@@ -11,7 +11,12 @@
 
 import * as THREE from "three";
 
-import { type Emission, particlesAt, type Vec3 } from "../../effects";
+import {
+  type Emission,
+  type NanoEmission,
+  particlesAt,
+  type Vec3,
+} from "../../effects";
 import type { LegoProject } from "../../model";
 import type { NanoStyle, ScriptTimeline } from "../../scriptPlayback";
 import { STAND_IN_MID_Y } from "../../standIn";
@@ -74,7 +79,7 @@ function resolve(
   let posed = -1;
   // Each nozzle's latest emission in the current unbroken run of spraying
   // frames, so its span can reach to when that nozzle next fires.
-  const latest = new Map<string, Emission>();
+  const latest = new Map<string, NanoEmission>();
   let lastSpraying = -2;
   timeline.events.forEach((event, seed) => {
     if (event.kind !== "nano") return;
@@ -107,7 +112,7 @@ function resolve(
       state.standIn.position.y + STAND_IN_MID_Y * state.standInRadius,
       state.standIn.position.z,
     ];
-    const emission: Emission = {
+    const emission: NanoEmission = {
       kind: "nano",
       birth: event.frame,
       at,

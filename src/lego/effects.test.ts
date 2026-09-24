@@ -1,14 +1,24 @@
 import { describe, expect, it } from "vitest";
 import {
-  type Emission,
+  BITMAP_LASER,
+  BITMAP_MUZZLE_FLAME,
+  BITMAP_SMOKE,
+  DEFAULT_FLAME_SIZE,
+  emitPoint,
+  type FlameEmission,
   NANO_DOTS_PER_FRAME,
   NANO_SPREAD,
+  type NanoEmission,
   type Particles,
   particlesAt,
+  type TracerEmission,
   unitFloat,
 } from "./effects";
 
-function nano(birth: number, overrides: Partial<Emission> = {}): Emission {
+function nano(
+  birth: number,
+  overrides: Partial<NanoEmission> = {},
+): NanoEmission {
   return {
     kind: "nano",
     birth,
@@ -30,7 +40,7 @@ function nano(birth: number, overrides: Partial<Emission> = {}): Emission {
  * coordinate is the along-track distance.
  */
 function assertWithinTravel(
-  emission: Emission,
+  emission: NanoEmission,
   age: number,
   particles: Particles,
 ) {
@@ -147,5 +157,139 @@ describe("particlesAt", () => {
     const aloneAlive = particlesAt([stillAlive], 903);
     expect(combined.count).toBeGreaterThan(0);
     expect(combined).toEqual(aloneAlive);
+  });
+});
+
+describe("emitPoint", () => {
+  it("emits from the origin along +Z for a piece with no vertices", () => {
+    expect(emitPoint([])).toEqual({ pos: [0, 0, 0], dir: [0, 0, 1] });
+  });
+
+  it("emits from the origin along the vertex for a one-vertex piece", () => {
+    expect(emitPoint([[1, 2, 3]])).toEqual({ pos: [0, 0, 0], dir: [1, 2, 3] });
+  });
+
+  it("emits from vertex 0 towards vertex 1 for a longer piece", () => {
+    expect(
+      emitPoint([
+        [1, 2, 3],
+        [1, 2, 5],
+        [9, 9, 9],
+      ]),
+    ).toEqual({ pos: [1, 2, 3], dir: [0, 0, 2] });
+  });
+});
+
+const flame: FlameEmission = {
+  kind: "flame",
+  birth: 10,
+  at: [0, 0, 0],
+  dir: [0, 0, 1],
+  size: DEFAULT_FLAME_SIZE,
+  seed: 3,
+};
+
+describe("the muzzle flame", () => {
+  it("defaults to the size the weapon def defaults give", () => {
+    expect(DEFAULT_FLAME_SIZE).toBeCloseTo(0.003);
+  });
+
+  // At the default size `fade` is 0.49 at age 1, 0.98 at age 2 and 1 from
+  // age 3, so the flame quad, drawn only while `fade < 1`, shows for two
+  // frames and the smoke quad for four.
+  it("draws smoke for ages 1 to 4, the flame quad only while it has not faded, and nothing after", () => {
+    for (const frame of [10, 11]) {
+      const { sprites } = particlesAt([flame], frame);
+      expect(sprites.count).toBe(2);
+      expect(sprites.bitmaps[0]).toBe(BITMAP_SMOKE);
+      expect(sprites.bitmaps[1]).toBe(BITMAP_MUZZLE_FLAME);
+    }
+    for (const frame of [12, 13]) {
+      const { sprites } = particlesAt([flame], frame);
+      expect(sprites.count).toBe(1);
+      expect(sprites.bitmaps[0]).toBe(BITMAP_SMOKE);
+    }
+    expect(particlesAt([flame], 14).sprites.count).toBe(0);
+    expect(particlesAt([flame], 9).sprites.count).toBe(0);
+  });
+
+  it("matches CMuzzleFlame::Draw on its first frame", () => {
+    const { sprites } = particlesAt([flame], 10);
+    const age = 1;
+    const life = 4 + DEFAULT_FLAME_SIZE * 30;
+    const alpha = 1 - age / life;
+    const modAge = Math.sqrt(age + 2);
+    const fade = Math.min(1, (1 - alpha) * 20 * 0.1);
+    expect(sprites.halfSizes[0]).toBeCloseTo(modAge * 3);
+    expect(sprites.colors[0]).toBeCloseTo(Math.trunc(180 * alpha * fade) / 255);
+    expect(sprites.colors[3]).toBeCloseTo(Math.trunc(255 * alpha * fade) / 255);
+    expect(sprites.colors[4]).toBeCloseTo(Math.trunc((1 - fade) * 255) / 255);
+    expect(sprites.colors[7]).toBeCloseTo(1 / 255);
+    // Along +Z from the piece, pulled back by size * 0.2 first.
+    expect(sprites.centers[2]).toBeGreaterThan(0);
+  });
+
+  it("cycles the smoke bitmaps by quad", () => {
+    const big = { ...flame, size: 1 };
+    const { sprites } = particlesAt([big], 10, 2);
+    const smoke = Array.from(sprites.bitmaps).filter(
+      (bitmap) => bitmap >= BITMAP_SMOKE,
+    );
+    expect(smoke.slice(0, 4)).toEqual([
+      BITMAP_SMOKE,
+      BITMAP_SMOKE + 1,
+      BITMAP_SMOKE,
+      BITMAP_SMOKE + 1,
+    ]);
+  });
+});
+
+const tracer: TracerEmission = {
+  kind: "tracer",
+  birth: 20,
+  at: [0, 0, 0],
+  to: [0, 0, 100],
+  seed: 1,
+};
+
+describe("the tracer", () => {
+  it("runs from the muzzle to the target and then stops", () => {
+    const early = particlesAt([tracer], 20).sprites;
+    expect(early.count).toBeGreaterThan(0);
+    for (let i = 0; i < early.count; i++) {
+      expect(early.centers[i * 3 + 2]).toBeGreaterThanOrEqual(0);
+      expect(early.centers[i * 3 + 2]).toBeLessThanOrEqual(100);
+      expect(early.bitmaps[i]).toBe(BITMAP_LASER);
+    }
+    expect(particlesAt([tracer], 20 + 100).sprites.count).toBe(0);
+  });
+
+  it("moves towards the target frame by frame", () => {
+    const furthest = (frame: number) => {
+      const { sprites } = particlesAt([tracer], frame);
+      return Math.max(
+        ...Array.from(
+          { length: sprites.count },
+          (_, i) => sprites.centers[i * 3 + 2],
+        ),
+      );
+    };
+    expect(furthest(22)).toBeGreaterThan(furthest(20));
+  });
+});
+
+describe("particlesAt with flames and tracers", () => {
+  it("gives the same arrays for the same frame, in any visiting order", () => {
+    const emissions = [flame, tracer];
+    const first = particlesAt(emissions, 21);
+    particlesAt(emissions, 11);
+    particlesAt(emissions, 30);
+    expect(particlesAt(emissions, 21)).toEqual(first);
+  });
+
+  it("keeps nano on the dots and everything else on the sprites", () => {
+    const { count, sprites } = particlesAt([flame], 10);
+    expect(count).toBe(0);
+    expect(sprites.count).toBeGreaterThan(0);
   });
 });

@@ -10,6 +10,10 @@
  * Nano moves as Recoil moves it (`rts/Sim/Projectiles/ProjectileHandler.cpp:670-746`)
  * and is drawn as Total Annihilation drew it: opaque dots with no alpha and a
  * little variation in colour. That is the user's choice, recorded in the spec.
+ *
+ * A shot also draws the engine's muzzle flame the way `CMuzzleFlame` draws it,
+ * and a tracer running from the muzzle to the target, a neutral look the
+ * preview chose since the engine draws the projectile itself instead.
  */
 
 import type { NanoStyle } from "./scriptPlayback";
@@ -37,7 +41,41 @@ export interface NanoEmission {
   span?: number;
 }
 
-export type Emission = NanoEmission;
+export interface FlameEmission {
+  kind: "flame";
+  birth: number;
+  /** The flare piece's origin, world space. */
+  at: Vec3;
+  /** Unit length, the latest aim. */
+  dir: Vec3;
+  /** `CMuzzleFlame`'s size. */
+  size: number;
+  seed: number;
+}
+
+export interface TracerEmission {
+  kind: "tracer";
+  birth: number;
+  /** The muzzle's emit point, world space. */
+  at: Vec3;
+  /** The stand-in's middle, world space. */
+  to: Vec3;
+  seed: number;
+}
+
+export type Emission = NanoEmission | FlameEmission | TracerEmission;
+
+export interface Sprites {
+  count: number;
+  /** Three per sprite, world space. */
+  centers: Float32Array;
+  /** One per sprite, in elmos. */
+  halfSizes: Float32Array;
+  /** Four per sprite, RGBA from 0 to 1, multiplied by the bitmap. */
+  colors: Float32Array;
+  /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, or `BITMAP_SMOKE + n`. */
+  bitmaps: Float32Array;
+}
 
 export interface Particles {
   count: number;
@@ -47,6 +85,37 @@ export interface Particles {
   halfSizes: Float32Array;
   /** Three per particle, sRGB from 0 to 1. */
   colors: Float32Array;
+  sprites: Sprites;
+}
+
+/** Which bitmap a sprite draws, `CMuzzleFlame::Draw`'s three textures. */
+export const BITMAP_MUZZLE_FLAME = 0;
+export const BITMAP_LASER = 1;
+export const BITMAP_SMOKE = 2;
+
+/** `CMuzzleFlame`'s size with the weapon def's defaults: area of effect 8
+ *  stored as 4 (`WeaponDef.cpp:71`) and damage 1 (`WeaponDef.cpp:417`), fed
+ *  through `min(damageAreaOfEffect * 0.2, min(1500, damage) * 0.003)`
+ *  (`Weapon.cpp:1229`). */
+export const DEFAULT_FLAME_SIZE = Math.min(4 * 0.2, Math.min(1500, 1) * 0.003);
+
+/**
+ * A piece's emit point and direction, from `LocalModelPiece::GetEmitDirPos`
+ * (`rts/Rendering/Models/3DModelPiece.cpp:60-78`): the origin and +Z with no
+ * vertices, the origin and that vertex with one, or vertex 0 towards vertex 1
+ * with more.
+ */
+export function emitPoint(vertices: Vec3[]): { pos: Vec3; dir: Vec3 } {
+  if (vertices.length === 0) return { pos: [0, 0, 0], dir: [0, 0, 1] };
+  if (vertices.length === 1) return { pos: [0, 0, 0], dir: vertices[0] };
+  return {
+    pos: vertices[0],
+    dir: [
+      vertices[1][0] - vertices[0][0],
+      vertices[1][1] - vertices[0][1],
+      vertices[1][2] - vertices[0][2],
+    ],
+  };
 }
 
 /** `UnitDef::nanoColor`'s default (`rts/Sim/Units/UnitDef.cpp:513`). */
@@ -166,11 +235,148 @@ function nanoColor(seed: number, dot: number): Vec3 {
   return lit.map((c) => c + (1 - c) * NANO_HIGHLIGHT_MIX) as Vec3;
 }
 
-export function particlesAt(emissions: Emission[], frame: number): Particles {
+/** Set by eye, to be tuned with the user on screen: how fast a preview tracer
+ *  crosses the ground, and how long, wide, and finely subdivided it is. The
+ *  engine draws the real projectile instead, so there is no source for these. */
+const TRACER_SPEED = 30;
+const TRACER_LENGTH = 40;
+const TRACER_HALF_SIZE = 2;
+const TRACER_QUADS = 8;
+/** Set by eye: a neutral white tracer, tinted by nothing in particular. */
+const TRACER_COLOR: [number, number, number, number] = [1, 1, 1, 1];
+
+interface SpriteArrays {
+  centers: number[];
+  halfSizes: number[];
+  colors: number[];
+  bitmaps: number[];
+}
+
+/** A muzzle flame's quads on one frame, following `CMuzzleFlame::Draw`
+ *  (`MuzzleFlame.cpp:52-93`). The flame is made during the firing frame's
+ *  unit update, and the projectile handler updates it later the same frame
+ *  before drawing, so on frame `birth + k` it already has age `k + 1`. */
+function flameSprites(
+  emission: FlameEmission,
+  frame: number,
+  smokeCount: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const age = k + 1;
+  const life = 4 + emission.size * 30;
+  if (age > life) return;
+
+  // Construction: pos -= dir * size * 0.2 (MuzzleFlame.cpp:31).
+  const pos: Vec3 = [
+    emission.at[0] - emission.dir[0] * emission.size * 0.2,
+    emission.at[1] - emission.dir[1] * emission.size * 0.2,
+    emission.at[2] - emission.dir[2] * emission.size * 0.2,
+  ];
+  const numSmoke = 1 + Math.floor(emission.size * 5);
+  const alpha = Math.max(0, 1 - age / life);
+  const modAge = Math.sqrt(age + 2);
+  const drawsize = modAge * 3;
+
+  for (let a = 0; a < numSmoke; a++) {
+    // randSmokeDir[a] = dir + guRNG.NextFloat() * 0.4, one float added to
+    // all three components.
+    const rand = unitFloat(emission.seed, a) * 0.4;
+    const scale = (a + 2) * modAge * 0.4;
+    const interPos: Vec3 = [
+      pos[0] + (emission.dir[0] + rand) * scale,
+      pos[1] + (emission.dir[1] + rand) * scale,
+      pos[2] + (emission.dir[2] + rand) * scale,
+    ];
+    const fade = Math.min(1, Math.max(0, (1 - alpha) * (20 + a) * 0.1));
+
+    out.centers.push(...interPos);
+    out.halfSizes.push(drawsize);
+    out.colors.push(
+      Math.trunc(180 * alpha * fade) / 255,
+      Math.trunc(180 * alpha * fade) / 255,
+      Math.trunc(180 * alpha * fade) / 255,
+      Math.trunc(255 * alpha * fade) / 255,
+    );
+    out.bitmaps.push(BITMAP_SMOKE + (a % smokeCount));
+
+    if (fade < 1) {
+      const ifade = 1 - fade;
+      out.centers.push(...interPos);
+      out.halfSizes.push(drawsize);
+      out.colors.push(
+        Math.trunc(ifade * 255) / 255,
+        Math.trunc(ifade * 255) / 255,
+        Math.trunc(ifade * 255) / 255,
+        1 / 255,
+      );
+      out.bitmaps.push(BITMAP_MUZZLE_FLAME);
+    }
+  }
+}
+
+/** A preview tracer's quads on one frame: `TRACER_QUADS` evenly spaced
+ *  points from `head - TRACER_LENGTH` to `head`, where `head` is how far the
+ *  tracer has travelled, skipping any point outside the run from the muzzle
+ *  to the target. */
+function tracerSprites(
+  emission: TracerEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const d: Vec3 = [
+    emission.to[0] - emission.at[0],
+    emission.to[1] - emission.at[1],
+    emission.to[2] - emission.at[2],
+  ];
+  const total = Math.hypot(...d);
+  if (total === 0) return;
+  const dir: Vec3 = [d[0] / total, d[1] / total, d[2] / total];
+  const head = k * TRACER_SPEED;
+  const tail = head - TRACER_LENGTH;
+  if (tail > total) return;
+
+  const step = TRACER_LENGTH / (TRACER_QUADS - 1);
+  for (let i = 0; i < TRACER_QUADS; i++) {
+    const dist = tail + i * step;
+    if (dist < 0 || dist > total) continue;
+    out.centers.push(
+      emission.at[0] + dir[0] * dist,
+      emission.at[1] + dir[1] * dist,
+      emission.at[2] + dir[2] * dist,
+    );
+    out.halfSizes.push(TRACER_HALF_SIZE);
+    out.colors.push(...TRACER_COLOR);
+    out.bitmaps.push(BITMAP_LASER);
+  }
+}
+
+export function particlesAt(
+  emissions: Emission[],
+  frame: number,
+  smokeCount = 1,
+): Particles {
   const centers: number[] = [];
   const halfSizes: number[] = [];
   const colors: number[] = [];
+  const sprites: SpriteArrays = {
+    centers: [],
+    halfSizes: [],
+    colors: [],
+    bitmaps: [],
+  };
   for (const emission of emissions) {
+    if (emission.kind === "flame") {
+      flameSprites(emission, frame, smokeCount, sprites);
+      continue;
+    }
+    if (emission.kind === "tracer") {
+      tracerSprites(emission, frame, sprites);
+      continue;
+    }
     const age = frame - emission.birth;
     if (age < 0) continue;
     const life = nanoLife(emission);
@@ -200,5 +406,12 @@ export function particlesAt(emissions: Emission[], frame: number): Particles {
     centers: new Float32Array(centers),
     halfSizes: new Float32Array(halfSizes),
     colors: new Float32Array(colors),
+    sprites: {
+      count: sprites.halfSizes.length,
+      centers: new Float32Array(sprites.centers),
+      halfSizes: new Float32Array(sprites.halfSizes),
+      colors: new Float32Array(sprites.colors),
+      bitmaps: new Float32Array(sprites.bitmaps),
+    },
   };
 }

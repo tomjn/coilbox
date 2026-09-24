@@ -10,6 +10,13 @@ function particles(count: number) {
     centers: new Float32Array(Array.from({ length: count * 3 }, (_, i) => i)),
     halfSizes: new Float32Array(count).fill(3),
     colors: new Float32Array(count * 3).fill(0.5),
+    sprites: {
+      count: 0,
+      centers: new Float32Array(),
+      halfSizes: new Float32Array(),
+      colors: new Float32Array(),
+      bitmaps: new Float32Array(),
+    },
   };
 }
 
