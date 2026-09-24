@@ -259,6 +259,7 @@ function resolve(
         seed,
         weapon: event.weapon,
       });
+      return;
     }
 
     if (event.kind === "sfx") {

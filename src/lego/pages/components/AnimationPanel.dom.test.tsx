@@ -424,9 +424,7 @@ describe("the missing bitmaps note", () => {
     fireEvent.click(screen.getByRole("button", { name: /Play/ }));
 
     await waitFor(() => expect(screen.getByText(`1/1`)).toBeTruthy());
-    expect(
-      screen.queryByText("The game has no heat cloud bitmap."),
-    ).toBeNull();
+    expect(screen.queryByText("The game has no heat cloud bitmap.")).toBeNull();
   });
 });
 

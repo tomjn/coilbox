@@ -585,7 +585,7 @@ const SMOKE_SIZE_EXPANSION = 0.5;
  *  (`SmokeProjectile.cpp:46-125`). Its size catches up towards its start size
  *  in a way with no simple closed form, so it is replayed from birth in
  *  32-bit floats, as the engine runs it. The replay stops when the particle
- *  dies, so it never runs more than about 60 steps. There is no wind in the
+ *  dies, so it runs at most 60 steps. There is no wind in the
  *  preview, so the wind term is left out. */
 function smokeSprites(
   emission: SmokeEmission,
@@ -609,7 +609,7 @@ function smokeSprites(
     if (age >= 1) return;
   }
 
-  // speed = guRNG.NextVector() * 0.5 + UpVector * 1.1 (UnitScript.cpp:694).
+  // speed = guRNG.NextVector() * 0.5 + UpVector * 1.1 (UnitScript.cpp:695).
   const wobble = ballPoint(emission.seed, 0);
   const center: Vec3 = [
     emission.at[0] + wobble[0] * 0.5 * updates,
@@ -676,7 +676,7 @@ function vtolSprites(
  *  the ground. Set by eye, to be tuned with the user on screen. */
 export const WAKE_LIFT = 0.5;
 
-/** `CWakeProjectile`'s ship values, from `UnitScript.cpp:638-640`. Hover
+/** `CWakeProjectile`'s ship values, from `UnitScript.cpp:637-639`. Hover
  *  craft use other values (`:645-649`) that depend on a move def the editor
  *  does not have. */
 const WAKE_ALPHA_DECAY = 0.004;
