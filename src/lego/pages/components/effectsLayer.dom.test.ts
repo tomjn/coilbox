@@ -17,6 +17,7 @@ function particles(count: number) {
       colors: new Float32Array(),
       bitmaps: new Float32Array(),
       axes: new Float32Array(),
+      sides: new Float32Array(),
       halfLengths: new Float32Array(),
       uvRanges: new Float32Array(),
     },
@@ -103,12 +104,15 @@ function withSprites(
   bitmap: number,
   axis: [number, number, number] = [0, 0, 0],
   halfLength = 0,
+  side: [number, number, number] = [0, 0, 0],
 ) {
   const axes = new Float32Array(count * 3);
+  const sides = new Float32Array(count * 3);
   const halfLengths = new Float32Array(count).fill(halfLength);
   const uvRanges = new Float32Array(count * 2);
   for (let i = 0; i < count; i++) {
     axes.set(axis, i * 3);
+    sides.set(side, i * 3);
     uvRanges.set([0, 1], i * 2);
   }
   return {
@@ -120,6 +124,7 @@ function withSprites(
       colors: new Float32Array(count * 4).fill(1),
       bitmaps: new Float32Array(count).fill(bitmap),
       axes,
+      sides,
       halfLengths,
       uvRanges,
     },
@@ -146,6 +151,14 @@ describe("the sprite mesh", () => {
     expect(material.blendDst).toBe(THREE.OneMinusSrcAlphaFactor);
     expect(material.depthTest).toBe(true);
     expect(material.depthWrite).toBe(false);
+  });
+
+  /** A wake lies flat with its front face down, so a camera above the
+   *  ground sees its back. */
+  it("draws both faces, so a sprite lying flat shows from above", () => {
+    const material = buildEffectsLayer().sprites
+      .material as THREE.ShaderMaterial;
+    expect(material.side).toBe(THREE.DoubleSide);
   });
 
   it("draws as many sprites as it is given, growing past its first size", () => {
@@ -186,6 +199,15 @@ describe("the sprite mesh", () => {
       Array.from(spriteGeometry(layer).getAttribute("axis").array).slice(0, 3),
     ).toEqual([0, 0, 1]);
     expect(spriteGeometry(layer).getAttribute("halfLength").array[0]).toBe(5);
+    layer.dispose();
+  });
+
+  it("writes a flat sprite's side onto the instanced attributes", () => {
+    const layer = buildEffectsLayer();
+    layer.update(withSprites(1, 0, [1, 0, 0], 5, [0, 0, 1]));
+    expect(
+      Array.from(spriteGeometry(layer).getAttribute("side").array).slice(0, 3),
+    ).toEqual([0, 0, 1]);
     layer.dispose();
   });
 

@@ -1078,11 +1078,11 @@ mod announcements {
         assert!(timeline
             .warnings
             .iter()
-            .any(|w| w == coilbox_unitpose::EFFECTS_NOTE));
+            .any(|w| w == coilbox_unitpose::CEG_NOTE));
         assert!(!timeline
             .warnings
             .iter()
-            .any(|w| w.contains("not drawn in the preview")));
+            .any(|w| w == coilbox_unitpose::EFFECTS_NOTE));
     }
 
     #[test]

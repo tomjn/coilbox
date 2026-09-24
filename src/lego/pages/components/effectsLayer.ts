@@ -66,7 +66,11 @@ void main() {
  *  `axis` from tail to head, its width across the direction facing the
  *  camera. If the axis points straight at the camera the cross product used
  *  for that width degenerates to zero, so that case falls back to the plain
- *  billboard rather than a zero-width sliver. */
+ *  billboard rather than a zero-width sliver.
+ *
+ *  A sprite with a `side` as well lies in the plane of its axis and side
+ *  instead, as `CWakeProjectile::Draw` lays a wake on the water
+ *  (`WakeProjectile.cpp:98-108`). */
 const SPRITE_VERTEX = /* glsl */ `
 attribute vec3 center;
 attribute float halfSize;
@@ -74,6 +78,7 @@ attribute vec4 tint;
 attribute vec4 uvRect;
 attribute vec2 uvRange;
 attribute vec3 axis;
+attribute vec3 side;
 attribute float halfLength;
 varying vec4 vTint;
 varying vec2 vUv;
@@ -83,13 +88,18 @@ void main() {
   vec4 view = modelViewMatrix * vec4(center, 1.0);
   if (halfLength > 0.0) {
     vec3 a = (modelViewMatrix * vec4(axis, 0.0)).xyz;
-    vec3 crossed = cross(a, normalize(view.xyz));
-    float crossedLen = length(crossed);
-    if (crossedLen > 1e-6) {
-      vec3 side = crossed / crossedLen;
-      view.xyz += a * halfLength * position.x + side * halfSize * position.y;
+    if (dot(side, side) > 0.0) {
+      vec3 s = (modelViewMatrix * vec4(side, 0.0)).xyz;
+      view.xyz += a * halfLength * position.x + s * halfSize * position.y;
     } else {
-      view.xy += position.xy * halfSize;
+      vec3 crossed = cross(a, normalize(view.xyz));
+      float crossedLen = length(crossed);
+      if (crossedLen > 1e-6) {
+        vec3 s = crossed / crossedLen;
+        view.xyz += a * halfLength * position.x + s * halfSize * position.y;
+      } else {
+        view.xy += position.xy * halfSize;
+      }
     }
   } else {
     view.xy += position.xy * halfSize;
@@ -159,6 +169,10 @@ function spriteGeometry(capacity: number): THREE.InstancedBufferGeometry {
   );
   geometry.setAttribute(
     "axis",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
+  );
+  geometry.setAttribute(
+    "side",
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
   );
   geometry.setAttribute(
@@ -262,6 +276,9 @@ export function buildEffectsLayer(): EffectsLayer {
     blendDst: THREE.OneMinusSrcAlphaFactor,
     depthTest: true,
     depthWrite: false,
+    // A wake lies flat with its front face pointing down, so a camera above
+    // the ground sees its back. Sprites that turn to the camera are unaffected.
+    side: THREE.DoubleSide,
     uniforms: {
       atlas: { value: atlasTexture },
     },
@@ -327,6 +344,7 @@ export function buildEffectsLayer(): EffectsLayer {
       writeSprite("halfSize", sprite.halfSizes);
       writeSprite("tint", sprite.colors);
       writeSprite("axis", sprite.axes);
+      writeSprite("side", sprite.sides);
       writeSprite("halfLength", sprite.halfLengths);
       writeSprite("uvRange", sprite.uvRanges);
       lastBitmaps = sprite.bitmaps;

@@ -14,9 +14,14 @@
  * A shot also draws the engine's muzzle flame the way `CMuzzleFlame` draws it,
  * and a tracer running from the muzzle to the target, a neutral look the
  * preview chose since the engine draws the projectile itself instead.
+ *
+ * The engine's built-in sfx are drawn as its own particle classes draw them:
+ * smoke as `CSmokeProjectile`, a VTOL jet as `CHeatCloudProjectile` and a wake
+ * as `CWakeProjectile`. A CEG, whose real look the game defines, is a neutral
+ * puff instead.
  */
 
-import type { NanoStyle } from "./scriptPlayback";
+import type { NanoStyle, ScriptEvent } from "./scriptPlayback";
 
 export type Vec3 = [number, number, number];
 
@@ -66,7 +71,50 @@ export interface TracerEmission {
   weapon: number;
 }
 
-export type Emission = NanoEmission | FlameEmission | TracerEmission;
+export interface SmokeEmission {
+  kind: "smoke";
+  birth: number;
+  at: Vec3;
+  /** 0.5 for white smoke (257), 0.6 for black (258). */
+  color: number;
+  seed: number;
+}
+export interface VtolEmission {
+  kind: "vtol";
+  birth: number;
+  at: Vec3;
+  /** The emit direction, world space, unit length or zero. */
+  dir: Vec3;
+  seed: number;
+}
+export interface WakeEmission {
+  kind: "wake";
+  birth: number;
+  at: Vec3;
+  dir: Vec3;
+  /** 4 and 5 run back along the emit direction. */
+  reverse: boolean;
+  seed: number;
+}
+
+export interface PuffEmission {
+  /** A CEG's stand-in puff, or a weapon detonation's larger burst. */
+  kind: "puff" | "burst";
+  birth: number;
+  at: Vec3;
+  /** The emit direction, world space, unit length or zero. */
+  dir: Vec3;
+  seed: number;
+}
+
+export type Emission =
+  | NanoEmission
+  | FlameEmission
+  | TracerEmission
+  | SmokeEmission
+  | VtolEmission
+  | WakeEmission
+  | PuffEmission;
 
 export interface Sprites {
   count: number;
@@ -76,12 +124,16 @@ export interface Sprites {
   halfSizes: Float32Array;
   /** Four per sprite, RGBA from 0 to 1, multiplied by the bitmap. */
   colors: Float32Array;
-  /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, `BITMAP_LASER_END`,
-   *  or `BITMAP_SMOKE + n`. */
+  /** One per sprite, a `BITMAP_*` slot, or `BITMAP_SMOKE + n` for smoke bitmap n. */
   bitmaps: Float32Array;
   /** Three per sprite, a world-space unit direction, zero for an ordinary
    *  billboard. Only a stretched sprite such as the tracer's bolt sets it. */
   axes: Float32Array;
+  /** Three per sprite, a world-space unit direction the quad's width runs
+   *  along, zero for a sprite that turns to face the camera. Only a sprite
+   *  lying flat on the ground, a wake, sets it, together with `axes` and
+   *  `halfLengths`. */
+  sides: Float32Array;
   /** One per sprite, in elmos, zero for an ordinary billboard. Half the
    *  bolt's length along its `axes` direction. */
   halfLengths: Float32Array;
@@ -102,12 +154,17 @@ export interface Particles {
   sprites: Sprites;
 }
 
-/** Which bitmap a sprite draws, `CMuzzleFlame::Draw`'s three textures, plus
- *  the laser's own end cap texture. */
+/** Which bitmap a sprite draws: `CMuzzleFlame::Draw`'s three textures, the
+ *  laser's own end cap texture, the heat cloud a VTOL sfx draws, the `explo`
+ *  bitmap the preview's CEG puff draws, and the wake. The smoke set comes
+ *  last because its length depends on the game. */
 export const BITMAP_MUZZLE_FLAME = 0;
 export const BITMAP_LASER = 1;
 export const BITMAP_LASER_END = 2;
-export const BITMAP_SMOKE = 3;
+export const BITMAP_HEATCLOUD = 3;
+export const BITMAP_EXPLO = 4;
+export const BITMAP_WAKE = 5;
+export const BITMAP_SMOKE = 6;
 
 /** `CMuzzleFlame`'s size with the weapon def's defaults: area of effect 8
  *  stored as 4 (`WeaponDef.cpp:71`) and damage 1 (`WeaponDef.cpp:417`), fed
@@ -300,6 +357,7 @@ interface SpriteArrays {
   colors: number[];
   bitmaps: number[];
   axes: number[];
+  sides: number[];
   halfLengths: number[];
   /** Two per sprite: where in its bitmap's rect the quad's near and far u
    *  edges sit, as fractions of the rect's own u range. `[0, 1]` for an
@@ -357,6 +415,7 @@ function flameSprites(
     );
     out.bitmaps.push(BITMAP_SMOKE + (a % smokeCount));
     out.axes.push(0, 0, 0);
+    out.sides.push(0, 0, 0);
     out.halfLengths.push(0);
     out.uvRanges.push(0, 1);
 
@@ -372,6 +431,7 @@ function flameSprites(
       );
       out.bitmaps.push(BITMAP_MUZZLE_FLAME);
       out.axes.push(0, 0, 0);
+      out.sides.push(0, 0, 0);
       out.halfLengths.push(0);
       out.uvRanges.push(0, 1);
     }
@@ -409,6 +469,7 @@ function tracerEndCap(
     out.colors.push(...color);
     out.bitmaps.push(BITMAP_LASER_END);
     out.axes.push(...axis);
+    out.sides.push(0, 0, 0);
     out.halfLengths.push(half);
     out.uvRanges.push(MIDTEX_U, farU);
   };
@@ -480,6 +541,7 @@ function tracerSprites(
   out.colors.push(...colors.outer);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
+  out.sides.push(0, 0, 0);
   out.halfLengths.push(halfLength);
   out.uvRanges.push(0, 1);
 
@@ -488,16 +550,395 @@ function tracerSprites(
   out.colors.push(...colors.core);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
+  out.sides.push(0, 0, 0);
   out.halfLengths.push(halfLength);
   out.uvRanges.push(0, 1);
 
   tracerEndCap(tailPos, behindHead, 1, colors, out);
 }
 
+/** A sprite that turns to face the camera. */
+function pushBillboard(
+  out: SpriteArrays,
+  center: Vec3,
+  halfSize: number,
+  color: [number, number, number, number],
+  bitmap: number,
+): void {
+  out.centers.push(...center);
+  out.halfSizes.push(halfSize);
+  out.colors.push(...color);
+  out.bitmaps.push(bitmap);
+  out.axes.push(0, 0, 0);
+  out.sides.push(0, 0, 0);
+  out.halfLengths.push(0);
+  out.uvRanges.push(0, 1);
+}
+
+/** `CSmokeProjectile`'s arguments for sfx 257 and 258: 60 frames, start size
+ *  4, growing 0.5 a frame (`UnitScript.cpp:693-698`). */
+const SMOKE_TTL = 60;
+const SMOKE_START_SIZE = 4;
+const SMOKE_SIZE_EXPANSION = 0.5;
+
+/** Smoke on one frame, following `CSmokeProjectile::Update` and `Draw`
+ *  (`SmokeProjectile.cpp:46-125`). Its size catches up towards its start size
+ *  in a way with no simple closed form, so it is replayed from birth in
+ *  32-bit floats, as the engine runs it. The replay stops when the particle
+ *  dies, so it runs at most 60 steps. There is no wind in the
+ *  preview, so the wind term is left out. */
+function smokeSprites(
+  emission: SmokeEmission,
+  frame: number,
+  smokeCount: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const ageSpeed = Math.fround(1 / SMOKE_TTL);
+  let age = 0;
+  let size = 0;
+  for (let i = 0; i < updates; i++) {
+    age = Math.fround(age + ageSpeed);
+    size = Math.fround(size + SMOKE_SIZE_EXPANSION);
+    if (size < SMOKE_START_SIZE) {
+      size = Math.fround(size + (SMOKE_START_SIZE - size) * 0.2);
+    }
+    age = Math.min(age, 1);
+    if (age >= 1) return;
+  }
+
+  // speed = guRNG.NextVector() * 0.5 + UpVector * 1.1 (UnitScript.cpp:695).
+  const wobble = ballPoint(emission.seed, 0);
+  const center: Vec3 = [
+    emission.at[0] + wobble[0] * 0.5 * updates,
+    emission.at[1] + (wobble[1] * 0.5 + 1.1) * updates,
+    emission.at[2] + wobble[2] * 0.5 * updates,
+  ];
+  const alpha = Math.trunc((1 - age) * 255);
+  const shade = Math.trunc(emission.color * alpha) / 255;
+  const texture = Math.min(
+    smokeCount - 1,
+    Math.floor(unitFloat(emission.seed, 3) * smokeCount),
+  );
+  pushBillboard(
+    out,
+    center,
+    size,
+    [shade, shade, shade, alpha / 255],
+    BITMAP_SMOKE + texture,
+  );
+}
+
+/** A VTOL jet's heat cloud on one frame. The arguments come from
+ *  `UnitScript.cpp:700-717`: a temperature of 10 to 15, a size argument of 3
+ *  to 5, and `size` set to 3 after construction. It moves at
+ *  `GetObjectSpaceVec(0.5 * dir.x, -0.5 * |dir.y|, 0.5 * dir.z)`, the
+ *  engine's formula with the unit's own speed at 0, since the preview unit
+ *  does not move. `CHeatCloudProjectile` loses one heat a frame and dies at
+ *  none, grows by `size / temperature` a frame, and draws its heat as
+ *  brightness with an alpha of 1 (`HeatCloudProjectile.cpp:48-139`). */
+function vtolSprites(
+  emission: VtolEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const temperature = 10 + unitFloat(emission.seed, 0) * 5;
+  const heat = temperature - updates;
+  if (heat <= 0) return;
+  const growth = (3 + unitFloat(emission.seed, 1) * 2) / temperature;
+  const speed: Vec3 = [
+    0.5 * emission.dir[0],
+    -0.5 * Math.abs(emission.dir[1]),
+    0.5 * emission.dir[2],
+  ];
+  const glow = Math.trunc((heat / temperature) * 255) / 255;
+  pushBillboard(
+    out,
+    [
+      emission.at[0] + speed[0] * updates,
+      emission.at[1] + speed[1] * updates,
+      emission.at[2] + speed[2] * updates,
+    ],
+    3 + growth * updates,
+    [glow, glow, glow, 1 / 255],
+    BITMAP_HEATCLOUD,
+  );
+}
+
+/** How far above the preview's ground a wake is drawn. The engine puts a
+ *  wake at sea level (`WakeProjectile.cpp:48`), and the preview's ground
+ *  counts as sea level, so a wake drawn at exactly 0 would flicker against
+ *  the ground. Set by eye, to be tuned with the user on screen. */
+export const WAKE_LIFT = 0.5;
+
+/** `CWakeProjectile`'s ship values, from `UnitScript.cpp:637-639`. Hover
+ *  craft use other values (`:645-649`) that depend on a move def the editor
+ *  does not have. */
+const WAKE_ALPHA_DECAY = 0.004;
+const WAKE_FADEUP_TIME = 4;
+
+/** A wake on one frame, following `CWakeProjectile` (`WakeProjectile.cpp:30-109`)
+ *  with the arguments from `UnitScript.cpp:653-676`. It fades up over its
+ *  first four updates, then out at 0.004 a frame, and is deleted once its
+ *  alpha goes below 0. It lies flat and turns slowly. */
+function wakeSprites(
+  emission: WakeEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  const alphaStart = 0.3 + unitFloat(emission.seed, 5) * 0.2;
+  const alphaAdd = alphaStart / WAKE_FADEUP_TIME;
+  const alpha =
+    Math.min(updates, WAKE_FADEUP_TIME) * alphaAdd - updates * WAKE_ALPHA_DECAY;
+  if (updates > WAKE_FADEUP_TIME && alpha < 0) return;
+
+  const wobble = ballPoint(emission.seed, 0);
+  const pace = emission.reverse ? -0.4 : 0.4;
+  const size =
+    6 +
+    unitFloat(emission.seed, 3) * 4 +
+    (0.15 + unitFloat(emission.seed, 4) * 0.3) * updates;
+  const rotation =
+    unitFloat(emission.seed, 6) * Math.PI * 2 +
+    (unitFloat(emission.seed, 7) - 0.5) * Math.PI * 2 * 0.01 * updates;
+  const axis: Vec3 = [Math.cos(rotation), 0, Math.sin(rotation)];
+  // dir1.cross(UpVector), WakeProjectile.cpp:99.
+  const side: Vec3 = [-axis[2], 0, axis[0]];
+  const shade = Math.trunc(255 * Math.max(alpha, 0)) / 255;
+
+  out.centers.push(
+    emission.at[0] + wobble[0] * 2 + emission.dir[0] * pace * updates,
+    WAKE_LIFT,
+    emission.at[2] + wobble[2] * 2 + emission.dir[2] * pace * updates,
+  );
+  out.halfSizes.push(size);
+  out.colors.push(shade, shade, shade, shade);
+  out.bitmaps.push(BITMAP_WAKE);
+  out.axes.push(...axis);
+  out.sides.push(...side);
+  out.halfLengths.push(size);
+  out.uvRanges.push(0, 1);
+}
+
+/**
+ * A CEG's stand-in puff. The game defines the real effect, and the preview
+ * cannot read it without the unit def, so every number here is set by eye,
+ * to be tuned with the user on screen: how many updates it lives, its half
+ * size at birth, how much it grows an update and how far it drifts along the
+ * emit direction an update. A detonation's burst is the same puff,
+ * `BURST_SCALE` times the size.
+ */
+export const PUFF_LIFE = 20;
+const PUFF_START_SIZE = 4;
+const PUFF_GROWTH = 0.5;
+const PUFF_DRIFT = 0.5;
+export const BURST_SCALE = 3;
+
+/** `PuffEmission.kind` is itself a union of two literals, so a plain
+ *  equality check against each does not narrow it out of `Emission`. */
+function isPuff(emission: Emission): emission is PuffEmission {
+  return emission.kind === "puff" || emission.kind === "burst";
+}
+
+/** A puff or burst on one frame: brightness fading with age and an alpha of
+ *  1, as the engine's heat cloud draws, with the `explo` bitmap. */
+function puffSprites(
+  emission: PuffEmission,
+  frame: number,
+  out: SpriteArrays,
+): void {
+  const k = frame - emission.birth;
+  if (k < 0) return;
+  const updates = k + 1;
+  if (updates >= PUFF_LIFE) return;
+  const scale = emission.kind === "burst" ? BURST_SCALE : 1;
+  const glow = 1 - updates / PUFF_LIFE;
+  pushBillboard(
+    out,
+    [
+      emission.at[0] + emission.dir[0] * PUFF_DRIFT * updates,
+      emission.at[1] + emission.dir[1] * PUFF_DRIFT * updates,
+      emission.at[2] + emission.dir[2] * PUFF_DRIFT * updates,
+    ],
+    (PUFF_START_SIZE + PUFF_GROWTH * updates) * scale,
+    [glow, glow, glow, 1 / 255],
+    BITMAP_EXPLO,
+  );
+}
+
+/** How far an `sfx 2048 + n` tracer runs along the emit direction. The
+ *  engine aims the weapon one elmo ahead of the emit point
+ *  (`UnitScript.cpp:768`), which would draw nothing to see, and the weapon's
+ *  real range needs its unit def. Set by eye, to be tuned with the user on
+ *  screen. */
+export const SFX_TRACER_RANGE = 200;
+
+/** `EmitSfx`'s numbers (`rts/Sim/Units/Scripts/CobDefines.h:9-20`). */
+const SFX_VTOL = 0;
+const SFX_WAKE = 2;
+const SFX_WAKE_2 = 3;
+const SFX_REVERSE_WAKE = 4;
+const SFX_REVERSE_WAKE_2 = 5;
+const SFX_WHITE_SMOKE = 257;
+const SFX_BLACK_SMOKE = 258;
+const SFX_CEG = 1024;
+const SFX_FIRE_WEAPON = 2048;
+const SFX_DETONATE_WEAPON = 4096;
+const SFX_GLOBAL = 16384;
+
+/**
+ * What an `emit-sfx` number draws, read in the engine's order: the exact
+ * built-in numbers first, then the range bits, global CEG, unit CEG, fire
+ * weapon, then detonate weapon (`UnitScript.cpp:651-790`). A bubble (259)
+ * sits under the water line and so under the preview's ground, and draws
+ * nothing, as does a number the engine does not know.
+ */
+export function sfxEmission(
+  sfx: number,
+  birth: number,
+  at: Vec3,
+  dir: Vec3,
+  seed: number,
+): Emission | null {
+  switch (sfx) {
+    case SFX_REVERSE_WAKE:
+    case SFX_REVERSE_WAKE_2:
+      return { kind: "wake", birth, at, dir, reverse: true, seed };
+    case SFX_WAKE:
+    case SFX_WAKE_2:
+      return { kind: "wake", birth, at, dir, reverse: false, seed };
+    case SFX_WHITE_SMOKE:
+      return { kind: "smoke", birth, at, color: 0.5, seed };
+    case SFX_BLACK_SMOKE:
+      return { kind: "smoke", birth, at, color: 0.6, seed };
+    case SFX_VTOL:
+      return { kind: "vtol", birth, at, dir, seed };
+  }
+  if ((sfx & (SFX_GLOBAL | SFX_CEG)) !== 0) {
+    return { kind: "puff", birth, at, dir, seed };
+  }
+  if ((sfx & SFX_FIRE_WEAPON) !== 0) {
+    return {
+      kind: "tracer",
+      birth,
+      at,
+      to: [
+        at[0] + dir[0] * SFX_TRACER_RANGE,
+        at[1] + dir[1] * SFX_TRACER_RANGE,
+        at[2] + dir[2] * SFX_TRACER_RANGE,
+      ],
+      seed,
+      // A unit definition counts its weapons from one.
+      weapon: sfx - SFX_FIRE_WEAPON + 1,
+    };
+  }
+  if ((sfx & SFX_DETONATE_WEAPON) !== 0) {
+    return { kind: "burst", birth, at, dir, seed };
+  }
+  return null;
+}
+
+/**
+ * When the unit is moving and how fast, for a scenario that tells it to move.
+ * The preview unit never actually moves, so this is what carries the
+ * particles it leaves behind back past it, as the world would stream past a
+ * unit that did.
+ */
+export interface UnitMotion {
+  /** Elmos a frame, along the unit's front, +Z. */
+  speed: number;
+  /** The frames it moves on, each from its first frame up to but not
+   *  including its last. */
+  spans: [number, number][];
+}
+
+/** When a scenario's events have the unit moving: from each `StartMoving` to
+ *  the next `StopMoving`, or to the end of the preview. Null for a scenario
+ *  that never moves it, or a speed of 0. */
+export function unitMotion(
+  events: ScriptEvent[],
+  speed: number,
+): UnitMotion | null {
+  if (speed <= 0) return null;
+  const spans: [number, number][] = [];
+  let start: number | null = null;
+  for (const event of events) {
+    if (event.callin === "StartMoving" && start === null) start = event.frame;
+    if (event.callin === "StopMoving" && start !== null) {
+      spans.push([start, event.frame]);
+      start = null;
+    }
+  }
+  if (start !== null) spans.push([start, Infinity]);
+  return spans.length > 0 ? { speed, spans } : null;
+}
+
+/** How far the unit has moved by `frame`, counting each moving frame before
+ *  it. */
+export function travelled(
+  motion: UnitMotion | null | undefined,
+  frame: number,
+): number {
+  if (!motion) return 0;
+  let frames = 0;
+  for (const [start, end] of motion.spans) {
+    frames += Math.max(0, Math.min(frame, end) - start);
+  }
+  return frames * motion.speed;
+}
+
+/** The unit's speed on `frame`, 0 when it is not moving then. */
+function speedOn(motion: UnitMotion | null, frame: number): number {
+  if (!motion) return 0;
+  const moving = motion.spans.some(
+    ([start, end]) => frame >= start && frame < end,
+  );
+  return moving ? motion.speed : 0;
+}
+
+/**
+ * Move the sprites from `first` on back along -Z by how far the unit moved
+ * since `birth`, plus `kept` elmos forward. A particle stays where it was
+ * made in the world, so a unit moving forward leaves it behind.
+ */
+function carry(
+  sprites: SpriteArrays,
+  first: number,
+  motion: UnitMotion | null,
+  birth: number,
+  frame: number,
+  kept: number,
+): void {
+  const back = travelled(motion, frame) - travelled(motion, birth) - kept;
+  if (back === 0) return;
+  for (let i = first + 2; i < sprites.centers.length; i += 3) {
+    sprites.centers[i] -= back;
+  }
+}
+
+/** The engine's VTOL heat cloud keeps this much of the unit's own speed
+ *  (`UnitScript.cpp:702-704`). */
+const VTOL_KEEPS_SPEED = 0.7;
+
+/**
+ * `motion` carries the particles the engine leaves in the world behind a
+ * moving unit: smoke, VTOL heat clouds, wakes and detonation bursts. A CEG's
+ * stand-in puff is left where it is, and so are nano, the muzzle flame and
+ * the tracer, which each go to a target or ride on the muzzle.
+ */
 export function particlesAt(
   emissions: Emission[],
   frame: number,
   smokeCount = 1,
+  motion: UnitMotion | null = null,
 ): Particles {
   const centers: number[] = [];
   const halfSizes: number[] = [];
@@ -508,6 +949,7 @@ export function particlesAt(
     colors: [],
     bitmaps: [],
     axes: [],
+    sides: [],
     halfLengths: [],
     uvRanges: [],
   };
@@ -518,6 +960,31 @@ export function particlesAt(
     }
     if (emission.kind === "tracer") {
       tracerSprites(emission, frame, sprites);
+      continue;
+    }
+    const first = sprites.centers.length;
+    if (emission.kind === "smoke") {
+      smokeSprites(emission, frame, smokeCount, sprites);
+      carry(sprites, first, motion, emission.birth, frame, 0);
+      continue;
+    }
+    if (emission.kind === "vtol") {
+      vtolSprites(emission, frame, sprites);
+      const updates = frame - emission.birth + 1;
+      const kept = VTOL_KEEPS_SPEED * speedOn(motion, emission.birth) * updates;
+      carry(sprites, first, motion, emission.birth, frame, kept);
+      continue;
+    }
+    if (emission.kind === "wake") {
+      wakeSprites(emission, frame, sprites);
+      carry(sprites, first, motion, emission.birth, frame, 0);
+      continue;
+    }
+    if (isPuff(emission)) {
+      puffSprites(emission, frame, sprites);
+      if (emission.kind === "burst") {
+        carry(sprites, first, motion, emission.birth, frame, 0);
+      }
       continue;
     }
     const age = frame - emission.birth;
@@ -556,6 +1023,7 @@ export function particlesAt(
       colors: new Float32Array(sprites.colors),
       bitmaps: new Float32Array(sprites.bitmaps),
       axes: new Float32Array(sprites.axes),
+      sides: new Float32Array(sprites.sides),
       halfLengths: new Float32Array(sprites.halfLengths),
       uvRanges: new Float32Array(sprites.uvRanges),
     },

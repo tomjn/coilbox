@@ -397,6 +397,37 @@ class FixedWidthResizeObserver {
   disconnect() {}
 }
 
+describe("the missing bitmaps note", () => {
+  it("shows for a run whose only event is an sfx", async () => {
+    runCob.mockResolvedValue(
+      timeline({
+        events: [{ frame: 5, kind: "sfx", piece: "base", sfx: 257 }],
+      }),
+    );
+    show(project({ compiledScript: COMPILED }), {
+      effectsNote: "The game has no heat cloud bitmap.",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("The game has no heat cloud bitmap."),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("does not show for a run with no events", async () => {
+    runCob.mockResolvedValue(timeline({ events: [] }));
+    show(project({ compiledScript: COMPILED }), {
+      effectsNote: "The game has no heat cloud bitmap.",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(screen.getByText(`1/1`)).toBeTruthy());
+    expect(screen.queryByText("The game has no heat cloud bitmap.")).toBeNull();
+  });
+});
+
 describe("marks under the scrubber", () => {
   const frames = (count: number) =>
     Array.from({ length: count }, () => [0, 0, 0, 0, 0, 0]);
@@ -469,5 +500,42 @@ describe("marks under the scrubber", () => {
     } finally {
       globalThis.ResizeObserver = original;
     }
+  });
+});
+
+describe("a scenario that moves the unit", () => {
+  const lastMotion = (onStandIn: ReturnType<typeof vi.fn>) =>
+    onStandIn.mock.calls.at(-1)?.[0]?.motion;
+
+  it("tells the viewport when the unit moves, at the speed the script is told", async () => {
+    const onStandIn = vi.fn();
+    show(project({ compiledScript: COMPILED }), { onStandIn });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(lastMotion(onStandIn)).toBeTruthy());
+    const motion = lastMotion(onStandIn);
+    // The engine's CURRENT_SPEED answer, one elmo a frame, from StartMoving
+    // on, with no StopMoving in the Moving scenario.
+    expect(motion.speed).toBe(1);
+    expect(motion.spans).toHaveLength(1);
+    expect(motion.spans[0][0]).toBeGreaterThan(0);
+    expect(motion.spans[0][1]).toBe(Infinity);
+  });
+
+  it("follows the Speed control once it has changed", async () => {
+    runCob.mockResolvedValue(
+      timeline({ asked: [{ id: 29, name: "CURRENT_SPEED", default: 65536 }] }),
+    );
+    const onStandIn = vi.fn();
+    show(project({ compiledScript: COMPILED }), { onStandIn });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(screen.getByText("Speed")).toBeTruthy());
+
+    const speedSlider = screen.getAllByRole("slider").at(-1) as HTMLElement;
+    fireEvent.keyDown(speedSlider, { key: "ArrowLeft" });
+
+    await waitFor(() =>
+      expect(lastMotion(onStandIn)?.speed).toBeCloseTo(0.95, 4),
+    );
   });
 });
