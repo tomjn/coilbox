@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  BITMAP_EXPLO,
+  BITMAP_HEATCLOUD,
   BITMAP_LASER,
   BITMAP_LASER_END,
   BITMAP_MUZZLE_FLAME,
   BITMAP_SMOKE,
+  BITMAP_WAKE,
 } from "./effects";
 
 vi.mock("@tauri-apps/api/path", () => ({
@@ -30,6 +33,7 @@ import {
   missingNote,
   packShelves,
   parseBitmaps,
+  RESOURCES_LUA,
   slotOf,
 } from "./effectBitmaps";
 
@@ -56,6 +60,33 @@ describe("slotOf", () => {
     expect(slotOf("laserend")).toBe(BITMAP_LASER_END);
     expect(slotOf("smoke1")).toBe(BITMAP_SMOKE);
     expect(slotOf("smoke3")).toBe(BITMAP_SMOKE + 2);
+  });
+
+  it("puts the sfx bitmaps in their own slots, before the smoke set", () => {
+    expect(slotOf("heatcloud")).toBe(BITMAP_HEATCLOUD);
+    expect(slotOf("explo")).toBe(BITMAP_EXPLO);
+    expect(slotOf("wake")).toBe(BITMAP_WAKE);
+    expect(
+      new Set([
+        BITMAP_MUZZLE_FLAME,
+        BITMAP_LASER,
+        BITMAP_LASER_END,
+        BITMAP_HEATCLOUD,
+        BITMAP_EXPLO,
+        BITMAP_WAKE,
+      ]).size,
+    ).toBe(6);
+    expect(BITMAP_SMOKE).toBeGreaterThan(BITMAP_WAKE);
+  });
+});
+
+describe("RESOURCES_LUA", () => {
+  it("asks for the heat cloud, explo and wake bitmaps, with the base content's names as defaults", () => {
+    expect(RESOURCES_LUA).toContain("add('heatcloud', field(textures, 'heatcloud'))");
+    expect(RESOURCES_LUA).toContain("add('explo', field(textures, 'explo'))");
+    expect(RESOURCES_LUA).toContain("add('wake', field(textures, 'wake'))");
+    expect(RESOURCES_LUA).toContain("heatcloud = 'explo.tga'");
+    expect(RESOURCES_LUA).toContain("wake = 'wake.tga'");
   });
 });
 

@@ -76,8 +76,7 @@ export interface Sprites {
   halfSizes: Float32Array;
   /** Four per sprite, RGBA from 0 to 1, multiplied by the bitmap. */
   colors: Float32Array;
-  /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, `BITMAP_LASER_END`,
-   *  or `BITMAP_SMOKE + n`. */
+  /** One per sprite, a `BITMAP_*` slot, or `BITMAP_SMOKE + n` for smoke bitmap n. */
   bitmaps: Float32Array;
   /** Three per sprite, a world-space unit direction, zero for an ordinary
    *  billboard. Only a stretched sprite such as the tracer's bolt sets it. */
@@ -102,12 +101,17 @@ export interface Particles {
   sprites: Sprites;
 }
 
-/** Which bitmap a sprite draws, `CMuzzleFlame::Draw`'s three textures, plus
- *  the laser's own end cap texture. */
+/** Which bitmap a sprite draws: `CMuzzleFlame::Draw`'s three textures, the
+ *  laser's own end cap texture, the heat cloud a VTOL sfx draws, the `explo`
+ *  bitmap the preview's CEG puff draws, and the wake. The smoke set comes
+ *  last because its length depends on the game. */
 export const BITMAP_MUZZLE_FLAME = 0;
 export const BITMAP_LASER = 1;
 export const BITMAP_LASER_END = 2;
-export const BITMAP_SMOKE = 3;
+export const BITMAP_HEATCLOUD = 3;
+export const BITMAP_EXPLO = 4;
+export const BITMAP_WAKE = 5;
+export const BITMAP_SMOKE = 6;
 
 /** `CMuzzleFlame`'s size with the weapon def's defaults: area of effect 8
  *  stored as 4 (`WeaponDef.cpp:71`) and damage 1 (`WeaponDef.cpp:417`), fed

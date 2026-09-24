@@ -23,10 +23,13 @@ import { unitsyncArchiveExtract, unitsyncLuaExec } from "@/content/bindings";
 import { primeScan } from "@/content/config";
 import { legoBitmapPng } from "./bindings";
 import {
+  BITMAP_EXPLO,
+  BITMAP_HEATCLOUD,
   BITMAP_LASER,
   BITMAP_LASER_END,
   BITMAP_MUZZLE_FLAME,
   BITMAP_SMOKE,
+  BITMAP_WAKE,
 } from "./effects";
 import type { EffectsAtlas } from "./pages/components/effectsLayer";
 
@@ -43,7 +46,7 @@ end
 -- The engine reads gamedata/resources.lua through the game and the base
 -- content under it (ProjectileDrawer.cpp:98). With neither, these are the
 -- base content's defaults (springcontent/gamedata/resources.lua:97-112).
-local textures = { explo = 'explo.tga', laserfalloff = 'laserfalloff.tga', laserend = 'laserend.tga' }
+local textures = { explo = 'explo.tga', heatcloud = 'explo.tga', wake = 'wake.tga', laserfalloff = 'laserfalloff.tga', laserend = 'laserend.tga' }
 local smoke = nil
 if VFS.FileExists('gamedata/resources.lua') then
   local ok, res = pcall(VFS.Include, 'gamedata/resources.lua')
@@ -72,6 +75,9 @@ end
 add('muzzleflame', field(textures, 'muzzleflametexture') or field(textures, 'explo'))
 add('laserfalloff', field(textures, 'laserfalloff'))
 add('laserend', field(textures, 'laserend'))
+add('heatcloud', field(textures, 'heatcloud'))
+add('explo', field(textures, 'explo'))
+add('wake', field(textures, 'wake'))
 if type(smoke) == 'table' and #smoke > 0 then
   for i = 1, #smoke do add('smoke' .. i, smoke[i]) end
 else
@@ -81,7 +87,8 @@ return table.concat(out, ';')
 `;
 
 export interface BitmapFile {
-  /** "muzzleflame", "laserfalloff", or "smoke1", "smoke2" and so on. */
+  /** "muzzleflame", "laserfalloff", "laserend", "heatcloud", "explo", "wake",
+   *  or "smoke1", "smoke2" and so on. */
   key: string;
   /** The name under `bitmaps/`, or null when the game names none. */
   file: string | null;
@@ -126,12 +133,15 @@ export function parseBitmaps(result: string | undefined): BitmapFile[] {
   return out;
 }
 
-/** The atlas slot a key goes in: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`,
- *  `BITMAP_LASER_END`, or `BITMAP_SMOKE + n - 1` for smoke n. */
+/** The atlas slot a key goes in, one of the `BITMAP_*` slots, or
+ *  `BITMAP_SMOKE + n - 1` for smoke n. */
 export function slotOf(key: string): number {
   if (key === "muzzleflame") return BITMAP_MUZZLE_FLAME;
   if (key === "laserfalloff") return BITMAP_LASER;
   if (key === "laserend") return BITMAP_LASER_END;
+  if (key === "heatcloud") return BITMAP_HEATCLOUD;
+  if (key === "explo") return BITMAP_EXPLO;
+  if (key === "wake") return BITMAP_WAKE;
   const smoke = /^smoke(\d+)$/.exec(key);
   if (smoke) return BITMAP_SMOKE + Number(smoke[1]) - 1;
   return -1;
