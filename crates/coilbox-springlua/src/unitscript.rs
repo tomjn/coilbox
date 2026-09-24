@@ -606,6 +606,10 @@ impl Run {
         // that sprays.
         let awaiting_build = self.sim.borrow().model.awaiting_build;
         if awaiting_build {
+            // A call-in queued later in this same frame, such as `Activate`
+            // listed after `factory-build`, needs its first tick before the
+            // stance check below, the way the engine-action path above does.
+            self.tick_queued_call_ins(start)?;
             let stance = self
                 .sim
                 .borrow()
