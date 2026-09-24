@@ -109,3 +109,34 @@ export function groupProjects(projects: LegoProject[]): GroupedProjects {
     files,
   };
 }
+
+/**
+ * Only the units a search asks for, still in their groups.
+ *
+ * Matches the unit's name and its unit name, ignoring case. A game's own name
+ * matches too, and brings every unit in it, so typing a game finds its units
+ * even when none of them is named after it. A group left with nothing is
+ * dropped. An empty or blank query changes nothing.
+ */
+export function filterGrouped(
+  grouped: GroupedProjects,
+  query: string,
+): GroupedProjects {
+  const needle = query.trim().toLowerCase();
+  if (!needle) return grouped;
+  const matches = (project: LegoProject) =>
+    project.name.toLowerCase().includes(needle) ||
+    project.unitName.toLowerCase().includes(needle);
+
+  return {
+    own: grouped.own.filter(matches),
+    games: grouped.games
+      .map((game) =>
+        game.label.toLowerCase().includes(needle)
+          ? game
+          : { ...game, projects: game.projects.filter(matches) },
+      )
+      .filter((game) => game.projects.length > 0),
+    files: grouped.files.filter(matches),
+  };
+}

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { LegoImported, LegoProject } from "./model";
-import { archiveFromSource, groupProjects } from "./projectGroups";
+import {
+  archiveFromSource,
+  filterGrouped,
+  groupProjects,
+} from "./projectGroups";
 
 function project(
   name: string,
@@ -163,5 +167,52 @@ describe("groupProjects", () => {
       newer,
       older,
     ]);
+  });
+});
+
+describe("filterGrouped", () => {
+  const adder = {
+    ...project("Adder", {
+      source: "",
+      game: { name: "MechCommander Legacy", archive: "MCL.sdd", member: "a" },
+    }),
+    unitName: "sj_adder",
+  } as LegoProject;
+  const atlas = {
+    ...project("Atlas", {
+      source: "",
+      game: { name: "MechCommander Legacy", archive: "MCL.sdd", member: "b" },
+    }),
+    unitName: "sj_atlas",
+  } as LegoProject;
+  const cakebot = { ...project("Cakebot"), unitName: "cake" } as LegoProject;
+  const loose = {
+    ...project("Blender thing", { source: "/Desktop/thing.s3o" }),
+    unitName: "thing",
+  } as LegoProject;
+  const all = groupProjects([adder, atlas, cakebot, loose]);
+
+  it("changes nothing for a blank search", () => {
+    expect(filterGrouped(all, "")).toBe(all);
+    expect(filterGrouped(all, "   ")).toBe(all);
+  });
+
+  it("keeps the units whose name or unit name matches, in any case", () => {
+    const found = filterGrouped(all, "ADD");
+    expect(found.games).toHaveLength(1);
+    expect(found.games[0].projects).toEqual([adder]);
+    expect(found.own).toEqual([]);
+    expect(found.files).toEqual([]);
+    expect(filterGrouped(all, "cake").own).toEqual([cakebot]);
+    expect(filterGrouped(all, "thing").files).toEqual([loose]);
+  });
+
+  it("brings a whole game when its name matches", () => {
+    const found = filterGrouped(all, "mechcommander");
+    expect(found.games[0].projects).toEqual([adder, atlas]);
+  });
+
+  it("drops a game with nothing left in it", () => {
+    expect(filterGrouped(all, "cakebot").games).toEqual([]);
   });
 });
