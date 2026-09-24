@@ -34,6 +34,7 @@ use std::collections::{BTreeSet, HashMap};
 use coilbox_unitpose::{
     unitvalue, EngineAction, Model, Rest, ScriptEvent, Timeline, Wait, MAX_FRAMES, TICK_MS,
 };
+use serde::Serialize;
 
 use crate::cob;
 use crate::opcodes::opcode;
@@ -107,6 +108,73 @@ pub fn run(
     match Run::start(bytes, pieces, rest, values) {
         Ok(mut run) => run.play(events, frames.min(MAX_FRAMES)),
         Err(error) => Timeline::failed(pieces, error),
+    }
+}
+
+/// What one call-in that returns a piece named, for a `.cob`.
+///
+/// The same shape `coilbox_springlua::unitscript::Probe` reports for a Lua
+/// script, mirrored here rather than shared because that crate is only a dev
+/// dependency of this one. The frontend's `ScriptProbe` fits either.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probe {
+    /// Key asked for, such as `AimFromWeapon1`.
+    pub callin: String,
+    /// The pieces it named, in call order and with repeats kept.
+    pub pieces: Vec<String>,
+    /// Why it named nothing.
+    pub note: Option<String>,
+}
+
+/// Every probe of one `.cob`, plus whatever went wrong before any ran.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Probes {
+    /// The unit's piece names, so a caller can check they are what it expected.
+    pub pieces: Vec<String>,
+    pub probes: Vec<Probe>,
+    /// Set when the script could not be loaded at all, in which case `probes`
+    /// is empty.
+    pub error: Option<String>,
+}
+
+/// How many times each probe calls its call-in.
+///
+/// The same limit the Lua probe uses, so a cycling answer, several nozzles on
+/// a builder, is reported the same way whichever runtime answered it.
+const PROBE_CALLS: usize = 16;
+
+/// Ask a compiled script which pieces it names, by calling the call-ins that
+/// return one.
+///
+/// Not a run. Nothing is animated and no frames pass. Each call-in is called
+/// directly, seeded and stepped once, the way `Run::ask_piece` asks for one on
+/// the engine's behalf, except a probe reports what stopped it rather than
+/// falling back to script piece 1. A caller here wants to know whether the
+/// script named a piece, not what the engine would have shown regardless.
+///
+/// Never returns an error. A file that will not decode comes back with
+/// `error` set and no probes. One that loads but answers badly says so on the
+/// probe itself.
+pub fn probe(bytes: &[u8], pieces: &[String], callins: &[String]) -> Probes {
+    let mut run = match Run::start(bytes, pieces, &[], &HashMap::new()) {
+        Ok(run) => run,
+        Err(error) => {
+            return Probes {
+                pieces: pieces.to_vec(),
+                probes: Vec::new(),
+                error: Some(error),
+            }
+        }
+    };
+    Probes {
+        pieces: pieces.to_vec(),
+        probes: callins
+            .iter()
+            .map(|callin| run.probe_callin(callin))
+            .collect(),
+        error: None,
     }
 }
 
@@ -756,6 +824,68 @@ impl Run {
             "{callin} waited rather than answering, so {what} comes from script piece 1, which is what the engine answers for it."
         ));
         Ok(UNANSWERED)
+    }
+
+    /// Ask one call-in for the pieces it names, `PROBE_CALLS` times so a
+    /// cycling answer is reported in order, the same shape the Lua probe
+    /// reports.
+    ///
+    /// Each call is asked the way `ask_piece` asks one, seeded `[-1]` and
+    /// stepped once, but a probe does not fall back to script piece 1: a
+    /// call-in the script lacks, one that waits rather than answering, or one
+    /// that names a piece this model does not have all stop the probe with a
+    /// note instead.
+    fn probe_callin(&mut self, callin: &str) -> Probe {
+        let Some(function) = self.program.script(callin) else {
+            return Probe {
+                callin: callin.to_string(),
+                pieces: Vec::new(),
+                note: Some(format!("This script has no {callin} call-in.")),
+            };
+        };
+
+        let mut pieces = Vec::new();
+        let mut note = None;
+        for _ in 0..PROBE_CALLS {
+            let mut thread =
+                Thread::new(function, self.program.offsets[function], 0, callin.into());
+            thread.data = vec![-1];
+            thread.params = 1;
+            if let Err(error) = self.add(thread) {
+                note = Some(error);
+                break;
+            }
+            let index = self.threads.len() - 1;
+            let stepped = self.step_thread(index);
+            for queued in std::mem::take(&mut self.queued) {
+                let _ = self.add(queued);
+            }
+            if let Err(error) = stepped {
+                note = Some(error);
+                break;
+            }
+            if !matches!(self.threads[index].state, State::Dead) {
+                note = Some(format!("{callin} waited rather than answering."));
+                break;
+            }
+            let answer = self.threads[index].data.first().copied().unwrap_or(0);
+            match model_piece(&self.program, answer) {
+                Some(at) => pieces.push(self.model.pieces[at].name.clone()),
+                None => {
+                    note = Some(format!(
+                        "{callin} answered with something that is not a piece of this unit."
+                    ));
+                    break;
+                }
+            }
+            self.threads.retain(|t| !matches!(t.state, State::Dead));
+        }
+
+        Probe {
+            callin: callin.to_string(),
+            pieces,
+            note,
+        }
     }
 
     /// Give a first tick to every call-in thread this frame's `fire_due` has

@@ -1999,3 +1999,61 @@ mod engine_fire {
             .any(|e| matches!(e, ScriptOutput::Flare { piece, .. } if piece == "turret")));
     }
 }
+
+mod probe {
+    use super::*;
+    use std::path::Path;
+
+    fn compile(source: &str) -> Vec<u8> {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../coilbox-bos2lua/tests/fixtures");
+        crate::compile_bos(source, &dir).unwrap()
+    }
+
+    /// A script written before Recoil numbered its first weapon still answers
+    /// `AimFromWeapon1`, because `Program::script` maps it to the older
+    /// `AimFromPrimary` the same way the run itself does.
+    #[test]
+    fn aim_from_primary_answers_under_aim_from_weapon_one() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimFromPrimary(piecenum) { piecenum = turret; }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["AimFromWeapon1".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "AimFromWeapon1");
+        // Called PROBE_CALLS times, same as the Lua probe, so a script that
+        // always names the same piece reports it that many times over.
+        assert_eq!(probe.pieces, vec!["turret".to_string(); PROBE_CALLS]);
+        assert_eq!(probe.note, None);
+    }
+
+    /// A call-in the script has no function for gets a note and names no
+    /// piece, the same answer the Lua probe gives.
+    #[test]
+    fn a_missing_callin_gives_a_note_and_no_piece() {
+        let source = "piece base, turret, barrel;\nCreate() { }\n";
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["QueryBuildInfo".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "QueryBuildInfo");
+        assert!(probe.pieces.is_empty());
+        assert!(probe
+            .note
+            .as_deref()
+            .is_some_and(|note| note.contains("no QueryBuildInfo call-in")));
+    }
+}

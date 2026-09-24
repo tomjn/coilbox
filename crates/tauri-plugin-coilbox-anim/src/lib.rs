@@ -6,9 +6,10 @@
 //! Implemented: `anim_cob_disasm` (disassemble a `.cob`), `anim_cob_decompile`
 //! (rebuild recompilable BOS from a `.cob`), `anim_bos2cob`
 //! (compile a `.bos` to `.cob`, byte-exact vs the Python reference), `anim_cob_run`
-//! (play a `.cob`) and `anim_bos2lua` (convert a `.bos` to a Lua unit script,
-//! through `coilbox-bos2lua`). See PORTING.md for the porting spec and
-//! golden-test harness.
+//! (play a `.cob`), `anim_cob_probe` (ask a compiled script which pieces it
+//! names, without playing it) and `anim_bos2lua` (convert a `.bos` to a Lua
+//! unit script, through `coilbox-bos2lua`). See PORTING.md for the porting
+//! spec and golden-test harness.
 
 #[cfg(test)]
 mod bos2lua_parity;
@@ -316,6 +317,31 @@ async fn anim_cob_run(
     }
 }
 
+/// `anim_cob_probe`: ask a compiled script which pieces it names, without
+/// playing it.
+///
+/// The model editor's "Aiming and firing" scenario asks `AimFromWeapon1` this
+/// way for a Lua script to work out where the stand-in should sit
+/// (`lego_probe_script`). A compiled script had no equivalent, so its stand-in
+/// was measured from the unit's origin regardless of where its aim-from piece
+/// actually is. This is the same question asked of the bytecode instead.
+///
+/// Not a run: nothing is animated and no frames pass. Read only, like
+/// `anim_cob_run`.
+#[tauri::command]
+async fn anim_cob_probe(bytes: Vec<u8>, pieces: Vec<String>, callins: Vec<String>) -> CliResult {
+    let result =
+        tauri::async_runtime::spawn_blocking(move || cobrun::probe(&bytes, &pieces, &callins))
+            .await;
+    match result {
+        Ok(probes) => match serde_json::to_value(&probes) {
+            Ok(value) => CliResult::ok(value),
+            Err(e) => CliResult::err(format!("could not report the probe: {e}")),
+        },
+        Err(e) => CliResult::err(format!("the probe failed to start: {e}")),
+    }
+}
+
 /// `anim_bos2lua`: a `.bos` as a Lua unit script that runs as it is.
 ///
 /// `includes` is the files it may `#include`, by path, and `pieces` the model's
@@ -525,6 +551,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             anim_cob_decompile_bytes,
             anim_cob_hex,
             anim_cob_run,
+            anim_cob_probe,
             anim_bos2cob,
             anim_bos2lua,
             anim_bos_lint,
