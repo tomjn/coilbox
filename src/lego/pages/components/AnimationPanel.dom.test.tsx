@@ -397,6 +397,39 @@ class FixedWidthResizeObserver {
   disconnect() {}
 }
 
+describe("the missing bitmaps note", () => {
+  it("shows for a run whose only event is an sfx", async () => {
+    runCob.mockResolvedValue(
+      timeline({
+        events: [{ frame: 5, kind: "sfx", piece: "base", sfx: 257 }],
+      }),
+    );
+    show(project({ compiledScript: COMPILED }), {
+      effectsNote: "The game has no heat cloud bitmap.",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("The game has no heat cloud bitmap."),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("does not show for a run with no events", async () => {
+    runCob.mockResolvedValue(timeline({ events: [] }));
+    show(project({ compiledScript: COMPILED }), {
+      effectsNote: "The game has no heat cloud bitmap.",
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(screen.getByText(`1/1`)).toBeTruthy());
+    expect(
+      screen.queryByText("The game has no heat cloud bitmap."),
+    ).toBeNull();
+  });
+});
+
 describe("marks under the scrubber", () => {
   const frames = (count: number) =>
     Array.from({ length: count }, () => [0, 0, 0, 0, 0, 0]);

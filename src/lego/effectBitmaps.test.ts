@@ -189,6 +189,41 @@ describe("loadEffectBitmaps", () => {
     expect(result.note).toContain("bitmaps/laserfalloff.tga");
   });
 
+  it("names a bitmap the game names no file for in plain words, not its raw key", async () => {
+    vi.mocked(unitsyncLuaExec).mockResolvedValue({
+      result: '"muzzleflame|explo.tga|1;heatcloud||"',
+      errors: [],
+    });
+    vi.mocked(unitsyncArchiveExtract).mockResolvedValue({
+      size: 100,
+      errors: [],
+    });
+    vi.mocked(legoBitmapPng).mockImplementation(async ({ path }) => ({
+      dataUrl: `data:image/png;base64,${path}`,
+      width: 16,
+      height: 16,
+    }));
+    vi.spyOn(atlasBuilder, "build").mockResolvedValue({
+      texture: { dispose: vi.fn() } as never,
+      packed: {
+        width: 64,
+        height: 64,
+        rects: [
+          { slot: BITMAP_MUZZLE_FLAME, x: 0, y: 0, width: 16, height: 16 },
+        ],
+      },
+      failed: [],
+    });
+
+    const result = await loadEffectBitmaps(
+      { enginePath: "/engine", dataDir: "/data" },
+      "Game.sdd",
+    );
+
+    expect(result.note).toContain("heat cloud bitmap");
+    expect(result.note).not.toContain("heatcloud");
+  });
+
   it("has no atlas, rather than a 0x0 texture, when every bitmap fails to decode", async () => {
     vi.mocked(unitsyncLuaExec).mockResolvedValue({
       result: quotedResult(),

@@ -937,7 +937,10 @@ export function AnimationPanel({
 
           {effectsNote &&
           timeline?.events.some(
-            (event) => event.kind === "flare" || event.kind === "shot",
+            (event) =>
+              event.kind === "flare" ||
+              event.kind === "shot" ||
+              event.kind === "sfx",
           ) ? (
             <p className="text-xs text-muted-foreground">{effectsNote}</p>
           ) : null}

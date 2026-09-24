@@ -212,10 +212,24 @@ export function missingNote(missing: string[]): string | null {
   return `The game has no ${list}, so those are drawn as a plain round sprite.`;
 }
 
+/** Plain English names for the keys `RESOURCES_LUA` can report with no file,
+ *  so the note reads as plain words rather than a `resources.lua` key. */
+const PLAIN_NAMES: Record<string, string> = {
+  muzzleflame: "muzzle flame bitmap",
+  laserfalloff: "laser bitmap",
+  laserend: "laser end bitmap",
+  heatcloud: "heat cloud bitmap",
+  explo: "explosion bitmap",
+  wake: "wake bitmap",
+};
+
 /** How a missing entry is named in a note: by its file under `bitmaps/` when
- *  it has one, otherwise by its key. */
+ *  it has one, otherwise in plain words for the key. */
 function missingName(entry: { key: string; file: string | null }): string {
-  return entry.file ? `bitmaps/${entry.file}` : entry.key;
+  if (entry.file) return `bitmaps/${entry.file}`;
+  const smoke = /^smoke(\d+)$/.exec(entry.key);
+  if (smoke) return `smoke bitmap ${smoke[1]}`;
+  return PLAIN_NAMES[entry.key] ?? entry.key;
 }
 
 // The engine builds four base archives (`cont/base/CMakeLists.txt:2-5`), and
