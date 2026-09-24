@@ -175,6 +175,22 @@ fn piece(source: &coilbox_3do::Piece, state: &mut Walk) -> coilbox_s3o::Piece {
         }
     }
 
+    // A piece with no faces keeps its vertices as they are, because the engine
+    // reads its emit point and direction off the first two
+    // (`3DOParser.cpp:391-396`). Without them a wake or a flare points along
+    // +Z from its origin. They draw nothing, so the normal and UV are zero.
+    if indices.is_empty() {
+        vertices = source
+            .vertices
+            .iter()
+            .map(|pos| coilbox_s3o::Vertex {
+                pos: *pos,
+                normal: [0.0; 3],
+                uv: [0.0; 2],
+            })
+            .collect();
+    }
+
     state.vertices += vertices.len();
     state.triangles += indices.len() / 3;
 
@@ -582,17 +598,31 @@ mod tests {
         assert!(out.is_err(), "{:?}", out.map(|c| c.model.texture1));
     }
 
-    /// A piece with one or two vertices and no faces is a flare or an aim
-    /// point, and the format carries all of them this way.
+    /// A piece with vertices and no faces is a flare or a wake, and its
+    /// vertices are its emit point and direction, so they come through in
+    /// order with no faces added.
     #[test]
-    fn leaves_a_piece_with_no_faces_without_geometry() {
-        let mut root = piece3("base", Vec::new());
+    fn keeps_the_vertices_of_a_piece_with_no_faces() {
+        let mut root = piece3("wake1", Vec::new());
+        root.vertices = vec![[0.0, 1.0, 2.0], [0.0, 1.0, -3.0]];
         root.children
             .push(piece3("body", vec![textured(vec![0, 1, 2])]));
         let out = convert(root);
 
-        assert!(out.model.root.vertices.is_empty());
+        let positions: Vec<[f32; 3]> = out.model.root.vertices.iter().map(|v| v.pos).collect();
+        assert_eq!(positions, vec![[0.0, 1.0, 2.0], [0.0, 1.0, -3.0]]);
+        assert!(out.model.root.indices.is_empty());
         assert_eq!(out.model.root.children[0].vertices.len(), 3);
+    }
+
+    /// A piece with no vertices at all, a hierarchy node, stays empty.
+    #[test]
+    fn leaves_a_piece_with_no_vertices_empty() {
+        let mut root = piece3("base", Vec::new());
+        root.vertices.clear();
+        let out = convert(root);
+
+        assert!(out.model.root.vertices.is_empty());
     }
 
     /// The real specimen this rule was written for: `ARM_T1_HOV_Constructor`
