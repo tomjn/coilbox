@@ -1149,12 +1149,20 @@ describe("the muzzle flame", () => {
     expect(DEFAULT_FLAME_SIZE).toBeCloseTo(0.003);
   });
 
-  it("draws a smoke quad and a flame quad for ages 1 to 4, and nothing after", () => {
-    for (const frame of [10, 11, 12, 13]) {
+  // At the default size `fade` is 0.49 at age 1, 0.98 at age 2 and 1 from
+  // age 3, so the flame quad, drawn only while `fade < 1`, shows for two
+  // frames and the smoke quad for four.
+  it("draws smoke for ages 1 to 4, the flame quad only while it has not faded, and nothing after", () => {
+    for (const frame of [10, 11]) {
       const { sprites } = particlesAt([flame], frame);
       expect(sprites.count).toBe(2);
       expect(sprites.bitmaps[0]).toBe(BITMAP_SMOKE);
       expect(sprites.bitmaps[1]).toBe(BITMAP_MUZZLE_FLAME);
+    }
+    for (const frame of [12, 13]) {
+      const { sprites } = particlesAt([flame], frame);
+      expect(sprites.count).toBe(1);
+      expect(sprites.bitmaps[0]).toBe(BITMAP_SMOKE);
     }
     expect(particlesAt([flame], 14).sprites.count).toBe(0);
     expect(particlesAt([flame], 9).sprites.count).toBe(0);
