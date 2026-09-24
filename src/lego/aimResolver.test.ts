@@ -185,6 +185,30 @@ describe("resolveScenario", () => {
     expect(events[0].args?.[1]).toBeLessThan(-0.5);
   });
 
+  /** A re-aim can fire many times with the same cause, and the panel keys its
+   *  note list on the note text, so a repeated cause must not repeat the
+   *  note. */
+  it("pushes a repeated note once, even when several events hit the same cause", () => {
+    const blind = context({ probed: () => null });
+    const repeated: Scenario = {
+      ...firing,
+      events: [
+        {
+          frame: 10,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+        {
+          frame: 20,
+          callin: "AimWeapon1",
+          aimAtStandIn: { from: "AimFromWeapon" },
+        },
+      ],
+    };
+    const { notes } = resolveScenario(repeated, blind);
+    expect(notes).toHaveLength(1);
+  });
+
   it("has nothing to aim at in a scenario with no track", () => {
     const { events, notes } = resolveScenario(
       { ...firing, standIn: undefined },

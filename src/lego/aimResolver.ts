@@ -172,7 +172,11 @@ export function resolveScenario(
     return { ...rest, args: [heading, pitch] };
   });
 
-  return { events, notes };
+  // A re-aim can fire many times in one scenario, and each miss produces the
+  // same wording. Dedupe so the panel shows each distinct note once rather
+  // than one row per event, which also keeps AnimationPanel's `key={note}`
+  // list free of duplicate keys.
+  return { events, notes: [...new Set(notes)] };
 }
 
 /** `TransportDrop`'s Lua arguments for a `dropAtStandIn` marker. */
