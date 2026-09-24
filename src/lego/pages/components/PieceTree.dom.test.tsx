@@ -166,6 +166,37 @@ describe("the shape of the list", () => {
     expect(screen.getAllByLabelText("Geometry piece")).toHaveLength(2);
     expect(screen.getAllByLabelText("Empty piece")).toHaveLength(4);
   });
+
+  it("shows an imported emit point as a bare point, not geometry", () => {
+    const project = walker();
+    const flare = project.pieces.find((p) => p.id === "flare");
+    if (flare) flare.meshId = "m1";
+    const raw = {
+      byId: new Map([
+        [
+          "m1",
+          {
+            id: "m1",
+            vFirst: 0,
+            vCount: 2,
+            iFirst: 0,
+            iCount: 0,
+            bbox: {
+              min: [0, 0, 0] as [number, number, number],
+              max: [0, 0, 1] as [number, number, number],
+            },
+          },
+        ],
+      ]),
+      vertices: new Float32Array(16),
+      indices: new Uint32Array(),
+    };
+    render(
+      <PieceTree project={project} raw={raw} selectedIds={[]} {...handlers} />,
+    );
+    expect(screen.getAllByLabelText("Geometry piece")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Empty piece")).toHaveLength(4);
+  });
 });
 
 describe("selecting", () => {

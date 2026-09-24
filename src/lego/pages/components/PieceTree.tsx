@@ -22,6 +22,7 @@ import {
   pieceById,
   pieceKind,
 } from "../../model";
+import type { RawGeometry } from "../../rawGeometry";
 import { canReparent } from "../../reparent";
 
 /** How far the pointer moves before a press on a row counts as a drag. */
@@ -29,6 +30,9 @@ const DRAG_THRESHOLD = 4;
 
 interface Props {
   project: LegoProject;
+  /** An imported unit's meshes, to tell an emit point from a piece that
+   *  draws. Null for a unit built from parts. */
+  raw?: RawGeometry | null;
   selectedIds: string[];
   /** `additive` is a Shift or Cmd click: add this piece to the selection
    *  rather than replacing it. */
@@ -53,6 +57,7 @@ interface Drag {
 
 export function PieceTree({
   project,
+  raw = null,
   selectedIds,
   onSelect,
   onReparent,
@@ -121,6 +126,7 @@ export function PieceTree({
     >
       <Rows
         project={project}
+        raw={raw}
         parentId={null}
         selectedIds={selectedIds}
         onSelect={onSelect}
@@ -151,6 +157,7 @@ function rowIdOf(element: Element | null): string | null {
 
 function Rows({
   project,
+  raw,
   parentId,
   selectedIds,
   onSelect,
@@ -162,6 +169,7 @@ function Rows({
   depth = 0,
 }: {
   project: LegoProject;
+  raw: RawGeometry | null;
   parentId: string | null;
   selectedIds: string[];
   onSelect: (pieceId: string, additive: boolean) => void;
@@ -231,17 +239,17 @@ function Rows({
                   className="shrink-0 text-muted-foreground"
                   role="img"
                   aria-label={
-                    pieceKind(piece) === "geometry"
+                    pieceKind(piece, raw) === "geometry"
                       ? "Geometry piece"
                       : "Empty piece"
                   }
                   title={
-                    pieceKind(piece) === "geometry"
+                    pieceKind(piece, raw) === "geometry"
                       ? "Has geometry"
                       : "Empty piece: a hierarchy node, flare, aim point or emitter"
                   }
                 >
-                  {pieceKind(piece) === "geometry" ? (
+                  {pieceKind(piece, raw) === "geometry" ? (
                     <Box size={14} />
                   ) : (
                     <Dot size={14} />
@@ -273,6 +281,7 @@ function Rows({
             </div>
             <Rows
               project={project}
+              raw={raw}
               parentId={piece.id}
               selectedIds={selectedIds}
               onSelect={onSelect}

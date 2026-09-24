@@ -1476,6 +1476,7 @@ function Builder({ id }: { id: string | undefined }) {
                     <div className="h-full overflow-y-auto py-1">
                       <PieceTree
                         project={draft}
+                        raw={raw}
                         selectedIds={selectedIds}
                         onSelect={selectPiece}
                         onReparent={reparent}

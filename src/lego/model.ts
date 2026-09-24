@@ -20,6 +20,8 @@
  * `project.imported` is what says which kind a unit is.
  */
 
+import type { RawGeometry } from "./rawGeometry";
+
 export const LEGO_SCHEMA_VERSION = 1;
 
 /** Extra snap targets beyond the ones derived from a part's bounding box. */
@@ -639,12 +641,19 @@ export function descendantIds(project: LegoProject, pieceId: string): string[] {
   return out;
 }
 
-/** A piece's kind, for the tree's type icon: whether it draws a part, or is
- *  a hierarchy node, flare, aim point or emitter with no vertices of its own. */
+/** A piece's kind, for the tree's type icon: whether it draws something, or
+ *  is a hierarchy node, flare, aim point or emitter. An imported flare keeps
+ *  its emit point as a mesh with vertices and no triangles, so `raw` is what
+ *  tells it apart from a piece that draws. */
 export type PieceKind = "geometry" | "empty";
 
-export function pieceKind(piece: LegoPiece): PieceKind {
-  return piece.partId || piece.meshId ? "geometry" : "empty";
+export function pieceKind(
+  piece: LegoPiece,
+  raw: RawGeometry | null = null,
+): PieceKind {
+  if (piece.partId) return "geometry";
+  if (!piece.meshId) return "empty";
+  return raw?.byId.get(piece.meshId)?.iCount === 0 ? "empty" : "geometry";
 }
 
 /**
