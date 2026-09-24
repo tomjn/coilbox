@@ -75,6 +75,12 @@ export interface Sprites {
   colors: Float32Array;
   /** One per sprite: `BITMAP_MUZZLE_FLAME`, `BITMAP_LASER`, or `BITMAP_SMOKE + n`. */
   bitmaps: Float32Array;
+  /** Three per sprite, a world-space unit direction, zero for an ordinary
+   *  billboard. Only a stretched sprite such as the tracer's bolt sets it. */
+  axes: Float32Array;
+  /** One per sprite, in elmos, zero for an ordinary billboard. Half the
+   *  bolt's length along its `axes` direction. */
+  halfLengths: Float32Array;
 }
 
 export interface Particles {
@@ -236,20 +242,36 @@ function nanoColor(seed: number, dot: number): Vec3 {
 }
 
 /** Set by eye, to be tuned with the user on screen: how fast a preview tracer
- *  crosses the ground, and how long, wide, and finely subdivided it is. The
- *  engine draws the real projectile instead, so there is no source for these. */
-const TRACER_SPEED = 30;
+ *  crosses the ground, and how long it is. The engine draws the real
+ *  projectile instead, so there is no source for these. */
+const TRACER_SPEED = 10;
 const TRACER_LENGTH = 40;
-const TRACER_HALF_SIZE = 2;
-const TRACER_QUADS = 8;
-/** Set by eye: a neutral white tracer, tinted by nothing in particular. */
-const TRACER_COLOR: [number, number, number, number] = [1, 1, 1, 1];
+
+/** `CLaserProjectile::Draw`'s half-width, the weapon def's `thickness`
+ *  default (`WeaponDef.cpp:261`), and its core, the `coreThickness` default
+ *  of that (`WeaponDef.cpp:262`). */
+const TRACER_THICKNESS = 2;
+const TRACER_CORE_THICKNESS = TRACER_THICKNESS * 0.25;
+
+/** Set by eye: a warm white bolt with a plain white core, tinted by nothing
+ *  in particular since the weapon's own colour needs its unit def. Alpha 1/255
+ *  matches the engine's own laser colour byte (`LaserProjectile.cpp:210`),
+ *  which is close to additive against the ONE / ONE_MINUS_SRC_ALPHA blend. */
+const TRACER_OUTER_COLOR: [number, number, number, number] = [
+  1,
+  0.85,
+  0.6,
+  1 / 255,
+];
+const TRACER_CORE_COLOR: [number, number, number, number] = [1, 1, 1, 1 / 255];
 
 interface SpriteArrays {
   centers: number[];
   halfSizes: number[];
   colors: number[];
   bitmaps: number[];
+  axes: number[];
+  halfLengths: number[];
 }
 
 /** A muzzle flame's quads on one frame, following `CMuzzleFlame::Draw`
@@ -300,6 +322,8 @@ function flameSprites(
       Math.trunc(255 * alpha * fade) / 255,
     );
     out.bitmaps.push(BITMAP_SMOKE + (a % smokeCount));
+    out.axes.push(0, 0, 0);
+    out.halfLengths.push(0);
 
     if (fade < 1) {
       const ifade = 1 - fade;
@@ -312,14 +336,18 @@ function flameSprites(
         1 / 255,
       );
       out.bitmaps.push(BITMAP_MUZZLE_FLAME);
+      out.axes.push(0, 0, 0);
+      out.halfLengths.push(0);
     }
   }
 }
 
-/** A preview tracer's quads on one frame: `TRACER_QUADS` evenly spaced
- *  points from `head - TRACER_LENGTH` to `head`, where `head` is how far the
- *  tracer has travelled, skipping any point outside the run from the muzzle
- *  to the target. */
+/** A preview tracer's bolt on one frame, drawn as `CLaserProjectile::Draw`
+ *  draws a laser: one quad stretched from `tail` to `head` along the shot's
+ *  path, plus a thinner core quad over it. `head` is how far the tracer has
+ *  travelled and `tail` is `TRACER_LENGTH` behind it, both clamped to the run
+ *  from the muzzle to the target. Nothing is drawn once the raw, unclamped
+ *  tail has passed the target, or before the emission's birth frame. */
 function tracerSprites(
   emission: TracerEmission,
   frame: number,
@@ -332,26 +360,37 @@ function tracerSprites(
     emission.to[1] - emission.at[1],
     emission.to[2] - emission.at[2],
   ];
-  const total = Math.hypot(...d);
-  if (total === 0) return;
-  const dir: Vec3 = [d[0] / total, d[1] / total, d[2] / total];
-  const head = k * TRACER_SPEED;
-  const tail = head - TRACER_LENGTH;
-  if (tail > total) return;
+  const distance = Math.hypot(...d);
+  if (distance === 0) return;
+  const dir: Vec3 = [d[0] / distance, d[1] / distance, d[2] / distance];
 
-  const step = TRACER_LENGTH / (TRACER_QUADS - 1);
-  for (let i = 0; i < TRACER_QUADS; i++) {
-    const dist = tail + i * step;
-    if (dist < 0 || dist > total) continue;
-    out.centers.push(
-      emission.at[0] + dir[0] * dist,
-      emission.at[1] + dir[1] * dist,
-      emission.at[2] + dir[2] * dist,
-    );
-    out.halfSizes.push(TRACER_HALF_SIZE);
-    out.colors.push(...TRACER_COLOR);
-    out.bitmaps.push(BITMAP_LASER);
-  }
+  const headRaw = k * TRACER_SPEED;
+  const tailRaw = headRaw - TRACER_LENGTH;
+  if (tailRaw >= distance) return;
+
+  const head = Math.min(Math.max(headRaw, 0), distance);
+  const tail = Math.min(Math.max(tailRaw, 0), distance);
+  const mid = (head + tail) / 2;
+  const halfLength = (head - tail) / 2;
+  const center: Vec3 = [
+    emission.at[0] + dir[0] * mid,
+    emission.at[1] + dir[1] * mid,
+    emission.at[2] + dir[2] * mid,
+  ];
+
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_THICKNESS);
+  out.colors.push(...TRACER_OUTER_COLOR);
+  out.bitmaps.push(BITMAP_LASER);
+  out.axes.push(...dir);
+  out.halfLengths.push(halfLength);
+
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_CORE_THICKNESS);
+  out.colors.push(...TRACER_CORE_COLOR);
+  out.bitmaps.push(BITMAP_LASER);
+  out.axes.push(...dir);
+  out.halfLengths.push(halfLength);
 }
 
 export function particlesAt(
@@ -367,6 +406,8 @@ export function particlesAt(
     halfSizes: [],
     colors: [],
     bitmaps: [],
+    axes: [],
+    halfLengths: [],
   };
   for (const emission of emissions) {
     if (emission.kind === "flame") {
@@ -412,6 +453,8 @@ export function particlesAt(
       halfSizes: new Float32Array(sprites.halfSizes),
       colors: new Float32Array(sprites.colors),
       bitmaps: new Float32Array(sprites.bitmaps),
+      axes: new Float32Array(sprites.axes),
+      halfLengths: new Float32Array(sprites.halfLengths),
     },
   };
 }

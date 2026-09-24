@@ -59,19 +59,40 @@ void main() {
 
 /** The sprite quad is sized in world space, in elmos, and offset in view
  *  space so it always faces the camera, matching `MuzzleFlame.cpp`'s corners:
- *  the centre plus and minus the camera's right and up times the draw size. */
+ *  the centre plus and minus the camera's right and up times the draw size.
+ *
+ *  A sprite with a `halfLength` is a bolt instead, drawn as
+ *  `CLaserProjectile::Draw` draws a laser: stretched along its world-space
+ *  `axis` from tail to head, its width across the direction facing the
+ *  camera. If the axis points straight at the camera the cross product used
+ *  for that width degenerates to zero, so that case falls back to the plain
+ *  billboard rather than a zero-width sliver. */
 const SPRITE_VERTEX = /* glsl */ `
 attribute vec3 center;
 attribute float halfSize;
 attribute vec4 tint;
 attribute vec4 uvRect;
+attribute vec3 axis;
+attribute float halfLength;
 varying vec4 vTint;
 varying vec2 vUv;
 varying vec2 vLocal;
 varying float vRound;
 void main() {
   vec4 view = modelViewMatrix * vec4(center, 1.0);
-  view.xy += position.xy * halfSize;
+  if (halfLength > 0.0) {
+    vec3 a = (modelViewMatrix * vec4(axis, 0.0)).xyz;
+    vec3 crossed = cross(a, normalize(view.xyz));
+    float crossedLen = length(crossed);
+    if (crossedLen > 1e-6) {
+      vec3 side = crossed / crossedLen;
+      view.xyz += a * halfLength * position.x + side * halfSize * position.y;
+    } else {
+      view.xy += position.xy * halfSize;
+    }
+  } else {
+    view.xy += position.xy * halfSize;
+  }
   gl_Position = projectionMatrix * view;
   vTint = tint;
   vLocal = position.xy;
@@ -128,6 +149,14 @@ function spriteGeometry(capacity: number): THREE.InstancedBufferGeometry {
   geometry.setAttribute(
     "uvRect",
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4),
+  );
+  geometry.setAttribute(
+    "axis",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3),
+  );
+  geometry.setAttribute(
+    "halfLength",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1),
   );
   geometry.instanceCount = 0;
   return geometry;
@@ -290,6 +319,8 @@ export function buildEffectsLayer(): EffectsLayer {
       writeSprite("center", sprite.centers);
       writeSprite("halfSize", sprite.halfSizes);
       writeSprite("tint", sprite.colors);
+      writeSprite("axis", sprite.axes);
+      writeSprite("halfLength", sprite.halfLengths);
       lastBitmaps = sprite.bitmaps;
       refillUvRect();
       spriteGeom.instanceCount = sprite.count;

@@ -980,12 +980,13 @@ describe("placeStandIn", () => {
           : [];
       placeEffects(state, doc, aiming, true, timeline, 5, vertices);
       // On the shot's own frame the tracer has not travelled yet, so its
-      // only sprite sits at the emit point itself: proof the tracer starts
-      // from the vertex, ten elmos above the arm's origin, rather than from
-      // the origin on its own.
-      expect(sprites(state).instanceCount).toBe(1);
+      // outer and core sprites both sit at the emit point itself: proof the
+      // tracer starts from the vertex, ten elmos above the arm's origin,
+      // rather than from the origin on its own.
+      expect(sprites(state).instanceCount).toBe(2);
       const center = sprites(state).getAttribute("center").array;
       expectNear(center[1], 14, 0.01);
+      expectNear(center[4], 14, 0.01);
     });
 
     it("draws no tracer for a shot from no piece", () => {

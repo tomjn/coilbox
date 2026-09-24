@@ -227,6 +227,10 @@ describe("the muzzle flame", () => {
     expect(sprites.colors[7]).toBeCloseTo(1 / 255);
     // Along +Z from the piece, pulled back by size * 0.2 first.
     expect(sprites.centers[2]).toBeGreaterThan(0);
+    // A flame sprite is a plain billboard, not a stretched bolt.
+    expect(Array.from(sprites.axes.slice(0, 6))).toEqual([0, 0, 0, 0, 0, 0]);
+    expect(sprites.halfLengths[0]).toBe(0);
+    expect(sprites.halfLengths[1]).toBe(0);
   });
 
   it("cycles the smoke bitmaps by quad", () => {
@@ -253,28 +257,46 @@ const tracer: TracerEmission = {
 };
 
 describe("the tracer", () => {
-  it("runs from the muzzle to the target and then stops", () => {
-    const early = particlesAt([tracer], 20).sprites;
-    expect(early.count).toBeGreaterThan(0);
-    for (let i = 0; i < early.count; i++) {
-      expect(early.centers[i * 3 + 2]).toBeGreaterThanOrEqual(0);
-      expect(early.centers[i * 3 + 2]).toBeLessThanOrEqual(100);
-      expect(early.bitmaps[i]).toBe(BITMAP_LASER);
+  it("draws an outer bolt and a thinner core, both the laser bitmap, along the path", () => {
+    const { sprites } = particlesAt([tracer], 22);
+    expect(sprites.count).toBe(2);
+    for (let i = 0; i < 2; i++) {
+      expect(sprites.bitmaps[i]).toBe(BITMAP_LASER);
+      expect(sprites.axes[i * 3]).toBeCloseTo(0);
+      expect(sprites.axes[i * 3 + 1]).toBeCloseTo(0);
+      expect(sprites.axes[i * 3 + 2]).toBeCloseTo(1);
     }
+    expect(sprites.halfSizes[0]).toBeGreaterThan(sprites.halfSizes[1]);
+  });
+
+  it("stretches from the clamped tail to the clamped head, centred between them", () => {
+    const { sprites } = particlesAt([tracer], 22);
+    const k = 2;
+    const head = Math.min(k * 10, 100);
+    const tail = Math.max(head - 40, 0);
+    const mid = (head + tail) / 2;
+    const halfLength = (head - tail) / 2;
+    expect(sprites.centers[2]).toBeCloseTo(mid);
+    expect(sprites.halfLengths[0]).toBeCloseTo(halfLength);
+    expect(sprites.centers[5]).toBeCloseTo(mid);
+    expect(sprites.halfLengths[1]).toBeCloseTo(halfLength);
+  });
+
+  it("starts at the muzzle on its birth frame, before it has travelled", () => {
+    const { sprites } = particlesAt([tracer], 20);
+    expect(sprites.count).toBe(2);
+    expect(sprites.centers[2]).toBeCloseTo(0);
+    expect(sprites.halfLengths[0]).toBeCloseTo(0);
+  });
+
+  it("is gone once the raw tail has passed the target", () => {
     expect(particlesAt([tracer], 20 + 100).sprites.count).toBe(0);
   });
 
   it("moves towards the target frame by frame", () => {
-    const furthest = (frame: number) => {
-      const { sprites } = particlesAt([tracer], frame);
-      return Math.max(
-        ...Array.from(
-          { length: sprites.count },
-          (_, i) => sprites.centers[i * 3 + 2],
-        ),
-      );
-    };
-    expect(furthest(22)).toBeGreaterThan(furthest(20));
+    const centerZ = (frame: number) =>
+      particlesAt([tracer], frame).sprites.centers[2];
+    expect(centerZ(24)).toBeGreaterThan(centerZ(22));
   });
 });
 

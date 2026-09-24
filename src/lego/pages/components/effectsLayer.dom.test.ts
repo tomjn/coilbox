@@ -16,6 +16,8 @@ function particles(count: number) {
       halfSizes: new Float32Array(),
       colors: new Float32Array(),
       bitmaps: new Float32Array(),
+      axes: new Float32Array(),
+      halfLengths: new Float32Array(),
     },
   };
 }
@@ -95,7 +97,15 @@ describe("buildEffectsLayer", () => {
   });
 });
 
-function withSprites(count: number, bitmap: number) {
+function withSprites(
+  count: number,
+  bitmap: number,
+  axis: [number, number, number] = [0, 0, 0],
+  halfLength = 0,
+) {
+  const axes = new Float32Array(count * 3);
+  const halfLengths = new Float32Array(count).fill(halfLength);
+  for (let i = 0; i < count; i++) axes.set(axis, i * 3);
   return {
     ...particles(0),
     sprites: {
@@ -104,6 +114,8 @@ function withSprites(count: number, bitmap: number) {
       halfSizes: new Float32Array(count).fill(2),
       colors: new Float32Array(count * 4).fill(1),
       bitmaps: new Float32Array(count).fill(bitmap),
+      axes,
+      halfLengths,
     },
   };
 }
@@ -158,6 +170,16 @@ describe("the sprite mesh", () => {
     expect(spriteGeometry(layer).getAttribute("uvRect").array[0]).toBeLessThan(
       0,
     );
+    layer.dispose();
+  });
+
+  it("writes a bolt's axis and half length onto the instanced attributes", () => {
+    const layer = buildEffectsLayer();
+    layer.update(withSprites(1, 0, [0, 0, 1], 5));
+    expect(
+      Array.from(spriteGeometry(layer).getAttribute("axis").array).slice(0, 3),
+    ).toEqual([0, 0, 1]);
+    expect(spriteGeometry(layer).getAttribute("halfLength").array[0]).toBe(5);
     layer.dispose();
   });
 
