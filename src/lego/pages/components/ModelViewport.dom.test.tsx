@@ -23,7 +23,11 @@ import type { LegoPartInfo, LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { applyTimelineFrame } from "./animationPlayback";
 import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
-import { placeEffects } from "./effectsPlayback";
+import {
+  bakedVertices,
+  type PieceVertices,
+  placeEffects,
+} from "./effectsPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
 import {
   placeStandIn,
@@ -722,6 +726,8 @@ describe("placeStandIn", () => {
       nano: "builder",
     };
 
+    const noVertices: PieceVertices = () => [];
+
     function sprayScene(): SceneState {
       const state = standInScene();
       (state as { effects: EffectsLayer }).effects = buildEffectsLayer();
@@ -744,16 +750,26 @@ describe("placeStandIn", () => {
       expect(Math.abs(actual - expected)).toBeLessThanOrEqual(bound);
     }
 
+    function sprites(state: SceneState) {
+      return state.effects.sprites.geometry as THREE.InstancedBufferGeometry;
+    }
+
+    const aiming: StandInPlacement = {
+      ...beside,
+      nano: null,
+      aims: [{ frame: 0, dir: [0, 0, 1] }],
+    };
+
     it("sprays from the nano piece on the frame it was emitted", () => {
       const state = sprayScene();
       const timeline = run(40, () => 0, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
       // Nothing has left the nozzle yet on the birth frame itself.
-      placeEffects(state, doc, beside, true, timeline, 5);
+      placeEffects(state, doc, beside, true, timeline, 5, noVertices);
       expect(geometry(state).instanceCount).toBe(0);
 
-      placeEffects(state, doc, beside, true, timeline, 6);
+      placeEffects(state, doc, beside, true, timeline, 6, noVertices);
       expect(state.effects.object.visible).toBe(true);
       expect(geometry(state).instanceCount).toBeGreaterThan(0);
       const center = geometry(state).getAttribute("center").array;
@@ -773,7 +789,7 @@ describe("placeStandIn", () => {
       const timeline = run(40, (frame) => frame * 100, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
-      placeEffects(state, doc, beside, true, timeline, 6);
+      placeEffects(state, doc, beside, true, timeline, 6, noVertices);
 
       const center = geometry(state).getAttribute("center").array;
       expect(geometry(state).instanceCount).toBeGreaterThan(0);
@@ -801,7 +817,7 @@ describe("placeStandIn", () => {
         show: true,
         nano: "factory",
       };
-      placeEffects(state, doc, swinging, true, timeline, 6);
+      placeEffects(state, doc, swinging, true, timeline, 6, noVertices);
 
       // The nozzle stayed at x = 0, so a particle drifting to positive x one
       // frame after it fired means the target read the emitting frame's
@@ -816,7 +832,7 @@ describe("placeStandIn", () => {
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
       applyTimelineFrame(state, doc, timeline, 12);
-      placeEffects(state, doc, beside, true, timeline, 12);
+      placeEffects(state, doc, beside, true, timeline, 12, noVertices);
 
       expect(state.groups.get("arm")?.position.x).toBe(12);
     });
@@ -826,11 +842,19 @@ describe("placeStandIn", () => {
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
       const quiet = sprayScene();
-      placeEffects(quiet, doc, { ...beside, nano: null }, true, timeline, 5);
+      placeEffects(
+        quiet,
+        doc,
+        { ...beside, nano: null },
+        true,
+        timeline,
+        5,
+        noVertices,
+      );
       expect(geometry(quiet).instanceCount).toBe(0);
 
       const hidden = sprayScene();
-      placeEffects(hidden, doc, beside, false, timeline, 5);
+      placeEffects(hidden, doc, beside, false, timeline, 5, noVertices);
       expect(hidden.effects.object.visible).toBe(false);
     });
 
@@ -839,7 +863,15 @@ describe("placeStandIn", () => {
       const timeline = run(40, () => 0, [
         { frame: 5, kind: "nano", piece: "arm" },
       ]);
-      placeEffects(state, doc, standInFor(beside, false), true, timeline, 6);
+      placeEffects(
+        state,
+        doc,
+        standInFor(beside, false),
+        true,
+        timeline,
+        6,
+        noVertices,
+      );
       expect(geometry(state).instanceCount).toBeGreaterThan(0);
       expect(state.standIn.visible).toBe(false);
     });
@@ -868,7 +900,7 @@ describe("placeStandIn", () => {
         { frame: 3, kind: "nano", piece: "arm" },
       ]);
 
-      placeEffects(state, doc, staggered, true, timeline, 3);
+      placeEffects(state, doc, staggered, true, timeline, 3, noVertices);
 
       const center = geometry(state).getAttribute("center").array;
       const nearArm = Array.from(
@@ -894,9 +926,94 @@ describe("placeStandIn", () => {
         { frame: 0, kind: "nano", piece: "arm" },
       ]);
 
-      placeEffects(state, doc, lone, true, timeline, 3);
+      placeEffects(state, doc, lone, true, timeline, 3, noVertices);
 
       expect(geometry(state).instanceCount).toBe(0);
+    });
+
+    it("draws a muzzle flame at the flare piece on its frame, and gone a few frames later", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "flare", piece: "arm" },
+      ]);
+      placeEffects(state, doc, aiming, true, timeline, 5, noVertices);
+      expect(sprites(state).instanceCount).toBeGreaterThan(0);
+      const center = sprites(state).getAttribute("center").array;
+      expectNear(center[0], 0, 6);
+      expectNear(center[1], 4, 6);
+
+      placeEffects(state, doc, aiming, true, timeline, 15, noVertices);
+      expect(sprites(state).instanceCount).toBe(0);
+    });
+
+    it("draws a flame for a unit that sprays no nano", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "flare", piece: "arm" },
+      ]);
+      placeEffects(
+        state,
+        doc,
+        { ...aiming, track: null },
+        true,
+        timeline,
+        5,
+        noVertices,
+      );
+      expect(sprites(state).instanceCount).toBeGreaterThan(0);
+    });
+
+    it("runs a tracer from the shot piece's emit point to the stand-in", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "shot", weapon: 1, piece: "arm" },
+      ]);
+      // Two vertices, so the emit point is the first one, ten elmos up the
+      // arm from its origin.
+      const vertices: PieceVertices = (piece) =>
+        piece === "arm"
+          ? [
+              [0, 10, 0],
+              [0, 10, 1],
+            ]
+          : [];
+      placeEffects(state, doc, aiming, true, timeline, 5, vertices);
+      expect(sprites(state).instanceCount).toBeGreaterThan(0);
+      const center = sprites(state).getAttribute("center").array;
+      for (let i = 0; i < sprites(state).instanceCount; i++) {
+        expect(center[i * 3 + 1]).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it("draws no tracer for a shot from no piece", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "shot", weapon: 1, piece: null },
+      ]);
+      placeEffects(state, doc, aiming, true, timeline, 5, noVertices);
+      expect(sprites(state).instanceCount).toBe(0);
+    });
+
+    it("hides the flame with the effects toggle", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "flare", piece: "arm" },
+      ]);
+      placeEffects(state, doc, aiming, false, timeline, 5, noVertices);
+      expect(state.effects.object.visible).toBe(false);
+    });
+
+    describe("bakedVertices", () => {
+      it("returns the same function for the same project, pack and raw", () => {
+        const first = bakedVertices(doc, loaded, null);
+        const second = bakedVertices(doc, loaded, null);
+        expect(second).toBe(first);
+      });
+
+      it("answers empty for a name that is not a piece", () => {
+        const vertices = bakedVertices(doc, loaded, null);
+        expect(vertices("no-such-piece")).toEqual([]);
+      });
     });
   });
 });
