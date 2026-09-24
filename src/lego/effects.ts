@@ -61,6 +61,9 @@ export interface TracerEmission {
   /** The stand-in's middle, world space. */
   to: Vec3;
   seed: number;
+  /** Which weapon fired it, counted from one, so a unit with more than one can
+   *  be told apart on screen. */
+  weapon: number;
 }
 
 export type Emission = NanoEmission | FlameEmission | TracerEmission;
@@ -260,17 +263,36 @@ const TRACER_LENGTH = 40;
 const TRACER_THICKNESS = 2;
 const TRACER_CORE_THICKNESS = TRACER_THICKNESS * 0.25;
 
-/** Set by eye: a warm white bolt with a plain white core, tinted by nothing
- *  in particular since the weapon's own colour needs its unit def. Alpha 1/255
- *  matches the engine's own laser colour byte (`LaserProjectile.cpp:210`),
- *  which is close to additive against the ONE / ONE_MINUS_SRC_ALPHA blend. */
-const TRACER_OUTER_COLOR: [number, number, number, number] = [
-  1,
-  0.85,
-  0.6,
-  1 / 255,
+/**
+ * A tracer's outer and core colour, by weapon, set by eye since the weapon's
+ * own colour needs its unit def. Weapon 1 keeps the preview's original warm
+ * white-gold bolt with a plain white core. Weapon 2 is an orange-red, so a
+ * unit's second weapon reads apart from its first, and weapon 3 a pale blue.
+ * A fourth weapon and beyond cycle back through the same three.
+ *
+ * Alpha 1/255 matches the engine's own laser colour byte
+ * (`LaserProjectile.cpp:210`), which is close to additive against the ONE /
+ * ONE_MINUS_SRC_ALPHA blend, and every entry keeps it.
+ */
+type TracerColors = {
+  outer: [number, number, number, number];
+  core: [number, number, number, number];
+};
+
+const TRACER_PALETTE: TracerColors[] = [
+  { outer: [1, 0.85, 0.6, 1 / 255], core: [1, 1, 1, 1 / 255] },
+  { outer: [1, 0.35, 0.15, 1 / 255], core: [1, 0.7, 0.55, 1 / 255] },
+  { outer: [0.55, 0.75, 1, 1 / 255], core: [0.85, 0.92, 1, 1 / 255] },
 ];
-const TRACER_CORE_COLOR: [number, number, number, number] = [1, 1, 1, 1 / 255];
+
+/** The outer and core colour a weapon's tracer draws, cycling through
+ *  `TRACER_PALETTE` for a weapon past the palette's own length. */
+function tracerColors(weapon: number): TracerColors {
+  const index =
+    (((weapon - 1) % TRACER_PALETTE.length) + TRACER_PALETTE.length) %
+    TRACER_PALETTE.length;
+  return TRACER_PALETTE[index];
+}
 
 interface SpriteArrays {
   centers: number[];
@@ -373,6 +395,7 @@ function tracerEndCap(
   end: Vec3,
   axis: Vec3,
   farU: number,
+  colors: TracerColors,
   out: SpriteArrays,
 ): void {
   const push = (size: number, color: [number, number, number, number]) => {
@@ -389,8 +412,8 @@ function tracerEndCap(
     out.halfLengths.push(half);
     out.uvRanges.push(MIDTEX_U, farU);
   };
-  push(TRACER_THICKNESS, TRACER_OUTER_COLOR);
-  push(TRACER_CORE_THICKNESS, TRACER_CORE_COLOR);
+  push(TRACER_THICKNESS, colors.outer);
+  push(TRACER_CORE_THICKNESS, colors.core);
 }
 
 /** A preview tracer's bolt on one frame, drawn as `CLaserProjectile::Draw`
@@ -446,14 +469,15 @@ function tracerSprites(
     emission.at[2] + dir[2] * tail,
   ];
   const behindHead: Vec3 = [-dir[0], -dir[1], -dir[2]];
+  const colors = tracerColors(emission.weapon);
 
   // Head cap first, at xstart..midtexx, then the bolt, then the tail cap at
   // midtexx..xend, the order `CLaserProjectile::Draw` itself uses.
-  tracerEndCap(headPos, dir, 0, out);
+  tracerEndCap(headPos, dir, 0, colors, out);
 
   out.centers.push(...center);
   out.halfSizes.push(TRACER_THICKNESS);
-  out.colors.push(...TRACER_OUTER_COLOR);
+  out.colors.push(...colors.outer);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
   out.halfLengths.push(halfLength);
@@ -461,13 +485,13 @@ function tracerSprites(
 
   out.centers.push(...center);
   out.halfSizes.push(TRACER_CORE_THICKNESS);
-  out.colors.push(...TRACER_CORE_COLOR);
+  out.colors.push(...colors.core);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
   out.halfLengths.push(halfLength);
   out.uvRanges.push(0, 1);
 
-  tracerEndCap(tailPos, behindHead, 1, out);
+  tracerEndCap(tailPos, behindHead, 1, colors, out);
 }
 
 export function particlesAt(

@@ -255,6 +255,7 @@ function resolve(
         at,
         to: standInMiddle(event.frame),
         seed,
+        weapon: event.weapon,
       });
     }
   });

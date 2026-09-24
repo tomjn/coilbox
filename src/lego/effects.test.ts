@@ -255,6 +255,7 @@ const tracer: TracerEmission = {
   at: [0, 0, 0],
   to: [0, 0, 100],
   seed: 1,
+  weapon: 1,
 };
 
 describe("the tracer", () => {
@@ -360,6 +361,57 @@ describe("the tracer", () => {
     const centerZ = (frame: number) =>
       particlesAt([tracer], frame).sprites.centers[BODY_OUTER * 3 + 2];
     expect(centerZ(24)).toBeGreaterThan(centerZ(22));
+  });
+});
+
+describe("a tracer's colour by weapon", () => {
+  const BODY_OUTER = 2;
+  const BODY_CORE = 3;
+
+  it("keeps weapon 1's original warm white-gold outer and white core", () => {
+    const { sprites } = particlesAt([tracer], 22);
+    const outer = sprites.colors.slice(BODY_OUTER * 4, BODY_OUTER * 4 + 3);
+    const core = sprites.colors.slice(BODY_CORE * 4, BODY_CORE * 4 + 3);
+    expect(outer[0]).toBeCloseTo(1);
+    expect(outer[1]).toBeCloseTo(0.85);
+    expect(outer[2]).toBeCloseTo(0.6);
+    expect(core[0]).toBeCloseTo(1);
+    expect(core[1]).toBeCloseTo(1);
+    expect(core[2]).toBeCloseTo(1);
+  });
+
+  it("draws weapon 2 in a different colour from weapon 1", () => {
+    const weapon2: TracerEmission = { ...tracer, weapon: 2 };
+    const one = particlesAt([tracer], 22).sprites.colors.slice(
+      BODY_OUTER * 4,
+      BODY_OUTER * 4 + 3,
+    );
+    const two = particlesAt([weapon2], 22).sprites.colors.slice(
+      BODY_OUTER * 4,
+      BODY_OUTER * 4 + 3,
+    );
+    expect(Array.from(two)).not.toEqual(Array.from(one));
+  });
+
+  it("draws weapon 3 in a colour different from weapons 1 and 2", () => {
+    const weapon2: TracerEmission = { ...tracer, weapon: 2 };
+    const weapon3: TracerEmission = { ...tracer, weapon: 3 };
+    const two = particlesAt([weapon2], 22).sprites.colors.slice(
+      BODY_OUTER * 4,
+      BODY_OUTER * 4 + 3,
+    );
+    const three = particlesAt([weapon3], 22).sprites.colors.slice(
+      BODY_OUTER * 4,
+      BODY_OUTER * 4 + 3,
+    );
+    expect(Array.from(three)).not.toEqual(Array.from(two));
+  });
+
+  it("cycles weapon 4 back to weapon 1's colour", () => {
+    const weapon1 = particlesAt([tracer], 22).sprites.colors;
+    const weapon4: TracerEmission = { ...tracer, weapon: 4 };
+    const four = particlesAt([weapon4], 22).sprites.colors;
+    expect(Array.from(four)).toEqual(Array.from(weapon1));
   });
 });
 
