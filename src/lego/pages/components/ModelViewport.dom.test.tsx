@@ -978,16 +978,29 @@ describe("placeStandIn", () => {
               [0, 10, 1],
             ]
           : [];
+      // The shot's own frame is the tracer's birth frame, where the engine's
+      // own curDrawLen <= 0 guard (LaserProjectile.cpp:225-226) leaves it
+      // with no length yet, so nothing is drawn (`effects.test.ts` covers
+      // that in the pure function).
       placeEffects(state, doc, aiming, true, timeline, 5, vertices);
-      // On the shot's own frame the tracer has not travelled yet, so the bolt
-      // and its end caps all sit at the emit point itself: proof the tracer
-      // starts from the vertex, ten elmos above the arm's origin, rather than
-      // from the origin on its own. Six sprites: the outer and core bolt,
-      // then an outer and core cap at each of its two (here coincident) ends.
+      expect(sprites(state).instanceCount).toBe(0);
+
+      // One frame on, the bolt has a length but its tail has not yet left
+      // the emit point, so the bolt's own tail edge still sits there: proof
+      // the tracer starts from the vertex, ten elmos above the arm's origin,
+      // rather than from the origin on its own. Six sprites: an outer and
+      // core cap at the head, the outer and core bolt, then the same pair of
+      // caps at the tail.
+      placeEffects(state, doc, aiming, true, timeline, 6, vertices);
       expect(sprites(state).instanceCount).toBe(6);
       const center = sprites(state).getAttribute("center").array;
-      expectNear(center[1], 14, 0.01);
-      expectNear(center[4], 14, 0.01);
+      const axis = sprites(state).getAttribute("axis").array;
+      const halfLength = sprites(state).getAttribute("halfLength").array;
+      const bodyOuter = 2;
+      const tailY =
+        center[bodyOuter * 3 + 1] -
+        axis[bodyOuter * 3 + 1] * halfLength[bodyOuter];
+      expectNear(tailY, 14, 0.01);
     });
 
     it("draws no tracer for a shot from no piece", () => {

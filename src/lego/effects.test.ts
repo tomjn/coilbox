@@ -258,37 +258,67 @@ const tracer: TracerEmission = {
 };
 
 describe("the tracer", () => {
+  // Indices follow `CLaserProjectile::Draw`'s own order: the head cap's
+  // outer and core quads, the bolt's outer and core quads, then the tail
+  // cap's outer and core quads.
+  const HEAD_CAP_OUTER = 0;
+  const HEAD_CAP_CORE = 1;
+  const BODY_OUTER = 2;
+  const BODY_CORE = 3;
+  const TAIL_CAP_OUTER = 4;
+  const TAIL_CAP_CORE = 5;
+
   it("draws an outer bolt and a thinner core, both the laser bitmap, along the path", () => {
     const { sprites } = particlesAt([tracer], 22);
     expect(sprites.count).toBe(6);
-    for (let i = 0; i < 2; i++) {
+    for (const i of [BODY_OUTER, BODY_CORE]) {
       expect(sprites.bitmaps[i]).toBe(BITMAP_LASER);
       expect(sprites.axes[i * 3]).toBeCloseTo(0);
       expect(sprites.axes[i * 3 + 1]).toBeCloseTo(0);
       expect(sprites.axes[i * 3 + 2]).toBeCloseTo(1);
     }
-    expect(sprites.halfSizes[0]).toBeGreaterThan(sprites.halfSizes[1]);
+    expect(sprites.halfSizes[BODY_OUTER]).toBeGreaterThan(
+      sprites.halfSizes[BODY_CORE],
+    );
   });
 
-  it("draws a camera-facing end cap at the head and the tail, using the laser end bitmap", () => {
+  it("draws a head and a tail cap, stretched past the bolt's own ends, using the laser end bitmap", () => {
     const { sprites } = particlesAt([tracer], 22);
     const k = 2;
     const head = Math.min(k * 10, 100);
     const tail = Math.max(head - 40, 0);
-    // Caps are indices 2 to 5: an outer and a core quad at the head, then the
-    // same pair at the tail, matching `LaserProjectile.cpp`'s own order.
-    for (let i = 2; i < 6; i++) {
+    for (const i of [
+      HEAD_CAP_OUTER,
+      HEAD_CAP_CORE,
+      TAIL_CAP_OUTER,
+      TAIL_CAP_CORE,
+    ]) {
       expect(sprites.bitmaps[i]).toBe(BITMAP_LASER_END);
-      // Billboarded, not stretched along the bolt's axis.
-      expect(Array.from(sprites.axes.slice(i * 3, i * 3 + 3))).toEqual([
-        0, 0, 0,
-      ]);
-      expect(sprites.halfLengths[i]).toBe(0);
     }
-    expect(sprites.centers[2 * 3 + 2]).toBeCloseTo(head);
-    expect(sprites.centers[4 * 3 + 2]).toBeCloseTo(tail);
-    expect(sprites.halfSizes[2]).toBeGreaterThan(sprites.halfSizes[3]);
-    expect(sprites.halfSizes[4]).toBeGreaterThan(sprites.halfSizes[5]);
+    // Each cap is stretched along the bolt's own axis, past the head in the
+    // direction of travel and past the tail in the opposite direction,
+    // following `CLaserProjectile::Draw`'s `texture2` quads
+    // (`LaserProjectile.cpp:243-260,279-295`).
+    expect(sprites.axes[HEAD_CAP_OUTER * 3 + 2]).toBeCloseTo(1);
+    expect(sprites.axes[TAIL_CAP_OUTER * 3 + 2]).toBeCloseTo(-1);
+    expect(sprites.halfLengths[HEAD_CAP_OUTER]).toBeGreaterThan(0);
+    expect(sprites.halfLengths[TAIL_CAP_OUTER]).toBeGreaterThan(0);
+    // The head cap bulges beyond the head, the tail cap beyond the tail.
+    expect(sprites.centers[HEAD_CAP_OUTER * 3 + 2]).toBeGreaterThan(head);
+    expect(sprites.centers[TAIL_CAP_OUTER * 3 + 2]).toBeLessThan(tail);
+    expect(sprites.halfSizes[HEAD_CAP_OUTER]).toBeGreaterThan(
+      sprites.halfSizes[HEAD_CAP_CORE],
+    );
+    expect(sprites.halfSizes[TAIL_CAP_OUTER]).toBeGreaterThan(
+      sprites.halfSizes[TAIL_CAP_CORE],
+    );
+    // The near edge of each cap, at the bolt's own end, sits at the laser
+    // end texture's midpoint, and the far edge at the outer edge of its own
+    // half: `xstart` for the head, `xend` for the tail.
+    expect(sprites.uvRanges[HEAD_CAP_OUTER * 2]).toBeCloseTo(0.5);
+    expect(sprites.uvRanges[HEAD_CAP_OUTER * 2 + 1]).toBeCloseTo(0);
+    expect(sprites.uvRanges[TAIL_CAP_OUTER * 2]).toBeCloseTo(0.5);
+    expect(sprites.uvRanges[TAIL_CAP_OUTER * 2 + 1]).toBeCloseTo(1);
   });
 
   it("stretches from the clamped tail to the clamped head, centred between them", () => {
@@ -298,17 +328,28 @@ describe("the tracer", () => {
     const tail = Math.max(head - 40, 0);
     const mid = (head + tail) / 2;
     const halfLength = (head - tail) / 2;
-    expect(sprites.centers[2]).toBeCloseTo(mid);
-    expect(sprites.halfLengths[0]).toBeCloseTo(halfLength);
-    expect(sprites.centers[5]).toBeCloseTo(mid);
-    expect(sprites.halfLengths[1]).toBeCloseTo(halfLength);
+    expect(sprites.centers[BODY_OUTER * 3 + 2]).toBeCloseTo(mid);
+    expect(sprites.halfLengths[BODY_OUTER]).toBeCloseTo(halfLength);
+    expect(sprites.centers[BODY_CORE * 3 + 2]).toBeCloseTo(mid);
+    expect(sprites.halfLengths[BODY_CORE]).toBeCloseTo(halfLength);
   });
 
-  it("starts at the muzzle on its birth frame, before it has travelled", () => {
-    const { sprites } = particlesAt([tracer], 20);
+  /** `LaserProjectile.cpp:225-226` returns before drawing anything once the
+   *  clamped bolt has no length, which is exactly true on the birth frame:
+   *  head and tail are both clamped to zero. */
+  it("draws nothing on its birth frame, before it has any length", () => {
+    expect(particlesAt([tracer], 20).sprites.count).toBe(0);
+  });
+
+  it("starts at the muzzle on the first frame it draws anything", () => {
+    const { sprites } = particlesAt([tracer], 21);
     expect(sprites.count).toBe(6);
-    expect(sprites.centers[2]).toBeCloseTo(0);
-    expect(sprites.halfLengths[0]).toBeCloseTo(0);
+    // The tail is still clamped to zero here, so the bolt's own tail edge,
+    // its centre pulled back by its own half length, sits at the emit point.
+    const tailZ =
+      sprites.centers[BODY_OUTER * 3 + 2] -
+      sprites.axes[BODY_OUTER * 3 + 2] * sprites.halfLengths[BODY_OUTER];
+    expect(tailZ).toBeCloseTo(0);
   });
 
   it("is gone once the raw tail has passed the target", () => {
@@ -317,7 +358,7 @@ describe("the tracer", () => {
 
   it("moves towards the target frame by frame", () => {
     const centerZ = (frame: number) =>
-      particlesAt([tracer], frame).sprites.centers[2];
+      particlesAt([tracer], frame).sprites.centers[BODY_OUTER * 3 + 2];
     expect(centerZ(24)).toBeGreaterThan(centerZ(22));
   });
 });

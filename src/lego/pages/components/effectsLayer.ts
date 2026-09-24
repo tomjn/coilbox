@@ -72,6 +72,7 @@ attribute vec3 center;
 attribute float halfSize;
 attribute vec4 tint;
 attribute vec4 uvRect;
+attribute vec2 uvRange;
 attribute vec3 axis;
 attribute float halfLength;
 varying vec4 vTint;
@@ -97,7 +98,9 @@ void main() {
   vTint = tint;
   vLocal = position.xy;
   vRound = uvRect.x < 0.0 ? 1.0 : 0.0;
-  vUv = mix(uvRect.xy, uvRect.zw, position.xy * 0.5 + 0.5);
+  vec2 fraction = position.xy * 0.5 + 0.5;
+  fraction.x = mix(uvRange.x, uvRange.y, fraction.x);
+  vUv = mix(uvRect.xy, uvRect.zw, fraction);
 }
 `;
 
@@ -149,6 +152,10 @@ function spriteGeometry(capacity: number): THREE.InstancedBufferGeometry {
   geometry.setAttribute(
     "uvRect",
     new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4),
+  );
+  geometry.setAttribute(
+    "uvRange",
+    new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2),
   );
   geometry.setAttribute(
     "axis",
@@ -321,6 +328,7 @@ export function buildEffectsLayer(): EffectsLayer {
       writeSprite("tint", sprite.colors);
       writeSprite("axis", sprite.axes);
       writeSprite("halfLength", sprite.halfLengths);
+      writeSprite("uvRange", sprite.uvRanges);
       lastBitmaps = sprite.bitmaps;
       refillUvRect();
       spriteGeom.instanceCount = sprite.count;

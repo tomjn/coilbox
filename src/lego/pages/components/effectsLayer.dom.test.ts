@@ -18,6 +18,7 @@ function particles(count: number) {
       bitmaps: new Float32Array(),
       axes: new Float32Array(),
       halfLengths: new Float32Array(),
+      uvRanges: new Float32Array(),
     },
   };
 }
@@ -105,7 +106,11 @@ function withSprites(
 ) {
   const axes = new Float32Array(count * 3);
   const halfLengths = new Float32Array(count).fill(halfLength);
-  for (let i = 0; i < count; i++) axes.set(axis, i * 3);
+  const uvRanges = new Float32Array(count * 2);
+  for (let i = 0; i < count; i++) {
+    axes.set(axis, i * 3);
+    uvRanges.set([0, 1], i * 2);
+  }
   return {
     ...particles(0),
     sprites: {
@@ -116,6 +121,7 @@ function withSprites(
       bitmaps: new Float32Array(count).fill(bitmap),
       axes,
       halfLengths,
+      uvRanges,
     },
   };
 }

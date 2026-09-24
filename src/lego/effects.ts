@@ -82,6 +82,10 @@ export interface Sprites {
   /** One per sprite, in elmos, zero for an ordinary billboard. Half the
    *  bolt's length along its `axes` direction. */
   halfLengths: Float32Array;
+  /** Two per sprite: the near and far u edges of the quad, as fractions of
+   *  its bitmap's own u range. `[0, 1]` for an ordinary sprite. A laser end
+   *  cap uses half the laser end bitmap, split at `midtexx`. */
+  uvRanges: Float32Array;
 }
 
 export interface Particles {
@@ -275,6 +279,11 @@ interface SpriteArrays {
   bitmaps: number[];
   axes: number[];
   halfLengths: number[];
+  /** Two per sprite: where in its bitmap's rect the quad's near and far u
+   *  edges sit, as fractions of the rect's own u range. `[0, 1]` for an
+   *  ordinary sprite that uses the whole rect. A laser end cap uses half of
+   *  it, split at the texture's `midtexx`. */
+  uvRanges: number[];
 }
 
 /** A muzzle flame's quads on one frame, following `CMuzzleFlame::Draw`
@@ -327,6 +336,7 @@ function flameSprites(
     out.bitmaps.push(BITMAP_SMOKE + (a % smokeCount));
     out.axes.push(0, 0, 0);
     out.halfLengths.push(0);
+    out.uvRanges.push(0, 1);
 
     if (fade < 1) {
       const ifade = 1 - fade;
@@ -341,39 +351,59 @@ function flameSprites(
       out.bitmaps.push(BITMAP_MUZZLE_FLAME);
       out.axes.push(0, 0, 0);
       out.halfLengths.push(0);
+      out.uvRanges.push(0, 1);
     }
   }
 }
 
-/** A camera-facing quad at one end of the bolt, drawn the way
- *  `CLaserProjectile::Draw` draws its `texture2` end cap: at the outer `size`
- *  and the core `coresize`, in the outer and core colours
- *  (`LaserProjectile.cpp:243-260,279-295`). Billboarded rather than stretched,
- *  so `axis` and `halfLength` are left at zero. */
-function tracerEndCap(center: Vec3, out: SpriteArrays): void {
-  out.centers.push(...center);
-  out.halfSizes.push(TRACER_THICKNESS);
-  out.colors.push(...TRACER_OUTER_COLOR);
-  out.bitmaps.push(BITMAP_LASER_END);
-  out.axes.push(0, 0, 0);
-  out.halfLengths.push(0);
+/** The fraction of the laser end texture's u range that its `midtexx` split
+ *  sits at. `midtexx` is defined as the exact midpoint of `xstart..xend`
+ *  (`LaserProjectile.cpp:47-49`), so the fraction is always one half, not a
+ *  number read off a particular weapon def. */
+const MIDTEX_U = 0.5;
 
-  out.centers.push(...center);
-  out.halfSizes.push(TRACER_CORE_THICKNESS);
-  out.colors.push(...TRACER_CORE_COLOR);
-  out.bitmaps.push(BITMAP_LASER_END);
-  out.axes.push(0, 0, 0);
-  out.halfLengths.push(0);
+/** One end cap's outer and core quads, following `CLaserProjectile::Draw`'s
+ *  `texture2` quads (`LaserProjectile.cpp:243-260,279-295`). Each is a quad
+ *  stretched from `end` outward by `size` (outer) or `coresize` (core) along
+ *  `axis`, the direction the cap bulges away from the bolt: forward past the
+ *  head, backward past the tail. The near edge, at `end` itself, sits at the
+ *  texture's `midtexx`, and the far edge sits at `farU`, `xstart` for the
+ *  head or `xend` for the tail. */
+function tracerEndCap(
+  end: Vec3,
+  axis: Vec3,
+  farU: number,
+  out: SpriteArrays,
+): void {
+  const push = (size: number, color: [number, number, number, number]) => {
+    const half = size / 2;
+    out.centers.push(
+      end[0] + axis[0] * half,
+      end[1] + axis[1] * half,
+      end[2] + axis[2] * half,
+    );
+    out.halfSizes.push(size);
+    out.colors.push(...color);
+    out.bitmaps.push(BITMAP_LASER_END);
+    out.axes.push(...axis);
+    out.halfLengths.push(half);
+    out.uvRanges.push(MIDTEX_U, farU);
+  };
+  push(TRACER_THICKNESS, TRACER_OUTER_COLOR);
+  push(TRACER_CORE_THICKNESS, TRACER_CORE_COLOR);
 }
 
 /** A preview tracer's bolt on one frame, drawn as `CLaserProjectile::Draw`
- *  draws a laser: one quad stretched from `tail` to `head` along the shot's
- *  path, plus a thinner core quad over it, and a camera-facing end cap quad
- *  at each end (`LaserProjectile.cpp:243-260,279-295`, the `texture2` branch).
- *  `head` is how far the tracer has travelled and `tail` is `TRACER_LENGTH`
- *  behind it, both clamped to the run from the muzzle to the target. Nothing
- *  is drawn once the raw, unclamped tail has passed the target, or before the
- *  emission's birth frame. */
+ *  draws a laser: a camera-facing end cap quad past the head, one quad
+ *  stretched from `tail` to `head` along the shot's path with a thinner core
+ *  quad over it, then a camera-facing end cap quad past the tail, the
+ *  engine's own draw order (`LaserProjectile.cpp:243-260,279-295`, the
+ *  `texture2` branch). `head` is how far the tracer has travelled and `tail`
+ *  is `TRACER_LENGTH` behind it, both clamped to the run from the muzzle to
+ *  the target. Nothing is drawn once the raw, unclamped tail has passed the
+ *  target, before the emission's birth frame, or while the clamped bolt has
+ *  no length, matching the engine's own `curDrawLen <= 0` guard
+ *  (`LaserProjectile.cpp:225-226`). */
 function tracerSprites(
   emission: TracerEmission,
   frame: number,
@@ -396,6 +426,8 @@ function tracerSprites(
 
   const head = Math.min(Math.max(headRaw, 0), distance);
   const tail = Math.min(Math.max(tailRaw, 0), distance);
+  if (head <= tail) return;
+
   const mid = (head + tail) / 2;
   const halfLength = (head - tail) / 2;
   const center: Vec3 = [
@@ -403,21 +435,6 @@ function tracerSprites(
     emission.at[1] + dir[1] * mid,
     emission.at[2] + dir[2] * mid,
   ];
-
-  out.centers.push(...center);
-  out.halfSizes.push(TRACER_THICKNESS);
-  out.colors.push(...TRACER_OUTER_COLOR);
-  out.bitmaps.push(BITMAP_LASER);
-  out.axes.push(...dir);
-  out.halfLengths.push(halfLength);
-
-  out.centers.push(...center);
-  out.halfSizes.push(TRACER_CORE_THICKNESS);
-  out.colors.push(...TRACER_CORE_COLOR);
-  out.bitmaps.push(BITMAP_LASER);
-  out.axes.push(...dir);
-  out.halfLengths.push(halfLength);
-
   const headPos: Vec3 = [
     emission.at[0] + dir[0] * head,
     emission.at[1] + dir[1] * head,
@@ -428,8 +445,29 @@ function tracerSprites(
     emission.at[1] + dir[1] * tail,
     emission.at[2] + dir[2] * tail,
   ];
-  tracerEndCap(headPos, out);
-  tracerEndCap(tailPos, out);
+  const behindHead: Vec3 = [-dir[0], -dir[1], -dir[2]];
+
+  // Head cap first, at xstart..midtexx, then the bolt, then the tail cap at
+  // midtexx..xend, the order `CLaserProjectile::Draw` itself uses.
+  tracerEndCap(headPos, dir, 0, out);
+
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_THICKNESS);
+  out.colors.push(...TRACER_OUTER_COLOR);
+  out.bitmaps.push(BITMAP_LASER);
+  out.axes.push(...dir);
+  out.halfLengths.push(halfLength);
+  out.uvRanges.push(0, 1);
+
+  out.centers.push(...center);
+  out.halfSizes.push(TRACER_CORE_THICKNESS);
+  out.colors.push(...TRACER_CORE_COLOR);
+  out.bitmaps.push(BITMAP_LASER);
+  out.axes.push(...dir);
+  out.halfLengths.push(halfLength);
+  out.uvRanges.push(0, 1);
+
+  tracerEndCap(tailPos, behindHead, 1, out);
 }
 
 export function particlesAt(
@@ -447,6 +485,7 @@ export function particlesAt(
     bitmaps: [],
     axes: [],
     halfLengths: [],
+    uvRanges: [],
   };
   for (const emission of emissions) {
     if (emission.kind === "flame") {
@@ -494,6 +533,7 @@ export function particlesAt(
       bitmaps: new Float32Array(sprites.bitmaps),
       axes: new Float32Array(sprites.axes),
       halfLengths: new Float32Array(sprites.halfLengths),
+      uvRanges: new Float32Array(sprites.uvRanges),
     },
   };
 }
