@@ -9,7 +9,7 @@
 //! it is unset, because no game ships in this repo.
 
 use coilbox_springlua::unitscript::{run as run_lua, Rest, ScriptEvent, Unit};
-use coilbox_unitpose::ScriptOutput;
+use coilbox_unitpose::{EngineAction, ScriptOutput};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -74,6 +74,17 @@ fn event(frame: u32, callin: &str, args: &[f64]) -> ScriptEvent {
     }
 }
 
+fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+    ScriptEvent {
+        frame,
+        callin: String::new(),
+        args: Vec::new(),
+        ambient: false,
+        world: None,
+        engine: Some(action),
+    }
+}
+
 fn pieces_of(lua: &str) -> Vec<String> {
     lua.split("piece(\"")
         .skip(1)
@@ -113,6 +124,8 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
         event(60, "StopMoving", &[]),
         event(70, "Activate", &[]),
         event(80, "StartBuilding", &[0.5, 0.1]),
+        action(81, EngineAction::NanoStart),
+        action(119, EngineAction::NanoStop),
         event(120, "StopBuilding", &[]),
         event(130, "AimWeapon1", &[0.8, 0.1]),
         event(131, "AimWeapon2", &[-0.5, 0.2]),
@@ -166,7 +179,11 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 continue;
             }
         };
-        let pieces = pieces_of(&conversion.lua);
+        // The model holds the pieces in another order from the script's, as
+        // a real one usually does, so a piece the Lua finds by number rather
+        // than by name shows up as the wrong one.
+        let mut pieces = pieces_of(&conversion.lua);
+        pieces.reverse();
         let from_cob = crate::cobrun::run(&bytes, &pieces, &events, FRAMES, &[], &HashMap::new());
         let from_lua = run_lua(
             &conversion.lua,
@@ -198,9 +215,33 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
             Some(_) if KNOWN.iter().any(|(known, _)| *known == name) => same += 1,
             Some(d) => differ.push(d),
         }
+        let known = KNOWN.iter().any(|(known, _)| *known == name);
+        let nano = |t: &coilbox_unitpose::Timeline| -> Vec<Option<String>> {
+            t.events
+                .iter()
+                .filter_map(|e| match e {
+                    ScriptOutput::Nano { piece, .. } => Some(piece.clone()),
+                    _ => None,
+                })
+                .collect()
+        };
+        // A COB script with no QueryNanoPiece sprays from its piece 1 and a Lua
+        // one sprays nothing, in the engine as in the runtimes, so only an
+        // answer the script gives is compared.
+        let answers = conversion.lua.contains("QueryNanoPiece");
+        let (cob_nano, lua_nano) = (nano(&from_cob), nano(&from_lua));
+        if answers && cob_nano != lua_nano && !known {
+            let at = cob_nano.iter().zip(&lua_nano).position(|(a, b)| a != b);
+            differ.push(format!(
+                "{name}: QueryNanoPiece names {:?} in COB and {:?} in Lua, first apart at spray {at:?}",
+                cob_nano.iter().flatten().collect::<std::collections::BTreeSet<_>>(),
+                lua_nano.iter().flatten().collect::<std::collections::BTreeSet<_>>(),
+            ));
+        }
         let heard = |t: &coilbox_unitpose::Timeline| -> Vec<ScriptOutput> {
             t.events
                 .iter()
+                .filter(|e| !matches!(e, ScriptOutput::Nano { .. }))
                 .cloned()
                 .map(|e| match e {
                     ScriptOutput::Sound { frame, .. } => ScriptOutput::Sound { frame, name: None },
@@ -208,7 +249,7 @@ fn converted_scripts_move_pieces_as_their_cobs_do() {
                 })
                 .collect()
         };
-        if heard(&from_cob) != heard(&from_lua) && !KNOWN.iter().any(|(known, _)| *known == name) {
+        if heard(&from_cob) != heard(&from_lua) && !known {
             differ.push(format!("{name}: the two announce different events"));
         }
     }

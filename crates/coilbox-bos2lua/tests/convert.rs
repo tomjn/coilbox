@@ -160,9 +160,9 @@ fn hands_call_ins_to_the_engine_under_its_names() {
 #[test]
 fn holds_a_piece_used_as_a_number_as_bos_numbers_it() {
     let lua = walker();
-    // base is piece 0 to a COB script, and 1 to Lua's piece().
-    assert!(lua.contains("spray = base - 1"), "{lua}");
-    assert!(lua.contains("gun_ready = base - 1"), "{lua}");
+    // base is piece 0 to a COB script, because the script declares it first.
+    assert!(lua.contains("spray = 0 --[[base]]"), "{lua}");
+    assert!(lua.contains("gun_ready = 0 --[[base]]"), "{lua}");
 }
 
 #[test]
@@ -488,4 +488,77 @@ fn find_includes_skips_comments_follows_parents_and_stops_on_a_cycle() {
             ("../c.h", "scripts/c.h"),
         ]
     );
+}
+
+/// Shaped like Balanced Annihilation's `corack.bos`, which answers
+/// `QueryNanoPiece` with a number that swaps between 0 and 1. Those are the
+/// first two pieces the script declares, which the model holds in another
+/// order.
+#[test]
+fn a_piece_given_as_a_number_is_the_one_the_script_declares_there() {
+    let source = "piece rnanospray, lnanospray, torso, ground, pelvis;\n\nstatic-var nanoNozzle;\n\nCreate()\n{\n\tnanoNozzle = 0;\n}\n\nQueryNanoPiece(piecenum)\n{\n\tpiecenum = nanoNozzle;\n\tnanoNozzle = !nanoNozzle;\n}\n\nTransportPickup(unitid)\n{\n\tattach-unit unitid to 1;\n}\n";
+    let model: Vec<String> = ["ground", "pelvis", "torso", "rnanospray", "lnanospray"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    let spray = |frame: u32, action: coilbox_springlua::unitscript::EngineAction| ScriptEvent {
+        frame,
+        callin: String::new(),
+        args: Vec::new(),
+        ambient: false,
+        world: None,
+        engine: Some(action),
+    };
+    for prune in [false, true] {
+        let includes = HashMap::new();
+        let lua = convert(
+            source,
+            &Options {
+                name: "scripts/corack.bos",
+                includes: &includes,
+                pieces: Some(&model),
+                linear_scale: MODERN_LINEAR,
+                precedence: Precedence::Modern,
+                prune,
+            },
+        )
+        .unwrap()
+        .lua;
+        let events = [
+            event(0, "Create", &[]),
+            spray(1, coilbox_springlua::unitscript::EngineAction::NanoStart),
+            spray(5, coilbox_springlua::unitscript::EngineAction::NanoStop),
+        ];
+        let timeline = run(
+            &lua,
+            "corack.lua",
+            &Unit::new(&model),
+            &events,
+            10,
+            &HashMap::new(),
+        );
+        assert_eq!(timeline.error, None, "{lua}");
+        let nano: Vec<String> = timeline
+            .events
+            .iter()
+            .filter_map(|e| match e {
+                coilbox_unitpose::ScriptOutput::Nano { piece, .. } => piece.clone(),
+                _ => None,
+            })
+            .collect();
+        assert!(!nano.is_empty(), "prune {prune}: no nano sprayed\n{lua}");
+        assert!(
+            nano.iter().all(|p| p == "rnanospray" || p == "lnanospray"),
+            "prune {prune}: {nano:?}\n{lua}"
+        );
+        assert!(
+            nano.iter().any(|p| p == "lnanospray"),
+            "prune {prune}: {nano:?}"
+        );
+        assert!(lua.contains("return PIECES[piecenum + 1]"), "{lua}");
+        // A number the script writes out names the piece.
+        if !prune {
+            assert!(lua.contains("AttachUnit(lnanospray, unitid)"), "{lua}");
+        }
+    }
 }
