@@ -9,6 +9,7 @@ import {
   MIN_FAR,
   MIN_MAX_DISTANCE,
   ZOOM_OUT_PADDING,
+  ZOOM_OUT_REACH,
 } from "./ModelViewport";
 import type { SceneState } from "./sceneState";
 
@@ -158,7 +159,7 @@ export function applySceneScale(state: SceneState) {
   const fit = radius / Math.sin(THREE.MathUtils.degToRad(state.camera.fov) / 2);
   state.controls.maxDistance = Math.max(
     MIN_MAX_DISTANCE,
-    fit * ZOOM_OUT_PADDING,
+    fit * ZOOM_OUT_PADDING * ZOOM_OUT_REACH,
   );
   // The ground is flat, so only how far the scene spreads matters here, not
   // how tall it stands.

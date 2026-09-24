@@ -177,4 +177,23 @@ export function applyHoverVisual(state: SceneState) {
     state.hoverOutline.visible = false;
     hideOverlay(state.hoverOverlay);
   }
+  // A flare, aim point or hierarchy node has no faces to wash, and its box is
+  // a point or its children's, so the dot is what shows where it is.
+  if (group && !hasFaces(group)) {
+    group.add(state.hoverMark);
+    state.hoverMark.visible = true;
+  } else {
+    state.hoverMark.visible = false;
+  }
+}
+
+/** Whether a piece's group draws any triangles of its own. An imported emit
+ *  point keeps its vertices in a mesh with an empty index. */
+function hasFaces(group: THREE.Group): boolean {
+  const mesh = group.children.find((child) => child instanceof THREE.Mesh) as
+    | THREE.Mesh
+    | undefined;
+  if (!mesh) return false;
+  const { index, attributes } = mesh.geometry;
+  return (index?.count ?? attributes.position?.count ?? 0) > 0;
 }

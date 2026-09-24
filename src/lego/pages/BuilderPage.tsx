@@ -2,6 +2,7 @@ import { Button, cn, Input, useHideSidebar } from "@picoframe/frame";
 import {
   Blocks,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Copy,
   FlipHorizontal2,
@@ -17,10 +18,12 @@ import {
   Sparkles,
   Undo,
   Upload,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router";
 
+import { TipButton } from "@/components/TipButton";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
   Collapsible,
@@ -64,6 +67,8 @@ import {
   type LegoPiece,
   type LegoProject,
   normalisePieceName,
+  pieceById,
+  pieceKind,
   projectProblems,
   type StaleExport,
   uniquePieceName,
@@ -119,6 +124,7 @@ import { TextureBuilderPanel } from "./components/TextureBuilderPanel";
 import { TexturePicker } from "./components/TexturePicker";
 import { TransformFields } from "./components/TransformFields";
 import { useEffectBitmaps } from "./components/useEffectBitmaps";
+import { useMoreBelow } from "./components/useMoreBelow";
 
 /** Radix needs a non-empty value, so "no role" gets one of its own. */
 const NO_ROLE = "none";
@@ -236,6 +242,36 @@ function Builder({ id }: { id: string | undefined }) {
   /** Shared between the viewport and the tree, so hovering a piece in either
    *  highlights it in the other. */
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [treeScrollRef, treeMoreBelow] = useMoreBelow();
+  /** The tree's folded branches. Here rather than in the tree, which unmounts
+   *  whenever the sidebar shows another tab. */
+  /** Whether the selected piece's panel is unfolded under the tree. */
+  const [detailsOpen, setDetailsOpen] = useState(true);
+  const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  // A piece picked in the viewport can be inside a folded branch, and a
+  // selection with no row to show it is one nobody can see. Unfold its
+  // ancestors, and leave every other branch as it was. Only on a change of
+  // selection. The unit is read through a ref, or every edit would unfold a
+  // branch folded round the selected piece a moment ago.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  useEffect(() => {
+    const draft = draftRef.current;
+    if (!draft || selectedIds.length === 0) return;
+    setCollapsedIds((was) => {
+      const next = new Set(was);
+      for (const id of selectedIds) {
+        let parentId = pieceById(draft, id)?.parentId ?? null;
+        while (parentId) {
+          next.delete(parentId);
+          parentId = pieceById(draft, parentId)?.parentId ?? null;
+        }
+      }
+      return next.size === was.size ? was : next;
+    });
+  }, [selectedIds]);
   /** Whether the next click in the viewport drops a snap anchor. */
   const [placingAnchor, setPlacingAnchor] = useState(false);
   /**
@@ -698,6 +734,15 @@ function Builder({ id }: { id: string | undefined }) {
         : "",
     [draft, pack, raw, collisionOpen],
   );
+  // Whether "Sit on the ground" would move anything. `sitOnGround` hands back
+  // the same project when the unit already rests on y = 0 or has no geometry.
+  const canGround = useMemo(
+    () =>
+      draft !== null &&
+      pack !== null &&
+      sitOnGround(draft, pack, raw) !== draft,
+    [draft, pack, raw],
+  );
   // The piece the viewport puts its collision handles on: whichever is
   // selected while the collision panel is open. Selecting a piece is the whole
   // gesture, rather than a switch on top of it, because picking the thing you
@@ -906,7 +951,7 @@ function Builder({ id }: { id: string | undefined }) {
                           <ButtonGroup>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
+                                <TipButton
                                   size="icon"
                                   variant="outline"
                                   onClick={doc.undo}
@@ -914,7 +959,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   aria-label="Undo"
                                 >
                                   <Undo size={14} />
-                                </Button>
+                                </TipButton>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 Undo ({shortcutLabel("undo")})
@@ -922,7 +967,7 @@ function Builder({ id }: { id: string | undefined }) {
                             </Tooltip>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
+                                <TipButton
                                   size="icon"
                                   variant="outline"
                                   onClick={doc.redo}
@@ -930,7 +975,7 @@ function Builder({ id }: { id: string | undefined }) {
                                   aria-label="Redo"
                                 >
                                   <Redo size={14} />
-                                </Button>
+                                </TipButton>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 Redo ({shortcutLabel("redo")})
@@ -945,7 +990,7 @@ function Builder({ id }: { id: string | undefined }) {
                           saving and saved belongs. */}
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button
+                                <TipButton
                                   size="icon"
                                   variant="outline"
                                   onClick={() => doc.save()}
@@ -964,7 +1009,7 @@ function Builder({ id }: { id: string | undefined }) {
                                       )}
                                     />
                                   ) : null}
-                                </Button>
+                                </TipButton>
                               </TooltipTrigger>
                               <TooltipContent side="bottom">
                                 {doc.saving
@@ -1079,17 +1124,20 @@ function Builder({ id }: { id: string | undefined }) {
                 onGround={() =>
                   edit((project) => sitOnGround(project, pack, raw))
                 }
+                canGround={canGround}
                 onReady={doc.onCapture}
                 pieceActions={{
                   onDuplicate: duplicateSelection,
                   canDuplicate: transformRoots(draft, selectedIds).length > 0,
                   onPaste: () => void pasteClipboard(),
-                  onSaveAsCompound: () => void saveSelectionAsCompound(),
                   // Not for an imported unit: a compound is pieces made of
                   // parts, and one saved out of raw geometry would name
                   // meshes that only mean anything inside the unit they
-                  // came from.
-                  canSaveAsCompound: selectedIds.length > 0 && !imported,
+                  // came from. It can never have one, so the button goes.
+                  onSaveAsCompound: imported
+                    ? undefined
+                    : () => void saveSelectionAsCompound(),
+                  canSaveAsCompound: selectedIds.length > 0,
                   onDelete: removeSelected,
                   canDelete: transformRoots(draft, selectedIds).length > 0,
                 }}
@@ -1473,7 +1521,10 @@ function Builder({ id }: { id: string | undefined }) {
                   </div>
 
                   <div className="relative min-h-32 flex-1">
-                    <div className="h-full overflow-y-auto py-1">
+                    <div
+                      ref={treeScrollRef}
+                      className="h-full overflow-y-auto py-1"
+                    >
                       <PieceTree
                         project={draft}
                         raw={raw}
@@ -1483,15 +1534,26 @@ function Builder({ id }: { id: string | undefined }) {
                         onToggleHidden={toggleHidden}
                         hoveredId={hoveredId}
                         onHoverChange={setHoveredId}
+                        collapsedIds={collapsedIds}
+                        onToggleCollapsed={(pieceId) =>
+                          setCollapsedIds((was) => {
+                            const next = new Set(was);
+                            if (!next.delete(pieceId)) next.add(pieceId);
+                            return next;
+                          })
+                        }
                       />
                     </div>
                     {/* Fades the last row rather than clipping it mid-line, so a
                     partly visible row reads as "more below" rather than a
-                    rendering fault. */}
-                    <div
-                      aria-hidden
-                      className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
-                    />
+                    rendering fault. Gone at the end of the list, where there
+                    is nothing below and it only dimmed the last row. */}
+                    {treeMoreBelow ? (
+                      <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-gradient-to-t from-background to-transparent"
+                      />
+                    ) : null}
                   </div>
 
                   {selectedIds.length > 1 ? (
@@ -1510,326 +1572,365 @@ function Builder({ id }: { id: string | undefined }) {
                     // Without shrink enabled here, that excess pushed past the
                     // aside's own box and over whatever sat below it (the parts
                     // drawer) instead of scrolling.
-                    <div className="max-h-[55%] min-h-0 overflow-y-auto border-t border-border px-3 py-2">
-                      <label
-                        className="text-xs text-muted-foreground"
-                        htmlFor="lego-piece-name"
-                      >
-                        Name
-                      </label>
-                      <NameInput
-                        id="lego-piece-name"
-                        value={selected.name}
-                        onCommit={renameSelected}
-                        className="mt-1"
-                      />
+                    <div className="flex max-h-[55%] min-h-0 flex-col border-t border-border">
+                      {/* Folds away to give the tree the room, and closes by
+                        clearing the selection, which is what the panel is
+                        about. */}
+                      <div className="flex items-center gap-1 px-1 py-1">
+                        <button
+                          type="button"
+                          onClick={() => setDetailsOpen((open) => !open)}
+                          aria-expanded={detailsOpen}
+                          className="flex min-w-0 flex-1 items-center gap-1 rounded px-2 py-1 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {detailsOpen ? (
+                            <ChevronDown size={14} className="shrink-0" />
+                          ) : (
+                            <ChevronRight size={14} className="shrink-0" />
+                          )}
+                          <span className="truncate">{selected.name}</span>
+                        </button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 shrink-0"
+                          onClick={() => setSelectedId(null)}
+                          aria-label="Close and deselect"
+                          title="Close and deselect"
+                        >
+                          <X size={14} />
+                        </Button>
+                      </div>
+                      {detailsOpen ? (
+                        <div className="min-h-0 overflow-y-auto px-3 pb-2">
+                          <label
+                            className="text-xs text-muted-foreground"
+                            htmlFor="lego-piece-name"
+                          >
+                            Name
+                          </label>
+                          <NameInput
+                            id="lego-piece-name"
+                            value={selected.name}
+                            onCommit={renameSelected}
+                            className="mt-1"
+                          />
 
-                      <TransformFields
-                        piece={selected}
-                        onChange={(change) =>
-                          transformPiece(selected.id, change)
-                        }
-                        uniformScale={uniformScale}
-                        onUniformScaleChange={setUniformScale}
-                      />
-                      {canMirror(draft, selected.id) ? (
-                        <div className="mt-2">
-                          <span className="text-xs text-muted-foreground">
-                            Mirror
-                          </span>
-                          <ButtonGroup className="mt-1 flex w-full">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={mirrorSelection}
-                            >
-                              <FlipHorizontal2 size={14} /> In place
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={mirrorCopyOfSelection}
-                            >
-                              <Copy size={14} /> As a copy
-                            </Button>
-                          </ButtonGroup>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Across the unit's centre line, taking everything
-                            under this piece with it. A copy is how one leg
-                            becomes the other.
-                          </p>
-                        </div>
-                      ) : null}
+                          <TransformFields
+                            piece={selected}
+                            onChange={(change) =>
+                              transformPiece(selected.id, change)
+                            }
+                            uniformScale={uniformScale}
+                            onUniformScaleChange={setUniformScale}
+                          />
+                          {canMirror(draft, selected.id) ? (
+                            <div className="mt-2">
+                              <span className="text-xs text-muted-foreground">
+                                Mirror
+                              </span>
+                              <ButtonGroup className="mt-1 flex w-full">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={mirrorSelection}
+                                >
+                                  <FlipHorizontal2 size={14} /> In place
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={mirrorCopyOfSelection}
+                                >
+                                  <Copy size={14} /> As a copy
+                                </Button>
+                              </ButtonGroup>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Across the unit's centre line, taking everything
+                                under this piece with it. A copy is how one leg
+                                becomes the other.
+                              </p>
+                            </div>
+                          ) : null}
 
-                      {/* Only for a unit imported whole: a part from the pack
+                          {/* Only for a unit imported whole: a part from the pack
                         arrives mapped, so there is nothing here for it to fix,
                         and this whole section would be a question with no
                         honest answer for it. See #2575. */}
-                      {imported ? (
-                        <div className="mt-2">
-                          <span className="text-xs text-muted-foreground">
-                            Fix UVs and normals
-                          </span>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            For a model imported from somewhere else, whose UVs
-                            or lighting arrived wrong.
-                          </p>
-                          <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
-                            <span />
-                            <span className="text-center text-[10px] uppercase text-muted-foreground">
-                              This piece
-                            </span>
-                            <span className="text-center text-[10px] uppercase text-muted-foreground">
-                              Whole model
-                            </span>
+                          {imported ? (
+                            <div className="mt-2">
+                              <span className="text-xs text-muted-foreground">
+                                Fix UVs and normals
+                              </span>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                For a model imported from somewhere else, whose
+                                UVs or lighting arrived wrong.
+                              </p>
+                              <div className="mt-1 grid grid-cols-[1fr_auto_auto] items-center gap-x-1.5 gap-y-1.5">
+                                <span />
+                                <span className="text-center text-[10px] uppercase text-muted-foreground">
+                                  This piece
+                                </span>
+                                <span className="text-center text-[10px] uppercase text-muted-foreground">
+                                  Whole model
+                                </span>
 
-                            <span className="flex items-center gap-1 text-xs">
-                              <FlipVertical2 size={12} /> Flip UVs
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!canFixMesh(selected)}
-                              onClick={() => fixSelectedUv("flip", "piece")}
-                            >
-                              Flip
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!hasImportedGeometry}
-                              onClick={() => fixSelectedUv("flip", "model")}
-                            >
-                              Flip
-                            </Button>
+                                <span className="flex items-center gap-1 text-xs">
+                                  <FlipVertical2 size={12} /> Flip UVs
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canFixMesh(selected)}
+                                  onClick={() => fixSelectedUv("flip", "piece")}
+                                >
+                                  Flip
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!hasImportedGeometry}
+                                  onClick={() => fixSelectedUv("flip", "model")}
+                                >
+                                  Flip
+                                </Button>
 
-                            <span className="flex items-center gap-1 text-xs">
-                              <FlipHorizontal2 size={12} /> Mirror UVs
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!canFixMesh(selected)}
-                              onClick={() => fixSelectedUv("mirror", "piece")}
-                            >
-                              Mirror
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!hasImportedGeometry}
-                              onClick={() => fixSelectedUv("mirror", "model")}
-                            >
-                              Mirror
-                            </Button>
+                                <span className="flex items-center gap-1 text-xs">
+                                  <FlipHorizontal2 size={12} /> Mirror UVs
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canFixMesh(selected)}
+                                  onClick={() =>
+                                    fixSelectedUv("mirror", "piece")
+                                  }
+                                >
+                                  Mirror
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!hasImportedGeometry}
+                                  onClick={() =>
+                                    fixSelectedUv("mirror", "model")
+                                  }
+                                >
+                                  Mirror
+                                </Button>
 
-                            <span className="flex items-center gap-1 text-xs">
-                              <Sparkles size={12} /> Recalc normals
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!canFixMesh(selected)}
-                              onClick={() => recalcSelectedNormals("piece")}
-                            >
-                              Fix
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={!hasImportedGeometry}
-                              onClick={() => recalcSelectedNormals("model")}
-                            >
-                              Fix
-                            </Button>
-                          </div>
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <label
-                              htmlFor="lego-normals-angle"
-                              className="text-xs text-muted-foreground"
-                            >
-                              Smoothing angle
-                            </label>
-                            <Input
-                              id="lego-normals-angle"
-                              inputMode="decimal"
-                              value={String(normalsAngle)}
-                              onChange={(event) => {
-                                const value = Number(event.target.value);
-                                if (Number.isFinite(value))
-                                  setNormalsAngle(value);
-                              }}
-                              className="h-6 w-16 text-right"
-                            />
-                            <span className="text-xs text-muted-foreground">
-                              degrees, for the next recalculation
-                            </span>
-                          </div>
-                        </div>
-                      ) : null}
+                                <span className="flex items-center gap-1 text-xs">
+                                  <Sparkles size={12} /> Recalc normals
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!canFixMesh(selected)}
+                                  onClick={() => recalcSelectedNormals("piece")}
+                                >
+                                  Fix
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={!hasImportedGeometry}
+                                  onClick={() => recalcSelectedNormals("model")}
+                                >
+                                  Fix
+                                </Button>
+                              </div>
+                              <div className="mt-1.5 flex items-center gap-2">
+                                <label
+                                  htmlFor="lego-normals-angle"
+                                  className="text-xs text-muted-foreground"
+                                >
+                                  Smoothing angle
+                                </label>
+                                <Input
+                                  id="lego-normals-angle"
+                                  inputMode="decimal"
+                                  value={String(normalsAngle)}
+                                  onChange={(event) => {
+                                    const value = Number(event.target.value);
+                                    if (Number.isFinite(value))
+                                      setNormalsAngle(value);
+                                  }}
+                                  className="h-6 w-16 text-right"
+                                />
+                                <span className="text-xs text-muted-foreground">
+                                  degrees, for the next recalculation
+                                </span>
+                              </div>
+                            </div>
+                          ) : null}
 
-                      {selected.id === draft.rootPieceId ? null : (
-                        // The same move as dragging a row onto another, for anyone not
-                        // using a pointer.
-                        <div className="mt-2">
-                          <span className="text-xs text-muted-foreground">
-                            Hangs off
-                          </span>
-                          <Select
-                            value={selected.parentId ?? draft.rootPieceId}
-                            onValueChange={(parentId) =>
-                              reparent(selected.id, parentId)
-                            }
-                          >
-                            <SelectTrigger
-                              size="sm"
-                              className="mt-1 w-full"
-                              aria-label="Parent piece"
-                            >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {parentOptions(draft, [selected.id]).map(
-                                ({ piece, depth }) => (
-                                  <SelectItem
-                                    key={piece.id}
-                                    value={piece.id}
-                                    // Indent on the item, not inside its text: Radix
-                                    // mirrors the text into the trigger, and the
-                                    // padding would come with it.
-                                    style={{ paddingLeft: 8 + depth * 12 }}
-                                  >
-                                    {piece.name}
-                                  </SelectItem>
+                          {selected.id === draft.rootPieceId ? null : (
+                            // The same move as dragging a row onto another, for anyone not
+                            // using a pointer.
+                            <div className="mt-2">
+                              <span className="text-xs text-muted-foreground">
+                                Hangs off
+                              </span>
+                              <Select
+                                value={selected.parentId ?? draft.rootPieceId}
+                                onValueChange={(parentId) =>
+                                  reparent(selected.id, parentId)
+                                }
+                              >
+                                <SelectTrigger
+                                  size="sm"
+                                  className="mt-1 w-full"
+                                  aria-label="Parent piece"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {parentOptions(draft, [selected.id]).map(
+                                    ({ piece, depth }) => (
+                                      <SelectItem
+                                        key={piece.id}
+                                        value={piece.id}
+                                        // Indent on the item, not inside its text: Radix
+                                        // mirrors the text into the trigger, and the
+                                        // padding would come with it.
+                                        style={{ paddingLeft: 8 + depth * 12 }}
+                                      >
+                                        {piece.name}
+                                      </SelectItem>
+                                    ),
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+
+                          {selectedPart ? (
+                            <div className="mt-2">
+                              <span className="text-xs text-muted-foreground">
+                                Turns about
+                              </span>
+                              <Select
+                                value={
+                                  currentPivot(selectedPart, selected.pivot) ??
+                                  "middle"
+                                }
+                                onValueChange={(id) => {
+                                  const choice = pivotChoices(
+                                    selectedPart,
+                                  ).find((option) => option.id === id);
+                                  if (choice)
+                                    movePivot(selected.id, choice.position);
+                                }}
+                              >
+                                <SelectTrigger
+                                  size="sm"
+                                  className="mt-1 w-full"
+                                  aria-label="Pivot point"
+                                >
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {pivotChoices(selectedPart).map((choice) => (
+                                    <SelectItem
+                                      key={choice.id}
+                                      value={choice.id}
+                                    >
+                                      {choice.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                The point this piece turns about, and that its
+                                children hang from. A leg wants its top, not its
+                                middle.
+                              </p>
+                            </div>
+                          ) : null}
+
+                          <AnchorList
+                            piece={selected}
+                            placing={placingAnchor}
+                            onPlacingChange={setPlacingAnchor}
+                            onAddAtOrigin={() =>
+                              edit((project) =>
+                                addAnchor(
+                                  project,
+                                  selected.id,
+                                  selected.pivot ?? [0, 0, 0],
+                                  crypto.randomUUID(),
                                 ),
-                              )}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-
-                      {selectedPart ? (
-                        <div className="mt-2">
-                          <span className="text-xs text-muted-foreground">
-                            Turns about
-                          </span>
-                          <Select
-                            value={
-                              currentPivot(selectedPart, selected.pivot) ??
-                              "middle"
+                              )
                             }
-                            onValueChange={(id) => {
-                              const choice = pivotChoices(selectedPart).find(
-                                (option) => option.id === id,
-                              );
-                              if (choice)
-                                movePivot(selected.id, choice.position);
-                            }}
-                          >
-                            <SelectTrigger
-                              size="sm"
-                              className="mt-1 w-full"
-                              aria-label="Pivot point"
+                            onChange={(anchorId, change) =>
+                              edit((project) =>
+                                updateAnchor(
+                                  project,
+                                  selected.id,
+                                  anchorId,
+                                  change,
+                                ),
+                              )
+                            }
+                            onRemove={(anchorId) =>
+                              edit((project) =>
+                                removeAnchor(project, selected.id, anchorId),
+                              )
+                            }
+                          />
+
+                          <div className="mt-2">
+                            <span className="text-xs text-muted-foreground">
+                              Role
+                            </span>
+                            <Select
+                              value={selected.role ?? NO_ROLE}
+                              onValueChange={(role) =>
+                                setRole(
+                                  selected.id,
+                                  role === NO_ROLE ? undefined : role,
+                                )
+                              }
                             >
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {pivotChoices(selectedPart).map((choice) => (
-                                <SelectItem key={choice.id} value={choice.id}>
-                                  {choice.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            The point this piece turns about, and that its
-                            children hang from. A leg wants its top, not its
-                            middle.
+                              <SelectTrigger
+                                size="sm"
+                                className="mt-1 w-full"
+                                aria-label="Animation role"
+                              >
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value={NO_ROLE}>None</SelectItem>
+                                {ROLES.map((role) => (
+                                  <SelectItem key={role.id} value={role.id}>
+                                    {role.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              What this piece is, so the animation presets know
+                              what to move.
+                            </p>
+                            {restAngleWarnings(selected).map((warning) => (
+                              <p
+                                key={warning}
+                                className="mt-1 text-xs text-amber-500"
+                              >
+                                {warning}
+                              </p>
+                            ))}
+                          </div>
+
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {pieceKind(selected, raw) === "geometry"
+                              ? "Geometry."
+                              : "Empty, so it carries other pieces and can be an emit point."}
                           </p>
                         </div>
                       ) : null}
-
-                      <AnchorList
-                        piece={selected}
-                        placing={placingAnchor}
-                        onPlacingChange={setPlacingAnchor}
-                        onAddAtOrigin={() =>
-                          edit((project) =>
-                            addAnchor(
-                              project,
-                              selected.id,
-                              selected.pivot ?? [0, 0, 0],
-                              crypto.randomUUID(),
-                            ),
-                          )
-                        }
-                        onChange={(anchorId, change) =>
-                          edit((project) =>
-                            updateAnchor(
-                              project,
-                              selected.id,
-                              anchorId,
-                              change,
-                            ),
-                          )
-                        }
-                        onRemove={(anchorId) =>
-                          edit((project) =>
-                            removeAnchor(project, selected.id, anchorId),
-                          )
-                        }
-                      />
-
-                      <div className="mt-2">
-                        <span className="text-xs text-muted-foreground">
-                          Role
-                        </span>
-                        <Select
-                          value={selected.role ?? NO_ROLE}
-                          onValueChange={(role) =>
-                            setRole(
-                              selected.id,
-                              role === NO_ROLE ? undefined : role,
-                            )
-                          }
-                        >
-                          <SelectTrigger
-                            size="sm"
-                            className="mt-1 w-full"
-                            aria-label="Animation role"
-                          >
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value={NO_ROLE}>None</SelectItem>
-                            {ROLES.map((role) => (
-                              <SelectItem key={role.id} value={role.id}>
-                                {role.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          What this piece is, so the animation presets know what
-                          to move.
-                        </p>
-                        {restAngleWarnings(selected).map((warning) => (
-                          <p
-                            key={warning}
-                            className="mt-1 text-xs text-amber-500"
-                          >
-                            {warning}
-                          </p>
-                        ))}
-                      </div>
-
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {selected.partId
-                          ? "Geometry."
-                          : "Empty, so it carries other pieces and can be an emit point."}
-                      </p>
                     </div>
                   ) : null}
                 </>

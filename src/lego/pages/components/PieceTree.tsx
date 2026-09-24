@@ -11,7 +11,7 @@
  */
 
 import { Button } from "@picoframe/frame";
-import { Box, Dot, Eye, EyeOff } from "lucide-react";
+import { Box, ChevronDown, ChevronRight, Dot, Eye, EyeOff } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { roleLabel } from "../../animPresets";
@@ -45,6 +45,10 @@ interface Props {
   /** Told when the pointer starts or stops being over a row, so the 3D view
    *  can highlight the matching piece. */
   onHoverChange?: (pieceId: string | null) => void;
+  /** The pieces whose branches are folded away. Held by the page rather than
+   *  here, so they stay folded when the sidebar changes tab and back. */
+  collapsedIds: ReadonlySet<string>;
+  onToggleCollapsed: (pieceId: string) => void;
 }
 
 interface Drag {
@@ -64,6 +68,8 @@ export function PieceTree({
   onToggleHidden,
   hoveredId,
   onHoverChange,
+  collapsedIds,
+  onToggleCollapsed,
 }: Props) {
   const [drag, setDrag] = useState<Drag | null>(null);
   const pressed = useRef<{ pieceId: string; x: number; y: number } | null>(
@@ -135,6 +141,8 @@ export function PieceTree({
         overId={drag?.over ?? null}
         hoveredId={hoveredId ?? null}
         onHoverChange={onHoverChange}
+        collapsedIds={collapsedIds}
+        onToggleCollapsed={onToggleCollapsed}
       />
 
       {drag && carried ? (
@@ -166,6 +174,8 @@ function Rows({
   overId,
   hoveredId,
   onHoverChange,
+  collapsedIds,
+  onToggleCollapsed,
   depth = 0,
 }: {
   project: LegoProject;
@@ -178,6 +188,8 @@ function Rows({
   overId: string | null;
   hoveredId: string | null;
   onHoverChange?: (pieceId: string | null) => void;
+  collapsedIds: ReadonlySet<string>;
+  onToggleCollapsed: (pieceId: string) => void;
   depth?: number;
 }) {
   const siblings = childrenOf(project, parentId);
@@ -191,6 +203,8 @@ function Rows({
         // Only ancestors count towards the dimming: a piece's own toggle
         // always acts on its own flag, whatever an ancestor is doing.
         const dimmed = isEffectivelyHidden(project, piece.id);
+        const hasChildren = childrenOf(project, piece.id).length > 0;
+        const collapsed = hasChildren && collapsedIds.has(piece.id);
         return (
           <li
             key={piece.id}
@@ -219,6 +233,29 @@ function Rows({
                       : "hover:bg-muted/50"
               } ${piece.id === draggingId ? "opacity-50" : ""}`}
             >
+              {/* A slot on every row, empty on a leaf, so names line up
+                  whether or not the piece has a branch to fold. */}
+              {hasChildren ? (
+                <button
+                  type="button"
+                  onClick={() => onToggleCollapsed(piece.id)}
+                  aria-expanded={!collapsed}
+                  aria-label={
+                    collapsed
+                      ? `Expand ${piece.name}`
+                      : `Collapse ${piece.name}`
+                  }
+                  className="ml-2 flex h-6 w-4 shrink-0 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {collapsed ? (
+                    <ChevronRight size={12} />
+                  ) : (
+                    <ChevronDown size={12} />
+                  )}
+                </button>
+              ) : (
+                <span aria-hidden className="ml-2 w-4 shrink-0" />
+              )}
               <button
                 type="button"
                 aria-pressed={selectedIds.includes(piece.id)}
@@ -233,7 +270,7 @@ function Rows({
                 className={`flex min-w-0 flex-1 items-center gap-2 py-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                   dimmed ? "text-muted-foreground" : ""
                 }`}
-                style={{ paddingLeft: 12 }}
+                style={{ paddingLeft: 2 }}
               >
                 <span
                   className="shrink-0 text-muted-foreground"
@@ -279,19 +316,23 @@ function Rows({
                 {piece.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
               </Button>
             </div>
-            <Rows
-              project={project}
-              raw={raw}
-              parentId={piece.id}
-              selectedIds={selectedIds}
-              onSelect={onSelect}
-              onToggleHidden={onToggleHidden}
-              draggingId={draggingId}
-              overId={overId}
-              hoveredId={hoveredId}
-              onHoverChange={onHoverChange}
-              depth={depth + 1}
-            />
+            {collapsed ? null : (
+              <Rows
+                project={project}
+                raw={raw}
+                parentId={piece.id}
+                selectedIds={selectedIds}
+                onSelect={onSelect}
+                onToggleHidden={onToggleHidden}
+                draggingId={draggingId}
+                overId={overId}
+                hoveredId={hoveredId}
+                onHoverChange={onHoverChange}
+                collapsedIds={collapsedIds}
+                onToggleCollapsed={onToggleCollapsed}
+                depth={depth + 1}
+              />
+            )}
           </li>
         );
       })}
