@@ -287,10 +287,31 @@ describe("weaponCount", () => {
     ).toBe(2);
   });
 
-  it("ignores a gap in the definition's own slot numbers", () => {
+  it("tolerates an empty slot among the first four", () => {
+    expect(
+      weaponCount(
+        { weapons: { "1": { name: "gatling" }, "2": {}, "3": { name: "c" } } },
+        [],
+      ),
+    ).toBe(3);
+  });
+
+  it("stops at a gap past the first four slots, missing a weapon named beyond it", () => {
     expect(
       weaponCount({ weapons: { "1": { name: "gatling" }, "5": {} } }, []),
-    ).toBe(5);
+    ).toBe(1);
+  });
+
+  it("counts a plain string entry as a weapon", () => {
+    expect(weaponCount({ weapons: { "1": "very-heavy-gatling" } }, [])).toBe(1);
+  });
+
+  it("caps the scan at MAX_WEAPONS_PER_UNIT, ignoring a key past it", () => {
+    const weapons: Record<string, { name: string }> = {};
+    for (let slot = 1; slot <= 40; slot++) {
+      weapons[String(slot)] = { name: `weapon${slot}` };
+    }
+    expect(weaponCount({ weapons }, [])).toBe(32);
   });
 
   it("is 1 for a definition with no weapons table", () => {
@@ -303,8 +324,12 @@ describe("weaponCount", () => {
     ).toBe(3);
   });
 
-  it("without a definition, counts a Recoil ordinal as its own slot", () => {
-    expect(weaponCount(null, ["Primary", "Secondary"])).toBe(2);
+  it("without a definition, counts a Recoil ordinal call-in as its own slot", () => {
+    expect(weaponCount(null, ["AimPrimary", "FireSecondary"])).toBe(2);
+  });
+
+  it("does not count a bare ordinal name no script defines", () => {
+    expect(weaponCount(null, ["Primary", "Secondary"])).toBe(1);
   });
 
   it("is 1 for a plain script with no definition and no numbered names", () => {
@@ -323,12 +348,16 @@ describe("expandForWeapons", () => {
     { frame: 30, engine: "fire", args: [1] },
   ];
 
+  /** A fire interval chosen so `(n - 1) * interval / weapons` lands on a
+   *  whole frame for both the 3- and 4-weapon cases below. */
+  const INTERVAL_FRAMES = 12;
+
   it("leaves events alone for one weapon", () => {
-    expect(expandForWeapons(events, 1)).toEqual(events);
+    expect(expandForWeapons(events, 1, INTERVAL_FRAMES)).toEqual(events);
   });
 
   it("gives every other weapon its own aim on the same frame", () => {
-    const expanded = expandForWeapons(events, 3);
+    const expanded = expandForWeapons(events, 3, INTERVAL_FRAMES);
     const aims = expanded.filter((e) => e.frame === 15);
     expect(aims.map((e) => e.callin)).toEqual([
       "AimWeapon1",
@@ -338,18 +367,28 @@ describe("expandForWeapons", () => {
     expect(aims[1].aimAtStandIn).toEqual({ from: "AimFromWeapon" });
   });
 
-  it("staggers each other weapon's shot later in the same volley", () => {
-    const expanded = expandForWeapons(events, 3);
+  it("spreads each other weapon's shot evenly across the fire interval", () => {
+    const expanded = expandForWeapons(events, 3, INTERVAL_FRAMES);
     const fires = expanded.filter((e) => e.engine === "fire");
     expect(fires.map((e) => [e.frame, e.args])).toEqual([
       [30, [1]],
-      [35, [2]],
-      [40, [3]],
+      [34, [2]],
+      [38, [3]],
     ]);
   });
 
+  it("keeps the last weapon's shot inside the interval rather than growing past it", () => {
+    const expanded = expandForWeapons(events, 4, INTERVAL_FRAMES);
+    const fires = expanded.filter((e) => e.engine === "fire");
+    const frames = fires.map((e) => e.frame);
+    expect(frames).toEqual([30, 33, 36, 39]);
+    // The next volley's own weapon 1 shot would land at 30 + interval: every
+    // weapon here fires before it.
+    expect(Math.max(...frames)).toBeLessThan(30 + INTERVAL_FRAMES);
+  });
+
   it("keeps events in frame order with an aim before a fire on the same frame", () => {
-    const expanded = expandForWeapons(events, 2);
+    const expanded = expandForWeapons(events, 2, INTERVAL_FRAMES);
     const frames = expanded.map((e) => e.frame);
     expect(frames).toEqual([...frames].sort((a, b) => a - b));
   });

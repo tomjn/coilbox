@@ -317,8 +317,16 @@ function weaponNumberOf(callin: string | undefined): number {
   return match ? Number(match[1]) : 1;
 }
 
-/** The Recoil ordinal a unit script may still define instead of a numbered
- *  call-in, and the weapon slot each one means (`CobScriptNames.cpp`). */
+/** The Recoil ordinal names a unit script may still define instead of a
+ *  numbered call-in, one per call-in stem: `QueryPrimary`, `AimPrimary`,
+ *  `AimFromPrimary`, `FirePrimary`, and the `Secondary` and `Tertiary` forms
+ *  of each (`CobScriptNames.cpp:79-90`, aliased back the same way by
+ *  `alias()` in `crates/tauri-plugin-coilbox-anim/src/cobrun.rs`). Only the
+ *  first three weapons ever had these names. */
+const ORDINAL_WEAPON_CALLIN =
+  /^(?:Query|Aim|AimFrom|Fire)(Primary|Secondary|Tertiary)$/;
+
+/** The weapon slot each ordinal above means. */
 const ORDINAL_WEAPON_NUMBERS: Record<string, number> = {
   Primary: 1,
   Secondary: 2,
@@ -344,16 +352,41 @@ export function weaponCount(
   return weaponCountFromFunctions(functions);
 }
 
+/** `MAX_WEAPONS_PER_UNIT`, `rts/Sim/Misc/GlobalConstants.h:126`: the engine
+ *  never reads a unit def's `weapons` table past this many slots. */
+const MAX_WEAPONS_PER_UNIT = 32;
+
+/** The name a `weapons` table slot gives its weapon, empty when the slot
+ *  names none: the entry is either the weapon's own name as a string, or a
+ *  table naming it in `name` (`UnitDef.cpp:749-758`). */
+function weaponEntryName(entry: unknown): string {
+  if (typeof entry === "string") return entry;
+  if (entry && typeof entry === "object") {
+    const name = (entry as Record<string, unknown>).name;
+    if (typeof name === "string") return name;
+  }
+  return "";
+}
+
+/**
+ * `UnitDef::ParseWeaponsTable` (`UnitDef.cpp:749-771`): the table is read
+ * slot by slot from 1. An empty slot is tolerated, and skipped over, only
+ * among the first four (`w <= 3`). An empty slot after that stops the table
+ * being read at all, so a weapon named past that point is never seen. This
+ * assumes any named slot resolves to a real `WeaponDef`, which is the best a
+ * preview with no weapon-def table to check against can do.
+ */
 function weaponCountFromDef(unitDef: Record<string, unknown>): number | null {
   const weapons = unitDef.weapons;
   if (!weapons || typeof weapons !== "object") return null;
+  const table = weapons as Record<string, unknown>;
   let highest = 0;
-  for (const [key, entry] of Object.entries(
-    weapons as Record<string, unknown>,
-  )) {
-    const slot = Number(key);
-    if (!Number.isInteger(slot) || slot < 1) continue;
-    if (entry && typeof entry === "object") highest = Math.max(highest, slot);
+  for (let slot = 0; slot < MAX_WEAPONS_PER_UNIT; slot++) {
+    if (weaponEntryName(table[String(slot + 1)])) {
+      highest = slot + 1;
+      continue;
+    }
+    if (slot > 3) break;
   }
   return highest > 0 ? highest : null;
 }
@@ -363,15 +396,12 @@ function weaponCountFromFunctions(functions: string[]): number {
   for (const name of functions) {
     const numbered = /^(?:AimWeapon|FireWeapon|QueryWeapon)(\d+)$/.exec(name);
     if (numbered) highest = Math.max(highest, Number(numbered[1]));
-    const ordinal = ORDINAL_WEAPON_NUMBERS[name];
-    if (ordinal) highest = Math.max(highest, ordinal);
+    const ordinal = ORDINAL_WEAPON_CALLIN.exec(name);
+    if (ordinal)
+      highest = Math.max(highest, ORDINAL_WEAPON_NUMBERS[ordinal[1]]);
   }
   return highest || 1;
 }
-
-/** How many frames after weapon 1 fires that weapon `n` fires in the same
- *  volley, set by eye so the shots read apart rather than landing together. */
-export const WEAPON_FIRE_STAGGER_FRAMES = 5;
 
 /**
  * A scenario's events with every weapon 1 aim and shot matched by one for
@@ -380,8 +410,11 @@ export const WEAPON_FIRE_STAGGER_FRAMES = 5;
  * An `AimWeapon1` event gets a same-frame `AimWeapon<n>` for each other
  * weapon, which `resolveScenario` then measures from that weapon's own
  * `AimFromWeapon<n>` piece. A weapon 1 `fire` engine event gets one for each
- * other weapon too, `(n - 1) * WEAPON_FIRE_STAGGER_FRAMES` frames later in the
- * same volley.
+ * other weapon too, spread evenly across the gap to weapon 1's next shot
+ * rather than trailing past it: weapon `n` fires
+ * `floor((n - 1) * intervalFrames / weapons)` frames later in the same
+ * volley, so the shots read apart without the last weapon overlapping the
+ * next round.
  *
  * A no-op below two weapons: nothing here duplicates when there is only the
  * one to drive.
@@ -389,6 +422,7 @@ export const WEAPON_FIRE_STAGGER_FRAMES = 5;
 export function expandForWeapons(
   events: ScriptEvent[],
   weapons: number,
+  intervalFrames: number,
 ): ScriptEvent[] {
   if (weapons <= 1) return events;
   const expanded: ScriptEvent[] = [];
@@ -404,7 +438,8 @@ export function expandForWeapons(
       for (let weapon = 2; weapon <= weapons; weapon++) {
         expanded.push({
           ...event,
-          frame: event.frame + (weapon - 1) * WEAPON_FIRE_STAGGER_FRAMES,
+          frame:
+            event.frame + Math.floor(((weapon - 1) * intervalFrames) / weapons),
           args: [weapon],
         });
       }
