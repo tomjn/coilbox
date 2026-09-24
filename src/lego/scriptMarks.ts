@@ -2,8 +2,8 @@
  * The marks under the script scrubber: one per frame on which the script
  * announced something, and the words each one says.
  *
- * What a script announces is recorded by the runtime and drawn by nothing yet.
- * A mark is where to look for it.
+ * Nano spray is not marked. A build span records it on every frame, which
+ * would bury everything else, and `build-start` already says where it starts.
  */
 
 import { type ScriptOutput, STAND_IN_UNIT_ID } from "./scriptPlayback";
@@ -36,6 +36,7 @@ export function scrubberMarks(
   const marks: ScrubberMark[] = [];
   let lastPixel: number | null = null;
   for (const event of events) {
+    if (!isMarked(event)) continue;
     const pixel =
       width > 0
         ? Math.round((markPercent(event.frame, frameCount) / 100) * width)
@@ -63,6 +64,11 @@ function unitName(unit: number): string {
   return unit === STAND_IN_UNIT_ID ? "stand-in" : `unit ${unit}`;
 }
 
+/** Whether an event gets a mark under the scrubber. */
+export function isMarked(event: ScriptOutput): boolean {
+  return event.kind !== "nano";
+}
+
 export function describeOutput(event: ScriptOutput): string {
   switch (event.kind) {
     case "sfx":
@@ -79,6 +85,12 @@ export function describeOutput(event: ScriptOutput): string {
         : `Attach ${unitName(event.unit)} to ${event.piece}`;
     case "drop":
       return `Drop ${unitName(event.unit)}`;
+    case "nano":
+      return event.piece === null
+        ? "Nano spray from no piece"
+        : `Nano spray from ${event.piece}`;
+    case "build-start":
+      return "Factory starts building";
   }
 }
 

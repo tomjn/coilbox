@@ -89,20 +89,21 @@ describe("scenarios", () => {
 
   /**
    * A factory and a mobile builder are driven differently. A factory is opened
-   * with `Activate` first and then told to build with no arguments at all, and
-   * most factory scripts will not animate until the yard is open.
+   * with `Activate` first, and the runtime queues its build and starts it once
+   * the script sets build stance, rather than a fixed `StartBuilding` frame.
    */
   it("offer a factory its own way of building", () => {
     const factory = scenarioById("building-factory");
 
     expect(factory).toBeDefined();
-    const callins = factory?.events.map((e) => e.callin) ?? [];
-    expect(callins).toContain("Activate");
-    const build = factory?.events.find((e) => e.callin === "StartBuilding");
-    expect(build?.args).toBeUndefined();
-    expect(callins.indexOf("Activate")).toBeLessThan(
-      callins.indexOf("StartBuilding"),
-    );
+    const events = factory?.events ?? [];
+    expect(events.map((e) => e.callin)).toContain("Activate");
+    expect(events.map((e) => e.callin)).not.toContain("StartBuilding");
+    const activate = events.findIndex((e) => e.callin === "Activate");
+    const build = events.findIndex((e) => e.engine === "factory-build");
+    expect(activate).toBeGreaterThan(-1);
+    expect(build).toBeGreaterThan(-1);
+    expect(activate).toBeLessThanOrEqual(build);
   });
 
   /**
@@ -188,15 +189,14 @@ describe("scenarios", () => {
   });
 
   /**
-   * A factory spawns what it builds at the piece `QueryBuildInfo` names
-   * (`rts/Sim/Units/UnitTypes/Factory.cpp:95-101,178`), and leaves it there.
-   * It does not carry it, so the stand-in sits at the piece's rest position
-   * rather than riding it.
+   * `UpdateBuild` moves the buildee to the build piece's world position and
+   * turns it with the piece, every frame of the build
+   * (`rts/Sim/Units/UnitTypes/Factory.cpp:209-244`). The attach carries no
+   * frame of its own: the preview starts riding from the run's `build-start`.
    */
-  it("puts a factory's stand-in on its build piece, sitting still", () => {
+  it("puts a factory's stand-in on its build piece, riding it", () => {
     expect(scenarioById("building-factory")?.standIn?.attach).toEqual({
       from: "QueryBuildInfo",
-      frame: at(2),
       until: null,
     });
   });
@@ -295,19 +295,19 @@ describe("scenarios", () => {
 
   /**
    * A transport's passenger is set smaller than the usual size, so it does not
-   * read as half the transport's own length. Every other scenario keeps the
-   * usual size, since it was tuned by eye for aiming and building at.
+   * read as half the transport's own length, and a factory's buildee is set
+   * smaller still, to fit its build pad. Every other scenario keeps the usual
+   * size, since it was tuned by eye for aiming.
    */
-  it("sizes only a transport's stand-in as a passenger", () => {
-    for (const id of ["transport-load", "transport-pickup"]) {
+  it("sizes only a transport's and a factory's stand-in smaller than usual", () => {
+    const sized = ["transport-load", "transport-pickup", "building-factory"];
+    for (const id of sized) {
       const size = scenarioById(id)?.standIn?.size;
       expect(size).toBeDefined();
       expect(size).toBeLessThan(7 / 30);
     }
     for (const scenario of SCENARIOS) {
-      if (["transport-load", "transport-pickup"].includes(scenario.id)) {
-        continue;
-      }
+      if (sized.includes(scenario.id)) continue;
       expect(scenario.standIn?.size).toBeUndefined();
     }
   });
@@ -320,6 +320,36 @@ describe("scenarios", () => {
   it("waits a fixed gap clear of the transport's edge before pickup", () => {
     expect(scenarioById("transport-pickup")?.standIn?.keys[0].fromEdge).toBe(5);
     expect(scenarioById("transport-load")?.standIn?.keys[0].fromEdge).toBe(5);
+  });
+});
+
+describe("nano spans", () => {
+  function span(id: string) {
+    const scenario = scenarioById(id);
+    if (!scenario) throw new Error(`no scenario ${id}`);
+    const frames = (name: string) =>
+      scenario.events.filter((e) => e.callin === name).map((e) => e.frame);
+    const engine = (name: string) =>
+      scenario.events.filter((e) => e.engine === name).map((e) => e.frame);
+    return { scenario, frames, engine };
+  }
+
+  it("sprays for as long as a construction unit builds", () => {
+    const { scenario, frames, engine } = span("building");
+    expect(scenario.nano).toBe("builder");
+    expect(engine("nano-start")).toEqual(frames("StartBuilding"));
+    expect(engine("nano-stop")).toEqual(frames("StopBuilding"));
+  });
+
+  it("queues a factory's build off its own script rather than a fixed frame", () => {
+    const { scenario, frames, engine } = span("building-factory");
+    expect(scenario.nano).toBe("factory");
+    expect(frames("StartBuilding")).toEqual([]);
+    expect(frames("StopBuilding")).toEqual([]);
+    expect(engine("nano-start")).toEqual([]);
+    expect(engine("nano-stop")).toEqual([]);
+    expect(engine("factory-build")).toEqual(frames("Activate"));
+    expect(engine("factory-finish").length).toBe(1);
   });
 });
 

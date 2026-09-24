@@ -105,6 +105,10 @@ pub const NAMES: &[(&str, i32)] = &[
 /// anything either of them hands that id to all mean the same unit.
 pub const UNIT_ID: i32 = 1;
 
+/// Whether a script has put its unit in build stance, which is what tells a
+/// factory to start building (`Factory.cpp:138-151`).
+pub const INBUILDSTANCE: i32 = 5;
+
 /// COB's fixed-point scale: 65536ths of an elmo, or of a full circle.
 const COBSCALE: f32 = 65536.0;
 
@@ -299,11 +303,18 @@ pub fn who(id: i64, world: &crate::World) -> Who<'_> {
 /// ([`crate::Passenger::at`]), which the scene no longer decides.
 /// `None` for an id this does not cover, and for one it cannot answer without
 /// a scene, so the caller's own "no world" note still says so.
+///
+/// `awaiting_build` is a factory still waiting for its script to reach build
+/// stance. The pre-run scene cannot know when that happens, so it hands this
+/// answer a rest position regardless, and this treats the stand-in as though
+/// it were not there at all until the run itself says building has started,
+/// because the buildee does not exist yet either.
 pub fn world(
     id: i32,
     p1: i32,
     world: Option<&crate::World>,
     carried: Option<[f64; 3]>,
+    awaiting_build: bool,
 ) -> Option<Answer> {
     let plain = |value: i32| Answer { value, note: None };
     if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT) {
@@ -320,6 +331,7 @@ pub fn world(
     let stand_in = match who(i64::from(p1), world) {
         Who::Own(own) => return Some(plain((own.radius * f64::from(COBSCALE)) as i32)),
         Who::Nobody => return Some(plain(0)),
+        Who::StandIn(_) if awaiting_build => return Some(plain(0)),
         Who::StandIn(stand_in) => stand_in,
     };
     if id == UNIT_HEIGHT {
@@ -535,7 +547,7 @@ mod tests {
     }
 
     fn value(id: i32, p1: i32, world: Option<&crate::World>) -> Option<i32> {
-        self::world(id, p1, world, None).map(|answer| answer.value)
+        self::world(id, p1, world, None, false).map(|answer| answer.value)
     }
 
     /// `rts/Sim/Units/Scripts/UnitScript.cpp:1060-1092`, a cell at a time.
@@ -563,14 +575,14 @@ mod tests {
     #[test]
     fn answers_zero_for_a_unit_that_is_not_there() {
         let w = scene(Some([10.0, 2.0, 84.0]));
-        let answer = world(UNIT_XZ, 7, Some(&w), None).unwrap();
+        let answer = world(UNIT_XZ, 7, Some(&w), None, false).unwrap();
         assert_eq!(answer.value, 0);
         assert_eq!(answer.note, None);
     }
 
     #[test]
     fn says_so_when_the_stand_in_is_nowhere_on_this_frame() {
-        let answer = world(UNIT_XZ, 2, Some(&scene(None)), None).unwrap();
+        let answer = world(UNIT_XZ, 2, Some(&scene(None)), None, false).unwrap();
         assert_eq!(answer.value, 0);
         assert!(answer.note.is_some());
     }
@@ -582,7 +594,7 @@ mod tests {
     fn answers_the_stand_ins_height_even_when_it_is_nowhere_on_this_frame() {
         assert_eq!(value(UNIT_HEIGHT, 2, Some(&scene(None))), Some(28 * 65536));
         assert_eq!(
-            world(UNIT_HEIGHT, 2, Some(&scene(None)), None)
+            world(UNIT_HEIGHT, 2, Some(&scene(None)), None, false)
                 .unwrap()
                 .note,
             None
@@ -596,23 +608,43 @@ mod tests {
         let w = scene(Some([10.0, 2.0, 84.0]));
         let carried = Some([1.0, 2.0, 3.0]);
         assert_eq!(
-            world(UNIT_XZ, 2, Some(&w), carried).map(|a| a.value),
+            world(UNIT_XZ, 2, Some(&w), carried, false).map(|a| a.value),
             Some(pack_xz(1.0, 3.0))
         );
         assert_eq!(
-            world(UNIT_Y, 2, Some(&w), carried).map(|a| a.value),
+            world(UNIT_Y, 2, Some(&w), carried, false).map(|a| a.value),
             Some(2 * 65536)
         );
         assert_eq!(
-            world(UNIT_HEIGHT, 2, Some(&w), carried).map(|a| a.value),
+            world(UNIT_HEIGHT, 2, Some(&w), carried, false).map(|a| a.value),
             Some(28 * 65536)
         );
+    }
+
+    /// A factory's buildee does not exist until its script reaches build
+    /// stance, whatever rest position the pre-run scene put there, since it
+    /// cannot know when that happens. `false` on the same scene still answers
+    /// for real, so this is `awaiting_build` doing the work rather than the
+    /// scene changing under it.
+    #[test]
+    fn hides_the_stand_in_while_a_factory_awaits_build_stance() {
+        let w = scene(Some([10.0, 2.0, 84.0]));
+        let waiting = world(UNIT_XZ, 2, Some(&w), None, true).unwrap();
+        assert_eq!(waiting.value, 0);
+        assert_eq!(waiting.note, None);
+        assert_eq!(
+            world(UNIT_HEIGHT, 2, Some(&w), None, true).unwrap().value,
+            0
+        );
+
+        let answered = world(UNIT_XZ, 2, Some(&w), None, false).unwrap();
+        assert_eq!(answered.value, pack_xz(10.0, 84.0));
     }
 
     /// A scene that puts the stand-in nowhere does not matter once it is held.
     #[test]
     fn a_carried_stand_in_is_somewhere_even_when_the_scene_says_nowhere() {
-        let answer = world(UNIT_XZ, 2, Some(&scene(None)), Some([1.0, 0.0, 3.0])).unwrap();
+        let answer = world(UNIT_XZ, 2, Some(&scene(None)), Some([1.0, 0.0, 3.0]), false).unwrap();
         assert_eq!(answer.value, pack_xz(1.0, 3.0));
         assert_eq!(answer.note, None);
     }
@@ -634,7 +666,7 @@ mod tests {
 
     #[test]
     fn leaves_everything_else_to_the_caller() {
-        assert!(world(HEALTH, 0, Some(&scene(None)), None).is_none());
+        assert!(world(HEALTH, 0, Some(&scene(None)), None, false).is_none());
     }
 
     #[test]

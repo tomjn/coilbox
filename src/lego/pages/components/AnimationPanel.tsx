@@ -53,10 +53,12 @@ import type { LoadedPack } from "../../pack";
 import { pieceRest } from "../../pieceRest";
 import type { RawGeometry } from "../../rawGeometry";
 import { pieceWorldRest, unitBounds, unitSize } from "../../s3oBuild";
+import { isMarked } from "../../scriptMarks";
 import {
   at,
   CREATED,
   clampFrame,
+  type NanoStyle,
   PREVIEW_FRAMES,
   PREVIEW_SECONDS,
   playable,
@@ -92,6 +94,7 @@ const STAND_IN_PROBES = ["AimFromWeapon1", "QueryBuildInfo"];
 const NO_STAND_IN: {
   track: StandInTrack | null;
   attachPieces: Map<string, string>;
+  nano?: NanoStyle | null;
 } = { track: null, attachPieces: new Map() };
 
 /** What a scenario's attachment could not be resolved to, in words. */
@@ -224,6 +227,7 @@ interface Props {
   onStandIn: (placement: {
     track: StandInTrack | null;
     attachPieces: Map<string, string>;
+    nano?: NanoStyle | null;
   }) => void;
 }
 
@@ -454,7 +458,7 @@ export function AnimationPanel({
         ...notes,
         ...attachNotes(scenario, named, compiled !== undefined),
       ]);
-      onStandIn({ track, attachPieces: named });
+      onStandIn({ track, attachPieces: named, nano: scenario.nano ?? null });
       const scene = withWorld(events, track, {
         radius,
         self: size,
@@ -653,7 +657,7 @@ export function AnimationPanel({
                   // buttons 14px below the thumb.
                   className="h-8"
                 />
-                {timeline && timeline.events.length > 0 ? (
+                {timeline?.events.some(isMarked) ? (
                   <ScrubberMarks
                     events={timeline.events}
                     frameCount={timeline.frames.length}

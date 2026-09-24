@@ -111,6 +111,22 @@ describe("attachedAt", () => {
   it("is nothing for a track with no attach", () => {
     expect(attachedAt(track(), 5)).toBeNull();
   });
+
+  /** No `frame` is the preview's own factory scenario, whose real start comes
+   *  from the run rather than a number the track can carry. In force from the
+   *  start, `until` aside. */
+  it("is in force from the start when the attach carries no frame", () => {
+    const noStart: StandInTrack = {
+      keys: [{ frame: 0, pos: [0, 0, 0] }],
+      attach: {
+        from: "QueryBuildInfo",
+        until: 20,
+      },
+    };
+    expect(attachedAt(noStart, 0)?.from).toBe("QueryBuildInfo");
+    expect(attachedAt(noStart, 19)?.from).toBe("QueryBuildInfo");
+    expect(attachedAt(noStart, 20)).toBeNull();
+  });
 });
 
 describe("standInRadius", () => {

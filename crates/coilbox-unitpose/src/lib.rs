@@ -15,9 +15,11 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod nanopiece;
 pub mod passenger;
 pub mod unitvalue;
 
+pub use nanopiece::NanoPieces;
 pub use passenger::Passenger;
 
 /// Said once when a run recorded an effect, an explosion or a sound, none of
@@ -88,6 +90,21 @@ pub struct ScriptEvent {
 pub enum EngineAction {
     Attach,
     Detach,
+    /// A builder starts spraying nano. `CBuilder` adds build power, and
+    /// sprays, on every frame it builds (`rts/Sim/Units/UnitTypes/Builder.cpp:339-354`).
+    #[serde(rename = "nano-start")]
+    NanoStart,
+    /// It stops.
+    #[serde(rename = "nano-stop")]
+    NanoStop,
+    /// A factory has a build queued, and starts it once the script puts the
+    /// unit in build stance (`Factory.cpp:138-151`).
+    #[serde(rename = "factory-build")]
+    FactoryBuild,
+    /// The buildee is finished. The factory stops spraying and calls
+    /// `StopBuilding`.
+    #[serde(rename = "factory-finish")]
+    FactoryFinish,
 }
 
 /// What the preview's scene holds on one event's frame, for a script that asks.
@@ -173,6 +190,14 @@ pub enum ScriptOutput {
     /// compiled script with no sound table, which is a TA script rather than
     /// a TA:K one.
     Sound { frame: u32, name: Option<String> },
+    /// The piece one frame's nano particle comes from, as `NanoPieceCache`
+    /// chose it. None when the script has named no piece of this unit yet.
+    Nano { frame: u32, piece: Option<String> },
+    /// `build-start`. The frame the factory started building, once its
+    /// script set `INBUILDSTANCE`. Not an effect: the preview draws the
+    /// spraying it starts rather than marking it on the scrubber.
+    #[serde(rename = "build-start")]
+    BuildStart { frame: u32 },
 }
 
 impl ScriptOutput {
@@ -349,6 +374,19 @@ pub struct Model {
     pub passenger: Passenger,
     /// What the script announced, in the order it did.
     pub events: Vec<ScriptOutput>,
+    /// Whether a builder is spraying nano, between an engine `nano-start` and
+    /// `nano-stop`.
+    pub spraying: bool,
+    /// Which piece it sprays from. Kept for the whole run, as the engine keeps
+    /// one cache per builder.
+    pub nano: NanoPieces,
+    /// A factory has a build queued and is waiting for its script to set
+    /// `INBUILDSTANCE`, between an engine `factory-build` and the frame the
+    /// runtime sees the stance set.
+    pub awaiting_build: bool,
+    /// Whether a factory is building, between the frame its script put it in
+    /// build stance and an engine `factory-finish`.
+    pub building: bool,
 }
 
 impl Model {
@@ -532,6 +570,22 @@ impl Model {
 
     pub fn play_sound(&mut self, frame: u32, name: Option<String>) {
         self.events.push(ScriptOutput::Sound { frame, name });
+    }
+
+    /// One spraying frame. `answer` is what `QueryNanoPiece` named, or none
+    /// when the cache has stopped asking (`NanoPieceCache.cpp:29-47`).
+    pub fn spray(&mut self, frame: u32, answer: Option<Option<usize>>) {
+        let piece = self.nano.next(frame, answer);
+        if piece.is_none() {
+            self.note("The script has named no nano piece, so nothing sprays.".to_string());
+        }
+        let piece = piece.map(|index| self.pieces[index].name.clone());
+        self.events.push(ScriptOutput::Nano { frame, piece });
+    }
+
+    /// Note the frame a factory started building.
+    pub fn build_start(&mut self, frame: u32) {
+        self.events.push(ScriptOutput::BuildStart { frame });
     }
 
     /// Attach a unit to `piece`, or to the void when there is none.
@@ -820,7 +874,13 @@ mod tests {
         model.after_frame();
         let later = scene([90.0, 0.0, 90.0]);
 
-        let answer = unitvalue::world(unitvalue::UNIT_XZ, 2, Some(&later), model.passenger.at());
+        let answer = unitvalue::world(
+            unitvalue::UNIT_XZ,
+            2,
+            Some(&later),
+            model.passenger.at(),
+            false,
+        );
         assert_eq!(answer.map(|a| a.value), Some(unitvalue::pack_xz(4.0, 0.0)));
     }
 
@@ -1045,5 +1105,68 @@ mod world_tests {
         let plain: ScriptEvent =
             serde_json::from_str(r#"{ "frame": 0, "callin": "Create" }"#).unwrap();
         assert_eq!(plain.engine, None);
+    }
+
+    #[test]
+    fn reads_the_nano_actions() {
+        let start: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 15, "engine": "nano-start" }"#).unwrap();
+        assert_eq!(start.engine, Some(EngineAction::NanoStart));
+        let stop: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 150, "engine": "nano-stop" }"#).unwrap();
+        assert_eq!(stop.engine, Some(EngineAction::NanoStop));
+    }
+
+    #[test]
+    fn reads_the_factory_actions() {
+        let build: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 15, "engine": "factory-build" }"#).unwrap();
+        assert_eq!(build.engine, Some(EngineAction::FactoryBuild));
+        let finish: ScriptEvent =
+            serde_json::from_str(r#"{ "frame": 150, "engine": "factory-finish" }"#).unwrap();
+        assert_eq!(finish.engine, Some(EngineAction::FactoryFinish));
+    }
+
+    #[test]
+    fn serialises_a_build_start_the_way_the_panel_reads_it() {
+        let build_start = ScriptOutput::BuildStart { frame: 42 };
+        assert_eq!(
+            serde_json::to_value(&build_start).unwrap(),
+            serde_json::json!({ "kind": "build-start", "frame": 42 })
+        );
+    }
+
+    #[test]
+    fn a_spraying_frame_records_its_piece_by_name() {
+        let mut model = Model::new(&["base".to_string(), "nozzle".to_string()]);
+        model.spray(4, Some(Some(1)));
+        model.spray(5, Some(None));
+        assert_eq!(
+            model.events,
+            [
+                ScriptOutput::Nano {
+                    frame: 4,
+                    piece: Some("nozzle".to_string())
+                },
+                ScriptOutput::Nano {
+                    frame: 5,
+                    piece: Some("nozzle".to_string())
+                },
+            ]
+        );
+        assert_eq!(
+            serde_json::to_value(&model.events[0]).unwrap(),
+            serde_json::json!({ "kind": "nano", "frame": 4, "piece": "nozzle" })
+        );
+    }
+
+    /// Nano is drawn, so it does not bring the note that effects are not.
+    #[test]
+    fn nano_alone_does_not_say_effects_are_not_drawn() {
+        let mut model = Model::new(&["base".to_string()]);
+        model.spray(0, Some(Some(0)));
+        let mut timeline = Timeline::new(vec!["base".to_string()], 1);
+        model.finish(&mut timeline);
+        assert!(!timeline.warnings.iter().any(|w| w == EFFECTS_NOTE));
     }
 }

@@ -1466,3 +1466,378 @@ mod engine_attach {
         );
     }
 }
+
+mod engine_nano {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn sprayed(bytes: &[u8], frames: u32, start: u32, stop: u32) -> Timeline {
+        run(
+            bytes,
+            &model_pieces(),
+            &[
+                action(start, EngineAction::NanoStart),
+                action(stop, EngineAction::NanoStop),
+            ],
+            frames,
+            &[],
+            &HashMap::new(),
+        )
+    }
+
+    fn nano(timeline: &Timeline) -> Vec<(u32, Option<String>)> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, piece } => Some((*frame, piece.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `QueryNanoPiece(piecenum)` flips static 0 between 1 and 0 and answers
+    /// it plus one, so barrel, turret, barrel and so on. Ends with the
+    /// trailing `push(0)` a compiled function's implicit `return 0` leaves
+    /// for `RETURN` to discard, so the answer already written to the
+    /// argument slot survives.
+    fn alternating() -> Vec<u8> {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        words.extend(push(1));
+        words.extend([op("PUSH_STATIC"), 0, op("SUB"), op("POP_STATIC"), 0]);
+        words.extend([op("PUSH_STATIC"), 0]);
+        words.extend(push(1));
+        words.extend([op("ADD"), op("POP_LOCAL_VAR"), 0]);
+        words.extend(push(0));
+        words.push(op("RETURN"));
+        build(&[("QueryNanoPiece", words)], PIECES, 1)
+    }
+
+    #[test]
+    fn sprays_from_what_query_nano_piece_answers_on_each_frame_between_start_and_stop() {
+        let timeline = sprayed(&alternating(), 8, 2, 6);
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            nano(&timeline),
+            [
+                (2, Some("barrel".to_string())),
+                (3, Some("turret".to_string())),
+                (4, Some("barrel".to_string())),
+                (5, Some("turret".to_string())),
+            ]
+        );
+    }
+
+    /// The engine seeds the call with `[1, -1]` and returns slot 0
+    /// (`CobInstance.cpp:411-421`), so with no call-in it is script piece 1.
+    #[test]
+    fn a_missing_query_nano_piece_answers_script_piece_one() {
+        let timeline = sprayed(&create_only(vec![op("RETURN")]), 3, 0, 2);
+
+        assert_eq!(
+            nano(&timeline),
+            [
+                (0, Some("turret".to_string())),
+                (1, Some("turret".to_string()))
+            ]
+        );
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryNanoPiece")));
+    }
+}
+
+mod engine_factory {
+    use super::*;
+    use coilbox_unitpose::{EngineAction, ScriptOutput};
+
+    const INBUILDSTANCE: u32 = 5;
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn callin(frame: u32, name: &str) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: name.to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        }
+    }
+
+    /// Sets INBUILDSTANCE as soon as it runs.
+    fn activate_now() -> Vec<u32> {
+        let mut words = push(INBUILDSTANCE);
+        words.extend(push(1));
+        words.extend([op("SET"), op("RETURN")]);
+        words
+    }
+
+    /// Sleeps one tick, standing in for an opening animation, then sets
+    /// INBUILDSTANCE.
+    fn activate_after_sleep() -> Vec<u32> {
+        let mut words = push(33); // one tick, in ms
+        words.push(op("SLEEP"));
+        words.extend(push(INBUILDSTANCE));
+        words.extend(push(1));
+        words.extend([op("SET"), op("RETURN")]);
+        words
+    }
+
+    /// Emits sfx `code` from the barrel, so a test can tell this call-in ran.
+    fn emits(code: u32) -> Vec<u32> {
+        let mut words = push(code);
+        words.extend([op("EMIT_SFX"), 2, op("RETURN")]);
+        words
+    }
+
+    fn build_start_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::BuildStart { frame } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn nano_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, .. } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn sfx_frames(timeline: &Timeline, code: i32) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Sfx { frame, sfx, .. } if *sfx == code => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `Factory.cpp:138-151`: a script that puts its unit in build stance the
+    /// moment it is asked to starts building the same frame the engine asks.
+    #[test]
+    fn building_starts_on_the_frame_the_script_sets_build_stance() {
+        let bytes = build(
+            &[("Activate", activate_now()), ("StartBuilding", emits(42))],
+            PIECES,
+            0,
+        );
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(&bytes, &model_pieces(), &events, 4, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
+    /// `Factory.cpp:138-151`: `Activate` and the stance check run in the same
+    /// `Update`, whatever order the frame lists them in. A `factory-build`
+    /// event queued before `Activate` must not push the build a frame late.
+    #[test]
+    fn building_starts_the_same_frame_even_when_factory_build_is_listed_first() {
+        let bytes = build(
+            &[("Activate", activate_now()), ("StartBuilding", emits(42))],
+            PIECES,
+            0,
+        );
+        let events = vec![action(0, EngineAction::FactoryBuild), callin(0, "Activate")];
+        let timeline = run(&bytes, &model_pieces(), &events, 4, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
+    /// A script that sleeps first, standing in for an opening animation, only
+    /// starts building once it actually sets the stance.
+    #[test]
+    fn building_waits_for_an_opening_animation_before_starting() {
+        let bytes = build(
+            &[
+                ("Activate", activate_after_sleep()),
+                ("StartBuilding", emits(42)),
+            ],
+            PIECES,
+            0,
+        );
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(&bytes, &model_pieces(), &events, 5, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [3]);
+        assert_eq!(sfx_frames(&timeline, 42), [3]);
+        assert_eq!(nano_frames(&timeline), [3, 4]);
+    }
+
+    /// The script never sets INBUILDSTANCE, so the factory never builds, and
+    /// `factory-finish` says so rather than firing `StopBuilding`.
+    #[test]
+    fn a_script_that_never_sets_build_stance_never_builds() {
+        let bytes = build(&[("Activate", vec![op("RETURN")])], PIECES, 0);
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 4, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert!(build_start_frames(&timeline).is_empty());
+        assert!(nano_frames(&timeline).is_empty());
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("never set INBUILDSTANCE")));
+    }
+
+    /// Build stance seeded from the preview's Unit values panel counts too:
+    /// building starts on the `factory-build` frame straight away.
+    #[test]
+    fn a_seeded_build_stance_starts_building_on_the_factory_build_frame() {
+        let bytes = build(&[("StartBuilding", emits(42))], PIECES, 0);
+        let events = vec![action(2, EngineAction::FactoryBuild)];
+        let values = HashMap::from([(INBUILDSTANCE as i32, 1)]);
+        let timeline = run(&bytes, &model_pieces(), &events, 4, &[], &values);
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+        assert_eq!(sfx_frames(&timeline, 42), [2]);
+    }
+
+    /// `factory-finish` stops the spraying and runs `StopBuilding`.
+    #[test]
+    fn factory_finish_stops_spraying_and_runs_stop_building() {
+        let bytes = build(
+            &[
+                ("Activate", activate_now()),
+                ("StartBuilding", emits(42)),
+                ("StopBuilding", emits(99)),
+            ],
+            PIECES,
+            0,
+        );
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 6, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(nano_frames(&timeline), [0, 1, 2]);
+        assert_eq!(sfx_frames(&timeline, 99), [3]);
+    }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// `get UNIT_Y(2, 0, 0, 0)` then move `piece` along z by it, the same
+    /// smuggling trick `reads_y_of_the_passenger` in `what_it_says_about_itself`
+    /// uses to get a queried number out where a test can read it.
+    fn reads_y_of_the_stand_in(piece: u32) -> Vec<u32> {
+        let mut words = push(10); // UNIT_Y
+        words.extend(push(2)); // the stand-in's id, as p1
+        words.extend(push(0)); // p2
+        words.extend(push(0)); // p3
+        words.extend(push(0)); // p4
+        words.push(op("GET"));
+        words.extend([op("MOVE_NOW"), piece, 2, op("RETURN")]);
+        words
+    }
+
+    /// The world handed to `Run` before it starts already carries the stand-in
+    /// on its build piece's rest position, because the preview cannot know the
+    /// run's own `build-start` frame ahead of time. But the buildee itself does
+    /// not exist until the script actually reaches build stance, so a question
+    /// asked while `awaiting_build` reads as though there were no stand-in at
+    /// all, the same world data notwithstanding. Once building starts, the
+    /// same question reads the real position.
+    #[test]
+    fn hides_the_stand_in_from_the_world_while_awaiting_build_stance() {
+        let bytes = build(
+            &[
+                ("Activate", activate_after_sleep()),
+                ("ProbeBefore", reads_y_of_the_stand_in(0)),
+                ("ProbeAfter", reads_y_of_the_stand_in(1)),
+            ],
+            PIECES,
+            0,
+        );
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 6, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        // Confirms the probes land either side of build-start.
+        assert_eq!(build_start_frames(&timeline), [3]);
+        assert!(close(pose(&timeline, 1, "base")[2], 0.0));
+        assert!(close(pose(&timeline, 4, "turret")[2], 3.0));
+    }
+}

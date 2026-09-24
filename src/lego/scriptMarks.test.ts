@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   describeOutput,
   explodeFlags,
+  isMarked,
   markLabel,
   markPercent,
   scrubberMarks,
@@ -40,6 +41,21 @@ describe("describeOutput", () => {
   it("says a sound a TA script played has no name", () => {
     expect(describeOutput({ frame: 0, kind: "sound", name: null })).toBe(
       "Sound, which a TA script does not name",
+    );
+  });
+
+  it("says where nano sprays from", () => {
+    expect(describeOutput({ frame: 3, kind: "nano", piece: "nozzle" })).toBe(
+      "Nano spray from nozzle",
+    );
+    expect(describeOutput({ frame: 3, kind: "nano", piece: null })).toBe(
+      "Nano spray from no piece",
+    );
+  });
+
+  it("says a factory started building", () => {
+    expect(describeOutput({ frame: 15, kind: "build-start" })).toBe(
+      "Factory starts building",
     );
   });
 });
@@ -94,6 +110,26 @@ describe("scrubberMarks", () => {
       [500, 2],
       [900, 1],
     ]);
+  });
+
+  it("marks no nano frames, which a build span records on every frame", () => {
+    const marks = scrubberMarks(
+      [
+        { frame: 3, kind: "nano", piece: "nozzle" },
+        { frame: 4, kind: "nano", piece: "nozzle" },
+        { frame: 5, kind: "sfx", piece: "flare", sfx: 1025 },
+      ],
+      100,
+      0,
+    );
+    expect(marks.map((mark) => mark.frame)).toEqual([5]);
+    expect(isMarked({ frame: 3, kind: "nano", piece: null })).toBe(false);
+  });
+
+  it("marks build-start, unlike nano", () => {
+    expect(isMarked({ frame: 15, kind: "build-start" })).toBe(true);
+    const marks = scrubberMarks([{ frame: 15, kind: "build-start" }], 100, 0);
+    expect(marks.map((mark) => mark.frame)).toEqual([15]);
   });
 
   it("places a mark along the scrubber as a percentage", () => {

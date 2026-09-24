@@ -460,24 +460,13 @@ impl Run {
                 self.engine(action)?;
                 continue;
             }
-            let Some(function) = self.program.script(&event.callin) else {
+            if !self.start_callin(&event.callin, &event.args)? {
                 if !event.ambient {
                     self.model
                         .note(format!("This script has no {} call-in.", event.callin));
                 }
                 continue;
-            };
-            let mut thread = Thread::new(
-                function,
-                self.program.offsets[function],
-                0,
-                event.callin.clone(),
-            );
-            // Arguments arrive on the stack, the way a call leaves them, and
-            // `CREATE_LOCAL_VAR` claims them one at a time.
-            thread.data = cob_args(&event.callin, &event.args, self.world.as_ref());
-            thread.params = thread.data.len() as i32;
-            self.add(thread)?;
+            }
 
             // The engine tells a script its longest reload straight after
             // Create (`CCobInstance::Create`), and scripts that wait on a
@@ -497,7 +486,60 @@ impl Run {
                 }
             }
         }
+        // A factory waiting for its script to set build stance, which is what
+        // starts a build (`Factory.cpp:138-151`). Checked before the spraying
+        // block below, so the frame the stance is seen is also the first frame
+        // that sprays.
+        if self.model.awaiting_build {
+            // A call-in queued later in this same frame, such as `Activate`
+            // listed after `factory-build`, needs its first tick before the
+            // stance check below, the way the engine-action path above does.
+            self.tick_queued_call_ins(start)?;
+            if self
+                .set_values
+                .get(&unitvalue::INBUILDSTANCE)
+                .copied()
+                .unwrap_or(0)
+                != 0
+            {
+                self.model.awaiting_build = false;
+                self.model.building = true;
+                self.model.spraying = true;
+                self.model.build_start(frame);
+                let queued_at = self.threads.len();
+                self.start_callin("StartBuilding", &[])?;
+                self.tick_queued_call_ins(queued_at)?;
+            }
+        }
+        // After the frame's call-ins and before its threads, because the engine
+        // updates builders before scripts tick (`rts/Game/Game.cpp:1782-1798`).
+        if self.model.spraying {
+            self.tick_queued_call_ins(start)?;
+            let answer = if self.model.nano.wants_answer() {
+                let piece = self.query_nano_piece()?;
+                Some(model_piece(&self.program, piece))
+            } else {
+                None
+            };
+            self.model.spray(frame, answer);
+        }
         Ok(())
+    }
+
+    /// Start a thread for a call-in by name, with these arguments, exactly as
+    /// an event naming it would. `false` when the script defines no such
+    /// call-in, so a caller can decide what that means to it.
+    fn start_callin(&mut self, callin: &str, args: &[f64]) -> Result<bool, String> {
+        let Some(function) = self.program.script(callin) else {
+            return Ok(false);
+        };
+        let mut thread = Thread::new(function, self.program.offsets[function], 0, callin.into());
+        // Arguments arrive on the stack, the way a call leaves them, and
+        // `CREATE_LOCAL_VAR` claims them one at a time.
+        thread.data = cob_args(callin, args, self.world.as_ref());
+        thread.params = thread.data.len() as i32;
+        self.add(thread)?;
+        Ok(true)
     }
 
     /// What the engine does to the stand-in itself: the air transport arm's
@@ -509,6 +551,30 @@ impl Run {
     /// acts, the way the engine's own call to each runs its first tick inline
     /// before the next call (`CobInstance.cpp:593`).
     fn engine(&mut self, action: EngineAction) -> Result<(), String> {
+        if matches!(action, EngineAction::NanoStart | EngineAction::NanoStop) {
+            self.model.spraying = action == EngineAction::NanoStart;
+            return Ok(());
+        }
+        if action == EngineAction::FactoryBuild {
+            self.model.awaiting_build = true;
+            return Ok(());
+        }
+        if action == EngineAction::FactoryFinish {
+            if self.model.building {
+                self.model.building = false;
+                self.model.spraying = false;
+                let queued_at = self.threads.len();
+                self.start_callin("StopBuilding", &[])?;
+                self.tick_queued_call_ins(queued_at)?;
+            } else if self.model.awaiting_build {
+                self.model.awaiting_build = false;
+                self.model.note(
+                    "The script never set INBUILDSTANCE, so the factory never started building, as in the engine (Factory.cpp:149). Switch on Build stance under Unit values to see it build anyway."
+                        .to_string(),
+                );
+            }
+            return Ok(());
+        }
         let Some(stand_in) = self.world.as_ref().and_then(|world| world.stand_in) else {
             self.model.note(
                 "The scenario has the engine carry the stand-in, and there is no stand-in in the scene."
@@ -516,15 +582,12 @@ impl Run {
             );
             return Ok(());
         };
-        match action {
-            EngineAction::Attach => {
-                let piece = self.query_transport(stand_in.height)?;
-                self.attach(stand_in.id, piece);
-            }
-            EngineAction::Detach => {
-                self.model
-                    .drop_unit(self.frame, stand_in.id, self.world.as_ref());
-            }
+        if action == EngineAction::Attach {
+            let piece = self.query_transport(stand_in.height)?;
+            self.attach(stand_in.id, piece);
+        } else {
+            self.model
+                .drop_unit(self.frame, stand_in.id, self.world.as_ref());
         }
         Ok(())
     }
@@ -570,6 +633,45 @@ impl Run {
         // Still running, as the engine leaves it (`CobInstance.cpp:620`).
         self.model.note(
             "QueryTransport waited rather than answering, so the stand-in rides script piece 2, which is what the engine answers for it."
+                .to_string(),
+        );
+        Ok(UNANSWERED)
+    }
+
+    /// Ask `QueryNanoPiece` straight away, as the engine's `Call` does.
+    ///
+    /// The engine seeds its arguments with a count of 1 and a -1, and returns
+    /// the first slot (`rts/Sim/Units/Scripts/CobInstance.cpp:411-421`). A
+    /// script with no `QueryNanoPiece`, or one that waits, leaves the count
+    /// there, so it answers script piece 1.
+    fn query_nano_piece(&mut self) -> Result<i32, String> {
+        const UNANSWERED: i32 = 1;
+        let Some(function) = self.program.script("QueryNanoPiece") else {
+            self.model.note(
+                "This script has no QueryNanoPiece call-in, so nano sprays from script piece 1, which is what the engine answers for it."
+                    .to_string(),
+            );
+            return Ok(UNANSWERED);
+        };
+        let mut thread = Thread::new(
+            function,
+            self.program.offsets[function],
+            0,
+            "QueryNanoPiece".into(),
+        );
+        thread.data = vec![-1];
+        thread.params = 1;
+        self.add(thread)?;
+        let index = self.threads.len() - 1;
+        self.step_thread(index)?;
+        for thread in std::mem::take(&mut self.queued) {
+            self.add(thread)?;
+        }
+        if matches!(self.threads[index].state, State::Dead) {
+            return Ok(self.threads[index].data.first().copied().unwrap_or(0));
+        }
+        self.model.note(
+            "QueryNanoPiece waited rather than answering, so nano sprays from script piece 1, which is what the engine answers for it."
                 .to_string(),
         );
         Ok(UNANSWERED)
@@ -1289,9 +1391,13 @@ impl Run {
         }
         // Where a unit is and how big, from the scene the latest event brought.
         // Before the stored values, because a script cannot set these.
-        if let Some(answer) =
-            unitvalue::world(id, p1, self.world.as_ref(), self.model.passenger.at())
-        {
+        if let Some(answer) = unitvalue::world(
+            id,
+            p1,
+            self.world.as_ref(),
+            self.model.passenger.at(),
+            self.model.awaiting_build,
+        ) {
             if let Some(note) = answer.note {
                 self.model.note(note);
             }

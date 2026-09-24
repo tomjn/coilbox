@@ -2979,3 +2979,448 @@ mod engine_attach {
         );
     }
 }
+
+mod engine_nano {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn sprayed(script: &str, frames: u32, start: u32, stop: u32) -> Timeline {
+        run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &[
+                action(start, EngineAction::NanoStart),
+                action(stop, EngineAction::NanoStop),
+            ],
+            frames,
+            &HashMap::new(),
+        )
+    }
+
+    fn nano(timeline: &Timeline) -> Vec<(u32, Option<String>)> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, piece } => Some((*frame, piece.clone())),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// The same answers as the compiled runtime's `alternating` script.
+    #[test]
+    fn sprays_from_what_query_nano_piece_answers_on_each_frame_between_start_and_stop() {
+        let timeline = sprayed(
+            r#"
+            local turret, barrel = piece("turret", "barrel")
+            local flip = 0
+            function script.QueryNanoPiece()
+                flip = 1 - flip
+                if flip == 1 then return barrel end
+                return turret
+            end
+            "#,
+            8,
+            2,
+            6,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(
+            nano(&timeline),
+            [
+                (2, Some("barrel".to_string())),
+                (3, Some("turret".to_string())),
+                (4, Some("barrel".to_string())),
+                (5, Some("turret".to_string())),
+            ]
+        );
+    }
+
+    /// `RunQueryCallIn` answers -1 when there is nothing to call
+    /// (`LuaUnitScript.cpp:505-519`), which names no piece.
+    #[test]
+    fn a_missing_query_nano_piece_names_no_piece() {
+        let timeline = sprayed("function script.Create() end", 3, 0, 2);
+
+        assert_eq!(nano(&timeline), [(0, None), (1, None)]);
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("no QueryNanoPiece")));
+    }
+}
+
+mod engine_factory {
+    use super::*;
+    use coilbox_unitpose::ScriptOutput;
+
+    fn action(frame: u32, action: EngineAction) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(action),
+        }
+    }
+
+    fn callin(frame: u32, name: &str) -> ScriptEvent {
+        ScriptEvent {
+            frame,
+            callin: name.to_string(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: None,
+        }
+    }
+
+    fn build_start_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::BuildStart { frame } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn nano_frames(timeline: &Timeline) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Nano { frame, .. } => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn sfx_frames(timeline: &Timeline, code: i32) -> Vec<u32> {
+        timeline
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ScriptOutput::Sfx { frame, sfx, .. } if *sfx == code => Some(*frame),
+                _ => None,
+            })
+            .collect()
+    }
+
+    const SCRIPT: &str = r#"
+        local barrel = piece("barrel")
+        function script.Activate()
+            SetUnitValue(COB.INBUILDSTANCE, true)
+        end
+        function script.StartBuilding()
+            EmitSfx(barrel, 42)
+        end
+    "#;
+
+    const SLEEPY_SCRIPT: &str = r#"
+        local barrel = piece("barrel")
+        function script.Activate()
+            Sleep(33)
+            SetUnitValue(COB.INBUILDSTANCE, true)
+        end
+        function script.StartBuilding()
+            EmitSfx(barrel, 42)
+        end
+    "#;
+
+    /// `Factory.cpp:138-151`: a script that puts its unit in build stance the
+    /// moment it is asked to starts building the same frame the engine asks.
+    #[test]
+    fn building_starts_on_the_frame_the_script_sets_build_stance() {
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(
+            SCRIPT,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
+    /// `Factory.cpp:138-151`: `Activate` and the stance check run in the same
+    /// `Update`, whatever order the frame lists them in. A `factory-build`
+    /// event queued before `Activate` must not push the build a frame late.
+    #[test]
+    fn building_starts_the_same_frame_even_when_factory_build_is_listed_first() {
+        let events = vec![action(0, EngineAction::FactoryBuild), callin(0, "Activate")];
+        let timeline = run(
+            SCRIPT,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 42), [0]);
+        assert!(nano_frames(&timeline).contains(&0));
+    }
+
+    /// A script that sleeps first, standing in for an opening animation, only
+    /// starts building once it actually sets the stance.
+    #[test]
+    fn building_waits_for_an_opening_animation_before_starting() {
+        let events = vec![callin(0, "Activate"), action(0, EngineAction::FactoryBuild)];
+        let timeline = run(
+            SLEEPY_SCRIPT,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+        assert_eq!(sfx_frames(&timeline, 42), [2]);
+        assert_eq!(nano_frames(&timeline), [2, 3]);
+    }
+
+    /// The script never sets INBUILDSTANCE, so the factory never builds, and
+    /// `factory-finish` says so rather than firing `StopBuilding`.
+    #[test]
+    fn a_script_that_never_sets_build_stance_never_builds() {
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(
+            "function script.Activate() end",
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert!(build_start_frames(&timeline).is_empty());
+        assert!(nano_frames(&timeline).is_empty());
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("never set INBUILDSTANCE")));
+    }
+
+    /// Build stance seeded from the preview's Unit values panel counts too:
+    /// building starts on the `factory-build` frame straight away.
+    #[test]
+    fn a_seeded_build_stance_starts_building_on_the_factory_build_frame() {
+        let events = vec![action(2, EngineAction::FactoryBuild)];
+        let values = HashMap::from([(unitvalue::INBUILDSTANCE, 1)]);
+        let timeline = run(
+            "function script.StartBuilding() end",
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            4,
+            &values,
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+    }
+
+    /// `factory-finish` stops the spraying and runs `StopBuilding`.
+    #[test]
+    fn factory_finish_stops_spraying_and_runs_stop_building() {
+        let script = r#"
+            local barrel = piece("barrel")
+            function script.Activate()
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.StartBuilding()
+                EmitSfx(barrel, 42)
+            end
+            function script.StopBuilding()
+                EmitSfx(barrel, 99)
+            end
+        "#;
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            action(3, EngineAction::FactoryFinish),
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(nano_frames(&timeline), [0, 1, 2]);
+        assert_eq!(sfx_frames(&timeline, 99), [3]);
+    }
+
+    fn scene(pos: Option<[f64; 3]>) -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos,
+                radius: 28.0,
+                height: 30.8,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 60.0,
+                height: 40.0,
+            },
+        }
+    }
+
+    /// The world handed to `Run` before it starts already carries the stand-in
+    /// on its build piece's rest position, because the preview cannot know the
+    /// run's own `build-start` frame ahead of time. But the buildee itself does
+    /// not exist until the script actually reaches build stance, so a question
+    /// asked while awaiting build stance reads as though there were no
+    /// stand-in at all, the same world data notwithstanding. Once building
+    /// starts, the same question reads the real position.
+    #[test]
+    fn hides_the_stand_in_from_the_world_while_awaiting_build_stance() {
+        let script = r#"
+            local base = piece("base")
+            local turret = piece("turret")
+            function script.Activate()
+                Sleep(33)
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.ProbeBefore()
+                Move(base, z_axis, GetUnitValue(COB.UNIT_Y, 2) / 65536)
+            end
+            function script.ProbeAfter()
+                Move(turret, z_axis, GetUnitValue(COB.UNIT_Y, 2) / 65536)
+            end
+        "#;
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        // Confirms the probes land either side of build-start.
+        assert_eq!(build_start_frames(&timeline), [2]);
+        assert_close(pose(&timeline, 1, "base")[2], 0.0);
+        assert_close(pose(&timeline, 4, "turret")[2], 3.0);
+    }
+
+    /// The same hiding as above, through the `Spring.*` calls a Lua transport
+    /// uses instead of `GetUnitValue`: `GetUnitPosition`, `GetUnitHeight` and
+    /// `GetUnitRadius` answer as for a unit that is not there while a factory
+    /// awaits build stance, and for real once building has started.
+    #[test]
+    fn hides_the_stand_in_from_spring_calls_while_awaiting_build_stance() {
+        let script = r#"
+            local base = piece("base")
+            function script.Activate()
+                Sleep(33)
+                SetUnitValue(COB.INBUILDSTANCE, true)
+            end
+            function script.ProbeBefore()
+                if Spring.GetUnitPosition(2) ~= nil then error("found a position") end
+                if Spring.GetUnitHeight(2) ~= nil then error("found a height") end
+                if Spring.GetUnitRadius(2) ~= nil then error("found a radius") end
+            end
+            function script.ProbeAfter()
+                local _, _, z = Spring.GetUnitPosition(2)
+                Move(base, z_axis, z)
+            end
+        "#;
+        let world = Some(scene(Some([0.0, 3.0, 84.0])));
+        let events = vec![
+            callin(0, "Activate"),
+            action(0, EngineAction::FactoryBuild),
+            ScriptEvent {
+                frame: 1,
+                callin: "ProbeBefore".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world: world.clone(),
+                engine: None,
+            },
+            ScriptEvent {
+                frame: 4,
+                callin: "ProbeAfter".to_string(),
+                args: Vec::new(),
+                ambient: false,
+                world,
+                engine: None,
+            },
+        ];
+        let timeline = run(
+            script,
+            "test.lua",
+            &Unit::new(&pieces()),
+            &events,
+            6,
+            &HashMap::new(),
+        );
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [2]);
+        // A thread that errors takes only itself down, so a wrongly answered
+        // position shows up as a note rather than `timeline.error`.
+        assert!(
+            !timeline.warnings.iter().any(|w| w.contains("found a")),
+            "{:?}",
+            timeline.warnings
+        );
+        assert_close(pose(&timeline, 4, "base")[2], 84.0);
+    }
+}

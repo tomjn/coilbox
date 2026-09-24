@@ -29,6 +29,7 @@ import {
   PackagePlus,
   RotateCw,
   Scaling,
+  Sparkles,
   Target,
   Trash2,
 } from "lucide-react";
@@ -104,6 +105,7 @@ import {
 import { disposePieceCollision } from "./collisionVolumes";
 import { dotMaterial, points } from "./dotsAndPoints";
 import { EnvironmentPicker } from "./EnvironmentPicker";
+import { buildEffectsLayer } from "./effectsLayer";
 import {
   commitAim,
   commitGizmo,
@@ -120,7 +122,7 @@ import {
   refreshSelectionOutlines,
   setHoveredAndNotify,
 } from "./selectionAndHoverOutlines";
-import type { StandInPlacement } from "./standInPlayback";
+import { type StandInPlacement, standInFor } from "./standInPlayback";
 import { useCollisionAndAimVisibility } from "./useCollisionAndAimVisibility";
 import { useGizmoMode } from "./useGizmoMode";
 import { useModelAnchors } from "./useModelAnchors";
@@ -266,9 +268,6 @@ const NO_STAND_IN: StandInPlacement = {
   attachPieces: new Map(),
   show: true,
 };
-
-/** The same, for the toggle being off. Stable for the same reason. */
-const HIDDEN_STAND_IN: StandInPlacement = { ...NO_STAND_IN, show: false };
 
 interface Props {
   /**
@@ -530,6 +529,7 @@ export function ModelViewport({
   // On by default: a scenario that defines a track wants it seen, and the
   // toggle exists for getting it out of the way rather than for opting in.
   const [showStandIn, setShowStandIn] = useState(true);
+  const [showEffects, setShowEffects] = useState(true);
   // View settings, held for as long as the viewport is open and no longer,
   // exactly as the two above are. Both open on what the builder has always
   // shown, so nothing about opening a project changes.
@@ -653,6 +653,12 @@ export function ModelViewport({
       const standInGroup = buildStandIn(radius);
       standInGroup.visible = false;
       scene.add(standInGroup);
+
+      // The dots a script's effects are drawn with. Hidden until a run that
+      // emits something plays.
+      const effects = buildEffectsLayer();
+      effects.object.visible = false;
+      scene.add(effects.object);
 
       // The collision volume's wireframe. Drawn over everything rather than
       // depth-tested, because a volume set smaller than the unit sits inside
@@ -842,6 +848,7 @@ export function ModelViewport({
         standIn: standInGroup,
         disposeStandIn: () => disposeStandIn(standInGroup),
         standInRadius: radius,
+        effects,
         collision: null,
         collisionMaterial,
         editCollision: false,
@@ -1018,6 +1025,7 @@ export function ModelViewport({
           // Not `standInGroup`, for the same reason: the shape is rebuilt when
           // the unit's size changes, so the one in the scene may not be this.
           state.disposeStandIn();
+          state.effects.dispose();
           state.collision?.geometry.dispose();
           collisionMaterial.dispose();
           // One square shared by all six plates, so it is freed once.
@@ -1072,6 +1080,14 @@ export function ModelViewport({
 
   useStandInSize(sceneRef, project, pack, raw, standIn.track?.size);
 
+  // The toggle only ever hides the stand-in mesh itself: the track and nano
+  // it carries go on to script frame stepping unchanged, so the spray keeps
+  // aiming at it while it is out of sight.
+  const standInPlacement = useMemo(
+    () => standInFor(standIn, showStandIn),
+    [standIn, showStandIn],
+  );
+
   useScriptFrameStepping(sceneRef, {
     playing,
     reduceMotion,
@@ -1079,7 +1095,8 @@ export function ModelViewport({
     scriptPaused,
     scriptTimeline,
     scriptFrame,
-    standIn: showStandIn ? standIn : HIDDEN_STAND_IN,
+    standIn: standInPlacement,
+    showEffects,
     packRef,
     rawRef,
     projectRef,
@@ -1379,6 +1396,13 @@ export function ModelViewport({
               onChange={setShowStandIn}
               hideTitle="Hide the stand-in unit"
               showTitle="Show the stand-in unit, the thing a scenario aims at, builds or carries"
+            />
+            <ViewToggle
+              icon={Sparkles}
+              on={showEffects}
+              onChange={setShowEffects}
+              hideTitle="Hide script effects"
+              showTitle="Show script effects, such as nano spray, from the unit's own script"
             />
             <ViewButton
               title="Keyboard shortcuts (?)"

@@ -215,6 +215,10 @@ export function worldAt(
   track: StandInTrack | null,
   frame: number,
   ctx: WorldContext,
+  /** The scenario's own `factory-build` event frame, for an attach with no
+   *  `frame` of its own. `withWorld` reads this out of the events once,
+   *  rather than every call working it out itself. */
+  buildStart?: number,
 ): ScriptWorld {
   if (!track) return { standIn: null, self: ctx.self };
   const base = {
@@ -223,13 +227,32 @@ export function worldAt(
     height: standInHeight(ctx.radius),
   };
 
+  const attach = attachedAt(track, frame);
+
+  // An attach with no `frame` is the preview's own factory scenario, whose
+  // real start is the run's own `build-start`, unknowable before the run
+  // happens. This world is built before the run, so it takes the scenario's
+  // own `factory-build` event frame instead: before it the buildee does not
+  // exist yet, so there is nothing to report, and its rest position stands in
+  // for where the run will carry it from that frame on.
+  if (attach && attach.frame === undefined) {
+    if (buildStart === undefined || frame < buildStart) {
+      // The buildee does not exist before `factory-build`, so there is no
+      // stand-in to report at all, not one with nowhere to stand.
+      return { standIn: null, self: ctx.self };
+    }
+    const resting = ctx.attachPiece(attach.from);
+    if (resting) return { standIn: { ...base, pos: resting }, self: ctx.self };
+  }
+
   // A factory's stand-in sits on its build piece from the frame after the
   // attach. The rule came from the air arm, which attaches in the runtime
   // now, and is kept for the factory rather than changed in passing
   // (`rts/Sim/Units/CommandAI/MobileCAI.cpp:1451-1453`).
-  const attach = attachedAt(track, frame);
   const riding =
-    attach && frame > attach.frame ? ctx.attachPiece(attach.from) : null;
+    attach && attach.frame !== undefined && frame > attach.frame
+      ? ctx.attachPiece(attach.from)
+      : null;
   if (riding) return { standIn: { ...base, pos: riding }, self: ctx.self };
 
   const pose = standInAt(track, frame, ctx.radius);
@@ -243,9 +266,10 @@ export function withWorld(
   track: StandInTrack | null,
   ctx: WorldContext,
 ): ScriptEvent[] {
+  const buildStart = events.find((e) => e.engine === "factory-build")?.frame;
   return events.map((event) => ({
     ...event,
-    world: worldAt(track, event.frame, ctx),
+    world: worldAt(track, event.frame, ctx, buildStart),
   }));
 }
 

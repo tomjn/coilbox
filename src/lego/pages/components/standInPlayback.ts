@@ -14,9 +14,12 @@
 import * as THREE from "three";
 
 import type { LegoProject } from "../../model";
-import type { ScriptTimeline, StandInTrack } from "../../scriptPlayback";
+import type {
+  NanoStyle,
+  ScriptTimeline,
+  StandInTrack,
+} from "../../scriptPlayback";
 import {
-  attachedAt,
   type PassengerState,
   passengerAt,
   standInAfterRelease,
@@ -35,10 +38,28 @@ export interface StandInPlacement {
   attachPieces: Map<string, string>;
   /** The viewport's own toggle. */
   show: boolean;
+  /** How the running scenario's unit sprays nano at the stand-in, or null
+   *  when it does not. */
+  nano?: NanoStyle | null;
 }
 
 const AT = new THREE.Vector3();
 const LOOSE: PassengerState = { kind: "loose" };
+
+/**
+ * The placement to hand to script frame stepping, with the viewport's own
+ * toggle swapped in for `show`.
+ *
+ * The track and `nano` come along unchanged, because nano spray goes to the
+ * stand-in whether or not it is being shown: only the mesh's own visibility
+ * should follow the toggle.
+ */
+export function standInFor(
+  standIn: StandInPlacement,
+  showStandIn: boolean,
+): StandInPlacement {
+  return { ...standIn, show: showStandIn };
+}
 
 export function placeStandIn(
   state: SceneState,
@@ -87,17 +108,52 @@ export function placeStandIn(
     return;
   }
 
-  placeLoose(state, project, track, attachPieces, frame);
+  placeLoose(state, project, track, attachPieces, timeline, frame);
 }
 
-/** Before anything has attached it, the track, as it always was. */
+/**
+ * Before anything has attached it, the track, as it always was. A factory's
+ * build piece is the one exception: the probe names it rather than the script
+ * attaching anything, and the run says when riding it starts.
+ */
 function placeLoose(
   state: SceneState,
   project: LegoProject,
   track: StandInTrack,
   attachPieces: Map<string, string>,
+  timeline: ScriptTimeline | null,
   frame: number,
 ): void {
+  const attach = track.attach;
+  if (attach) {
+    // Never started, or not yet: the run says why, and there is nothing to
+    // draw before it happens.
+    const buildStart = timeline?.events.find(
+      (event) => event.kind === "build-start",
+    );
+    if (!buildStart || frame < buildStart.frame) {
+      state.standIn.visible = false;
+      return;
+    }
+    if (attach.until === null || frame < attach.until) {
+      const piece = attachPieces.get(attach.from);
+      const group = piece ? groupOfPiece(state, project, piece) : undefined;
+      if (group) {
+        // `UpdateBuild` moves the buildee to the piece's world position and
+        // turns it with the piece, every frame of the build, so this reads
+        // the piece's posed matrix rather than its rest offset.
+        group.updateWorldMatrix(true, false);
+        state.standIn.visible = true;
+        state.standIn.position.copy(group.getWorldPosition(AT));
+        const e = group.matrixWorld.elements;
+        state.standIn.rotation.set(0, Math.atan2(e[8], e[10]), 0);
+        return;
+      }
+    }
+  }
+
+  // Loose, past the attach, or on a build piece the probe never named. Nothing
+  // has been let go yet, so every key is measured from the unit's origin.
   const pose = standInAt(track, frame, state.standInRadius);
   if (!pose) {
     state.standIn.visible = false;
@@ -105,19 +161,6 @@ function placeLoose(
   }
   state.standIn.visible = true;
   state.standIn.rotation.set(0, pose.heading, 0);
-
-  // A factory's build spot: where its piece rests, not where the doors have
-  // swung it. The rest offsets are what `showBaked` wrote.
-  const attach = attachedAt(track, frame);
-  const piece = attach ? attachPieces.get(attach.from) : undefined;
-  const rest = piece ? restOfPiece(state, project, piece) : null;
-  if (rest) {
-    state.standIn.position.set(...rest);
-    return;
-  }
-
-  // Loose, or on a build piece the probe never named. Nothing has been let go
-  // yet, so every key is measured from the unit's origin.
   state.standIn.position.set(...pose.pos);
 }
 
@@ -171,34 +214,11 @@ function releasePoint(
 
 /** The scene group standing for a piece, found by the piece's name because
  *  that is what a script probe answers with. */
-function groupOfPiece(
+export function groupOfPiece(
   state: SceneState,
   project: LegoProject,
   name: string,
 ): THREE.Group | undefined {
   const piece = project.pieces.find((candidate) => candidate.name === name);
   return piece ? state.groups.get(piece.id) : undefined;
-}
-
-/** Where a piece rests, accumulated from the offsets playback wrote into
- *  `state.rest`, which is the bake rather than the document. */
-function restOfPiece(
-  state: SceneState,
-  project: LegoProject,
-  name: string,
-): [number, number, number] | null {
-  let piece = project.pieces.find((candidate) => candidate.name === name);
-  const at: [number, number, number] = [0, 0, 0];
-  while (piece) {
-    const offset = state.rest.get(piece.id);
-    if (!offset) return null;
-    at[0] += offset[0];
-    at[1] += offset[1];
-    at[2] += offset[2];
-    const parentId = piece.parentId;
-    piece = parentId
-      ? project.pieces.find((candidate) => candidate.id === parentId)
-      : undefined;
-  }
-  return at;
 }

@@ -22,8 +22,14 @@ import { type LegoPiece, type LegoProject, newProject } from "../../model";
 import type { LegoPartInfo, LoadedPack } from "../../pack";
 import type { ScriptOutput, ScriptTimeline } from "../../scriptPlayback";
 import { applyTimelineFrame } from "./animationPlayback";
+import { buildEffectsLayer, type EffectsLayer } from "./effectsLayer";
+import { placeEffects } from "./effectsPlayback";
 import { type SceneGraph, type SceneState, syncScene } from "./sceneState";
-import { placeStandIn } from "./standInPlayback";
+import {
+  placeStandIn,
+  type StandInPlacement,
+  standInFor,
+} from "./standInPlayback";
 
 /** A pack holding one part: a triangle a metre out along x and z. */
 function pack(): LoadedPack {
@@ -429,22 +435,17 @@ describe("placeStandIn", () => {
     expect(state.standIn.visible).toBe(false);
   });
 
-  /** A factory does not carry what it builds, so its stand-in sits where the
-   *  piece rests rather than following it through whatever the doors do. */
-  it("sits at a factory's build piece where it rests", () => {
+  /** A build with no timeline at all never asked the run whether building
+   *  started, so there is nothing to say it did. */
+  it("hides a factory's buildee with no timeline to say building started", () => {
     const state = standInScene();
-    state.groups.get("arm")?.position.set(0, 99, 0);
     placeStandIn(
       state,
       doc,
       {
         track: {
           keys: [{ frame: 0, pos: [0, 0, 0] }],
-          attach: {
-            from: "QueryBuildInfo",
-            frame: 0,
-            until: null,
-          },
+          attach: { from: "QueryBuildInfo", until: null },
         },
         attachPieces: new Map([["QueryBuildInfo", "arm"]]),
         show: true,
@@ -453,7 +454,80 @@ describe("placeStandIn", () => {
       0,
     );
 
-    expect(state.standIn.position.toArray()).toEqual([0, 4, 0]);
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** Before the run's own `build-start` frame, the script may still be
+   *  opening the factory's doors, so there is nothing to show yet. */
+  it("hides a factory's buildee before the run says building started", () => {
+    const state = standInScene();
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      4,
+    );
+
+    expect(state.standIn.visible).toBe(false);
+  });
+
+  /** From `build-start` on, the buildee rides the piece's own posed world
+   *  position, the way `UpdateBuild` carries it, rather than sitting at its
+   *  rest position. */
+  it("rides the build piece's posed position from build-start", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.position.set(0, 99, 0);
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      5,
+    );
+
+    expect(state.standIn.visible).toBe(true);
+    expect(state.standIn.position.toArray()).toEqual([0, 99, 0]);
+  });
+
+  /** A build pad turned by +0.5 radians about y turns the stand-in the same
+   *  way, per `Factory.cpp`'s `GetHeadingFromVector`. */
+  it("turns with the build piece", () => {
+    const state = standInScene();
+    state.groups.get("arm")?.rotation.set(0, 0.5, 0);
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
+    placeStandIn(
+      state,
+      doc,
+      {
+        track: {
+          keys: [{ frame: 0, pos: [0, 0, 0] }],
+          attach: { from: "QueryBuildInfo", until: null },
+        },
+        attachPieces: new Map([["QueryBuildInfo", "arm"]]),
+        show: true,
+      },
+      timeline,
+      5,
+    );
+
+    expect(state.standIn.rotation.y).toBeCloseTo(0.5);
   });
 
   /**
@@ -463,23 +537,20 @@ describe("placeStandIn", () => {
    */
   it("holds the keyed position when the probe named no piece", () => {
     const state = standInScene();
+    const timeline = run(10, () => 0, [{ frame: 5, kind: "build-start" }]);
     placeStandIn(
       state,
       doc,
       {
         track: {
           keys: [{ frame: 0, pos: [0, 1, 4] }],
-          attach: {
-            from: "QueryBuildInfo",
-            frame: 0,
-            until: null,
-          },
+          attach: { from: "QueryBuildInfo", until: null },
         },
         attachPieces: new Map(),
         show: true,
       },
-      null,
-      0,
+      timeline,
+      5,
     );
 
     expect(state.standIn.visible).toBe(true);
@@ -641,5 +712,209 @@ describe("placeStandIn", () => {
 
     // Halfway from (0, 4, 0) to ten elmos above it.
     expect(state.standIn.position.toArray()).toEqual([0, 9, 0]);
+  });
+
+  describe("placeEffects", () => {
+    const beside: StandInPlacement = {
+      track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+      attachPieces: new Map(),
+      show: true,
+      nano: "builder",
+    };
+
+    function sprayScene(): SceneState {
+      const state = standInScene();
+      (state as { effects: EffectsLayer }).effects = buildEffectsLayer();
+      return state;
+    }
+
+    function geometry(state: SceneState) {
+      return state.effects.object.geometry as THREE.InstancedBufferGeometry;
+    }
+
+    /** No dot has left the nozzle on the birth frame itself (`effects.test.ts`
+     *  covers that in the pure function), so these tests read the frame after,
+     *  and check closeness rather than exact equality: by then every dot has
+     *  its own bit of travel and jitter behind it. A builder's pace is three
+     *  elmos a frame, and its jitter here is small, so this is a generous
+     *  upper bound on one frame's travel, not a tight one. */
+    const NOZZLE_TRAVEL_BOUND = 6;
+
+    function expectNear(actual: number, expected: number, bound: number) {
+      expect(Math.abs(actual - expected)).toBeLessThanOrEqual(bound);
+    }
+
+    it("sprays from the nano piece on the frame it was emitted", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      // Nothing has left the nozzle yet on the birth frame itself.
+      placeEffects(state, doc, beside, true, timeline, 5);
+      expect(geometry(state).instanceCount).toBe(0);
+
+      placeEffects(state, doc, beside, true, timeline, 6);
+      expect(state.effects.object.visible).toBe(true);
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      const center = geometry(state).getAttribute("center").array;
+      for (let i = 0; i < geometry(state).instanceCount; i++) {
+        expectNear(center[i * 3], 0, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 1], 4, NOZZLE_TRAVEL_BOUND);
+        expectNear(center[i * 3 + 2], 0, NOZZLE_TRAVEL_BOUND);
+      }
+    });
+
+    /** The engine places a frame-N emission where the pieces were at the end
+     *  of frame N - 1's animation. The arm moves 100 elmos a frame here, so
+     *  a frame's worth of jitter and travel is nowhere near enough to confuse
+     *  frame 4's pose (400) with frame 5's (500). */
+    it("uses the pose of the frame before", () => {
+      const state = sprayScene();
+      const timeline = run(40, (frame) => frame * 100, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      placeEffects(state, doc, beside, true, timeline, 6);
+
+      const center = geometry(state).getAttribute("center").array;
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      for (let i = 0; i < geometry(state).instanceCount; i++) {
+        expectNear(center[i * 3], 400, NOZZLE_TRAVEL_BOUND);
+      }
+    });
+
+    /** The engine reads the buildee's own `midPos` on the emitting frame,
+     *  never the frame before (`Builder.cpp:353`). Only the nozzle comes from
+     *  the frame before. */
+    it("aims at the stand-in's position on the emitting frame, not the frame before", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      const swinging: StandInPlacement = {
+        track: {
+          keys: [
+            { frame: 4, pos: [-1000, 0, 0] },
+            { frame: 5, pos: [1000, 0, 0] },
+          ],
+        },
+        attachPieces: new Map(),
+        show: true,
+        nano: "factory",
+      };
+      placeEffects(state, doc, swinging, true, timeline, 6);
+
+      // The nozzle stayed at x = 0, so a particle drifting to positive x one
+      // frame after it fired means the target read the emitting frame's
+      // position rather than the frame before's.
+      const center = geometry(state).getAttribute("center").array;
+      expect(center[0]).toBeGreaterThan(0);
+    });
+
+    it("leaves the scene posed on the frame it was asked for", () => {
+      const state = sprayScene();
+      const timeline = run(40, (frame) => frame, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      applyTimelineFrame(state, doc, timeline, 12);
+      placeEffects(state, doc, beside, true, timeline, 12);
+
+      expect(state.groups.get("arm")?.position.x).toBe(12);
+    });
+
+    it("draws nothing for a scenario that does not spray, or with the toggle off", () => {
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      const quiet = sprayScene();
+      placeEffects(quiet, doc, { ...beside, nano: null }, true, timeline, 5);
+      expect(geometry(quiet).instanceCount).toBe(0);
+
+      const hidden = sprayScene();
+      placeEffects(hidden, doc, beside, false, timeline, 5);
+      expect(hidden.effects.object.visible).toBe(false);
+    });
+
+    it("sprays at the stand-in even while the stand-in is hidden, using the placement the viewport builds", () => {
+      const state = sprayScene();
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "nano", piece: "arm" },
+      ]);
+      placeEffects(state, doc, standInFor(beside, false), true, timeline, 6);
+      expect(geometry(state).instanceCount).toBeGreaterThan(0);
+      expect(state.standIn.visible).toBe(false);
+    });
+
+    /** A piece whose gap to its own next firing is bridged by other nozzles'
+     *  firings keeps spraying across that gap, because its span reaches to
+     *  when it next fires rather than defaulting to one frame. */
+    it("keeps a nozzle spraying through the run's other events, since its span reaches to when it next fires", () => {
+      const state = sprayScene();
+      state.standInRadius = 1;
+      // Arm is a child of base's group, so its world position is base's plus
+      // its own: this puts base's world position at 50, far from the target,
+      // and the arm's back at the origin, near it.
+      state.rest.set("base", [50, 0, 0]);
+      state.rest.set("arm", [-50, 0, 0]);
+      const staggered: StandInPlacement = {
+        track: { keys: [{ frame: 0, pos: [6, 0, 0] }] },
+        attachPieces: new Map(),
+        show: true,
+        nano: "builder",
+      };
+      const timeline = run(10, () => 0, [
+        { frame: 0, kind: "nano", piece: "arm" },
+        { frame: 1, kind: "nano", piece: "base" },
+        { frame: 2, kind: "nano", piece: "base" },
+        { frame: 3, kind: "nano", piece: "arm" },
+      ]);
+
+      placeEffects(state, doc, staggered, true, timeline, 3);
+
+      const center = geometry(state).getAttribute("center").array;
+      const nearArm = Array.from(
+        { length: geometry(state).instanceCount },
+        (_, i) => center[i * 3],
+      ).some((x) => x < 25);
+      expect(nearArm).toBe(true);
+    });
+
+    /** Without another nozzle's firing to bridge the gap, the same nozzle's
+     *  spray dies out at its own pace: the control for the test above. */
+    it("lets a lone nozzle's spray die out at its own pace when nothing bridges the gap", () => {
+      const state = sprayScene();
+      state.standInRadius = 1;
+      state.rest.set("arm", [0, 0, 0]);
+      const lone: StandInPlacement = {
+        track: { keys: [{ frame: 0, pos: [6, 0, 0] }] },
+        attachPieces: new Map(),
+        show: true,
+        nano: "builder",
+      };
+      const timeline = run(10, () => 0, [
+        { frame: 0, kind: "nano", piece: "arm" },
+      ]);
+
+      placeEffects(state, doc, lone, true, timeline, 3);
+
+      expect(geometry(state).instanceCount).toBe(0);
+    });
+  });
+});
+
+describe("standInFor", () => {
+  it("keeps the track and nano, and swaps in the toggle for show", () => {
+    const standIn: StandInPlacement = {
+      track: { keys: [{ frame: 0, pos: [1, 0, 2] }] },
+      attachPieces: new Map(),
+      show: true,
+      nano: "builder",
+    };
+
+    const hidden = standInFor(standIn, false);
+
+    expect(hidden.track).toBe(standIn.track);
+    expect(hidden.nano).toBe("builder");
+    expect(hidden.attachPieces).toBe(standIn.attachPieces);
+    expect(hidden.show).toBe(false);
   });
 });

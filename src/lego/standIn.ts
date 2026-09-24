@@ -167,14 +167,20 @@ export function trackBesideUnit(
   };
 }
 
-/** The attachment in force on a frame, or null when the stand-in is loose. */
+/**
+ * The attachment in force on a frame, or null when the stand-in is loose.
+ *
+ * An attach with no `frame` is in force from the start: only `until` can end
+ * it. `aimResolver.ts`'s `worldAt` is the only caller that reads `frame`
+ * itself, for a pre-run gate this function does not need to apply.
+ */
 export function attachedAt(
   track: StandInTrack,
   frame: number,
 ): StandInAttach | null {
   const attach = track.attach;
   if (!attach) return null;
-  if (frame < attach.frame) return null;
+  if (attach.frame !== undefined && frame < attach.frame) return null;
   if (attach.until !== null && frame >= attach.until) return null;
   return attach;
 }
