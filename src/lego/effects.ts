@@ -21,7 +21,7 @@
  * puff instead.
  */
 
-import type { NanoStyle } from "./scriptPlayback";
+import type { NanoStyle, ScriptEvent } from "./scriptPlayback";
 
 export type Vec3 = [number, number, number];
 
@@ -846,10 +846,99 @@ export function sfxEmission(
   return null;
 }
 
+/**
+ * When the unit is moving and how fast, for a scenario that tells it to move.
+ * The preview unit never actually moves, so this is what carries the
+ * particles it leaves behind back past it, as the world would stream past a
+ * unit that did.
+ */
+export interface UnitMotion {
+  /** Elmos a frame, along the unit's front, +Z. */
+  speed: number;
+  /** The frames it moves on, each from its first frame up to but not
+   *  including its last. */
+  spans: [number, number][];
+}
+
+/** When a scenario's events have the unit moving: from each `StartMoving` to
+ *  the next `StopMoving`, or to the end of the preview. Null for a scenario
+ *  that never moves it, or a speed of 0. */
+export function unitMotion(
+  events: ScriptEvent[],
+  speed: number,
+): UnitMotion | null {
+  if (speed <= 0) return null;
+  const spans: [number, number][] = [];
+  let start: number | null = null;
+  for (const event of events) {
+    if (event.callin === "StartMoving" && start === null) start = event.frame;
+    if (event.callin === "StopMoving" && start !== null) {
+      spans.push([start, event.frame]);
+      start = null;
+    }
+  }
+  if (start !== null) spans.push([start, Infinity]);
+  return spans.length > 0 ? { speed, spans } : null;
+}
+
+/** How far the unit has moved by `frame`, counting each moving frame before
+ *  it. */
+export function travelled(
+  motion: UnitMotion | null | undefined,
+  frame: number,
+): number {
+  if (!motion) return 0;
+  let frames = 0;
+  for (const [start, end] of motion.spans) {
+    frames += Math.max(0, Math.min(frame, end) - start);
+  }
+  return frames * motion.speed;
+}
+
+/** The unit's speed on `frame`, 0 when it is not moving then. */
+function speedOn(motion: UnitMotion | null, frame: number): number {
+  if (!motion) return 0;
+  const moving = motion.spans.some(
+    ([start, end]) => frame >= start && frame < end,
+  );
+  return moving ? motion.speed : 0;
+}
+
+/**
+ * Move the sprites from `first` on back along -Z by how far the unit moved
+ * since `birth`, plus `kept` elmos forward. A particle stays where it was
+ * made in the world, so a unit moving forward leaves it behind.
+ */
+function carry(
+  sprites: SpriteArrays,
+  first: number,
+  motion: UnitMotion | null,
+  birth: number,
+  frame: number,
+  kept: number,
+): void {
+  const back = travelled(motion, frame) - travelled(motion, birth) - kept;
+  if (back === 0) return;
+  for (let i = first + 2; i < sprites.centers.length; i += 3) {
+    sprites.centers[i] -= back;
+  }
+}
+
+/** The engine's VTOL heat cloud keeps this much of the unit's own speed
+ *  (`UnitScript.cpp:702-704`). */
+const VTOL_KEEPS_SPEED = 0.7;
+
+/**
+ * `motion` carries the particles the engine leaves in the world behind a
+ * moving unit: smoke, VTOL heat clouds, wakes and detonation bursts. A CEG's
+ * stand-in puff is left where it is, and so are nano, the muzzle flame and
+ * the tracer, which each go to a target or ride on the muzzle.
+ */
 export function particlesAt(
   emissions: Emission[],
   frame: number,
   smokeCount = 1,
+  motion: UnitMotion | null = null,
 ): Particles {
   const centers: number[] = [];
   const halfSizes: number[] = [];
@@ -873,20 +962,29 @@ export function particlesAt(
       tracerSprites(emission, frame, sprites);
       continue;
     }
+    const first = sprites.centers.length;
     if (emission.kind === "smoke") {
       smokeSprites(emission, frame, smokeCount, sprites);
+      carry(sprites, first, motion, emission.birth, frame, 0);
       continue;
     }
     if (emission.kind === "vtol") {
       vtolSprites(emission, frame, sprites);
+      const updates = frame - emission.birth + 1;
+      const kept = VTOL_KEEPS_SPEED * speedOn(motion, emission.birth) * updates;
+      carry(sprites, first, motion, emission.birth, frame, kept);
       continue;
     }
     if (emission.kind === "wake") {
       wakeSprites(emission, frame, sprites);
+      carry(sprites, first, motion, emission.birth, frame, 0);
       continue;
     }
     if (isPuff(emission)) {
       puffSprites(emission, frame, sprites);
+      if (emission.kind === "burst") {
+        carry(sprites, first, motion, emission.birth, frame, 0);
+      }
       continue;
     }
     const age = frame - emission.birth;

@@ -502,3 +502,40 @@ describe("marks under the scrubber", () => {
     }
   });
 });
+
+describe("a scenario that moves the unit", () => {
+  const lastMotion = (onStandIn: ReturnType<typeof vi.fn>) =>
+    onStandIn.mock.calls.at(-1)?.[0]?.motion;
+
+  it("tells the viewport when the unit moves, at the speed the script is told", async () => {
+    const onStandIn = vi.fn();
+    show(project({ compiledScript: COMPILED }), { onStandIn });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+
+    await waitFor(() => expect(lastMotion(onStandIn)).toBeTruthy());
+    const motion = lastMotion(onStandIn);
+    // The engine's CURRENT_SPEED answer, one elmo a frame, from StartMoving
+    // on, with no StopMoving in the Moving scenario.
+    expect(motion.speed).toBe(1);
+    expect(motion.spans).toHaveLength(1);
+    expect(motion.spans[0][0]).toBeGreaterThan(0);
+    expect(motion.spans[0][1]).toBe(Infinity);
+  });
+
+  it("follows the Speed control once it has changed", async () => {
+    runCob.mockResolvedValue(
+      timeline({ asked: [{ id: 29, name: "CURRENT_SPEED", default: 65536 }] }),
+    );
+    const onStandIn = vi.fn();
+    show(project({ compiledScript: COMPILED }), { onStandIn });
+    fireEvent.click(screen.getByRole("button", { name: /Play/ }));
+    await waitFor(() => expect(screen.getByText("Speed")).toBeTruthy());
+
+    const speedSlider = screen.getAllByRole("slider").at(-1) as HTMLElement;
+    fireEvent.keyDown(speedSlider, { key: "ArrowLeft" });
+
+    await waitFor(() =>
+      expect(lastMotion(onStandIn)?.speed).toBeCloseTo(0.95, 4),
+    );
+  });
+});

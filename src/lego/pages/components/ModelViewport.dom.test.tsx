@@ -1044,6 +1044,36 @@ describe("placeStandIn", () => {
       expectNear(center[1], 14 + 1.1, 0.51);
     });
 
+    it("carries sfx smoke back past a moving unit", () => {
+      const timeline = run(40, () => 0, [
+        { frame: 5, kind: "sfx", piece: "arm", sfx: 257 },
+      ]);
+      const still = sprayScene();
+      placeEffects(
+        still,
+        doc,
+        { ...aiming, track: null },
+        true,
+        timeline,
+        9,
+        upTheArm,
+      );
+      const moving = sprayScene();
+      placeEffects(
+        moving,
+        doc,
+        { ...aiming, track: null, motion: { speed: 2, spans: [[0, 40]] } },
+        true,
+        timeline,
+        9,
+        upTheArm,
+      );
+      const z = (state: SceneState) =>
+        sprites(state).getAttribute("center").array[2];
+      // Four frames since the smoke was made, at two elmos a frame.
+      expectNear(z(moving), z(still) - 8, 1e-4);
+    });
+
     it("fires sfx 2048 + n as a tracer along the emit direction, with no stand-in", () => {
       const state = sprayScene();
       const timeline = run(40, () => 0, [

@@ -9,6 +9,7 @@ import {
   BITMAP_WAKE,
   BURST_SCALE,
   DEFAULT_FLAME_SIZE,
+  type Emission,
   emitPoint,
   type FlameEmission,
   NANO_DOTS_PER_FRAME,
@@ -22,7 +23,10 @@ import {
   type SmokeEmission,
   sfxEmission,
   type TracerEmission,
+  travelled,
+  type UnitMotion,
   unitFloat,
+  unitMotion,
   type Vec3,
   type VtolEmission,
   WAKE_LIFT,
@@ -740,5 +744,89 @@ describe("sfxEmission", () => {
       dir,
       seed: 9,
     });
+  });
+});
+
+describe("particles carried back by a moving unit", () => {
+  const moving: UnitMotion = { speed: 2, spans: [[10, 40]] };
+
+  it("reads when the unit moves from its StartMoving and StopMoving call-ins", () => {
+    expect(
+      unitMotion(
+        [
+          { frame: 0, callin: "Create" },
+          { frame: 15, callin: "StartMoving" },
+          { frame: 225, callin: "StopMoving" },
+        ],
+        1.5,
+      ),
+    ).toEqual({ speed: 1.5, spans: [[15, 225]] });
+    expect(unitMotion([{ frame: 15, callin: "StartMoving" }], 1)).toEqual({
+      speed: 1,
+      spans: [[15, Infinity]],
+    });
+    expect(unitMotion([{ frame: 0, callin: "Create" }], 1)).toBeNull();
+    expect(unitMotion([{ frame: 15, callin: "StartMoving" }], 0)).toBeNull();
+  });
+
+  it("measures how far the unit has moved by a frame, counting only its moving frames", () => {
+    expect(travelled(moving, 5)).toBe(0);
+    expect(travelled(moving, 10)).toBe(0);
+    expect(travelled(moving, 15)).toBe(10);
+    expect(travelled(moving, 50)).toBe(60);
+    expect(travelled(null, 50)).toBe(0);
+  });
+
+  it("carries smoke, a wake and a burst back along -Z by how far the unit moved since their birth", () => {
+    const carried = [
+      smoke({ birth: 20 }),
+      wake([1, 0, 0], { birth: 20 }),
+      puff({ kind: "burst", birth: 20 }),
+    ];
+    for (const emission of carried) {
+      const still = particlesAt([emission], 25).sprites.centers;
+      const moved = particlesAt([emission], 25, 1, moving).sprites.centers;
+      expect(moved[0]).toBeCloseTo(still[0], 5);
+      expect(moved[1]).toBeCloseTo(still[1], 5);
+      expect(moved[2]).toBeCloseTo(still[2] - 10, 5);
+    }
+  });
+
+  it("keeps 0.7 of the unit's speed in a VTOL heat cloud, as the engine does", () => {
+    const emission = vtol([0, 0, 1], { birth: 20 });
+    const still = particlesAt([emission], 25).sprites.centers[2];
+    const moved = particlesAt([emission], 25, 1, moving).sprites.centers[2];
+    // Five frames of travel at 2 elmos a frame back, and six updates at 0.7
+    // of 2 elmos a frame forward (UnitScript.cpp:702-704).
+    expect(moved).toBeCloseTo(still - 10 + 0.7 * 2 * 6, 5);
+  });
+
+  it("leaves a CEG puff, nano, a flame and a tracer where they are", () => {
+    const fixed: Emission[] = [
+      puff({ birth: 20 }),
+      nano(20),
+      {
+        kind: "flame",
+        birth: 20,
+        at: [0, 0, 0],
+        dir: [0, 0, 1],
+        size: DEFAULT_FLAME_SIZE,
+        seed: 1,
+      },
+      {
+        kind: "tracer",
+        birth: 20,
+        at: [0, 0, 0],
+        to: [0, 0, 100],
+        seed: 2,
+        weapon: 1,
+      },
+    ];
+    const still = particlesAt(fixed, 25);
+    const moved = particlesAt(fixed, 25, 1, moving);
+    expect(Array.from(moved.centers)).toEqual(Array.from(still.centers));
+    expect(Array.from(moved.sprites.centers)).toEqual(
+      Array.from(still.sprites.centers),
+    );
   });
 });

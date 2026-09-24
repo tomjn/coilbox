@@ -51,6 +51,7 @@ import {
   unmetRequirements,
 } from "../../animPresets";
 import { legoProbeScript, legoRunScript } from "../../bindings";
+import { type UnitMotion, unitMotion } from "../../effects";
 import {
   DEFAULT_BUILDER,
   type LegoBuilder,
@@ -104,6 +105,22 @@ const NO_STAND_IN: {
   attachPieces: Map<string, string>;
   nano?: NanoStyle | null;
 } = { track: null, attachPieces: new Map() };
+
+/** The unit value the engine answers `get CURRENT_SPEED` with
+ *  (`rts/Sim/Units/Scripts/CobDefines.h:53`), in 65536ths of an elmo a
+ *  frame. The preview answers one elmo a frame unless the panel changes it
+ *  (`crates/coilbox-unitpose/src/unitvalue.rs`). */
+const CURRENT_SPEED = 29;
+const COB_SCALE = 65536;
+
+/** How fast a scenario's unit moves and when, from the speed the script is
+ *  told it moves at. */
+function motionOf(
+  events: ScriptEvent[],
+  values: Record<number, number>,
+): UnitMotion | null {
+  return unitMotion(events, (values[CURRENT_SPEED] ?? COB_SCALE) / COB_SCALE);
+}
 
 /** What a scenario's attachment could not be resolved to, in words. */
 function attachNotes(scenario: Scenario, named: Map<string, string>): string[] {
@@ -228,6 +245,7 @@ interface Props {
     attachPieces: Map<string, string>;
     nano?: NanoStyle | null;
     aims?: Aim[];
+    motion?: UnitMotion | null;
   }) => void;
   /** What the unit's game lacks for effects to draw its own bitmaps, or null
    *  when it has everything they need. Shown only for a scenario that fires
@@ -418,7 +436,10 @@ export function AnimationPanel({
 
       if (!scenario.standIn && !scenario.events.some((e) => e.aimAtStandIn)) {
         setStandInNotes([]);
-        onStandIn(NO_STAND_IN);
+        onStandIn({
+          ...NO_STAND_IN,
+          motion: motionOf(scenario.events, withValues),
+        });
         return runEvents(scenario.events, withValues);
       }
 
@@ -498,6 +519,7 @@ export function AnimationPanel({
         attachPieces: named,
         nano: scenario.nano ?? null,
         aims: aimsOf(events),
+        motion: motionOf(events, withValues),
       });
       const scene = withWorld(events, track, {
         radius,

@@ -115,7 +115,14 @@ export function placeEffects(
     frame,
     vertices,
   );
-  state.effects.update(particlesAt(emissions, frame, state.effects.smokeCount));
+  state.effects.update(
+    particlesAt(
+      emissions,
+      frame,
+      state.effects.smokeCount,
+      standIn.motion ?? null,
+    ),
+  );
 }
 
 /** The latest `aims` entry at or before `frame`, normalised, or up when there
