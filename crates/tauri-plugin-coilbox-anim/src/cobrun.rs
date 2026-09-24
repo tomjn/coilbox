@@ -835,6 +835,11 @@ impl Run {
     /// call-in the script lacks, one that waits rather than answering, or one
     /// that names a piece this model does not have all stop the probe with a
     /// note instead.
+    ///
+    /// The budget and the fatal flag are refilled before each call, the way
+    /// `step` refills them once a frame and the Lua probe refills them once a
+    /// call, so a call that spends its own budget does not leave the next one
+    /// short.
     fn probe_callin(&mut self, callin: &str) -> Probe {
         let Some(function) = self.program.script(callin) else {
             return Probe {
@@ -847,6 +852,8 @@ impl Run {
         let mut pieces = Vec::new();
         let mut note = None;
         for _ in 0..PROBE_CALLS {
+            self.budget = FRAME_INSTRUCTIONS;
+            self.fatal = false;
             let mut thread =
                 Thread::new(function, self.program.offsets[function], 0, callin.into());
             thread.data = vec![-1];
@@ -856,11 +863,17 @@ impl Run {
                 break;
             }
             let index = self.threads.len() - 1;
-            let stepped = self.step_thread(index);
+            let stepped = self.tick_thread(index);
             for queued in std::mem::take(&mut self.queued) {
                 let _ = self.add(queued);
             }
             if let Err(error) = stepped {
+                // A thread that dies mid-instruction leaves no answer behind,
+                // so the error it died on is the useful note, not a claim
+                // that whatever is left in its data slot is a bad piece.
+                if !self.fatal {
+                    self.threads[index].state = State::Dead;
+                }
                 note = Some(error);
                 break;
             }

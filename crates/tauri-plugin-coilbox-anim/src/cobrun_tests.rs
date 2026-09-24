@@ -2035,6 +2035,77 @@ mod probe {
         assert_eq!(probe.note, None);
     }
 
+    /// A call-in that answers a different piece on every call, the way a
+    /// builder's `QueryNanoPiece` alternates its nozzles, is reported in the
+    /// order the calls were made, over a static variable the run keeps
+    /// between the sixteen fresh threads the probe hands it.
+    #[test]
+    fn a_cycling_answer_is_reported_in_call_order() {
+        let source = r#"
+            piece base, turret, barrel;
+            static-var spray;
+            Create() { }
+            QueryNanoPiece(piecenum)
+            {
+                if( spray == 0 )
+                {
+                    piecenum = turret;
+                }
+                else
+                {
+                    piecenum = barrel;
+                }
+                spray = !spray;
+            }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["QueryNanoPiece".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "QueryNanoPiece");
+        let expected: Vec<String> = (0..PROBE_CALLS)
+            .map(|i| if i % 2 == 0 { "turret" } else { "barrel" }.to_string())
+            .collect();
+        assert_eq!(probe.pieces, expected);
+        assert_eq!(probe.note, None);
+    }
+
+    /// A call-in that sleeps rather than answering leaves the probe's seed,
+    /// `-1`, sitting unread in the thread's data slot. The probe has to tell
+    /// that apart from a real answer rather than reporting `-1` as a piece.
+    #[test]
+    fn a_sleeping_callin_stops_the_probe_rather_than_reporting_its_seed() {
+        let source = r#"
+            piece base, turret, barrel;
+            Create() { }
+            AimFromWeapon1(piecenum)
+            {
+                sleep 100;
+                piecenum = turret;
+            }
+        "#;
+        let probes = probe(
+            &compile(source),
+            &model_pieces(),
+            &["AimFromWeapon1".to_string()],
+        );
+
+        assert_eq!(probes.error, None);
+        assert_eq!(probes.probes.len(), 1);
+        let probe = &probes.probes[0];
+        assert_eq!(probe.callin, "AimFromWeapon1");
+        assert!(probe.pieces.is_empty());
+        assert!(probe
+            .note
+            .as_deref()
+            .is_some_and(|note| note.contains("waited rather than answering")));
+    }
+
     /// A call-in the script has no function for gets a note and names no
     /// piece, the same answer the Lua probe gives.
     #[test]
