@@ -81,6 +81,11 @@ export interface Sprites {
   /** Three per sprite, a world-space unit direction, zero for an ordinary
    *  billboard. Only a stretched sprite such as the tracer's bolt sets it. */
   axes: Float32Array;
+  /** Three per sprite, a world-space unit direction the quad's width runs
+   *  along, zero for a sprite that turns to face the camera. Only a sprite
+   *  lying flat on the ground, a wake, sets it, together with `axes` and
+   *  `halfLengths`. */
+  sides: Float32Array;
   /** One per sprite, in elmos, zero for an ordinary billboard. Half the
    *  bolt's length along its `axes` direction. */
   halfLengths: Float32Array;
@@ -304,6 +309,7 @@ interface SpriteArrays {
   colors: number[];
   bitmaps: number[];
   axes: number[];
+  sides: number[];
   halfLengths: number[];
   /** Two per sprite: where in its bitmap's rect the quad's near and far u
    *  edges sit, as fractions of the rect's own u range. `[0, 1]` for an
@@ -361,6 +367,7 @@ function flameSprites(
     );
     out.bitmaps.push(BITMAP_SMOKE + (a % smokeCount));
     out.axes.push(0, 0, 0);
+    out.sides.push(0, 0, 0);
     out.halfLengths.push(0);
     out.uvRanges.push(0, 1);
 
@@ -376,6 +383,7 @@ function flameSprites(
       );
       out.bitmaps.push(BITMAP_MUZZLE_FLAME);
       out.axes.push(0, 0, 0);
+      out.sides.push(0, 0, 0);
       out.halfLengths.push(0);
       out.uvRanges.push(0, 1);
     }
@@ -413,6 +421,7 @@ function tracerEndCap(
     out.colors.push(...color);
     out.bitmaps.push(BITMAP_LASER_END);
     out.axes.push(...axis);
+    out.sides.push(0, 0, 0);
     out.halfLengths.push(half);
     out.uvRanges.push(MIDTEX_U, farU);
   };
@@ -484,6 +493,7 @@ function tracerSprites(
   out.colors.push(...colors.outer);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
+  out.sides.push(0, 0, 0);
   out.halfLengths.push(halfLength);
   out.uvRanges.push(0, 1);
 
@@ -492,6 +502,7 @@ function tracerSprites(
   out.colors.push(...colors.core);
   out.bitmaps.push(BITMAP_LASER);
   out.axes.push(...dir);
+  out.sides.push(0, 0, 0);
   out.halfLengths.push(halfLength);
   out.uvRanges.push(0, 1);
 
@@ -512,6 +523,7 @@ export function particlesAt(
     colors: [],
     bitmaps: [],
     axes: [],
+    sides: [],
     halfLengths: [],
     uvRanges: [],
   };
@@ -560,6 +572,7 @@ export function particlesAt(
       colors: new Float32Array(sprites.colors),
       bitmaps: new Float32Array(sprites.bitmaps),
       axes: new Float32Array(sprites.axes),
+      sides: new Float32Array(sprites.sides),
       halfLengths: new Float32Array(sprites.halfLengths),
       uvRanges: new Float32Array(sprites.uvRanges),
     },

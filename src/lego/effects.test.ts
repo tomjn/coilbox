@@ -429,4 +429,31 @@ describe("particlesAt with flames and tracers", () => {
     expect(count).toBe(0);
     expect(sprites.count).toBeGreaterThan(0);
   });
+
+  it("turns every flame and tracer sprite to the camera, with no side of its own", () => {
+    const { sprites } = particlesAt(
+      [
+        {
+          kind: "flame",
+          birth: 0,
+          at: [0, 0, 0],
+          dir: [0, 0, 1],
+          size: DEFAULT_FLAME_SIZE,
+          seed: 1,
+        },
+        {
+          kind: "tracer",
+          birth: 0,
+          at: [0, 0, 0],
+          to: [0, 0, 100],
+          seed: 2,
+          weapon: 1,
+        },
+      ],
+      2,
+    );
+    expect(sprites.count).toBeGreaterThan(0);
+    expect(sprites.sides).toHaveLength(sprites.count * 3);
+    expect(sprites.sides.every((value) => value === 0)).toBe(true);
+  });
 });

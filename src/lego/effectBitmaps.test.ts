@@ -82,7 +82,9 @@ describe("slotOf", () => {
 
 describe("RESOURCES_LUA", () => {
   it("asks for the heat cloud, explo and wake bitmaps, with the base content's names as defaults", () => {
-    expect(RESOURCES_LUA).toContain("add('heatcloud', field(textures, 'heatcloud'))");
+    expect(RESOURCES_LUA).toContain(
+      "add('heatcloud', field(textures, 'heatcloud'))",
+    );
     expect(RESOURCES_LUA).toContain("add('explo', field(textures, 'explo'))");
     expect(RESOURCES_LUA).toContain("add('wake', field(textures, 'wake'))");
     expect(RESOURCES_LUA).toContain("heatcloud = 'explo.tga'");
