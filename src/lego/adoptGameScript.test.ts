@@ -18,7 +18,6 @@ import {
 
 const readScript = vi.fn();
 const infer = vi.fn();
-const disasm = vi.fn();
 const convertBos = vi.fn();
 
 vi.mock("../content/bindings", () => ({
@@ -26,7 +25,6 @@ vi.mock("../content/bindings", () => ({
 }));
 
 vi.mock("../animation/bindings", () => ({
-  animCobDisasmBytes: (args: unknown) => disasm(args),
   animBos2lua: (args: unknown) => convertBos(args),
 }));
 
@@ -92,8 +90,6 @@ beforeEach(() => {
   infer.mockReset();
   readScript.mockResolvedValue(found());
   infer.mockResolvedValue({ proposals: [], notes: [], error: null });
-  disasm.mockReset();
-  disasm.mockResolvedValue({ listing: "; COB v4\n" });
   convertBos.mockReset();
   convertBos.mockResolvedValue({
     lua: "-- converted\n",
@@ -207,7 +203,6 @@ describe("a compiled script", () => {
     expect(adopted.script).toBeNull();
     expect(adopted.kind).toBe("cob");
     expect(adopted.member).toBe("scripts/armcom.cob");
-    expect(adopted.notes.join(" ")).toContain("bytecode");
   });
 
   it("is not asked about roles, since nothing can run it here", async () => {
@@ -240,53 +235,6 @@ describe("a compiled script", () => {
     const adopted = await adoptGameScript(project(), ENGINE);
 
     expect(adopted.compiled).toBeNull();
-  });
-
-  /** Legible rather than an opaque file coilbox merely names. */
-  it("is read back as a disassembly listing", async () => {
-    readScript.mockResolvedValue(
-      found({ kind: "cob", text: null, bytes: [1, 2, 3] }),
-    );
-
-    const adopted = await adoptGameScript(project(), ENGINE);
-
-    expect(adopted.listing).toBe("; COB v4\n");
-  });
-
-  /**
-   * The whole point of a bytes-taking disassembly. Handing back a path would
-   * mean writing a copy of a file inside somebody else's game, and the file
-   * itself is never opened for writing either way.
-   */
-  it("is disassembled from its bytes, so nothing is written anywhere", async () => {
-    readScript.mockResolvedValue(
-      found({ kind: "cob", text: null, bytes: [1, 2, 3] }),
-    );
-
-    await adoptGameScript(project(), ENGINE);
-
-    expect(disasm).toHaveBeenCalledWith({ bytes: [1, 2, 3] });
-  });
-
-  it("says so when the file will not disassemble, rather than failing", async () => {
-    readScript.mockResolvedValue(
-      found({ kind: "cob", text: null, bytes: [1, 2, 3] }),
-    );
-    disasm.mockRejectedValue(new Error("not a cob file"));
-
-    const adopted = await adoptGameScript(project(), ENGINE);
-
-    expect(adopted.listing).toBeNull();
-    expect(adopted.notes.join(" ")).toContain("not a cob file");
-  });
-
-  it("asks for no disassembly when the read handed back no bytes", async () => {
-    readScript.mockResolvedValue(found({ kind: "cob", text: null, bytes: [] }));
-
-    const adopted = await adoptGameScript(project(), ENGINE);
-
-    expect(adopted.listing).toBeNull();
-    expect(disasm).not.toHaveBeenCalled();
   });
 });
 
@@ -393,8 +341,7 @@ describe("a compiled script whose game ships its source", () => {
     expect(adopted.converted?.member).toBe("scripts/armcom.bos");
   });
 
-  /** The compiled file is still what the game runs, and the disassembly is
-   *  still the only faithful reading of it. */
+  /** The compiled file is still what the game runs. */
   it("still reports the compiled file it sits beside", async () => {
     readScript.mockResolvedValue(withSource());
 
@@ -402,7 +349,6 @@ describe("a compiled script whose game ships its source", () => {
 
     expect(adopted.kind).toBe("cob");
     expect(adopted.member).toBe("scripts/armcom.cob");
-    expect(adopted.listing).toBe("; COB v4\n");
   });
 
   /**
@@ -417,15 +363,6 @@ describe("a compiled script whose game ships its source", () => {
 
     expect(infer).not.toHaveBeenCalled();
     expect(adopted.findings).toBeNull();
-  });
-
-  it("says the script is a conversion rather than leaving it implied", async () => {
-    readScript.mockResolvedValue(withSource());
-
-    const adopted = await adoptGameScript(project(), ENGINE);
-
-    expect(adopted.notes.join(" ")).toContain("scripts/armcom.bos");
-    expect(adopted.notes.join(" ")).toContain("converted");
   });
 
   it("offers nothing to convert when the game shipped only the compiled file", async () => {

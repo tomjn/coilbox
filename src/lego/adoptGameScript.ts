@@ -9,8 +9,7 @@
  * Only Lua is adopted. A `.cob` is compiled bytecode, and an export writes Lua,
  * so adopting one would give a unit a script that cannot be written back. It
  * still animates: the bytecode travels with the unit and the builder runs it,
- * which is exactly what the game plays. It is also disassembled and shown as a
- * listing, so a compiled unit is legible as well as watchable.
+ * which is exactly what the game plays.
  *
  * Most games that compiled a script shipped the `.bos` source they compiled it
  * from, and that source is text coilbox converts. So a compiled unit still
@@ -20,8 +19,8 @@
  * of the game's script rather than the file the game runs.
  *
  * Nothing is ever written to a game. The `.cob` is read out of the archive as
- * bytes and disassembled in memory, so the file itself is never opened for
- * writing, copied, or touched in any way.
+ * bytes, so the file itself is never opened for writing, copied, or touched in
+ * any way.
  *
  * Nothing here decides anything. It reads, it reports, and the caller shows the
  * result. Adoption replaces `project.script`, which is the same one way door as
@@ -29,11 +28,7 @@
  * script and use the presets" is the way back.
  */
 
-import {
-  animBos2lua,
-  animCobDisasmBytes,
-  type ConversionWarning,
-} from "../animation/bindings";
+import { animBos2lua, type ConversionWarning } from "../animation/bindings";
 import { unitsyncUnitScript } from "../content/bindings";
 import { inferRoles, type RoleFindings } from "./inferRoles";
 import type { LegoProject } from "./model";
@@ -49,14 +44,6 @@ export interface AdoptedScript {
   /** Roles the script names or shows, for the caller to offer. Null when there
    *  was no Lua to ask. */
   findings: RoleFindings | null;
-  /**
-   * A `.cob` read back as a disassembly listing, for reading only.
-   *
-   * Not BOS anybody could recompile and not something an export writes. It is
-   * here so a unit whose animation is compiled is still legible rather than
-   * being an opaque file coilbox merely names.
-   */
-  listing: string | null;
   /**
    * Set when `script` is a conversion of the `.bos` source beside a `.cob`
    * rather than the game's own Lua.
@@ -107,7 +94,6 @@ const NOTHING: AdoptedScript = {
   kind: null,
   declared: null,
   findings: null,
-  listing: null,
   converted: null,
   compiled: null,
   unitDef: null,
@@ -141,31 +127,6 @@ function warningText(warning: ConversionWarning): string {
   return warning.file !== null && warning.line !== null
     ? `${warning.file} line ${warning.line}: ${warning.message}`
     : warning.message;
-}
-
-/**
- * Read a `.cob` back as a listing, or say why it could not be.
- *
- * Straight from the bytes, so nothing is written anywhere and the file inside
- * the game archive is only ever read. A `.cob` that will not disassemble is a
- * note rather than a failure: the unit still imported and its model is fine.
- */
-async function disassemble(
-  bytes: number[] | null,
-  notes: string[],
-): Promise<string | null> {
-  if (!bytes || bytes.length === 0) return null;
-  try {
-    const { listing } = await animCobDisasmBytes({ bytes });
-    return listing;
-  } catch (error) {
-    notes.push(
-      `That file could not be disassembled: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-    return null;
-  }
 }
 
 /**
@@ -263,12 +224,9 @@ export async function adoptGameScript(
   }
 
   if (result.kind === "cob" || result.text === null) {
+    // What a compiled script means for the unit is the panel's to say, from
+    // `kind` and `converted`, so nothing about it goes into the notes.
     const source = result.bosText?.trim() ? result.bosMember : null;
-    notes.push(
-      source
-        ? `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates either way. What is on offer here is ${source} converted to Lua, comments and all, which is a script you can edit and export.`
-        : `${result.member} is compiled bytecode rather than Lua. Coilbox runs it, so the unit animates, but an export writes Lua and does not write this.`,
-    );
     const script =
       source && result.bosText ? await convert(result, project, notes) : null;
     return {
@@ -281,7 +239,6 @@ export async function adoptGameScript(
       kind: "cob",
       declared: result.declared,
       findings: null,
-      listing: await disassemble(result.bytes, notes),
       converted: script && source ? { member: source } : null,
       compiled: result.bytes?.length
         ? { member: result.member, bytes: result.bytes }
@@ -313,7 +270,6 @@ export async function adoptGameScript(
     kind: "lua",
     declared: result.declared,
     findings,
-    listing: null,
     converted: null,
     compiled: null,
     unitDef,

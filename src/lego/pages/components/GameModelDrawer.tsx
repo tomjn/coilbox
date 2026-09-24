@@ -16,7 +16,7 @@
 import { Button, Input } from "@picoframe/frame";
 import { Blocks, ChevronLeft, Search, X } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { GameItem, UnitDisplay } from "@/content/bindings";
@@ -51,6 +51,21 @@ import {
   stageProject,
 } from "./ImportResult";
 
+/** What a unit whose script would not read is left with: nothing, and the
+ *  reason in its notes. */
+const NO_SCRIPT: AdoptedScript = {
+  script: null,
+  member: null,
+  kind: null,
+  declared: null,
+  findings: null,
+  converted: null,
+  compiled: null,
+  unitDef: null,
+  includes: {},
+  notes: [],
+};
+
 /** How many rows are drawn at once. Balanced Annihilation is 727 models and a
  *  big game is thousands, so the search narrows rather than the list growing. */
 const ROW_CAP = 200;
@@ -80,6 +95,12 @@ export function GameModelDrawer({
    * definition points at.
    */
   const [adopted, setAdopted] = useState<AdoptedScript | null>(null);
+  /** Whether the script is still being read. The unit is not offered for
+   *  opening until it is, or it would open without its animation. */
+  const [adopting, setAdopting] = useState(false);
+  /** Counts picks, so a script read that lands after somebody has gone back
+   *  or picked another model is dropped rather than shown against it. */
+  const pickCount = useRef(0);
   const [takeScript, setTakeScript] = useState(true);
   /** Piece names whose proposed role is taken when the unit is accepted. */
   const [takenRoles, setTakenRoles] = useState<Set<string>>(new Set());
@@ -135,6 +156,8 @@ export function GameModelDrawer({
   }, [models, query]);
 
   function back() {
+    pickCount.current += 1;
+    setAdopting(false);
     setGame(null);
     setQuery("");
     setStage({ state: "idle" });
@@ -155,6 +178,7 @@ export function GameModelDrawer({
       archivePath: tree.archivePath,
       member: row.member,
     };
+    const thisPick = ++pickCount.current;
     setStage({ state: "reading" });
     setAdopted(null);
     setTakenRoles(new Set());
@@ -176,24 +200,44 @@ export function GameModelDrawer({
         beforeImport: (textures) =>
           stageTextures(target, picked, staged, tree.files, textures),
       });
+      if (thisPick !== pickCount.current) return;
       setStage(read);
 
       // After the model rather than alongside it. Reading the script means
       // running it, and running it needs the piece names the model just
       // produced. A unit whose model did not import has nothing to run against.
       const project = stageProject(read);
-      if (project) {
-        const found = await adoptGameScript(project, target);
-        setAdopted(found);
-        setTakenRoles(defaultTakenRoles(found));
-        setTakeScript(defaultTakeScript(found));
-      }
+      if (project) await adoptFor(project, thisPick);
     } catch (error) {
+      if (thisPick !== pickCount.current) return;
       setStage({
         state: "failed",
         message: error instanceof Error ? error.message : String(error),
       });
     }
+  }
+
+  /** Read the unit's script. A script that will not read is a note under the
+   *  animation rather than a failed import, since the model itself is fine. */
+  async function adoptFor(project: LegoProject, thisPick: number) {
+    if (!target) return;
+    setAdopting(true);
+    let found: AdoptedScript;
+    try {
+      found = await adoptGameScript(project, target);
+    } catch (error) {
+      found = {
+        ...NO_SCRIPT,
+        notes: [
+          `The animation could not be read: ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      };
+    }
+    if (thisPick !== pickCount.current) return;
+    setAdopted(found);
+    setTakenRoles(defaultTakenRoles(found));
+    setTakeScript(defaultTakeScript(found));
+    setAdopting(false);
   }
 
   function accept() {
@@ -276,22 +320,24 @@ export function GameModelDrawer({
                   )
                 }
                 onAccept={accept}
-              />
-              {adopted ? (
-                <GameScriptPanel
-                  adopted={adopted}
-                  takeScript={takeScript}
-                  onTakeScript={setTakeScript}
-                  taken={takenRoles}
-                  onToggleRole={(pieceName) =>
-                    setTakenRoles((current) => {
-                      const next = new Set(current);
-                      if (!next.delete(pieceName)) next.add(pieceName);
-                      return next;
-                    })
-                  }
-                />
-              ) : null}
+                pending={adopting ? "Reading the animation" : null}
+              >
+                {adopting || adopted ? (
+                  <GameScriptPanel
+                    adopted={adopting ? null : adopted}
+                    takeScript={takeScript}
+                    onTakeScript={setTakeScript}
+                    taken={takenRoles}
+                    onToggleRole={(pieceName) =>
+                      setTakenRoles((current) => {
+                        const next = new Set(current);
+                        if (!next.delete(pieceName)) next.add(pieceName);
+                        return next;
+                      })
+                    }
+                  />
+                ) : null}
+              </ImportResult>
               {stage.state === "failed" ? (
                 <Button
                   variant="outline"
