@@ -61,13 +61,14 @@ import {
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import type { UnitClone } from "./clones";
 import { customParamKey } from "./customParamConsumers";
-import { readPath, sameValue } from "./overrides";
+import { readPath, resolvedDef, sameValue } from "./overrides";
 import type { GameEdits } from "./project";
 import {
   type EquippedWeapons,
   unequipUnit,
   unequipWeapon,
 } from "./weaponLibrary";
+import { refProblems } from "./weaponRefs";
 import { weaponSlots } from "./weaponSlots";
 
 /** How much a finding matters, in the two states a reference can be in. */
@@ -710,6 +711,71 @@ function libraryFindings(
   return out;
 }
 
+/**
+ * References between weapons the game no longer answers (issue #2641): a
+ * cluster weapon whose child has gone, or a special effect naming a weapon the
+ * game dropped.
+ *
+ * Only on a definition the project owns or changed: a copy's, a library
+ * weapon a slot fires, or a game unit's own definition the project has an
+ * override inside. A reference the game broke in a definition the project
+ * never touched is the game's to fix, and nothing the project did changes it.
+ * No removal is offered. The reference is usually right and the child has
+ * moved, which only the author can match up.
+ */
+function referenceFindings(
+  input: CompatInput,
+  known: (key: string) => boolean,
+  defOf: (key: string) => Record<string, unknown> | undefined,
+): CompatFinding[] {
+  const out: CompatFinding[] = [];
+  const library = input.edits.weapons ?? {};
+  const units = new Set([
+    ...Object.keys(input.edits.overrides),
+    ...Object.keys(input.edits.clones),
+    ...Object.keys(input.edits.equipped ?? {}),
+  ]);
+  for (const unit of [...units].sort()) {
+    if (!known(unit)) continue;
+    const clone = input.edits.clones[unit];
+    const patch = input.edits.overrides[unit] ?? {};
+    const owners = clone?.source ? [unit, clone.source] : [unit];
+    const fired = Object.values(input.edits.equipped?.[unit] ?? {}).flatMap(
+      (key) => (library[key] ? [library[key]] : []),
+    );
+    const touched = (key: string) =>
+      clone !== undefined ||
+      Object.keys(patch).some((path) => {
+        const [head, name] = path.toLowerCase().split(".");
+        return head === "weapondefs" && name === key.toLowerCase();
+      });
+    for (const problem of refProblems(
+      resolvedDef(defOf(unit), patch),
+      unit,
+      owners,
+      input.weaponDefs,
+      library,
+      fired,
+    )) {
+      if (problem.holder.kind === "own" && !touched(problem.holder.key))
+        continue;
+      out.push({
+        id: `references:${unit}:${problem.id}`,
+        store:
+          problem.holder.kind === "library"
+            ? "weapons"
+            : clone
+              ? "clones"
+              : "overrides",
+        severity: "broken",
+        subject: unit,
+        detail: problem.message,
+      });
+    }
+  }
+  return out;
+}
+
 /** Broken first, then by store in the order the page shows them, then by name. */
 const STORE_ORDER: (keyof GameEdits)[] = [
   "overrides",
@@ -748,6 +814,7 @@ export function checkCompatibility(input: CompatInput): CompatReport {
     ...textFindings(input, known),
     ...disabledFindings(input, known),
     ...libraryFindings(input, known, defOf),
+    ...referenceFindings(input, known, defOf),
   ].sort((a, b) => {
     if (a.severity !== b.severity) return a.severity === "broken" ? -1 : 1;
     const store = STORE_ORDER.indexOf(a.store) - STORE_ORDER.indexOf(b.store);

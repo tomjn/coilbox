@@ -689,3 +689,66 @@ describe("the weapon library (issue #2640)", () => {
     expect(ids(check(older as GameEdits))).toEqual([]);
   });
 });
+
+describe("references between weapons (issue #2641)", () => {
+  const ship = (child: boolean) => ({
+    weapons: [{ name: "armmship_rocket" }],
+    weapondefs: {
+      rocket: {
+        range: 1000,
+        customparams: { speceffect_def: "armmship_rocket_split" },
+      },
+      ...(child ? { rocket_split: { range: 300 } } : {}),
+    },
+  });
+  const shared = (child: boolean) => ({
+    armmship_rocket: ship(child).weapondefs.rocket,
+    ...(child ? { armmship_rocket_split: { range: 300 } } : {}),
+  });
+  const edits: GameEdits = {
+    ...EMPTY_EDITS,
+    overrides: { armmship: { "weapondefs.rocket.range": 1200 } },
+  };
+
+  it("says nothing while the child is still there", () => {
+    expect(
+      ids(
+        check(edits, {
+          units: { armmship: ship(true) },
+          weaponDefs: shared(true),
+        }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("says when the game drops a child a changed weapon names", () => {
+    const finding = only(
+      check(edits, {
+        units: { armmship: ship(false) },
+        weaponDefs: shared(false),
+      }),
+    );
+    expect(finding).toMatchObject({
+      id: "references:armmship:own:rocket:speceffect_def",
+      store: "overrides",
+      severity: "broken",
+      subject: "armmship",
+    });
+    expect(finding.fix).toBeUndefined();
+  });
+
+  it("leaves a weapon the project never touched to the game", () => {
+    const untouched: GameEdits = {
+      ...EMPTY_EDITS,
+      overrides: { armmship: { maxdamage: 10 } },
+    };
+    expect(
+      ids(
+        check(untouched, {
+          units: { armmship: ship(false) },
+          weaponDefs: shared(false),
+        }),
+      ),
+    ).toEqual([]);
+  });
+});
