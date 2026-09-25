@@ -85,6 +85,9 @@ let mockBuildpics: UnitBuildpicsResult | null = null;
 /** The game archive's member list, which the asset fields browse (issue #2648).
  *  Empty in most tests, where a field is a plain text box. */
 let mockArchiveFiles: { path: string; size: number }[] = [];
+/** The game's shared table of weapon definitions, keyed by lowercased name.
+ *  Empty in most tests, where every weapon is one the unit carries. */
+let mockWeaponDefs: Record<string, Record<string, unknown>> = {};
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -341,7 +344,7 @@ function show(
 ) {
   mockDefs = {
     units,
-    weaponDefs: {},
+    weaponDefs: mockWeaponDefs,
     unitErrors,
     errors: [],
     checksum,
@@ -489,6 +492,7 @@ afterEach(() => {
   mockGameOptions = [];
   mockBuildpics = null;
   mockArchiveFiles = [];
+  mockWeaponDefs = {};
   mockConsumers = null;
   mockConsumersByArchive = {};
   mockLegoProjects = [];
@@ -925,7 +929,14 @@ describe("UnitPage", () => {
      * thing.
      */
     describe("a game that ships more than one translation", () => {
-      const tabs = () => screen.getAllByRole("tab").map((t) => t.textContent);
+      // Scoped to the language list: the page's own Fields and Weapons tabs
+      // are tabs as well (issue #2639).
+      const languageList = () =>
+        screen.queryByRole("tablist", { name: "Language" });
+      const tabs = () =>
+        within(languageList() as HTMLElement)
+          .getAllByRole("tab")
+          .map((t) => t.textContent);
       // Radix picks a tab on mouse down rather than on click, so a plain click
       // leaves the panel where it was.
       const pick = (code: string) =>
@@ -939,12 +950,12 @@ describe("UnitPage", () => {
       /** A picker with one entry is a control that cannot be used. */
       it("offers no picker for a game that ships one", () => {
         bar();
-        expect(screen.queryAllByRole("tab")).toEqual([]);
+        expect(languageList()).toBeNull();
       });
 
       it("offers none at all for a game that names its units in the def", () => {
         ba();
-        expect(screen.queryAllByRole("tab")).toEqual([]);
+        expect(languageList()).toBeNull();
       });
 
       it("shows each language's own words", () => {
@@ -2315,6 +2326,208 @@ describe("UnitPage", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(checkedFields).toEqual([]);
       expect(screen.queryByText("Read only for edit in place.")).toBeNull();
+    });
+  });
+
+  /**
+   * Issue #2639. A unit's weapons are edited one slot at a time, with the
+   * slot's own fields and its definition's fields in two labelled groups, and
+   * each edit landing where the engine reads it: `weapons.<n>` for the slot
+   * and the unit's own `weapondefs` for the definition.
+   */
+  describe("the weapons tab", () => {
+    /** A unit as Balanced Annihilation's def pipeline hands one over. */
+    const GUNNER: Record<string, unknown> = {
+      name: "gunner",
+      humanName: "Gunner",
+      maxdamage: 900,
+      weapons: [
+        { name: "gunner_laser", onlytargetcategory: "NOTSUB" },
+        { name: "gunner_rocket" },
+        { name: "SHAREDGUN" },
+      ],
+      weapondefs: {
+        laser: {
+          name: "Light Laser",
+          range: 300,
+          reloadtime: 1,
+          damage: { default: 50, subs: 5 },
+          mygamesflag: 1,
+        },
+        rocket: { name: "Rocket", range: 600 },
+      },
+    };
+    const entry = (extra = "") =>
+      `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=gunner${extra}`;
+    const openGunner = (extra = "") => {
+      mockWeaponDefs = {
+        gunner_laser: { range: 300 },
+        gunner_rocket: { range: 600 },
+        sharedgun: { name: "Shared Gun", range: 450 },
+      };
+      return show(
+        { gunner: GUNNER, other: { weapons: [{ name: "sharedgun" }] } },
+        entry(extra),
+        [{ name: "gunner", fullName: "Gunner" }],
+      );
+    };
+    // Radix picks a tab on mouse down rather than on click.
+    const openWeapons = () =>
+      fireEvent.mouseDown(screen.getByRole("tab", { name: /Weapons/ }));
+    const slotButton = (n: number) =>
+      screen.getByRole("radio", { name: new RegExp(`^Weapon ${n},`) });
+    const edits = () =>
+      readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.overrides;
+
+    it("lists the unit's slots by number and weapon name", () => {
+      openGunner();
+      expect(screen.getByRole("tab", { name: /Weapons/ }).textContent).toBe(
+        "Weapons3",
+      );
+      openWeapons();
+      expect(slotButton(1).textContent).toContain("Light Laser");
+      expect(slotButton(2).textContent).toContain("Rocket");
+      expect(slotButton(3).textContent).toContain("Shared Gun");
+      // The first slot is the one open, with its mount and its definition.
+      expect(screen.getByText("Weapon 1 mount")).toBeTruthy();
+      expect(screen.getByText("Weapon definition laser")).toBeTruthy();
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "300");
+      // And none of it is on the fields tab any more.
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
+      expect(screen.queryByLabelText("Range")).toBeNull();
+      expect(screen.queryByLabelText(/Only shoots at/)).toBeNull();
+    });
+
+    it("writes a slot field to the slot and a definition field to the unit's own definition", () => {
+      openGunner();
+      openWeapons();
+      type(
+        screen.getByLabelText("Only shoots at") as HTMLInputElement,
+        "SURFACE",
+      );
+      type(screen.getByLabelText("Range") as HTMLInputElement, "450");
+      type(
+        screen.getByLabelText("Damage against subs") as HTMLInputElement,
+        "20",
+      );
+      expect(edits()).toEqual({
+        gunner: {
+          "weapons.0.onlytargetcategory": "SURFACE",
+          "weapondefs.laser.range": 450,
+          "weapondefs.laser.damage.subs": 20,
+        },
+      });
+      expect(screen.getByText("3 changes")).toBeTruthy();
+      expect(within(slotButton(1)).getByTitle("3 fields changed")).toBeTruthy();
+      expect(screen.getByText(/Game value: 300/)).toBeTruthy();
+
+      fireEvent.click(screen.getByLabelText(/^Reset Range/));
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "300");
+      expect(edits()?.gunner).not.toHaveProperty(["weapondefs.laser.range"]);
+    });
+
+    it("edits one slot at a time", () => {
+      openGunner();
+      openWeapons();
+      fireEvent.click(slotButton(2));
+      expect(screen.getByText("Weapon 2 mount")).toBeTruthy();
+      expect(screen.getByText("Weapon definition rocket")).toBeTruthy();
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "600");
+      type(screen.getByLabelText("Range") as HTMLInputElement, "700");
+      expect(edits()).toEqual({ gunner: { "weapondefs.rocket.range": 700 } });
+      // The first slot's definition is its own and was not touched.
+      fireEvent.click(slotButton(1));
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "300");
+    });
+
+    it("shows only what the definition declares until every field is asked for", () => {
+      openGunner();
+      openWeapons();
+      expect(screen.queryByLabelText("Shots per burst")).toBeNull();
+      const relevant = screen.getByText(/shown, .* hidden/).textContent ?? "";
+      const shown = Number(relevant.match(/(\d+) shown/)?.[1]);
+      const hidden = Number(relevant.match(/(\d+) hidden/)?.[1]);
+      expect(hidden).toBeGreaterThan(shown);
+
+      fireEvent.click(screen.getByText("All"));
+      expect(screen.getByLabelText("Shots per burst")).toBeTruthy();
+      expect(screen.getByLabelText("Firing arc")).toBeTruthy();
+      expect(screen.getByText(`${shown + hidden} shown`)).toBeTruthy();
+    });
+
+    /** Issue #3050: the same marks a unit field gets when coilbox has no
+     *  label of its own for a key. */
+    it("marks a definition key only the game reads", () => {
+      openGunner();
+      openWeapons();
+      const row = document.getElementById(
+        "field-weapondefs.laser.mygamesflag",
+      ) as HTMLElement;
+      expect(within(row).getByText("game")).toBeTruthy();
+    });
+
+    it("shows a shared definition and does not offer it", () => {
+      openGunner();
+      openWeapons();
+      fireEvent.click(slotButton(3));
+      expect(
+        screen.getByText("Weapon definition sharedgun, shared"),
+      ).toBeTruthy();
+      expect(screen.getByText(/and 2 units mount it/)).toBeTruthy();
+      expect(screen.getByLabelText("Range")).toHaveProperty("disabled", true);
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "450");
+    });
+
+    /** The change ledger's link to a weapon field (issue #2653). */
+    it("opens on the slot a link to one of its fields names", () => {
+      vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(
+        () => {},
+      );
+      openGunner("&field=weapondefs.rocket.range");
+      expect(screen.getByText("Weapon 2 mount")).toBeTruthy();
+      expect(
+        document.getElementById("field-weapondefs.rocket.range"),
+      ).not.toBeNull();
+    });
+
+    /** Issue #2633's dry run covers weapon fields as it does unit fields. */
+    it("asks the in-place route about the slot on screen and marks what it refuses", async () => {
+      mockRefusals = {
+        "weapondefs.laser.range": "The value is worked out by code.",
+      };
+      openGunner();
+      openWeapons();
+      expect(
+        await screen.findByText("Read only for edit in place."),
+      ).toBeTruthy();
+      expect(screen.getByLabelText("Range")).toHaveProperty("disabled", true);
+      expect(checkedFields).toContain("weapons.0.onlytargetcategory");
+      expect(checkedFields).toContain("weapondefs.laser.range");
+      // Nothing is asked about a definition the unit does not carry.
+      fireEvent.click(slotButton(3));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(checkedFields.some((f) => f.startsWith("WeaponDefs."))).toBe(
+        false,
+      );
+    });
+
+    it("says so for a unit with no weapons", () => {
+      show(
+        { armaak: ARMAAK },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armaak`,
+      );
+      openWeapons();
+      expect(screen.getByText("This unit has no weapons.")).toBeTruthy();
+    });
+
+    it("says when nothing in the game defines a slot's weapon", () => {
+      show();
+      openWeapons();
+      expect(
+        screen.getByText(
+          /No weapon definition in this game is called disintegrator/,
+        ),
+      ).toBeTruthy();
     });
   });
 

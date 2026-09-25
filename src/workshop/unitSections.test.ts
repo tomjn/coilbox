@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { engineFields } from "@/content/unitFields";
 import { setOverride, type UnitOverrides } from "./overrides";
 import {
+  isWeaponPath,
   OWN_EDITOR,
   presentPaths,
   UNIT_FIELD_GROUPS,
@@ -74,18 +75,14 @@ describe("UNIT_FIELD_GROUPS", () => {
       UNIT_FIELD_GROUPS.flatMap((g) => g.sections.flatMap((s) => s.paths)),
     );
     // A path with a control of its own is not unplaced, it is somewhere else on
-    // the page: the build menu roster and the name panel (issues #1274, #2650).
+    // the page: the build menu roster, the name panel and the weapons tab
+    // (issues #1274, #2650 and #2639).
     const unplaced = registryPaths.filter(
-      (p) => !placed.has(p) && !OWN_EDITOR.has(p.toLowerCase()),
+      (p) =>
+        !placed.has(p) && !OWN_EDITOR.has(p.toLowerCase()) && !isWeaponPath(p),
     );
     expect(unplaced.sort()).toEqual(
-      [
-        "SFXTypes",
-        "collisionVolume",
-        "selectionVolume",
-        "sounds",
-        "weapons",
-      ].sort(),
+      ["SFXTypes", "collisionVolume", "selectionVolume", "sounds"].sort(),
     );
   });
 });
@@ -131,7 +128,9 @@ describe("unitFieldView", () => {
 
   /** What the unit declares, minus the paths another control on the page owns. */
   const drawable = (def: Record<string, unknown>) =>
-    presentPaths(def).filter((p) => !OWN_EDITOR.has(p.toLowerCase()));
+    presentPaths(def).filter(
+      (p) => !OWN_EDITOR.has(p.toLowerCase()) && !isWeaponPath(p),
+    );
 
   /**
    * Issue #2651. The relevant view hides a path the def does not declare, and
@@ -181,8 +180,7 @@ describe("unitFieldView", () => {
 
   /**
    * The name and the description have a panel of their own (issue #2650), and
-   * two boxes for one value is one too many. `weapons.0.name` is a different
-   * field that happens to end in the same word, so it stays.
+   * two boxes for one value is one too many.
    */
   it("leaves the name and the description to the panel that owns them", () => {
     const withText = { ...armcom, humanName: "Commander", description: "Big" };
@@ -193,7 +191,6 @@ describe("unitFieldView", () => {
       expect(paths).not.toContain("name");
       expect(paths).not.toContain("humanName");
       expect(paths).not.toContain("description");
-      expect(paths).toContain("weapons.0.name");
     }
   });
 
@@ -214,9 +211,33 @@ describe("unitFieldView", () => {
     expect(paths.has("radarDistance")).toBe(true);
     expect(paths.has("cloakCost")).toBe(true);
     expect(paths.has("weapons")).toBe(false);
-    // A pattern is not a path, so it only appears where the def has an entry.
     expect(paths.has("weapons.*.name")).toBe(false);
-    expect(paths.has("weapons.0.name")).toBe(true);
+  });
+
+  /**
+   * Issue #2639. A weapon slot and the definitions a unit carries are drawn
+   * on the weapons tab, one slot at a time, so this list draws neither in
+   * either view: a second box for the same value, or every weapon the unit
+   * has as one blob of Lua.
+   */
+  it("leaves every weapon slot and definition to the weapons tab", () => {
+    const withDefs = {
+      ...armcom,
+      weapondefs: { armcomlaser: { range: 300 } },
+    };
+    const overrides = setOverride(
+      {},
+      "armcom",
+      "weapondefs.armcomlaser.range",
+      400,
+      300,
+    );
+    for (const view of ["relevant", "all"] as const) {
+      const paths = rowsOf(
+        unitFieldView(withDefs, overrides, "armcom", view),
+      ).map((r) => r.path);
+      expect(paths.filter(isWeaponPath)).toEqual([]);
+    }
   });
 
   it("puts a field in the section its group names", () => {
@@ -233,10 +254,6 @@ describe("unitFieldView", () => {
       group: "movement",
       section: { id: "sensors" },
     });
-    expect(sectionOf("weapons.0.name")).toMatchObject({
-      group: "weapons",
-      section: { id: "weapons" },
-    });
     expect(sectionOf("objectName")).toMatchObject({
       group: "presentation",
       section: { id: "assets" },
@@ -252,37 +269,6 @@ describe("unitFieldView", () => {
     expect(row?.field.known).toBe(false);
     expect(row?.label).toBe("somethingOnlyThisGameReads");
     expect(row?.value).toBe(4);
-  });
-
-  it("orders weapon rows by mount and labels which one they belong to", () => {
-    const rows = unitFieldView(armcom, {}, "armcom", "relevant")
-      .groups.flatMap((g) => g.sections)
-      .find((s) => s.id === "weapons")?.rows;
-    expect(rows?.map((r) => r.path)).toEqual([
-      "weapons.0.name",
-      "weapons.1.name",
-      "weapons.1.slaveTo",
-    ]);
-    expect(rows?.[0].label).toBe("Weapon (weapon 1)");
-    expect(rows?.[1].label).toBe("Weapon (weapon 2)");
-  });
-
-  it("labels a weapon of a list with a gap by its own number", () => {
-    // XTA's commander: Weapon1 and Weapon3 and no Weapon2, which the worker
-    // reads as an object keyed by those numbers (issue #3041).
-    const xta = {
-      weapons: {
-        "1": { name: "CSARMCOMLASER" },
-        "3": { name: "CSARM_DISINTEGRATOR" },
-      },
-    };
-    const rows = unitFieldView(xta, {}, "armcom", "relevant")
-      .groups.flatMap((g) => g.sections)
-      .find((s) => s.id === "weapons")?.rows;
-    expect(rows?.map((r) => [r.path, r.label])).toEqual([
-      ["weapons.1.name", "Weapon (weapon 1)"],
-      ["weapons.3.name", "Weapon (weapon 3)"],
-    ]);
   });
 
   it("inherits the game's value where the def has one, and the engine's where it does not", () => {
@@ -366,19 +352,6 @@ describe("unitFieldView", () => {
       expect(new Set(paths.map((p) => p.toLowerCase())).size).toBe(
         paths.length,
       );
-    });
-
-    it("keeps each weapon mount as its own row", () => {
-      const rows = unitFieldView(lowercased, {}, "armcom", "relevant")
-        .groups.flatMap((g) => g.sections)
-        .find((s) => s.id === "weapons")?.rows;
-      expect(rows?.map((r) => r.path)).toEqual([
-        "weapons.0.name",
-        "weapons.0.onlytargetcategory",
-        "weapons.1.name",
-        "weapons.1.badtargetcategory",
-      ]);
-      expect(rows?.[1].label).toBe("Only shoots at (weapon 1)");
     });
 
     it("walks into customParams however the game spells it", () => {

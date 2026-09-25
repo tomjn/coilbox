@@ -336,26 +336,13 @@ export const UNIT_FIELD_GROUPS: GroupSpec[] = [
     ],
   },
   {
-    id: "weapons",
-    label: "Weapons",
+    // The weapons themselves are not here. Each slot and its definition have
+    // a tab of their own (issue #2639, and `weaponSlots.ts`), which is what
+    // {@link isWeaponPath} keeps out of this list. What is left is how the
+    // unit as a whole fights.
+    id: "combat",
+    label: "Combat",
     sections: [
-      {
-        id: "weapons",
-        label: "Weapon mounts",
-        paths: [
-          "weapons.*.name",
-          "weapons.*.slaveTo",
-          "weapons.*.mainDir",
-          "weapons.*.maxAngleDif",
-          "weapons.*.onlyTargetCategory",
-          "weapons.*.badTargetCategory",
-          "weapons.*.accurateLeading",
-          "weapons.*.fastAutoRetargeting",
-          "weapons.*.fastQueryPointUpdate",
-          "weapons.*.burstControlWhenOutOfArc",
-          "weapons.*.weaponAimAdjustPriority",
-        ],
-      },
       {
         id: "combat",
         label: "Combat behaviour",
@@ -598,6 +585,18 @@ export const OWN_EDITOR = new Set([
   "description",
 ]);
 
+/**
+ * Whether a unit field path is one the weapons tab draws rather than this
+ * list (issue #2639): a weapon slot, `weapons.0.mainDir`, or a definition the
+ * unit carries, `weapondefs.armcomlaser.range`. Either drawn here as well
+ * would be a second box for one value, and `weapondefs` would be one blob of
+ * Lua holding every weapon the unit has.
+ */
+export function isWeaponPath(path: string): boolean {
+  const head = path.split(".")[0].toLowerCase();
+  return head === "weapons" || head === "weapondefs";
+}
+
 /** Which view of the field list the page is showing. */
 export type FieldView = "relevant" | "all";
 
@@ -629,6 +628,11 @@ export interface RenderedSection {
 export interface RenderedGroup {
   id: string;
   label: string;
+  /** A line under the heading, for a group whose heading needs saying where
+   *  its fields are written (issue #2639). */
+  note?: string;
+  /** Whether every field in the group is shown and not offered. */
+  readOnly?: boolean;
   sections: RenderedSection[];
 }
 
@@ -761,7 +765,7 @@ function pathsForView(
     }
   }
   for (const path of OWN_EDITOR) paths.delete(path);
-  return [...paths.values()];
+  return [...paths.values()].filter((path) => !isWeaponPath(path));
 }
 
 /**

@@ -81,6 +81,7 @@ import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { gameIdentityForName } from "@/container/gameIdentity";
 import { assetIndex } from "@/content/assetKinds";
@@ -153,7 +154,12 @@ import {
 import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
-import { type FieldView, unitFieldView } from "../unitSections";
+import {
+  type FieldRow,
+  type FieldView,
+  isWeaponPath,
+  unitFieldView,
+} from "../unitSections";
 import {
   BASE_LANGUAGE,
   baseLanguage,
@@ -167,6 +173,12 @@ import {
   unitTextCount,
   unitTextRows,
 } from "../unitText";
+import {
+  slotOfPath,
+  unitsMounting,
+  weaponSlots,
+  weaponSlotView,
+} from "../weaponSlots";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
@@ -184,9 +196,14 @@ import {
 } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
+import { WeaponSlotsPanel } from "./components/WeaponSlotsPanel";
 
 /** A stable empty, so a page with no game does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
+
+/** Which half of a unit the page is showing: its own fields, or its weapons
+ *  one slot at a time (issue #2639). */
+type UnitTab = "fields" | "weapons";
 
 export default function UnitPage() {
   const [params] = useSearchParams();
@@ -313,7 +330,18 @@ export default function UnitPage() {
       edits,
     });
     pathRef.current = started.id;
-    navigate(projectPath(started.id, unitKey), { replace: true });
+    // The tab and the weapon slot come along, so the first edit on the
+    // weapons tab does not drop its author back on the fields (issue #2639).
+    const path = projectPath(started.id, unitKey);
+    const kept = new URLSearchParams();
+    for (const key of ["tab", "slot"]) {
+      const value = params.get(key);
+      if (value) kept.set(key, value);
+    }
+    navigate(
+      kept.size > 0 ? `${path}${path.includes("?") ? "&" : "?"}${kept}` : path,
+      { replace: true },
+    );
     return started;
   };
 
@@ -434,6 +462,53 @@ export default function UnitPage() {
     [unit, overrides, unitKey, view, edited],
   );
 
+  // The unit's weapons, one slot at a time (issue #2639). Read off the def as
+  // the game has it, with the game's own table of every weapon definition for
+  // a slot that names one the unit does not carry. A copy's slots still name
+  // the unit it was copied from, so that name finds the copy's own table too.
+  const weaponDefs = defs?.weaponDefs ?? NO_UNITS;
+  const cloneSource = clone?.source;
+  const slots = useMemo(
+    () =>
+      weaponSlots(
+        unit,
+        weaponDefs,
+        cloneSource ? [unitKey, cloneSource] : [unitKey],
+      ),
+    [unit, weaponDefs, unitKey, cloneSource],
+  );
+  // The tab and the slot are in the URL, so a link can name them. A link from
+  // the change ledger names a field instead (issue #2653), and a weapon field
+  // is only drawn on the weapons tab, so that link opens it on the right slot.
+  const linkedSlot =
+    fieldKey && isWeaponPath(fieldKey)
+      ? slotOfPath(slots, fieldKey)
+      : undefined;
+  const tabParam = params.get("tab");
+  const tab: UnitTab =
+    tabParam === "weapons" || (tabParam === null && linkedSlot)
+      ? "weapons"
+      : "fields";
+  const slotParam = params.get("slot") ?? linkedSlot?.step;
+  const slot = slots.find((s) => s.step === slotParam) ?? slots[0];
+  const sharedName =
+    slot?.definition.kind === "shared" ? slot.definition.key : undefined;
+  const mountedBy = useMemo(
+    () =>
+      sharedName === undefined
+        ? 0
+        : unitsMounting(gameUnits, weaponDefs, sharedName),
+    [sharedName, gameUnits, weaponDefs],
+  );
+  const unitName = nameOf(unitKey, unit);
+  const weaponView = useMemo(
+    () =>
+      slot
+        ? weaponSlotView(slot, overrides, unitKey, view, unitName, mountedBy)
+        : null,
+    [slot, overrides, unitKey, view, unitName, mountedBy],
+  );
+
   // Which of the fields on screen the edit-in-place route could write into
   // the unit's own file (issue #2633), asked at edit time so a field it
   // cannot is read only before the user types into it rather than refused at
@@ -447,14 +522,21 @@ export default function UnitPage() {
       : undefined;
   const inPlaceProbes = useMemo((): FieldProbe[] => {
     if (!inPlaceDir) return [];
-    return fields.groups.flatMap((group) =>
+    // The weapon slot on screen as well, whichever tab is showing, so moving
+    // to the weapons tab finds its answers already there. A definition the
+    // unit does not carry is left out: nothing on the page offers it.
+    const groups = [
+      ...fields.groups,
+      ...(weaponView?.groups.filter((group) => !group.readOnly) ?? []),
+    ];
+    return groups.flatMap((group) =>
       group.sections.flatMap((section) =>
         section.rows
           .filter((row) => controlKind(row) !== "raw")
           .map((row) => ({ field: row.path, value: row.value ?? null })),
       ),
     );
-  }, [inPlaceDir, fields]);
+  }, [inPlaceDir, fields, weaponView]);
   const inPlaceChecks = useInPlaceChecks(
     inPlaceDir,
     defs?.checksum,
@@ -520,12 +602,12 @@ export default function UnitPage() {
   // this render": the row itself carries no ref this page holds, and its id
   // is stable, so a plain `getElementById` after paint is enough rather than
   // threading a ref through every row for a link that is followed once.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: fields retriggers this once the field list has actually rendered, not read in the body.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fields and weaponView retrigger this once the field list has actually rendered, not read in the body.
   useEffect(() => {
     if (!fieldKey) return;
     const row = document.getElementById(`field-${fieldKey}`);
     row?.scrollIntoView({ block: "center" });
-  }, [fieldKey, fields]);
+  }, [fieldKey, fields, weaponView]);
 
   // What this game's units actually move on, so the class is picked out of a
   // list rather than spelled from memory against a file nobody has open (issue
@@ -1008,6 +1090,28 @@ export default function UnitPage() {
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
 
+  // One way to change a field, whichever tab it is on. A weapon field is an
+  // override like any other: its path already says whether it is written to
+  // the slot or to the definition the unit carries (`weaponSlots.ts`).
+  const changeField = (row: FieldRow, value: unknown) =>
+    updateOverrides((o) =>
+      setOverride(o, unitKey, row.path, value, row.inherited),
+    );
+  const resetField = (row: FieldRow) =>
+    updateOverrides((o) => clearOverride(o, unitKey, row.path));
+  /** What the value under an edit is, for a unit whose definition is not the
+   *  game's. */
+  const inheritedLabel = clone
+    ? clone.origin
+      ? "Exported value"
+      : "Copied value"
+    : builtBy
+      ? "Value in the game"
+      : undefined;
+  /** What the count beside the tabs is counting. */
+  const counted =
+    tab === "weapons" ? (weaponView ?? { shown: 0, hidden: 0 }) : fields;
+
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
   // the whole page scrolling as one. Below `lg` they stack and the frame
@@ -1308,7 +1412,13 @@ export default function UnitPage() {
           {!unit ? (
             <EmptyState label="Pick a unit to see its fields." />
           ) : (
-            <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
+            <Tabs
+              value={tab}
+              onValueChange={(next) =>
+                select({ tab: next === "weapons" ? next : "" })
+              }
+              className="flex min-w-0 flex-col gap-3 lg:min-h-0"
+            >
               {/* Who the unit is on the left, everything that acts on it on the
                 right, and what is worth saying about it underneath.
 
@@ -1433,14 +1543,26 @@ export default function UnitPage() {
                   </div>
                 </div>
 
-                {/* How much of the unit the list below is showing. Under the
-                  row and against its right edge, so it reads with the toggle it
-                  belongs to without being able to move it. */}
-                <span className="self-end text-xs text-muted-foreground">
-                  {view === "relevant"
-                    ? `${fields.shown} shown, ${fields.hidden} hidden`
-                    : `${fields.shown} shown`}
-                </span>
+                {/* The unit's own fields or its weapons (issue #2639), and
+                  how much of whichever it is the list below is showing. The
+                  count is against the right edge, so it reads with the toggle
+                  it belongs to without being able to move it. */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <TabsList aria-label="Which part of the unit to edit">
+                    <TabsTrigger value="fields">Fields</TabsTrigger>
+                    <TabsTrigger value="weapons">
+                      Weapons
+                      <span className="text-xs text-muted-foreground">
+                        {slots.length}
+                      </span>
+                    </TabsTrigger>
+                  </TabsList>
+                  <span className="text-xs text-muted-foreground">
+                    {view === "relevant"
+                      ? `${counted.shown} shown, ${counted.hidden} hidden`
+                      : `${counted.shown} shown`}
+                  </span>
+                </div>
 
                 {/* What is true of this unit: where it came from, and whether
                   it is switched off. The width cap is for reading length now,
@@ -1481,77 +1603,6 @@ export default function UnitPage() {
               </div>
 
               <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
-                <UnitTextPanel
-                  rows={textRows}
-                  home={home}
-                  isClone={clone !== undefined}
-                  languages={languages}
-                  language={shownLanguage}
-                  onLanguage={setLanguage}
-                  onChange={commitText}
-                  onReset={resetText}
-                />
-                {isBuilder(unit) && (
-                  <BuildMenuPanel
-                    builderKey={unitKey}
-                    builderName={nameOf(unitKey, unit)}
-                    builderFlag={builderFlag}
-                    inherited={inheritedMenu}
-                    menu={currentMenu}
-                    edited={(menuOps?.length ?? 0) > 0}
-                    units={pickerUnits}
-                    clones={clones}
-                    disabled={disabled}
-                    nameOf={(key) => nameOf(key, units[key])}
-                    picOf={picOf}
-                    picsPending={picsPending}
-                    buildpics={buildpics}
-                    factionOf={factionOf}
-                    gameName={game.name}
-                    gameArchive={game.primaryArchive.name}
-                    enginePath={selected?.enginePath}
-                    dataDir={selected?.rootPath}
-                    onAdd={(target) =>
-                      updateMenus((m) =>
-                        addToBuildMenu(m, unitKey, target, inheritedMenu),
-                      )
-                    }
-                    onRemove={(target) =>
-                      updateMenus((m) =>
-                        removeFromBuildMenu(m, unitKey, target, inheritedMenu),
-                      )
-                    }
-                    onMoveBefore={(target, before) =>
-                      updateMenus((m) =>
-                        moveBeforeInBuildMenu(
-                          m,
-                          unitKey,
-                          target,
-                          before,
-                          inheritedMenu,
-                        ),
-                      )
-                    }
-                    // The one edit on this panel that touches the unit's own
-                    // definition, and it goes through the same `setOverride`
-                    // every field row uses, so it counts and undoes as a field
-                    // change rather than as a menu edit.
-                    onEnableBuilder={() =>
-                      updateOverrides((o) =>
-                        setOverride(
-                          o,
-                          unitKey,
-                          builderPath,
-                          true,
-                          unit?.[builderPath],
-                        ),
-                      )
-                    }
-                    onReset={() =>
-                      updateMenus((m) => clearBuildMenu(m, unitKey))
-                    }
-                  />
-                )}
                 {inPlaceChecks.error && (
                   <p className="text-xs text-destructive">
                     Coilbox could not check which fields can be written into the
@@ -1570,33 +1621,116 @@ export default function UnitPage() {
                     onRoute={onRouteClone}
                   />
                 )}
-                <UnitFieldGroups
-                  view={fields}
-                  inPlace={inPlaceDir ? inPlaceOf : undefined}
-                  consumers={consumers}
-                  assets={assets}
-                  choices={choices}
-                  warnings={warnings}
-                  inheritedLabel={
-                    clone
-                      ? clone.origin
-                        ? "Exported value"
-                        : "Copied value"
-                      : builtBy
-                        ? "Value in the game"
-                        : undefined
-                  }
-                  onChange={(row, value) =>
-                    updateOverrides((o) =>
-                      setOverride(o, unitKey, row.path, value, row.inherited),
-                    )
-                  }
-                  onReset={(row) =>
-                    updateOverrides((o) => clearOverride(o, unitKey, row.path))
-                  }
-                />
+                <TabsContent value="weapons" className="flex-none">
+                  <WeaponSlotsPanel
+                    slots={slots}
+                    selected={slot}
+                    view={weaponView}
+                    overrides={overrides}
+                    unitKey={unitKey}
+                    consumers={consumers}
+                    assets={assets}
+                    inheritedLabel={inheritedLabel}
+                    inPlace={inPlaceDir ? inPlaceOf : undefined}
+                    onSelect={(step) => select({ tab: "weapons", slot: step })}
+                    onChange={changeField}
+                    onReset={resetField}
+                  />
+                </TabsContent>
+                <TabsContent
+                  value="fields"
+                  className="flex flex-none flex-col gap-3"
+                >
+                  <UnitTextPanel
+                    rows={textRows}
+                    home={home}
+                    isClone={clone !== undefined}
+                    languages={languages}
+                    language={shownLanguage}
+                    onLanguage={setLanguage}
+                    onChange={commitText}
+                    onReset={resetText}
+                  />
+                  {isBuilder(unit) && (
+                    <BuildMenuPanel
+                      builderKey={unitKey}
+                      builderName={nameOf(unitKey, unit)}
+                      builderFlag={builderFlag}
+                      inherited={inheritedMenu}
+                      menu={currentMenu}
+                      edited={(menuOps?.length ?? 0) > 0}
+                      units={pickerUnits}
+                      clones={clones}
+                      disabled={disabled}
+                      nameOf={(key) => nameOf(key, units[key])}
+                      picOf={picOf}
+                      picsPending={picsPending}
+                      buildpics={buildpics}
+                      factionOf={factionOf}
+                      gameName={game.name}
+                      gameArchive={game.primaryArchive.name}
+                      enginePath={selected?.enginePath}
+                      dataDir={selected?.rootPath}
+                      onAdd={(target) =>
+                        updateMenus((m) =>
+                          addToBuildMenu(m, unitKey, target, inheritedMenu),
+                        )
+                      }
+                      onRemove={(target) =>
+                        updateMenus((m) =>
+                          removeFromBuildMenu(
+                            m,
+                            unitKey,
+                            target,
+                            inheritedMenu,
+                          ),
+                        )
+                      }
+                      onMoveBefore={(target, before) =>
+                        updateMenus((m) =>
+                          moveBeforeInBuildMenu(
+                            m,
+                            unitKey,
+                            target,
+                            before,
+                            inheritedMenu,
+                          ),
+                        )
+                      }
+                      // The one edit on this panel that touches the unit's own
+                      // definition, and it goes through the same `setOverride`
+                      // every field row uses, so it counts and undoes as a field
+                      // change rather than as a menu edit.
+                      onEnableBuilder={() =>
+                        updateOverrides((o) =>
+                          setOverride(
+                            o,
+                            unitKey,
+                            builderPath,
+                            true,
+                            unit?.[builderPath],
+                          ),
+                        )
+                      }
+                      onReset={() =>
+                        updateMenus((m) => clearBuildMenu(m, unitKey))
+                      }
+                    />
+                  )}
+                  <UnitFieldGroups
+                    view={fields}
+                    inPlace={inPlaceDir ? inPlaceOf : undefined}
+                    consumers={consumers}
+                    assets={assets}
+                    choices={choices}
+                    warnings={warnings}
+                    inheritedLabel={inheritedLabel}
+                    onChange={changeField}
+                    onReset={resetField}
+                  />
+                </TabsContent>
               </div>
-            </div>
+            </Tabs>
           )}
         </div>
       )}
