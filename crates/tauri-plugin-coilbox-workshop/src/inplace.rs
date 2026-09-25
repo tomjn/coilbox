@@ -404,6 +404,16 @@ fn not_carried(project: &ModProject) -> Vec<String> {
     if !edits.disabled.is_empty() {
         out.push("Switched-off units are not written into the game yet.".to_string());
     }
+    let equipped = edits.equipped_count();
+    if equipped > 0 {
+        out.push(format!(
+            "{equipped} weapon{} equipped from the project's weapon library {} not written into the game yet. {} still need{} a mutator.",
+            if equipped == 1 { "" } else { "s" },
+            if equipped == 1 { "is" } else { "are" },
+            if equipped == 1 { "It" } else { "They" },
+            if equipped == 1 { "s" } else { "" },
+        ));
+    }
     if edits.text_edit_count() > 0 {
         out.push("Name and description changes are not written into the game yet.".to_string());
     }
@@ -2188,6 +2198,25 @@ mod tests {
         assert!(outcome.copies.is_empty());
         assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
         assert!(outcome.not_carried[0].contains("replaces a unit"));
+    }
+
+    /// Issue #2640. A weapon equipped from the library is left to the
+    /// mutator, and says so, rather than stopping the rest of the write.
+    #[test]
+    fn an_equipped_library_weapon_is_not_carried() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "x",
+            "gameName": "g",
+            "edits": {
+                "weapons": { "heavylaser": { "key": "heavylaser", "def": { "range": 300 } } },
+                "equipped": { "armdfly": { "0": "heavylaser" } }
+            }
+        }))
+        .unwrap();
+        let lines = super::not_carried(&project);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0]
+            .starts_with("1 weapon equipped from the project's weapon library is not written"));
     }
 
     /// Issue #3035. A copy sent to the mutator route is skipped by the write,

@@ -33,9 +33,12 @@
 //! project and the machine that received it.
 
 use crate::lua::{lua_literal, lua_string, PatchTree};
-use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject, UnitClone};
+use crate::model::{
+    through_a_position, BuildMenuOp, GameEdits, LibraryWeapon, ModProject, UnitClone,
+};
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 /// Which of the two forms a chunk is written in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -308,6 +311,38 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         });
     }
 
+    // Slots the project re-armed with a weapon out of its own library (issue
+    // #2640). A copy's are folded into its definition above. A game unit's
+    // slot has to be found in the game's own list first, which only the
+    // loaded table can answer, so it is a block.
+    notes.extend(equip_notes(edits));
+    let equips: Vec<(&str, u64, &str)> = edits
+        .equipped
+        .iter()
+        .filter(|(unit, _)| !edits.clones.contains_key(*unit))
+        .flat_map(|(unit, slots)| {
+            slots
+                .iter()
+                .map(move |(step, key)| (unit.as_str(), step.as_str(), key.as_str()))
+        })
+        .filter_map(|(unit, step, key)| {
+            let at = equip_step(step)?;
+            (edits.weapons.contains_key(key) && valid_unit_key(key)).then_some((unit, at, key))
+        })
+        .collect();
+    if !equips.is_empty() {
+        chunks.push(Chunk {
+            form: LuaForm::Block,
+            title: format!(
+                "{} weapon{} equipped",
+                equips.len(),
+                if equips.len() == 1 { "" } else { "s" }
+            ),
+            reason: "The slot is found in the unit's own weapon list as the game loads it, and the weapon is written into that unit's own weapon definitions, so no other unit changes.".to_string(),
+            lua: equip_block(&equips, &edits.weapons),
+        });
+    }
+
     // Build menus. A copy's menu is folded into its definition, because the
     // project owns that list outright. A game unit's menu cannot be: writing
     // out the list as it stands today would pin it, and a unit the game adds to
@@ -464,6 +499,9 @@ pub(crate) fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value 
     if let Some(source) = clone.source.as_deref() {
         mount_own_weapons(&mut def, source, &clone.key);
     }
+    if let Some(slots) = edits.equipped.get(&clone.key) {
+        equip_into(&mut def, &clone.key, slots, &edits.weapons);
+    }
     if let Some(ops) = edits.menus.get(&clone.key) {
         let key = build_options_key(&def);
         let resolved = apply_build_menu(&build_options_of(&def), ops);
@@ -543,6 +581,207 @@ fn mount_own_weapons(def: &mut Value, source: &str, key: &str) {
             }
         }
     }
+}
+
+/// A slot's step as a number, or `None` for one that is not digits, which
+/// nothing in coilbox writes (`weaponSlots.ts`).
+fn equip_step(step: &str) -> Option<u64> {
+    if step.is_empty() || !step.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    step.parse().ok()
+}
+
+/// A library weapon's definition as the game will read it: the definition it
+/// was copied with, and the changes the project made to it since.
+pub(crate) fn library_def(weapon: &LibraryWeapon) -> Value {
+    let mut def = weapon.def.clone();
+    for (path, value) in &weapon.changes {
+        let steps: Vec<&str> = path.split('.').collect();
+        write_path(&mut def, &steps, value.clone());
+    }
+    def
+}
+
+/// What the compiler left out of the equipped slots, one sentence each.
+fn equip_notes(edits: &GameEdits) -> Vec<String> {
+    let mut notes = Vec::new();
+    for (key, weapon) in &edits.weapons {
+        if !valid_unit_key(key) || weapon.key != *key {
+            notes.push(format!(
+                "The library weapon {key:?} was left out. A weapon's name can only hold lowercase letters, digits and underscores, and it becomes a key in each unit that equips it."
+            ));
+        }
+    }
+    for (unit, slots) in &edits.equipped {
+        for (step, key) in slots {
+            if equip_step(step).is_none() {
+                notes.push(format!(
+                    "{unit} has a weapon equipped in a slot called {step:?}, which is not a slot number, so it was left out."
+                ));
+            } else if !edits.weapons.contains_key(key) {
+                notes.push(format!(
+                    "{unit} has {key} equipped, which is not in the project's weapon library any more, so that slot keeps the weapon the game gives it."
+                ));
+            }
+        }
+    }
+    notes
+}
+
+/// Point a slot at a weapon the unit carries in its own `weapondefs`.
+///
+/// Both keys a game can bind a slot by are written. `def` is what Beyond All
+/// Reason's `weapondefs_post.lua`, Balanced Annihilation's and the base
+/// content's all read: each turns it into `<unit>_<def>` once it has put the
+/// unit's own definitions into the shared table under that name. `name` is
+/// that same full name, for a game that reads the slot's name and never its
+/// `def`. Any other spelling of either is dropped first, so the slot cannot
+/// end up naming two weapons.
+fn point_slot(slot: &mut Value, unit: &str, key: &str) {
+    if !slot.is_object() {
+        *slot = Value::Object(serde_json::Map::new());
+    }
+    if let Some(table) = slot.as_object_mut() {
+        table.retain(|k, _| {
+            let lower = k.to_lowercase();
+            lower != "name" && lower != "def"
+        });
+        table.insert("def".to_string(), Value::String(key.to_string()));
+        table.insert(
+            "name".to_string(),
+            Value::String(format!("{}_{key}", unit.to_lowercase())),
+        );
+    }
+}
+
+/// Equip library weapons into a copy the project owns (issue #2640).
+///
+/// The copy's whole definition is the project's, so the weapon is written
+/// straight into it rather than by a block at load time: into the copy's own
+/// `weapondefs` under the library name, with the slot pointed at it by
+/// [`point_slot`]. A step is a position counted from zero in a list and the
+/// Lua key itself in a list with a gap, the way `weaponSlots.ts` reads one.
+/// A slot the copy does not have is left alone.
+fn equip_into(
+    def: &mut Value,
+    unit: &str,
+    slots: &BTreeMap<String, String>,
+    weapons: &BTreeMap<String, LibraryWeapon>,
+) {
+    for (step, key) in slots {
+        let Some(weapon) = weapons.get(key) else {
+            continue;
+        };
+        if !valid_unit_key(key) || equip_step(step).is_none() {
+            continue;
+        }
+        let Some(map) = def.as_object_mut() else {
+            return;
+        };
+        let slot = map
+            .iter_mut()
+            .find(|(k, _)| k.eq_ignore_ascii_case("weapons"))
+            .and_then(|(_, list)| match list {
+                Value::Array(items) => step.parse::<usize>().ok().and_then(|i| items.get_mut(i)),
+                Value::Object(items) => items.get_mut(step),
+                _ => None,
+            });
+        let Some(slot) = slot else {
+            continue;
+        };
+        point_slot(slot, unit, key);
+        let defs_key = map
+            .keys()
+            .find(|k| k.eq_ignore_ascii_case("weapondefs"))
+            .cloned()
+            .unwrap_or_else(|| "weapondefs".to_string());
+        let own = map
+            .entry(defs_key)
+            .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        if !own.is_object() {
+            *own = Value::Object(serde_json::Map::new());
+        }
+        if let Some(own) = own.as_object_mut() {
+            own.insert(key.clone(), library_def(weapon));
+        }
+    }
+}
+
+/// Library weapons equipped into the game's own units (issue #2640).
+///
+/// Each weapon is written into the unit's own `weapondefs` under its library
+/// name, so it is that unit's alone, and the slot is pointed at it the way
+/// [`point_slot`] does for a copy. The slot is found the way
+/// [`positional_block`] finds a list entry, and a unit or slot the game does
+/// not have is skipped. Each unit gets its own copy of the table, because the
+/// game's post-processing edits a definition in place.
+fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryWeapon>) -> String {
+    let mut library = serde_json::Map::new();
+    for (_, _, key) in equips {
+        if let Some(weapon) = weapons.get(*key) {
+            library.insert((*key).to_string(), library_def(weapon));
+        }
+    }
+    let entries: Vec<String> = equips
+        .iter()
+        .map(|(unit, at, key)| {
+            format!("    {{ {}, {at}, {} }},", lua_string(unit), lua_string(key))
+        })
+        .collect();
+    format!(
+        "-- Weapons equipped from the project's weapon library. Each goes into the\n\
+         -- unit's own weapondefs, and the slot names it by def and by full name.\n\
+         do\n\
+         \x20 local library = {}\n\
+         \x20 local equipped = {{\n{}\n  }}\n\
+         \x20 local function field(t, lower)\n\
+         \x20   for k in pairs(t) do\n\
+         \x20     if type(k) == \"string\" and string.lower(k) == lower then return k end\n\
+         \x20   end\n\
+         \x20   return lower\n\
+         \x20 end\n\
+         \x20 local function key(list, at)\n\
+         \x20   local count = 0\n\
+         \x20   for _ in pairs(list) do count = count + 1 end\n\
+         \x20   if count == 0 or #list == count then return at + 1 end\n\
+         \x20   if list[at] == nil and list[tostring(at)] ~= nil then return tostring(at) end\n\
+         \x20   return at\n\
+         \x20 end\n\
+         \x20 local function copy(v)\n\
+         \x20   if type(v) ~= \"table\" then return v end\n\
+         \x20   local out = {{}}\n\
+         \x20   for k, x in pairs(v) do out[k] = copy(x) end\n\
+         \x20   return out\n\
+         \x20 end\n\
+         \x20 for _, e in ipairs(equipped) do\n\
+         \x20   local unit, at, name = e[1], e[2], e[3]\n\
+         \x20   local ud = UnitDefs[unit]\n\
+         \x20   local weapons = type(ud) == \"table\" and ud[field(ud, \"weapons\")] or nil\n\
+         \x20   if type(weapons) == \"table\" then\n\
+         \x20     local step = key(weapons, at)\n\
+         \x20     local slot = weapons[step]\n\
+         \x20     if slot ~= nil then\n\
+         \x20       if type(slot) ~= \"table\" then\n\
+         \x20         slot = {{}}\n\
+         \x20         weapons[step] = slot\n\
+         \x20       end\n\
+         \x20       for k in pairs(slot) do\n\
+         \x20         local lower = type(k) == \"string\" and string.lower(k)\n\
+         \x20         if lower == \"name\" or lower == \"def\" then slot[k] = nil end\n\
+         \x20       end\n\
+         \x20       slot.def = name\n\
+         \x20       slot.name = unit .. \"_\" .. name\n\
+         \x20       local defs = field(ud, \"weapondefs\")\n\
+         \x20       if type(ud[defs]) ~= \"table\" then ud[defs] = {{}} end\n\
+         \x20       ud[defs][name] = copy(library[name])\n\
+         \x20     end\n\
+         \x20   end\n\
+         \x20 end\n\
+         end",
+        lua_literal(&Value::Object(library), "  "),
+        entries.join("\n")
+    )
 }
 
 /// The key a definition spells its build list under, so a rewrite lands on the
@@ -1356,6 +1595,80 @@ mod tests {
         .expect("parse");
         let def = resolved_clone_def(&clone, &GameEdits::default());
         assert_eq!(def["weapons"][0]["name"], json!("armcom_armcomlaser"));
+    }
+
+    fn library() -> Value {
+        json!({ "heavylaser": {
+            "key": "heavylaser",
+            "source": "armcom_armcomlaser",
+            "def": { "range": 300, "damage": { "default": 75 } },
+            "changes": { "range": 450 }
+        } })
+    }
+
+    /// Issue #2640. A library weapon equipped into a game unit is one block,
+    /// carrying the weapon with its changes folded in, and a weapon the
+    /// library holds but nothing equips is not compiled at all.
+    #[test]
+    fn an_equipped_weapon_is_a_block_carrying_the_weapon_with_its_changes() {
+        let mut weapons = library();
+        weapons["unused"] = json!({ "key": "unused", "def": { "range": 1 } });
+        let out = compile(&project(json!({
+            "weapons": weapons,
+            "equipped": { "armcom": { "0": "heavylaser" } }
+        })));
+        assert_eq!(out.chunks.len(), 1);
+        let chunk = &out.chunks[0];
+        assert_eq!(chunk.form, LuaForm::Block);
+        assert_eq!(chunk.title, "1 weapon equipped");
+        assert!(chunk.lua.contains("range = 450"), "{}", chunk.lua);
+        assert!(!chunk.lua.contains("range = 300"), "{}", chunk.lua);
+        assert!(chunk.lua.contains("{ \"armcom\", 0, \"heavylaser\" },"));
+        assert!(!chunk.lua.contains("unused"));
+        assert!(out.bar_tweakdefs.expect("tweakdefs").contains("heavylaser"));
+    }
+
+    /// A copy's definition is the project's own, so a weapon equipped into
+    /// it is written straight into its file: into its own `weapondefs`, with
+    /// the slot naming it both ways and keeping its mount fields.
+    #[test]
+    fn a_weapon_equipped_into_a_copy_is_folded_into_its_file() {
+        let out = compile(&project(json!({
+            "weapons": library(),
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": {
+                    "weapons": [
+                        { "name": "armcom_armcomlaser", "onlytargetcategory": "NOTSUB" },
+                        { "name": "ARM_LIGHTLASER" }
+                    ],
+                    "weapondefs": { "armcomlaser": { "range": 300 } }
+                }
+            } },
+            "equipped": { "supercom": { "1": "heavylaser" } }
+        })));
+        assert!(out.chunks.iter().all(|c| !c.title.contains("equipped")));
+        let unit = file(&out, "units/supercom.lua");
+        assert!(unit.contains("def = \"heavylaser\""), "{unit}");
+        assert!(unit.contains("name = \"supercom_heavylaser\""), "{unit}");
+        assert!(!unit.contains("ARM_LIGHTLASER"), "{unit}");
+        assert!(unit.contains("name = \"supercom_armcomlaser\""), "{unit}");
+        assert!(unit.contains("heavylaser = {"), "{unit}");
+        assert!(unit.contains("range = 450"), "{unit}");
+    }
+
+    /// A slot whose library weapon has gone keeps the game's weapon, and says
+    /// so, rather than compiling a slot that names nothing.
+    #[test]
+    fn a_slot_naming_a_weapon_the_library_lost_is_left_out_with_a_note() {
+        let out = compile(&project(json!({
+            "equipped": { "armcom": { "0": "gone", "x": "gone" } }
+        })));
+        assert!(out.chunks.is_empty());
+        assert!(out.notes.iter().any(|n| n
+            .contains("armcom has gone equipped, which is not in the project's weapon library")));
+        assert!(out.notes.iter().any(|n| n.contains("not a slot number")));
     }
 
     /// The archive loads an added unit out of `units/`, so that file stays a
