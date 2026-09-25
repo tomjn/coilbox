@@ -53,10 +53,16 @@
 //! backups it left, undo and accept. `workshop_check_in_place` (issue #2633)
 //! is the same patching as a dry run for one unit, which the unit page asks
 //! at edit time. See `inplace`'s own doc comment.
+//!
+//! `workshop_in_place_diffs` (issue #2636) reads rather than writes: a line
+//! diff of every file the edit-in-place route has touched, backup against
+//! current, so a game author can see what changed on disk before accepting or
+//! undoing it. See `diff`'s own doc comment.
 
 mod bar_pack;
 mod compile;
 mod decode;
+mod diff;
 mod inplace;
 mod ledger;
 mod lua;
@@ -312,6 +318,15 @@ async fn workshop_check_in_place(
     blocking("check", move || inplace::check(&game, &unit, &fields)).await
 }
 
+/// A line diff of every file under `gameDir` that carries a workshop backup or
+/// created marker, backup against current (issue #2636). A read, and it
+/// changes nothing undo or accept would need.
+#[tauri::command]
+async fn workshop_in_place_diffs(game_dir: String) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("diff", move || diff::disk_diffs(&game)).await
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
@@ -326,7 +341,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_in_place_status,
             workshop_undo_in_place,
             workshop_accept_in_place,
-            workshop_check_in_place
+            workshop_check_in_place,
+            workshop_in_place_diffs
         ])
         .build()
 }
