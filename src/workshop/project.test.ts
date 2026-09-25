@@ -40,6 +40,12 @@ import {
   useModProjects,
 } from "./project";
 import { setUnitText } from "./unitText";
+import {
+  addLibraryWeapon,
+  copyGameWeapon,
+  equipWeapon,
+  setLibraryField,
+} from "./weaponLibrary";
 
 let storage = memorySettingsStorage();
 
@@ -97,6 +103,24 @@ function fullEdits(): GameEdits {
   edits = editSlot(edits, "text", (t) =>
     setUnitText(t, "armrock", "en", "name", "Pebble", "Rocko"),
   );
+  // A weapon copied into the library, changed, and equipped (issue #2640).
+  edits = editSlot(edits, "weapons", (w) =>
+    addLibraryWeapon(
+      w,
+      copyGameWeapon(
+        "heavylaser",
+        "armcom_armcomlaser",
+        { range: 300 },
+        "abc123",
+      ),
+    ),
+  );
+  edits = editSlot(edits, "weapons", (w) =>
+    setLibraryField(w, "heavylaser", "range", 450, 300),
+  );
+  edits = editSlot(edits, "equipped", (e) =>
+    equipWeapon(e, "armcom", "0", "heavylaser"),
+  );
   return edits;
 }
 
@@ -138,6 +162,8 @@ describe("a project survives being closed", () => {
       added: 1,
       menuOps: 2,
       off: 1,
+      weapons: 1,
+      equipped: 1,
     });
   });
 

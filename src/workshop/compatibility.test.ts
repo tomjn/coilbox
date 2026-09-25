@@ -617,3 +617,75 @@ describe("against real Balanced Annihilation definitions", () => {
     expect(report.findings[0].detail).toContain("armcom_armcomlaser");
   });
 });
+
+describe("the weapon library (issue #2640)", () => {
+  const armcom = {
+    weapons: [{ name: "armcom_armcomlaser" }],
+    weapondefs: { armcomlaser: { range: 300 } },
+  };
+  const edits: GameEdits = {
+    ...EMPTY_EDITS,
+    weapons: {
+      heavylaser: {
+        key: "heavylaser",
+        source: "armcom_armcomlaser",
+        def: { range: 300 },
+      },
+    },
+    equipped: { armcom: { "0": "heavylaser" } },
+  };
+
+  it("says nothing while the source and the slot are both still there", () => {
+    const report = check(edits, {
+      units: { armcom },
+      weaponDefs: { armcom_armcomlaser: { range: 300 } },
+    });
+    expect(ids(report)).toEqual([]);
+  });
+
+  it("names the fields the game changed under a copy, and offers nothing", () => {
+    const finding = only(
+      check(edits, {
+        units: { armcom },
+        weaponDefs: { armcom_armcomlaser: { range: 320, reloadtime: 1 } },
+      }),
+    );
+    expect(finding.id).toBe("weapons:heavylaser:moved");
+    expect(finding.severity).toBe("review");
+    expect(finding.detail).toContain("range, reloadtime");
+    expect(finding.fix).toBeUndefined();
+  });
+
+  it("says when the source has gone, because the copy still fires", () => {
+    const finding = only(check(edits, { units: { armcom } }));
+    expect(finding.id).toBe("weapons:heavylaser:source");
+    expect(finding.severity).toBe("review");
+  });
+
+  it("puts back a slot the unit no longer has, keeping the weapon", () => {
+    const finding = only(
+      check(edits, {
+        units: { armcom: { weapons: [] } },
+        weaponDefs: { armcom_armcomlaser: { range: 300 } },
+      }),
+    );
+    expect(finding.id).toBe("equipped:armcom:0");
+    expect(finding.severity).toBe("broken");
+    const fixed = finding.fix?.apply(edits);
+    expect(fixed?.equipped).toEqual({});
+    expect(fixed?.weapons).toBe(edits.weapons);
+  });
+
+  it("puts back every slot on a unit the game has dropped", () => {
+    const finding = only(
+      check(edits, { weaponDefs: { armcom_armcomlaser: { range: 300 } } }),
+    );
+    expect(finding.id).toBe("equipped:armcom");
+    expect(finding.fix?.apply(edits).equipped).toEqual({});
+  });
+
+  it("reads a project saved before the library as holding none", () => {
+    const { weapons: _w, equipped: _e, ...older } = EMPTY_EDITS;
+    expect(ids(check(older as GameEdits))).toEqual([]);
+  });
+});

@@ -78,6 +78,13 @@ import { overrideCount } from "./overrides";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
 import type { TextField, UnitTextEdits } from "./unitText";
 import { BASE_LANGUAGE, textEditCount } from "./unitText";
+import {
+  type EquippedWeapons,
+  equippedCount,
+  parseEquippedWeapons,
+  parseWeaponLibrary,
+  type WeaponLibrary,
+} from "./weaponLibrary";
 
 /** Payload schema version for a tweak project container. */
 export const MOD_PROJECT_KIND_VERSION = 1;
@@ -97,6 +104,12 @@ export const PROJECTS_KEY = "workshop.projects";
  *  - `text` is name and description for a game that keeps them in a
  *    localisation file rather than in its unitdefs.
  *  - `disabled` is a mark against a unit, and never an edit to anything.
+ *  - `weapons` is the project's weapon library, and `equipped` is which unit
+ *    slot fires which of its weapons (issue #2640, `weaponLibrary.ts`).
+ *
+ * The last two are optional because a project saved before them is read back
+ * out of the settings store as it was written, with neither key. Everything
+ * that reads them takes absent to mean empty.
  */
 export interface GameEdits {
   overrides: UnitOverrides;
@@ -104,6 +117,8 @@ export interface GameEdits {
   menus: BuildMenus;
   text: UnitTextEdits;
   disabled: DisabledUnits;
+  weapons?: WeaponLibrary;
+  equipped?: EquippedWeapons;
 }
 
 /**
@@ -119,10 +134,13 @@ export const EMPTY_EDITS: GameEdits = {
   menus: {},
   text: {},
   disabled: [],
+  weapons: {},
+  equipped: {},
 };
 
 /** Whether a slot holds anything at all, whichever of the five it is. */
 function slotIsEmpty(value: GameEdits[keyof GameEdits]): boolean {
+  if (value === undefined) return true;
   return Array.isArray(value)
     ? value.length === 0
     : Object.keys(value).length === 0;
@@ -135,7 +153,9 @@ export function isEmptyEdits(edits: GameEdits): boolean {
     slotIsEmpty(edits.clones) &&
     slotIsEmpty(edits.menus) &&
     slotIsEmpty(edits.text) &&
-    slotIsEmpty(edits.disabled)
+    slotIsEmpty(edits.disabled) &&
+    slotIsEmpty(edits.weapons) &&
+    slotIsEmpty(edits.equipped)
   );
 }
 
@@ -174,6 +194,10 @@ export interface EditCounts {
   menuOps: number;
   /** Units switched off. */
   off: number;
+  /** Weapons in the project's library (issue #2640). */
+  weapons: number;
+  /** Slots that fire one of them. */
+  equipped: number;
 }
 
 export function editCounts(edits: GameEdits): EditCounts {
@@ -182,17 +206,21 @@ export function editCounts(edits: GameEdits): EditCounts {
     added: Object.keys(edits.clones).length,
     menuOps: buildMenuOpCount(edits.menus),
     off: edits.disabled.length,
+    weapons: Object.keys(edits.weapons ?? {}).length,
+    equipped: equippedCount(edits.equipped),
   };
 }
 
 /** The counts as a sentence, for a header that says what is in the project. */
 export function describeEdits(edits: GameEdits): string {
-  const { fields, added, menuOps, off } = editCounts(edits);
+  const { fields, added, menuOps, off, weapons, equipped } = editCounts(edits);
   const parts = [
     fields > 0 && `${fields} change${fields === 1 ? "" : "s"}`,
     added > 0 && `${added} unit${added === 1 ? "" : "s"} added`,
     menuOps > 0 && `${menuOps} build menu edit${menuOps === 1 ? "" : "s"}`,
     off > 0 && `${off} unit${off === 1 ? "" : "s"} disabled`,
+    weapons > 0 &&
+      `${weapons} library weapon${weapons === 1 ? "" : "s"}${equipped > 0 ? ` in ${equipped} slot${equipped === 1 ? "" : "s"}` : ""}`,
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0 ? "Nothing changed yet" : parts.join(", ");
 }
@@ -944,7 +972,11 @@ function parseReadOnlyLua(value: unknown): ReadOnlyLuaBlock[] {
   return out;
 }
 
-/** Read the five stores out of untrusted JSON, each validated on its own. */
+/**
+ * Read the stores out of untrusted JSON, each validated on its own. The weapon
+ * library is optional and additive (issue #2640), so a file written before it
+ * reads back with an empty one and the kind version stays where it is.
+ */
 export function parseGameEdits(value: unknown): GameEdits {
   const source = asRecord(value) ?? {};
   return {
@@ -953,6 +985,8 @@ export function parseGameEdits(value: unknown): GameEdits {
     menus: parseMenus(source.menus),
     text: parseText(source.text),
     disabled: parseDisabled(source.disabled),
+    weapons: parseWeaponLibrary(source.weapons),
+    equipped: parseEquippedWeapons(source.equipped),
   };
 }
 

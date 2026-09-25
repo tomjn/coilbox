@@ -60,7 +60,28 @@
     "disabled": [
       "armaser",
       "armbanth"
-    ]
+    ],
+    "weapons": {
+      "heavylaser": {
+        "key": "heavylaser",
+        "source": "armcom_disintegrator",
+        "sourceChecksum": "c6a15f1f",
+        "def": {
+          "range": 300,
+          "damage": {
+            "default": 1000
+          }
+        },
+        "changes": {
+          "range": 450
+        }
+      }
+    },
+    "equipped": {
+      "armcom": {
+        "0": "heavylaser"
+      }
+    }
   },
   "writtenInPlace": {
     "armpw": {
