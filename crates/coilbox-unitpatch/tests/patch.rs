@@ -5,7 +5,9 @@
 
 use std::path::Path;
 
-use coilbox_unitpatch::{parse_path, patch, Edit, Op, Patched, Refusal, RefusalKind, Value};
+use coilbox_unitpatch::{
+    check_fields, parse_path, patch, Edit, Location, Op, Patched, Refusal, RefusalKind, Value,
+};
 
 fn fixture(name: &str) -> String {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -454,4 +456,67 @@ fn a_refusal_serialises_for_the_interface() {
     let json = serde_json::to_value(&refusal).unwrap();
     assert_eq!(json["kind"], "fieldComputed");
     assert_eq!(json["location"]["start"]["line"], 12);
+}
+
+// The dry run the unit page asks before an edit (issue #2633).
+
+fn check(source: &str, unit: &str, fields: &[(&str, Value)]) -> Vec<Result<Location, Refusal>> {
+    let root = tempfile::tempdir().expect("temp dir");
+    let fields: Vec<_> = fields
+        .iter()
+        .map(|(path, value)| (parse_path(path).expect("valid path"), value.clone()))
+        .collect();
+    check_fields(source, unit, &fields, root.path())
+}
+
+#[test]
+fn a_dry_run_answers_each_field_on_its_own() {
+    let source = fixture("bar_armdfly.lua");
+    let answers = check(
+        &source,
+        "armdfly",
+        &[("metalcost", num(400.0)), ("health", num(2000.0))],
+    );
+    assert_eq!(answers.len(), 2);
+    assert!(answers[0].is_ok(), "{:?}", answers[0]);
+    let refusal = answers[1].as_ref().expect_err("health is computed");
+    assert_eq!(refusal.kind, RefusalKind::FieldComputed);
+    assert_eq!(refusal.location.expect("a location").start.line, 12);
+}
+
+/// `patch` accepts a value the file already holds without running the
+/// post-check, so a dry run with the value the game has must try another one
+/// or a shared table would read as writable.
+#[test]
+fn a_dry_run_with_the_current_value_still_catches_a_shared_table() {
+    let source = "local Base = Unit:New{\n\tmaxDamage = 100,\n\tname = \"Base\",\n\tarmored = true,\n}\nlocal A = Base:New{ cost = 5 }\nlocal B = Base:New{ cost = 6 }\nreturn lowerkeys({ A = A, B = B })\n";
+    let answers = check(
+        source,
+        "A",
+        &[
+            ("maxdamage", num(100.0)),
+            ("name", text("Base")),
+            ("armored", Value::Bool(true)),
+            ("cost", num(5.0)),
+        ],
+    );
+    for answer in &answers[..3] {
+        let refusal = answer.as_ref().expect_err("B shares this table");
+        assert_eq!(refusal.kind, RefusalKind::PostCheckFailed, "{refusal}");
+    }
+    assert!(answers[3].is_ok(), "{:?}", answers[3]);
+}
+
+#[test]
+fn a_dry_run_refuses_what_patch_refuses() {
+    let source = "local opts = Spring.GetModOptions()\nreturn { u = { a = 1 } }\n";
+    let answers = check(source, "u", &[("a", num(2.0)), ("b", num(f64::INFINITY))]);
+    assert_eq!(
+        answers[0].as_ref().unwrap_err().kind,
+        RefusalKind::EvalFailed
+    );
+    assert_eq!(
+        answers[1].as_ref().unwrap_err().kind,
+        RefusalKind::InvalidValue
+    );
 }

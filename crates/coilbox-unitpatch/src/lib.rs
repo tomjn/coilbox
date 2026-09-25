@@ -262,6 +262,109 @@ impl std::error::Error for Refusal {}
 /// its `VFS` rooted there, so a unit file that includes a sibling file still
 /// evaluates.
 pub fn patch(source: &str, edit: &Edit, game_root: &Path) -> Result<Patched, Refusal> {
+    let value = validate(edit)?;
+    let plan = locate::plan(source, edit)?;
+    let before = evaluate_original(source, game_root)?;
+
+    let mut expected = expected_path(edit);
+    if let Op::Push(_) = edit.op {
+        let length = check::list_length(&before, &expected);
+        expected.push(format!("[{}]", length + 1));
+    } else if check::holds(&before, &expected, value) {
+        return Ok(Patched {
+            text: source.to_string(),
+            changed: false,
+            location: plan.location,
+        });
+    }
+
+    let text = plan.apply(source);
+    post_check(&text, &before, &expected, value, plan.location, game_root)?;
+
+    Ok(Patched {
+        text,
+        changed: true,
+        location: plan.location,
+    })
+}
+
+/// Where `edit` would go in `source`, worked out from the file's text alone.
+/// Nothing is evaluated, so this is cheap, and it only refuses what the
+/// file's shape decides. A refusal only the post-check can give, such as a
+/// table two units share, is not found here.
+pub fn locate_edit(source: &str, edit: &Edit) -> Result<Location, Refusal> {
+    validate(edit)?;
+    locate::plan(source, edit).map(|plan| plan.location)
+}
+
+/// Whether each of `fields` of `unit` could be changed in `source`, without
+/// writing anything (issue #2633). Each answer is the place in the file the
+/// change would go, or the refusal [`patch`] would give.
+///
+/// A dry run of [`patch`] with [`Op::Set`], one field at a time against the
+/// file as it is. When the file already returns the value given for a field,
+/// the field is tried with a different value of the same type instead,
+/// because `patch` accepts a value that is already there without running the
+/// post-check. A table two units share passes that and fails the post-check,
+/// so it would read as writable when no change to it ever is.
+///
+/// The original file is evaluated once for the whole batch rather than once
+/// per field, so a unit's whole field list costs one evaluation per field
+/// rather than two.
+pub fn check_fields(
+    source: &str,
+    unit: &str,
+    fields: &[(Vec<Segment>, Value)],
+    game_root: &Path,
+) -> Vec<Result<Location, Refusal>> {
+    let mut before: Option<Result<serde_json::Value, Refusal>> = None;
+    fields
+        .iter()
+        .map(|(path, value)| {
+            let edit = Edit {
+                unit: unit.to_string(),
+                path: path.clone(),
+                op: Op::Set(value.clone()),
+            };
+            validate(&edit)?;
+            locate::plan(source, &edit)?;
+            let before = before
+                .get_or_insert_with(|| evaluate_original(source, game_root))
+                .as_ref()
+                .map_err(Clone::clone)?;
+            let expected = expected_path(&edit);
+            let value = if check::holds(before, &expected, value) {
+                different(value)
+            } else {
+                value.clone()
+            };
+            let edit = Edit {
+                op: Op::Set(value.clone()),
+                ..edit
+            };
+            let plan = locate::plan(source, &edit)?;
+            let text = plan.apply(source);
+            post_check(&text, before, &expected, &value, plan.location, game_root)?;
+            Ok(plan.location)
+        })
+        .collect()
+}
+
+/// A value of the same type as `value` that is not equal to it.
+fn different(value: &Value) -> Value {
+    match value {
+        Value::Bool(b) => Value::Bool(!b),
+        // A number so large that adding one does not move it is halved
+        // instead, which cannot overflow.
+        Value::Number(n) if *n + 1.0 != *n => Value::Number(n + 1.0),
+        Value::Number(n) => Value::Number(n / 2.0),
+        Value::String(s) => Value::String(format!("{s}_")),
+    }
+}
+
+/// The value an edit writes, once it is known to be one the patcher can
+/// write at a path it can follow.
+fn validate(edit: &Edit) -> Result<&Value, Refusal> {
     let value = match &edit.op {
         Op::Set(value) | Op::Push(value) => value,
     };
@@ -279,44 +382,44 @@ pub fn patch(source: &str, edit: &Edit, game_root: &Path) -> Result<Patched, Ref
             "The edit names no field.",
         ));
     }
+    Ok(value)
+}
 
-    let plan = locate::plan(source, edit)?;
-    let before = check::evaluate(source, game_root, "original").map_err(|e| {
+fn evaluate_original(source: &str, game_root: &Path) -> Result<serde_json::Value, Refusal> {
+    check::evaluate(source, game_root, "original").map_err(|e| {
         Refusal::new(
             RefusalKind::EvalFailed,
             format!("Coilbox could not run this file to check the edit: {e}"),
         )
-    })?;
+    })
+}
 
+/// The edited field's path as the post-check spells it, unit first.
+fn expected_path(edit: &Edit) -> Vec<String> {
     let mut expected = vec![edit.unit.to_lowercase()];
     expected.extend(edit.path.iter().map(Segment::canonical));
-    if let Op::Push(_) = edit.op {
-        let length = check::list_length(&before, &expected);
-        expected.push(format!("[{}]", length + 1));
-    } else if check::holds(&before, &expected, value) {
-        return Ok(Patched {
-            text: source.to_string(),
-            changed: false,
-            location: plan.location,
-        });
-    }
+    expected
+}
 
-    let text = plan.apply(source);
-    let after = check::evaluate(&text, game_root, "patched").map_err(|e| {
+/// Run the patched `text` and confirm it differs from `before` only at
+/// `expected`, where it now holds `value`.
+fn post_check(
+    text: &str,
+    before: &serde_json::Value,
+    expected: &[String],
+    value: &Value,
+    location: Location,
+    game_root: &Path,
+) -> Result<(), Refusal> {
+    let after = check::evaluate(text, game_root, "patched").map_err(|e| {
         Refusal::new(
             RefusalKind::PostCheckFailed,
             format!("The patched file does not run: {e}"),
         )
-        .at(plan.location)
+        .at(location)
     })?;
-    check::confirm(&before, &after, &expected, value)
-        .map_err(|message| Refusal::new(RefusalKind::PostCheckFailed, message).at(plan.location))?;
-
-    Ok(Patched {
-        text,
-        changed: true,
-        location: plan.location,
-    })
+    check::confirm(before, &after, expected, value)
+        .map_err(|message| Refusal::new(RefusalKind::PostCheckFailed, message).at(location))
 }
 
 #[cfg(test)]
