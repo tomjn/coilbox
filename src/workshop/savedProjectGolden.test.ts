@@ -119,6 +119,9 @@ function buildProject(): ModProject {
     // holds them.
     writtenInPlace: { armpw: { metalCost: 60 } },
     checksumBeforeInPlace: "c6a15f1f",
+    // A change sent through the mutator route because the edit-in-place
+    // route cannot write it (issue #2633). The Rust model reads this one.
+    mutatorOnly: { armcom: ["weapondefs.disintegrator.range"] },
     createdAt: "2026-09-08T11:44:47.201Z",
     updatedAt: "2026-09-08T11:47:21.638Z",
   };

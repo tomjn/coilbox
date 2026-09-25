@@ -50,7 +50,9 @@
 //!
 //! `workshop_write_in_place` (issue #2635) is the one command that writes
 //! into a game's own folder, and three more go with it: a status count of the
-//! backups it left, undo and accept. See `inplace`'s own doc comment.
+//! backups it left, undo and accept. `workshop_check_in_place` (issue #2633)
+//! is the same patching as a dry run for one unit, which the unit page asks
+//! at edit time. See `inplace`'s own doc comment.
 
 mod bar_pack;
 mod compile;
@@ -297,6 +299,19 @@ async fn workshop_accept_in_place(game_dir: String) -> CliResult {
     blocking("accept", move || inplace::accept(&game)).await
 }
 
+/// Say which of `fields` of `unit` could be written into the loose `.sdd`
+/// game at `gameDir`, writing nothing (issue #2633). Answers with a refusal
+/// and the unit file's Lua around it for each field that cannot.
+#[tauri::command]
+async fn workshop_check_in_place(
+    game_dir: String,
+    unit: String,
+    fields: Vec<inplace::FieldProbe>,
+) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("check", move || inplace::check(&game, &unit, &fields)).await
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
@@ -310,7 +325,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_write_in_place,
             workshop_in_place_status,
             workshop_undo_in_place,
-            workshop_accept_in_place
+            workshop_accept_in_place,
+            workshop_check_in_place
         ])
         .build()
 }
@@ -435,6 +451,15 @@ mod tests {
             workshop_accept_in_place(dir()),
         ));
         assert_eq!(accepted["kept"], serde_json::json!([]));
+        let checked =
+            unwrap_as_the_frontend_does(tauri::async_runtime::block_on(workshop_check_in_place(
+                dir(),
+                "armcom".into(),
+                serde_json::from_value(serde_json::json!([{ "field": "metalcost", "value": 1 }]))
+                    .expect("probes"),
+            )));
+        assert_eq!(checked["file"], serde_json::json!("units/armcom.lua"));
+        assert_eq!(checked["fields"][0]["refusal"], Value::Null);
 
         let outside = root.path().join("dev.sdd");
         std::fs::create_dir_all(&outside).expect("outside dir");
@@ -629,6 +654,9 @@ mod tests {
             project.description.as_deref(),
             Some("What the checked-in fixture is for")
         );
+        // Beside `edits`, and read by the in-place write (issue #2633).
+        assert!(project.is_mutator_only("armcom", "weapondefs.disintegrator.range"));
+        assert!(!project.is_mutator_only("armcom", "maxDamage"));
 
         let edits = &project.edits;
         assert_eq!(

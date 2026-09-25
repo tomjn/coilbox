@@ -83,6 +83,40 @@ export const workshopAcceptInPlace = defineCommand<
   { kept: string[] }
 >("coilbox-workshop", "workshop_accept_in_place");
 
+/** Some lines of a unit file around a refusal's location. */
+export interface LuaExcerpt {
+  /** The first line's number, counted from 1. */
+  firstLine: number;
+  lines: string[];
+}
+
+/** One field the unit page asks about, with the value to try: the project's
+ *  change when it has one, otherwise the game's own. `null` stands for a
+ *  field the game does not set. */
+export interface FieldProbe {
+  field: string;
+  value: unknown;
+}
+
+/** Whether one field can be written in place, and why not when it cannot. */
+export interface FieldCheck {
+  field: string;
+  refusal: RefusedChange | null;
+  excerpt: LuaExcerpt | null;
+}
+
+/** What `workshop_check_in_place` found for one unit (issue #2633). */
+export interface InPlaceCheck {
+  /** The unit's file, relative to the game, when one defines it. */
+  file: string | null;
+  fields: FieldCheck[];
+}
+
+export const workshopCheckInPlace = defineCommand<
+  { gameDir: string; unit: string; fields: FieldProbe[] },
+  InPlaceCheck
+>("coilbox-workshop", "workshop_check_in_place");
+
 /** One refused change as a line a person reads. */
 export function describeRefusal(r: RefusedChange): string {
   const where = r.file

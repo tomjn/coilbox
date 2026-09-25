@@ -40,7 +40,11 @@ import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
-import { type FieldChoices, UnitFieldRow } from "./UnitFieldRow";
+import {
+  type FieldChoices,
+  type InPlaceField,
+  UnitFieldRow,
+} from "./UnitFieldRow";
 
 /**
  * The icon on each section's header, keyed by the section id `unitSections.ts`
@@ -73,6 +77,7 @@ export function UnitFieldGroups({
   choices,
   warnings,
   inheritedLabel,
+  inPlace,
   onChange,
   onReset,
 }: {
@@ -94,6 +99,9 @@ export function UnitFieldGroups({
   /** What to call the value underneath an edit, for a unit whose definition is
    *  not the game's. */
   inheritedLabel?: string;
+  /** What the edit-in-place route makes of a row, when there is anything to
+   *  say (issue #2633). Absent on a game that route cannot write. */
+  inPlace?: (row: FieldRow) => InPlaceField | undefined;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -147,6 +155,7 @@ export function UnitFieldGroups({
                     choices={choices?.[row.path.toLowerCase()]}
                     warning={warnings?.[row.path.toLowerCase()]}
                     inheritedLabel={inheritedLabel}
+                    inPlace={inPlace?.(row)}
                     onChange={(value) => onChange(row, value)}
                     onReset={() => onReset(row)}
                   />

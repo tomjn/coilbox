@@ -25,11 +25,21 @@
  * A custom parameter also carries a note naming the Lua file that reads it
  * (issue #2661), which for most of them is the only thing on the page that says
  * what the value does.
+ *
+ * On a game the edit-in-place route can write, a field the patcher cannot
+ * change in the unit's own file is read only, with the reason and the file's
+ * Lua a click away, and an offer to send that one change through the mutator
+ * route instead (issue #2633). `InPlaceNote` below draws that.
  */
 import { Button, cn, Input } from "@picoframe/frame";
-import { FolderOpen, RotateCcw, TriangleAlert } from "lucide-react";
+import { FileLock2, FolderOpen, RotateCcw, TriangleAlert } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
@@ -42,15 +52,16 @@ import {
   assetState,
 } from "../../assetFields";
 import type { ConsumerNote } from "../../customParamConsumers";
+import type { FieldCheck, LuaExcerpt } from "../../inPlace";
 import type { FieldRow } from "../../unitSections";
 import { AssetPicker } from "./AssetPicker";
 import { AssetPreview } from "./AssetPreview";
 import { LuaTableValue } from "./LuaTableValue";
 
 /** Which editor a value gets, or none. */
-type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
+export type ControlKind = "boolean" | "number" | "numberList" | "text" | "raw";
 
-function controlKind(row: FieldRow): ControlKind {
+export function controlKind(row: FieldRow): ControlKind {
   const value = row.value;
   if (typeof value === "boolean") return "boolean";
   if (typeof value === "number") return "number";
@@ -108,12 +119,14 @@ function SettlingInput({
   value,
   kind,
   muted,
+  disabled,
   ariaLabel,
   onCommit,
 }: {
   value: unknown;
   kind: ControlKind;
   muted: boolean;
+  disabled: boolean;
   ariaLabel: string;
   onCommit: (parsed: unknown) => void;
 }) {
@@ -152,6 +165,7 @@ function SettlingInput({
     <Input
       value={draft}
       aria-label={ariaLabel}
+      disabled={disabled}
       inputMode={kind === "number" ? "decimal" : undefined}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
@@ -184,6 +198,139 @@ export interface FieldChoices {
   unknownLabel: (value: string) => string;
 }
 
+/** What the edit-in-place route makes of one field (issue #2633). */
+export interface InPlaceField {
+  /** The dry run's answer. `refusal` is null when the field can be written. */
+  check: FieldCheck;
+  /** Whether the user sent this field's change through the mutator route. */
+  routed: boolean;
+  onRoute: (routed: boolean) => void;
+}
+
+/** The unit file's Lua around a refusal, with the lines it is about marked. */
+function Excerpt({
+  excerpt,
+  from,
+  to,
+}: {
+  excerpt: LuaExcerpt;
+  from: number;
+  to: number;
+}) {
+  return (
+    <pre className="max-h-64 overflow-auto rounded bg-muted py-1.5 font-mono text-[11px] leading-snug">
+      {excerpt.lines.map((line, i) => {
+        const number = excerpt.firstLine + i;
+        const marked = number >= from && number <= to;
+        return (
+          <div
+            key={number}
+            data-marked={marked || undefined}
+            className={cn(
+              "flex gap-2 px-1.5",
+              marked && "bg-amber-500/15 text-foreground",
+            )}
+          >
+            <span className="w-7 shrink-0 select-none text-right text-muted-foreground">
+              {number}
+            </span>
+            <span className="whitespace-pre">{line}</span>
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
+
+/**
+ * Why a field is read only for the edit-in-place route, and the way round it
+ * (issue #2633). The reason and the Lua sit in a popover rather than the row,
+ * because a unit whose table two units share has every row refused, and forty
+ * excerpts inline would bury the values.
+ */
+function InPlaceNote({
+  label,
+  field,
+  overridden,
+}: {
+  label: string;
+  field: InPlaceField;
+  overridden: boolean;
+}) {
+  const refusal = field.check.refusal;
+  const where = refusal?.file
+    ? `${refusal.file}${refusal.location ? `, line ${refusal.location.start.line}` : ""}`
+    : null;
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] text-muted-foreground">
+      <FileLock2 className="size-3 shrink-0" />
+      <span>
+        {field.routed
+          ? "Goes through the mutator route. Writing in place skips this field."
+          : overridden
+            ? "Read only for edit in place. This change stops an in-place write."
+            : "Read only for edit in place."}
+      </span>
+      {refusal && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="underline underline-offset-2 hover:text-foreground focus-visible:text-foreground"
+              aria-label={`Why ${label} cannot be written in place`}
+            >
+              Why?
+            </button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="start"
+            className="flex w-[32rem] flex-col gap-2"
+          >
+            <h3 className="text-sm font-medium">
+              Coilbox cannot write {label} into the game's own file
+            </h3>
+            <p className="text-xs">{refusal.message}</p>
+            {where && (
+              <p className="font-mono text-[11px] text-muted-foreground">
+                {where}
+              </p>
+            )}
+            {field.check.excerpt && refusal.location && (
+              <Excerpt
+                excerpt={field.check.excerpt}
+                from={refusal.location.start.line}
+                to={refusal.location.end.line}
+              />
+            )}
+            <p className="text-xs text-muted-foreground">
+              A mutator overrides the value however the file works it out, so
+              this one change can go that way while the rest of the project is
+              written in place.
+            </p>
+          </PopoverContent>
+        </Popover>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-6 px-2 text-[10px]"
+        onClick={() => field.onRoute(!field.routed)}
+        aria-label={
+          field.routed
+            ? `Stop sending ${label} through the mutator route`
+            : `Send ${label} through the mutator route`
+        }
+      >
+        {field.routed
+          ? "Undo"
+          : overridden
+            ? "Send this change to the mutator"
+            : "Change it through the mutator"}
+      </Button>
+    </span>
+  );
+}
+
 /**
  * One row. `onChange` is handed the new value and is expected to drop the
  * override when it matches what was inherited, which is what `setOverride`
@@ -196,6 +343,7 @@ export function UnitFieldRow({
   choices,
   warning,
   inheritedLabel = "Game value",
+  inPlace,
   onChange,
   onReset,
 }: {
@@ -216,12 +364,19 @@ export function UnitFieldRow({
   /** What the value under an edit is. The game's, unless the unit is one the
    *  project added, in which case the game never had an opinion about it. */
   inheritedLabel?: string;
+  /** What the edit-in-place route makes of this field, on a game it can write
+   *  and only when there is something to say: the field cannot be written in
+   *  place, or its change was sent through the mutator route (issue #2633). */
+  inPlace?: InPlaceField;
   onChange: (value: unknown) => void;
   onReset: () => void;
 }) {
   const kind = controlKind(row);
   const overridden = row.state === "overridden";
   const muted = !overridden;
+  // Read only until the user sends the change through the mutator route. A
+  // reset stays on offer, since taking a change out never stops a write.
+  const readOnly = Boolean(inPlace?.check.refusal) && !inPlace?.routed;
 
   const [picking, setPicking] = useState(false);
   // Only once the archive listing has landed. Without it there is nothing to
@@ -246,6 +401,7 @@ export function UnitFieldRow({
       value={row.value}
       kind={kind}
       muted={muted}
+      disabled={readOnly}
       ariaLabel={row.label}
       onCommit={onChange}
     />
@@ -338,6 +494,7 @@ export function UnitFieldRow({
           <Switch
             checked={row.value === true}
             aria-label={row.label}
+            disabled={readOnly}
             onCheckedChange={(v) => onChange(v)}
           />
         ) : choices && kind === "text" ? (
@@ -345,6 +502,7 @@ export function UnitFieldRow({
             size="sm"
             ariaLabel={row.label}
             placeholder={choices.placeholder}
+            disabled={readOnly}
             value={current}
             onValueChange={onChange}
             options={options}
@@ -362,6 +520,7 @@ export function UnitFieldRow({
               variant="outline"
               size="sm"
               className="h-8 shrink-0 gap-1.5"
+              disabled={readOnly}
               onClick={() => setPicking(true)}
               title={`Choose a ${asset.kind.noun} from ${assets.archiveLabel}`}
               aria-label={`Browse for ${row.label}`}
@@ -406,6 +565,13 @@ export function UnitFieldRow({
             {text}
           </span>
         ))}
+        {inPlace && (
+          <InPlaceNote
+            label={row.label}
+            field={inPlace}
+            overridden={overridden}
+          />
+        )}
         {note && (
           <span className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] text-muted-foreground">
             {note.text}

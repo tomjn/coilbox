@@ -20,6 +20,10 @@
  * second action pressed before the first one's read landed would be measured
  * against the game as it was before either.
  *
+ * A field change the user sent through the mutator route because this route
+ * cannot write it (issue #2633) is skipped by the write rather than refused,
+ * and listed here as still needing a mutator, before anything is pressed.
+ *
  * A text diff of what changed is #2636.
  */
 import { Button } from "@picoframe/frame";
@@ -39,6 +43,7 @@ import {
   workshopWriteInPlace,
 } from "../../inPlace";
 import type { InPlaceDone } from "../../inPlaceProject";
+import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
 import type { ModProject } from "../../project";
 
 type Busy = "write" | "undo" | "accept" | null;
@@ -122,8 +127,18 @@ export function InPlaceWrite({
   }
 
   const pending = status ? status.backups + status.created : 0;
-  const hasFieldChanges = Object.values(project?.edits.overrides ?? {}).some(
-    (fields) => Object.keys(fields).length > 0,
+  // A copied unit's changes are not this route's either, and the Rust side
+  // already says so after a write, so they are left out of both counts.
+  const clones = project?.edits.clones ?? {};
+  const routed = mutatorOnlyChanges(
+    project?.mutatorOnly,
+    project?.edits.overrides ?? {},
+  ).filter((c) => !clones[c.unit]);
+  const hasFieldChanges = Object.entries(project?.edits.overrides ?? {}).some(
+    ([unit, fields]) =>
+      Object.keys(fields).some(
+        (field) => !isMutatorOnly(project?.mutatorOnly, unit, field),
+      ),
   );
 
   return (
@@ -198,9 +213,29 @@ export function InPlaceWrite({
         {!project
           ? "Open a project to write its changes into the game."
           : !hasFieldChanges
-            ? "This project has no field changes to write."
+            ? routed.length > 0
+              ? "Every field change in this project goes through the mutator route, so there is nothing to write in place."
+              : "This project has no field changes to write."
             : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
       </p>
+      {routed.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+          <span>
+            {plural(routed.length, "change")} cannot be written into the game's
+            files, so you sent {routed.length === 1 ? "it" : "them"} to the
+            mutator route. Writing in place skips{" "}
+            {routed.length === 1 ? "it" : "them"}, and you still need a mutator
+            for {routed.length === 1 ? "it" : "them"}:
+          </span>
+          <ul className="flex list-disc flex-col gap-0.5 pl-4 font-mono text-[11px]">
+            {routed.map((c) => (
+              <li key={`${c.unit}:${c.field}`}>
+                {c.unit} {c.field}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {pending > 0 && (
         <p className="text-xs">
           {plural(pending, "file")} in this game{" "}
