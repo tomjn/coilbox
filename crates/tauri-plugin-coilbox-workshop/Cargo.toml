@@ -39,6 +39,10 @@ coilbox-portable = { path = "../coilbox-portable" }
 coilbox-unitpatch = { path = "../coilbox-unitpatch" }
 coilbox-tdf = { path = "../coilbox-tdf" }
 coilbox-gamebackup = { path = "../coilbox-gamebackup" }
+# The unitsync worker's `--defs-probe` mode, which loads the game with a
+# compiled mutator on top so a typed value can be written as one the game's
+# post files turn into it (issue #3059). Only the blocking runner it exports.
+tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

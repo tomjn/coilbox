@@ -17,4 +17,5 @@ permissions = [
   "allow-workshop-check-in-place",
   "allow-workshop-check-clone-in-place",
   "allow-workshop-in-place-diffs",
+  "allow-workshop-settle-typed-values",
 ]
