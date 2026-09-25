@@ -405,7 +405,7 @@ fn an_edit_that_reaches_another_unit_fails_the_post_check() {
 
 #[test]
 fn a_file_that_does_not_run_is_refused() {
-    let source = "local opts = Spring.GetModOptions()\nreturn { u = { a = 1 } }\n";
+    let source = "local frame = Spring.GetGameFrame()\nreturn { u = { a = 1 } }\n";
     refused(set(source, "u", "a", num(2.0)), RefusalKind::EvalFailed);
 }
 
@@ -512,7 +512,7 @@ fn a_dry_run_with_the_current_value_still_catches_a_shared_table() {
 
 #[test]
 fn a_dry_run_refuses_what_patch_refuses() {
-    let source = "local opts = Spring.GetModOptions()\nreturn { u = { a = 1 } }\n";
+    let source = "local frame = Spring.GetGameFrame()\nreturn { u = { a = 1 } }\n";
     let answers = check(source, "u", &[("a", num(2.0)), ("b", num(f64::INFINITY))]);
     assert_eq!(
         answers[0].as_ref().unwrap_err().kind,

@@ -10,6 +10,11 @@
 //! in as an empty class whose `New` merges tables as the games' own class
 //! helpers do. That gives the same answer before and after the edit, which is
 //! all the comparison needs. It is not the unit as the engine sees it.
+//!
+//! `Spring.GetModOptions()` is stood in too (issue #3038): it reads the
+//! game's own `ModOptions.lua` for a declared option's default, and answers
+//! `1` for one nobody declared, so a unit file that multiplies by a mod
+//! option still runs.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -64,6 +69,35 @@ setmetatable(_G, { __index = function(_, name)
   end
   return stub
 end })
+-- Spring.GetModOptions(), stood in so a unit file that reads it can still
+-- run (issue #3038). A declared option reads as the game's own default from
+-- its ModOptions.lua (matched case-insensitively, as the engine matches
+-- files); an option nobody declared, such as SplinterFaction's
+-- chicken_queentimemult, reads as 1, which is enough for the arithmetic a
+-- unit file does with it to run. Both the original and the patched run read
+-- this same table, so the comparison the post-check makes never sees it move.
+local __cbx_modoptions_declared = {}
+do
+  local ok, declared = pcall(VFS.Include, "modoptions.lua")
+  if ok and type(declared) == "table" then
+    for _, option in pairs(declared) do
+      if type(option) == "table" and type(option.key) == "string"
+        and option.type ~= "section" and option.def ~= nil then
+        __cbx_modoptions_declared[string.lower(option.key)] = option.def
+      end
+    end
+  end
+end
+local __cbx_modoptions = setmetatable({}, { __index = function(_, key)
+  if type(key) == "string" then
+    local declared = __cbx_modoptions_declared[string.lower(key)]
+    if declared ~= nil then return declared end
+  end
+  return 1
+end })
+if type(Spring.GetModOptions) ~= "function" then
+  Spring.GetModOptions = function() return __cbx_modoptions end
+end
 local function __cbx_plain(value, depth)
   local kind = type(value)
   if kind == "number" or kind == "string" or kind == "boolean" then return value end
