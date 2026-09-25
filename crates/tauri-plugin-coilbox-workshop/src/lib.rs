@@ -775,6 +775,14 @@ mod tests {
         assert_eq!(weapon.source_checksum.as_deref(), Some("c6a15f1f"));
         assert_eq!(weapon.changes["range"], serde_json::json!(450));
         assert_eq!(edits.equipped["armcom"]["0"], "heavylaser");
+
+        // A unit moved to a different armour class, and the snapshot the
+        // compiler needs to write the whole file back (issue #2645).
+        assert_eq!(edits.armor_classes.moves["armflash"], "heavyunits");
+        assert_eq!(
+            edits.armor_classes.base["commanders"],
+            vec!["armcom", "corcom"]
+        );
     }
 
     /// A project somebody saved compiles and passes its own checks. Preflight

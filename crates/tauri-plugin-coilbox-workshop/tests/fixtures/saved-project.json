@@ -81,6 +81,17 @@
       "armcom": {
         "0": "heavylaser"
       }
+    },
+    "armorClasses": {
+      "base": {
+        "commanders": [
+          "armcom",
+          "corcom"
+        ]
+      },
+      "moves": {
+        "armflash": "heavyunits"
+      }
     }
   },
   "writtenInPlace": {
