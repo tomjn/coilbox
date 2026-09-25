@@ -55,7 +55,7 @@ function unmoved(p: ModProject, current: string) {
 describe("after an in-place write", () => {
   const written = settleInPlace(
     project,
-    { kind: "write", carried, changed: true },
+    { kind: "write", carried, copies: [], changed: true },
     BEFORE,
   );
 
@@ -127,6 +127,7 @@ describe("after an in-place write", () => {
       {
         kind: "write",
         carried: [{ unit: "atlas", field: "metalcost", undoable: false }],
+        copies: [],
         changed: false,
       },
       BEFORE,
@@ -149,6 +150,7 @@ describe("after an in-place write", () => {
       {
         kind: "write",
         carried: [{ unit: "brv", field: "trackwidth", undoable: true }],
+        copies: [],
         changed: true,
       },
       WRITTEN,
@@ -159,12 +161,116 @@ describe("after an in-place write", () => {
   });
 });
 
+/** Issue #2634. A copy the write added as a unit file leaves the project the
+ *  way a written field does, and undo brings it back whole. */
+describe("after an in-place write of a copy", () => {
+  const withCopy: ModProject = {
+    ...project,
+    edits: {
+      ...project.edits,
+      clones: {
+        brv2: {
+          key: "brv2",
+          source: "brv",
+          replacesGameUnit: false,
+          def: { name: "BRV Mk2" },
+        },
+      },
+      overrides: { ...project.edits.overrides, brv2: { trackwidth: 44 } },
+      menus: {
+        salvageyard: [
+          { op: "add", unit: "brv2" },
+          { op: "remove", unit: "atlas" },
+        ],
+        brv2: [{ op: "add", unit: "atlas" }],
+      },
+      text: { brv2: { en: { description: "A heavier BRV" } } },
+    },
+  };
+  const copies = [
+    { unit: "brv2", file: "units/brv2.lua", builders: ["salvageyard"] },
+  ];
+  const written = settleInPlace(
+    withCopy,
+    { kind: "write", carried: [], copies, changed: true },
+    BEFORE,
+  );
+
+  it("takes the copy, its changes and its menu additions out of the project", () => {
+    expect(written.edits.clones).toEqual({});
+    expect(written.edits.overrides.brv2).toBeUndefined();
+    expect(written.edits.menus).toEqual({
+      salvageyard: [{ op: "remove", unit: "atlas" }],
+    });
+    // Words are not written in place, so the project keeps them, now about
+    // a unit of the game's.
+    expect(written.edits.text).toEqual(withCopy.edits.text);
+    expect(written.copiesWrittenInPlace?.brv2).toEqual({
+      clone: withCopy.edits.clones.brv2,
+      overrides: { trackwidth: 44 },
+      menu: [{ op: "add", unit: "atlas" }],
+      builders: ["salvageyard"],
+    });
+  });
+
+  it("puts all of it back on undo", () => {
+    const undone = settleInPlace(
+      adoptChecksum(written, WRITTEN),
+      { kind: "undo", changed: true },
+      WRITTEN,
+    );
+    expect(undone.edits.clones).toEqual(withCopy.edits.clones);
+    expect(undone.edits.overrides).toEqual(withCopy.edits.overrides);
+    expect(undone.edits.menus).toEqual({
+      salvageyard: [
+        { op: "remove", unit: "atlas" },
+        { op: "add", unit: "brv2" },
+      ],
+      brv2: [{ op: "add", unit: "atlas" }],
+    });
+    expect(undone.copiesWrittenInPlace).toBeUndefined();
+  });
+
+  it("keeps a copy made again under the same name since, over the old one", () => {
+    const again = {
+      ...written,
+      edits: {
+        ...written.edits,
+        clones: {
+          brv2: {
+            key: "brv2",
+            source: "brv",
+            replacesGameUnit: true,
+            def: { name: "Newer" },
+          },
+        },
+      },
+    };
+    const undone = settleInPlace(
+      again,
+      { kind: "undo", changed: true },
+      BEFORE,
+    );
+    expect(undone.edits.clones.brv2.def).toEqual({ name: "Newer" });
+  });
+
+  it("forgets the copy on accept", () => {
+    const accepted = settleInPlace(
+      written,
+      { kind: "accept", changed: true },
+      WRITTEN,
+    );
+    expect(accepted.copiesWrittenInPlace).toBeUndefined();
+    expect(accepted.edits.clones).toEqual({});
+  });
+});
+
 describe("a game that had already moved before the write", () => {
   it("still reports the earlier update rather than hiding it", () => {
     const stale = { ...project, authoredChecksum: "0ld" };
     const written = settleInPlace(
       stale,
-      { kind: "write", carried, changed: true },
+      { kind: "write", carried, copies: [], changed: true },
       BEFORE,
     );
     expect(written.checksumBeforeInPlace).toBeUndefined();

@@ -118,6 +118,19 @@ function buildProject(): ModProject {
     // ignores both fields, and this proves it still parses a project that
     // holds them.
     writtenInPlace: { armpw: { metalCost: 60 } },
+    // A copy an in-place write added as a unit file, kept for undo (issue
+    // #2634). Beside `edits` for the same reason.
+    copiesWrittenInPlace: {
+      armpw2: {
+        clone: {
+          key: "armpw2",
+          source: "armpw",
+          replacesGameUnit: false,
+          def: { metalcost: 60 },
+        },
+        builders: ["armlab"],
+      },
+    },
     checksumBeforeInPlace: "c6a15f1f",
     // A change sent through the mutator route because the edit-in-place
     // route cannot write it (issue #2633). The Rust model reads this one.

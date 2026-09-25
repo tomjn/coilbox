@@ -239,6 +239,7 @@ function RoutesSection({
   gamePath,
   checking,
   project,
+  gameUnits,
   reading,
   onInPlaceWrite,
 }: {
@@ -251,6 +252,9 @@ function RoutesSection({
   checking: boolean;
   /** The open project, which the edit-in-place route writes (issue #2635). */
   project: ModProject | undefined;
+  /** The game's own read of its units, which a copy written in place is
+   *  measured against (issue #2634). */
+  gameUnits: Record<string, Record<string, unknown>>;
   /** The page is still reading the game's definitions, so the
    *  edit-in-place route waits (issue #3023). */
   reading: boolean;
@@ -290,6 +294,7 @@ function RoutesSection({
                     <InPlaceWrite
                       gameDir={gamePath}
                       project={project}
+                      gameUnits={gameUnits}
                       reading={reading}
                       onDone={onInPlaceWrite}
                     />
@@ -649,6 +654,7 @@ export function ChecksButton({
   routeOptions,
   routesChecking,
   project,
+  gameUnits,
   compatibility,
   onApplyFix,
   onInPlaceWrite,
@@ -674,6 +680,9 @@ export function ChecksButton({
    *  when no project is open yet, in which case preflight has nothing to
    *  say and does not affect the verdict. */
   project: ModProject | undefined;
+  /** The game's own read of its units, without the project's copies, which
+   *  a copy written in place is measured against (issue #2634). */
+  gameUnits: Record<string, Record<string, unknown>>;
   /** Whether the game has moved under the project, and what that did to it
    *  (issue #1281). Null when no project is open. Worked out by the page,
    *  which is where the game's definitions already are. */
@@ -798,6 +807,7 @@ export function ChecksButton({
             gamePath={gameArchives[0]?.path}
             checking={routesChecking}
             project={project}
+            gameUnits={gameUnits}
             reading={diagnosticsChecking}
             onInPlaceWrite={onInPlaceWrite}
           />

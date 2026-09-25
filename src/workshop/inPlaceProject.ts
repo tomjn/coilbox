@@ -24,10 +24,19 @@
  * takes the next read that answers something else. Accept deletes the backup
  * files, and undo puts the original files back, and both change the checksum
  * too, so all three actions follow it the same way.
+ *
+ * A copy written as a unit file of its own (issue #2634) is followed the same
+ * way as a field. Once the game holds the file, the copy is a unit of the
+ * game's, so it leaves the project's copies, taking its own field changes and
+ * build menu with it, along with the build menu additions the write made to
+ * the game's own builders. {@link ModProject.copiesWrittenInPlace} keeps all
+ * of it for undo, which puts the copy back as it was.
  */
-import type { CarriedChange } from "./inPlace";
+import type { BuildMenuOp, BuildMenus } from "./buildMenus";
+import type { UnitClone } from "./clones";
+import type { CarriedChange, WrittenCopy } from "./inPlace";
 import { clearOverride, type UnitOverrides } from "./overrides";
-import type { ModProject } from "./project";
+import type { GameEdits, ModProject } from "./project";
 
 /** What one of the edit-in-place route's three actions did. */
 export type InPlaceDone =
@@ -35,24 +44,98 @@ export type InPlaceDone =
       kind: "write";
       /** The field changes the game's files now hold. */
       carried: CarriedChange[];
+      /** The copies the game now holds as unit files (issue #2634). */
+      copies: WrittenCopy[];
       /** Whether any file on disk changed. */
       changed: boolean;
     }
   | { kind: "undo"; changed: boolean }
   | { kind: "accept"; changed: boolean };
 
-/** `project` without the kept fields, dropping the key rather than leaving
- *  an empty table behind. */
+/** A copy an in-place write moved out of the project, as undo puts it back. */
+export interface KeptCopy {
+  clone: UnitClone;
+  /** Its own field changes, which the file was written with. */
+  overrides?: Record<string, unknown>;
+  /** Its own build menu, which the file was written with. */
+  menu?: BuildMenuOp[];
+  /** The game units whose build menus the write added it to. */
+  builders: string[];
+}
+
+/** `project` without what a write kept for undo, dropping the keys rather
+ *  than leaving empty tables behind. */
 function withoutWritten(project: ModProject): ModProject {
-  if (project.writtenInPlace === undefined) return project;
-  const { writtenInPlace: _dropped, ...rest } = project;
+  if (
+    project.writtenInPlace === undefined &&
+    project.copiesWrittenInPlace === undefined
+  )
+    return project;
+  const {
+    writtenInPlace: _fields,
+    copiesWrittenInPlace: _copies,
+    ...rest
+  } = project;
   return rest;
 }
 
-/** Move each carried field out of the override set, keeping the ones undo
- *  can reach. */
-function settleWrite(project: ModProject, carried: CarriedChange[]) {
-  let overrides = project.edits.overrides;
+/** `menus` without `builder`'s additions of `unit`, dropping a builder left
+ *  with nothing. */
+function withoutAdd(
+  menus: BuildMenus,
+  builder: string,
+  unit: string,
+): BuildMenus {
+  const ops = (menus[builder] ?? []).filter(
+    (op) => !(op.op === "add" && op.unit === unit),
+  );
+  const { [builder]: _dropped, ...rest } = menus;
+  return ops.length > 0 ? { ...rest, [builder]: ops } : rest;
+}
+
+/** Move each written copy out of the project, keeping what undo puts back. */
+function moveCopies(
+  edits: GameEdits,
+  kept: Record<string, KeptCopy>,
+  copies: WrittenCopy[],
+): { edits: GameEdits; kept: Record<string, KeptCopy> } {
+  for (const { unit, builders } of copies) {
+    const clone = edits.clones[unit];
+    if (!clone) continue;
+    const overrides = edits.overrides[unit];
+    const menu = edits.menus[unit];
+    kept = {
+      ...kept,
+      [unit]: {
+        clone,
+        builders,
+        ...(overrides ? { overrides } : {}),
+        ...(menu ? { menu } : {}),
+      },
+    };
+    const { [unit]: _clone, ...clones } = edits.clones;
+    const { [unit]: _fields, ...rest } = edits.overrides;
+    const { [unit]: _menu, ...others } = edits.menus;
+    let menus: BuildMenus = others;
+    for (const builder of builders) menus = withoutAdd(menus, builder, unit);
+    edits = { ...edits, clones, overrides: rest, menus };
+  }
+  return { edits, kept };
+}
+
+/** Move each carried field and copy out of the project, keeping the ones
+ *  undo can reach. */
+function settleWrite(
+  project: ModProject,
+  carried: CarriedChange[],
+  copies: WrittenCopy[],
+) {
+  const moved = moveCopies(
+    project.edits,
+    project.copiesWrittenInPlace ?? {},
+    copies,
+  );
+  let overrides = moved.edits.overrides;
   let kept: UnitOverrides = project.writtenInPlace ?? {};
   for (const { unit, field, undoable } of carried) {
     const fields = overrides[unit];
@@ -64,27 +147,60 @@ function settleWrite(project: ModProject, carried: CarriedChange[]) {
       kept = { ...kept, [unit]: { ...kept[unit], [field]: fields[field] } };
     overrides = clearOverride(overrides, unit, field);
   }
-  if (overrides === project.edits.overrides) return project;
+  if (overrides === project.edits.overrides && moved.edits === project.edits)
+    return project;
   return {
     ...withoutWritten(project),
-    edits: { ...project.edits, overrides },
+    edits: { ...moved.edits, overrides },
     ...(Object.keys(kept).length > 0 ? { writtenInPlace: kept } : {}),
+    ...(Object.keys(moved.kept).length > 0
+      ? { copiesWrittenInPlace: moved.kept }
+      : {}),
   };
 }
 
-/** Put the kept fields back. A field edited again since the write keeps the
- *  newer value, because that is the last thing the user asked for. */
+/** Put a kept copy back, unless the project has made another under the same
+ *  name since, which is the newer thing the user asked for. */
+function restoreCopy(edits: GameEdits, unit: string, kept: KeptCopy) {
+  if (Object.hasOwn(edits.clones, unit)) return edits;
+  let menus: BuildMenus = { ...edits.menus };
+  if (kept.menu && !menus[unit]) menus[unit] = kept.menu;
+  for (const builder of kept.builders) {
+    const ops = menus[builder] ?? [];
+    if (!ops.some((op) => op.op === "add" && op.unit === unit))
+      menus = { ...menus, [builder]: [...ops, { op: "add", unit }] };
+  }
+  return {
+    ...edits,
+    clones: { ...edits.clones, [unit]: kept.clone },
+    overrides: kept.overrides
+      ? {
+          ...edits.overrides,
+          [unit]: { ...kept.overrides, ...edits.overrides[unit] },
+        }
+      : edits.overrides,
+    menus,
+  };
+}
+
+/** Put the kept fields and copies back. A field edited again since the write
+ *  keeps the newer value, because that is the last thing the user asked
+ *  for. */
 function settleUndo(project: ModProject): ModProject {
   const kept = project.writtenInPlace;
-  if (kept === undefined) return project;
-  const current = project.edits.overrides;
-  const overrides: UnitOverrides = { ...current };
-  for (const [unit, fields] of Object.entries(kept))
-    overrides[unit] = { ...fields, ...current[unit] };
-  return {
-    ...withoutWritten(project),
-    edits: { ...project.edits, overrides },
-  };
+  const copies = project.copiesWrittenInPlace;
+  if (kept === undefined && copies === undefined) return project;
+  let edits = project.edits;
+  if (kept !== undefined) {
+    const current = edits.overrides;
+    const overrides: UnitOverrides = { ...current };
+    for (const [unit, fields] of Object.entries(kept))
+      overrides[unit] = { ...fields, ...current[unit] };
+    edits = { ...edits, overrides };
+  }
+  for (const [unit, copy] of Object.entries(copies ?? {}))
+    edits = restoreCopy(edits, unit, copy);
+  return { ...withoutWritten(project), edits };
 }
 
 /**
@@ -105,7 +221,7 @@ export function settleInPlace(
 ): ModProject {
   const settled =
     done.kind === "write"
-      ? settleWrite(project, done.carried)
+      ? settleWrite(project, done.carried, done.copies)
       : done.kind === "undo"
         ? settleUndo(project)
         : withoutWritten(project);

@@ -67,6 +67,21 @@
       "metalCost": 60
     }
   },
+  "copiesWrittenInPlace": {
+    "armpw2": {
+      "clone": {
+        "key": "armpw2",
+        "source": "armpw",
+        "replacesGameUnit": false,
+        "def": {
+          "metalcost": 60
+        }
+      },
+      "builders": [
+        "armlab"
+      ]
+    }
+  },
   "checksumBeforeInPlace": "c6a15f1f",
   "mutatorOnly": {
     "armcom": [

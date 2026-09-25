@@ -102,6 +102,7 @@ function buttonElement(props: Partial<Parameters<typeof ChecksButton>[0]>) {
         onApplyFix={() => {}}
         onInPlaceWrite={() => {}}
         {...props}
+        gameUnits={props.gameUnits ?? {}}
       />
     </MemoryRouter>
   );
@@ -241,6 +242,7 @@ describe("the checks button", () => {
         refused: [],
         notCarried: [],
         carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
+        copies: [],
       };
       const { rerenderWith } = renderButton({
         gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
