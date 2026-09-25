@@ -19,7 +19,8 @@
 //! build menus the project adds it to. `inplace_clone.rs` has the copy's
 //! half. A library weapon equipped into a game unit, in a slot or as a death
 //! explosion, goes into that unit's own `weapondefs` (issue #3055), or only
-//! its name for an `.fbi` unit, which has no such table, and into a new file
+//! its name for an `.fbi` unit, which has no such table, or for a unit whose
+//! file sets that table again afterwards (issue #3069), and into a new file
 //! under `weapons/` that puts it in the game's weapon table (issue #3068).
 //! One that cannot be written is reported with the reason rather than
 //! stopping the write. Other build menu changes, words, switched-off units and copies that
@@ -1220,40 +1221,36 @@ fn write_equipped(
                         continue;
                     }
                 };
-            let mut text = texts[&file].clone();
-            let mut pending = included.clone();
-            let mut into = file.clone();
-            let mut changed = false;
-            let mut failed = None;
-            for edit in &list {
-                match patch_file(&file, &text, edit, game_dir, &pending) {
-                    Ok(patched) => {
-                        changed |= patched.changed;
-                        match patched.file {
-                            Some(path) => {
-                                into = path.clone();
-                                if patched.changed {
-                                    pending.insert(path, patched.text);
-                                }
-                            }
-                            None if patched.changed => text = patched.text,
-                            None => {}
-                        }
-                    }
-                    Err(refusal) => {
-                        failed = Some(refusal);
-                        break;
-                    }
+            // A unit whose own `weapondefs` cannot take the weapon, such as
+            // a SplinterFaction unit, whose file sets that table again after
+            // its basedef builds the unit (issue #3069), still gets the slot
+            // pointed at the weapon's full name. The weapon file is what puts
+            // the weapon in the game's table under that name, as for an
+            // `.fbi` unit.
+            let applied = match apply_equip(&file, &texts[&file], included, &list, game_dir) {
+                Err(refusal)
+                    if refusal.own && crate::compile::weapon_file_name(unit, weapon).is_some() =>
+                {
+                    let named: Vec<Edit> = list
+                        .iter()
+                        .filter(|e| !adds_own_weapon(e))
+                        .cloned()
+                        .collect();
+                    apply_equip(&file, &texts[&file], included, &named, game_dir)
                 }
-            }
-            if let Some(refusal) = failed {
-                let at = rel(refusal.file.as_deref().unwrap_or(&file));
-                let line = refusal
-                    .location
-                    .map_or(String::new(), |l| format!(", line {}", l.start.line));
-                report(format!("{} ({at}{line})", refusal.message));
-                continue;
-            }
+                other => other,
+            };
+            let (text, pending, into, mut changed) = match applied {
+                Ok(applied) => applied,
+                Err(EquipRefused { refusal, .. }) => {
+                    let at = rel(refusal.file.as_deref().unwrap_or(&file));
+                    let line = refusal
+                        .location
+                        .map_or(String::new(), |l| format!(", line {}", l.start.line));
+                    report(format!("{} ({at}{line})", refusal.message));
+                    continue;
+                }
+            };
             if let Some((path, contents)) = weapon_file(game_dir, unit, weapon, edits) {
                 changed |=
                     std::fs::read_to_string(&path).ok().as_deref() != Some(contents.as_str());
@@ -1274,6 +1271,56 @@ fn write_equipped(
             });
         }
     }
+}
+
+/// Why one equipped weapon's edits could not all go in, and whether the edit
+/// refused was one adding a weapon to the unit's own `weapondefs`.
+struct EquipRefused {
+    refusal: Refusal,
+    own: bool,
+}
+
+/// The file text, included files, file the slot went into and whether
+/// anything changed, once every edit in `list` is made to a scratch copy of
+/// `text` and `included`.
+type Equipped = (String, BTreeMap<PathBuf, String>, PathBuf, bool);
+
+/// Whether `edit` adds a weapon to the unit's own `weapondefs`.
+fn adds_own_weapon(edit: &Edit) -> bool {
+    edit.path.first() == Some(&Segment::Key("weapondefs".into()))
+}
+
+/// Make one equipped weapon's edits, all or nothing.
+fn apply_equip(
+    file: &Path,
+    text: &str,
+    included: &BTreeMap<PathBuf, String>,
+    list: &[Edit],
+    game_dir: &Path,
+) -> Result<Equipped, EquipRefused> {
+    let mut text = text.to_string();
+    let mut pending = included.clone();
+    let mut into = file.to_path_buf();
+    let mut changed = false;
+    for edit in list {
+        let patched =
+            patch_file(file, &text, edit, game_dir, &pending).map_err(|refusal| EquipRefused {
+                refusal,
+                own: adds_own_weapon(edit),
+            })?;
+        changed |= patched.changed;
+        match patched.file {
+            Some(path) => {
+                into = path.clone();
+                if patched.changed {
+                    pending.insert(path, patched.text);
+                }
+            }
+            None if patched.changed => text = patched.text,
+            None => {}
+        }
+    }
+    Ok((text, pending, into, changed))
 }
 
 /// The weapon file that puts library weapon `key` into the game's shared
@@ -2760,33 +2807,66 @@ mod tests {
         assert!(!weapon_file.exists());
     }
 
-    /// SplinterFaction's unit files set the unit's `weaponDefs` after
-    /// including its table, so a weapon added to the table would be thrown
-    /// away. Reported with the line that does it, and nothing is written for
-    /// that weapon.
+    /// Issue #3069. SplinterFaction's unit files set the unit's `weaponDefs`
+    /// after including its basedef, so a weapon added to the basedef's table
+    /// would be thrown away. The slot and the death explosion are still
+    /// pointed at the weapon's full name in the basedef, and the weapon file
+    /// is what defines it, as for an `.fbi` unit. Undo takes both back out.
     #[test]
-    fn an_equipped_weapon_the_file_cannot_take_is_reported_with_the_reason() {
+    fn an_equipped_weapon_the_units_own_table_cannot_take_names_the_weapon_file() {
+        const SCORPION_BASEDEF: &str =
+            "Units-Configs-Basedefs/basedefs/Loz Alliance - Faction 2/Tier 1/lozscorpion_basedef.lua";
         let (_root, game) = sf_game();
-        let basedef = game.join(BEACON_BASEDEF);
-        let before = read(&basedef);
+        let scorpion = game.join(SCORPION_BASEDEF);
+        let beacon = game.join(BEACON_BASEDEF);
+        let (scorpion_before, beacon_before) = (read(&scorpion), read(&beacon));
         let project = equipping(
             serde_json::json!({ "blast": { "key": "blast", "def": { "areaofeffect": 300 } } }),
-            serde_json::json!({ "beacon": { "explodeas": "blast" } }),
+            serde_json::json!({
+                "beacon": { "explodeas": "blast" },
+                "lozscorpion": { "0": "blast" },
+            }),
             serde_json::json!({}),
         );
+        let sources = serde_json::from_value(serde_json::json!({
+            "lozscorpion": { "weapons": [{ "name": "lozscorpion_lightningcannon" }] }
+        }))
+        .unwrap();
 
-        let outcome = write(&game, &project).unwrap();
+        let outcome = super::write(&game, &project, &sources).unwrap();
 
         assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
-        assert!(outcome.written.is_empty(), "{:?}", outcome.written);
-        assert_eq!(read(&basedef), before);
-        assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
-        assert!(
-            outcome.not_carried[0]
-                .contains("sets this value again after the unit's table is built"),
-            "{:?}",
-            outcome.not_carried
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(
+            outcome.written,
+            vec![
+                SCORPION_BASEDEF,
+                BEACON_BASEDEF,
+                "weapons/coilbox_beacon_blast.lua",
+                "weapons/coilbox_lozscorpion_blast.lua",
+            ]
         );
+        let scorpion_unit = unit_in(
+            &game,
+            "Units/Loz Alliance - Faction 2/Tech 1/lozscorpion.lua",
+            "lozscorpion",
+        );
+        let slot = &scorpion_unit["weapons"]["[1]"];
+        assert_eq!(slot["def"], "blast");
+        assert_eq!(slot["name"], "lozscorpion_blast");
+        assert!(scorpion_unit["weapondefs"].get("blast").is_none());
+        assert_eq!(
+            unit_in(&game, BEACON, "beacon")["explodeas"],
+            "beacon_blast"
+        );
+        let weapon_file = game.join("weapons/coilbox_lozscorpion_blast.lua");
+        assert!(read(&weapon_file).contains("[\"lozscorpion_blast\"] = {"));
+
+        undo(&game).unwrap();
+        assert_eq!(read(&scorpion), scorpion_before);
+        assert_eq!(read(&beacon), beacon_before);
+        assert!(!weapon_file.exists());
+        assert!(!game.join("weapons/coilbox_beacon_blast.lua").exists());
     }
 
     /// A loose game whose `weapondefs_post.lua` does what the base content's

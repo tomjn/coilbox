@@ -607,6 +607,36 @@ fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_splinterfact
     equipped_through_the_mutator(&game, "SplinterFaction", "lozscorpion");
 }
 
+/// Issue #3069. A SplinterFaction unit file sets its table's `weaponDefs`
+/// again after including its basedef, so the weapon cannot go into the
+/// unit's own table. Its slot is pointed at the weapon file's entry instead,
+/// and every armed unit's slot is written that way unless another unit file
+/// includes the same basedef. Each one written loads equal to its source,
+/// though the game post-processes a weapon from `weapons/` fewer times than
+/// one a unit carries.
+///
+/// A death explosion is left to the mutator when the basedef sets
+/// `explodeAs` from a global its unit file sets, since the patcher does not
+/// follow the global.
+#[test]
+fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_splinterfaction() {
+    let Some(game) = installed("SplinterFaction.sdd") else {
+        return;
+    };
+    let (written, not_carried) = equipped_in_place(&game, "SplinterFaction", &[]);
+    eprintln!(
+        "{written} equips written, {} left to the mutator",
+        not_carried.len()
+    );
+    assert!(written > 0, "nothing was written: {not_carried:?}");
+    for line in &not_carried {
+        let shared = line.contains("unit files include");
+        let computed_explosion =
+            line.contains("'s explodeas is not written") && line.contains("worked out by code");
+        assert!(shared || computed_explosion, "{line}");
+    }
+}
+
 /// The weapon files change nothing in a game that keeps the base content's
 /// own `gamedata/weapondefs_post.lua`, as XTA does: it writes the unit's own
 /// entry over each one under the same name, so every unit and weapon loads
