@@ -28,6 +28,7 @@ const check = (edits: GameEdits, over: Partial<CompatInput> = {}) =>
     edits,
     units: {},
     weaponDefs: {},
+    armorDefs: {},
     gameName: "Test Game",
     ...over,
   });
@@ -482,7 +483,12 @@ const BA = JSON.parse(
 ) as { units: CompatInput["units"]; weaponDefs: CompatInput["weaponDefs"] };
 
 describe("against real Balanced Annihilation definitions", () => {
-  const game = { units: BA.units, weaponDefs: BA.weaponDefs, gameName: "BA" };
+  const game = {
+    units: BA.units,
+    weaponDefs: BA.weaponDefs,
+    armorDefs: {},
+    gameName: "BA",
+  };
 
   it("has the shape the rules assume", () => {
     // Not a check of this module so much as of the belief it rests on. If a
@@ -707,6 +713,84 @@ describe("the weapon library (issue #2640)", () => {
 
   it("reads a project saved before the library as holding none", () => {
     const { weapons: _w, equipped: _e, ...older } = EMPTY_EDITS;
+    expect(ids(check(older as GameEdits))).toEqual([]);
+  });
+});
+
+describe("armour-class moves (issue #3062)", () => {
+  // `base` carries "heavyunits" because that is what makes it a class the
+  // game once really had, at the moment the move was made, rather than one
+  // the modder invented with "Add a class" and never expected the live game
+  // to carry (see `armorClassFindings`'s own doc comment).
+  const edits: GameEdits = {
+    ...EMPTY_EDITS,
+    armorClasses: {
+      base: { commanders: [], heavyunits: ["armcom"] },
+      moves: { armcom: "heavyunits" },
+    },
+  };
+
+  it("says nothing while the target class is still in the live game", () => {
+    const report = check(edits, {
+      armorDefs: { commanders: [], heavyunits: ["armcom"] },
+    });
+    expect(ids(report)).toEqual([]);
+  });
+
+  it("says nothing about a move to default, which needs no class of its own", () => {
+    const toDefault: GameEdits = {
+      ...EMPTY_EDITS,
+      armorClasses: {
+        base: { commanders: ["armcom"] },
+        moves: { armcom: "default" },
+      },
+    };
+    expect(ids(check(toDefault, { armorDefs: { commanders: [] } }))).toEqual(
+      [],
+    );
+  });
+
+  it("says nothing about a move to a class the modder invented, which the game never had", () => {
+    const invented: GameEdits = {
+      ...EMPTY_EDITS,
+      armorClasses: {
+        base: { commanders: [] },
+        moves: { armcom: "myownclass" },
+      },
+    };
+    expect(ids(check(invented, { armorDefs: { commanders: [] } }))).toEqual([]);
+  });
+
+  it("reports a move to a class the game no longer has, and offers to remove it", () => {
+    const finding = only(check(edits, { armorDefs: { commanders: [] } }));
+    expect(finding.id).toBe("armorClasses:armcom");
+    expect(finding.store).toBe("armorClasses");
+    expect(finding.severity).toBe("broken");
+    expect(finding.detail).toContain("heavyunits");
+    const fixed = finding.fix?.apply(edits);
+    expect(fixed?.armorClasses).toBeUndefined();
+  });
+
+  it("keeps the snapshot and the other moves when only one move is removed", () => {
+    const both: GameEdits = {
+      ...EMPTY_EDITS,
+      armorClasses: {
+        base: { commanders: [], heavyunits: ["armcom"], vtol: ["armkam"] },
+        moves: { armcom: "heavyunits", armkam: "mines" },
+      },
+    };
+    const finding = only(
+      check(both, { armorDefs: { commanders: [], vtol: [], mines: [] } }),
+    );
+    expect(finding.subject).toBe("armcom");
+    expect(finding.fix?.apply(both).armorClasses).toEqual({
+      base: { commanders: [], heavyunits: ["armcom"], vtol: ["armkam"] },
+      moves: { armkam: "mines" },
+    });
+  });
+
+  it("reads a project saved before this store as holding no moves", () => {
+    const { armorClasses: _a, ...older } = EMPTY_EDITS;
     expect(ids(check(older as GameEdits))).toEqual([]);
   });
 });

@@ -132,6 +132,11 @@ export interface CompatInput {
   units: Record<string, Record<string, unknown>>;
   /** The game's shared weapondef table, which unit mounts name. */
   weaponDefs: Record<string, Record<string, unknown>>;
+  /** The game's own armour classes, from `gamedata/armordefs.lua`, class name
+   *  to member unit keys (issue #3062). Never the project's snapshot in
+   *  `edits.armorClasses.base`: that is what this check is comparing against
+   *  the game for. */
+  armorDefs: Record<string, string[]>;
   /** For the sentences, so a finding reads as being about a game. */
   gameName: string;
   /**
@@ -782,6 +787,78 @@ function referenceFindings(
   return out;
 }
 
+/** Drop one unit's armour-class move, matching the cleanup `setArmorClass`
+ *  already does: a snapshot with no move left to apply says nothing the game
+ *  does not already say, so it goes too. */
+function removeArmorMove(
+  armorClasses: GameEdits["armorClasses"],
+  unit: string,
+): GameEdits["armorClasses"] {
+  if (!armorClasses || !Object.hasOwn(armorClasses.moves, unit))
+    return armorClasses;
+  const { [unit]: _gone, ...moves } = armorClasses.moves;
+  return Object.keys(moves).length === 0
+    ? undefined
+    : { ...armorClasses, moves };
+}
+
+/**
+ * Findings for a unit moved to an armour class the game no longer has (issue
+ * #3062).
+ *
+ * `rebaseArmorClasses` (`armorClasses.ts`) keeps every untouched unit's class
+ * following the live game, but a move itself is left exactly as written: only
+ * the modder can say whether a class that has been renamed or removed should
+ * become the rename, the default, or stay a class of its own. So this is a
+ * finding and not a silent correction, the same reason a renamed unit is
+ * reported rather than guessed at elsewhere in this file.
+ *
+ * A target absent from the live game is reported only when `base` still
+ * carries it (which `rebaseArmorClasses` keeps precisely for a class in this
+ * state). A target absent from both is a class the modder invented with "Add
+ * a class" and never expected the live game to have in the first place, the
+ * same ordinary case `unknownDamageClasses` already treats as fine below, and
+ * reporting it would flag the panel's own supported workflow as broken.
+ * Compiling still works either way: `armor_defs_file` creates a class of that
+ * name for the moved unit alone when nothing in `base` already has one, which
+ * is legal Lua and simply a class the game's own weapons never mention.
+ */
+function armorClassFindings(input: CompatInput): CompatFinding[] {
+  const moves = input.edits.armorClasses?.moves ?? {};
+  if (Object.keys(moves).length === 0) return [];
+  const liveClasses = new Set(
+    Object.keys(input.armorDefs).map((c) => c.toLowerCase()),
+  );
+  const baseClasses = new Set(
+    Object.keys(input.edits.armorClasses?.base ?? {}).map((c) =>
+      c.toLowerCase(),
+    ),
+  );
+  const out: CompatFinding[] = [];
+  for (const [unit, className] of Object.entries(moves)) {
+    const lower = className.toLowerCase();
+    if (lower === "default") continue;
+    if (liveClasses.has(lower)) continue;
+    if (!baseClasses.has(lower)) continue;
+    out.push({
+      id: `armorClasses:${unit}`,
+      store: "armorClasses",
+      severity: "broken",
+      subject: unit,
+      detail: `${unit} was moved to the armour class ${className}, which ${input.gameName} no longer has. It still compiles, as a class of its own that no weapon's damage table names, so ${unit} takes default damage exactly as it would if it had never been moved.`,
+      fix: {
+        label: "Put back the game's class",
+        cost: `the move of ${unit} to ${className}`,
+        apply: (edits) => ({
+          ...edits,
+          armorClasses: removeArmorMove(edits.armorClasses, unit),
+        }),
+      },
+    });
+  }
+  return out;
+}
+
 /** Broken first, then by store in the order the page shows them, then by name. */
 const STORE_ORDER: (keyof GameEdits)[] = [
   "overrides",
@@ -791,6 +868,7 @@ const STORE_ORDER: (keyof GameEdits)[] = [
   "disabled",
   "weapons",
   "equipped",
+  "armorClasses",
 ];
 
 /**
@@ -821,6 +899,7 @@ export function checkCompatibility(input: CompatInput): CompatReport {
     ...disabledFindings(input, known),
     ...libraryFindings(input, known, defOf),
     ...referenceFindings(input, known, defOf),
+    ...armorClassFindings(input),
   ].sort((a, b) => {
     if (a.severity !== b.severity) return a.severity === "broken" ? -1 : 1;
     const store = STORE_ORDER.indexOf(a.store) - STORE_ORDER.indexOf(b.store);

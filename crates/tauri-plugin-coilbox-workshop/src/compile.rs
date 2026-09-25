@@ -460,7 +460,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     if let Some(armor_file) = armor_defs_file(edits) {
         files.push(armor_file);
         notes.push(format!(
-            "{ARMOR_FILE} takes the place of the base game's own file of that name whole, moving {} unit{} into a different armour class. Coilbox cannot patch that file, only replace it, so it carries a snapshot of the game's own classes from the moment the first move was made: a class the game has added since will not appear here until a unit is moved into or out of it again.",
+            "{ARMOR_FILE} takes the place of the base game's own file of that name whole, moving {} unit{} into a different armour class. Coilbox cannot patch that file, only replace it, so it compiles from a snapshot of the game's own classes rather than the game itself. Opening the project keeps that snapshot following the game (issue #3062), except for a class a move still targets that the game has since removed or renamed, which the project's checks report so it can be resolved by hand.",
             edits.armor_classes.moves.len(),
             if edits.armor_classes.moves.len() == 1 { "" } else { "s" }
         ));
