@@ -60,6 +60,7 @@ import type { DisabledUnits } from "./disabled";
 import {
   adoptChecksum,
   type InPlaceDone,
+  type KeptCopy,
   settleInPlace,
 } from "./inPlaceProject";
 import {
@@ -251,6 +252,13 @@ export interface ModProject {
    * about backups on this machine's disk, not about what the project changes.
    */
   writtenInPlace?: UnitOverrides;
+  /**
+   * Copies an in-place write added to the game as unit files of their own
+   * (issue #2634), by name, with their own changes and the build menus they
+   * were added to. Kept for undo, like `writtenInPlace`, and left out of the
+   * container payload for the same reason.
+   */
+  copiesWrittenInPlace?: Record<string, KeptCopy>;
   /**
    * The game's checksum just before coilbox last wrote into its files, set
    * only when the project was written against exactly that game (issue
@@ -556,7 +564,11 @@ export function useModProjects() {
     if (!source) return null;
     // The fields an in-place write kept for undo belong to the project that
     // wrote them. A copy holding them too would put them back a second time.
-    const { writtenInPlace: _kept, ...rest } = source;
+    const {
+      writtenInPlace: _kept,
+      copiesWrittenInPlace: _copies,
+      ...rest
+    } = source;
     const copy: ModProject = {
       ...rest,
       id: crypto.randomUUID(),

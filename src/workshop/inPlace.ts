@@ -12,6 +12,7 @@
  * needs no diff library of its own.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { UnitClone } from "./clones";
 import type { ModProject } from "./project";
 
 /** A place in a unit file. Lines and columns count from 1. */
@@ -44,6 +45,17 @@ export interface CarriedChange {
   undoable: boolean;
 }
 
+/** A copy the game now holds as a unit file of its own (issue #2634). Undo
+ *  always reaches it: the file is marked as created, and every builder's file
+ *  has a backup. */
+export interface WrittenCopy {
+  unit: string;
+  /** The new file, relative to the game. */
+  file: string;
+  /** The game units whose build lists it was added to. */
+  builders: string[];
+}
+
 /** What `workshop_write_in_place` did. */
 export interface InPlaceWriteOutcome {
   /** Files written, relative to the game. Empty when anything was refused. */
@@ -58,6 +70,9 @@ export interface InPlaceWriteOutcome {
   /** Every field change the game's files now hold (issue #3023). Empty when
    *  anything was refused. */
   carried: CarriedChange[];
+  /** Every copy written as a unit file of its own (issue #2634). Empty when
+   *  anything was refused. */
+  copies: WrittenCopy[];
 }
 
 /** How many files carry a workshop backup, or a marker saying coilbox
@@ -67,10 +82,44 @@ export interface InPlaceStatus {
   created: number;
 }
 
+/**
+ * `sources` is the game's own read of each unit a copy was made from. A copy's
+ * changes are worked out against it, since the unit's file leaves out every
+ * field the unit inherits (see `inplace_clone.rs`).
+ */
 export const workshopWriteInPlace = defineCommand<
-  { gameDir: string; project: ModProject },
+  {
+    gameDir: string;
+    project: ModProject;
+    sources: Record<string, Record<string, unknown>>;
+  },
   InPlaceWriteOutcome
 >("coilbox-workshop", "workshop_write_in_place");
+
+/**
+ * The copies an in-place write carries as new unit files (issue #2634): those
+ * copied from a game unit under a name the game did not use. A copy that
+ * stands in for a game unit stays with the mutator route, as `inplace.rs`
+ * says after a write.
+ */
+export function copiesToWrite(project: ModProject | undefined): UnitClone[] {
+  return Object.values(project?.edits.clones ?? {}).filter(
+    (clone) => clone.source !== undefined && !clone.replacesGameUnit,
+  );
+}
+
+/** The game's read of every unit `project`'s copies were made from. */
+export function copySources(
+  project: ModProject | undefined,
+  gameUnits: Record<string, Record<string, unknown>>,
+): Record<string, Record<string, unknown>> {
+  const out: Record<string, Record<string, unknown>> = {};
+  for (const clone of copiesToWrite(project)) {
+    const source = clone.source as string;
+    if (Object.hasOwn(gameUnits, source)) out[source] = gameUnits[source];
+  }
+  return out;
+}
 
 export const workshopInPlaceStatus = defineCommand<
   { gameDir: string },

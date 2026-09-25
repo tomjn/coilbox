@@ -16,25 +16,28 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 let status = { backups: 0, created: 0 };
 let writeResponse: unknown = null;
 const calls: string[] = [];
+const args: Record<string, unknown> = {};
 vi.mock("@picoframe/plugin-sdk", () => ({
-  defineCommand: (_plugin: string, command: string) => async () => {
-    calls.push(command);
-    if (command === "workshop_in_place_status") return status;
-    if (command === "workshop_write_in_place") {
-      const outcome = writeResponse as { written: string[] };
-      if (outcome.written.length > 0) status = { backups: 1, created: 0 };
-      return outcome;
-    }
-    if (command === "workshop_undo_in_place") {
-      status = { backups: 0, created: 0 };
-      return { restored: ["units/armcom.lua"], deleted: [] };
-    }
-    if (command === "workshop_accept_in_place") {
-      status = { backups: 0, created: 0 };
-      return { kept: ["units/armcom.lua"] };
-    }
-    throw new Error(`unexpected command ${command}`);
-  },
+  defineCommand:
+    (_plugin: string, command: string) => async (given: unknown) => {
+      calls.push(command);
+      args[command] = given;
+      if (command === "workshop_in_place_status") return status;
+      if (command === "workshop_write_in_place") {
+        const outcome = writeResponse as { written: string[] };
+        if (outcome.written.length > 0) status = { backups: 1, created: 0 };
+        return outcome;
+      }
+      if (command === "workshop_undo_in_place") {
+        status = { backups: 0, created: 0 };
+        return { restored: ["units/armcom.lua"], deleted: [] };
+      }
+      if (command === "workshop_accept_in_place") {
+        status = { backups: 0, created: 0 };
+        return { kept: ["units/armcom.lua"] };
+      }
+      throw new Error(`unexpected command ${command}`);
+    },
 }));
 
 import type { InPlaceDone } from "../../inPlaceProject";
@@ -56,6 +59,30 @@ const project: ModProject = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
+/** The game's own read, which a copy's source is taken from. */
+const GAME_UNITS = {
+  armpw: { metalcost: 50, buildoptions: [] },
+  armcom: { metalcost: 2500 },
+};
+
+/** A project holding one copy of a game unit, added to one factory. */
+const withCopy: ModProject = {
+  ...project,
+  edits: {
+    ...project.edits,
+    overrides: {},
+    clones: {
+      armpw2: {
+        key: "armpw2",
+        source: "armpw",
+        replacesGameUnit: false,
+        def: { metalcost: 60, buildoptions: [] },
+      },
+    },
+    menus: { armlab: [{ op: "add", unit: "armpw2" }] },
+  },
+};
+
 afterEach(() => {
   cleanup();
   status = { backups: 0, created: 0 };
@@ -72,6 +99,7 @@ function renderWrite(
     <InPlaceWrite
       gameDir="/spring/games/dev.sdd"
       project={p}
+      gameUnits={GAME_UNITS}
       reading={reading}
       onDone={onDone}
     />,
@@ -103,7 +131,7 @@ describe("the edit-in-place actions", () => {
     });
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(
-      screen.getByText("This project has no field changes to write."),
+      screen.getByText("This project has no field changes or copies to write."),
     ).toBeTruthy();
   });
 
@@ -163,6 +191,7 @@ describe("the edit-in-place actions", () => {
       ],
       notCarried: [],
       carried: [],
+      copies: [],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -187,6 +216,7 @@ describe("the edit-in-place actions", () => {
       refused: [],
       notCarried: ["Build menu changes are not written into the game yet."],
       carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
+      copies: [],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -204,6 +234,7 @@ describe("the edit-in-place actions", () => {
     expect(onWritten).toHaveBeenCalledWith({
       kind: "write",
       carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
+      copies: [],
       changed: true,
     });
   });
@@ -216,6 +247,7 @@ describe("the edit-in-place actions", () => {
       refused: [],
       notCarried: [],
       carried: [{ unit: "armcom", field: "metalcost", undoable: false }],
+      copies: [],
     };
     const onDone = vi.fn();
     renderWrite(project, onDone);
@@ -226,8 +258,71 @@ describe("the edit-in-place actions", () => {
     expect(onDone).toHaveBeenCalledWith({
       kind: "write",
       carried: [{ unit: "armcom", field: "metalcost", undoable: false }],
+      copies: [],
       changed: false,
     });
+  });
+
+  /** Issue #2634. A copy alone is something to write, and the write is sent
+   *  the game's read of the unit it was copied from. */
+  it("writes a copy as a new file and says where it went", async () => {
+    writeResponse = {
+      written: ["units/armlab.lua", "units/armpw2.lua"],
+      changed: 0,
+      unchanged: 0,
+      refused: [],
+      notCarried: [],
+      carried: [],
+      copies: [
+        { unit: "armpw2", file: "units/armpw2.lua", builders: ["armlab"] },
+      ],
+    };
+    const onDone = vi.fn();
+    renderWrite(withCopy, onDone);
+    expect(screen.getByText(/each copy into a new file beside/)).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Write changes into the game" }),
+    );
+
+    expect(
+      await screen.findByText(
+        "Added armpw2 as units/armpw2.lua, and to the build menu of armlab.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/Wrote 0 changes/)).toBeNull();
+    expect(args.workshop_write_in_place).toMatchObject({
+      sources: { armpw: GAME_UNITS.armpw },
+    });
+    expect(
+      Object.keys(
+        (args.workshop_write_in_place as { sources: object }).sources,
+      ),
+    ).toEqual(["armpw"]);
+    expect(onDone).toHaveBeenCalledWith({
+      kind: "write",
+      carried: [],
+      copies: [
+        { unit: "armpw2", file: "units/armpw2.lua", builders: ["armlab"] },
+      ],
+      changed: true,
+    });
+  });
+
+  it("leaves a copy that replaces a game unit to the mutator", () => {
+    const clone = withCopy.edits.clones.armpw2;
+    renderWrite({
+      ...withCopy,
+      edits: {
+        ...withCopy.edits,
+        clones: { armpw: { ...clone, key: "armpw", replacesGameUnit: true } },
+        overrides: { armpw: { metalcost: 70 } },
+      },
+    });
+    expect(
+      screen
+        .getByRole("button", { name: "Write changes into the game" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("holds every action off while the page reads the game again", async () => {

@@ -26,6 +26,10 @@
  *
  * The disk diff behind a pending backup or created file, with Undo and
  * Accept offered a second way inside it, is `DiskDiffDrawer` (issue #2636).
+ *
+ * A copy of a game unit is written too, as a new file beside the unit it was
+ * copied from (issue #2634). The write is sent the game's own read of each
+ * copy's source, which is what the copy's changes are measured against.
  */
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
@@ -35,6 +39,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  copiesToWrite,
+  copySources,
   describeRefusal,
   type InPlaceStatus,
   type InPlaceWriteOutcome,
@@ -61,12 +67,15 @@ function plural(n: number, word: string): string {
 export function InPlaceWrite({
   gameDir,
   project,
+  gameUnits,
   reading,
   onDone,
 }: {
   /** The loose `.sdd` game's folder. */
   gameDir: string;
   project: ModProject | undefined;
+  /** The game's own read of its units, without the project's copies. */
+  gameUnits: Record<string, Record<string, unknown>>;
   /** The page is reading the game again, so nothing can be pressed yet. */
   reading: boolean;
   /** Called after write, undo or accept went through, with what it did. */
@@ -99,12 +108,17 @@ export function InPlaceWrite({
     setOutcome(null);
     try {
       if (kind === "write" && project) {
-        const written = await workshopWriteInPlace({ gameDir, project });
+        const written = await workshopWriteInPlace({
+          gameDir,
+          project,
+          sources: copySources(project, gameUnits),
+        });
         setOutcome(written);
         if (written.refused.length === 0)
           onDone({
             kind: "write",
             carried: written.carried,
+            copies: written.copies,
             changed: written.written.length > 0,
           });
       } else if (kind === "undo") {
@@ -137,12 +151,17 @@ export function InPlaceWrite({
     project?.mutatorOnly,
     project?.edits.overrides ?? {},
   ).filter((c) => !clones[c.unit]);
+  // A copy's own field changes are part of its file, so they count with the
+  // copy rather than here.
   const hasFieldChanges = Object.entries(project?.edits.overrides ?? {}).some(
     ([unit, fields]) =>
+      !clones[unit] &&
       Object.keys(fields).some(
         (field) => !isMutatorOnly(project?.mutatorOnly, unit, field),
       ),
   );
+  const copies = copiesToWrite(project);
+  const hasWork = hasFieldChanges || copies.length > 0;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border/60 p-2.5">
@@ -150,7 +169,7 @@ export function InPlaceWrite({
         <Button
           size="sm"
           variant="outline"
-          disabled={!project || !hasFieldChanges || busy !== null || reading}
+          disabled={!project || !hasWork || busy !== null || reading}
           onClick={() => void run("write")}
         >
           {busy === "write" ? "Writing…" : "Write changes into the game"}
@@ -223,11 +242,13 @@ export function InPlaceWrite({
       <p className="text-muted-foreground text-xs">
         {!project
           ? "Open a project to write its changes into the game."
-          : !hasFieldChanges
+          : !hasWork
             ? routed.length > 0
               ? "Every field change in this project goes through the mutator route, so there is nothing to write in place."
-              : "This project has no field changes to write."
-            : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
+              : "This project has no field changes or copies to write."
+            : copies.length > 0
+              ? "Each field change is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
+              : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
       </p>
       {routed.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
@@ -272,6 +293,8 @@ export function InPlaceWrite({
 }
 
 function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
+  const copyFiles = new Set(outcome.copies.map((c) => c.file));
+  const patched = outcome.written.filter((file) => !copyFiles.has(file));
   return (
     <div className="flex flex-col gap-1.5 text-xs">
       {outcome.refused.length > 0 ? (
@@ -287,10 +310,23 @@ function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
           </ul>
         </div>
       ) : outcome.written.length > 0 ? (
-        <span>
-          Wrote {plural(outcome.changed, "change")} into{" "}
-          {outcome.written.join(", ")}.
-        </span>
+        <>
+          {outcome.changed > 0 && (
+            <span>
+              Wrote {plural(outcome.changed, "change")} into{" "}
+              {patched.join(", ")}.
+            </span>
+          )}
+          {outcome.copies.map((copy) => (
+            <span key={copy.unit}>
+              Added {copy.unit} as {copy.file}
+              {copy.builders.length > 0
+                ? `, and to the build menu of ${copy.builders.join(", ")}`
+                : ""}
+              .
+            </span>
+          ))}
+        </>
       ) : (
         <span>
           The game's files already hold every change, so nothing was written.

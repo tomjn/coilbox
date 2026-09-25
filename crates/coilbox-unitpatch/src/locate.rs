@@ -42,8 +42,8 @@ impl Plan {
     }
 }
 
-pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
-    let ast = full_moon::parse_fallible(source, LuaVersion::lua51())
+fn parse(source: &str) -> Result<full_moon::ast::Ast, Refusal> {
+    full_moon::parse_fallible(source, LuaVersion::lua51())
         .into_result()
         .map_err(|errors| {
             let first = &errors[0];
@@ -57,15 +57,12 @@ pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
                 start.bytes(),
                 end.bytes().max(start.bytes()),
             ))
-        })?;
-    let block = ast.nodes();
-    let scope = Scope::of(block.stmts());
-    let here = |node: &dyn Spanned| {
-        let (start, end) = node.span();
-        Location::of(source, start, end)
-    };
+        })
+}
 
-    let returned = match block.last_stmt() {
+/// The expression a file's `return` hands back.
+fn returned(block: &full_moon::ast::Block) -> Result<&Expression, Refusal> {
+    match block.last_stmt() {
         Some(LastStmt::Return(ret)) => ret.returns().iter().next(),
         _ => None,
     }
@@ -74,8 +71,19 @@ pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
             RefusalKind::ReturnNotLiteral,
             "The file does not end by returning a table of units.",
         )
-    })?;
-    let units = returned_table(returned, &scope, source)?;
+    })
+}
+
+pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
+    let ast = parse(source)?;
+    let block = ast.nodes();
+    let scope = Scope::of(block.stmts());
+    let here = |node: &dyn Spanned| {
+        let (start, end) = node.span();
+        Location::of(source, start, end)
+    };
+
+    let units = returned_table(returned(block)?, &scope, source)?;
 
     let entry = find_unit(units, &edit.unit, &scope, source)?;
     let mut chain = Chain::default();
@@ -372,6 +380,99 @@ fn single_argument_call(expression: &Expression) -> Option<&Expression> {
     }
 }
 
+/// The unit name one field of the returned table is keyed by, when the file
+/// spells it out: `armdfly = ...`, `["BRV"] = ...`, or `[unitName] = ...`
+/// with `unitName` set to a string in the file.
+fn unit_key(field: &Field, scope: &Scope<'_>) -> Option<String> {
+    match field {
+        Field::NameKey { key, .. } => Some(identifier(key)),
+        Field::ExpressionKey { key, .. } => string_value(key).or_else(|| match key {
+            Expression::Var(Var::Name(name)) => scope
+                .single(&identifier(name))
+                .ok()
+                .flatten()
+                .and_then(string_value),
+            _ => None,
+        }),
+        _ => None,
+    }
+}
+
+/// The file with `unit` keyed as `new_unit` instead, and every other entry
+/// of the returned table taken out (issue #2634).
+///
+/// Only the key changes. The unit's table, and every local it is built from,
+/// stays as the file wrote it, so the copy is in its source's shape. A local
+/// variable keeps its name too: it is local to the file, so the copy's file
+/// can use the same one without clashing. The other entries go because the
+/// copy's file must define only the copy. Locals only they used are left in
+/// place, unused, since taking them out would mean working out what else
+/// reads them.
+pub fn rename(source: &str, unit: &str, new_unit: &str) -> Result<Plan, Refusal> {
+    let ast = parse(source)?;
+    let block = ast.nodes();
+    let scope = Scope::of(block.stmts());
+    let units = returned_table(returned(block)?, &scope, source)?;
+    find_unit(units, unit, &scope, source)?;
+
+    let mut splices = Vec::new();
+    let mut location = None;
+    for pair in units.fields().pairs() {
+        let field = pair.value();
+        if !unit_key(field, &scope).is_some_and(|key| key.eq_ignore_ascii_case(unit)) {
+            splices.push(removal(source, pair));
+            continue;
+        }
+        let (start, end, text) = match field {
+            Field::NameKey { key, .. } => {
+                let (start, end) = key.span();
+                (start, end, render::key(new_unit, false))
+            }
+            Field::ExpressionKey { key, .. } => {
+                let (start, end) = key.span();
+                // A string key keeps its quotes. A name the file set to a
+                // string elsewhere is replaced by the string itself, since
+                // that name may be read for other things, such as a
+                // `buildpic` built from it.
+                let quote = match key {
+                    Expression::String(_) => literal(key).unwrap_or(Quote::Double),
+                    _ => Quote::Double,
+                };
+                let text = render::literal(&Value::String(new_unit.to_string()), quote);
+                (start, end, text)
+            }
+            _ => unreachable!("find_unit matched a keyed field"),
+        };
+        location = Some(Location::of(source, start, end));
+        splices.push((start, end, text));
+    }
+    splices.sort_by_key(|(start, _, _)| *start);
+    Ok(Plan {
+        splices,
+        location: location.expect("find_unit found the unit's field"),
+    })
+}
+
+/// The splice that takes one entry out of a table, with its separator, and
+/// with its whole line when the entry had the line to itself.
+fn removal(source: &str, pair: &Pair<Field>) -> (usize, usize, String) {
+    let (mut start, field_end) = pair.value().span();
+    let mut end = pair.punctuation().map_or(field_end, |token| token.span().1);
+    let rest = &source[end..];
+    end += rest.len() - rest.trim_start_matches([' ', '\t']).len();
+    let line_start = source[..start].rfind('\n').map_or(0, |at| at + 1);
+    if source[line_start..start].trim().is_empty() {
+        for newline in ["\r\n", "\n"] {
+            if source[end..].starts_with(newline) {
+                end += newline.len();
+                start = line_start;
+                break;
+            }
+        }
+    }
+    (start, end, String::new())
+}
+
 /// The value the returned table holds for `unit`.
 fn find_unit<'a>(
     units: &'a TableConstructor,
@@ -381,22 +482,11 @@ fn find_unit<'a>(
 ) -> Result<&'a Expression, Refusal> {
     let mut found: Vec<(&Expression, (usize, usize))> = Vec::new();
     for field in units.fields() {
-        let (key, value) = match field {
-            Field::NameKey { key, value, .. } => (Some(identifier(key)), value),
-            Field::ExpressionKey { key, value, .. } => {
-                let name = string_value(key).or_else(|| match key {
-                    Expression::Var(Var::Name(name)) => scope
-                        .single(&identifier(name))
-                        .ok()
-                        .flatten()
-                        .and_then(string_value),
-                    _ => None,
-                });
-                (name, value)
-            }
+        let value = match field {
+            Field::NameKey { value, .. } | Field::ExpressionKey { value, .. } => value,
             _ => continue,
         };
-        if key.is_some_and(|key| key.eq_ignore_ascii_case(unit)) {
+        if unit_key(field, scope).is_some_and(|key| key.eq_ignore_ascii_case(unit)) {
             found.push((value, field.span()));
         }
     }

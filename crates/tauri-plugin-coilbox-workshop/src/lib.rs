@@ -64,6 +64,7 @@ mod compile;
 mod decode;
 mod diff;
 mod inplace;
+mod inplace_clone;
 mod ledger;
 mod lua;
 mod model;
@@ -274,12 +275,19 @@ where
 }
 
 /// Patch a project's field changes into the loose `.sdd` game at `gameDir`
-/// (issue #2635). Answers with what was written, or with every refusal and
-/// nothing written.
+/// (issue #2635), and add its copies as unit files of their own (issue
+/// #2634). `sources` is the game's own read of each unit a copy was made
+/// from. Answers with what was written, or with every refusal and nothing
+/// written.
 #[tauri::command]
-async fn workshop_write_in_place(game_dir: String, project: ModProject) -> CliResult {
+async fn workshop_write_in_place(
+    game_dir: String,
+    project: ModProject,
+    sources: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+) -> CliResult {
     let game = std::path::PathBuf::from(game_dir);
-    blocking("write", move || inplace::write(&game, &project)).await
+    let sources = sources.unwrap_or_default();
+    blocking("write", move || inplace::write(&game, &project, &sources)).await
 }
 
 /// How many files under `gameDir` hold a workshop backup or created marker,
@@ -452,7 +460,7 @@ mod tests {
         .expect("parse");
 
         let written = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
-            workshop_write_in_place(dir(), project),
+            workshop_write_in_place(dir(), project, None),
         ));
         assert_eq!(written["written"], serde_json::json!(["units/armcom.lua"]));
         let status = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(

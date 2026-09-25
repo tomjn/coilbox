@@ -652,6 +652,7 @@ describe("settleInPlaceAction across two projects for the same game", () => {
         {
           kind: "write",
           carried: [{ unit: "brv", field: "trackwidth", undoable: true }],
+          copies: [],
           changed: true,
         },
         BEFORE,

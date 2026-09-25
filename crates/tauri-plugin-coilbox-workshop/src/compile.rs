@@ -434,7 +434,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
 /// Folded rather than left as a patch because a copy owns its table outright.
 /// The game has no unit of that name to follow, so there is nothing for a
 /// sparse patch to be sparse against (`src/workshop/clones.ts`).
-fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value {
+pub(crate) fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value {
     let mut def = clone.def.clone();
     if let Some(patch) = edits.overrides.get(&clone.key) {
         for (path, value) in patch {
@@ -1023,7 +1023,7 @@ pub(crate) fn modinfo_versioned(project: &ModProject, version: &str) -> String {
 /// every unit key in both games installed here matches it. Checked again
 /// because the key becomes a file name under the generated archive and a
 /// project arrives as JSON that somebody may have written by hand.
-fn valid_unit_key(key: &str) -> bool {
+pub(crate) fn valid_unit_key(key: &str) -> bool {
     !key.is_empty()
         && key
             .bytes()

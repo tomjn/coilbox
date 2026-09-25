@@ -11,10 +11,12 @@
 //! reported. Writing the rest would leave the game holding part of what the
 //! user asked for with no sign on disk of which part.
 //!
-//! Only field changes to the game's own units go this way. Copies, build
-//! menus, words and switched-off units have no in-place form yet, and the
-//! outcome says which of them the project holds rather than dropping them
-//! quietly.
+//! Field changes to the game's own units go this way, and so do copies of
+//! them (issue #2634), each as a new file beside its source's, added to the
+//! build menus the project adds it to. `inplace_clone.rs` has the copy's
+//! half. Other build menu changes, words, switched-off units and copies that
+//! replace a game unit have no in-place form yet, and the outcome says which
+//! of them the project holds rather than dropping them quietly.
 //!
 //! [`check`] is the same patching as a dry run, one unit at a time, for the
 //! unit page to ask at edit time (issue #2633). A field it refuses is one the
@@ -31,6 +33,7 @@ use coilbox_unitpatch::{patch, Edit, Location, Op, RefusalKind, Segment, Value a
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::inplace_clone;
 use crate::model::ModProject;
 
 /// What the workshop marks its in-place writes with. Distinct from the `.3do`
@@ -86,6 +89,21 @@ pub struct WriteOutcome {
     /// Every field change the game's files now hold, so the project can stop
     /// holding it (issue #3023). Empty when anything was refused.
     pub carried: Vec<Carried>,
+    /// Every copy written as a new unit file (issue #2634). Empty when
+    /// anything was refused.
+    pub copies: Vec<WrittenCopy>,
+}
+
+/// A copy the game now holds as a unit file of its own. Undo always reaches
+/// it: the file is marked as created and every builder's file has a backup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WrittenCopy {
+    pub unit: String,
+    /// The new file, relative to the game.
+    pub file: String,
+    /// The game units whose build lists it was added to.
+    pub builders: Vec<String>,
 }
 
 /// How many files carry a workshop backup or created marker.
@@ -190,20 +208,38 @@ fn walk_lua(at: &Path, out: &mut Vec<PathBuf>) {
 fn not_carried(project: &ModProject) -> Vec<String> {
     let edits = &project.edits;
     let mut out = Vec::new();
-    if !edits.clones.is_empty() {
+    let replacing = edits
+        .clones
+        .values()
+        .filter(|clone| clone.replaces_game_unit)
+        .count();
+    if replacing > 0 {
         out.push(format!(
-            "{} copied unit{} and any field changes to {} are not written into the game yet.",
-            edits.clones.len(),
-            if edits.clones.len() == 1 { "" } else { "s" },
-            if edits.clones.len() == 1 {
-                "it"
-            } else {
-                "them"
-            },
+            "{replacing} cop{} that replace{} a unit the game already has {} not written into the game, because the game would then define that unit twice. {} still need{} a mutator.",
+            if replacing == 1 { "y" } else { "ies" },
+            if replacing == 1 { "s" } else { "" },
+            if replacing == 1 { "is" } else { "are" },
+            if replacing == 1 { "It" } else { "They" },
+            if replacing == 1 { "s" } else { "" },
         ));
     }
-    if !edits.menus.is_empty() {
-        out.push("Build menu changes are not written into the game yet.".to_string());
+    let unsourced = edits
+        .clones
+        .values()
+        .filter(|clone| clone.source.is_none() && !clone.replaces_game_unit)
+        .count();
+    if unsourced > 0 {
+        out.push(format!(
+            "{unsourced} unit{} not copied from a unit in the game {} not written into the game, because there is no unit file to copy.",
+            if unsourced == 1 { "" } else { "s" },
+            if unsourced == 1 { "is" } else { "are" },
+        ));
+    }
+    if inplace_clone::menu_ops_not_carried(edits) > 0 {
+        out.push(
+            "Build menu changes, other than adding a copy written here, are not written into the game yet."
+                .to_string(),
+        );
     }
     if !edits.disabled.is_empty() {
         out.push("Switched-off units are not written into the game yet.".to_string());
@@ -519,8 +555,17 @@ fn unit_texts(game_dir: &Path) -> BTreeMap<PathBuf, String> {
 }
 
 /// Patch every field change in `project` into the game's unit files under
-/// `game_dir`, and write them if the patcher accepted every one.
-pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, String> {
+/// `game_dir`, add each copy as a unit file of its own, and write them if the
+/// patcher accepted every one.
+///
+/// `sources` is the game's own read of each unit a copy was made from, keyed
+/// by unit, which is what a copy's changes are worked out against. See
+/// `inplace_clone.rs` for why the unit's file cannot stand in for it.
+pub fn write(
+    game_dir: &Path,
+    project: &ModProject,
+    sources: &BTreeMap<String, Value>,
+) -> Result<WriteOutcome, String> {
     require_loose_game(game_dir)?;
     let mut outcome = WriteOutcome {
         not_carried: not_carried(project),
@@ -621,9 +666,20 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         }
     }
 
+    let created = write_copies(
+        game_dir,
+        project,
+        sources,
+        &files,
+        &originals,
+        &mut texts,
+        &mut outcome,
+    );
+
     if !outcome.refused.is_empty() {
         outcome.changed = 0;
         outcome.unchanged = 0;
+        outcome.copies.clear();
         return Ok(outcome);
     }
 
@@ -631,6 +687,10 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         if originals.get(file) == Some(text) {
             continue;
         }
+        MARKERS.write(file, text.as_bytes())?;
+        outcome.written.push(rel(file));
+    }
+    for (file, text) in &created {
         MARKERS.write(file, text.as_bytes())?;
         outcome.written.push(rel(file));
     }
@@ -650,6 +710,184 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         coilbox_gamebackup::touch(game_dir);
     }
     Ok(outcome)
+}
+
+/// Make each copy's file and add it to its builders' lists (issue #2634).
+///
+/// The copy is made from the source's file as the game has it now, from
+/// `originals`, not from `texts`: a field change to the source written in the
+/// same go is the source's, and the copy's definition already says whether it
+/// wants that value. The builders' pushes go into `texts`, beside any field
+/// change to the same file. Returns the new files to write, and adds every
+/// refusal to `outcome`.
+fn write_copies(
+    game_dir: &Path,
+    project: &ModProject,
+    sources: &BTreeMap<String, Value>,
+    files: &[PathBuf],
+    originals: &BTreeMap<PathBuf, String>,
+    texts: &mut BTreeMap<PathBuf, String>,
+    outcome: &mut WriteOutcome,
+) -> Vec<(PathBuf, String)> {
+    let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
+    let mut created = Vec::new();
+    let copies = project
+        .edits
+        .clones
+        .values()
+        .filter(|clone| inplace_clone::writable(clone));
+    for clone in copies {
+        let unit = clone.key.as_str();
+        let source = clone
+            .source
+            .as_deref()
+            .expect("a writable copy has a source");
+        let refuse = |field: &str, file: Option<String>, kind, message: String| Refused {
+            unit: unit.to_string(),
+            field: field.to_string(),
+            file,
+            kind,
+            message,
+            location: None,
+        };
+        if !crate::compile::valid_unit_key(unit) {
+            outcome.refused.push(refuse(
+                "",
+                None,
+                RefusalKind::InvalidValue,
+                format!("{unit:?} cannot be a unit's name. A unit's internal name can only hold lowercase letters, digits and underscores, and it becomes a file name in the game."),
+            ));
+            continue;
+        }
+        let Some(source_def) = sources.get(source) else {
+            outcome.refused.push(refuse(
+                "",
+                None,
+                RefusalKind::UnitNotFound,
+                format!("The game has no unit called {source} to copy {unit} from."),
+            ));
+            continue;
+        };
+        if let Some((file, message)) = inplace_clone::name_taken(unit, originals, game_dir) {
+            outcome.refused.push(refuse(
+                "",
+                Some(rel(&file)),
+                RefusalKind::NameTaken,
+                message,
+            ));
+            continue;
+        }
+
+        let def = crate::compile::resolved_clone_def(clone, &project.edits);
+        let (edits, unwritable) = inplace_clone::copy_edits(source_def, &def);
+        for u in unwritable {
+            outcome
+                .refused
+                .push(refuse(&u.field, None, RefusalKind::InvalidValue, u.message));
+        }
+
+        let file = match find_unit_file(source, files, originals, |text| {
+            coilbox_unitpatch::locate_unit(text, source)
+        }) {
+            Found::File(file, Ok(_)) => file,
+            Found::File(file, Err(r)) => {
+                outcome.refused.push(Refused {
+                    location: r.location,
+                    ..refuse("", Some(rel(&file)), r.kind, r.message)
+                });
+                continue;
+            }
+            Found::None(file_level) => {
+                outcome.refused.push(Refused {
+                    unit: unit.to_string(),
+                    ..no_file_refusal(source, file_level, game_dir)
+                });
+                continue;
+            }
+        };
+        let target = file
+            .parent()
+            .unwrap_or(game_dir)
+            .join(format!("{unit}.lua"));
+        if let Some(taken) = inplace_clone::file_taken(&target) {
+            outcome.refused.push(refuse(
+                "",
+                Some(rel(&taken)),
+                RefusalKind::NameTaken,
+                format!(
+                    "{} already exists, so {unit} has nowhere to go beside {}.",
+                    rel(&taken),
+                    rel(&file)
+                ),
+            ));
+            continue;
+        }
+
+        let mut edits = edits;
+        if let Some(file_unit) = coilbox_unitpatch::evaluate(&originals[&file], game_dir)
+            .ok()
+            .and_then(|units| units.get(source.to_lowercase()).cloned())
+        {
+            edits.extend(inplace_clone::name_pins(
+                source, source_def, &def, &file_unit,
+            ));
+        }
+        let list: Vec<_> = edits
+            .iter()
+            .map(|e| (e.path.clone(), e.op.clone()))
+            .collect();
+        match coilbox_unitpatch::clone_unit(&originals[&file], source, unit, &list, game_dir) {
+            Ok(text) => created.push((target.clone(), text)),
+            Err(refusals) => {
+                for r in refusals {
+                    let field = r.edit.map_or("", |at| edits[at].field.as_str());
+                    outcome.refused.push(Refused {
+                        location: r.refusal.location,
+                        ..refuse(field, Some(rel(&file)), r.refusal.kind, r.refusal.message)
+                    });
+                }
+            }
+        }
+
+        let builders = inplace_clone::builders_adding(&project.edits, unit);
+        for builder in &builders {
+            let push = Edit {
+                unit: builder.to_string(),
+                path: vec![Segment::Key("buildoptions".into())],
+                op: Op::Push(PatchValue::String(unit.to_string())),
+            };
+            let found = find_unit_file(builder, files, texts, |text| {
+                if inplace_clone::already_lists(text, builder, unit, game_dir) {
+                    return Ok(None);
+                }
+                patch(text, &push, game_dir).map(Some)
+            });
+            match found {
+                Found::File(_, Ok(None)) => {}
+                Found::File(file, Ok(Some(patched))) => {
+                    texts.insert(file, patched.text);
+                }
+                Found::File(file, Err(r)) => outcome.refused.push(Refused {
+                    unit: builder.to_string(),
+                    field: "buildoptions".into(),
+                    file: Some(rel(&file)),
+                    kind: r.kind,
+                    message: r.message,
+                    location: r.location,
+                }),
+                Found::None(file_level) => outcome.refused.push(Refused {
+                    field: "buildoptions".into(),
+                    ..no_file_refusal(builder, file_level, game_dir)
+                }),
+            }
+        }
+        outcome.copies.push(WrittenCopy {
+            unit: unit.to_string(),
+            file: rel(&target),
+            builders: builders.iter().map(|b| b.to_string()).collect(),
+        });
+    }
+    created
 }
 
 /// How many workshop backups and created markers sit under `game_dir`.
@@ -754,6 +992,11 @@ mod tests {
 
     fn read(path: &Path) -> String {
         std::fs::read_to_string(path).unwrap()
+    }
+
+    /// A write of a project with no copies, so no source units to send.
+    fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, String> {
+        super::write(game_dir, project, &BTreeMap::new())
     }
 
     #[test]
@@ -1189,6 +1432,253 @@ mod tests {
             "{:?}",
             outcome.not_carried
         );
+    }
+
+    /// The game's own read of the two units the copy tests copy, as unitsync
+    /// hands it over: keys lowercased, and fields the file never mentions,
+    /// such as the class's `maxvelocity`, present all the same.
+    fn sources() -> BTreeMap<String, Value> {
+        serde_json::from_value(serde_json::json!({
+            "armdfly": {
+                "metalcost": 320,
+                "health": 1800,
+                "maxvelocity": 7.5,
+                "customparams": { "subfolder": "ArmAircraft" },
+                "buildoptions": ["armsolar", "armwin"],
+            },
+            "brv": {
+                "name": "Heavy BRV",
+                // Worked out from the unit's name by the game's
+                // post-processing, as SpringMCLegacy's is.
+                "objectname": "vehicle/brv.s3o",
+                "maxvelocity": 2.1,
+                "customparams": { "tonnage": 80, "mods": ["ferrofibrousarmour"] },
+            },
+        }))
+        .unwrap()
+    }
+
+    /// A project copying `source` as `key`, its definition the source's read
+    /// with `changes` laid over it, plus `extra` merged into the edits.
+    fn copying(source: &str, key: &str, changes: Value, extra: Value) -> ModProject {
+        let mut def = sources()[source].clone();
+        for (field, value) in changes.as_object().unwrap() {
+            def[field] = value.clone();
+        }
+        let mut edits = serde_json::json!({
+            "clones": { key: {
+                "key": key,
+                "source": source,
+                "replacesGameUnit": false,
+                "def": def,
+            } },
+        });
+        for (store, value) in extra.as_object().unwrap() {
+            edits[store] = value.clone();
+        }
+        serde_json::from_value(serde_json::json!({
+            "name": "In place",
+            "gameName": "Dev",
+            "edits": edits,
+        }))
+        .unwrap()
+    }
+
+    /// Issue #2634, in Beyond All Reason's shape. The copy is the source's
+    /// file with the key renamed and its one change made, beside it, and the
+    /// factory the project adds it to lists it. Undo takes both back.
+    #[test]
+    fn a_copy_is_a_new_file_beside_its_source_and_joins_its_builders() {
+        let (_root, game) = game();
+        let factory = game.join("units/factory.lua");
+        let factory_before = read(&factory);
+        let project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({ "metalcost": 400 }),
+            serde_json::json!({ "menus": { "factory": [{ "op": "add", "unit": "armdfly2" }] } }),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(
+            outcome.written,
+            vec!["units/factory.lua", "units/armdfly2.lua"]
+        );
+        assert_eq!(
+            outcome.copies,
+            vec![WrittenCopy {
+                unit: "armdfly2".into(),
+                file: "units/armdfly2.lua".into(),
+                builders: vec!["factory".into()],
+            }]
+        );
+        assert_eq!(
+            read(&game.join("units/armdfly2.lua")),
+            fixture("bar_armdfly.lua")
+                .replacen("\tarmdfly = {", "\tarmdfly2 = {", 1)
+                .replacen("metalcost = 320", "metalcost = 400", 1)
+        );
+        assert_eq!(
+            read(&factory),
+            "return { factory = { buildoptions = { \"brv\", \"armdfly2\" } } }\n"
+        );
+        assert_eq!((status(&game).backups, status(&game).created), (1, 1));
+
+        let undone = undo(&game).unwrap();
+        assert_eq!(undone.deleted, vec!["units/armdfly2.lua"]);
+        assert!(!game.join("units/armdfly2.lua").exists());
+        assert_eq!(read(&factory), factory_before);
+    }
+
+    /// In SpringMCLegacy's shape the copy keeps the class chain and the
+    /// bracketed key, and its new name goes where the source's was, since
+    /// this game reads names from the definition. The model path the game
+    /// works out from the unit's name is written in, or the copy would look
+    /// for a `brv_mk2.s3o` that does not exist.
+    #[test]
+    fn a_copy_in_a_class_built_file_keeps_its_shape() {
+        let (_root, game) = game();
+        let project = copying(
+            "brv",
+            "brv_mk2",
+            serde_json::json!({
+                "name": "Heavy BRV Mk2",
+                "customparams": { "tonnage": 85, "mods": ["ferrofibrousarmour"] },
+            }),
+            serde_json::json!({}),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.written, vec!["units/vehicles/brv_mk2.lua"]);
+        assert_eq!(
+            read(&game.join("units/vehicles/brv_mk2.lua")),
+            fixture("mcl_brv.lua")
+                .replacen("[\"BRV\"] = BRV:New()", "[\"brv_mk2\"] = BRV:New()", 1)
+                .replacen("\"Heavy BRV\"", "\"Heavy BRV Mk2\"", 1)
+                .replacen("tonnage\t\t\t= 80", "tonnage\t\t\t= 85", 1)
+                .replacen(
+                    "\t\thitchmaxy\t\t= 60,\n\t},\n",
+                    "\t\thitchmaxy\t\t= 60,\n\t},\n\tobjectname          = \"vehicle/brv.s3o\",\n",
+                    1
+                )
+        );
+    }
+
+    #[test]
+    fn a_copy_under_a_name_the_game_uses_is_refused_and_nothing_is_written() {
+        let (_root, game) = game();
+        // `BRV` is how the file spells it, and Spring lowercases unit names.
+        let mut project = copying(
+            "armdfly",
+            "brv",
+            serde_json::json!({}),
+            serde_json::json!({}),
+        );
+        project.edits.overrides.insert(
+            "armdfly".into(),
+            [("metalcost".to_string(), Value::from(400))].into(),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        assert_eq!(outcome.refused[0].kind, RefusalKind::NameTaken);
+        assert_eq!(
+            outcome.refused[0].file.as_deref(),
+            Some("units/vehicles/HeavyBRV.lua")
+        );
+        assert!(outcome.written.is_empty());
+        assert!(outcome.copies.is_empty());
+        assert!(read(&game.join("units/armdfly.lua")).contains("metalcost = 320"));
+        assert_eq!((status(&game).backups, status(&game).created), (0, 0));
+    }
+
+    #[test]
+    fn a_copy_whose_file_name_is_taken_is_refused() {
+        let (_root, game) = game();
+        std::fs::write(game.join("units/ARMDFLY2.lua"), "return {}\n").unwrap();
+        let project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({}),
+            serde_json::json!({}),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        assert_eq!(outcome.refused[0].kind, RefusalKind::NameTaken);
+        assert!(outcome.refused[0].message.contains("units/ARMDFLY2.lua"));
+        assert!(outcome.written.is_empty());
+    }
+
+    /// A change to a field the source's file computes has no place in the
+    /// copy's file either, so the copy is refused on that field.
+    #[test]
+    fn a_copy_changing_a_computed_field_is_refused_on_that_field() {
+        let (_root, game) = game();
+        let project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({ "health": 2500 }),
+            serde_json::json!({}),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        let refused = &outcome.refused[0];
+        assert_eq!(
+            (refused.unit.as_str(), refused.field.as_str(), refused.kind),
+            ("armdfly2", "health", RefusalKind::FieldComputed)
+        );
+        assert_eq!(refused.file.as_deref(), Some("units/armdfly.lua"));
+        assert!(!game.join("units/armdfly2.lua").exists());
+    }
+
+    /// A copy made to stand in for a game unit is left to the mutator, and
+    /// says so, rather than stopping the rest of the write.
+    #[test]
+    fn a_copy_that_replaces_a_game_unit_is_not_carried() {
+        let (_root, game) = game();
+        let mut project = copying(
+            "armdfly",
+            "brv",
+            serde_json::json!({}),
+            serde_json::json!({}),
+        );
+        project
+            .edits
+            .clones
+            .get_mut("brv")
+            .unwrap()
+            .replaces_game_unit = true;
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.copies.is_empty());
+        assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
+        assert!(outcome.not_carried[0].contains("replaces a unit"));
+    }
+
+    #[test]
+    fn a_copy_of_a_unit_the_page_did_not_send_is_refused() {
+        let (_root, game) = game();
+        let project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({}),
+            serde_json::json!({}),
+        );
+        let outcome = super::write(&game, &project, &BTreeMap::new()).unwrap();
+        assert_eq!(outcome.refused.len(), 1);
+        assert_eq!(outcome.refused[0].kind, RefusalKind::UnitNotFound);
     }
 
     #[test]

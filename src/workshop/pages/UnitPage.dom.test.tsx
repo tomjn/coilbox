@@ -2182,6 +2182,7 @@ describe("UnitPage", () => {
             refused: [],
             notCarried: [],
             carried: [{ unit: "armcom", field: "health", undoable: true }],
+            copies: [],
           };
         },
         workshop_undo_in_place: () => {

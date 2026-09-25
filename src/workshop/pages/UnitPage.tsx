@@ -1090,6 +1090,7 @@ export default function UnitPage() {
                   gameInfoStatus === "idle" || gameInfoStatus === "loading"
                 }
                 project={project}
+                gameUnits={gameUnits}
                 compatibility={compatibility}
                 // Through `commit`, so taking a dead reference out is one undo
                 // step like every other edit on this page. Nothing here is
