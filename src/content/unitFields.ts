@@ -181,7 +181,11 @@ export function defaultValue(
  * dropping it.
  */
 export function describeField(kind: DefKind, path: string): ResolvedField {
-  const normalised = normaliseFieldPath(path);
+  // A literal path wins over a normalised one. Weapon textures are keyed "1"
+  // through "4" in their own table rather than by array position, so without
+  // this a digit-only key would always be read as an array index and the
+  // literal field could never be found.
+  const normalised = INDEX[kind].has(path) ? path : normaliseFieldPath(path);
   const engine = INDEX[kind].get(normalised);
   const note = NOTES[kind][normalised];
   const key = normalised.split(".").at(-1) ?? normalised;

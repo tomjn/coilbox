@@ -201,6 +201,16 @@ describe("the hand-written notes", () => {
       .filter((path) => !containersAndOwnEditors.has(path));
     expect(undescribed).toEqual([]);
   });
+
+  it("describes every weapon field the page can draw a row for", () => {
+    // Unlike the unit side, none of the weapon registry's tables are pure
+    // containers: damage, scarIndices and customParams all have their own
+    // note, so there is nothing to exclude here.
+    const undescribed = engineFields("weapon")
+      .map((f) => (f.section === "" ? f.key : `${f.section}.${f.key}`))
+      .filter((path) => !describeField("weapon", path).described);
+    expect(undescribed).toEqual([]);
+  });
 });
 
 describe("a key only the game declares", () => {
