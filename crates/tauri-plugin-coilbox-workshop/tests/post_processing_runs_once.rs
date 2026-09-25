@@ -222,6 +222,11 @@ for udName, ud in pairs(DEFS.unitDefs) do
       end
     end
   end
+  for _, f in ipairs({ 'explodeas', 'selfdestructas' }) do
+    if type(ud[f]) == 'string' and WeaponDefs[udName .. '_' .. ud[f]] then
+      ud[f] = udName .. '_' .. ud[f]
+    end
+  end
 end
 "#,
         ),
@@ -237,6 +242,8 @@ end
             "units/armcom.lua",
             r#"return { armcom = {
   humanName = "Commander",
+  explodeas = "COMMANDER_BLAST",
+  selfdestructas = "COMMANDER_BLAST",
   weapons = {
     [1] = { def = "ARMCOMLASER", onlytargetcategory = "NOTSUB" },
     [2] = { def = "ARMCOMSEALASER" },
@@ -395,6 +402,33 @@ fn library_weapons_load_like_their_sources(game: &Game) {
     );
 }
 
+/// A copy of a shared explosion out of `weapons/`, made one unit's death
+/// explosion (issue #2642), loads equal to the explosion it was copied from,
+/// and that unit dies as it. Its self-destruct still names the game's own. As
+/// with the weapons above, the equip is a block in the mutator's post file,
+/// so the copy and its source are compared within one load.
+fn a_death_explosion_loads_like_its_source(game: &Game) {
+    let alone = load(game, &[]);
+    let files = mutator(json!({
+        "weapons": {
+            "commander_blast_copy": copied_weapon(&alone, "commander_blast", "commander_blast_copy"),
+        },
+        "equipped": { "armcom": { "explodeas": "commander_blast_copy" } }
+    }));
+    let modded = load(game, &files);
+    let copy = "armcom_commander_blast_copy";
+    assert_eq!(modded.units["armcom"]["explodeas"], json!(copy));
+    assert_eq!(
+        modded.units["armcom"]["selfdestructas"],
+        alone.units["armcom"]["selfdestructas"]
+    );
+    assert_eq!(modded.weapons[copy], modded.weapons["commander_blast"]);
+    assert_eq!(
+        modded.weapons["commander_blast"],
+        alone.weapons["commander_blast"]
+    );
+}
+
 /// What a crater multiplier typed on a copy of the Big Bertha loads as, once
 /// with the copy alone in the project and once beside a field change on
 /// another unit (issue #3057).
@@ -490,4 +524,18 @@ fn library_weapons_load_like_their_sources_in_balanced_annihilation() {
         return;
     };
     library_weapons_load_like_their_sources(&game);
+}
+
+#[test]
+fn a_death_explosion_loads_like_its_source_in_a_game_that_scales_on_load() {
+    a_death_explosion_loads_like_its_source(&model_game());
+}
+
+#[test]
+fn a_death_explosion_loads_like_its_source_in_balanced_annihilation() {
+    let Some(game) = balanced_annihilation() else {
+        eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
+        return;
+    };
+    a_death_explosion_loads_like_its_source(&game);
 }

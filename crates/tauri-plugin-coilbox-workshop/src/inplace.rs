@@ -404,7 +404,8 @@ fn not_carried(project: &ModProject) -> Vec<String> {
     if !edits.disabled.is_empty() {
         out.push("Switched-off units are not written into the game yet.".to_string());
     }
-    let equipped = edits.equipped_count();
+    let deaths = edits.death_explosion_count();
+    let equipped = edits.equipped_count() - deaths;
     if equipped > 0 {
         out.push(format!(
             "{equipped} weapon{} equipped from the project's weapon library {} not written into the game yet. {} still need{} a mutator.",
@@ -412,6 +413,15 @@ fn not_carried(project: &ModProject) -> Vec<String> {
             if equipped == 1 { "is" } else { "are" },
             if equipped == 1 { "It" } else { "They" },
             if equipped == 1 { "s" } else { "" },
+        ));
+    }
+    if deaths > 0 {
+        out.push(format!(
+            "{deaths} death explosion{} copied into the project's weapon library {} not written into the game yet. {} still need{} a mutator.",
+            if deaths == 1 { "" } else { "s" },
+            if deaths == 1 { "is" } else { "are" },
+            if deaths == 1 { "It" } else { "They" },
+            if deaths == 1 { "s" } else { "" },
         ));
     }
     if edits.text_edit_count() > 0 {
@@ -2249,6 +2259,26 @@ mod tests {
         assert_eq!(lines.len(), 1, "{lines:?}");
         assert!(lines[0]
             .starts_with("1 weapon equipped from the project's weapon library is not written"));
+    }
+
+    /// Issue #2642. A death explosion out of the library is left to the
+    /// mutator too, and counted apart from the slots.
+    #[test]
+    fn a_death_explosion_from_the_library_is_not_carried() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "x",
+            "gameName": "g",
+            "edits": {
+                "weapons": { "blast": { "key": "blast", "def": { "areaofeffect": 300 } } },
+                "equipped": { "armdfly": { "explodeas": "blast", "selfdestructas": "blast" } }
+            }
+        }))
+        .unwrap();
+        let lines = super::not_carried(&project);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0].starts_with(
+            "2 death explosions copied into the project's weapon library are not written"
+        ));
     }
 
     /// Issue #3035. A copy sent to the mutator route is skipped by the write,

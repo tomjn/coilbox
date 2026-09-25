@@ -30,7 +30,7 @@
 //! chunk ahead of it was.
 
 use crate::bar_pack::{self, BarSlotPack};
-use crate::compile::{compile, Chunk, LuaForm};
+use crate::compile::{compile, equip_at, Chunk, EquipAt, LuaForm};
 use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
@@ -233,10 +233,7 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
     let equips_game_unit = edits.equipped.iter().any(|(unit, slots)| {
         !edits.clones.contains_key(unit)
             && slots.iter().any(|(step, key)| {
-                !step.is_empty()
-                    && step.bytes().all(|b| b.is_ascii_digit())
-                    && edits.weapons.contains_key(key)
-                    && valid_unit_key(key)
+                equip_at(step).is_some() && edits.weapons.contains_key(key) && valid_unit_key(key)
             })
     });
     if equips_game_unit {
@@ -493,8 +490,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                 (vec![POST_FILE.to_string()], Some(PositionKey::Equipped))
             };
             for (step, key) in slots {
-                let compiled = !step.is_empty()
-                    && step.bytes().all(|b| b.is_ascii_digit())
+                let at = equip_at(step);
+                let compiled = at.is_some()
                     && edits.weapons.contains_key(key)
                     && valid_unit_key(key)
                     && home_key.is_some();
@@ -503,7 +500,12 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     _ => (None, None),
                 };
                 changes.push(LedgerChange {
-                    description: format!("Weapon slot {step} fires library weapon {key}"),
+                    description: match at {
+                        Some(EquipAt::Death(field)) => {
+                            format!("Death explosion {field} is library weapon {key}")
+                        }
+                        _ => format!("Weapon slot {step} fires library weapon {key}"),
+                    },
                     field_path: None,
                     files: if compiled { files.clone() } else { Vec::new() },
                     bar_slot,
@@ -900,6 +902,23 @@ mod tests {
             .expect("the equip is traced");
         assert_eq!(change.files, vec![POST_FILE.to_string()]);
         assert!(change.bar_slot.is_some() || change.bar_miss.is_some());
+        assert!(change.uncompiled_reason.is_none());
+    }
+
+    /// Issue #2642. A death explosion out of the library is traced to the
+    /// same block as the equipped slots, in words of its own.
+    #[test]
+    fn a_death_explosion_is_traced_to_the_equip_block() {
+        let ledger = build_ledger(&project(json!({
+            "weapons": { "blast": { "key": "blast", "def": { "areaofeffect": 300 } } },
+            "equipped": { "armcom": { "explodeas": "blast" } }
+        })));
+        assert!(ledger.notes.is_empty(), "{:?}", ledger.notes);
+        let change = changes_for(&ledger, "armcom")
+            .iter()
+            .find(|c| c.description == "Death explosion explodeas is library weapon blast")
+            .expect("the death explosion is traced");
+        assert_eq!(change.files, vec![POST_FILE.to_string()]);
         assert!(change.uncompiled_reason.is_none());
     }
 
