@@ -1,4 +1,4 @@
-import { Input } from "@picoframe/frame";
+import { buttonVariants, Input } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -181,11 +181,21 @@ export default function GameUnitsPage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <h1 className="text-lg font-semibold">
-        <Link to={backTo} className="hover:underline">
-          {game.name}
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold">
+          <Link to={backTo} className="hover:underline">
+            {game.name}
+          </Link>
+        </h1>
+        {/* The sortable table and comparison view (issue #1316), for the
+          question this grid cannot answer: which of two units is better. */}
+        <Link
+          to={`/library/games/${encodeURIComponent(game.name)}/units/reference`}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          Compare units
         </Link>
-      </h1>
+      </div>
 
       <div className="flex items-center gap-3">
         <Input

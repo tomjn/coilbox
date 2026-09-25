@@ -90,6 +90,7 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 | `#/library/games/:name`                   | A single game's detail page                    |
 | `#/library/games/:name/units`             | A single game's unit list                      |
 | `#/library/games/:name/units/:unit`       | A single unit's detail page                    |
+| `#/library/games/:name/units/reference`   | Sortable table and comparison view over the game's own units |
 | `#/library/blueprints/:id`                | A single layout's detail page                  |
 | `#/play/replays/:name`                    | A single replay's detail page                  |
 | `#/stats/:name`                           | A player's dossier (head-to-head stats)        |
@@ -107,6 +108,7 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 | `#/lego/:id`                              | Editing a unit in the builder (advanced)       |
 | `#/workshop/:id`                          | Editing one tweak project (advanced)           |
 | `#/workshop/new?game=:name&unit=:unit`    | The tweak editor on a unit with no project yet, which the first change starts (advanced) |
+| `#/workshop/:id/reference`                | Sortable table and comparison view over one project's units, resolved through its own edits (advanced) |
 
 ## Settings sections
 

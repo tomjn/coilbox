@@ -61,6 +61,15 @@ const workshopPlugin: FramePlugin = {
           ? "New project"
           : (c.params.id && cachedProjectName(c.params.id)) || "Project",
     },
+    {
+      // The reference table and comparison view (issue #1316), resolved
+      // through this project's own edits. A static segment past the opaque
+      // `:id` rather than a second dynamic one, so `workshop/:id` still
+      // matches the editor alone.
+      path: "workshop/:id/reference",
+      lazy: gateAdvanced(() => import("./pages/ReferencePage")),
+      crumb: "Reference",
+    },
   ],
   settings: [],
 };
