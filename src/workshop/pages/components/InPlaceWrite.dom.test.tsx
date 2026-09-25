@@ -42,6 +42,18 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 
 import type { InPlaceDone } from "../../inPlaceProject";
 import type { ModProject } from "../../project";
+
+// This suite is about what the write button offers and reports, not about
+// settling typed values (issue #3093), which has its own coverage in
+// `loads_as.rs`. The game is never "installed" here, so the write goes ahead
+// with every field written as typed.
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({ data: undefined, loading: false, error: null }),
+}));
+vi.mock("@/play/config", () => ({
+  usePreferredTarget: () => ({ target: undefined, loading: false }),
+}));
+
 import { InPlaceWrite } from "./InPlaceWrite";
 
 const project: ModProject = {

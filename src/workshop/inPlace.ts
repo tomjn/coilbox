@@ -14,6 +14,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { BuildMenuOp } from "./buildMenus";
 import type { UnitClone } from "./clones";
+import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
 /** A place in a unit file. Lines and columns count from 1. */
@@ -117,12 +118,17 @@ export interface InPlaceStatus {
  * `sources` is the game's own read of each unit a copy was made from. A copy's
  * changes are worked out against it, since the unit's file leaves out every
  * field the unit inherits (see `inplace_clone.rs`).
+ *
+ * `written` is what `workshopSettleTypedValuesInPlace` worked out (issue
+ * #3093): values the game's own files turn into the typed ones on this
+ * route, each proven by loading the game with exactly these files.
  */
 export const workshopWriteInPlace = defineCommand<
   {
     gameDir: string;
     project: ModProject;
     sources: Record<string, Record<string, unknown>>;
+    written?: Written;
   },
   InPlaceWriteOutcome
 >("coilbox-workshop", "workshop_write_in_place");

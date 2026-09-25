@@ -349,10 +349,11 @@ function InPlaceNote({
  * "May" because what they do to a typed value depends on the game's Lua and
  * on the route the project reaches the game by: a mutator that ships its own
  * `gamedata/unitdefs_post.lua` covers the game's (`postHook.ts`), and a copy
- * or a tweak slot does not. The mutator route loads the game with its own
- * files before a test or a package and writes a value that loads as the
- * typed one, where that load proves it (`loadsAs.ts`, issue #3059). The other
- * two routes write the value as typed, so the note still says "may".
+ * or a tweak slot does not. Both the mutator route and edit in place load the
+ * game with its own files before a write and write a value that loads as the
+ * typed one, where that load proves it (`loadsAs.ts`, issue #3059, and
+ * issue #3093 for edit in place). Beyond All Reason's tweak slots write the
+ * value as typed, so the note still says "may".
  */
 function PostProcessedNote({ post }: { post: PostNote }) {
   const what =
@@ -365,9 +366,10 @@ function PostProcessedNote({ post }: { post: PostNote }) {
     <span className="flex items-start gap-1 text-[10px] text-muted-foreground">
       <FileCog className="mt-px size-3 shrink-0" />
       <span>
-        {what} It may change a value typed here too. A mutator archive gets a
-        value the game turns into the typed one, where loading the game proves
-        it. Beyond All Reason's tweak slots and edit in place write it as typed.
+        {what} It may change a value typed here too. A mutator archive and an
+        edit-in-place write each get a value the game turns into the typed one,
+        where loading the game proves it. Beyond All Reason's tweak slots write
+        it as typed.
       </span>
     </span>
   );

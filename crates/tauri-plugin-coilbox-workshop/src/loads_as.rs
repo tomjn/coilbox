@@ -267,10 +267,21 @@ fn unit_place(unit: &str, path: &str) -> Place {
     }
 }
 
-/// Every number the project typed that reaches the game, with the places the
-/// game keeps it. A library weapon reaches it once per slot or death
-/// explosion that fires it, under the name the compiler gives it there.
-fn typed_fields(project: &ModProject) -> Vec<Field> {
+/// Every number the project typed that reaches the game through this route,
+/// with the places the game keeps it. A library weapon reaches it once per
+/// slot or death explosion that fires it, under the name the compiler gives
+/// it there.
+///
+/// `carries_field` and `carries_equip` say which unit overrides and which
+/// equipping units this route carries at all: the mutator route carries
+/// everything, and edit in place skips a clone and a field sent to the
+/// mutator route on purpose (`ModProject::is_mutator_only`), the same way
+/// `inplace::write` does (issue #3093).
+fn typed_fields(
+    project: &ModProject,
+    carries_field: &dyn Fn(&str, &str) -> bool,
+    carries_equip: &dyn Fn(&str) -> bool,
+) -> Vec<Field> {
     let edits = &project.edits;
     let mut out = Vec::new();
     for (unit, patch) in &edits.overrides {
@@ -279,6 +290,9 @@ fn typed_fields(project: &ModProject) -> Vec<Field> {
                 continue;
             };
             if a_slot_name(path) {
+                continue;
+            }
+            if !carries_field(unit, path) {
                 continue;
             }
             out.push(Field {
@@ -295,6 +309,7 @@ fn typed_fields(project: &ModProject) -> Vec<Field> {
         let mounts: Vec<String> = edits
             .equipped
             .iter()
+            .filter(|(unit, _)| carries_equip(unit))
             .flat_map(|(unit, slots)| {
                 slots
                     .iter()
@@ -394,18 +409,61 @@ struct Trial {
 
 type Loader<'a> = dyn FnMut(&[ProbeRun]) -> Result<Vec<ProbeResult>, String> + 'a;
 
-/// Work out, for every number the project typed, a value that the game loads
-/// as that number on the mutator route, and prove it by loading it.
-///
-/// Fails only when the game will not load with the project as typed. That is
-/// a fact about the project or the game, not about any one field, and the
-/// caller writes every value as typed.
+/// Turn `project` with `written` in place of each typed value into the files
+/// a load needs on top of the game, for a route. The mutator route compiles
+/// the whole project, and edit in place patches the game's own files instead
+/// (`inplace::dry_run`, issue #3093).
+type Compiler<'a> = dyn FnMut(&ModProject, &Written) -> Result<Vec<ProbeFile>, String> + 'a;
+
+/// [`settle_scoped`] for the mutator route specifically: every typed number,
+/// and the project compiled the way `workshop_test_mutator` and
+/// `workshop_package_mutator` do.
 pub fn settle(
     project: &ModProject,
     precision: Precision,
     load: &mut Loader<'_>,
 ) -> Result<Settled, String> {
-    let fields = typed_fields(project);
+    settle_scoped(
+        project,
+        precision,
+        &|_, _| true,
+        &|_| true,
+        &mut |p, w| Ok(mutator_probe_files(p, w)),
+        load,
+    )
+}
+
+/// `project` compiled for the mutator route with `written` in place, as the
+/// files a load needs on top of the game.
+fn mutator_probe_files(project: &ModProject, written: &Written) -> Vec<ProbeFile> {
+    compile_written(project, written)
+        .files
+        .into_iter()
+        .map(|f| ProbeFile {
+            path: f.path,
+            contents: f.contents,
+        })
+        .collect()
+}
+
+/// Work out, for every number the project typed that this route carries, a
+/// value that the game loads as that number, and prove it by loading it.
+/// `carries_field`, `carries_equip` and `compile` say what the route carries
+/// and how it turns `written` values into files on top of the game. See
+/// [`settle`] for the mutator route's own answers to those (issue #3093).
+///
+/// Fails only when the game will not load with the project as typed. That is
+/// a fact about the project or the game, not about any one field, and the
+/// caller writes every value as typed.
+pub fn settle_scoped(
+    project: &ModProject,
+    precision: Precision,
+    carries_field: &dyn Fn(&str, &str) -> bool,
+    carries_equip: &dyn Fn(&str) -> bool,
+    compile: &mut Compiler<'_>,
+    load: &mut Loader<'_>,
+) -> Result<Settled, String> {
+    let fields = typed_fields(project, carries_field, carries_equip);
     let mut settled = Settled::default();
     if fields.is_empty() {
         return Ok(settled);
@@ -413,8 +471,15 @@ pub fn settle(
     let typed: Vec<f64> = fields.iter().map(|f| precision.round(f.typed)).collect();
 
     // The project as typed.
-    let first = load_once(project, &fields, &BTreeMap::new(), load, &mut settled)
-        .map_err(|e| format!("the game did not load with this project: {e}"))?;
+    let first = load_once(
+        project,
+        &fields,
+        &BTreeMap::new(),
+        compile,
+        load,
+        &mut settled,
+    )
+    .map_err(|e| format!("the game did not load with this project: {e}"))?;
     let mut reasons: BTreeMap<usize, &'static str> = BTreeMap::new();
     let mut loads_as_typed: Vec<Option<f64>> = Vec::new();
     let mut wrong = Vec::new();
@@ -435,7 +500,7 @@ pub fn settle(
             .iter()
             .map(|&i| (i, precision.round(second_value(fields[i].typed))))
             .collect();
-        match load_once(project, &fields, &probe, load, &mut settled) {
+        match load_once(project, &fields, &probe, compile, load, &mut settled) {
             Err(_) => {
                 for &i in &wrong {
                     reasons.insert(i, PROBE_FAILED);
@@ -474,7 +539,7 @@ pub fn settle(
     let mut last = first.clone();
     while !trials.is_empty() {
         let values: BTreeMap<usize, f64> = trials.iter().map(|(&i, t)| (i, t.x)).collect();
-        let Ok(readings) = load_once(project, &fields, &values, load, &mut settled) else {
+        let Ok(readings) = load_once(project, &fields, &values, compile, load, &mut settled) else {
             for i in std::mem::take(&mut trials).into_keys() {
                 reasons.insert(i, NO_EXACT);
             }
@@ -553,13 +618,14 @@ fn second_value(typed: f64) -> f64 {
     }
 }
 
-/// Load the game once with the project compiled for the mutator route, each
-/// field in `values` written in place of its typed value, and read every
-/// field back. The readings come back per field, one per place.
+/// Load the game once with `compile`'s files for the route, each field in
+/// `values` written in place of its typed value, and read every field back.
+/// The readings come back per field, one per place.
 fn load_once(
     project: &ModProject,
     fields: &[Field],
     values: &BTreeMap<usize, f64>,
+    compile: &mut Compiler<'_>,
     load: &mut Loader<'_>,
     settled: &mut Settled,
 ) -> Result<Vec<Vec<ProbeReading>>, String> {
@@ -567,14 +633,7 @@ fn load_once(
     for (&i, &x) in values {
         written.insert(&fields[i].field, fields[i].typed, x);
     }
-    let files = compile_written(project, &written)
-        .files
-        .into_iter()
-        .map(|f| ProbeFile {
-            path: f.path,
-            contents: f.contents,
-        })
-        .collect();
+    let files = compile(project, &written)?;
     let reads: Vec<ProbeRead> = fields
         .iter()
         .flat_map(|f| {
@@ -782,7 +841,7 @@ mod tests {
             "weapons": { "gun": { "key": "gun", "def": {}, "changes": { "range": 900 } } },
             "equipped": { "armcom": { "0": "gun" }, "corcom": { "explodeas": "gun" } },
         }));
-        let fields = typed_fields(&p);
+        let fields = typed_fields(&p, &|_, _| true, &|_| true);
         assert_eq!(fields.len(), 2);
         assert_eq!(
             fields[0].places,
@@ -794,5 +853,56 @@ mod tests {
         );
         let names: Vec<&str> = fields[1].places.iter().map(|p| p.key.as_str()).collect();
         assert_eq!(names, vec!["armcom_gun", "corcom_gun"]);
+    }
+
+    /// A route's scope leaves out a field or an equipping unit before it ever
+    /// reaches the game, the way edit in place leaves out a clone and a field
+    /// sent to the mutator route on purpose (issue #3093).
+    #[test]
+    fn a_scope_leaves_out_a_field_and_an_equipping_units_mounts() {
+        let p = project(json!({
+            "overrides": { "armcom": { "maxdamage": 3000 }, "corcom": { "maxdamage": 3000 } },
+            "weapons": { "gun": { "key": "gun", "def": {}, "changes": { "range": 900 } } },
+            "equipped": { "armcom": { "0": "gun" }, "corcom": { "explodeas": "gun" } },
+        }));
+        let carries_field = |unit: &str, _: &str| unit != "corcom";
+        let carries_equip = |unit: &str| unit != "corcom";
+        let fields = typed_fields(&p, &carries_field, &carries_equip);
+        assert_eq!(fields.len(), 2, "{fields:?}");
+        let unit_field = fields
+            .iter()
+            .find(|f| matches!(&f.field, TypedField::Unit { .. }))
+            .expect("the unit field");
+        assert!(matches!(&unit_field.field, TypedField::Unit { unit, .. } if unit == "armcom"));
+        let weapon_field = fields
+            .iter()
+            .find(|f| matches!(&f.field, TypedField::Weapon { .. }))
+            .expect("the weapon field");
+        let names: Vec<&str> = weapon_field.places.iter().map(|p| p.key.as_str()).collect();
+        assert_eq!(names, vec!["armcom_gun"]);
+    }
+
+    /// [`settle_scoped`] with a scope and a compiler of its own settles the
+    /// same way [`settle`] does for the fields it lets through, and never
+    /// asks about the ones it does not.
+    #[test]
+    fn settle_scoped_only_settles_what_its_scope_lets_through() {
+        let p = project(json!({
+            "overrides": { "armcom": { "maxdamage": 0.5 }, "corcom": { "maxdamage": 3000 } },
+        }));
+        let mut load = game(|x| x * 0.3 * 0.3, Precision::F32);
+        let mut compile = |p: &ModProject, w: &Written| Ok(mutator_probe_files(p, w));
+        let settled = settle_scoped(
+            &p,
+            Precision::F32,
+            &|unit, _| unit == "armcom",
+            &|_| true,
+            &mut compile,
+            &mut load,
+        )
+        .expect("settle");
+        assert_eq!(settled.fields.len(), 1);
+        assert_eq!(settled.fields[0].typed, 0.5);
+        assert_eq!(settled.fields[0].outcome, Outcome::Written);
     }
 }

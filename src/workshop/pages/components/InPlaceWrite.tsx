@@ -46,6 +46,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useUnitsyncScan } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import { isCloneMutatorOnly } from "../../cloneMutatorOnly";
 import {
   copiesToWrite,
@@ -60,12 +62,13 @@ import {
   writeSources,
 } from "../../inPlace";
 import type { InPlaceDone } from "../../inPlaceProject";
+import { settledSummary, settleTypedValuesInPlace } from "../../loadsAs";
 import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
 import type { ModProject } from "../../project";
 import { isDeathMount } from "../../weaponLibrary";
 import { DiskDiffDrawer } from "./DiskDiffDrawer";
 
-type Busy = "write" | "undo" | "accept" | null;
+type Busy = "settling" | "write" | "undo" | "accept" | null;
 
 function message(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -95,10 +98,17 @@ export function InPlaceWrite({
   const [status, setStatus] = useState<InPlaceStatus | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
   const [outcome, setOutcome] = useState<InPlaceWriteOutcome | null>(null);
+  const [typedNote, setTypedNote] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmAccept, setConfirmAccept] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // The game, so typed values can be checked against it before a write
+  // (issue #3093), the same way `PackageMutatorButton` checks them before a
+  // package.
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const game = scan.data?.games.find((g) => g.name === project?.gameName);
 
   const refresh = useCallback(async () => {
     try {
@@ -117,12 +127,37 @@ export function InPlaceWrite({
     setError(null);
     setDone(null);
     setOutcome(null);
+    setTypedNote(null);
     try {
       if (kind === "write" && project) {
+        const sources = writeSources(project, gameUnits);
+        // A value the game's own files would turn into something else is
+        // written as one they turn into the typed number, checked by loading
+        // the game with exactly these files (issue #3093).
+        setBusy("settling");
+        const settled =
+          target && game
+            ? await settleTypedValuesInPlace({
+                enginePath: target.enginePath,
+                dataDir: target.dataDir,
+                archive: game.primaryArchive.name,
+                gameDir,
+                project,
+                sources,
+              })
+            : ({
+                ok: false,
+                message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+              } as const);
+        setTypedNote(
+          settled.ok ? settledSummary(settled.settled) : settled.message,
+        );
+        setBusy("write");
         const written = await workshopWriteInPlace({
           gameDir,
           project,
-          sources: writeSources(project, gameUnits),
+          sources,
+          written: settled.ok ? settled.settled.written : undefined,
         });
         setOutcome(written);
         if (written.refused.length === 0)
@@ -192,7 +227,11 @@ export function InPlaceWrite({
           disabled={!project || !hasWork || busy !== null || reading}
           onClick={() => void run("write")}
         >
-          {busy === "write" ? "Writing…" : "Write changes into the game"}
+          {busy === "settling"
+            ? "Checking typed values against the game"
+            : busy === "write"
+              ? "Writing…"
+              : "Write changes into the game"}
         </Button>
         {pending > 0 && (
           <>
@@ -317,6 +356,9 @@ export function InPlaceWrite({
       {error && <p className="text-destructive text-xs">{error}</p>}
       {done && <p className="text-xs">{done}</p>}
       {outcome && <WriteResult outcome={outcome} />}
+      {typedNote && (
+        <p className="text-muted-foreground text-xs">{typedNote}</p>
+      )}
       <DiskDiffDrawer
         open={reviewing}
         onOpenChange={setReviewing}
