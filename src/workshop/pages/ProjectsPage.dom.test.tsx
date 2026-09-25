@@ -59,11 +59,17 @@ const GAME_2 = {
   info: {},
 };
 
+// Mutable so a test can stand in whichever games are "installed" for the
+// heading lookup, without every other test having to know about it. Named
+// with the `mock` prefix vitest requires for a variable a hoisted `vi.mock`
+// factory is allowed to close over.
+let mockScanGames: (typeof GAME)[] = [GAME, GAME_2];
+
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
   useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
   useUnitsyncScan: () => ({
-    data: { games: [GAME, GAME_2], maps: [] },
+    data: { games: mockScanGames, maps: [] },
     loading: false,
     error: null,
     run: () => {},
@@ -163,6 +169,7 @@ beforeEach(() => {
   storage = memorySettingsStorage();
   installSettingsStorage(storage);
   resetShortnames();
+  mockScanGames = [GAME, GAME_2];
 });
 
 afterEach(() => {
@@ -388,13 +395,49 @@ describe("ProjectsPage", () => {
         }),
       ]);
 
-      // One heading, not two, and it names the newest of the two builds
-      // rather than the raw shortname "BA".
+      // One heading, not two. Neither build is installed here, so the
+      // heading falls back to the newest project's exact gameName.
       expect(
         screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
       ).toEqual(["Balanced Annihilation V15.9.8"]);
       expect(screen.getByText("Old build")).toBeTruthy();
       expect(screen.getByText("New build")).toBeTruthy();
+    });
+
+    it("heads the group with the installed game's modinfo name, not a build", () => {
+      // An installed game whose shortname matches the group answers the
+      // heading with its versionless modinfo name, rather than the exact
+      // build either project happens to pin (issue #3071 review: a heading
+      // reading "V15.9.8" over a group holding V15.9.7 too looks like the
+      // group were that one build).
+      mockScanGames = [
+        {
+          name: "Balanced Annihilation V15.9.8",
+          primaryArchive: { name: "ba.sdz", path: "/data/games/ba.sdz" },
+          dependencyArchives: [],
+          info: { name: "Balanced Annihilation", shortname: "BA" },
+        },
+      ];
+      show([
+        project({
+          id: "old",
+          name: "Old build",
+          gameName: "Balanced Annihilation V15.9.7",
+          game: { name: "Balanced Annihilation V15.9.7", shortname: "BA" },
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }),
+        project({
+          id: "new",
+          name: "New build",
+          gameName: "Balanced Annihilation V15.9.8",
+          game: { name: "Balanced Annihilation V15.9.8", shortname: "BA" },
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        }),
+      ]);
+
+      expect(
+        screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+      ).toEqual(["Balanced Annihilation"]);
     });
 
     it("falls back to a remembered shortname when a project carries none", () => {

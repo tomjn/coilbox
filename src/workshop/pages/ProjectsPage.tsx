@@ -33,7 +33,10 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { gameIdentityForName } from "@/container/gameIdentity";
+import {
+  gameIdentityForName,
+  type InstalledGameInfo,
+} from "@/container/gameIdentity";
 import { rememberedShortname } from "@/container/shortnames";
 import {
   useScanTargetSelection,
@@ -114,15 +117,22 @@ function groupKeyFor(project: ModProject): string {
 interface ProjectGroup {
   key: string;
   /** The game's display name for the heading. A shortname alone ("BA") means
-   *  little on its own, so the heading uses an exact archive name instead -
-   *  the group's most recently changed project's, since that is the build a
-   *  person is most likely thinking of. */
+   *  little on its own, and an exact archive name ("Balanced Annihilation
+   *  V15.9.8") reads as if the whole group were that one build when it holds
+   *  several. So the heading is the modinfo `name` (no version) of whichever
+   *  installed game answers to the group's key, read the same way the unit
+   *  page's own game picker does. A game nobody has installed right now
+   *  cannot be read that way, so the group falls back to the most recently
+   *  changed project's exact `gameName` instead. */
   heading: string;
   projects: ModProject[];
 }
 
 /** Every project grouped by game, headed by name and ordered by it too. */
-function groupProjects(projects: ModProject[]): ProjectGroup[] {
+function groupProjects(
+  projects: ModProject[],
+  installed: readonly InstalledGameInfo[],
+): ProjectGroup[] {
   const byKey = new Map<string, ModProject[]>();
   for (const project of projects) {
     const key = groupKeyFor(project);
@@ -131,10 +141,12 @@ function groupProjects(projects: ModProject[]): ProjectGroup[] {
     else byKey.set(key, [project]);
   }
   const groups = [...byKey.entries()].map(([key, list]) => {
+    const installedName = installed.find((g) => g.info?.shortname === key)?.info
+      ?.name;
     const newest = [...list].sort((a, b) =>
       b.updatedAt.localeCompare(a.updatedAt),
     )[0];
-    return { key, heading: newest.gameName, projects: list };
+    return { key, heading: installedName || newest.gameName, projects: list };
   });
   groups.sort((a, b) => a.heading.localeCompare(b.heading));
   return groups;
@@ -178,7 +190,10 @@ export default function ProjectsPage() {
   // text or the sort order. Sorting is safe here in a way it was not in the
   // drawer this replaces: nothing on this page writes an edit, so the list
   // cannot reorder itself under the cursor.
-  const groups = useMemo(() => groupProjects(projects), [projects]);
+  const groups = useMemo(
+    () => groupProjects(projects, games),
+    [projects, games],
+  );
 
   const visibleGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
