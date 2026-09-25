@@ -511,7 +511,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     bar_slot,
                     bar_miss,
                     uncompiled_reason: (!compiled).then(|| {
-                        "The weapon is not in the library under a name the compiler can use,                          so the slot keeps the game's weapon."
+                        "The weapon is not in the library under a name the compiler can use, so the slot keeps the game's weapon."
                             .to_string()
                     }),
                 });
@@ -920,6 +920,23 @@ mod tests {
             .expect("the death explosion is traced");
         assert_eq!(change.files, vec![POST_FILE.to_string()]);
         assert!(change.uncompiled_reason.is_none());
+    }
+
+    /// A slot naming a weapon the library no longer holds says why in one
+    /// plain sentence.
+    #[test]
+    fn a_weapon_missing_from_the_library_is_reported_in_one_sentence() {
+        let ledger = build_ledger(&project(json!({
+            "equipped": { "armcom": { "0": "gone" } }
+        })));
+        let reason = changes_for(&ledger, "armcom")[0]
+            .uncompiled_reason
+            .clone()
+            .expect("left out");
+        assert_eq!(
+            reason,
+            "The weapon is not in the library under a name the compiler can use, so the slot keeps the game's weapon."
+        );
     }
 
     #[test]
