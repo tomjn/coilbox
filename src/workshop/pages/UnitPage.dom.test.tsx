@@ -57,6 +57,7 @@ const GAME_2 = {
 let mockDefs: UnitDefsResult = {
   units: {},
   weaponDefs: {},
+  armorDefs: {},
   unitErrors: [],
   errors: [],
   checksum: "abc",
@@ -348,6 +349,7 @@ function show(
   mockDefs = {
     units,
     weaponDefs: mockWeaponDefs,
+    armorDefs: {},
     unitErrors,
     errors: [],
     checksum,

@@ -139,6 +139,16 @@ const POST_FILE: &str = "gamedata/unitdefs_post.lua";
 /// replaces rather than a new one.
 const LANGUAGE_FILE: &str = "zz_coilbox.json";
 
+/// Where a project's armour class moves have to live (issue #2645).
+///
+/// The engine reads this file's returned table whole
+/// (`CDamageArrayHandler::Init`), and a mutator archive covers up the base
+/// game's copy of any path it also ships with no way for either to read the
+/// other, the same limit [`POST_FILE`]'s own note names. So this is never a
+/// patch: it is `edits.armor_classes.base`, the snapshot the project took the
+/// moment it moved its first unit, with every move applied on top.
+const ARMOR_FILE: &str = "gamedata/armordefs.lua";
+
 /// A mutator archive's version for every route except packaging.
 ///
 /// The local test route (`mutator.rs`) rewrites its folder whole on every
@@ -445,6 +455,14 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     }
     files.extend(unit_files);
     files.extend(language_files);
+    if let Some(armor_file) = armor_defs_file(edits) {
+        files.push(armor_file);
+        notes.push(format!(
+            "{ARMOR_FILE} takes the place of the base game's own file of that name whole, moving {} unit{} into a different armour class. Coilbox cannot patch that file, only replace it, so it carries a snapshot of the game's own classes from the moment the first move was made: a class the game has added since will not appear here until a unit is moved into or out of it again.",
+            edits.armor_classes.moves.len(),
+            if edits.armor_classes.moves.len() == 1 { "" } else { "s" }
+        ));
+    }
 
     // Every block, in the order they were compiled, which is the order they have
     // to run in: a copy standing in for a game unit before a menu is replayed
@@ -1612,6 +1630,68 @@ fn unit_file(project: &ModProject, key: &str, def: &Value) -> String {
     )
 }
 
+/// The project's `gamedata/armordefs.lua` (issue #2645), or `None` when it
+/// moves nothing.
+///
+/// `edits.armor_classes.base`, the snapshot taken when the project moved its
+/// first unit, with every move applied on top: a unit named in a move is
+/// dropped out of whichever of `base`'s lists names it (case insensitively,
+/// matching the engine's own lookup), then added to its target class's list,
+/// unless that target is `"default"`, which needs no list of its own.
+fn armor_defs_file(edits: &GameEdits) -> Option<CompiledFile> {
+    if edits.armor_classes.moves.is_empty() {
+        return None;
+    }
+    let moved: std::collections::BTreeSet<String> = edits
+        .armor_classes
+        .moves
+        .keys()
+        .map(|k| k.to_lowercase())
+        .collect();
+    let mut classes: BTreeMap<String, Vec<String>> = edits
+        .armor_classes
+        .base
+        .iter()
+        .map(|(name, members)| {
+            let kept = members
+                .iter()
+                .filter(|m| !moved.contains(&m.to_lowercase()))
+                .cloned()
+                .collect();
+            (name.clone(), kept)
+        })
+        .collect();
+    for (unit, class) in &edits.armor_classes.moves {
+        if class.eq_ignore_ascii_case("default") {
+            continue;
+        }
+        classes.entry(class.clone()).or_default().push(unit.clone());
+    }
+    Some(CompiledFile {
+        path: ARMOR_FILE.to_string(),
+        contents: armor_defs_lua(&classes),
+    })
+}
+
+/// [`armor_defs_file`]'s Lua: the same shape `gamedata/armordefs.lua` already
+/// has in every game measured for issue #2645, a class name to an array of
+/// unit def names, keyed with `[...]` rather than a bare word so a class name
+/// the game itself spelled oddly still writes out as valid Lua.
+fn armor_defs_lua(classes: &BTreeMap<String, Vec<String>>) -> String {
+    let mut out = String::from(
+        "-- Written by coilbox (issue #2645). Replaces the base game's own\n-- gamedata/armordefs.lua whole: the engine reads this file's table in one\n-- piece, and this archive covers up the base game's copy of it entirely.\nlocal armorDefs = {\n",
+    );
+    for (name, members) in classes {
+        out.push_str(&format!("  [{}] = {{\n", lua_string(name)));
+        for member in members {
+            out.push_str(&format!("    {},\n", lua_string(member)));
+        }
+        out.push_str("  },\n");
+    }
+    out.push_str("}\nreturn armorDefs\n");
+    out
+}
+
 /// The patch table with the code that applies it: every field change, merged
 /// onto whatever `UnitDefs` already holds. Shared by [`post_file`] and
 /// [`bar_tweakdefs_body`], which both run this over the same `UnitDefs` the
@@ -1775,6 +1855,19 @@ mod tests {
             "edits": edits,
         }))
         .expect("parse")
+    }
+
+    /// One class's own `{ ... }` body out of a compiled `armordefs.lua`, so a
+    /// test can say a unit is or is not a member of it without a substring
+    /// match landing in a different class by coincidence.
+    fn class_block<'a>(lua: &'a str, name: &str) -> &'a str {
+        let key = format!("[{:?}] = {{", name);
+        let start = lua
+            .find(&key)
+            .unwrap_or_else(|| panic!("no {name} in {lua}"));
+        let body = &lua[start + key.len()..];
+        let end = body.find("},\n").unwrap_or(body.len());
+        &body[..end]
     }
 
     fn file<'a>(out: &'a CompiledMod, path: &str) -> &'a str {
@@ -2672,5 +2765,72 @@ mod tests {
             "text": { "armcom": { "en": { "name": "Commander" } } }
         })));
         assert!(out.bar_tweakdefs.is_none());
+    }
+
+    /// A project that has never moved a unit ships no armour class file at
+    /// all, even when the frontend has stashed a snapshot: `base` on its own
+    /// says nothing the game does not already say (issue #2645).
+    #[test]
+    fn a_snapshot_with_no_moves_compiles_to_nothing() {
+        let out = compile(&project(json!({
+            "armorClasses": { "base": { "commanders": ["armcom"] }, "moves": {} }
+        })));
+        assert!(out.files.iter().all(|f| f.path != ARMOR_FILE));
+    }
+
+    /// Moving a unit writes the whole snapshot back with that unit taken out
+    /// of its old class and put in the new one, and every other class
+    /// untouched.
+    #[test]
+    fn moving_a_unit_rewrites_its_class_and_keeps_the_rest() {
+        let out = compile(&project(json!({
+            "armorClasses": {
+                "base": {
+                    "commanders": ["armcom", "corcom"],
+                    "vtol": ["armkam"],
+                },
+                "moves": { "armcom": "heavyunits" },
+            }
+        })));
+        let lua = file(&out, ARMOR_FILE);
+        let commanders = class_block(lua, "commanders");
+        assert!(commanders.contains("corcom"));
+        assert!(!commanders.contains("armcom"), "commanders: {commanders}");
+        let heavyunits = class_block(lua, "heavyunits");
+        assert!(heavyunits.contains("armcom"));
+        assert!(class_block(lua, "vtol").contains("armkam"));
+        assert!(lua.trim_end().ends_with("return armorDefs"));
+        assert!(out.notes.iter().any(|n| n.contains(ARMOR_FILE)));
+    }
+
+    /// Moving a unit to "default" only has to remove it from its old class:
+    /// the engine's own catch-all needs no list naming anybody.
+    #[test]
+    fn moving_a_unit_to_default_only_removes_it() {
+        let out = compile(&project(json!({
+            "armorClasses": {
+                "base": { "commanders": ["armcom", "corcom"] },
+                "moves": { "armcom": "default" },
+            }
+        })));
+        let lua = file(&out, ARMOR_FILE);
+        assert!(!lua.contains("\"armcom\""));
+        assert!(lua.contains("\"corcom\""));
+        assert!(!lua.contains("[\"default\"]"));
+    }
+
+    /// A move can name a class the snapshot never held, which is how a
+    /// modder invents a brand new one.
+    #[test]
+    fn moving_a_unit_into_a_new_class_creates_it() {
+        let out = compile(&project(json!({
+            "armorClasses": {
+                "base": { "commanders": ["armcom"] },
+                "moves": { "armkam": "flyingcircus" },
+            }
+        })));
+        let lua = file(&out, ARMOR_FILE);
+        assert!(lua.contains("[\"flyingcircus\"]"));
+        assert!(lua.contains("\"armkam\""));
     }
 }

@@ -127,6 +127,40 @@ pub struct LibraryWeapon {
     pub before_post: Option<PostChange>,
 }
 
+/// A unit's armour class, when the project has moved it out of the one the
+/// game's own `gamedata/armordefs.lua` puts it in (issue #2645), a mirror of
+/// `ArmorClasses` in `src/workshop/armorClasses.ts`.
+///
+/// The engine assigns a unit's class purely from which class's membership list
+/// in that one file names it, and `compile::compile` is handed the project
+/// alone, never the game (its own doc comment). So the moment the project
+/// moves its first unit, the frontend takes a snapshot of the game's whole
+/// table into `base`, and every move after that is read against the snapshot
+/// rather than the game, the same way a copied weapon in the library is read
+/// against the copy it was made from rather than the game's weapon of today.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ArmorClasses {
+    /// The game's own class membership at the moment of the first move: class
+    /// name to the unit def keys it lists as members, exactly as the game
+    /// wrote them.
+    pub base: BTreeMap<String, Vec<String>>,
+    /// Unit key to the class name the project moves it to. A unit named here
+    /// is taken out of whichever of `base`'s lists names it and put in this
+    /// one instead. A target of `"default"` (case insensitive) takes it out of
+    /// every list, which is the engine's own catch-all class and needs no
+    /// list of its own.
+    pub moves: BTreeMap<String, String>,
+}
+
+impl ArmorClasses {
+    /// Whether the project moves anything at all. `base` on its own compiles
+    /// to nothing, so it does not count.
+    pub fn is_empty(&self) -> bool {
+        self.moves.is_empty()
+    }
+}
+
 /// Everything one project changes about one game.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GameEdits {
@@ -148,6 +182,10 @@ pub struct GameEdits {
     /// library weapon that slot fires.
     #[serde(default)]
     pub equipped: BTreeMap<String, BTreeMap<String, String>>,
+    /// Which units the project has moved to a different armour class (issue
+    /// #2645). Absent on a project saved before it, which reads as empty.
+    #[serde(rename = "armorClasses", default)]
+    pub armor_classes: ArmorClasses,
 }
 
 impl GameEdits {
@@ -160,6 +198,7 @@ impl GameEdits {
             && self.disabled.is_empty()
             && self.weapons.is_empty()
             && self.equipped.values().all(BTreeMap::is_empty)
+            && self.armor_classes.is_empty()
     }
 
     /// How many slots fire a library weapon, across every unit.

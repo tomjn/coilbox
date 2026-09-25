@@ -101,6 +101,13 @@ import { EmptyState, SkeletonList } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
+import {
+  armorClassesOf,
+  armorClassOf,
+  normaliseArmorDefs,
+  setArmorClass,
+  unknownDamageClasses,
+} from "../armorClasses";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
 import {
   adoptBeforePost,
@@ -190,6 +197,7 @@ import {
   equippedKey,
   equipRefusal,
   equipWeapon,
+  libraryWeaponDef,
   mountsOf,
   removeLibraryWeapon,
   setLibraryField,
@@ -218,6 +226,7 @@ import {
   weaponSlots,
   weaponSlotView,
 } from "../weaponSlots";
+import { ArmorClassPanel } from "./components/ArmorClassPanel";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
@@ -775,6 +784,52 @@ export default function UnitPage() {
   // #2651). Off the game's own table, never the one with our units in it: a
   // built unit has nothing to say about which classes exist.
   const moveClasses = useMemo(() => moveClassesOf(gameUnits), [gameUnits]);
+
+  // The game's own armour classes, from `gamedata/armordefs.lua` (issue
+  // #2645). Unlike a movement class this is never a key on the unit's own
+  // definition, so it is read here rather than folded into `choices` below,
+  // and moving a unit writes to its own store rather than to `overrides`.
+  const armorDefs = useMemo(
+    () => normaliseArmorDefs(defs?.armorDefs),
+    [defs?.armorDefs],
+  );
+  const armorMoves = edits.armorClasses?.moves;
+  const inheritedArmorClass = armorClassOf(armorDefs, undefined, unitKey);
+  const currentArmorClass = armorClassOf(armorDefs, armorMoves, unitKey);
+  const armorClassOptions = useMemo(
+    () => armorClassesOf(armorDefs, armorMoves),
+    [armorDefs, armorMoves],
+  );
+  const onChangeArmorClass = (className: string) =>
+    commit((current) =>
+      editSlot(current, "armorClasses", (ac) =>
+        setArmorClass(ac, armorDefs, unitKey, className, inheritedArmorClass),
+      ),
+    );
+  // A weapon's damage table naming an armour class this game and this project
+  // neither one has (issue #2645), across every definition the unit carries
+  // itself and every library weapon its slots fire, the same scope `refIssues`
+  // above checks references in.
+  const armorProblems = useMemo(() => {
+    const known = armorClassOptions.map((c) => c.name);
+    const asDef = (value: unknown): Record<string, unknown> | undefined =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : undefined;
+    const own = ownWeaponDefs(edited).defs;
+    const ownProblems = Object.entries(own).flatMap(([key, value]) => {
+      const def = asDef(value);
+      return def ? unknownDamageClasses(def, known, key) : [];
+    });
+    const firedProblems = Object.values(unitEquipped ?? {}).flatMap((key) => {
+      const weapon = library[key];
+      return weapon
+        ? unknownDamageClasses(libraryWeaponDef(weapon), known, key)
+        : [];
+    });
+    return [...ownProblems, ...firedProblems];
+  }, [edited, armorClassOptions, unitEquipped, library]);
+
   const choices = useMemo((): Record<string, FieldChoices> | undefined => {
     if (moveClasses.length === 0) return undefined;
     return {
@@ -2068,13 +2123,20 @@ export default function UnitPage() {
                     onSelectSupport={(key) =>
                       select({ tab: "weapons", support: key, slot: "" })
                     }
-                    problems={refIssues}
+                    problems={[...refIssues, ...armorProblems]}
                   />
                 </TabsContent>
                 <TabsContent
                   value="fields"
                   className="flex flex-none flex-col gap-3"
                 >
+                  <ArmorClassPanel
+                    unitName={nameOf(unitKey, unit)}
+                    current={currentArmorClass}
+                    inherited={inheritedArmorClass}
+                    options={armorClassOptions}
+                    onChange={onChangeArmorClass}
+                  />
                   <UnitTextPanel
                     rows={textRows}
                     home={home}

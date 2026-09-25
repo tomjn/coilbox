@@ -53,6 +53,11 @@ import {
 } from "../container/gameIdentity";
 import { MAX_CODE_LENGTH } from "../deeplink/parse";
 import { readStoredSetting, updateStoredSetting } from "../lib/storedSetting";
+import {
+  type ArmorClasses,
+  EMPTY_ARMOR_CLASSES,
+  parseArmorClasses,
+} from "./armorClasses";
 import { parsePostChange } from "./beforePost";
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import { buildMenuOpCount } from "./buildMenus";
@@ -120,6 +125,10 @@ export interface GameEdits {
   disabled: DisabledUnits;
   weapons?: WeaponLibrary;
   equipped?: EquippedWeapons;
+  /** Units the project has moved to a different armour class (issue #2645),
+   *  and the game's own class membership from the moment of the first move.
+   *  Optional for the same reason `weapons` is. */
+  armorClasses?: ArmorClasses;
 }
 
 /**
@@ -137,6 +146,7 @@ export const EMPTY_EDITS: GameEdits = {
   disabled: [],
   weapons: {},
   equipped: {},
+  armorClasses: EMPTY_ARMOR_CLASSES,
 };
 
 /** Whether a slot holds anything at all, whichever of the five it is. */
@@ -156,7 +166,10 @@ export function isEmptyEdits(edits: GameEdits): boolean {
     slotIsEmpty(edits.text) &&
     slotIsEmpty(edits.disabled) &&
     slotIsEmpty(edits.weapons) &&
-    slotIsEmpty(edits.equipped)
+    slotIsEmpty(edits.equipped) &&
+    // `base` on its own says nothing the game does not already say, so only
+    // `moves` counts, the same way `ArmorClasses::is_empty` reads it in Rust.
+    Object.keys(edits.armorClasses?.moves ?? {}).length === 0
   );
 }
 
@@ -199,6 +212,8 @@ export interface EditCounts {
   weapons: number;
   /** Slots that fire one of them. */
   equipped: number;
+  /** Units moved to a different armour class (issue #2645). */
+  armorMoves: number;
 }
 
 export function editCounts(edits: GameEdits): EditCounts {
@@ -209,12 +224,14 @@ export function editCounts(edits: GameEdits): EditCounts {
     off: edits.disabled.length,
     weapons: Object.keys(edits.weapons ?? {}).length,
     equipped: equippedCount(edits.equipped),
+    armorMoves: Object.keys(edits.armorClasses?.moves ?? {}).length,
   };
 }
 
 /** The counts as a sentence, for a header that says what is in the project. */
 export function describeEdits(edits: GameEdits): string {
-  const { fields, added, menuOps, off, weapons, equipped } = editCounts(edits);
+  const { fields, added, menuOps, off, weapons, equipped, armorMoves } =
+    editCounts(edits);
   const parts = [
     fields > 0 && `${fields} change${fields === 1 ? "" : "s"}`,
     added > 0 && `${added} unit${added === 1 ? "" : "s"} added`,
@@ -222,6 +239,8 @@ export function describeEdits(edits: GameEdits): string {
     off > 0 && `${off} unit${off === 1 ? "" : "s"} disabled`,
     weapons > 0 &&
       `${weapons} library weapon${weapons === 1 ? "" : "s"}${equipped > 0 ? ` in ${equipped} slot${equipped === 1 ? "" : "s"}` : ""}`,
+    armorMoves > 0 &&
+      `${armorMoves} unit${armorMoves === 1 ? "" : "s"} moved to a different armour class`,
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0 ? "Nothing changed yet" : parts.join(", ");
 }
@@ -990,6 +1009,7 @@ export function parseGameEdits(value: unknown): GameEdits {
     disabled: parseDisabled(source.disabled),
     weapons: parseWeaponLibrary(source.weapons),
     equipped: parseEquippedWeapons(source.equipped),
+    armorClasses: parseArmorClasses(source.armorClasses),
   };
 }
 
