@@ -64,6 +64,7 @@ import {
   type ProjectDetails,
   ProjectDetailsDrawer,
 } from "./components/ProjectDetailsDrawer";
+import { RandomModDrawer } from "./components/RandomModDrawer";
 
 /** When a project was last written to, in words a person reads at a glance. */
 function when(iso: string): string {
@@ -341,12 +342,12 @@ export default function ProjectsPage() {
   }
 
   /**
-   * What a decoded tweak set turned into is created and opened the same way
-   * an imported file is (issue #1280): a project is a document rather than a
-   * setting, so there is nothing left to ask once the drawer has a game and
-   * something to put in it.
+   * What a decoded tweak set, or a randomised mod (issue #1318), turned into
+   * is created and opened the same way an imported file is (issue #1280): a
+   * project is a document rather than a setting, so there is nothing left to
+   * ask once the drawer has a game and something to put in it.
    */
-  function onDecodedStart(input: NewProject) {
+  function startFromInput(input: NewProject) {
     setError(null);
     navigate(projectPath(createProject(input).id));
   }
@@ -369,7 +370,16 @@ export default function ProjectsPage() {
                 games={games}
                 headers={gameHeaders}
                 scanning={scan.loading}
-                onStarted={onDecodedStart}
+                onStarted={startFromInput}
+              />
+              <RandomModDrawer
+                games={games}
+                headers={gameHeaders}
+                scanning={scan.loading}
+                projects={projects}
+                enginePath={selected?.enginePath}
+                dataDir={selected?.rootPath}
+                onStarted={startFromInput}
               />
               <Button size="sm" variant="secondary" onClick={onImport}>
                 <Upload className="mr-1 size-3.5" />

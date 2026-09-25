@@ -85,8 +85,11 @@ export function applyBatchRounding(
 
 /** The field a unit holds one of `keys` under, checking its override before
  *  its def, case-insensitively against the def the way `searchQuery.ts`'s own
- *  field lookup does. `undefined` when neither holds any of `keys`. */
-function findField(
+ *  field lookup does. `undefined` when neither holds any of `keys`.
+ *
+ *  Exported for `randomMod.ts` (issue #1318), which resolves a unit's numeric
+ *  fields the same way a batch edit does rather than keeping a second lookup. */
+export function findField(
   def: Record<string, unknown> | undefined,
   unitOverrides: Record<string, unknown> | undefined,
   keys: readonly string[],
@@ -105,7 +108,8 @@ function findField(
   return undefined;
 }
 
-function toNumber(raw: unknown): number | undefined {
+/** Exported alongside {@link findField} for the same reason. */
+export function toNumber(raw: unknown): number | undefined {
   if (typeof raw === "number" && Number.isFinite(raw)) return raw;
   if (typeof raw === "string" && raw.trim() !== "") {
     const parsed = Number(raw);
