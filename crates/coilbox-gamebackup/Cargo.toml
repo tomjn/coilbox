@@ -6,6 +6,11 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+# Setting a directory's own mtime (issue #2637): std's `File::set_modified`
+# cannot open a directory for write on Windows, and this is the one crate that
+# gets it right on all three platforms. Already resolved in the workspace lock
+# at 0.2.29, pulled in transitively by `tar`, so this adds no new version.
+filetime = "0.2"
 
 [dev-dependencies]
 tempfile = { workspace = true }

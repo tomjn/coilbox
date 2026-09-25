@@ -389,6 +389,12 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         MARKERS.write(file, text.as_bytes())?;
         outcome.written.push(rel(file));
     }
+    // The unitsync worker and the engine's own archive cache both key a loose
+    // game on its folder's own mtime (issue #2637), which a write under
+    // `units/` never moves on its own.
+    if !outcome.written.is_empty() {
+        coilbox_gamebackup::touch(game_dir);
+    }
     Ok(outcome)
 }
 
@@ -405,6 +411,11 @@ pub fn status(game_dir: &Path) -> StatusOutcome {
 pub fn undo(game_dir: &Path) -> Result<UndoOutcome, String> {
     require_loose_game(game_dir)?;
     let undone = MARKERS.undo(game_dir)?;
+    // Undo puts old content back on disk, which is exactly what a stale
+    // unitsync read would otherwise keep answering with (issue #2637).
+    if !undone.restored.is_empty() || !undone.deleted.is_empty() {
+        coilbox_gamebackup::touch(game_dir);
+    }
     Ok(UndoOutcome {
         restored: undone.restored,
         deleted: undone.deleted,
@@ -415,9 +426,15 @@ pub fn undo(game_dir: &Path) -> Result<UndoOutcome, String> {
 /// backups.
 pub fn accept(game_dir: &Path) -> Result<AcceptOutcome, String> {
     require_loose_game(game_dir)?;
-    Ok(AcceptOutcome {
-        kept: MARKERS.accept(game_dir)?,
-    })
+    let kept = MARKERS.accept(game_dir)?;
+    // Accept does not touch a unit file's own content, but it is offered
+    // beside write and undo as one route, and the frontend refreshes after
+    // all three (issue #2637): touching here means a scan that raced the
+    // write and lost still gets put right once the user accepts.
+    if !kept.is_empty() {
+        coilbox_gamebackup::touch(game_dir);
+    }
+    Ok(AcceptOutcome { kept })
 }
 
 #[cfg(test)]
@@ -636,6 +653,85 @@ mod tests {
         assert_eq!(accepted.kept, vec!["units/armdfly.lua"]);
         assert!(read(&dfly).contains("metalcost = 400"));
         assert_eq!(status(&game).backups, 0);
+    }
+
+    /// Set `path`'s mtime a day in the past, so a later touch to now has
+    /// something older to move away from regardless of filesystem
+    /// resolution.
+    fn backdate(path: &Path) {
+        let day_ago =
+            filetime::FileTime::from_unix_time(filetime::FileTime::now().seconds() - 86_400, 0);
+        filetime::set_file_mtime(path, day_ago).unwrap();
+    }
+
+    fn mtime(path: &Path) -> std::time::SystemTime {
+        std::fs::metadata(path).unwrap().modified().unwrap()
+    }
+
+    #[test]
+    fn a_write_bumps_the_games_own_mtime_so_a_stale_scan_notices() {
+        let (_root, game) = game();
+        backdate(&game);
+        let before = mtime(&game);
+
+        write(
+            &game,
+            &project(serde_json::json!({ "armdfly": { "metalcost": 400 } })),
+        )
+        .unwrap();
+
+        assert_ne!(
+            mtime(&game),
+            before,
+            "a write changed a unit file, so the game folder's own mtime must \
+             move or the unitsync cache keeps answering with the old content"
+        );
+    }
+
+    #[test]
+    fn a_write_that_changes_nothing_leaves_the_games_mtime_alone() {
+        let (_root, game) = game();
+        write(
+            &game,
+            &project(serde_json::json!({ "armdfly": { "metalcost": 400 } })),
+        )
+        .unwrap();
+        backdate(&game);
+        let before = mtime(&game);
+
+        // The same edit again: the patcher sees the value already matches
+        // and writes nothing.
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "armdfly": { "metalcost": 400 } })),
+        )
+        .unwrap();
+
+        assert!(outcome.written.is_empty());
+        assert_eq!(mtime(&game), before);
+    }
+
+    #[test]
+    fn undo_and_accept_each_bump_the_games_own_mtime() {
+        let (_root, game) = game();
+        let edits = project(serde_json::json!({ "armdfly": { "metalcost": 400 } }));
+
+        write(&game, &edits).unwrap();
+        backdate(&game);
+        let before_undo = mtime(&game);
+        undo(&game).unwrap();
+        assert_ne!(
+            mtime(&game),
+            before_undo,
+            "undo put the old content back, which is as much a content \
+             change as the write was"
+        );
+
+        write(&game, &edits).unwrap();
+        backdate(&game);
+        let before_accept = mtime(&game);
+        accept(&game).unwrap();
+        assert_ne!(mtime(&game), before_accept);
     }
 
     #[test]
