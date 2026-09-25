@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { setArmorClass } from "./armorClasses";
 import {
   addToBuildMenu,
   moveBeforeInBuildMenu,
@@ -55,8 +56,16 @@ const FIXTURE = join(
 const INHERITED_MENU = ["armpw", "armflash"];
 
 function buildEdits(): GameEdits {
-  let { overrides, clones, menus, text, disabled, weapons, equipped } =
-    EMPTY_EDITS;
+  let {
+    overrides,
+    clones,
+    menus,
+    text,
+    disabled,
+    weapons,
+    equipped,
+    armorClasses,
+  } = EMPTY_EDITS;
 
   // A number and a nested path, so the dotted keys an override set uses are
   // both in the file.
@@ -116,7 +125,26 @@ function buildEdits(): GameEdits {
   weapons = setLibraryField(weapons, "heavylaser", "range", 450, 300);
   equipped = equipWeapon(equipped, "armcom", "0", "heavylaser");
 
-  return { overrides, clones, menus, text, disabled, weapons, equipped };
+  // A unit moved to a class the game does not name, which is also what takes
+  // the snapshot the compiler needs (issue #2645).
+  armorClasses = setArmorClass(
+    armorClasses,
+    { commanders: ["armcom", "corcom"] },
+    "armflash",
+    "heavyunits",
+    "default",
+  );
+
+  return {
+    overrides,
+    clones,
+    menus,
+    text,
+    disabled,
+    weapons,
+    equipped,
+    armorClasses,
+  };
 }
 
 /**

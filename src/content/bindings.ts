@@ -1367,6 +1367,15 @@ export interface UnitDefsResult {
    */
   weaponDefs: Record<string, Record<string, unknown>>;
   /**
+   * The game's armour classes, from `gamedata/armordefs.lua`: each class name
+   * to whatever the game listed as its members, ordinarily an array of unit
+   * def keys. The engine assigns a unit's class purely from which of these
+   * lists names it, always trying a class it calls `default` first regardless
+   * of what the game writes here, so a unit named nowhere in this table is in
+   * that class rather than in none (issue #2645).
+   */
+  armorDefs: Record<string, unknown>;
+  /**
    * The units the game's own def loader could not read, in its own words. The
    * loader runs each unit file separately and logs the ones that raise, so a
    * broken unit costs that unit and not the scan. Without this the unit would

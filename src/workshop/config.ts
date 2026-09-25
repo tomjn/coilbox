@@ -95,6 +95,7 @@ export function useUnitDefs(
         setDefs({
           ...res,
           units,
+          armorDefs: res.armorDefs ?? {},
           unitErrors: res.unitErrors ?? [],
           errors: res.errors ?? [],
         });
