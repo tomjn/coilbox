@@ -105,6 +105,7 @@ import {
   armorClassesOf,
   armorClassOf,
   normaliseArmorDefs,
+  rebaseArmorClasses,
   setArmorClass,
   unknownDamageClasses,
 } from "../armorClasses";
@@ -915,6 +916,33 @@ export default function UnitPage() {
         setArmorClass(ac, armorDefs, unitKey, className, inheritedArmorClass),
       ),
     );
+
+  // A project's armour-class snapshot is only ever taken once, the moment it
+  // moves its first unit, and the compiler never sees the game to check it
+  // against (issue #3062). Left alone, a game update to `armordefs.lua`
+  // silently reverts every unit the project never touched to whatever class
+  // the game gave it back when the snapshot was taken. Refreshed on load, the
+  // same one-step correction `migrateCloneText` and `adoptBeforePost` make
+  // above, so opening the project against today's game keeps every untouched
+  // unit following the live game. Gated on `defs` so this never runs against
+  // the empty class table a page shows before the game's own read lands, which
+  // would otherwise wipe a real snapshot out from under it.
+  const pendingArmorRebase = useMemo(
+    () => (defs ? rebaseArmorClasses(edits.armorClasses, armorDefs) : null),
+    [defs, edits.armorClasses, armorDefs],
+  );
+  const rebaseArmorRef = useRef<() => void>(() => {});
+  rebaseArmorRef.current = () => {
+    commit((current) => {
+      const rebased = rebaseArmorClasses(current.armorClasses, armorDefs);
+      if (!rebased) return current;
+      return editSlot(current, "armorClasses", () => rebased);
+    });
+  };
+  useEffect(() => {
+    if (pendingArmorRebase) rebaseArmorRef.current();
+  }, [pendingArmorRebase]);
+
   // A weapon's damage table naming an armour class this game and this project
   // neither one has (issue #2645), across every definition the unit carries
   // itself and every library weapon its slots fire, the same scope `refIssues`
@@ -1446,6 +1474,7 @@ export default function UnitPage() {
               edits: project.edits,
               units: defs.units,
               weaponDefs: defs.weaponDefs,
+              armorDefs,
               gameName: game?.name ?? project.gameName,
               // Already being fetched for issue #2661's field notes, so a dead
               // `customParams` key only ever fills in once that scan lands
@@ -1454,7 +1483,7 @@ export default function UnitPage() {
             },
           )
         : null,
-    [project, defs, game?.name, consumers],
+    [project, defs, armorDefs, game?.name, consumers],
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
 

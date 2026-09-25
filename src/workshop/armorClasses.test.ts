@@ -5,6 +5,7 @@ import {
   EMPTY_ARMOR_CLASSES,
   normaliseArmorDefs,
   parseArmorClasses,
+  rebaseArmorClasses,
   resolvedArmorDefs,
   setArmorClass,
   unknownDamageClasses,
@@ -197,6 +198,89 @@ describe("setArmorClass", () => {
         "commanders",
       ),
     ).toBeUndefined();
+  });
+});
+
+describe("rebaseArmorClasses", () => {
+  const moved = setArmorClass(
+    undefined,
+    BA_ARMOR_DEFS,
+    "armcom",
+    "heavyunits",
+    "commanders",
+  );
+
+  it("does nothing for a project that has never moved a unit", () => {
+    expect(
+      rebaseArmorClasses(undefined, { commanders: ["armcom", "corcom"] }),
+    ).toBeNull();
+  });
+
+  it("does nothing once the snapshot already matches the live game", () => {
+    expect(rebaseArmorClasses(moved, BA_ARMOR_DEFS)).toBeNull();
+  });
+
+  it("ignores member order and array-vs-object emptiness when comparing", () => {
+    const reordered = { vtol: ["armkam"], commanders: ["corcom", "armcom"] };
+    expect(rebaseArmorClasses(moved, reordered)).toBeNull();
+  });
+
+  it("refreshes the snapshot when the game's own membership has changed, keeping the moves", () => {
+    const updated = { commanders: ["corcom"], vtol: ["armkam", "armseer"] };
+    expect(rebaseArmorClasses(moved, updated)).toEqual({
+      base: updated,
+      moves: { armcom: "heavyunits" },
+    });
+  });
+
+  it("picks up a class the game added since the snapshot was taken", () => {
+    const withNewClass = { ...BA_ARMOR_DEFS, shields: [] };
+    expect(rebaseArmorClasses(moved, withNewClass)).toEqual({
+      base: withNewClass,
+      moves: { armcom: "heavyunits" },
+    });
+  });
+
+  it("picks up a class the game removed since the snapshot was taken", () => {
+    const withoutVtol = { commanders: ["armcom", "corcom"] };
+    expect(rebaseArmorClasses(moved, withoutVtol)).toEqual({
+      base: withoutVtol,
+      moves: { armcom: "heavyunits" },
+    });
+  });
+
+  /** "heavyunits" above was never a real class: it is a name `setArmorClass`
+   *  invented, and BA_ARMOR_DEFS never carried it, so those cases above are
+   *  really testing that an invented class is left alone. This is the other
+   *  case: a class that really was in the game when the project moved a unit
+   *  into it. */
+  it("keeps a class the game has since removed, but only while a move still targets it", () => {
+    const movedToReal = setArmorClass(
+      undefined,
+      BA_ARMOR_DEFS,
+      "armkam",
+      "commanders",
+      "vtol",
+    );
+    const withoutCommanders = { vtol: [] };
+    expect(rebaseArmorClasses(movedToReal, withoutCommanders)).toEqual({
+      base: { vtol: [], commanders: ["armcom", "corcom"] },
+      moves: { armkam: "commanders" },
+    });
+  });
+
+  it("drops a preserved class once no move targets it any more", () => {
+    // As if "commanders" had already been preserved by an earlier rebase
+    // while armkam targeted it, and the project has since moved armkam
+    // somewhere else, leaving corak's own unrelated move as the only one left.
+    const noLongerTargeted = {
+      base: { vtol: [], commanders: ["armcom", "corcom"] },
+      moves: { corak: "vtol" },
+    };
+    expect(rebaseArmorClasses(noLongerTargeted, { vtol: [] })).toEqual({
+      base: { vtol: [] },
+      moves: { corak: "vtol" },
+    });
   });
 });
 

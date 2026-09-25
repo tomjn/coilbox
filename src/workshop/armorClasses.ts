@@ -220,6 +220,80 @@ export function setArmorClass(
   return { base, moves: { ...current.moves, [unitKey]: target } };
 }
 
+/** Whether two class tables name the same classes with the same members,
+ *  order aside: the worker rebuilds `armorDefs` from Lua tables on every read,
+ *  which owes nothing to the order a class's members were declared in. */
+function sameArmorDefs(
+  a: Record<string, string[]>,
+  b: Record<string, string[]>,
+): boolean {
+  const aKeys = Object.keys(a).sort();
+  const bKeys = Object.keys(b).sort();
+  if (aKeys.length !== bKeys.length) return false;
+  return aKeys.every((key, i) => {
+    if (key !== bKeys[i]) return false;
+    const av = [...a[key]].sort();
+    const bv = [...b[key]].sort();
+    return av.length === bv.length && av.every((m, j) => m === bv[j]);
+  });
+}
+
+/**
+ * Refresh `base` to the game's live class membership, keeping every move the
+ * project has made (issue #3062).
+ *
+ * `compile::compile` never sees the game (its own doc comment), so `base` is
+ * the only place the class an untouched unit compiles into comes from. Taken
+ * once and never refreshed, it drifts the moment the game's own
+ * `armordefs.lua` changes without the project's own moves changing at all,
+ * silently reverting every unit the project never touched to whatever class
+ * the game gave it back when the project moved its first unit.
+ *
+ * Rebasing on load is the fix, and the frontend is where it has to happen:
+ * the compiler is handed the project alone. This is the same one-step
+ * correction `migrateCloneText` and `adoptBeforePost` make on their own
+ * stores, so `null` once there is nothing left to refresh, matching both,
+ * which is what lets an effect built on this settle after the first render
+ * that has a live game read rather than looping.
+ *
+ * One class of `base` entry is kept rather than replaced: a class a move
+ * still targets that the live game no longer has. Dropping it the moment the
+ * game changes would erase the only evidence that the move's target ever
+ * existed, and `armorClassFindings` (`compatibility.ts`) needs that evidence
+ * to tell a class the game genuinely removed or renamed apart from a class
+ * the modder simply invented with "Add a class" and never expected the game
+ * to carry: both look identical to a check that only asks "is this in the
+ * live game", since {@link ArmorClassPanel} lets a modder move a unit into a
+ * class the game has never heard of and that is a normal, supported thing to
+ * do. Keeping the stale entry does mean any *other*, untouched unit the old
+ * snapshot also listed under that vanished class keeps compiling into it
+ * until the modder acts on the finding, rather than snapping to the live
+ * game immediately like every other class does: a bounded, visible
+ * trade-off, not the silent, project-wide one this issue is about.
+ */
+export function rebaseArmorClasses(
+  armorClasses: ArmorClasses | undefined,
+  liveArmorDefs: Record<string, string[]>,
+): ArmorClasses | null {
+  if (!armorClasses || Object.keys(armorClasses.moves).length === 0)
+    return null;
+  const targets = new Set(
+    Object.values(armorClasses.moves)
+      .filter((c) => c.toLowerCase() !== "default")
+      .map((c) => c.toLowerCase()),
+  );
+  const liveLower = new Set(
+    Object.keys(liveArmorDefs).map((c) => c.toLowerCase()),
+  );
+  const next: Record<string, string[]> = { ...liveArmorDefs };
+  for (const [name, members] of Object.entries(armorClasses.base)) {
+    if (targets.has(name.toLowerCase()) && !liveLower.has(name.toLowerCase()))
+      next[name] = members;
+  }
+  if (sameArmorDefs(armorClasses.base, next)) return null;
+  return { ...armorClasses, base: next };
+}
+
 /** One thing wrong with a definition, for the same rendering `RefProblem`
  *  already has in `WeaponSlotsPanel`. */
 export interface ArmorProblem {

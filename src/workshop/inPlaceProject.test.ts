@@ -47,6 +47,7 @@ function unmoved(p: ModProject, current: string) {
       edits: p.edits,
       units: {},
       weaponDefs: {},
+      armorDefs: {},
       gameName: p.gameName,
     },
   ).kind;
