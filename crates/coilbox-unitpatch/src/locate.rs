@@ -1103,12 +1103,33 @@ fn style(source: &str, unit: &TableConstructor, container: &TableConstructor) ->
         } else {
             "\n"
         },
-        step: indent_step(source),
+        step: container_step(source, container).unwrap_or_else(|| indent_step(source)),
         separator,
         quote,
         numbered: first_list_numbered(unit).unwrap_or(false),
         bracketed,
     }
+}
+
+/// One level of indentation as `table` writes it: how much further in its
+/// first field's line is than the line its opening brace is on. `None` when
+/// the field shares the brace's line or is not indented further, and the
+/// file's own step is used instead. A file can indent some lines with spaces
+/// and its tables with tabs, as flove's `mushrooms.lua` does.
+fn container_step(source: &str, table: &TableConstructor) -> Option<String> {
+    let (open, _) = table.braces().tokens();
+    let brace = open.span().0;
+    let field = table.fields().iter().next()?.span().0;
+    let line_of = |at: usize| source[..at].matches('\n').count();
+    if line_of(field) == line_of(brace) {
+        return None;
+    }
+    let outer = indentation(source, brace);
+    let inner = indentation(source, field);
+    inner
+        .strip_prefix(outer.as_str())
+        .filter(|step| !step.is_empty())
+        .map(str::to_string)
 }
 
 /// Whether the first list inside `table`, depth first, is written with its

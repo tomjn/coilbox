@@ -117,6 +117,19 @@ fn a_table_the_file_already_holds_changes_nothing() {
     assert_eq!(again.text, first.text);
 }
 
+/// flove's `mushrooms.lua` indents some lines with spaces and its tables
+/// with tabs. A table written into one takes the step that table's own
+/// fields are indented by, not the first indented line in the file.
+#[test]
+fn a_table_is_indented_by_the_step_its_container_uses() {
+    let source = "local Base = Unit:New {\n    maxdamage = 1,\n}\nlocal U = Base:New {\n\tname = \"U\",\n}\nreturn lowerkeys({ U = U })\n";
+    let patched = run(source, &set("U", "weapondefs.heavylaser", laser())).unwrap();
+    assert_eq!(
+        inserted(source, &patched),
+        "\tweapondefs = {\n\t\theavylaser = {\n\t\t\tdamage = {\n\t\t\t\tdefault = 100,\n\t\t\t\tvtol = 5,\n\t\t\t},\n\t\t\trange = 300,\n\t\t\tweapontype = \"LaserCannon\",\n\t\t},\n\t},\n"
+    );
+}
+
 #[test]
 fn a_changed_table_replaces_the_one_the_file_holds() {
     let source = fixture("bar_armdfly.lua");
