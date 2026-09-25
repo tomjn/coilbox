@@ -3,6 +3,7 @@ import BA from "./fixtures/ba-units-slice.json";
 import { setOverride } from "./overrides";
 import type { FieldRow } from "./unitSections";
 import {
+  libraryWeaponGroup,
   slotEditCount,
   slotOfPath,
   unitsMounting,
@@ -305,6 +306,57 @@ describe("weaponSlotView", () => {
     const view = weaponSlotView(slot, {}, "u", "all", "U");
     expect(view.groups[0].sections).toEqual([]);
     expect(view.groups[0].note).toContain("no mount fields");
+  });
+});
+
+describe("a slot firing a library weapon (issue #2640)", () => {
+  const [laser] = armcomSlots();
+  const weapon = {
+    key: "heavylaser",
+    source: "armcom_armcomlaser",
+    def: { range: 300, damage: { default: 75 } },
+    changes: { range: 450 },
+  };
+
+  it("draws the library weapon in place of the game's definition, apart from the unit's fields", () => {
+    const view = weaponSlotView(
+      laser,
+      {},
+      "armcom",
+      "relevant",
+      "Commander",
+      0,
+      { weapon, mounts: 3 },
+    );
+    expect(view.groups.map((g) => g.id)).toEqual(["slot"]);
+    expect(view.library?.id).toBe("library");
+    expect(view.library?.note).toContain(
+      "it reaches the 2 other slots that fire it too",
+    );
+    const range = rowsOf(view.library).find((r) => r.field.key === "range");
+    expect(range).toMatchObject({
+      path: "range",
+      value: 450,
+      inherited: 300,
+      state: "overridden",
+    });
+    const dmg = rowsOf(view.library).find((r) => r.path === "damage.default");
+    expect(dmg).toMatchObject({ value: 75, state: "inherited" });
+    expect(view.shown).toBe(rowsOf(view.groups[0]).length + 2);
+  });
+
+  it("keeps an edit on screen for a field the copy never declared", () => {
+    const { group, relevant } = libraryWeaponGroup(
+      { ...weapon, changes: { reloadtime: 2 } },
+      "relevant",
+      "",
+    );
+    expect(relevant).toBe(3);
+    expect(rowsOf(group).find((r) => r.path === "reloadtime")).toMatchObject({
+      present: false,
+      value: 2,
+      state: "overridden",
+    });
   });
 });
 

@@ -2529,6 +2529,175 @@ describe("UnitPage", () => {
         ),
       ).toBeTruthy();
     });
+
+    const project = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+
+    /**
+     * Issue #3052. A slot naming a weapon out of the game's shared table gets
+     * its own copy in the project's library, equipped into that slot, and
+     * the copy's fields are then the ones on screen and editable.
+     */
+    it("gives a unit its own copy of a shared weapon and edits only the copy", async () => {
+      openGunner();
+      openWeapons();
+      fireEvent.click(slotButton(3));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Give Gunner its own copy" }),
+      );
+      const name = (await screen.findByLabelText(
+        /^Weapon name/,
+      )) as HTMLInputElement;
+      expect(name.value).toBe("sharedgun_copy");
+      fireEvent.click(screen.getByRole("button", { name: "Copy and equip" }));
+
+      expect(project()?.edits.weapons).toEqual({
+        sharedgun_copy: {
+          key: "sharedgun_copy",
+          source: "sharedgun",
+          sourceChecksum: "abc",
+          def: { name: "Shared Gun", range: 450 },
+        },
+      });
+      expect(project()?.edits.equipped).toEqual({
+        gunner: { "2": "sharedgun_copy" },
+      });
+      expect(screen.getByText("Library weapon sharedgun_copy")).toBeTruthy();
+      expect(slotButton(3).textContent).toContain("sharedgun_copy");
+
+      const range = screen.getByLabelText("Range") as HTMLInputElement;
+      expect(range.disabled).toBe(false);
+      type(range, "500");
+      expect(project()?.edits.weapons?.sharedgun_copy.changes).toEqual({
+        range: 500,
+      });
+      // Nothing was written against the unit itself or the shared weapon.
+      expect(project()?.edits.overrides).toEqual({});
+      expect(screen.getByText(/Copied value: 450/)).toBeTruthy();
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Put back SHAREDGUN" }),
+      );
+      expect(project()?.edits.equipped).toEqual({});
+      expect(
+        screen.getByText("Weapon definition sharedgun, shared"),
+      ).toBeTruthy();
+      // The weapon stays in the library for another slot to use.
+      expect(project()?.edits.weapons).toHaveProperty("sharedgun_copy");
+    });
+
+    it("copies a weapon the unit carries with the project's changes, as one undo step", async () => {
+      openGunner();
+      openWeapons();
+      type(screen.getByLabelText("Range") as HTMLInputElement, "450");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Equip a library weapon" }),
+      );
+      const name = (await screen.findByLabelText(
+        /^Weapon name/,
+      )) as HTMLInputElement;
+      expect(name.value).toBe("gunner_laser_copy");
+      // A name the unit already carries a definition under is refused.
+      type(name, "laser");
+      expect(
+        screen.getByText(/already carries a weapon definition called laser/),
+      ).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Copy and equip" }),
+      ).toHaveProperty("disabled", true);
+      type(name, "biglaser");
+      fireEvent.click(screen.getByRole("button", { name: "Copy and equip" }));
+
+      const weapon = project()?.edits.weapons?.biglaser;
+      expect(weapon?.source).toBe("gunner_laser");
+      expect(weapon?.def).toMatchObject({ range: 450, reloadtime: 1 });
+      expect(project()?.edits.equipped).toEqual({
+        gunner: { "0": "biglaser" },
+      });
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(project()?.edits.weapons).toEqual({});
+      expect(project()?.edits.equipped).toEqual({});
+      expect(project()?.edits.overrides).toEqual({
+        gunner: { "weapondefs.laser.range": 450 },
+      });
+    });
+
+    it("equips a weapon already in the library into another slot", async () => {
+      openGunner();
+      openWeapons();
+      fireEvent.click(slotButton(3));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Give Gunner its own copy" }),
+      );
+      await screen.findByLabelText(/^Weapon name/);
+      fireEvent.click(screen.getByRole("button", { name: "Copy and equip" }));
+
+      fireEvent.click(slotButton(2));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Equip a library weapon" }),
+      );
+      fireEvent.click(
+        await screen.findByRole("button", { name: /^sharedgun_copy/ }),
+      );
+      expect(project()?.edits.equipped).toEqual({
+        gunner: { "1": "sharedgun_copy", "2": "sharedgun_copy" },
+      });
+      expect(
+        screen.getByText(/it reaches the 1 other slot that fires it too/),
+      ).toBeTruthy();
+    });
+  });
+
+  /**
+   * Issue #2640. The weapon library is reached from the project page itself,
+   * and holds a weapon copied out of the game before any unit fires it.
+   */
+  describe("the weapon library drawer", () => {
+    it("copies a game weapon into the library and edits it there", async () => {
+      mockWeaponDefs = {
+        sharedgun: { name: "Shared Gun", range: 450 },
+        other_cannon: { name: "Cannon", range: 700 },
+      };
+      show(
+        { armcom: ARMCOM },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+      );
+      fireEvent.click(
+        screen.getByTitle(
+          "The weapons this project owns, to copy, change and equip",
+        ),
+      );
+      const search = await screen.findByLabelText(/^Find a weapon/);
+      fireEvent.change(search, { target: { value: "cannon" } });
+      const list = screen.getByRole("list", { name: "Weapons in the game" });
+      expect(within(list).queryByText("sharedgun")).toBeNull();
+      fireEvent.click(within(list).getByText("other_cannon"));
+      expect(
+        (screen.getByLabelText(/Name for the copy/) as HTMLInputElement).value,
+      ).toBe("other_cannon_copy");
+      fireEvent.click(screen.getByRole("button", { name: "Add to library" }));
+
+      const saved = readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+      expect(saved?.edits.weapons?.other_cannon_copy).toMatchObject({
+        source: "other_cannon",
+        def: { name: "Cannon", range: 700 },
+      });
+      expect(screen.getByText("Not equipped anywhere.")).toBeTruthy();
+
+      type(screen.getByLabelText("Range") as HTMLInputElement, "800");
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.weapons
+          ?.other_cannon_copy.changes,
+      ).toEqual({ range: 800 });
+
+      fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+      await screen.findByText(/It goes out of the library/);
+      const confirm = screen.getAllByRole("button", { name: "Delete" });
+      fireEvent.click(confirm[confirm.length - 1]);
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.weapons,
+      ).toEqual({});
+    });
   });
 
   describe("saving and undoing", () => {
