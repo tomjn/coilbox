@@ -131,7 +131,9 @@ describe("the edit-in-place actions", () => {
     });
     expect(button.hasAttribute("disabled")).toBe(true);
     expect(
-      screen.getByText("This project has no field changes or copies to write."),
+      screen.getByText(
+        "This project has no field changes, copies or equipped weapons to write.",
+      ),
     ).toBeTruthy();
   });
 
@@ -192,6 +194,7 @@ describe("the edit-in-place actions", () => {
       notCarried: [],
       carried: [],
       copies: [],
+      equipped: [],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -217,6 +220,7 @@ describe("the edit-in-place actions", () => {
       notCarried: ["Build menu changes are not written into the game yet."],
       carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
       copies: [],
+      equipped: [],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -248,6 +252,7 @@ describe("the edit-in-place actions", () => {
       notCarried: [],
       carried: [{ unit: "armcom", field: "metalcost", undoable: false }],
       copies: [],
+      equipped: [],
     };
     const onDone = vi.fn();
     renderWrite(project, onDone);
@@ -275,6 +280,7 @@ describe("the edit-in-place actions", () => {
       notCarried: [],
       carried: [],
       copies: [],
+      equipped: [],
     };
     renderWrite({
       ...project,
@@ -314,6 +320,7 @@ describe("the edit-in-place actions", () => {
       copies: [
         { unit: "armpw2", file: "units/armpw2.lua", builders: ["armlab"] },
       ],
+      equipped: [],
     };
     const onDone = vi.fn();
     renderWrite(withCopy, onDone);
@@ -344,6 +351,68 @@ describe("the edit-in-place actions", () => {
       ],
       changed: true,
     });
+  });
+
+  /** Issue #3055. A library weapon equipped into a game unit is something
+   *  to write on its own, the write is sent the game's read of a unit with a
+   *  slot equipped, and the outcome says where each weapon went. */
+  it("writes weapons equipped from the library and says where they went", async () => {
+    writeResponse = {
+      written: ["units/armcom.lua"],
+      changed: 2,
+      unchanged: 0,
+      refused: [],
+      notCarried: [],
+      carried: [],
+      copies: [],
+      equipped: [
+        {
+          unit: "armcom",
+          at: "0",
+          weapon: "heavylaser",
+          file: "units/armcom.lua",
+        },
+        {
+          unit: "armcom",
+          at: "explodeas",
+          weapon: "blast",
+          file: "units/armcom.lua",
+        },
+      ],
+    };
+    renderWrite({
+      ...project,
+      edits: {
+        ...project.edits,
+        overrides: {},
+        weapons: {
+          heavylaser: { key: "heavylaser", source: "armcom_laser", def: {} },
+          blast: { key: "blast", source: "commander_blast", def: {} },
+        },
+        equipped: { armcom: { "0": "heavylaser", explodeas: "blast" } },
+      },
+    });
+    const button = screen.getByRole("button", {
+      name: "Write changes into the game",
+    });
+    expect(button.hasAttribute("disabled")).toBe(false);
+    fireEvent.click(button);
+
+    expect(
+      await screen.findByText(
+        "Equipped heavylaser in armcom's weapon slot 0, in units/armcom.lua.",
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Equipped blast as armcom's explodeas, in units/armcom.lua.",
+      ),
+    ).toBeTruthy();
+    expect(
+      Object.keys(
+        (args.workshop_write_in_place as { sources: object }).sources,
+      ),
+    ).toEqual(["armcom"]);
   });
 
   it("leaves a copy that replaces a game unit to the mutator", () => {

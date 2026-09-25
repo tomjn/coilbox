@@ -52,7 +52,7 @@ pub fn unit_name(path: &Path) -> String {
 
 /// [`crate::patch`] for the `.fbi` file `file`, whose text is `source`.
 pub fn patch(source: &str, edit: &Edit, file: &Path) -> Result<Patched, Refusal> {
-    let value = validate(edit)?;
+    let value = validate_fbi(edit)?;
     let doc = unit_document(source, &edit.unit, file)?;
     let at = |start, end| Location::of(source, start, end);
     let keys = match target(&doc, source, &edit.path, &edit.op, &unit_name(file))? {
@@ -83,10 +83,24 @@ pub fn patch(source: &str, edit: &Edit, file: &Path) -> Result<Patched, Refusal>
     })
 }
 
+/// [`validate`], and a whole table refused: an `.fbi` file has sections of
+/// single values and no `weapondefs` table a unit carries its own weapons
+/// in (issue #3055).
+fn validate_fbi(edit: &Edit) -> Result<&Value, Refusal> {
+    let value = validate(edit)?;
+    if let Value::Table(_) = value {
+        return Err(Refusal::new(
+            RefusalKind::InvalidValue,
+            "An .fbi unit file holds single values only, and has no weapondefs table for a unit to carry a weapon of its own in.",
+        ));
+    }
+    Ok(value)
+}
+
 /// [`crate::locate_edit`] for an `.fbi` file: where `edit` would go, without
 /// writing it.
 pub fn locate_edit(source: &str, edit: &Edit, file: &Path) -> Result<Place, Refusal> {
-    validate(edit)?;
+    validate_fbi(edit)?;
     let doc = unit_document(source, &edit.unit, file)?;
     let keys = match target(&doc, source, &edit.path, &edit.op, &unit_name(file))? {
         Target::Keys(keys) => keys,
@@ -666,6 +680,7 @@ fn text(value: &Value) -> String {
         Value::Number(n) if n.fract() == 0.0 && n.abs() < 1e15 => format!("{}", *n as i64),
         Value::Number(n) => format!("{n}"),
         Value::String(s) => s.clone(),
+        Value::Table(_) => unreachable!("validate_fbi refuses a table"),
     }
 }
 
@@ -681,6 +696,7 @@ fn holds(existing: &str, value: &Value) -> bool {
             _ => false,
         },
         Value::String(s) => existing == s,
+        Value::Table(_) => false,
     }
 }
 

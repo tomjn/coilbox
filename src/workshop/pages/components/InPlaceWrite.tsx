@@ -30,6 +30,12 @@
  * A copy of a game unit is written too, as a new file beside the unit it was
  * copied from (issue #2634). The write is sent the game's own read of each
  * copy's source, which is what the copy's changes are measured against.
+ *
+ * A library weapon equipped into a game unit is written into that unit's own
+ * file (issue #3055), and the outcome says where each one went. One the file
+ * cannot take comes back in `notCarried` with the reason. The project keeps
+ * the weapon equipped, so the library stays where it is edited, and a later
+ * write brings the file up to date with it.
  */
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
@@ -42,6 +48,7 @@ import { isCloneMutatorOnly } from "../../cloneMutatorOnly";
 import {
   copiesToWrite,
   describeRefusal,
+  equipsGameUnits,
   type InPlaceStatus,
   type InPlaceWriteOutcome,
   workshopAcceptInPlace,
@@ -53,6 +60,7 @@ import {
 import type { InPlaceDone } from "../../inPlaceProject";
 import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
 import type { ModProject } from "../../project";
+import { isDeathMount } from "../../weaponLibrary";
 import { DiskDiffDrawer } from "./DiskDiffDrawer";
 
 type Busy = "write" | "undo" | "accept" | null;
@@ -170,7 +178,8 @@ export function InPlaceWrite({
   const routedClones = copiesToWrite(project).filter((c) =>
     isCloneMutatorOnly(project?.cloneMutatorOnly, c.key),
   );
-  const hasWork = hasFieldChanges || copies.length > 0;
+  const equips = equipsGameUnits(project);
+  const hasWork = hasFieldChanges || copies.length > 0 || equips;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border/60 p-2.5">
@@ -254,10 +263,10 @@ export function InPlaceWrite({
           : !hasWork
             ? routed.length > 0 || routedClones.length > 0
               ? "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place."
-              : "This project has no field changes or copies to write."
+              : "This project has no field changes, copies or equipped weapons to write."
             : copies.length > 0
-              ? "Each field change is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
-              : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
+              ? "Each field change and equipped weapon is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
+              : "Each field change and equipped weapon is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
       </p>
       {routed.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
@@ -350,6 +359,15 @@ function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
                 ? `, and to the build menu of ${copy.builders.join(", ")}`
                 : ""}
               .
+            </span>
+          ))}
+          {outcome.equipped.map((e) => (
+            <span key={`${e.unit}:${e.at}`}>
+              Equipped {e.weapon}{" "}
+              {isDeathMount(e.at)
+                ? `as ${e.unit}'s ${e.at}`
+                : `in ${e.unit}'s weapon slot ${e.at}`}
+              , in {e.file}.
             </span>
           ))}
         </>

@@ -22,7 +22,7 @@ use std::path::{Path, PathBuf};
 use coilbox_springlua::SpringLua;
 use serde_json::{Map, Value as Json};
 
-use crate::Value;
+use crate::{TableKey, Value};
 
 /// Run before the unit file. Defines `lowerkeys`, the stand-in class, and a
 /// function that turns the returned table into one JSON can hold: keys
@@ -168,6 +168,7 @@ fn matches(found: &Json, value: &Value) -> bool {
         (Json::Bool(a), Value::Bool(b)) => a == b,
         (Json::Number(a), Value::Number(b)) => a.as_f64() == Some(*b),
         (Json::String(a), Value::String(b)) => a == b,
+        (found @ Json::Object(_), Value::Table(_)) => differing(found, &json(value)).is_empty(),
         _ => false,
     }
 }
@@ -203,11 +204,25 @@ pub fn differing(a: &Json, b: &Json) -> Vec<String> {
     found.iter().map(|path| path.join(".")).collect()
 }
 
+/// `value` in the form [`evaluate`] returns: keys lowercased, positions
+/// written `[1]`.
 fn json(value: &Value) -> Json {
     match value {
         Value::Bool(b) => Json::Bool(*b),
         Value::Number(n) => serde_json::Number::from_f64(*n).map_or(Json::Null, Json::Number),
         Value::String(s) => Json::String(s.clone()),
+        Value::Table(entries) => Json::Object(
+            entries
+                .iter()
+                .map(|(key, item)| {
+                    let key = match key {
+                        TableKey::Name(name) => name.to_lowercase(),
+                        TableKey::Index(index) => format!("[{index}]"),
+                    };
+                    (key, json(item))
+                })
+                .collect(),
+        ),
     }
 }
 
@@ -253,6 +268,9 @@ pub fn confirm(
     expected: &[String],
     value: &Value,
 ) -> Result<(), String> {
+    if let Value::Table(_) = value {
+        return confirm_table(before, after, expected, value);
+    }
     let mut found = Vec::new();
     differences(before, after, &mut Vec::new(), &mut found);
     let others: Vec<String> = found
@@ -285,6 +303,51 @@ pub fn confirm(
             expected.join(".")
         )),
     }
+}
+
+/// [`confirm`] for a whole table. `after` has to be exactly `before` with the
+/// table at `expected`, and any table on the way there that `before` did not
+/// have, which is how the file's own table grows a `weapondefs` it did not
+/// have. Every key inside the new table is compared, not only its presence.
+fn confirm_table(
+    before: &Json,
+    after: &Json,
+    expected: &[String],
+    value: &Value,
+) -> Result<(), String> {
+    let mut wanted = before.clone();
+    let Some((last, parent)) = expected.split_last() else {
+        return Err("The edit names no field.".into());
+    };
+    table_at(&mut wanted, parent).insert(last.clone(), json(value));
+    let mut off = Vec::new();
+    differences(&wanted, after, &mut Vec::new(), &mut off);
+    let (inside, others): (Vec<_>, Vec<_>) =
+        off.into_iter().partition(|path| path.starts_with(expected));
+    if !others.is_empty() {
+        let shown: Vec<String> = others.iter().take(5).map(|p| p.join(".")).collect();
+        let more = match others.len() - shown.len() {
+            0 => String::new(),
+            n => format!(" and {n} more"),
+        };
+        return Err(format!(
+            "The edit would also change {}{more}, so it was not made.",
+            shown.join(", ")
+        ));
+    }
+    if let Some(path) = inside.first() {
+        return Err(format!(
+            "After the edit the file returns a different value for {} than the one asked for.",
+            path.join(".")
+        ));
+    }
+    if differing(before, after).is_empty() {
+        return Err(
+            "The edit made no difference to what the file returns. Something later in the file, or a table it inherits from, decides this value."
+                .into(),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

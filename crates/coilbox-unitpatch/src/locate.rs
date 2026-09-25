@@ -15,7 +15,7 @@ use full_moon::tokenizer::{StringLiteralQuoteType, TokenReference, TokenType};
 use full_moon::LuaVersion;
 
 use crate::render::{self, Quote};
-use crate::{Edit, Game, Location, Op, Refusal, RefusalKind, Segment, Value};
+use crate::{Edit, Game, Location, Op, Refusal, RefusalKind, Segment, TableKey, Value};
 
 /// Deepest chain of `local A = B:New{...}` the patcher follows before giving
 /// up, so a file where two names refer to each other cannot loop forever.
@@ -327,6 +327,7 @@ fn walk(source: &str, tables: Vec<&TableConstructor>, edit: &Edit) -> Result<Pla
         let (start, end) = node.span();
         Location::of(source, start, end)
     };
+    let unit_table = tables[0];
     let mut candidates = tables;
     let last = edit.path.len() - 1;
     for (depth, segment) in edit.path.iter().enumerate() {
@@ -337,7 +338,7 @@ fn walk(source: &str, tables: Vec<&TableConstructor>, edit: &Edit) -> Result<Pla
                 continue;
             };
             if is_target {
-                return replace(source, value, edit);
+                return replace(source, value, edit, &style(source, unit_table, table));
             }
             match value {
                 Expression::TableConstructor(inner) => next.push(inner),
@@ -358,7 +359,16 @@ fn walk(source: &str, tables: Vec<&TableConstructor>, edit: &Edit) -> Result<Pla
             }
         }
         if let (true, Op::Set(value)) = (is_target, &edit.op) {
-            return append_keyed(source, candidates[0], segment, value);
+            let style = style(source, unit_table, candidates[0]);
+            return append_keyed(source, candidates[0], segment, value, &style);
+        }
+        // A whole table can bring the tables on the way to it with it, as a
+        // unit with no `weapondefs` gets one holding its new weapon.
+        if let (true, Op::Set(value @ Value::Table(_))) = (next.is_empty(), &edit.op) {
+            if let Some(wrapped) = wrap(&edit.path[depth + 1..], value) {
+                let style = style(source, unit_table, candidates[0]);
+                return append_keyed(source, candidates[0], segment, &wrapped, &style);
+            }
         }
         if next.is_empty() {
             return Err(Refusal::new(
@@ -387,10 +397,10 @@ fn walk(source: &str, tables: Vec<&TableConstructor>, edit: &Edit) -> Result<Pla
     if numbered {
         let position = fields.len() + 1;
         let entry = keyed_entry(source, list, |_| format!("[{position}]"), &value);
-        return insert(source, list, entry);
+        return insert(source, list, |_| entry);
     }
     if fields.iter().all(|field| matches!(field, Field::NoKey(_))) {
-        return insert(source, list, value);
+        return insert(source, list, |_| value);
     }
     Err(Refusal::new(
         RefusalKind::NotAList,
@@ -948,10 +958,37 @@ fn find_field<'a>(
     }
 }
 
-/// Replace a literal value in place.
-fn replace(source: &str, value: &Expression, edit: &Edit) -> Result<Plan, Refusal> {
+/// Replace a literal value in place. A whole table replaces a literal or a
+/// table written out in the file, in `style`.
+fn replace(
+    source: &str,
+    value: &Expression,
+    edit: &Edit,
+    style: &render::Style,
+) -> Result<Plan, Refusal> {
     let (start, end) = value.span();
     let location = Location::of(source, start, end);
+    if let Op::Set(new @ Value::Table(_)) = &edit.op {
+        if literal(value).is_none() && !matches!(value, Expression::TableConstructor(_)) {
+            return Err(Refusal::new(
+                RefusalKind::FieldComputed,
+                format!(
+                    "This value is worked out by code (`{}`), not written out as a table, so coilbox will not replace it.",
+                    &source[start..end]
+                ),
+            )
+            .at(location));
+        }
+        return Ok(Plan {
+            file: None,
+            splices: vec![(
+                start,
+                end,
+                render::value(new, style, &indentation(source, start)),
+            )],
+            location,
+        });
+    }
     let Some(quote) = literal(value) else {
         return Err(Refusal::new(
             RefusalKind::FieldComputed,
@@ -978,6 +1015,7 @@ fn append_keyed(
     table: &TableConstructor,
     segment: &Segment,
     value: &Value,
+    style: &render::Style,
 ) -> Result<Plan, Refusal> {
     let Segment::Key(key) = segment else {
         return Err(Refusal::new(
@@ -986,13 +1024,145 @@ fn append_keyed(
         )
         .at(Location::of(source, table.span().0, table.span().1)));
     };
-    let entry = keyed_entry(
-        source,
-        table,
-        |bracketed| render::key(key, bracketed),
-        &render::literal(value, Quote::Double),
-    );
-    insert(source, table, entry)
+    insert(source, table, |indent| {
+        let text = match value {
+            Value::Table(_) => render::value(value, style, indent),
+            _ => render::literal(value, Quote::Double),
+        };
+        keyed_entry(
+            source,
+            table,
+            |bracketed| render::key(key, bracketed),
+            &text,
+        )
+    })
+}
+
+/// `value` inside a table for each of `path`'s keys, the last key innermost:
+/// what a table missing on the way to the edit is set to. `None` when a step
+/// is a list position, which there is no list to put it in.
+fn wrap(path: &[Segment], value: &Value) -> Option<Value> {
+    path.iter()
+        .rev()
+        .try_fold(value.clone(), |inner, segment| match segment {
+            Segment::Key(key) => Some(Value::Table(vec![(TableKey::Name(key.clone()), inner)])),
+            Segment::Index(_) => None,
+        })
+}
+
+/// How `source` writes its tables, read from the unit's own table and from
+/// `container`, the table a new entry goes into.
+///
+/// The separator and whether keys are bracketed follow `container`, the
+/// same as a new single field does. Strings take the quote the unit's table
+/// uses most, double quotes on a tie. Lists are numbered when the first list
+/// the unit's table holds is written `[1] = ...`, as Beyond All Reason
+/// writes them.
+fn style(source: &str, unit: &TableConstructor, container: &TableConstructor) -> render::Style {
+    let mut counts = [0usize; 3];
+    for token in unit.tokens() {
+        if let TokenType::StringLiteral {
+            quote_type,
+            multi_line_depth,
+            ..
+        } = token.token_type()
+        {
+            match quote_type {
+                StringLiteralQuoteType::Brackets if *multi_line_depth == 0 => counts[2] += 1,
+                StringLiteralQuoteType::Single => counts[1] += 1,
+                StringLiteralQuoteType::Double => counts[0] += 1,
+                _ => {}
+            }
+        }
+    }
+    let quote = if counts[1] > counts[0] && counts[1] >= counts[2] {
+        Quote::Single
+    } else if counts[2] > counts[0] && counts[2] > counts[1] {
+        Quote::Long(0)
+    } else {
+        Quote::Double
+    };
+    let separator = container
+        .fields()
+        .pairs()
+        .find_map(Pair::punctuation)
+        .map_or(",".to_string(), |token| token.token().to_string());
+    let bracketed = container
+        .fields()
+        .iter()
+        .filter_map(|field| match field {
+            Field::NameKey { .. } => Some(false),
+            Field::ExpressionKey { key, .. } => Some(string_value(key).is_some()),
+            _ => None,
+        })
+        .last()
+        .unwrap_or(false);
+    render::Style {
+        newline: if source.contains("\r\n") {
+            "\r\n"
+        } else {
+            "\n"
+        },
+        step: container_step(source, container).unwrap_or_else(|| indent_step(source)),
+        separator,
+        quote,
+        numbered: first_list_numbered(unit).unwrap_or(false),
+        bracketed,
+    }
+}
+
+/// One level of indentation as `table` writes it: how much further in its
+/// first field's line is than the line its opening brace is on. `None` when
+/// the field shares the brace's line or is not indented further, and the
+/// file's own step is used instead. A file can indent some lines with spaces
+/// and its tables with tabs, as flove's `mushrooms.lua` does.
+fn container_step(source: &str, table: &TableConstructor) -> Option<String> {
+    let (open, _) = table.braces().tokens();
+    let brace = open.span().0;
+    let field = table.fields().iter().next()?.span().0;
+    let line_of = |at: usize| source[..at].matches('\n').count();
+    if line_of(field) == line_of(brace) {
+        return None;
+    }
+    let outer = indentation(source, brace);
+    let inner = indentation(source, field);
+    inner
+        .strip_prefix(outer.as_str())
+        .filter(|step| !step.is_empty())
+        .map(str::to_string)
+}
+
+/// Whether the first list inside `table`, depth first, is written with its
+/// positions spelled out. `None` when it holds no list.
+fn first_list_numbered(table: &TableConstructor) -> Option<bool> {
+    let fields: Vec<&Field> = table.fields().iter().collect();
+    let numbered = !fields.is_empty()
+        && fields.iter().all(|field| {
+            matches!(
+                field,
+                Field::ExpressionKey {
+                    key: Expression::Number(_),
+                    ..
+                }
+            )
+        });
+    if numbered {
+        return Some(true);
+    }
+    if !fields.is_empty() && fields.iter().all(|field| matches!(field, Field::NoKey(_))) {
+        return Some(false);
+    }
+    fields.iter().find_map(|field| match field {
+        Field::NameKey {
+            value: Expression::TableConstructor(inner),
+            ..
+        }
+        | Field::ExpressionKey {
+            value: Expression::TableConstructor(inner),
+            ..
+        } => first_list_numbered(inner),
+        _ => None,
+    })
 }
 
 /// `key = value` spaced like the last keyed field in `table`, so a new field
@@ -1054,8 +1224,14 @@ fn keyed_entry(
 
 /// Add `entry` as the last field of `table`, in the table's layout: on its
 /// own line with the same indentation when fields are one per line, after a
-/// separator on the same line otherwise.
-fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan, Refusal> {
+/// separator on the same line otherwise. `entry` is given the indentation of
+/// the line the entry starts on, for a table value written over several
+/// lines.
+fn insert(
+    source: &str,
+    table: &TableConstructor,
+    entry: impl FnOnce(&str) -> String,
+) -> Result<Plan, Refusal> {
     let (open, close) = table.braces().tokens();
     let inside_start = open.span().1;
     let inside_end = close.span().0;
@@ -1071,9 +1247,10 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
         let text = if inside.contains('\n') {
             let outer = indentation(source, inside_end);
             let step = indent_step(source);
+            let entry = entry(&format!("{outer}{step}"));
             format!("{newline}{outer}{step}{entry},{newline}{outer}")
         } else {
-            format!(" {entry} ")
+            format!(" {} ", entry(&indentation(source, inside_start)))
         };
         return Ok(Plan {
             file: None,
@@ -1094,6 +1271,7 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
 
     let mut splices = Vec::new();
     if !one_per_line {
+        let entry = entry(&indentation(source, field_start));
         let (at, text) = match punctuation {
             Some(_) => (after_last, format!(" {entry}{separator}")),
             None => (field_end, format!("{separator} {entry}")),
@@ -1138,6 +1316,7 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
     } else {
         ""
     };
+    let entry = entry(&indent);
     let text = if source[..at].ends_with('\n') {
         format!("{indent}{entry}{trailing}{newline}")
     } else {
