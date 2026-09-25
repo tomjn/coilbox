@@ -77,6 +77,7 @@ import type { PreflightReport } from "../../preflight";
 import { usePreflightReport } from "../../preflight";
 import type { ModProject } from "../../project";
 import { projectPath } from "../../routes";
+import { InPlaceWrite } from "./InPlaceWrite";
 
 /** One labelled group of preflight lines, styled by what the group means.
  *  Kept apart from the other two groups on purpose: a blocker that stops an
@@ -228,6 +229,7 @@ function RoutesSection({
   options,
   gamePath,
   checking,
+  project,
 }: {
   gameName: string;
   options: ConfigOption[] | undefined;
@@ -236,6 +238,8 @@ function RoutesSection({
    *  (issue #2631). Undefined before a scan target resolves it. */
   gamePath: string | undefined;
   checking: boolean;
+  /** The open project, which the edit-in-place route writes (issue #2635). */
+  project: ModProject | undefined;
 }) {
   return (
     <section className="flex flex-col gap-2">
@@ -258,11 +262,16 @@ function RoutesSection({
               ) : (
                 <CircleX className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
               )}
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-1 flex-col gap-0.5">
                 <span className="font-medium text-sm">{r.label}</span>
                 <span className="text-muted-foreground text-xs">
                   {r.detail}
                 </span>
+                {r.route === "edit-in-place" && r.available && gamePath && (
+                  <div className="mt-1.5">
+                    <InPlaceWrite gameDir={gamePath} project={project} />
+                  </div>
+                )}
               </div>
             </li>
           ))}
@@ -760,6 +769,7 @@ export function ChecksButton({
             options={routeOptions}
             gamePath={gameArchives[0]?.path}
             checking={routesChecking}
+            project={project}
           />
           <PostHookSection
             gameName={gameName}

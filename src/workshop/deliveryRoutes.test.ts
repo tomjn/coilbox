@@ -126,6 +126,6 @@ describe("deliveryRoutes", () => {
     const inPlace = routes.find((r) => r.route === "edit-in-place");
     expect(inPlace?.available).toBe(true);
     expect(inPlace?.detail).toContain("Dev Game");
-    expect(inPlace?.detail).toContain("not built yet");
+    expect(inPlace?.detail).toContain("undo or accept");
   });
 });

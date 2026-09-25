@@ -31,6 +31,8 @@ vi.mock("@picoframe/plugin-sdk", () => ({
       if (command === "workshop_preflight") return preflightResponse;
       if (command === "workshop_change_ledger") return changeLedgerResponse;
       if (command === "workshop_compile") return compileResponse;
+      if (command === "workshop_in_place_status")
+        return { backups: 0, created: 0 };
       if (command === "unitsync_archive_tree") {
         const archive = (args as { archive: string }).archive;
         return {
@@ -175,6 +177,30 @@ describe("the checks button", () => {
       );
       expect(screen.getByText("Mutator archive")).toBeTruthy();
       expect(screen.getByText("BAR tweak slots")).toBeTruthy();
+    });
+
+    it("offers the in-place write for a loose game in a games folder", async () => {
+      renderButton({
+        gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: "No problems found" }),
+      );
+      expect(
+        await screen.findByRole("button", {
+          name: "Write changes into the game",
+        }),
+      ).toBeTruthy();
+    });
+
+    it("offers no in-place write for a packed game", () => {
+      renderButton();
+      fireEvent.click(
+        screen.getByRole("button", { name: "No problems found" }),
+      );
+      expect(
+        screen.queryByRole("button", { name: "Write changes into the game" }),
+      ).toBeNull();
     });
 
     it("keeps a blocker, a review item and a pass in three separate groups", async () => {

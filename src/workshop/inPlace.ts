@@ -1,0 +1,78 @@
+/**
+ * Writing a project's field changes into a loose `.sdd` game's own unit files
+ * (issue #2635), the edit-in-place route `deliveryRoutes.ts` offers.
+ *
+ * `inplace.rs` does the work. Before the first write to a file it renames the
+ * original aside, so undo and accept read the backups on disk and work after
+ * a restart. A write is all or nothing: if the patcher refuses any change,
+ * nothing is written and `refused` lists every change that stopped it.
+ */
+import { defineCommand } from "@picoframe/plugin-sdk";
+import type { ModProject } from "./project";
+
+/** A place in a unit file. Lines and columns count from 1. */
+export interface FilePoint {
+  line: number;
+  column: number;
+  byte: number;
+}
+
+/** One change that stopped a write. */
+export interface RefusedChange {
+  unit: string;
+  /** The field's dotted path, as the project holds it. */
+  field: string;
+  /** The unit's file, relative to the game, when one was found. */
+  file: string | null;
+  kind: string;
+  message: string;
+  location: { start: FilePoint; end: FilePoint } | null;
+}
+
+/** What `workshop_write_in_place` did. */
+export interface InPlaceWriteOutcome {
+  /** Files written, relative to the game. Empty when anything was refused. */
+  written: string[];
+  /** Field changes the written files now carry. */
+  changed: number;
+  /** Field changes the files already held. */
+  unchanged: number;
+  refused: RefusedChange[];
+  /** Parts of the project this route cannot carry yet, one sentence each. */
+  notCarried: string[];
+}
+
+/** How many files carry a workshop backup, or a marker saying coilbox
+ *  created them. */
+export interface InPlaceStatus {
+  backups: number;
+  created: number;
+}
+
+export const workshopWriteInPlace = defineCommand<
+  { gameDir: string; project: ModProject },
+  InPlaceWriteOutcome
+>("coilbox-workshop", "workshop_write_in_place");
+
+export const workshopInPlaceStatus = defineCommand<
+  { gameDir: string },
+  InPlaceStatus
+>("coilbox-workshop", "workshop_in_place_status");
+
+export const workshopUndoInPlace = defineCommand<
+  { gameDir: string },
+  { restored: string[]; deleted: string[] }
+>("coilbox-workshop", "workshop_undo_in_place");
+
+export const workshopAcceptInPlace = defineCommand<
+  { gameDir: string },
+  { kept: string[] }
+>("coilbox-workshop", "workshop_accept_in_place");
+
+/** One refused change as a line a person reads. */
+export function describeRefusal(r: RefusedChange): string {
+  const where = r.file
+    ? ` (${r.file}${r.location ? `, line ${r.location.start.line}` : ""})`
+    : "";
+  return `${r.unit} ${r.field}${where}: ${r.message}`;
+}
