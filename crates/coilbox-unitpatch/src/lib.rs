@@ -982,7 +982,19 @@ fn post_check(
     };
     let after = check::evaluate(unit_file, game.root, "patched", files)
         .map_err(|e| refuse(format!("The patched file does not run: {e}")))?;
-    check::confirm(before, &after, expected, value).map_err(refuse)
+    // A field the basedef writes from the same global as the edited one,
+    // such as `selfDestructAs` reading `explodeAs`'s global too (issue
+    // #3079), moves as well. It is allowed to, but only to `value` itself.
+    let linked: Vec<Vec<String>> = plan
+        .linked
+        .iter()
+        .map(|field| {
+            let mut path = expected[..expected.len() - 1].to_vec();
+            path.push(field.clone());
+            path
+        })
+        .collect();
+    check::confirm(before, &after, expected, value, &linked).map_err(refuse)
 }
 
 #[cfg(test)]

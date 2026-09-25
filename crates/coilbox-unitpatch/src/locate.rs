@@ -30,6 +30,12 @@ pub struct Plan {
     /// The file the splices go into, when it is one the unit file includes
     /// rather than the unit file itself.
     pub file: Option<Included>,
+    /// Other fields, canonical and in the same table as the edited one, that
+    /// this edit also changes because they read the same global the edited
+    /// field does (issue #3079), such as `selfDestructAs` reading the same
+    /// `explodeAs` global as `explodeAs` itself. The post-check allows these
+    /// to move too, but only to the value being written.
+    pub linked: Vec<String>,
 }
 
 /// A file the unit file includes for its table, as SplinterFaction's include
@@ -136,7 +142,7 @@ pub fn plan(source: &str, edit: &Edit, game: &Game) -> Result<Plan, Refusal> {
 
     if let Some(unset) = &chain.unset {
         let site = include_setting(&scope, unset, source, game)?;
-        return site.plan(edit);
+        return site.plan(edit, &scope, source);
     }
     if chain.tables.is_empty() {
         return Err(Refusal::new(
@@ -249,7 +255,13 @@ fn include_setting(
 impl Included {
     /// The edit as splices into this file, where the unit's table is the
     /// global the unit file reads. Refusals are about this file.
-    fn plan(self, edit: &Edit) -> Result<Plan, Refusal> {
+    ///
+    /// `unit_scope` and `unit_source` are the unit file's own top level: the
+    /// one that includes this file. When the edited field itself is a bare
+    /// global name this file's basedef sets nowhere, such as
+    /// `explodeAs = explodeAs` (issue #3079), [`global_edit`] tries the unit
+    /// file's own literal for that name instead of refusing.
+    fn plan(self, edit: &Edit, unit_scope: &Scope<'_>, unit_source: &str) -> Result<Plan, Refusal> {
         let into = |refusal: Refusal| refusal.in_file(&self.path);
         let ast = parse(&self.text).map_err(into)?;
         let scope = Scope::of(ast.nodes().stmts());
@@ -282,12 +294,131 @@ impl Included {
                 .at(Location::of(text, start, end)),
             ));
         }
+        if let Some(plan) = global_edit(
+            text,
+            &chain.tables,
+            edit,
+            unit_scope,
+            unit_source,
+            self.statement.start.byte,
+        ) {
+            // Already a splice into the unit file itself, so it is not
+            // wrapped in `Some(self)` below.
+            return Ok(plan);
+        }
         let plan = walk(text, chain.tables, edit).map_err(into)?;
         Ok(Plan {
             file: Some(self),
             ..plan
         })
     }
+}
+
+/// When the field `edit` names, somewhere in `tables`, is written as a bare
+/// name rather than a literal, and the unit file that includes this basedef
+/// sets that name once, as a literal, at its top level, before the
+/// `VFS.Include` at byte `before` (issue #3079): the edit as a splice into
+/// that literal in the unit file, in place of the refusal a computed value
+/// would otherwise get. `None` when the field is not that shape, so the
+/// caller falls back to the ordinary walk and its refusal.
+///
+/// Only a `Set` of a single value applies: a table value has no single
+/// global to follow, and a push names no field to look at.
+fn global_edit(
+    text: &str,
+    tables: &[&TableConstructor],
+    edit: &Edit,
+    unit_scope: &Scope<'_>,
+    unit_source: &str,
+    before: usize,
+) -> Option<Plan> {
+    let Op::Set(new_value) = &edit.op else {
+        return None;
+    };
+    if matches!(new_value, Value::Table(_)) {
+        return None;
+    }
+    let (last, earlier) = edit.path.split_last()?;
+    let mut candidates: Vec<&TableConstructor> = tables.to_vec();
+    for segment in earlier {
+        let mut next = Vec::new();
+        for table in &candidates {
+            if let Ok(Some(Expression::TableConstructor(inner))) = find_field(table, segment, text)
+            {
+                next.push(inner);
+            }
+        }
+        if next.is_empty() {
+            return None;
+        }
+        candidates = next;
+    }
+    for table in &candidates {
+        let Ok(Some(Expression::Var(Var::Name(token)))) = find_field(table, last, text) else {
+            continue;
+        };
+        let name = identifier(token);
+        if unit_scope.locals.contains(&name) {
+            continue;
+        }
+        let Ok(Some(rhs)) = unit_scope.single(&name) else {
+            continue;
+        };
+        let Some(quote) = literal(rhs) else {
+            continue;
+        };
+        let (start, end) = rhs.span();
+        if start >= before {
+            continue;
+        }
+        let linked = linked_fields(table, &name, last);
+        return Some(Plan {
+            file: None,
+            splices: vec![(start, end, render::literal(new_value, quote))],
+            location: Location::of(unit_source, start, end),
+            linked,
+        });
+    }
+    None
+}
+
+/// The key of `field`, when it is written as a plain name or a string, cased
+/// as the file writes it.
+fn field_key(field: &Field) -> Option<String> {
+    match field {
+        Field::NameKey { key, .. } => Some(identifier(key)),
+        Field::ExpressionKey { key, .. } => string_value(key),
+        _ => None,
+    }
+}
+
+/// The other fields of `table`, besides `exclude`, that are also written as
+/// the bare name `global`, canonical and lowercased (issue #3079). An edit
+/// that changes `global`'s value changes these fields too, since they read
+/// the very same global.
+fn linked_fields(table: &TableConstructor, global: &str, exclude: &Segment) -> Vec<String> {
+    table
+        .fields()
+        .iter()
+        .filter_map(|field| {
+            let key = field_key(field)?;
+            if segment_matches(exclude, &key) {
+                return None;
+            }
+            let value = match field {
+                Field::NameKey { value, .. } | Field::ExpressionKey { value, .. } => value,
+                _ => return None,
+            };
+            match value {
+                Expression::Var(Var::Name(token))
+                    if identifier(token).eq_ignore_ascii_case(global) =>
+                {
+                    Some(key.to_lowercase())
+                }
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 /// Refuse an edit to a field that a top-level statement sets again on one of
@@ -717,6 +848,7 @@ pub fn rename(source: &str, unit: &str, new_unit: &str) -> Result<Plan, Refusal>
         file: None,
         splices,
         location: location.expect("find_unit found the unit's field"),
+        linked: Vec::new(),
     })
 }
 
@@ -987,6 +1119,7 @@ fn replace(
                 render::value(new, style, &indentation(source, start)),
             )],
             location,
+            linked: Vec::new(),
         });
     }
     let Some(quote) = literal(value) else {
@@ -1006,6 +1139,7 @@ fn replace(
         file: None,
         splices: vec![(start, end, render::literal(new, quote))],
         location,
+        linked: Vec::new(),
     })
 }
 
@@ -1256,6 +1390,7 @@ fn insert(
             file: None,
             splices: vec![(inside_start, inside_end, text)],
             location: Location::of(source, inside_start, inside_start),
+            linked: Vec::new(),
         });
     };
 
@@ -1281,6 +1416,7 @@ fn insert(
             file: None,
             splices,
             location: Location::of(source, at, at),
+            linked: Vec::new(),
         });
     }
 
@@ -1327,6 +1463,7 @@ fn insert(
         file: None,
         splices,
         location: Location::of(source, at, at),
+        linked: Vec::new(),
     })
 }
 
