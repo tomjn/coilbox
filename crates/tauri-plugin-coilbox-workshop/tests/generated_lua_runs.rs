@@ -747,3 +747,86 @@ fn an_equipped_library_weapon_fires_its_own_children() {
         );
     }
 }
+
+/// What Beyond All Reason's and Balanced Annihilation's `weapondefs_post.lua`
+/// and the engine do with a unit's death explosions once a tweak or the
+/// mutator's post file has run (issue #2642). Each unit's own definitions go
+/// into the shared table as `<unit>_<name>`. A field naming exactly one of
+/// those short names, as written, becomes that full name. The engine then
+/// looks the field up lowercased, and `selfDestructAs` falls back to
+/// `explodeAs` when unset (`UnitDef.cpp`). Returns, per unit, the area of
+/// effect of what each field finds, or `nothing`.
+fn load_deaths(generated: &str, unit_defs: &str, shared: &str) -> Value {
+    let root = tempfile::tempdir().expect("tempdir");
+    let vm = SpringLua::new(root.path()).expect("vm");
+    let source = format!(
+        "(function()\n\
+         UnitDefs = {unit_defs}\n\
+         (function()\n{generated}\nend)()\n\
+         local WeaponDefs = {shared}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           for name, wd in pairs(ud.weapondefs or {{}}) do WeaponDefs[udName .. '_' .. name] = wd end\n\
+           for _, f in ipairs({{ 'explodeas', 'selfdestructas' }}) do\n\
+             if type(ud[f]) == 'string' and WeaponDefs[udName .. '_' .. ud[f]] then\n\
+               ud[f] = udName .. '_' .. ud[f]\n\
+             end\n\
+           end\n\
+         end\n\
+         local found = {{}}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           local function aoe(name)\n\
+             local hit = type(name) == 'string' and WeaponDefs[string.lower(name)]\n\
+             return hit and hit.areaofeffect or 'nothing'\n\
+           end\n\
+           found[udName] = {{ dies = aoe(ud.explodeas), selfd = aoe(ud.selfdestructas or ud.explodeas) }}\n\
+         end\n\
+         return found\n\
+         end)()"
+    );
+    vm.eval_expr_value(&source, "generated.lua")
+        .unwrap_or_else(|e| panic!("{e}\n\n{source}"))
+}
+
+/// Issue #2642. A copy of a shared explosion out of `weapons/`, made the
+/// death explosion of one unit, is what that unit explodes as on both routes.
+/// Its self-destruct, which names the same shared explosion, and a second
+/// unit that dies with it are untouched, and so is the shared definition.
+/// A unit with no `selfdestructas` self-destructs as its new death explosion,
+/// because that is the engine's fallback.
+#[test]
+fn a_copied_death_explosion_is_what_that_unit_explodes_as() {
+    let routes = both_routes(json!({
+        "weapons": { "big_unitex_copy": {
+            "key": "big_unitex_copy",
+            "source": "big_unitex",
+            "def": { "areaofeffect": 64, "damage": { "default": 25 } },
+            "changes": { "areaofeffect": 200 }
+        } },
+        "equipped": {
+            "armpw": { "explodeas": "big_unitex_copy" },
+            "armflash": { "explodeas": "big_unitex_copy" }
+        }
+    }));
+    let unit_defs = r#"{
+        armpw = { explodeas = "BIG_UNITEX", selfdestructas = "BIG_UNITEX" },
+        armflash = { explodeAs = "big_unitex" },
+        corak = { explodeas = "big_unitex", selfdestructas = "BIG_UNITEX" },
+    }"#;
+    let shared = r#"{ big_unitex = { areaofeffect = 64, damage = { default = 25 } } }"#;
+    for (what, lua) in routes {
+        let found = load_deaths(&lua, unit_defs, shared);
+        assert_eq!(found["armpw"]["dies"], json!(200), "{what}");
+        assert_eq!(found["armpw"]["selfd"], json!(64), "{what}");
+        assert_eq!(found["corak"]["dies"], json!(64), "{what}");
+        assert_eq!(found["corak"]["selfd"], json!(64), "{what}");
+        // `explodeAs` in capitals: the block writes the key the unit uses, so
+        // the lowercase read below finds nothing new beside it.
+        let raw = load_weapons(&lua, unit_defs, shared, false);
+        assert_eq!(
+            raw["units"]["armflash"]["explodeAs"],
+            json!("armflash_big_unitex_copy"),
+            "{what}"
+        );
+        assert_eq!(raw["units"]["armflash"]["explodeas"], Value::Null, "{what}");
+    }
+}

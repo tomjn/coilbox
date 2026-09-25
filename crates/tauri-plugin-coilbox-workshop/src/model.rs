@@ -179,7 +179,9 @@ pub struct GameEdits {
     #[serde(default)]
     pub weapons: BTreeMap<String, LibraryWeapon>,
     /// Unit key, then the slot's step as `weaponSlots.ts` writes it, then the
-    /// library weapon that slot fires.
+    /// library weapon that slot fires. The step can also be `explodeas` or
+    /// `selfdestructas`, for a library weapon the unit explodes as when it dies
+    /// or self-destructs (issue #2642).
     #[serde(default)]
     pub equipped: BTreeMap<String, BTreeMap<String, String>>,
     /// Which units the project has moved to a different armour class (issue
@@ -201,9 +203,19 @@ impl GameEdits {
             && self.armor_classes.is_empty()
     }
 
-    /// How many slots fire a library weapon, across every unit.
+    /// How many slots fire a library weapon, and how many death explosions
+    /// are one, across every unit.
     pub fn equipped_count(&self) -> usize {
         self.equipped.values().map(BTreeMap::len).sum()
+    }
+
+    /// How many of [`Self::equipped_count`] are death explosions (issue #2642).
+    pub fn death_explosion_count(&self) -> usize {
+        self.equipped
+            .values()
+            .flat_map(BTreeMap::keys)
+            .filter(|step| crate::compile::DEATH_MOUNTS.contains(&step.as_str()))
+            .count()
     }
 
     /// How many name and description edits the project holds, across every

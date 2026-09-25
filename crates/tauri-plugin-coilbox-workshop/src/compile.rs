@@ -332,7 +332,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // slot has to be found in the game's own list first, which only the
     // loaded table can answer, so it is a block.
     notes.extend(equip_notes(edits));
-    let equips: Vec<(&str, u64, &str)> = edits
+    let equips: Vec<(&str, EquipAt, &str)> = edits
         .equipped
         .iter()
         .filter(|(unit, _)| !edits.clones.contains_key(*unit))
@@ -342,19 +342,20 @@ pub fn compile(project: &ModProject) -> CompiledMod {
                 .map(move |(step, key)| (unit.as_str(), step.as_str(), key.as_str()))
         })
         .filter_map(|(unit, step, key)| {
-            let at = equip_step(step)?;
+            let at = equip_at(step)?;
             (edits.weapons.contains_key(key) && valid_unit_key(key)).then_some((unit, at, key))
         })
         .collect();
     if !equips.is_empty() {
         chunks.push(Chunk {
             form: LuaForm::Block,
-            title: format!(
-                "{} weapon{} equipped",
-                equips.len(),
-                if equips.len() == 1 { "" } else { "s" }
-            ),
-            reason: "The slot is found in the unit's own weapon list as the game loads it, and the weapon is written into that unit's own weapon definitions, so no other unit changes.".to_string(),
+            title: equip_title(&equips),
+            reason: if equips.iter().any(|(_, at, _)| matches!(at, EquipAt::Death(_))) {
+                "Each weapon is written into the unit's own weapon definitions as the game loads it, and the slot or death explosion field is pointed at it there, so no other unit changes."
+            } else {
+                "The slot is found in the unit's own weapon list as the game loads it, and the weapon is written into that unit's own weapon definitions, so no other unit changes."
+            }
+            .to_string(),
             lua: equip_block(&equips, &edits.weapons),
         });
     }
@@ -599,6 +600,25 @@ fn mount_own_weapons(def: &mut Value, source: &str, key: &str) {
     if own.is_empty() {
         return;
     }
+    let prefix = format!("{}_", source.to_lowercase());
+    // A death explosion the source carries itself is named the same way once
+    // the post files have run, so it is pointed at the copy's own the same way
+    // (issue #2642). No installed game ships a unit like that today: Balanced
+    // Annihilation's two candidates name theirs in capitals, which its post
+    // file does not match, so they explode as the shared weapon of that name.
+    for (field, value) in map.iter_mut() {
+        if !DEATH_MOUNTS.contains(&field.to_lowercase().as_str()) {
+            continue;
+        }
+        let Some(lower) = value.as_str().map(|n| n.trim().to_lowercase()) else {
+            continue;
+        };
+        if let Some(short) = lower.strip_prefix(&prefix) {
+            if own.iter().any(|k| k == short) {
+                *value = Value::String(format!("{}_{short}", key.to_lowercase()));
+            }
+        }
+    }
     let Some(weapons) = map
         .iter_mut()
         .find(|(k, _)| k.eq_ignore_ascii_case("weapons"))
@@ -606,7 +626,6 @@ fn mount_own_weapons(def: &mut Value, source: &str, key: &str) {
     else {
         return;
     };
-    let prefix = format!("{}_", source.to_lowercase());
     let slots: Vec<&mut Value> = match weapons {
         Value::Array(items) => items.iter_mut().collect(),
         Value::Object(items) => items.values_mut().collect(),
@@ -635,13 +654,33 @@ fn mount_own_weapons(def: &mut Value, source: &str, key: &str) {
     }
 }
 
-/// A slot's step as a number, or `None` for one that is not digits, which
-/// nothing in coilbox writes (`weaponSlots.ts`).
-fn equip_step(step: &str) -> Option<u64> {
+/// The two unit fields that name a death explosion (issue #2642), lowercased
+/// as the unit tables hold them. RecoilEngine looks each one up by name in the
+/// game's weapon table (`UnitDef.cpp`, `CWeaponDefHandler::GetWeaponDef`, which
+/// lowercases it), and `selfDestructAs` falls back to `explodeAs` when unset.
+pub(crate) const DEATH_MOUNTS: [&str; 2] = ["explodeas", "selfdestructas"];
+
+/// Where an equipped library weapon goes on a unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EquipAt {
+    /// A weapon slot, by its step: the position counted from zero in a list,
+    /// or the Lua key itself in a list with a gap (`weaponSlots.ts`).
+    Slot(u64),
+    /// One of [`DEATH_MOUNTS`].
+    Death(&'static str),
+}
+
+/// Where an `equipped` entry's step puts its weapon, or `None` for a step that
+/// is neither a slot number nor a death explosion, which nothing in coilbox
+/// writes (`weaponLibrary.ts`).
+pub(crate) fn equip_at(step: &str) -> Option<EquipAt> {
+    if let Some(field) = DEATH_MOUNTS.iter().find(|field| **field == step) {
+        return Some(EquipAt::Death(field));
+    }
     if step.is_empty() || !step.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    step.parse().ok()
+    step.parse().ok().map(EquipAt::Slot)
 }
 
 /// A library weapon's definition as the game will read it: the definition it
@@ -877,14 +916,17 @@ fn equip_notes(edits: &GameEdits) -> Vec<String> {
     }
     for (unit, slots) in &edits.equipped {
         for (step, key) in slots {
-            if equip_step(step).is_none() {
-                notes.push(format!(
-                    "{unit} has a weapon equipped in a slot called {step:?}, which is not a slot number, so it was left out."
-                ));
-            } else if !edits.weapons.contains_key(key) {
-                notes.push(format!(
+            match equip_at(step) {
+                None => notes.push(format!(
+                    "{unit} has a weapon equipped in a slot called {step:?}, which is not a slot number or a death explosion, so it was left out."
+                )),
+                Some(_) if edits.weapons.contains_key(key) => {}
+                Some(EquipAt::Slot(_)) => notes.push(format!(
                     "{unit} has {key} equipped, which is not in the project's weapon library any more, so that slot keeps the weapon the game gives it."
-                ));
+                )),
+                Some(EquipAt::Death(field)) => notes.push(format!(
+                    "{unit} has {key} as its {field}, which is not in the project's weapon library any more, so it keeps the explosion the game gives it."
+                )),
             }
         }
     }
@@ -917,6 +959,40 @@ fn point_slot(slot: &mut Value, unit: &str, key: &str) {
     }
 }
 
+/// The name a unit's death explosion field is given for a library weapon it
+/// carries (issue #2642): the full name the game gives that definition,
+/// `<unit>_<key>`.
+///
+/// Not the short name. Balanced Annihilation's, Beyond All Reason's and the
+/// base content's `weapondefs_post.lua` each turn a short name into
+/// `<unit>_<name>` when the unit carries a definition of exactly that name,
+/// and leave the field alone otherwise. The full name finds nothing under
+/// that rule and is left alone, and the engine then finds the definition by
+/// it, so it works in a game with that rule and in one without it.
+fn death_name(unit: &str, key: &str) -> String {
+    format!("{}_{key}", unit.to_lowercase())
+}
+
+/// The heading for the chunk of equipped weapons: slots, death explosions, or
+/// both.
+fn equip_title(equips: &[(&str, EquipAt, &str)]) -> String {
+    let deaths = equips
+        .iter()
+        .filter(|(_, at, _)| matches!(at, EquipAt::Death(_)))
+        .count();
+    let slots = equips.len() - deaths;
+    let plural = |n: usize| if n == 1 { "" } else { "s" };
+    match (slots, deaths) {
+        (_, 0) => format!("{slots} weapon{} equipped", plural(slots)),
+        (0, _) => format!("{deaths} death explosion{} equipped", plural(deaths)),
+        _ => format!(
+            "{slots} weapon{} and {deaths} death explosion{} equipped",
+            plural(slots),
+            plural(deaths)
+        ),
+    }
+}
+
 /// Equip library weapons into a copy the project owns (issue #2640).
 ///
 /// The copy's whole definition is the project's, so the weapon is written
@@ -932,24 +1008,41 @@ fn equip_into(
     weapons: &BTreeMap<String, LibraryWeapon>,
 ) {
     for (step, key) in slots {
-        if !weapons.contains_key(key) || !valid_unit_key(key) || equip_step(step).is_none() {
+        if !weapons.contains_key(key) || !valid_unit_key(key) {
             continue;
         }
+        let Some(at) = equip_at(step) else {
+            continue;
+        };
         let Some(map) = def.as_object_mut() else {
             return;
         };
-        let slot = map
-            .iter_mut()
-            .find(|(k, _)| k.eq_ignore_ascii_case("weapons"))
-            .and_then(|(_, list)| match list {
-                Value::Array(items) => step.parse::<usize>().ok().and_then(|i| items.get_mut(i)),
-                Value::Object(items) => items.get_mut(step),
-                _ => None,
-            });
-        let Some(slot) = slot else {
-            continue;
-        };
-        point_slot(slot, unit, key);
+        match at {
+            EquipAt::Death(field) => {
+                let spelled = map
+                    .keys()
+                    .find(|k| k.eq_ignore_ascii_case(field))
+                    .cloned()
+                    .unwrap_or_else(|| field.to_string());
+                map.insert(spelled, Value::String(death_name(unit, key)));
+            }
+            EquipAt::Slot(_) => {
+                let slot = map
+                    .iter_mut()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("weapons"))
+                    .and_then(|(_, list)| match list {
+                        Value::Array(items) => {
+                            step.parse::<usize>().ok().and_then(|i| items.get_mut(i))
+                        }
+                        Value::Object(items) => items.get_mut(step),
+                        _ => None,
+                    });
+                let Some(slot) = slot else {
+                    continue;
+                };
+                point_slot(slot, unit, key);
+            }
+        }
         let defs_key = map
             .keys()
             .find(|k| k.eq_ignore_ascii_case("weapondefs"))
@@ -984,7 +1077,14 @@ fn equip_into(
 /// say which unit it is in, which only the loop knows, so `support` carries
 /// where each of those is and the loop writes `<unit>_<key>` there. A project
 /// with no such weapons gets none of this, and the same Lua it always did.
-fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryWeapon>) -> String {
+///
+/// A death explosion (issue #2642) is an entry whose second value is the
+/// field's name rather than a slot number. The weapon goes into the unit's
+/// own `weapondefs` the same way, and the field is set to [`death_name`].
+fn equip_block(
+    equips: &[(&str, EquipAt, &str)],
+    weapons: &BTreeMap<String, LibraryWeapon>,
+) -> String {
     let mut library = serde_json::Map::new();
     let mut support: BTreeMap<String, (Vec<String>, Vec<[String; 4]>)> = BTreeMap::new();
     for (_, _, key) in equips {
@@ -1046,24 +1146,29 @@ fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryW
     let support_loop = if support.is_empty() {
         ""
     } else {
-        "\x20       local s = support[name]\n\
-         \x20       if s then\n\
-         \x20         for _, child in ipairs(s[1]) do ud[defs][child] = copy(library[child]) end\n\
-         \x20         for _, r in ipairs(s[2]) do\n\
-         \x20           local params = ud[defs][r[1]][r[2]]\n\
-         \x20           if type(params) == \"table\" then params[r[3]] = unit .. \"_\" .. r[4] end\n\
-         \x20         end\n\
-         \x20       end\n"
+        "\x20     local s = support[name]\n\
+         \x20     if s then\n\
+         \x20       for _, child in ipairs(s[1]) do ud[defs][child] = copy(library[child]) end\n\
+         \x20       for _, r in ipairs(s[2]) do\n\
+         \x20         local params = ud[defs][r[1]][r[2]]\n\
+         \x20         if type(params) == \"table\" then params[r[3]] = unit .. \"_\" .. r[4] end\n\
+         \x20       end\n\
+         \x20     end\n"
     };
     let entries: Vec<String> = equips
         .iter()
         .map(|(unit, at, key)| {
+            let at = match at {
+                EquipAt::Slot(step) => step.to_string(),
+                EquipAt::Death(field) => lua_string(field),
+            };
             format!("    {{ {}, {at}, {} }},", lua_string(unit), lua_string(key))
         })
         .collect();
     format!(
         "-- Weapons equipped from the project's weapon library. Each goes into the\n\
          -- unit's own weapondefs, and the slot names it by def and by full name.\n\
+         -- A death explosion field names it by full name.\n\
          do\n\
          \x20 local library = {}\n\
          \x20 local equipped = {{\n{}\n  }}\n\
@@ -1090,10 +1195,16 @@ fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryW
          \x20 for _, e in ipairs(equipped) do\n\
          \x20   local unit, at, name = e[1], e[2], e[3]\n\
          \x20   local ud = UnitDefs[unit]\n\
-         \x20   local weapons = type(ud) == \"table\" and ud[field(ud, \"weapons\")] or nil\n\
-         \x20   if type(weapons) == \"table\" then\n\
-         \x20     local step = key(weapons, at)\n\
-         \x20     local slot = weapons[step]\n\
+         \x20   local placed = false\n\
+         \x20   if type(ud) == \"table\" and type(at) == \"string\" then\n\
+         \x20     -- A death explosion, named by the full name the game gives\n\
+         \x20     -- a definition the unit carries.\n\
+         \x20     ud[field(ud, at)] = unit .. \"_\" .. name\n\
+         \x20     placed = true\n\
+         \x20   elseif type(ud) == \"table\" then\n\
+         \x20     local weapons = ud[field(ud, \"weapons\")]\n\
+         \x20     local step = type(weapons) == \"table\" and key(weapons, at) or nil\n\
+         \x20     local slot = step ~= nil and weapons[step] or nil\n\
          \x20     if slot ~= nil then\n\
          \x20       if type(slot) ~= \"table\" then\n\
          \x20         slot = {{}}\n\
@@ -1105,11 +1216,14 @@ fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryW
          \x20       end\n\
          \x20       slot.def = name\n\
          \x20       slot.name = unit .. \"_\" .. name\n\
-         \x20       local defs = field(ud, \"weapondefs\")\n\
-         \x20       if type(ud[defs]) ~= \"table\" then ud[defs] = {{}} end\n\
-         \x20       ud[defs][name] = copy(library[name])\n\
-         {}\
+         \x20       placed = true\n\
          \x20     end\n\
+         \x20   end\n\
+         \x20   if placed then\n\
+         \x20     local defs = field(ud, \"weapondefs\")\n\
+         \x20     if type(ud[defs]) ~= \"table\" then ud[defs] = {{}} end\n\
+         \x20     ud[defs][name] = copy(library[name])\n\
+         {}\
          \x20   end\n\
          \x20 end\n\
          end",
@@ -2236,6 +2350,108 @@ mod tests {
         assert!(out.notes.iter().any(|n| n
             .contains("armcom has gone equipped, which is not in the project's weapon library")));
         assert!(out.notes.iter().any(|n| n.contains("not a slot number")));
+    }
+
+    fn blast() -> Value {
+        json!({ "big_unitex_copy": {
+            "key": "big_unitex_copy",
+            "source": "big_unitex",
+            "def": { "areaofeffect": 64, "damage": { "default": 25 } },
+            "changes": { "areaofeffect": 200 }
+        } })
+    }
+
+    /// Issue #2642. A death explosion equipped into a game unit goes in the
+    /// same block as the slots, named by its field rather than a number, and
+    /// the heading says what it is.
+    #[test]
+    fn a_death_explosion_on_a_game_unit_is_an_entry_in_the_equip_block() {
+        let mut weapons = blast();
+        weapons["heavylaser"] = library()["heavylaser"].clone();
+        let out = compile(&project(json!({
+            "weapons": weapons,
+            "equipped": {
+                "armcom": { "0": "heavylaser", "explodeas": "big_unitex_copy" },
+                "armpw": { "selfdestructas": "big_unitex_copy" }
+            }
+        })));
+        assert_eq!(out.chunks.len(), 1);
+        let chunk = &out.chunks[0];
+        assert_eq!(chunk.title, "1 weapon and 2 death explosions equipped");
+        assert!(chunk
+            .lua
+            .contains("{ \"armcom\", \"explodeas\", \"big_unitex_copy\" },"));
+        assert!(chunk
+            .lua
+            .contains("{ \"armpw\", \"selfdestructas\", \"big_unitex_copy\" },"));
+        assert!(chunk.lua.contains("areaofeffect = 200"), "{}", chunk.lua);
+        let only = compile(&project(json!({
+            "weapons": blast(),
+            "equipped": { "armpw": { "explodeas": "big_unitex_copy" } }
+        })));
+        assert_eq!(only.chunks[0].title, "1 death explosion equipped");
+    }
+
+    /// Issue #2642. A copy's death explosion is written into its file: the
+    /// weapon into its own `weapondefs`, and the field, in the spelling the
+    /// copy already uses, naming it by full name.
+    #[test]
+    fn a_death_explosion_equipped_into_a_copy_is_folded_into_its_file() {
+        let out = compile(&project(json!({
+            "weapons": blast(),
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": { "explodeAs": "COMMANDER_BLAST", "selfdestructas": "COMMANDER_BLAST" }
+            } },
+            "equipped": { "supercom": { "explodeas": "big_unitex_copy" } }
+        })));
+        assert!(out.chunks.iter().all(|c| !c.title.contains("equipped")));
+        let unit = file(&out, "units/supercom.lua");
+        assert!(
+            unit.contains("explodeAs = \"supercom_big_unitex_copy\""),
+            "{unit}"
+        );
+        assert!(
+            unit.contains("selfdestructas = \"COMMANDER_BLAST\""),
+            "{unit}"
+        );
+        assert!(unit.contains("big_unitex_copy = {"), "{unit}");
+        assert!(unit.contains("areaofeffect = 200"), "{unit}");
+    }
+
+    /// Issue #2642. A copy made after the post files ran names a death
+    /// explosion its source carries by the source's full name, and is pointed
+    /// at its own, as its slots are. One naming a shared explosion is left.
+    #[test]
+    fn a_copy_explodes_as_the_definition_it_carries() {
+        let out = compile(&project(json!({
+            "clones": { "myshock": {
+                "key": "myshock", "source": "armshock",
+                "replacesGameUnit": false,
+                "def": {
+                    "explodeas": "armshock_shocker",
+                    "selfdestructas": "BIG_UNIT",
+                    "weapondefs": { "shocker": { "range": 1 } }
+                }
+            } }
+        })));
+        let unit = file(&out, "units/myshock.lua");
+        assert!(unit.contains("explodeas = \"myshock_shocker\""), "{unit}");
+        assert!(unit.contains("selfdestructas = \"BIG_UNIT\""), "{unit}");
+    }
+
+    /// A death explosion whose library weapon has gone keeps the game's, and
+    /// says so in its own words.
+    #[test]
+    fn a_death_explosion_the_library_lost_is_left_out_with_a_note() {
+        let out = compile(&project(json!({
+            "equipped": { "armcom": { "explodeas": "gone" } }
+        })));
+        assert!(out.chunks.is_empty());
+        assert!(out.notes.iter().any(|n| n.contains(
+            "armcom has gone as its explodeas, which is not in the project's weapon library"
+        )));
     }
 
     /// The archive loads an added unit out of `units/`, so that file stays a

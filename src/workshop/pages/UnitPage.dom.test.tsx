@@ -2651,6 +2651,75 @@ describe("UnitPage", () => {
       expect(project()?.edits.weapons).toHaveProperty("sharedgun_copy");
     });
 
+    /**
+     * Issue #2642. A death explosion is a named weapon out of the game's
+     * shared table. Its effect is on screen and editable, and the first edit
+     * copies it into the library and makes the copy this unit's, as one undo
+     * step, so the other unit that dies with it keeps the game's.
+     */
+    it("edits a death explosion by giving the unit its own copy of it", () => {
+      mockWeaponDefs = {
+        big_unitex: {
+          areaofeffect: 64,
+          impulsefactor: 0.123,
+          damage: { default: 25 },
+        },
+      };
+      show(
+        {
+          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
+          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
+        },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
+        [{ name: "blaster", fullName: "Blaster" }],
+      );
+      openWeapons();
+      // No slots and nothing carried, so the death explosion is on screen.
+      expect(screen.getByText("Death explosion: BIG_UNITEX")).toBeTruthy();
+      expect(screen.getByText(/1 other unit uses it/)).toBeTruthy();
+      expect(screen.getByLabelText("Splash diameter")).toHaveProperty(
+        "value",
+        "64",
+      );
+      // Unset, so it shows what the engine falls back on: the default damage.
+      expect(screen.getByLabelText("Camera shake strength")).toHaveProperty(
+        "value",
+        "25",
+      );
+
+      type(screen.getByLabelText("Splash diameter") as HTMLInputElement, "200");
+      expect(project()?.edits.weapons).toEqual({
+        big_unitex_copy: {
+          key: "big_unitex_copy",
+          source: "big_unitex",
+          sourceChecksum: "abc",
+          def: mockWeaponDefs.big_unitex,
+          changes: { areaofeffect: 200 },
+        },
+      });
+      expect(project()?.edits.equipped).toEqual({
+        blaster: { explodeas: "big_unitex_copy" },
+      });
+      expect(project()?.edits.overrides).toEqual({});
+      expect(
+        screen.getByText("Death explosion: library weapon big_unitex_copy"),
+      ).toBeTruthy();
+      expect(screen.getByText(/Copied value: 64/)).toBeTruthy();
+
+      // It sets no self-destruct explosion, so that one follows.
+      fireEvent.click(
+        screen.getByRole("radio", { name: "Self-destruct explosion" }),
+      );
+      expect(
+        screen.getByText(/sets no selfDestructAs, so the engine uses/),
+      ).toBeTruthy();
+      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(project()?.edits.weapons).toEqual({});
+      expect(project()?.edits.equipped).toEqual({});
+    });
+
     it("copies a weapon the unit carries with the project's changes, as one undo step", async () => {
       openGunner();
       openWeapons();

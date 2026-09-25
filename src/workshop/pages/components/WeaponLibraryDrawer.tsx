@@ -279,7 +279,7 @@ export function WeaponLibraryDrawer({
                 <p className="text-xs text-muted-foreground">
                   {mounts.length === 0
                     ? "Not equipped anywhere."
-                    : `Fired by ${mounts.length} slot${mounts.length === 1 ? "" : "s"}:`}
+                    : `Equipped in ${mounts.length} place${mounts.length === 1 ? "" : "s"}:`}
                 </p>
                 {mounts.length > 0 && (
                   <ul className="flex flex-wrap gap-1">

@@ -17,6 +17,10 @@
  * such as a cluster munition's child (issue #2641, `weaponRefs.ts`). Their
  * fields are the unit's own, edited the way a mounted definition's are, and a
  * reference on the unit that names nothing is listed above both.
+ *
+ * Last are the unit's two death explosions (issue #2642,
+ * `deathExplosions.ts`). Each is a weapon definition the game names, and a
+ * change to a shared one gives the unit its own copy out of the library.
  */
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Undo2 } from "lucide-react";
@@ -25,9 +29,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
+import type { DeathExplosion } from "../../deathExplosions";
 import type { UnitOverrides } from "../../overrides";
 import type { FieldRow } from "../../unitSections";
-import type { WeaponLibrary } from "../../weaponLibrary";
+import type { DeathMount, WeaponLibrary } from "../../weaponLibrary";
 import { librarySupport, type SupportingDef } from "../../weaponRefs";
 import {
   describeLeaf,
@@ -133,6 +138,7 @@ export function WeaponSlotsPanel({
   selectedSupport,
   onSelectSupport,
   problems = [],
+  explosions,
 }: {
   slots: WeaponSlot[];
   /** The slot on screen, which is always one of `slots` when there are any
@@ -163,32 +169,65 @@ export function WeaponSlotsPanel({
    *  game's own data reveal: a reference that names nothing (issue #2641)
    *  and a damage table naming an armour class nobody has (issue #2645). */
   problems?: { id: string; message: string }[];
+  /** The unit's death explosions, and what the panel can do with them
+   *  (issue #2642). When one is selected, `view` is its fields. */
+  explosions?: ExplosionPanel;
 }) {
-  if (slots.length === 0 && supporting.length === 0)
+  const hasExplosions = (explosions?.entries.length ?? 0) > 0;
+  if (slots.length === 0 && supporting.length === 0 && !hasExplosions)
     return (
       <p className="text-sm text-muted-foreground">This unit has no weapons.</p>
     );
-  const onSlot = selectedSupport === undefined ? selected : undefined;
+  const activeExplosion =
+    explosions?.selected === undefined
+      ? undefined
+      : explosions.entries.find((e) => e.mount === explosions.selected);
+  const onSlot =
+    selectedSupport === undefined && activeExplosion === undefined
+      ? selected
+      : undefined;
 
   // Where "add a class" writes, when there is anywhere it can (issue #2645):
   // the supporting definition on screen, the library weapon the slot fires,
   // or the slot's own definition. A shared definition offers nothing, the
   // same as every other field on one.
   const activeSupport =
-    selectedSupport !== undefined
+    selectedSupport !== undefined && activeExplosion === undefined
       ? supporting.find((s) => s.key === selectedSupport)
       : undefined;
   const fires = onSlot ? library.equippedIn(onSlot.step) : undefined;
   const firesWeapon = fires ? library.weapons[fires] : undefined;
+  // A death explosion takes a new class the way it takes any other field: on
+  // its library weapon, on the definition the unit carries, or, for a shared
+  // one, by copying it first.
+  const explosionFires = activeExplosion
+    ? explosions?.equippedIn(activeExplosion.mount)
+    : undefined;
+  const explosionTarget = !activeExplosion
+    ? undefined
+    : explosionFires && library.weapons[explosionFires]
+      ? { prefix: "", def: library.weapons[explosionFires].def }
+      : activeExplosion.follows
+        ? undefined
+        : activeExplosion.definition.kind === "own"
+          ? {
+              prefix: activeExplosion.definition.path,
+              def: activeExplosion.definition.def,
+            }
+          : activeExplosion.definition.kind === "shared"
+            ? { prefix: "", def: activeExplosion.definition.def }
+            : undefined;
   const addTarget:
     | { prefix: string; def: Record<string, unknown> }
-    | undefined = activeSupport
-    ? { prefix: activeSupport.path, def: activeSupport.def }
-    : firesWeapon
-      ? { prefix: "", def: firesWeapon.def }
-      : onSlot?.definition.kind === "own"
-        ? { prefix: onSlot.definition.path, def: onSlot.definition.def }
-        : undefined;
+    | undefined = activeExplosion
+    ? explosionTarget
+    : activeSupport
+      ? { prefix: activeSupport.path, def: activeSupport.def }
+      : firesWeapon
+        ? { prefix: "", def: firesWeapon.def }
+        : onSlot?.definition.kind === "own"
+          ? { prefix: onSlot.definition.path, def: onSlot.definition.def }
+          : undefined;
   const onAddDamageClass = (className: string) => {
     if (!addTarget) return;
     const leaf = `damage.${className}`;
@@ -203,7 +242,9 @@ export function WeaponSlotsPanel({
       value: 0,
       state: "overridden",
     };
-    if (firesWeapon) library.onChange(fires, row, 0);
+    if (activeExplosion && explosions)
+      explosions.onChange(activeExplosion, row, 0);
+    else if (firesWeapon) library.onChange(fires, row, 0);
     else onChange(row, 0);
   };
 
@@ -271,7 +312,7 @@ export function WeaponSlotsPanel({
             size="sm"
             spacing={1}
             className="flex-wrap"
-            value={selectedSupport ?? ""}
+            value={activeSupport?.key ?? ""}
             onValueChange={(key) => key && onSelectSupport?.(key)}
             aria-labelledby="supporting-defs"
           >
@@ -307,6 +348,68 @@ export function WeaponSlotsPanel({
         </div>
       )}
 
+      {explosions && hasExplosions && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-muted-foreground" id="death-explosions">
+            Death explosions: what the unit explodes as
+          </p>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            className="flex-wrap"
+            value={activeExplosion?.mount ?? ""}
+            onValueChange={(mount) =>
+              mount && explosions.onSelect(mount as DeathMount)
+            }
+            aria-labelledby="death-explosions"
+          >
+            {explosions.entries.map((explosion) => {
+              const changed = explosions.editCount(explosion);
+              const equippedHere = explosions.equippedIn(explosion.mount);
+              return (
+                <ToggleGroupItem
+                  key={explosion.mount}
+                  value={explosion.mount}
+                  aria-label={explosion.label}
+                  title={explosion.field}
+                  className="gap-1.5"
+                >
+                  <span>
+                    {explosion.mount === "explodeas"
+                      ? "Dies"
+                      : "Self-destructs"}
+                  </span>
+                  <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
+                    {equippedHere ??
+                      (explosion.follows
+                        ? "as it dies"
+                        : explosion.name || "nothing")}
+                  </span>
+                  {changed > 0 && (
+                    <span
+                      className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
+                      title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                    >
+                      {changed}
+                    </span>
+                  )}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </div>
+      )}
+
+      {activeExplosion && explosions && (
+        <ExplosionActions
+          explosion={activeExplosion}
+          explosions={explosions}
+          library={library}
+        />
+      )}
+
       {onSlot && (
         <SlotWeaponActions
           slot={onSlot}
@@ -323,7 +426,32 @@ export function WeaponSlotsPanel({
           </p>
         )}
 
-      {view && (
+      {view && activeExplosion && explosions && (
+        <UnitFieldGroups
+          view={view}
+          inPlace={
+            activeExplosion.definition.kind === "own" && !explosionFires
+              ? inPlace
+              : undefined
+          }
+          post={(row) => explosions.postOf(activeExplosion, row)}
+          consumers={consumers}
+          assets={assets}
+          inheritedLabel={
+            explosionFires
+              ? "Copied value"
+              : activeExplosion.definition.kind === "own"
+                ? inheritedLabel
+                : undefined
+          }
+          onChange={(row, value) =>
+            explosions.onChange(activeExplosion, row, value)
+          }
+          onReset={(row) => explosions.onReset(activeExplosion, row)}
+        />
+      )}
+
+      {view && !activeExplosion && (
         <div className="flex flex-col gap-8">
           <UnitFieldGroups
             view={{
@@ -388,6 +516,115 @@ export interface SlotLibrary {
   postOf: (key: string | undefined, row: FieldRow) => PostNote | undefined;
 }
 
+/** What the weapons panel needs to show and edit the unit's death
+ *  explosions (issue #2642). */
+export interface ExplosionPanel {
+  entries: DeathExplosion[];
+  /** The one on screen, in place of a slot. */
+  selected: DeathMount | undefined;
+  /** The library weapon one is, when the project made it one. */
+  equippedIn: (mount: DeathMount) => string | undefined;
+  editCount: (explosion: DeathExplosion) => number;
+  /** What a copy of one would be called. */
+  copyKey: (explosion: DeathExplosion) => string;
+  onSelect: (mount: DeathMount) => void;
+  onChange: (explosion: DeathExplosion, row: FieldRow, value: unknown) => void;
+  onReset: (explosion: DeathExplosion, row: FieldRow) => void;
+  postOf: (explosion: DeathExplosion, row: FieldRow) => PostNote | undefined;
+  onCopy: (explosion: DeathExplosion, key: string) => void;
+  onEquip: (explosion: DeathExplosion, key: string) => void;
+  onPutBack: (explosion: DeathExplosion) => void;
+}
+
+/** What a death explosion is now, and the buttons that change it. */
+function ExplosionActions({
+  explosion,
+  explosions,
+  library,
+}: {
+  explosion: DeathExplosion;
+  explosions: ExplosionPanel;
+  library: SlotLibrary;
+}) {
+  const fires = explosions.equippedIn(explosion.mount);
+  const noun =
+    explosion.mount === "explodeas"
+      ? "death explosion"
+      : "self-destruct explosion";
+  if (!fires && explosion.follows) {
+    const death = explosions.equippedIn("explodeas") ?? explosion.name;
+    return (
+      <p className="max-w-prose text-xs text-muted-foreground">
+        {library.unitName} sets no {explosion.field}, so the engine uses its
+        death explosion,{" "}
+        <span className="font-mono text-foreground">{death || "nothing"}</span>,
+        when it self-destructs. Change the death explosion to change both, or
+        set {explosion.field} on the fields tab to give it one of its own.
+      </p>
+    );
+  }
+  const shared = !fires && explosion.definition.kind === "shared";
+  const copySource =
+    fires || explosion.definition.kind === "missing"
+      ? undefined
+      : explosion.definition.kind === "shared"
+        ? explosion.definition.key
+        : explosion.name.toLowerCase();
+  return (
+    <div className="flex flex-col gap-2">
+      {fires ? (
+        <p className="max-w-prose text-xs text-muted-foreground">
+          The {noun} is{" "}
+          <span className="font-mono text-foreground">{fires}</span> from the
+          project's weapon library, in place of{" "}
+          <span className="font-mono">{explosion.name || "nothing"}</span>.
+        </p>
+      ) : (
+        explosion.definition.kind === "missing" && (
+          <p className="max-w-prose text-xs text-destructive">
+            {explosion.name
+              ? `No weapon definition in this game is called ${explosion.name}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`
+              : `${library.unitName} sets no ${explosion.field}, so the engine uses its empty NOWEAPON definition and the unit explodes as nothing.`}
+          </p>
+        )
+      )}
+      <div className="flex flex-wrap items-center gap-2">
+        <EquipWeaponPopover
+          label={
+            fires
+              ? "Change explosion"
+              : shared
+                ? `Give ${library.unitName} its own copy`
+                : "Use a library weapon"
+          }
+          shared={shared}
+          unitName={library.unitName}
+          usesCopy={`the ${noun} is the copy`}
+          copySource={copySource}
+          suggestedKey={copySource ? explosions.copyKey(explosion) : undefined}
+          library={library.weapons}
+          equippedHere={fires}
+          mounts={library.mounts}
+          refusal={library.refusal}
+          onCopy={(key) => explosions.onCopy(explosion, key)}
+          onEquip={(key) => explosions.onEquip(explosion, key)}
+        />
+        {fires && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => explosions.onPutBack(explosion)}
+          >
+            <Undo2 className="size-3.5" />
+            Put back {explosion.name || "the game's"}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /** Which weapon the slot fires, and the buttons that change it. */
 function SlotWeaponActions({
   slot,
@@ -433,7 +670,7 @@ function SlotWeaponActions({
         }
         shared={shared}
         unitName={library.unitName}
-        slotNumber={slot.number}
+        usesCopy={`weapon ${slot.number} fires the copy`}
         copySource={copySource}
         library={library.weapons}
         equippedHere={fires}

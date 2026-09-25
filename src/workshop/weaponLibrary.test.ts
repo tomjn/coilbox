@@ -4,6 +4,7 @@ import {
   checkWeaponName,
   clearLibraryField,
   copyGameWeapon,
+  deathExplosionCount,
   equippedCount,
   equipRefusal,
   equipWeapon,
@@ -168,5 +169,26 @@ describe("the weapon library (issue #2640)", () => {
       }),
     ).toEqual({ armcom: { "0": "heavylaser" } });
     expect(parseWeaponLibrary(undefined)).toEqual({});
+  });
+
+  /** Issue #2642. A death explosion is equipped under its field's name. */
+  it("equips a death explosion beside the slots and lists it after them", () => {
+    let eq = equipWeapon({}, "armcom", "selfdestructas", "blast");
+    eq = equipWeapon(eq, "armcom", "explodeas", "blast");
+    eq = equipWeapon(eq, "armcom", "10", "blast");
+    eq = equipWeapon(eq, "armcom", "2", "blast");
+    expect(mountsOf(eq, "blast").map((m) => m.step)).toEqual([
+      "2",
+      "10",
+      "explodeas",
+      "selfdestructas",
+    ]);
+    expect(equippedCount(eq)).toBe(4);
+    expect(deathExplosionCount(eq)).toBe(2);
+    expect(
+      parseEquippedWeapons({
+        armcom: { explodeas: "blast", selfDestructAs: "blast", other: "x" },
+      }),
+    ).toEqual({ armcom: { explodeas: "blast" } });
   });
 });
