@@ -120,7 +120,7 @@ describe("WeaponSlotsPanel supporting definitions", () => {
     draw({ problems: [problem] });
     expect(
       screen.getByRole("list", {
-        name: "Weapon references that name nothing",
+        name: "Problems with this unit's weapons",
       }).textContent,
     ).toBe(problem.message);
   });

@@ -18,8 +18,9 @@
  * fields are the unit's own, edited the way a mounted definition's are, and a
  * reference on the unit that names nothing is listed above both.
  */
-import { Button } from "@picoframe/frame";
-import { Undo2 } from "lucide-react";
+import { Button, Input } from "@picoframe/frame";
+import { Plus, Undo2 } from "lucide-react";
+import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
@@ -27,12 +28,9 @@ import type { PostNote } from "../../beforePost";
 import type { UnitOverrides } from "../../overrides";
 import type { FieldRow } from "../../unitSections";
 import type { WeaponLibrary } from "../../weaponLibrary";
+import { librarySupport, type SupportingDef } from "../../weaponRefs";
 import {
-  librarySupport,
-  type RefProblem,
-  type SupportingDef,
-} from "../../weaponRefs";
-import {
+  describeLeaf,
   slotEditCount,
   supportingEditCount,
   type WeaponSlot,
@@ -41,6 +39,69 @@ import {
 import { EquipWeaponPopover } from "./EquipWeaponPopover";
 import { UnitFieldGroups } from "./UnitFieldGroups";
 import type { InPlaceField } from "./UnitFieldRow";
+
+/**
+ * A button that turns into a name box, for adding one row to a weapon's
+ * damage table (issue #2645). The value starts at 0, the same way a fresh
+ * damage table entry means nothing until somebody types a number into it: this
+ * only has to make the row exist, the field it becomes is the same one every
+ * other damage row already draws.
+ */
+function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  if (!adding) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-fit gap-1.5 text-xs"
+        onClick={() => setAdding(true)}
+      >
+        <Plus className="size-3.5" />
+        Add a class to the damage table
+      </Button>
+    );
+  }
+  const submit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setName("");
+    setAdding(false);
+  };
+  return (
+    <div className="flex w-fit items-center gap-1.5">
+      <Input
+        className="h-8 w-40 font-mono text-xs"
+        aria-label="Armour class to add to the damage table"
+        placeholder="Armour class"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            submit();
+          }
+          if (e.key === "Escape") {
+            setName("");
+            setAdding(false);
+          }
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="h-8 text-[10px]"
+        onClick={submit}
+      >
+        Add
+      </Button>
+    </div>
+  );
+}
 
 /** What a slot is called on its button: the weapon's display name, or the
  *  name the slot holds when its definition gives none. */
@@ -98,8 +159,10 @@ export function WeaponSlotsPanel({
   /** The supporting definition on screen, by key, in place of a slot. */
   selectedSupport?: string;
   onSelectSupport?: (key: string) => void;
-  /** References on this unit that name nothing (issue #2641). */
-  problems?: RefProblem[];
+  /** Things wrong with this unit's weapons that only its neighbours or the
+   *  game's own data reveal: a reference that names nothing (issue #2641)
+   *  and a damage table naming an armour class nobody has (issue #2645). */
+  problems?: { id: string; message: string }[];
 }) {
   if (slots.length === 0 && supporting.length === 0)
     return (
@@ -107,12 +170,49 @@ export function WeaponSlotsPanel({
     );
   const onSlot = selectedSupport === undefined ? selected : undefined;
 
+  // Where "add a class" writes, when there is anywhere it can (issue #2645):
+  // the supporting definition on screen, the library weapon the slot fires,
+  // or the slot's own definition. A shared definition offers nothing, the
+  // same as every other field on one.
+  const activeSupport =
+    selectedSupport !== undefined
+      ? supporting.find((s) => s.key === selectedSupport)
+      : undefined;
+  const fires = onSlot ? library.equippedIn(onSlot.step) : undefined;
+  const firesWeapon = fires ? library.weapons[fires] : undefined;
+  const addTarget:
+    | { prefix: string; def: Record<string, unknown> }
+    | undefined = activeSupport
+    ? { prefix: activeSupport.path, def: activeSupport.def }
+    : firesWeapon
+      ? { prefix: "", def: firesWeapon.def }
+      : onSlot?.definition.kind === "own"
+        ? { prefix: onSlot.definition.path, def: onSlot.definition.def }
+        : undefined;
+  const onAddDamageClass = (className: string) => {
+    if (!addTarget) return;
+    const leaf = `damage.${className}`;
+    const field = describeLeaf(leaf, addTarget.def);
+    const path = addTarget.prefix ? `${addTarget.prefix}.${leaf}` : leaf;
+    const row: FieldRow = {
+      path,
+      field,
+      label: field.label,
+      present: false,
+      inherited: field.default,
+      value: 0,
+      state: "overridden",
+    };
+    if (firesWeapon) library.onChange(fires, row, 0);
+    else onChange(row, 0);
+  };
+
   return (
     <div className="flex flex-col gap-4">
       {problems.length > 0 && (
         <ul
           className="flex max-w-prose flex-col gap-1 text-xs text-destructive"
-          aria-label="Weapon references that name nothing"
+          aria-label="Problems with this unit's weapons"
         >
           {problems.map((problem) => (
             <li key={problem.id}>{problem.message}</li>
@@ -262,6 +362,7 @@ export function WeaponSlotsPanel({
           )}
         </div>
       )}
+      {addTarget && <AddDamageClass onAdd={onAddDamageClass} />}
     </div>
   );
 }

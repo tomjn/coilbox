@@ -332,7 +332,7 @@ function definitionLeaves(def: Record<string, unknown>): string[] {
  * named, which the engine does read, so it is described here rather than
  * marked as a key only the game's Lua reads.
  */
-function describeLeaf(
+export function describeLeaf(
   leaf: string,
   def: Record<string, unknown>,
 ): ResolvedField {
