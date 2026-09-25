@@ -12,6 +12,7 @@ import {
   restrictEditsToUnits,
   setCollectionMembership,
   setCollectionParent,
+  setCollectionRule,
 } from "./collections";
 import { EMPTY_EDITS } from "./project";
 
@@ -160,6 +161,77 @@ describe("collectionUnits", () => {
   it("is undefined for an id the project holds no collection for", () => {
     expect(collectionUnits(EMPTY_COLLECTIONS, "gone")).toBeUndefined();
   });
+
+  it("adds units the rule matches, alongside the explicit list, when live units are given", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    const withRule = setCollectionRule(collections, id, "cost < 200");
+    const withMember = setCollectionMembership(
+      withRule,
+      id,
+      "armexpensive",
+      true,
+    );
+    const live = {
+      units: {
+        armcheap: { metalCost: 100 },
+        armexpensive: { metalCost: 900 },
+        armmid: { metalCost: 150 },
+      },
+      overrides: {},
+    };
+    expect(collectionUnits(withMember, id, live)).toEqual(
+      new Set(["armcheap", "armmid", "armexpensive"]),
+    );
+  });
+
+  it("ignores the rule when no live units are given", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    const withRule = setCollectionRule(collections, id, "cost < 200");
+    expect(collectionUnits(withRule, id)).toEqual(new Set());
+  });
+
+  it("matches nothing for a rule that fails to parse, rather than throwing", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Broken");
+    const withRule = setCollectionRule(collections, id, "cost >");
+    const live = { units: { armcom: { metalCost: 100 } }, overrides: {} };
+    expect(collectionUnits(withRule, id, live)).toEqual(new Set());
+  });
+
+  it("reads a project's override before the game's own field", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    const withRule = setCollectionRule(collections, id, "cost < 200");
+    const live = {
+      units: { armcom: { metalCost: 900 } },
+      overrides: { armcom: { metalCost: 50 } },
+    };
+    expect(collectionUnits(withRule, id, live)).toEqual(new Set(["armcom"]));
+  });
+});
+
+describe("setCollectionRule", () => {
+  it("sets a trimmed rule", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    expect(setCollectionRule(collections, id, "  cost < 200  ")[id].rule).toBe(
+      "cost < 200",
+    );
+  });
+
+  it("clears the rule for a blank string", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    const withRule = setCollectionRule(collections, id, "cost < 200");
+    expect(setCollectionRule(withRule, id, "  ")[id].rule).toBeUndefined();
+  });
+
+  it("returns the same object when nothing would change", () => {
+    const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Cheap");
+    expect(setCollectionRule(collections, id, "")).toBe(collections);
+  });
+
+  it("is a no-op for an id it does not hold", () => {
+    expect(setCollectionRule(EMPTY_COLLECTIONS, "nope", "cost < 200")).toBe(
+      EMPTY_COLLECTIONS,
+    );
+  });
 });
 
 describe("collectionTree", () => {
@@ -218,6 +290,24 @@ describe("parseCollections", () => {
       bots: { name: "Bots", parentId: "gone", units: [] },
     });
     expect(parsed.bots.parentId).toBe("gone");
+  });
+
+  it("reads a trimmed rule", () => {
+    const parsed = parseCollections({
+      cheap: { name: "Cheap", units: [], rule: "  cost < 200  " },
+    });
+    expect(parsed.cheap.rule).toBe("cost < 200");
+  });
+
+  it("drops a blank or non-string rule rather than storing an empty predicate", () => {
+    expect(
+      parseCollections({ cheap: { name: "Cheap", units: [], rule: "  " } })
+        .cheap.rule,
+    ).toBeUndefined();
+    expect(
+      parseCollections({ cheap: { name: "Cheap", units: [], rule: 5 } }).cheap
+        .rule,
+    ).toBeUndefined();
   });
 });
 

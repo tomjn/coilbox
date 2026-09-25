@@ -240,10 +240,15 @@ function BarSlotExportSection({
 
 export function PackageMutatorButton({
   project,
+  units,
   onPackaged,
   routeOptions,
 }: {
   project: ModProject;
+  /** The game's units with the project's own already in among them, the same
+   *  set `UnitList` draws from. Needed to resolve a rule-based collection
+   *  (issue #2656) into a concrete set for the export restriction below. */
+  units: Record<string, Record<string, unknown>>;
   /** Called with the version a package was just written under, so the page
    *  can record it and offer the next number after this one. */
   onPackaged: (version: number) => void;
@@ -267,7 +272,10 @@ export function PackageMutatorButton({
   const [restrictTo, setRestrictTo] = useState("");
   const restriction =
     restrictTo && collections
-      ? collectionUnits(collections, restrictTo)
+      ? collectionUnits(collections, restrictTo, {
+          units,
+          overrides: project.edits.overrides,
+        })
       : undefined;
   const scopedProject = useMemo(
     () =>

@@ -1,12 +1,14 @@
 /**
  * The project's collections (issue #2654): named, nestable sets of units that
- * scope the unit list and, later, batch edits (#2655) and an export (#2656's
- * neighbour, restricting a package to one collection's units).
+ * scope the unit list and, later, batch edits (#2655) and an export (issue
+ * #2656's neighbour, restricting a package to one collection's units).
  *
  * A drawer rather than a page, matching `WeaponLibraryDrawer`: the unit being
  * worked on stays where it was. Creating a collection comes first, the tree
  * of what exists is next, and picking one opens a searchable checklist of
- * every unit in the game to add or remove from it.
+ * every unit in the game to add or remove from it, and a rule (issue #2656)
+ * that adds every unit matching a `searchQuery.ts` predicate on top of
+ * whatever is ticked.
  */
 import { Button, Drawer, Input } from "@picoframe/frame";
 import { FolderPlus, Trash2 } from "lucide-react";
@@ -20,6 +22,8 @@ import {
   collectionTree,
   collectionUnits,
 } from "../../collections";
+import type { UnitOverrides } from "../../overrides";
+import { parseUnitQuery } from "../../searchQuery";
 
 /** How many units the membership checklist draws before asking for more of a
  *  search term. Only a limit on what is drawn: a game the size of Beyond All
@@ -61,12 +65,14 @@ export function CollectionsDrawer({
   onOpenChange,
   collections,
   units,
+  overrides,
   nameOf,
   onCreate,
   onRename,
   onDelete,
   onSetParent,
   onToggleMember,
+  onSetRule,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,12 +80,17 @@ export function CollectionsDrawer({
   /** The game's units with the project's own already in among them, the same
    *  set `UnitList` draws from. */
   units: Record<string, Record<string, unknown>>;
+  /** The project's own field overrides, so a rule (issue #2656) is evaluated
+   *  against a unit's edited values, not only the game's own. */
+  overrides: UnitOverrides;
   nameOf: (key: string, def: Record<string, unknown>) => string;
   onCreate: (name: string, parentId: string | undefined) => void;
   onRename: (id: string, name: string) => void;
   onDelete: (id: string) => void;
   onSetParent: (id: string, parentId: string | undefined) => void;
   onToggleMember: (id: string, unit: string, member: boolean) => void;
+  /** Set or clear a collection's rule (issue #2656). */
+  onSetRule: (id: string, rule: string) => void;
 }) {
   const [name, setName] = useState("");
   const [newParent, setNewParent] = useState("");
@@ -88,9 +99,11 @@ export function CollectionsDrawer({
 
   const tree = useMemo(() => collectionTree(collections), [collections]);
   const active = selected ? collections[selected] : undefined;
+  const live = useMemo(() => ({ units, overrides }), [units, overrides]);
   const activeUnits = active
-    ? collectionUnits(collections, active.id)
+    ? collectionUnits(collections, active.id, live)
     : undefined;
+  const ruleResult = active?.rule ? parseUnitQuery(active.rule) : undefined;
 
   const allUnits = useMemo(
     () =>
@@ -176,7 +189,7 @@ export function CollectionsDrawer({
                   collection={collection}
                   depth={depth}
                   memberCount={
-                    collectionUnits(collections, collection.id)?.size ?? 0
+                    collectionUnits(collections, collection.id, live)?.size ?? 0
                   }
                   isSelected={collection.id === selected}
                   parentOptions={parentOptions(collections, collection.id)}
@@ -203,6 +216,25 @@ export function CollectionsDrawer({
                 {activeUnits?.size ?? 0}
               </span>
             </h3>
+            <Field label="Rule (optional)">
+              <Input
+                value={active.rule ?? ""}
+                onChange={(e) => onSetRule(active.id, e.target.value)}
+                placeholder="e.g. cost < 200"
+                className="h-8 font-mono text-xs"
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </Field>
+            {ruleResult && !ruleResult.ok && (
+              <p className="text-xs text-destructive">{ruleResult.error}</p>
+            )}
+            {ruleResult?.ok && (
+              <p className="text-xs text-muted-foreground">
+                Every unit matching this rule belongs too, kept up to date as
+                values change, on top of anything ticked below.
+              </p>
+            )}
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -213,10 +245,11 @@ export function CollectionsDrawer({
             />
             <ul className="flex max-h-72 flex-col gap-0.5 overflow-y-auto rounded-md border border-border/60 p-1">
               {matches.slice(0, SHOWN).map((u) => {
-                // Own membership, not what nesting resolves to: a unit picked
-                // up from a child shows as included above but is not a
-                // checkbox this collection owns, so ticking it here would add
-                // a second, redundant listing rather than move anything.
+                // Own explicit membership, not what nesting or the rule
+                // resolves to: a unit picked up from a child or matched by
+                // the rule shows as included above but is not a checkbox this
+                // collection owns, so ticking it here would add a second,
+                // redundant listing rather than move anything.
                 const checked = active.units.includes(u.key);
                 return (
                   // biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control
