@@ -395,6 +395,65 @@ fn library_weapons_load_like_their_sources(game: &Game) {
     );
 }
 
+/// What a crater multiplier typed on a copy of the Big Bertha loads as, once
+/// with the copy alone in the project and once beside a field change on
+/// another unit (issue #3057).
+///
+/// The field change makes the mutator ship `gamedata/unitdefs_post.lua`,
+/// which covers the game's own (`src/workshop/postHook.ts`), so the game's
+/// unit post-processing no longer runs over the copy. The same typed value
+/// then loads as a different number. This is why coilbox writes a typed value
+/// as typed and says beside the field that the game may change it, rather
+/// than writing a value worked out to load as the typed one: what the game
+/// does to it is not a fact about the game and the field alone.
+fn typed_crater_multiplier(game: &Game) -> (f64, f64) {
+    let alone = load(game, &[]);
+    let mut clone = copied_unit(&alone, "armbrtha", "armbrtha2");
+    clone["def"]["weapondefs"]["arm_berthacannon"]["cratermult"] = json!(0.5);
+    let typed = json!({ "armbrtha2": { "weapondefs.arm_berthacannon.cratermult": 0.5 } });
+    let read = |edits: Value| {
+        let modded = load(game, &mutator(edits));
+        cratermult(&modded.weapons, "armbrtha2_arm_berthacannon")
+            .as_f64()
+            .expect("a number")
+    };
+    let copy_alone = read(json!({
+        "clones": { "armbrtha2": clone.clone() },
+        "overrides": typed.clone(),
+    }));
+    let mut overrides = typed;
+    overrides["armcom"] = json!({ "maxdamage": 3001 });
+    let beside_a_change = read(json!({
+        "clones": { "armbrtha2": clone },
+        "overrides": overrides,
+    }));
+    (copy_alone, beside_a_change)
+}
+
+#[test]
+fn a_typed_value_loads_changed_and_by_how_much_depends_on_the_route() {
+    let (alone, beside) = typed_crater_multiplier(&model_game());
+    assert!((alone - 0.045).abs() < 1e-9, "alone: got {alone}");
+    assert!(
+        (beside - 0.15).abs() < 1e-9,
+        "beside a change: got {beside}"
+    );
+}
+
+#[test]
+fn a_typed_value_loads_changed_and_by_how_much_depends_on_the_route_in_balanced_annihilation() {
+    let Some(game) = balanced_annihilation() else {
+        eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
+        return;
+    };
+    let (alone, beside) = typed_crater_multiplier(&game);
+    assert!((alone - 0.045).abs() < 1e-6, "alone: got {alone}");
+    assert!(
+        (beside - 0.15).abs() < 1e-6,
+        "beside a change: got {beside}"
+    );
+}
+
 #[test]
 fn a_copied_unit_loads_like_its_source_in_a_game_that_scales_on_load() {
     a_copied_unit_loads_like_its_source(&model_game());
