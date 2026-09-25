@@ -467,6 +467,9 @@ fn check(source: &str, unit: &str, fields: &[(&str, Value)]) -> Vec<Result<Locat
         .map(|(path, value)| (parse_path(path).expect("valid path"), value.clone()))
         .collect();
     check_fields(source, unit, &fields, root.path())
+        .into_iter()
+        .map(|answer| answer.map(|place| place.location))
+        .collect()
 }
 
 #[test]
