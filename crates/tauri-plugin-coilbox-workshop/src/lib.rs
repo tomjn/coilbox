@@ -218,6 +218,16 @@ fn workshop_package_mutator(project: ModProject, version: u32, dest: String) -> 
 /// the project reaching a lobby is better than none of it silently vanishing.
 #[tauri::command]
 fn workshop_pack_bar_slots(project: ModProject) -> CliResult {
+    // A numbered slot is still a tweak slot: it carries a field that names a
+    // generator, never the effects/<key>.lua file the name resolves to
+    // (`compile.rs`'s own note on `bar_tweakdefs`). Refused outright, the
+    // same way an empty project is, rather than packed with a reference
+    // nothing in the lobby will deliver.
+    if !project.edits.explosion_generators.is_empty() {
+        return CliResult::err(
+            "This project has a custom explosion effect. Beyond All Reason's tweak slots cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead.",
+        );
+    }
     let compiled = compile(&project);
     if compiled.chunks.is_empty() {
         return CliResult::err(
@@ -461,6 +471,11 @@ mod tests {
         assert!(packaged.get("files").is_some_and(Value::is_array));
         assert_eq!(packaged["version"], Value::from(1));
 
+        // Cleared for this one call: a custom explosion generator (issue
+        // #2643) makes the numbered-slot route refuse outright, checked on
+        // its own in `packing_bar_slots_refuses_a_project_with_an_explosion_generator`.
+        let mut project = project;
+        project.edits.explosion_generators.clear();
         let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
         assert!(bar_pack.get("tweakdefs").is_some_and(Value::is_array));
         assert!(bar_pack.get("tweakunits").is_some_and(Value::is_array));
@@ -702,10 +717,14 @@ mod tests {
     /// The saved fixture carries both a table-form edit (an override) and
     /// several block-form ones (a copy, a menu, a disabled unit), so packing
     /// it is a real check that both slot kinds come back non-empty rather
-    /// than only the one the other tests happen to build.
+    /// than only the one the other tests happen to build. It also carries a
+    /// custom explosion generator (issue #2643), which the numbered-slot
+    /// route cannot deliver, so that store is cleared here and checked on
+    /// its own in the refusal test below.
     #[test]
     fn packing_bar_slots_for_the_saved_project_fills_both_kinds_of_slot() {
-        let project = saved_project();
+        let mut project = saved_project();
+        project.edits.explosion_generators.clear();
         let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
 
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
@@ -720,6 +739,22 @@ mod tests {
         );
         assert!(pack["oversized"].as_array().is_some_and(Vec::is_empty));
         assert!(pack["unplaced"].as_array().is_some_and(Vec::is_empty));
+    }
+
+    /// The engine only ever loads a CEG from a real file under `effects/`
+    /// (`ExplosionGenerator.cpp:208`), which a numbered tweak slot has no way
+    /// to carry, so the saved project (which has one, unmodified) is refused
+    /// outright rather than packed with a broken reference (issue #2643).
+    #[test]
+    fn packing_bar_slots_refuses_a_project_with_an_explosion_generator() {
+        let project = saved_project();
+        let result = workshop_pack_bar_slots(project);
+        let response = serde_json::to_value(&result).expect("the answer serialises");
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response["error"]
+            .as_str()
+            .expect("error string")
+            .contains("explosion effect"));
     }
 
     /// The whole point of the fixture: a project saved by the app, through the
@@ -783,6 +818,12 @@ mod tests {
             edits.armor_classes.base["commanders"],
             vec!["armcom", "corcom"]
         );
+
+        // A custom explosion generator (issue #2643).
+        let generator = &edits.explosion_generators["purpleflash"];
+        assert_eq!(generator.class, crate::model::CegClass::CBitmapMuzzleFlame);
+        assert_eq!(generator.texture.as_deref(), Some("flare.tga"));
+        assert_eq!(generator.size, Some(8.0));
     }
 
     /// A project somebody saved compiles and passes its own checks. Preflight

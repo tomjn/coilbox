@@ -2338,6 +2338,13 @@ export default function UnitPage() {
                     }
                     problems={[...refIssues, ...armorProblems]}
                     explosions={explosionPanel}
+                    cegLibrary={{
+                      generators: edits.explosionGenerators ?? {},
+                      onChange: (next) =>
+                        commit((current) =>
+                          editSlot(current, "explosionGenerators", () => next),
+                        ),
+                    }}
                   />
                 </TabsContent>
                 <TabsContent

@@ -69,6 +69,10 @@ import {
 import type { UnitClone, UnitClones } from "./clones";
 import type { DisabledUnits } from "./disabled";
 import {
+  type ExplosionGenerators,
+  parseExplosionGenerators,
+} from "./explosionGenerators";
+import {
   adoptChecksum,
   type InPlaceDone,
   type KeptCopy,
@@ -130,6 +134,9 @@ export interface GameEdits {
    *  and the game's own class membership from the moment of the first move.
    *  Optional for the same reason `weapons` is. */
   armorClasses?: ArmorClasses;
+  /** Custom explosion generators the project writes as `effects/<name>.lua`
+   *  (issue #2643), by key. Optional for the same reason `weapons` is. */
+  explosionGenerators?: ExplosionGenerators;
 }
 
 /**
@@ -148,6 +155,7 @@ export const EMPTY_EDITS: GameEdits = {
   weapons: {},
   equipped: {},
   armorClasses: EMPTY_ARMOR_CLASSES,
+  explosionGenerators: {},
 };
 
 /** Whether a slot holds anything at all, whichever of the five it is. */
@@ -170,7 +178,8 @@ export function isEmptyEdits(edits: GameEdits): boolean {
     slotIsEmpty(edits.equipped) &&
     // `base` on its own says nothing the game does not already say, so only
     // `moves` counts, the same way `ArmorClasses::is_empty` reads it in Rust.
-    Object.keys(edits.armorClasses?.moves ?? {}).length === 0
+    Object.keys(edits.armorClasses?.moves ?? {}).length === 0 &&
+    slotIsEmpty(edits.explosionGenerators)
   );
 }
 
@@ -217,6 +226,8 @@ export interface EditCounts {
   deaths: number;
   /** Units moved to a different armour class (issue #2645). */
   armorMoves: number;
+  /** Custom explosion generators the project writes (issue #2643). */
+  effects: number;
 }
 
 export function editCounts(edits: GameEdits): EditCounts {
@@ -229,13 +240,23 @@ export function editCounts(edits: GameEdits): EditCounts {
     equipped: equippedCount(edits.equipped),
     deaths: deathExplosionCount(edits.equipped),
     armorMoves: Object.keys(edits.armorClasses?.moves ?? {}).length,
+    effects: Object.keys(edits.explosionGenerators ?? {}).length,
   };
 }
 
 /** The counts as a sentence, for a header that says what is in the project. */
 export function describeEdits(edits: GameEdits): string {
-  const { fields, added, menuOps, off, weapons, equipped, deaths, armorMoves } =
-    editCounts(edits);
+  const {
+    fields,
+    added,
+    menuOps,
+    off,
+    weapons,
+    equipped,
+    deaths,
+    armorMoves,
+    effects,
+  } = editCounts(edits);
   const slots = equipped - deaths;
   const uses = [
     slots > 0 && `${slots} slot${slots === 1 ? "" : "s"}`,
@@ -250,6 +271,7 @@ export function describeEdits(edits: GameEdits): string {
       `${weapons} library weapon${weapons === 1 ? "" : "s"}${uses.length > 0 ? ` in ${uses.join(" and ")}` : ""}`,
     armorMoves > 0 &&
       `${armorMoves} unit${armorMoves === 1 ? "" : "s"} moved to a different armour class`,
+    effects > 0 && `${effects} explosion effect${effects === 1 ? "" : "s"}`,
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0 ? "Nothing changed yet" : parts.join(", ");
 }
@@ -1019,6 +1041,7 @@ export function parseGameEdits(value: unknown): GameEdits {
     weapons: parseWeaponLibrary(source.weapons),
     equipped: parseEquippedWeapons(source.equipped),
     armorClasses: parseArmorClasses(source.armorClasses),
+    explosionGenerators: parseExplosionGenerators(source.explosionGenerators),
   };
 }
 

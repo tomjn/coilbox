@@ -277,7 +277,12 @@ function RoutesSection({
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {deliveryRoutes(options, gameName, gamePath).map((r) => (
+          {deliveryRoutes(
+            options,
+            gameName,
+            gamePath,
+            Object.keys(project?.edits.explosionGenerators ?? {}).length > 0,
+          ).map((r) => (
             <li key={r.route} className="flex gap-2">
               {r.available ? (
                 <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />

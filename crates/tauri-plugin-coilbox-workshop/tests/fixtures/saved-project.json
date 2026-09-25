@@ -92,6 +92,25 @@
       "moves": {
         "armflash": "heavyunits"
       }
+    },
+    "explosionGenerators": {
+      "purpleflash": {
+        "key": "purpleflash",
+        "class": "CBitmapMuzzleFlame",
+        "count": 1,
+        "ground": true,
+        "water": true,
+        "air": true,
+        "underwater": true,
+        "texture": "flare.tga",
+        "color": {
+          "r": 1,
+          "g": 0,
+          "b": 1
+        },
+        "size": 8,
+        "lifetime": 30
+      }
     }
   },
   "writtenInPlace": {
