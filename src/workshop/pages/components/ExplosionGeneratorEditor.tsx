@@ -53,6 +53,10 @@ const colorToHex = (color: { r: number; g: number; b: number } | undefined) => {
     : "#ffffff";
 };
 
+/** "a" or "an", for a field label that starts a sentence lowercase, e.g.
+ *  "impact effect" against "bounce effect". */
+const articleFor = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
+
 /** One class specific field's control, by {@link CegFieldSpec.key}. */
 function ClassField({
   spec,
@@ -224,7 +228,9 @@ export function ExplosionGeneratorEditor({
       <PopoverTrigger asChild>
         <Button variant={owned ? "default" : "outline"} size="sm">
           <Sparkles className="size-3.5" />
-          {owned ? `Edit ${owned.key}` : `Create a ${label.toLowerCase()}`}
+          {owned
+            ? `Edit ${owned.key}`
+            : `Create ${articleFor(label)} ${label.toLowerCase()}`}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-96 flex-col gap-4">
@@ -273,7 +279,7 @@ export function ExplosionGeneratorEditor({
           >
             <div className="flex flex-col gap-1">
               <h3 className="text-sm font-medium">
-                Create a {label.toLowerCase()}
+                Create {articleFor(label)} {label.toLowerCase()}
               </h3>
               <p className="text-xs text-muted-foreground">
                 {currentKey

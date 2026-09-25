@@ -603,7 +603,14 @@ function CegFieldControls({
     group.sections.flatMap((section) => section.rows),
   );
   const controls = rows
-    .map((row) => ({ row, field: cegWeaponField(row.path) }))
+    // A row's path is dotted into the definition it belongs to
+    // (weapondefs.armcomlaser.explosionGenerator), not the bare field name,
+    // so only the last step is checked against the three CEG-carrying
+    // fields.
+    .map((row) => ({
+      row,
+      field: cegWeaponField(row.path.split(".").at(-1) ?? row.path),
+    }))
     .filter(
       (
         entry,
