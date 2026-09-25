@@ -34,7 +34,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::inplace_clone;
-use crate::model::ModProject;
+use crate::model::{BuildMenuOp, GameEdits, ModProject, UnitClone, UnitPatch};
 
 /// What the workshop marks its in-place writes with. Distinct from the `.3do`
 /// installer's suffix, so undoing one never undoes the other.
@@ -233,6 +233,21 @@ fn not_carried(project: &ModProject) -> Vec<String> {
             "{unsourced} unit{} not copied from a unit in the game {} not written into the game, because there is no unit file to copy.",
             if unsourced == 1 { "" } else { "s" },
             if unsourced == 1 { "is" } else { "are" },
+        ));
+    }
+    let clone_routed = edits
+        .clones
+        .values()
+        .filter(|clone| inplace_clone::writable(clone))
+        .filter(|clone| project.is_clone_mutator_only(&clone.key))
+        .count();
+    if clone_routed > 0 {
+        out.push(format!(
+            "{clone_routed} cop{} you sent to the mutator route {} not written into the game. {} still need{} a mutator.",
+            if clone_routed == 1 { "y" } else { "ies" },
+            if clone_routed == 1 { "is" } else { "are" },
+            if clone_routed == 1 { "It" } else { "They" },
+            if clone_routed == 1 { "s" } else { "" },
         ));
     }
     if inplace_clone::menu_ops_not_carried(edits) > 0 {
@@ -454,6 +469,50 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
         file: Some(rel),
         fields,
     })
+}
+
+/// What a dry run found for one copy (issue #3035).
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneCheckOutcome {
+    /// Every change the copy makes that no edit to a file can carry. Empty
+    /// for a copy the write does not attempt in place at all: one with no
+    /// source, or one that replaces a game unit (see [`inplace_clone::writable`]).
+    pub unwritable: Vec<inplace_clone::Unwritable>,
+}
+
+/// Whether a copy's own changes could be written into the game's own files,
+/// without writing anything and without reading any file (issue #3035). A
+/// copy's differences from its source are worked out from values alone, the
+/// same way [`inplace_clone::copy_edits`] does for the write, so the unit
+/// page can ask this the moment the copy is edited rather than at write time.
+///
+/// `overrides` and `menu_ops` are the project's own edits to this one copy,
+/// which `resolved_clone_def` folds into `clone.def` the same way the write
+/// does, so the answer matches what the write would actually try.
+pub fn check_clone(
+    game_dir: &Path,
+    clone: &UnitClone,
+    overrides: Option<&UnitPatch>,
+    menu_ops: Option<&[BuildMenuOp]>,
+    source_def: &Value,
+) -> Result<CloneCheckOutcome, String> {
+    require_loose_game(game_dir)?;
+    if !inplace_clone::writable(clone) {
+        return Ok(CloneCheckOutcome {
+            unwritable: Vec::new(),
+        });
+    }
+    let mut edits = GameEdits::default();
+    if let Some(patch) = overrides {
+        edits.overrides.insert(clone.key.clone(), patch.clone());
+    }
+    if let Some(ops) = menu_ops {
+        edits.menus.insert(clone.key.clone(), ops.to_vec());
+    }
+    let def = crate::compile::resolved_clone_def(clone, &edits);
+    let (_, unwritable) = inplace_clone::copy_edits(source_def, &def);
+    Ok(CloneCheckOutcome { unwritable })
 }
 
 /// One unit's field changes, ready to patch.
@@ -731,11 +790,18 @@ fn write_copies(
 ) -> Vec<(PathBuf, String)> {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
     let mut created = Vec::new();
+    // A copy sent to the mutator route (issue #3035) is skipped here exactly
+    // as a mutator-only field change is skipped in `write` above: left out of
+    // the write, counted in `not_carried`, and never refused, so it does not
+    // stop the rest of the project going in. Its own build menu pushes are
+    // never generated in the first place, since this loop is the only place
+    // that adds them.
     let copies = project
         .edits
         .clones
         .values()
-        .filter(|clone| inplace_clone::writable(clone));
+        .filter(|clone| inplace_clone::writable(clone))
+        .filter(|clone| !project.is_clone_mutator_only(&clone.key));
     for clone in copies {
         let unit = clone.key.as_str();
         let source = clone
@@ -1665,6 +1731,92 @@ mod tests {
         assert!(outcome.copies.is_empty());
         assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
         assert!(outcome.not_carried[0].contains("replaces a unit"));
+    }
+
+    /// Issue #3035. A copy sent to the mutator route is skipped by the write,
+    /// with no refusal, and the rest of the project still goes in. The push
+    /// its build menu placement would have made is never generated, since it
+    /// is the write loop for the copy itself that makes that push.
+    #[test]
+    fn a_copy_sent_to_the_mutator_is_skipped_rather_than_refused() {
+        let (_root, game) = game();
+        let factory = game.join("units/factory.lua");
+        let factory_before = read(&factory);
+        let mut project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({ "health": 2500 }),
+            serde_json::json!({ "menus": { "factory": [{ "op": "add", "unit": "armdfly2" }] } }),
+        );
+        project.clone_mutator_only.push("armdfly2".into());
+        project.edits.overrides.insert(
+            "brv".into(),
+            [("customparams.tonnage".to_string(), Value::from(85))].into(),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.copies.is_empty());
+        assert!(!game.join("units/armdfly2.lua").exists());
+        assert_eq!(read(&factory), factory_before);
+        assert_eq!(
+            outcome.written,
+            vec!["units/vehicles/HeavyBRV.lua".to_string()]
+        );
+        assert!(
+            outcome
+                .not_carried
+                .iter()
+                .any(|line| line.contains("1 copy you sent to the mutator route")),
+            "{:?}",
+            outcome.not_carried
+        );
+    }
+
+    /// Issue #3035. The dry run for a copy compares its definition against
+    /// its source's values alone: a table the copy adds is refused by field,
+    /// a change matching what the source already has is not, and nothing is
+    /// read off disk.
+    #[test]
+    fn a_clone_dry_run_says_which_of_its_own_changes_cannot_be_written() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let game = root.path().join("games/dev.sdd");
+        std::fs::create_dir_all(&game).unwrap();
+        let mut def = sources()["armdfly"].clone();
+        def["featuredefs"] = serde_json::json!({ "dead": { "metal": 1 } });
+        let clone: UnitClone = serde_json::from_value(serde_json::json!({
+            "key": "armdfly2",
+            "source": "armdfly",
+            "replacesGameUnit": false,
+            "def": def,
+        }))
+        .unwrap();
+
+        let outcome = check_clone(&game, &clone, None, None, &sources()["armdfly"]).unwrap();
+
+        assert_eq!(outcome.unwritable.len(), 1, "{:?}", outcome.unwritable);
+        assert_eq!(outcome.unwritable[0].field, "featuredefs");
+    }
+
+    /// A copy with no source, or one that replaces a game unit, is never
+    /// attempted in place at all, so the dry run has nothing to refuse.
+    #[test]
+    fn a_clone_dry_run_is_silent_for_a_copy_the_write_never_attempts() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let game = root.path().join("games/dev.sdd");
+        std::fs::create_dir_all(&game).unwrap();
+        let clone: UnitClone = serde_json::from_value(serde_json::json!({
+            "key": "brv",
+            "source": "armdfly",
+            "replacesGameUnit": true,
+            "def": { "featuredefs": { "dead": { "metal": 1 } } },
+        }))
+        .unwrap();
+
+        let outcome = check_clone(&game, &clone, None, None, &sources()["armdfly"]).unwrap();
+
+        assert!(outcome.unwritable.is_empty());
     }
 
     #[test]

@@ -88,6 +88,9 @@
       "weapondefs.disintegrator.range"
     ]
   },
+  "cloneMutatorOnly": [
+    "supercom"
+  ],
   "createdAt": "2026-09-08T11:44:47.201Z",
   "updatedAt": "2026-09-08T11:47:21.638Z"
 }

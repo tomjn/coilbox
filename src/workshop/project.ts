@@ -55,6 +55,11 @@ import { MAX_CODE_LENGTH } from "../deeplink/parse";
 import { readStoredSetting, updateStoredSetting } from "../lib/storedSetting";
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import { buildMenuOpCount } from "./buildMenus";
+import {
+  type CloneMutatorOnly,
+  parseCloneMutatorOnly,
+  setCloneMutatorOnly,
+} from "./cloneMutatorOnly";
 import type { UnitClone, UnitClones } from "./clones";
 import type { DisabledUnits } from "./disabled";
 import {
@@ -279,6 +284,15 @@ export interface ModProject {
    * every field before an in-place write would go through.
    */
   mutatorOnly?: MutatorOnly;
+  /**
+   * Copies sent through the mutator route whole, because one of their
+   * changes has no edit a file can take (issue #3035). See
+   * `cloneMutatorOnly.ts`. Absent when nothing has been sent that way.
+   *
+   * Carried in the container payload, like `mutatorOnly`: it is the author's
+   * decision about where a copy goes.
+   */
+  cloneMutatorOnly?: CloneMutatorOnly;
   createdAt: string;
   updatedAt: string;
 }
@@ -293,6 +307,7 @@ export interface NewProject {
   edits?: GameEdits;
   readOnlyLua?: ReadOnlyLuaBlock[];
   mutatorOnly?: MutatorOnly;
+  cloneMutatorOnly?: CloneMutatorOnly;
 }
 
 /** A name for a project nobody has named: the game, and which one it is. */
@@ -340,6 +355,9 @@ export function useModProjects() {
       ...(input.readOnlyLua?.length ? { readOnlyLua: input.readOnlyLua } : {}),
       ...(input.mutatorOnly && Object.keys(input.mutatorOnly).length > 0
         ? { mutatorOnly: input.mutatorOnly }
+        : {}),
+      ...(input.cloneMutatorOnly?.length
+        ? { cloneMutatorOnly: input.cloneMutatorOnly }
         : {}),
       createdAt: now,
       updatedAt: now,
@@ -475,6 +493,26 @@ export function useModProjects() {
   }
 
   /**
+   * Send one whole copy through the mutator route, or take it back, when one
+   * of its changes has no edit a file can take (issue #3035). A copy is
+   * written as a file or not at all, so this marks the whole copy rather than
+   * one of its fields, unlike `routeThroughMutator`. Not an edit to what the
+   * project changes, so `updatedAt` is left alone and it is no undo step.
+   */
+  function routeCloneThroughMutator(id: string, unit: string, on: boolean) {
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const marks = setCloneMutatorOnly(target.cloneMutatorOnly, unit, on);
+      if (marks === target.cloneMutatorOnly) return prev;
+      const { cloneMutatorOnly: _dropped, ...rest } = target;
+      const next: ModProject =
+        marks.length > 0 ? { ...rest, cloneMutatorOnly: marks } : rest;
+      return prev.map((p) => (p.id === id ? next : p));
+    });
+  }
+
+  /**
    * Record the version a packaged `.sdz` was just written with (issue
    * #1283). Always overwritten, unlike `recordAuthoredChecksum`: a project
    * can be packaged more than once, and each one has to move the number on
@@ -592,6 +630,7 @@ export function useModProjects() {
     settleInPlaceAction,
     adoptInPlaceChecksum,
     routeThroughMutator,
+    routeCloneThroughMutator,
     recordPackagedVersion,
     updateProjectDetails,
     duplicateProject,
@@ -647,6 +686,9 @@ export interface ModProjectPayload {
   /** Optional and additive, so the kind version stays where it is (issue
    *  #2633). */
   mutatorOnly?: MutatorOnly;
+  /** Optional and additive, so the kind version stays where it is (issue
+   *  #3035). */
+  cloneMutatorOnly?: CloneMutatorOnly;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -671,6 +713,9 @@ export function modProjectPayload(
       : {}),
     ...(project.mutatorOnly && Object.keys(project.mutatorOnly).length > 0
       ? { mutatorOnly: project.mutatorOnly }
+      : {}),
+    ...(project.cloneMutatorOnly?.length
+      ? { cloneMutatorOnly: project.cloneMutatorOnly }
       : {}),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -949,6 +994,7 @@ export function parseModProjectJson(text: string): ImportedProject | null {
     typeof payload.description === "string" ? payload.description.trim() : "";
   const readOnlyLua = parseReadOnlyLua(payload.readOnlyLua);
   const mutatorOnly = parseMutatorOnly(payload.mutatorOnly);
+  const cloneMutatorOnly = parseCloneMutatorOnly(payload.cloneMutatorOnly);
   return {
     name,
     ...(description ? { description } : {}),
@@ -960,5 +1006,6 @@ export function parseModProjectJson(text: string): ImportedProject | null {
     edits: parseGameEdits(payload.edits),
     ...(readOnlyLua.length ? { readOnlyLua } : {}),
     ...(Object.keys(mutatorOnly).length > 0 ? { mutatorOnly } : {}),
+    ...(cloneMutatorOnly.length ? { cloneMutatorOnly } : {}),
   };
 }

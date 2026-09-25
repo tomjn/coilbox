@@ -12,6 +12,7 @@
  * needs no diff library of its own.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { BuildMenuOp } from "./buildMenus";
 import type { UnitClone } from "./clones";
 import type { ModProject } from "./project";
 
@@ -169,6 +170,40 @@ export const workshopCheckInPlace = defineCommand<
   { gameDir: string; unit: string; fields: FieldProbe[] },
   InPlaceCheck
 >("coilbox-workshop", "workshop_check_in_place");
+
+/** One of a copy's own changes that no edit to a file can make, with the
+ *  sentence saying why (issue #3035). */
+export interface CloneUnwritable {
+  /** The field's dotted path, as the copy's definition spells it. */
+  field: string;
+  message: string;
+}
+
+/** What `workshop_check_clone_in_place` found for one copy (issue #3035). */
+export interface CloneCheck {
+  /** Every change the copy makes that no edit to a file can carry. Empty for
+   *  a copy the write does not attempt in place at all. */
+  unwritable: CloneUnwritable[];
+}
+
+/**
+ * Whether a copy's own changes could be written into the game's own files, as
+ * a dry run over values alone: no file is read (issue #3035). `overrides` and
+ * `menuOps` are the project's own edits to this one copy, the same slices
+ * `edits.overrides[unit]` and `edits.menus[unit]` hold. `sourceDef` is the
+ * game's own read of the unit the copy was made from, the same as one entry
+ * of what `copySources` builds for the write.
+ */
+export const workshopCheckCloneInPlace = defineCommand<
+  {
+    gameDir: string;
+    clone: UnitClone;
+    overrides?: Record<string, unknown>;
+    menuOps?: BuildMenuOp[];
+    sourceDef: Record<string, unknown>;
+  },
+  CloneCheck
+>("coilbox-workshop", "workshop_check_clone_in_place");
 
 /** What one line of a diff is, from the old side, the new side, or both. */
 export type LineChange = "equal" | "removed" | "added";

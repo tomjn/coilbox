@@ -38,6 +38,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { isCloneMutatorOnly } from "../../cloneMutatorOnly";
 import {
   copiesToWrite,
   copySources,
@@ -160,7 +161,15 @@ export function InPlaceWrite({
         (field) => !isMutatorOnly(project?.mutatorOnly, unit, field),
       ),
   );
-  const copies = copiesToWrite(project);
+  // A copy sent through the mutator route whole (issue #3035) is not this
+  // route's either: the write skips it, and it is listed with the field
+  // changes sent the same way rather than counted as work below.
+  const copies = copiesToWrite(project).filter(
+    (c) => !isCloneMutatorOnly(project?.cloneMutatorOnly, c.key),
+  );
+  const routedClones = copiesToWrite(project).filter((c) =>
+    isCloneMutatorOnly(project?.cloneMutatorOnly, c.key),
+  );
   const hasWork = hasFieldChanges || copies.length > 0;
 
   return (
@@ -243,8 +252,8 @@ export function InPlaceWrite({
         {!project
           ? "Open a project to write its changes into the game."
           : !hasWork
-            ? routed.length > 0
-              ? "Every field change in this project goes through the mutator route, so there is nothing to write in place."
+            ? routed.length > 0 || routedClones.length > 0
+              ? "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place."
               : "This project has no field changes or copies to write."
             : copies.length > 0
               ? "Each field change is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
@@ -264,6 +273,23 @@ export function InPlaceWrite({
               <li key={`${c.unit}:${c.field}`}>
                 {c.unit} {c.field}
               </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {routedClones.length > 0 && (
+        <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+          <span>
+            {routedClones.length} cop{routedClones.length === 1 ? "y" : "ies"}{" "}
+            cannot be written into the game's files, so you sent{" "}
+            {routedClones.length === 1 ? "it" : "them"} to the mutator route
+            whole. Writing in place skips{" "}
+            {routedClones.length === 1 ? "it" : "them"}, and you still need a
+            mutator for {routedClones.length === 1 ? "it" : "them"}:
+          </span>
+          <ul className="flex list-disc flex-col gap-0.5 pl-4 font-mono text-[11px]">
+            {routedClones.map((c) => (
+              <li key={c.key}>{c.key}</li>
             ))}
           </ul>
         </div>

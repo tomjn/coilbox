@@ -52,7 +52,9 @@
 //! into a game's own folder, and three more go with it: a status count of the
 //! backups it left, undo and accept. `workshop_check_in_place` (issue #2633)
 //! is the same patching as a dry run for one unit, which the unit page asks
-//! at edit time. See `inplace`'s own doc comment.
+//! at edit time. `workshop_check_clone_in_place` (issue #3035) is the same
+//! question for a copy: which of its own changes have no edit a file can
+//! carry, worked out from values alone. See `inplace`'s own doc comment.
 //!
 //! `workshop_in_place_diffs` (issue #2636) reads rather than writes: a line
 //! diff of every file the edit-in-place route has touched, backup against
@@ -326,6 +328,33 @@ async fn workshop_check_in_place(
     blocking("check", move || inplace::check(&game, &unit, &fields)).await
 }
 
+/// Say which of a copy's own changes could be written into the loose `.sdd`
+/// game at `gameDir`, writing nothing and reading no file (issue #3035). A
+/// copy's changes are worked out from values alone (`inplace_clone.rs`), so
+/// this needs only the copy, the project's edits to it, and the game's own
+/// read of the unit it was copied from, which `copySources` on the frontend
+/// already builds for the write.
+#[tauri::command]
+async fn workshop_check_clone_in_place(
+    game_dir: String,
+    clone: crate::model::UnitClone,
+    overrides: Option<crate::model::UnitPatch>,
+    menu_ops: Option<Vec<crate::model::BuildMenuOp>>,
+    source_def: serde_json::Value,
+) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("check clone", move || {
+        inplace::check_clone(
+            &game,
+            &clone,
+            overrides.as_ref(),
+            menu_ops.as_deref(),
+            &source_def,
+        )
+    })
+    .await
+}
+
 /// A line diff of every file under `gameDir` that carries a workshop backup or
 /// created marker, backup against current (issue #2636). A read, and it
 /// changes nothing undo or accept would need.
@@ -350,6 +379,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_undo_in_place,
             workshop_accept_in_place,
             workshop_check_in_place,
+            workshop_check_clone_in_place,
             workshop_in_place_diffs
         ])
         .build()
@@ -484,6 +514,24 @@ mod tests {
             )));
         assert_eq!(checked["file"], serde_json::json!("units/armcom.lua"));
         assert_eq!(checked["fields"][0]["refusal"], Value::Null);
+
+        let clone: crate::model::UnitClone = serde_json::from_value(serde_json::json!({
+            "key": "armcom2",
+            "source": "armcom",
+            "replacesGameUnit": false,
+            "def": { "metalcost": 1, "featuredefs": { "dead": { "metal": 1 } } },
+        }))
+        .expect("clone");
+        let clone_checked = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
+            workshop_check_clone_in_place(
+                dir(),
+                clone,
+                None,
+                None,
+                serde_json::json!({ "metalcost": 1 }),
+            ),
+        ));
+        assert_eq!(clone_checked["unwritable"][0]["field"], "featuredefs");
 
         let outside = root.path().join("dev.sdd");
         std::fs::create_dir_all(&outside).expect("outside dir");
