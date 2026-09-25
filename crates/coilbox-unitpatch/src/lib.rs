@@ -107,14 +107,96 @@ pub fn parse_path(path: &str) -> Option<Vec<Segment>> {
     (!segments.is_empty()).then_some(segments)
 }
 
-/// A value the patcher can write. Only plain literals: anything else would
-/// need the patcher to write code, which is the author's job.
+/// A value the patcher can write. Only literals and tables of literals:
+/// anything else would need the patcher to write code, which is the author's
+/// job.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind", content = "value")]
 pub enum Value {
     Bool(bool),
     Number(f64),
     String(String),
+    /// A whole table, such as a weapon definition added to a unit's
+    /// `weapondefs` (issue #3055). Entries are written in this order, so
+    /// build one with [`Value::from_json`] for a stable order.
+    Table(Vec<(TableKey, Value)>),
+}
+
+/// A key in a [`Value::Table`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "value")]
+pub enum TableKey {
+    Name(String),
+    /// A list position, counted from 1.
+    Index(usize),
+}
+
+impl Value {
+    /// `json` as a value the patcher can write.
+    ///
+    /// An array is a list numbered from 1. An object's key of digits is a
+    /// number key, since the unitsync worker sends a Lua table numbered with
+    /// a gap as an object keyed by its numbers. A `null` entry is left out,
+    /// which is what Lua makes of a key set to `nil`. Entries are sorted,
+    /// positions first and then names without regard to case, so the same
+    /// table is always written the same way. Two names that differ only in
+    /// case are refused, because the engine lowercases keys and would read
+    /// only one of them.
+    pub fn from_json(json: &serde_json::Value) -> Result<Value, String> {
+        use serde_json::Value as Json;
+        match json {
+            Json::Bool(b) => Ok(Value::Bool(*b)),
+            Json::Number(n) => n
+                .as_f64()
+                .map(Value::Number)
+                .ok_or_else(|| format!("{n} cannot be written as a Lua number.")),
+            Json::String(s) => Ok(Value::String(s.clone())),
+            Json::Null => Err("A missing value cannot be written as a field.".into()),
+            Json::Array(items) => {
+                let mut entries = Vec::new();
+                for (at, item) in items.iter().enumerate() {
+                    if !item.is_null() {
+                        entries.push((TableKey::Index(at + 1), Value::from_json(item)?));
+                    }
+                }
+                Ok(Value::Table(entries))
+            }
+            Json::Object(map) => {
+                let mut entries = Vec::new();
+                for (key, item) in map {
+                    if item.is_null() {
+                        continue;
+                    }
+                    let key = match key.parse::<usize>() {
+                        Ok(n) if n > 0 && key.bytes().all(|b| b.is_ascii_digit()) => {
+                            TableKey::Index(n)
+                        }
+                        _ => TableKey::Name(key.clone()),
+                    };
+                    entries.push((key, Value::from_json(item)?));
+                }
+                entries.sort_by(|(a, _), (b, _)| match (a, b) {
+                    (TableKey::Index(x), TableKey::Index(y)) => x.cmp(y),
+                    (TableKey::Index(_), TableKey::Name(_)) => std::cmp::Ordering::Less,
+                    (TableKey::Name(_), TableKey::Index(_)) => std::cmp::Ordering::Greater,
+                    (TableKey::Name(x), TableKey::Name(y)) => x
+                        .to_lowercase()
+                        .cmp(&y.to_lowercase())
+                        .then_with(|| x.cmp(y)),
+                });
+                for pair in entries.windows(2) {
+                    if let [(TableKey::Name(a), _), (TableKey::Name(b), _)] = pair {
+                        if a.eq_ignore_ascii_case(b) {
+                            return Err(format!(
+                                "The table holds both {a} and {b}, which the engine reads as one key."
+                            ));
+                        }
+                    }
+                }
+                Ok(Value::Table(entries))
+            }
+        }
+    }
 }
 
 /// What to do at the end of the path.
@@ -813,6 +895,20 @@ fn different(value: &Value) -> Value {
         Value::Number(n) if *n + 1.0 != *n => Value::Number(n + 1.0),
         Value::Number(n) => Value::Number(n / 2.0),
         Value::String(s) => Value::String(format!("{s}_")),
+        Value::Table(entries) => {
+            let mut entries = entries.clone();
+            entries.push((TableKey::Name("coilbox_probe".into()), Value::Bool(true)));
+            Value::Table(entries)
+        }
+    }
+}
+
+/// The first number in `value` that Lua cannot hold, if there is one.
+fn not_finite(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(number) if !number.is_finite() => Some(*number),
+        Value::Table(entries) => entries.iter().find_map(|(_, item)| not_finite(item)),
+        _ => None,
     }
 }
 
@@ -822,13 +918,17 @@ fn validate(edit: &Edit) -> Result<&Value, Refusal> {
     let value = match &edit.op {
         Op::Set(value) | Op::Push(value) => value,
     };
-    if let Value::Number(number) = value {
-        if !number.is_finite() {
-            return Err(Refusal::new(
-                RefusalKind::InvalidValue,
-                format!("{number} cannot be written as a Lua number."),
-            ));
-        }
+    if let Some(number) = not_finite(value) {
+        return Err(Refusal::new(
+            RefusalKind::InvalidValue,
+            format!("{number} cannot be written as a Lua number."),
+        ));
+    }
+    if let (Op::Push(_), Value::Table(_)) = (&edit.op, value) {
+        return Err(Refusal::new(
+            RefusalKind::InvalidValue,
+            "Only a single value can be added to the end of a list, not a table.",
+        ));
     }
     if edit.path.is_empty() {
         return Err(Refusal::new(
