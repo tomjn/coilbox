@@ -2869,6 +2869,51 @@ mod tests {
         assert!(!game.join("weapons/coilbox_beacon_blast.lua").exists());
     }
 
+    /// Issue #3079. LozScorpion's basedef writes both `explodeAs` and
+    /// `selfDestructAs` from the single global its unit file sets, as a
+    /// literal, before the include. Equipping a library weapon as the death
+    /// explosion changes that line in the unit file itself, which changes
+    /// both fields together and leaves the basedef untouched. Undo puts the
+    /// unit file back.
+    #[test]
+    fn an_equipped_death_explosion_reads_through_the_units_own_global() {
+        const SCORPION: &str = "Units/Loz Alliance - Faction 2/Tech 1/lozscorpion.lua";
+        const SCORPION_BASEDEF: &str =
+            "Units-Configs-Basedefs/basedefs/Loz Alliance - Faction 2/Tier 1/lozscorpion_basedef.lua";
+        let (_root, game) = sf_game();
+        let scorpion = game.join(SCORPION);
+        let basedef = game.join(SCORPION_BASEDEF);
+        let (scorpion_before, basedef_before) = (read(&scorpion), read(&basedef));
+        let project = equipping(
+            serde_json::json!({ "blast": { "key": "blast", "def": { "areaofeffect": 300 } } }),
+            serde_json::json!({ "lozscorpion": { "explodeas": "blast" } }),
+            serde_json::json!({}),
+        );
+        let sources = serde_json::from_value(serde_json::json!({
+            "lozscorpion": { "weapons": [{ "name": "lozscorpion_lightningcannon" }] }
+        }))
+        .unwrap();
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(
+            outcome.written,
+            vec![SCORPION, "weapons/coilbox_lozscorpion_blast.lua"]
+        );
+        let unit = unit_in(&game, SCORPION, "lozscorpion");
+        assert_eq!(unit["explodeas"], "lozscorpion_blast");
+        assert_eq!(unit["selfdestructas"], "lozscorpion_blast");
+        assert_eq!(read(&basedef), basedef_before, "the basedef is untouched");
+        let weapon_file = game.join("weapons/coilbox_lozscorpion_blast.lua");
+        assert!(read(&weapon_file).contains("[\"lozscorpion_blast\"] = {"));
+
+        undo(&game).unwrap();
+        assert_eq!(read(&scorpion), scorpion_before);
+        assert!(!weapon_file.exists());
+    }
+
     /// A loose game whose `weapondefs_post.lua` does what the base content's
     /// does with a unit's own weapons: puts each into the shared table as
     /// `<unit>_<name>`, turns a slot's `def` into that name, and turns a
@@ -3260,10 +3305,27 @@ end)()"#,
     }
 
     /// The "Why?" popover shows the Lua of the file the refusal is about,
-    /// which for a value worked out in the included file is that file.
+    /// which for a value worked out in the included file is that file. A
+    /// bare global the unit file sets before the include is now followed
+    /// there instead of refused (issue #3079), so this needs a value the
+    /// basedef works out some other way: here, a `local` the unit file sets,
+    /// which a file it includes can never read.
     #[test]
     fn a_dry_run_shows_the_included_files_lua_for_a_refusal_there() {
-        let (_root, game) = sf_game();
+        let root = tempfile::tempdir().expect("tempdir");
+        let game = root.path().join("games/x.sdd");
+        std::fs::create_dir_all(game.join("units")).unwrap();
+        std::fs::write(
+            game.join("units/beacon.lua"),
+            "local humanName = [[Spawn Beacon]]\nVFS.Include(\"basedef.lua\")\nreturn { beacon = unitDef }\n",
+        )
+        .unwrap();
+        std::fs::write(
+            game.join("basedef.lua"),
+            "unitDef = {\n\tmaxdamage = 2000,\n\tname = humanName,\n}\n",
+        )
+        .unwrap();
+
         let outcome = check(
             &game,
             "beacon",
@@ -3275,7 +3337,7 @@ end)()"#,
         )
         .unwrap();
 
-        assert_eq!(outcome.file.as_deref(), Some(BEACON));
+        assert_eq!(outcome.file.as_deref(), Some("units/beacon.lua"));
         assert!(
             outcome.fields[0].refusal.is_none(),
             "{:?}",
@@ -3284,7 +3346,7 @@ end)()"#,
         let name = &outcome.fields[1];
         let refusal = name.refusal.as_ref().expect("computed");
         assert_eq!(refusal.kind, RefusalKind::FieldComputed);
-        assert_eq!(refusal.file.as_deref(), Some(BEACON_BASEDEF));
+        assert_eq!(refusal.file.as_deref(), Some("basedef.lua"));
         let shown = name.excerpt.as_ref().expect("an excerpt");
         let line = refusal.location.expect("a location").start.line;
         assert!(shown.lines[line - shown.first_line].contains("humanName"));

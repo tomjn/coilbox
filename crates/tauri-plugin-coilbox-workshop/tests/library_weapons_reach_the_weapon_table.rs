@@ -615,9 +615,12 @@ fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_splinterfact
 /// though the game post-processes a weapon from `weapons/` fewer times than
 /// one a unit carries.
 ///
-/// A death explosion is left to the mutator when the basedef sets
-/// `explodeAs` from a global its unit file sets, since the patcher does not
-/// follow the global.
+/// Issue #3079. The basedef also writes a death explosion from a global its
+/// unit file sets before the include, such as `explodeAs = explodeAs`. That
+/// is now followed too: the edit lands on the unit file's own line for the
+/// global, which any other field reading the identical global (SplinterFaction
+/// also sets `selfDestructAs` from it) moves to match. Only a unit whose
+/// basedef another unit file also includes is still left to the mutator.
 #[test]
 fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_splinterfaction() {
     let Some(game) = installed("SplinterFaction.sdd") else {
@@ -630,10 +633,7 @@ fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_splinterfaction
     );
     assert!(written > 0, "nothing was written: {not_carried:?}");
     for line in &not_carried {
-        let shared = line.contains("unit files include");
-        let computed_explosion =
-            line.contains("'s explodeas is not written") && line.contains("worked out by code");
-        assert!(shared || computed_explosion, "{line}");
+        assert!(line.contains("unit files include"), "{line}");
     }
 }
 

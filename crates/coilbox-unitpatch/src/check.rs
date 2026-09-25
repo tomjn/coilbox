@@ -261,12 +261,16 @@ pub fn push(root: &mut Json, path: &[String], value: &Value) {
 }
 
 /// Confirm `after` is `before` with only the value at `expected` changed, to
-/// `value`. The error is a sentence for the person who asked for the edit.
+/// `value`, and each path in `linked` also changed to `value` (issue #3079):
+/// a field that reads the very same global as the edited one, such as
+/// `selfDestructAs` reading `explodeAs`'s global too. The error is a sentence
+/// for the person who asked for the edit.
 pub fn confirm(
     before: &Json,
     after: &Json,
     expected: &[String],
     value: &Value,
+    linked: &[Vec<String>],
 ) -> Result<(), String> {
     if let Value::Table(_) = value {
         return confirm_table(before, after, expected, value);
@@ -275,7 +279,13 @@ pub fn confirm(
     differences(before, after, &mut Vec::new(), &mut found);
     let others: Vec<String> = found
         .iter()
-        .filter(|path| path.as_slice() != expected)
+        .filter(|path| {
+            path.as_slice() != expected
+                && !linked.iter().any(|linked| {
+                    linked.as_slice() == path.as_slice()
+                        && at(after, linked).is_some_and(|found| matches(found, value))
+                })
+        })
         .map(|path| path.join("."))
         .collect();
     if !others.is_empty() {
@@ -380,13 +390,26 @@ mod tests {
         let before = json!({ "u": { "a": 1, "b": 2 } });
         let expected = path(&["u", "a"]);
         let one = json!({ "u": { "a": 5, "b": 2 } });
-        assert!(confirm(&before, &one, &expected, &Value::Number(5.0)).is_ok());
+        assert!(confirm(&before, &one, &expected, &Value::Number(5.0), &[]).is_ok());
         let wrong = json!({ "u": { "a": 6, "b": 2 } });
-        assert!(confirm(&before, &wrong, &expected, &Value::Number(5.0)).is_err());
+        assert!(confirm(&before, &wrong, &expected, &Value::Number(5.0), &[]).is_err());
         let two = json!({ "u": { "a": 5, "b": 3 } });
-        let message = confirm(&before, &two, &expected, &Value::Number(5.0)).unwrap_err();
+        let message = confirm(&before, &two, &expected, &Value::Number(5.0), &[]).unwrap_err();
         assert!(message.contains("u.b"), "{message}");
-        assert!(confirm(&before, &before, &expected, &Value::Number(5.0)).is_err());
+        assert!(confirm(&before, &before, &expected, &Value::Number(5.0), &[]).is_err());
+    }
+
+    #[test]
+    fn confirm_allows_a_linked_field_that_moves_to_the_same_value() {
+        let before = json!({ "u": { "a": 1, "b": 1 } });
+        let expected = path(&["u", "a"]);
+        let linked = vec![path(&["u", "b"])];
+        let both = json!({ "u": { "a": 5, "b": 5 } });
+        assert!(confirm(&before, &both, &expected, &Value::Number(5.0), &linked).is_ok());
+        let diverged = json!({ "u": { "a": 5, "b": 3 } });
+        let message =
+            confirm(&before, &diverged, &expected, &Value::Number(5.0), &linked).unwrap_err();
+        assert!(message.contains("u.b"), "{message}");
     }
 
     #[test]
