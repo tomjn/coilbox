@@ -40,6 +40,11 @@
  * A unit the project switches off gets a mark of its own too (issue #2649), and
  * it is not a count: switching a unit off is one decision, not N edits, so it
  * says "off" rather than a number.
+ *
+ * The search box understands stats as well as names (issue #2656): "hp >
+ * 3000" or "speed < 50 and cost > 200" alongside plain words. `searchQuery.ts`
+ * carries the grammar and the alias table. A query that does not parse shows
+ * its own error here rather than matching nothing silently.
  */
 import { cn, Input } from "@picoframe/frame";
 import {
@@ -56,6 +61,7 @@ import type { BuildMenus } from "../../buildMenus";
 import type { CloneOrigin, UnitClones } from "../../clones";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 import type { UnitOverrides } from "../../overrides";
+import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
 import { type UnitTextEdits, unitTextCount } from "../../unitText";
 
 /**
@@ -130,17 +136,28 @@ export function UnitList({
     () =>
       Object.entries(units)
         .filter(([key]) => !restrictTo || restrictTo.has(key))
-        .map(([key, def]) => ({ key, label: nameOf(key, def) }))
+        .map(([key, def]) => ({ key, label: nameOf(key, def), def }))
         .sort((a, b) => a.label.localeCompare(b.label)),
     [units, nameOf, restrictTo],
   );
 
-  const needle = query.trim().toLowerCase();
-  const rows = needle
-    ? all.filter(
-        (u) => u.key.includes(needle) || u.label.toLowerCase().includes(needle),
+  const needle = query.trim();
+  // A query of plain words is a name search, same as it always was. One with
+  // a comparison ("hp > 3000") is a predicate over the unit's own resolved
+  // fields (issue #2656), read game first then the project's own overrides so
+  // a search reflects a project's own edits. A query that does not parse
+  // shows the reason inline rather than matching nothing silently.
+  const parsedQuery = useMemo(() => parseUnitQuery(needle), [needle]);
+  const rows = parsedQuery.ok
+    ? all.filter((u) =>
+        evaluateUnitQuery(parsedQuery.query, {
+          key: u.key,
+          name: u.label,
+          def: u.def,
+          overrides: overrides[u.key],
+        }),
       )
-    : all;
+    : [];
 
   // The element itself rather than a ref, because a search that matches
   // nothing takes the whole scroller out of the DOM and puts a fresh one back
@@ -287,12 +304,19 @@ export function UnitList({
         className="h-9 shrink-0"
       />
       {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          {needle
-            ? `No unit matches "${query.trim()}".`
-            : restrictTo
-              ? "This collection has no units in it yet."
-              : 'No unit matches "".'}
+        <p
+          className={cn(
+            "text-sm",
+            parsedQuery.ok ? "text-muted-foreground" : "text-destructive",
+          )}
+        >
+          {!parsedQuery.ok
+            ? parsedQuery.error
+            : needle
+              ? `No unit matches "${needle}".`
+              : restrictTo
+                ? "This collection has no units in it yet."
+                : 'No unit matches "".'}
         </p>
       ) : (
         <div
