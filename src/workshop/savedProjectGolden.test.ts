@@ -9,6 +9,11 @@ import {
 } from "./buildMenus";
 import { addClone } from "./clones";
 import { setUnitDisabled } from "./disabled";
+import {
+  addExplosionGenerator,
+  newExplosionGenerator,
+  setExplosionGenerator,
+} from "./explosionGenerators";
 import { setOverride } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
 import { EMPTY_EDITS } from "./project";
@@ -65,6 +70,7 @@ function buildEdits(): GameEdits {
     weapons,
     equipped,
     armorClasses,
+    explosionGenerators,
   } = EMPTY_EDITS;
 
   // A number and a nested path, so the dotted keys an override set uses are
@@ -135,6 +141,23 @@ function buildEdits(): GameEdits {
     "default",
   );
 
+  // A custom explosion generator, bound to a weapon's impact field with the
+  // custom: prefix the engine's own LoadGeneratorID requires (issue #2643).
+  explosionGenerators = addExplosionGenerator(
+    explosionGenerators,
+    newExplosionGenerator("purpleflash", "CBitmapMuzzleFlame"),
+  );
+  explosionGenerators = setExplosionGenerator(
+    explosionGenerators,
+    "purpleflash",
+    {
+      texture: "flare.tga",
+      color: { r: 1, g: 0, b: 1 },
+      size: 8,
+      lifetime: 30,
+    },
+  );
+
   return {
     overrides,
     clones,
@@ -144,6 +167,7 @@ function buildEdits(): GameEdits {
     weapons,
     equipped,
     armorClasses,
+    explosionGenerators,
   };
 }
 

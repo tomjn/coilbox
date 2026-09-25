@@ -173,6 +173,7 @@ describe("a project survives being closed", () => {
       equipped: 1,
       deaths: 0,
       armorMoves: 0,
+      effects: 0,
     });
   });
 

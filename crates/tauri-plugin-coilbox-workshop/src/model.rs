@@ -161,6 +161,63 @@ impl ArmorClasses {
     }
 }
 
+/// The four emitter classes the explosion generator form covers (issue
+/// #2643), a mirror of `CegClass` in `src/workshop/explosionGenerators.ts`.
+/// Named exactly as the engine spells the class
+/// (`rts/Rendering/Env/Particles/Classes/*.cpp`, `rts/Rendering/GroundFlash.cpp`),
+/// which is also the value `compile.rs` writes into a spawn's `class` field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
+#[allow(clippy::enum_variant_names)] // The shared "C" is the engine's own naming, not this enum's.
+pub enum CegClass {
+    CBitmapMuzzleFlame,
+    CSimpleParticleSystem,
+    CHeatCloudProjectile,
+    CStandardGroundFlash,
+}
+
+/// A constant colour, 0 to 1 per channel, a mirror of `CegColor`.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+pub struct CegColor {
+    pub r: f64,
+    pub g: f64,
+    pub b: f64,
+}
+
+/// One custom explosion generator: one spawn of one class, written as
+/// `effects/<key>.lua` (issue #2643), a mirror of `ExplosionGenerator` in
+/// `src/workshop/explosionGenerators.ts`. See that module's doc comment for
+/// why this is one spawn rather than the engine's general case.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplosionGenerator {
+    pub key: String,
+    pub class: CegClass,
+    #[serde(default = "default_ceg_count")]
+    pub count: u32,
+    #[serde(default)]
+    pub ground: bool,
+    #[serde(default)]
+    pub water: bool,
+    #[serde(default)]
+    pub air: bool,
+    #[serde(default)]
+    pub underwater: bool,
+    #[serde(default)]
+    pub texture: Option<String>,
+    #[serde(default)]
+    pub color: Option<CegColor>,
+    #[serde(default)]
+    pub size: Option<f64>,
+    #[serde(default)]
+    pub lifetime: Option<f64>,
+    #[serde(default)]
+    pub particles: Option<u32>,
+}
+
+fn default_ceg_count() -> u32 {
+    1
+}
+
 /// Everything one project changes about one game.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GameEdits {
@@ -188,6 +245,11 @@ pub struct GameEdits {
     /// #2645). Absent on a project saved before it, which reads as empty.
     #[serde(rename = "armorClasses", default)]
     pub armor_classes: ArmorClasses,
+    /// Custom explosion generators the project writes as `effects/<key>.lua`
+    /// (issue #2643), by key. Absent on a project saved before it, which
+    /// reads as empty.
+    #[serde(rename = "explosionGenerators", default)]
+    pub explosion_generators: BTreeMap<String, ExplosionGenerator>,
 }
 
 impl GameEdits {
@@ -201,6 +263,7 @@ impl GameEdits {
             && self.weapons.is_empty()
             && self.equipped.values().all(BTreeMap::is_empty)
             && self.armor_classes.is_empty()
+            && self.explosion_generators.is_empty()
     }
 
     /// How many slots fire a library weapon, and how many death explosions
