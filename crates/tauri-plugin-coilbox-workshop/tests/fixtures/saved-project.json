@@ -185,6 +185,24 @@
   "cloneMutatorOnly": [
     "supercom"
   ],
+  "randomModRecipe": {
+    "seed": 4242,
+    "scope": {
+      "kind": "collection",
+      "sourceProjectId": "5f6c1d9e-0000-4000-8000-0000000000ab",
+      "collectionId": "bots"
+    },
+    "fields": [
+      "cost",
+      "health"
+    ],
+    "tierWeights": {
+      "common": 60,
+      "uncommon": 25,
+      "rare": 12,
+      "legendary": 3
+    }
+  },
   "createdAt": "2026-09-08T11:44:47.201Z",
   "updatedAt": "2026-09-08T11:47:21.638Z"
 }

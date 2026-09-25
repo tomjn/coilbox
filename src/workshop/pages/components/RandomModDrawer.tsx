@@ -1,13 +1,13 @@
 /**
  * Randomise a game into rarity tiers and start a project from it (issue
- * #1318).
+ * #1318), and reopen the same form against a project it already made to
+ * regenerate it (issue #3090, {@link RegenerateRandomModDrawer}).
  *
  * A seed, a scope and which fields roll are the whole of what a run needs to
- * be reproducible: `randomMod.ts` says why that is enough, and why there is no
- * "regenerate" button here yet. This drawer is the button beside "New
- * project" and "Import" on the projects list, the same place `DecodeTweakSetDrawer`
- * sits, and it hands back a plain `NewProject` the page opens the same way it
- * opens any other import.
+ * be reproducible: `randomMod.ts` says why that is enough. `RandomModDrawer`
+ * is the button beside "New project" and "Import" on the projects list, the
+ * same place `DecodeTweakSetDrawer` sits, and it hands back a plain
+ * `NewProject` the page opens the same way it opens any other import.
  *
  * Reading the game's unit defs is the one thing this drawer needs that
  * `DecodeTweakSetDrawer` does not: the preview and the plan both need the
@@ -25,23 +25,46 @@ import type { GameItem } from "@/content/bindings";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { useUnitDefs } from "../../config";
+import { overrideCount, type UnitOverrides } from "../../overrides";
 import type { ModProject, NewProject } from "../../project";
 import {
   applyRandomModPlan,
   DEFAULT_TIER_WEIGHTS,
   describeRandomModRules,
+  handEditedOverrides,
   planRandomMod,
   RANDOM_FIELDS,
   RARITY_TIERS,
+  type RandomModRecipe,
+  type RandomRecipeScope,
   type RandomScope,
   randomModChangeCount,
   randomModProjectName,
   randomSeed,
+  recipeOverrides,
+  regeneratedOverrides,
   resolveRandomScope,
   type TierWeights,
 } from "../../randomMod";
 
 type ScopeKind = "all" | "query" | "collection";
+
+/** A live scope's collection variant, read back into the `sourceProjectId`
+ *  form a recipe stores it as (issue #3090). The UI state is already exactly
+ *  this shape (`collectionKey` is `${projectId}:${collectionId}`), so this is
+ *  a straight read rather than a resolve. */
+function toRandomRecipeScope(
+  scopeKind: ScopeKind,
+  query: string,
+  collectionKey: string,
+): RandomRecipeScope {
+  if (scopeKind === "query") return { kind: "query", query };
+  if (scopeKind === "collection" && collectionKey) {
+    const [sourceProjectId, collectionId] = collectionKey.split(":");
+    return { kind: "collection", sourceProjectId, collectionId };
+  }
+  return { kind: "all" };
+}
 
 /** Every collection any of the game's own projects has defined, so a scope
  *  can name one even though the project this drawer is about to start has
@@ -121,9 +144,78 @@ export function RandomModDrawer({
   );
 }
 
+/**
+ * The same drawer and the same form, reopened against a project the
+ * generator already made (issue #3090). "Regenerate" on the project's page
+ * offers this rather than "Randomise": the game is fixed to the project's
+ * own, and every field starts from the recipe on {@link ModProject.randomModRecipe}
+ * rather than from scratch. Submitting replaces the project's overrides
+ * instead of starting a new project, keeping any field edited by hand since
+ * the recipe last ran (`randomMod.ts`'s own `regeneratedOverrides`).
+ *
+ * Only ever rendered for a project that already has a recipe: the button
+ * that opens it does not show otherwise, so `RandomModForm` can read
+ * `project.randomModRecipe` without a fallback.
+ */
+export function RegenerateRandomModDrawer({
+  open,
+  onOpenChange,
+  project,
+  games,
+  projects,
+  enginePath,
+  dataDir,
+  onRegenerate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  project: ModProject;
+  games: readonly GameItem[];
+  /** Every saved project, so a scope can still name a collection from
+   *  another one, the same as when the recipe was first made. */
+  projects: readonly ModProject[];
+  enginePath?: string;
+  dataDir?: string;
+  onRegenerate: (overrides: UnitOverrides, recipe: RandomModRecipe) => void;
+}) {
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Regenerate"
+      description="The seed and rules this project was made from. Change one, preview the result and apply it as a single change you can undo."
+      width="28rem"
+    >
+      {open ? (
+        <RandomModForm
+          games={games}
+          headers={NO_ART}
+          scanning={false}
+          projects={projects}
+          enginePath={enginePath}
+          dataDir={dataDir}
+          regenerate={{
+            project,
+            onRegenerate: (overrides, recipe) => {
+              onOpenChange(false);
+              onRegenerate(overrides, recipe);
+            },
+          }}
+        />
+      ) : null}
+    </Drawer>
+  );
+}
+
+/** No loading-screen art to offer: `RegenerateRandomModDrawer` never shows
+ *  the game picker, since a regenerate cannot move a project to another
+ *  game. */
+const NO_ART = new Map<string, string>();
+
 /** Separate from the drawer, the same way `ProjectDetailsForm` is, so closing
  *  the drawer unmounts it and reopening starts from a fresh seed rather than
- *  wherever the fields were left. */
+ *  wherever the fields were left (or, regenerating, from the recipe again
+ *  rather than from whatever was typed the last time it was open). */
 function RandomModForm({
   games,
   headers,
@@ -131,6 +223,7 @@ function RandomModForm({
   projects,
   enginePath,
   dataDir,
+  regenerate,
   onStarted,
 }: {
   games: readonly GameItem[];
@@ -139,19 +232,37 @@ function RandomModForm({
   projects: readonly ModProject[];
   enginePath?: string;
   dataDir?: string;
-  onStarted: (input: NewProject) => void;
+  /** Present when this form is reopened against a project the generator
+   *  already made (issue #3090), rather than starting a new one: its game is
+   *  fixed and every field starts from `project.randomModRecipe`. */
+  regenerate?: {
+    project: ModProject;
+    onRegenerate: (overrides: UnitOverrides, recipe: RandomModRecipe) => void;
+  };
+  onStarted?: (input: NewProject) => void;
 }) {
-  const [gameName, setGameName] = useState("");
+  const recipe = regenerate?.project.randomModRecipe;
+  const [pickedGameName, setPickedGameName] = useState("");
+  const gameName = regenerate?.project.gameName ?? pickedGameName;
   const [pickingGame, setPickingGame] = useState(false);
-  const [seed, setSeed] = useState(() => randomSeed());
-  const [scopeKind, setScopeKind] = useState<ScopeKind>("all");
-  const [query, setQuery] = useState("");
-  const [collectionKey, setCollectionKey] = useState("");
+  const [seed, setSeed] = useState(() => recipe?.seed ?? randomSeed());
+  const [scopeKind, setScopeKind] = useState<ScopeKind>(
+    recipe?.scope.kind ?? "all",
+  );
+  const [query, setQuery] = useState(
+    recipe?.scope.kind === "query" ? recipe.scope.query : "",
+  );
+  const [collectionKey, setCollectionKey] = useState(
+    recipe?.scope.kind === "collection"
+      ? `${recipe.scope.sourceProjectId}:${recipe.scope.collectionId}`
+      : "",
+  );
   const [fields, setFields] = useState<string[]>(
-    RANDOM_FIELDS.map((f) => f.id),
+    recipe ? [...recipe.fields] : RANDOM_FIELDS.map((f) => f.id),
   );
   const [tierWeights, setTierWeights] = useState<TierWeights>({
     ...DEFAULT_TIER_WEIGHTS,
+    ...recipe?.tierWeights,
   });
 
   const game = games.find((g) => g.name === gameName);
@@ -196,13 +307,35 @@ function RandomModForm({
   );
   const changed = randomModChangeCount(plan);
 
+  // What the project's current recipe would still write today, so the
+  // preview can say which of its overrides a regenerate would touch and
+  // which it would leave alone because a person edited them by hand since
+  // (issue #3090). Empty, and so is `handEdited`, on the create path: there
+  // is no earlier recipe to compare against yet.
+  const oldGenerated = useMemo(
+    () =>
+      regenerate && recipe && status === "ready"
+        ? recipeOverrides(recipe, units, projects)
+        : {},
+    [regenerate, recipe, status, units, projects],
+  );
+  const handEdited = useMemo(
+    () =>
+      regenerate
+        ? handEditedOverrides(regenerate.project.edits.overrides, oldGenerated)
+        : {},
+    [regenerate, oldGenerated],
+  );
+  const handEditedFieldCount = overrideCount(handEdited);
+  const handEditedUnitCount = Object.keys(handEdited).length;
+
   if (pickingGame) {
     return (
       <GamePickerPanel
         games={games}
         headers={headers}
         selectedName={gameName}
-        onSelect={setGameName}
+        onSelect={setPickedGameName}
         onBack={() => setPickingGame(false)}
         backLabel="Back to the randomised mod"
         gamesLoading={scanning}
@@ -216,13 +349,34 @@ function RandomModForm({
 
   function submit() {
     if (!gameName || status !== "ready") return;
+    if (regenerate) {
+      const newRecipe: RandomModRecipe = {
+        seed,
+        scope: toRandomRecipeScope(scopeKind, query, collectionKey),
+        fields,
+        tierWeights,
+      };
+      const overrides = regeneratedOverrides(
+        regenerate.project.edits.overrides,
+        oldGenerated,
+        plan,
+      );
+      regenerate.onRegenerate(overrides, newRecipe);
+      return;
+    }
     const overrides = applyRandomModPlan(plan);
-    onStarted({
+    onStarted?.({
       name: randomModProjectName(gameName, seed),
       description: describeRandomModRules(rules, scope),
       gameName,
       game: gameIdentityForName(gameName, games) ?? undefined,
       authoredChecksum: defs?.checksum,
+      randomModRecipe: {
+        seed,
+        scope: toRandomRecipeScope(scopeKind, query, collectionKey),
+        fields,
+        tierWeights,
+      },
       edits: {
         overrides,
         clones: {},
@@ -235,19 +389,28 @@ function RandomModForm({
 
   return (
     <div className="flex flex-col gap-4">
-      <Field
-        label="Game"
-        hint="Every roll reads this game's own numbers, so it has to be read first."
-      >
-        <GamePickerButton
-          ariaLabel="Game to randomise"
-          placeholder={scanning ? "Scanning…" : "Pick a game"}
-          value={gameName}
-          games={games}
-          headers={headers}
-          onClick={() => setPickingGame(true)}
-        />
-      </Field>
+      {regenerate ? (
+        <Field
+          label="Game"
+          hint="A regenerate cannot move this project to another game."
+        >
+          <p className="text-muted-foreground text-sm">{gameName}</p>
+        </Field>
+      ) : (
+        <Field
+          label="Game"
+          hint="Every roll reads this game's own numbers, so it has to be read first."
+        >
+          <GamePickerButton
+            ariaLabel="Game to randomise"
+            placeholder={scanning ? "Scanning…" : "Pick a game"}
+            value={gameName}
+            games={games}
+            headers={headers}
+            onClick={() => setPickingGame(true)}
+          />
+        </Field>
+      )}
 
       {gameName && status === "loading" ? (
         <p className="text-muted-foreground text-xs">
@@ -388,6 +551,15 @@ function RandomModForm({
               {scopedUnits.length} unit{scopedUnits.length === 1 ? "" : "s"} in
               scope, {changed} will change.
             </span>
+            {regenerate && handEditedFieldCount > 0 ? (
+              <span>
+                {handEditedFieldCount} hand-edited field
+                {handEditedFieldCount === 1 ? "" : "s"} across{" "}
+                {handEditedUnitCount} unit
+                {handEditedUnitCount === 1 ? "" : "s"} will be kept as they are,
+                not replaced by this run.
+              </span>
+            ) : null}
             <ul className="flex flex-col gap-0.5 text-muted-foreground">
               {plan
                 .filter((row) => row.changes.length > 0)
@@ -413,7 +585,7 @@ function RandomModForm({
               }
             >
               <Dice5 className="size-4" />
-              Create project
+              {regenerate ? "Regenerate" : "Create project"}
             </Button>
           </div>
         </>

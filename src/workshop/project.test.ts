@@ -257,6 +257,40 @@ describe("a project survives being closed", () => {
     );
   });
 
+  /**
+   * Issue #3090. The recipe a randomised project was made from survives a
+   * share, so whoever receives it can regenerate too, as an optional field
+   * that leaves the kind version where it was.
+   */
+  it("carries a randomised project's recipe across a share", () => {
+    const project = {
+      id: "whatever",
+      name: "Balanced Annihilation random 4242",
+      gameName: "Balanced Annihilation V15.9.8",
+      edits: EMPTY_EDITS,
+      randomModRecipe: {
+        seed: 4242,
+        scope: { kind: "query" as const, query: "cost < 100" },
+        fields: ["cost", "health"],
+        tierWeights: { common: 60, uncommon: 25, rare: 12, legendary: 3 },
+      },
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+
+    const json = modProjectJson(project);
+    expect(JSON.parse(json).kindVersion).toBe(MOD_PROJECT_KIND_VERSION);
+    expect(MOD_PROJECT_KIND_VERSION).toBe(1);
+    expect(parseModProjectJson(json)?.randomModRecipe).toEqual(
+      project.randomModRecipe,
+    );
+
+    const { randomModRecipe: _none, ...plain } = project;
+    expect(parseModProjectJson(modProjectJson(plain))?.randomModRecipe).toBe(
+      undefined,
+    );
+  });
+
   it("is a container anything can recognise without opening it", () => {
     const project = {
       id: "whatever",
@@ -654,6 +688,68 @@ describe("routeThroughMutator", () => {
     expect(result.current.projects.find((p) => p.id === id)).not.toHaveProperty(
       "mutatorOnly",
     );
+  });
+});
+
+describe("regenerateRandomMod", () => {
+  it("replaces the overrides, records the recipe, and reports one undo step", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    let id = "";
+    const firstOverrides = { armcom: { health: 4000 } };
+    act(() => {
+      id = result.current.createProject({
+        name: "Balanced Annihilation random 4242",
+        gameName: "Balanced Annihilation V15.9.8",
+        edits: editSlot(EMPTY_EDITS, "overrides", () => firstOverrides),
+        randomModRecipe: {
+          seed: 4242,
+          scope: { kind: "all" },
+          fields: ["health"],
+          tierWeights: { common: 60, uncommon: 25, rare: 12, legendary: 3 },
+        },
+      }).id;
+    });
+
+    const nextOverrides = { armcom: { health: 3500 } };
+    const nextRecipe = {
+      seed: 7,
+      scope: { kind: "all" as const },
+      fields: ["health"],
+      tierWeights: { common: 60, uncommon: 25, rare: 12, legendary: 3 },
+    };
+    let changed: { before: GameEdits; after: GameEdits } | null | undefined;
+    act(() => {
+      changed = result.current.regenerateRandomMod(
+        id,
+        nextOverrides,
+        nextRecipe,
+      );
+    });
+
+    expect(changed?.before.overrides).toEqual(firstOverrides);
+    expect(changed?.after.overrides).toEqual(nextOverrides);
+    const project = result.current.projects.find((p) => p.id === id);
+    expect(project?.edits.overrides).toEqual(nextOverrides);
+    expect(project?.randomModRecipe).toEqual(nextRecipe);
+  });
+
+  it("does nothing when the project no longer exists", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    let changed: { before: GameEdits; after: GameEdits } | null | undefined;
+    act(() => {
+      changed = result.current.regenerateRandomMod(
+        "gone",
+        { armcom: { health: 3500 } },
+        {
+          seed: 7,
+          scope: { kind: "all" },
+          fields: ["health"],
+          tierWeights: {},
+        },
+      );
+    });
+    expect(changed).toBeNull();
+    expect(result.current.projects).toEqual([]);
   });
 });
 
