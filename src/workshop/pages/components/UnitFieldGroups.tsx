@@ -40,6 +40,7 @@ import {
 import { SectionPanel } from "@/components/SectionPanel";
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
+import type { PostNote } from "../../beforePost";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import {
@@ -86,6 +87,7 @@ export function UnitFieldGroups({
   warnings,
   inheritedLabel,
   inPlace,
+  post,
   onChange,
   onReset,
 }: {
@@ -110,6 +112,9 @@ export function UnitFieldGroups({
   /** What the edit-in-place route makes of a row, when there is anything to
    *  say (issue #2633). Absent on a game that route cannot write. */
   inPlace?: (row: FieldRow) => InPlaceField | undefined;
+  /** What the game's post files do to a row's field, when they change it
+   *  (issue #3057). */
+  post?: (row: FieldRow) => PostNote | undefined;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -170,6 +175,7 @@ export function UnitFieldGroups({
                     inheritedLabel={inheritedLabel}
                     readOnly={group.readOnly}
                     inPlace={group.readOnly ? undefined : inPlace?.(row)}
+                    post={group.readOnly ? undefined : post?.(row)}
                     onChange={(value) => onChange(row, value)}
                     onReset={() => onReset(row)}
                   />

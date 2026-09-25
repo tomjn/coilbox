@@ -3634,3 +3634,137 @@ describe("UnitPage", () => {
     });
   });
 });
+
+/**
+ * Issue #3057. A value typed into a field the game's post files change is
+ * changed too as the game loads, so the row says so, with what the game does
+ * to its own value. Balanced Annihilation V15.9.8's shape: its post files cut
+ * the Big Bertha's crater multiplier from 0.1 to 0.009.
+ */
+describe("a field the game's post files change", () => {
+  const BERTHA: Record<string, unknown> = {
+    name: "armbrtha",
+    humanName: "Big Bertha",
+    weapons: [{ name: "armbrtha_arm_berthacannon" }],
+    weapondefs: { arm_berthacannon: { cratermult: 0.009, range: 4650 } },
+  };
+  const NOTE = /Its files say 0\.1 and it loads as 0\.009\./;
+  const crater = () =>
+    screen.getByLabelText("Crater strength multiplier") as HTMLInputElement;
+  const openWeapons = () =>
+    fireEvent.mouseDown(screen.getByRole("tab", { name: /Weapons/ }));
+  const project = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+
+  beforeEach(() => {
+    mockWeaponDefs = {
+      armbrtha_arm_berthacannon: { cratermult: 0.009, range: 4650 },
+    };
+    mockBeforePost = {
+      units: {
+        armbrtha: {
+          values: { "weapondefs.arm_berthacannon.cratermult": 0.1 },
+        },
+      },
+      weaponDefs: {
+        armbrtha_arm_berthacannon: { values: { cratermult: 0.1 } },
+      },
+    };
+  });
+
+  /** A saved project holding `edits`, opened on `unit`. */
+  const openProject = (edits: Record<string, unknown>, unit: string) => {
+    const saved = {
+      id: "2f0f5a2e-0000-4000-8000-000000003057",
+      name: "TEST post-processed field (delete me)",
+      gameName: GAME.name,
+      authoredChecksum: "abc",
+      edits: {
+        overrides: {},
+        clones: {},
+        menus: {},
+        text: {},
+        disabled: [],
+        ...edits,
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    storage.set(PROJECTS_KEY, JSON.stringify([saved]));
+    show({ armbrtha: BERTHA }, `/workshop/${saved.id}?unit=${unit}`, [
+      { name: "armbrtha", fullName: "Big Bertha" },
+    ]);
+    openWeapons();
+  };
+
+  it("says so on one of the game's own units, and keeps the typed value", () => {
+    show(
+      { armbrtha: BERTHA },
+      `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armbrtha`,
+      [{ name: "armbrtha", fullName: "Big Bertha" }],
+    );
+    openWeapons();
+    const row = () =>
+      document.getElementById(
+        "field-weapondefs.arm_berthacannon.cratermult",
+      ) as HTMLElement;
+    expect(within(row()).getByText(NOTE)).toBeTruthy();
+    expect(
+      within(row()).getByText(/may change a value typed here/),
+    ).toBeTruthy();
+    // The range is the game's own, so it says nothing.
+    expect(
+      document.getElementById("field-weapondefs.arm_berthacannon.range")
+        ?.textContent,
+    ).not.toMatch(/loads as/);
+
+    type(crater(), "0.5");
+    expect(project()?.edits.overrides).toEqual({
+      armbrtha: { "weapondefs.arm_berthacannon.cratermult": 0.5 },
+    });
+    expect(within(row()).getByText(NOTE)).toBeTruthy();
+  });
+
+  it("says so on a copied unit", () => {
+    openProject(
+      {
+        clones: {
+          armbrtha2: {
+            key: "armbrtha2",
+            source: "armbrtha",
+            replacesGameUnit: false,
+            def: { ...structuredClone(BERTHA), humanName: "Bertha copy" },
+            beforePost: {
+              values: { "weapondefs.arm_berthacannon.cratermult": 0.1 },
+            },
+          },
+        },
+        overrides: {
+          armbrtha2: { "weapondefs.arm_berthacannon.cratermult": 0.5 },
+        },
+      },
+      "armbrtha2",
+    );
+    expect(crater().value).toBe("0.5");
+    expect(screen.getByText(NOTE)).toBeTruthy();
+  });
+
+  it("says so on a weapon out of the project's library", () => {
+    openProject(
+      {
+        weapons: {
+          bertha_copy: {
+            key: "bertha_copy",
+            source: "armbrtha_arm_berthacannon",
+            def: { cratermult: 0.009, range: 4650 },
+            changes: { cratermult: 0.5 },
+            beforePost: { values: { cratermult: 0.1 } },
+          },
+        },
+        equipped: { armbrtha: { "0": "bertha_copy" } },
+      },
+      "armbrtha",
+    );
+    expect(crater().value).toBe("0.5");
+    expect(screen.getByText(NOTE)).toBeTruthy();
+  });
+});

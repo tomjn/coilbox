@@ -18,6 +18,7 @@ import { Undo2 } from "lucide-react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
+import type { PostNote } from "../../beforePost";
 import type { UnitOverrides } from "../../overrides";
 import type { FieldRow } from "../../unitSections";
 import type { WeaponLibrary } from "../../weaponLibrary";
@@ -51,6 +52,7 @@ export function WeaponSlotsPanel({
   assets,
   inheritedLabel,
   inPlace,
+  post,
   onSelect,
   onChange,
   onReset,
@@ -67,6 +69,8 @@ export function WeaponSlotsPanel({
   assets?: AssetBrowsing;
   inheritedLabel?: string;
   inPlace?: (row: FieldRow) => InPlaceField | undefined;
+  /** What the game's post files do to a field of the unit's (issue #3057). */
+  post?: (row: FieldRow) => PostNote | undefined;
   onSelect: (step: string) => void;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
@@ -147,6 +151,7 @@ export function WeaponSlotsPanel({
               hidden: view.hidden,
             }}
             inPlace={inPlace}
+            post={post}
             consumers={consumers}
             assets={assets}
             inheritedLabel={inheritedLabel}
@@ -163,6 +168,9 @@ export function WeaponSlotsPanel({
               consumers={consumers}
               assets={assets}
               inheritedLabel="Copied value"
+              post={(row) =>
+                library.postOf(library.equippedIn(selected.step), row)
+              }
               onChange={(row, value) =>
                 library.onChange(library.equippedIn(selected.step), row, value)
               }
@@ -193,6 +201,9 @@ export interface SlotLibrary {
   onUnequip: (slot: WeaponSlot) => void;
   onChange: (key: string | undefined, row: FieldRow, value: unknown) => void;
   onReset: (key: string | undefined, row: FieldRow) => void;
+  /** What the game's post files do to a library weapon's field (issue
+   *  #3057). */
+  postOf: (key: string | undefined, row: FieldRow) => PostNote | undefined;
 }
 
 /** Which weapon the slot fires, and the buttons that change it. */
