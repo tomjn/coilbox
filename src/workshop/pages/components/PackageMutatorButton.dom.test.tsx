@@ -19,12 +19,23 @@ const project = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
+const WRITTEN = {
+  units: { armcom: { maxdamage: { typed: 0.5, written: 5.5555553 } } },
+};
+
 const {
   save,
   workshopPreflight,
   workshopPackageMutator,
   workshopPackBarSlots,
+  settleTypedValues,
 } = vi.hoisted(() => ({
+  settleTypedValues: vi.fn(
+    async (_args: unknown): Promise<unknown> => ({
+      ok: true,
+      settled: { written: WRITTEN, fields: [], loads: 1, elapsedMs: 400 },
+    }),
+  ),
   save: vi.fn(
     async (): Promise<string | null> => "/home/tom/faster-commanders-v1.sdz",
   ),
@@ -66,6 +77,32 @@ vi.mock("../../barPack", async () => {
   return { ...actual, workshopPackBarSlots };
 });
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
+vi.mock("../../loadsAs", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
+  return { ...actual, settleTypedValues };
+});
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({
+    data: {
+      games: [
+        {
+          name: "Balanced Annihilation V15.9.8",
+          primaryArchive: { name: "ba.sdz" },
+        },
+      ],
+      maps: [],
+    },
+    loading: false,
+    error: null,
+  }),
+}));
+vi.mock("@/play/config", () => ({
+  usePreferredTarget: () => ({
+    target: { enginePath: "/engines/105", dataDir: "/data" },
+    loading: false,
+  }),
+}));
 
 const { PackageMutatorButton } = await import("./PackageMutatorButton");
 
@@ -149,10 +186,17 @@ describe("PackageMutatorButton", () => {
       expect(workshopPackageMutator).toHaveBeenCalledTimes(1),
     );
     expect(workshopPreflight).toHaveBeenCalledWith({ project });
+    expect(settleTypedValues).toHaveBeenCalledWith({
+      enginePath: "/engines/105",
+      dataDir: "/data",
+      archive: "ba.sdz",
+      project,
+    });
     expect(workshopPackageMutator).toHaveBeenCalledWith({
       project,
       version: 1,
       dest: "/home/tom/faster-commanders-v1.sdz",
+      written: WRITTEN,
     });
     expect(onPackaged).toHaveBeenCalledWith(1);
     await vi.waitFor(() =>

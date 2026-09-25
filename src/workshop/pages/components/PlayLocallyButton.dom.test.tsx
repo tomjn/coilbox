@@ -28,29 +28,57 @@ const WORKSHOP_TEST_GAME = {
 };
 const MAP = { name: "Comet Catcher Redux" };
 
-const { primeScan, launch, workshopTestMutator, workshopPreflight } =
-  vi.hoisted(() => ({
-    primeScan: vi.fn(async () => ({
-      games: [GAME, WORKSHOP_TEST_GAME],
-      maps: [MAP],
-    })),
-    launch: vi.fn(
-      async (
-        _kind: string,
-        _opts: { config: { gameType: string; modOptions: unknown } },
-      ) => ({ exitCode: 0 }),
-    ),
-    workshopPreflight: vi.fn(async () => ({
-      blockers: [] as string[],
-      review: [] as string[],
-      passes: [] as string[],
-    })),
-    workshopTestMutator: vi.fn(async () => ({
-      dir: "/data/games/coilbox-workshop-test.sdd",
-      folder: "coilbox-workshop-test.sdd",
-      files: ["modinfo.lua"],
-    })),
-  }));
+const WRITTEN = {
+  units: { armcom: { maxdamage: { typed: 0.5, written: 5.5555553 } } },
+};
+
+const {
+  primeScan,
+  launch,
+  workshopTestMutator,
+  workshopPreflight,
+  settleTypedValues,
+} = vi.hoisted(() => ({
+  settleTypedValues: vi.fn(
+    async (_args: unknown): Promise<unknown> => ({
+      ok: true,
+      settled: {
+        written: WRITTEN,
+        fields: [
+          {
+            field: { kind: "unit", unit: "armcom", path: "maxdamage" },
+            typed: 0.5,
+            loadsAsTyped: 0.045,
+            outcome: "written",
+            written: 5.5555553,
+          },
+        ],
+        loads: 3,
+        elapsedMs: 900,
+      },
+    }),
+  ),
+  primeScan: vi.fn(async () => ({
+    games: [GAME, WORKSHOP_TEST_GAME],
+    maps: [MAP],
+  })),
+  launch: vi.fn(
+    async (
+      _kind: string,
+      _opts: { config: { gameType: string; modOptions: unknown } },
+    ) => ({ exitCode: 0 }),
+  ),
+  workshopPreflight: vi.fn(async () => ({
+    blockers: [] as string[],
+    review: [] as string[],
+    passes: [] as string[],
+  })),
+  workshopTestMutator: vi.fn(async () => ({
+    dir: "/data/games/coilbox-workshop-test.sdd",
+    folder: "coilbox-workshop-test.sdd",
+    files: ["modinfo.lua"],
+  })),
+}));
 
 /** Reassigned per test, and read by the mocks below at call time. */
 let mockCompiled: {
@@ -103,6 +131,11 @@ vi.mock("@/play/config", () => ({
   }),
 }));
 vi.mock("../../mutator", () => ({ workshopTestMutator }));
+vi.mock("../../loadsAs", async () => {
+  const actual =
+    await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
+  return { ...actual, settleTypedValues };
+});
 vi.mock("../../preflight", () => ({ workshopPreflight }));
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
@@ -219,13 +252,46 @@ describe("PlayLocallyButton", () => {
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
 
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+    expect(settleTypedValues).toHaveBeenCalledWith({
+      enginePath: "/engines/105",
+      dataDir: "/data",
+      archive: "ba.sdd",
+      project,
+    });
     expect(workshopTestMutator).toHaveBeenCalledWith({
       dataDir: "/data",
       project,
+      written: WRITTEN,
     });
     expect(primeScan).toHaveBeenCalledWith("/engines/105", "/data", true);
     const [, opts] = launch.mock.calls[0];
     expect(opts.config.gameType).toBe(WORKSHOP_TEST_GAME.name);
+    expect(
+      screen.getByText(/1 typed value is written so the game's own Lua/),
+    ).toBeTruthy();
+  });
+
+  it("writes the typed values and says why when the game cannot be checked", async () => {
+    mockCompiled = compiled({
+      files: [{ path: "modinfo.lua", contents: "return {}" }],
+    });
+    settleTypedValues.mockResolvedValueOnce({
+      ok: false,
+      message: "Coilbox could not load the game to check typed values",
+    });
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+    expect(workshopTestMutator).toHaveBeenCalledWith({
+      dataDir: "/data",
+      project,
+      written: undefined,
+    });
+    expect(
+      screen.getByText(/could not load the game to check typed values/),
+    ).toBeTruthy();
   });
 
   it("refuses to launch when preflight finds a blocker, before writing anything", async () => {
