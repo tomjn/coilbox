@@ -95,6 +95,38 @@ fn mapinfo_via_vfs_include() {
     assert_eq!(info.smf.maxheight, Some(800.0));
 }
 
+/// Text handed in for a file is what `VFS` reads, for an edit not yet written
+/// (issue #3021). The key is spelled as the disk spells it, whatever the Lua
+/// asks for, and a file that does not exist yet can be handed in too.
+#[test]
+fn files_handed_in_are_read_in_place_of_the_disk() {
+    let dir = fixture("withinclude");
+    let files = [
+        (
+            dir.join("sub/extra.lua"),
+            "return { minh = 5, maxh = 900 }".to_string(),
+        ),
+        (dir.join("sub/new.lua"), "return 7".to_string()),
+    ];
+    let lua = SpringLua::with_files(&dir, files.into_iter().collect()).unwrap();
+    let info: Info = lua
+        .eval_to(&read("withinclude", "mapinfo.lua"), "mapinfo.lua")
+        .unwrap();
+    assert_eq!(info.smf.minheight, Some(5.0));
+    assert_eq!(info.smf.maxheight, Some(900.0));
+
+    let found: serde_json::Value = lua
+        .eval_value_raw(
+            "return { VFS.FileExists('SUB/new.lua'), VFS.Include('sub/NEW.lua'), VFS.LoadFile('Sub/Extra.lua') }",
+            "probe",
+        )
+        .unwrap();
+    assert_eq!(
+        found,
+        serde_json::json!([true, 7, "return { minh = 5, maxh = 900 }"])
+    );
+}
+
 #[test]
 fn modinfo_generalises() {
     #[derive(Deserialize, Debug)]

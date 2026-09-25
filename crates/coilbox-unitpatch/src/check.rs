@@ -11,7 +11,8 @@
 //! helpers do. That gives the same answer before and after the edit, which is
 //! all the comparison needs. It is not the unit as the engine sees it.
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use coilbox_springlua::SpringLua;
 use serde_json::{Map, Value as Json};
@@ -80,9 +81,14 @@ end
 "#;
 
 /// Run `source` as a unit file and return what it returned, in the form
-/// described on [`PRELUDE`].
-pub fn evaluate(source: &str, game_root: &Path, name: &str) -> Result<Json, String> {
-    let lua = SpringLua::new(game_root).map_err(|e| e.to_string())?;
+/// described on [`PRELUDE`]. `VFS` reads `files` in place of the disk.
+pub fn evaluate(
+    source: &str,
+    game_root: &Path,
+    name: &str,
+    files: BTreeMap<PathBuf, String>,
+) -> Result<Json, String> {
+    let lua = SpringLua::with_files(game_root, files).map_err(|e| e.to_string())?;
     let chunk = format!(
         "{PRELUDE}\nlocal __cbx_unit = function(...)\n{source}\nend\nreturn __cbx_plain(__cbx_unit(), 0)\n"
     );

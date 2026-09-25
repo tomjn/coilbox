@@ -33,7 +33,9 @@ mod vfs;
 /// answers for a read.
 pub use vfs::resolve_case;
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use mlua::{Lua, LuaSerdeExt, Value};
 use serde::de::DeserializeOwned;
@@ -81,8 +83,17 @@ impl SpringLua {
     /// `lowerkeys` helper; removes `os`/`io`/`package` and the base-library exec
     /// hatches; arms the instruction cap.
     pub fn new(root: impl Into<PathBuf>) -> Result<Self> {
+        Self::with_files(root, BTreeMap::new())
+    }
+
+    /// [`new`](Self::new), with `files` read in place of what is on disk.
+    /// Each key is a full path under `root`, spelled as [`resolve_case`]
+    /// spells it, so Lua can be run against text the caller has not written
+    /// yet. `VFS.Include`, `VFS.LoadFile` and `VFS.FileExists` see it.
+    /// `VFS.DirList` and `VFS.SubDirs` list the disk only.
+    pub fn with_files(root: impl Into<PathBuf>, files: BTreeMap<PathBuf, String>) -> Result<Self> {
         let root = root.into();
-        let lua = env::sandbox(&root)?;
+        let lua = env::sandbox(&root, Arc::new(files))?;
         Ok(Self { lua, root })
     }
 

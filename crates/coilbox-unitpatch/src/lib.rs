@@ -19,6 +19,13 @@
 //! through [`coilbox_springlua`], and the patch is only returned if the two
 //! resulting tables differ in the edited field and nowhere else.
 //!
+//! A unit file may hold no table at all and include a second file that sets
+//! the unit's table as a global, as SplinterFaction's include their
+//! `basedefs` files (issue #3021). The patcher follows one such
+//! `VFS.Include` and edits the second file, and says so in [`Patched::file`].
+//! A second file that more than one unit file includes is refused, since an
+//! edit to it would change every unit that includes it.
+//!
 //! Nothing here writes to disk. The caller gets the patched text or a
 //! [`Refusal`] that says why, with the place in the file it is about.
 
@@ -26,8 +33,9 @@ mod check;
 mod locate;
 mod render;
 
+use std::collections::BTreeMap;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
@@ -169,6 +177,7 @@ impl Point {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Patched {
+    /// The whole text of the file the edit went into.
     pub text: String,
     /// False when the field already held the value. `text` is then the
     /// original, untouched.
@@ -176,6 +185,19 @@ pub struct Patched {
     /// Where in the original file the edit went: the value that was replaced,
     /// or the point a new field or list entry was inserted.
     pub location: Location,
+    /// The file the edit went into, when it is not the unit file: the file
+    /// the unit file includes for its table, as a full path under the game's
+    /// folder. `None` means the unit file itself.
+    pub file: Option<PathBuf>,
+}
+
+/// Where an edit would go: a place in the unit file, or in the file it
+/// includes for its table when `file` is set.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Place {
+    pub location: Location,
+    pub file: Option<PathBuf>,
 }
 
 /// Why the patcher would not make the edit.
@@ -216,6 +238,9 @@ pub enum RefusalKind {
     PostCheckFailed,
     /// A new unit's name, or its file's, is one the game already uses.
     NameTaken,
+    /// The unit's table is in a file that other unit files include too, so
+    /// an edit to it would change their units as well.
+    FileShared,
 }
 
 /// A refusal to patch, with a reason a person can read and, where there is
@@ -226,6 +251,10 @@ pub struct Refusal {
     pub kind: RefusalKind,
     pub message: String,
     pub location: Option<Location>,
+    /// The file the refusal is about, when it is not the unit file: the file
+    /// the unit file includes for its table, as a full path under the game's
+    /// folder. `location` is in this file when it is set.
+    pub file: Option<PathBuf>,
 }
 
 impl Refusal {
@@ -234,6 +263,7 @@ impl Refusal {
             kind,
             message: message.into(),
             location: None,
+            file: None,
         }
     }
 
@@ -241,32 +271,112 @@ impl Refusal {
         self.location = Some(location);
         self
     }
+
+    /// The refusal as one about `file` rather than the unit file.
+    pub(crate) fn in_file(mut self, file: &Path) -> Self {
+        self.file = Some(file.to_path_buf());
+        self
+    }
 }
 
 impl fmt::Display for Refusal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.location {
-            Some(location) => write!(
+        f.write_str(&self.message)?;
+        match (self.location, &self.file) {
+            (Some(location), Some(file)) => write!(
                 f,
-                "{} (line {}, column {})",
-                self.message, location.start.line, location.start.column
+                " ({}, line {}, column {})",
+                file.display(),
+                location.start.line,
+                location.start.column
             ),
-            None => f.write_str(&self.message),
+            (Some(location), None) => write!(
+                f,
+                " (line {}, column {})",
+                location.start.line, location.start.column
+            ),
+            (None, Some(file)) => write!(f, " ({})", file.display()),
+            (None, None) => Ok(()),
         }
     }
 }
 
 impl std::error::Error for Refusal {}
 
+/// A game's folder, and text for files in it that the caller has patched but
+/// not written yet.
+pub(crate) struct Game<'a> {
+    root: &'a Path,
+    pending: &'a BTreeMap<PathBuf, String>,
+}
+
+impl Game<'_> {
+    /// The full path of `written`, a path as a unit file passes it to
+    /// `VFS.Include`, spelled as the game's folder spells it. `None` for a
+    /// path that climbs out of the folder.
+    pub(crate) fn resolve(&self, written: &str) -> Option<PathBuf> {
+        let mut rel = PathBuf::new();
+        for part in written.split(['/', '\\']) {
+            match part {
+                "" | "." => {}
+                ".." => return None,
+                part => rel.push(part),
+            }
+        }
+        Some(coilbox_springlua::resolve_case(self.root, &rel))
+    }
+
+    /// The text of the file at `path`: the pending text if there is some,
+    /// otherwise what is on disk.
+    pub(crate) fn read(&self, path: &Path) -> Option<String> {
+        match self.pending.get(path) {
+            Some(text) => Some(text.clone()),
+            None => std::fs::read_to_string(path).ok(),
+        }
+    }
+
+    /// The pending text with `extra` in it too, as the post-check's `VFS`
+    /// reads it.
+    fn files(&self, extra: Option<(&Path, &str)>) -> BTreeMap<PathBuf, String> {
+        let mut files = self.pending.clone();
+        if let Some((path, text)) = extra {
+            files.insert(path.to_path_buf(), text.to_string());
+        }
+        files
+    }
+}
+
 /// Apply `edit` to the unit file `source` and return the patched text.
 ///
 /// `game_root` is the game's folder. The post-check evaluates the file with
 /// its `VFS` rooted there, so a unit file that includes a sibling file still
-/// evaluates.
+/// evaluates. When the unit's table is in a file `source` includes, that file
+/// is patched instead and [`Patched::file`] names it.
 pub fn patch(source: &str, edit: &Edit, game_root: &Path) -> Result<Patched, Refusal> {
+    patch_pending(source, edit, game_root, &BTreeMap::new())
+}
+
+/// [`patch`], with `pending` read in place of the files on disk. Each key is
+/// a full path under `game_root`, as [`Patched::file`] gives it. A caller
+/// making several edits to a file the unit file includes passes each result
+/// back in here, so the next edit starts from it rather than from the disk.
+pub fn patch_pending(
+    source: &str,
+    edit: &Edit,
+    game_root: &Path,
+    pending: &BTreeMap<PathBuf, String>,
+) -> Result<Patched, Refusal> {
+    let game = Game {
+        root: game_root,
+        pending,
+    };
     let value = validate(edit)?;
-    let plan = locate::plan(source, edit)?;
-    let before = evaluate_original(source, game_root)?;
+    let plan = locate::plan(source, edit, &game)?;
+    let file = plan.file.as_ref().map(|included| included.path.clone());
+    if let Some(included) = &plan.file {
+        shared(&game, included)?;
+    }
+    let before = evaluate_original(source, &game)?;
 
     let mut expected = expected_path(edit);
     if let Op::Push(_) = edit.op {
@@ -274,34 +384,47 @@ pub fn patch(source: &str, edit: &Edit, game_root: &Path) -> Result<Patched, Ref
         expected.push(format!("[{}]", length + 1));
     } else if check::holds(&before, &expected, value) {
         return Ok(Patched {
-            text: source.to_string(),
+            text: plan
+                .file
+                .as_ref()
+                .map_or(source, |included| included.text.as_str())
+                .to_string(),
             changed: false,
             location: plan.location,
+            file,
         });
     }
 
     let text = plan.apply(source);
-    post_check(&text, &before, &expected, value, plan.location, game_root)?;
+    post_check(source, &plan, &text, &before, &expected, value, &game)?;
 
     Ok(Patched {
         text,
         changed: true,
         location: plan.location,
+        file,
     })
 }
 
-/// Where `edit` would go in `source`, worked out from the file's text alone.
-/// Nothing is evaluated, so this is cheap, and it only refuses what the
-/// file's shape decides. A refusal only the post-check can give, such as a
-/// table two units share, is not found here.
-pub fn locate_edit(source: &str, edit: &Edit) -> Result<Location, Refusal> {
+/// Where `edit` would go in `source`, worked out without evaluating
+/// anything, so this is cheap. It only refuses what the text of the unit file
+/// and any file it includes for its table decides. A refusal only the
+/// post-check can give, such as a table two units share, is not found here.
+pub fn locate_edit(source: &str, edit: &Edit, game_root: &Path) -> Result<Place, Refusal> {
     validate(edit)?;
-    locate::plan(source, edit).map(|plan| plan.location)
+    let game = Game {
+        root: game_root,
+        pending: &BTreeMap::new(),
+    };
+    locate::plan(source, edit, &game).map(|plan| Place {
+        location: plan.location,
+        file: plan.file.map(|included| included.path),
+    })
 }
 
 /// Whether each of `fields` of `unit` could be changed in `source`, without
-/// writing anything (issue #2633). Each answer is the place in the file the
-/// change would go, or the refusal [`patch`] would give.
+/// writing anything (issue #2633). Each answer is the place the change would
+/// go, or the refusal [`patch`] would give.
 ///
 /// A dry run of [`patch`] with [`Op::Set`], one field at a time against the
 /// file as it is. When the file already returns the value given for a field,
@@ -312,14 +435,20 @@ pub fn locate_edit(source: &str, edit: &Edit) -> Result<Location, Refusal> {
 ///
 /// The original file is evaluated once for the whole batch rather than once
 /// per field, so a unit's whole field list costs one evaluation per field
-/// rather than two.
+/// rather than two. Whether another unit file includes the same file is
+/// looked up once too.
 pub fn check_fields(
     source: &str,
     unit: &str,
     fields: &[(Vec<Segment>, Value)],
     game_root: &Path,
-) -> Vec<Result<Location, Refusal>> {
+) -> Vec<Result<Place, Refusal>> {
+    let game = Game {
+        root: game_root,
+        pending: &BTreeMap::new(),
+    };
     let mut before: Option<Result<serde_json::Value, Refusal>> = None;
+    let mut sharing: Option<Result<(), Refusal>> = None;
     fields
         .iter()
         .map(|(path, value)| {
@@ -329,9 +458,14 @@ pub fn check_fields(
                 op: Op::Set(value.clone()),
             };
             validate(&edit)?;
-            locate::plan(source, &edit)?;
+            let plan = locate::plan(source, &edit, &game)?;
+            if let Some(included) = &plan.file {
+                sharing
+                    .get_or_insert_with(|| shared(&game, included))
+                    .clone()?;
+            }
             let before = before
-                .get_or_insert_with(|| evaluate_original(source, game_root))
+                .get_or_insert_with(|| evaluate_original(source, &game))
                 .as_ref()
                 .map_err(Clone::clone)?;
             let expected = expected_path(&edit);
@@ -344,12 +478,99 @@ pub fn check_fields(
                 op: Op::Set(value.clone()),
                 ..edit
             };
-            let plan = locate::plan(source, &edit)?;
+            let plan = locate::plan(source, &edit, &game)?;
             let text = plan.apply(source);
-            post_check(&text, before, &expected, &value, plan.location, game_root)?;
-            Ok(plan.location)
+            post_check(source, &plan, &text, before, &expected, &value, &game)?;
+            Ok(Place {
+                location: plan.location,
+                file: plan.file.map(|included| included.path),
+            })
         })
         .collect()
+}
+
+/// Refuse an edit to `included` when more than one unit file includes it.
+///
+/// This looks at every `.lua` file under the game's `units` folder, the
+/// folder the engine loads unit definitions from and the one the unit file
+/// being patched is in. A file counts when it includes the same file at its
+/// top level by a path written out in it, spelled any way that resolves to the
+/// same file. Nothing is evaluated: an edit to a value written out in a
+/// shared file changes every unit that includes it, unless that unit sets the
+/// value again after the include, and the post-check cannot see the others to
+/// tell. A file elsewhere in the game that includes it, such as a gadget,
+/// does not define a unit and is not looked at.
+fn shared(game: &Game, included: &locate::Included) -> Result<(), Refusal> {
+    let name = included
+        .path
+        .file_name()
+        .map(|name| name.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    let wanted = included.path.to_string_lossy().to_lowercase();
+    let rel = |path: &Path| {
+        path.strip_prefix(game.root)
+            .unwrap_or(path)
+            .to_string_lossy()
+            .replace('\\', "/")
+    };
+    let mut files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(game.root) {
+        for entry in entries.flatten() {
+            if entry.file_name().eq_ignore_ascii_case("units") && entry.path().is_dir() {
+                lua_files(&entry.path(), &mut files);
+            }
+        }
+    }
+    files.sort();
+    let including: Vec<String> = files
+        .iter()
+        .filter(|file| {
+            let Some(text) = game.read(file) else {
+                return false;
+            };
+            text.to_lowercase().contains(&name)
+                && locate::includes(&text).iter().any(|written| {
+                    game.resolve(written)
+                        .is_some_and(|path| path.to_string_lossy().to_lowercase() == wanted)
+                })
+        })
+        .map(|file| rel(file))
+        .collect();
+    if including.len() <= 1 {
+        return Ok(());
+    }
+    let shown: Vec<&str> = including.iter().take(5).map(String::as_str).collect();
+    let more = match including.len() - shown.len() {
+        0 => String::new(),
+        n => format!(" and {n} more"),
+    };
+    Err(Refusal::new(
+        RefusalKind::FileShared,
+        format!(
+            "This unit's table is in {}, which {} unit files include: {}{more}. A change to it would change all of those units, so coilbox will not make it.",
+            rel(&included.path),
+            including.len(),
+            shown.join(", "),
+        ),
+    )
+    .at(included.statement))
+}
+
+fn lua_files(at: &Path, out: &mut Vec<PathBuf>) {
+    let Ok(entries) = std::fs::read_dir(at) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            lua_files(&path, out);
+        } else if path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("lua"))
+        {
+            out.push(path);
+        }
+    }
 }
 
 /// Where the returned table keys `unit` in `source`, worked out from the
@@ -364,7 +585,13 @@ pub fn locate_unit(source: &str, unit: &str) -> Result<Location, Refusal> {
 /// other files stand in as empty tables, so this is the file's own table and
 /// not the unit as the engine sees it.
 pub fn evaluate(source: &str, game_root: &Path) -> Result<serde_json::Value, Refusal> {
-    evaluate_original(source, game_root)
+    evaluate_original(
+        source,
+        &Game {
+            root: game_root,
+            pending: &BTreeMap::new(),
+        },
+    )
 }
 
 /// One reason [`clone_unit`] would not make a copy.
@@ -377,6 +604,18 @@ pub struct CloneRefusal {
     pub refusal: Refusal,
 }
 
+/// A copy [`clone_unit`] made.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Cloned {
+    /// The copy's unit file.
+    pub text: String,
+    /// When the source's table is in a file its unit file includes, a copy
+    /// of that file for the copy's unit file to include in its place, as a
+    /// full path under the game's folder and its text. Neither exists on
+    /// disk yet.
+    pub included: Option<(PathBuf, String)>,
+}
+
 /// A new unit file for `new_unit`, made from the file `source` that defines
 /// `unit`, with `edits` made to the copy (issue #2634).
 ///
@@ -387,6 +626,13 @@ pub struct CloneRefusal {
 /// exactly one unit, `new_unit`, whose table is the source unit's with the
 /// edits made and nothing else different.
 ///
+/// When the source's table is in a file its unit file includes (issue
+/// #3021), that file is copied too, beside it, and the copy's unit file
+/// includes the copy. Sharing the source's file would leave the copy with no
+/// field an edit could change without changing the source as well. The new
+/// file's name is the source's with the unit's name swapped for the copy's,
+/// or the copy's name put in front when the source's name is not in it.
+///
 /// Every edit is tried, so the refusals list all of those the copy cannot
 /// take rather than only the first.
 pub fn clone_unit(
@@ -395,24 +641,66 @@ pub fn clone_unit(
     new_unit: &str,
     edits: &[(Vec<Segment>, Op)],
     game_root: &Path,
-) -> Result<String, Vec<CloneRefusal>> {
+) -> Result<Cloned, Vec<CloneRefusal>> {
     let whole = |refusal| {
         vec![CloneRefusal {
             edit: None,
             refusal,
         }]
     };
-    let plan = locate::rename(source, unit, new_unit).map_err(whole)?;
-    let before = evaluate_original(source, game_root).map_err(whole)?;
+    let empty = BTreeMap::new();
+    let on_disk = Game {
+        root: game_root,
+        pending: &empty,
+    };
+    let mut plan = locate::rename(source, unit, new_unit).map_err(whole)?;
+    let before = evaluate_original(source, &on_disk).map_err(whole)?;
     let Some(mut expected) = before.get(unit.to_lowercase()).cloned() else {
         return Err(whole(Refusal::new(
             RefusalKind::EvalFailed,
             format!("The file does not return `{unit}` when it runs, so there is nothing to copy."),
         )));
     };
+
+    // A unit whose table the patcher cannot follow into an included file
+    // gets no copy of one. Every edit to the copy is then refused for the
+    // same reason an edit to the source would be.
+    let mut pending = BTreeMap::new();
+    let included = match locate::included_table(source, unit, &on_disk) {
+        Ok(Some(included)) => {
+            let written = copy_name(&included.written, unit, new_unit);
+            let path = on_disk.resolve(&written).ok_or_else(|| {
+                whole(Refusal::new(
+                    RefusalKind::NameTaken,
+                    format!("{written} is outside the game's folder."),
+                ))
+            })?;
+            if path.exists() {
+                return Err(whole(
+                    Refusal::new(
+                        RefusalKind::NameTaken,
+                        format!(
+                            "{} already exists, so the copy of {} has nowhere to go.",
+                            written, included.written
+                        ),
+                    )
+                    .in_file(&path),
+                ));
+            }
+            plan.retarget(&included, &written);
+            pending.insert(path.clone(), included.text.clone());
+            Some(path)
+        }
+        _ => None,
+    };
+
     let key = new_unit.to_lowercase();
     let mut text = plan.apply(source);
-    confirm_copy(&text, &key, &expected, plan.location, game_root).map_err(whole)?;
+    let game = Game {
+        root: game_root,
+        pending: &pending,
+    };
+    confirm_copy(&text, &key, &expected, plan.location, &game).map_err(whole)?;
 
     let mut refused = Vec::new();
     for (at, (path, op)) in edits.iter().enumerate() {
@@ -421,9 +709,14 @@ pub fn clone_unit(
             path: path.clone(),
             op: op.clone(),
         };
-        match patch(&text, &edit, game_root) {
+        match patch_pending(&text, &edit, game_root, &pending) {
             Ok(patched) => {
-                text = patched.text;
+                match patched.file {
+                    Some(file) => {
+                        pending.insert(file, patched.text);
+                    }
+                    None => text = patched.text,
+                }
                 let steps: Vec<String> = path.iter().map(Segment::canonical).collect();
                 match op {
                     Op::Set(value) => check::set(&mut expected, &steps, value),
@@ -439,8 +732,34 @@ pub fn clone_unit(
     if !refused.is_empty() {
         return Err(refused);
     }
-    confirm_copy(&text, &key, &expected, plan.location, game_root).map_err(whole)?;
-    Ok(text)
+    let game = Game {
+        root: game_root,
+        pending: &pending,
+    };
+    confirm_copy(&text, &key, &expected, plan.location, &game).map_err(whole)?;
+    let included = included.map(|path| {
+        let text = pending.remove(&path).expect("put in above");
+        (path, text)
+    });
+    Ok(Cloned { text, included })
+}
+
+/// `written`, an included file's path, with its file name made the copy's:
+/// `unit` swapped for `new_unit`, or `new_unit` put in front when the name
+/// does not hold `unit`.
+fn copy_name(written: &str, unit: &str, new_unit: &str) -> String {
+    let at = written.rfind(['/', '\\']).map_or(0, |at| at + 1);
+    let (folder, name) = written.split_at(at);
+    let lower = name.to_ascii_lowercase();
+    let renamed = match lower.find(&unit.to_ascii_lowercase()) {
+        Some(start) => format!(
+            "{}{new_unit}{}",
+            &name[..start],
+            &name[start + unit.len()..]
+        ),
+        None => format!("{new_unit}_{name}"),
+    };
+    format!("{folder}{renamed}")
 }
 
 /// Run a copy's file and confirm it returns only `key`, holding `expected`.
@@ -449,10 +768,10 @@ fn confirm_copy(
     key: &str,
     expected: &serde_json::Value,
     location: Location,
-    game_root: &Path,
+    game: &Game,
 ) -> Result<(), Refusal> {
     let refuse = |message: String| Refusal::new(RefusalKind::PostCheckFailed, message).at(location);
-    let after = check::evaluate(text, game_root, "copy")
+    let after = check::evaluate(text, game.root, "copy", game.files(None))
         .map_err(|e| refuse(format!("The copy's file does not run: {e}")))?;
     let keys: Vec<&String> = after
         .as_object()
@@ -515,8 +834,8 @@ fn validate(edit: &Edit) -> Result<&Value, Refusal> {
     Ok(value)
 }
 
-fn evaluate_original(source: &str, game_root: &Path) -> Result<serde_json::Value, Refusal> {
-    check::evaluate(source, game_root, "original").map_err(|e| {
+fn evaluate_original(source: &str, game: &Game) -> Result<serde_json::Value, Refusal> {
+    check::evaluate(source, game.root, "original", game.files(None)).map_err(|e| {
         Refusal::new(
             RefusalKind::EvalFailed,
             format!("Coilbox could not run this file to check the edit: {e}"),
@@ -531,25 +850,34 @@ fn expected_path(edit: &Edit) -> Vec<String> {
     expected
 }
 
-/// Run the patched `text` and confirm it differs from `before` only at
-/// `expected`, where it now holds `value`.
+/// Run the unit file with `patched`, the text `plan` made, and confirm it
+/// differs from `before` only at `expected`, where it now holds `value`.
+/// When the plan went into an included file, the unit file `source` runs as
+/// it is and its `VFS` reads `patched` for that file.
 fn post_check(
-    text: &str,
+    source: &str,
+    plan: &locate::Plan,
+    patched: &str,
     before: &serde_json::Value,
     expected: &[String],
     value: &Value,
-    location: Location,
-    game_root: &Path,
+    game: &Game,
 ) -> Result<(), Refusal> {
-    let after = check::evaluate(text, game_root, "patched").map_err(|e| {
-        Refusal::new(
-            RefusalKind::PostCheckFailed,
-            format!("The patched file does not run: {e}"),
-        )
-        .at(location)
-    })?;
-    check::confirm(before, &after, expected, value)
-        .map_err(|message| Refusal::new(RefusalKind::PostCheckFailed, message).at(location))
+    let location = plan.location;
+    let refuse = |message: String| {
+        let refusal = Refusal::new(RefusalKind::PostCheckFailed, message).at(location);
+        match &plan.file {
+            Some(included) => refusal.in_file(&included.path),
+            None => refusal,
+        }
+    };
+    let (unit_file, files) = match &plan.file {
+        Some(included) => (source, game.files(Some((&included.path, patched)))),
+        None => (patched, game.files(None)),
+    };
+    let after = check::evaluate(unit_file, game.root, "patched", files)
+        .map_err(|e| refuse(format!("The patched file does not run: {e}")))?;
+    check::confirm(before, &after, expected, value).map_err(refuse)
 }
 
 #[cfg(test)]

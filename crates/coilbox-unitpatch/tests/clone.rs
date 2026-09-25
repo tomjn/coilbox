@@ -23,7 +23,10 @@ fn copy(
         .iter()
         .map(|(path, op)| (parse_path(path).expect("valid path"), op.clone()))
         .collect();
-    clone_unit(source, unit, new_unit, &edits, root.path())
+    clone_unit(source, unit, new_unit, &edits, root.path()).map(|cloned| {
+        assert_eq!(cloned.included, None);
+        cloned.text
+    })
 }
 
 #[test]

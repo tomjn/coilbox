@@ -5,6 +5,9 @@
 //! time through `coilbox-unitpatch`, and written through
 //! `coilbox_gamebackup::Markers`. The first write to a file renames the
 //! original aside, so undo and accept work from the files on disk alone.
+//! When a unit file includes another file for its table, as
+//! SplinterFaction's include their `basedefs` files, the change goes into
+//! that file instead and is backed up the same way (issue #3021).
 //!
 //! A write is all or nothing. Every change is patched in memory first, and if
 //! the patcher refuses any of them, nothing is written and every refusal is
@@ -29,7 +32,9 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use coilbox_gamebackup::{key, Markers};
-use coilbox_unitpatch::{patch, Edit, Location, Op, RefusalKind, Segment, Value as PatchValue};
+use coilbox_unitpatch::{
+    patch_pending, Edit, Location, Op, RefusalKind, Segment, Value as PatchValue,
+};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -51,7 +56,9 @@ pub struct Refused {
     pub unit: String,
     /// The field's dotted path, as the project holds it.
     pub field: String,
-    /// The unit's file, relative to the game, when one was found.
+    /// The file the refusal is about, relative to the game: the unit's
+    /// file, or the file it includes for its table when the refusal is about
+    /// that one (issue #3021). `None` when no file was found.
     pub file: Option<String>,
     pub kind: RefusalKind,
     pub message: String,
@@ -411,7 +418,7 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
         op: Op::Set(first.1.clone()),
     };
     let file = match find_unit_file(unit, &files, &texts, |text| {
-        coilbox_unitpatch::locate_edit(text, &first)
+        coilbox_unitpatch::locate_edit(text, &first, game_dir)
     }) {
         Found::File(file, _) => file,
         Found::None(file_level) => {
@@ -445,18 +452,33 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
         .map(|(probe, edit)| match edit {
             Err(message) => refusal(&probe.field, &invalid(Some(rel.clone()), message.clone())),
             Ok(_) => match answers.next() {
-                Some(Err(r)) => FieldCheck {
-                    field: probe.field.clone(),
-                    excerpt: r.location.as_ref().map(|at| excerpt(text, at)),
-                    refusal: Some(Refused {
-                        unit: unit.to_string(),
+                Some(Err(r)) => {
+                    // A refusal about the file the unit file includes shows
+                    // that file's Lua (issue #3021).
+                    let (shown, text) = match &r.file {
+                        Some(path) => (
+                            key(path.strip_prefix(game_dir).unwrap_or(path)),
+                            std::fs::read_to_string(path).ok(),
+                        ),
+                        None => (rel.clone(), Some(text.clone())),
+                    };
+                    FieldCheck {
                         field: probe.field.clone(),
-                        file: Some(rel.clone()),
-                        kind: r.kind,
-                        message: r.message,
-                        location: r.location,
-                    }),
-                },
+                        excerpt: r
+                            .location
+                            .as_ref()
+                            .zip(text.as_deref())
+                            .map(|(at, text)| excerpt(text, at)),
+                        refusal: Some(Refused {
+                            unit: unit.to_string(),
+                            field: probe.field.clone(),
+                            file: Some(shown),
+                            kind: r.kind,
+                            message: r.message,
+                            location: r.location,
+                        }),
+                    }
+                }
                 _ => FieldCheck {
                     field: probe.field.clone(),
                     refusal: None,
@@ -678,12 +700,17 @@ pub fn write(
     let mut texts = unit_texts(game_dir);
     let files: Vec<PathBuf> = texts.keys().cloned().collect();
     let originals = texts.clone();
+    // Files outside `units/` that a unit file includes for its table (issue
+    // #3021), as patched so far. Each patch reads them in place of the disk.
+    let mut included: BTreeMap<PathBuf, String> = BTreeMap::new();
     // Which file each accepted change landed in, to say whether undo reaches it.
     let mut held: Vec<(&str, &str, PathBuf)> = Vec::new();
 
     for UnitChanges { unit, edits } in units {
         let (_, first) = &edits[0];
-        let found = find_unit_file(unit, &files, &texts, |text| patch(text, first, game_dir));
+        let found = find_unit_file(unit, &files, &texts, |text| {
+            patch_pending(text, first, game_dir, &included)
+        });
         let (file, first_result) = match found {
             Found::File(file, result) => (file, result),
             Found::None(file_level) => {
@@ -701,22 +728,26 @@ pub fn write(
         for (field, edit) in &edits {
             let result = match pending.take() {
                 Some(result) => result,
-                None => patch(&texts[&file], edit, game_dir),
+                None => patch_pending(&texts[&file], edit, game_dir, &included),
             };
             match result {
-                Ok(patched) if patched.changed => {
-                    outcome.changed += 1;
-                    texts.insert(file.clone(), patched.text);
-                    held.push((unit, *field, file.clone()));
-                }
-                Ok(_) => {
-                    outcome.unchanged += 1;
-                    held.push((unit, *field, file.clone()));
+                Ok(patched) => {
+                    let into = patched.file.clone().unwrap_or_else(|| file.clone());
+                    if patched.changed {
+                        outcome.changed += 1;
+                        match patched.file {
+                            Some(path) => included.insert(path, patched.text),
+                            None => texts.insert(file.clone(), patched.text),
+                        };
+                    } else {
+                        outcome.unchanged += 1;
+                    }
+                    held.push((unit, *field, into));
                 }
                 Err(refusal) => outcome.refused.push(Refused {
                     unit: unit.to_string(),
                     field: field.to_string(),
-                    file: Some(rel(&file)),
+                    file: Some(rel(refusal.file.as_deref().unwrap_or(&file))),
                     kind: refusal.kind,
                     message: refusal.message,
                     location: refusal.location,
@@ -732,6 +763,7 @@ pub fn write(
         &files,
         &originals,
         &mut texts,
+        &mut included,
         &mut outcome,
     );
 
@@ -746,6 +778,10 @@ pub fn write(
         if originals.get(file) == Some(text) {
             continue;
         }
+        MARKERS.write(file, text.as_bytes())?;
+        outcome.written.push(rel(file));
+    }
+    for (file, text) in &included {
         MARKERS.write(file, text.as_bytes())?;
         outcome.written.push(rel(file));
     }
@@ -776,9 +812,15 @@ pub fn write(
 /// The copy is made from the source's file as the game has it now, from
 /// `originals`, not from `texts`: a field change to the source written in the
 /// same go is the source's, and the copy's definition already says whether it
-/// wants that value. The builders' pushes go into `texts`, beside any field
-/// change to the same file. Returns the new files to write, and adds every
-/// refusal to `outcome`.
+/// wants that value. The builders' pushes go into `texts`, or `included`
+/// when a builder's table is in a file its unit file includes, beside any
+/// field change to the same file. Returns the new files to write, and adds
+/// every refusal to `outcome`.
+///
+/// A copy of a unit whose table is in an included file gets a copy of that
+/// file as well, beside it, which the copy's unit file includes instead
+/// (issue #3021). Both are new files, so undo deletes both.
+#[allow(clippy::too_many_arguments)]
 fn write_copies(
     game_dir: &Path,
     project: &ModProject,
@@ -786,6 +828,7 @@ fn write_copies(
     files: &[PathBuf],
     originals: &BTreeMap<PathBuf, String>,
     texts: &mut BTreeMap<PathBuf, String>,
+    included: &mut BTreeMap<PathBuf, String>,
     outcome: &mut WriteOutcome,
 ) -> Vec<(PathBuf, String)> {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
@@ -903,13 +946,17 @@ fn write_copies(
             .map(|e| (e.path.clone(), e.op.clone()))
             .collect();
         match coilbox_unitpatch::clone_unit(&originals[&file], source, unit, &list, game_dir) {
-            Ok(text) => created.push((target.clone(), text)),
+            Ok(cloned) => {
+                created.push((target.clone(), cloned.text));
+                created.extend(cloned.included);
+            }
             Err(refusals) => {
                 for r in refusals {
                     let field = r.edit.map_or("", |at| edits[at].field.as_str());
+                    let about = rel(r.refusal.file.as_deref().unwrap_or(&file));
                     outcome.refused.push(Refused {
                         location: r.refusal.location,
-                        ..refuse(field, Some(rel(&file)), r.refusal.kind, r.refusal.message)
+                        ..refuse(field, Some(about), r.refusal.kind, r.refusal.message)
                     });
                 }
             }
@@ -926,17 +973,22 @@ fn write_copies(
                 if inplace_clone::already_lists(text, builder, unit, game_dir) {
                     return Ok(None);
                 }
-                patch(text, &push, game_dir).map(Some)
+                patch_pending(text, &push, game_dir, included).map(Some)
             });
             match found {
                 Found::File(_, Ok(None)) => {}
-                Found::File(file, Ok(Some(patched))) => {
-                    texts.insert(file, patched.text);
-                }
+                Found::File(file, Ok(Some(patched))) => match patched.file {
+                    Some(path) => {
+                        included.insert(path, patched.text);
+                    }
+                    None => {
+                        texts.insert(file, patched.text);
+                    }
+                },
                 Found::File(file, Err(r)) => outcome.refused.push(Refused {
                     unit: builder.to_string(),
                     field: "buildoptions".into(),
-                    file: Some(rel(&file)),
+                    file: Some(rel(r.file.as_deref().unwrap_or(&file))),
                     kind: r.kind,
                     message: r.message,
                     location: r.location,
@@ -1871,5 +1923,183 @@ mod tests {
         assert!(undo(&game).is_err());
         assert!(accept(&game).is_err());
         assert!(check(&game, "u", &[]).is_err());
+    }
+
+    fn copy_tree(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                copy_tree(&path, &to.join(entry.file_name()));
+            } else {
+                std::fs::copy(&path, to.join(entry.file_name())).unwrap();
+            }
+        }
+    }
+
+    const BEACON: &str = "Units/survivalai/beacon.lua";
+    const BEACON_BASEDEF: &str = "Units-Configs-Basedefs/basedefs/survivalai/beacon_basedef.lua";
+
+    /// A loose game holding the SplinterFaction files the patcher's own
+    /// tests use (issue #3021): each unit file includes a `basedefs` file
+    /// that sets the unit's table, and two unit files share one.
+    fn sf_game() -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().expect("temp dir");
+        let game = root.path().join("games/sf.sdd");
+        copy_tree(
+            &Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../coilbox-unitpatch/tests/fixtures/sf_game"),
+            &game,
+        );
+        (root, game)
+    }
+
+    /// Both changes land in the file the unit file includes, which is backed
+    /// up, listed in the diff drawer and put back by undo. The unit file
+    /// itself is not touched.
+    #[test]
+    fn a_change_to_a_unit_whose_table_is_included_is_written_into_that_file() {
+        let (_root, game) = sf_game();
+        let unit = game.join(BEACON);
+        let basedef = game.join(BEACON_BASEDEF);
+        let (unit_before, basedef_before) = (read(&unit), read(&basedef));
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({
+                "beacon": { "maxdamage": 2500, "workertime": 1600 },
+            })),
+        )
+        .unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.written, vec![BEACON_BASEDEF]);
+        assert_eq!(outcome.changed, 2);
+        assert_eq!(read(&unit), unit_before);
+        assert_eq!(
+            read(&basedef),
+            basedef_before
+                .replacen(
+                    "maxDamage                     = 2000",
+                    "maxDamage                     = 2500",
+                    1
+                )
+                .replacen(
+                    "workerTime                    = 1500",
+                    "workerTime                    = 1600",
+                    1
+                )
+        );
+        assert!(
+            outcome.carried.iter().all(|c| c.undoable),
+            "{:?}",
+            outcome.carried
+        );
+        assert_eq!(status(&game).backups, 1);
+
+        let diffs = crate::diff::disk_diffs(&game).unwrap();
+        assert_eq!(
+            diffs.iter().map(|d| d.file.as_str()).collect::<Vec<_>>(),
+            vec![BEACON_BASEDEF]
+        );
+
+        let undone = undo(&game).unwrap();
+        assert_eq!(undone.restored, vec![BEACON_BASEDEF]);
+        assert_eq!(read(&basedef), basedef_before);
+    }
+
+    #[test]
+    fn a_change_to_a_file_two_units_include_stops_the_write() {
+        let (_root, game) = sf_game();
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "lozairplant": { "maxdamage": 5 } })),
+        )
+        .unwrap();
+
+        assert!(outcome.written.is_empty());
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        let refused = &outcome.refused[0];
+        assert_eq!(refused.kind, RefusalKind::FileShared);
+        assert_eq!(
+            refused.file.as_deref(),
+            Some("Units/Loz Alliance - Faction 2/lozairplant.lua")
+        );
+        assert_eq!(status(&game).backups, 0);
+    }
+
+    /// The "Why?" popover shows the Lua of the file the refusal is about,
+    /// which for a value worked out in the included file is that file.
+    #[test]
+    fn a_dry_run_shows_the_included_files_lua_for_a_refusal_there() {
+        let (_root, game) = sf_game();
+        let outcome = check(
+            &game,
+            "beacon",
+            &probes(serde_json::json!([
+                { "field": "maxdamage", "value": 2000 },
+                { "field": "name", "value": "Spawn Beacon" },
+            ])),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.file.as_deref(), Some(BEACON));
+        assert!(
+            outcome.fields[0].refusal.is_none(),
+            "{:?}",
+            outcome.fields[0]
+        );
+        let name = &outcome.fields[1];
+        let refusal = name.refusal.as_ref().expect("computed");
+        assert_eq!(refusal.kind, RefusalKind::FieldComputed);
+        assert_eq!(refusal.file.as_deref(), Some(BEACON_BASEDEF));
+        let shown = name.excerpt.as_ref().expect("an excerpt");
+        let line = refusal.location.expect("a location").start.line;
+        assert!(shown.lines[line - shown.first_line].contains("humanName"));
+        assert_eq!(status(&game).backups, 0);
+    }
+
+    /// A copy of such a unit gets its own copy of the included file, so its
+    /// change does not reach the source. Undo deletes both new files.
+    #[test]
+    fn a_copy_of_a_unit_whose_table_is_included_copies_that_file_too() {
+        let (_root, game) = sf_game();
+        let basedef = game.join(BEACON_BASEDEF);
+        let basedef_before = read(&basedef);
+        let sources: BTreeMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "beacon": { "maxdamage": 2000, "name": "Spawn Beacon" },
+        }))
+        .unwrap();
+        let mut def = sources["beacon"].clone();
+        def["maxdamage"] = serde_json::json!(3000);
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "In place",
+            "gameName": "SF",
+            "edits": { "clones": { "beacon_mk2": {
+                "key": "beacon_mk2",
+                "source": "beacon",
+                "replacesGameUnit": false,
+                "def": def,
+            } } },
+        }))
+        .unwrap();
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        let copy_basedef = "Units-Configs-Basedefs/basedefs/survivalai/beacon_mk2_basedef.lua";
+        assert_eq!(
+            outcome.written,
+            vec!["Units/survivalai/beacon_mk2.lua", copy_basedef]
+        );
+        assert_eq!(read(&basedef), basedef_before);
+        assert!(read(&game.join(copy_basedef)).contains("maxDamage                     = 3000"));
+        assert!(read(&game.join("Units/survivalai/beacon_mk2.lua"))
+            .contains("\"units-configs-basedefs/basedefs/survivalai/beacon_mk2_basedef.lua\""));
+        assert_eq!(status(&game).created, 2);
+
+        let undone = undo(&game).unwrap();
+        assert_eq!(undone.deleted.len(), 2, "{:?}", undone.deleted);
+        assert!(!game.join(copy_basedef).exists());
     }
 }

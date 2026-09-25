@@ -2,7 +2,8 @@
 //! the unit, walks the path, and turns the edit into splices over the
 //! original text.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 
 use full_moon::ast::punctuated::Pair;
 use full_moon::ast::{
@@ -14,7 +15,7 @@ use full_moon::tokenizer::{StringLiteralQuoteType, TokenReference, TokenType};
 use full_moon::LuaVersion;
 
 use crate::render::{self, Quote};
-use crate::{Edit, Location, Op, Refusal, RefusalKind, Segment, Value};
+use crate::{Edit, Game, Location, Op, Refusal, RefusalKind, Segment, Value};
 
 /// Deepest chain of `local A = B:New{...}` the patcher follows before giving
 /// up, so a file where two names refer to each other cannot loop forever.
@@ -26,10 +27,47 @@ pub struct Plan {
     /// `(start, end, replacement)` byte ranges, sorted and not overlapping.
     splices: Vec<(usize, usize, String)>,
     pub location: Location,
+    /// The file the splices go into, when it is one the unit file includes
+    /// rather than the unit file itself.
+    pub file: Option<Included>,
+}
+
+/// A file the unit file includes for its table, as SplinterFaction's include
+/// `units-configs-basedefs/basedefs/...` (issue #3021).
+#[derive(Debug, Clone)]
+pub struct Included {
+    /// The file's full path under the game's folder, spelled as the folder
+    /// spells it.
+    pub path: PathBuf,
+    /// Its text, as the patch found it.
+    pub text: String,
+    /// The path as the unit file writes it.
+    pub written: String,
+    /// The `VFS.Include` statement in the unit file.
+    pub statement: Location,
+    /// The path's string in the unit file, quotes and all.
+    pub literal: (usize, usize),
+    /// How the path's string is quoted in the unit file.
+    quote: Quote,
+    /// The global the unit file reads and this file sets, such as `unitDef`.
+    global: String,
 }
 
 impl Plan {
+    /// Point the unit file's include of `included` at `written` instead, in
+    /// the same quotes. Only for a plan whose splices are in the unit file.
+    pub fn retarget(&mut self, included: &Included, written: &str) {
+        let (start, end) = included.literal;
+        let text = render::literal(&Value::String(written.to_string()), included.quote);
+        let at = self.splices.partition_point(|(s, _, _)| *s < start);
+        self.splices.insert(at, (start, end, text));
+    }
+
+    /// The text of the file the plan goes into once the splices are made.
+    /// `source` is the unit file's text, which is that file unless the plan
+    /// goes into one the unit file includes.
     pub fn apply(&self, source: &str) -> String {
+        let source = self.file.as_ref().map_or(source, |file| file.text.as_str());
         let mut out = String::with_capacity(source.len() + 64);
         let mut cursor = 0;
         for (start, end, text) in &self.splices {
@@ -74,7 +112,7 @@ fn returned(block: &full_moon::ast::Block) -> Result<&Expression, Refusal> {
     })
 }
 
-pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
+pub fn plan(source: &str, edit: &Edit, game: &Game) -> Result<Plan, Refusal> {
     let ast = parse(source)?;
     let block = ast.nodes();
     let scope = Scope::of(block.stmts());
@@ -88,6 +126,18 @@ pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
     let entry = find_unit(units, &edit.unit, &scope, source)?;
     let mut chain = Chain::default();
     follow(entry, &scope, source, &mut chain, 0)?;
+
+    // A value set on the unit's variable after the table is built wins over
+    // whatever the table says, so editing the table would change nothing.
+    // The unit file is checked even when the table is in a file it
+    // includes, since SplinterFaction's set `unitDef.weaponDefs` after the
+    // include.
+    later_set(&scope, &chain.names, source, edit)?;
+
+    if let Some(unset) = &chain.unset {
+        let site = include_setting(&scope, unset, source, game)?;
+        return site.plan(edit);
+    }
     if chain.tables.is_empty() {
         return Err(Refusal::new(
             RefusalKind::UnitComputed,
@@ -98,11 +148,158 @@ pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
         )
         .at(here(entry)));
     }
+    walk(source, chain.tables, edit)
+}
 
-    // A value set on the unit's variable after the table is built wins over
-    // whatever the table says, so editing the table would change nothing.
+/// The file `source` includes for `unit`'s table, or `None` when the table is
+/// in `source` itself.
+pub fn included_table(source: &str, unit: &str, game: &Game) -> Result<Option<Included>, Refusal> {
+    let ast = parse(source)?;
+    let block = ast.nodes();
+    let scope = Scope::of(block.stmts());
+    let units = returned_table(returned(block)?, &scope, source)?;
+    let entry = find_unit(units, unit, &scope, source)?;
+    let mut chain = Chain::default();
+    follow(entry, &scope, source, &mut chain, 0)?;
+    match &chain.unset {
+        Some(unset) => include_setting(&scope, unset, source, game).map(Some),
+        None => Ok(None),
+    }
+}
+
+/// The paths `source` includes at its top level, as it writes them. Empty
+/// for a file that does not parse.
+pub fn includes(source: &str) -> Vec<String> {
+    let Ok(ast) = parse(source) else {
+        return Vec::new();
+    };
+    Scope::of(ast.nodes().stmts())
+        .includes
+        .into_iter()
+        .map(|include| include.written)
+        .collect()
+}
+
+/// The file the unit file includes that sets `unset`'s name as a global, as
+/// SplinterFaction's basedef files set `unitDef` (issue #3021).
+///
+/// Only a `VFS.Include` at the top level of the unit file with the path
+/// written out is followed, and only one step: a name the included file does
+/// not set is not looked for in the files it includes in turn.
+fn include_setting(
+    scope: &Scope<'_>,
+    unset: &(String, Location),
+    source: &str,
+    game: &Game,
+) -> Result<Included, Refusal> {
+    let (name, at) = unset;
+    let not_set = |message: String| Refusal::new(RefusalKind::UnitComputed, message).at(*at);
+    if scope.includes.is_empty() {
+        return Err(not_set(format!(
+            "`{name}` is not set in this file, so its table cannot be edited here."
+        )));
+    }
+    let mut setting = Vec::new();
+    let mut unread = Vec::new();
+    for include in &scope.includes {
+        let Some(path) = game.resolve(&include.written) else {
+            unread.push(include.written.clone());
+            continue;
+        };
+        let Some(text) = game.read(&path) else {
+            unread.push(include.written.clone());
+            continue;
+        };
+        let Ok(ast) = parse(&text) else {
+            // A file that does not parse cannot set anything the unit file
+            // then reads, and the post-check would say so.
+            unread.push(include.written.clone());
+            continue;
+        };
+        let included = Scope::of(ast.nodes().stmts());
+        if included.bindings.contains_key(name) && !included.locals.contains(name) {
+            let (start, end) = include.literal.span();
+            setting.push(Included {
+                path,
+                written: include.written.clone(),
+                statement: Location::of(source, include.statement.0, include.statement.1),
+                literal: (start, end),
+                quote: literal(include.literal).unwrap_or(Quote::Double),
+                global: name.clone(),
+                text,
+            });
+        }
+    }
+    match setting.len() {
+        1 => Ok(setting.remove(0)),
+        0 if unread.is_empty() => Err(not_set(format!(
+            "`{name}` is not set in this file or in the files it includes, so its table cannot be edited here."
+        ))),
+        0 => Err(not_set(format!(
+            "`{name}` is not set in this file, and coilbox could not read {} to look for it there.",
+            unread.join(", ")
+        ))),
+        _ => Err(not_set(format!(
+            "`{name}` is set in more than one file this file includes ({}), so coilbox cannot tell which one the game reads.",
+            setting.iter().map(|s| s.written.as_str()).collect::<Vec<_>>().join(", ")
+        ))),
+    }
+}
+
+impl Included {
+    /// The edit as splices into this file, where the unit's table is the
+    /// global the unit file reads. Refusals are about this file.
+    fn plan(self, edit: &Edit) -> Result<Plan, Refusal> {
+        let into = |refusal: Refusal| refusal.in_file(&self.path);
+        let ast = parse(&self.text).map_err(into)?;
+        let scope = Scope::of(ast.nodes().stmts());
+        let text = self.text.as_str();
+        let name = self.global.clone();
+        let value = scope
+            .single(&name)
+            .map_err(|message| into(Refusal::new(RefusalKind::UnitComputed, message)))?
+            .expect("include_setting found the name set here");
+        let mut chain = Chain::default();
+        chain.names.push(name.clone());
+        follow(value, &scope, text, &mut chain, 0).map_err(into)?;
+        later_set(&scope, &chain.names, text, edit).map_err(into)?;
+        if let Some((unset, at)) = &chain.unset {
+            return Err(into(
+                Refusal::new(
+                    RefusalKind::UnitComputed,
+                    format!("`{unset}` is not set in this file either, and coilbox follows only one included file, so there is no table to edit."),
+                )
+                .at(*at),
+            ));
+        }
+        if chain.tables.is_empty() {
+            let (start, end) = value.span();
+            return Err(into(
+                Refusal::new(
+                    RefusalKind::UnitComputed,
+                    format!("`{name}` is built by code in this file, not written out as a table, so there is no table to edit."),
+                )
+                .at(Location::of(text, start, end)),
+            ));
+        }
+        let plan = walk(text, chain.tables, edit).map_err(into)?;
+        Ok(Plan {
+            file: Some(self),
+            ..plan
+        })
+    }
+}
+
+/// Refuse an edit to a field that a top-level statement sets again on one of
+/// `names` after the table is built.
+fn later_set(
+    scope: &Scope<'_>,
+    names: &[String],
+    source: &str,
+    edit: &Edit,
+) -> Result<(), Refusal> {
     for (name, keys, span) in &scope.later_sets {
-        if !chain.names.contains(name) {
+        if !names.contains(name) {
             continue;
         }
         let overlap = keys
@@ -120,8 +317,17 @@ pub fn plan(source: &str, edit: &Edit) -> Result<Plan, Refusal> {
             .at(Location::of(source, span.0, span.1)));
         }
     }
+    Ok(())
+}
 
-    let mut candidates = chain.tables;
+/// The edit as splices into `source`, whose `tables` hold the unit's fields,
+/// most specific first.
+fn walk(source: &str, tables: Vec<&TableConstructor>, edit: &Edit) -> Result<Plan, Refusal> {
+    let here = |node: &dyn Spanned| {
+        let (start, end) = node.span();
+        Location::of(source, start, end)
+    };
+    let mut candidates = tables;
     let last = edit.path.len() - 1;
     for (depth, segment) in edit.path.iter().enumerate() {
         let is_target = depth == last && matches!(edit.op, Op::Set(_));
@@ -214,6 +420,19 @@ struct Scope<'a> {
     /// Top-level assignments into a name's fields, such as
     /// `unitDef.unitname = unitName`: the name, the keys, and the byte range.
     later_sets: Vec<(String, Vec<String>, (usize, usize))>,
+    /// Names declared `local` at the top level. A file that includes this one
+    /// cannot see them.
+    locals: HashSet<String>,
+    /// Every `VFS.Include` of a path written out in the file, in order, at
+    /// the top level.
+    includes: Vec<Include<'a>>,
+}
+
+/// A top-level `VFS.Include("path")` in a unit file.
+struct Include<'a> {
+    written: String,
+    statement: (usize, usize),
+    literal: &'a Expression,
 }
 
 impl<'a> Scope<'a> {
@@ -222,8 +441,22 @@ impl<'a> Scope<'a> {
         for stmt in stmts {
             match stmt {
                 Stmt::LocalAssignment(local) => {
+                    for name in local.names() {
+                        scope.locals.insert(identifier(name));
+                    }
                     for (name, value) in local.names().iter().zip(local.expressions().iter()) {
                         scope.bind(identifier(name), value);
+                    }
+                }
+                Stmt::FunctionCall(call) => {
+                    if let Some(literal) = include_argument(call) {
+                        if let Some(written) = string_value(literal) {
+                            scope.includes.push(Include {
+                                written,
+                                statement: stmt.span(),
+                                literal,
+                            });
+                        }
                     }
                 }
                 Stmt::Assignment(assignment) => {
@@ -284,6 +517,29 @@ fn identifier(token: &TokenReference) -> String {
     match token.token_type() {
         TokenType::Identifier { identifier } => identifier.to_string(),
         _ => token.token().to_string(),
+    }
+}
+
+/// For `VFS.Include("path", ...)`, the path's expression.
+fn include_argument(call: &full_moon::ast::FunctionCall) -> Option<&Expression> {
+    let Prefix::Name(prefix) = call.prefix() else {
+        return None;
+    };
+    let mut suffixes = call.suffixes();
+    let (
+        Some(Suffix::Index(Index::Dot { name, .. })),
+        Some(Suffix::Call(Call::AnonymousCall(args))),
+        None,
+    ) = (suffixes.next(), suffixes.next(), suffixes.next())
+    else {
+        return None;
+    };
+    if identifier(prefix) != "VFS" || identifier(name) != "Include" {
+        return None;
+    }
+    match args {
+        FunctionArgs::Parentheses { arguments, .. } => arguments.iter().next(),
+        _ => None,
     }
 }
 
@@ -448,6 +704,7 @@ pub fn rename(source: &str, unit: &str, new_unit: &str) -> Result<Plan, Refusal>
     }
     splices.sort_by_key(|(start, _, _)| *start);
     Ok(Plan {
+        file: None,
         splices,
         location: location.expect("find_unit found the unit's field"),
     })
@@ -510,6 +767,11 @@ fn find_unit<'a>(
 struct Chain<'a> {
     tables: Vec<&'a TableConstructor>,
     names: Vec<String>,
+    /// A name the unit's value leads to that the file never sets, with the
+    /// place it is read. Only when no table came before it, so the whole
+    /// table has to come from somewhere else, such as a file the unit file
+    /// includes.
+    unset: Option<(String, Location)>,
 }
 
 /// Follow a unit's value back to the tables written in the file. Handles a
@@ -547,6 +809,12 @@ fn follow<'a>(
                 Ok(Some(value)) => {
                     chain.names.push(name);
                     follow(value, scope, source, chain, depth + 1)
+                }
+                Ok(None) if chain.tables.is_empty() => {
+                    let (start, end) = expression.span();
+                    chain.names.push(name.clone());
+                    chain.unset = Some((name, Location::of(source, start, end)));
+                    Ok(())
                 }
                 Ok(None) => Err(computed(
                     expression,
@@ -698,6 +966,7 @@ fn replace(source: &str, value: &Expression, edit: &Edit) -> Result<Plan, Refusa
         unreachable!("only a set replaces")
     };
     Ok(Plan {
+        file: None,
         splices: vec![(start, end, render::literal(new, quote))],
         location,
     })
@@ -807,6 +1076,7 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
             format!(" {entry} ")
         };
         return Ok(Plan {
+            file: None,
             splices: vec![(inside_start, inside_end, text)],
             location: Location::of(source, inside_start, inside_start),
         });
@@ -830,6 +1100,7 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
         };
         splices.push((at, at, text));
         return Ok(Plan {
+            file: None,
             splices,
             location: Location::of(source, at, at),
         });
@@ -874,6 +1145,7 @@ fn insert(source: &str, table: &TableConstructor, entry: String) -> Result<Plan,
     };
     splices.push((at, at, text));
     Ok(Plan {
+        file: None,
         splices,
         location: Location::of(source, at, at),
     })

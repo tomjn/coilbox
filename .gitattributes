@@ -24,4 +24,4 @@ crates/coilbox-zerok-protocol/upstream/**/*.cs -text
 # Unit files copied from real games, trailing whitespace and missing final
 # newline included. The patcher's tests check that every byte outside an edit
 # survives, so the fixtures have to keep the bytes the games have.
-crates/coilbox-unitpatch/tests/fixtures/*.lua -text
+crates/coilbox-unitpatch/tests/fixtures/**/*.lua -text
