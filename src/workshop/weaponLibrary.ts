@@ -51,8 +51,26 @@ export interface LibraryWeapon {
 /** The library, by key. */
 export type WeaponLibrary = Record<string, LibraryWeapon>;
 
-/** Unit key, then the slot's step, then the library weapon that slot fires. */
+/**
+ * Unit key, then the slot's step, then the library weapon that slot fires.
+ * The step can also be one of {@link DEATH_MOUNTS}, for the library weapon a
+ * unit explodes as (issue #2642).
+ */
 export type EquippedWeapons = Record<string, Record<string, string>>;
+
+/**
+ * The two unit fields that name a death explosion, lowercased as the unit
+ * tables hold them (issue #2642). RecoilEngine looks each one up by name in
+ * the game's weapon table, lowercased (`UnitDef.cpp`), so a death explosion is
+ * a weapon definition like any other and the library can hold one.
+ */
+export const DEATH_MOUNTS = ["explodeas", "selfdestructas"] as const;
+export type DeathMount = (typeof DEATH_MOUNTS)[number];
+
+/** Whether an `equipped` step is a death explosion rather than a slot. */
+export function isDeathMount(step: string): step is DeathMount {
+  return (DEATH_MOUNTS as readonly string[]).includes(step);
+}
 
 /** One slot that fires a library weapon. */
 export interface WeaponMount {
@@ -293,12 +311,28 @@ export function mountsOf(
   for (const [unit, slots] of Object.entries(equipped ?? {}))
     for (const [step, fired] of Object.entries(slots))
       if (fired === key) out.push({ unit, step });
+  // Slots in number order, then the two death explosions.
+  const rank = (step: string) =>
+    isDeathMount(step)
+      ? Number.MAX_SAFE_INTEGER - 1 + DEATH_MOUNTS.indexOf(step)
+      : Number(step);
   return out.sort(
-    (a, b) => a.unit.localeCompare(b.unit) || Number(a.step) - Number(b.step),
+    (a, b) => a.unit.localeCompare(b.unit) || rank(a.step) - rank(b.step),
   );
 }
 
-/** How many slots fire a library weapon, across every unit. */
+/** How many of {@link equippedCount} are death explosions (issue #2642). */
+export function deathExplosionCount(
+  equipped: EquippedWeapons | undefined,
+): number {
+  return Object.values(equipped ?? {}).reduce(
+    (n, slots) => n + Object.keys(slots).filter(isDeathMount).length,
+    0,
+  );
+}
+
+/** How many slots fire a library weapon, and how many death explosions are
+ *  one, across every unit. */
 export function equippedCount(equipped: EquippedWeapons | undefined): number {
   return Object.values(equipped ?? {}).reduce(
     (n, slots) => n + Object.keys(slots).length,
@@ -368,7 +402,8 @@ export function parseEquippedWeapons(value: unknown): EquippedWeapons {
     if (!isRecord(raw)) continue;
     const slots: Record<string, string> = {};
     for (const [step, key] of Object.entries(raw))
-      if (/^\d+$/.test(step) && typeof key === "string") slots[step] = key;
+      if ((/^\d+$/.test(step) || isDeathMount(step)) && typeof key === "string")
+        slots[step] = key;
     if (Object.keys(slots).length > 0) out[unit] = slots;
   }
   return out;

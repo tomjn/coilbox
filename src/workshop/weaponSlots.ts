@@ -487,23 +487,50 @@ function slotGroup(
  * `prefix` and the field's own path, and `prefix` is empty for a definition
  * whose changes are keyed by the field alone, which is a library weapon's
  * (issue #2640). A definition nobody can edit reads nothing from it.
+ *
+ * `focus` narrows the relevant view to the fields a use of the definition is
+ * about, drawn whether the definition sets them or not, which is how a death
+ * explosion is shown (issue #2642). Registry paths, and `damage` for every row
+ * of the damage table. A field it leaves unset shows the value the engine
+ * falls back on, read off the definition, where the registry names one.
  */
-function definitionSections(
+export function definitionSections(
   def: Record<string, unknown>,
   patch: Record<string, unknown>,
   prefix: string,
   view: FieldView,
   editable: boolean,
+  focus?: readonly string[],
 ): { sections: RenderedSection[]; relevant: number; all: number } {
   const pathOf = (leaf: string) => (prefix ? `${prefix}.${leaf}` : leaf);
-  const present = definitionLeaves(def);
+  const all = definitionLeaves(def);
+  const focused = focus?.map((path) => path.toLowerCase());
+  const inFocus = (leaf: string) => {
+    const lower = leaf.toLowerCase();
+    return (
+      focused === undefined ||
+      focused.some((path) => lower === path || lower.startsWith(`${path}.`))
+    );
+  };
+  // The focused fields the definition leaves unset, so they are drawn anyway.
+  // A damage table with no row at all gets its `default` row.
+  const unset = (focus ?? []).flatMap((path) =>
+    path.toLowerCase() === "damage"
+      ? all.some((leaf) => leaf.toLowerCase().startsWith("damage."))
+        ? []
+        : ["damage.default"]
+      : all.some((leaf) => leaf.toLowerCase() === path.toLowerCase())
+        ? []
+        : [path],
+  );
+  const present = all.filter(inFocus);
   const lowerPrefix = prefix ? `${prefix.toLowerCase()}.` : "";
   const edited = editable
     ? Object.keys(patch)
         .filter((path) => path.toLowerCase().startsWith(lowerPrefix))
         .map((path) => path.slice(lowerPrefix.length))
     : [];
-  const walked = new Set(present.map((leaf) => leaf.toLowerCase()));
+  const walked = new Set(all.map((leaf) => leaf.toLowerCase()));
   const extra = WEAPON_PATHS.filter((path) => {
     const lower = path.toLowerCase();
     if (path.includes("*") || WEAPON_CONTAINERS.has(lower)) return false;
@@ -511,8 +538,8 @@ function definitionSections(
     // drawn as its keys and not again as one row.
     return ![...walked].some((leaf) => leaf.startsWith(`${lower}.`));
   });
-  const relevantLeaves = mergeLeaves(present, edited);
-  const allLeaves = mergeLeaves(present, edited, extra);
+  const relevantLeaves = mergeLeaves(present, unset, edited);
+  const allLeaves = mergeLeaves(all, unset, edited, extra);
   const leaves = view === "all" ? allLeaves : relevantLeaves;
 
   const bySection = new Map<string, FieldRow[]>();
@@ -521,7 +548,8 @@ function definitionSections(
     const field = describeLeaf(leaf, def);
     const value = readPath(def, leaf);
     const isPresent = value !== undefined;
-    const inherited = isPresent ? value : field.default;
+    const fallback = focus && !isPresent ? fallbackOf(def, field) : undefined;
+    const inherited = isPresent ? value : (fallback ?? field.default);
     const state =
       editable && Object.hasOwn(patch, path) ? "overridden" : "inherited";
     const row: FieldRow = {
@@ -554,6 +582,31 @@ function definitionSections(
     relevant: relevantLeaves.length,
     all: allLeaves.length,
   };
+}
+
+/**
+ * What the engine reads for a field the definition leaves unset, when the
+ * registry says it falls back on another field the definition does set:
+ * `cameraShake` on `damage.default`, for one. Matched case-insensitively,
+ * since games spell keys either way.
+ */
+function fallbackOf(
+  def: Record<string, unknown>,
+  field: ResolvedField,
+): unknown {
+  for (const path of field.engine?.fallsBackTo ?? []) {
+    let at: unknown = def;
+    for (const step of path.split(".")) {
+      if (!isPlainObject(at)) {
+        at = undefined;
+        break;
+      }
+      const key = findKey(at, step.toLowerCase());
+      at = key === undefined ? undefined : at[key];
+    }
+    if (at !== undefined) return at;
+  }
+  return undefined;
 }
 
 function definitionGroup(

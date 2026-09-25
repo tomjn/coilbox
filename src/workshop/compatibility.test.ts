@@ -684,6 +684,27 @@ describe("the weapon library (issue #2640)", () => {
     expect(finding.fix?.apply(edits).equipped).toEqual({});
   });
 
+  /** Issue #2642. Every unit has a death explosion to go into. */
+  it("keeps a death explosion, and says when its library weapon has gone", () => {
+    const deaths: GameEdits = {
+      ...edits,
+      equipped: { armcom: { explodeas: "heavylaser", selfdestructas: "gone" } },
+    };
+    const finding = only(
+      check(deaths, {
+        units: { armcom },
+        weaponDefs: { armcom_armcomlaser: { range: 300 } },
+      }),
+    );
+    expect(finding.id).toBe("equipped:armcom:selfdestructas");
+    expect(finding.detail).toMatch(
+      /explodes as the game's own when it self-destructs/,
+    );
+    expect(finding.fix?.apply(deaths).equipped).toEqual({
+      armcom: { explodeas: "heavylaser" },
+    });
+  });
+
   it("reads a project saved before the library as holding none", () => {
     const { weapons: _w, equipped: _e, ...older } = EMPTY_EDITS;
     expect(ids(check(older as GameEdits))).toEqual([]);

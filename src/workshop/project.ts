@@ -85,6 +85,7 @@ import type { ReadOnlyLuaBlock } from "./readOnlyLua";
 import type { TextField, UnitTextEdits } from "./unitText";
 import { BASE_LANGUAGE, textEditCount } from "./unitText";
 import {
+  deathExplosionCount,
   type EquippedWeapons,
   equippedCount,
   parseEquippedWeapons,
@@ -210,8 +211,10 @@ export interface EditCounts {
   off: number;
   /** Weapons in the project's library (issue #2640). */
   weapons: number;
-  /** Slots that fire one of them. */
+  /** Slots that fire one of them, and death explosions that are one. */
   equipped: number;
+  /** How many of `equipped` are death explosions (issue #2642). */
+  deaths: number;
   /** Units moved to a different armour class (issue #2645). */
   armorMoves: number;
 }
@@ -224,21 +227,27 @@ export function editCounts(edits: GameEdits): EditCounts {
     off: edits.disabled.length,
     weapons: Object.keys(edits.weapons ?? {}).length,
     equipped: equippedCount(edits.equipped),
+    deaths: deathExplosionCount(edits.equipped),
     armorMoves: Object.keys(edits.armorClasses?.moves ?? {}).length,
   };
 }
 
 /** The counts as a sentence, for a header that says what is in the project. */
 export function describeEdits(edits: GameEdits): string {
-  const { fields, added, menuOps, off, weapons, equipped, armorMoves } =
+  const { fields, added, menuOps, off, weapons, equipped, deaths, armorMoves } =
     editCounts(edits);
+  const slots = equipped - deaths;
+  const uses = [
+    slots > 0 && `${slots} slot${slots === 1 ? "" : "s"}`,
+    deaths > 0 && `${deaths} death explosion${deaths === 1 ? "" : "s"}`,
+  ].filter((part): part is string => typeof part === "string");
   const parts = [
     fields > 0 && `${fields} change${fields === 1 ? "" : "s"}`,
     added > 0 && `${added} unit${added === 1 ? "" : "s"} added`,
     menuOps > 0 && `${menuOps} build menu edit${menuOps === 1 ? "" : "s"}`,
     off > 0 && `${off} unit${off === 1 ? "" : "s"} disabled`,
     weapons > 0 &&
-      `${weapons} library weapon${weapons === 1 ? "" : "s"}${equipped > 0 ? ` in ${equipped} slot${equipped === 1 ? "" : "s"}` : ""}`,
+      `${weapons} library weapon${weapons === 1 ? "" : "s"}${uses.length > 0 ? ` in ${uses.join(" and ")}` : ""}`,
     armorMoves > 0 &&
       `${armorMoves} unit${armorMoves === 1 ? "" : "s"} moved to a different armour class`,
   ].filter((part): part is string => typeof part === "string");

@@ -65,6 +65,7 @@ import { readPath, resolvedDef, sameValue } from "./overrides";
 import type { GameEdits } from "./project";
 import {
   type EquippedWeapons,
+  isDeathMount,
   unequipUnit,
   unequipWeapon,
 } from "./weaponLibrary";
@@ -695,14 +696,19 @@ function libraryFindings(
     );
     for (const [step, key] of Object.entries(slots)) {
       const lost = !Object.hasOwn(input.edits.weapons ?? {}, key);
-      if (!lost && steps.has(step)) continue;
+      // Every unit can die, so a death explosion always has a field to go
+      // into (issue #2642).
+      const death = isDeathMount(step);
+      if (!lost && (death || steps.has(step))) continue;
       out.push({
         id: `equipped:${unit}:${step}`,
         store: "equipped",
         severity: "broken",
         subject: unit,
         detail: lost
-          ? `${unit} is equipped with ${key}, which is not in the weapon library any more, so that slot fires the game's weapon.`
+          ? death
+            ? `${unit} explodes as ${key}, which is not in the weapon library any more, so it explodes as the game's own when it ${step === "explodeas" ? "dies" : "self-destructs"}.`
+            : `${unit} is equipped with ${key}, which is not in the weapon library any more, so that slot fires the game's weapon.`
           : `${unit} no longer has the weapon slot ${key} was equipped into, so it is equipped into nothing.`,
         fix: unequip(unit, step),
       });
