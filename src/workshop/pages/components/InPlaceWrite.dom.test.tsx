@@ -166,7 +166,7 @@ describe("the edit-in-place actions", () => {
     ).toBe(true);
     expect(
       screen.getByText(
-        "Every field change in this project goes through the mutator route, so there is nothing to write in place.",
+        "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place.",
       ),
     ).toBeTruthy();
   });
@@ -323,6 +323,24 @@ describe("the edit-in-place actions", () => {
         .getByRole("button", { name: "Write changes into the game" })
         .hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  /** Issue #3035. A copy sent through the mutator route whole is left out of
+   *  what the write attempts, and said, the same way a field change is. */
+  it("says a copy sent to the mutator still needs one, and disables the write when it is all there is", () => {
+    renderWrite({ ...withCopy, cloneMutatorOnly: ["armpw2"] });
+    expect(
+      screen
+        .getByRole("button", { name: "Write changes into the game" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByText(
+        "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place.",
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText(/you still need a mutator for it/)).toBeTruthy();
+    expect(screen.getByText("armpw2")).toBeTruthy();
   });
 
   it("holds every action off while the page reads the game again", async () => {

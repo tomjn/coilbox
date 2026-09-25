@@ -135,6 +135,10 @@ function buildProject(): ModProject {
     // A change sent through the mutator route because the edit-in-place
     // route cannot write it (issue #2633). The Rust model reads this one.
     mutatorOnly: { armcom: ["weapondefs.disintegrator.range"] },
+    // A whole copy sent through the mutator route because one of its changes
+    // has no edit a file can take (issue #3035). The Rust model reads this
+    // one too.
+    cloneMutatorOnly: ["supercom"],
     createdAt: "2026-09-08T11:44:47.201Z",
     updatedAt: "2026-09-08T11:47:21.638Z",
   };

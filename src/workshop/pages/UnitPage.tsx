@@ -110,6 +110,7 @@ import {
   moveBeforeInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
+import { isCloneMutatorOnly } from "../cloneMutatorOnly";
 import {
   addClone,
   deriveClone,
@@ -124,6 +125,7 @@ import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
 import type { FieldProbe } from "../inPlace";
 import { useInPlaceChecks } from "../inPlaceCheck";
+import { useCloneInPlaceCheck } from "../inPlaceCloneCheck";
 import { adoptChecksum, type InPlaceDone } from "../inPlaceProject";
 import { withLegoUnits } from "../legoUnits";
 import {
@@ -168,6 +170,7 @@ import {
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
+import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PackageMutatorButton } from "./components/PackageMutatorButton";
@@ -204,6 +207,7 @@ export default function UnitPage() {
     settleInPlaceAction,
     adoptInPlaceChecksum,
     routeThroughMutator,
+    routeCloneThroughMutator,
     recordPackagedVersion,
     updateProjectDetails,
   } = useModProjects();
@@ -474,6 +478,40 @@ export default function UnitPage() {
         routeThroughMutator(target.id, unitKey, row.path, on);
       },
     };
+  };
+
+  // Whether the copy on screen could be written into the game as a unit file
+  // of its own (issue #3035), asked while it is being edited the same way a
+  // game unit's fields are. Only a copy made from a unit in the game, under a
+  // name the game did not use: one that replaces a game unit or was built in
+  // the lego builder has no in-place form to check at all, and the write
+  // already reports it under "still needs a mutator" (`inplace.rs`).
+  const ownClone = ownClones[unitKey];
+  const cloneInPlaceDir =
+    game &&
+    isEditInPlaceEligible(game.primaryArchive.path) &&
+    ownClone?.source &&
+    !ownClone.replacesGameUnit
+      ? game.primaryArchive.path
+      : undefined;
+  const cloneSourceDef =
+    ownClone?.source && gameUnits[ownClone.source]
+      ? gameUnits[ownClone.source]
+      : undefined;
+  const cloneInPlaceCheck = useCloneInPlaceCheck(
+    cloneInPlaceDir,
+    defs?.checksum,
+    ownClone,
+    overrides[unitKey],
+    menus[unitKey],
+    cloneSourceDef,
+  );
+  const cloneRouted = isCloneMutatorOnly(project?.cloneMutatorOnly, unitKey);
+  const onRouteClone = (on: boolean) => {
+    const target =
+      project ??
+      startProject(defaultProjectName(gameName, projects), EMPTY_EDITS);
+    routeCloneThroughMutator(target.id, unitKey, on);
   };
 
   // Scroll to the field a link named, once the row for it is on the page
@@ -1518,6 +1556,18 @@ export default function UnitPage() {
                     Coilbox could not check which fields can be written into the
                     game's own files: {inPlaceChecks.error}
                   </p>
+                )}
+                {cloneInPlaceDir && (
+                  <CloneInPlaceNotice
+                    unitName={nameOf(unitKey, unit)}
+                    unwritable={cloneInPlaceCheck.check?.unwritable ?? null}
+                    checking={
+                      !cloneInPlaceCheck.check && !cloneInPlaceCheck.error
+                    }
+                    error={cloneInPlaceCheck.error}
+                    routed={cloneRouted}
+                    onRoute={onRouteClone}
+                  />
                 )}
                 <UnitFieldGroups
                   view={fields}
