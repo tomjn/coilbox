@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
+import type { PostNote } from "../../beforePost";
 import type { FieldRow, FieldView } from "../../unitSections";
 import {
   checkWeaponName,
@@ -56,6 +57,7 @@ export function WeaponLibraryDrawer({
   onDelete,
   onChange,
   onReset,
+  postOf,
   onOpenMount,
 }: {
   open: boolean;
@@ -72,6 +74,8 @@ export function WeaponLibraryDrawer({
   onDelete: (key: string) => void;
   onChange: (key: string, row: FieldRow, value: unknown) => void;
   onReset: (key: string, row: FieldRow) => void;
+  /** What the game's post files do to a weapon's field (issue #3057). */
+  postOf?: (key: string, row: FieldRow) => PostNote | undefined;
   onOpenMount: (mount: WeaponMount) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -325,6 +329,7 @@ export function WeaponLibraryDrawer({
               }}
               consumers={consumers}
               inheritedLabel="Copied value"
+              post={postOf && ((row) => postOf(selected.key, row))}
               onChange={(row, value) => onChange(selected.key, row, value)}
               onReset={(row) => onReset(selected.key, row)}
             />

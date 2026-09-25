@@ -102,7 +102,13 @@ import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
-import { adoptBeforePost, copiedFrom, type PostChange } from "../beforePost";
+import {
+  adoptBeforePost,
+  copiedFrom,
+  type PostChange,
+  type PostNote,
+  postNoteOf,
+} from "../beforePost";
 import {
   addToBuildMenu,
   applyBuildMenu,
@@ -515,6 +521,38 @@ export default function UnitPage() {
     : defs?.beforePost && (defs.beforePost.units[unitKey] ?? {});
   const gameWeaponBeforePost = (name: string): PostChange | undefined =>
     defs?.beforePost && (defs.beforePost.weaponDefs[name] ?? {});
+  // What the game's post files do to each field on screen, for the note
+  // beside it (issue #3057). Asked of the game's own unit, or of the one a
+  // copy was made from, since that is the unit the game post-processes. A copy
+  // whose source the game no longer has falls back on what it carries.
+  const postSource = ownClones[unitKey]?.source;
+  const unitPost: {
+    change: PostChange | undefined;
+    loaded: Record<string, unknown> | undefined;
+  } = !ownClones[unitKey]
+    ? { change: defs?.beforePost?.units[unitKey], loaded: gameUnits[unitKey] }
+    : postSource && defs?.beforePost && gameUnits[postSource]
+      ? {
+          change: defs.beforePost.units[postSource],
+          loaded: gameUnits[postSource],
+        }
+      : {
+          change: ownClones[unitKey].beforePost,
+          loaded: ownClones[unitKey].def,
+        };
+  const unitPostOf = (row: { path: string }): PostNote | undefined =>
+    postNoteOf(unitPost.change, row.path, unitPost.loaded);
+  const libraryPostOf = (
+    key: string | undefined,
+    row: { path: string },
+  ): PostNote | undefined => {
+    const weapon = key ? library[key] : undefined;
+    if (!weapon) return undefined;
+    const source = defs?.weaponDefs[weapon.source];
+    return defs?.beforePost && source
+      ? postNoteOf(defs.beforePost.weaponDefs[weapon.source], row.path, source)
+      : postNoteOf(weapon.beforePost, row.path, weapon.def);
+  };
   const slots = useMemo(
     () =>
       weaponSlots(
@@ -1318,6 +1356,7 @@ export default function UnitPage() {
     onUnequip: (s) => updateEquipped((e) => unequipWeapon(e, unitKey, s.step)),
     onChange: changeLibraryField,
     onReset: resetLibraryField,
+    postOf: libraryPostOf,
   };
   /** A slot that fires a library weapon, as the drawer lists it. */
   const describeMount = (mount: WeaponMount) => {
@@ -1569,6 +1608,7 @@ export default function UnitPage() {
           onDelete={deleteLibraryWeapon}
           onChange={changeLibraryField}
           onReset={resetLibraryField}
+          postOf={libraryPostOf}
           onOpenMount={(mount) => {
             setLibraryOpen(false);
             select({ unit: mount.unit, tab: "weapons", slot: mount.step });
@@ -1915,6 +1955,7 @@ export default function UnitPage() {
                     assets={assets}
                     inheritedLabel={inheritedLabel}
                     inPlace={inPlaceDir ? inPlaceOf : undefined}
+                    post={unitPostOf}
                     onSelect={(step) => select({ tab: "weapons", slot: step })}
                     onChange={changeField}
                     onReset={resetField}
@@ -2009,6 +2050,7 @@ export default function UnitPage() {
                     choices={choices}
                     warnings={warnings}
                     inheritedLabel={inheritedLabel}
+                    post={unitPostOf}
                     onChange={changeField}
                     onReset={resetField}
                   />

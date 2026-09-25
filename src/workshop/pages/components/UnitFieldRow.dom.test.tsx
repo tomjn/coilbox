@@ -134,3 +134,43 @@ describe("a row the edit-in-place route cannot write", () => {
     expect(onRoute).toHaveBeenCalledWith(false);
   });
 });
+
+/** Issue #3057. A field the game's post files change as it loads. */
+describe("a row the game's post files change", () => {
+  const drawPost = (
+    post: Parameters<typeof UnitFieldRow>[0]["post"],
+    readOnly = false,
+  ) =>
+    render(
+      <UnitFieldRow
+        row={row(field({}))}
+        post={post}
+        readOnly={readOnly}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+
+  it("says what the game does to its own value", () => {
+    drawPost({ kind: "changed", file: 0.1, loaded: 0.009 });
+    expect(
+      screen.getByText(
+        "The game changes this field as it loads. Its files say 0.1 and it loads as 0.009. It may change a value typed here too.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says when the game sets a field its own files leave unset", () => {
+    drawPost({ kind: "added", loaded: 0.3 });
+    expect(
+      screen.getByText(
+        "The game sets this field as it loads, to 0.3. Its own files leave it unset. It may change a value typed here too.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("says nothing on a row nobody can type into", () => {
+    drawPost({ kind: "changed", file: 0.1, loaded: 0.009 }, true);
+    expect(screen.queryByText(/loads as/)).toBeNull();
+  });
+});

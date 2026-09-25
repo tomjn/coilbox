@@ -30,9 +30,20 @@
  * change in the unit's own file is read only, with the reason and the file's
  * Lua a click away, and an offer to send that one change through the mutator
  * route instead (issue #2633). `InPlaceNote` below draws that.
+ *
+ * A field the game's own post files change as it loads says so, with what
+ * they do to the game's own value (issue #3057). The game runs them over a
+ * value typed here too, so the number typed is not always the number the game
+ * loads. `PostProcessedNote` below draws that.
  */
 import { Button, cn, Input } from "@picoframe/frame";
-import { FileLock2, FolderOpen, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  FileCog,
+  FileLock2,
+  FolderOpen,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -51,6 +62,7 @@ import {
   assetFieldOf,
   assetState,
 } from "../../assetFields";
+import type { PostNote } from "../../beforePost";
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldCheck, LuaExcerpt } from "../../inPlace";
 import type { FieldRow } from "../../unitSections";
@@ -332,6 +344,30 @@ function InPlaceNote({
 }
 
 /**
+ * What the game's post files do to this field as it loads (issue #3057).
+ *
+ * "May" because what they do to a typed value depends on the game's Lua and
+ * on the route the project reaches the game by: a mutator that ships its own
+ * `gamedata/unitdefs_post.lua` covers the game's (`postHook.ts`), and a copy
+ * or a tweak slot does not. So coilbox writes the value as typed and says so
+ * here rather than guessing at the number the game will load.
+ */
+function PostProcessedNote({ post }: { post: PostNote }) {
+  const what =
+    post.kind === "changed"
+      ? `The game changes this field as it loads. Its files say ${display(post.file)} and it loads as ${display(post.loaded)}.`
+      : post.loaded === undefined
+        ? "The game sets this field as it loads. Its own files leave it unset."
+        : `The game sets this field as it loads, to ${display(post.loaded)}. Its own files leave it unset.`;
+  return (
+    <span className="flex items-start gap-1 text-[10px] text-muted-foreground">
+      <FileCog className="mt-px size-3 shrink-0" />
+      <span>{what} It may change a value typed here too.</span>
+    </span>
+  );
+}
+
+/**
  * One row. `onChange` is handed the new value and is expected to drop the
  * override when it matches what was inherited, which is what `setOverride`
  * does, so this component never has to decide whether an edit is really an edit.
@@ -344,6 +380,7 @@ export function UnitFieldRow({
   warning,
   inheritedLabel = "Game value",
   inPlace,
+  post,
   readOnly: locked = false,
   onChange,
   onReset,
@@ -369,6 +406,9 @@ export function UnitFieldRow({
    *  and only when there is something to say: the field cannot be written in
    *  place, or its change was sent through the mutator route (issue #2633). */
   inPlace?: InPlaceField;
+  /** What the game's post files do to this field, when they change it (issue
+   *  #3057). Said only on a row that can be typed into. */
+  post?: PostNote;
   /** Shown and not offered, for a field nothing on this page can change, such
    *  as one on a weapon definition several units share (issue #2639). The
    *  reason is said once above the rows rather than on each of them. */
@@ -577,6 +617,9 @@ export function UnitFieldRow({
             field={inPlace}
             overridden={overridden}
           />
+        )}
+        {post && !readOnly && kind !== "raw" && (
+          <PostProcessedNote post={post} />
         )}
         {note && (
           <span className="flex flex-wrap items-baseline gap-x-1.5 text-[10px] text-muted-foreground">
