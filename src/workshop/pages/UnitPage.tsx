@@ -137,6 +137,13 @@ import {
 import { compatibilityState } from "../compatibility";
 import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
+import {
+  type DeathExplosion,
+  deathExplosions,
+  deathExplosionView,
+  explosionEditCount,
+  unitsExplodingAs,
+} from "../deathExplosions";
 import { unitDerivedStats, type WeaponInput } from "../derivedStats";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
@@ -198,6 +205,7 @@ import {
   equippedKey,
   equipRefusal,
   equipWeapon,
+  isDeathMount,
   libraryWeaponDef,
   mountsOf,
   removeLibraryWeapon,
@@ -219,6 +227,7 @@ import {
   type WeaponRef,
 } from "../weaponRefs";
 import {
+  type SlotDefinition,
   slotOfPath,
   supportingView,
   supportOfPath,
@@ -248,6 +257,7 @@ import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
 import { WeaponLibraryDrawer } from "./components/WeaponLibraryDrawer";
 import {
+  type ExplosionPanel,
   type SlotLibrary,
   WeaponSlotsPanel,
 } from "./components/WeaponSlotsPanel";
@@ -396,7 +406,7 @@ export default function UnitPage() {
     // and so does a supporting definition (issue #2641).
     const path = projectPath(started.id, unitKey);
     const kept = new URLSearchParams();
-    for (const key of ["tab", "slot", "support"]) {
+    for (const key of ["tab", "slot", "support", "explosion"]) {
       const value = params.get(key);
       if (value) kept.set(key, value);
     }
@@ -605,20 +615,46 @@ export default function UnitPage() {
       ? supportOfPath(supporting, fieldKey)
       : undefined;
   const tabParam = params.get("tab");
+  // The unit's two death explosions (issue #2642), named in the URL the same
+  // way a slot is.
+  const explosions = useMemo(
+    () => deathExplosions(unit, edited, weaponDefs, owners),
+    [unit, edited, weaponDefs, owners],
+  );
+  const explosionParam = params.get("explosion") ?? "";
   const tab: UnitTab =
     tabParam === "weapons" ||
-    (tabParam === null && (linkedSlot || linkedSupport))
+    (tabParam === null && (linkedSlot || linkedSupport || explosionParam))
       ? "weapons"
       : "fields";
   const slotParam = params.get("slot") ?? linkedSlot?.step;
   const supportParam =
     params.get("support") ?? (linkedSlot ? undefined : linkedSupport?.key);
   // A unit with nothing mounted and something carried opens on the first
-  // thing it carries.
+  // thing it carries, and one with neither on its death explosion.
   const support =
     supporting.find((s) => s.key === supportParam) ??
     (slots.length === 0 ? supporting[0] : undefined);
   const slot = slots.find((s) => s.step === slotParam) ?? slots[0];
+  const explosion =
+    (isDeathMount(explosionParam)
+      ? explosions.find((e) => e.mount === explosionParam)
+      : undefined) ??
+    (slots.length === 0 && !support ? explosions[0] : undefined);
+  const explosionFires = explosion
+    ? equippedKey(equipped, unitKey, explosion.mount)
+    : undefined;
+  const explosionShared =
+    explosion?.definition.kind === "shared" && !explosion.follows
+      ? explosion.definition.key
+      : undefined;
+  const explodingAs = useMemo(
+    () =>
+      explosionShared === undefined
+        ? 0
+        : unitsExplodingAs(gameUnits, weaponDefs, explosionShared),
+    [explosionShared, gameUnits, weaponDefs],
+  );
   const sharedName =
     slot?.definition.kind === "shared" ? slot.definition.key : undefined;
   const mountedBy = useMemo(
@@ -634,24 +670,59 @@ export default function UnitPage() {
   const firesKey = slot ? equippedKey(equipped, unitKey, slot.step) : undefined;
   const firesWeapon = firesKey ? library[firesKey] : undefined;
   const firesMounts = firesKey ? mountsOf(equipped, firesKey).length : 0;
+  /**
+   * What a copy of a death explosion is called (issue #2642): its own name
+   * with `_copy` on the end, numbered past any name the library or the
+   * unit's own definitions already use, since it goes into the unit's
+   * `weapondefs` under that name.
+   */
+  const explosionCopyKey = (e: DeathExplosion) =>
+    suggestWeaponKeyWhere(
+      e.definition.kind === "own" ? e.definition.key : e.name,
+      (key) =>
+        Object.hasOwn(library, key) ||
+        Object.keys(ownWeaponDefs(unit).defs).some(
+          (k) => k.toLowerCase() === key,
+        ),
+    );
+  const explosionFiresWeapon = explosionFires
+    ? library[explosionFires]
+    : undefined;
+  const explosionMounts = explosionFires
+    ? mountsOf(equipped, explosionFires).length
+    : 0;
+  const explosionKey = explosion ? explosionCopyKey(explosion) : "";
   const weaponView = useMemo(
     () =>
-      support
-        ? supportingView(support, overrides, unitKey, view, unitName)
-        : slot
-          ? weaponSlotView(
-              slot,
-              overrides,
-              unitKey,
-              view,
-              unitName,
-              mountedBy,
-              firesWeapon
-                ? { weapon: firesWeapon, mounts: firesMounts }
-                : undefined,
-            )
-          : null,
+      explosion
+        ? deathExplosionView(explosion, overrides, unitKey, view, unitName, {
+            fires: explosionFiresWeapon
+              ? { weapon: explosionFiresWeapon, mounts: explosionMounts }
+              : undefined,
+            usedBy: explodingAs,
+            copyKey: explosionKey,
+          })
+        : support
+          ? supportingView(support, overrides, unitKey, view, unitName)
+          : slot
+            ? weaponSlotView(
+                slot,
+                overrides,
+                unitKey,
+                view,
+                unitName,
+                mountedBy,
+                firesWeapon
+                  ? { weapon: firesWeapon, mounts: firesMounts }
+                  : undefined,
+              )
+            : null,
     [
+      explosion,
+      explosionFiresWeapon,
+      explosionMounts,
+      explodingAs,
+      explosionKey,
       support,
       slot,
       overrides,
@@ -1402,8 +1473,11 @@ export default function UnitPage() {
    * under the name the game's weapon table gives it. `undefined` for a slot
    * naming a weapon nothing defines.
    */
-  const slotCopy = (
-    s: WeaponSlot,
+  const slotCopy = (s: WeaponSlot) => definitionCopy(s.definition);
+  /** The same for any definition a unit names, a death explosion's included
+   *  (issue #2642). */
+  const definitionCopy = (
+    definition: SlotDefinition,
   ):
     | {
         source: string;
@@ -1411,7 +1485,6 @@ export default function UnitPage() {
         beforePost: PostChange | undefined;
       }
     | undefined => {
-    const definition = s.definition;
     if (definition.kind === "missing") return undefined;
     if (definition.kind === "shared")
       return {
@@ -1469,12 +1542,15 @@ export default function UnitPage() {
   };
   /** Copy a game weapon into the library with every weapon it names that the
    *  game can hand over (issue #2641), and fire it from a slot when one is
-   *  given, as one undo step. */
+   *  given, as one undo step. `then` is a change to the copy made in the same
+   *  step, which is how editing a shared death explosion copies it (issue
+   *  #2642). */
   const addToLibrary = (
     key: string,
     from: CopySource,
     childOf: (ref: WeaponRef) => CopySource | undefined,
     into?: { unit: string; step: string },
+    then?: (w: WeaponLibrary | undefined) => WeaponLibrary | undefined,
   ) => {
     const weapons = planLibraryCopy(
       key,
@@ -1492,9 +1568,10 @@ export default function UnitPage() {
       ),
     );
     commit((current) => {
-      const next = editSlot(current, "weapons", (w) =>
-        weapons.reduce(addLibraryWeapon, w),
-      );
+      const next = editSlot(current, "weapons", (w) => {
+        const added = weapons.reduce(addLibraryWeapon, w);
+        return then ? then(added) : added;
+      });
       return into
         ? editSlot(next, "equipped", (e) =>
             equipWeapon(e, into.unit, into.step, key),
@@ -1548,9 +1625,80 @@ export default function UnitPage() {
     onReset: resetLibraryField,
     postOf: libraryPostOf,
   };
+  /**
+   * The unit's death explosions (issue #2642). An edit to one the game
+   * shares copies it into the library under the name the page offered, makes
+   * the copy this unit's, and writes the edit to the copy, all as one undo
+   * step. After that it is a library weapon like any other.
+   */
+  const explosionCopyFrom = (e: DeathExplosion) =>
+    e.follows ? undefined : definitionCopy(e.definition);
+  const copyExplosion = (
+    e: DeathExplosion,
+    key: string,
+    then?: (w: WeaponLibrary | undefined) => WeaponLibrary | undefined,
+  ) => {
+    const from = explosionCopyFrom(e);
+    if (!from) return;
+    addToLibrary(
+      key,
+      from,
+      e.definition.kind === "own" ? unitChildOf : gameChildOf,
+      { unit: unitKey, step: e.mount },
+      then,
+    );
+  };
+  const explosionPanel: ExplosionPanel = {
+    entries: explosions,
+    selected: explosion?.mount,
+    equippedIn: (mount) => equippedKey(equipped, unitKey, mount),
+    editCount: (e) =>
+      explosionEditCount(
+        e,
+        overrides,
+        unitKey,
+        equippedKey(equipped, unitKey, e.mount),
+      ),
+    copyKey: explosionCopyKey,
+    onSelect: (mount) =>
+      select({ tab: "weapons", explosion: mount, slot: "", support: "" }),
+    onChange: (e, row, value) => {
+      const fires = equippedKey(equipped, unitKey, e.mount);
+      if (fires) return changeLibraryField(fires, row, value);
+      if (e.definition.kind === "own") return changeField(row, value);
+      if (e.definition.kind !== "shared" || e.follows) return;
+      const key = explosionCopyKey(e);
+      copyExplosion(e, key, (w) =>
+        setLibraryField(w, key, row.path, value, row.inherited),
+      );
+    },
+    onReset: (e, row) => {
+      const fires = equippedKey(equipped, unitKey, e.mount);
+      if (fires) resetLibraryField(fires, row);
+      else if (e.definition.kind === "own") resetField(row);
+    },
+    postOf: (e, row) => {
+      const fires = equippedKey(equipped, unitKey, e.mount);
+      if (fires) return libraryPostOf(fires, row);
+      if (e.definition.kind === "own") return unitPostOf(row);
+      if (e.definition.kind !== "shared" || !defs?.beforePost) return undefined;
+      return postNoteOf(
+        defs.beforePost.weaponDefs[e.definition.key],
+        row.path,
+        e.definition.def,
+      );
+    },
+    onCopy: (e, key) => copyExplosion(e, key),
+    onEquip: (e, key) =>
+      updateEquipped((eq) => equipWeapon(eq, unitKey, e.mount, key)),
+    onPutBack: (e) =>
+      updateEquipped((eq) => unequipWeapon(eq, unitKey, e.mount)),
+  };
   /** A slot that fires a library weapon, as the drawer lists it. */
   const describeMount = (mount: WeaponMount) => {
     const def = units[mount.unit];
+    if (isDeathMount(mount.step))
+      return `${nameOf(mount.unit, def)}, ${mount.step === "explodeas" ? "death explosion" : "self-destruct explosion"}`;
     const owners = [
       mount.unit,
       ...(clones[mount.unit]?.source
@@ -1800,12 +1948,23 @@ export default function UnitPage() {
           postOf={libraryPostOf}
           onOpenMount={(mount) => {
             setLibraryOpen(false);
-            select({
-              unit: mount.unit,
-              tab: "weapons",
-              slot: mount.step,
-              support: "",
-            });
+            select(
+              isDeathMount(mount.step)
+                ? {
+                    unit: mount.unit,
+                    tab: "weapons",
+                    explosion: mount.step,
+                    slot: "",
+                    support: "",
+                  }
+                : {
+                    unit: mount.unit,
+                    tab: "weapons",
+                    slot: mount.step,
+                    support: "",
+                    explosion: "",
+                  },
+            );
           }}
         />
       )}
@@ -2157,7 +2316,12 @@ export default function UnitPage() {
                     inPlace={inPlaceDir ? inPlaceOf : undefined}
                     post={unitPostOf}
                     onSelect={(step) =>
-                      select({ tab: "weapons", slot: step, support: "" })
+                      select({
+                        tab: "weapons",
+                        slot: step,
+                        support: "",
+                        explosion: "",
+                      })
                     }
                     onChange={changeField}
                     onReset={resetField}
@@ -2165,9 +2329,15 @@ export default function UnitPage() {
                     supporting={supporting}
                     selectedSupport={support?.key}
                     onSelectSupport={(key) =>
-                      select({ tab: "weapons", support: key, slot: "" })
+                      select({
+                        tab: "weapons",
+                        support: key,
+                        slot: "",
+                        explosion: "",
+                      })
                     }
                     problems={[...refIssues, ...armorProblems]}
+                    explosions={explosionPanel}
                   />
                 </TabsContent>
                 <TabsContent

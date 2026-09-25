@@ -27,8 +27,9 @@ export function EquipWeaponPopover({
   label,
   shared,
   unitName,
-  slotNumber,
+  usesCopy,
   copySource,
+  suggestedKey,
   library,
   equippedHere,
   mounts,
@@ -42,10 +43,15 @@ export function EquipWeaponPopover({
    *  when the copy is the thing to do and the button says so. */
   shared: boolean;
   unitName: string;
-  slotNumber: number;
+  /** What happens to the copy, finishing the sentence "Copies X into the
+   *  library, and": "weapon 2 fires the copy". */
+  usesCopy: string;
   /** The weapon the slot fires now, as the game names it, when there is one
    *  to copy. */
   copySource: string | undefined;
+  /** The name to offer for the copy, when the caller has picked one.
+   *  Otherwise one is made from `copySource`. */
+  suggestedKey?: string;
   library: WeaponLibrary;
   /** The library weapon this slot already fires, if any. */
   equippedHere: string | undefined;
@@ -61,7 +67,8 @@ export function EquipWeaponPopover({
 
   const toggle = (next: boolean) => {
     setOpen(next);
-    if (next && copySource) setName(suggestWeaponKey(copySource, library));
+    if (next && copySource)
+      setName(suggestedKey ?? suggestWeaponKey(copySource, library));
   };
 
   const check = checkWeaponName(name, library);
@@ -101,9 +108,8 @@ export function EquipWeaponPopover({
               </h3>
               <p className="text-xs text-muted-foreground">
                 Copies <span className="font-mono">{copySource}</span> as it
-                stands into the project's weapon library, and weapon{" "}
-                {slotNumber} fires the copy. Changing the copy changes no other
-                unit.
+                stands into the project's weapon library, and {usesCopy}.
+                Changing the copy changes no other unit.
               </p>
             </div>
             <Field
@@ -170,7 +176,7 @@ export function EquipWeaponPopover({
                       <span className="font-mono text-xs">{weapon.key}</span>
                       <span className="text-xs font-normal text-muted-foreground">
                         {why ??
-                          `Copied from ${weapon.source}${fired > 0 ? `, fired by ${fired} slot${fired === 1 ? "" : "s"}` : ""}`}
+                          `Copied from ${weapon.source}${fired > 0 ? `, equipped in ${fired} place${fired === 1 ? "" : "s"}` : ""}`}
                       </span>
                     </Button>
                   </li>
