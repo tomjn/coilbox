@@ -214,33 +214,56 @@ fn resolve_original(game_dir: &Path, stem: &str) -> Option<PathBuf> {
     })
 }
 
-/// Every `.lua` file under `root`. Balanced Annihilation, Basically OTA (via
-/// XTA) and every other Recoil-era game coilbox has been tested against write
-/// unit definitions as Lua tables. The old Total Annihilation `.fbi`/`.tdf`
-/// key=value shape has no quoted strings to match the same way, and is out
-/// of scope here.
-fn lua_files_under(root: &Path) -> Vec<PathBuf> {
+/// Every `.lua` and `.fbi` file under `root`. Balanced Annihilation and most
+/// Recoil-era games write unit definitions as Lua tables. XTA and Basically
+/// OTA still write them in Total Annihilation's `.fbi` format (issue #2630).
+fn def_files_under(root: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
-    walk_lua(root, &mut out);
+    walk_defs(root, &mut out);
     out
 }
 
-fn walk_lua(at: &Path, out: &mut Vec<PathBuf>) {
+fn walk_defs(at: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(at) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            walk_lua(&path, out);
+            walk_defs(&path, out);
         } else if path
             .extension()
             .and_then(|e| e.to_str())
-            .is_some_and(|e| e.eq_ignore_ascii_case("lua"))
+            .is_some_and(|e| e.eq_ignore_ascii_case("lua") || is_fbi_ext(e))
         {
             out.push(path);
         }
     }
+}
+
+fn is_fbi_ext(ext: &str) -> bool {
+    ext.eq_ignore_ascii_case("fbi")
+}
+
+/// [`patch_objectnames`] for an `.fbi` file's bytes (issue #2630), where the
+/// field is an unquoted `Objectname=ARMDRAG.3do` in its `[UNITINFO]`
+/// section. Goes through `coilbox_tdf`, which reads the file as the engine
+/// does and refuses to change anything but that one value. A file that is not
+/// UTF-8 is written back in the bytes it came in.
+fn patch_fbi_objectname(bytes: &[u8], stems: &BTreeSet<String>) -> Option<Vec<u8>> {
+    let (text, encoding) = coilbox_tdf::decode(bytes);
+    let path = ["UNITINFO", "objectname"];
+    let doc = coilbox_tdf::parse(&text).ok()?;
+    let value = doc.lookup(&path).ok()??.value.trim().to_string();
+    if value.len() < 4 || !value[value.len() - 4..].eq_ignore_ascii_case(".3do") {
+        return None;
+    }
+    let base = &value[..value.len() - 4];
+    if !stems.contains(&base.replace('\\', "/").to_ascii_lowercase()) {
+        return None;
+    }
+    let change = coilbox_tdf::set(&text, &path, base).ok()?;
+    encoding.encode(&change.text)
 }
 
 /// Rewrite the first `objectname` field on `line` in place, if it names a
@@ -345,11 +368,23 @@ pub fn install(game_dir: &Path, out_dir: &Path) -> Result<InstallOutcome, String
     }
 
     let mut unit_defs_patched = Vec::new();
-    for path in lua_files_under(game_dir) {
-        let Ok(text) = std::fs::read_to_string(&path) else {
+    for path in def_files_under(game_dir) {
+        let Ok(bytes) = std::fs::read(&path) else {
             continue;
         };
-        let Some(patched) = patch_objectnames(&text, &stems_lower) else {
+        let fbi = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(is_fbi_ext);
+        let patched = if fbi {
+            patch_fbi_objectname(&bytes, &stems_lower)
+        } else {
+            std::str::from_utf8(&bytes)
+                .ok()
+                .and_then(|text| patch_objectnames(text, &stems_lower))
+                .map(String::into_bytes)
+        };
+        let Some(patched) = patched else {
             continue;
         };
         let backup = backup_path(&path);
@@ -549,6 +584,30 @@ mod tests {
         assert_eq!(
             untouched,
             "return {\n armcom = {\n  objectname = \"ARMCOM\",\n },\n}\n"
+        );
+    }
+
+    /// Issue #2630. The same case in Total Annihilation's `.fbi` format, with
+    /// its Windows line endings, which only the one value changes.
+    #[test]
+    fn strips_the_extension_from_an_fbi_unit_definition_and_undo_puts_it_back() {
+        let (game, out) = fixture("fbi");
+        std::fs::remove_file(game.join("units/armdrag.lua")).unwrap();
+        let before = "[UNITINFO]\r\n{\r\n\tUnitname=ARMDRAG;\r\n\tObjectname=ARMDRAG.3do;\r\n\tMaxDamage=2000;\r\n}\r\n";
+        write(&game.join("units/ARMDRAG.FBI"), before);
+
+        let outcome = install(&game, &out).expect("install");
+
+        assert_eq!(outcome.unit_defs_patched, vec!["units/ARMDRAG.FBI"]);
+        assert_eq!(
+            std::fs::read_to_string(game.join("units/ARMDRAG.FBI")).unwrap(),
+            before.replacen("Objectname=ARMDRAG.3do;", "Objectname=ARMDRAG;", 1)
+        );
+
+        undo(&game).expect("undo");
+        assert_eq!(
+            std::fs::read_to_string(game.join("units/ARMDRAG.FBI")).unwrap(),
+            before
         );
     }
 

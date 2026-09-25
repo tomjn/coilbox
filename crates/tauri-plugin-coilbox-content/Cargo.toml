@@ -21,6 +21,8 @@ coilbox-proc = { path = "../coilbox-proc" }
 # The backup-before-write helpers the .3do installer shares with the
 # workshop's edit-in-place route (issue #2635).
 coilbox-gamebackup = { path = "../coilbox-gamebackup" }
+# Reads and edits an `.fbi` unit definition's objectname (issue #2630).
+coilbox-tdf = { path = "../coilbox-tdf" }
 flate2 = "1"
 notify = "8"
 zip = { workspace = true }

@@ -1,0 +1,50 @@
+[UNITINFO]
+{
+	Name=Dagger;
+	Unitname=dagger;
+	Description=Light ship with dual kinetics;
+
+	// Required Tags
+	power=30;
+	mass=60;
+	icontype=dagger;
+	Category=SMALL WEAK TARGET ANY CHASE;
+	FootprintX=1;
+	FootprintZ=1;
+	MaxDamage=650;
+	ObjectName=dagger.s3o;
+	//BuildPic=dagger.tga;
+	SoundCategory=FIGHTER;
+	collisionVolumeScales=16 6 22;
+
+	// Movement
+	canFly=1;
+	Acceleration=.08;
+	MaxVelocity=2.4;
+
+	// Weapons
+	Weapon1=KLight;
+	OnlyTargetCategory1=TARGET;
+	WeaponMainDir1=0 0 1;
+	MaxAngleDif1=30;
+
+	Weapon2=KLight;
+	OnlyTargetCategory2=TARGET;
+	WeaponMainDir2=0 0 11;
+	MaxAngleDif2=30;
+
+	ExplodeAs=RetroDeathSmall;
+
+	// Misc
+	SmoothAnim=0;
+
+	[SFXTypes]
+	{
+		explosiongenerator0 = custom:damage_fire;
+		explosiongenerator1 = custom:death_small;
+	}
+	[customParams] {
+		type=small;
+		cost=200;
+	}
+}

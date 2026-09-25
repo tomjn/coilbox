@@ -15,6 +15,8 @@ full_moon = { version = "2.2.0", default-features = false }
 # Evaluates the file before and after the edit, to prove only the edited field
 # changed.
 coilbox-springlua = { path = "../coilbox-springlua" }
+# Reads and edits units written in the old `.fbi` format (issue #2638).
+coilbox-tdf = { path = "../coilbox-tdf" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
