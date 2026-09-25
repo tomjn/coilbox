@@ -6652,6 +6652,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-coilbox-unitsync",
  "tempfile",
  "zip 8.6.0",
 ]

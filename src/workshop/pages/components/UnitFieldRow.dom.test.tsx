@@ -155,7 +155,7 @@ describe("a row the game's post files change", () => {
     drawPost({ kind: "changed", file: 0.1, loaded: 0.009 });
     expect(
       screen.getByText(
-        "The game changes this field as it loads. Its files say 0.1 and it loads as 0.009. It may change a value typed here too.",
+        "The game changes this field as it loads. Its files say 0.1 and it loads as 0.009. It may change a value typed here too. A mutator archive gets a value the game turns into the typed one, where loading the game proves it. Beyond All Reason's tweak slots and edit in place write it as typed.",
       ),
     ).toBeTruthy();
   });
@@ -164,7 +164,7 @@ describe("a row the game's post files change", () => {
     drawPost({ kind: "added", loaded: 0.3 });
     expect(
       screen.getByText(
-        "The game sets this field as it loads, to 0.3. Its own files leave it unset. It may change a value typed here too.",
+        "The game sets this field as it loads, to 0.3. Its own files leave it unset. It may change a value typed here too. A mutator archive gets a value the game turns into the typed one, where loading the game proves it. Beyond All Reason's tweak slots and edit in place write it as typed.",
       ),
     ).toBeTruthy();
   });

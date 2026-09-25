@@ -40,6 +40,8 @@ import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ConfigOption } from "@/content/bindings";
+import { useUnitsyncScan } from "@/content/config";
+import { usePreferredTarget } from "@/play/config";
 import {
   type BarSlotPack,
   barSlotFit,
@@ -52,6 +54,7 @@ import {
   restrictEditsToUnits,
 } from "../../collections";
 import { useCompiledProject } from "../../compile";
+import { settledSummary, settleTypedValues } from "../../loadsAs";
 import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
@@ -60,8 +63,9 @@ import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 type Phase =
   | { state: "idle" }
   | { state: "checking" }
+  | { state: "settling" }
   | { state: "packaging" }
-  | { state: "done"; path: string; version: number }
+  | { state: "done"; path: string; version: number; typedNote: string | null }
   | { state: "failed"; message: string };
 
 type ExportMode = "mutator" | "bar";
@@ -273,8 +277,16 @@ export function PackageMutatorButton({
 }) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
-  const busy = phase.state === "checking" || phase.state === "packaging";
+  const busy =
+    phase.state === "checking" ||
+    phase.state === "settling" ||
+    phase.state === "packaging";
   const [mode, setMode] = useState<ExportMode>("mutator");
+  // The game, so typed values can be checked against it before packaging
+  // (issue #3059).
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const game = scan.data?.games.find((g) => g.name === project.gameName);
 
   // Restrict what gets compiled to one collection's units (issue #2654), or
   // "" for the whole project. Drawer-local rather than the page's own active
@@ -335,14 +347,39 @@ export function PackageMutatorButton({
         return;
       }
 
+      // A value the game's own Lua would turn into something else is written
+      // as one it turns into the typed number, checked by loading the game
+      // with these very files (issue #3059).
+      setPhase({ state: "settling" });
+      const settled =
+        target && game
+          ? await settleTypedValues({
+              enginePath: target.enginePath,
+              dataDir: target.dataDir,
+              archive: game.primaryArchive.name,
+              project: scopedProject,
+            })
+          : ({
+              ok: false,
+              message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+            } as const);
+
       setPhase({ state: "packaging" });
       const written = await workshopPackageMutator({
         project: scopedProject,
         version: nextVersion,
         dest,
+        written: settled.ok ? settled.settled.written : undefined,
       });
       onPackaged(written.version);
-      setPhase({ state: "done", path: written.path, version: written.version });
+      setPhase({
+        state: "done",
+        path: written.path,
+        version: written.version,
+        typedNote: settled.ok
+          ? settledSummary(settled.settled)
+          : settled.message,
+      });
     } catch (error) {
       setPhase({
         state: "failed",
@@ -444,11 +481,13 @@ export function PackageMutatorButton({
                   <Package className="size-4" />
                   {phase.state === "checking"
                     ? "Checking"
-                    : phase.state === "packaging"
-                      ? "Writing the archive"
-                      : nothingToPackage
-                        ? "Nothing to package yet"
-                        : "Save as .sdz…"}
+                    : phase.state === "settling"
+                      ? "Checking typed values against the game"
+                      : phase.state === "packaging"
+                        ? "Writing the archive"
+                        : nothingToPackage
+                          ? "Nothing to package yet"
+                          : "Save as .sdz…"}
                 </Button>
               </div>
 
@@ -468,6 +507,7 @@ export function PackageMutatorButton({
                   <p className="break-all">
                     <code>{phase.path}</code>
                   </p>
+                  {phase.typedNote ? <p>{phase.typedNote}</p> : null}
                 </div>
               ) : null}
             </>

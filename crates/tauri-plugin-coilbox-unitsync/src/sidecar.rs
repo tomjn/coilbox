@@ -221,6 +221,25 @@ pub fn build_unit_defs_args(
     args
 }
 
+/// Build args for `--defs-probe` mode: the game to load and the JSON file
+/// holding the runs (issue #3059).
+pub fn build_defs_probe_args(
+    lib: &str,
+    datadir: &str,
+    game: &str,
+    source_file: &str,
+) -> Vec<String> {
+    let mut args = build_args(lib, datadir);
+    args.extend(
+        coilbox_unitsync_worker::Mode::DefsProbe(coilbox_unitsync_worker::DefsProbeArgs {
+            game: game.into(),
+            source_file: source_file.into(),
+        })
+        .to_args(),
+    );
+    args
+}
+
 /// Build args for `--custom-params` mode: the game whose Lua to index for
 /// custom parameter consumers, plus the optional on-disk info-blob cache dir.
 ///
@@ -1562,6 +1581,22 @@ mod tests {
         assert!(!without.iter().any(|x| x == "--cache-dir"));
         let recovered = UnitDefsArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
+    }
+
+    #[test]
+    fn build_defs_probe_args_round_trips_through_the_worker_s_own_parser() {
+        use coilbox_unitsync_worker::DefsProbeArgs;
+
+        let a = build_defs_probe_args("/eng/libunitsync.so", "/data", "BA.sdz", "/tmp/p.json");
+        assert!(a.contains(&"--defs-probe".to_string()));
+        assert!(!a.contains(&"--unit-defs".to_string()));
+        assert_eq!(
+            DefsProbeArgs::from_args(&a).expect("valid argv"),
+            DefsProbeArgs {
+                game: "BA.sdz".into(),
+                source_file: "/tmp/p.json".into(),
+            }
+        );
     }
 
     /// What `build_custom_params_args` writes, the worker's own `from_args`

@@ -30,6 +30,10 @@ use std::path::PathBuf;
 
 use coilbox_springlua::SpringLua;
 use serde_json::{json, Map, Value};
+use tauri_plugin_coilbox_workshop::loads_as::{
+    compile_written, settle, DefTable, Outcome, Precision, ProbeReading, ProbeResult, ProbeRun,
+    TypedField,
+};
 use tauri_plugin_coilbox_workshop::{compile, ModProject};
 
 #[allow(dead_code)]
@@ -532,6 +536,132 @@ fn a_typed_value_loads_changed_and_by_how_much_depends_on_the_route_in_balanced_
         (beside - 0.15).abs() < 1e-6,
         "beside a change: got {beside}"
     );
+}
+
+/// A value at `path` inside `value`, the way the engine reads one: any
+/// spelling of a key, and a step of digits as a position counted from zero
+/// in a list.
+fn read_path<'a>(value: &'a Value, path: &[String]) -> Option<&'a Value> {
+    let mut at = value;
+    for step in path {
+        at = match at {
+            Value::Array(items) => items.get(step.parse::<usize>().ok()?)?,
+            Value::Object(map) => map.get(step).or_else(|| {
+                map.iter()
+                    .find(|(k, _)| k.eq_ignore_ascii_case(step))
+                    .map(|(_, v)| v)
+            })?,
+            _ => return None,
+        };
+    }
+    Some(at)
+}
+
+/// The loader `loads_as::settle` is handed in the app is the unitsync
+/// worker, which runs the engine's own Lua. This one loads `game` the way
+/// [`load`] does, in a stock Lua whose numbers are doubles.
+fn loader(game: &Game) -> impl FnMut(&[ProbeRun]) -> Result<Vec<ProbeResult>, String> + '_ {
+    move |runs: &[ProbeRun]| {
+        Ok(runs
+            .iter()
+            .map(|run| {
+                let files: Vec<(String, String)> = run
+                    .files
+                    .iter()
+                    .map(|f| (f.path.clone(), f.contents.clone()))
+                    .collect();
+                let loaded = load(game, &files);
+                let reads = run
+                    .reads
+                    .iter()
+                    .map(|read| {
+                        let table = match read.table {
+                            DefTable::Units => &loaded.units,
+                            DefTable::Weapons => &loaded.weapons,
+                        };
+                        let value = table
+                            .iter()
+                            .find(|(k, _)| k.eq_ignore_ascii_case(&read.key))
+                            .and_then(|(_, def)| read_path(def, &read.path))
+                            .and_then(Value::as_f64);
+                        ProbeReading {
+                            value,
+                            equal: value == Some(read.expect),
+                        }
+                    })
+                    .collect();
+                ProbeResult { reads, error: None }
+            })
+            .collect())
+    }
+}
+
+/// A crater multiplier typed on a copy of the Big Bertha loads as exactly the
+/// typed value on the mutator route (issue #3059), both with the copy alone
+/// in the project and beside a field change that makes the mutator cover the
+/// game's `unitdefs_post.lua`. The two routes need different written values,
+/// and each is checked by loading the game with the files the mutator would
+/// carry, the same way it was worked out.
+fn typed_crater_multiplier_loads_as_typed(game: &Game) {
+    let alone = load(game, &[]);
+    let mut clone = copied_unit(&alone, "armbrtha", "armbrtha2");
+    clone["def"]["weapondefs"]["arm_berthacannon"]["cratermult"] = json!(0.5);
+    let typed = json!({ "armbrtha2": { "weapondefs.arm_berthacannon.cratermult": 0.5 } });
+    let mut beside = typed.clone();
+    beside["armcom"] = json!({ "maxdamage": 3001 });
+    let mut written_values = Vec::new();
+    for overrides in [typed, beside] {
+        let project: ModProject = serde_json::from_value(json!({
+            "name": "TEST loads as typed (delete me)",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "edits": { "clones": { "armbrtha2": clone.clone() }, "overrides": overrides },
+        }))
+        .expect("parse");
+        let settled = settle(&project, Precision::F64, &mut loader(game)).expect("settle");
+        let files: Vec<(String, String)> = compile_written(&project, &settled.written)
+            .files
+            .into_iter()
+            .map(|file| (file.path, file.contents))
+            .collect();
+        let modded = load(game, &files);
+        assert_eq!(
+            cratermult(&modded.weapons, "armbrtha2_arm_berthacannon"),
+            json!(0.5),
+            "{:?}",
+            settled.fields
+        );
+        let report = settled
+            .fields
+            .iter()
+            .find(|f| matches!(&f.field, TypedField::Unit { unit, .. } if unit == "armbrtha2"))
+            .expect("the crater multiplier");
+        assert_eq!(report.outcome, Outcome::Written);
+        written_values.push(report.written.expect("a written value"));
+        // The unit field on the game's own unit needs nothing.
+        assert!(settled
+            .fields
+            .iter()
+            .filter(|f| matches!(&f.field, TypedField::Unit { unit, .. } if unit == "armcom"))
+            .all(|f| f.outcome == Outcome::AsTyped));
+    }
+    assert_ne!(
+        written_values[0], written_values[1],
+        "the two routes need different values"
+    );
+}
+
+#[test]
+fn a_typed_value_loads_as_typed_on_the_mutator_route() {
+    typed_crater_multiplier_loads_as_typed(&model_game());
+}
+
+#[test]
+fn a_typed_value_loads_as_typed_on_the_mutator_route_in_balanced_annihilation() {
+    let Some(game) = balanced_annihilation() else {
+        eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
+        return;
+    };
+    typed_crater_multiplier_loads_as_typed(&game);
 }
 
 #[test]

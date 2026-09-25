@@ -69,6 +69,7 @@ mod diff;
 mod inplace;
 mod inplace_clone;
 mod ledger;
+pub mod loads_as;
 mod lua;
 mod model;
 mod mutator;
@@ -138,9 +139,17 @@ pub struct TestMutatorResult {
 /// supports. An empty compile (a project with no edits, or one whose only
 /// edits are text that cannot compile to a mutator at all) is refused rather
 /// than writing an empty archive: there is nothing to test.
+///
+/// `written` is what `workshop_settle_typed_values` worked out for this
+/// project (issue #3059): values the game's post files turn into the typed
+/// ones, each proven by loading the game with exactly these files.
 #[tauri::command]
-fn workshop_test_mutator(data_dir: String, project: ModProject) -> CliResult {
-    let compiled = compile(&project);
+fn workshop_test_mutator(
+    data_dir: String,
+    project: ModProject,
+    written: Option<loads_as::Written>,
+) -> CliResult {
+    let compiled = loads_as::compile_written(&project, &written.unwrap_or_default());
     if compiled.files.is_empty() {
         return CliResult::err(
             "This project has no edits a mutator archive can carry, so there is nothing to test.",
@@ -179,8 +188,16 @@ pub struct PackagedMutatorResult {
 /// there is nothing to package, and refused again when preflight finds a
 /// blocker: a file going out to other people is exactly the case a blocker
 /// should stop rather than only flag (issue #2748).
+///
+/// `written` is as `workshop_test_mutator` takes it (issue #3059).
 #[tauri::command]
-fn workshop_package_mutator(project: ModProject, version: u32, dest: String) -> CliResult {
+fn workshop_package_mutator(
+    project: ModProject,
+    version: u32,
+    dest: String,
+    written: Option<loads_as::Written>,
+) -> CliResult {
+    let project = loads_as::with_written(&project, &written.unwrap_or_default());
     let compiled = compile(&project);
     if compiled.files.is_empty() {
         return CliResult::err(
@@ -271,6 +288,68 @@ fn workshop_decode_tweak_set(entries: BTreeMap<String, String>) -> CliResult {
 #[tauri::command]
 fn workshop_change_ledger(project: ModProject) -> CliResult {
     envelope(&ledger::build_ledger(&project))
+}
+
+/// What `workshop_settle_typed_values` answers with.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SettledResult {
+    #[serde(flatten)]
+    settled: loads_as::Settled,
+    /// How long the whole thing took, loads and all.
+    elapsed_ms: u64,
+}
+
+/// What the unitsync worker's `--defs-probe` mode prints.
+#[derive(serde::Deserialize)]
+struct ProbeOutput {
+    #[serde(default)]
+    runs: Vec<loads_as::ProbeResult>,
+    #[serde(default)]
+    errors: Vec<String>,
+}
+
+/// Work out, for every number a project typed, a value that the game at
+/// `archive` loads as that number on the mutator route, proven by loading the
+/// game with the compiled mutator on top (issue #3059). Loads the game at
+/// least once whenever the project types a number, so it is asked for before
+/// a test or a package rather than on every keystroke.
+#[tauri::command]
+async fn workshop_settle_typed_values(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    project: ModProject,
+) -> CliResult {
+    blocking("settle", move || {
+        let start = std::time::Instant::now();
+        let mut load = |runs: &[loads_as::ProbeRun]| {
+            let input = serde_json::to_string(&serde_json::json!({ "runs": runs }))
+                .map_err(|e| format!("could not write the probe: {e}"))?;
+            let out = tauri_plugin_coilbox_unitsync::defs_probe_blocking(
+                &engine_path,
+                &data_dir,
+                &archive,
+                &input,
+            )?;
+            let out: ProbeOutput = serde_json::from_str(&out)
+                .map_err(|e| format!("could not read the probe's answer: {e}"))?;
+            if out.runs.len() != runs.len() {
+                return Err(if out.errors.is_empty() {
+                    "the game could not be loaded".to_string()
+                } else {
+                    out.errors.join("; ")
+                });
+            }
+            Ok(out.runs)
+        };
+        let settled = loads_as::settle(&project, loads_as::Precision::F32, &mut load)?;
+        Ok(SettledResult {
+            settled,
+            elapsed_ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+        })
+    })
+    .await
 }
 
 /// Run a blocking in-place operation off the async runtime and wrap its
@@ -399,7 +478,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_accept_in_place,
             workshop_check_in_place,
             workshop_check_clone_in_place,
-            workshop_in_place_diffs
+            workshop_in_place_diffs,
+            workshop_settle_typed_values
         ])
         .build()
 }
@@ -460,6 +540,7 @@ mod tests {
         let written = unwrap_as_the_frontend_does(workshop_test_mutator(
             dir.path().to_string_lossy().into_owned(),
             project.clone(),
+            None,
         ));
         assert!(written.get("files").is_some_and(Value::is_array));
 
@@ -468,6 +549,7 @@ mod tests {
             project.clone(),
             1,
             dest.to_string_lossy().into_owned(),
+            None,
         ));
         assert!(packaged.get("files").is_some_and(Value::is_array));
         assert_eq!(packaged["version"], Value::from(1));
@@ -490,6 +572,34 @@ mod tests {
 
         let ledger = unwrap_as_the_frontend_does(workshop_change_ledger(saved_project()));
         assert!(ledger.get("units").is_some_and(Value::is_array));
+    }
+
+    /// A written value reaches the test mutator's files in place of the typed
+    /// one, and only while the project still holds that typed value (issue
+    /// #3059).
+    #[test]
+    fn the_test_mutator_writes_what_settling_worked_out() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "TEST written (delete me)",
+            "gameName": "g",
+            "edits": { "overrides": { "armcom": { "maxdamage": 0.5 } } },
+        }))
+        .expect("parse");
+        let written: loads_as::Written = serde_json::from_value(serde_json::json!({
+            "units": { "armcom": { "maxdamage": { "typed": 0.5, "written": 5.5 } } }
+        }))
+        .expect("parse");
+        let dir = tempfile::tempdir().expect("temp dir");
+        let out = unwrap_as_the_frontend_does(workshop_test_mutator(
+            dir.path().to_string_lossy().into_owned(),
+            project,
+            Some(written),
+        ));
+        let post = std::path::Path::new(out["dir"].as_str().expect("a dir"))
+            .join("gamedata/unitdefs_post.lua");
+        let text = std::fs::read_to_string(post).expect("the post file");
+        assert!(text.contains("5.5"), "{text}");
+        assert!(!text.contains("0.5,"), "{text}");
     }
 
     /// The in-place commands answer in the same envelope (issue #2635), and a
@@ -595,6 +705,7 @@ mod tests {
         let result = workshop_test_mutator(
             std::env::temp_dir().to_string_lossy().into_owned(),
             ModProject::default(),
+            None,
         );
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
@@ -615,6 +726,7 @@ mod tests {
             ModProject::default(),
             1,
             dest.to_string_lossy().into_owned(),
+            None,
         );
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
@@ -644,7 +756,8 @@ mod tests {
         .expect("parse");
         let dest = std::env::temp_dir().join("cbx-workshop-package-blocker-test.sdz");
 
-        let result = workshop_package_mutator(project, 1, dest.to_string_lossy().into_owned());
+        let result =
+            workshop_package_mutator(project, 1, dest.to_string_lossy().into_owned(), None);
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));

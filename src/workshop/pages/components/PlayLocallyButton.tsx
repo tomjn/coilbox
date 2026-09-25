@@ -37,6 +37,7 @@ import {
 } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
 import { useCompiledProject } from "../../compile";
+import { settledSummary, settleTypedValues } from "../../loadsAs";
 import { barRouteAvailable, barTweakModOptions } from "../../localBar";
 import { workshopTestMutator } from "../../mutator";
 import { workshopPreflight } from "../../preflight";
@@ -49,6 +50,7 @@ type Route = "bar-tweak" | "mutator";
 
 type Phase =
   | { state: "idle" }
+  | { state: "settling" }
   | { state: "writing" }
   | { state: "scanning" }
   | { state: "playing" }
@@ -56,6 +58,7 @@ type Phase =
   | { state: "failed"; message: string };
 
 const BUSY_LABEL: Record<string, string> = {
+  settling: "Checking typed values against the game",
   writing: "Writing the test game",
   scanning: "Letting the engine find it",
   playing: "Game running",
@@ -130,7 +133,11 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
         : "mutator";
 
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
+  // What the mutator route did about typed values the game's own Lua would
+  // change (issue #3059), for the run under way or the last one.
+  const [typedNote, setTypedNote] = useState<string | null>(null);
   const busy =
+    phase.state === "settling" ||
     phase.state === "writing" ||
     phase.state === "scanning" ||
     phase.state === "playing";
@@ -154,6 +161,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
   async function run() {
     if (!target || !game || !map) return;
     const route = selectedRoute;
+    setTypedNote(null);
     setPhase({ state: "writing" });
     try {
       // Nothing reaches the engine unchecked (issue #1276). A blocker is
@@ -177,9 +185,24 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
       if (route === "bar-tweak") {
         modOptions = barTweakModOptions(compiled.compiled);
       } else {
+        // A value the game's own Lua would turn into something else is
+        // written as one it turns into the typed number, checked by loading
+        // the game with these very files (issue #3059).
+        setPhase({ state: "settling" });
+        const settled = await settleTypedValues({
+          enginePath: target.enginePath,
+          dataDir: target.dataDir,
+          archive: game.primaryArchive.name,
+          project,
+        });
+        setTypedNote(
+          settled.ok ? settledSummary(settled.settled) : settled.message,
+        );
+        setPhase({ state: "writing" });
         const written = await workshopTestMutator({
           dataDir: target.dataDir,
           project,
+          written: settled.ok ? settled.settled.written : undefined,
         });
         dir = written.dir;
         setPhase({ state: "scanning" });
@@ -318,6 +341,10 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
 
           {phase.state === "failed" ? (
             <p className="text-xs text-destructive">{phase.message}</p>
+          ) : null}
+
+          {typedNote ? (
+            <p className="text-xs text-muted-foreground">{typedNote}</p>
           ) : null}
 
           {phase.state === "done" ? (

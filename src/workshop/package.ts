@@ -13,6 +13,7 @@
  * dialog picked.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
 /** What `workshop_package_mutator` wrote. */
@@ -32,7 +33,7 @@ export interface PackagedMutatorResult {
  * people is exactly the case a blocker should stop rather than only flag.
  */
 export const workshopPackageMutator = defineCommand<
-  { project: ModProject; version: number; dest: string },
+  { project: ModProject; version: number; dest: string; written?: Written },
   PackagedMutatorResult
 >("coilbox-workshop", "workshop_package_mutator");
 

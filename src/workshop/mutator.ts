@@ -14,6 +14,7 @@
  * ever wrote.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
+import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
 /** What `workshop_test_mutator` wrote. */
@@ -32,6 +33,6 @@ export interface TestMutatorResult {
  * carry, since there would be nothing to test.
  */
 export const workshopTestMutator = defineCommand<
-  { dataDir: string; project: ModProject },
+  { dataDir: string; project: ModProject; written?: Written },
   TestMutatorResult
 >("coilbox-workshop", "workshop_test_mutator");

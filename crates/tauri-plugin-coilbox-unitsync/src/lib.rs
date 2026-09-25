@@ -18,10 +18,10 @@ use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
     build_config_args, build_config_set_args, build_convert_3do_args, build_custom_params_args,
-    build_faction_logos_args, build_game_args, build_game_headers_args, build_height_field_args,
-    build_heightmap_args, build_lua_args, build_lua_repl_args, build_map_info_args,
-    build_map_meta_args, build_map_skybox_args, build_metalmap_args, build_minimap_args,
-    build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
+    build_defs_probe_args, build_faction_logos_args, build_game_args, build_game_headers_args,
+    build_height_field_args, build_heightmap_args, build_lua_args, build_lua_repl_args,
+    build_map_info_args, build_map_meta_args, build_map_skybox_args, build_metalmap_args,
+    build_minimap_args, build_skirmish_ai_args, build_thumbnails_args, build_unit_buildpics_args,
     build_unit_dataset_args, build_unit_defs_args, build_unit_model_args, build_unit_models_args,
     build_unit_render_args, build_unit_render_keys_args, build_unit_script_args, find_unitsync,
     resolve_sidecar,
@@ -1518,6 +1518,34 @@ async fn unitsync_lua_exec(
     let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
     let _ = std::fs::remove_file(&script);
     result
+}
+
+/// Load `archive`'s definitions once per run in `input`, each run with its
+/// own files on top, and read numbers back (issue #3059). `input` is the
+/// JSON the worker's `--defs-probe` mode reads, and the answer is the JSON it
+/// prints.
+///
+/// Blocking, and not a command of its own: the workshop's
+/// `workshop_settle_typed_values` calls it once per load while it works out
+/// what to write, from a blocking task.
+pub fn defs_probe_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    archive: &str,
+    input: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let path = write_temp_list("defs-probe", input)?;
+    let args = build_defs_probe_args(
+        &libpath.to_string_lossy(),
+        data_dir,
+        archive,
+        &path.to_string_lossy(),
+    );
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(bin, args, envs, LUA_TIMEOUT, "defs probe".into(), None);
+    let _ = std::fs::remove_file(&path);
+    out
 }
 
 /// `unitsync_lua_repl_exec` — REPL replay: run `chunks` (the session's
