@@ -313,8 +313,9 @@ fn pins(
 /// Why `key` cannot be a new unit in this game, as the file that stops it
 /// and a sentence, or `None` when nothing does.
 ///
-/// Any unit file that mentions the name is run to see whether it defines a
-/// unit of that name. Spring lowercases unit names, and `key` is already
+/// Any Lua unit file that mentions the name is run to see whether it defines
+/// a unit of that name, and an `.fbi` file stops it when the file is named
+/// after it. Spring lowercases unit names, and `key` is already
 /// lowercase, so a file defining `ArmDfly2` stops `armdfly2`. A file that does
 /// not run and whose text does not settle it stops the copy too, since a
 /// collision would quietly replace a unit.
@@ -324,13 +325,20 @@ pub(crate) fn name_taken(
     game_dir: &Path,
 ) -> Option<(PathBuf, String)> {
     for (file, text) in texts {
-        if !text.to_lowercase().contains(key) {
-            continue;
-        }
         let rel = coilbox_gamebackup::key(file.strip_prefix(game_dir).unwrap_or(file));
         let taken = format!(
             "{rel} already defines a unit called {key}. A new file under that name would replace it."
         );
+        // An `.fbi` file defines the unit its file name says (issue #2638).
+        if coilbox_unitpatch::fbi::is_fbi(file) {
+            if coilbox_unitpatch::fbi::unit_name(file) == key {
+                return Some((file.clone(), taken));
+            }
+            continue;
+        }
+        if !text.to_lowercase().contains(key) {
+            continue;
+        }
         match coilbox_unitpatch::evaluate(text, game_dir) {
             Ok(Value::Object(units)) if units.contains_key(key) => return Some((file.clone(), taken)),
             Ok(_) => continue,

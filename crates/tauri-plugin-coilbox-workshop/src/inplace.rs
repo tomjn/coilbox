@@ -32,8 +32,11 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use coilbox_gamebackup::{key, Markers};
+use coilbox_tdf::Encoding;
+use coilbox_unitpatch::fbi::{self, is_fbi};
 use coilbox_unitpatch::{
-    patch_pending, Edit, Location, Op, RefusalKind, Segment, Value as PatchValue,
+    patch_pending, CloneRefusal, Cloned, Edit, Location, Op, Patched, Place, Refusal, RefusalKind,
+    Segment, Value as PatchValue,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -175,10 +178,10 @@ fn patch_value(value: &Value) -> Option<PatchValue> {
     }
 }
 
-/// Every `.lua` file under the game's `units` folder, which is where the
-/// engine's own `gamedata/unitdefs.lua` loads unit definitions from. The
-/// folder name is matched without regard to case, as the engine's archive
-/// lookups are.
+/// Every `.lua` and `.fbi` file under the game's `units` folder, which is
+/// where the engine's own `gamedata/unitdefs.lua` loads unit definitions
+/// from. The folder name and the extensions are matched without regard to
+/// case, as the engine's archive lookups are.
 fn unit_files(game_dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(game_dir) else {
         return Vec::new();
@@ -187,27 +190,84 @@ fn unit_files(game_dir: &Path) -> Vec<PathBuf> {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() && entry.file_name().eq_ignore_ascii_case("units") {
-            walk_lua(&path, &mut out);
+            walk_units(&path, &mut out);
         }
     }
     out.sort();
     out
 }
 
-fn walk_lua(at: &Path, out: &mut Vec<PathBuf>) {
+fn walk_units(at: &Path, out: &mut Vec<PathBuf>) {
     let Ok(entries) = std::fs::read_dir(at) else {
         return;
     };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            walk_lua(&path, out);
-        } else if path
-            .extension()
-            .is_some_and(|e| e.eq_ignore_ascii_case("lua"))
+            walk_units(&path, out);
+        } else if is_fbi(&path)
+            || path
+                .extension()
+                .is_some_and(|e| e.eq_ignore_ascii_case("lua"))
         {
             out.push(path);
         }
+    }
+}
+
+/// [`patch_pending`], or its `.fbi` form for a unit written in that format
+/// (issue #2638). An `.fbi` unit never includes another file, so `included`
+/// does not apply to it.
+fn patch_file(
+    file: &Path,
+    text: &str,
+    edit: &Edit,
+    game_dir: &Path,
+    included: &BTreeMap<PathBuf, String>,
+) -> Result<Patched, Refusal> {
+    if is_fbi(file) {
+        fbi::patch(text, edit, file)
+    } else {
+        patch_pending(text, edit, game_dir, included)
+    }
+}
+
+fn locate_edit(file: &Path, text: &str, edit: &Edit, game_dir: &Path) -> Result<Place, Refusal> {
+    if is_fbi(file) {
+        fbi::locate_edit(text, edit, file)
+    } else {
+        coilbox_unitpatch::locate_edit(text, edit, game_dir)
+    }
+}
+
+fn locate_unit(file: &Path, text: &str, unit: &str) -> Result<Location, Refusal> {
+    if is_fbi(file) {
+        fbi::locate_unit(text, unit, file)
+    } else {
+        coilbox_unitpatch::locate_unit(text, unit)
+    }
+}
+
+pub(crate) fn evaluate(file: &Path, text: &str, game_dir: &Path) -> Result<Value, Refusal> {
+    if is_fbi(file) {
+        fbi::evaluate(text, file)
+    } else {
+        coilbox_unitpatch::evaluate(text, game_dir)
+    }
+}
+
+fn clone_unit(
+    file: &Path,
+    text: &str,
+    unit: &str,
+    new_unit: &str,
+    edits: &[(Vec<Segment>, Op)],
+    game_dir: &Path,
+) -> Result<Cloned, Vec<CloneRefusal>> {
+    if is_fbi(file) {
+        fbi::clone_unit(text, unit, new_unit, edits, file)
+    } else {
+        coilbox_unitpatch::clone_unit(text, unit, new_unit, edits, game_dir)
     }
 }
 
@@ -417,8 +477,8 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
         path: first.0.clone(),
         op: Op::Set(first.1.clone()),
     };
-    let file = match find_unit_file(unit, &files, &texts, |text| {
-        coilbox_unitpatch::locate_edit(text, &first, game_dir)
+    let file = match find_unit_file(unit, &files, &texts, |file, text| {
+        locate_edit(file, text, &first, game_dir)
     }) {
         Found::File(file, _) => file,
         Found::None(file_level) => {
@@ -445,7 +505,12 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
         .iter()
         .filter_map(|e| e.as_ref().ok().cloned())
         .collect();
-    let mut answers = coilbox_unitpatch::check_fields(text, unit, &valid, game_dir).into_iter();
+    let answers = if is_fbi(&file) {
+        fbi::check_fields(text, unit, &valid, &file)
+    } else {
+        coilbox_unitpatch::check_fields(text, unit, &valid, game_dir)
+    };
+    let mut answers = answers.into_iter();
     let fields = fields
         .iter()
         .zip(&edits)
@@ -551,6 +616,11 @@ struct UnitChanges<'a> {
 /// `UnitNotFound` before anything is evaluated, so trying each candidate is
 /// cheap. Files whose name matches the unit are tried first, because that is
 /// how most games lay their units out.
+///
+/// An `.fbi` file is a candidate when its name is the unit's, since the
+/// engine names an `.fbi` unit after its file whatever the text says (issue
+/// #2638). A `.lua` file is tried before an `.fbi` one, because the engine
+/// loads the Lua ones second and a unit defined in both is the Lua one.
 enum Found<T> {
     /// The file, and the first attempt's result against it.
     File(PathBuf, Result<T, coilbox_unitpatch::Refusal>),
@@ -563,20 +633,26 @@ fn find_unit_file<T>(
     unit: &str,
     files: &[PathBuf],
     texts: &BTreeMap<PathBuf, String>,
-    attempt: impl Fn(&str) -> Result<T, coilbox_unitpatch::Refusal>,
+    attempt: impl Fn(&Path, &str) -> Result<T, coilbox_unitpatch::Refusal>,
 ) -> Found<T> {
     let wanted = unit.to_lowercase();
     let mut candidates: Vec<&PathBuf> = files
         .iter()
-        .filter(|f| texts[*f].to_lowercase().contains(&wanted))
+        .filter(|f| {
+            if is_fbi(f) {
+                fbi::unit_name(f) == wanted
+            } else {
+                texts[*f].to_lowercase().contains(&wanted)
+            }
+        })
         .collect();
     candidates.sort_by_key(|f| {
         let stem = f.file_stem().map(|s| s.to_string_lossy().to_lowercase());
-        stem.as_deref() != Some(wanted.as_str())
+        (is_fbi(f), stem.as_deref() != Some(wanted.as_str()))
     });
     let mut file_level: Option<(PathBuf, coilbox_unitpatch::Refusal)> = None;
     for file in candidates {
-        match attempt(&texts[file]) {
+        match attempt(file, &texts[file]) {
             Err(refusal) if refusal.kind == RefusalKind::UnitNotFound => continue,
             // A file that does not parse or does not return a table might be
             // a helper that merely mentions the unit, so keep looking, and
@@ -622,16 +698,37 @@ fn no_file_refusal(
     }
 }
 
-/// Every unit file's text, by path. A file that is not UTF-8 cannot be a unit
-/// file the patcher reads, so it is left out of the search rather than
-/// failing the whole request.
+/// Every unit file's text, by path. A Lua file that is not UTF-8 cannot be a
+/// unit file the patcher reads, so it is left out of the search rather than
+/// failing the whole request. An `.fbi` file that is not UTF-8 is read one
+/// character per byte instead, since games of that era have a Windows-1252
+/// character here and there, and [`unit_encodings`] says so for the write.
 fn unit_texts(game_dir: &Path) -> BTreeMap<PathBuf, String> {
     unit_files(game_dir)
         .into_iter()
         .filter_map(|file| {
-            let text = std::fs::read_to_string(&file).ok()?;
+            let text = read_unit_file(&file)?.0;
             Some((file, text))
         })
+        .collect()
+}
+
+fn read_unit_file(file: &Path) -> Option<(String, Encoding)> {
+    if is_fbi(file) {
+        Some(coilbox_tdf::decode(&std::fs::read(file).ok()?))
+    } else {
+        Some((std::fs::read_to_string(file).ok()?, Encoding::Utf8))
+    }
+}
+
+/// The unit files [`unit_texts`] did not read as UTF-8, so the write puts
+/// them back in the bytes they came in.
+fn unit_encodings(files: &[PathBuf]) -> BTreeMap<PathBuf, Encoding> {
+    files
+        .iter()
+        .filter(|file| is_fbi(file))
+        .filter_map(|file| Some((file.clone(), read_unit_file(file)?.1)))
+        .filter(|(_, encoding)| *encoding != Encoding::Utf8)
         .collect()
 }
 
@@ -708,8 +805,8 @@ pub fn write(
 
     for UnitChanges { unit, edits } in units {
         let (_, first) = &edits[0];
-        let found = find_unit_file(unit, &files, &texts, |text| {
-            patch_pending(text, first, game_dir, &included)
+        let found = find_unit_file(unit, &files, &texts, |file, text| {
+            patch_file(file, text, first, game_dir, &included)
         });
         let (file, first_result) = match found {
             Found::File(file, result) => (file, result),
@@ -728,7 +825,7 @@ pub fn write(
         for (field, edit) in &edits {
             let result = match pending.take() {
                 Some(result) => result,
-                None => patch_pending(&texts[&file], edit, game_dir, &included),
+                None => patch_file(&file, &texts[&file], edit, game_dir, &included),
             };
             match result {
                 Ok(patched) => {
@@ -767,6 +864,42 @@ pub fn write(
         &mut outcome,
     );
 
+    // Every file to write, as the bytes to write, in the order the outcome
+    // lists them. A file read one character per byte goes back the same way,
+    // and a change that brings in a character it has no byte for is refused
+    // before anything is written.
+    let encodings = unit_encodings(&files);
+    let changed = texts
+        .iter()
+        .filter(|(file, text)| originals.get(*file) != Some(*text))
+        .map(|(file, text)| (file, text, encodings.get(file).copied()));
+    let others = included
+        .iter()
+        .map(|(file, text)| (file, text, None))
+        .chain(
+            created
+                .iter()
+                .map(|(file, text, encoding)| (file, text, Some(*encoding))),
+        );
+    let mut writes = Vec::new();
+    for (file, text, encoding) in changed.chain(others) {
+        let encoding = encoding.unwrap_or(Encoding::Utf8);
+        match encoding.encode(text) {
+            Some(bytes) => writes.push((file.clone(), bytes)),
+            None => outcome.refused.push(Refused {
+                unit: file
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().to_lowercase())
+                    .unwrap_or_default(),
+                field: String::new(),
+                file: Some(rel(file)),
+                kind: RefusalKind::InvalidValue,
+                message: "This file is not UTF-8, and a change to it holds a character it has no byte for, such as one outside Western European text.".into(),
+                location: None,
+            }),
+        }
+    }
+
     if !outcome.refused.is_empty() {
         outcome.changed = 0;
         outcome.unchanged = 0;
@@ -774,19 +907,8 @@ pub fn write(
         return Ok(outcome);
     }
 
-    for (file, text) in &texts {
-        if originals.get(file) == Some(text) {
-            continue;
-        }
-        MARKERS.write(file, text.as_bytes())?;
-        outcome.written.push(rel(file));
-    }
-    for (file, text) in &included {
-        MARKERS.write(file, text.as_bytes())?;
-        outcome.written.push(rel(file));
-    }
-    for (file, text) in &created {
-        MARKERS.write(file, text.as_bytes())?;
+    for (file, bytes) in &writes {
+        MARKERS.write(file, bytes)?;
         outcome.written.push(rel(file));
     }
     outcome.carried = held
@@ -830,7 +952,7 @@ fn write_copies(
     texts: &mut BTreeMap<PathBuf, String>,
     included: &mut BTreeMap<PathBuf, String>,
     outcome: &mut WriteOutcome,
-) -> Vec<(PathBuf, String)> {
+) -> Vec<(PathBuf, String, Encoding)> {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
     let mut created = Vec::new();
     // A copy sent to the mutator route (issue #3035) is skipped here exactly
@@ -895,8 +1017,8 @@ fn write_copies(
                 .push(refuse(&u.field, None, RefusalKind::InvalidValue, u.message));
         }
 
-        let file = match find_unit_file(source, files, originals, |text| {
-            coilbox_unitpatch::locate_unit(text, source)
+        let file = match find_unit_file(source, files, originals, |file, text| {
+            locate_unit(file, text, source)
         }) {
             Found::File(file, Ok(_)) => file,
             Found::File(file, Err(r)) => {
@@ -914,10 +1036,16 @@ fn write_copies(
                 continue;
             }
         };
+        // A copy of an `.fbi` unit is an `.fbi` file too, extension spelled
+        // as its source's is (issue #2638).
+        let extension = match file.extension() {
+            Some(ext) if is_fbi(&file) => ext.to_string_lossy().into_owned(),
+            _ => "lua".to_string(),
+        };
         let target = file
             .parent()
             .unwrap_or(game_dir)
-            .join(format!("{unit}.lua"));
+            .join(format!("{unit}.{extension}"));
         if let Some(taken) = inplace_clone::file_taken(&target) {
             outcome.refused.push(refuse(
                 "",
@@ -933,22 +1061,33 @@ fn write_copies(
         }
 
         let mut edits = edits;
-        if let Some(file_unit) = coilbox_unitpatch::evaluate(&originals[&file], game_dir)
+        if let Some(file_unit) = evaluate(&file, &originals[&file], game_dir)
             .ok()
             .and_then(|units| units.get(source.to_lowercase()).cloned())
         {
-            edits.extend(inplace_clone::name_pins(
-                source, source_def, &def, &file_unit,
-            ));
+            let pins = inplace_clone::name_pins(source, source_def, &def, &file_unit);
+            // An `.fbi` unit's sounds and build menu come from the game's
+            // shared files, not from anything its name decides, so the copy
+            // gets the same ones without a pin.
+            edits.extend(pins.into_iter().filter(|pin| {
+                !is_fbi(&file)
+                    || !matches!(pin.path.first(), Some(Segment::Key(k))
+                        if ["sounds", "buildoptions"].contains(&k.to_lowercase().as_str()))
+            }));
         }
         let list: Vec<_> = edits
             .iter()
             .map(|e| (e.path.clone(), e.op.clone()))
             .collect();
-        match coilbox_unitpatch::clone_unit(&originals[&file], source, unit, &list, game_dir) {
+        match clone_unit(&file, &originals[&file], source, unit, &list, game_dir) {
             Ok(cloned) => {
-                created.push((target.clone(), cloned.text));
-                created.extend(cloned.included);
+                let encoding = read_unit_file(&file).map_or(Encoding::Utf8, |(_, e)| e);
+                created.push((target.clone(), cloned.text, encoding));
+                created.extend(
+                    cloned
+                        .included
+                        .map(|(path, text)| (path, text, Encoding::Utf8)),
+                );
             }
             Err(refusals) => {
                 for r in refusals {
@@ -969,11 +1108,11 @@ fn write_copies(
                 path: vec![Segment::Key("buildoptions".into())],
                 op: Op::Push(PatchValue::String(unit.to_string())),
             };
-            let found = find_unit_file(builder, files, texts, |text| {
-                if inplace_clone::already_lists(text, builder, unit, game_dir) {
+            let found = find_unit_file(builder, files, texts, |file, text| {
+                if !is_fbi(file) && inplace_clone::already_lists(text, builder, unit, game_dir) {
                     return Ok(None);
                 }
-                patch_pending(text, &push, game_dir, included).map(Some)
+                patch_file(file, text, &push, game_dir, included).map(Some)
             });
             match found {
                 Found::File(_, Ok(None)) => {}
@@ -2101,5 +2240,210 @@ mod tests {
         let undone = undo(&game).unwrap();
         assert_eq!(undone.deleted.len(), 2, "{:?}", undone.deleted);
         assert!(!game.join(copy_basedef).exists());
+    }
+
+    /// A loose game with units in the `.fbi` format (issue #2638): THIS's
+    /// dagger, XTA's commander with its Windows line endings and an
+    /// uppercase extension, and a Lua factory.
+    fn fbi_game() -> (tempfile::TempDir, PathBuf) {
+        let (root, game) = game();
+        let units = game.join("units");
+        std::fs::write(units.join("dagger.fbi"), fixture("this_dagger.fbi")).unwrap();
+        std::fs::write(units.join("ARMCOM.FBI"), fixture("xta_armcom.fbi")).unwrap();
+        (root, game)
+    }
+
+    #[test]
+    fn an_fbi_unit_is_written_one_line_at_a_time_and_undo_puts_it_back() {
+        let (_root, game) = fbi_game();
+        let dagger = game.join("units/dagger.fbi");
+        let armcom = game.join("units/ARMCOM.FBI");
+        let (dagger_before, armcom_before) = (read(&dagger), read(&armcom));
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({
+                "dagger": { "maxdamage": 700, "customparams.role": "attacker" },
+                "armcom": { "buildcostmetal": 2500 },
+            })),
+        )
+        .unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(
+            outcome.written,
+            vec!["units/ARMCOM.FBI", "units/dagger.fbi"]
+        );
+        assert_eq!(outcome.changed, 3);
+        assert_eq!(
+            read(&dagger),
+            dagger_before
+                .replacen("MaxDamage=650;", "MaxDamage=700;", 1)
+                .replacen("\t\tcost=200;\n", "\t\tcost=200;\n\t\trole=attacker;\n", 1)
+        );
+        assert_eq!(
+            read(&armcom),
+            armcom_before.replacen("BuildCostMetal=2200;\r\n", "BuildCostMetal=2500;\r\n", 1)
+        );
+        assert!(outcome.carried.iter().all(|c| c.undoable));
+
+        let diffs = crate::diff::disk_diffs(&game).unwrap();
+        let changed: Vec<&str> = diffs
+            .iter()
+            .flat_map(|d| &d.lines)
+            .filter(|l| l.kind != crate::diff::LineChange::Equal)
+            .map(|l| l.text.as_str())
+            .collect();
+        assert_eq!(
+            changed,
+            vec![
+                "\tBuildCostMetal=2200;",
+                "\tBuildCostMetal=2500;",
+                "\tMaxDamage=650;",
+                "\tMaxDamage=700;",
+                "\t\trole=attacker;",
+            ]
+        );
+
+        undo(&game).unwrap();
+        assert_eq!(read(&dagger), dagger_before);
+        assert_eq!(read(&armcom), armcom_before);
+    }
+
+    #[test]
+    fn a_dry_run_on_an_fbi_unit_refuses_what_its_file_does_not_hold() {
+        let (_root, game) = fbi_game();
+        let outcome = check(
+            &game,
+            "armcom",
+            &probes(serde_json::json!([
+                { "field": "maxdamage", "value": 3500 },
+                { "field": "weapons.0.name", "value": "CSARMCOMLASER" },
+                { "field": "buildoptions", "value": null },
+                { "field": "cloakcost", "value": null },
+            ])),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.file.as_deref(), Some("units/ARMCOM.FBI"));
+        let kinds: Vec<Option<RefusalKind>> = outcome
+            .fields
+            .iter()
+            .map(|f| f.refusal.as_ref().map(|r| r.kind))
+            .collect();
+        assert_eq!(
+            kinds,
+            vec![
+                None,
+                // Weapon1 and Weapon3, with no Weapon2.
+                Some(RefusalKind::FieldComputed),
+                Some(RefusalKind::FieldComputed),
+                None,
+            ]
+        );
+    }
+
+    #[test]
+    fn an_fbi_file_the_engine_cannot_read_is_shown_where_it_breaks() {
+        let (_root, game) = fbi_game();
+        std::fs::write(
+            game.join("units/dagger.fbi"),
+            "[UNITINFO]\n{\n\tName=Dagger;\n\tMaxDamage=650\n}\n",
+        )
+        .unwrap();
+        let outcome = check(
+            &game,
+            "dagger",
+            &probes(serde_json::json!([{ "field": "maxdamage", "value": 1 }])),
+        )
+        .unwrap();
+        let field = &outcome.fields[0];
+        assert_eq!(field.refusal.as_ref().unwrap().kind, RefusalKind::Syntax);
+        let shown = field.excerpt.as_ref().expect("an excerpt");
+        assert!(shown.lines.iter().any(|l| l.contains("MaxDamage=650")));
+    }
+
+    #[test]
+    fn a_copy_of_an_fbi_unit_is_an_fbi_file_beside_it() {
+        let (_root, game) = fbi_game();
+        let sources: BTreeMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "dagger": { "maxdamage": 650, "unitname": "dagger", "name": "Dagger" },
+        }))
+        .unwrap();
+        let mut def = sources["dagger"].clone();
+        def["maxdamage"] = serde_json::json!(900);
+        def["unitname"] = serde_json::json!("dagger2");
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "In place",
+            "gameName": "THIS",
+            "edits": { "clones": { "dagger2": {
+                "key": "dagger2",
+                "source": "dagger",
+                "replacesGameUnit": false,
+                "def": def,
+            } } },
+        }))
+        .unwrap();
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.written, vec!["units/dagger2.fbi"]);
+        assert_eq!(
+            read(&game.join("units/dagger2.fbi")),
+            fixture("this_dagger.fbi")
+                .replacen("MaxDamage=650;", "MaxDamage=900;", 1)
+                .replacen("Unitname=dagger;", "Unitname=dagger2;", 1)
+        );
+
+        // The name is taken once the copy exists.
+        let again = super::write(&game, &project, &sources).unwrap();
+        assert_eq!(again.refused[0].kind, RefusalKind::NameTaken);
+    }
+
+    #[test]
+    fn a_unit_in_both_formats_is_changed_where_the_engine_reads_it() {
+        let (_root, game) = fbi_game();
+        std::fs::write(
+            game.join("units/dagger.lua"),
+            "return { dagger = { maxdamage = 800 } }\n",
+        )
+        .unwrap();
+        let fbi_before = read(&game.join("units/dagger.fbi"));
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "dagger": { "maxdamage": 900 } })),
+        )
+        .unwrap();
+        assert_eq!(outcome.written, vec!["units/dagger.lua"]);
+        assert_eq!(read(&game.join("units/dagger.fbi")), fbi_before);
+    }
+
+    #[test]
+    fn an_fbi_file_that_is_not_utf8_goes_back_in_its_own_bytes() {
+        let (_root, game) = fbi_game();
+        let path = game.join("units/corcom.fbi");
+        let before =
+            b"[UNITINFO]\r\n{\r\n\tcopyright=\xa9 1997 Cavedog;\r\n\tMaxDamage=3000;\r\n}\r\n";
+        std::fs::write(&path, before).unwrap();
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "corcom": { "maxdamage": 3100 } })),
+        )
+        .unwrap();
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            b"[UNITINFO]\r\n{\r\n\tcopyright=\xa9 1997 Cavedog;\r\n\tMaxDamage=3100;\r\n}\r\n"
+        );
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "corcom": { "name": "Commandant \u{263a}" } })),
+        )
+        .unwrap();
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        assert!(outcome.written.is_empty());
     }
 }

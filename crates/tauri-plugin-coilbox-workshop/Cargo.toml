@@ -37,6 +37,7 @@ coilbox-portable = { path = "../coilbox-portable" }
 # The edit-in-place route (issue #2635): the patcher that changes one field in
 # a unit file, and the backup-before-write helpers the .3do installer shares.
 coilbox-unitpatch = { path = "../coilbox-unitpatch" }
+coilbox-tdf = { path = "../coilbox-tdf" }
 coilbox-gamebackup = { path = "../coilbox-gamebackup" }
 
 [dev-dependencies]

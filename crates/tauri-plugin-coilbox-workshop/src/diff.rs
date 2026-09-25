@@ -130,8 +130,12 @@ pub struct FileDiff {
 /// what is there now.
 pub fn disk_diffs(game_dir: &Path) -> Result<Vec<FileDiff>, String> {
     require_loose_game(game_dir)?;
+    // An `.fbi` file from the Total Annihilation era may not be UTF-8 (issue
+    // #2638), and is shown one character per byte, as the write read it.
     let read = |path: &Path| {
-        std::fs::read_to_string(path).map_err(|e| format!("could not read {}: {e}", path.display()))
+        std::fs::read(path)
+            .map(|bytes| coilbox_tdf::decode(&bytes).0)
+            .map_err(|e| format!("could not read {}: {e}", path.display()))
     };
     let rel = |file: &Path| coilbox_gamebackup::key(file.strip_prefix(game_dir).unwrap_or(file));
 
