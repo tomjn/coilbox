@@ -8,9 +8,14 @@
  * generator looks like (the issue's own scoping), so the form says that
  * plainly and points at the local test launch (`PlayLocallyButton`, issue
  * #1278) as the way to see it.
+ *
+ * A generator holds a list of spawns plus an optional ground flash (issue
+ * #3066): `GeneratorForm` lists the spawns with add, remove and reorder
+ * controls, then a ground flash toggle and a `useDefaultExplosions` toggle
+ * below them.
  */
 import { Button, Input } from "@picoframe/frame";
-import { Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -20,20 +25,25 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  addExplosionSpawn,
   CEG_CLASS_FIELDS,
-  CEG_CLASSES,
-  type CegClass,
   type CegFieldSpec,
   type CegWeaponField,
   cegFieldValue,
-  cegHasSpawnControls,
   cegKeyFromFieldValue,
   checkExplosionGeneratorName,
   type ExplosionGenerator,
   type ExplosionGenerators,
+  type ExplosionSpawn,
+  type GroundFlash,
+  moveExplosionSpawn,
   newExplosionGenerator,
   removeExplosionGenerator,
+  removeExplosionSpawn,
+  SPAWN_CLASSES,
+  type SpawnClass,
   setExplosionGenerator,
+  setExplosionSpawn,
   suggestExplosionGeneratorKey,
 } from "../../explosionGenerators";
 
@@ -57,15 +67,17 @@ const colorToHex = (color: { r: number; g: number; b: number } | undefined) => {
  *  "impact effect" against "bounce effect". */
 const articleFor = (word: string) => (/^[aeiou]/i.test(word) ? "an" : "a");
 
-/** One class specific field's control, by {@link CegFieldSpec.key}. */
-function ClassField({
+/** One class specific field's control, by {@link CegFieldSpec.key}, shared by
+ *  a spawn and the ground flash: both are plain objects with the same
+ *  optional `texture`/`color`/`size`/`lifetime`/`particles` fields. */
+function ClassField<T extends Partial<ExplosionSpawn> & Partial<GroundFlash>>({
   spec,
-  generator,
+  value,
   onPatch,
 }: {
   spec: CegFieldSpec;
-  generator: ExplosionGenerator;
-  onPatch: (patch: Partial<ExplosionGenerator>) => void;
+  value: T;
+  onPatch: (patch: Partial<T>) => void;
 }) {
   if (spec.key === "color")
     return (
@@ -73,8 +85,10 @@ function ClassField({
         <input
           type="color"
           className="h-8 w-16 rounded border border-input"
-          value={colorToHex(generator.color)}
-          onChange={(e) => onPatch({ color: hexToColor(e.target.value) })}
+          value={colorToHex(value.color)}
+          onChange={(e) =>
+            onPatch({ color: hexToColor(e.target.value) } as Partial<T>)
+          }
         />
       </Field>
     );
@@ -83,8 +97,8 @@ function ClassField({
       <Field label={spec.label} hint={spec.help}>
         <Input
           className="h-8 font-mono text-xs"
-          value={generator.texture ?? ""}
-          onChange={(e) => onPatch({ texture: e.target.value })}
+          value={value.texture ?? ""}
+          onChange={(e) => onPatch({ texture: e.target.value } as Partial<T>)}
           placeholder="gfx/flare.tga"
           autoComplete="off"
           spellCheck={false}
@@ -97,82 +111,195 @@ function ClassField({
       <Input
         type="number"
         className="h-8 text-xs"
-        value={generator[spec.key] ?? ""}
+        value={(value[spec.key as keyof T] as number | undefined) ?? ""}
         onChange={(e) => {
           const raw = e.target.value;
-          onPatch({ [spec.key]: raw === "" ? undefined : Number(raw) });
+          onPatch({
+            [spec.key]: raw === "" ? undefined : Number(raw),
+          } as Partial<T>);
         }}
       />
     </Field>
   );
 }
 
-function GeneratorForm({
-  generator,
+function SpawnForm({
+  spawn,
+  index,
+  spawnCount,
   onPatch,
+  onRemove,
+  onMove,
 }: {
-  generator: ExplosionGenerator;
-  onPatch: (patch: Partial<ExplosionGenerator>) => void;
+  spawn: ExplosionSpawn;
+  index: number;
+  spawnCount: number;
+  onPatch: (patch: Partial<ExplosionSpawn>) => void;
+  onRemove: () => void;
+  onMove: (direction: "up" | "down") => void;
 }) {
-  const hasSpawnControls = cegHasSpawnControls(generator.class);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 rounded border border-border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          Spawn {index + 1}
+        </span>
+        <div className="flex gap-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={index === 0}
+            onClick={() => onMove("up")}
+            aria-label="Move spawn up"
+          >
+            <ArrowUp className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={index === spawnCount - 1}
+            onClick={() => onMove("down")}
+            aria-label="Move spawn down"
+          >
+            <ArrowDown className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            onClick={onRemove}
+            aria-label="Remove spawn"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+      </div>
       <Field label="Class">
         <OptionSelect
-          value={generator.class}
-          onValueChange={(value) => onPatch({ class: value as CegClass })}
-          options={CEG_CLASSES.map((c) => ({ value: c.value, label: c.label }))}
+          value={spawn.class}
+          onValueChange={(value) => onPatch({ class: value as SpawnClass })}
+          options={SPAWN_CLASSES.map((c) => ({
+            value: c.value,
+            label: c.label,
+          }))}
           size="sm"
         />
       </Field>
-      {CEG_CLASS_FIELDS[generator.class].map((spec) => (
+      {CEG_CLASS_FIELDS[spawn.class].map((spec) => (
         <ClassField
           key={spec.key}
           spec={spec}
-          generator={generator}
+          value={spawn}
           onPatch={onPatch}
         />
       ))}
-      {hasSpawnControls && (
-        <>
-          <Field label="Count" hint="How many times this fires per explosion.">
-            <Input
-              type="number"
-              min={1}
-              className="h-8 text-xs"
-              value={generator.count}
-              onChange={(e) =>
-                onPatch({ count: Math.max(1, Number(e.target.value) || 1) })
+      <Field label="Count" hint="How many times this fires per explosion.">
+        <Input
+          type="number"
+          min={1}
+          className="h-8 text-xs"
+          value={spawn.count}
+          onChange={(e) =>
+            onPatch({ count: Math.max(1, Number(e.target.value) || 1) })
+          }
+        />
+      </Field>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-medium">Fires on</span>
+        <div className="grid grid-cols-2 gap-1.5">
+          <CheckField
+            label="Ground"
+            checked={spawn.ground}
+            onChange={(v) => onPatch({ ground: v })}
+          />
+          <CheckField
+            label="Water"
+            checked={spawn.water}
+            onChange={(v) => onPatch({ water: v })}
+          />
+          <CheckField
+            label="Air"
+            checked={spawn.air}
+            onChange={(v) => onPatch({ air: v })}
+          />
+          <CheckField
+            label="Underwater"
+            checked={spawn.underwater}
+            onChange={(v) => onPatch({ underwater: v })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GeneratorForm({
+  generator,
+  onPatchSpawn,
+  onRemoveSpawn,
+  onMoveSpawn,
+  onAddSpawn,
+  onSetGroundFlash,
+  onPatch,
+}: {
+  generator: ExplosionGenerator;
+  onPatchSpawn: (index: number, patch: Partial<ExplosionSpawn>) => void;
+  onRemoveSpawn: (index: number) => void;
+  onMoveSpawn: (index: number, direction: "up" | "down") => void;
+  onAddSpawn: (cegClass: SpawnClass) => void;
+  onSetGroundFlash: (groundFlash: GroundFlash | undefined) => void;
+  onPatch: (patch: Partial<ExplosionGenerator>) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      {generator.spawns.map((spawn, index) => (
+        <SpawnForm
+          // Spawns have no other stable identity, and reordering already
+          // updates every field a change here could confuse.
+          // biome-ignore lint/suspicious/noArrayIndexKey: see above
+          key={index}
+          spawn={spawn}
+          index={index}
+          spawnCount={generator.spawns.length}
+          onPatch={(patch) => onPatchSpawn(index, patch)}
+          onRemove={() => onRemoveSpawn(index)}
+          onMove={(direction) => onMoveSpawn(index, direction)}
+        />
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => onAddSpawn(SPAWN_CLASSES[0].value)}
+      >
+        <Plus className="size-3.5" />
+        Add spawn
+      </Button>
+      <div className="flex flex-col gap-3 rounded border border-border p-3">
+        <CheckField
+          label="Ground flash"
+          checked={!!generator.groundFlash}
+          onChange={(v) => onSetGroundFlash(v ? {} : undefined)}
+        />
+        {generator.groundFlash &&
+          CEG_CLASS_FIELDS.CStandardGroundFlash.map((spec) => (
+            <ClassField
+              key={spec.key}
+              spec={spec}
+              value={generator.groundFlash as GroundFlash}
+              onPatch={(patch) =>
+                onSetGroundFlash({ ...generator.groundFlash, ...patch })
               }
             />
-          </Field>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-sm font-medium">Fires on</span>
-            <div className="grid grid-cols-2 gap-1.5">
-              <CheckField
-                label="Ground"
-                checked={generator.ground}
-                onChange={(v) => onPatch({ ground: v })}
-              />
-              <CheckField
-                label="Water"
-                checked={generator.water}
-                onChange={(v) => onPatch({ water: v })}
-              />
-              <CheckField
-                label="Air"
-                checked={generator.air}
-                onChange={(v) => onPatch({ air: v })}
-              />
-              <CheckField
-                label="Underwater"
-                checked={generator.underwater}
-                onChange={(v) => onPatch({ underwater: v })}
-              />
-            </div>
-          </div>
-        </>
-      )}
+          ))}
+      </div>
+      <CheckField
+        label="Also play the engine's own explosion"
+        checked={generator.useDefaultExplosions}
+        onChange={(v) => onPatch({ useDefaultExplosions: v })}
+      />
     </div>
   );
 }
@@ -210,7 +337,7 @@ export function ExplosionGeneratorEditor({
 
   const create = () => {
     if (!check.ok) return;
-    const generator = newExplosionGenerator(check.key, CEG_CLASSES[0].value);
+    const generator = newExplosionGenerator(check.key, SPAWN_CLASSES[0].value);
     onSetGenerators(setGeneratorsWith(generators, generator));
     onSetField(cegFieldValue(field, check.key));
     setOpen(false);
@@ -248,6 +375,37 @@ export function ExplosionGeneratorEditor({
             </div>
             <GeneratorForm
               generator={owned}
+              onPatchSpawn={(index, patch) =>
+                onSetGenerators(
+                  setExplosionSpawn(generators, owned.key, index, patch) ??
+                    generators,
+                )
+              }
+              onRemoveSpawn={(index) =>
+                onSetGenerators(
+                  removeExplosionSpawn(generators, owned.key, index) ??
+                    generators,
+                )
+              }
+              onMoveSpawn={(index, direction) =>
+                onSetGenerators(
+                  moveExplosionSpawn(generators, owned.key, index, direction) ??
+                    generators,
+                )
+              }
+              onAddSpawn={(cegClass) =>
+                onSetGenerators(
+                  addExplosionSpawn(generators, owned.key, cegClass) ??
+                    generators,
+                )
+              }
+              onSetGroundFlash={(groundFlash) =>
+                onSetGenerators(
+                  setExplosionGenerator(generators, owned.key, {
+                    groundFlash,
+                  }) ?? generators,
+                )
+              }
               onPatch={(patch) =>
                 onSetGenerators(
                   setExplosionGenerator(generators, owned.key, patch) ??

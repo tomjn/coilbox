@@ -17,20 +17,31 @@
  *    the engine (`LoadCustomGeneratorID`, `ExplosionGenerator.h:60`), so it
  *    is written as the bare name.
  *
- * A generator here is one spawn entry of one of the four classes, not the
- * general case the engine allows (several spawns, an optional `groundflash`
- * sub-table alongside them, `useDefaultExplosions`). That is deliberate: the
- * issue asks for colour, texture, size, count and lifetime controls over the
- * four classes people actually reach for, not a general compositor.
- * Combining several spawns in one generator is issue #3066.
+ * A generator holds a list of spawns (each one of the three particle
+ * classes, with its own colour, texture, size, count and lifetime), plus an
+ * optional ground flash and a `useDefaultExplosions` toggle, matching the
+ * engine's own general case (several spawns, an optional `groundflash`
+ * sub-table alongside them, `useDefaultExplosions` layering the built-in
+ * explosion on top) rather than the single spawn issue #2643 shipped with
+ * (issue #3066).
  *
- * `CStandardGroundFlash` is the odd one out. Every real CEG file measured
- * for this issue uses the engine's reserved `groundflash` key rather than a
- * generic spawn entry for it (`ExplosionGenerator.cpp:1027-1039` parses that
- * key unconditionally, outside the spawn loop, and always adds the ground
- * gating flag itself), so `compile.rs` writes it that way rather than as a
- * `class = "CStandardGroundFlash"` spawn, and it takes neither a repeat
- * count nor the gating flags the other three do.
+ * `CStandardGroundFlash` is the odd one out, which is why it is not one of
+ * the spawn classes: every real CEG file measured for this issue uses the
+ * engine's reserved `groundflash` key rather than a generic spawn entry for
+ * it (`ExplosionGenerator.cpp:1027-1039` parses that key unconditionally,
+ * outside the spawn loop, and always adds the ground gating flag itself), so
+ * `compile.rs` writes it that way rather than as a `class =
+ * "CStandardGroundFlash"` spawn, and it takes neither a repeat count nor the
+ * gating flags the three spawn classes do.
+ *
+ * A project saved before this issue holds one spawn's fields directly on
+ * the generator (a `class` field alongside `count` and the gating flags).
+ * `parseExplosionGenerators` migrates that shape on read into a single
+ * spawn, or into a lone ground flash when the old `class` was
+ * `CStandardGroundFlash`, so a generator saved by #2643 loads unchanged and
+ * still writes the same CEG file. There is no `kindVersion` bump for this:
+ * the migration is lossless and the old shape is still recognisable from
+ * its own fields.
  */
 
 /** The four emitter classes the form covers, in engine spelling
@@ -49,6 +60,19 @@ export const CEG_CLASSES: { value: CegClass; label: string }[] = [
   { value: "CStandardGroundFlash", label: "Ground flash" },
 ];
 
+/** The three classes a spawn can be. `CStandardGroundFlash` is not one of
+ *  them: it is the generator's separate `groundFlash` slot instead, matching
+ *  the engine's own reserved `groundflash` key (see this module's doc
+ *  comment). */
+export type SpawnClass = Exclude<CegClass, "CStandardGroundFlash">;
+
+/** The spawn classes, in the order the form offers them. */
+export const SPAWN_CLASSES: { value: SpawnClass; label: string }[] =
+  CEG_CLASSES.filter(
+    (c): c is { value: SpawnClass; label: string } =>
+      c.value !== "CStandardGroundFlash",
+  );
+
 /** A constant colour, 0 to 1 per channel, the way `CColorMap::LoadFromDefString`
  *  and a ground flash's `color` field both read one
  *  (`rts/Rendering/Textures/ColorMap.cpp:98`, `System/Color.h`'s float
@@ -59,40 +83,59 @@ export interface CegColor {
   b: number;
 }
 
-/** One custom explosion generator: one spawn of one class. */
-export interface ExplosionGenerator {
-  /** Its name, which is the file's own `effects/<key>.lua` and the CEG's key
-   *  inside it. */
-  key: string;
-  class: CegClass;
-  /** How many times the spawn fires per explosion. Ignored for
-   *  `CStandardGroundFlash`, which the engine's reserved `groundflash` key
-   *  fires once. */
+/** One spawn: one of the three particle classes, fired some number of times
+ *  and gated on what was actually hit. */
+export interface ExplosionSpawn {
+  class: SpawnClass;
+  /** How many times the spawn fires per explosion. */
   count: number;
   /** Gating flags, OR'd by the engine against what was actually hit
-   *  (`GetFlagsFromTable`, `ExplosionGenerator.cpp:60`). Ignored for
-   *  `CStandardGroundFlash`, which the engine always gates on `ground`
-   *  itself. */
+   *  (`GetFlagsFromTable`, `ExplosionGenerator.cpp:60`). */
   ground: boolean;
   water: boolean;
   air: boolean;
   underwater: boolean;
   /** `sidetexture`/`fronttexture` (muzzle flame) or `texture` (particle
-   *  system, heat cloud). Unused by `CStandardGroundFlash`, which has none. */
+   *  system, heat cloud). */
   texture?: string;
-  /** A constant colour: a two-stop colormap for muzzle flame and particle
-   *  system, the `color` float3 for ground flash. Unused by heat cloud,
-   *  which has no colour of its own. */
+  /** A constant colour: a two-stop colormap. Unused by heat cloud, which has
+   *  no colour of its own. */
   color?: CegColor;
-  /** `size` (muzzle flame, heat cloud), `particlesize` (particle system) or
-   *  `flashSize` (ground flash). */
+  /** `size` (muzzle flame, heat cloud) or `particlesize` (particle system). */
   size?: number;
-  /** `ttl` in frames (muzzle flame, ground flash), `particlelife` (particle
-   *  system) or `heatfalloff` (heat cloud, which has no fixed lifetime: this
-   *  is how fast its heat drains rather than a frame count). */
+  /** `ttl` in frames (muzzle flame) or `particlelife` (particle system) or
+   *  `heatfalloff` (heat cloud, which has no fixed lifetime: this is how
+   *  fast its heat drains rather than a frame count). */
   lifetime?: number;
   /** `numparticles`. Particle system only. */
   particles?: number;
+}
+
+/** A generator's optional ground flash: the engine's reserved `groundflash`
+ *  key, which takes neither a repeat count nor the gating flags a spawn
+ *  does. */
+export interface GroundFlash {
+  /** The `color` float3. */
+  color?: CegColor;
+  /** `flashSize`. */
+  size?: number;
+  /** `ttl` in frames. */
+  lifetime?: number;
+}
+
+/** One custom explosion generator: a list of spawns, plus an optional ground
+ *  flash and the engine's `useDefaultExplosions` toggle (issue #3066). */
+export interface ExplosionGenerator {
+  /** Its name, which is the file's own `effects/<key>.lua` and the CEG's key
+   *  inside it. */
+  key: string;
+  spawns: ExplosionSpawn[];
+  /** Present when the generator also scorches the ground, independently of
+   *  whatever spawns it has. */
+  groundFlash?: GroundFlash;
+  /** Whether the engine's own built-in explosion also plays alongside this
+   *  generator's spawns. */
+  useDefaultExplosions: boolean;
 }
 
 /** The project's explosion generators, by key. */
@@ -137,21 +180,29 @@ export function suggestExplosionGeneratorKey(
   return `effect${n}`;
 }
 
-/** A fresh generator of the given class, with the gating flags on so it
- *  actually fires (issue #2643's own reading of `Explosion()`'s OR, not an
- *  AND, `ExplosionGenerator.cpp:1097`). */
-export function newExplosionGenerator(
-  key: string,
-  cegClass: CegClass,
-): ExplosionGenerator {
+/** A fresh spawn of the given class, with the gating flags on so it actually
+ *  fires (issue #2643's own reading of `Explosion()`'s OR, not an AND,
+ *  `ExplosionGenerator.cpp:1097`). */
+export function newExplosionSpawn(cegClass: SpawnClass): ExplosionSpawn {
   return {
-    key,
     class: cegClass,
     count: 1,
     ground: true,
     water: true,
     air: true,
     underwater: true,
+  };
+}
+
+/** A fresh generator holding one spawn of the given class. */
+export function newExplosionGenerator(
+  key: string,
+  cegClass: SpawnClass,
+): ExplosionGenerator {
+  return {
+    key,
+    spawns: [newExplosionSpawn(cegClass)],
+    useDefaultExplosions: false,
   };
 }
 
@@ -183,6 +234,84 @@ export function removeExplosionGenerator(
   if (!generators || !Object.hasOwn(generators, key)) return generators;
   const { [key]: _gone, ...rest } = generators;
   return rest;
+}
+
+/** Add a spawn of the given class to the end of a generator's list. */
+export function addExplosionSpawn(
+  generators: ExplosionGenerators | undefined,
+  key: string,
+  cegClass: SpawnClass,
+): ExplosionGenerators | undefined {
+  const generator = generators?.[key];
+  if (!generators || !generator) return generators;
+  return {
+    ...generators,
+    [key]: {
+      ...generator,
+      spawns: [...generator.spawns, newExplosionSpawn(cegClass)],
+    },
+  };
+}
+
+/** Take one spawn out of a generator by its index. */
+export function removeExplosionSpawn(
+  generators: ExplosionGenerators | undefined,
+  key: string,
+  index: number,
+): ExplosionGenerators | undefined {
+  const generator = generators?.[key];
+  if (!generators || !generator?.spawns[index]) return generators;
+  return {
+    ...generators,
+    [key]: {
+      ...generator,
+      spawns: generator.spawns.filter((_, i) => i !== index),
+    },
+  };
+}
+
+/** Patch one spawn's fields by its index. */
+export function setExplosionSpawn(
+  generators: ExplosionGenerators | undefined,
+  key: string,
+  index: number,
+  patch: Partial<ExplosionSpawn>,
+): ExplosionGenerators | undefined {
+  const generator = generators?.[key];
+  const spawn = generator?.spawns[index];
+  if (!generators || !generator || !spawn) return generators;
+  return {
+    ...generators,
+    [key]: {
+      ...generator,
+      spawns: generator.spawns.map((s, i) =>
+        i === index ? { ...s, ...patch } : s,
+      ),
+    },
+  };
+}
+
+/** Swap a spawn with its neighbour in the given direction. A move past
+ *  either end is a no-op, so a caller does not have to check bounds first. */
+export function moveExplosionSpawn(
+  generators: ExplosionGenerators | undefined,
+  key: string,
+  index: number,
+  direction: "up" | "down",
+): ExplosionGenerators | undefined {
+  const generator = generators?.[key];
+  if (!generators || !generator) return generators;
+  const target = direction === "up" ? index - 1 : index + 1;
+  if (
+    index < 0 ||
+    index >= generator.spawns.length ||
+    target < 0 ||
+    target >= generator.spawns.length
+  )
+    return generators;
+  const spawns = [...generator.spawns];
+  [spawns[index], spawns[target]] = [spawns[target], spawns[index]];
+  return { ...generators, [key]: { ...generator, spawns } };
 }
 
 /** The three weapon fields that can name a custom explosion generator
@@ -234,11 +363,12 @@ export interface CegFieldSpec {
   help: string;
 }
 
-/** Which of {@link ExplosionGenerator}'s optional fields each class uses, and
- *  what to call them: the issue's own list (colour, texture, size, count and
- *  lifetime), read against each class's real parameter name so the label
- *  says what the field actually is. `count` is drawn separately, since every
- *  class but ground flash takes it the same way. */
+/** Which of {@link ExplosionSpawn}'s (or, for ground flash, {@link GroundFlash}'s)
+ *  optional fields each class uses, and what to call them: the issue's own
+ *  list (colour, texture, size, count and lifetime), read against each
+ *  class's real parameter name so the label says what the field actually
+ *  is. `count` and the gating flags are drawn separately, since every spawn
+ *  class takes them the same way and ground flash takes neither. */
 export const CEG_CLASS_FIELDS: Record<CegClass, CegFieldSpec[]> = {
   CBitmapMuzzleFlame: [
     {
@@ -281,44 +411,104 @@ export const CEG_CLASS_FIELDS: Record<CegClass, CegFieldSpec[]> = {
   ],
 };
 
-/** Whether a class takes a repeat count and the gating flags (every class but
- *  ground flash, which the engine's reserved `groundflash` key fires once and
- *  always gates on `ground` itself). */
-export function cegHasSpawnControls(cegClass: CegClass): boolean {
-  return cegClass !== "CStandardGroundFlash";
-}
-
 /** Read the project's explosion generators out of untrusted JSON, dropping
  *  anything malformed rather than throwing, the way `parseWeaponLibrary`
- *  does. */
+ *  does. Migrates a generator saved before issue #3066 (one spawn's fields
+ *  directly on the generator) into the current shape, as described in this
+ *  module's doc comment. */
 export function parseExplosionGenerators(value: unknown): ExplosionGenerators {
   const out: ExplosionGenerators = {};
   if (!isRecord(value)) return out;
   for (const [key, raw] of Object.entries(value)) {
     if (!isRecord(raw) || raw.key !== key || !KEY_PATTERN.test(key)) continue;
-    if (!isCegClass(raw.class)) continue;
-    const generator: ExplosionGenerator = {
-      key,
-      class: raw.class,
-      count: typeof raw.count === "number" ? raw.count : 1,
-      ground: raw.ground === true,
-      water: raw.water === true,
-      air: raw.air === true,
-      underwater: raw.underwater === true,
-    };
-    if (typeof raw.texture === "string") generator.texture = raw.texture;
-    if (isCegColor(raw.color)) generator.color = raw.color;
-    if (typeof raw.size === "number") generator.size = raw.size;
-    if (typeof raw.lifetime === "number") generator.lifetime = raw.lifetime;
-    if (typeof raw.particles === "number") generator.particles = raw.particles;
-    out[key] = generator;
+    const generator = Array.isArray(raw.spawns)
+      ? parseCurrentGenerator(key, raw)
+      : isCegClass(raw.class)
+        ? migrateLegacyGenerator(key, raw)
+        : undefined;
+    if (generator) out[key] = generator;
   }
   return out;
+}
+
+function parseCurrentGenerator(
+  key: string,
+  raw: Record<string, unknown>,
+): ExplosionGenerator {
+  const spawns = (raw.spawns as unknown[])
+    .map(parseSpawn)
+    .filter((s): s is ExplosionSpawn => s !== undefined);
+  const generator: ExplosionGenerator = {
+    key,
+    spawns,
+    useDefaultExplosions: raw.useDefaultExplosions === true,
+  };
+  if (isRecord(raw.groundFlash)) {
+    generator.groundFlash = parseGroundFlash(raw.groundFlash);
+  }
+  return generator;
+}
+
+/** A generator saved before issue #3066 held one spawn's fields directly:
+ *  `class` alongside `count` and the gating flags, with `CStandardGroundFlash`
+ *  sharing that one slot rather than being a separate ground flash. Migrated
+ *  losslessly, since either shape writes the same CEG file. */
+function migrateLegacyGenerator(
+  key: string,
+  raw: Record<string, unknown>,
+): ExplosionGenerator {
+  if (raw.class === "CStandardGroundFlash") {
+    return {
+      key,
+      spawns: [],
+      groundFlash: parseGroundFlash(raw),
+      useDefaultExplosions: false,
+    };
+  }
+  const spawn = parseSpawn(raw);
+  return {
+    key,
+    spawns: spawn ? [spawn] : [],
+    useDefaultExplosions: false,
+  };
+}
+
+function parseSpawn(raw: unknown): ExplosionSpawn | undefined {
+  if (!isRecord(raw) || !isSpawnClass(raw.class)) return undefined;
+  const spawn: ExplosionSpawn = {
+    class: raw.class,
+    count: typeof raw.count === "number" ? raw.count : 1,
+    ground: raw.ground === true,
+    water: raw.water === true,
+    air: raw.air === true,
+    underwater: raw.underwater === true,
+  };
+  if (typeof raw.texture === "string") spawn.texture = raw.texture;
+  if (isCegColor(raw.color)) spawn.color = raw.color;
+  if (typeof raw.size === "number") spawn.size = raw.size;
+  if (typeof raw.lifetime === "number") spawn.lifetime = raw.lifetime;
+  if (typeof raw.particles === "number") spawn.particles = raw.particles;
+  return spawn;
+}
+
+function parseGroundFlash(raw: unknown): GroundFlash {
+  const flash: GroundFlash = {};
+  if (!isRecord(raw)) return flash;
+  if (isCegColor(raw.color)) flash.color = raw.color;
+  if (typeof raw.size === "number") flash.size = raw.size;
+  if (typeof raw.lifetime === "number") flash.lifetime = raw.lifetime;
+  return flash;
 }
 
 function isCegClass(value: unknown): value is CegClass {
   return (
     typeof value === "string" && CEG_CLASSES.some((c) => c.value === value)
+  );
+}
+
+function isSpawnClass(value: unknown): value is SpawnClass {
+  return (
+    typeof value === "string" && SPAWN_CLASSES.some((c) => c.value === value)
   );
 }
 
