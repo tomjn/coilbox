@@ -151,17 +151,49 @@ fn weapon_and_effect_fields_go_to_their_numbered_keys() {
     );
 }
 
+/// XTA's commander has `Weapon1` and `Weapon3` and no `Weapon2`, and the
+/// engine keys each weapon by its own number (issue #3041).
 #[test]
-fn weapons_numbered_with_a_gap_are_refused() {
+fn weapons_numbered_with_a_gap_are_each_their_own_number() {
     let (source, file) = armcom();
-    let refusal = refused(
-        set(&source, &file, "weapons[2].name", text("X")),
-        RefusalKind::FieldComputed,
+    let patched = set(&source, &file, "weapons[3].name", text("ARM_DGUN")).unwrap();
+    assert_replaced(
+        &source,
+        &patched,
+        "weapon3=CSARM_DISINTEGRATOR;",
+        "weapon3=ARM_DGUN;",
     );
+    let patched = set(&source, &file, "weapons[1].name", text("ARM_LASER")).unwrap();
+    assert_replaced(
+        &source,
+        &patched,
+        "weapon1=CSARMCOMLASER;",
+        "weapon1=ARM_LASER;",
+    );
+    let patched = set(&source, &file, "weapons[3].maxangledif", num(90.0)).unwrap();
     assert!(
-        refusal.message.contains("Weapon1, Weapon3"),
+        patched.text.contains("\tmaxangledif3 = 90;\r\n"),
         "{}",
-        refusal.message
+        patched.text
+    );
+
+    // The gap is a weapon the engine would read, so a new one can fill it.
+    let patched = set(&source, &file, "weapons[2].name", text("ARM_ROCKET")).unwrap();
+    assert!(
+        patched.text.contains("\tweapon2 = ARM_ROCKET;\r\n"),
+        "{}",
+        patched.text
+    );
+    // But a field of a weapon the file does not have has nothing to go with.
+    refused(
+        set(&source, &file, "weapons[2].maxangledif", num(1.0)),
+        RefusalKind::ParentMissing,
+    );
+    // And the engine stops at the first missing weapon after the third, so a
+    // fifth with no fourth would never be read.
+    refused(
+        set(&source, &file, "weapons[5].name", text("X")),
+        RefusalKind::ParentMissing,
     );
 }
 

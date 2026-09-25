@@ -41,7 +41,6 @@ import {
 import { isCloneMutatorOnly } from "../../cloneMutatorOnly";
 import {
   copiesToWrite,
-  copySources,
   describeRefusal,
   type InPlaceStatus,
   type InPlaceWriteOutcome,
@@ -49,6 +48,7 @@ import {
   workshopInPlaceStatus,
   workshopUndoInPlace,
   workshopWriteInPlace,
+  writeSources,
 } from "../../inPlace";
 import type { InPlaceDone } from "../../inPlaceProject";
 import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
@@ -112,7 +112,7 @@ export function InPlaceWrite({
         const written = await workshopWriteInPlace({
           gameDir,
           project,
-          sources: copySources(project, gameUnits),
+          sources: writeSources(project, gameUnits),
         });
         setOutcome(written);
         if (written.refused.length === 0)

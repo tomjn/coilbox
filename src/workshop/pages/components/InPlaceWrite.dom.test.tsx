@@ -263,6 +263,44 @@ describe("the edit-in-place actions", () => {
     });
   });
 
+  /** Issue #3041. A change through a list position is read against the
+   *  table the page showed, so the write is sent the game's read of that
+   *  unit, and only of that one. */
+  it("sends the game's read of a unit changed through a list position", async () => {
+    writeResponse = {
+      written: ["units/armcom.lua"],
+      changed: 2,
+      unchanged: 0,
+      refused: [],
+      notCarried: [],
+      carried: [],
+      copies: [],
+    };
+    renderWrite({
+      ...project,
+      edits: {
+        ...project.edits,
+        overrides: {
+          armcom: { "weapons.1.name": "CANNON" },
+          armpw: { metalcost: 55 },
+        },
+      },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Write changes into the game" }),
+    );
+    await waitFor(() =>
+      expect(args.workshop_write_in_place).toMatchObject({
+        sources: { armcom: GAME_UNITS.armcom },
+      }),
+    );
+    expect(
+      Object.keys(
+        (args.workshop_write_in_place as { sources: object }).sources,
+      ),
+    ).toEqual(["armcom"]);
+  });
+
   /** Issue #2634. A copy alone is something to write, and the write is sent
    *  the game's read of the unit it was copied from. */
   it("writes a copy as a new file and says where it went", async () => {

@@ -279,8 +279,9 @@ where
 /// Patch a project's field changes into the loose `.sdd` game at `gameDir`
 /// (issue #2635), and add its copies as unit files of their own (issue
 /// #2634). `sources` is the game's own read of each unit a copy was made
-/// from. Answers with what was written, or with every refusal and nothing
-/// written.
+/// from, and of each unit with a field change through a list position
+/// (issue #3041). Answers with what was written, or with every refusal and
+/// nothing written.
 #[tauri::command]
 async fn workshop_write_in_place(
     game_dir: String,
@@ -317,22 +318,28 @@ async fn workshop_accept_in_place(game_dir: String) -> CliResult {
 
 /// Say which of `fields` of `unit` could be written into the loose `.sdd`
 /// game at `gameDir`, writing nothing (issue #2633). Answers with a refusal
-/// and the unit file's Lua around it for each field that cannot.
+/// and the unit file's Lua around it for each field that cannot. `def` is the
+/// game's read of the unit, which a field through a list position needs
+/// (issue #3041).
 #[tauri::command]
 async fn workshop_check_in_place(
     game_dir: String,
     unit: String,
     fields: Vec<inplace::FieldProbe>,
+    def: Option<serde_json::Value>,
 ) -> CliResult {
     let game = std::path::PathBuf::from(game_dir);
-    blocking("check", move || inplace::check(&game, &unit, &fields)).await
+    blocking("check", move || {
+        inplace::check(&game, &unit, &fields, def.as_ref())
+    })
+    .await
 }
 
 /// Say which of a copy's own changes could be written into the loose `.sdd`
 /// game at `gameDir`, writing nothing and reading no file (issue #3035). A
 /// copy's changes are worked out from values alone (`inplace_clone.rs`), so
 /// this needs only the copy, the project's edits to it, and the game's own
-/// read of the unit it was copied from, which `copySources` on the frontend
+/// read of the unit it was copied from, which `writeSources` on the frontend
 /// already builds for the write.
 #[tauri::command]
 async fn workshop_check_clone_in_place(
@@ -511,6 +518,7 @@ mod tests {
                 "armcom".into(),
                 serde_json::from_value(serde_json::json!([{ "field": "metalcost", "value": 1 }]))
                     .expect("probes"),
+                None,
             )));
         assert_eq!(checked["file"], serde_json::json!("units/armcom.lua"));
         assert_eq!(checked["fields"][0]["refusal"], Value::Null);

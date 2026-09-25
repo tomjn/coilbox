@@ -55,12 +55,16 @@ const NONE: InPlaceChecks = { checks: {}, error: null };
  * `checksum` must be the read the probes' values came from. Undefined while
  * the game is still being read, which also asks nothing: a read that has not
  * landed could be of a file that is about to change.
+ *
+ * `def` is that read of the unit, which a field through a list position is
+ * read against (issue #3041).
  */
 export function useInPlaceChecks(
   gameDir: string | undefined,
   checksum: string | undefined,
   unit: string,
   probes: FieldProbe[],
+  def?: Record<string, unknown>,
 ): InPlaceChecks {
   const key =
     gameDir && checksum && unit ? cacheKey(gameDir, checksum, unit) : null;
@@ -88,7 +92,7 @@ export function useInPlaceChecks(
     );
     if (missing.length === 0) return;
     for (const p of missing) inFlight.add(p.field);
-    workshopCheckInPlace({ gameDir, unit, fields: missing })
+    workshopCheckInPlace({ gameDir, unit, fields: missing, def })
       .then((result) => {
         for (const check of result.fields) known.set(check.field, check);
         setError(null);
@@ -100,7 +104,7 @@ export function useInPlaceChecks(
         for (const p of missing) inFlight.delete(p.field);
         for (const heard of listeners) heard();
       });
-  }, [key, gameDir, unit, probes]);
+  }, [key, gameDir, unit, probes, def]);
 
   if (!key) return NONE;
   const known = answers.get(key);

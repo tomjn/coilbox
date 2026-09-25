@@ -151,22 +151,60 @@ pub(crate) fn require_loose_game(game_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// A project path step of digits is a list position counted from zero, the
-/// rule `overrides.ts` writes paths under. The patcher counts from one, as
-/// Lua does.
-fn segments(path: &str) -> Option<Vec<Segment>> {
+/// A project path as the patcher's steps.
+///
+/// A step of digits is a key into `def`, the game's read of the unit, which
+/// is the table the unit page showed when it wrote the path. The unitsync
+/// worker sends a Lua table numbered 1 to n as a JSON array and any other
+/// table as an object keyed by its Lua keys, so one step can mean two
+/// things. `weapons.1` is the second weapon of a list with no gap, and
+/// `weapons[1]` itself in a list with one, such as a Total Annihilation
+/// commander with `Weapon1` and `Weapon3` and no `Weapon2` (issue #3041).
+/// Each digit step is read against the table it lands in. A step into a
+/// table the read does not have is a list position counted from zero, since
+/// that is what `writePath` in `overrides.ts` makes of it.
+///
+/// Without the read, a digit step could mean either, so the path is refused
+/// rather than guessed.
+fn segments(path: &str, def: Option<&Value>) -> Result<Vec<Segment>, String> {
+    let not_a_path = || format!("{path:?} is not a field path.");
     let mut out = Vec::new();
+    let mut at = def;
     for step in path.split('.') {
         if step.is_empty() {
-            return None;
+            return Err(not_a_path());
         }
-        if step.bytes().all(|b| b.is_ascii_digit()) {
-            out.push(Segment::Index(step.parse::<usize>().ok()? + 1));
-        } else {
+        if !step.bytes().all(|b| b.is_ascii_digit()) {
             out.push(Segment::Key(step.to_string()));
+            at = at.and_then(|table| entry(table, step));
+            continue;
         }
+        if def.is_none() {
+            return Err(format!(
+                "Coilbox was not given the game's read of this unit, so it cannot tell which entry {path} is."
+            ));
+        }
+        let n: usize = step.parse().map_err(|_| not_a_path())?;
+        let (index, next) = match at {
+            Some(Value::Object(map)) if !map.is_empty() => (n, map.get(step)),
+            Some(Value::Array(items)) => (n.checked_add(1).ok_or_else(not_a_path)?, items.get(n)),
+            _ => (n.checked_add(1).ok_or_else(not_a_path)?, None),
+        };
+        out.push(Segment::Index(index));
+        at = next;
     }
-    Some(out)
+    Ok(out)
+}
+
+/// `table`'s value for `key`, matched without regard to case when no key is
+/// spelled the same, as the patcher matches keys.
+fn entry<'a>(table: &'a Value, key: &str) -> Option<&'a Value> {
+    let map = table.as_object()?;
+    map.get(key).or_else(|| {
+        map.iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case(key))
+            .map(|(_, v)| v)
+    })
 }
 
 fn patch_value(value: &Value) -> Option<PatchValue> {
@@ -421,8 +459,14 @@ pub struct CheckOutcome {
 /// Whether each of `fields` of `unit` could be written into the game's own
 /// files, without writing anything (issue #2633). The unit page asks this at
 /// edit time so a field the route cannot carry is marked before the user
-/// reaches the write.
-pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<CheckOutcome, String> {
+/// reaches the write. `def` is the game's read of the unit, which a field
+/// through a list position is read against (see [`segments`]).
+pub fn check(
+    game_dir: &Path,
+    unit: &str,
+    fields: &[FieldProbe],
+    def: Option<&Value>,
+) -> Result<CheckOutcome, String> {
     require_loose_game(game_dir)?;
     let refusal = |field: &str, template: &Refused| FieldCheck {
         field: field.to_string(),
@@ -445,8 +489,7 @@ pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<Check
     let edits: Vec<Result<(Vec<Segment>, PatchValue), String>> = fields
         .iter()
         .map(|probe| {
-            let path = segments(&probe.field)
-                .ok_or_else(|| format!("{:?} is not a field path.", probe.field))?;
+            let path = segments(&probe.field, def)?;
             let value = match &probe.value {
                 // Any literal shows whether the file has somewhere to put
                 // one, and a number is the commonest kind of field.
@@ -736,9 +779,11 @@ fn unit_encodings(files: &[PathBuf]) -> BTreeMap<PathBuf, Encoding> {
 /// `game_dir`, add each copy as a unit file of its own, and write them if the
 /// patcher accepted every one.
 ///
-/// `sources` is the game's own read of each unit a copy was made from, keyed
-/// by unit, which is what a copy's changes are worked out against. See
-/// `inplace_clone.rs` for why the unit's file cannot stand in for it.
+/// `sources` is the game's own read of units, keyed by unit: each unit a copy
+/// was made from, which is what a copy's changes are worked out against, and
+/// each unit with a field change through a list position, which [`segments`]
+/// reads that position against. See `inplace_clone.rs` for why the unit's
+/// file cannot stand in for it.
 pub fn write(
     game_dir: &Path,
     project: &ModProject,
@@ -770,11 +815,12 @@ pub fn write(
                 message,
                 location: None,
             };
-            let Some(path) = segments(field) else {
-                outcome
-                    .refused
-                    .push(refuse(format!("{field:?} is not a field path.")));
-                continue;
+            let path = match segments(field, sources.get(unit)) {
+                Ok(path) => path,
+                Err(message) => {
+                    outcome.refused.push(refuse(message));
+                    continue;
+                }
             };
             let Some(value) = patch_value(value) else {
                 outcome.refused.push(refuse(NOT_A_PLAIN_VALUE.to_string()));
@@ -1190,17 +1236,81 @@ pub fn accept(game_dir: &Path) -> Result<AcceptOutcome, String> {
 mod tests {
     use super::*;
 
+    /// A digit step is read against the table the page read it from
+    /// (issue #3041): a position counted from zero in a list numbered 1 to n,
+    /// and the Lua key itself in a table with a gap.
     #[test]
-    fn a_digit_step_counts_from_one_in_lua() {
-        assert_eq!(
-            segments("weapons.0.def"),
-            Some(vec![
+    fn a_digit_step_is_read_as_the_page_read_it() {
+        let steps = |index| {
+            vec![
                 Segment::Key("weapons".into()),
-                Segment::Index(1),
-                Segment::Key("def".into())
+                Segment::Index(index),
+                Segment::Key("def".into()),
+            ]
+        };
+        let listed = serde_json::json!({ "weapons": [{ "def": "A" }, { "def": "B" }] });
+        let gapped = serde_json::json!({ "weapons": { "1": { "def": "A" }, "3": { "def": "C" } } });
+        assert_eq!(segments("weapons.0.def", Some(&listed)), Ok(steps(1)));
+        assert_eq!(segments("weapons.1.def", Some(&listed)), Ok(steps(2)));
+        assert_eq!(segments("weapons.1.def", Some(&gapped)), Ok(steps(1)));
+        assert_eq!(segments("weapons.3.def", Some(&gapped)), Ok(steps(3)));
+        // A table the read does not have is a list the page would create.
+        assert_eq!(
+            segments("weapons.0.def", Some(&serde_json::json!({}))),
+            Ok(steps(1))
+        );
+        // Keys are matched as the patcher matches them.
+        assert_eq!(
+            segments("Weapons.1.def", Some(&gapped)).map(|s| s[1].clone()),
+            Ok(Segment::Index(1))
+        );
+
+        assert!(segments("weapons.0.def", None).is_err());
+        assert_eq!(
+            segments("customparams.tonnage", None),
+            Ok(vec![
+                Segment::Key("customparams".into()),
+                Segment::Key("tonnage".into())
             ])
         );
-        assert_eq!(segments("a..b"), None);
+        assert!(segments("a..b", Some(&listed)).is_err());
+    }
+
+    /// Issue #3041 for a Lua unit: `weapons` numbered 1, 2 and 4 reads as an
+    /// object, so the page's `weapons.1` is `weapons[1]`. Taken as a list
+    /// position it would have changed `weapons[2]`, which the post-check
+    /// cannot catch because that is exactly the change it was asked for.
+    #[test]
+    fn a_lua_list_with_a_gap_is_written_at_the_entry_the_page_showed() {
+        let (_root, game) = game();
+        let file = game.join("units/gapped.lua");
+        let source = "return {\n  gapped = {\n    weapons = {\n      [1] = { def = \"LASER\" },\n      [2] = { def = \"ROCKET\" },\n      [4] = { def = \"DGUN\" },\n    },\n  },\n}\n";
+        std::fs::write(&file, source).unwrap();
+        let read_of_unit = serde_json::json!({
+            "weapons": {
+                "1": { "def": "LASER" },
+                "2": { "def": "ROCKET" },
+                "4": { "def": "DGUN" },
+            },
+        });
+        let sources = BTreeMap::from([("gapped".to_string(), read_of_unit)]);
+
+        let outcome = super::write(
+            &game,
+            &project(serde_json::json!({
+                "gapped": { "weapons.1.def": "BIGLASER", "weapons.4.def": "BIGDGUN" },
+            })),
+            &sources,
+        )
+        .unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(
+            read(&file),
+            source
+                .replacen("\"LASER\"", "\"BIGLASER\"", 1)
+                .replacen("\"DGUN\"", "\"BIGDGUN\"", 1)
+        );
     }
 
     #[test]
@@ -1576,6 +1686,7 @@ mod tests {
                 { "field": "brandnewfield", "value": null },
                 { "field": "buildoptions", "value": ["armsolar"] },
             ])),
+            None,
         )
         .unwrap();
 
@@ -1623,6 +1734,7 @@ mod tests {
                 { "field": "description", "value": "Assault Vanguard" },
                 { "field": "customparams.tonnage", "value": 100 },
             ])),
+            None,
         )
         .unwrap();
 
@@ -1645,6 +1757,7 @@ mod tests {
             &game,
             "armcom",
             &probes(serde_json::json!([{ "field": "metalcost", "value": 1 }])),
+            None,
         )
         .unwrap();
         assert_eq!(outcome.file, None);
@@ -2061,7 +2174,7 @@ mod tests {
         assert!(write(&game, &project(serde_json::json!({}))).is_err());
         assert!(undo(&game).is_err());
         assert!(accept(&game).is_err());
-        assert!(check(&game, "u", &[]).is_err());
+        assert!(check(&game, "u", &[], None).is_err());
     }
 
     fn copy_tree(from: &Path, to: &Path) {
@@ -2179,6 +2292,7 @@ mod tests {
                 { "field": "maxdamage", "value": 2000 },
                 { "field": "name", "value": "Spawn Beacon" },
             ])),
+            None,
         )
         .unwrap();
 
@@ -2318,10 +2432,11 @@ mod tests {
             "armcom",
             &probes(serde_json::json!([
                 { "field": "maxdamage", "value": 3500 },
-                { "field": "weapons.0.name", "value": "CSARMCOMLASER" },
+                { "field": "weapons.3.name", "value": "CSARM_DISINTEGRATOR" },
                 { "field": "buildoptions", "value": null },
                 { "field": "cloakcost", "value": null },
             ])),
+            Some(&armcom_read()),
         )
         .unwrap();
 
@@ -2333,14 +2448,73 @@ mod tests {
             .collect();
         assert_eq!(
             kinds,
-            vec![
-                None,
-                // Weapon1 and Weapon3, with no Weapon2.
-                Some(RefusalKind::FieldComputed),
-                Some(RefusalKind::FieldComputed),
-                None,
-            ]
+            vec![None, None, Some(RefusalKind::FieldComputed), None]
         );
+    }
+
+    /// XTA's commander as the unit page reads it: `parse_fbi.lua` keys each
+    /// weapon by its number, and with `Weapon1` and `Weapon3` and no
+    /// `Weapon2` that is not a list numbered 1 to n, so the unitsync worker
+    /// sends an object keyed `"1"` and `"3"`.
+    fn armcom_read() -> Value {
+        serde_json::json!({
+            "buildcostmetal": 2200,
+            "weapons": {
+                "1": { "name": "CSARMCOMLASER" },
+                "3": { "name": "CSARM_DISINTEGRATOR" },
+            },
+        })
+    }
+
+    /// Issue #3041: an edit to either of the commander's weapons lands on the
+    /// weapon the page showed it against, and nothing else in the file moves.
+    #[test]
+    fn an_fbi_commander_with_a_gap_in_its_weapons_takes_an_edit_to_either() {
+        let (_root, game) = fbi_game();
+        let armcom = game.join("units/ARMCOM.FBI");
+        let before = read(&armcom);
+        let sources = BTreeMap::from([("armcom".to_string(), armcom_read())]);
+
+        let outcome = super::write(
+            &game,
+            &project(serde_json::json!({
+                "armcom": {
+                    "weapons.1.name": "ARM_LIGHTLASER",
+                    "weapons.3.name": "ARM_DGUN",
+                },
+            })),
+            &sources,
+        )
+        .unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.changed, 2);
+        assert_eq!(
+            read(&armcom),
+            before
+                .replacen("weapon1=CSARMCOMLASER;", "weapon1=ARM_LIGHTLASER;", 1)
+                .replacen("weapon3=CSARM_DISINTEGRATOR;", "weapon3=ARM_DGUN;", 1)
+        );
+    }
+
+    /// Without the game's read, `weapons.1` could be `Weapon1` or `Weapon2`,
+    /// so the change is refused and nothing is written.
+    #[test]
+    fn a_list_position_with_no_read_of_the_unit_is_refused() {
+        let (_root, game) = fbi_game();
+        let armcom = game.join("units/ARMCOM.FBI");
+        let before = read(&armcom);
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({ "armcom": { "weapons.1.name": "X" } })),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        assert_eq!(outcome.refused[0].kind, RefusalKind::InvalidValue);
+        assert!(outcome.written.is_empty());
+        assert_eq!(read(&armcom), before);
     }
 
     #[test]
@@ -2355,6 +2529,7 @@ mod tests {
             &game,
             "dagger",
             &probes(serde_json::json!([{ "field": "maxdamage", "value": 1 }])),
+            None,
         )
         .unwrap();
         let field = &outcome.fields[0];

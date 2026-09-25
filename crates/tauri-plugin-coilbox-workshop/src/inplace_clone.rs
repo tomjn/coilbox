@@ -101,6 +101,16 @@ fn as_list(value: &Value) -> Option<&[Value]> {
     }
 }
 
+/// A key of a table read as an object. A key of digits is a Lua number key,
+/// since the unitsync worker sends a numbered table with a gap in it as an
+/// object keyed by its numbers (issue #3041).
+fn map_segment(key: &str) -> Segment {
+    match key.parse::<usize>() {
+        Ok(n) if key.bytes().all(|b| b.is_ascii_digit()) => Segment::Index(n),
+        _ => Segment::Key(key.to_string()),
+    }
+}
+
 fn as_map<'a>(value: &'a Value, empty: &'a Map<String, Value>) -> Option<&'a Map<String, Value>> {
     match value {
         Value::Object(map) => Some(map),
@@ -172,7 +182,7 @@ impl Walk {
         for key in keys {
             let b = before.get(key).filter(|v| !v.is_null());
             let a = after.get(key).filter(|v| !v.is_null());
-            self.enter(Segment::Key(key.clone()), key.clone());
+            self.enter(map_segment(key), key.clone());
             match (b, a) {
                 (Some(b), Some(a)) => self.step(b, a),
                 (None, Some(a)) => match scalar(a) {
@@ -478,6 +488,29 @@ mod tests {
                 Segment::Key("weapons".into()),
                 Segment::Index(1),
                 Segment::Key("def".into())
+            ]
+        );
+    }
+
+    /// A table with a gap reads as an object keyed by its Lua numbers
+    /// (issue #3041), so a copy's change to its `"3"` is to `weapons[3]`,
+    /// not to a field named 3.
+    #[test]
+    fn a_number_key_of_a_table_with_a_gap_is_that_lua_key() {
+        let source = json!({ "weapons": { "1": { "name": "LASER" }, "3": { "name": "DGUN" } } });
+        let copy = json!({ "weapons": { "1": { "name": "LASER" }, "3": { "name": "BIGDGUN" } } });
+
+        let (edits, refused) = copy_edits(&source, &copy);
+
+        assert!(refused.is_empty(), "{refused:?}");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].field, "weapons.3.name");
+        assert_eq!(
+            edits[0].path,
+            vec![
+                Segment::Key("weapons".into()),
+                Segment::Index(3),
+                Segment::Key("name".into())
             ]
         );
     }

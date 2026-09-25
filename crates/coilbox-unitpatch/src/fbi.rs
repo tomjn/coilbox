@@ -414,20 +414,15 @@ fn weapon(doc: &Document, source: &str, path: &[Segment], op: &Op) -> Result<Tar
         }
     };
     // The weapons the engine reads: `weapon1` to `weapon3` whether or not
-    // each is there, then on until the first one missing.
+    // each is there, then on until the first one missing. Each is keyed by
+    // its own number, gap or not, so `weapons[3]` is `Weapon3` in a file
+    // with no `Weapon2` (issue #3041).
     let tree = doc.tree();
     let has = |key: &str| matches!(tree.get("unitinfo"), Some(Node::Table(info)) if info.contains_key(key));
     let present: Vec<usize> = (1..=MAX_WEAPONS)
         .take_while(|&w| w <= 3 || has(&format!("weapon{w}")))
         .filter(|&w| has(&format!("weapon{w}")))
         .collect();
-    let count = present.len();
-    if present.iter().enumerate().any(|(i, &w)| w != i + 1) {
-        return Err(Refusal::new(
-            RefusalKind::FieldComputed,
-            format!("This file numbers its weapons with a gap ({}), so coilbox cannot be sure which one {shown} is.", present.iter().map(|w| format!("Weapon{w}")).collect::<Vec<_>>().join(", ")),
-        ));
-    }
     let key = if field == "badtargetcategory" {
         let alias = [
             "wpri_badtargetcategory",
@@ -451,8 +446,12 @@ fn weapon(doc: &Document, source: &str, path: &[Segment], op: &Op) -> Result<Tar
             }
         }
     };
-    let new_weapon = field == "name" && n == count + 1 && n <= MAX_WEAPONS;
-    if n > count && !new_weapon {
+    // A new weapon has to be one the engine goes on to read: any of the
+    // first three, or the one straight after the last.
+    let exists = present.contains(&n);
+    let new_weapon =
+        field == "name" && (1..=MAX_WEAPONS).contains(&n) && (n <= 3 || present.contains(&(n - 1)));
+    if !exists && !new_weapon {
         let refusal = Refusal::new(
             RefusalKind::ParentMissing,
             format!("This file has no Weapon{n}, so {shown} has no weapon to go with."),

@@ -460,6 +460,7 @@ export default function UnitPage() {
     defs?.checksum,
     unitKey,
     inPlaceProbes,
+    gameUnits[unitKey],
   );
   const mutatorOnly = project?.mutatorOnly;
   const inPlaceOf = (row: { path: string }): InPlaceField | undefined => {
