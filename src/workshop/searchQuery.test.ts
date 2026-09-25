@@ -1,9 +1,27 @@
 import { describe, expect, it } from "vitest";
+import type { UnitDerivedStats } from "./derivedStats";
 import {
   evaluateUnitQuery,
   parseUnitQuery,
+  queryNeedsDerivedFields,
   type UnitQueryContext,
 } from "./searchQuery";
+
+/** A `derivedStats.ts` answer with everything absent unless overridden, for a
+ *  test that only cares about one or two of its numbers. */
+function stats(over: Partial<UnitDerivedStats> = {}): UnitDerivedStats {
+  return {
+    dps: null,
+    alphaDamage: null,
+    costPerHitPoint: null,
+    dpsPer100Metal: null,
+    hitPointsPerBuildSecond: null,
+    rangePerCost: null,
+    weapons: [],
+    weaponsSummed: 0,
+    ...over,
+  };
+}
 
 function ctx(over: Partial<UnitQueryContext> = {}): UnitQueryContext {
   return {
@@ -136,6 +154,53 @@ describe("string fields", () => {
     const unit = ctx({ def: { objectName: "Units/ARMCOM.s3o" } });
     expect(matches('objectname = "units/armcom.s3o"', unit)).toBe(true);
     expect(matches('objectname != "units/armcom.s3o"', unit)).toBe(false);
+  });
+});
+
+describe("derived fields (issue #3074)", () => {
+  it("matches a derived alias against a supplied UnitDerivedStats", () => {
+    expect(
+      matches("dps > 50", ctx({ derived: () => stats({ dps: 100 }) })),
+    ).toBe(true);
+    expect(
+      matches("dps > 50", ctx({ derived: () => stats({ dps: 10 }) })),
+    ).toBe(false);
+  });
+
+  it("resolves the alpha, costperhp and dpsper100metal spellings", () => {
+    const derived = () =>
+      stats({ alphaDamage: 200, costPerHitPoint: 0.5, dpsPer100Metal: 40 });
+    expect(matches("alpha > 100", ctx({ derived }))).toBe(true);
+    expect(matches("costperhp < 1", ctx({ derived }))).toBe(true);
+    expect(matches("dpsper100metal > 30", ctx({ derived }))).toBe(true);
+  });
+
+  it("never matches a comparison when derivedStats.ts cannot state the number (a paralyser has no DPS)", () => {
+    const derived = () => stats({ dps: null });
+    expect(matches("dps > 0", ctx({ derived }))).toBe(false);
+    expect(matches("dps < 999999", ctx({ derived }))).toBe(false);
+    expect(matches("dps != 0", ctx({ derived }))).toBe(false);
+  });
+
+  it("never matches when the caller supplies no derived resolution at all", () => {
+    expect(matches("dps > 0", ctx())).toBe(false);
+  });
+
+  it("queryNeedsDerivedFields is true only when a term names one", () => {
+    const plain = parseUnitQuery("hp > 100");
+    const withDerived = parseUnitQuery("hp > 100 and dps > 50");
+    if (!plain.ok || !withDerived.ok) throw new Error("expected valid queries");
+    expect(queryNeedsDerivedFields(plain.query)).toBe(false);
+    expect(queryNeedsDerivedFields(withDerived.query)).toBe(true);
+  });
+
+  it("combines a derived term with a plain field term", () => {
+    expect(
+      matches(
+        "hp > 1000 and dps > 50",
+        ctx({ derived: () => stats({ dps: 100 }) }),
+      ),
+    ).toBe(true);
   });
 });
 

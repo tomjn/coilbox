@@ -68,6 +68,9 @@ function unitListProps(
     picOf: () => undefined,
     picsPending: false,
     factionOf: () => undefined,
+    weaponDefs: {},
+    library: {},
+    equipped: {},
     onSelect: () => {},
     ...over,
   };
@@ -306,5 +309,67 @@ describe("searching by stat (issue #2656)", () => {
       target: { value: "unit001" },
     });
     expect(screen.getByText("1 of 3 units")).toBeTruthy();
+  });
+});
+
+describe("searching by a derived stat (issue #3074)", () => {
+  const gameLaser = {
+    weaponType: "Cannon",
+    range: 300,
+    reloadTime: 2,
+    damage: { default: 50 },
+  };
+  /** 50 damage every 2 seconds: a DPS of 25. */
+  const gunned = {
+    weapons: [{ name: "unit000_laser" }],
+    weapondefs: { laser: gameLaser },
+  };
+  const unarmed = {};
+
+  function unitsWithWeapons(): Record<string, Record<string, unknown>> {
+    return { unit000: gunned, unit001: unarmed };
+  }
+
+  it("filters by dps, resolved off the unit's own weapon", () => {
+    draw({ units: unitsWithWeapons() });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "dps > 20" },
+    });
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
+  });
+
+  it("stands an equipped library weapon in for the unit's own (issue #3081)", () => {
+    draw({
+      units: unitsWithWeapons(),
+      library: {
+        bigcannon: {
+          key: "bigcannon",
+          source: "bigcannon",
+          def: {
+            weaponType: "Cannon",
+            range: 500,
+            reloadTime: 1,
+            damage: { default: 5 },
+          },
+        },
+      },
+      equipped: { unit000: { "0": "bigcannon" } },
+    });
+    // The equipped weapon's DPS is 5, not the game laser's 25, so a query
+    // for dps > 20 no longer matches unit000.
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "dps > 20" },
+    });
+    expect(screen.getByText("0 of 2 units")).toBeTruthy();
+  });
+
+  it("never matches a unit derivedStats.ts cannot state a number for, rather than as zero", () => {
+    draw({ units: unitsWithWeapons() });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "dps < 999999" },
+    });
+    // unit001 has no weapon at all, so its dps is null, not zero: it must
+    // not match an upper-bound comparison either.
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
   });
 });

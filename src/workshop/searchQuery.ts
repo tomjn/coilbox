@@ -32,20 +32,46 @@
  * that resolves to nothing the engine declares for a unit is a parse error,
  * reported inline rather than silently matching nothing.
  *
+ * A field name is also tried against a second, smaller alias table for
+ * `derivedStats.ts`'s own numbers (issue #3074): `dps`, `alpha`, `costperhp`
+ * and the rest of {@link DERIVED_ALIASES}. Those do not live on a unit's def
+ * at all, so a term that resolves to one is a {@link FieldTerm} with
+ * {@link FieldTerm.derived} set rather than {@link FieldTerm.keys}, and
+ * `evaluateUnitQuery` reads it off {@link UnitQueryContext.derived} instead of
+ * the def. A unit `derivedStats.ts` cannot state a number for honestly (a
+ * paralyser's DPS, a shield's range per cost) reads as absent, the same as a
+ * def field nothing sets, so a comparison against it never matches rather
+ * than matching a manufactured zero.
+ *
  * Parsing never throws. A malformed query comes back as `{ ok: false, error
  * }` with a message meant to be shown next to the search box.
  */
 import { engineFields } from "@/content/unitFields";
+import type { UnitDerivedStats } from "./derivedStats";
 
 export type CompareOp = ">" | "<" | ">=" | "<=" | "=" | "!=";
 
-/** One field a query names, alongside every real spelling a game might use
- *  for it, oldest last. */
+/** The `derivedStats.ts` numbers a query can compare against, rather than a
+ *  raw def field (issue #3074). */
+export type DerivedFieldKey =
+  | "dps"
+  | "alphaDamage"
+  | "costPerHitPoint"
+  | "dpsPer100Metal"
+  | "hitPointsPerBuildSecond"
+  | "rangePerCost";
+
+/** One field a query names: either a raw def field, alongside every real
+ *  spelling a game might use for it (oldest last), or one of
+ *  `derivedStats.ts`'s own numbers, named by {@link derived} instead. */
 interface FieldTerm {
   kind: "field";
   /** The identifier as the query typed it, for error messages only. */
   label: string;
   keys: string[];
+  /** Set when this term names a `derivedStats.ts` number instead of a def
+   *  field, in which case {@link keys} is empty and unused. */
+  derived?: DerivedFieldKey;
   op: CompareOp;
   value: number | string;
 }
@@ -90,6 +116,21 @@ const FIELD_ALIASES: Record<string, string[]> = {
   sightrange: ["sightDistance"],
 };
 
+/** Aliases for `derivedStats.ts`'s own numbers (issue #3074), short spellings
+ *  first. Checked before {@link FIELD_ALIASES}, since none of these names a
+ *  def field a game could also declare. */
+const DERIVED_ALIASES: Record<string, DerivedFieldKey> = {
+  dps: "dps",
+  alpha: "alphaDamage",
+  alphadamage: "alphaDamage",
+  costperhp: "costPerHitPoint",
+  costperhitpoint: "costPerHitPoint",
+  dpsper100metal: "dpsPer100Metal",
+  hpperbuildsecond: "hitPointsPerBuildSecond",
+  hitpointsperbuildsecond: "hitPointsPerBuildSecond",
+  rangepercost: "rangePerCost",
+};
+
 /** Every top level key the engine declares for a unit definition, lowercased
  *  for a case-insensitive lookup, alongside the case the engine writes it in. */
 function unitFieldKeys(): Map<string, string> {
@@ -123,6 +164,23 @@ export function resolveField(
     ok: false,
     error: `Unknown field "${identifier}". Try hp, speed, cost, metal, energy, buildtime, los, or a unit field's own name.`,
   };
+}
+
+/**
+ * Resolve a field name for a query term, trying `derivedStats.ts`'s own
+ * aliases before falling through to {@link resolveField}'s def fields (issue
+ * #3074). Not exported alongside it: a batch edit writes into a def field, and
+ * a derived number has nowhere to write, so its own field picker has no
+ * business offering one.
+ */
+function resolveQueryField(
+  identifier: string,
+):
+  | { ok: true; keys: string[]; derived?: DerivedFieldKey }
+  | { ok: false; error: string } {
+  const derived = DERIVED_ALIASES[identifier.toLowerCase()];
+  if (derived) return { ok: true, keys: [], derived };
+  return resolveField(identifier);
 }
 
 type Token =
@@ -219,7 +277,7 @@ export function parseUnitQuery(input: string): ParseResult {
           error: `"${token.value} ${next.value}" needs a value after it.`,
         };
       }
-      const resolved = resolveField(token.value);
+      const resolved = resolveQueryField(token.value);
       if (!resolved.ok) return resolved;
       const isNumber =
         valueToken.type === "word" && NUMBER_RE.test(valueToken.value);
@@ -239,6 +297,7 @@ export function parseUnitQuery(input: string): ParseResult {
         kind: "field",
         label: token.value,
         keys: resolved.keys,
+        derived: resolved.derived,
         op: next.value,
         value: isNumber
           ? Number(valueToken.value)
@@ -275,6 +334,21 @@ export interface UnitQueryContext {
   /** The project's own overrides for this unit, keyed by field path, checked
    *  before `def` for each candidate key. */
   overrides?: Record<string, unknown>;
+  /** This unit's `derivedStats.ts` numbers, read only when a term names one
+   *  (issue #3074): {@link queryNeedsDerivedFields} says whether a parsed
+   *  query does, so a caller can skip resolving a unit's weapons for a plain
+   *  field search. Omitted, a derived-field term never matches, the same as
+   *  one `derivedStats.ts` could not state a number for honestly. */
+  derived?: () => UnitDerivedStats;
+}
+
+/** Whether `query` names a `derivedStats.ts` number (issue #3074), so a
+ *  caller can skip the cost of resolving one for every unit when nothing in
+ *  the query asks for it. */
+export function queryNeedsDerivedFields(query: ParsedQuery): boolean {
+  return query.some((group) =>
+    group.some((term) => term.kind === "field" && term.derived !== undefined),
+  );
 }
 
 function findKeyCI(
@@ -314,8 +388,14 @@ function evaluateTerm(term: QueryTerm, ctx: UnitQueryContext): boolean {
       ctx.name.toLowerCase().includes(needle)
     );
   }
-  const raw = fieldValue(ctx, term.keys);
-  if (raw === undefined) return false;
+  const raw =
+    term.derived !== undefined
+      ? (ctx.derived?.()[term.derived] ?? undefined)
+      : fieldValue(ctx, term.keys);
+  // `null` is `derivedStats.ts`'s own "cannot state this honestly" (a
+  // paralyser's DPS, a shield's range per cost), which must not match a
+  // comparison the way a real zero would.
+  if (raw === undefined || raw === null) return false;
   if (typeof term.value === "number") {
     const n = coerceNumber(raw);
     if (n === undefined) return false;

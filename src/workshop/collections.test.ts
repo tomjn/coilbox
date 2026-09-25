@@ -206,6 +206,39 @@ describe("collectionUnits", () => {
     };
     expect(collectionUnits(withRule, id, live)).toEqual(new Set(["armcom"]));
   });
+
+  describe("a rule naming a derived field (issue #3074)", () => {
+    const gameLaser = {
+      weaponType: "Cannon",
+      range: 300,
+      reloadTime: 2,
+      damage: { default: 50 },
+    };
+    const tank = {
+      metalCost: 200,
+      weapons: [{ name: "armtank_laser" }],
+      weapondefs: { laser: gameLaser },
+    };
+
+    it("matches when weapon resolution is supplied", () => {
+      const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Hard");
+      const withRule = setCollectionRule(collections, id, "dps > 20");
+      const live = {
+        units: { armtank: tank },
+        overrides: {},
+        weapons: { weaponDefs: {}, library: {}, equipped: {}, clones: {} },
+      };
+      // 50 damage every 2 seconds is a DPS of 25.
+      expect(collectionUnits(withRule, id, live)).toEqual(new Set(["armtank"]));
+    });
+
+    it("matches nothing when no weapon resolution is supplied", () => {
+      const { collections, id } = createCollection(EMPTY_COLLECTIONS, "Hard");
+      const withRule = setCollectionRule(collections, id, "dps > 20");
+      const live = { units: { armtank: tank }, overrides: {} };
+      expect(collectionUnits(withRule, id, live)).toEqual(new Set());
+    });
+  });
 });
 
 describe("setCollectionRule", () => {

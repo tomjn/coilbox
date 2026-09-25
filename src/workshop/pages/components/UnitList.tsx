@@ -59,10 +59,17 @@ import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { scrollTopForRow, visibleRowWindow } from "@/lib/rowVirtualize";
 import type { BuildMenus } from "../../buildMenus";
 import type { CloneOrigin, UnitClones } from "../../clones";
+import type { UnitDerivedStats } from "../../derivedStats";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
-import type { UnitOverrides } from "../../overrides";
-import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
+import { resolvedDef, type UnitOverrides } from "../../overrides";
+import {
+  evaluateUnitQuery,
+  parseUnitQuery,
+  queryNeedsDerivedFields,
+} from "../../searchQuery";
 import { type UnitTextEdits, unitTextCount } from "../../unitText";
+import { unitEffectiveDerivedStats } from "../../unitWeapons";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 /**
  * A row's height in pixels, pinned by an inline style on every row so the
@@ -98,6 +105,9 @@ export function UnitList({
   picOf,
   picsPending,
   factionOf,
+  weaponDefs,
+  library,
+  equipped,
   restrictTo,
   onSelect,
 }: {
@@ -124,6 +134,15 @@ export function UnitList({
   /** Which side reaches this unit, where the game has more than one and its
    *  build graph reaches it at all. */
   factionOf: (key: string) => string | undefined;
+  /** The game's shared weapon table, needed alongside {@link library} and
+   *  {@link equipped} to answer a search term naming a `derivedStats.ts`
+   *  number (issue #3074), the same resolution the unit editor and the
+   *  reference table use (`unitWeapons.ts`). */
+  weaponDefs: Record<string, Record<string, unknown>>;
+  /** The project's weapon library (issue #2640). */
+  library: WeaponLibrary;
+  /** The project's equipped weapons, keyed by unit then slot. */
+  equipped: EquippedWeapons;
   /** Scope the list to a collection's units (issue #2654), on top of the
    *  search box below rather than instead of it. `undefined` for every unit,
    *  which is the whole game the same way it always was. */
@@ -148,16 +167,47 @@ export function UnitList({
   // a search reflects a project's own edits. A query that does not parse
   // shows the reason inline rather than matching nothing silently.
   const parsedQuery = useMemo(() => parseUnitQuery(needle), [needle]);
-  const rows = parsedQuery.ok
-    ? all.filter((u) =>
-        evaluateUnitQuery(parsedQuery.query, {
-          key: u.key,
-          name: u.label,
-          def: u.def,
-          overrides: overrides[u.key],
-        }),
-      )
-    : [];
+  // A `derivedStats.ts` number (issue #3074) costs a unit's full weapon
+  // resolution to answer, so it is worth computing at all only when the query
+  // actually names one (`needsDerived`), and worth remembering per unit once
+  // it is: `derivedCache` is scoped to this one filter pass, so two derived
+  // terms in the same query ("dps > 100 and alpha > 50") resolve a unit once
+  // between them rather than twice. The whole computation is memoised on the
+  // project state a resolution reads, so an unrelated re-render (scrolling)
+  // does not repeat it.
+  const rows = useMemo(() => {
+    if (!parsedQuery.ok) return [];
+    const needsDerived = queryNeedsDerivedFields(parsedQuery.query);
+    const derivedCache = new Map<string, UnitDerivedStats>();
+    const derivedFor = (
+      key: string,
+      def: Record<string, unknown>,
+    ): UnitDerivedStats => {
+      const cached = derivedCache.get(key);
+      if (cached) return cached;
+      const cloneSource = clones[key]?.source;
+      const owners = cloneSource ? [key, cloneSource] : [key];
+      const resolved = resolvedDef(def, overrides[key]);
+      const stats = unitEffectiveDerivedStats(
+        { def: resolved },
+        weaponDefs,
+        owners,
+        library,
+        equipped[key],
+      );
+      derivedCache.set(key, stats);
+      return stats;
+    };
+    return all.filter((u) =>
+      evaluateUnitQuery(parsedQuery.query, {
+        key: u.key,
+        name: u.label,
+        def: u.def,
+        overrides: overrides[u.key],
+        derived: needsDerived ? () => derivedFor(u.key, u.def) : undefined,
+      }),
+    );
+  }, [all, parsedQuery, overrides, weaponDefs, library, equipped, clones]);
 
   // The element itself rather than a ref, because a search that matches
   // nothing takes the whole scroller out of the DOM and puts a fresh one back

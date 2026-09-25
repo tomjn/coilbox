@@ -79,6 +79,9 @@ export function UnitReferenceTable({
         key: row.key,
         name: row.name,
         def: row.def,
+        // Already computed for this row (issue #3074): no extra resolution
+        // to memoise, since `rows` itself is.
+        derived: () => row.derived,
       }),
     );
   }, [rows, parsedQuery]);
