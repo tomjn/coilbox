@@ -43,6 +43,7 @@ import { importContainerFile } from "@/deeplink/bindings";
 import { useImportParam } from "@/deeplink/useImportParam";
 import { nextDrawerKey } from "@/general/drawerKey";
 import { useRecordHubImport } from "@/hub/imports";
+import { useCheckpoints } from "../checkpoints";
 import { forgetEditHistory } from "../history";
 import {
   describeEdits,
@@ -82,6 +83,7 @@ export default function ProjectsPage() {
     duplicateProject,
     removeProject,
   } = useModProjects();
+  const { forget: forgetCheckpoints } = useCheckpoints();
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   /** Whether the details drawer is up to start a project. */
@@ -341,6 +343,7 @@ export default function ProjectsPage() {
                     onDelete={() => {
                       removeProject(project.id);
                       forgetEditHistory(project.id);
+                      forgetCheckpoints(project.id);
                     }}
                   />
                 </div>
