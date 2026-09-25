@@ -12,6 +12,12 @@ import { setOverride } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
 import { EMPTY_EDITS } from "./project";
 import { setUnitText } from "./unitText";
+import {
+  addLibraryWeapon,
+  copyGameWeapon,
+  equipWeapon,
+  setLibraryField,
+} from "./weaponLibrary";
 
 /**
  * One saved project, written by this side and read by the other (issue #2751).
@@ -49,7 +55,8 @@ const FIXTURE = join(
 const INHERITED_MENU = ["armpw", "armflash"];
 
 function buildEdits(): GameEdits {
-  let { overrides, clones, menus, text, disabled } = EMPTY_EDITS;
+  let { overrides, clones, menus, text, disabled, weapons, equipped } =
+    EMPTY_EDITS;
 
   // A number and a nested path, so the dotted keys an override set uses are
   // both in the file.
@@ -95,7 +102,21 @@ function buildEdits(): GameEdits {
   disabled = setUnitDisabled(disabled, "armbanth", true);
   disabled = setUnitDisabled(disabled, "armaser", true);
 
-  return { overrides, clones, menus, text, disabled };
+  // A weapon copied into the library with one change on it, fired from a
+  // slot of a game unit (issue #2640).
+  weapons = addLibraryWeapon(
+    weapons,
+    copyGameWeapon(
+      "heavylaser",
+      "armcom_disintegrator",
+      { range: 300, damage: { default: 1000 } },
+      "c6a15f1f",
+    ),
+  );
+  weapons = setLibraryField(weapons, "heavylaser", "range", 450, 300);
+  equipped = equipWeapon(equipped, "armcom", "0", "heavylaser");
+
+  return { overrides, clones, menus, text, disabled, weapons, equipped };
 }
 
 /**
@@ -165,7 +186,7 @@ describe("the saved project fixture the Rust crate reads", () => {
       .filter(([, value]) =>
         Array.isArray(value)
           ? value.length === 0
-          : Object.keys(value).length === 0,
+          : Object.keys(value ?? {}).length === 0,
       )
       .map(([slot]) => slot);
 

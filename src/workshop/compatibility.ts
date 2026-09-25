@@ -61,8 +61,14 @@ import {
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import type { UnitClone } from "./clones";
 import { customParamKey } from "./customParamConsumers";
-import { readPath } from "./overrides";
+import { readPath, sameValue } from "./overrides";
 import type { GameEdits } from "./project";
+import {
+  type EquippedWeapons,
+  unequipUnit,
+  unequipWeapon,
+} from "./weaponLibrary";
+import { weaponSlots } from "./weaponSlots";
 
 /** How much a finding matters, in the two states a reference can be in. */
 export type CompatSeverity =
@@ -618,6 +624,92 @@ function disabledFindings(
     }));
 }
 
+/**
+ * Findings for the weapon library (issue #2640).
+ *
+ * A library weapon is a whole copy, so a source the game has dropped or
+ * changed breaks nothing: the copy still fires as it is. It is still worth
+ * saying, because the author copied it to be a variant of something and that
+ * something has moved. What does break is a slot that fires one: a unit the
+ * game has dropped, a slot it has taken out, or a weapon no longer in the
+ * library. Taking the slot back to the game's weapon costs nothing, because
+ * the weapon itself stays in the library.
+ */
+function libraryFindings(
+  input: CompatInput,
+  known: (key: string) => boolean,
+  defOf: (key: string) => Record<string, unknown> | undefined,
+): CompatFinding[] {
+  const out: CompatFinding[] = [];
+  for (const weapon of Object.values(input.edits.weapons ?? {})) {
+    const source = input.weaponDefs[weapon.source];
+    if (!source)
+      out.push({
+        id: `weapons:${weapon.key}:source`,
+        store: "weapons",
+        severity: "review",
+        subject: weapon.key,
+        detail: `${weapon.key} was copied from ${weapon.source}, which ${input.gameName} no longer has. The copy still works, but it is now the only version of that weapon.`,
+      });
+    else {
+      const moved = Object.keys({ ...weapon.def, ...source }).filter(
+        (key) => !sameValue(weapon.def[key], source[key]),
+      );
+      if (moved.length > 0)
+        out.push({
+          id: `weapons:${weapon.key}:moved`,
+          store: "weapons",
+          severity: "review",
+          subject: weapon.key,
+          detail: `${input.gameName} has changed ${weapon.source} since ${weapon.key} was copied from it: ${moved.sort().join(", ")}. The copy keeps the values it was copied with.`,
+        });
+    }
+  }
+  const unequip = (unit: string, step?: string) => ({
+    label: "Put back the game's weapon",
+    cost: "nothing, the weapon stays in the library",
+    apply: (edits: GameEdits) => ({
+      ...edits,
+      equipped:
+        step === undefined
+          ? unequipUnit(edits.equipped, unit)
+          : unequipWeapon(edits.equipped, unit, step),
+    }),
+  });
+  const equipped: EquippedWeapons = input.edits.equipped ?? {};
+  for (const [unit, slots] of Object.entries(equipped)) {
+    if (!known(unit)) {
+      out.push({
+        id: `equipped:${unit}`,
+        store: "equipped",
+        severity: "broken",
+        subject: unit,
+        detail: `${input.gameName} has no unit called ${unit} any more, so the library weapons equipped into it go nowhere.`,
+        fix: unequip(unit),
+      });
+      continue;
+    }
+    const steps = new Set(
+      weaponSlots(defOf(unit), input.weaponDefs, [unit]).map((s) => s.step),
+    );
+    for (const [step, key] of Object.entries(slots)) {
+      const lost = !Object.hasOwn(input.edits.weapons ?? {}, key);
+      if (!lost && steps.has(step)) continue;
+      out.push({
+        id: `equipped:${unit}:${step}`,
+        store: "equipped",
+        severity: "broken",
+        subject: unit,
+        detail: lost
+          ? `${unit} is equipped with ${key}, which is not in the weapon library any more, so that slot fires the game's weapon.`
+          : `${unit} no longer has the weapon slot ${key} was equipped into, so it is equipped into nothing.`,
+        fix: unequip(unit, step),
+      });
+    }
+  }
+  return out;
+}
+
 /** Broken first, then by store in the order the page shows them, then by name. */
 const STORE_ORDER: (keyof GameEdits)[] = [
   "overrides",
@@ -625,6 +717,8 @@ const STORE_ORDER: (keyof GameEdits)[] = [
   "menus",
   "text",
   "disabled",
+  "weapons",
+  "equipped",
 ];
 
 /**
@@ -653,6 +747,7 @@ export function checkCompatibility(input: CompatInput): CompatReport {
     ...menuFindings(input, known),
     ...textFindings(input, known),
     ...disabledFindings(input, known),
+    ...libraryFindings(input, known, defOf),
   ].sort((a, b) => {
     if (a.severity !== b.severity) return a.severity === "broken" ? -1 : 1;
     const store = STORE_ORDER.indexOf(a.store) - STORE_ORDER.indexOf(b.store);

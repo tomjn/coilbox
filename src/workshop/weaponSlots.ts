@@ -28,9 +28,9 @@
  *
  * A slot can also name a definition the unit does not carry, out of the
  * game's `weapons/` folder or out of another unit. That definition is shared,
- * and changing it for one unit would take copying it into that unit first. A
- * library of copied definitions is issue #2640's. Until then those fields are
- * shown and not offered.
+ * and changing it for one unit takes copying it into that unit first: into the
+ * project's weapon library, equipped into the slot (issues #2640 and #3052,
+ * `weaponLibrary.ts`). Until then those fields are shown and not offered.
  */
 
 import { WEAPON_FIELD_NOTES } from "@/content/unitFieldNotes";
@@ -47,6 +47,7 @@ import type {
   RenderedGroup,
   RenderedSection,
 } from "./unitSections";
+import type { LibraryWeapon } from "./weaponLibrary";
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -241,8 +242,8 @@ export function slotEditCount(
 // The slot fields, straight out of the unit registry, in the order a reader
 // wants them: what it is, where it points, what it shoots at, then the tuning
 // flags. `name` is only drawn when the project already changed it: changing
-// which weapon a slot holds is equipping a different weapon, which is issue
-// #2640's library.
+// which weapon a slot holds is equipping a different weapon out of the
+// project's library (issue #2640).
 const SLOT_ORDER = [
   "name",
   "slaveTo",
@@ -382,6 +383,9 @@ function definitionSection(leaf: string, field: ResolvedField): string {
 /** One slot and its definition, grouped for drawing. */
 export interface WeaponSlotView {
   groups: RenderedGroup[];
+  /** The library weapon the slot fires instead of the game's, when the
+   *  project equipped one (issue #2640). */
+  library?: RenderedGroup;
   /** How many fields are drawn. */
   shown: number;
   /** How many the "all" view would add. */
@@ -475,24 +479,29 @@ function slotGroup(
   };
 }
 
-function definitionGroup(
-  slot: WeaponSlot,
-  overrides: UnitOverrides,
-  unitKey: string,
+/**
+ * A weapon definition's fields, in the sections the page draws them in.
+ *
+ * `patch` is the sparse set of changes the fields are read against, keyed by
+ * `prefix` and the field's own path, and `prefix` is empty for a definition
+ * whose changes are keyed by the field alone, which is a library weapon's
+ * (issue #2640). A definition nobody can edit reads nothing from it.
+ */
+function definitionSections(
+  def: Record<string, unknown>,
+  patch: Record<string, unknown>,
+  prefix: string,
   view: FieldView,
-  unitName: string,
-  mountedBy: number,
-): { group: RenderedGroup; relevant: number; all: number } | null {
-  const definition = slot.definition;
-  if (definition.kind === "missing") return null;
-  const def = definition.def;
-  const own = definition.kind === "own";
-  // A shared definition is shown under the name the engine gives it, since the
-  // unit has no table of its own to write into.
-  const prefix = own ? definition.path : `WeaponDefs.${definition.key}`;
-
+  editable: boolean,
+): { sections: RenderedSection[]; relevant: number; all: number } {
+  const pathOf = (leaf: string) => (prefix ? `${prefix}.${leaf}` : leaf);
   const present = definitionLeaves(def);
-  const edited = own ? overriddenBelow(overrides, unitKey, prefix) : [];
+  const lowerPrefix = prefix ? `${prefix.toLowerCase()}.` : "";
+  const edited = editable
+    ? Object.keys(patch)
+        .filter((path) => path.toLowerCase().startsWith(lowerPrefix))
+        .map((path) => path.slice(lowerPrefix.length))
+    : [];
   const walked = new Set(present.map((leaf) => leaf.toLowerCase()));
   const extra = WEAPON_PATHS.filter((path) => {
     const lower = path.toLowerCase();
@@ -507,19 +516,20 @@ function definitionGroup(
 
   const bySection = new Map<string, FieldRow[]>();
   for (const leaf of leaves) {
-    const path = `${prefix}.${leaf}`;
+    const path = pathOf(leaf);
     const field = describeLeaf(leaf, def);
     const value = readPath(def, leaf);
     const isPresent = value !== undefined;
     const inherited = isPresent ? value : field.default;
-    const state = own ? fieldState(overrides, unitKey, path) : "inherited";
+    const state =
+      editable && Object.hasOwn(patch, path) ? "overridden" : "inherited";
     const row: FieldRow = {
       path,
       field,
       label: field.label,
       present: isPresent,
       inherited,
-      value: state === "overridden" ? overrides[unitKey]?.[path] : inherited,
+      value: state === "overridden" ? patch[path] : inherited,
       state,
     };
     const section = definitionSection(leaf, field);
@@ -538,6 +548,34 @@ function definitionGroup(
     sortRows(rows, rank);
     sections.push({ ...spec, rows });
   }
+  return {
+    sections,
+    relevant: relevantLeaves.length,
+    all: allLeaves.length,
+  };
+}
+
+function definitionGroup(
+  slot: WeaponSlot,
+  overrides: UnitOverrides,
+  unitKey: string,
+  view: FieldView,
+  unitName: string,
+  mountedBy: number,
+): { group: RenderedGroup; relevant: number; all: number } | null {
+  const definition = slot.definition;
+  if (definition.kind === "missing") return null;
+  const own = definition.kind === "own";
+  // A shared definition is shown under the name the engine gives it, since the
+  // unit has no table of its own to write into.
+  const prefix = own ? definition.path : `WeaponDefs.${definition.key}`;
+  const { sections, relevant, all } = definitionSections(
+    definition.def,
+    overrides[unitKey] ?? {},
+    prefix,
+    view,
+    own,
+  );
 
   return {
     group: {
@@ -547,12 +585,41 @@ function definitionGroup(
         : `Weapon definition ${definition.key}, shared`,
       note: own
         ? `What the weapon does. ${unitName} carries its own copy of this definition, so a change here reaches no other unit, even one whose weapon has the same name.`
-        : `${unitName} does not carry this definition itself. ${slot.name} is in the game's shared weapon table${mountedBy > 1 ? `, and ${mountedBy} units mount it` : ""}. Coilbox only changes a definition a unit carries, so these fields are shown and not offered.`,
+        : `${unitName} does not carry this definition itself. ${slot.name} is in the game's shared weapon table${mountedBy > 1 ? `, and ${mountedBy} units mount it` : ""}, so a change to it would reach every one of them. Give ${unitName} its own copy to change it here.`,
       readOnly: !own,
       sections,
     },
-    relevant: relevantLeaves.length,
-    all: allLeaves.length,
+    relevant,
+    all,
+  };
+}
+
+/**
+ * A library weapon's fields, grouped for drawing (issue #2640). Changes are
+ * written to the library entry, keyed by the field's own path, so every slot
+ * that fires the weapon gets them.
+ */
+export function libraryWeaponGroup(
+  weapon: LibraryWeapon,
+  view: FieldView,
+  note: string,
+): { group: RenderedGroup; relevant: number; all: number } {
+  const { sections, relevant, all } = definitionSections(
+    weapon.def,
+    weapon.changes ?? {},
+    "",
+    view,
+    true,
+  );
+  return {
+    group: {
+      id: "library",
+      label: `Library weapon ${weapon.key}`,
+      note,
+      sections,
+    },
+    relevant,
+    all,
   };
 }
 
@@ -562,6 +629,11 @@ function definitionGroup(
  * "relevant" is what the slot and the definition declare, plus anything the
  * project has changed under either, so an edit never vanishes out from under
  * the person who made it. "all" adds every key the engine reads there.
+ *
+ * A slot the project has equipped with a library weapon (issue #2640) draws
+ * that weapon in place of the game's definition, as `library` rather than in
+ * `groups`: its fields are written to the library, not to the unit, so the
+ * page hands them to a different writer.
  */
 export function weaponSlotView(
   slot: WeaponSlot,
@@ -570,8 +642,25 @@ export function weaponSlotView(
   view: FieldView,
   unitName: string,
   mountedBy = 0,
+  equipped?: { weapon: LibraryWeapon; mounts: number },
 ): WeaponSlotView {
   const mount = slotGroup(slot, overrides, unitKey, view);
+  if (equipped) {
+    const others = equipped.mounts - 1;
+    const library = libraryWeaponGroup(
+      equipped.weapon,
+      view,
+      `What the weapon does. ${unitName} carries it as its own, out of the project's weapon library. A change here is a change to the library weapon${others > 0 ? `, so it reaches the ${others} other slot${others === 1 ? "" : "s"} that fire${others === 1 ? "s" : ""} it too` : ""}.`,
+    );
+    const relevant = mount.relevant + library.relevant;
+    const all = mount.all + library.all;
+    return {
+      groups: [mount.group],
+      library: library.group,
+      shown: view === "all" ? all : relevant,
+      hidden: all - relevant,
+    };
+  }
   const definition = definitionGroup(
     slot,
     overrides,

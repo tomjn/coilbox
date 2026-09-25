@@ -71,6 +71,7 @@ import { Button, buttonVariants, cn } from "@picoframe/frame";
 import {
   ArrowLeft,
   Code2,
+  Crosshair,
   Pencil,
   Redo2,
   RotateCcw,
@@ -138,6 +139,7 @@ import { isMutatorOnly } from "../mutatorOnly";
 import {
   clearOverride,
   clearUnit,
+  readPath,
   resolvedDef,
   setOverride,
 } from "../overrides";
@@ -174,8 +176,26 @@ import {
   unitTextRows,
 } from "../unitText";
 import {
+  addLibraryWeapon,
+  clearLibraryField,
+  copyGameWeapon,
+  type EquippedWeapons,
+  equippedKey,
+  equipRefusal,
+  equipWeapon,
+  mountsOf,
+  removeLibraryWeapon,
+  setLibraryField,
+  unequipEverywhere,
+  unequipUnit,
+  unequipWeapon,
+  type WeaponLibrary,
+  type WeaponMount,
+} from "../weaponLibrary";
+import {
   slotOfPath,
   unitsMounting,
+  type WeaponSlot,
   weaponSlots,
   weaponSlotView,
 } from "../weaponSlots";
@@ -196,10 +216,16 @@ import {
 } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
-import { WeaponSlotsPanel } from "./components/WeaponSlotsPanel";
+import { WeaponLibraryDrawer } from "./components/WeaponLibraryDrawer";
+import {
+  type SlotLibrary,
+  WeaponSlotsPanel,
+} from "./components/WeaponSlotsPanel";
 
 /** A stable empty, so a page with no game does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
+const NO_LIBRARY: WeaponLibrary = {};
+const NO_EQUIPPED: EquippedWeapons = {};
 
 /** Which half of a unit the page is showing: its own fields, or its weapons
  *  one slot at a time (issue #2639). */
@@ -233,6 +259,8 @@ export default function UnitPage() {
   const [renaming, setRenaming] = useState(false);
   /** Whether the generated Lua is on screen (issue #1275). */
   const [readingLua, setReadingLua] = useState(false);
+  /** Whether the project's weapon library is on screen (issue #2640). */
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   // Which project is open. The route says so, except on `/workshop/new`, where
   // there is no project yet and the game comes from the link that sent us here.
@@ -293,6 +321,9 @@ export default function UnitPage() {
   // lego builder put in the game folder, which the project must never hold.
   const { overrides, menus, text, disabled } = edits;
   const ownClones = edits.clones;
+  // Absent on a project saved before the library existed (issue #2640).
+  const library = edits.weapons ?? NO_LIBRARY;
+  const equipped = edits.equipped ?? NO_EQUIPPED;
 
   /**
    * Record one change, as one undo step.
@@ -354,6 +385,8 @@ export default function UnitPage() {
   const updateMenus = editing("menus");
   const updateText = editing("text");
   const updateDisabled = editing("disabled");
+  const updateWeapons = editing("weapons");
+  const updateEquipped = editing("equipped");
 
   const [view, setView] = useState<FieldView>("relevant");
 
@@ -501,12 +534,36 @@ export default function UnitPage() {
     [sharedName, gameUnits, weaponDefs],
   );
   const unitName = nameOf(unitKey, unit);
+  // The library weapon the slot on screen fires instead of the game's, when
+  // the project equipped one (issue #2640).
+  const firesKey = slot ? equippedKey(equipped, unitKey, slot.step) : undefined;
+  const firesWeapon = firesKey ? library[firesKey] : undefined;
+  const firesMounts = firesKey ? mountsOf(equipped, firesKey).length : 0;
   const weaponView = useMemo(
     () =>
       slot
-        ? weaponSlotView(slot, overrides, unitKey, view, unitName, mountedBy)
+        ? weaponSlotView(
+            slot,
+            overrides,
+            unitKey,
+            view,
+            unitName,
+            mountedBy,
+            firesWeapon
+              ? { weapon: firesWeapon, mounts: firesMounts }
+              : undefined,
+          )
         : null,
-    [slot, overrides, unitKey, view, unitName, mountedBy],
+    [
+      slot,
+      overrides,
+      unitKey,
+      view,
+      unitName,
+      mountedBy,
+      firesWeapon,
+      firesMounts,
+    ],
   );
 
   // Which of the fields on screen the edit-in-place route could write into
@@ -942,7 +999,9 @@ export default function UnitPage() {
   // it lands differs.
   const counts = editCounts(edits);
   const unitEdits =
-    Object.keys(overrides[unitKey] ?? {}).length + unitTextCount(text, unitKey);
+    Object.keys(overrides[unitKey] ?? {}).length +
+    unitTextCount(text, unitKey) +
+    Object.keys(equipped[unitKey] ?? {}).length;
   // Only the ones copied here. A unit the lego builder exported is already a
   // file in the game folder, so counting it as a project edit would have the
   // project claim work the user never did, and go stale against the file the
@@ -960,7 +1019,8 @@ export default function UnitPage() {
     counts.fields > 0 ||
     counts.added > 0 ||
     counts.menuOps > 0 ||
-    counts.off > 0;
+    counts.off > 0 ||
+    counts.weapons > 0;
   const anythingToShow = anythingChanged || origins.length > 0;
   // Only while the drawer is open, so a page nobody has asked to see the Lua
   // for does not compile the project on every keystroke.
@@ -1006,6 +1066,7 @@ export default function UnitPage() {
     commit((current) => {
       let next = editSlot(current, "clones", (c) => removeClone(c, unitKey));
       next = editSlot(next, "overrides", (o) => clearUnit(o, unitKey));
+      next = editSlot(next, "equipped", (e) => unequipUnit(e, unitKey));
       next = editSlot(next, "text", (t) => clearUnitTexts(t, unitKey));
       // The mark goes with it. A unit that no longer exists cannot be switched
       // off, and an entry naming one is the empty-entry trap the other three
@@ -1099,6 +1160,109 @@ export default function UnitPage() {
     );
   const resetField = (row: FieldRow) =>
     updateOverrides((o) => clearOverride(o, unitKey, row.path));
+  /**
+   * What copying a slot's weapon into the library copies (issue #2640): the
+   * definition as the page shows it, with the project's own changes to it,
+   * under the name the game's weapon table gives it. `undefined` for a slot
+   * naming a weapon nothing defines.
+   */
+  const slotCopy = (
+    s: WeaponSlot,
+  ): { source: string; def: Record<string, unknown> } | undefined => {
+    const definition = s.definition;
+    if (definition.kind === "missing") return undefined;
+    if (definition.kind === "shared")
+      return { source: definition.key, def: definition.def };
+    const resolved = readPath(
+      resolvedDef(unit, overrides[unitKey]),
+      definition.path,
+    );
+    return {
+      source: `${cloneSource ?? unitKey}_${definition.key}`.toLowerCase(),
+      def:
+        resolved !== null && typeof resolved === "object"
+          ? (resolved as Record<string, unknown>)
+          : definition.def,
+    };
+  };
+  /** Copy a game weapon into the library, and fire it from a slot when one
+   *  is given, as one undo step. */
+  const addToLibrary = (
+    key: string,
+    source: string,
+    def: Record<string, unknown>,
+    into?: { unit: string; step: string },
+  ) => {
+    const weapon = copyGameWeapon(key, source, def, defs?.checksum);
+    commit((current) => {
+      const next = editSlot(current, "weapons", (w) =>
+        addLibraryWeapon(w, weapon),
+      );
+      return into
+        ? editSlot(next, "equipped", (e) =>
+            equipWeapon(e, into.unit, into.step, key),
+          )
+        : next;
+    });
+  };
+  /** Take a weapon out of the library and out of every slot that fires it. */
+  const deleteLibraryWeapon = (key: string) =>
+    commit((current) =>
+      editSlot(
+        editSlot(current, "weapons", (w) => removeLibraryWeapon(w, key)),
+        "equipped",
+        (e) => unequipEverywhere(e, key),
+      ),
+    );
+  const changeLibraryField = (
+    key: string | undefined,
+    row: FieldRow,
+    value: unknown,
+  ) => {
+    if (key)
+      updateWeapons((w) =>
+        setLibraryField(w, key, row.path, value, row.inherited),
+      );
+  };
+  const resetLibraryField = (key: string | undefined, row: FieldRow) => {
+    if (key) updateWeapons((w) => clearLibraryField(w, key, row.path));
+  };
+  const slotLibrary: SlotLibrary = {
+    weapons: library,
+    unitName,
+    equippedIn: (step) => equippedKey(equipped, unitKey, step),
+    copySourceOf: (s) => slotCopy(s)?.source,
+    mounts: (key) => mountsOf(equipped, key).length,
+    refusal: (key) => equipRefusal(unit, unitName, key),
+    onCopy: (s, key) => {
+      const from = slotCopy(s);
+      if (from)
+        addToLibrary(key, from.source, from.def, {
+          unit: unitKey,
+          step: s.step,
+        });
+    },
+    onEquip: (s, key) =>
+      updateEquipped((e) => equipWeapon(e, unitKey, s.step, key)),
+    onUnequip: (s) => updateEquipped((e) => unequipWeapon(e, unitKey, s.step)),
+    onChange: changeLibraryField,
+    onReset: resetLibraryField,
+  };
+  /** A slot that fires a library weapon, as the drawer lists it. */
+  const describeMount = (mount: WeaponMount) => {
+    const def = units[mount.unit];
+    const owners = [
+      mount.unit,
+      ...(clones[mount.unit]?.source
+        ? [clones[mount.unit].source as string]
+        : []),
+    ];
+    const number =
+      weaponSlots(def, weaponDefs, owners).find((s) => s.step === mount.step)
+        ?.number ?? Number(mount.step) + 1;
+    return `${nameOf(mount.unit, def)}, weapon ${number}`;
+  };
+
   /** What the value under an edit is, for a unit whose definition is not the
    *  game's. */
   const inheritedLabel = clone
@@ -1244,6 +1408,25 @@ export default function UnitPage() {
                 onInPlaceWrite={onInPlaceDone}
               />
             )}
+            {/* The weapons the project owns (issue #2640), to copy out of the
+              game, change and equip. Needs the game's weapon table, so only
+              once the definitions have been read. */}
+            {game && defs && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setLibraryOpen(true)}
+                title="The weapons this project owns, to copy, change and equip"
+              >
+                <Crosshair className="mr-1 size-3.5" />
+                Weapons
+                {counts.weapons > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {counts.weapons}
+                  </span>
+                )}
+              </Button>
+            )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
               and the fastest way to find out whether coilbox understood the
               edit is to read what it wrote. */}
@@ -1293,6 +1476,30 @@ export default function UnitPage() {
           onSubmit={(details) => {
             updateProjectDetails(project.id, details);
             setRenaming(false);
+          }}
+        />
+      )}
+
+      {game && defs && (
+        <WeaponLibraryDrawer
+          open={libraryOpen}
+          onOpenChange={setLibraryOpen}
+          gameName={game.name}
+          gameWeapons={weaponDefs}
+          library={library}
+          equipped={equipped}
+          consumers={consumers}
+          describeMount={describeMount}
+          onAdd={(key, source) => {
+            const def = weaponDefs[source];
+            if (def) addToLibrary(key, source, def);
+          }}
+          onDelete={deleteLibraryWeapon}
+          onChange={changeLibraryField}
+          onReset={resetLibraryField}
+          onOpenMount={(mount) => {
+            setLibraryOpen(false);
+            select({ unit: mount.unit, tab: "weapons", slot: mount.step });
           }}
         />
       )}
@@ -1498,11 +1705,15 @@ export default function UnitPage() {
                         onClick={() =>
                           commit((current) =>
                             editSlot(
-                              editSlot(current, "overrides", (o) =>
-                                clearUnit(o, unitKey),
+                              editSlot(
+                                editSlot(current, "overrides", (o) =>
+                                  clearUnit(o, unitKey),
+                                ),
+                                "text",
+                                (t) => clearUnitTexts(t, unitKey),
                               ),
-                              "text",
-                              (t) => clearUnitTexts(t, unitKey),
+                              "equipped",
+                              (e) => unequipUnit(e, unitKey),
                             ),
                           )
                         }
@@ -1635,6 +1846,7 @@ export default function UnitPage() {
                     onSelect={(step) => select({ tab: "weapons", slot: step })}
                     onChange={changeField}
                     onReset={resetField}
+                    library={slotLibrary}
                   />
                 </TabsContent>
                 <TabsContent

@@ -12,6 +12,9 @@
 //!  - `text` is name and description for a game that keeps them in a
 //!    localisation file.
 //!  - `disabled` is a mark against a unit key.
+//!  - `weapons` is the project's weapon library, whole definitions copied out
+//!    of the game under names of their own (issue #2640).
+//!  - `equipped` says which unit slot fires which library weapon.
 //!
 //! Nothing here is authoritative. If one of those modules changes shape, that
 //! module is right and this file is behind.
@@ -75,6 +78,32 @@ pub struct TextFields {
     pub description: Option<String>,
 }
 
+/// One weapon in the project's library (issue #2640), a mirror of
+/// `LibraryWeapon` in `src/workshop/weaponLibrary.ts`.
+///
+/// A whole definition copied out of the game's weapon table under a name of
+/// its own, plus the sparse changes made to it since. It reaches the game only
+/// through a slot that [`GameEdits::equipped`] points at it.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LibraryWeapon {
+    /// Its short name, which is its key in a unit's own `weapondefs`.
+    pub key: String,
+    /// The game weapon it was copied from, lowercased as the game's table
+    /// keys it. Kept for the drift check (issue #1281), never compiled.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// The game's checksum when it was copied, for the same reason.
+    #[serde(default)]
+    pub source_checksum: Option<String>,
+    /// The definition as it was copied.
+    #[serde(default)]
+    pub def: Value,
+    /// Dotted paths into `def` and the values the user set since.
+    #[serde(default)]
+    pub changes: BTreeMap<String, Value>,
+}
+
 /// Everything one project changes about one game.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct GameEdits {
@@ -88,6 +117,14 @@ pub struct GameEdits {
     pub text: BTreeMap<String, BTreeMap<String, TextFields>>,
     #[serde(default)]
     pub disabled: Vec<String>,
+    /// The weapon library, by key (issue #2640). Absent on a project saved
+    /// before it, which reads as empty.
+    #[serde(default)]
+    pub weapons: BTreeMap<String, LibraryWeapon>,
+    /// Unit key, then the slot's step as `weaponSlots.ts` writes it, then the
+    /// library weapon that slot fires.
+    #[serde(default)]
+    pub equipped: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl GameEdits {
@@ -98,6 +135,13 @@ impl GameEdits {
             && self.menus.is_empty()
             && self.text.is_empty()
             && self.disabled.is_empty()
+            && self.weapons.is_empty()
+            && self.equipped.values().all(BTreeMap::is_empty)
+    }
+
+    /// How many slots fire a library weapon, across every unit.
+    pub fn equipped_count(&self) -> usize {
+        self.equipped.values().map(BTreeMap::len).sum()
     }
 
     /// How many name and description edits the project holds, across every
@@ -289,6 +333,39 @@ mod tests {
         let older: ModProject =
             serde_json::from_value(json!({ "name": "x", "gameName": "g" })).expect("parse");
         assert!(older.clone_mutator_only.is_empty());
+    }
+
+    /// A project saved before issue #2640 has no library, and one saved after
+    /// it reads each weapon and each slot that fires one.
+    #[test]
+    fn the_weapon_library_is_optional() {
+        let project: ModProject = serde_json::from_value(json!({
+            "name": "x",
+            "gameName": "g",
+            "edits": {
+                "weapons": { "heavylaser": {
+                    "key": "heavylaser",
+                    "source": "armcom_armcomlaser",
+                    "sourceChecksum": "c6a15f1f",
+                    "def": { "range": 300 },
+                    "changes": { "range": 450 }
+                } },
+                "equipped": { "armcom": { "0": "heavylaser" } }
+            }
+        }))
+        .expect("parse");
+        let weapon = &project.edits.weapons["heavylaser"];
+        assert_eq!(weapon.source.as_deref(), Some("armcom_armcomlaser"));
+        assert_eq!(weapon.changes["range"], json!(450));
+        assert_eq!(project.edits.equipped["armcom"]["0"], "heavylaser");
+        assert_eq!(project.edits.equipped_count(), 1);
+        assert!(!project.edits.is_empty());
+
+        let older: ModProject =
+            serde_json::from_value(json!({ "name": "x", "gameName": "g", "edits": {} }))
+                .expect("parse");
+        assert!(older.edits.weapons.is_empty());
+        assert!(older.edits.equipped.is_empty());
     }
 
     /// A project that changes nothing still parses, which is what the editor

@@ -165,6 +165,9 @@ enum PositionKey {
     /// Every such field change through a list position, folded into one
     /// block chunk (issue #3041).
     Positional,
+    /// Every library weapon equipped into a game unit, folded into one block
+    /// chunk (issue #2640).
+    Equipped,
     /// One builder's replayed build menu.
     Menu(String),
     /// Every unit switched off, folded into one block chunk.
@@ -182,8 +185,8 @@ enum SlotResolution {
 /// pushes chunks in: each block of carried Lua, then added, then each
 /// replaced clone (alphabetically, the order a `BTreeMap`'s own iteration
 /// already gives), then field changes, then field changes through a list
-/// position, then each builder's menu
-/// (alphabetically), then disabled units. Read this module's own doc comment
+/// position, then library weapons equipped into game units, then each
+/// builder's menu (alphabetically), then disabled units. Read this module's own doc comment
 /// for why re-deriving this rather than reading it off `compile.rs` is the
 /// whole design.
 fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
@@ -225,6 +228,19 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
     }
     if game_unit_paths().any(|path| through_a_position(path)) {
         positions.push((PositionKey::Positional, LuaForm::Block));
+    }
+
+    let equips_game_unit = edits.equipped.iter().any(|(unit, slots)| {
+        !edits.clones.contains_key(unit)
+            && slots.iter().any(|(step, key)| {
+                !step.is_empty()
+                    && step.bytes().all(|b| b.is_ascii_digit())
+                    && edits.weapons.contains_key(key)
+                    && valid_unit_key(key)
+            })
+    });
+    if equips_game_unit {
+        positions.push((PositionKey::Equipped, LuaForm::Block));
     }
 
     for (builder, ops) in &edits.menus {
@@ -393,6 +409,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
     unit_keys.extend(edits.menus.keys().cloned());
     unit_keys.extend(edits.disabled.iter().cloned());
     unit_keys.extend(edits.text.keys().cloned());
+    unit_keys.extend(edits.equipped.keys().cloned());
 
     let mut units = Vec::new();
     for unit in unit_keys {
@@ -461,6 +478,38 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     uncompiled_reason: home_key.is_none().then(|| {
                         "This copy's key was already left out of the compile, so nothing \
                          carries its fields either."
+                            .to_string()
+                    }),
+                });
+            }
+        }
+
+        // Library weapons equipped into a slot (issue #2640): folded into a
+        // copy's own file, or one block for the game's units.
+        if let Some(slots) = edits.equipped.get(&unit) {
+            let (files, home_key) = if edits.clones.contains_key(&unit) {
+                unit_home(&unit, edits)
+            } else {
+                (vec![POST_FILE.to_string()], Some(PositionKey::Equipped))
+            };
+            for (step, key) in slots {
+                let compiled = !step.is_empty()
+                    && step.bytes().all(|b| b.is_ascii_digit())
+                    && edits.weapons.contains_key(key)
+                    && valid_unit_key(key)
+                    && home_key.is_some();
+                let (bar_slot, bar_miss) = match (&home_key, compiled) {
+                    (Some(position), true) => slot_fields(resolution_of(position), verified),
+                    _ => (None, None),
+                };
+                changes.push(LedgerChange {
+                    description: format!("Weapon slot {step} fires library weapon {key}"),
+                    field_path: None,
+                    files: if compiled { files.clone() } else { Vec::new() },
+                    bar_slot,
+                    bar_miss,
+                    uncompiled_reason: (!compiled).then(|| {
+                        "The weapon is not in the library under a name the compiler can use,                          so the slot keeps the game's weapon."
                             .to_string()
                     }),
                 });
@@ -834,6 +883,26 @@ mod tests {
 
     /// A project with nothing recorded traces to nothing, the same empty
     /// answer `compile::compile` gives it.
+    /// Issue #2640. The equipped weapons are a chunk of their own, and the
+    /// trace still lines up with the compiler's order around it.
+    #[test]
+    fn equipping_a_weapon_keeps_the_trace_verified() {
+        let ledger = build_ledger(&project(json!({
+            "overrides": { "armcom": { "maxdamage": 5000, "weapons.0.onlytargetcategory": "SURFACE" } },
+            "weapons": { "heavylaser": { "key": "heavylaser", "def": { "range": 300 } } },
+            "equipped": { "armcom": { "0": "heavylaser" } },
+            "disabled": ["armflash"]
+        })));
+        assert!(ledger.notes.is_empty(), "{:?}", ledger.notes);
+        let change = changes_for(&ledger, "armcom")
+            .iter()
+            .find(|c| c.description.contains("library weapon heavylaser"))
+            .expect("the equip is traced");
+        assert_eq!(change.files, vec![POST_FILE.to_string()]);
+        assert!(change.bar_slot.is_some() || change.bar_miss.is_some());
+        assert!(change.uncompiled_reason.is_none());
+    }
+
     #[test]
     fn an_empty_project_traces_to_an_empty_ledger() {
         let ledger = build_ledger(&project(json!({})));

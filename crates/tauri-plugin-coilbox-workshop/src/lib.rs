@@ -766,6 +766,14 @@ mod tests {
             "text is keyed by unit and then by language"
         );
         assert_eq!(edits.disabled, vec!["armaser", "armbanth"]);
+
+        // The weapon library and the slot that fires from it (issue #2640).
+        let weapon = &edits.weapons["heavylaser"];
+        assert_eq!(weapon.key, "heavylaser");
+        assert_eq!(weapon.source.as_deref(), Some("armcom_disintegrator"));
+        assert_eq!(weapon.source_checksum.as_deref(), Some("c6a15f1f"));
+        assert_eq!(weapon.changes["range"], serde_json::json!(450));
+        assert_eq!(edits.equipped["armcom"]["0"], "heavylaser");
     }
 
     /// A project somebody saved compiles and passes its own checks. Preflight

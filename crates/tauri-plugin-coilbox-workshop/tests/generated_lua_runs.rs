@@ -444,3 +444,188 @@ fn every_generated_file_is_lua_that_parses() {
         assert_eq!(out["ok"], json!(true));
     }
 }
+
+/// What a game's `weapondefs_post.lua` does with the unit table once the
+/// mutator's `unitdefs_post.lua` or a BAR tweak slot has run over it: put
+/// each unit's own definitions into the shared table as `<unit>_<name>`,
+/// then, for a game that binds a slot by `def`, point the slot at one. The
+/// `def` half is the loop in the base content's `ProcessUnitDef`, Balanced
+/// Annihilation's `ExtractWeaponDefs` and Beyond All Reason's own post file.
+/// A game that binds by `name` skips it. Returns the unit table, the shared
+/// table, and the range of the weapon each slot ends up firing, as the engine
+/// would look it up by lowercased name.
+fn load_weapons(generated: &str, unit_defs: &str, shared: &str, by_def: bool) -> Value {
+    let root = tempfile::tempdir().expect("tempdir");
+    let vm = SpringLua::new(root.path()).expect("vm");
+    let source = format!(
+        "(function()\n\
+         UnitDefs = {unit_defs}\n\
+         (function()\n{generated}\nend)()\n\
+         local WeaponDefs = {shared}\n\
+         local byDef = {by_def}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           if type(ud.weapondefs) == 'table' then\n\
+             for name, wd in pairs(ud.weapondefs) do WeaponDefs[udName .. '_' .. name] = wd end\n\
+           end\n\
+           if byDef and type(ud.weapons) == 'table' then\n\
+             for i = 1, 32 do\n\
+               local w = ud.weapons[i]\n\
+               if type(w) == 'table' then\n\
+                 if type(w.def) == 'string' then\n\
+                   local full = udName .. '_' .. string.lower(w.def)\n\
+                   if type(WeaponDefs[full]) == 'table' then w.name = full end\n\
+                 end\n\
+                 w.def = nil\n\
+               end\n\
+             end\n\
+           end\n\
+         end\n\
+         local fires = {{}}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           fires[udName] = {{}}\n\
+           for i = 1, 32 do\n\
+             local w = ud.weapons and ud.weapons[i]\n\
+             if type(w) == 'table' and type(w.name) == 'string' then\n\
+               local wd = WeaponDefs[string.lower(w.name)]\n\
+               fires[udName][tostring(i)] = wd and wd.range or 'nothing'\n\
+             end\n\
+           end\n\
+         end\n\
+         return {{ fires = fires, units = UnitDefs }}\n\
+         end)()"
+    );
+    vm.eval_expr_value(&source, "generated.lua")
+        .unwrap_or_else(|e| panic!("{e}\n\n{source}"))
+}
+
+/// The mutator's post file and the BAR tweakdefs a project compiled to.
+fn both_routes(edits: Value) -> Vec<(&'static str, String)> {
+    let project: ModProject = serde_json::from_value(json!({
+        "name": "Test project",
+        "gameName": "Balanced Annihilation V15.9.8",
+        "edits": edits,
+    }))
+    .expect("parse");
+    let compiled = compile(&project);
+    let post = compiled
+        .files
+        .iter()
+        .find(|f| f.path == "gamedata/unitdefs_post.lua")
+        .expect("a post file")
+        .contents
+        .clone();
+    vec![
+        ("post file", post),
+        ("tweakdefs", compiled.bar_tweakdefs.expect("tweakdefs")),
+    ]
+}
+
+/// Issue #2640. Balanced Annihilation's commander names its weapon by `def`
+/// in its own file, and so does Beyond All Reason's. A library weapon
+/// equipped into the first slot is fired by that slot with the project's
+/// changes on it, the unit's second slot and a second unit whose weapon has
+/// the same short name are untouched, and the mount fields stay where they
+/// were. Run once as a game that binds by `def` and once as one that binds by
+/// `name`, since the compiled Lua writes both.
+#[test]
+fn an_equipped_library_weapon_is_what_the_slot_fires_in_a_def_bound_game() {
+    let routes = both_routes(json!({
+        "weapons": { "heavylaser": {
+            "key": "heavylaser",
+            "source": "armcom_armcomlaser",
+            "def": { "range": 300, "damage": { "default": 75 } },
+            "changes": { "range": 450, "damage.default": 200 }
+        } },
+        "equipped": { "armcom": { "0": "heavylaser" } }
+    }));
+    let unit_defs = r#"{
+        armcom = {
+            weapons = {
+                { def = "ARMCOMLASER", onlytargetcategory = "NOTSUB" },
+                { def = "ARM_DISINTEGRATOR" },
+            },
+            weapondefs = {
+                armcomlaser = { range = 300, damage = { default = 75 } },
+                arm_disintegrator = { range = 250 },
+            },
+        },
+        corcom = {
+            weapons = { { def = "ARMCOMLASER" } },
+            weapondefs = { armcomlaser = { range = 300 } },
+        },
+    }"#;
+    for (what, lua) in routes {
+        for by_def in [true, false] {
+            let out = load_weapons(&lua, unit_defs, "{}", by_def);
+            let fires = &out["fires"];
+            assert_eq!(fires["armcom"]["1"], json!(450), "{what}, by_def {by_def}");
+            assert_eq!(
+                out["units"]["armcom"]["weapons"][0]["onlytargetcategory"],
+                json!("NOTSUB"),
+                "{what}"
+            );
+            assert_eq!(
+                out["units"]["armcom"]["weapondefs"]["heavylaser"]["damage"],
+                json!({ "default": 200 }),
+                "{what}"
+            );
+            if by_def {
+                assert_eq!(fires["armcom"]["2"], json!(250), "{what}");
+                assert_eq!(fires["corcom"]["1"], json!(300), "{what}");
+            }
+            assert_eq!(
+                out["units"]["corcom"]["weapondefs"],
+                json!({ "armcomlaser": { "range": 300 } }),
+                "{what}"
+            );
+        }
+    }
+}
+
+/// Issue #3052. XTA's commander names a weapon out of the game's shared
+/// `weapons/` folder by `name`, in a list with a gap in it, and so does a
+/// second unit. Giving the first its own copy and equipping it points that
+/// one slot at the copy, and the shared weapon and the second unit's slot are
+/// exactly as they were.
+#[test]
+fn a_copy_of_a_shared_weapon_changes_one_unit_and_not_the_others() {
+    let routes = both_routes(json!({
+        "weapons": { "arm_comlaser_copy": {
+            "key": "arm_comlaser_copy",
+            "source": "arm_comlaser",
+            "def": { "range": 280, "weapontype": "LaserCannon" },
+            "changes": { "range": 500 }
+        } },
+        "equipped": { "arm_commander": { "1": "arm_comlaser_copy" } }
+    }));
+    let unit_defs = r#"{
+        arm_commander = {
+            weapons = {
+                [1] = { name = "ARM_COMLASER", onlytargetcategory = "NOTAIR" },
+                [3] = { name = "ARM_DISINTEGRATOR" },
+            },
+        },
+        core_commander = { weapons = { [1] = { name = "ARM_COMLASER" } } },
+    }"#;
+    let shared = r#"{
+        arm_comlaser = { range = 280, weapontype = "LaserCannon" },
+        arm_disintegrator = { range = 250 },
+    }"#;
+    for (what, lua) in routes {
+        let out = load_weapons(&lua, unit_defs, shared, true);
+        let fires = &out["fires"];
+        assert_eq!(fires["arm_commander"]["1"], json!(500), "{what}");
+        assert_eq!(fires["arm_commander"]["3"], json!(250), "{what}");
+        assert_eq!(fires["core_commander"]["1"], json!(280), "{what}");
+        assert_eq!(
+            out["units"]["arm_commander"]["weapons"]["1"]["onlytargetcategory"],
+            json!("NOTAIR"),
+            "{what}"
+        );
+        assert_eq!(
+            out["units"]["core_commander"]["weapons"][0]["name"],
+            json!("ARM_COMLASER"),
+            "{what}"
+        );
+    }
+}
