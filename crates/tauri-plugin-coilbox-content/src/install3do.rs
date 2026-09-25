@@ -364,6 +364,13 @@ pub fn install(game_dir: &Path, out_dir: &Path) -> Result<InstallOutcome, String
         }
     }
 
+    // The unitsync worker and the engine's own archive cache both key a loose
+    // game on its folder's own mtime (issue #2637), which copying files in or
+    // moving/patching them never moves on its own.
+    if files_copied > 0 || !originals_moved_aside.is_empty() || !unit_defs_patched.is_empty() {
+        coilbox_gamebackup::touch(game_dir);
+    }
+
     Ok(InstallOutcome {
         files_copied,
         originals_moved_aside,
@@ -410,6 +417,11 @@ pub fn undo(game_dir: &Path) -> Result<UndoOutcome, String> {
         if let Ok(rel) = original.strip_prefix(game_dir) {
             restored.push(key(rel));
         }
+    }
+    // Undo puts old content back on disk, which is exactly what a stale
+    // unitsync read would otherwise keep answering with (issue #2637).
+    if !restored.is_empty() {
+        coilbox_gamebackup::touch(game_dir);
     }
     Ok(UndoOutcome { restored })
 }
@@ -619,5 +631,64 @@ mod tests {
         assert_eq!(status(&game), 0);
         install(&game, &out).expect("install");
         assert_eq!(status(&game), 3);
+    }
+
+    /// Set `path`'s mtime a day in the past, so a later touch to now has
+    /// something older to move away from regardless of filesystem
+    /// resolution.
+    fn backdate(path: &Path) {
+        let day_ago =
+            filetime::FileTime::from_unix_time(filetime::FileTime::now().seconds() - 86_400, 0);
+        filetime::set_file_mtime(path, day_ago).unwrap();
+    }
+
+    fn mtime(path: &Path) -> std::time::SystemTime {
+        std::fs::metadata(path).unwrap().modified().unwrap()
+    }
+
+    #[test]
+    fn an_install_bumps_the_games_own_mtime_so_a_stale_scan_notices() {
+        let (game, out) = fixture("mtime-install");
+        backdate(&game);
+        let before = mtime(&game);
+
+        install(&game, &out).expect("install");
+
+        assert_ne!(
+            mtime(&game),
+            before,
+            "an install changed files under the game, so the game folder's \
+             own mtime must move or the unitsync cache keeps answering with \
+             the old content"
+        );
+    }
+
+    #[test]
+    fn an_undo_with_nothing_to_restore_leaves_the_games_mtime_alone() {
+        let (game, _out) = fixture("mtime-undo-noop");
+        backdate(&game);
+        let before = mtime(&game);
+
+        let outcome = undo(&game).expect("undo");
+
+        assert!(outcome.restored.is_empty());
+        assert_eq!(mtime(&game), before);
+    }
+
+    #[test]
+    fn undo_bumps_the_games_own_mtime() {
+        let (game, out) = fixture("mtime-undo");
+        install(&game, &out).expect("install");
+        backdate(&game);
+        let before = mtime(&game);
+
+        undo(&game).expect("undo");
+
+        assert_ne!(
+            mtime(&game),
+            before,
+            "undo put the old content back, which is as much a content \
+             change as the install was"
+        );
     }
 }
