@@ -35,7 +35,9 @@
  * file (issue #3055), and the outcome says where each one went. One the file
  * cannot take comes back in `notCarried` with the reason. The project keeps
  * the weapon equipped, so the library stays where it is edited, and a later
- * write brings the file up to date with it.
+ * write brings the file up to date with it. Each one also gets a file under
+ * `weapons/`, which is what puts it in the game's weapon table for a game
+ * whose own post files never add a unit's weapons there (issue #3068).
  */
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
@@ -265,8 +267,10 @@ export function InPlaceWrite({
               ? "Every field change and copy in this project goes through the mutator route, so there is nothing to write in place."
               : "This project has no field changes, copies or equipped weapons to write."
             : copies.length > 0
-              ? "Each field change and equipped weapon is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
-              : "Each field change and equipped weapon is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
+              ? "Each field change and equipped weapon is written into its unit's own file, and each copy into a new file beside the unit it was copied from. Each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
+              : equips
+                ? "Each field change and equipped weapon is written into its unit's own file, and each equipped weapon also gets a file of its own under weapons/. Coilbox keeps the original of every file it changes, and marks every file it adds, until you undo or accept."
+                : "Each field change is written into its unit's own file. Coilbox keeps the original of every file it changes until you undo or accept."}
       </p>
       {routed.length > 0 && (
         <div className="flex flex-col gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
