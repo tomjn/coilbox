@@ -31,7 +31,7 @@
 
 use crate::bar_pack::{self, BarSlotPack};
 use crate::compile::{compile, Chunk, LuaForm};
-use crate::model::{BuildMenuOp, GameEdits, ModProject};
+use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
@@ -162,6 +162,9 @@ enum PositionKey {
     /// Every field change against a unit the project does not also clone,
     /// folded into one table chunk.
     Patches,
+    /// Every such field change through a list position, folded into one
+    /// block chunk (issue #3041).
+    Positional,
     /// One builder's replayed build menu.
     Menu(String),
     /// Every unit switched off, folded into one block chunk.
@@ -178,7 +181,8 @@ enum SlotResolution {
 /// The same category boundaries `compile::compile` uses, in the same order it
 /// pushes chunks in: each block of carried Lua, then added, then each
 /// replaced clone (alphabetically, the order a `BTreeMap`'s own iteration
-/// already gives), then field changes, then each builder's menu
+/// already gives), then field changes, then field changes through a list
+/// position, then each builder's menu
 /// (alphabetically), then disabled units. Read this module's own doc comment
 /// for why re-deriving this rather than reading it off `compile.rs` is the
 /// whole design.
@@ -209,12 +213,18 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
         }
     }
 
-    let patches_nonempty = edits
-        .overrides
-        .iter()
-        .any(|(unit, patch)| !edits.clones.contains_key(unit) && !patch.is_empty());
-    if patches_nonempty {
+    let game_unit_paths = || {
+        edits
+            .overrides
+            .iter()
+            .filter(|(unit, _)| !edits.clones.contains_key(*unit))
+            .flat_map(|(_, patch)| patch.keys())
+    };
+    if game_unit_paths().any(|path| !through_a_position(path)) {
         positions.push((PositionKey::Patches, LuaForm::Table));
+    }
+    if game_unit_paths().any(|path| through_a_position(path)) {
+        positions.push((PositionKey::Positional, LuaForm::Block));
     }
 
     for (builder, ops) in &edits.menus {
@@ -432,6 +442,12 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
         if let Some(patch) = edits.overrides.get(&unit) {
             let (files, home_key) = unit_home(&unit, edits);
             for path in patch.keys() {
+                let home_key = match &home_key {
+                    Some(PositionKey::Patches) if through_a_position(path) => {
+                        Some(PositionKey::Positional)
+                    }
+                    other => other.clone(),
+                };
                 let (bar_slot, bar_miss) = match &home_key {
                     Some(key) => slot_fields(resolution_of(key), verified),
                     None => (None, None),
@@ -585,6 +601,28 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].field_path.as_deref(), Some("maxDamage"));
         assert_eq!(changes[0].files, vec![POST_FILE.to_string()]);
+    }
+
+    /// A change through a list position is a block of its own (issue
+    /// #3041), so it reaches a `tweakdefs` slot while the same unit's other
+    /// field changes stay in `tweakunits`, and the trace still lines up.
+    #[test]
+    fn a_change_through_a_list_position_traces_to_its_own_slot() {
+        let ledger = build_ledger(&project(json!({
+            "overrides": { "armcom": { "maxDamage": 5000, "weapons.1.name": "CANNON" } }
+        })));
+        assert!(ledger.notes.is_empty(), "{:?}", ledger.notes);
+        let changes = changes_for(&ledger, "armcom");
+        let slot = |path: &str| {
+            let change = changes
+                .iter()
+                .find(|c| c.field_path.as_deref() == Some(path))
+                .unwrap_or_else(|| panic!("no {path}"));
+            assert_eq!(change.files, vec![POST_FILE.to_string()]);
+            change.bar_slot.as_ref().map(|s| s.label.clone())
+        };
+        assert_eq!(slot("maxDamage").as_deref(), Some("tweakunits"));
+        assert_eq!(slot("weapons.1.name").as_deref(), Some("tweakdefs"));
     }
 
     /// A copy the project adds gets its own file, and the ledger has to name

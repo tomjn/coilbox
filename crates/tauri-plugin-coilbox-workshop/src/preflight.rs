@@ -411,11 +411,10 @@ mod tests {
         assert!(report.passes.iter().any(|p| p.contains("generated file")));
     }
 
-    /// A patch against one weapon of several (issue #2964). The compiler
-    /// writes it as `weapons = { [2] = { name = "CANNON" } }` on purpose,
-    /// because naming the first weapon would blank it on merge. That table is
-    /// neither a Lua sequence nor string-keyed, and the check used to fail on
-    /// reading it back rather than on anything wrong with the Lua.
+    /// A patch against one weapon of several (issue #2964). It must not name
+    /// the first weapon, or the merge would blank it. Since issue #3041 it is
+    /// a block that reads the game's list before it writes, and that block
+    /// has to pass as one.
     #[test]
     fn an_override_on_the_second_weapon_alone_still_passes() {
         let (_, _, report) = run(json!({
@@ -429,7 +428,7 @@ mod tests {
         assert!(report
             .passes
             .iter()
-            .any(|p| p.contains("table chunk") && p.contains("compile")));
+            .any(|p| p.contains("block chunk") && p.contains("do ... end")));
     }
 
     #[test]

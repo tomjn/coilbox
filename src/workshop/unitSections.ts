@@ -659,13 +659,23 @@ function compareIndexPaths(a: number[], b: number[]): number {
 
 /** A label that says which array entry it belongs to, when there is more than
  *  one. `weapons.0.name` reads "name (weapon 1)", counting from one because
- *  that is how a game's own def file writes its weapon list. */
-function qualifiedLabel(path: string, field: ResolvedField): string {
+ *  that is how a game's own def file writes its weapon list. A list with a gap
+ *  in its numbers reads as an object keyed by them (issue #3041), so there the
+ *  step already is the number the file writes. */
+function qualifiedLabel(
+  path: string,
+  field: ResolvedField,
+  def: Record<string, unknown> | undefined,
+): string {
   const parts = path.split(".");
   const at = parts.findIndex((part) => /^\d+$/.test(part));
   if (at <= 0) return field.label;
   const container = parts[at - 1].replace(/s$/, "");
-  return `${field.label} (${container} ${Number(parts[at]) + 1})`;
+  const list = readPath(def, parts.slice(0, at).join("."));
+  const keyed =
+    list !== null && typeof list === "object" && !Array.isArray(list);
+  const number = Number(parts[at]) + (keyed ? 0 : 1);
+  return `${field.label} (${container} ${number})`;
 }
 
 /**
@@ -688,7 +698,7 @@ function buildRow(
   return {
     path,
     field,
-    label: qualifiedLabel(path, field),
+    label: qualifiedLabel(path, field, def),
     present,
     inherited,
     value,

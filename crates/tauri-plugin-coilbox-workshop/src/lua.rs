@@ -216,6 +216,9 @@ impl PatchTree {
     /// `overrides.ts` writes paths under: its `readPath` indexes a JavaScript
     /// array with the step, so `weapons.0` is the first mount. Lua counts from
     /// one, so the step is written out one higher than it was stored.
+    /// `compile.rs` keeps changes through a list position out of the tree,
+    /// because a list with a gap counts by its own keys instead (issue
+    /// #3041).
     ///
     /// A path that runs through a value already set replaces it, because the
     /// last thing the user said about a field is what they meant.

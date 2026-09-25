@@ -111,15 +111,30 @@ export function copiesToWrite(project: ModProject | undefined): UnitClone[] {
   );
 }
 
-/** The game's read of every unit `project`'s copies were made from. */
-export function copySources(
+/** Whether a field path goes through a list position: a step of digits. */
+const throughAPosition = (path: string) =>
+  path.split(".").some((step) => /^\d+$/.test(step));
+
+/**
+ * The game's read of every unit the write needs one for: each unit
+ * `project`'s copies were made from, and each game unit with a field change
+ * through a list position. A digit step is a position counted from zero in a
+ * list numbered 1 to n, and the Lua key itself in a table with a gap in it,
+ * so the write reads it against the table the page showed (issue #3041).
+ */
+export function writeSources(
   project: ModProject | undefined,
   gameUnits: Record<string, Record<string, unknown>>,
 ): Record<string, Record<string, unknown>> {
   const out: Record<string, Record<string, unknown>> = {};
-  for (const clone of copiesToWrite(project)) {
-    const source = clone.source as string;
-    if (Object.hasOwn(gameUnits, source)) out[source] = gameUnits[source];
+  const add = (unit: string) => {
+    if (Object.hasOwn(gameUnits, unit)) out[unit] = gameUnits[unit];
+  };
+  for (const clone of copiesToWrite(project)) add(clone.source as string);
+  const edits = project?.edits;
+  for (const [unit, fields] of Object.entries(edits?.overrides ?? {})) {
+    if (Object.hasOwn(edits?.clones ?? {}, unit)) continue;
+    if (Object.keys(fields).some(throughAPosition)) add(unit);
   }
   return out;
 }
@@ -168,8 +183,17 @@ export interface InPlaceCheck {
   fields: FieldCheck[];
 }
 
+/**
+ * `def` is the game's read of the unit, which a field through a list position
+ * is read against (issue #3041). Without it, such a field is refused.
+ */
 export const workshopCheckInPlace = defineCommand<
-  { gameDir: string; unit: string; fields: FieldProbe[] },
+  {
+    gameDir: string;
+    unit: string;
+    fields: FieldProbe[];
+    def?: Record<string, unknown>;
+  },
   InPlaceCheck
 >("coilbox-workshop", "workshop_check_in_place");
 
@@ -194,7 +218,7 @@ export interface CloneCheck {
  * `menuOps` are the project's own edits to this one copy, the same slices
  * `edits.overrides[unit]` and `edits.menus[unit]` hold. `sourceDef` is the
  * game's own read of the unit the copy was made from, the same as one entry
- * of what `copySources` builds for the write.
+ * of what `writeSources` builds for the write.
  */
 export const workshopCheckCloneInPlace = defineCommand<
   {

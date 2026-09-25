@@ -267,6 +267,24 @@ describe("unitFieldView", () => {
     expect(rows?.[1].label).toBe("Weapon (weapon 2)");
   });
 
+  it("labels a weapon of a list with a gap by its own number", () => {
+    // XTA's commander: Weapon1 and Weapon3 and no Weapon2, which the worker
+    // reads as an object keyed by those numbers (issue #3041).
+    const xta = {
+      weapons: {
+        "1": { name: "CSARMCOMLASER" },
+        "3": { name: "CSARM_DISINTEGRATOR" },
+      },
+    };
+    const rows = unitFieldView(xta, {}, "armcom", "relevant")
+      .groups.flatMap((g) => g.sections)
+      .find((s) => s.id === "weapons")?.rows;
+    expect(rows?.map((r) => [r.path, r.label])).toEqual([
+      ["weapons.1.name", "Weapon (weapon 1)"],
+      ["weapons.3.name", "Weapon (weapon 3)"],
+    ]);
+  });
+
   it("inherits the game's value where the def has one, and the engine's where it does not", () => {
     const rows = rowsOf(unitFieldView(armcom, {}, "armcom", "all"));
     const health = rows.find((r) => r.path === "health");
