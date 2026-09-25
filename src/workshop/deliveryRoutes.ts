@@ -23,11 +23,23 @@
  *
  * The mutator route is the default that always works. The tweak-slot route is
  * additional, and only when the game says so.
+ *
+ * Edit-in-place (issue #2631) is a third: writing the change straight into
+ * the game's own files rather than a generated mutator or a lobby slot,
+ * offered only when the selected game is a loose `.sdd` directory under a
+ * content root's `games` folder, since that is the only shape a rewrite in
+ * place can safely target (`isEditInPlaceEligible` in `content/format.ts`
+ * mirrors the Rust guard that will enforce it). This module only offers and
+ * explains the route: the patching, backup and undo it unlocks are separate
+ * issues (#2632, #2635, #2636), so `available` here means "this game's
+ * layout supports writing into it directly", not that the write is built
+ * yet.
  */
 import type { ConfigOption } from "@/content/bindings";
+import { isEditInPlaceEligible } from "@/content/format";
 
-/** One of the two ways a project's edits can reach a running game. */
-export type DeliveryRoute = "mutator" | "tweak-slots";
+/** One of the three ways a project's edits can reach a running game. */
+export type DeliveryRoute = "mutator" | "tweak-slots" | "edit-in-place";
 
 /** How many BAR-style tweak slots a game's mod options declare, by kind. */
 export interface TweakSlotCounts {
@@ -95,19 +107,24 @@ export interface RouteAvailability {
 }
 
 /**
- * The two routes for one game, in the order they are offered. The mutator is
+ * The three routes for one game, in the order they are offered. The mutator is
  * always available. It is the one every game supports, and the one nothing
  * here needs to check. The tweak-slot route is available only when the game's
  * own mod options declare at least one `tweakdefs`/`tweakunits` slot, since a
  * project that only needs a plain table still needs somewhere to put it, so
- * either kind on its own counts.
+ * either kind on its own counts. The edit-in-place route is available only
+ * when `gamePath` is a loose `.sdd` directly under a content root's `games`
+ * folder. Omitted, it reads as not eligible, which is right for a caller such
+ * as a battle preset that has no installed game path to check.
  */
 export function deliveryRoutes(
   options: ConfigOption[],
   gameName: string,
+  gamePath?: string,
 ): RouteAvailability[] {
   const { defs, units } = tweakSlotCounts(options);
   const available = defs > 0 || units > 0;
+  const inPlace = isEditInPlaceEligible(gamePath);
   return [
     {
       route: "mutator",
@@ -123,6 +140,14 @@ export function deliveryRoutes(
       detail: available
         ? `${gameName} declares ${defs} tweakdefs slot${defs === 1 ? "" : "s"} and ${units} tweakunits slot${units === 1 ? "" : "s"} for base64 Lua.`
         : `${gameName} does not declare any tweakdefs or tweakunits mod options, so there is no slot to carry base64 Lua. The mutator route above still works.`,
+    },
+    {
+      route: "edit-in-place",
+      label: "Edit in place",
+      available: inPlace,
+      detail: inPlace
+        ? `${gameName} is a loose .sdd game under a content root's games folder, so a change can be written straight into its own files. Writing it is not built yet, so use the mutator route above for now.`
+        : `${gameName} is not a loose .sdd game directly under a content root's games folder, so its files cannot be rewritten in place. The mutator route above still works.`,
     },
   ];
 }

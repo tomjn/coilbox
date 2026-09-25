@@ -28,6 +28,28 @@ const DELETABLE_EXTS = ["sd7", "sdz", "sdd", "sdp"];
 const CONTENT_DIRS = ["games", "maps", "packages"];
 
 /**
+ * Whether an on-disk game path qualifies for the edit-in-place delivery
+ * route (issue #2631): a loose `.sdd` directory sitting directly under a
+ * content root's `games` folder. Mirrors `require_sdd` and
+ * `require_in_games_dir` in
+ * `crates/tauri-plugin-coilbox-content/src/install3do.rs`, the same guard
+ * the `.3do` installer applies before writing into a game in place, the
+ * same way {@link isDeletableArchive} mirrors the Rust `archives` module's
+ * guard: the UI offers the route only where the Rust side would actually
+ * allow the write, and the Rust guard stays the one place that enforces it.
+ */
+export function isEditInPlaceEligible(
+  path: string | null | undefined,
+): boolean {
+  if (!path) return false;
+  const parts = path.split(/[\\/]/).filter(Boolean);
+  const file = parts.pop()?.toLowerCase();
+  const parent = parts.pop()?.toLowerCase();
+  if (!file || !parent) return false;
+  return file.endsWith(".sdd") && parent === "games";
+}
+
+/**
  * Whether a delete button should be offered for an on-disk archive path. Mirrors
  * the guard in the Rust `archives` module so the UI hides the button instead of
  * showing one that always fails: only archives in a content root's `games`,
