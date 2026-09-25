@@ -21,6 +21,7 @@ mod config;
 mod convert3do;
 mod customparams;
 mod dataset;
+mod defsprobe;
 mod factionlogo;
 mod ffi;
 mod game;
@@ -160,6 +161,10 @@ struct Args {
     /// `coilbox_unitsync_worker::UnitDefsArgs`, shared with the sidecar plugin
     /// that builds this flag's argv (issue #2448).
     unit_defs: Option<Mode>,
+    /// `--defs-probe`: load a game's definitions with some files on top and
+    /// read numbers back (issue #3059). Its fields live once in
+    /// `coilbox_unitsync_worker::DefsProbeArgs`.
+    defs_probe: Option<Mode>,
     /// `--custom-params`: index which of a game's own Lua files name each
     /// custom parameter, for the unit editor's custom parameter rows. Its
     /// fields live once in `coilbox_unitsync_worker::CustomParamsArgs`, shared
@@ -449,6 +454,27 @@ fn run() -> i32 {
             || unitdefs::render(&args.lib, &mode.game, cache_dir),
             print_ok,
             || unitdefs::emit_error("worker panicked while reading unit defs".into()),
+        );
+    }
+
+    // Defs probe: load one game's definitions once per run with that run's
+    // files on top, and read numbers back. Keys off --game, so checked before
+    // the --game game-detail mode.
+    if let Some(Mode::DefsProbe(mode)) = &args.defs_probe {
+        let input = match std::fs::read_to_string(&mode.source_file) {
+            Ok(s) => s,
+            Err(e) => {
+                defsprobe::emit_error(format!(
+                    "could not read probe file {}: {e}",
+                    mode.source_file
+                ));
+                return 1;
+            }
+        };
+        return run_mode(
+            || defsprobe::render(&args.lib, &mode.game, &input),
+            print_ok,
+            || defsprobe::emit_error("worker panicked while probing the game's defs".into()),
         );
     }
 
@@ -940,6 +966,9 @@ fn parse_args() -> Result<Args, String> {
     // locals here for its own use: `Mode::UnitDefs`'s `from_args` below
     // re-scans `raw` for those (issue #2448).
     let mut unit_defs_flag = false;
+    // `--defs-probe`'s fields (game, source file) are read by its own
+    // `from_args` below.
+    let mut defs_probe_flag = false;
     // `--custom-params`' own fields (game, cache directory) are not collected
     // into locals here for its own use: `Mode::CustomParams`'s `from_args`
     // below re-scans `raw` for those (issue #2448).
@@ -1043,6 +1072,7 @@ fn parse_args() -> Result<Args, String> {
             "--unit-buildpics" => unit_buildpics_flag = true,
             "--unit-dataset" => unit_dataset_flag = true,
             "--unit-defs" => unit_defs_flag = true,
+            "--defs-probe" => defs_probe_flag = true,
             "--custom-params" => custom_params_flag = true,
             "--unit-model" => unit_model_flag = true,
             "--unit-script" => unit_script_flag = true,
@@ -1231,6 +1261,13 @@ fn parse_args() -> Result<Args, String> {
         unit_defs: if unit_defs_flag {
             Some(Mode::UnitDefs(
                 coilbox_unitsync_worker::UnitDefsArgs::from_args(&raw)?,
+            ))
+        } else {
+            None
+        },
+        defs_probe: if defs_probe_flag {
+            Some(Mode::DefsProbe(
+                coilbox_unitsync_worker::DefsProbeArgs::from_args(&raw)?,
             ))
         } else {
             None
@@ -1987,6 +2024,7 @@ mod tests {
             unit_buildpics: None,
             unit_dataset: None,
             unit_defs: None,
+            defs_probe: None,
             custom_params: None,
             unit_model: None,
             unit_models: None,

@@ -56,6 +56,7 @@ pub enum Mode {
     FactionLogos(FactionLogosArgs),
     UnitDataset(UnitDatasetArgs),
     UnitDefs(UnitDefsArgs),
+    DefsProbe(DefsProbeArgs),
     CustomParams(CustomParamsArgs),
     UnitModel(UnitModelArgs),
     UnitScript(UnitScriptArgs),
@@ -96,6 +97,7 @@ impl Mode {
             Mode::FactionLogos(args) => args.to_args(),
             Mode::UnitDataset(args) => args.to_args(),
             Mode::UnitDefs(args) => args.to_args(),
+            Mode::DefsProbe(args) => args.to_args(),
             Mode::CustomParams(args) => args.to_args(),
             Mode::UnitModel(args) => args.to_args(),
             Mode::UnitScript(args) => args.to_args(),
@@ -1302,6 +1304,53 @@ impl UnitDefsArgs {
         Ok(UnitDefsArgs {
             game: game.unwrap_or_default(),
             cache_dir,
+        })
+    }
+}
+
+/// `--defs-probe`: load `game`'s definitions once per run in the JSON at
+/// `source_file`, each time with that run's files on top, and read numbers
+/// back out of the loaded tables (issue #3059).
+///
+/// A mode of its own rather than a flag on `--unit-defs`: it is never cached,
+/// it loads the game as many times as it is asked to, and it answers a
+/// handful of numbers rather than every table.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DefsProbeArgs {
+    pub game: String,
+    pub source_file: String,
+}
+
+impl DefsProbeArgs {
+    /// Build the flags for `--defs-probe` mode: the flag itself, the game to
+    /// load and the file holding the runs.
+    pub fn to_args(&self) -> Vec<String> {
+        vec![
+            "--defs-probe".to_string(),
+            "--game".to_string(),
+            self.game.clone(),
+            "--source-file".to_string(),
+            self.source_file.clone(),
+        ]
+    }
+
+    /// Recover a `--defs-probe` invocation from a worker argv. As with the
+    /// other modes' `from_args` functions, unrelated flags are skipped rather
+    /// than rejected.
+    pub fn from_args(args: &[String]) -> Result<Self, String> {
+        let mut game = None;
+        let mut source_file = None;
+        let mut it = args.iter();
+        while let Some(a) = it.next() {
+            match a.as_str() {
+                "--game" => game = it.next().cloned(),
+                "--source-file" => source_file = it.next().cloned(),
+                _ => {}
+            }
+        }
+        Ok(DefsProbeArgs {
+            game: game.ok_or("--defs-probe needs --game")?,
+            source_file: source_file.ok_or("--defs-probe needs --source-file")?,
         })
     }
 }
@@ -2619,6 +2668,21 @@ mod tests {
     fn unit_defs_dispatches_to_args_to_its_variant() {
         let a = unit_defs_args();
         assert_eq!(Mode::UnitDefs(a.clone()).to_args(), a.to_args());
+    }
+
+    #[test]
+    fn defs_probe_round_trips_through_to_args_and_from_args() {
+        let original = DefsProbeArgs {
+            game: "balanced_annihilation-v15.9.8.sdz".into(),
+            source_file: "/tmp/probe.json".into(),
+        };
+        let recovered = DefsProbeArgs::from_args(&original.to_args()).expect("valid argv");
+        assert_eq!(recovered, original);
+        assert_eq!(
+            Mode::DefsProbe(original.clone()).to_args(),
+            original.to_args()
+        );
+        assert!(DefsProbeArgs::from_args(&["--defs-probe".into()]).is_err());
     }
 
     /// The two modes take the same fields, so the flag that names them apart is
