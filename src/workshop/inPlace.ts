@@ -29,6 +29,17 @@ export interface RefusedChange {
   location: { start: FilePoint; end: FilePoint } | null;
 }
 
+/** One field change the game's files hold once a write has gone through,
+ *  whether the write put it there or the file already said the same. */
+export interface CarriedChange {
+  unit: string;
+  /** The field's dotted path, as the project holds it. */
+  field: string;
+  /** Whether the unit's file has a workshop backup, so undo takes the change
+   *  back out of the game. */
+  undoable: boolean;
+}
+
 /** What `workshop_write_in_place` did. */
 export interface InPlaceWriteOutcome {
   /** Files written, relative to the game. Empty when anything was refused. */
@@ -40,6 +51,9 @@ export interface InPlaceWriteOutcome {
   refused: RefusedChange[];
   /** Parts of the project this route cannot carry yet, one sentence each. */
   notCarried: string[];
+  /** Every field change the game's files now hold (issue #3023). Empty when
+   *  anything was refused. */
+  carried: CarriedChange[];
 }
 
 /** How many files carry a workshop backup, or a marker saying coilbox

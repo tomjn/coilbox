@@ -37,6 +37,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   },
 }));
 
+import type { InPlaceDone } from "../../inPlaceProject";
 import type { ModProject } from "../../project";
 import { InPlaceWrite } from "./InPlaceWrite";
 
@@ -64,13 +65,15 @@ afterEach(() => {
 
 function renderWrite(
   p: ModProject | undefined = project,
-  onWritten: () => void = vi.fn(),
+  onDone: (done: InPlaceDone) => void = vi.fn(),
+  reading = false,
 ) {
   return render(
     <InPlaceWrite
       gameDir="/spring/games/dev.sdd"
       project={p}
-      onWritten={onWritten}
+      reading={reading}
+      onDone={onDone}
     />,
   );
 }
@@ -123,6 +126,7 @@ describe("the edit-in-place actions", () => {
         },
       ],
       notCarried: [],
+      carried: [],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -146,6 +150,7 @@ describe("the edit-in-place actions", () => {
       unchanged: 0,
       refused: [],
       notCarried: ["Build menu changes are not written into the game yet."],
+      carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
     };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
@@ -160,6 +165,48 @@ describe("the edit-in-place actions", () => {
     ).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
     expect(onWritten).toHaveBeenCalledTimes(1);
+    expect(onWritten).toHaveBeenCalledWith({
+      kind: "write",
+      carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
+      changed: true,
+    });
+  });
+
+  it("tells the caller what the game holds even when every file already held it", async () => {
+    writeResponse = {
+      written: [],
+      changed: 0,
+      unchanged: 1,
+      refused: [],
+      notCarried: [],
+      carried: [{ unit: "armcom", field: "metalcost", undoable: false }],
+    };
+    const onDone = vi.fn();
+    renderWrite(project, onDone);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Write changes into the game" }),
+    );
+    expect(await screen.findByText(/already hold every change/)).toBeTruthy();
+    expect(onDone).toHaveBeenCalledWith({
+      kind: "write",
+      carried: [{ unit: "armcom", field: "metalcost", undoable: false }],
+      changed: false,
+    });
+  });
+
+  it("holds every action off while the page reads the game again", async () => {
+    status = { backups: 1, created: 0 };
+    renderWrite(project, vi.fn(), true);
+    const undo = await screen.findByRole("button", { name: "Undo" });
+    expect(undo.hasAttribute("disabled")).toBe(true);
+    expect(
+      screen
+        .getByRole("button", { name: "Write changes into the game" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByRole("button", { name: "Accept" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   it("asks before accepting, since accept deletes the backups, then asks the caller to refresh", async () => {
@@ -181,15 +228,15 @@ describe("the edit-in-place actions", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Undo" })).toBeNull(),
     );
-    expect(onWritten).toHaveBeenCalledTimes(1);
+    expect(onWritten).toHaveBeenCalledWith({ kind: "accept", changed: true });
   });
 
-  it("undoes without asking, since the project can write again, then asks the caller to refresh", async () => {
+  it("undoes without asking, since the project gets its fields back, then tells the caller", async () => {
     status = { backups: 1, created: 0 };
     const onWritten = vi.fn();
     renderWrite(project, onWritten);
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Put 1 file back as it was.")).toBeTruthy();
-    expect(onWritten).toHaveBeenCalledTimes(1);
+    expect(onWritten).toHaveBeenCalledWith({ kind: "undo", changed: true });
   });
 });

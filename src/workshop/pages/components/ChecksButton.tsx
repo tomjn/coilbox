@@ -71,6 +71,7 @@ import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
 import type { CompatFinding, CompatState } from "../../compatibility";
 import { useCompiledProject } from "../../compile";
 import { deliveryRoutes } from "../../deliveryRoutes";
+import type { InPlaceDone } from "../../inPlaceProject";
 import type { PostHookState } from "../../postHook";
 import { POST_FILE, usePostHookCheck } from "../../postHook";
 import type { PreflightReport } from "../../preflight";
@@ -230,6 +231,7 @@ function RoutesSection({
   gamePath,
   checking,
   project,
+  reading,
   onInPlaceWrite,
 }: {
   gameName: string;
@@ -241,9 +243,13 @@ function RoutesSection({
   checking: boolean;
   /** The open project, which the edit-in-place route writes (issue #2635). */
   project: ModProject | undefined;
-  /** Called after the edit-in-place route changes a file on disk, so the
-   *  page can drop its own unitsync reads of the game (issue #2637). */
-  onInPlaceWrite: () => void;
+  /** The page is still reading the game's definitions, so the
+   *  edit-in-place route waits (issue #3023). */
+  reading: boolean;
+  /** Called after an edit-in-place action went through, so the page can
+   *  follow it in the project (issue #3023) and drop its own unitsync reads
+   *  of the game (issue #2637). */
+  onInPlaceWrite: (done: InPlaceDone) => void;
 }) {
   return (
     <section className="flex flex-col gap-2">
@@ -276,7 +282,8 @@ function RoutesSection({
                     <InPlaceWrite
                       gameDir={gamePath}
                       project={project}
-                      onWritten={onInPlaceWrite}
+                      reading={reading}
+                      onDone={onInPlaceWrite}
                     />
                   </div>
                 )}
@@ -664,9 +671,10 @@ export function ChecksButton({
    *  which is where the game's definitions already are. */
   compatibility: CompatState | null;
   onApplyFix: (finding: CompatFinding) => void;
-  /** Called after the edit-in-place route changes a file on disk, so the
-   *  page can drop its own unitsync reads of the game (issue #2637). */
-  onInPlaceWrite: () => void;
+  /** Called after an edit-in-place action went through, so the page can
+   *  follow it in the project (issue #3023) and drop its own unitsync reads
+   *  of the game (issue #2637). */
+  onInPlaceWrite: (done: InPlaceDone) => void;
 }) {
   const [open, setOpen] = useState(false);
   // Read whenever a project is open, not only while the drawer is up: see
@@ -782,6 +790,7 @@ export function ChecksButton({
             gamePath={gameArchives[0]?.path}
             checking={routesChecking}
             project={project}
+            reading={diagnosticsChecking}
             onInPlaceWrite={onInPlaceWrite}
           />
           <PostHookSection

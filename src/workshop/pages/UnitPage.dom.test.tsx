@@ -32,6 +32,7 @@ import type {
   UnitDefsResult,
 } from "@/content/bindings";
 import { LEGO_SCHEMA_VERSION, type LegoProject } from "@/lego/model";
+import type { ModProject } from "../project";
 
 const SELECTED = {
   enginePath: "/engines/105",
@@ -130,10 +131,14 @@ vi.mock("@/play/PlayProvider", () => ({
  *  most of this file is about the fields and stores, not the preflight
  *  check, which has its own coverage in `ChecksButton.dom.test.tsx`. */
 let mockPreflightReport = { blockers: [], review: [], passes: [] };
+/** What the edit-in-place commands answer, for the tests of issue #3023.
+ *  Empty elsewhere, where nothing presses them. */
+let mockInPlace: Record<string, () => unknown> = {};
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
     (_plugin: string, command: string) => async (_args: unknown) => {
       if (command === "workshop_preflight") return mockPreflightReport;
+      if (Object.hasOwn(mockInPlace, command)) return mockInPlace[command]();
       throw new Error(`unexpected command ${command}`);
     },
 }));
@@ -436,6 +441,7 @@ afterEach(() => {
   mockConsumersByArchive = {};
   mockLegoProjects = [];
   mockPreflightReport = { blockers: [], review: [], passes: [] };
+  mockInPlace = {};
 });
 
 describe("UnitPage", () => {
@@ -2093,6 +2099,83 @@ describe("UnitPage", () => {
    * They now go into a saved project as they are made, so the page has to be
    * closable, and undo has to reach back over them.
    */
+  /**
+   * Issue #3023. A write puts the project's field changes into the game's own
+   * files, and the page reads the game again (issue #2637). The project then
+   * has to stop counting what the game now carries, and stop calling the game
+   * it changed itself an updated one. Undo puts both back.
+   */
+  describe("writing the project into the game's own files", () => {
+    const project = () =>
+      readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0] as ModProject;
+
+    it("stops counting the written field and keeps the game unmoved, and undo puts it back", async () => {
+      let backups = 0;
+      mockInPlace = {
+        workshop_in_place_status: () => ({ backups, created: 0 }),
+        workshop_write_in_place: () => {
+          backups = 1;
+          // The game as the write left it, which the page reads next.
+          mockDefs = {
+            ...mockDefs,
+            units: { armcom: { ...ARMCOM, health: 5000 } },
+            checksum: "written",
+          };
+          return {
+            written: ["units/armcom.lua"],
+            changed: 1,
+            unchanged: 0,
+            refused: [],
+            notCarried: [],
+            carried: [{ unit: "armcom", field: "health", undoable: true }],
+          };
+        },
+        workshop_undo_in_place: () => {
+          backups = 0;
+          mockDefs = {
+            ...mockDefs,
+            units: { armcom: ARMCOM },
+            checksum: "abc",
+          };
+          return { restored: ["units/armcom.lua"], deleted: [] };
+        },
+      };
+      show();
+      type(healthBox(), "5000");
+      expect(screen.getByText("1 change")).toBeTruthy();
+      expect(project().authoredChecksum).toBe("abc");
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "No problems found" }),
+      );
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Write changes into the game",
+        }),
+      );
+      expect(
+        await screen.findByText("Wrote 1 change into units/armcom.lua."),
+      ).toBeTruthy();
+
+      await waitFor(() => expect(project().authoredChecksum).toBe("written"));
+      expect(project().edits.overrides).toEqual({});
+      expect(project().writtenInPlace).toEqual({ armcom: { health: 5000 } });
+      expect(screen.queryByText("1 change")).toBeNull();
+      expect(screen.queryByText(/has been updated since/)).toBeNull();
+      expect(healthBox().value).toBe("5000");
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(
+        await screen.findByText("Put 1 file back as it was."),
+      ).toBeTruthy();
+      await waitFor(() => expect(project().authoredChecksum).toBe("abc"));
+      expect(project().edits.overrides).toEqual({ armcom: { health: 5000 } });
+      expect(project().writtenInPlace).toBeUndefined();
+      expect(screen.getByText("1 change")).toBeTruthy();
+      expect(screen.queryByText(/has been updated since/)).toBeNull();
+    });
+  });
+
   describe("saving and undoing", () => {
     const units = { armcom: ARMCOM, armlab: ARMLAB };
     const dataset = [
