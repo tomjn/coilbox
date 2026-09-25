@@ -6,6 +6,8 @@ import {
   libraryWeaponGroup,
   slotEditCount,
   slotOfPath,
+  supportingView,
+  supportOfPath,
   unitsMounting,
   type WeaponSlot,
   weaponSlots,
@@ -369,5 +371,46 @@ describe("slotOfPath", () => {
       slotOfPath(slots, "weapondefs.arm_disintegrator.range")?.number,
     ).toBe(3);
     expect(slotOfPath(slots, "health")).toBeUndefined();
+  });
+});
+
+describe("supportingView (issue #2641)", () => {
+  const support = {
+    key: "rocket_split",
+    path: "weapondefs.rocket_split",
+    def: { range: 300, customparams: { model: "rocket" } },
+    usedBy: [{ from: "rocket", field: "speceffect_def" }],
+  };
+
+  it("draws a supporting definition's fields as the unit's own", () => {
+    const view = supportingView(support, {}, "armmship", "relevant", "Ship");
+    expect(view.groups).toHaveLength(1);
+    const [group] = view.groups;
+    expect(group.label).toBe("Supporting definition rocket_split");
+    expect(group.readOnly).toBeUndefined();
+    expect(group.note).toContain("rocket's speceffect_def");
+    const paths = rowsOf(group).map((r) => r.path);
+    expect(paths).toContain("weapondefs.rocket_split.range");
+    expect(paths).toContain("weapondefs.rocket_split.customparams.model");
+  });
+
+  it("shows an edit as an edit, and a link to one finds it", () => {
+    const overrides = setOverride(
+      {},
+      "armmship",
+      "weapondefs.rocket_split.range",
+      450,
+      300,
+    );
+    const row = rowsOf(
+      supportingView(support, overrides, "armmship", "relevant", "Ship")
+        .groups[0],
+    ).find((r) => r.path === "weapondefs.rocket_split.range");
+    expect(row?.state).toBe("overridden");
+    expect(row?.value).toBe(450);
+    expect(supportOfPath([support], "weapondefs.rocket_split.range")?.key).toBe(
+      "rocket_split",
+    );
+    expect(supportOfPath([support], "weapondefs.rocket.range")).toBeUndefined();
   });
 });

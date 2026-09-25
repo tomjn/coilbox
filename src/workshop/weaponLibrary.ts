@@ -25,6 +25,7 @@
  */
 import { type PostChange, parsePostChange } from "./beforePost";
 import { clearOverride, resolvedDef, setOverride } from "./overrides";
+import { librarySupport } from "./weaponRefs";
 
 /** One weapon in the project's library. */
 export interface LibraryWeapon {
@@ -101,12 +102,23 @@ export function suggestWeaponKey(
   source: string,
   library: WeaponLibrary | undefined,
 ): string {
+  return suggestWeaponKeyWhere(
+    source,
+    (key) => !!library && Object.hasOwn(library, key),
+  );
+}
+
+/** {@link suggestWeaponKey} against any test of whether a name is taken, for
+ *  naming several copies at once (`weaponRefs.ts`). */
+export function suggestWeaponKeyWhere(
+  source: string,
+  taken: (key: string) => boolean,
+): string {
   const base =
     source
       .toLowerCase()
       .replace(/[^a-z0-9_]+/g, "_")
       .replace(/^_+|_+$/g, "") || "weapon";
-  const taken = (key: string) => !!library && Object.hasOwn(library, key);
   let key = `${base}_copy`;
   let n = 2;
   while (taken(key)) {
@@ -305,16 +317,23 @@ export function equipRefusal(
   unitDef: Record<string, unknown> | undefined,
   unitName: string,
   key: string,
+  library?: WeaponLibrary,
 ): string | undefined {
   const defsKey = Object.keys(unitDef ?? {}).find(
     (k) => k.toLowerCase() === "weapondefs",
   );
   const own = defsKey === undefined ? undefined : unitDef?.[defsKey];
   if (own === null || typeof own !== "object") return undefined;
-  const clash = Object.keys(own).some((k) => k.toLowerCase() === key);
-  return clash
-    ? `${unitName} already carries a weapon definition called ${key}, and equipping this would replace it. Copy the weapon into the library under another name.`
-    : undefined;
+  const carries = (name: string) =>
+    Object.keys(own).some((k) => k.toLowerCase() === name);
+  if (carries(key))
+    return `${unitName} already carries a weapon definition called ${key}, and equipping this would replace it. Copy the weapon into the library under another name.`;
+  // The library weapons this one names go into the unit beside it (issue
+  // #2641), so a clash with one of those replaces a definition just the same.
+  const child = librarySupport(library, key).find(carries);
+  return child === undefined
+    ? undefined
+    : `${key} brings ${child} from the library along with it, and ${unitName} already carries a weapon definition called ${child}, which it would replace. Copy ${child} into the library under another name and point ${key} at that.`;
 }
 
 /** Read the library out of untrusted JSON, dropping any entry it cannot use. */

@@ -48,6 +48,7 @@ import type {
   RenderedSection,
 } from "./unitSections";
 import type { LibraryWeapon } from "./weaponLibrary";
+import type { SupportingDef } from "./weaponRefs";
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -677,6 +678,67 @@ export function weaponSlotView(
     shown: view === "all" ? all : relevant,
     hidden: all - relevant,
   };
+}
+
+/**
+ * A definition the unit carries and no slot mounts, grouped for drawing
+ * (issue #2641). Its fields are the unit's own, written as overrides under
+ * its path the same as a mounted definition's.
+ */
+export function supportingView(
+  support: SupportingDef,
+  overrides: UnitOverrides,
+  unitKey: string,
+  view: FieldView,
+  unitName: string,
+): WeaponSlotView {
+  const { sections, relevant, all } = definitionSections(
+    support.def,
+    overrides[unitKey] ?? {},
+    support.path,
+    view,
+    true,
+  );
+  const users = support.usedBy.map((u) => `${u.from}'s ${u.field}`);
+  const named =
+    users.length > 0
+      ? `${unitName} carries it for ${users.join(" and ")}, which name${users.length === 1 ? "s" : ""} it.`
+      : `No field coilbox knows names it, so the game's own Lua may use it by name, or nothing does.`;
+  return {
+    groups: [
+      {
+        id: "definition",
+        label: `Supporting definition ${support.key}`,
+        note: `A weapon definition ${unitName} carries and no slot mounts. ${named} A change here reaches no other unit.`,
+        sections,
+      },
+    ],
+    shown: view === "all" ? all : relevant,
+    hidden: all - relevant,
+  };
+}
+
+/** How many of the project's edits to a unit belong to one supporting
+ *  definition. */
+export function supportingEditCount(
+  support: SupportingDef,
+  overrides: UnitOverrides,
+  unitKey: string,
+): number {
+  const prefix = `${support.path.toLowerCase()}.`;
+  return Object.keys(overrides[unitKey] ?? {}).filter((path) =>
+    path.toLowerCase().startsWith(prefix),
+  ).length;
+}
+
+/** Which supporting definition a field path belongs to, for a link that
+ *  names one. */
+export function supportOfPath(
+  supporting: SupportingDef[],
+  path: string,
+): SupportingDef | undefined {
+  const lower = path.toLowerCase();
+  return supporting.find((s) => lower.startsWith(`${s.path.toLowerCase()}.`));
 }
 
 /**

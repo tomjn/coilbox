@@ -193,6 +193,7 @@ import {
   mountsOf,
   removeLibraryWeapon,
   setLibraryField,
+  suggestWeaponKeyWhere,
   unequipEverywhere,
   unequipUnit,
   unequipWeapon,
@@ -200,7 +201,18 @@ import {
   type WeaponMount,
 } from "../weaponLibrary";
 import {
+  type CopySource,
+  ownWeaponDefs,
+  planLibraryCopy,
+  refProblems,
+  resolveRef,
+  supportingDefs,
+  type WeaponRef,
+} from "../weaponRefs";
+import {
   slotOfPath,
+  supportingView,
+  supportOfPath,
   unitsMounting,
   type WeaponSlot,
   weaponSlots,
@@ -369,10 +381,11 @@ export default function UnitPage() {
     });
     pathRef.current = started.id;
     // The tab and the weapon slot come along, so the first edit on the
-    // weapons tab does not drop its author back on the fields (issue #2639).
+    // weapons tab does not drop its author back on the fields (issue #2639),
+    // and so does a supporting definition (issue #2641).
     const path = projectPath(started.id, unitKey);
     const kept = new URLSearchParams();
-    for (const key of ["tab", "slot"]) {
+    for (const key of ["tab", "slot", "support"]) {
       const value = params.get(key);
       if (value) kept.set(key, value);
     }
@@ -553,28 +566,47 @@ export default function UnitPage() {
       ? postNoteOf(defs.beforePost.weaponDefs[weapon.source], row.path, source)
       : postNoteOf(weapon.beforePost, row.path, weapon.def);
   };
+  const owners = useMemo(
+    () => (cloneSource ? [unitKey, cloneSource] : [unitKey]),
+    [unitKey, cloneSource],
+  );
   const slots = useMemo(
-    () =>
-      weaponSlots(
-        unit,
-        weaponDefs,
-        cloneSource ? [unitKey, cloneSource] : [unitKey],
-      ),
-    [unit, weaponDefs, unitKey, cloneSource],
+    () => weaponSlots(unit, weaponDefs, owners),
+    [unit, weaponDefs, owners],
+  );
+  // The definitions the unit carries and no slot mounts (issue #2641), read
+  // off the game's unit for what it carries and off the edited one for what
+  // names each.
+  const supporting = useMemo(
+    () => supportingDefs(unit, edited, slots, owners, weaponDefs),
+    [unit, edited, slots, owners, weaponDefs],
   );
   // The tab and the slot are in the URL, so a link can name them. A link from
   // the change ledger names a field instead (issue #2653), and a weapon field
-  // is only drawn on the weapons tab, so that link opens it on the right slot.
+  // is only drawn on the weapons tab, so that link opens it on the right slot,
+  // or on the supporting definition it belongs to.
   const linkedSlot =
     fieldKey && isWeaponPath(fieldKey)
       ? slotOfPath(slots, fieldKey)
       : undefined;
+  const linkedSupport =
+    fieldKey && isWeaponPath(fieldKey) && !linkedSlot
+      ? supportOfPath(supporting, fieldKey)
+      : undefined;
   const tabParam = params.get("tab");
   const tab: UnitTab =
-    tabParam === "weapons" || (tabParam === null && linkedSlot)
+    tabParam === "weapons" ||
+    (tabParam === null && (linkedSlot || linkedSupport))
       ? "weapons"
       : "fields";
   const slotParam = params.get("slot") ?? linkedSlot?.step;
+  const supportParam =
+    params.get("support") ?? (linkedSlot ? undefined : linkedSupport?.key);
+  // A unit with nothing mounted and something carried opens on the first
+  // thing it carries.
+  const support =
+    supporting.find((s) => s.key === supportParam) ??
+    (slots.length === 0 ? supporting[0] : undefined);
   const slot = slots.find((s) => s.step === slotParam) ?? slots[0];
   const sharedName =
     slot?.definition.kind === "shared" ? slot.definition.key : undefined;
@@ -593,20 +625,23 @@ export default function UnitPage() {
   const firesMounts = firesKey ? mountsOf(equipped, firesKey).length : 0;
   const weaponView = useMemo(
     () =>
-      slot
-        ? weaponSlotView(
-            slot,
-            overrides,
-            unitKey,
-            view,
-            unitName,
-            mountedBy,
-            firesWeapon
-              ? { weapon: firesWeapon, mounts: firesMounts }
-              : undefined,
-          )
-        : null,
+      support
+        ? supportingView(support, overrides, unitKey, view, unitName)
+        : slot
+          ? weaponSlotView(
+              slot,
+              overrides,
+              unitKey,
+              view,
+              unitName,
+              mountedBy,
+              firesWeapon
+                ? { weapon: firesWeapon, mounts: firesMounts }
+                : undefined,
+            )
+          : null,
     [
+      support,
       slot,
       overrides,
       unitKey,
@@ -616,6 +651,23 @@ export default function UnitPage() {
       firesWeapon,
       firesMounts,
     ],
+  );
+  // References on this unit that name nothing (issue #2641): its own
+  // definitions, and the library weapons its slots fire.
+  const unitEquipped = equipped?.[unitKey];
+  const refIssues = useMemo(
+    () =>
+      refProblems(
+        edited,
+        unitName,
+        owners,
+        weaponDefs,
+        library,
+        Object.values(unitEquipped ?? {}).flatMap((key) =>
+          library[key] ? [library[key]] : [],
+        ),
+      ),
+    [edited, unitName, owners, weaponDefs, library, unitEquipped],
   );
 
   // Which of the fields on screen the edit-in-place route could write into
@@ -1293,19 +1345,62 @@ export default function UnitPage() {
         ),
     };
   };
-  /** Copy a game weapon into the library, and fire it from a slot when one
-   *  is given, as one undo step. */
+  /** A weapon out of the game's shared table, to copy. */
+  const sharedCopy = (name: string): CopySource | undefined =>
+    weaponDefs[name]
+      ? {
+          source: name,
+          def: weaponDefs[name],
+          beforePost: gameWeaponBeforePost(name),
+        }
+      : undefined;
+  /** What a reference on a weapon out of the game's shared table names, to
+   *  copy along with it (issue #2641). */
+  const gameChildOf = (ref: WeaponRef) => sharedCopy(ref.value.toLowerCase());
+  /** What a reference on one of this unit's own weapons names, to copy along
+   *  with it: one the unit carries, as the page has it, or one in the game's
+   *  shared table. */
+  const unitChildOf = (ref: WeaponRef): CopySource | undefined => {
+    const own = ownWeaponDefs(edited).defs;
+    const target = resolveRef(ref, { own, owners, shared: weaponDefs });
+    if (target?.kind === "shared") return sharedCopy(target.key);
+    if (target?.kind !== "own") return undefined;
+    const path = `${ownWeaponDefs(unit).key}.${target.key}`;
+    return {
+      source: `${cloneSource ?? unitKey}_${target.key}`.toLowerCase(),
+      def: own[target.key] as Record<string, unknown>,
+      beforePost:
+        unitBeforePost &&
+        copiedFrom(unitBeforePost, path, Object.keys(overrides[unitKey] ?? {})),
+    };
+  };
+  /** Copy a game weapon into the library with every weapon it names that the
+   *  game can hand over (issue #2641), and fire it from a slot when one is
+   *  given, as one undo step. */
   const addToLibrary = (
     key: string,
-    source: string,
-    def: Record<string, unknown>,
-    beforePost: PostChange | undefined,
+    from: CopySource,
+    childOf: (ref: WeaponRef) => CopySource | undefined,
     into?: { unit: string; step: string },
   ) => {
-    const weapon = copyGameWeapon(key, source, def, defs?.checksum, beforePost);
+    const weapons = planLibraryCopy(
+      key,
+      from,
+      library,
+      childOf,
+      suggestWeaponKeyWhere,
+    ).map((p) =>
+      copyGameWeapon(
+        p.key,
+        p.from.source,
+        p.from.def,
+        defs?.checksum,
+        p.from.beforePost,
+      ),
+    );
     commit((current) => {
       const next = editSlot(current, "weapons", (w) =>
-        addLibraryWeapon(w, weapon),
+        weapons.reduce(addLibraryWeapon, w),
       );
       return into
         ? editSlot(next, "equipped", (e) =>
@@ -1342,14 +1437,16 @@ export default function UnitPage() {
     equippedIn: (step) => equippedKey(equipped, unitKey, step),
     copySourceOf: (s) => slotCopy(s)?.source,
     mounts: (key) => mountsOf(equipped, key).length,
-    refusal: (key) => equipRefusal(unit, unitName, key),
+    refusal: (key) => equipRefusal(unit, unitName, key, library),
     onCopy: (s, key) => {
       const from = slotCopy(s);
       if (from)
-        addToLibrary(key, from.source, from.def, from.beforePost, {
-          unit: unitKey,
-          step: s.step,
-        });
+        addToLibrary(
+          key,
+          from,
+          s.definition.kind === "own" ? unitChildOf : gameChildOf,
+          { unit: unitKey, step: s.step },
+        );
     },
     onEquip: (s, key) =>
       updateEquipped((e) => equipWeapon(e, unitKey, s.step, key)),
@@ -1601,9 +1698,8 @@ export default function UnitPage() {
           consumers={consumers}
           describeMount={describeMount}
           onAdd={(key, source) => {
-            const def = weaponDefs[source];
-            if (def)
-              addToLibrary(key, source, def, gameWeaponBeforePost(source));
+            const from = sharedCopy(source);
+            if (from) addToLibrary(key, from, gameChildOf);
           }}
           onDelete={deleteLibraryWeapon}
           onChange={changeLibraryField}
@@ -1611,7 +1707,12 @@ export default function UnitPage() {
           postOf={libraryPostOf}
           onOpenMount={(mount) => {
             setLibraryOpen(false);
-            select({ unit: mount.unit, tab: "weapons", slot: mount.step });
+            select({
+              unit: mount.unit,
+              tab: "weapons",
+              slot: mount.step,
+              support: "",
+            });
           }}
         />
       )}
@@ -1956,10 +2057,18 @@ export default function UnitPage() {
                     inheritedLabel={inheritedLabel}
                     inPlace={inPlaceDir ? inPlaceOf : undefined}
                     post={unitPostOf}
-                    onSelect={(step) => select({ tab: "weapons", slot: step })}
+                    onSelect={(step) =>
+                      select({ tab: "weapons", slot: step, support: "" })
+                    }
                     onChange={changeField}
                     onReset={resetField}
                     library={slotLibrary}
+                    supporting={supporting}
+                    selectedSupport={support?.key}
+                    onSelectSupport={(key) =>
+                      select({ tab: "weapons", support: key, slot: "" })
+                    }
+                    problems={refIssues}
                   />
                 </TabsContent>
                 <TabsContent

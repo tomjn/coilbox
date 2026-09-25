@@ -629,3 +629,121 @@ fn a_copy_of_a_shared_weapon_changes_one_unit_and_not_the_others() {
         );
     }
 }
+
+/// What Beyond All Reason does with the references between a unit's weapons
+/// once a tweak has run (issue #2641): `processWeapons` in
+/// `gamedata/alldefs_post.lua` prefixes a short `cluster_def` with the unit's
+/// name, and `weapondefs_post.lua` puts each definition a unit carries into
+/// the shared table as `<unit>_<name>`. The two gadgets then look each
+/// reference up by name. Returns, per unit and definition, the range of what
+/// each reference finds, or `nothing`.
+fn resolve_references(generated: &str, unit_defs: &str) -> Value {
+    let root = tempfile::tempdir().expect("tempdir");
+    let vm = SpringLua::new(root.path()).expect("vm");
+    let source = format!(
+        "(function()\n\
+         UnitDefs = {unit_defs}\n\
+         (function()\n{generated}\nend)()\n\
+         local WeaponDefs = {{}}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           for name, wd in pairs(ud.weapondefs or {{}}) do\n\
+             if wd.customparams and wd.customparams.cluster_def then\n\
+               wd.customparams.cluster_def = udName .. '_' .. wd.customparams.cluster_def\n\
+             end\n\
+             WeaponDefs[udName .. '_' .. name] = wd\n\
+           end\n\
+         end\n\
+         local found = {{}}\n\
+         for udName, ud in pairs(UnitDefs) do\n\
+           found[udName] = {{}}\n\
+           for name, wd in pairs(ud.weapondefs or {{}}) do\n\
+             local cp = wd.customparams or {{}}\n\
+             local function range(ref)\n\
+               if ref == nil then return 'none' end\n\
+               local hit = WeaponDefs[string.lower(ref)]\n\
+               return hit and hit.range or 'nothing'\n\
+             end\n\
+             found[udName][name] = {{ cluster = range(cp.cluster_def), split = range(cp.speceffect_def), range = wd.range }}\n\
+           end\n\
+         end\n\
+         return found\n\
+         end)()"
+    );
+    vm.eval_expr_value(&source, "generated.lua")
+        .unwrap_or_else(|e| panic!("{e}\n\n{source}"))
+}
+
+/// A stand-in for Beyond All Reason's `armmship` as its file has it: a rocket
+/// whose split names the unmounted `rocket_split` by full name, and a second
+/// ship with a definition of the same short name that must not move.
+const SHIPS: &str = r#"{
+    armmship = {
+        weapons = { { def = "ROCKET" } },
+        weapondefs = {
+            rocket = { range = 1000, customparams = { speceffect = "split", speceffect_def = "armmship_rocket_split" } },
+            rocket_split = { range = 300 },
+        },
+    },
+    cormship = {
+        weapons = { { def = "ROCKET" } },
+        weapondefs = {
+            rocket = { range = 1000, customparams = { speceffect = "split", speceffect_def = "cormship_rocket_split" } },
+            rocket_split = { range = 300 },
+        },
+    },
+}"#;
+
+/// Issue #2641. An edit to a definition no slot mounts is an ordinary edit
+/// to the unit, and reaches that unit's definition and no other on both
+/// routes.
+#[test]
+fn an_edit_to_a_supporting_definition_reaches_that_unit_alone() {
+    let routes = both_routes(json!({
+        "overrides": { "armmship": { "weapondefs.rocket_split.range": 450 } }
+    }));
+    for (what, lua) in routes {
+        let found = resolve_references(&lua, SHIPS);
+        assert_eq!(found["armmship"]["rocket"]["split"], json!(450), "{what}");
+        assert_eq!(found["cormship"]["rocket"]["split"], json!(300), "{what}");
+    }
+}
+
+/// Issue #2641. A library weapon equipped into a game unit brings the library
+/// weapons it names, and both references find the library's copies in that
+/// unit: the full name the block writes, and the short name the game's post
+/// files prefix. The unit's own child is untouched.
+#[test]
+fn an_equipped_library_weapon_fires_its_own_children() {
+    let routes = both_routes(json!({
+        "weapons": {
+            "rocket_copy": {
+                "key": "rocket_copy", "source": "armmship_rocket",
+                "def": { "range": 1000, "customparams": {
+                    "speceffect": "split", "speceffect_def": "rocket_split_copy",
+                    "cluster_def": "munition_copy"
+                } }
+            },
+            "rocket_split_copy": {
+                "key": "rocket_split_copy", "source": "armmship_rocket_split",
+                "def": { "range": 300 }, "changes": { "range": 350 }
+            },
+            "munition_copy": {
+                "key": "munition_copy", "source": "legcluster_cluster_munition",
+                "def": { "range": 100 }
+            }
+        },
+        "equipped": { "armmship": { "0": "rocket_copy" } }
+    }));
+    for (what, lua) in routes {
+        let found = resolve_references(&lua, SHIPS);
+        let copy = &found["armmship"]["rocket_copy"];
+        assert_eq!(copy["split"], json!(350), "{what}");
+        assert_eq!(copy["cluster"], json!(100), "{what}");
+        assert_eq!(found["armmship"]["rocket"]["split"], json!(300), "{what}");
+        assert_eq!(
+            found["cormship"]["rocket_split_copy"],
+            Value::Null,
+            "{what}"
+        );
+    }
+}
