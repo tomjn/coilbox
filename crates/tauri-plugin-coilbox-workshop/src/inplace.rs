@@ -15,6 +15,13 @@
 //! menus, words and switched-off units have no in-place form yet, and the
 //! outcome says which of them the project holds rather than dropping them
 //! quietly.
+//!
+//! [`check`] is the same patching as a dry run, one unit at a time, for the
+//! unit page to ask at edit time (issue #2633). A field it refuses is one the
+//! user can send through the mutator route instead, which the project records
+//! in `ModProject::mutator_only`. The write skips those changes rather than
+//! refusing the whole batch over them, and says a mutator still has to carry
+//! them.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -207,7 +214,210 @@ fn not_carried(project: &ModProject) -> Vec<String> {
     if !project.read_only_lua.is_empty() {
         out.push("Lua carried from an import is not written into the game.".to_string());
     }
+    let routed = edits
+        .overrides
+        .iter()
+        .filter(|(unit, _)| !edits.clones.contains_key(*unit))
+        .flat_map(|(unit, fields)| fields.keys().map(move |field| (unit, field)))
+        .filter(|(unit, field)| project.is_mutator_only(unit, field))
+        .count();
+    if routed > 0 {
+        out.push(format!(
+            "{routed} field change{} you sent to the mutator route {} not written into the game. {} still need{} a mutator.",
+            if routed == 1 { "" } else { "s" },
+            if routed == 1 { "is" } else { "are" },
+            if routed == 1 { "It" } else { "They" },
+            if routed == 1 { "s" } else { "" },
+        ));
+    }
     out
+}
+
+/// Why a list or a table cannot go in place, said the same way by the write
+/// and by the dry run the unit page asks for.
+const NOT_A_PLAIN_VALUE: &str = "Only a number, a string or true or false can be written into the file. A list or a table has to go through the mutator route.";
+
+/// How many lines either side of a refusal's location the unit page shows.
+const EXCERPT_CONTEXT: usize = 3;
+
+/// The most lines an excerpt holds, so a refusal about a whole unit's table
+/// shows where it starts rather than all of it.
+const EXCERPT_MAX: usize = 16;
+
+/// Some lines of a unit file around a refusal's location.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Excerpt {
+    /// The first line's number, counted from 1.
+    pub first_line: usize,
+    pub lines: Vec<String>,
+}
+
+fn excerpt(text: &str, location: &Location) -> Excerpt {
+    let lines: Vec<&str> = text.lines().collect();
+    let start = location
+        .start
+        .line
+        .saturating_sub(1 + EXCERPT_CONTEXT)
+        .min(lines.len());
+    let end = (location.end.line + EXCERPT_CONTEXT)
+        .min(lines.len())
+        .min(start + EXCERPT_MAX)
+        .max(start);
+    Excerpt {
+        first_line: start + 1,
+        lines: lines[start..end].iter().map(|l| l.to_string()).collect(),
+    }
+}
+
+/// One field the unit page asks about, with the value to try: the project's
+/// change when it has one, otherwise the game's own value. `null` stands for
+/// a field the game does not set.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FieldProbe {
+    pub field: String,
+    #[serde(default)]
+    pub value: Value,
+}
+
+/// Whether one field can be written in place, and why not when it cannot.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldCheck {
+    pub field: String,
+    /// Absent when the field can be written.
+    pub refusal: Option<Refused>,
+    /// The unit file's Lua around the refusal's location, when it has one.
+    pub excerpt: Option<Excerpt>,
+}
+
+/// What a dry run found for one unit.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CheckOutcome {
+    /// The unit's file, relative to the game, when one defines it.
+    pub file: Option<String>,
+    pub fields: Vec<FieldCheck>,
+}
+
+/// Whether each of `fields` of `unit` could be written into the game's own
+/// files, without writing anything (issue #2633). The unit page asks this at
+/// edit time so a field the route cannot carry is marked before the user
+/// reaches the write.
+pub fn check(game_dir: &Path, unit: &str, fields: &[FieldProbe]) -> Result<CheckOutcome, String> {
+    require_loose_game(game_dir)?;
+    let refusal = |field: &str, template: &Refused| FieldCheck {
+        field: field.to_string(),
+        refusal: Some(Refused {
+            field: field.to_string(),
+            ..template.clone()
+        }),
+        excerpt: None,
+    };
+    let invalid = |file: Option<String>, message: String| Refused {
+        unit: unit.to_string(),
+        field: String::new(),
+        file,
+        kind: RefusalKind::InvalidValue,
+        message,
+        location: None,
+    };
+
+    // Each field as an edit, or the reason it cannot be one.
+    let edits: Vec<Result<(Vec<Segment>, PatchValue), String>> = fields
+        .iter()
+        .map(|probe| {
+            let path = segments(&probe.field)
+                .ok_or_else(|| format!("{:?} is not a field path.", probe.field))?;
+            let value = match &probe.value {
+                // Any literal shows whether the file has somewhere to put
+                // one, and a number is the commonest kind of field.
+                Value::Null => PatchValue::Number(1.0),
+                value => patch_value(value).ok_or_else(|| NOT_A_PLAIN_VALUE.to_string())?,
+            };
+            Ok((path, value))
+        })
+        .collect();
+
+    let texts = unit_texts(game_dir);
+    let files: Vec<PathBuf> = texts.keys().cloned().collect();
+    let Some(first) = edits.iter().find_map(|e| e.as_ref().ok()) else {
+        return Ok(CheckOutcome {
+            file: None,
+            fields: fields
+                .iter()
+                .zip(&edits)
+                .map(|(probe, edit)| {
+                    let message = edit.as_ref().err().cloned().unwrap_or_default();
+                    refusal(&probe.field, &invalid(None, message))
+                })
+                .collect(),
+        });
+    };
+    let first = Edit {
+        unit: unit.to_string(),
+        path: first.0.clone(),
+        op: Op::Set(first.1.clone()),
+    };
+    let file = match find_unit_file(unit, &files, &texts, |text| {
+        coilbox_unitpatch::locate_edit(text, &first)
+    }) {
+        Found::File(file, _) => file,
+        Found::None(file_level) => {
+            let shown = file_level
+                .as_ref()
+                .and_then(|(file, r)| Some(excerpt(&texts[file], r.location.as_ref()?)));
+            let refused = no_file_refusal(unit, file_level, game_dir);
+            return Ok(CheckOutcome {
+                file: refused.file.clone(),
+                fields: fields
+                    .iter()
+                    .map(|probe| FieldCheck {
+                        excerpt: shown.clone(),
+                        ..refusal(&probe.field, &refused)
+                    })
+                    .collect(),
+            });
+        }
+    };
+    let text = &texts[&file];
+    let rel = key(file.strip_prefix(game_dir).unwrap_or(&file));
+
+    let valid: Vec<(Vec<Segment>, PatchValue)> = edits
+        .iter()
+        .filter_map(|e| e.as_ref().ok().cloned())
+        .collect();
+    let mut answers = coilbox_unitpatch::check_fields(text, unit, &valid, game_dir).into_iter();
+    let fields = fields
+        .iter()
+        .zip(&edits)
+        .map(|(probe, edit)| match edit {
+            Err(message) => refusal(&probe.field, &invalid(Some(rel.clone()), message.clone())),
+            Ok(_) => match answers.next() {
+                Some(Err(r)) => FieldCheck {
+                    field: probe.field.clone(),
+                    excerpt: r.location.as_ref().map(|at| excerpt(text, at)),
+                    refusal: Some(Refused {
+                        unit: unit.to_string(),
+                        field: probe.field.clone(),
+                        file: Some(rel.clone()),
+                        kind: r.kind,
+                        message: r.message,
+                        location: r.location,
+                    }),
+                },
+                _ => FieldCheck {
+                    field: probe.field.clone(),
+                    refusal: None,
+                    excerpt: None,
+                },
+            },
+        })
+        .collect();
+    Ok(CheckOutcome {
+        file: Some(rel),
+        fields,
+    })
 }
 
 /// One unit's field changes, ready to patch.
@@ -217,31 +427,27 @@ struct UnitChanges<'a> {
     edits: Vec<(&'a str, Edit)>,
 }
 
-/// Which file defines `unit`, and the first edit already applied to it.
+/// Which file defines `unit`, and the result of the first attempt on it.
 ///
 /// A file is a candidate when its text names the unit at all. The patcher
 /// then settles it: a file that does not define the unit is refused as
 /// `UnitNotFound` before anything is evaluated, so trying each candidate is
 /// cheap. Files whose name matches the unit are tried first, because that is
 /// how most games lay their units out.
-enum Found {
-    /// The file, and the first edit's result against it.
-    File(
-        PathBuf,
-        Result<coilbox_unitpatch::Patched, coilbox_unitpatch::Refusal>,
-    ),
+enum Found<T> {
+    /// The file, and the first attempt's result against it.
+    File(PathBuf, Result<T, coilbox_unitpatch::Refusal>),
     /// No file under `units/` defines the unit. The refusal, when there is
     /// one, is the most useful thing a candidate file said.
     None(Option<(PathBuf, coilbox_unitpatch::Refusal)>),
 }
 
-fn find_unit_file(
+fn find_unit_file<T>(
     unit: &str,
-    first: &Edit,
     files: &[PathBuf],
     texts: &BTreeMap<PathBuf, String>,
-    game_dir: &Path,
-) -> Found {
+    attempt: impl Fn(&str) -> Result<T, coilbox_unitpatch::Refusal>,
+) -> Found<T> {
     let wanted = unit.to_lowercase();
     let mut candidates: Vec<&PathBuf> = files
         .iter()
@@ -253,7 +459,7 @@ fn find_unit_file(
     });
     let mut file_level: Option<(PathBuf, coilbox_unitpatch::Refusal)> = None;
     for file in candidates {
-        match patch(&texts[file], first, game_dir) {
+        match attempt(&texts[file]) {
             Err(refusal) if refusal.kind == RefusalKind::UnitNotFound => continue,
             // A file that does not parse or does not return a table might be
             // a helper that merely mentions the unit, so keep looking, and
@@ -270,6 +476,46 @@ fn find_unit_file(
         }
     }
     Found::None(file_level)
+}
+
+/// The refusal for every change to `unit` when no file under `units/`
+/// defines it, with an empty `field` for the caller to fill in.
+fn no_file_refusal(
+    unit: &str,
+    file_level: Option<(PathBuf, coilbox_unitpatch::Refusal)>,
+    game_dir: &Path,
+) -> Refused {
+    match file_level {
+        Some((file, refusal)) => Refused {
+            unit: unit.to_string(),
+            field: String::new(),
+            file: Some(key(file.strip_prefix(game_dir).unwrap_or(&file))),
+            kind: refusal.kind,
+            message: refusal.message,
+            location: refusal.location,
+        },
+        None => Refused {
+            unit: unit.to_string(),
+            field: String::new(),
+            file: None,
+            kind: RefusalKind::UnitNotFound,
+            message: format!("No file under units/ defines {unit}."),
+            location: None,
+        },
+    }
+}
+
+/// Every unit file's text, by path. A file that is not UTF-8 cannot be a unit
+/// file the patcher reads, so it is left out of the search rather than
+/// failing the whole request.
+fn unit_texts(game_dir: &Path) -> BTreeMap<PathBuf, String> {
+    unit_files(game_dir)
+        .into_iter()
+        .filter_map(|file| {
+            let text = std::fs::read_to_string(&file).ok()?;
+            Some((file, text))
+        })
+        .collect()
 }
 
 /// Patch every field change in `project` into the game's unit files under
@@ -290,6 +536,9 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         }
         let mut edits = Vec::new();
         for (field, value) in fields {
+            if project.is_mutator_only(unit, field) {
+                continue; // Counted in `not_carried`.
+            }
             let refuse = |message: String| Refused {
                 unit: unit.clone(),
                 field: field.clone(),
@@ -305,9 +554,7 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
                 continue;
             };
             let Some(value) = patch_value(value) else {
-                outcome.refused.push(refuse(
-                    "Only a number, a string or true or false can be written into the file. A list or a table has to go through the mutator route.".to_string(),
-                ));
+                outcome.refused.push(refuse(NOT_A_PLAIN_VALUE.to_string()));
                 continue;
             };
             edits.push((
@@ -324,15 +571,7 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         }
     }
 
-    let files = unit_files(game_dir);
-    let mut texts: BTreeMap<PathBuf, String> = BTreeMap::new();
-    for file in &files {
-        // A file that is not UTF-8 cannot be a unit file the patcher reads,
-        // so it is left out of the search rather than failing the write.
-        if let Ok(text) = std::fs::read_to_string(file) {
-            texts.insert(file.clone(), text);
-        }
-    }
+    let mut texts = unit_texts(game_dir);
     let files: Vec<PathBuf> = texts.keys().cloned().collect();
     let originals = texts.clone();
     // Which file each accepted change landed in, to say whether undo reaches it.
@@ -340,31 +579,15 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
 
     for UnitChanges { unit, edits } in units {
         let (_, first) = &edits[0];
-        let (file, first_result) = match find_unit_file(unit, first, &files, &texts, game_dir) {
+        let found = find_unit_file(unit, &files, &texts, |text| patch(text, first, game_dir));
+        let (file, first_result) = match found {
             Found::File(file, result) => (file, result),
             Found::None(file_level) => {
-                let (file, kind, message, location) = match file_level {
-                    Some((file, refusal)) => (
-                        Some(rel(&file)),
-                        refusal.kind,
-                        refusal.message,
-                        refusal.location,
-                    ),
-                    None => (
-                        None,
-                        RefusalKind::UnitNotFound,
-                        format!("No file under units/ defines {unit}."),
-                        None,
-                    ),
-                };
+                let refused = no_file_refusal(unit, file_level, game_dir);
                 for (field, _) in &edits {
                     outcome.refused.push(Refused {
-                        unit: unit.to_string(),
                         field: field.to_string(),
-                        file: file.clone(),
-                        kind,
-                        message: message.clone(),
-                        location,
+                        ..refused.clone()
                     });
                 }
                 continue;
@@ -831,6 +1054,172 @@ mod tests {
         assert!(outcome.written.is_empty());
     }
 
+    fn probes(fields: Value) -> Vec<FieldProbe> {
+        serde_json::from_value(fields).expect("probes")
+    }
+
+    /// Issue #2633. The unit page asks before any edit, with the game's own
+    /// values, and a field the file computes comes back refused with the
+    /// file's Lua around it.
+    #[test]
+    fn a_dry_run_says_which_fields_can_be_written_and_writes_nothing() {
+        let (_root, game) = game();
+        let dfly = game.join("units/armdfly.lua");
+        let before = read(&dfly);
+
+        let outcome = check(
+            &game,
+            "armdfly",
+            &probes(serde_json::json!([
+                { "field": "metalcost", "value": 320 },
+                { "field": "health", "value": 1000 },
+                { "field": "brandnewfield", "value": null },
+                { "field": "buildoptions", "value": ["armsolar"] },
+            ])),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.file.as_deref(), Some("units/armdfly.lua"));
+        let by_field: BTreeMap<&str, &FieldCheck> = outcome
+            .fields
+            .iter()
+            .map(|f| (f.field.as_str(), f))
+            .collect();
+        assert!(by_field["metalcost"].refusal.is_none());
+        assert!(by_field["brandnewfield"].refusal.is_none());
+        let health = by_field["health"].refusal.as_ref().expect("computed");
+        assert_eq!(health.kind, RefusalKind::FieldComputed);
+        assert_eq!(health.field, "health");
+        let shown = by_field["health"].excerpt.as_ref().expect("an excerpt");
+        let line = health.location.expect("a location").start.line;
+        assert!(shown.first_line <= line);
+        assert!(shown.lines[line - shown.first_line]
+            .to_lowercase()
+            .contains("health"));
+        assert_eq!(
+            by_field["buildoptions"].refusal.as_ref().unwrap().kind,
+            RefusalKind::InvalidValue
+        );
+
+        assert_eq!(read(&dfly), before);
+        assert_eq!(status(&game).backups, 0);
+    }
+
+    /// SpringMCLegacy's Direwolf file builds two units out of every variant's
+    /// table, so no change to one of them can be written without the other.
+    #[test]
+    fn a_dry_run_refuses_a_table_two_units_share() {
+        let (_root, game) = game();
+        std::fs::write(
+            game.join("units/Direwolf.lua"),
+            "local Direwolf = Assault:New{\n\tname = \"Dire Wolf\",\n\tcustomparams = { tonnage = 100 },\n}\nlocal Prime = Direwolf:New{\n\tdescription = \"Assault Vanguard\",\n}\nreturn lowerkeys({\n\t[\"WF_Direwolf_P\"] = Prime:New(),\n\t[\"SJ_Direwolf_P\"] = Prime:New(),\n})\n",
+        )
+        .unwrap();
+
+        let outcome = check(
+            &game,
+            "WF_Direwolf_P",
+            &probes(serde_json::json!([
+                { "field": "description", "value": "Assault Vanguard" },
+                { "field": "customparams.tonnage", "value": 100 },
+            ])),
+        )
+        .unwrap();
+
+        assert_eq!(outcome.file.as_deref(), Some("units/Direwolf.lua"));
+        for field in &outcome.fields {
+            let refusal = field.refusal.as_ref().expect("shared with SJ_Direwolf_P");
+            assert_eq!(refusal.kind, RefusalKind::PostCheckFailed);
+            assert!(
+                refusal.message.contains("sj_direwolf_p"),
+                "{}",
+                refusal.message
+            );
+        }
+    }
+
+    #[test]
+    fn a_dry_run_for_a_unit_no_file_defines_refuses_every_field() {
+        let (_root, game) = game();
+        let outcome = check(
+            &game,
+            "armcom",
+            &probes(serde_json::json!([{ "field": "metalcost", "value": 1 }])),
+        )
+        .unwrap();
+        assert_eq!(outcome.file, None);
+        assert_eq!(
+            outcome.fields[0].refusal.as_ref().unwrap().kind,
+            RefusalKind::UnitNotFound
+        );
+    }
+
+    /// A change the user sent to the mutator route is left out of the write,
+    /// so it no longer stops the rest, and the outcome says a mutator still
+    /// has to carry it.
+    #[test]
+    fn a_change_sent_to_the_mutator_is_skipped_rather_than_refused() {
+        let (_root, game) = game();
+        let dfly = game.join("units/armdfly.lua");
+        let mut edits = project(serde_json::json!({
+            "armdfly": { "metalcost": 400, "health": 2000 },
+        }));
+        edits
+            .mutator_only
+            .insert("armdfly".into(), vec!["health".into()]);
+
+        let outcome = write(&game, &edits).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        assert!(read(&dfly).contains("metalcost = 400"));
+        assert_eq!(
+            outcome.carried,
+            vec![Carried {
+                unit: "armdfly".into(),
+                field: "metalcost".into(),
+                undoable: true,
+            }]
+        );
+        assert!(
+            outcome
+                .not_carried
+                .iter()
+                .any(|line| line.contains("1 field change you sent to the mutator route")),
+            "{:?}",
+            outcome.not_carried
+        );
+    }
+
+    #[test]
+    fn an_excerpt_stays_inside_the_file() {
+        let text = "a\nb\nc\n";
+        let at = |line| coilbox_unitpatch::Point {
+            line,
+            column: 1,
+            byte: 0,
+        };
+        let shown = excerpt(
+            text,
+            &Location {
+                start: at(1),
+                end: at(1),
+            },
+        );
+        assert_eq!(shown.first_line, 1);
+        assert_eq!(shown.lines, vec!["a", "b", "c"]);
+        let long = (1..=100).map(|n| format!("{n}\n")).collect::<String>();
+        let shown = excerpt(
+            &long,
+            &Location {
+                start: at(50),
+                end: at(90),
+            },
+        );
+        assert_eq!(shown.first_line, 47);
+        assert_eq!(shown.lines.len(), EXCERPT_MAX);
+    }
+
     #[test]
     fn a_game_outside_a_games_folder_is_refused() {
         let root = tempfile::tempdir().unwrap();
@@ -839,5 +1228,6 @@ mod tests {
         assert!(write(&game, &project(serde_json::json!({}))).is_err());
         assert!(undo(&game).is_err());
         assert!(accept(&game).is_err());
+        assert!(check(&game, "u", &[]).is_err());
     }
 }

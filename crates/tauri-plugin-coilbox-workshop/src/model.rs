@@ -168,6 +168,22 @@ pub struct ModProject {
     /// [`ReadOnlyLuaBlock`] for why it lives here rather than in `edits`.
     #[serde(default)]
     pub read_only_lua: Vec<ReadOnlyLuaBlock>,
+    /// Field changes the user sent through the mutator route because the
+    /// edit-in-place route cannot write them (issue #2633), as unit to dotted
+    /// field paths spelled the way `edits.overrides` spells them. The
+    /// in-place write skips them. The compiler reads only `edits`, so a
+    /// mutator still carries them.
+    #[serde(default)]
+    pub mutator_only: BTreeMap<String, Vec<String>>,
+}
+
+impl ModProject {
+    /// Whether the user sent this one field change through the mutator route.
+    pub fn is_mutator_only(&self, unit: &str, field: &str) -> bool {
+        self.mutator_only
+            .get(unit)
+            .is_some_and(|fields| fields.iter().any(|f| f == field))
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +228,25 @@ mod tests {
         );
         assert_eq!(project.edits.disabled, vec!["armflash"]);
         assert_eq!(project.edits.text_edit_count(), 1);
+    }
+
+    /// A project saved before issue #2633 has no `mutatorOnly`, and one saved
+    /// after it reads the marks back per unit.
+    #[test]
+    fn the_mutator_only_marks_are_optional() {
+        let project: ModProject = serde_json::from_value(json!({
+            "name": "x",
+            "gameName": "g",
+            "mutatorOnly": { "wf_direwolf_p": ["maxDamage", "customparams.speed"] },
+        }))
+        .expect("parse");
+        assert!(project.is_mutator_only("wf_direwolf_p", "customparams.speed"));
+        assert!(!project.is_mutator_only("wf_direwolf_p", "customparams"));
+        assert!(!project.is_mutator_only("sj_direwolf_p", "maxDamage"));
+
+        let older: ModProject =
+            serde_json::from_value(json!({ "name": "x", "gameName": "g" })).expect("parse");
+        assert!(older.mutator_only.is_empty());
     }
 
     /// A project that changes nothing still parses, which is what the editor

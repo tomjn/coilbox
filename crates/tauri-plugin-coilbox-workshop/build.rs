@@ -14,6 +14,7 @@ const COMMANDS: &[&str] = &[
     "workshop_in_place_status",
     "workshop_undo_in_place",
     "workshop_accept_in_place",
+    "workshop_check_in_place",
 ];
 
 fn main() {
