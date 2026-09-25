@@ -565,3 +565,63 @@ describe("recordPackagedVersion", () => {
     expect(imported).not.toHaveProperty("distributionVersion");
   });
 });
+
+describe("settleInPlaceAction across two projects for the same game", () => {
+  const GAME = "SpringMCLegacy dev";
+  const BEFORE = "c0ffee00";
+  const WRITTEN = "c0ffee01";
+
+  it("gives the fields back to the project that wrote them, not the one that undid them", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    let a = "";
+    let b = "";
+    act(() => {
+      a = result.current.createProject({
+        name: "Project A",
+        gameName: GAME,
+        authoredChecksum: BEFORE,
+        edits: editSlot(EMPTY_EDITS, "overrides", (o) =>
+          setOverride(o, "brv", "trackwidth", 44, 40),
+        ),
+      }).id;
+      b = result.current.createProject({
+        name: "Project B",
+        gameName: GAME,
+        authoredChecksum: BEFORE,
+      }).id;
+    });
+
+    // Project A writes its change into the game's own files.
+    act(() => {
+      result.current.settleInPlaceAction(
+        a,
+        {
+          kind: "write",
+          carried: [{ unit: "brv", field: "trackwidth", undoable: true }],
+          changed: true,
+        },
+        BEFORE,
+      );
+    });
+    expect(
+      result.current.projects.find((p) => p.id === a)?.writtenInPlace,
+    ).toEqual({ brv: { trackwidth: 44 } });
+
+    // Project B, opened afterwards for the same game, undoes the write.
+    act(() => {
+      result.current.settleInPlaceAction(
+        b,
+        { kind: "undo", changed: true },
+        WRITTEN,
+      );
+    });
+
+    const projectA = result.current.projects.find((p) => p.id === a);
+    const projectB = result.current.projects.find((p) => p.id === b);
+    // The field goes back to the project that wrote it...
+    expect(projectA?.edits.overrides).toEqual({ brv: { trackwidth: 44 } });
+    expect(projectA?.writtenInPlace).toBeUndefined();
+    // ...not to the project that pressed undo.
+    expect(projectB?.edits.overrides).toEqual({});
+  });
+});

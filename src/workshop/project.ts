@@ -367,9 +367,18 @@ export function useModProjects() {
    * (issue #3023). `inPlaceProject.ts` says what that means. `checksum` is
    * what the game checksummed to when the action was pressed.
    *
-   * Hands back the edits it folded over when the override set changed, the
-   * way `applyEdits` does, so moving fields in or out of the project is an
-   * undo step like any other change to it.
+   * A write only ever moves fields out of the project that made it, but undo
+   * and accept act on the game folder and are offered from the Checks drawer
+   * of any project against it (issue #3027). So a write settles only `id`,
+   * while undo and accept settle every saved project for the same game that
+   * still holds a `writtenInPlace` copy, `useModProjects` folding over the
+   * whole stored list as one write.
+   *
+   * Hands back the edits it folded over for `id` when its own override set
+   * changed, the way `applyEdits` does, so moving fields in or out of the
+   * open project is an undo step like any other change to it. A field an
+   * undo or accept moves on a different project has no such step: that
+   * page's own undo stack only ever covered the project it was open on.
    */
   function settleInPlaceAction(
     id: string,
@@ -381,14 +390,20 @@ export function useModProjects() {
     write((prev) => {
       const target = prev.find((p) => p.id === id);
       if (!target) return prev;
-      const next = settleInPlace(target, done, checksum);
-      if (next === target) return prev;
-      const editsChanged = next.edits !== target.edits;
-      if (editsChanged)
-        changed.push({ before: target.edits, after: next.edits });
-      return prev.map((p) =>
-        p.id !== id ? p : editsChanged ? { ...next, updatedAt: now } : next,
-      );
+      const settleOne = (p: ModProject): ModProject => {
+        const next = settleInPlace(p, done, checksum);
+        if (next === p) return p;
+        const editsChanged = next.edits !== p.edits;
+        if (p.id === id && editsChanged)
+          changed.push({ before: p.edits, after: next.edits });
+        return editsChanged ? { ...next, updatedAt: now } : next;
+      };
+      return prev.map((p) => {
+        if (p.id === id) return settleOne(p);
+        if (done.kind !== "write" && p.gameName === target.gameName)
+          return settleOne(p);
+        return p;
+      });
     });
     return changed[0] ?? null;
   }
