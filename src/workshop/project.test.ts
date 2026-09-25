@@ -87,6 +87,12 @@ function fullEdits(): GameEdits {
         displayName: "Super Commander",
         replacesGameUnit: false,
         home: "def",
+        // What the game's post files changed, so the copy is post-processed
+        // once (issue #3054).
+        sourceBeforePost: {
+          values: { "weapons.0.def": "ARMCOMLASER" },
+          added: ["weapons.0.name"],
+        },
       }).clone,
     ),
   );
@@ -110,8 +116,9 @@ function fullEdits(): GameEdits {
       copyGameWeapon(
         "heavylaser",
         "armcom_armcomlaser",
-        { range: 300 },
+        { range: 300, cratermult: 0.09 },
         "abc123",
+        { values: { cratermult: 1 } },
       ),
     ),
   );

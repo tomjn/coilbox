@@ -29,6 +29,22 @@ function library(): WeaponLibrary {
   ) as WeaponLibrary;
 }
 
+describe("a library weapon and the game's post files (issue #3054)", () => {
+  it("keeps what they changed in the weapon, and reads it back from a save", () => {
+    const weapon = copyGameWeapon(
+      "cannon",
+      "armbrtha_arm_berthacannon",
+      { cratermult: 0.009 },
+      "abc",
+      { values: { cratermult: 0.1 } },
+    );
+    expect(weapon.beforePost).toEqual({ values: { cratermult: 0.1 } });
+    expect(
+      parseWeaponLibrary(JSON.parse(JSON.stringify({ cannon: weapon }))),
+    ).toEqual({ cannon: weapon });
+  });
+});
+
 describe("the weapon library (issue #2640)", () => {
   it("copies a game weapon with its source and checksum, and never shares the table", () => {
     const lib = library();

@@ -14,6 +14,7 @@
 //! wrong answer: every game post-processes its raw unit files, so the values in
 //! them are not the values the engine runs.
 
+use crate::beforepost::BeforePost;
 use crate::ffi::Unitsync;
 use crate::infocache;
 use crate::model::UnitDefsOutput;
@@ -68,7 +69,40 @@ Spring.Log = function(section, level, msg, ...)
   end
 end
 
+-- Keep the unit and weapon tables as they stand when the game's post files are
+-- about to run (issue #3054). The engine's loaders, and every game's own copy
+-- of them read so far, hand the table over as the global `UnitDefs` or
+-- `WeaponDefs` and then include the post file, so that include is the moment.
+-- A deep copy, because the post files edit the tables in place.
+local __cb_raw_units, __cb_raw_weapons
+local function __cb_copy(v, seen)
+  if type(v) ~= 'table' then return v end
+  if seen[v] then return seen[v] end
+  local out = {}
+  seen[v] = out
+  for k, x in pairs(v) do out[__cb_copy(k, seen)] = __cb_copy(x, seen) end
+  return out
+end
+local __cb_include = VFS.Include
+VFS.Include = function(name, env, ...)
+  if type(name) == 'string' then
+    local lower = string.lower(name)
+    if lower == 'gamedata/unitdefs_post.lua' and __cb_raw_units == nil
+      and type(UnitDefs) == 'table' then
+      __cb_raw_units = __cb_copy(UnitDefs, {})
+    elseif lower == 'gamedata/weapondefs_post.lua' and __cb_raw_weapons == nil
+      and type(WeaponDefs) == 'table' then
+      __cb_raw_weapons = __cb_copy(WeaponDefs, {})
+    end
+  end
+  -- The engine runs an include in its caller's environment when it is given
+  -- none, and this wrapper is now the caller, so it names the real one.
+  if env == nil then env = getfenv(2) end
+  return __cb_include(name, env, ...)
+end
+
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
+VFS.Include = __cb_include
 Spring.Log = __cb_prev_log
 if not ok then return { __error = tostring(defs) } end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
@@ -212,9 +246,23 @@ encode_all(ud, 'unit', units, notes)
 local weapons = {}
 encode_all(wd, 'weapondef', weapons, notes)
 
+-- The tables from before the post files ran, when the loader handed them over.
+-- Rust compares them with the two above and keeps only the difference.
+local raw = ''
+if __cb_raw_units ~= nil then
+  local raw_units = {}
+  encode_all(__cb_raw_units, 'unit before post-processing', raw_units, notes)
+  local raw_weapons = {}
+  if __cb_raw_weapons ~= nil then
+    encode_all(__cb_raw_weapons, 'weapondef before post-processing', raw_weapons, notes)
+  end
+  raw = ',"rawUnits":{' .. table.concat(raw_units, ',')
+    .. '},"rawWeaponDefs":{' .. table.concat(raw_weapons, ',') .. '}'
+end
+
 local doc = '{"units":{' .. table.concat(units, ',')
   .. '},"weaponDefs":{' .. table.concat(weapons, ',')
-  .. '},"unitErrors":[' .. table.concat(notes, ',') .. ']}'
+  .. '},"unitErrors":[' .. table.concat(notes, ',') .. ']' .. raw .. '}'
 -- The document is megabytes on a full game, so it goes back in pieces.
 return __cb_chunk(doc)
 "#;
@@ -228,6 +276,25 @@ struct ShimDoc {
     units: Map<String, Value>,
     weapon_defs: Map<String, Value>,
     unit_errors: Vec<String>,
+    /// The units as they stood before the game's post files ran. Absent when
+    /// the game's loader never included `gamedata/unitdefs_post.lua`.
+    raw_units: Option<Map<String, Value>>,
+    /// The shared weapon table before `gamedata/weapondefs_post.lua` ran.
+    raw_weapon_defs: Map<String, Value>,
+}
+
+impl ShimDoc {
+    /// What the post files changed, when there was a moment to take a copy
+    /// before they ran.
+    fn before_post(&self) -> Option<BeforePost> {
+        let raw_units = self.raw_units.as_ref()?;
+        Some(BeforePost::read(
+            &self.units,
+            &self.weapon_defs,
+            raw_units,
+            &self.raw_weapon_defs,
+        ))
+    }
 }
 
 /// Load `game_archive` and read every key it declares for every unit.
@@ -312,7 +379,9 @@ pub(crate) fn resolve(
     errors.extend(us.drain_errors());
     us.remove_all_archives();
 
+    let before_post = doc.before_post();
     let out = UnitDefsOutput {
+        before_post,
         units: doc.units,
         weapon_defs: doc.weapon_defs,
         unit_errors: doc.unit_errors,

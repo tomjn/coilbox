@@ -27,6 +27,7 @@
  * game that does not, so this asks `unitText.ts` which of the two it is dealing
  * with rather than always writing the engine's keys (issue #2673).
  */
+import { type PostChange, withoutEdited, withoutNames } from "./beforePost";
 import { resolvedDef } from "./overrides";
 import type {
   LanguageTexts,
@@ -84,6 +85,13 @@ export interface UnitClone {
   replacesGameUnit: boolean;
   /** The whole definition, as the game would have to read it. */
   def: Record<string, unknown>;
+  /**
+   * What the game's own post files changed in `def`, for the compiler to put
+   * back before the game runs them again (issue #3054, `beforePost.ts`).
+   * Absent for a copy made where the game could not say, or before coilbox
+   * asked.
+   */
+  beforePost?: PostChange;
 }
 
 /** Every unit the project adds, keyed by internal name. */
@@ -267,6 +275,10 @@ export interface DerivedClone {
  * but a language file has nothing under a key the game has never seen, and a
  * copy whose tooltip reads `units.descriptions.mycopy` is the same bug as one
  * whose name does.
+ *
+ * `sourceBeforePost` is what the game's post files changed in the source, when
+ * the game could say (issue #3054). The copy keeps it apart from anything
+ * `patch` edited and from the name, which are both the copy's own now.
  */
 export function deriveClone({
   key,
@@ -277,11 +289,13 @@ export function deriveClone({
   replacesGameUnit,
   home,
   texts,
+  sourceBeforePost,
 }: {
   key: string;
   source: string;
   sourceDef: Record<string, unknown> | undefined;
   patch?: Record<string, unknown>;
+  sourceBeforePost?: PostChange;
   displayName: string;
   replacesGameUnit: boolean;
   home: TextHome;
@@ -289,7 +303,19 @@ export function deriveClone({
 }): DerivedClone {
   const def = resolvedDef(sourceDef, patch);
   const name = displayName.trim();
-  const clone: UnitClone = { key, source, replacesGameUnit, def };
+  const clone: UnitClone = {
+    key,
+    source,
+    replacesGameUnit,
+    def,
+    ...(sourceBeforePost
+      ? {
+          beforePost: withoutNames(
+            withoutEdited(sourceBeforePost, Object.keys(patch ?? {})),
+          ),
+        }
+      : {}),
+  };
   if (home === "def") {
     applyNames(def, source, key, name);
     return { clone, text: {} };

@@ -88,6 +88,9 @@ let mockArchiveFiles: { path: string; size: number }[] = [];
 /** The game's shared table of weapon definitions, keyed by lowercased name.
  *  Empty in most tests, where every weapon is one the unit carries. */
 let mockWeaponDefs: Record<string, Record<string, unknown>> = {};
+/** What the game's post files changed, for a game whose read could say
+ *  (issue #3054). Absent in most tests, as for a game it could not. */
+let mockBeforePost: UnitDefsResult["beforePost"];
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
@@ -349,6 +352,7 @@ function show(
     errors: [],
     checksum,
     languageText: language,
+    ...(mockBeforePost ? { beforePost: mockBeforePost } : {}),
   };
   mockDataset = dataset;
   return render(
@@ -493,6 +497,7 @@ afterEach(() => {
   mockBuildpics = null;
   mockArchiveFiles = [];
   mockWeaponDefs = {};
+  mockBeforePost = undefined;
   mockConsumers = null;
   mockConsumersByArchive = {};
   mockLegoProjects = [];
@@ -1273,6 +1278,65 @@ describe("UnitPage", () => {
           "A unit you added, copied from armcom",
         ),
       ).toBeTruthy();
+    });
+
+    /** Issue #3054, for a copied unit. */
+    it("gives the copy what the game's post files changed in its source", async () => {
+      mockBeforePost = {
+        units: { armcom: { values: { "weapons.0.def": "DISINTEGRATOR" } } },
+        weaponDefs: {},
+      };
+      show();
+      await copy("armcom4", "Overlord");
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.clones
+          .armcom4.beforePost,
+      ).toEqual({
+        values: { "weapons.0.def": "DISINTEGRATOR" },
+      });
+    });
+
+    /**
+     * A copy saved before issue #3054 has no record, and takes what still
+     * applies of its source's the first time the game's read can say.
+     */
+    it("gives a copy saved before it could tell what still applies", () => {
+      mockBeforePost = {
+        units: { armcom: { values: { health: 2000, metalCost: 900 } } },
+        weaponDefs: {},
+      };
+      const def = { ...structuredClone(ARMCOM), metalCost: 5 };
+      const project = {
+        id: "2f0f5a2e-0000-4000-8000-000000003054",
+        name: "TEST saved copy (delete me)",
+        gameName: GAME.name,
+        authoredChecksum: "abc",
+        edits: {
+          overrides: {},
+          clones: {
+            armcom4: {
+              key: "armcom4",
+              source: "armcom",
+              replacesGameUnit: false,
+              def,
+            },
+          },
+          menus: {},
+          text: {},
+          disabled: [],
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show(undefined, `/workshop/${project.id}?unit=armcom4`);
+      // The copy's metal cost is its own, so only the health goes back.
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.clones
+          .armcom4.beforePost,
+      ).toEqual({
+        values: { health: 2000 },
+      });
     });
 
     it("lets the copy be edited like any other unit", async () => {
@@ -2619,6 +2683,47 @@ describe("UnitPage", () => {
       expect(project()?.edits.equipped).toEqual({});
       expect(project()?.edits.overrides).toEqual({
         gunner: { "weapondefs.laser.range": 450 },
+      });
+    });
+
+    /**
+     * Issue #3054. A copy carries what the game's post files changed in the
+     * weapon it came from, less anything the project had already changed, so
+     * the compiler can put the game's own values back.
+     */
+    it("copies what the game's post files changed along with a weapon", async () => {
+      mockBeforePost = {
+        units: {
+          gunner: {
+            values: {
+              "weapondefs.laser.cratermult": 1,
+              "weapondefs.laser.range": 200,
+            },
+            added: ["weapons.0.name"],
+          },
+        },
+        weaponDefs: { sharedgun: { values: { range: 300 } } },
+      };
+      openGunner();
+      openWeapons();
+      type(screen.getByLabelText("Range") as HTMLInputElement, "450");
+      fireEvent.click(
+        screen.getByRole("button", { name: "Equip a library weapon" }),
+      );
+      await screen.findByLabelText(/^Weapon name/);
+      fireEvent.click(screen.getByRole("button", { name: "Copy and equip" }));
+      expect(project()?.edits.weapons?.gunner_laser_copy.beforePost).toEqual({
+        values: { cratermult: 1 },
+      });
+
+      fireEvent.click(slotButton(3));
+      fireEvent.click(
+        screen.getByRole("button", { name: "Give Gunner its own copy" }),
+      );
+      await screen.findByLabelText(/^Weapon name/);
+      fireEvent.click(screen.getByRole("button", { name: "Copy and equip" }));
+      expect(project()?.edits.weapons?.sharedgun_copy.beforePost).toEqual({
+        values: { range: 300 },
       });
     });
 

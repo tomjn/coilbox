@@ -1391,8 +1391,32 @@ export interface UnitDefsResult {
     string,
     { names?: Record<string, string>; descriptions?: Record<string, string> }
   >;
+  /**
+   * What the game's own `unitdefs_post.lua` and `weapondefs_post.lua` changed
+   * in each definition, by unit and by weapon, the weapon keyed as
+   * {@link weaponDefs} keys it. A definition they left alone has no entry
+   * (issue #3054).
+   *
+   * Absent when the game's loader never ran a post file by either name, so
+   * there was no moment to compare against.
+   */
+  beforePost?: {
+    units: Record<string, PostChange>;
+    weaponDefs: Record<string, PostChange>;
+  };
   checksum?: string;
   errors: string[];
+}
+
+/**
+ * What a game's post files did to one definition. Paths are dotted, a list
+ * position counted from zero. `values` holds the game's own value at each path
+ * the post files changed or removed, and `added` each path they added. Either
+ * half is left out when empty.
+ */
+export interface PostChange {
+  values?: Record<string, unknown>;
+  added?: string[];
 }
 
 /**

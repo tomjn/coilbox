@@ -15,6 +15,7 @@
 
 mod archive;
 mod assetencode;
+mod beforepost;
 mod buildpic;
 mod config;
 mod convert3do;

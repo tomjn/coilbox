@@ -23,6 +23,7 @@
  * checksum at the time, so the drift check (issue #1281) can say when the
  * source has moved.
  */
+import { type PostChange, parsePostChange } from "./beforePost";
 import { clearOverride, resolvedDef, setOverride } from "./overrides";
 
 /** One weapon in the project's library. */
@@ -37,6 +38,13 @@ export interface LibraryWeapon {
   def: Record<string, unknown>;
   /** Dotted paths into `def` and the values set since. Absent when none. */
   changes?: Record<string, unknown>;
+  /**
+   * What the game's own post files changed in `def`, for the compiler to put
+   * back before the game runs them again (issue #3054, `beforePost.ts`).
+   * Absent for a copy made where the game could not say, or before coilbox
+   * asked.
+   */
+  beforePost?: PostChange;
 }
 
 /** The library, by key. */
@@ -117,18 +125,23 @@ export function addLibraryWeapon(
   return { ...library, [weapon.key]: weapon };
 }
 
-/** A copy of one of the game's weapons, ready for the library. */
+/**
+ * A copy of one of the game's weapons, ready for the library. `beforePost` is
+ * what the game's post files changed in it, when the game could say.
+ */
 export function copyGameWeapon(
   key: string,
   source: string,
   def: Record<string, unknown>,
   checksum: string | undefined,
+  beforePost?: PostChange,
 ): LibraryWeapon {
   return {
     key,
     source: source.toLowerCase(),
     ...(checksum ? { sourceChecksum: checksum } : {}),
     def: structuredClone(def),
+    ...(beforePost ? { beforePost: structuredClone(beforePost) } : {}),
   };
 }
 
@@ -311,6 +324,7 @@ export function parseWeaponLibrary(value: unknown): WeaponLibrary {
   for (const [key, raw] of Object.entries(value)) {
     if (!isRecord(raw) || !isRecord(raw.def)) continue;
     if (!KEY_PATTERN.test(key) || raw.key !== key) continue;
+    const beforePost = parsePostChange(raw.beforePost);
     out[key] = {
       key,
       source: typeof raw.source === "string" ? raw.source : "",
@@ -321,6 +335,7 @@ export function parseWeaponLibrary(value: unknown): WeaponLibrary {
       ...(isRecord(raw.changes) && Object.keys(raw.changes).length > 0
         ? { changes: raw.changes }
         : {}),
+      ...(beforePost ? { beforePost } : {}),
     };
   }
   return out;

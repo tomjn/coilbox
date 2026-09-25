@@ -50,6 +50,26 @@ pub struct UnitClone {
     /// The whole definition, as the game would have to read it.
     #[serde(default)]
     pub def: Value,
+    /// What the game's own post-processing changed in `def` (issue #3054).
+    /// Absent for a copy made before coilbox could tell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_post: Option<PostChange>,
+}
+
+/// What a game's post files changed in one definition, a mirror of
+/// `PostChange` in `src/workshop/beforePost.ts` and of the unitsync worker's
+/// read of it (`beforepost.rs`).
+///
+/// A copy's definition holds the values the game ended up with, which is what
+/// the page shows. The game runs its post-processing again over anything a
+/// mutator adds, so the compiler writes these back first: `values` are the
+/// game's own values at each path the post files changed or removed, and
+/// `added` the paths they added.
+#[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct PostChange {
+    pub values: BTreeMap<String, Value>,
+    pub added: Vec<String>,
 }
 
 /// One change to one build menu. Unit names are lowercased def keys.
@@ -102,6 +122,9 @@ pub struct LibraryWeapon {
     /// Dotted paths into `def` and the values the user set since.
     #[serde(default)]
     pub changes: BTreeMap<String, Value>,
+    /// What the game's own post-processing changed in `def` (issue #3054).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub before_post: Option<PostChange>,
 }
 
 /// Everything one project changes about one game.
