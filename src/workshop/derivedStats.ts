@@ -78,8 +78,10 @@ function findKey(
 /** A numeric field off a def, trying each spelling in turn and falling back
  *  to the next only when the field is absent, the way `readPath` callers in
  *  this workshop already read `health`/`maxDamage` and `metalCost`/
- *  `buildCostMetal` pairs. */
-function numberField(
+ *  `buildCostMetal` pairs. Exported so `unitReference.ts` (issue #1316) reads
+ *  a unit's raw fields the same way this module does, rather than growing a
+ *  second copy of the same fallback pairs. */
+export function numberField(
   def: Record<string, unknown> | undefined,
   names: string[],
 ): number | undefined {
