@@ -25,14 +25,16 @@
  * game yet and the list must not wait 23 seconds to offer a button. The editor
  * fills it in the first time it opens the project against a game it can read.
  */
-import { Button, useDrawer } from "@picoframe/frame";
+import { Button, Input, useDrawer, useSetting } from "@picoframe/frame";
 import { open } from "@tauri-apps/plugin-dialog";
-import { Plus, SlidersHorizontal, Upload } from "lucide-react";
+import { Plus, Search, SlidersHorizontal, Upload } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { gameIdentityForName } from "@/container/gameIdentity";
+import { rememberedShortname } from "@/container/shortnames";
 import {
   useScanTargetSelection,
   useUnitsyncGameHeaders,
@@ -66,6 +68,78 @@ function when(iso: string): string {
   return Number.isNaN(at.getTime()) ? "" : at.toLocaleDateString();
 }
 
+/** Where the chosen sort order is remembered, beside the project list itself. */
+const SORT_KEY = "workshop.projectsSort";
+
+type ProjectSort = "updated-desc" | "name-asc" | "created-desc";
+
+const SORT_OPTIONS: { value: ProjectSort; label: string }[] = [
+  { value: "updated-desc", label: "Last changed" },
+  { value: "name-asc", label: "Name A–Z" },
+  { value: "created-desc", label: "Date created" },
+];
+
+function sortProjects(list: ModProject[], sort: ProjectSort): ModProject[] {
+  const arr = [...list];
+  switch (sort) {
+    case "name-asc":
+      arr.sort((a, b) => a.name.localeCompare(b.name));
+      break;
+    case "created-desc":
+      arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      break;
+    default:
+      arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+  return arr;
+}
+
+/**
+ * The key a project groups under: its game's stable shortname when one is
+ * known, since a shortname survives the game moving from one exact build to
+ * the next (issue #3071). `rememberedShortname` recovers it for a project
+ * that predates `game` or whose game coilbox has never read a modinfo for in
+ * this session. Falling back to the exact archive name still separates games
+ * coilbox cannot identify from one another, rather than lumping them under
+ * one catch-all group.
+ */
+function groupKeyFor(project: ModProject): string {
+  return (
+    project.game?.shortname ||
+    rememberedShortname(project.gameName) ||
+    project.gameName
+  );
+}
+
+interface ProjectGroup {
+  key: string;
+  /** The game's display name for the heading. A shortname alone ("BA") means
+   *  little on its own, so the heading uses an exact archive name instead -
+   *  the group's most recently changed project's, since that is the build a
+   *  person is most likely thinking of. */
+  heading: string;
+  projects: ModProject[];
+}
+
+/** Every project grouped by game, headed by name and ordered by it too. */
+function groupProjects(projects: ModProject[]): ProjectGroup[] {
+  const byKey = new Map<string, ModProject[]>();
+  for (const project of projects) {
+    const key = groupKeyFor(project);
+    const list = byKey.get(key);
+    if (list) list.push(project);
+    else byKey.set(key, [project]);
+  }
+  const groups = [...byKey.entries()].map(([key, list]) => {
+    const newest = [...list].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt),
+    )[0];
+    return { key, heading: newest.gameName, projects: list };
+  });
+  groups.sort((a, b) => a.heading.localeCompare(b.heading));
+  return groups;
+}
+
 export default function ProjectsPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -91,14 +165,37 @@ export default function ProjectsPage() {
   /** The project the details drawer is up to rename, if it is. */
   const [renamingId, setRenamingId] = useState<string | null>(null);
 
-  // Newest first, which is the order the editor's own "which project does this
-  // game's link open" answer uses. Sorting is safe here in a way it was not in
-  // the drawer this replaces: nothing on this page writes an edit, so the list
+  // The search box narrows the list as the person types, but is not itself
+  // remembered: it is a one-off "find this project", not a standing view like
+  // the sort order (issue #3071).
+  const [search, setSearch] = useState("");
+  // The sort order is remembered between visits, unlike the search text
+  // above, because it is how someone has chosen to read their own list
+  // rather than a query aimed at finding one project right now.
+  const [sort, setSort] = useSetting<ProjectSort>(SORT_KEY, "updated-desc");
+
+  // Grouped by game first, since that grouping does not depend on the search
+  // text or the sort order. Sorting is safe here in a way it was not in the
+  // drawer this replaces: nothing on this page writes an edit, so the list
   // cannot reorder itself under the cursor.
-  const listed = useMemo(
-    () => [...projects].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [projects],
-  );
+  const groups = useMemo(() => groupProjects(projects), [projects]);
+
+  const visibleGroups = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return groups
+      .map((group) => {
+        const matching = q
+          ? group.projects.filter(
+              (p) =>
+                p.name.toLowerCase().includes(q) ||
+                (p.description ?? "").toLowerCase().includes(q) ||
+                p.gameName.toLowerCase().includes(q),
+            )
+          : group.projects;
+        return { ...group, projects: sortProjects(matching, sort) };
+      })
+      .filter((group) => group.projects.length > 0);
+  }, [groups, search, sort]);
 
   /** The project the details drawer has open, when it is renaming one. */
   const renaming = renamingId
@@ -289,67 +386,107 @@ export default function ProjectsPage() {
           <p className="text-muted-foreground text-sm">{status}</p>
         ) : null}
 
-        {listed.length === 0 ? (
+        {projects.length === 0 ? (
           <EmptyState label="No tweak projects yet. Start one against a game, or import one somebody sent you." />
         ) : (
-          <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
-            {listed.map((project) => (
-              // The card is the thing you open, so the whole of it is the link
-              // and it colours under the pointer rather than leaving the title to
-              // carry an underline on its own (issue #2706). The menu is a
-              // sibling of the link, not a child: a button inside a link is a
-              // link nobody can trust.
-              <li
-                key={project.id}
-                className="group relative rounded border border-border transition-colors hover:border-primary/40 hover:bg-accent/50"
-              >
-                {/* `h-full` because the grid stretches every card in a row to
-                    the tallest of them, and without it a card with no
-                    description ends short of its own border: the strip below
-                    the text still hovered but nothing happened when you clicked
-                    it (issue #2718). The right-hand padding keeps the title
-                    clear of the menu button without giving up the pixels. */}
-                <Link
-                  to={projectPath(project.id)}
-                  className="flex h-full flex-col gap-1 p-3 pr-10"
-                >
-                  <span className="truncate font-medium text-sm group-hover:underline">
-                    {project.name}
-                  </span>
-                  {project.description ? (
-                    <span className="line-clamp-2 text-muted-foreground text-xs">
-                      {project.description}
-                    </span>
-                  ) : null}
-                  <span className="truncate text-muted-foreground text-xs">
-                    {project.gameName}
-                  </span>
-                  <span className="text-muted-foreground text-xs">
-                    {describeEdits(project.edits)}
-                    {when(project.updatedAt)
-                      ? ` · changed ${when(project.updatedAt)}`
-                      : ""}
-                  </span>
-                </Link>
-                <div className="absolute top-1 right-1">
-                  <ProjectCardMenu
-                    project={project}
-                    onRename={() => setRenamingId(project.id)}
-                    onDuplicate={() => {
-                      const copy = duplicateProject(project.id);
-                      if (copy) setStatus(`Copied to "${copy.name}".`);
-                    }}
-                    onShare={() => void openShare(project)}
-                    onDelete={() => {
-                      removeProject(project.id);
-                      forgetEditHistory(project.id);
-                      forgetCheckpoints(project.id);
-                    }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative max-w-xs flex-1">
+                <Search
+                  size={14}
+                  className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search projects…"
+                  aria-label="Search projects"
+                  className="h-9 pl-7"
+                />
+              </div>
+              <OptionSelect
+                value={sort}
+                onValueChange={(v) => setSort(v as ProjectSort)}
+                options={SORT_OPTIONS}
+                ariaLabel="Sort projects"
+                className="w-40"
+              />
+            </div>
+
+            {visibleGroups.length === 0 ? (
+              <EmptyState label={`No projects match "${search.trim()}".`} />
+            ) : (
+              visibleGroups.map((group) => (
+                <section key={group.key} className="flex flex-col gap-2">
+                  <h2 className="font-medium text-muted-foreground text-sm">
+                    {group.heading}
+                  </h2>
+                  <ul className="grid grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] gap-3">
+                    {group.projects.map((project) => (
+                      // The card is the thing you open, so the whole of it is
+                      // the link and it colours under the pointer rather than
+                      // leaving the title to carry an underline on its own
+                      // (issue #2706). The menu is a sibling of the link, not
+                      // a child: a button inside a link is a link nobody can
+                      // trust.
+                      <li
+                        key={project.id}
+                        className="group relative rounded border border-border transition-colors hover:border-primary/40 hover:bg-accent/50"
+                      >
+                        {/* `h-full` because the grid stretches every card in
+                            a row to the tallest of them, and without it a
+                            card with no description ends short of its own
+                            border: the strip below the text still hovered
+                            but nothing happened when you clicked it (issue
+                            #2718). The right-hand padding keeps the title
+                            clear of the menu button without giving up the
+                            pixels. */}
+                        <Link
+                          to={projectPath(project.id)}
+                          className="flex h-full flex-col gap-1 p-3 pr-10"
+                        >
+                          <span className="truncate font-medium text-sm group-hover:underline">
+                            {project.name}
+                          </span>
+                          {project.description ? (
+                            <span className="line-clamp-2 text-muted-foreground text-xs">
+                              {project.description}
+                            </span>
+                          ) : null}
+                          <span className="truncate text-muted-foreground text-xs">
+                            {project.gameName}
+                          </span>
+                          <span className="text-muted-foreground text-xs">
+                            {describeEdits(project.edits)}
+                            {when(project.updatedAt)
+                              ? ` · changed ${when(project.updatedAt)}`
+                              : ""}
+                          </span>
+                        </Link>
+                        <div className="absolute top-1 right-1">
+                          <ProjectCardMenu
+                            project={project}
+                            onRename={() => setRenamingId(project.id)}
+                            onDuplicate={() => {
+                              const copy = duplicateProject(project.id);
+                              if (copy) setStatus(`Copied to "${copy.name}".`);
+                            }}
+                            onShare={() => void openShare(project)}
+                            onDelete={() => {
+                              removeProject(project.id);
+                              forgetEditHistory(project.id);
+                              forgetCheckpoints(project.id);
+                            }}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ))
+            )}
+          </>
         )}
       </div>
     </TooltipProvider>

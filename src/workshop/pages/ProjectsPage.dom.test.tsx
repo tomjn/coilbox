@@ -93,7 +93,11 @@ const { installSettingsStorage, memorySettingsStorage, readStoredSetting } =
 const { EMPTY_EDITS, PROJECTS_KEY, modProjectCode } = await import(
   "../project"
 );
+const { rememberShortnames, resetShortnames } = await import(
+  "@/container/shortnames"
+);
 type ModProject = import("../project").ModProject;
+type GameIdentity = import("@/container/gameIdentity").GameIdentity;
 
 let storage = memorySettingsStorage();
 
@@ -109,12 +113,16 @@ function project(fields: {
   name: string;
   gameName: string;
   description?: string;
+  game?: GameIdentity;
+  createdAt?: string;
+  updatedAt?: string;
 }): ModProject {
+  const { createdAt, updatedAt, ...rest } = fields;
   return {
-    ...fields,
+    ...rest,
     edits: EMPTY_EDITS,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
+    createdAt: createdAt ?? "2026-01-01T00:00:00.000Z",
+    updatedAt: updatedAt ?? "2026-01-01T00:00:00.000Z",
   };
 }
 
@@ -154,6 +162,7 @@ beforeAll(async () => {
 beforeEach(() => {
   storage = memorySettingsStorage();
   installSettingsStorage(storage);
+  resetShortnames();
 });
 
 afterEach(() => {
@@ -171,7 +180,8 @@ describe("ProjectsPage", () => {
   it("says which game each project changes and how much", () => {
     show([project({ id: "a", name: "Slower tanks", gameName: GAME.name })]);
     expect(screen.getByText("Slower tanks")).toBeTruthy();
-    expect(screen.getByText(GAME.name)).toBeTruthy();
+    // Twice: once as the group heading, once on the card itself.
+    expect(screen.getAllByText(GAME.name)).toHaveLength(2);
     expect(screen.getByText(/Nothing changed yet/)).toBeTruthy();
   });
 
@@ -351,6 +361,167 @@ describe("ProjectsPage", () => {
       ).toBeTruthy();
       // Nothing started for a unit somebody has only looked at.
       expect(stored()).toEqual([]);
+    });
+  });
+
+  /**
+   * Issue #3071: projects group under a heading per game rather than sitting
+   * in one flat list, so a game's several versions collapse into one group a
+   * person actually recognises.
+   */
+  describe("grouping by game", () => {
+    it("groups two versions of the same game under one heading", () => {
+      show([
+        project({
+          id: "old",
+          name: "Old build",
+          gameName: "Balanced Annihilation V15.9.7",
+          game: { name: "Balanced Annihilation V15.9.7", shortname: "BA" },
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }),
+        project({
+          id: "new",
+          name: "New build",
+          gameName: "Balanced Annihilation V15.9.8",
+          game: { name: "Balanced Annihilation V15.9.8", shortname: "BA" },
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        }),
+      ]);
+
+      // One heading, not two, and it names the newest of the two builds
+      // rather than the raw shortname "BA".
+      expect(
+        screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+      ).toEqual(["Balanced Annihilation V15.9.8"]);
+      expect(screen.getByText("Old build")).toBeTruthy();
+      expect(screen.getByText("New build")).toBeTruthy();
+    });
+
+    it("falls back to a remembered shortname when a project carries none", () => {
+      rememberShortnames([{ name: "Zero-K v1.12", info: { shortname: "ZK" } }]);
+      show([
+        project({
+          id: "remembered",
+          name: "No shortname on the project itself",
+          gameName: "Zero-K v1.12",
+        }),
+        project({
+          id: "current",
+          name: "Shortname on the project",
+          gameName: "Zero-K v1.13",
+          game: { name: "Zero-K v1.13", shortname: "ZK" },
+        }),
+      ]);
+
+      expect(screen.getAllByRole("heading", { level: 2 })).toHaveLength(1);
+    });
+
+    it("groups a project with no recoverable shortname under its own game name", () => {
+      show([
+        project({
+          id: "a",
+          name: "Unknown game project",
+          gameName: "Some Unread Game 1.0",
+        }),
+        project({ id: "b", name: "Slower tanks", gameName: GAME.name }),
+      ]);
+
+      expect(
+        screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent),
+      ).toEqual(["Some Unread Game 1.0", GAME.name]);
+    });
+  });
+
+  /**
+   * Issue #3071: a search box narrows the list to projects whose name,
+   * description or game name matches, hiding a group with no match at all.
+   */
+  describe("searching", () => {
+    it("matches on name, description and game name, ignoring case", () => {
+      show([
+        project({ id: "a", name: "Slower tanks", gameName: GAME.name }),
+        project({
+          id: "b",
+          name: "Faster bots",
+          gameName: GAME_2.name,
+          description: "Rebalances air units.",
+        }),
+      ]);
+
+      fireEvent.change(screen.getByLabelText("Search projects"), {
+        target: { value: "AIR" },
+      });
+      expect(screen.getByText("Faster bots")).toBeTruthy();
+      expect(screen.queryByText("Slower tanks")).toBeNull();
+    });
+
+    it("says nothing matches rather than showing an empty list", () => {
+      show([project({ id: "a", name: "Slower tanks", gameName: GAME.name })]);
+      fireEvent.change(screen.getByLabelText("Search projects"), {
+        target: { value: "nothing matches this" },
+      });
+      expect(screen.getByText(/No projects match/)).toBeTruthy();
+    });
+  });
+
+  /**
+   * Issue #3071: the sort dropdown orders projects within each group, and the
+   * choice is remembered through the settings store so it survives a restart.
+   */
+  describe("sorting", () => {
+    it("orders by last changed, newest first, by default", () => {
+      show([
+        project({
+          id: "a",
+          name: "Older",
+          gameName: GAME.name,
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        }),
+        project({
+          id: "b",
+          name: "Newer",
+          gameName: GAME.name,
+          updatedAt: "2026-02-01T00:00:00.000Z",
+        }),
+      ]);
+      const names = screen.getAllByRole("link").map((l) => l.textContent);
+      expect(names.findIndex((t) => t?.startsWith("Newer"))).toBeLessThan(
+        names.findIndex((t) => t?.startsWith("Older")),
+      );
+    });
+
+    it("sorts by name A-Z when chosen, and remembers the choice", async () => {
+      show([
+        project({ id: "a", name: "Zebra project", gameName: GAME.name }),
+        project({ id: "b", name: "Alpha project", gameName: GAME.name }),
+      ]);
+
+      fireEvent.click(screen.getByRole("combobox", { name: "Sort projects" }));
+      fireEvent.click(await screen.findByText("Name A–Z"));
+
+      const names = screen.getAllByRole("link").map((l) => l.textContent);
+      expect(
+        names.findIndex((t) => t?.startsWith("Alpha project")),
+      ).toBeLessThan(names.findIndex((t) => t?.startsWith("Zebra project")));
+      expect(readStoredSetting("workshop.projectsSort", "updated-desc")).toBe(
+        "name-asc",
+      );
+
+      // A fresh mount reads the remembered choice back rather than resetting
+      // to "last changed".
+      cleanup();
+      show([
+        project({ id: "a", name: "Zebra project", gameName: GAME.name }),
+        project({ id: "b", name: "Alpha project", gameName: GAME.name }),
+      ]);
+      const namesAfterRemount = screen
+        .getAllByRole("link")
+        .map((l) => l.textContent);
+      expect(
+        namesAfterRemount.findIndex((t) => t?.startsWith("Alpha project")),
+      ).toBeLessThan(
+        namesAfterRemount.findIndex((t) => t?.startsWith("Zebra project")),
+      );
     });
   });
 });
