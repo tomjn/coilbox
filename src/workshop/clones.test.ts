@@ -125,6 +125,41 @@ describe("suggestCloneKey", () => {
 });
 
 describe("deriveClone", () => {
+  /**
+   * Issue #3054. The copy keeps what the game's post files changed in its
+   * source, for the compiler to put back, apart from the fields the project
+   * edited before copying and the name, which are the copy's own.
+   */
+  it("keeps what the game's post files changed, less the copy's own edits and name", () => {
+    const clone = copy({
+      key: "armcom4",
+      source: "armcom",
+      sourceDef: ARMCOM,
+      patch: { health: 5000 },
+      displayName: "Overlord",
+      replacesGameUnit: false,
+      sourceBeforePost: {
+        values: { health: 2500, humanName: "Commander", "weapons.0.def": "D" },
+        added: ["weapons.0.name"],
+      },
+    });
+    expect(clone.beforePost).toEqual({
+      values: { "weapons.0.def": "D" },
+      added: ["weapons.0.name"],
+    });
+  });
+
+  it("records nothing when the game could not say", () => {
+    const clone = copy({
+      key: "armcom4",
+      source: "armcom",
+      sourceDef: ARMCOM,
+      displayName: "Overlord",
+      replacesGameUnit: false,
+    });
+    expect(clone).not.toHaveProperty("beforePost");
+  });
+
   it("copies the whole definition rather than a patch of it", () => {
     const clone = copy({
       key: "armcom4",

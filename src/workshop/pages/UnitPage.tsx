@@ -102,6 +102,7 @@ import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
+import { adoptBeforePost, copiedFrom, type PostChange } from "../beforePost";
 import {
   addToBuildMenu,
   applyBuildMenu,
@@ -501,6 +502,19 @@ export default function UnitPage() {
   // the unit it was copied from, so that name finds the copy's own table too.
   const weaponDefs = defs?.weaponDefs ?? NO_UNITS;
   const cloneSource = clone?.source;
+  // What the game's post files changed in this unit, for a copy of it or of a
+  // weapon it carries to put back (issue #3054). A unit the project copied
+  // carries its own. Empty rather than absent when the game said and there
+  // was nothing, so a copy made from it is not taken for one made before
+  // coilbox asked.
+  const unitBeforePost: PostChange | undefined = Object.hasOwn(
+    ownClones,
+    unitKey,
+  )
+    ? ownClones[unitKey].beforePost
+    : defs?.beforePost && (defs.beforePost.units[unitKey] ?? {});
+  const gameWeaponBeforePost = (name: string): PostChange | undefined =>
+    defs?.beforePost && (defs.beforePost.weaponDefs[name] ?? {});
   const slots = useMemo(
     () =>
       weaponSlots(
@@ -752,6 +766,44 @@ export default function UnitPage() {
   useEffect(() => {
     if (pendingCloneText) migrateRef.current();
   }, [pendingCloneText]);
+
+  // A copy saved before issue #3054 holds the values the game's post files
+  // left, with nothing to say which. Compiled as they are, the game would
+  // post-process it a second time. Its source still says, so each such copy
+  // takes what still applies on the first render that has the game's read, and
+  // `adoptBeforePost` answers `null` from then on, for the reason
+  // `migrateCloneText` does above.
+  const pendingBeforePost = useMemo(
+    () =>
+      adoptBeforePost(
+        ownClones,
+        edits.weapons,
+        defs?.beforePost,
+        gameUnits,
+        weaponDefs,
+      ),
+    [ownClones, edits.weapons, defs, gameUnits, weaponDefs],
+  );
+  const adoptRef = useRef<() => void>(() => {});
+  adoptRef.current = () => {
+    commit((current) => {
+      const adopted = adoptBeforePost(
+        current.clones,
+        current.weapons,
+        defs?.beforePost,
+        gameUnits,
+        weaponDefs,
+      );
+      if (!adopted) return current;
+      const next = editSlot(current, "clones", () => adopted.clones);
+      return adopted.weapons === current.weapons
+        ? next
+        : editSlot(next, "weapons", () => adopted.weapons);
+    });
+  };
+  useEffect(() => {
+    if (pendingBeforePost) adoptRef.current();
+  }, [pendingBeforePost]);
 
   /** Rename the unit, or rewrite its tooltip, wherever this game keeps them. */
   const commitText = (field: TextField, value: string) => {
@@ -1045,6 +1097,7 @@ export default function UnitPage() {
       replacesGameUnit: replaces,
       home,
       texts,
+      sourceBeforePost: unitBeforePost,
     });
     commit((current) => {
       const next = editSlot(current, "clones", (c) => addClone(c, made));
@@ -1168,11 +1221,21 @@ export default function UnitPage() {
    */
   const slotCopy = (
     s: WeaponSlot,
-  ): { source: string; def: Record<string, unknown> } | undefined => {
+  ):
+    | {
+        source: string;
+        def: Record<string, unknown>;
+        beforePost: PostChange | undefined;
+      }
+    | undefined => {
     const definition = s.definition;
     if (definition.kind === "missing") return undefined;
     if (definition.kind === "shared")
-      return { source: definition.key, def: definition.def };
+      return {
+        source: definition.key,
+        def: definition.def,
+        beforePost: gameWeaponBeforePost(definition.key),
+      };
     const resolved = readPath(
       resolvedDef(unit, overrides[unitKey]),
       definition.path,
@@ -1183,6 +1246,13 @@ export default function UnitPage() {
         resolved !== null && typeof resolved === "object"
           ? (resolved as Record<string, unknown>)
           : definition.def,
+      beforePost:
+        unitBeforePost &&
+        copiedFrom(
+          unitBeforePost,
+          definition.path,
+          Object.keys(overrides[unitKey] ?? {}),
+        ),
     };
   };
   /** Copy a game weapon into the library, and fire it from a slot when one
@@ -1191,9 +1261,10 @@ export default function UnitPage() {
     key: string,
     source: string,
     def: Record<string, unknown>,
+    beforePost: PostChange | undefined,
     into?: { unit: string; step: string },
   ) => {
-    const weapon = copyGameWeapon(key, source, def, defs?.checksum);
+    const weapon = copyGameWeapon(key, source, def, defs?.checksum, beforePost);
     commit((current) => {
       const next = editSlot(current, "weapons", (w) =>
         addLibraryWeapon(w, weapon),
@@ -1237,7 +1308,7 @@ export default function UnitPage() {
     onCopy: (s, key) => {
       const from = slotCopy(s);
       if (from)
-        addToLibrary(key, from.source, from.def, {
+        addToLibrary(key, from.source, from.def, from.beforePost, {
           unit: unitKey,
           step: s.step,
         });
@@ -1492,7 +1563,8 @@ export default function UnitPage() {
           describeMount={describeMount}
           onAdd={(key, source) => {
             const def = weaponDefs[source];
-            if (def) addToLibrary(key, source, def);
+            if (def)
+              addToLibrary(key, source, def, gameWeaponBeforePost(source));
           }}
           onDelete={deleteLibraryWeapon}
           onChange={changeLibraryField}

@@ -53,6 +53,7 @@ import {
 } from "../container/gameIdentity";
 import { MAX_CODE_LENGTH } from "../deeplink/parse";
 import { readStoredSetting, updateStoredSetting } from "../lib/storedSetting";
+import { parsePostChange } from "./beforePost";
 import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import { buildMenuOpCount } from "./buildMenus";
 import {
@@ -848,11 +849,13 @@ function parseClones(value: unknown): UnitClones {
     const def = asRecord(clone?.def);
     if (!clone || !def) continue;
     if (typeof clone.source !== "string") continue;
+    const beforePost = parsePostChange(clone.beforePost);
     const parsed: UnitClone = {
       key,
       source: clone.source,
       replacesGameUnit: clone.replacesGameUnit === true,
       def,
+      ...(beforePost ? { beforePost } : {}),
     };
     out[key] = parsed;
   }
