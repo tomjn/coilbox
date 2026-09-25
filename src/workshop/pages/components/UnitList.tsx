@@ -92,6 +92,7 @@ export function UnitList({
   picOf,
   picsPending,
   factionOf,
+  restrictTo,
   onSelect,
 }: {
   /** The game's units with the project's own already in among them. */
@@ -117,6 +118,10 @@ export function UnitList({
   /** Which side reaches this unit, where the game has more than one and its
    *  build graph reaches it at all. */
   factionOf: (key: string) => string | undefined;
+  /** Scope the list to a collection's units (issue #2654), on top of the
+   *  search box below rather than instead of it. `undefined` for every unit,
+   *  which is the whole game the same way it always was. */
+  restrictTo?: ReadonlySet<string>;
   onSelect: (key: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -124,9 +129,10 @@ export function UnitList({
   const all = useMemo(
     () =>
       Object.entries(units)
+        .filter(([key]) => !restrictTo || restrictTo.has(key))
         .map(([key, def]) => ({ key, label: nameOf(key, def) }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [units, nameOf],
+    [units, nameOf, restrictTo],
   );
 
   const needle = query.trim().toLowerCase();
@@ -282,7 +288,11 @@ export function UnitList({
       />
       {rows.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No unit matches "{query.trim()}".
+          {needle
+            ? `No unit matches "${query.trim()}".`
+            : restrictTo
+              ? "This collection has no units in it yet."
+              : 'No unit matches "".'}
         </p>
       ) : (
         <div

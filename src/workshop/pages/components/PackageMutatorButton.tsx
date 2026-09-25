@@ -36,7 +36,8 @@
 import { Button, Drawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Check, Copy, Package } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ConfigOption } from "@/content/bindings";
 import {
@@ -44,6 +45,11 @@ import {
   barSlotFit,
   workshopPackBarSlots,
 } from "../../barPack";
+import {
+  collectionTree,
+  collectionUnits,
+  restrictEditsToUnits,
+} from "../../collections";
 import { useCompiledProject } from "../../compile";
 import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
 import { workshopPreflight } from "../../preflight";
@@ -248,10 +254,33 @@ export function PackageMutatorButton({
   routeOptions?: ConfigOption[];
 }) {
   const [open, setOpen] = useState(false);
-  const compiled = useCompiledProject(project, open);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
   const busy = phase.state === "checking" || phase.state === "packaging";
   const [mode, setMode] = useState<ExportMode>("mutator");
+
+  // Restrict what gets compiled to one collection's units (issue #2654), or
+  // "" for the whole project. Drawer-local rather than the page's own active
+  // filter: what you are looking at while editing and what you choose to ship
+  // are different questions, and answering "no" to the second should not
+  // require clearing the first.
+  const collections = project.edits.collections;
+  const [restrictTo, setRestrictTo] = useState("");
+  const restriction =
+    restrictTo && collections
+      ? collectionUnits(collections, restrictTo)
+      : undefined;
+  const scopedProject = useMemo(
+    () =>
+      restriction
+        ? {
+            ...project,
+            edits: restrictEditsToUnits(project.edits, restriction),
+          }
+        : project,
+    [project, restriction],
+  );
+
+  const compiled = useCompiledProject(scopedProject, open);
 
   const nextVersion = (project.distributionVersion ?? 0) + 1;
   const nothingToPackage =
@@ -264,7 +293,7 @@ export function PackageMutatorButton({
       // Nothing leaves the app unchecked (issue #1276), and a file handed to
       // somebody else is exactly the case a blocker should stop rather than
       // only flag (issue #2748).
-      const preflight = await workshopPreflight({ project });
+      const preflight = await workshopPreflight({ project: scopedProject });
       if (preflight.blockers.length > 0) {
         const [first, ...rest] = preflight.blockers;
         setPhase({
@@ -286,7 +315,7 @@ export function PackageMutatorButton({
 
       setPhase({ state: "packaging" });
       const written = await workshopPackageMutator({
-        project,
+        project: scopedProject,
         version: nextVersion,
         dest,
       });
@@ -343,6 +372,26 @@ export function PackageMutatorButton({
             <ToggleGroupItem value="bar">BAR tweak slots</ToggleGroupItem>
           </ToggleGroup>
 
+          {/* Restrict what gets exported to one collection's units (issue
+            #2654). Only offered once the project has a collection to name,
+            so a project with none sees exactly what it saw before this
+            existed. */}
+          {collections && Object.keys(collections).length > 0 && (
+            <OptionSelect
+              value={restrictTo}
+              onValueChange={setRestrictTo}
+              options={[
+                { value: "", label: "Whole project" },
+                ...collectionTree(collections).map((n) => ({
+                  value: n.collection.id,
+                  label: `${"— ".repeat(n.depth)}${n.collection.name}`,
+                })),
+              ]}
+              size="sm"
+              ariaLabel="Restrict this export to a collection"
+            />
+          )}
+
           {mode === "bar" ? (
             nothingToPackage ? (
               <p className="text-xs text-muted-foreground">
@@ -350,7 +399,7 @@ export function PackageMutatorButton({
               </p>
             ) : (
               <BarSlotExportSection
-                project={project}
+                project={scopedProject}
                 routeOptions={routeOptions}
               />
             )
