@@ -175,6 +175,14 @@ pub struct ModProject {
     /// mutator still carries them.
     #[serde(default)]
     pub mutator_only: BTreeMap<String, Vec<String>>,
+    /// Copies sent through the mutator route whole, because one of their
+    /// changes has no edit a file can take (issue #3035). A copy is written as
+    /// a file or not at all (`inplace_clone.rs`), so this is a mark against
+    /// the whole copy rather than one of its fields, unlike `mutator_only`.
+    /// The in-place write skips a copy named here rather than refusing the
+    /// whole batch over it.
+    #[serde(default)]
+    pub clone_mutator_only: Vec<String>,
 }
 
 impl ModProject {
@@ -183,6 +191,11 @@ impl ModProject {
         self.mutator_only
             .get(unit)
             .is_some_and(|fields| fields.iter().any(|f| f == field))
+    }
+
+    /// Whether the user sent this whole copy through the mutator route.
+    pub fn is_clone_mutator_only(&self, unit: &str) -> bool {
+        self.clone_mutator_only.iter().any(|u| u == unit)
     }
 }
 
@@ -247,6 +260,26 @@ mod tests {
         let older: ModProject =
             serde_json::from_value(json!({ "name": "x", "gameName": "g" })).expect("parse");
         assert!(older.mutator_only.is_empty());
+    }
+
+    /// A project saved before issue #3035 has no `cloneMutatorOnly`, and one
+    /// saved after it reads the marks back as a flat list of copy keys: a
+    /// copy is written as a file or not at all, so the mark is against the
+    /// whole copy rather than one of its fields.
+    #[test]
+    fn the_clone_mutator_only_marks_are_optional() {
+        let project: ModProject = serde_json::from_value(json!({
+            "name": "x",
+            "gameName": "g",
+            "cloneMutatorOnly": ["armdfly2"],
+        }))
+        .expect("parse");
+        assert!(project.is_clone_mutator_only("armdfly2"));
+        assert!(!project.is_clone_mutator_only("brv_mk2"));
+
+        let older: ModProject =
+            serde_json::from_value(json!({ "name": "x", "gameName": "g" })).expect("parse");
+        assert!(older.clone_mutator_only.is_empty());
     }
 
     /// A project that changes nothing still parses, which is what the editor

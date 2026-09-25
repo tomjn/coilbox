@@ -1,7 +1,7 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Allows the workshop plugin's compiler, preflight check, local test launch, packaging, BAR tweak-slot export, tweak-set decode and change ledger. The compiler and preflight check turn a saved tweak project into the Lua a game reads and read nothing and write nothing; the test launch writes a generated game under the content root's games/ (issue #1278); packaging writes a versioned .sdz to a caller-chosen path (issue #1283); the BAR export packs compiled chunks across Beyond All Reason's numbered tweak slots and reads and writes nothing (issue #1277); the decode command reads a payload or a battle's mod options back to Lua and reads and writes nothing (issue #1280); the change ledger traces a project's edits to the mutator file or BAR slot that carries each one and reads and writes nothing (issue #2653); the edit-in-place commands patch field changes into a loose .sdd game's own unit files after moving each original aside, count those backups, and undo or accept them (issue #2635), a dry run of the same patching reads a unit's file to say which fields it could write, writing nothing (issue #2633), and a disk diff command reads a line diff of every file with a backup or created marker against the current file, writing nothing (issue #2636)."
+description = "Allows the workshop plugin's compiler, preflight check, local test launch, packaging, BAR tweak-slot export, tweak-set decode and change ledger. The compiler and preflight check turn a saved tweak project into the Lua a game reads and read nothing and write nothing; the test launch writes a generated game under the content root's games/ (issue #1278); packaging writes a versioned .sdz to a caller-chosen path (issue #1283); the BAR export packs compiled chunks across Beyond All Reason's numbered tweak slots and reads and writes nothing (issue #1277); the decode command reads a payload or a battle's mod options back to Lua and reads and writes nothing (issue #1280); the change ledger traces a project's edits to the mutator file or BAR slot that carries each one and reads and writes nothing (issue #2653); the edit-in-place commands patch field changes into a loose .sdd game's own unit files after moving each original aside, count those backups, and undo or accept them (issue #2635), a dry run of the same patching reads a unit's file to say which fields it could write, writing nothing (issue #2633), a dry run of a copy's own changes compares values only and reads no file at all (issue #3035), and a disk diff command reads a line diff of every file with a backup or created marker against the current file, writing nothing (issue #2636)."
 permissions = [
   "allow-workshop-compile",
   "allow-workshop-preflight",
@@ -15,5 +15,6 @@ permissions = [
   "allow-workshop-undo-in-place",
   "allow-workshop-accept-in-place",
   "allow-workshop-check-in-place",
+  "allow-workshop-check-clone-in-place",
   "allow-workshop-in-place-diffs",
 ]

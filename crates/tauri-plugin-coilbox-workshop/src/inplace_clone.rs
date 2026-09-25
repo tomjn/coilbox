@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use coilbox_unitpatch::{Op, RefusalKind, Segment, Value as PatchValue};
+use serde::Serialize;
 use serde_json::{Map, Value};
 
 use crate::model::{BuildMenuOp, GameEdits, UnitClone};
@@ -40,8 +41,9 @@ pub(crate) struct CopyEdit {
 
 /// A difference between the copy and its source that no edit to a file can
 /// make, with the sentence saying why.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Unwritable {
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Unwritable {
     pub field: String,
     pub message: String,
 }
