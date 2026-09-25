@@ -23,6 +23,7 @@ import {
   computeBatchRows,
 } from "../../batchEdit";
 import { type PostChange, postNoteOf } from "../../beforePost";
+import type { UnitClones } from "../../clones";
 import {
   type Collections,
   collectionTree,
@@ -30,6 +31,7 @@ import {
 } from "../../collections";
 import type { UnitOverrides } from "../../overrides";
 import { resolveField } from "../../searchQuery";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 /** How many preview rows are drawn before asking to narrow the collection
  *  instead. Mirrors `CollectionsDrawer`'s `SHOWN`: the apply button still acts
@@ -60,6 +62,10 @@ export function BatchEditDrawer({
   nameOf,
   beforePost,
   onApply,
+  weaponDefs,
+  library,
+  equipped,
+  clones,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -75,6 +81,13 @@ export function BatchEditDrawer({
   /** Apply every row that would change, folded into the caller's own
    *  `updateOverrides` so it counts as one undo step. */
   onApply: (rows: BatchRow[]) => void;
+  /** The game's own weapon table, the project's weapon library and what is
+   *  equipped where (issue #3085), so a collection's rule can match a
+   *  `derivedStats.ts` number the same way `UnitPage`'s own filter does. */
+  weaponDefs: Record<string, Record<string, unknown>>;
+  library: WeaponLibrary;
+  equipped: EquippedWeapons;
+  clones: UnitClones;
 }) {
   const [collectionId, setCollectionId] = useState("");
   const [fieldInput, setFieldInput] = useState("");
@@ -86,7 +99,14 @@ export function BatchEditDrawer({
   const [roundingStep, setRoundingStep] = useState("");
 
   const tree = useMemo(() => collectionTree(collections), [collections]);
-  const live = useMemo(() => ({ units, overrides }), [units, overrides]);
+  const live = useMemo(
+    () => ({
+      units,
+      overrides,
+      weapons: { weaponDefs, library, equipped, clones },
+    }),
+    [units, overrides, weaponDefs, library, equipped, clones],
+  );
   const unitSet = collectionId
     ? collectionUnits(collections, collectionId, live)
     : undefined;

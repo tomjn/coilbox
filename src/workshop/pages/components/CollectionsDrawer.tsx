@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { UnitClones } from "../../clones";
 import {
   type Collection,
   type Collections,
@@ -24,6 +25,7 @@ import {
 } from "../../collections";
 import type { UnitOverrides } from "../../overrides";
 import { parseUnitQuery } from "../../searchQuery";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 /** How many units the membership checklist draws before asking for more of a
  *  search term. Only a limit on what is drawn: a game the size of Beyond All
@@ -73,6 +75,10 @@ export function CollectionsDrawer({
   onSetParent,
   onToggleMember,
   onSetRule,
+  weaponDefs,
+  library,
+  equipped,
+  clones,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -91,6 +97,13 @@ export function CollectionsDrawer({
   onToggleMember: (id: string, unit: string, member: boolean) => void;
   /** Set or clear a collection's rule (issue #2656). */
   onSetRule: (id: string, rule: string) => void;
+  /** The game's own weapon table, the project's weapon library and what is
+   *  equipped where (issue #3085), so a rule can match a `derivedStats.ts`
+   *  number the same way `UnitPage`'s own filter does. */
+  weaponDefs: Record<string, Record<string, unknown>>;
+  library: WeaponLibrary;
+  equipped: EquippedWeapons;
+  clones: UnitClones;
 }) {
   const [name, setName] = useState("");
   const [newParent, setNewParent] = useState("");
@@ -99,7 +112,14 @@ export function CollectionsDrawer({
 
   const tree = useMemo(() => collectionTree(collections), [collections]);
   const active = selected ? collections[selected] : undefined;
-  const live = useMemo(() => ({ units, overrides }), [units, overrides]);
+  const live = useMemo(
+    () => ({
+      units,
+      overrides,
+      weapons: { weaponDefs, library, equipped, clones },
+    }),
+    [units, overrides, weaponDefs, library, equipped, clones],
+  );
   const activeUnits = active
     ? collectionUnits(collections, active.id, live)
     : undefined;
