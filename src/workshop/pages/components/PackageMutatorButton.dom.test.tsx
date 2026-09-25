@@ -182,6 +182,63 @@ describe("PackageMutatorButton", () => {
     expect(workshopPackageMutator).not.toHaveBeenCalled();
   });
 
+  describe("restricting the export to a collection", () => {
+    const withCollections = {
+      ...project,
+      edits: {
+        ...project.edits,
+        overrides: {
+          armcom: { maxDamage: 5000 },
+          armflash: { buildTime: 900 },
+        },
+        collections: {
+          bots: { id: "bots", name: "Bots", units: ["armcom"] },
+        },
+      },
+    };
+
+    it("offers no selector when the project has no collections", () => {
+      draw();
+      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
+      expect(
+        screen.queryByRole("combobox", {
+          name: /restrict this export to a collection/i,
+        }),
+      ).toBeNull();
+    });
+
+    it("compiles and packages only the picked collection's units", async () => {
+      mockCompiled = compiled([{ path: "units/armcom.lua", contents: "" }]);
+      render(
+        <PackageMutatorButton
+          // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture
+          project={withCollections as any}
+          onPackaged={vi.fn()}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
+      fireEvent.click(
+        screen.getByRole("combobox", {
+          name: /restrict this export to a collection/i,
+        }),
+      );
+      fireEvent.click(screen.getByRole("option", { name: "Bots" }));
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackageMutator).toHaveBeenCalledWith(
+          expect.objectContaining({
+            project: expect.objectContaining({
+              edits: expect.objectContaining({
+                overrides: { armcom: { maxDamage: 5000 } },
+              }),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
   describe("BAR tweak slots mode", () => {
     function openBarMode() {
       fireEvent.click(screen.getByRole("button", { name: /^package$/i }));

@@ -101,6 +101,24 @@ describe("the count line", () => {
   });
 });
 
+describe("restrictTo", () => {
+  it("scopes the list to the given units, on top of the search box", () => {
+    draw({ restrictTo: new Set(["unit001", "unit002"]) });
+    expect(screen.getByText("2 units")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "unit002" },
+    });
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
+  });
+
+  it("says a collection is empty rather than that nothing matches a search", () => {
+    draw({ restrictTo: new Set() });
+    expect(
+      screen.getByText("This collection has no units in it yet."),
+    ).toBeTruthy();
+  });
+});
+
 describe("windowing", () => {
   it("mounts a row per unit while the container has no measured height", () => {
     draw();

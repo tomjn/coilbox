@@ -67,6 +67,11 @@ import {
   setCloneMutatorOnly,
 } from "./cloneMutatorOnly";
 import type { UnitClone, UnitClones } from "./clones";
+import {
+  type Collections,
+  collectionCount,
+  parseCollections,
+} from "./collections";
 import type { DisabledUnits } from "./disabled";
 import {
   type ExplosionGenerators,
@@ -137,6 +142,9 @@ export interface GameEdits {
   /** Custom explosion generators the project writes as `effects/<name>.lua`
    *  (issue #2643), by key. Optional for the same reason `weapons` is. */
   explosionGenerators?: ExplosionGenerators;
+  /** Named, nestable sets of units (issue #2654), by id. Optional for the
+   *  same reason `weapons` is. See `collections.ts`. */
+  collections?: Collections;
 }
 
 /**
@@ -156,6 +164,7 @@ export const EMPTY_EDITS: GameEdits = {
   equipped: {},
   armorClasses: EMPTY_ARMOR_CLASSES,
   explosionGenerators: {},
+  collections: {},
 };
 
 /** Whether a slot holds anything at all, whichever of the five it is. */
@@ -179,7 +188,8 @@ export function isEmptyEdits(edits: GameEdits): boolean {
     // `base` on its own says nothing the game does not already say, so only
     // `moves` counts, the same way `ArmorClasses::is_empty` reads it in Rust.
     Object.keys(edits.armorClasses?.moves ?? {}).length === 0 &&
-    slotIsEmpty(edits.explosionGenerators)
+    slotIsEmpty(edits.explosionGenerators) &&
+    slotIsEmpty(edits.collections)
   );
 }
 
@@ -228,6 +238,8 @@ export interface EditCounts {
   armorMoves: number;
   /** Custom explosion generators the project writes (issue #2643). */
   effects: number;
+  /** Collections the project has defined (issue #2654). */
+  collections: number;
 }
 
 export function editCounts(edits: GameEdits): EditCounts {
@@ -241,6 +253,7 @@ export function editCounts(edits: GameEdits): EditCounts {
     deaths: deathExplosionCount(edits.equipped),
     armorMoves: Object.keys(edits.armorClasses?.moves ?? {}).length,
     effects: Object.keys(edits.explosionGenerators ?? {}).length,
+    collections: collectionCount(edits.collections),
   };
 }
 
@@ -256,6 +269,7 @@ export function describeEdits(edits: GameEdits): string {
     deaths,
     armorMoves,
     effects,
+    collections,
   } = editCounts(edits);
   const slots = equipped - deaths;
   const uses = [
@@ -272,6 +286,8 @@ export function describeEdits(edits: GameEdits): string {
     armorMoves > 0 &&
       `${armorMoves} unit${armorMoves === 1 ? "" : "s"} moved to a different armour class`,
     effects > 0 && `${effects} explosion effect${effects === 1 ? "" : "s"}`,
+    collections > 0 &&
+      `${collections} collection${collections === 1 ? "" : "s"}`,
   ].filter((part): part is string => typeof part === "string");
   return parts.length === 0 ? "Nothing changed yet" : parts.join(", ");
 }
@@ -1042,6 +1058,7 @@ export function parseGameEdits(value: unknown): GameEdits {
     equipped: parseEquippedWeapons(source.equipped),
     armorClasses: parseArmorClasses(source.armorClasses),
     explosionGenerators: parseExplosionGenerators(source.explosionGenerators),
+    collections: parseCollections(source.collections),
   };
 }
 

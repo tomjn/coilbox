@@ -111,6 +111,23 @@
         "size": 8,
         "lifetime": 30
       }
+    },
+    "collections": {
+      "tier-two": {
+        "id": "tier-two",
+        "name": "Tier two",
+        "units": [
+          "armflash"
+        ]
+      },
+      "bots": {
+        "id": "bots",
+        "name": "Bots",
+        "parentId": "tier-two",
+        "units": [
+          "armcom"
+        ]
+      }
     }
   },
   "writtenInPlace": {

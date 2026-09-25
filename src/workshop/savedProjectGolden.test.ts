@@ -8,6 +8,7 @@ import {
   removeFromBuildMenu,
 } from "./buildMenus";
 import { addClone } from "./clones";
+import { setCollectionMembership } from "./collections";
 import { setUnitDisabled } from "./disabled";
 import {
   addExplosionGenerator,
@@ -71,6 +72,7 @@ function buildEdits(): GameEdits {
     equipped,
     armorClasses,
     explosionGenerators,
+    collections,
   } = EMPTY_EDITS;
 
   // A number and a nested path, so the dotted keys an override set uses are
@@ -158,6 +160,23 @@ function buildEdits(): GameEdits {
     },
   );
 
+  // A parent collection and a nested one, so both the flat membership list and
+  // the nesting are in the fixture (issue #2654). Fixed ids rather than
+  // `createCollection`'s own `crypto.randomUUID()`, the same reason
+  // `buildProject` below gives `id` as a literal: a golden fixture has to
+  // come out the same on every run.
+  collections = {
+    "tier-two": { id: "tier-two", name: "Tier two", units: [] },
+    bots: { id: "bots", name: "Bots", parentId: "tier-two", units: [] },
+  };
+  collections = setCollectionMembership(
+    collections,
+    "tier-two",
+    "armflash",
+    true,
+  );
+  collections = setCollectionMembership(collections, "bots", "armcom", true);
+
   return {
     overrides,
     clones,
@@ -168,6 +187,7 @@ function buildEdits(): GameEdits {
     equipped,
     armorClasses,
     explosionGenerators,
+    collections,
   };
 }
 

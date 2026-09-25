@@ -72,6 +72,7 @@ import {
   ArrowLeft,
   Code2,
   Crosshair,
+  FolderTree,
   Pencil,
   Redo2,
   RotateCcw,
@@ -79,6 +80,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -134,6 +136,16 @@ import {
   removeClone,
   unitsWithClones,
 } from "../clones";
+import {
+  type Collections,
+  collectionTree,
+  collectionUnits,
+  createCollection,
+  removeCollection,
+  renameCollection,
+  setCollectionMembership,
+  setCollectionParent,
+} from "../collections";
 import { compatibilityState } from "../compatibility";
 import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
@@ -241,6 +253,7 @@ import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
+import { CollectionsDrawer } from "./components/CollectionsDrawer";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
 import { DerivedStatsStrip } from "./components/DerivedStatsStrip";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
@@ -266,6 +279,7 @@ import {
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
 const NO_LIBRARY: WeaponLibrary = {};
 const NO_EQUIPPED: EquippedWeapons = {};
+const NO_COLLECTIONS: Collections = {};
 
 /** Which half of a unit the page is showing: its own fields, or its weapons
  *  one slot at a time (issue #2639). */
@@ -301,6 +315,18 @@ export default function UnitPage() {
   const [readingLua, setReadingLua] = useState(false);
   /** Whether the project's weapon library is on screen (issue #2640). */
   const [libraryOpen, setLibraryOpen] = useState(false);
+  /** Whether the project's collections are on screen (issue #2654). */
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  /**
+   * The collection filtering the unit list, or `undefined` for every unit
+   * (issue #2654). Page state rather than part of the saved project: which
+   * collection somebody is looking through right now is a fact about this
+   * visit, not an edit worth an undo step or a share, and every other filter
+   * on this page (the search box) is kept the same way.
+   */
+  const [activeCollectionId, setActiveCollectionId] = useState<
+    string | undefined
+  >();
 
   // Which project is open. The route says so, except on `/workshop/new`, where
   // there is no project yet and the game comes from the link that sent us here.
@@ -364,6 +390,8 @@ export default function UnitPage() {
   // Absent on a project saved before the library existed (issue #2640).
   const library = edits.weapons ?? NO_LIBRARY;
   const equipped = edits.equipped ?? NO_EQUIPPED;
+  // Absent on a project saved before collections existed (issue #2654).
+  const collections = edits.collections ?? NO_COLLECTIONS;
 
   /**
    * Record one change, as one undo step.
@@ -428,6 +456,7 @@ export default function UnitPage() {
   const updateDisabled = editing("disabled");
   const updateWeapons = editing("weapons");
   const updateEquipped = editing("equipped");
+  const updateCollections = editing("collections");
 
   const [view, setView] = useState<FieldView>("relevant");
 
@@ -1875,6 +1904,25 @@ export default function UnitPage() {
                 )}
               </Button>
             )}
+            {/* Named, nestable sets of units (issue #2654), which scope the
+              list on the left and, later, a batch edit or a restricted
+              export. */}
+            {game && defs && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCollectionsOpen(true)}
+                title="Named sets of units, to filter the list and scope what you work on"
+              >
+                <FolderTree className="mr-1 size-3.5" />
+                Collections
+                {counts.collections > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {counts.collections}
+                  </span>
+                )}
+              </Button>
+            )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
               and the fastest way to find out whether coilbox understood the
               edit is to read what it wrote. */}
@@ -1966,6 +2014,42 @@ export default function UnitPage() {
                   },
             );
           }}
+        />
+      )}
+
+      {game && defs && (
+        <CollectionsDrawer
+          open={collectionsOpen}
+          onOpenChange={setCollectionsOpen}
+          collections={collections}
+          units={units}
+          nameOf={nameOf}
+          onCreate={(name, parentId) =>
+            updateCollections(
+              (c) =>
+                createCollection(c ?? NO_COLLECTIONS, name, parentId)
+                  .collections,
+            )
+          }
+          onRename={(id, name) =>
+            updateCollections((c) =>
+              renameCollection(c ?? NO_COLLECTIONS, id, name),
+            )
+          }
+          onDelete={(id) => {
+            updateCollections((c) => removeCollection(c ?? NO_COLLECTIONS, id));
+            if (activeCollectionId === id) setActiveCollectionId(undefined);
+          }}
+          onSetParent={(id, parentId) =>
+            updateCollections((c) =>
+              setCollectionParent(c ?? NO_COLLECTIONS, id, parentId),
+            )
+          }
+          onToggleMember={(id, unit, member) =>
+            updateCollections((c) =>
+              setCollectionMembership(c ?? NO_COLLECTIONS, id, unit, member),
+            )
+          }
         />
       )}
 
@@ -2065,21 +2149,47 @@ export default function UnitPage() {
         </div>
       ) : (
         <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">
-          <UnitList
-            units={units}
-            selected={unitKey}
-            overrides={overrides}
-            text={text}
-            clones={clones}
-            builtBy={built.builtBy}
-            menus={menus}
-            disabled={disabled}
-            nameOf={nameOf}
-            picOf={picOf}
-            picsPending={picsPending}
-            factionOf={factionOf}
-            onSelect={(key) => select({ unit: key })}
-          />
+          <div className="flex min-h-0 flex-col gap-2 lg:h-full">
+            {Object.keys(collections).length > 0 && (
+              <OptionSelect
+                value={
+                  activeCollectionId && collections[activeCollectionId]
+                    ? activeCollectionId
+                    : ""
+                }
+                onValueChange={(v) => setActiveCollectionId(v || undefined)}
+                options={[
+                  { value: "", label: "All units" },
+                  ...collectionTree(collections).map((n) => ({
+                    value: n.collection.id,
+                    label: `${"— ".repeat(n.depth)}${n.collection.name}`,
+                  })),
+                ]}
+                size="sm"
+                ariaLabel="Filter the unit list to a collection"
+              />
+            )}
+            <UnitList
+              units={units}
+              selected={unitKey}
+              overrides={overrides}
+              text={text}
+              clones={clones}
+              builtBy={built.builtBy}
+              menus={menus}
+              disabled={disabled}
+              nameOf={nameOf}
+              picOf={picOf}
+              picsPending={picsPending}
+              factionOf={factionOf}
+              restrictTo={
+                activeCollectionId && collections[activeCollectionId]
+                  ? collectionUnits(collections, activeCollectionId)
+                  : undefined
+              }
+              onSelect={(key) => select({ unit: key })}
+            />
+          </div>
 
           {!unit ? (
             <EmptyState label="Pick a unit to see its fields." />
