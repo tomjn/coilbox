@@ -127,6 +127,13 @@ end
 Spring.Echo = function() end
 Spring.TimeCheck = function(_, fn, ...) return fn(...) end
 Spring.GetModOptions = function() return {} end
+-- Two tables the engine's defs parser has and the sandbox does not
+-- (`LuaParser::SetupEnv`). SplinterFaction's `init.lua` reads `Script`, and
+-- its `WeaponDef_Post` reads `Game.gameSpeed`, the engine's `GAME_SPEED`.
+-- SpringMCLegacy's `unitdefs_post.lua` reads `Game.mapName`, and there is no
+-- map, so it gets a name no map folder has.
+Script = Script or { IsEngineMinVersion = function() return true end }
+Game = Game or { gameSpeed = 30, mapName = '' }
 
 -- Reads back `return <data>`, as table.serialize writes it.
 loadstring = function(src)
@@ -369,12 +376,26 @@ fn weapon<'a>(loaded: &'a Loaded, name: &str) -> Option<&'a Value> {
     loaded.weapons.get(&name.to_lowercase())
 }
 
+/// Every error a game logs loading on its own is a unit file of its own that
+/// fails to load, as SplinterFaction's chicken bosses do: they read a mod
+/// option its `ModOptions.lua` does not define. Anything else is the
+/// loader missing something the engine has, and a check made on that load
+/// would be checking the loader.
+fn only_broken_units(alone: &Loaded, name: &str) {
+    let others: Vec<&String> = alone
+        .errors
+        .iter()
+        .filter(|e| !e.starts_with("unitdefs.lua: Error parsing units/"))
+        .collect();
+    assert!(others.is_empty(), "{name} alone: {others:?}");
+}
+
 /// A library copy of the weapon in `unit`'s first slot, equipped back into
 /// that slot and as its death explosion on the mutator route, loads as a
 /// weapon the engine finds, equal to the one it was copied from.
 fn equipped_through_the_mutator(game: &Game, name: &str, unit: &str) {
     let alone = load(game, &game.dir, &[], &[unit]);
-    assert_eq!(alone.errors, Vec::<String>::new(), "{name} alone");
+    only_broken_units(&alone, name);
     let source = slot_weapon(&alone, unit, 0);
     let key = format!("{source}_copy");
     let project = project(
@@ -385,11 +406,7 @@ fn equipped_through_the_mutator(game: &Game, name: &str, unit: &str) {
         }),
     );
     let modded = load(game, &game.dir, &mutator(&project), &[unit]);
-    assert_eq!(
-        modded.errors,
-        Vec::<String>::new(),
-        "{name} with the mutator"
-    );
+    assert_eq!(modded.errors, alone.errors, "{name} with the mutator");
     let full = format!("{unit}_{key}");
     assert_eq!(slot_weapon(&modded, unit, 0), full, "the slot's weapon");
     let fired = weapon(&modded, &full)
@@ -451,7 +468,7 @@ fn equipped_in_place(game: &Game, name: &str, units: &[&str]) -> (usize, Vec<Str
     let scratch = tempfile::tempdir().expect("tempdir");
     let dir = scratch_copy(game, scratch.path());
     let alone = load(game, &dir, &[], units);
-    assert_eq!(alone.errors, Vec::<String>::new(), "{name} alone");
+    only_broken_units(&alone, name);
     let mut weapons = Map::new();
     let mut equipped = Map::new();
     let mut sources = BTreeMap::new();
@@ -478,7 +495,7 @@ fn equipped_in_place(game: &Game, name: &str, units: &[&str]) -> (usize, Vec<Str
     let outcome = write_in_place(&dir, &project, &sources).expect("write");
     assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
     let written = load(game, &dir, &[], units);
-    assert_eq!(written.errors, Vec::<String>::new(), "{name} as written");
+    assert_eq!(written.errors, alone.errors, "{name} as written");
     for equip in &outcome.equipped {
         let unit = equip.unit.as_str();
         let key = &equip.weapon;
@@ -576,6 +593,18 @@ fn a_library_weapon_written_in_place_reaches_the_weapon_table_in_this() {
     };
     let (written, not_carried) = equipped_in_place(&game, "THIS", &["carrier", "dagger"]);
     assert_eq!(written, 4, "{not_carried:?}");
+}
+
+/// SplinterFaction runs its `WeaponDef_Post` over a weapon a unit carries
+/// more times than over one from `weapons/`, and on this route the mutator's
+/// own post file takes the place of the game's `unitdefs_post.lua`. The copy
+/// still has to load equal to its source.
+#[test]
+fn a_library_weapon_reaches_the_weapon_table_through_the_mutator_in_splinterfaction() {
+    let Some(game) = installed("SplinterFaction.sdd") else {
+        return;
+    };
+    equipped_through_the_mutator(&game, "SplinterFaction", "lozscorpion");
 }
 
 /// The weapon files change nothing in a game that keeps the base content's
