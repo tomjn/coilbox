@@ -30,8 +30,12 @@ import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
 import type { DeathExplosion } from "../../deathExplosions";
+import {
+  cegWeaponField,
+  type ExplosionGenerators,
+} from "../../explosionGenerators";
 import type { UnitOverrides } from "../../overrides";
-import type { FieldRow } from "../../unitSections";
+import type { FieldRow, RenderedGroup } from "../../unitSections";
 import type { DeathMount, WeaponLibrary } from "../../weaponLibrary";
 import { librarySupport, type SupportingDef } from "../../weaponRefs";
 import {
@@ -42,6 +46,7 @@ import {
   type WeaponSlotView,
 } from "../../weaponSlots";
 import { EquipWeaponPopover } from "./EquipWeaponPopover";
+import { ExplosionGeneratorEditor } from "./ExplosionGeneratorEditor";
 import { UnitFieldGroups } from "./UnitFieldGroups";
 import type { InPlaceField } from "./UnitFieldRow";
 
@@ -139,6 +144,7 @@ export function WeaponSlotsPanel({
   onSelectSupport,
   problems = [],
   explosions,
+  cegLibrary,
 }: {
   slots: WeaponSlot[];
   /** The slot on screen, which is always one of `slots` when there are any
@@ -172,6 +178,10 @@ export function WeaponSlotsPanel({
   /** The unit's death explosions, and what the panel can do with them
    *  (issue #2642). When one is selected, `view` is its fields. */
   explosions?: ExplosionPanel;
+  /** The project's custom explosion generators, and where a change to the
+   *  library goes (issue #2643). Absent for a page that has not wired this
+   *  up yet, in which case no control is offered. */
+  cegLibrary?: CegLibrary;
 }) {
   const hasExplosions = (explosions?.entries.length ?? 0) > 0;
   if (slots.length === 0 && supporting.length === 0 && !hasExplosions)
@@ -246,6 +256,18 @@ export function WeaponSlotsPanel({
       explosions.onChange(activeExplosion, row, 0);
     else if (firesWeapon) library.onChange(fires, row, 0);
     else onChange(row, 0);
+  };
+
+  // Where a field write goes: the death explosion on screen, the library
+  // weapon the slot fires, or the slot's or supporting definition's own row,
+  // the same three sinks `onAddDamageClass` already picks between. Used by
+  // the explosion generator control (issue #2643) to write the field it
+  // binds a generator to, wherever that field is on screen.
+  const writeField = (row: FieldRow, value: unknown) => {
+    if (activeExplosion && explosions)
+      explosions.onChange(activeExplosion, row, value);
+    else if (firesWeapon) library.onChange(fires, row, value);
+    else onChange(row, value);
   };
 
   return (
@@ -426,6 +448,14 @@ export function WeaponSlotsPanel({
           </p>
         )}
 
+      {view && cegLibrary && (
+        <CegFieldControls
+          view={view}
+          cegLibrary={cegLibrary}
+          writeField={writeField}
+        />
+      )}
+
       {view && activeExplosion && explosions && (
         <UnitFieldGroups
           view={view}
@@ -534,6 +564,76 @@ export interface ExplosionPanel {
   onCopy: (explosion: DeathExplosion, key: string) => void;
   onEquip: (explosion: DeathExplosion, key: string) => void;
   onPutBack: (explosion: DeathExplosion) => void;
+}
+
+/** What the panel needs to offer the project's custom explosion generators
+ *  (issue #2643). */
+export interface CegLibrary {
+  generators: ExplosionGenerators;
+  onChange: (next: ExplosionGenerators) => void;
+}
+
+/** The label a weapon field's own row already carries, for the three fields
+ *  that can name a custom explosion generator, so the control reads "Create
+ *  an impact effect" rather than the field's raw key. */
+const CEG_FIELD_LABEL: Record<string, string> = {
+  explosionGenerator: "Impact effect",
+  bounceExplosionGenerator: "Bounce effect",
+  cegTag: "Trail effect",
+};
+
+/**
+ * A create/edit control beside every field on screen that can name a custom
+ * explosion generator (issue #2643): `explosionGenerator`,
+ * `bounceExplosionGenerator` and `cegTag`, wherever the current slot,
+ * supporting definition or death explosion's own rows put them. Additive,
+ * beside the plain text field `UnitFieldGroups` already draws for these,
+ * rather than a replacement for it.
+ */
+function CegFieldControls({
+  view,
+  cegLibrary,
+  writeField,
+}: {
+  view: { groups: RenderedGroup[] };
+  cegLibrary: CegLibrary;
+  writeField: (row: FieldRow, value: unknown) => void;
+}) {
+  const rows = view.groups.flatMap((group) =>
+    group.sections.flatMap((section) => section.rows),
+  );
+  const controls = rows
+    .map((row) => ({ row, field: cegWeaponField(row.path) }))
+    .filter(
+      (
+        entry,
+      ): entry is {
+        row: FieldRow;
+        field: NonNullable<ReturnType<typeof cegWeaponField>>;
+      } => entry.field !== undefined,
+    );
+  if (controls.length === 0) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs text-muted-foreground">
+        Custom explosion effects: coilbox cannot render one, but Test can launch
+        a real skirmish to show it
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {controls.map(({ row, field }) => (
+          <ExplosionGeneratorEditor
+            key={row.path}
+            field={field}
+            label={CEG_FIELD_LABEL[field]}
+            value={row.value}
+            generators={cegLibrary.generators}
+            onSetGenerators={cegLibrary.onChange}
+            onSetField={(value) => writeField(row, value)}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /** What a death explosion is now, and the buttons that change it. */
