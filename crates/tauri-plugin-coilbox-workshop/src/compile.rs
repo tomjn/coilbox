@@ -33,7 +33,7 @@
 //! project and the machine that received it.
 
 use crate::lua::{lua_literal, lua_string, PatchTree};
-use crate::model::{BuildMenuOp, GameEdits, ModProject, UnitClone};
+use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject, UnitClone};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -258,26 +258,33 @@ pub fn compile(project: &ModProject) -> CompiledMod {
 
     // Field changes against the game's own units. A patch and nothing more:
     // every field the project does not mention keeps following the game.
+    //
+    // A change through a list position is held apart from the rest (issue
+    // #3041). Its step means the position counted from zero in a list
+    // numbered 1 to n, and the Lua key itself in any other table, which is
+    // how the unit page read the game. Only the game's own table can say
+    // which, so it is a block that reads the table before it writes.
     let mut patches: Vec<(String, PatchTree)> = Vec::new();
+    let mut positional: Vec<(&str, &str, &Value)> = Vec::new();
+    let mut count = 0;
     for (unit, patch) in &edits.overrides {
         if edits.clones.contains_key(unit) {
             continue; // Folded into the copy's own definition above.
         }
         let mut tree = PatchTree::new();
         for (path, value) in patch {
-            tree.insert(path, value.clone());
+            if through_a_position(path) {
+                positional.push((unit, path, value));
+            } else {
+                tree.insert(path, value.clone());
+                count += 1;
+            }
         }
         if !tree.is_empty() {
             patches.push((unit.clone(), tree));
         }
     }
     if !patches.is_empty() {
-        let count: usize = edits
-            .overrides
-            .iter()
-            .filter(|(unit, _)| !edits.clones.contains_key(*unit))
-            .map(|(_, patch)| patch.len())
-            .sum();
         chunks.push(Chunk {
             form: LuaForm::Table,
             title: format!(
@@ -286,6 +293,18 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             ),
             reason: "Each one is a value the user typed, so none of them has to read the game's own first.".to_string(),
             lua: patch_table(&patches, ""),
+        });
+    }
+    if !positional.is_empty() {
+        chunks.push(Chunk {
+            form: LuaForm::Block,
+            title: format!(
+                "{} field change{} through a list",
+                positional.len(),
+                if positional.len() == 1 { "" } else { "s" }
+            ),
+            reason: "A list with a gap in it, such as weapons 1 and 3 and no 2, keeps its own numbers, so which entry each change is for has to be read off the game's own list.".to_string(),
+            lua: positional_block(&positional),
         });
     }
 
@@ -613,6 +632,77 @@ fn added_block(entries: &[(String, Value)]) -> String {
          -- nothing to merge onto.\n\
          do\n  local added = {}\n  for name, def in pairs(added) do\n    UnitDefs[name] = def\n  end\nend",
         unit_table(entries, "  "),
+    )
+}
+
+/// Field changes through a list position, each applied to the table the
+/// game has when it loads (issue #3041).
+///
+/// A step of digits is written as a Lua number and every other step as a
+/// string. `key` turns a number into the key the unit page meant, by the
+/// rule the unitsync worker reads a table with: a table numbered 1 to n is a
+/// list counted from zero, and any other table is keyed by its own keys. A
+/// table not there yet is made a list, as `writePath` in `overrides.ts`
+/// makes one. The last step is merged or set the way the patch table's own
+/// `merge` would, and a unit the game no longer has is skipped.
+fn positional_block(changes: &[(&str, &str, &Value)]) -> String {
+    let entries: Vec<String> = changes
+        .iter()
+        .map(|(unit, path, value)| {
+            let steps: Vec<String> = path
+                .split('.')
+                .map(|step| match step.parse::<u64>() {
+                    Ok(n) if step.bytes().all(|b| b.is_ascii_digit()) => n.to_string(),
+                    _ => lua_string(step),
+                })
+                .collect();
+            format!(
+                "    {{ {}, {{ {} }}, {} }},",
+                lua_string(unit),
+                steps.join(", "),
+                lua_literal(value, "    ")
+            )
+        })
+        .collect();
+    format!(
+        "-- Field changes through a list position, matched against the game's own\n\
+         -- list when it loads.\n\
+         do\n\
+         \x20 local changes = {{\n{}\n  }}\n\
+         \x20 local function key(list, at)\n\
+         \x20   local count = 0\n\
+         \x20   for _ in pairs(list) do count = count + 1 end\n\
+         \x20   if count == 0 or #list == count then return at + 1 end\n\
+         \x20   if list[at] == nil and list[tostring(at)] ~= nil then return tostring(at) end\n\
+         \x20   return at\n\
+         \x20 end\n\
+         \x20 local function merge(dest, src)\n\
+         \x20   for k, v in pairs(src) do\n\
+         \x20     if type(v) == \"table\" and type(dest[k]) == \"table\" then\n\
+         \x20       merge(dest[k], v)\n\
+         \x20     else\n\
+         \x20       dest[k] = v\n\
+         \x20     end\n\
+         \x20   end\n\
+         \x20 end\n\
+         \x20 for _, change in ipairs(changes) do\n\
+         \x20   local target, steps, value = UnitDefs[change[1]], change[2], change[3]\n\
+         \x20   for i = 1, #steps do\n\
+         \x20     if type(target) ~= \"table\" or value == nil then break end\n\
+         \x20     local step = steps[i]\n\
+         \x20     if type(step) == \"number\" then step = key(target, step) end\n\
+         \x20     if i < #steps then\n\
+         \x20       if type(target[step]) ~= \"table\" then target[step] = {{}} end\n\
+         \x20       target = target[step]\n\
+         \x20     elseif type(value) == \"table\" and type(target[step]) == \"table\" then\n\
+         \x20       merge(target[step], value)\n\
+         \x20     else\n\
+         \x20       target[step] = value\n\
+         \x20     end\n\
+         \x20   end\n\
+         \x20 end\n\
+         end",
+        entries.join("\n")
     )
 }
 
@@ -1094,15 +1184,37 @@ mod tests {
         assert!(!chunk.lua.contains("buildoptions"));
     }
 
-    /// A patch against a weapon must count from one and must not invent the
-    /// weapons it does not mention.
+    /// A patch against a weapon must not invent the weapons it does not
+    /// mention. Which weapon its step is depends on whether the game's list
+    /// has a gap (issue #3041), so it is a block that reads the list first,
+    /// and the rest of the unit's changes stay in the plain table.
+    /// `tests/generated_lua_runs.rs` runs it.
     #[test]
-    fn a_patch_into_a_weapon_lands_on_the_lua_index() {
+    fn a_patch_into_a_weapon_is_a_block_that_reads_the_list_first() {
         let out = compile(&project(json!({
-            "overrides": { "armcom": { "weapons.1.name": "CANNON" } }
+            "overrides": { "armcom": { "weapons.1.name": "CANNON", "maxDamage": 5000 } }
         })));
-        assert!(out.chunks[0].lua.contains("[2] = { name = \"CANNON\" }"));
-        assert!(!out.chunks[0].lua.contains("[1]"));
+        assert_eq!(out.chunks.len(), 2);
+        assert_eq!(out.chunks[0].form, LuaForm::Table);
+        assert_eq!(out.chunks[0].title, "1 field change");
+        assert!(!out.chunks[0].lua.contains("weapons"));
+        let block = &out.chunks[1];
+        assert_eq!(block.form, LuaForm::Block);
+        assert_eq!(block.title, "1 field change through a list");
+        assert!(block
+            .lua
+            .contains("{ \"armcom\", { \"weapons\", 1, \"name\" }, \"CANNON\" },"));
+        for route in [
+            &out.files
+                .iter()
+                .find(|f| f.path == POST_FILE)
+                .expect("post file")
+                .contents,
+            out.bar_tweakdefs.as_ref().expect("tweakdefs"),
+        ] {
+            assert!(route.contains(&block.lua));
+            assert!(route.contains("maxDamage = 5000"));
+        }
     }
 
     /// The archive loads an added unit out of `units/`, so that file stays a

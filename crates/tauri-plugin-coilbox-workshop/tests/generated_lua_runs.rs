@@ -35,11 +35,14 @@ fn run(edits: Value, unit_defs: &str) -> Value {
 
     let root = tempfile::tempdir().expect("tempdir");
     let lua = SpringLua::new(root.path()).expect("vm");
+    // Read back with integer keys kept, so a table with a gap in its numbers
+    // comes back as the object the unitsync worker would read it as rather
+    // than cut short at the gap.
     let source = format!(
-        "local UnitDefs = {unit_defs}\n\n{}\n\nreturn UnitDefs\n",
+        "(function()\nlocal UnitDefs = {unit_defs}\n\n{}\n\nreturn UnitDefs\nend)()",
         blocks.join("\n\n")
     );
-    lua.eval_value_raw(&source, "generated.lua")
+    lua.eval_expr_value(&source, "generated.lua")
         .unwrap_or_else(|e| panic!("{e}\n\n{source}"))
 }
 
@@ -62,6 +65,102 @@ fn a_build_menu_block_replays_the_operations_the_editor_recorded() {
         out["armlab"]["buildoptions"],
         json!(["armrock", "armham", "armpw"])
     );
+}
+
+/// Issue #3041. The unit page counts a list numbered 1 to n from zero, and
+/// reads any other table, such as XTA's commander with weapons 1 and 3 and no
+/// 2, by its own keys. The compiler never sees the game, so the generated Lua
+/// has to tell the two apart when it runs.
+#[test]
+fn a_field_change_through_a_list_position_lands_where_the_page_read_it() {
+    let out = run(
+        json!({
+            "overrides": {
+                "armcom": {
+                    "weapons.3.name": "ARM_DGUN",
+                    "weapons.1.onlytargetcategory": "SURFACE",
+                    "maxdamage": 4000
+                },
+                "corcom": { "weapons.1.name": "COR_DGUN" },
+                "newlist": { "customparams.recoil.0": 5 },
+                "gone": { "weapons.0.name": "X" }
+            }
+        }),
+        r#"{
+            armcom = { maxdamage = 3500, weapons = {
+                [1] = { name = "CSARMCOMLASER" },
+                [3] = { name = "CSARM_DISINTEGRATOR" },
+            } },
+            corcom = { weapons = { { name = "CORLASER" }, { name = "CORDGUN" } } },
+            newlist = { customparams = {} },
+        }"#,
+    );
+    assert_eq!(
+        out["armcom"]["weapons"],
+        json!({
+            "1": { "name": "CSARMCOMLASER", "onlytargetcategory": "SURFACE" },
+            "3": { "name": "ARM_DGUN" }
+        })
+    );
+    assert_eq!(
+        out["corcom"]["weapons"],
+        json!([{ "name": "CORLASER" }, { "name": "COR_DGUN" }])
+    );
+    assert_eq!(out["newlist"]["customparams"]["recoil"], json!([5]));
+    assert!(out.get("gone").is_none());
+}
+
+/// The same change through the mutator's whole post file and through BAR's
+/// single `tweakdefs` payload, the two outputs that carry every field
+/// change. Before issue #3041 both wrote the commander's D-gun change into a
+/// fourth weapon of its own.
+#[test]
+fn the_post_file_and_bar_tweakdefs_change_the_weapon_the_page_showed() {
+    let project: ModProject = serde_json::from_value(json!({
+        "name": "Test project",
+        "gameName": "XTA 9.65",
+        "edits": { "overrides": { "armcom": {
+            "weapons.3.name": "ARM_DGUN",
+            "maxdamage": 4000
+        } } },
+    }))
+    .expect("parse");
+    let compiled = compile(&project);
+    let post = compiled
+        .files
+        .iter()
+        .find(|f| f.path == "gamedata/unitdefs_post.lua")
+        .expect("a post file");
+    let unit_defs = r#"{ armcom = { maxdamage = 3500, weapons = {
+        [1] = { name = "CSARMCOMLASER" },
+        [3] = { name = "CSARM_DISINTEGRATOR" },
+    } } }"#;
+    for (what, lua) in [
+        ("post file", post.contents.clone()),
+        (
+            "tweakdefs",
+            compiled.bar_tweakdefs.clone().expect("tweakdefs"),
+        ),
+    ] {
+        let root = tempfile::tempdir().expect("tempdir");
+        let vm = SpringLua::new(root.path()).expect("vm");
+        let source =
+            format!("(function()\nUnitDefs = {unit_defs}\n(function()\n{lua}\nend)()\nreturn UnitDefs\nend)()");
+        let out = vm
+            .eval_expr_value(&source, "generated.lua")
+            .unwrap_or_else(|e| panic!("{what}: {e}\n\n{source}"));
+        assert_eq!(
+            out["armcom"],
+            json!({
+                "maxdamage": 4000,
+                "weapons": {
+                    "1": { "name": "CSARMCOMLASER" },
+                    "3": { "name": "ARM_DGUN" }
+                }
+            }),
+            "{what}"
+        );
+    }
 }
 
 /// Tech Annihilation comments entries out of its build lists and leaves the

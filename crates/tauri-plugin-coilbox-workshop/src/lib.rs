@@ -682,7 +682,8 @@ mod tests {
     /// A patch against a unit's second weapon and not its first (issue
     /// #2964). Refused at the command boundary, so the whole project could
     /// not reach a lobby over one indexed path, although the Lua was correct
-    /// and the compiler was right to write it that way.
+    /// and the compiler was right to write it that way. A change through a
+    /// list position is a block since issue #3041, so it packs as `tweakdefs`.
     #[test]
     fn a_project_patching_one_weapon_of_several_packs() {
         let project: ModProject = serde_json::from_value(serde_json::json!({
@@ -693,8 +694,8 @@ mod tests {
         .expect("parse");
 
         let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
-        let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
-        assert_eq!(tweakunits.len(), 1);
+        let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
+        assert_eq!(tweakdefs.len(), 1);
     }
 
     /// The saved fixture carries both a table-form edit (an override) and

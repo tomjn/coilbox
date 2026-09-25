@@ -31,17 +31,25 @@
     "chunks": [
       {
         "form": "table",
-        "lua": "{\n  [\"armcom\"] = {\n    buildCostMetal = 12.5,\n    canMove = false,\n    customParams = {\n      note = \"he said \\\"hi\\\"\\nthen left\",\n      [\"repeat\"] = \"yes\",\n    },\n    maxDamage = 5000,\n    turnRate = 0.1,\n    weaponDefs = {\n      laser = {\n        damage = { default = 75 },\n      },\n    },\n    weapons = {\n      [2] = { name = \"CANNON\" },\n    },\n  },\n  [\"corak\"] = { name = \"Танк -- not a comment\", speed = -3 },\n}",
+        "lua": "{\n  [\"armcom\"] = {\n    buildCostMetal = 12.5,\n    canMove = false,\n    customParams = {\n      note = \"he said \\\"hi\\\"\\nthen left\",\n      [\"repeat\"] = \"yes\",\n    },\n    maxDamage = 5000,\n    turnRate = 0.1,\n    weaponDefs = {\n      laser = {\n        damage = { default = 75 },\n      },\n    },\n  },\n  [\"corak\"] = { name = \"Танк -- not a comment\", speed = -3 },\n}",
         "reason": "Each one is a value the user typed, so none of them has to read the game's own first.",
-        "title": "10 field changes"
+        "title": "9 field changes"
+      },
+      {
+        "form": "block",
+        "lua": "-- Field changes through a list position, matched against the game's own\n-- list when it loads.\ndo\n  local changes = {\n    { \"armcom\", { \"weapons\", 1, \"name\" }, \"CANNON\" },\n  }\n  local function key(list, at)\n    local count = 0\n    for _ in pairs(list) do count = count + 1 end\n    if count == 0 or #list == count then return at + 1 end\n    if list[at] == nil and list[tostring(at)] ~= nil then return tostring(at) end\n    return at\n  end\n  local function merge(dest, src)\n    for k, v in pairs(src) do\n      if type(v) == \"table\" and type(dest[k]) == \"table\" then\n        merge(dest[k], v)\n      else\n        dest[k] = v\n      end\n    end\n  end\n  for _, change in ipairs(changes) do\n    local target, steps, value = UnitDefs[change[1]], change[2], change[3]\n    for i = 1, #steps do\n      if type(target) ~= \"table\" or value == nil then break end\n      local step = steps[i]\n      if type(step) == \"number\" then step = key(target, step) end\n      if i < #steps then\n        if type(target[step]) ~= \"table\" then target[step] = {} end\n        target = target[step]\n      elseif type(value) == \"table\" and type(target[step]) == \"table\" then\n        merge(target[step], value)\n      else\n        target[step] = value\n      end\n    end\n  end\nend",
+        "reason": "A list with a gap in it, such as weapons 1 and 3 and no 2, keeps its own numbers, so which entry each change is for has to be read off the game's own list.",
+        "title": "1 field change through a list"
       }
     ],
     "name": "Field changes",
     "pack": {
       "oversized": [],
-      "tweakdefs": [],
+      "tweakdefs": [
+        "!bset tweakdefs ZG8gbG9jYWwgY2hhbmdlcyA9IHsgeyAiYXJtY29tIiwgeyAid2VhcG9ucyIsIDEsICJuYW1lIiB9LCAiQ0FOTk9OIiB9LCB9IGxvY2FsIGZ1bmN0aW9uIGtleShsaXN0LCBhdCkgbG9jYWwgY291bnQgPSAwIGZvciBfIGluIHBhaXJzKGxpc3QpIGRvIGNvdW50ID0gY291bnQgKyAxIGVuZCBpZiBjb3VudCA9PSAwIG9yICNsaXN0ID09IGNvdW50IHRoZW4gcmV0dXJuIGF0ICsgMSBlbmQgaWYgbGlzdFthdF0gPT0gbmlsIGFuZCBsaXN0W3Rvc3RyaW5nKGF0KV0gfj0gbmlsIHRoZW4gcmV0dXJuIHRvc3RyaW5nKGF0KSBlbmQgcmV0dXJuIGF0IGVuZCBsb2NhbCBmdW5jdGlvbiBtZXJnZShkZXN0LCBzcmMpIGZvciBrLCB2IGluIHBhaXJzKHNyYykgZG8gaWYgdHlwZSh2KSA9PSAidGFibGUiIGFuZCB0eXBlKGRlc3Rba10pID09ICJ0YWJsZSIgdGhlbiBtZXJnZShkZXN0W2tdLCB2KSBlbHNlIGRlc3Rba10gPSB2IGVuZCBlbmQgZW5kIGZvciBfLCBjaGFuZ2UgaW4gaXBhaXJzKGNoYW5nZXMpIGRvIGxvY2FsIHRhcmdldCwgc3RlcHMsIHZhbHVlID0gVW5pdERlZnNbY2hhbmdlWzFdXSwgY2hhbmdlWzJdLCBjaGFuZ2VbM10gZm9yIGkgPSAxLCAjc3RlcHMgZG8gaWYgdHlwZSh0YXJnZXQpIH49ICJ0YWJsZSIgb3IgdmFsdWUgPT0gbmlsIHRoZW4gYnJlYWsgZW5kIGxvY2FsIHN0ZXAgPSBzdGVwc1tpXSBpZiB0eXBlKHN0ZXApID09ICJudW1iZXIiIHRoZW4gc3RlcCA9IGtleSh0YXJnZXQsIHN0ZXApIGVuZCBpZiBpIDwgI3N0ZXBzIHRoZW4gaWYgdHlwZSh0YXJnZXRbc3RlcF0pIH49ICJ0YWJsZSIgdGhlbiB0YXJnZXRbc3RlcF0gPSB7fSBlbmQgdGFyZ2V0ID0gdGFyZ2V0W3N0ZXBdIGVsc2VpZiB0eXBlKHZhbHVlKSA9PSAidGFibGUiIGFuZCB0eXBlKHRhcmdldFtzdGVwXSkgPT0gInRhYmxlIiB0aGVuIG1lcmdlKHRhcmdldFtzdGVwXSwgdmFsdWUpIGVsc2UgdGFyZ2V0W3N0ZXBdID0gdmFsdWUgZW5kIGVuZCBlbmQgZW5k"
+      ],
       "tweakunits": [
-        "!bset tweakunits eyBbImFybWNvbSJdID0geyBidWlsZENvc3RNZXRhbCA9IDEyLjUsIGNhbk1vdmUgPSBmYWxzZSwgY3VzdG9tUGFyYW1zID0geyBub3RlID0gImhlIHNhaWQgXCJoaVwiXG50aGVuIGxlZnQiLCBbInJlcGVhdCJdID0gInllcyIsIH0sIG1heERhbWFnZSA9IDUwMDAsIHR1cm5SYXRlID0gMC4xLCB3ZWFwb25EZWZzID0geyBsYXNlciA9IHsgZGFtYWdlID0geyBkZWZhdWx0ID0gNzUgfSwgfSwgfSwgd2VhcG9ucyA9IHsgWzJdID0geyBuYW1lID0gIkNBTk5PTiIgfSwgfSwgfSwgWyJjb3JhayJdID0geyBuYW1lID0gItCi0LDQvdC6IC0tIG5vdCBhIGNvbW1lbnQiLCBzcGVlZCA9IC0zIH0sIH0"
+        "!bset tweakunits eyBbImFybWNvbSJdID0geyBidWlsZENvc3RNZXRhbCA9IDEyLjUsIGNhbk1vdmUgPSBmYWxzZSwgY3VzdG9tUGFyYW1zID0geyBub3RlID0gImhlIHNhaWQgXCJoaVwiXG50aGVuIGxlZnQiLCBbInJlcGVhdCJdID0gInllcyIsIH0sIG1heERhbWFnZSA9IDUwMDAsIHR1cm5SYXRlID0gMC4xLCB3ZWFwb25EZWZzID0geyBsYXNlciA9IHsgZGFtYWdlID0geyBkZWZhdWx0ID0gNzUgfSwgfSwgfSwgfSwgWyJjb3JhayJdID0geyBuYW1lID0gItCi0LDQvdC6IC0tIG5vdCBhIGNvbW1lbnQiLCBzcGVlZCA9IC0zIH0sIH0"
       ],
       "unplaced": []
     },

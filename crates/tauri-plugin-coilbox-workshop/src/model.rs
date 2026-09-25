@@ -23,6 +23,15 @@ use std::collections::BTreeMap;
 /// A unit's sparse patch: dotted field path to the value the user set.
 pub type UnitPatch = BTreeMap<String, Value>;
 
+/// Whether a field path goes through a list position: a step of nothing but
+/// digits, which is how `overrides.ts` writes one. Which entry that step is
+/// depends on the game's own table (issue #3041), so every route that
+/// carries such a change reads the table before it writes.
+pub(crate) fn through_a_position(path: &str) -> bool {
+    path.split('.')
+        .any(|step| !step.is_empty() && step.bytes().all(|b| b.is_ascii_digit()))
+}
+
 /// One unit the project adds, held as a whole definition rather than a patch.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
