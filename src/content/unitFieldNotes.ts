@@ -1036,4 +1036,723 @@ export const WEAPON_FIELD_NOTES: Record<string, FieldNote> = {
     label: "Custom parameters",
     help: "Arbitrary key and value pairs the engine ignores. Only the game's own Lua gives them meaning.",
   },
+  acceleration: {
+    label: "Projectile acceleration (old name)",
+    unit: "elmo/s²",
+  },
+  accuracy: {
+    label: "Burst accuracy",
+    help: "Higher is less accurate. 0 is perfect. Improves with the firing unit's experience.",
+  },
+  allowNonBlockingAim: {
+    label: "Aims without blocking fire",
+    help: "Off, the weapon can't fire until AimWeapon() returns in the unit's script.",
+  },
+  alphaDecay: {
+    label: "Cannon stage fade",
+    help: "Cannon only. How much the last stage's alpha fades, blended for the ones in between. See stages.",
+  },
+  alwaysVisible: {
+    label: "Always visible",
+    help: "Draws the projectile even outside sight.",
+  },
+  animParams: {
+    label: "Flipbook animation (old name)",
+    help: "Frame columns, rows and playback rate for texture1's flipbook animation, and the default for texture2, 3 and 4 too.",
+  },
+  animParams1: {
+    label: "Flipbook animation (texture 1)",
+    help: "Frame columns, rows and playback rate for texture1's flipbook animation.",
+  },
+  animParams2: {
+    label: "Flipbook animation (texture 2)",
+    help: "Frame columns, rows and playback rate for texture2's flipbook animation.",
+  },
+  animParams3: {
+    label: "Flipbook animation (texture 3)",
+    help: "Frame columns, rows and playback rate for texture3's flipbook animation.",
+  },
+  animParams4: {
+    label: "Flipbook animation (texture 4)",
+    help: "Frame columns, rows and playback rate for texture4's flipbook animation.",
+  },
+  avoidCloaked: {
+    label: "Avoids firing through cloaked units",
+    help: "See avoidFriendly for how avoiding differs from colliding.",
+  },
+  avoidFeature: { label: "Avoids firing through features" },
+  avoidFriendly: {
+    label: "Avoids firing through allies",
+    help: "An ally can still walk into the projectile after it's fired; use collideFriendly to stop the explosion happening at all.",
+  },
+  avoidGround: { label: "Avoids firing through blocking terrain" },
+  avoidNeutral: {
+    label: "Avoids firing through neutral units",
+    help: "Does not include Gaia.",
+  },
+  beamburst: {
+    label: "Beam fires in bursts",
+    help: "BeamLaser only. Uses burst mechanics, with beamtime forced to the length of one sim frame.",
+  },
+  beamDecay: {
+    label: "Beam fade per frame",
+    help: "BeamLaser only. Alpha multiplier applied every sim frame.",
+  },
+  beamtime: {
+    label: "Beam duration",
+    unit: "s",
+    help: "BeamLaser only. Damage is spread out over this time.",
+  },
+  beamTTL: {
+    label: "Beam sprite linger time",
+    unit: "frames",
+    help: "BeamLaser and LightningCannon only.",
+  },
+  bounceExplosionGenerator: {
+    label: "Bounce effect",
+    help: "Name, with prefix, of the custom explosion generator played when the projectile bounces.",
+  },
+  bounceRebound: {
+    label: "Bounce vertical rebound",
+    help: "Multiplies vertical velocity when the projectile bounces.",
+  },
+  bounceSlip: {
+    label: "Bounce horizontal slip",
+    help: "Multiplies horizontal velocity when the projectile bounces.",
+  },
+  burnblow: {
+    label: "Explodes at end of flight",
+    help: "LaserCannon expires at the target instead of at max range. Cannon explodes on reaching the target instead of falling. Missile, Starburst and TorpedoLauncher explode when out of fuel instead of falling.",
+  },
+  cameraShake: {
+    label: "Camera shake strength",
+    help: "Passed to widgets so they can shake the camera on a strong hit. Uses the same scale as damage.",
+  },
+  canAttackGround: {
+    label: "Can target ground",
+    help: "Off, only units can be targeted. Features are never directly targetable either way.",
+  },
+  castShadow: { label: "Projectile casts a shadow" },
+  cegTag: {
+    label: "Trail effect",
+    help: "Name, without prefix, of a custom explosion generator emitted by the projectile every frame.",
+  },
+  collideCloaked: {
+    label: "Collides with cloaked units",
+    help: "See collideFriendly for how colliding differs from avoiding.",
+  },
+  collideEnemy: {
+    label: "Collides with enemies",
+    help: "Off, the projectile passes through enemies without exploding. Targeting still always picks enemies, never allies.",
+  },
+  collideFeature: { label: "Collides with features" },
+  collideFireBase: {
+    label: "Collides with its own firebase",
+    help: "Off, a unit can fire out of the transport carrying it (its firebase) without exploding early. Useful for marines shooting from inside a bunker.",
+  },
+  collideFriendly: {
+    label: "Collides with allies",
+    help: "Off, projectiles pass through allies without exploding. Whether the unit avoids firing through them at all is controlled separately by avoidFriendly.",
+  },
+  collideGround: { label: "Collides with terrain" },
+  collideNeutral: {
+    label: "Collides with neutral units",
+    help: "Does not include Gaia.",
+  },
+  collideNonTarget: {
+    label: "Collides with things that aren't its target",
+    help: "Off, the projectile ignores everything except what it's locked onto, including other enemies. Combine with tracks and impactOnly for weapons that are mostly visual.",
+  },
+  collisionSize: {
+    label: "Collision size",
+    unit: "elmo",
+    help: "Width for hitscan interceptors. Meant to be a collision radius for other projectile types too, but that part doesn't currently work.",
+  },
+  color1: {
+    label: "Removed, use rgbColor",
+    help: "The engine only logs a warning and ignores this key.",
+  },
+  color2: {
+    label: "Removed, use rgbColor",
+    help: "The engine only logs a warning and ignores this key.",
+  },
+  colormap: {
+    label: "Colour cycle",
+    help: "A series of RGBA colours the sprite fades through over its lifetime, when it has no model.",
+  },
+  commandfire: {
+    label: "Only fires on manual command",
+    help: "On, the weapon never fires automatically and only responds to the manual fire command.",
+  },
+  coreThickness: {
+    label: "Beam core thickness",
+    help: "BeamLaser and LaserCannon only. Fraction, 0 to 1, of the beam's full thickness that shows the inner colour set by rgbColor2.",
+  },
+  coverage: {
+    label: "Interception radius",
+    unit: "elmo",
+    help: "How close a targetable weapon has to be for this interceptor to fire on it.",
+  },
+  craterBoost: {
+    label: "Crater strength bonus",
+    help: "Flat addition to cratering strength, applied after altitude reduction but before craterMult.",
+  },
+  craterMult: {
+    label: "Crater strength multiplier",
+    help: "Applied last, after every other cratering modifier.",
+  },
+  cylinderTargeting: {
+    label: "Cylinder targeting height",
+    help: "Multiplies range to get the height of a targeting cylinder. Zero uses the normal spherical or ballistic range check instead.",
+  },
+  cylinderTargetting: {
+    label: "Cylinder targeting height (old spelling)",
+    help: "Multiplies range to get the height of a targeting cylinder. Zero uses the normal spherical or ballistic range check instead.",
+  },
+  damageAreaOfEffect: {
+    label: "Splash diameter",
+    unit: "elmo",
+    help: "A diameter, not a radius. Also the collision radius for projectile-based interceptors. Cratering is controlled separately by craterAreaOfEffect.",
+  },
+  dance: {
+    label: "Missile wobble distance",
+    unit: "elmo",
+    help: "Missile only. Maximum random sideways shift, rerolled every 8 sim frames.",
+  },
+  duration: {
+    label: "Beam visual length",
+    help: "LaserCannon only. Visual-only, expressed as a fraction of the projectile's per-second speed.",
+  },
+  dynDamageExp: {
+    label: "Range damage falloff exponent",
+    help: "0 disables range-based damage scaling. 1 is linear, 2 is quadratic, and so on.",
+  },
+  dynDamageInverted: {
+    label: "Damage increases with range",
+    help: "On, the weapon does more damage at greater range instead of less.",
+  },
+  dynDamageMin: {
+    label: "Minimum range-scaled damage",
+    help: "The floor that range-dependent damage cannot drop below.",
+  },
+  dynDamageRange: {
+    label: "Range used for damage scaling",
+    unit: "elmo",
+    help: "Replaces the actual range in the range-dependent damage formula, when set to a non-zero value.",
+  },
+  edgeEffectiveness: {
+    label: "Splash falloff shape",
+    help: "0 is a linear falloff to the edge of the splash. 1 is no falloff at all. Negative values concentrate damage further into the centre.",
+  },
+  energyPerShot: {
+    label: "Energy cost per shot",
+    unit: "energy",
+    help: "For stockpile weapons this is spent over time as it stockpiles; otherwise it's spent immediately on firing.",
+  },
+  explosionGenerator: {
+    label: "Impact effect",
+    help: "Name, with prefix, of the custom explosion generator played on impact.",
+  },
+  explosionScar: { label: "Leaves a scar decal" },
+  explosionSpeed: {
+    label: "Shockwave propagation speed",
+    help: "Controls how fast the damage shockwave spreads outward. Units can't dodge it: they're tagged for damage immediately and only take it after a delay.",
+  },
+  exteriorShield: { label: "Shield lets outgoing fire through (old name)" },
+  falloffRate: {
+    label: "Laser fade rate beyond range",
+    help: "LaserCannon with hardstop off only. Fraction the laser fades per sim frame past max range. The engine floors this at 0.2, so a laser never takes more than 5 frames to fade out fully.",
+  },
+  fireStarter: {
+    label: "Fire-starting chance",
+    unit: "%",
+    help: "Chance of setting static map features alight on impact.",
+  },
+  fireSubmersed: {
+    label: "Can fire while underwater",
+    help: "Requires waterweapon to also be on.",
+  },
+  fixedLauncher: {
+    label: "Launches along a fixed heading",
+    help: "Missile, Torpedo and Starburst only. Starts aimed along the launching piece's own direction rather than at the target.",
+  },
+  flameGfxTime: {
+    label: "Flame visual reach",
+    help: "Flamethrower only. Multiplies the weapon's range for the visual-only flame length; at 1.2 the visual extends 20% past max range. Should be 1 or higher.",
+  },
+  gravityAffected: {
+    label: "Falls under gravity",
+    help: "DGun weapon type only. Aiming does not account for the fall.",
+  },
+  groundBounce: { label: "Bounces off terrain" },
+  hardstop: {
+    label: "Laser stops sharply at range",
+    help: "LaserCannon only. On, the laser is cut off at max range. Off, it fades out past range according to intensityFalloff and can no longer collide.",
+  },
+  heightBoostFactor: {
+    label: "Ballistic height range bonus",
+    help: "Cannon weapon type only. Adjusts ballistic range for height difference to the target; larger values increase the effect. -1 uses the engine's own formula. How it stacks with heightmod isn't documented.",
+  },
+  heightmod: {
+    label: "Height difference multiplier",
+    help: "Below 1, the unit can target further above or below itself than sideways. At 0, height to the target is ignored entirely for targeting.",
+  },
+  heightMod: {
+    label: "Height difference multiplier (case variant)",
+    help: "Read with a capital M as an alternate spelling of heightmod. Its default depends on whether the weapon is ballistic (0.8) or guided (1.0).",
+  },
+  highTrajectory: {
+    label: "Trajectory choice",
+    help: "0 is low trajectory, 1 is high trajectory, 2 gives the player a toggle between the two.",
+  },
+  impactOnly: {
+    label: "Only damages what it hits",
+    help: "Roughly the same as a zero area of effect but without that value's side effects, and it also stops cratering.",
+  },
+  impulseBoost: {
+    label: "Flat impulse bonus",
+    help: "Added on top of the impulse from impulseFactor.",
+  },
+  impulseFactor: {
+    label: "Impulse multiplier",
+    help: "For most weapons, base impulse equals the damage dealt. For melee weapons it's the attacker's mass instead.",
+  },
+  intensity: {
+    label: "Projectile transparency",
+    help: "Sprite-only. Lower is more transparent; 0 makes the projectile invisible.",
+  },
+  interceptedByShieldType: {
+    label: "Shield interception bitmask (incoming)",
+    help: "Each set bit lets a shield whose shieldInterceptType has the matching bit hit this weapon.",
+  },
+  interceptor: {
+    label: "Weapon interception bitmask (outgoing)",
+    help: "Each set bit lets this weapon intercept a weapon whose targetable has the matching bit set.",
+  },
+  interceptSolo: {
+    label: "Exclusive interception",
+    help: "On, once one interceptor is chasing a projectile, no other interceptor may also target it.",
+  },
+  isShield: {
+    label: "Removed, use weaponType Shield",
+    help: 'The engine only logs a warning and ignores this key. Set weaponType to "Shield" instead.',
+  },
+  largeBeamLaser: {
+    label: "Large beam laser texturing",
+    help: "BeamLaser only. Switches on extra texturing for the 'large' variant. Does not change size on its own.",
+  },
+  laserFlareSize: {
+    label: "Beam flare size",
+    unit: "elmo",
+    help: "BeamLaser only.",
+  },
+  leadBonus: {
+    label: "Target-leading XP bonus",
+    help: "Added to leadLimit, multiplied by the firing unit's raw experience, when leadLimit isn't unlimited.",
+  },
+  leadLimit: {
+    label: "Target-leading distance limit",
+    unit: "elmo",
+    help: "Negative values mean no limit.",
+  },
+  lodDistance: {
+    label: "Simplified-rendering distance",
+    unit: "elmo",
+    help: "LaserCannon only. Beyond this distance the beam is drawn without its rounded ends.",
+  },
+  metalPerShot: {
+    label: "Metal cost per shot",
+    unit: "metal",
+    help: "For stockpile weapons this is spent over time as it stockpiles; otherwise it's spent immediately on firing.",
+  },
+  minIntensity: {
+    label: "Minimum damage falloff",
+    help: "BeamLaser only. The lowest fraction of full damage the beam can fall off to across its range; 1.0 disables falloff entirely. Distinct from the visual-only intensity, and largely duplicates dynDamageExp.",
+  },
+  model: {
+    label: "3D model",
+    help: "Name of a model to use for the projectile. Without one, the weapon falls back to 2D sprites.",
+  },
+  movingAccuracy: {
+    label: "Burst accuracy while moving",
+    help: "Same as accuracy, but used while the firing unit is moving.",
+  },
+  myGravity: {
+    label: "Gravity override",
+    help: "Overrides the map's gravity for ballistic weapons and missiles; missiles are only affected once flightTime runs out. 0 disables the override and uses map gravity.",
+  },
+  noExplode: {
+    label: "Never removed by exploding",
+    help: "The projectile survives its own explosion and keeps going, exploding again on every sim frame it spends inside a collision volume. Multiplies damage enormously.",
+  },
+  noGap: {
+    label: "Keeps cannon stages touching",
+    help: "Cannon only. Adjusts separation to account for sizeDecay so the stages in a burst stay adjacent.",
+  },
+  noSelfDamage: { label: "Can't damage its own unit" },
+  numBounce: {
+    label: "Bounce limit",
+    help: "How many times the projectile can bounce before exploding on impact instead. -1 is unlimited.",
+  },
+  ownerExpAccWeight: {
+    label: "Accuracy gain from XP",
+    help: "How much accuracy, but not sprayAngle, improves with the firing unit's raw experience. At limXP 0.4 and a weight of 2, only 20% of the original inaccuracy remains.",
+  },
+  paralyzer: {
+    label: "Stuns instead of damaging",
+    help: "On, the weapon only stuns; it never removes hit points.",
+  },
+  paralyzeTime: {
+    label: "Stun duration",
+    unit: "s",
+    help: "Restarts every time the target is hit again.",
+  },
+  predictBoost: {
+    label: "Target-leading accuracy",
+    help: "0 to 1. At 0, the unit misjudges target speed by up to double or half. At 1, it predicts speed perfectly. leadLimit can still cap how far it leads.",
+  },
+  proximityPriority: {
+    label: "Closeness targeting weight",
+    help: "Higher values prefer closer targets more strongly. Negative values make the weapon prefer distant targets instead.",
+  },
+  pulseSpeed: {
+    label: "Beam pulse frequency",
+    unit: "Hz",
+    help: "'Large' BeamLaser only. How fast the beam fades to nothing and back.",
+  },
+  rechargeDelay: {
+    label: "Shield recharge delay",
+    unit: "s",
+    help: "How long the shield waits after being hit before it starts regenerating again.",
+  },
+  reload: {
+    label: "Stockpile round time (old name)",
+    unit: "s",
+  },
+  rgbColor: {
+    label: "Sprite colour",
+    help: "Used when the weapon has no model. EmgCannon defaults to a different colour.",
+  },
+  rgbColor2: {
+    label: "Beam core colour",
+    help: "BeamLaser and LaserCannon only. Colour of the beam's inner core, sized by coreThickness.",
+  },
+  scarAlpha: {
+    label: "Scar starting opacity",
+    help: "0 to 1.",
+  },
+  scarColorTint: {
+    label: "Scar colour tint",
+    help: "0.5 in each channel means no change; 1.0 is twice as bright.",
+  },
+  scarDiameter: {
+    label: "Scar decal size",
+    unit: "elmo",
+    help: "-1 uses the engine's own default sizing.",
+  },
+  scarDotElimination: {
+    label: "Scar surface-angle cutoff",
+    help: "Exponent on the dot product between the scar's projection direction and the terrain normal, used to stop the decal appearing on surfaces it shouldn't. 0 disables the cutoff entirely.",
+  },
+  scarGlow: {
+    label: "Scar glow intensity",
+    help: "0 to 1.",
+  },
+  scarGlowColorMap: {
+    label: "Scar glow colour cycle",
+    help: "A series of RGBA colours the scar's glow fades through over its lifetime.",
+  },
+  scarGlowTtl: {
+    label: "Scar glow duration",
+    unit: "s",
+  },
+  scarIndices: {
+    label: "Scar shape indices",
+    help: "Indices into the scar table in resources.lua.",
+  },
+  scarProjVector: {
+    label: "Scar projection direction",
+    help: "Forces the direction the scar decal is projected from, as if from a projector at that world-space vector. All zeroes uses the ground normal instead; {0, 1, 0} suits orbital-type weapons.",
+  },
+  scarTtl: {
+    label: "Scar decal duration",
+    unit: "s",
+  },
+  scrollSpeed: {
+    label: "Beam texture scroll speed",
+    unit: "elmo/s",
+    help: "'Large' BeamLaser only.",
+  },
+  separation: {
+    label: "Cannon stage spacing",
+    help: "Cannon only. Multiplies the default distance between stages. See stages.",
+  },
+  shieldAlpha: { label: "Shield opacity (old name)" },
+  shieldArmorType: { label: "Shield armour class (old name)" },
+  shieldBadColor: { label: "Shield colour when weak (old name)" },
+  shieldEnergyUse: { label: "Shield energy drain (old name)" },
+  shieldForce: { label: "Shield repulsion force (old name)" },
+  shieldGoodColor: { label: "Shield colour when strong (old name)" },
+  shieldInterceptType: { label: "Shield interception bitmask (old name)" },
+  shieldMaxSpeed: {
+    label: "Shield repulsion speed cap (old name)",
+    unit: "elmo/s",
+  },
+  shieldPower: { label: "Shield hit points (old name)" },
+  shieldPowerRegen: {
+    label: "Shield regen rate (old name)",
+    unit: "HP/s",
+  },
+  shieldPowerRegenEnergy: {
+    label: "Energy cost of shield regen (old name)",
+    unit: "energy/HP",
+  },
+  shieldRadius: {
+    label: "Shield radius (old name)",
+    unit: "elmo",
+  },
+  shieldRechargeDelay: {
+    label: "Shield recharge delay (old name)",
+    unit: "s",
+  },
+  shieldRepulser: { label: "Shield repels rather than absorbs (old name)" },
+  shieldStartingPower: { label: "Shield starting charge (old name)" },
+  size: {
+    label: "Sprite size",
+    unit: "elmo",
+    help: "Only used when the weapon has no model.",
+  },
+  sizeDecay: {
+    label: "Cannon stage shrink",
+    help: "Cannon only. Size reduction per stage, as a fraction of the first stage's size.",
+  },
+  sizeGrowth: {
+    label: "Flame growth rate",
+    unit: "elmo/frame",
+    help: "Flamethrower only. Visual-only.",
+  },
+  smartShield: { label: "Shield lets allied fire through (old name)" },
+  smokeColor: { label: "Smoke trail brightness" },
+  smokePeriod: {
+    label: "Smoke trail update rate",
+    unit: "frames",
+    help: "How often the trail adds a new vertex. Lower is smoother but costs more performance; useful for fast-turning homing missiles to avoid jagged trails.",
+  },
+  smokeSize: { label: "Smoke trail size" },
+  smokeTime: {
+    label: "Smoke trail lifetime",
+    unit: "frames",
+  },
+  smokeTrail: {
+    label: "Leaves a smoke trail",
+    help: "MissileLauncher only.",
+  },
+  smokeTrailCastShadow: { label: "Smoke trail casts a shadow" },
+  soundHit: {
+    label: "Impact sound (old name)",
+    help: "Played on hitting outside water. A BeamLaser plays it once per sim frame.",
+  },
+  soundHitDry: {
+    label: "Impact sound (outside water)",
+    help: "A BeamLaser plays it once per sim frame.",
+  },
+  soundHitDryVolume: {
+    label: "Impact sound volume (outside water)",
+    help: "-1 autogenerates the volume from damage dealt.",
+  },
+  soundHitVolume: {
+    label: "Impact sound volume (old name)",
+    help: "-1 autogenerates the volume from damage dealt.",
+  },
+  soundHitWet: {
+    label: "Impact sound (underwater)",
+    help: "A BeamLaser plays it once per sim frame.",
+  },
+  soundHitWetVolume: {
+    label: "Impact sound volume (underwater)",
+    help: "-1 autogenerates the volume from damage dealt.",
+  },
+  soundStart: { label: "Firing sound" },
+  soundStartVolume: {
+    label: "Firing sound volume",
+    help: "-1 autogenerates the volume from damage dealt.",
+  },
+  soundTrigger: {
+    label: "One firing sound per burst",
+    help: "Off, the sound plays once per shot in a burst instead of once for the whole burst.",
+  },
+  sprayAngle: {
+    label: "Burst spread",
+    help: "Spread of individual projectiles within one burst, using the same angle transform as accuracy.",
+  },
+  stages: {
+    label: "Cannon sprite stages",
+    help: "Cannon only. Number of 2D sprites drawn to fake motion blur, when no model is set.",
+  },
+  stockpile: {
+    label: "Requires stockpiling",
+    help: "Each round must be built up by the player before it can fire. Only the first stockpiled weapon of this type on a unit works correctly.",
+  },
+  stockpileTime: {
+    label: "Stockpile round time",
+    unit: "s",
+    help: "0 stops it progressing, useful for a Lua reimplementation.",
+  },
+  submissile: {
+    label: "Torpedo can surface",
+    help: "Torpedo only. Lets it leave the water and continue as a missile, and lets underwater launchers hit above-water targets. Launchers that start above water still can't; use Missile instead of Torpedo for that.",
+  },
+  sweepFire: {
+    label: "Beam sweeps to new targets",
+    help: "Makes a BeamLaser keep firing while retargeting, sweeping across the terrain instead of cutting off.",
+  },
+  targetable: {
+    label: "Interceptable-by bitmask",
+    help: "Each set bit lets a weapon whose interceptor has the matching bit intercept this one. Instant-hit weapons like BeamLaser, LightningCannon and Rifle can never be targeted this way.",
+  },
+  targetBorder: {
+    label: "Targets the edge, not the centre",
+    help: "1 targets the near edge of the collision volume, -1 the far edge, 0 the centre. Mainly matters for large collision volumes or short ranges.",
+  },
+  targetMoveError: {
+    label: "Target-leading error",
+    help: "Adds a random vector, up to this fraction of the target's speed, to the predicted position each second. At 0.5 and a target moving 50 elmo/s, the error can be up to 25 elmos.",
+  },
+  texture1: { label: "Primary texture (old name)" },
+  texture2: { label: "Secondary texture (old name)" },
+  texture3: { label: "Tertiary texture (old name)" },
+  texture4: { label: "Quaternary texture (old name)" },
+  thickness: {
+    label: "Beam thickness",
+    unit: "elmo",
+    help: "LaserCannon, BeamLaser and Lightning only.",
+  },
+  tileLength: {
+    label: "Beam texture tile length",
+    unit: "elmo",
+    help: "'Large' BeamLaser only. Regular BeamLaser stretches a single tile instead of repeating it.",
+  },
+  tracks: {
+    label: "Homes in on its target",
+    help: "Missile, Torpedo and Starburst only. Requires a positive turnRate to actually turn towards the target.",
+  },
+  trajectoryHeight: {
+    label: "Missile arc height",
+    help: "Missile and Torpedo only. Fraction of the distance to the target added as extra arc height; at 1.0 the arc is as tall as it is long.",
+  },
+  turret: {
+    label: "Aims within a turret arc",
+    help: "Off, the weapon always points along the owner's own heading instead of tracking within an arc.",
+  },
+  visibleShield: { label: "Shield is visible (old name)" },
+  visibleShieldHitFrames: {
+    label: "Shield visible-on-hit duration (old name)",
+    unit: "frames",
+  },
+  visibleShieldRepulse: { label: "Shows the repulse effect (old name)" },
+  waterBounce: { label: "Bounces off water" },
+  waterweapon: {
+    label: "Can travel underwater",
+    help: "Firing underwater at all is controlled separately by fireSubmersed.",
+  },
+  wobble: {
+    label: "Missile wobble turn rate",
+    unit: "COB angle/s",
+    help: "Missile only. New random direction rolled every 16 sim frames.",
+  },
+  "damage.default": {
+    label: "Default damage",
+    help: "Used for any armour class that doesn't have its own entry in damage.",
+  },
+  "shield.alpha": {
+    label: "Shield opacity",
+    help: "How transparent the shield is while visible.",
+  },
+  "shield.armorType": {
+    label: "Shield armour class",
+    help: "An armour class name, or a unit's name to share its armour class.",
+  },
+  "shield.badColor": {
+    label: "Shield colour when weak",
+    help: "The colour the shield fades to as its charge drops to 0.",
+  },
+  "shield.energyUse": {
+    label: "Shield energy drain",
+    help: "Energy drained continuously by a repulsor while a projectile is nearby, or spent absorbing a hit.",
+  },
+  "shield.exterior": {
+    label: "Shield lets outgoing fire through",
+    help: "On, projectiles fired from inside the shield's radius pass through it. Off, they're intercepted too.",
+  },
+  "shield.force": {
+    label: "Shield repulsion force",
+    help: "Higher values deflect incoming weapons away at higher speed.",
+  },
+  "shield.goodColor": {
+    label: "Shield colour when strong",
+    help: "The colour the shield fades to as its charge regenerates to full.",
+  },
+  "shield.interceptType": {
+    label: "Shield interception bitmask",
+    help: "Each set bit lets the shield intercept a weapon whose interceptedByShieldType has the matching bit set.",
+  },
+  "shield.maxSpeed": {
+    label: "Shield repulsion speed cap",
+    unit: "elmo/s",
+    help: "The fastest speed the repulsor can impart to a deflected projectile.",
+  },
+  "shield.power": {
+    label: "Shield hit points",
+    help: "The maximum charge the shield can hold, reduced by incoming weapon damage.",
+  },
+  "shield.powerRegen": {
+    label: "Shield regen rate",
+    unit: "HP/s",
+  },
+  "shield.powerRegenEnergy": {
+    label: "Energy cost of shield regen",
+    unit: "energy/HP",
+  },
+  "shield.radius": {
+    label: "Shield radius",
+    unit: "elmo",
+  },
+  "shield.repulser": {
+    label: "Shield repels rather than absorbs",
+    help: "On, the shield deflects incoming projectiles. Off, it absorbs them.",
+  },
+  "shield.smart": {
+    label: "Shield lets allied fire through",
+    help: "On, projectiles fired by allies pass through. Off, they're intercepted the same as enemy fire.",
+  },
+  "shield.startingPower": {
+    label: "Shield starting charge",
+    help: "How much charge the shield has when it first appears, rather than starting empty and regenerating up to full power.",
+  },
+  "shield.visible": { label: "Shield is visible" },
+  "shield.visibleHitFrames": {
+    label: "Shield visible-on-hit duration",
+    unit: "frames",
+    help: "How many frames the shield is shown for after being hit.",
+  },
+  "shield.visibleRepulse": {
+    label: "Shows the repulse effect",
+    help: "Whether the shield's hard-coded projectile-deflection effect is drawn.",
+  },
+  "textures.1": {
+    label: "Primary texture",
+    help: "Sprite texture for AircraftBomb, Cannon, EMG and Flame weapons; the main beam texture for LaserCannon, BeamLaser and Lightning; the flare texture for Missile and Starburst; the shield dome texture. DGun ignores this and uses a hardcoded texture.",
+  },
+  "textures.2": {
+    label: "Secondary texture",
+    help: "The end-of-beam texture for LaserCannon and BeamLaser, split between both ends; the smoke trail texture for Missile and Starburst. Torpedo ignores this and uses a hardcoded trail.",
+  },
+  "textures.3": {
+    label: "Tertiary texture",
+    help: "The flare texture for a regular BeamLaser, or the directional muzzle exhaust for a 'large' one; the flame exhaust texture for Starburst.",
+  },
+  "textures.4": {
+    label: "Quaternary texture",
+    help: "The flare texture for a 'large' BeamLaser.",
+  },
 };
