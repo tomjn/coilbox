@@ -94,6 +94,7 @@ import {
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "@/content/config";
+import { isEditInPlaceEligible } from "@/content/format";
 import { EmptyState, SkeletonList } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
@@ -121,6 +122,8 @@ import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
+import type { FieldProbe } from "../inPlace";
+import { useInPlaceChecks } from "../inPlaceCheck";
 import { adoptChecksum, type InPlaceDone } from "../inPlaceProject";
 import { withLegoUnits } from "../legoUnits";
 import {
@@ -128,6 +131,7 @@ import {
   moveClassesOf,
   moveClassProblem,
 } from "../moveClasses";
+import { isMutatorOnly } from "../mutatorOnly";
 import {
   clearOverride,
   clearUnit,
@@ -170,7 +174,11 @@ import { PackageMutatorButton } from "./components/PackageMutatorButton";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
-import type { FieldChoices } from "./components/UnitFieldRow";
+import {
+  controlKind,
+  type FieldChoices,
+  type InPlaceField,
+} from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
 
@@ -195,6 +203,7 @@ export default function UnitPage() {
     recordAuthoredChecksum,
     settleInPlaceAction,
     adoptInPlaceChecksum,
+    routeThroughMutator,
     recordPackagedVersion,
     updateProjectDetails,
   } = useModProjects();
@@ -420,6 +429,52 @@ export default function UnitPage() {
       ),
     [unit, overrides, unitKey, view, edited],
   );
+
+  // Which of the fields on screen the edit-in-place route could write into
+  // the unit's own file (issue #2633), asked at edit time so a field it
+  // cannot is read only before the user types into it rather than refused at
+  // the write. Only on a game that route can write, and never for a unit the
+  // project copied, which has no file of its own in the game to write into.
+  const inPlaceDir =
+    game &&
+    isEditInPlaceEligible(game.primaryArchive.path) &&
+    !ownClones[unitKey]
+      ? game.primaryArchive.path
+      : undefined;
+  const inPlaceProbes = useMemo((): FieldProbe[] => {
+    if (!inPlaceDir) return [];
+    return fields.groups.flatMap((group) =>
+      group.sections.flatMap((section) =>
+        section.rows
+          .filter((row) => controlKind(row) !== "raw")
+          .map((row) => ({ field: row.path, value: row.value ?? null })),
+      ),
+    );
+  }, [inPlaceDir, fields]);
+  const inPlaceChecks = useInPlaceChecks(
+    inPlaceDir,
+    defs?.checksum,
+    unitKey,
+    inPlaceProbes,
+  );
+  const mutatorOnly = project?.mutatorOnly;
+  const inPlaceOf = (row: { path: string }): InPlaceField | undefined => {
+    const check = inPlaceChecks.checks[row.path];
+    const routed = isMutatorOnly(mutatorOnly, unitKey, row.path);
+    if (!check || (!check.refusal && !routed)) return undefined;
+    return {
+      check,
+      routed,
+      onRoute: (on) => {
+        // Sending a change somewhere is worth a project on `/workshop/new`
+        // as much as the change itself is.
+        const target =
+          project ??
+          startProject(defaultProjectName(gameName, projects), EMPTY_EDITS);
+        routeThroughMutator(target.id, unitKey, row.path, on);
+      },
+    };
+  };
 
   // Scroll to the field a link named, once the row for it is on the page
   // (issue #2653). `fields.shown` stands in for "the list has rendered
@@ -1457,8 +1512,15 @@ export default function UnitPage() {
                     }
                   />
                 )}
+                {inPlaceChecks.error && (
+                  <p className="text-xs text-destructive">
+                    Coilbox could not check which fields can be written into the
+                    game's own files: {inPlaceChecks.error}
+                  </p>
+                )}
                 <UnitFieldGroups
                   view={fields}
+                  inPlace={inPlaceDir ? inPlaceOf : undefined}
                   consumers={consumers}
                   assets={assets}
                   choices={choices}

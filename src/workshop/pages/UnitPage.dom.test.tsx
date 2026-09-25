@@ -62,6 +62,13 @@ let mockDefs: UnitDefsResult = {
   checksum: "abc",
 };
 let mockStatus = "ready";
+/** A packed archive, which the edit-in-place route cannot write into. */
+const PACKED_GAME = {
+  name: "Packed Game",
+  primaryArchive: { name: "packed.sdz", path: "/data/games/packed.sdz" },
+  dependencyArchives: [],
+};
+
 /** The curated dataset the page joins for names, keyed by internal def key. */
 let mockDataset: {
   name: string;
@@ -87,7 +94,7 @@ vi.mock("@/content/config", () => ({
   invalidateGameInfo: () => {},
   invalidateUnitDataset: () => {},
   useUnitsyncScan: () => ({
-    data: { games: [GAME, GAME_2], maps: [] },
+    data: { games: [GAME, GAME_2, PACKED_GAME], maps: [] },
     loading: false,
     error: null,
     run: () => {},
@@ -134,11 +141,54 @@ let mockPreflightReport = { blockers: [], review: [], passes: [] };
 /** What the edit-in-place commands answer, for the tests of issue #3023.
  *  Empty elsewhere, where nothing presses them. */
 let mockInPlace: Record<string, () => unknown> = {};
+/** What the in-place dry run refuses, by field path (issue #2633). The page
+ *  asks it for every field it shows on the loose `.sdd` these tests open, so
+ *  it answers every test, and a field not named here can be written. */
+let mockRefusals: Record<string, string> = {};
+/** Every field the dry run was asked about, in order. */
+let checkedFields: string[] = [];
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
-    (_plugin: string, command: string) => async (_args: unknown) => {
+    (_plugin: string, command: string) => async (args: unknown) => {
       if (command === "workshop_preflight") return mockPreflightReport;
       if (Object.hasOwn(mockInPlace, command)) return mockInPlace[command]();
+      if (command === "workshop_check_in_place") {
+        const { unit, fields } = args as {
+          unit: string;
+          fields: { field: string }[];
+        };
+        checkedFields.push(...fields.map((f) => f.field));
+        return {
+          file: `units/${unit}.lua`,
+          fields: fields.map(({ field }) => ({
+            field,
+            refusal: mockRefusals[field]
+              ? {
+                  unit,
+                  field,
+                  file: `units/${unit}.lua`,
+                  kind: "fieldComputed",
+                  message: mockRefusals[field],
+                  location: {
+                    start: { line: 3, column: 2, byte: 20 },
+                    end: { line: 3, column: 30, byte: 48 },
+                  },
+                }
+              : null,
+            excerpt: mockRefusals[field]
+              ? {
+                  firstLine: 1,
+                  lines: [
+                    "local hp = 1000",
+                    "return { armcom = {",
+                    "\thealth = hp * 3,",
+                    "} }",
+                  ],
+                }
+              : null,
+          })),
+        };
+      }
       throw new Error(`unexpected command ${command}`);
     },
 }));
@@ -221,6 +271,7 @@ const { installSettingsStorage, memorySettingsStorage } = await import(
 );
 const { PROJECTS_KEY } = await import("../project");
 const { resetEditHistory } = await import("../history");
+const { clearInPlaceChecks } = await import("../inPlaceCheck");
 const { readStoredSetting } = await import("@/lib/storedSetting");
 
 /**
@@ -427,6 +478,7 @@ beforeEach(() => {
   // Module state, shared by every mount since #2696, so one test's undo stack
   // would otherwise still be there for the next.
   resetEditHistory();
+  clearInPlaceChecks();
 });
 
 afterEach(() => {
@@ -442,6 +494,8 @@ afterEach(() => {
   mockLegoProjects = [];
   mockPreflightReport = { blockers: [], review: [], passes: [] };
   mockInPlace = {};
+  mockRefusals = {};
+  checkedFields = [];
 });
 
 describe("UnitPage", () => {
@@ -2173,6 +2227,93 @@ describe("UnitPage", () => {
       expect(project().writtenInPlace).toBeUndefined();
       expect(screen.getByText("1 change")).toBeTruthy();
       expect(screen.queryByText(/has been updated since/)).toBeNull();
+    });
+  });
+
+  /**
+   * Issue #2633. A field the unit file works out in code cannot be patched
+   * in place, so the page says so before the user edits it, shows why, and
+   * offers the mutator route for that one change.
+   */
+  describe("a field the unit file computes", () => {
+    const project = () =>
+      readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0] as ModProject;
+
+    it("is read only for edit in place until its change is sent to the mutator", async () => {
+      mockRefusals = {
+        health: "The value is worked out by code rather than written out.",
+      };
+      show();
+
+      expect(
+        await screen.findByText("Read only for edit in place."),
+      ).toBeTruthy();
+      expect(healthBox().disabled).toBe(true);
+      expect(screen.getByLabelText("Metal cost")).toHaveProperty(
+        "disabled",
+        false,
+      );
+      // One ask for every field on screen, not one per field.
+      expect(checkedFields).toContain("health");
+      expect(checkedFields).toContain("metalCost");
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Why Health cannot be written in place",
+        }),
+      );
+      expect(
+        await screen.findByText(
+          "The value is worked out by code rather than written out.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText("units/armcom.lua, line 3")).toBeTruthy();
+      const marked = screen.getByText("health = hp * 3,").closest("div");
+      expect(marked?.getAttribute("data-marked")).toBe("true");
+
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Send Health through the mutator route",
+        }),
+      );
+      await waitFor(() =>
+        expect(project().mutatorOnly).toEqual({ armcom: ["health"] }),
+      );
+      expect(healthBox().disabled).toBe(false);
+      expect(
+        screen.getByText(
+          "Goes through the mutator route. Writing in place skips this field.",
+        ),
+      ).toBeTruthy();
+
+      type(healthBox(), "5000");
+      expect(project().edits.overrides).toEqual({ armcom: { health: 5000 } });
+
+      // The Checks drawer says a mutator is still needed, and there is
+      // nothing left for the in-place write to do.
+      fireEvent.click(
+        await screen.findByRole("button", { name: "No problems found" }),
+      );
+      expect(
+        await screen.findByText(/you still need a mutator for it/),
+      ).toBeTruthy();
+      expect(screen.getByText("armcom health")).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: "Write changes into the game" }),
+      ).toHaveProperty("disabled", true);
+    });
+
+    it("asks nothing for a game the route cannot write", async () => {
+      mockRefusals = { health: "Computed." };
+      show(
+        { armcom: ARMCOM },
+        `/workshop/new?game=${encodeURIComponent(PACKED_GAME.name)}&unit=armcom`,
+      );
+      expect(healthBox().disabled).toBe(false);
+      // Give an ask that should not happen the chance to land.
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(checkedFields).toEqual([]);
+      expect(screen.queryByText("Read only for edit in place.")).toBeNull();
     });
   });
 

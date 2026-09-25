@@ -8,8 +8,8 @@
  * and they land here labelled with the key. The row has to admit that rather
  * than letting the key pass for a label, which is the whole point of the flag.
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedField } from "@/content/unitFields";
 import type { FieldRow } from "../../unitSections";
 import { UnitFieldRow } from "./UnitFieldRow";
@@ -70,5 +70,67 @@ describe("a row whose label nobody wrote", () => {
     draw(field({ known: false, described: false, label: "unitgroup" }));
     expect(screen.getByText("game")).toBeTruthy();
     expect(screen.queryByText("engine key")).toBeNull();
+  });
+});
+
+/**
+ * Issue #2633. The row on a game the edit-in-place route can write, when the
+ * unit's file cannot take a change to this field.
+ */
+describe("a row the edit-in-place route cannot write", () => {
+  const check = {
+    field: "someKey",
+    refusal: {
+      unit: "u",
+      field: "someKey",
+      file: "units/u.lua",
+      kind: "postCheckFailed",
+      message: "The edit would also change v.somekey, so it was not made.",
+      location: null,
+    },
+    excerpt: null,
+  };
+
+  const drawRouted = (routed: boolean, overridden: boolean) => {
+    const onRoute = vi.fn();
+    const f = field({ label: "Some key" });
+    render(
+      <UnitFieldRow
+        row={{ ...row(f), state: overridden ? "overridden" : "inherited" }}
+        inPlace={{ check, routed, onRoute }}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    return onRoute;
+  };
+
+  it("keeps a change already made on screen, read only, and offers the mutator for it", () => {
+    const onRoute = drawRouted(false, true);
+    expect(screen.getByLabelText("Some key")).toHaveProperty("disabled", true);
+    expect(
+      screen.getByText(
+        "Read only for edit in place. This change stops an in-place write.",
+      ),
+    ).toBeTruthy();
+    // Taking the change out is always allowed.
+    expect(
+      screen.getByRole("button", {
+        name: "Reset Some key to the inherited value",
+      }),
+    ).toHaveProperty("disabled", false);
+    fireEvent.click(screen.getByText("Send this change to the mutator"));
+    expect(onRoute).toHaveBeenCalledWith(true);
+  });
+
+  it("is editable once its change goes through the mutator, and can be taken back", () => {
+    const onRoute = drawRouted(true, false);
+    expect(screen.getByLabelText("Some key")).toHaveProperty("disabled", false);
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Stop sending Some key through the mutator route",
+      }),
+    );
+    expect(onRoute).toHaveBeenCalledWith(false);
   });
 });

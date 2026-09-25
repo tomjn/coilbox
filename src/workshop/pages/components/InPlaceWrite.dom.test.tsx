@@ -107,6 +107,42 @@ describe("the edit-in-place actions", () => {
     ).toBeTruthy();
   });
 
+  /** Issue #2633. A change sent to the mutator route is skipped, so it
+   *  neither blocks the write nor goes unmentioned. */
+  it("says which changes still need a mutator and writes the rest", async () => {
+    renderWrite({
+      ...project,
+      edits: {
+        ...project.edits,
+        overrides: { armcom: { metalcost: 2, health: 5 } },
+      },
+      mutatorOnly: { armcom: ["health"], armpw: ["speed"] },
+    });
+    expect(screen.getByText(/you still need a mutator for it/)).toBeTruthy();
+    expect(screen.getByText("armcom health")).toBeTruthy();
+    // A mark with no change under it says nothing.
+    expect(screen.queryByText("armpw speed")).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: "Write changes into the game" })
+        .hasAttribute("disabled"),
+    ).toBe(false);
+  });
+
+  it("has nothing to write when every change goes to the mutator", () => {
+    renderWrite({ ...project, mutatorOnly: { armcom: ["metalcost"] } });
+    expect(
+      screen
+        .getByRole("button", { name: "Write changes into the game" })
+        .hasAttribute("disabled"),
+    ).toBe(true);
+    expect(
+      screen.getByText(
+        "Every field change in this project goes through the mutator route, so there is nothing to write in place.",
+      ),
+    ).toBeTruthy();
+  });
+
   it("lists every refusal, says nothing was written, and does not ask for a refresh", async () => {
     writeResponse = {
       written: [],
