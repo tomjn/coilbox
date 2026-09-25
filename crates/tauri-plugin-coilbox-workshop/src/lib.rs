@@ -820,11 +820,23 @@ mod tests {
             vec!["armcom", "corcom"]
         );
 
-        // A custom explosion generator (issue #2643).
+        // A custom explosion generator: two spawns and a ground flash
+        // together (issues #2643 and #3066).
         let generator = &edits.explosion_generators["purpleflash"];
-        assert_eq!(generator.class, crate::model::CegClass::CBitmapMuzzleFlame);
-        assert_eq!(generator.texture.as_deref(), Some("flare.tga"));
-        assert_eq!(generator.size, Some(8.0));
+        assert_eq!(generator.spawns.len(), 2);
+        assert_eq!(
+            generator.spawns[0].class,
+            crate::model::SpawnClass::CBitmapMuzzleFlame
+        );
+        assert_eq!(generator.spawns[0].texture.as_deref(), Some("flare.tga"));
+        assert_eq!(generator.spawns[0].size, Some(8.0));
+        assert_eq!(
+            generator.spawns[1].class,
+            crate::model::SpawnClass::CSimpleParticleSystem
+        );
+        assert_eq!(generator.spawns[1].particles, Some(12));
+        assert!(generator.ground_flash.is_some());
+        assert!(generator.use_default_explosions);
     }
 
     /// A project somebody saved compiles and passes its own checks. Preflight

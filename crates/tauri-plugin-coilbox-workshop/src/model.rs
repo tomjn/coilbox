@@ -161,18 +161,19 @@ impl ArmorClasses {
     }
 }
 
-/// The four emitter classes the explosion generator form covers (issue
-/// #2643), a mirror of `CegClass` in `src/workshop/explosionGenerators.ts`.
-/// Named exactly as the engine spells the class
-/// (`rts/Rendering/Env/Particles/Classes/*.cpp`, `rts/Rendering/GroundFlash.cpp`),
-/// which is also the value `compile.rs` writes into a spawn's `class` field.
+/// The three classes a spawn can be (issue #2643), a mirror of `SpawnClass`
+/// in `src/workshop/explosionGenerators.ts`. Named exactly as the engine
+/// spells the class (`rts/Rendering/Env/Particles/Classes/*.cpp`), which is
+/// also the value `compile.rs` writes into a spawn's `class` field.
+/// `CStandardGroundFlash` is not one of them: it is [`GroundFlash`] instead,
+/// matching the engine's own reserved `groundflash` key
+/// (`rts/Rendering/GroundFlash.cpp`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
-#[allow(clippy::enum_variant_names)] // The shared "C" is the engine's own naming, not this enum's.
-pub enum CegClass {
+#[allow(clippy::enum_variant_names)]
+pub enum SpawnClass {
     CBitmapMuzzleFlame,
     CSimpleParticleSystem,
     CHeatCloudProjectile,
-    CStandardGroundFlash,
 }
 
 /// A constant colour, 0 to 1 per channel, a mirror of `CegColor`.
@@ -183,15 +184,13 @@ pub struct CegColor {
     pub b: f64,
 }
 
-/// One custom explosion generator: one spawn of one class, written as
-/// `effects/<key>.lua` (issue #2643), a mirror of `ExplosionGenerator` in
-/// `src/workshop/explosionGenerators.ts`. See that module's doc comment for
-/// why this is one spawn rather than the engine's general case.
+/// One spawn: one of the three particle classes, fired some number of times
+/// and gated on what was actually hit, a mirror of `ExplosionSpawn` in
+/// `src/workshop/explosionGenerators.ts`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ExplosionGenerator {
-    pub key: String,
-    pub class: CegClass,
+pub struct ExplosionSpawn {
+    pub class: SpawnClass,
     #[serde(default = "default_ceg_count")]
     pub count: u32,
     #[serde(default)]
@@ -216,6 +215,36 @@ pub struct ExplosionGenerator {
 
 fn default_ceg_count() -> u32 {
     1
+}
+
+/// A generator's optional ground flash: the engine's reserved `groundflash`
+/// key, which takes neither a repeat count nor the gating flags a spawn
+/// does, a mirror of `GroundFlash` in `explosionGenerators.ts`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroundFlash {
+    #[serde(default)]
+    pub color: Option<CegColor>,
+    #[serde(default)]
+    pub size: Option<f64>,
+    #[serde(default)]
+    pub lifetime: Option<f64>,
+}
+
+/// One custom explosion generator: a list of spawns, plus an optional ground
+/// flash and the engine's `useDefaultExplosions` toggle, written as
+/// `effects/<key>.lua` (issues #2643 and #3066), a mirror of
+/// `ExplosionGenerator` in `src/workshop/explosionGenerators.ts`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExplosionGenerator {
+    pub key: String,
+    #[serde(default)]
+    pub spawns: Vec<ExplosionSpawn>,
+    #[serde(default)]
+    pub ground_flash: Option<GroundFlash>,
+    #[serde(default)]
+    pub use_default_explosions: bool,
 }
 
 /// Everything one project changes about one game.

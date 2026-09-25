@@ -35,8 +35,8 @@
 use crate::before_post;
 use crate::lua::{lua_literal, lua_string, PatchTree};
 use crate::model::{
-    through_a_position, BuildMenuOp, CegClass, ExplosionGenerator, GameEdits, LibraryWeapon,
-    ModProject, UnitClone,
+    through_a_position, BuildMenuOp, ExplosionGenerator, ExplosionSpawn, GameEdits, GroundFlash,
+    LibraryWeapon, ModProject, SpawnClass, UnitClone,
 };
 use serde::Serialize;
 use serde_json::{json, Value};
@@ -1930,59 +1930,56 @@ fn ceg_colormap(color: &crate::model::CegColor) -> String {
     format!("{stop} {stop}")
 }
 
-/// One generator's class specific properties, keyed by the name the engine's
+/// One spawn's class specific properties, keyed by the name the engine's
 /// `GetMemberInfo` chain reads for that class (`ExpGenSpawnableMemberInfo.h`,
 /// and the class's own `.cpp`, see `explosionGenerators.ts`'s doc comment for
-/// the file and line of each). Ground flash takes no `properties` table at
-/// all, so it never calls this function. Its own reserved shape is
-/// [`ceg_groundflash_value`].
-fn ceg_properties(generator: &ExplosionGenerator) -> Value {
+/// the file and line of each).
+fn ceg_properties(spawn: &ExplosionSpawn) -> Value {
     let mut props = serde_json::Map::new();
-    match generator.class {
-        CegClass::CBitmapMuzzleFlame => {
-            if let Some(texture) = &generator.texture {
+    match spawn.class {
+        SpawnClass::CBitmapMuzzleFlame => {
+            if let Some(texture) = &spawn.texture {
                 props.insert("sidetexture".to_string(), json!(texture));
                 props.insert("fronttexture".to_string(), json!(texture));
             }
-            if let Some(color) = &generator.color {
+            if let Some(color) = &spawn.color {
                 props.insert("colormap".to_string(), json!(ceg_colormap(color)));
             }
-            if let Some(size) = generator.size {
+            if let Some(size) = spawn.size {
                 props.insert("size".to_string(), json!(size));
             }
-            if let Some(lifetime) = generator.lifetime {
+            if let Some(lifetime) = spawn.lifetime {
                 props.insert("ttl".to_string(), json!(lifetime as i64));
             }
         }
-        CegClass::CSimpleParticleSystem => {
-            if let Some(texture) = &generator.texture {
+        SpawnClass::CSimpleParticleSystem => {
+            if let Some(texture) = &spawn.texture {
                 props.insert("texture".to_string(), json!(texture));
             }
-            if let Some(color) = &generator.color {
+            if let Some(color) = &spawn.color {
                 props.insert("colormap".to_string(), json!(ceg_colormap(color)));
             }
-            if let Some(size) = generator.size {
+            if let Some(size) = spawn.size {
                 props.insert("particlesize".to_string(), json!(size));
             }
-            if let Some(lifetime) = generator.lifetime {
+            if let Some(lifetime) = spawn.lifetime {
                 props.insert("particlelife".to_string(), json!(lifetime));
             }
-            if let Some(particles) = generator.particles {
+            if let Some(particles) = spawn.particles {
                 props.insert("numparticles".to_string(), json!(particles));
             }
         }
-        CegClass::CHeatCloudProjectile => {
-            if let Some(texture) = &generator.texture {
+        SpawnClass::CHeatCloudProjectile => {
+            if let Some(texture) = &spawn.texture {
                 props.insert("texture".to_string(), json!(texture));
             }
-            if let Some(size) = generator.size {
+            if let Some(size) = spawn.size {
                 props.insert("size".to_string(), json!(size));
             }
-            if let Some(lifetime) = generator.lifetime {
+            if let Some(lifetime) = spawn.lifetime {
                 props.insert("heatfalloff".to_string(), json!(lifetime));
             }
         }
-        CegClass::CStandardGroundFlash => {}
     }
     Value::Object(props)
 }
@@ -1990,52 +1987,58 @@ fn ceg_properties(generator: &ExplosionGenerator) -> Value {
 /// The reserved `groundflash` sub-table `CCustomExplosionGenerator::Load`
 /// parses outside the ordinary spawn loop, and always gates on `ground`
 /// itself (`ExplosionGenerator.cpp:1027-1039`), so neither a repeat count
-/// nor the gating flags the other three classes take are written here.
-fn ceg_groundflash_value(generator: &ExplosionGenerator) -> Value {
-    let mut flash = serde_json::Map::new();
-    if let Some(lifetime) = generator.lifetime {
-        flash.insert("ttl".to_string(), json!(lifetime as i64));
+/// nor the gating flags a spawn takes are written here.
+fn ceg_groundflash_value(flash: &GroundFlash) -> Value {
+    let mut out = serde_json::Map::new();
+    if let Some(lifetime) = flash.lifetime {
+        out.insert("ttl".to_string(), json!(lifetime as i64));
     }
-    if let Some(color) = &generator.color {
-        flash.insert("color".to_string(), json!([color.r, color.g, color.b]));
+    if let Some(color) = &flash.color {
+        out.insert("color".to_string(), json!([color.r, color.g, color.b]));
     }
-    if let Some(size) = generator.size {
-        flash.insert("flashSize".to_string(), json!(size));
+    if let Some(size) = flash.size {
+        out.insert("flashSize".to_string(), json!(size));
     }
-    Value::Object(flash)
+    Value::Object(out)
 }
 
-/// One generator's spawn entry, for every class but ground flash: `class`,
-/// the repeat `count` (default 1, `ExplosionGenerator.cpp:978`), the gating
-/// flags read straight off the spawn table rather than `properties`
-/// (`GetFlagsFromTable`, `ExplosionGenerator.cpp:60`), and the class's own
-/// `properties`.
-fn ceg_spawn_value(generator: &ExplosionGenerator) -> Value {
-    let class_name = match generator.class {
-        CegClass::CBitmapMuzzleFlame => "CBitmapMuzzleFlame",
-        CegClass::CSimpleParticleSystem => "CSimpleParticleSystem",
-        CegClass::CHeatCloudProjectile => "CHeatCloudProjectile",
-        CegClass::CStandardGroundFlash => unreachable!("ground flash has no spawn entry"),
+/// One spawn entry: `class`, the repeat `count` (default 1,
+/// `ExplosionGenerator.cpp:978`), the gating flags read straight off the
+/// spawn table rather than `properties` (`GetFlagsFromTable`,
+/// `ExplosionGenerator.cpp:60`), and the class's own `properties`.
+fn ceg_spawn_value(spawn: &ExplosionSpawn) -> Value {
+    let class_name = match spawn.class {
+        SpawnClass::CBitmapMuzzleFlame => "CBitmapMuzzleFlame",
+        SpawnClass::CSimpleParticleSystem => "CSimpleParticleSystem",
+        SpawnClass::CHeatCloudProjectile => "CHeatCloudProjectile",
     };
     json!({
         "class": class_name,
-        "count": generator.count,
-        "ground": generator.ground,
-        "water": generator.water,
-        "air": generator.air,
-        "underwater": generator.underwater,
-        "properties": ceg_properties(generator),
+        "count": spawn.count,
+        "ground": spawn.ground,
+        "water": spawn.water,
+        "air": spawn.air,
+        "underwater": spawn.underwater,
+        "properties": ceg_properties(spawn),
     })
 }
 
-/// One generator's whole CEG entry: `{ groundflash = {...} }` for
-/// `CStandardGroundFlash`, `{ spawn1 = {...} }` for the other three.
+/// One generator's whole CEG entry: `spawn1`, `spawn2`, and so on for every
+/// spawn in order, `groundflash` when the generator has one, and
+/// `useDefaultExplosions` when set (`ExplosionGenerator.cpp:1041`,
+/// `CCustomExplosionGenerator::Load`, reads all three from the same table).
 fn ceg_entry_value(generator: &ExplosionGenerator) -> Value {
-    if generator.class == CegClass::CStandardGroundFlash {
-        json!({ "groundflash": ceg_groundflash_value(generator) })
-    } else {
-        json!({ "spawn1": ceg_spawn_value(generator) })
+    let mut entry = serde_json::Map::new();
+    for (i, spawn) in generator.spawns.iter().enumerate() {
+        entry.insert(format!("spawn{}", i + 1), ceg_spawn_value(spawn));
     }
+    if let Some(flash) = &generator.ground_flash {
+        entry.insert("groundflash".to_string(), ceg_groundflash_value(flash));
+    }
+    if generator.use_default_explosions {
+        entry.insert("useDefaultExplosions".to_string(), json!(true));
+    }
+    Value::Object(entry)
 }
 
 /// A generator's whole `effects/<key>.lua` (issue #2643): a table of CEG name
@@ -3419,16 +3422,18 @@ mod tests {
             "explosionGenerators": {
                 "purpleflash": {
                     "key": "purpleflash",
-                    "class": "CBitmapMuzzleFlame",
-                    "count": 1,
-                    "ground": true,
-                    "water": true,
-                    "air": true,
-                    "underwater": true,
-                    "texture": "flare.tga",
-                    "color": { "r": 1.0, "g": 0.0, "b": 1.0 },
-                    "size": 8.0,
-                    "lifetime": 30.0,
+                    "spawns": [{
+                        "class": "CBitmapMuzzleFlame",
+                        "count": 1,
+                        "ground": true,
+                        "water": true,
+                        "air": true,
+                        "underwater": true,
+                        "texture": "flare.tga",
+                        "color": { "r": 1.0, "g": 0.0, "b": 1.0 },
+                        "size": 8.0,
+                        "lifetime": 30.0,
+                    }],
                 }
             }
         })));
@@ -3451,16 +3456,18 @@ mod tests {
             "explosionGenerators": {
                 "smoke": {
                     "key": "smoke",
-                    "class": "CSimpleParticleSystem",
-                    "count": 2,
-                    "ground": true,
-                    "water": false,
-                    "air": true,
-                    "underwater": false,
-                    "texture": "smoke.tga",
-                    "size": 4.5,
-                    "lifetime": 60.0,
-                    "particles": 20,
+                    "spawns": [{
+                        "class": "CSimpleParticleSystem",
+                        "count": 2,
+                        "ground": true,
+                        "water": false,
+                        "air": true,
+                        "underwater": false,
+                        "texture": "smoke.tga",
+                        "size": 4.5,
+                        "lifetime": 60.0,
+                        "particles": 20,
+                    }],
                 }
             }
         })));
@@ -3482,14 +3489,16 @@ mod tests {
             "explosionGenerators": {
                 "warmth": {
                     "key": "warmth",
-                    "class": "CHeatCloudProjectile",
-                    "count": 1,
-                    "ground": true,
-                    "water": true,
-                    "air": true,
-                    "underwater": true,
-                    "size": 3.0,
-                    "lifetime": 0.5,
+                    "spawns": [{
+                        "class": "CHeatCloudProjectile",
+                        "count": 1,
+                        "ground": true,
+                        "water": true,
+                        "air": true,
+                        "underwater": true,
+                        "size": 3.0,
+                        "lifetime": 0.5,
+                    }],
                 }
             }
         })));
@@ -3511,15 +3520,12 @@ mod tests {
             "explosionGenerators": {
                 "bigflash": {
                     "key": "bigflash",
-                    "class": "CStandardGroundFlash",
-                    "count": 1,
-                    "ground": false,
-                    "water": false,
-                    "air": false,
-                    "underwater": false,
-                    "color": { "r": 1.0, "g": 1.0, "b": 0.8 },
-                    "size": 100.0,
-                    "lifetime": 20.0,
+                    "spawns": [],
+                    "groundFlash": {
+                        "color": { "r": 1.0, "g": 1.0, "b": 0.8 },
+                        "size": 100.0,
+                        "lifetime": 20.0,
+                    },
                 }
             }
         })));
@@ -3539,6 +3545,55 @@ mod tests {
         assert_eq!(color, vec![1.0, 1.0, 0.8]);
     }
 
+    /// The general case the engine allows (issue #3066): several spawns,
+    /// each numbered in order, a ground flash alongside them, and
+    /// `useDefaultExplosions` layering the engine's own explosion on top.
+    #[test]
+    fn several_spawns_and_a_ground_flash_write_one_entry_together() {
+        let out = compile(&project(json!({
+            "explosionGenerators": {
+                "commanderdeath": {
+                    "key": "commanderdeath",
+                    "spawns": [
+                        {
+                            "class": "CBitmapMuzzleFlame",
+                            "count": 1,
+                            "ground": true,
+                            "water": true,
+                            "air": true,
+                            "underwater": true,
+                            "texture": "flare.tga",
+                        },
+                        {
+                            "class": "CSimpleParticleSystem",
+                            "count": 3,
+                            "ground": true,
+                            "water": true,
+                            "air": true,
+                            "underwater": true,
+                            "texture": "smoke.tga",
+                            "particles": 20,
+                        },
+                    ],
+                    "groundFlash": {
+                        "color": { "r": 1.0, "g": 0.6, "b": 0.2 },
+                        "size": 120.0,
+                        "lifetime": 25.0,
+                    },
+                    "useDefaultExplosions": true,
+                }
+            }
+        })));
+        let lua = file(&out, "effects/commanderdeath.lua");
+        let value = eval_ceg(lua);
+        let entry = &value["commanderdeath"];
+        assert_eq!(entry["spawn1"]["class"], "CBitmapMuzzleFlame");
+        assert_eq!(entry["spawn2"]["class"], "CSimpleParticleSystem");
+        assert_eq!(entry["spawn2"]["count"], 3);
+        assert_eq!(entry["groundflash"]["flashSize"], 120.0);
+        assert_eq!(entry["useDefaultExplosions"], true);
+    }
+
     /// The engine only ever loads a CEG from a real file under `effects/`
     /// (`ExplosionGenerator.cpp:208`), which a BAR tweak slot has no way to
     /// carry, so a project holding one gets no tweakdefs export at all
@@ -3550,12 +3605,14 @@ mod tests {
             "explosionGenerators": {
                 "purpleflash": {
                     "key": "purpleflash",
-                    "class": "CBitmapMuzzleFlame",
-                    "count": 1,
-                    "ground": true,
-                    "water": true,
-                    "air": true,
-                    "underwater": true,
+                    "spawns": [{
+                        "class": "CBitmapMuzzleFlame",
+                        "count": 1,
+                        "ground": true,
+                        "water": true,
+                        "air": true,
+                        "underwater": true,
+                    }],
                 }
             }
         })));

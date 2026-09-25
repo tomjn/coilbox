@@ -12,8 +12,10 @@ import { setCollectionMembership } from "./collections";
 import { setUnitDisabled } from "./disabled";
 import {
   addExplosionGenerator,
+  addExplosionSpawn,
   newExplosionGenerator,
   setExplosionGenerator,
+  setExplosionSpawn,
 } from "./explosionGenerators";
 import { setOverride } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
@@ -145,18 +147,46 @@ function buildEdits(): GameEdits {
 
   // A custom explosion generator, bound to a weapon's impact field with the
   // custom: prefix the engine's own LoadGeneratorID requires (issue #2643).
+  // Two spawns and a ground flash together, so the fixture exercises the
+  // general case the engine allows (issue #3066) rather than just the one
+  // spawn #2643 shipped with.
   explosionGenerators = addExplosionGenerator(
     explosionGenerators,
     newExplosionGenerator("purpleflash", "CBitmapMuzzleFlame"),
   );
-  explosionGenerators = setExplosionGenerator(
+  explosionGenerators = setExplosionSpawn(
     explosionGenerators,
     "purpleflash",
+    0,
     {
       texture: "flare.tga",
       color: { r: 1, g: 0, b: 1 },
       size: 8,
       lifetime: 30,
+    },
+  );
+  explosionGenerators = addExplosionSpawn(
+    explosionGenerators,
+    "purpleflash",
+    "CSimpleParticleSystem",
+  );
+  explosionGenerators = setExplosionSpawn(
+    explosionGenerators,
+    "purpleflash",
+    1,
+    {
+      texture: "smoke.tga",
+      size: 4,
+      lifetime: 40,
+      particles: 12,
+    },
+  );
+  explosionGenerators = setExplosionGenerator(
+    explosionGenerators,
+    "purpleflash",
+    {
+      groundFlash: { color: { r: 1, g: 1, b: 0.8 }, size: 100, lifetime: 20 },
+      useDefaultExplosions: true,
     },
   );
 
