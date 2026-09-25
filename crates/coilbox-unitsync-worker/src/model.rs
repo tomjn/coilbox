@@ -816,6 +816,13 @@ pub struct UnitDefsOutput {
     /// and Chinese players reading the old name (issue #2672).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub language_text: BTreeMap<String, LanguageUnitText>,
+    /// What the game's own `unitdefs_post.lua` and `weapondefs_post.lua`
+    /// changed in each definition (issue #3054), so a copy can go back into
+    /// the game with the values its files give rather than the ones the post
+    /// files left. Absent when the game's loader never ran a post file by
+    /// either name, which leaves nothing to compare.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before_post: Option<crate::beforepost::BeforePost>,
     /// Sync checksum (from GetPrimaryModChecksum), over the archive plus every
     /// dependency. Also this dataset's cache key.
     #[serde(skip_serializing_if = "Option::is_none")]

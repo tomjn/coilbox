@@ -57,8 +57,11 @@ use std::path::Path;
 /// or v18 holds a unit list with no names and four sides whose start units are
 /// def keys. v20: the unit dataset now reads every numbered build option rather
 /// than stopping at the first gap in the numbering, so a Tech Annihilation blob
-/// cached under v19 holds builders with most of their menu missing.
-const INFO_CACHE_VERSION: u32 = 20;
+/// cached under v19 holds builders with most of their menu missing. v21: the
+/// unit-defs read now says what the game's post files changed (#3054), and a
+/// blob cached under v20 has no answer, so every copy made from it would go on
+/// taking the post-processed values.
+const INFO_CACHE_VERSION: u32 = 21;
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
