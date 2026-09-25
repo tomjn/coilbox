@@ -22,7 +22,7 @@
  * sub-table alongside them, `useDefaultExplosions`). That is deliberate: the
  * issue asks for colour, texture, size, count and lifetime controls over the
  * four classes people actually reach for, not a general compositor.
- * Combining several spawns in one generator is issue #3072.
+ * Combining several spawns in one generator is issue #3066.
  *
  * `CStandardGroundFlash` is the odd one out. Every real CEG file measured
  * for this issue uses the engine's reserved `groundflash` key rather than a
