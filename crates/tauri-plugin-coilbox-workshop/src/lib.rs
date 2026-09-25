@@ -78,6 +78,7 @@ mod preflight;
 pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
+pub use inplace::{write as write_in_place, WriteOutcome as InPlaceWriteOutcome};
 pub use ledger::{build_ledger, BarSlotMiss, BarSlotRef, ChangeLedger, LedgerChange, UnitLedger};
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
