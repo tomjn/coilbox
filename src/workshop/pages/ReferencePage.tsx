@@ -10,13 +10,11 @@
  * are read side by side. A unit's name in the table links back to that
  * editor.
  *
- * Known gap, tracked as a follow-up: a slot a project has equipped with a
- * library weapon (`weaponLibrary.ts`, issue #2640) is not resolved here, so a
- * unit that fires an equipped weapon shows its own unequipped definition's
- * numbers instead. Every other project edit - overridden fields, a copied
- * unit, a weapon edited in place in the unit's own `weapondefs` - is
- * resolved, since `resolvedDef` writes an override to whichever path it
- * names, weapon fields included.
+ * A slot the project has equipped with a library weapon (`weaponLibrary.ts`,
+ * issue #2640) is resolved here too (issue #3081), the same way
+ * `UnitPage.tsx`'s editor resolves one, so a unit that fires an equipped
+ * weapon shows that weapon's numbers rather than its own unequipped
+ * definition's.
  */
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
@@ -47,6 +45,9 @@ export default function ReferencePage() {
   const edits = project?.edits ?? EMPTY_EDITS;
   const { overrides, text } = edits;
   const ownClones = edits.clones;
+  // Absent on a project saved before the library existed (issue #2640).
+  const library = edits.weapons ?? {};
+  const equipped = edits.equipped ?? {};
 
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
@@ -103,8 +104,14 @@ export default function ReferencePage() {
     const resolved: Record<string, Record<string, unknown>> = {};
     for (const [key, def] of Object.entries(units))
       resolved[key] = resolvedDef(def, overrides[key]);
-    return unitReferenceRows(resolved, defs.weaponDefs, nameOf);
-  }, [units, overrides, defs, nameOf]);
+    return unitReferenceRows(
+      resolved,
+      defs.weaponDefs,
+      nameOf,
+      library,
+      equipped,
+    );
+  }, [units, overrides, defs, nameOf, library, equipped]);
 
   const backTo = project ? projectPath(project.id) : "/workshop";
 

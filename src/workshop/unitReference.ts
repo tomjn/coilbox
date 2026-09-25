@@ -10,13 +10,14 @@
  * page (inside a project, `resolvedDef`'s answer for each unit) both call it
  * with whichever def is theirs to show, so the table and the comparison view
  * are the one thing the issue asked for rather than two.
+ *
+ * `library` and `unitEquipped` are optional: a project's weapon library
+ * (issue #2640, #3081), absent outside a project, in which case a slot's own
+ * definition is what fires, the same as before that feature existed.
  */
-import {
-  numberField,
-  type UnitDerivedStats,
-  unitDerivedStats,
-} from "./derivedStats";
-import { weaponSlots } from "./weaponSlots";
+import { numberField, type UnitDerivedStats } from "./derivedStats";
+import { unitEffectiveDerivedStats } from "./unitWeapons";
+import type { EquippedWeapons, WeaponLibrary } from "./weaponLibrary";
 
 /** One unit, its resolved fields and its derived numbers. */
 export interface UnitReferenceRow {
@@ -35,42 +36,28 @@ export interface UnitReferenceRow {
   derived: UnitDerivedStats;
 }
 
-/** A weapon slot's own `slaveTo` field, the unit's own weapon mount, which
- *  excludes a slaved weapon from the unit's summed DPS the same way
- *  `UnitPage.tsx`'s own reading of it does. */
-function slavedExclude(
-  table: Record<string, unknown> | undefined,
-): "slaved" | undefined {
-  if (!table) return undefined;
-  const key = Object.keys(table).find((k) => k.toLowerCase() === "slaveto");
-  const value = key ? table[key] : undefined;
-  return typeof value === "number" && value !== 0 ? "slaved" : undefined;
-}
-
 /**
  * One unit's reference row: its resolved fields plus `derivedStats.ts`'s
- * numbers for its weapons, read off `weaponSlots` the way `UnitPage.tsx`
- * feeds them in, minus the project-only concerns (overrides, an equipped
- * library weapon) a read-only reference has no need of.
+ * numbers for its actually-firing weapons (`unitWeapons.ts`), the same
+ * resolution `UnitPage.tsx`'s editor uses, so a slot the project has equipped
+ * with a library weapon (issue #2640) shows that weapon's numbers here too
+ * rather than the slot's own unequipped definition (issue #3081).
  */
 export function unitReferenceRow(
   key: string,
   name: string,
   def: Record<string, unknown>,
   weaponDefs: Record<string, Record<string, unknown>>,
+  library: WeaponLibrary = {},
+  unitEquipped: Record<string, string> | undefined = undefined,
 ): UnitReferenceRow {
-  const slots = weaponSlots(def, weaponDefs, [key]);
-  const weapons = slots.flatMap((slot) =>
-    slot.definition.kind === "missing"
-      ? []
-      : [
-          {
-            def: slot.definition.def,
-            excludeFromSum: slavedExclude(slot.table),
-          },
-        ],
+  const derived = unitEffectiveDerivedStats(
+    { def },
+    weaponDefs,
+    [key],
+    library,
+    unitEquipped,
   );
-  const derived = unitDerivedStats({ def }, weapons);
   const ranged = derived.weapons.filter((w) => w.weaponType !== "Shield");
   const maxRange = ranged.length
     ? Math.max(...ranged.map((w) => w.range))
@@ -90,14 +77,24 @@ export function unitReferenceRow(
   };
 }
 
-/** Every unit in `units`, as a reference row. */
+/** Every unit in `units`, as a reference row. `library` and `equipped` are a
+ *  project's weapon library store (issue #2640), absent outside a project. */
 export function unitReferenceRows(
   units: Record<string, Record<string, unknown>>,
   weaponDefs: Record<string, Record<string, unknown>>,
   nameOf: (key: string, def: Record<string, unknown>) => string,
+  library: WeaponLibrary = {},
+  equipped: EquippedWeapons = {},
 ): UnitReferenceRow[] {
   return Object.entries(units).map(([key, def]) =>
-    unitReferenceRow(key, nameOf(key, def), def, weaponDefs),
+    unitReferenceRow(
+      key,
+      nameOf(key, def),
+      def,
+      weaponDefs,
+      library,
+      equipped[key],
+    ),
   );
 }
 
