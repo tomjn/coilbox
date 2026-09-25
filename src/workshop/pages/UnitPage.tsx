@@ -78,6 +78,7 @@ import {
   Redo2,
   RotateCcw,
   Sigma,
+  Table2,
   Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -194,7 +195,7 @@ import {
   type ModProject,
   useModProjects,
 } from "../project";
-import { projectPath } from "../routes";
+import { projectPath, referencePath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
 import {
@@ -2047,6 +2048,20 @@ export default function UnitPage() {
                 <Sigma className="mr-1 size-3.5" />
                 Batch edit
               </Button>
+            )}
+            {/* The sortable table and comparison view over every unit in the
+              project, resolved through its own edits (issue #1316). Needs a
+              saved project: `/workshop/new` has no id for the route to name
+              and nothing of its own to resolve yet. */}
+            {project && defs && (
+              <Link
+                to={referencePath(project.id)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+                title="Every unit in this project, sortable and compared side by side"
+              >
+                <Table2 className="mr-1 size-3.5" />
+                Reference
+              </Link>
             )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
               and the fastest way to find out whether coilbox understood the

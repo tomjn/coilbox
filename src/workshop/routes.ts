@@ -75,3 +75,13 @@ export function unitEditPath(
   // with spaces in it ("Beyond All Reason test-...").
   return `/workshop/new?${new URLSearchParams({ game: gameName, unit: unitKey })}`;
 }
+
+/**
+ * A project's reference table and comparison view (issue #1316), resolved
+ * through that project's own overrides. `id` must name a saved project: the
+ * table has nothing to show for `/workshop/new`, since there is no project's
+ * edits to apply yet.
+ */
+export function referencePath(id: string): string {
+  return `/workshop/${id}/reference`;
+}

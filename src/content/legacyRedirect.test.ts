@@ -51,6 +51,18 @@ function pluginPaths(): string[] {
   return (contentPlugin.routes ?? []).flatMap((r) => (r.path ? [r.path] : []));
 }
 
+/**
+ * `library/` routes that never lived under `content/`, so they need no
+ * retired twin. Named here rather than left for the "lists every live
+ * library route as renamed" test to fail silently past, per that test's own
+ * point: a new page needs no redirect, but the omission has to be on
+ * purpose.
+ *
+ * - `games/:name/units/reference` (issue #1316): added straight under
+ *   `library/`, after the `content/` → `library/` move.
+ */
+const NEW_LIBRARY_ROUTES: readonly string[] = ["games/:name/units/reference"];
+
 describe("the content to library move", () => {
   it("kept a retired twin for every renamed path", () => {
     const paths = new Set(pluginPaths());
@@ -75,7 +87,9 @@ describe("the content to library move", () => {
     const live = pluginPaths()
       .filter((p) => p.startsWith("library/"))
       .map((p) => p.slice("library/".length));
-    expect(live.sort()).toEqual([...RENAMED_TO_LIBRARY].sort());
+    expect(live.sort()).toEqual(
+      [...RENAMED_TO_LIBRARY, ...NEW_LIBRARY_ROUTES].sort(),
+    );
   });
 
   it("left no live route under the old prefix", () => {

@@ -167,6 +167,18 @@ const contentPlugin: FramePlugin = {
       crumb: "Units",
     },
     {
+      // The reference table and comparison view for the game's own units
+      // (issue #1316). A static segment ahead of `library/games/:name/units/:unit`
+      // below, so react-router's static-over-dynamic ranking sends "reference"
+      // here rather than to that route's `:unit` param.
+      path: "library/games/:name/units/reference",
+      lazy: gateProfileHidden(
+        "library.games",
+        () => import("./pages/UnitReferencePage"),
+      ),
+      crumb: "Reference",
+    },
+    {
       // The crumb is the def key rather than the display name, because it
       // renders before the dataset is read. A def key is a worse label than a
       // name and a better one than nothing, the same trade the blueprint
