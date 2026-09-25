@@ -1,0 +1,8 @@
+[package]
+name = "coilbox-tdf"
+version = "0.0.0"
+description = "Reads Total Annihilation's key-value files (.fbi, .tdf) as the engine does, and changes one value while leaving every other byte alone."
+edition = "2021"
+license = "MIT"
+
+[dependencies]

@@ -922,6 +922,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-tdf"
+version = "0.0.0"
+
+[[package]]
 name = "coilbox-texture"
 version = "0.0.0"
 dependencies = [
@@ -940,6 +944,7 @@ name = "coilbox-unitpatch"
 version = "0.0.0"
 dependencies = [
  "coilbox-springlua",
+ "coilbox-tdf",
  "full_moon",
  "serde",
  "serde_json",
@@ -6383,6 +6388,7 @@ dependencies = [
  "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-proc",
+ "coilbox-tdf",
  "filetime",
  "flate2",
  "image 0.25.10",
@@ -6638,6 +6644,7 @@ dependencies = [
  "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-springlua",
+ "coilbox-tdf",
  "coilbox-unitpatch",
  "filetime",
  "picoframe-core",

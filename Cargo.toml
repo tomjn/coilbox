@@ -13,6 +13,7 @@ members = [
   "crates/coilbox-zerok-protocol",
   "crates/coilbox-springlua",
   "crates/coilbox-unitpatch",
+  "crates/coilbox-tdf",
   "crates/coilbox-gamebackup",
   "crates/coilbox-bos2lua",
   "crates/coilbox-unitpose",
