@@ -194,6 +194,75 @@ export function adoptBeforePost(
     : { clones: nextClones, weapons: nextWeapons };
 }
 
+/**
+ * What the game's post files do to one field, for the note beside it on the
+ * page (issue #3057).
+ *
+ * `changed` carries the value the game's own files hold there, before the
+ * post files ran. `added` is a field the game's files leave unset and the
+ * post files set. Both carry `loaded`, what the game ends up with.
+ */
+export type PostNote =
+  | { kind: "changed"; file: unknown; loaded: unknown }
+  | { kind: "added"; loaded: unknown };
+
+/** A value inside `value`, however each table spells the step. */
+function readFolded(value: unknown, steps: string[]): unknown {
+  let at = value;
+  for (const step of steps) {
+    if (at === null || typeof at !== "object") return undefined;
+    const table = at as Record<string, unknown>;
+    const key = Object.keys(table).find((k) => k.toLowerCase() === step);
+    if (key === undefined) return undefined;
+    at = table[key];
+  }
+  return at;
+}
+
+/**
+ * What `change` says the game's post files do to the field at `path`, or
+ * `undefined` when they leave it alone. `loaded` is the definition as the game
+ * ended up with it, which `change` was read against.
+ *
+ * A path inside a table the post files changed whole reads the game's value
+ * out of that table. A weapon slot's `def` and `name` say nothing: a post file
+ * turns the first into the second, and a name the modder types is kept.
+ */
+export function postNoteOf(
+  change: PostChange | undefined,
+  path: string,
+  loaded: Record<string, unknown> | undefined,
+): PostNote | undefined {
+  if (!change) return undefined;
+  const target = path.split(".").map((step) => step.toLowerCase());
+  const after = readFolded(loaded, target);
+  if (
+    target.length === 3 &&
+    target[0] === "weapons" &&
+    (target[2] === "def" || target[2] === "name")
+  )
+    return undefined;
+  /** The steps of `target` below `entry`, when `entry` is it or holds it. */
+  const below = (entry: string): string[] | undefined => {
+    const head = entry.split(".").map((step) => step.toLowerCase());
+    if (head.length > target.length) return undefined;
+    return head.every((step, i) => step === target[i])
+      ? target.slice(head.length)
+      : undefined;
+  };
+  for (const [entry, value] of Object.entries(change.values ?? {})) {
+    const rest = below(entry);
+    if (!rest) continue;
+    const file = readFolded(value, rest);
+    return file === undefined
+      ? { kind: "added", loaded: after }
+      : { kind: "changed", file, loaded: after };
+  }
+  return (change.added ?? []).some((entry) => below(entry))
+    ? { kind: "added", loaded: after }
+    : undefined;
+}
+
 /** Read a change out of untrusted JSON. `undefined` when it is not one. */
 export function parsePostChange(value: unknown): PostChange | undefined {
   if (typeof value !== "object" || value === null || Array.isArray(value))

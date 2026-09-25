@@ -5,6 +5,7 @@ import {
   copiedFrom,
   overlaps,
   parsePostChange,
+  postNoteOf,
   withoutEdited,
   withoutNames,
 } from "./beforePost";
@@ -141,5 +142,76 @@ describe("what the game's post files changed, on a copy (issue #3054)", () => {
     expect(parsePostChange({})).toEqual({});
     expect(parsePostChange("nope")).toBeUndefined();
     expect(parsePostChange(undefined)).toBeUndefined();
+  });
+});
+
+describe("what the game's post files do to a field, for the note beside it (issue #3057)", () => {
+  const change = {
+    values: {
+      "weapondefs.arm_berthacannon.cratermult": 0.1,
+      "weapons.0.def": "ARM_BERTHACANNON",
+      corpse: "DEAD",
+      "weapondefs.laser.damage": { default: 100 },
+    },
+    added: ["weapons.0.name", "customparams", "weapondefs.laser.cratermult"],
+  };
+  const loaded = {
+    ...ARMBRTHA_POST,
+    corpse: "dead",
+    customparams: { faction: "arm" },
+    weapondefs: {
+      ...ARMBRTHA_POST.weapondefs,
+      laser: { cratermult: 0.3, damage: { default: 30, subs: 3 } },
+    },
+  };
+  const note = (path: string) => postNoteOf(change, path, loaded);
+
+  it("gives the game's own value and the one it loads at a changed field", () => {
+    expect(note("weapondefs.arm_berthacannon.cratermult")).toEqual({
+      kind: "changed",
+      file: 0.1,
+      loaded: 0.009,
+    });
+    // However the page spells the path.
+    expect(note("Corpse")).toEqual({
+      kind: "changed",
+      file: "DEAD",
+      loaded: "dead",
+    });
+  });
+
+  it("reads a field inside a table the post files changed whole", () => {
+    expect(note("weapondefs.laser.damage.default")).toEqual({
+      kind: "changed",
+      file: 100,
+      loaded: 30,
+    });
+    // One the files never set inside it was the post files' own.
+    expect(note("weapondefs.laser.damage.subs")).toEqual({
+      kind: "added",
+      loaded: 3,
+    });
+  });
+
+  it("says when the post files set a field the game's files do not", () => {
+    expect(note("weapondefs.laser.cratermult")).toEqual({
+      kind: "added",
+      loaded: 0.3,
+    });
+    expect(note("customparams.faction")).toEqual({
+      kind: "added",
+      loaded: "arm",
+    });
+  });
+
+  it("says nothing about a slot's weapon name, which a typed name keeps", () => {
+    expect(note("weapons.0.name")).toBeUndefined();
+    expect(note("weapons.0.def")).toBeUndefined();
+  });
+
+  it("says nothing about a field the post files left alone", () => {
+    expect(note("weapondefs.arm_berthacannon.range")).toBeUndefined();
+    expect(note("weapondefs")).toBeUndefined();
+    expect(postNoteOf(undefined, "corpse", loaded)).toBeUndefined();
   });
 });
