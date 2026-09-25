@@ -32,6 +32,7 @@
 //! unitsync scan, and produces the same bytes on the machine that made the
 //! project and the machine that received it.
 
+use crate::before_post;
 use crate::lua::{lua_literal, lua_string, PatchTree};
 use crate::model::{
     through_a_position, BuildMenuOp, GameEdits, LibraryWeapon, ModProject, UnitClone,
@@ -210,7 +211,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // second time.
     let added_entries: Vec<(String, Value)> = added
         .iter()
-        .map(|clone| (clone.key.clone(), resolved_clone_def(clone, edits)))
+        .map(|clone| (clone.key.clone(), game_clone_def(clone, edits)))
         .collect();
     // Assigned rather than left as a plain table (issue #2962). BAR's
     // `tweakunits` route walks the units the game already has and merges a
@@ -255,7 +256,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
                 "The game defines {} too, so this has to be written after its definitions have loaded, and it replaces rather than merges.",
                 clone.key
             ),
-            lua: replace_block(clone, &resolved_clone_def(clone, edits)),
+            lua: replace_block(clone, &game_clone_def(clone, edits)),
         });
     }
 
@@ -489,7 +490,34 @@ pub fn compile(project: &ModProject) -> CompiledMod {
 /// The game has no unit of that name to follow, so there is nothing for a
 /// sparse patch to be sparse against (`src/workshop/clones.ts`).
 pub(crate) fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value {
+    clone_def(clone, edits, false)
+}
+
+/// A copy's definition as the mutator writes it, for the game's post files to
+/// run over (issue #3054).
+///
+/// [`resolved_clone_def`] with the game's own values put back first, wherever
+/// its post files changed one and the project has not changed it since. The
+/// copy then goes through the game's post-processing once, as its source did,
+/// rather than a second time on top of the values the page read.
+///
+/// The edit-in-place route keeps [`resolved_clone_def`]. It copies the source
+/// unit's own file and writes only what the copy changed, so the file's
+/// values are already there.
+fn game_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value {
+    clone_def(clone, edits, true)
+}
+
+fn clone_def(clone: &UnitClone, edits: &GameEdits, before_post: bool) -> Value {
     let mut def = clone.def.clone();
+    if let (true, Some(change)) = (before_post, &clone.before_post) {
+        let edited = edits
+            .overrides
+            .get(&clone.key)
+            .into_iter()
+            .flat_map(|patch| patch.keys().map(String::as_str));
+        before_post::restore(&mut def, change, edited);
+    }
     if let Some(patch) = edits.overrides.get(&clone.key) {
         for (path, value) in patch {
             let steps: Vec<&str> = path.split('.').collect();
@@ -593,9 +621,14 @@ fn equip_step(step: &str) -> Option<u64> {
 }
 
 /// A library weapon's definition as the game will read it: the definition it
-/// was copied with, and the changes the project made to it since.
+/// was copied with, put back the way the game's own files had it where its
+/// post files changed it (issue #3054), and the changes the project made to it
+/// since.
 pub(crate) fn library_def(weapon: &LibraryWeapon) -> Value {
     let mut def = weapon.def.clone();
+    if let Some(change) = &weapon.before_post {
+        before_post::restore(&mut def, change, weapon.changes.keys().map(String::as_str));
+    }
     for (path, value) in &weapon.changes {
         let steps: Vec<&str> = path.split('.').collect();
         write_path(&mut def, &steps, value.clone());

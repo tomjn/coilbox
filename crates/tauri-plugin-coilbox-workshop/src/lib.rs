@@ -62,6 +62,7 @@
 //! undoing it. See `diff`'s own doc comment.
 
 mod bar_pack;
+mod before_post;
 mod compile;
 mod decode;
 mod diff;
