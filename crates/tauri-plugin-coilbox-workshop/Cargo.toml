@@ -41,3 +41,6 @@ coilbox-gamebackup = { path = "../coilbox-gamebackup" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# Backdating a fixture game's mtime in the issue #2637 tests, so the write's
+# own touch has something older to move away from.
+filetime = "0.2"

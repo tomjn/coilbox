@@ -9,9 +9,13 @@
  * not, since the project still holds every change and writing again puts
  * them back.
  *
- * A text diff of what changed is #2636, and reloading the unit page after a
- * write is #2637. Until then the page can show the values from before the
- * write, and the note after a write says so.
+ * `onWritten` runs after write, undo or accept actually changes a file, so
+ * the caller can refresh whatever it reads with unitsync (issue #2637). The
+ * Rust side already bumps the game folder's own mtime so the next read is
+ * not served from the unitsync worker's own cache. This only needs to tell
+ * the frontend's caches to forget what they read before.
+ *
+ * A text diff of what changed is #2636.
  */
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
@@ -44,10 +48,14 @@ function plural(n: number, word: string): string {
 export function InPlaceWrite({
   gameDir,
   project,
+  onWritten,
 }: {
   /** The loose `.sdd` game's folder. */
   gameDir: string;
   project: ModProject | undefined;
+  /** Called after write, undo or accept actually changed a file on disk, so
+   *  the page can drop its own unitsync reads and fetch the game again. */
+  onWritten: () => void;
 }) {
   const [status, setStatus] = useState<InPlaceStatus | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -75,18 +83,22 @@ export function InPlaceWrite({
     setOutcome(null);
     try {
       if (kind === "write" && project) {
-        setOutcome(await workshopWriteInPlace({ gameDir, project }));
+        const written = await workshopWriteInPlace({ gameDir, project });
+        setOutcome(written);
+        if (written.written.length > 0) onWritten();
       } else if (kind === "undo") {
         const undone = await workshopUndoInPlace({ gameDir });
         const count = undone.restored.length + undone.deleted.length;
         setDone(
           `Put ${plural(count, "file")} back as ${count === 1 ? "it was" : "they were"}.`,
         );
+        if (count > 0) onWritten();
       } else if (kind === "accept") {
         const accepted = await workshopAcceptInPlace({ gameDir });
         setDone(
           `Kept the changes to ${plural(accepted.kept.length, "file")} and deleted the backups.`,
         );
+        if (accepted.kept.length > 0) onWritten();
       }
     } catch (e) {
       setError(message(e));
@@ -202,16 +214,10 @@ function WriteResult({ outcome }: { outcome: InPlaceWriteOutcome }) {
           </ul>
         </div>
       ) : outcome.written.length > 0 ? (
-        <>
-          <span>
-            Wrote {plural(outcome.changed, "change")} into{" "}
-            {outcome.written.join(", ")}.
-          </span>
-          <span className="text-muted-foreground">
-            The unit page can still show the values from before the write until
-            the game is read again.
-          </span>
-        </>
+        <span>
+          Wrote {plural(outcome.changed, "change")} into{" "}
+          {outcome.written.join(", ")}.
+        </span>
       ) : (
         <span>
           The game's files already hold every change, so nothing was written.

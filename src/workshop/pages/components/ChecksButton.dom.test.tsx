@@ -83,6 +83,7 @@ function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
         project={undefined}
         compatibility={null}
         onApplyFix={() => {}}
+        onInPlaceWrite={() => {}}
         {...props}
       />
     </MemoryRouter>,

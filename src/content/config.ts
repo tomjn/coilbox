@@ -749,6 +749,23 @@ export function useUnitsyncUnitDataset(
   return { dataset, status, reload, loading: status === "loading" };
 }
 
+/**
+ * Drop a game's session-cached unit dataset so the next `reload()` refetches
+ * from the worker instead of serving the cache. The same gap `reload()` alone
+ * has on `useUnitsyncGameInfo`: a ready result stays cached for the session,
+ * so a nonce bump reaches the effect but the cache lookup inside it still
+ * answers first. Needed after an in-place write changes what the game's units
+ * are (issue #2637).
+ */
+export function invalidateUnitDataset(
+  enginePath?: string,
+  dataDir?: string,
+  gameArchive?: string,
+) {
+  if (!enginePath || !dataDir || !gameArchive) return;
+  unitDatasetCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
+}
+
 /** Session cache of read models, keyed by `dataDir::engine::game::object`.
  *  Null for an object the game has no model for, so it is not asked again. */
 const unitModelCache = new Map<string, UnitModelResult | null>();

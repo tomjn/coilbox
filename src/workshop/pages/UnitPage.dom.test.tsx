@@ -80,6 +80,11 @@ let mockArchiveFiles: { path: string; size: number }[] = [];
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
+  // Only exercised through the edit-in-place route, which has its own
+  // coverage in `InPlaceWrite.dom.test.tsx`. Present here so a callback that
+  // reaches them does not crash on an undefined import.
+  invalidateGameInfo: () => {},
+  invalidateUnitDataset: () => {},
   useUnitsyncScan: () => ({
     data: { games: [GAME, GAME_2], maps: [] },
     loading: false,
@@ -98,6 +103,7 @@ vi.mock("@/content/config", () => ({
   useUnitsyncGameInfo: () => ({
     info: { sides: mockSides, options: mockGameOptions },
     status: "ready",
+    reload: () => {},
     loading: false,
   }),
   useUnitsyncUnitBuildpics: () => mockBuildpics,

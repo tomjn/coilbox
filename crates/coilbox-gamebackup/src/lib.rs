@@ -27,6 +27,24 @@ pub fn is_sdd(game_dir: &Path) -> bool {
         && game_dir.is_dir()
 }
 
+/// Set `game_dir`'s own mtime to now (issue #2637).
+///
+/// A `.sdd` is a directory, and both the engine's archive scanner and
+/// coilbox's own unitsync worker cache treat that directory's own mtime as
+/// the archive's file identity. Renaming a file inside `units/` moves the
+/// containing subdirectory's mtime, never the game folder's own, so a write,
+/// undo or accept that changes what is on disk leaves every one of those
+/// caches looking at the game's old identity and answering with what it read
+/// before. Bumping the game folder's own mtime after a change gives the next
+/// scan a new identity to key its answer on, in both caches at once, without
+/// needing to find and evict any entry by hand.
+///
+/// Best effort: a failure here leaves the cache stale rather than losing any
+/// of the write it followed, so it is never treated as the write's own error.
+pub fn touch(game_dir: &Path) {
+    let _ = filetime::set_file_mtime(game_dir, filetime::FileTime::now());
+}
+
 /// Whether `game_dir` sits directly in a folder named `games`, the only place
 /// a content root keeps the games the engine loads.
 pub fn in_games_dir(game_dir: &Path) -> bool {
