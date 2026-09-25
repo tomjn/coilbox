@@ -62,6 +62,11 @@ import {
   type InPlaceDone,
   settleInPlace,
 } from "./inPlaceProject";
+import {
+  type MutatorOnly,
+  parseMutatorOnly,
+  setMutatorOnly,
+} from "./mutatorOnly";
 import type { UnitOverrides } from "./overrides";
 import { overrideCount } from "./overrides";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
@@ -255,6 +260,17 @@ export interface ModProject {
    * not leave the project reporting coilbox's own write as a game update.
    */
   checksumBeforeInPlace?: string;
+  /**
+   * Field changes sent through the mutator route because the edit-in-place
+   * route cannot write them (issue #2633). See `mutatorOnly.ts`. Absent when
+   * nothing has been sent that way.
+   *
+   * Carried in the container payload, unlike `writtenInPlace`: it is the
+   * author's decision about where a change goes, and whoever imports the
+   * project against the same game would otherwise have to make it again for
+   * every field before an in-place write would go through.
+   */
+  mutatorOnly?: MutatorOnly;
   createdAt: string;
   updatedAt: string;
 }
@@ -268,6 +284,7 @@ export interface NewProject {
   authoredChecksum?: string;
   edits?: GameEdits;
   readOnlyLua?: ReadOnlyLuaBlock[];
+  mutatorOnly?: MutatorOnly;
 }
 
 /** A name for a project nobody has named: the game, and which one it is. */
@@ -313,6 +330,9 @@ export function useModProjects() {
         : {}),
       edits: input.edits ?? EMPTY_EDITS,
       ...(input.readOnlyLua?.length ? { readOnlyLua: input.readOnlyLua } : {}),
+      ...(input.mutatorOnly && Object.keys(input.mutatorOnly).length > 0
+        ? { mutatorOnly: input.mutatorOnly }
+        : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -419,6 +439,30 @@ export function useModProjects() {
       if (!target) return prev;
       const next = adoptChecksum(target, read);
       return next === target ? prev : prev.map((p) => (p.id === id ? next : p));
+    });
+  }
+
+  /**
+   * Send one field change through the mutator route, or take it back, for a
+   * field the edit-in-place route cannot write (issue #2633). See
+   * `mutatorOnly.ts`. Not an edit to what the project changes, so
+   * `updatedAt` is left alone and it is no undo step.
+   */
+  function routeThroughMutator(
+    id: string,
+    unit: string,
+    field: string,
+    on: boolean,
+  ) {
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const marks = setMutatorOnly(target.mutatorOnly, unit, field, on);
+      if (marks === target.mutatorOnly) return prev;
+      const { mutatorOnly: _dropped, ...rest } = target;
+      const next: ModProject =
+        Object.keys(marks).length > 0 ? { ...rest, mutatorOnly: marks } : rest;
+      return prev.map((p) => (p.id === id ? next : p));
     });
   }
 
@@ -535,6 +579,7 @@ export function useModProjects() {
     recordAuthoredChecksum,
     settleInPlaceAction,
     adoptInPlaceChecksum,
+    routeThroughMutator,
     recordPackagedVersion,
     updateProjectDetails,
     duplicateProject,
@@ -587,6 +632,9 @@ export interface ModProjectPayload {
   authoredChecksum?: string;
   edits: GameEdits;
   readOnlyLua?: ReadOnlyLuaBlock[];
+  /** Optional and additive, so the kind version stays where it is (issue
+   *  #2633). */
+  mutatorOnly?: MutatorOnly;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -608,6 +656,9 @@ export function modProjectPayload(
     edits: project.edits,
     ...(project.readOnlyLua?.length
       ? { readOnlyLua: project.readOnlyLua }
+      : {}),
+    ...(project.mutatorOnly && Object.keys(project.mutatorOnly).length > 0
+      ? { mutatorOnly: project.mutatorOnly }
       : {}),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -885,6 +936,7 @@ export function parseModProjectJson(text: string): ImportedProject | null {
   const description =
     typeof payload.description === "string" ? payload.description.trim() : "";
   const readOnlyLua = parseReadOnlyLua(payload.readOnlyLua);
+  const mutatorOnly = parseMutatorOnly(payload.mutatorOnly);
   return {
     name,
     ...(description ? { description } : {}),
@@ -895,5 +947,6 @@ export function parseModProjectJson(text: string): ImportedProject | null {
       : {}),
     edits: parseGameEdits(payload.edits),
     ...(readOnlyLua.length ? { readOnlyLua } : {}),
+    ...(Object.keys(mutatorOnly).length > 0 ? { mutatorOnly } : {}),
   };
 }

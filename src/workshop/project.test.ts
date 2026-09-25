@@ -32,6 +32,7 @@ import {
   editSlot,
   type GameEdits,
   isEmptyEdits,
+  MOD_PROJECT_KIND_VERSION,
   modProjectCode,
   modProjectJson,
   parseGameEdits,
@@ -190,6 +191,33 @@ describe("a project survives being closed", () => {
     const imported = parseModProjectJson(modProjectJson(project));
 
     expect(imported?.readOnlyLua).toEqual(project.readOnlyLua);
+  });
+
+  /**
+   * Issue #2633. Which changes go through the mutator route is the author's
+   * decision, so it survives a share, as an optional field that leaves the
+   * kind version where it was.
+   */
+  it("carries the changes sent to the mutator route across a share", () => {
+    const project = {
+      id: "whatever",
+      name: "Heavier wolves",
+      gameName: "MechCommander: Legacy",
+      edits: EMPTY_EDITS,
+      mutatorOnly: { wf_direwolf_p: ["customparams.speed", "maxDamage"] },
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+
+    const json = modProjectJson(project);
+    expect(JSON.parse(json).kindVersion).toBe(MOD_PROJECT_KIND_VERSION);
+    expect(MOD_PROJECT_KIND_VERSION).toBe(1);
+    expect(parseModProjectJson(json)?.mutatorOnly).toEqual(project.mutatorOnly);
+
+    const { mutatorOnly: _none, ...plain } = project;
+    expect(parseModProjectJson(modProjectJson(plain))?.mutatorOnly).toBe(
+      undefined,
+    );
   });
 
   it("is a container anything can recognise without opening it", () => {
@@ -563,6 +591,32 @@ describe("recordPackagedVersion", () => {
     const imported = parseModProjectJson(modProjectJson(project));
     expect(imported).toBeDefined();
     expect(imported).not.toHaveProperty("distributionVersion");
+  });
+});
+
+describe("routeThroughMutator", () => {
+  it("marks one change for the mutator route and takes the mark back off", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    let id = "";
+    act(() => {
+      id = result.current.createProject({ name: "p", gameName: "g" }).id;
+    });
+    const updatedAt = result.current.projects[0]?.updatedAt;
+
+    act(() => {
+      result.current.routeThroughMutator(id, "brv", "trackwidth", true);
+    });
+    const marked = result.current.projects.find((p) => p.id === id);
+    expect(marked?.mutatorOnly).toEqual({ brv: ["trackwidth"] });
+    // Where a change goes is not an edit to what the project changes.
+    expect(marked?.updatedAt).toBe(updatedAt);
+
+    act(() => {
+      result.current.routeThroughMutator(id, "brv", "trackwidth", false);
+    });
+    expect(result.current.projects.find((p) => p.id === id)).not.toHaveProperty(
+      "mutatorOnly",
+    );
   });
 });
 
