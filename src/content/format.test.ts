@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isDeletableArchive } from "./format";
+import { isDeletableArchive, isEditInPlaceEligible } from "./format";
 
 describe("isDeletableArchive", () => {
   it("accepts downloaded games, maps and rapid packages", () => {
@@ -32,5 +32,34 @@ describe("isDeletableArchive", () => {
     expect(isDeletableArchive("bar.sd7")).toBe(false);
     expect(isDeletableArchive(null)).toBe(false);
     expect(isDeletableArchive(undefined)).toBe(false);
+  });
+});
+
+describe("isEditInPlaceEligible", () => {
+  it("accepts a loose .sdd directly under a content root's games folder", () => {
+    expect(isEditInPlaceEligible("/data/spring/games/dev.sdd")).toBe(true);
+    expect(isEditInPlaceEligible("C:\\spring\\games\\dev.sdd")).toBe(true);
+  });
+
+  it("is case-insensitive on both the folder and the extension", () => {
+    expect(isEditInPlaceEligible("/data/spring/Games/dev.SDD")).toBe(true);
+  });
+
+  it("rejects a packed archive, even one under games", () => {
+    expect(isEditInPlaceEligible("/data/spring/games/bar.sd7")).toBe(false);
+    expect(isEditInPlaceEligible("/data/spring/games/bar.sdz")).toBe(false);
+  });
+
+  it("rejects a .sdd that is not directly under a games folder", () => {
+    expect(isEditInPlaceEligible("/data/spring/maps/dev.sdd")).toBe(false);
+    expect(isEditInPlaceEligible("/data/spring/games/nested/dev.sdd")).toBe(
+      false,
+    );
+  });
+
+  it("rejects a missing or unresolved path", () => {
+    expect(isEditInPlaceEligible(null)).toBe(false);
+    expect(isEditInPlaceEligible(undefined)).toBe(false);
+    expect(isEditInPlaceEligible("")).toBe(false);
   });
 });

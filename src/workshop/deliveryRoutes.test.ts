@@ -99,4 +99,33 @@ describe("deliveryRoutes", () => {
     const slots = routes.find((r) => r.route === "tweak-slots");
     expect(slots?.available).toBe(true);
   });
+
+  it("refuses the edit-in-place route when no game path is given", () => {
+    const routes = deliveryRoutes([], "Some Game");
+    const inPlace = routes.find((r) => r.route === "edit-in-place");
+    expect(inPlace?.available).toBe(false);
+  });
+
+  it("refuses the edit-in-place route for a packed archive", () => {
+    const routes = deliveryRoutes(
+      [],
+      "Some Game",
+      "/data/spring/games/some-game.sdz",
+    );
+    const inPlace = routes.find((r) => r.route === "edit-in-place");
+    expect(inPlace?.available).toBe(false);
+    expect(inPlace?.detail).toContain("not a loose .sdd game");
+  });
+
+  it("offers the edit-in-place route for a loose .sdd under a games folder", () => {
+    const routes = deliveryRoutes(
+      [],
+      "Dev Game",
+      "/data/spring/games/dev-game.sdd",
+    );
+    const inPlace = routes.find((r) => r.route === "edit-in-place");
+    expect(inPlace?.available).toBe(true);
+    expect(inPlace?.detail).toContain("Dev Game");
+    expect(inPlace?.detail).toContain("not built yet");
+  });
 });

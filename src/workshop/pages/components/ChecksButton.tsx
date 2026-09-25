@@ -3,8 +3,8 @@
  *
  * Six toolbar buttons landed on this page in the same handful of days, three
  * of which answer the same question: diagnostics reports what unitsync said
- * reading the game's definitions, delivery routes says which of the two ways
- * an edit reaches a game this game supports, and preflight reports what is
+ * reading the game's definitions, delivery routes says which of the ways an
+ * edit reaches a game this game supports, and preflight reports what is
  * wrong with the compiled output. Next to each other they read as three
  * buttons rather than one answer, and all three were styled like the actions
  * beside them (Lua, Test), which mixes a verdict with a thing you do.
@@ -226,10 +226,15 @@ function CompatibilitySection({
 function RoutesSection({
   gameName,
   options,
+  gamePath,
   checking,
 }: {
   gameName: string;
   options: ConfigOption[] | undefined;
+  /** The game's on-disk path, so the edit-in-place route can tell a loose
+   *  `.sdd` under a content root's `games` folder from anything else
+   *  (issue #2631). Undefined before a scan target resolves it. */
+  gamePath: string | undefined;
   checking: boolean;
 }) {
   return (
@@ -246,7 +251,7 @@ function RoutesSection({
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {deliveryRoutes(options, gameName).map((r) => (
+          {deliveryRoutes(options, gameName, gamePath).map((r) => (
             <li key={r.route} className="flex gap-2">
               {r.available ? (
                 <CircleCheck className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
@@ -753,6 +758,7 @@ export function ChecksButton({
           <RoutesSection
             gameName={gameName}
             options={routeOptions}
+            gamePath={gameArchives[0]?.path}
             checking={routesChecking}
           />
           <PostHookSection
