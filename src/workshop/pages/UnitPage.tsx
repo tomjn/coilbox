@@ -137,6 +137,7 @@ import {
 import { compatibilityState } from "../compatibility";
 import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
+import { unitDerivedStats, type WeaponInput } from "../derivedStats";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
 import type { FieldProbe } from "../inPlace";
@@ -232,6 +233,7 @@ import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
 import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
+import { DerivedStatsStrip } from "./components/DerivedStatsStrip";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PackageMutatorButton } from "./components/PackageMutatorButton";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
@@ -677,6 +679,42 @@ export default function UnitPage() {
         ),
       ),
     [edited, unitName, owners, weaponDefs, library, unitEquipped],
+  );
+
+  // DPS, alpha damage and the rest of the numbers players argue about (issue
+  // #2644), off the same resolved values everything else on the page reads:
+  // a library weapon equipped into a slot stands in for the game's own
+  // (issue #2640), and a definition the unit carries itself reads through
+  // the project's overrides the same way a field row does. A slot naming
+  // nothing (`kind: "missing"`) fires nothing, so it contributes nothing.
+  const derivedWeapons = useMemo((): WeaponInput[] => {
+    return slots.flatMap((s): WeaponInput[] => {
+      const fires = unitEquipped?.[s.step];
+      const equippedWeapon = fires ? library[fires] : undefined;
+      const def = equippedWeapon
+        ? libraryWeaponDef(equippedWeapon)
+        : s.definition.kind === "own"
+          ? ((readPath(edited, s.definition.path) as
+              | Record<string, unknown>
+              | undefined) ?? s.definition.def)
+          : s.definition.kind === "shared"
+            ? s.definition.def
+            : undefined;
+      if (!def) return [];
+      // `slaveTo` is the unit's own weapon mount field, a weapon number
+      // (1-based) it fires alongside, 0 meaning not slaved
+      // (`UnitDef.cpp`'s `slavedTo`).
+      const slaveToKey = s.table
+        ? Object.keys(s.table).find((k) => k.toLowerCase() === "slaveto")
+        : undefined;
+      const slaveTo = slaveToKey ? s.table?.[slaveToKey] : undefined;
+      const slaved = typeof slaveTo === "number" && slaveTo !== 0;
+      return [{ def, excludeFromSum: slaved ? "slaved" : undefined }];
+    });
+  }, [slots, unitEquipped, library, edited]);
+  const derived = useMemo(
+    () => unitDerivedStats({ def: edited }, derivedWeapons),
+    [edited, derivedWeapons],
   );
 
   // Which of the fields on screen the edit-in-place route could write into
@@ -2021,6 +2059,12 @@ export default function UnitPage() {
                     </ToggleGroup>
                   </div>
                 </div>
+
+                {/* DPS, alpha damage and the rest of the numbers players
+                  argue about (issue #2644), recomputed as the project's
+                  overrides change. Nothing is drawn for a figure
+                  `derivedStats.ts` could not compute honestly. */}
+                <DerivedStatsStrip stats={derived} />
 
                 {/* The unit's own fields or its weapons (issue #2639), and
                   how much of whichever it is the list below is showing. The
