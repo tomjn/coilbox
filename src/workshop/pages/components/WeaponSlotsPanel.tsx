@@ -12,6 +12,11 @@
  * game's (issue #2640), which is how a unit gets its own copy of a weapon it
  * mounts from the game's shared table (issue #3052). Those fields are the
  * library weapon's, so they go to their own writer rather than the unit's.
+ *
+ * Below the slots are the definitions the unit carries and no slot mounts,
+ * such as a cluster munition's child (issue #2641, `weaponRefs.ts`). Their
+ * fields are the unit's own, edited the way a mounted definition's are, and a
+ * reference on the unit that names nothing is listed above both.
  */
 import { Button } from "@picoframe/frame";
 import { Undo2 } from "lucide-react";
@@ -23,7 +28,13 @@ import type { UnitOverrides } from "../../overrides";
 import type { FieldRow } from "../../unitSections";
 import type { WeaponLibrary } from "../../weaponLibrary";
 import {
+  librarySupport,
+  type RefProblem,
+  type SupportingDef,
+} from "../../weaponRefs";
+import {
   slotEditCount,
+  supportingEditCount,
   type WeaponSlot,
   type WeaponSlotView,
 } from "../../weaponSlots";
@@ -57,11 +68,16 @@ export function WeaponSlotsPanel({
   onChange,
   onReset,
   library,
+  supporting = [],
+  selectedSupport,
+  onSelectSupport,
+  problems = [],
 }: {
   slots: WeaponSlot[];
-  /** The slot on screen, which is always one of `slots` when there are any. */
+  /** The slot on screen, which is always one of `slots` when there are any
+   *  and no supporting definition is on screen instead. */
   selected: WeaponSlot | undefined;
-  /** The selected slot's fields, grouped. */
+  /** The selected slot's fields, or the supporting definition's, grouped. */
   view: WeaponSlotView | null;
   overrides: UnitOverrides;
   unitKey: string;
@@ -77,21 +93,39 @@ export function WeaponSlotsPanel({
   /** The project's weapon library, and what the panel can do with it (issue
    *  #2640). */
   library: SlotLibrary;
+  /** The definitions the unit carries and no slot mounts (issue #2641). */
+  supporting?: SupportingDef[];
+  /** The supporting definition on screen, by key, in place of a slot. */
+  selectedSupport?: string;
+  onSelectSupport?: (key: string) => void;
+  /** References on this unit that name nothing (issue #2641). */
+  problems?: RefProblem[];
 }) {
-  if (slots.length === 0)
+  if (slots.length === 0 && supporting.length === 0)
     return (
       <p className="text-sm text-muted-foreground">This unit has no weapons.</p>
     );
+  const onSlot = selectedSupport === undefined ? selected : undefined;
 
   return (
     <div className="flex flex-col gap-4">
+      {problems.length > 0 && (
+        <ul
+          className="flex max-w-prose flex-col gap-1 text-xs text-destructive"
+          aria-label="Weapon references that name nothing"
+        >
+          {problems.map((problem) => (
+            <li key={problem.id}>{problem.message}</li>
+          ))}
+        </ul>
+      )}
       <ToggleGroup
         type="single"
         variant="outline"
         size="sm"
         spacing={1}
         className="flex-wrap"
-        value={selected?.step ?? ""}
+        value={onSlot?.step ?? ""}
         onValueChange={(step) => step && onSelect(step)}
         aria-label="Weapon slot"
       >
@@ -126,18 +160,65 @@ export function WeaponSlotsPanel({
         })}
       </ToggleGroup>
 
-      {selected && (
+      {supporting.length > 0 && (
+        <div className="flex flex-col gap-1.5">
+          <p className="text-xs text-muted-foreground" id="supporting-defs">
+            Supporting definitions: carried by this unit, mounted in no slot
+          </p>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            className="flex-wrap"
+            value={selectedSupport ?? ""}
+            onValueChange={(key) => key && onSelectSupport?.(key)}
+            aria-labelledby="supporting-defs"
+          >
+            {supporting.map((support) => {
+              const changed = supportingEditCount(support, overrides, unitKey);
+              return (
+                <ToggleGroupItem
+                  key={support.key}
+                  value={support.key}
+                  aria-label={`Supporting definition ${support.key}`}
+                  title={
+                    support.usedBy.length > 0
+                      ? `Named by ${support.usedBy.map((u) => `${u.from}'s ${u.field}`).join(" and ")}`
+                      : support.key
+                  }
+                  className="gap-1.5"
+                >
+                  <span className="max-w-48 truncate font-mono text-xs">
+                    {support.key}
+                  </span>
+                  {changed > 0 && (
+                    <span
+                      className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
+                      title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                    >
+                      {changed}
+                    </span>
+                  )}
+                </ToggleGroupItem>
+              );
+            })}
+          </ToggleGroup>
+        </div>
+      )}
+
+      {onSlot && (
         <SlotWeaponActions
-          slot={selected}
+          slot={onSlot}
           library={library}
-          fires={library.equippedIn(selected.step)}
+          fires={library.equippedIn(onSlot.step)}
         />
       )}
 
-      {selected?.definition.kind === "missing" &&
-        !library.equippedIn(selected.step) && (
+      {onSlot?.definition.kind === "missing" &&
+        !library.equippedIn(onSlot.step) && (
           <p className="max-w-prose text-xs text-destructive">
-            No weapon definition in this game is called {selected.name}, so the
+            No weapon definition in this game is called {onSlot.name}, so the
             engine leaves this slot empty.
           </p>
         )}
@@ -158,7 +239,7 @@ export function WeaponSlotsPanel({
             onChange={onChange}
             onReset={onReset}
           />
-          {view.library && selected && (
+          {view.library && onSlot && (
             <UnitFieldGroups
               view={{
                 groups: [view.library],
@@ -169,13 +250,13 @@ export function WeaponSlotsPanel({
               assets={assets}
               inheritedLabel="Copied value"
               post={(row) =>
-                library.postOf(library.equippedIn(selected.step), row)
+                library.postOf(library.equippedIn(onSlot.step), row)
               }
               onChange={(row, value) =>
-                library.onChange(library.equippedIn(selected.step), row, value)
+                library.onChange(library.equippedIn(onSlot.step), row, value)
               }
               onReset={(row) =>
-                library.onReset(library.equippedIn(selected.step), row)
+                library.onReset(library.equippedIn(onSlot.step), row)
               }
             />
           )}
@@ -218,6 +299,7 @@ function SlotWeaponActions({
 }) {
   const shared = !fires && slot.definition.kind === "shared";
   const copySource = fires ? undefined : library.copySourceOf(slot);
+  const brings = fires ? librarySupport(library.weapons, fires) : [];
   return (
     <div className="flex flex-wrap items-center gap-2">
       {fires && (
@@ -226,6 +308,18 @@ function SlotWeaponActions({
           <span className="font-mono text-foreground">{fires}</span> from the
           project's weapon library, in place of{" "}
           <span className="font-mono">{slot.name}</span>.
+          {brings.length > 0 && (
+            <>
+              {" "}
+              It names{" "}
+              <span className="font-mono text-foreground">
+                {brings.join(", ")}
+              </span>
+              , which {brings.length === 1 ? "goes" : "go"} into{" "}
+              {library.unitName} beside it. Change{" "}
+              {brings.length === 1 ? "it" : "them"} in the weapon library.
+            </>
+          )}
         </p>
       )}
       <EquipWeaponPopover
