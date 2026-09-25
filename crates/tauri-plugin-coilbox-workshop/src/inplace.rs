@@ -48,6 +48,19 @@ pub struct Refused {
     pub location: Option<Location>,
 }
 
+/// One field change the game's files hold once a write has gone through,
+/// whether this write put it there or the file already said the same.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Carried {
+    pub unit: String,
+    /// The field's dotted path, as the project holds it.
+    pub field: String,
+    /// Whether the unit's file has a workshop backup, so undo takes this
+    /// change back out of the game (issue #3023).
+    pub undoable: bool,
+}
+
 /// What a write did.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,6 +76,9 @@ pub struct WriteOutcome {
     pub refused: Vec<Refused>,
     /// Parts of the project this route cannot carry yet, one sentence each.
     pub not_carried: Vec<String>,
+    /// Every field change the game's files now hold, so the project can stop
+    /// holding it (issue #3023). Empty when anything was refused.
+    pub carried: Vec<Carried>,
 }
 
 /// How many files carry a workshop backup or created marker.
@@ -319,6 +335,8 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
     }
     let files: Vec<PathBuf> = texts.keys().cloned().collect();
     let originals = texts.clone();
+    // Which file each accepted change landed in, to say whether undo reaches it.
+    let mut held: Vec<(&str, &str, PathBuf)> = Vec::new();
 
     for UnitChanges { unit, edits } in units {
         let (_, first) = &edits[0];
@@ -362,8 +380,12 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
                 Ok(patched) if patched.changed => {
                     outcome.changed += 1;
                     texts.insert(file.clone(), patched.text);
+                    held.push((unit, *field, file.clone()));
                 }
-                Ok(_) => outcome.unchanged += 1,
+                Ok(_) => {
+                    outcome.unchanged += 1;
+                    held.push((unit, *field, file.clone()));
+                }
                 Err(refusal) => outcome.refused.push(Refused {
                     unit: unit.to_string(),
                     field: field.to_string(),
@@ -389,6 +411,15 @@ pub fn write(game_dir: &Path, project: &ModProject) -> Result<WriteOutcome, Stri
         MARKERS.write(file, text.as_bytes())?;
         outcome.written.push(rel(file));
     }
+    outcome.carried = held
+        .into_iter()
+        .map(|(unit, field, file)| Carried {
+            unit: unit.to_string(),
+            field: field.to_string(),
+            undoable: coilbox_gamebackup::with_suffix(&file, MARKERS.backup).exists()
+                || coilbox_gamebackup::with_suffix(&file, MARKERS.created).exists(),
+        })
+        .collect();
     // The unitsync worker and the engine's own archive cache both key a loose
     // game on its folder's own mtime (issue #2637), which a write under
     // `units/` never moves on its own.
@@ -573,6 +604,53 @@ mod tests {
             before
         );
         assert_eq!(status(&game).backups, 1);
+    }
+
+    #[test]
+    fn a_write_says_which_changes_the_game_now_holds_and_which_undo_reaches() {
+        let (_root, game) = game();
+        // The BRV's tonnage is already 80 in its file, so the write leaves
+        // that file alone and no backup of it exists to undo.
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({
+                "brv": { "customparams.tonnage": 80 },
+                "armdfly": { "metalcost": 400 },
+            })),
+        )
+        .unwrap();
+
+        let mut carried = outcome.carried.clone();
+        carried.sort_by(|a, b| a.unit.cmp(&b.unit));
+        assert_eq!(
+            carried,
+            vec![
+                Carried {
+                    unit: "armdfly".into(),
+                    field: "metalcost".into(),
+                    undoable: true,
+                },
+                Carried {
+                    unit: "brv".into(),
+                    field: "customparams.tonnage".into(),
+                    undoable: false,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_refused_write_says_the_game_holds_nothing() {
+        let (_root, game) = game();
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({
+                "armdfly": { "metalcost": 400, "health": 2000 },
+            })),
+        )
+        .unwrap();
+        assert!(!outcome.refused.is_empty());
+        assert!(outcome.carried.is_empty(), "{:?}", outcome.carried);
     }
 
     #[test]

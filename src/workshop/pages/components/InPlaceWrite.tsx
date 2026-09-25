@@ -6,14 +6,19 @@
  * backup, read from disk when this mounts, so they are there after a restart
  * as well as after a write in this session. Accept asks first, because it
  * deletes the backups and nothing can undo the write after that. Undo does
- * not, since the project still holds every change and writing again puts
- * them back.
+ * not, since it puts the written fields back into the project (issue #3023)
+ * and writing again puts them back into the game.
  *
- * `onWritten` runs after write, undo or accept actually changes a file, so
- * the caller can refresh whatever it reads with unitsync (issue #2637). The
- * Rust side already bumps the game folder's own mtime so the next read is
- * not served from the unitsync worker's own cache. This only needs to tell
- * the frontend's caches to forget what they read before.
+ * `onDone` runs after each action that went through, saying what it did, so
+ * the caller can move the written fields out of the project or back in
+ * (issue #3023) and refresh whatever it reads with unitsync when a file
+ * changed (issue #2637). The Rust side already bumps the game folder's own
+ * mtime so the next read is not served from the unitsync worker's own cache.
+ *
+ * `reading` holds the actions off while the page reads the game again. The
+ * project follows the game's checksum from one read to the next, and a
+ * second action pressed before the first one's read landed would be measured
+ * against the game as it was before either.
  *
  * A text diff of what changed is #2636.
  */
@@ -33,6 +38,7 @@ import {
   workshopUndoInPlace,
   workshopWriteInPlace,
 } from "../../inPlace";
+import type { InPlaceDone } from "../../inPlaceProject";
 import type { ModProject } from "../../project";
 
 type Busy = "write" | "undo" | "accept" | null;
@@ -48,14 +54,16 @@ function plural(n: number, word: string): string {
 export function InPlaceWrite({
   gameDir,
   project,
-  onWritten,
+  reading,
+  onDone,
 }: {
   /** The loose `.sdd` game's folder. */
   gameDir: string;
   project: ModProject | undefined;
-  /** Called after write, undo or accept actually changed a file on disk, so
-   *  the page can drop its own unitsync reads and fetch the game again. */
-  onWritten: () => void;
+  /** The page is reading the game again, so nothing can be pressed yet. */
+  reading: boolean;
+  /** Called after write, undo or accept went through, with what it did. */
+  onDone: (done: InPlaceDone) => void;
 }) {
   const [status, setStatus] = useState<InPlaceStatus | null>(null);
   const [busy, setBusy] = useState<Busy>(null);
@@ -85,20 +93,25 @@ export function InPlaceWrite({
       if (kind === "write" && project) {
         const written = await workshopWriteInPlace({ gameDir, project });
         setOutcome(written);
-        if (written.written.length > 0) onWritten();
+        if (written.refused.length === 0)
+          onDone({
+            kind: "write",
+            carried: written.carried,
+            changed: written.written.length > 0,
+          });
       } else if (kind === "undo") {
         const undone = await workshopUndoInPlace({ gameDir });
         const count = undone.restored.length + undone.deleted.length;
         setDone(
           `Put ${plural(count, "file")} back as ${count === 1 ? "it was" : "they were"}.`,
         );
-        if (count > 0) onWritten();
+        onDone({ kind: "undo", changed: count > 0 });
       } else if (kind === "accept") {
         const accepted = await workshopAcceptInPlace({ gameDir });
         setDone(
           `Kept the changes to ${plural(accepted.kept.length, "file")} and deleted the backups.`,
         );
-        if (accepted.kept.length > 0) onWritten();
+        onDone({ kind: "accept", changed: accepted.kept.length > 0 });
       }
     } catch (e) {
       setError(message(e));
@@ -119,7 +132,7 @@ export function InPlaceWrite({
         <Button
           size="sm"
           variant="outline"
-          disabled={!project || !hasFieldChanges || busy !== null}
+          disabled={!project || !hasFieldChanges || busy !== null || reading}
           onClick={() => void run("write")}
         >
           {busy === "write" ? "Writing…" : "Write changes into the game"}
@@ -129,14 +142,18 @@ export function InPlaceWrite({
             <Button
               size="sm"
               variant="outline"
-              disabled={busy !== null}
+              disabled={busy !== null || reading}
               onClick={() => void run("undo")}
             >
               {busy === "undo" ? "Undoing…" : "Undo"}
             </Button>
             <Popover open={confirmAccept} onOpenChange={setConfirmAccept}>
               <PopoverTrigger asChild>
-                <Button size="sm" variant="outline" disabled={busy !== null}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy !== null || reading}
+                >
                   {busy === "accept" ? "Accepting…" : "Accept"}
                 </Button>
               </PopoverTrigger>

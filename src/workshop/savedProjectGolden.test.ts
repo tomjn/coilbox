@@ -113,6 +113,12 @@ function buildProject(): ModProject {
     game: { name: "Balanced Annihilation V15.9.8", shortname: "BA" },
     authoredChecksum: "c6a15f1f",
     edits: buildEdits(),
+    // What an in-place write moved out of the override set and kept for undo
+    // (issue #3023). Beside `edits` rather than in it, so the Rust model
+    // ignores both fields, and this proves it still parses a project that
+    // holds them.
+    writtenInPlace: { armpw: { metalCost: 60 } },
+    checksumBeforeInPlace: "c6a15f1f",
     createdAt: "2026-09-08T11:44:47.201Z",
     updatedAt: "2026-09-08T11:47:21.638Z",
   };

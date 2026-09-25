@@ -57,6 +57,11 @@ import type { BuildMenuOp, BuildMenus } from "./buildMenus";
 import { buildMenuOpCount } from "./buildMenus";
 import type { UnitClone, UnitClones } from "./clones";
 import type { DisabledUnits } from "./disabled";
+import {
+  adoptChecksum,
+  type InPlaceDone,
+  settleInPlace,
+} from "./inPlaceProject";
 import type { UnitOverrides } from "./overrides";
 import { overrideCount } from "./overrides";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
@@ -230,6 +235,26 @@ export interface ModProject {
    * import writes it, and nothing here offers a way to change one afterwards.
    */
   readOnlyLua?: ReadOnlyLuaBlock[];
+  /**
+   * Field changes an in-place write moved out of `edits.overrides` and into
+   * the game's own unit files (issue #3023). The game carries them now, so
+   * the project stops counting them as its own. They are kept here until the
+   * write is accepted, so undo can put them back into the project as well as
+   * into the files. See `inPlaceProject.ts`.
+   *
+   * Left out of the container payload, like `distributionVersion`: it is
+   * about backups on this machine's disk, not about what the project changes.
+   */
+  writtenInPlace?: UnitOverrides;
+  /**
+   * The game's checksum just before coilbox last wrote into its files, set
+   * only when the project was written against exactly that game (issue
+   * #3023). The next read of the game that answers something else is what
+   * coilbox itself wrote, and becomes `authoredChecksum`. Kept on the project
+   * rather than in the page, so leaving the page before the read lands does
+   * not leave the project reporting coilbox's own write as a game update.
+   */
+  checksumBeforeInPlace?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -338,6 +363,51 @@ export function useModProjects() {
   }
 
   /**
+   * Follow what the edit-in-place route just did to the project's game
+   * (issue #3023). `inPlaceProject.ts` says what that means. `checksum` is
+   * what the game checksummed to when the action was pressed.
+   *
+   * Hands back the edits it folded over when the override set changed, the
+   * way `applyEdits` does, so moving fields in or out of the project is an
+   * undo step like any other change to it.
+   */
+  function settleInPlaceAction(
+    id: string,
+    done: InPlaceDone,
+    checksum: string | undefined,
+  ): { before: GameEdits; after: GameEdits } | null {
+    const now = new Date().toISOString();
+    const changed: { before: GameEdits; after: GameEdits }[] = [];
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const next = settleInPlace(target, done, checksum);
+      if (next === target) return prev;
+      const editsChanged = next.edits !== target.edits;
+      if (editsChanged)
+        changed.push({ before: target.edits, after: next.edits });
+      return prev.map((p) =>
+        p.id !== id ? p : editsChanged ? { ...next, updatedAt: now } : next,
+      );
+    });
+    return changed[0] ?? null;
+  }
+
+  /**
+   * Take a fresh read of the game as the project's checksum when it is the
+   * game coilbox itself just wrote into (issue #3023). See `adoptChecksum`.
+   * Not an edit, so `updatedAt` is left alone.
+   */
+  function adoptInPlaceChecksum(id: string, read: string) {
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const next = adoptChecksum(target, read);
+      return next === target ? prev : prev.map((p) => (p.id === id ? next : p));
+    });
+  }
+
+  /**
    * Record the version a packaged `.sdz` was just written with (issue
    * #1283). Always overwritten, unlike `recordAuthoredChecksum`: a project
    * can be packaged more than once, and each one has to move the number on
@@ -425,8 +495,11 @@ export function useModProjects() {
       (p) => p.id === id,
     );
     if (!source) return null;
+    // The fields an in-place write kept for undo belong to the project that
+    // wrote them. A copy holding them too would put them back a second time.
+    const { writtenInPlace: _kept, ...rest } = source;
     const copy: ModProject = {
-      ...source,
+      ...rest,
       id: crypto.randomUUID(),
       name: `${source.name} copy`,
       createdAt: new Date().toISOString(),
@@ -445,6 +518,8 @@ export function useModProjects() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
+    settleInPlaceAction,
+    adoptInPlaceChecksum,
     recordPackagedVersion,
     updateProjectDetails,
     duplicateProject,

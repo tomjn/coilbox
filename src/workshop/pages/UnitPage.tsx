@@ -121,6 +121,7 @@ import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
+import { adoptChecksum, type InPlaceDone } from "../inPlaceProject";
 import { withLegoUnits } from "../legoUnits";
 import {
   asksAboutMovement,
@@ -192,6 +193,8 @@ export default function UnitPage() {
     applyEdits,
     setEdits,
     recordAuthoredChecksum,
+    settleInPlaceAction,
+    adoptInPlaceChecksum,
     recordPackagedVersion,
     updateProjectDetails,
   } = useModProjects();
@@ -640,6 +643,22 @@ export default function UnitPage() {
     reloadDataset,
   ]);
 
+  /**
+   * Follow an edit-in-place action in the project (issue #3023), then read
+   * the game again if a file changed. A write moves the fields the game now
+   * carries out of the override set, undo puts them back, and both, like
+   * accept, let the project's checksum follow the game coilbox changed. See
+   * `inPlaceProject.ts`. Moving fields is an undo step, as every other change
+   * to the project is.
+   */
+  const onInPlaceDone = (done: InPlaceDone) => {
+    if (project) {
+      const changed = settleInPlaceAction(project.id, done, defs?.checksum);
+      if (changed) history.push(project.id, changed.before);
+    }
+    if (done.changed) refreshAfterInPlaceWrite();
+  };
+
   const sides = useMemo(
     () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
     [gameInfo],
@@ -732,8 +751,11 @@ export default function UnitPage() {
    */
   const checksumRef = useRef<(checksum: string) => void>(() => {});
   checksumRef.current = (checksum: string) => {
-    if (project && project.authoredChecksum === undefined)
+    if (!project) return;
+    if (project.authoredChecksum === undefined)
       recordAuthoredChecksum(project.id, checksum);
+    // The game as coilbox itself just wrote it, read for the first time.
+    else adoptInPlaceChecksum(project.id, checksum);
   };
   useEffect(() => {
     if (defs?.checksum) checksumRef.current(defs.checksum);
@@ -870,16 +892,23 @@ export default function UnitPage() {
   const compatibility = useMemo(
     () =>
       project && defs
-        ? compatibilityState(project.authoredChecksum, defs.checksum, {
-            edits: project.edits,
-            units: defs.units,
-            weaponDefs: defs.weaponDefs,
-            gameName: game?.name ?? project.gameName,
-            // Already being fetched for issue #2661's field notes, so a dead
-            // `customParams` key only ever fills in once that scan lands
-            // rather than costing this check a read of its own.
-            customParams: consumers,
-          })
+        ? // Through `adoptChecksum`, so the render in which the read of a
+          // game coilbox just wrote lands does not flash that game up as
+          // updated before the effect above records it (issue #3023).
+          compatibilityState(
+            adoptChecksum(project, defs.checksum).authoredChecksum,
+            defs.checksum,
+            {
+              edits: project.edits,
+              units: defs.units,
+              weaponDefs: defs.weaponDefs,
+              gameName: game?.name ?? project.gameName,
+              // Already being fetched for issue #2661's field notes, so a dead
+              // `customParams` key only ever fills in once that scan lands
+              // rather than costing this check a read of its own.
+              customParams: consumers,
+            },
+          )
         : null,
     [project, defs, game?.name, consumers],
   );
@@ -1013,7 +1042,7 @@ export default function UnitPage() {
                 onApplyFix={(finding) =>
                   commit(finding.fix?.apply ?? ((e) => e))
                 }
-                onInPlaceWrite={refreshAfterInPlaceWrite}
+                onInPlaceWrite={onInPlaceDone}
               />
             )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
