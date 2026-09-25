@@ -213,6 +213,9 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         .iter()
         .map(|clone| (clone.key.clone(), game_clone_def(clone, edits)))
         .collect();
+    for (key, def) in &added_entries {
+        notes.extend(reference_notes(key, def));
+    }
     // Assigned rather than left as a plain table (issue #2962). BAR's
     // `tweakunits` route walks the units the game already has and merges a
     // tweak into each one it finds a key for, so a key naming a unit the game
@@ -249,6 +252,8 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // game's own definitions, and it has to replace rather than merge, so the
     // table form cannot carry it.
     for clone in &replaced {
+        let def = game_clone_def(clone, edits);
+        notes.extend(reference_notes(&clone.key, &def));
         chunks.push(Chunk {
             form: LuaForm::Block,
             title: format!("{} replaced", clone.key),
@@ -256,7 +261,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
                 "The game defines {} too, so this has to be written after its definitions have loaded, and it replaces rather than merges.",
                 clone.key
             ),
-            lua: replace_block(clone, &game_clone_def(clone, edits)),
+            lua: replace_block(clone, &def),
         });
     }
 
@@ -526,6 +531,7 @@ fn clone_def(clone: &UnitClone, edits: &GameEdits, before_post: bool) -> Value {
     }
     if let Some(source) = clone.source.as_deref() {
         mount_own_weapons(&mut def, source, &clone.key);
+        point_own_references(&mut def, source, &clone.key);
     }
     if let Some(slots) = edits.equipped.get(&clone.key) {
         equip_into(&mut def, &clone.key, slots, &edits.weapons);
@@ -636,6 +642,211 @@ pub(crate) fn library_def(weapon: &LibraryWeapon) -> Value {
     def
 }
 
+/// How a game turns a reference between weapons into a definition (issue
+/// #2641). `src/workshop/weaponRefs.ts` has the same list and the sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Resolution {
+    /// A short name among the same unit's own `weapondefs`. Beyond All
+    /// Reason's `alldefs_post.lua` prefixes it with the unit's name.
+    Own,
+    /// A full name in the game's weapon table, looked up as it stands.
+    Full,
+}
+
+/// The custom parameters that name another weapon definition.
+const REFERENCE_FIELDS: [(&str, Resolution); 2] = [
+    ("cluster_def", Resolution::Own),
+    ("speceffect_def", Resolution::Full),
+];
+
+/// One reference a definition holds: the `customparams` key and the field's
+/// key as the definition spells them, how it resolves, and the name it holds.
+struct Reference {
+    params: String,
+    key: String,
+    resolution: Resolution,
+    value: String,
+}
+
+fn find_key<'a>(map: &'a serde_json::Map<String, Value>, lower: &str) -> Option<&'a String> {
+    map.keys().find(|k| k.eq_ignore_ascii_case(lower))
+}
+
+/// Every reference a weapon definition holds.
+fn references(def: &Value) -> Vec<Reference> {
+    let Some(map) = def.as_object() else {
+        return Vec::new();
+    };
+    let Some(params) = find_key(map, "customparams") else {
+        return Vec::new();
+    };
+    let Some(table) = map[params].as_object() else {
+        return Vec::new();
+    };
+    REFERENCE_FIELDS
+        .iter()
+        .filter_map(|(field, resolution)| {
+            let key = find_key(table, field)?;
+            let value = table[key].as_str()?.trim();
+            (!value.is_empty()).then(|| Reference {
+                params: params.clone(),
+                key: key.clone(),
+                resolution: *resolution,
+                value: value.to_string(),
+            })
+        })
+        .collect()
+}
+
+/// Write a reference's new value where it was read from.
+fn set_reference(def: &mut Value, reference: &Reference, value: String) {
+    if let Some(table) = def
+        .get_mut(&reference.params)
+        .and_then(Value::as_object_mut)
+    {
+        table.insert(reference.key.clone(), Value::String(value));
+    }
+}
+
+/// Every library weapon one library weapon names, and the ones those name, in
+/// the order they are reached (issue #2641). A reference inside a library
+/// weapon names another library weapon by its key, and equipping the first
+/// writes each of these into the unit beside it, the same as `librarySupport`
+/// in `weaponRefs.ts` lists them.
+pub(crate) fn library_support(weapons: &BTreeMap<String, LibraryWeapon>, key: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut queue = vec![key.to_string()];
+    while let Some(at) = queue.pop() {
+        let Some(weapon) = weapons.get(&at) else {
+            continue;
+        };
+        for reference in references(&library_def(weapon)) {
+            let next = reference.value.to_lowercase();
+            if next == key
+                || out.contains(&next)
+                || !weapons.contains_key(&next)
+                || !valid_unit_key(&next)
+            {
+                continue;
+            }
+            out.push(next.clone());
+            queue.push(next);
+        }
+    }
+    out
+}
+
+/// A library weapon and the ones it names, as `unit` carries them: each under
+/// its library key, with every full-name reference to one of them turned into
+/// the name the game gives it in that unit, `<unit>_<key>`. A short-name
+/// reference is left as the key, which the game's post files prefix itself.
+fn library_defs_for(
+    unit: &str,
+    key: &str,
+    weapons: &BTreeMap<String, LibraryWeapon>,
+) -> Vec<(String, Value)> {
+    let mut keys = vec![key.to_string()];
+    keys.extend(library_support(weapons, key));
+    keys.iter()
+        .filter_map(|k| weapons.get(k).map(|w| (k.clone(), library_def(w))))
+        .map(|(k, mut def)| {
+            for reference in references(&def) {
+                let lower = reference.value.to_lowercase();
+                if reference.resolution == Resolution::Full && keys.contains(&lower) {
+                    set_reference(
+                        &mut def,
+                        &reference,
+                        format!("{}_{lower}", unit.to_lowercase()),
+                    );
+                }
+            }
+            (k, def)
+        })
+        .collect()
+}
+
+/// Point a copy's references at the definitions the copy carries itself
+/// (issue #2641), for the reason [`mount_own_weapons`] gives for its slots.
+///
+/// A full-name reference, `armmship_rocket_split`, still names the source's
+/// definition, so it becomes the copy's own, `<copy>_rocket_split`. A
+/// short-name one read after the game's post files had prefixed it,
+/// `legcluster_cluster_munition`, goes back to the short name the post files
+/// will prefix with the copy's name. Only a name that lands on a definition
+/// the copy carries.
+fn point_own_references(def: &mut Value, source: &str, key: &str) {
+    if source.eq_ignore_ascii_case(key) {
+        return;
+    }
+    let prefix = format!("{}_", source.to_lowercase());
+    let Some(own) = def
+        .as_object_mut()
+        .and_then(|map| {
+            let k = find_key(map, "weapondefs")?.clone();
+            map.get_mut(&k)
+        })
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    let names: Vec<String> = own.keys().cloned().collect();
+    for weapon in own.values_mut() {
+        for reference in references(weapon) {
+            let lower = reference.value.to_lowercase();
+            let Some(short) = lower.strip_prefix(&prefix) else {
+                continue;
+            };
+            let Some(target) = names.iter().find(|n| n.eq_ignore_ascii_case(short)) else {
+                continue;
+            };
+            let value = match reference.resolution {
+                Resolution::Own => target.clone(),
+                Resolution::Full => format!("{}_{}", key.to_lowercase(), target.to_lowercase()),
+            };
+            set_reference(weapon, &reference, value);
+        }
+    }
+}
+
+/// References in a copy's finished definition that name nothing it carries
+/// (issue #2641), one sentence each.
+///
+/// A copy's whole definition is the project's, so what it carries is known
+/// here. A short-name reference has to name one of its own definitions. A
+/// full-name one under the copy's own prefix has to as well. A full name under
+/// any other is a weapon in the game's table, which the compiler never sees,
+/// so it is left to the page's own check.
+fn reference_notes(key: &str, def: &Value) -> Vec<String> {
+    let Some(own) = def
+        .as_object()
+        .and_then(|map| map.get(find_key(map, "weapondefs")?))
+        .and_then(Value::as_object)
+    else {
+        return Vec::new();
+    };
+    let carries = |name: &str| own.keys().any(|k| k.eq_ignore_ascii_case(name));
+    let prefix = format!("{}_", key.to_lowercase());
+    let mut notes = Vec::new();
+    for (holder, weapon) in own {
+        for reference in references(weapon) {
+            let lower = reference.value.to_lowercase();
+            let names = match reference.resolution {
+                Resolution::Own => Some(lower.as_str()),
+                Resolution::Full => lower.strip_prefix(&prefix),
+            };
+            if let Some(name) = names {
+                if !carries(name) {
+                    notes.push(format!(
+                        "{key}'s weapon {holder} names {} in {}, which {key} does not carry, so the effect that needs it does not happen.",
+                        reference.value, reference.key
+                    ));
+                }
+            }
+        }
+    }
+    notes
+}
+
 /// What the compiler left out of the equipped slots, one sentence each.
 fn equip_notes(edits: &GameEdits) -> Vec<String> {
     let mut notes = Vec::new();
@@ -703,10 +914,7 @@ fn equip_into(
     weapons: &BTreeMap<String, LibraryWeapon>,
 ) {
     for (step, key) in slots {
-        let Some(weapon) = weapons.get(key) else {
-            continue;
-        };
-        if !valid_unit_key(key) || equip_step(step).is_none() {
+        if !weapons.contains_key(key) || !valid_unit_key(key) || equip_step(step).is_none() {
             continue;
         }
         let Some(map) = def.as_object_mut() else {
@@ -736,7 +944,10 @@ fn equip_into(
             *own = Value::Object(serde_json::Map::new());
         }
         if let Some(own) = own.as_object_mut() {
-            own.insert(key.clone(), library_def(weapon));
+            // The weapons it names come with it (issue #2641).
+            for (name, def) in library_defs_for(unit, key, weapons) {
+                own.insert(name, def);
+            }
         }
     }
 }
@@ -749,13 +960,83 @@ fn equip_into(
 /// [`positional_block`] finds a list entry, and a unit or slot the game does
 /// not have is skipped. Each unit gets its own copy of the table, because the
 /// game's post-processing edits a definition in place.
+///
+/// The library weapons a weapon names go into the unit beside it (issue
+/// #2641), each under its library key. A full-name reference to one has to
+/// say which unit it is in, which only the loop knows, so `support` carries
+/// where each of those is and the loop writes `<unit>_<key>` there. A project
+/// with no such weapons gets none of this, and the same Lua it always did.
 fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryWeapon>) -> String {
     let mut library = serde_json::Map::new();
+    let mut support: BTreeMap<String, (Vec<String>, Vec<[String; 4]>)> = BTreeMap::new();
     for (_, _, key) in equips {
-        if let Some(weapon) = weapons.get(*key) {
-            library.insert((*key).to_string(), library_def(weapon));
+        let Some(weapon) = weapons.get(*key) else {
+            continue;
+        };
+        library.insert((*key).to_string(), library_def(weapon));
+        let children = library_support(weapons, key);
+        if children.is_empty() || support.contains_key(*key) {
+            continue;
         }
+        let mut full = Vec::new();
+        for holder in std::iter::once(key.to_string()).chain(children.iter().cloned()) {
+            let def = library_def(&weapons[&holder]);
+            for reference in references(&def) {
+                let target = reference.value.to_lowercase();
+                if reference.resolution == Resolution::Full
+                    && (target == *key || children.contains(&target))
+                {
+                    full.push([holder.clone(), reference.params, reference.key, target]);
+                }
+            }
+            library.insert(holder.clone(), def);
+        }
+        support.insert((*key).to_string(), (children, full));
     }
+    let support_table = if support.is_empty() {
+        String::new()
+    } else {
+        let quoted = |items: &[String]| {
+            items
+                .iter()
+                .map(|item| lua_string(item))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let rows: Vec<String> = support
+            .iter()
+            .map(|(key, (children, full))| {
+                let refs: Vec<String> = full
+                    .iter()
+                    .map(|r| format!("{{ {} }}", quoted(r)))
+                    .collect();
+                format!(
+                    "    [{}] = {{ {{ {} }}, {{ {} }} }},",
+                    lua_string(key),
+                    quoted(children),
+                    refs.join(", ")
+                )
+            })
+            .collect();
+        format!(
+            "\x20 -- The library weapons each one names, and the references that\n\
+             \x20 -- name one by the full name it gets in the unit.\n\
+             \x20 local support = {{\n{}\n  }}\n",
+            rows.join("\n")
+        )
+    };
+    let support_loop = if support.is_empty() {
+        ""
+    } else {
+        "\x20       local s = support[name]\n\
+         \x20       if s then\n\
+         \x20         for _, child in ipairs(s[1]) do ud[defs][child] = copy(library[child]) end\n\
+         \x20         for _, r in ipairs(s[2]) do\n\
+         \x20           local params = ud[defs][r[1]][r[2]]\n\
+         \x20           if type(params) == \"table\" then params[r[3]] = unit .. \"_\" .. r[4] end\n\
+         \x20         end\n\
+         \x20       end\n"
+    };
     let entries: Vec<String> = equips
         .iter()
         .map(|(unit, at, key)| {
@@ -768,6 +1049,7 @@ fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryW
          do\n\
          \x20 local library = {}\n\
          \x20 local equipped = {{\n{}\n  }}\n\
+         {}\
          \x20 local function field(t, lower)\n\
          \x20   for k in pairs(t) do\n\
          \x20     if type(k) == \"string\" and string.lower(k) == lower then return k end\n\
@@ -808,12 +1090,15 @@ fn equip_block(equips: &[(&str, u64, &str)], weapons: &BTreeMap<String, LibraryW
          \x20       local defs = field(ud, \"weapondefs\")\n\
          \x20       if type(ud[defs]) ~= \"table\" then ud[defs] = {{}} end\n\
          \x20       ud[defs][name] = copy(library[name])\n\
+         {}\
          \x20     end\n\
          \x20   end\n\
          \x20 end\n\
          end",
         lua_literal(&Value::Object(library), "  "),
-        entries.join("\n")
+        entries.join("\n"),
+        support_table,
+        support_loop
     )
 }
 
@@ -1689,6 +1974,162 @@ mod tests {
         assert!(unit.contains("name = \"supercom_armcomlaser\""), "{unit}");
         assert!(unit.contains("heavylaser = {"), "{unit}");
         assert!(unit.contains("range = 450"), "{unit}");
+    }
+
+    /// A copy of Beyond All Reason's `armmship` as the page read it, with a
+    /// rocket whose split effect names the unit's own unmounted definition by
+    /// its full name, and a plasma shell whose cluster child the game's post
+    /// files had already prefixed (issue #2641). Values are made up, shaped
+    /// like BAR test-30922's.
+    fn ship_copy(extra: Value) -> ModProject {
+        let mut edits = json!({
+            "clones": { "myship": {
+                "key": "myship", "source": "armmship",
+                "replacesGameUnit": false,
+                "def": {
+                    "weapons": [{ "name": "armmship_rocket" }, { "name": "armmship_plasma" }],
+                    "weapondefs": {
+                        "rocket": { "range": 1000, "customparams": {
+                            "speceffect": "split", "speceffect_def": "armmship_rocket_split"
+                        } },
+                        "rocket_split": { "range": 300 },
+                        "plasma": { "customparams": { "cluster_def": "armmship_cluster_munition" } },
+                        "cluster_munition": { "range": 100 }
+                    }
+                }
+            } }
+        });
+        if let (Some(target), Some(more)) = (edits.as_object_mut(), extra.as_object()) {
+            for (k, v) in more {
+                target.insert(k.clone(), v.clone());
+            }
+        }
+        project(edits)
+    }
+
+    /// Issue #2641. A copy's references name the definitions the copy carries,
+    /// the way its slots do: the full name under the copy's own prefix, and the
+    /// short name back where the game's post files will prefix it.
+    #[test]
+    fn a_copys_references_name_the_definitions_the_copy_carries() {
+        let clone = &ship_copy(json!({})).edits.clones["myship"];
+        let def = resolved_clone_def(clone, &GameEdits::default());
+        let own = &def["weapondefs"];
+        assert_eq!(
+            own["rocket"]["customparams"]["speceffect_def"],
+            json!("myship_rocket_split")
+        );
+        assert_eq!(
+            own["plasma"]["customparams"]["cluster_def"],
+            json!("cluster_munition")
+        );
+        let out = compile(&ship_copy(json!({})));
+        assert!(out.notes.is_empty(), "{:?}", out.notes);
+    }
+
+    /// Issue #2641. A reference in a copy that names nothing the copy carries
+    /// is said, since the copy's whole definition is the project's.
+    #[test]
+    fn a_copys_reference_to_nothing_is_noted() {
+        let out = compile(&ship_copy(json!({
+            "overrides": { "myship": {
+                "weapondefs.plasma.customparams.cluster_def": "gone",
+                "weapondefs.rocket.customparams.speceffect_def": "myship_nothing"
+            } }
+        })));
+        assert_eq!(out.notes.len(), 2, "{:?}", out.notes);
+        assert!(
+            out.notes[0].contains("names gone in cluster_def"),
+            "{:?}",
+            out.notes
+        );
+        assert!(
+            out.notes[1].contains("names myship_nothing in speceffect_def"),
+            "{:?}",
+            out.notes
+        );
+    }
+
+    fn library_with_child() -> Value {
+        json!({
+            "rocket_copy": {
+                "key": "rocket_copy", "source": "armmship_rocket",
+                "def": { "range": 1000, "customparams": {
+                    "speceffect": "split", "speceffect_def": "rocket_split_copy",
+                    "cluster_def": "munition_copy"
+                } }
+            },
+            "rocket_split_copy": {
+                "key": "rocket_split_copy", "source": "armmship_rocket_split",
+                "def": { "range": 300 }, "changes": { "range": 350 }
+            },
+            "munition_copy": {
+                "key": "munition_copy", "source": "armmship_cluster_munition",
+                "def": { "range": 100 }
+            }
+        })
+    }
+
+    /// Issue #2641. A library weapon brings the library weapons it names into
+    /// the copy beside it. The full-name reference gets the copy's own full
+    /// name, and the short one stays the key the game's post files prefix.
+    #[test]
+    fn a_library_weapon_brings_the_weapons_it_names_into_a_copy() {
+        let out = compile(&ship_copy(json!({
+            "weapons": library_with_child(),
+            "equipped": { "myship": { "0": "rocket_copy" } }
+        })));
+        let clone = &ship_copy(json!({
+            "weapons": library_with_child(),
+            "equipped": { "myship": { "0": "rocket_copy" } }
+        }))
+        .edits;
+        let def = resolved_clone_def(&clone.clones["myship"], clone);
+        let own = &def["weapondefs"];
+        assert_eq!(own["rocket_split_copy"]["range"], json!(350));
+        assert_eq!(own["munition_copy"]["range"], json!(100));
+        let params = &own["rocket_copy"]["customparams"];
+        assert_eq!(params["speceffect_def"], json!("myship_rocket_split_copy"));
+        assert_eq!(params["cluster_def"], json!("munition_copy"));
+        assert!(out.notes.is_empty(), "{:?}", out.notes);
+    }
+
+    /// Issue #2641. Into a game unit, the block carries the weapons a library
+    /// weapon names, and where the unit's name goes, and a project without
+    /// any gets the block it always did.
+    #[test]
+    fn an_equip_block_carries_the_weapons_a_library_weapon_names() {
+        let out = compile(&project(json!({
+            "weapons": library_with_child(),
+            "equipped": { "armmship": { "0": "rocket_copy" } }
+        })));
+        let block = &out.chunks[0].lua;
+        assert!(block.contains("local support = {"), "{block}");
+        assert!(block.contains(
+            "[\"rocket_copy\"] = { { \"munition_copy\", \"rocket_split_copy\" }, { { \"rocket_copy\", \"customparams\", \"speceffect_def\", \"rocket_split_copy\" } } },"
+        ), "{block}");
+        assert!(block.contains("rocket_split_copy = {"), "{block}");
+        let plain = compile(&project(json!({
+            "weapons": library(),
+            "equipped": { "armcom": { "0": "heavylaser" } }
+        })));
+        assert!(
+            !plain.chunks[0].lua.contains("support"),
+            "{}",
+            plain.chunks[0].lua
+        );
+    }
+
+    /// Issue #2641. A library weapon naming itself, or two naming each other,
+    /// is written once each rather than looping.
+    #[test]
+    fn library_support_stops_at_a_cycle() {
+        let weapons: BTreeMap<String, LibraryWeapon> = serde_json::from_value(json!({
+            "a": { "key": "a", "source": "x_a", "def": { "customparams": { "cluster_def": "b" } } },
+            "b": { "key": "b", "source": "x_b", "def": { "customparams": { "cluster_def": "a" } } }
+        }))
+        .expect("parse");
+        assert_eq!(library_support(&weapons, "a"), vec!["b".to_string()]);
     }
 
     /// A slot whose library weapon has gone keeps the game's weapon, and says

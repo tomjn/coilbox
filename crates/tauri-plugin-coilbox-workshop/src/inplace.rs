@@ -1476,6 +1476,38 @@ mod tests {
         );
     }
 
+    /// Issue #2641: a definition the unit carries and no slot mounts takes an
+    /// edit in its own file the same as a mounted one, and so does the
+    /// reference that names it.
+    #[test]
+    fn a_supporting_definition_is_written_in_the_units_own_file() {
+        let (_root, game) = game();
+        let file = game.join("units/ship.lua");
+        let source = "return {\n  ship = {\n    weapons = { { def = \"ROCKET\" } },\n    weapondefs = {\n      rocket = { range = 1000, customparams = { speceffect_def = \"ship_rocket_split\" } },\n      rocket_split = { range = 300 },\n      rocket_split2 = { range = 200 },\n    },\n  },\n}\n";
+        std::fs::write(&file, source).unwrap();
+
+        let outcome = write(
+            &game,
+            &project(serde_json::json!({
+                "ship": {
+                    "weapondefs.rocket_split.range": 450,
+                    "weapondefs.rocket.customparams.speceffect_def": "ship_rocket_split2",
+                },
+            })),
+        )
+        .unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(
+            read(&file),
+            source.replacen("range = 300", "range = 450", 1).replacen(
+                "\"ship_rocket_split\"",
+                "\"ship_rocket_split2\"",
+                1
+            )
+        );
+    }
+
     #[test]
     fn only_plain_values_can_be_written() {
         assert!(patch_value(&serde_json::json!(3)).is_some());
