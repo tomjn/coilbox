@@ -28,7 +28,9 @@ export interface RefusedChange {
   unit: string;
   /** The field's dotted path, as the project holds it. */
   field: string;
-  /** The unit's file, relative to the game, when one was found. */
+  /** The file the refusal is about, relative to the game: the unit's file,
+   *  or the file it includes for its table when the refusal is about that
+   *  one. Null when no file was found. */
   file: string | null;
   kind: string;
   message: string;
