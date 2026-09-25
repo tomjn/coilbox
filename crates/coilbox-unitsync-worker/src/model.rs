@@ -795,6 +795,14 @@ pub struct UnitDefsOutput {
     /// A unitdef's `weapons` list names entries here, and a game that hoists
     /// its weapons out of the unit keeps them nowhere else.
     pub weapon_defs: serde_json::Map<String, serde_json::Value>,
+    /// The game's armour classes, from `gamedata/armordefs.lua`: class name to
+    /// whatever the game listed as its members, ordinarily an array of unit
+    /// def keys. The engine assigns a unit's armour class purely from which of
+    /// these lists names it (`CDamageArrayHandler::Init`, `UnitDef::armorType`
+    /// in RecoilEngine), always trying `"default"` first regardless of what a
+    /// game writes here, so a unit named nowhere in this table is in that
+    /// class rather than in none (issue #2645).
+    pub armor_defs: serde_json::Map<String, serde_json::Value>,
     /// The units the game's own def loader could not read, in its own words.
     ///
     /// The loader runs each unit file under `pcall` and logs the ones that

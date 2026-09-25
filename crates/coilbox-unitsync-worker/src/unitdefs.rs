@@ -109,6 +109,8 @@ local ud = (type(defs) == 'table') and defs.unitdefs or nil
 if type(ud) ~= 'table' then return { __error = 'defs.lua produced no unitdefs table' } end
 local wd = (type(defs) == 'table') and defs.weapondefs or nil
 if type(wd) ~= 'table' then wd = {} end
+local ad = (type(defs) == 'table') and defs.armordefs or nil
+if type(ad) ~= 'table' then ad = {} end
 
 -- A JSON string, in ASCII only. The fast path is every string a def actually
 -- holds: no quote, no backslash, no control character and no high byte.
@@ -245,6 +247,8 @@ local units = {}
 encode_all(ud, 'unit', units, notes)
 local weapons = {}
 encode_all(wd, 'weapondef', weapons, notes)
+local armor = {}
+encode_all(ad, 'armor class', armor, notes)
 
 -- The tables from before the post files ran, when the loader handed them over.
 -- Rust compares them with the two above and keeps only the difference.
@@ -262,6 +266,7 @@ end
 
 local doc = '{"units":{' .. table.concat(units, ',')
   .. '},"weaponDefs":{' .. table.concat(weapons, ',')
+  .. '},"armorDefs":{' .. table.concat(armor, ',')
   .. '},"unitErrors":[' .. table.concat(notes, ',') .. ']' .. raw .. '}'
 -- The document is megabytes on a full game, so it goes back in pieces.
 return __cb_chunk(doc)
@@ -275,6 +280,11 @@ return __cb_chunk(doc)
 struct ShimDoc {
     units: Map<String, Value>,
     weapon_defs: Map<String, Value>,
+    /// The game's armour classes, from `gamedata/armordefs.lua` by way of
+    /// `defs.lua`'s `armordefs` key: class name to whatever the game wrote as
+    /// its members, unshaped, since a class is expected to be an array of unit
+    /// names but nothing here enforces that (issue #2645).
+    armor_defs: Map<String, Value>,
     unit_errors: Vec<String>,
     /// The units as they stood before the game's post files ran. Absent when
     /// the game's loader never included `gamedata/unitdefs_post.lua`.
@@ -384,6 +394,7 @@ pub(crate) fn resolve(
         before_post,
         units: doc.units,
         weapon_defs: doc.weapon_defs,
+        armor_defs: doc.armor_defs,
         unit_errors: doc.unit_errors,
         language_text: language,
         checksum,
@@ -494,6 +505,20 @@ mod tests {
     }
 
     #[test]
+    fn parses_armour_classes_by_name() {
+        let doc = parse_shim_doc(
+            r#"{"units":{},"weaponDefs":{},
+                "armorDefs":{"commanders":["armcom","corcom"],"else":["armvader"]}}"#,
+        )
+        .expect("valid document");
+        assert_eq!(
+            doc.armor_defs["commanders"],
+            serde_json::json!(["armcom", "corcom"])
+        );
+        assert_eq!(doc.armor_defs["else"], serde_json::json!(["armvader"]));
+    }
+
+    #[test]
     fn a_document_that_will_not_parse_says_how_much_arrived() {
         let err = parse_shim_doc(r#"{"units":{"armcom":}"#).expect_err("invalid document");
         assert!(err.contains("20 bytes"), "got: {err}");
@@ -504,6 +529,7 @@ mod tests {
         let doc = parse_shim_doc("{}").expect("an empty object is a valid document");
         assert!(doc.units.is_empty());
         assert!(doc.weapon_defs.is_empty());
+        assert!(doc.armor_defs.is_empty());
         assert!(doc.unit_errors.is_empty());
     }
 
