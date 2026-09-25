@@ -64,10 +64,15 @@ fn load(game: &Game, mutator: &[(String, String)]) -> Loaded {
         .map(|(path, text)| (root.path().join(path), text.clone()))
         .collect();
     let mut units = game.units.clone();
+    let mut weapons = game.weapons.clone();
     for (path, text) in mutator {
         files.insert(root.path().join(path), text.clone());
         if path.starts_with("units/") && !units.contains(path) {
             units.push(path.clone());
+        }
+        // The weapon files an equipped weapon brings (issue #3068).
+        if path.starts_with("weapons/") && !weapons.contains(path) {
+            weapons.push(path.clone());
         }
     }
     let list = |paths: &[String]| {
@@ -108,7 +113,7 @@ fn load(game: &Game, mutator: &[(String, String)]) -> Loaded {
   return {{ units = DEFS.unitDefs, weapons = WeaponDefs, rawUnits = rawUnits, rawWeapons = rawWeapons }}
 end)()"#,
         units = list(&units),
-        weapons = list(&game.weapons),
+        weapons = list(&weapons),
     );
     let vm = SpringLua::with_files(root.path(), files).expect("vm");
     let out = vm
@@ -427,6 +432,47 @@ fn a_death_explosion_loads_like_its_source(game: &Game) {
         modded.weapons["commander_blast"],
         alone.weapons["commander_blast"]
     );
+}
+
+/// The weapon files a mutator ships for its equipped weapons (issue #3068)
+/// change nothing in a game whose `weapondefs_post.lua` adds a unit's own
+/// weapons to the shared table itself: its post file writes the unit's entry
+/// over each one under the same name. Every unit and weapon loads the same
+/// with them as without them.
+fn weapon_files_change_nothing(game: &Game) {
+    let alone = load(game, &[]);
+    let files = mutator(json!({
+        "weapons": {
+            "berthacannon_copy": copied_weapon(&alone, "armbrtha_arm_berthacannon", "berthacannon_copy"),
+            "commander_blast_copy": copied_weapon(&alone, "commander_blast", "commander_blast_copy"),
+        },
+        "equipped": { "armcom": { "0": "berthacannon_copy", "explodeas": "commander_blast_copy" } }
+    }));
+    let without: Vec<(String, String)> = files
+        .iter()
+        .filter(|(path, _)| !path.starts_with("weapons/"))
+        .cloned()
+        .collect();
+    assert_eq!(files.len() - without.len(), 2, "two weapon files");
+    let with_them = load(game, &files);
+    let without_them = load(game, &without);
+    assert_eq!(with_them.units, without_them.units);
+    assert_eq!(with_them.weapons, without_them.weapons);
+    assert!(with_them.weapons.contains_key("armcom_berthacannon_copy"));
+}
+
+#[test]
+fn weapon_files_change_nothing_in_a_game_that_adds_unit_weapons_itself() {
+    weapon_files_change_nothing(&model_game());
+}
+
+#[test]
+fn weapon_files_change_nothing_in_balanced_annihilation() {
+    let Some(game) = balanced_annihilation() else {
+        eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
+        return;
+    };
+    weapon_files_change_nothing(&game);
 }
 
 /// What a crater multiplier typed on a copy of the Big Bertha loads as, once

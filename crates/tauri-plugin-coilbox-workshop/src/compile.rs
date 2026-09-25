@@ -457,6 +457,15 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     }
     files.extend(unit_files);
     files.extend(language_files);
+    let weapon_files = weapon_files(edits, &mut notes);
+    if !weapon_files.is_empty() {
+        notes.push(format!(
+            "{} weapon file{} written under weapons/, one for each unit and library weapon it carries, so the weapon is in the game's shared weapon table under the name its slot gives it. A game that adds a unit's own weapons to that table itself, as Balanced Annihilation and Beyond All Reason do, replaces each one with the same weapon, and one that does not, such as SpringMCLegacy or THIS, finds it there. A BAR tweak slot carries no files, and needs none, because Beyond All Reason adds the unit's own weapons itself.",
+            weapon_files.len(),
+            if weapon_files.len() == 1 { "" } else { "s" }
+        ));
+    }
+    files.extend(weapon_files);
     if let Some(armor_file) = armor_defs_file(edits) {
         files.push(armor_file);
         notes.push(format!(
@@ -990,6 +999,93 @@ fn point_slot(slot: &mut Value, unit: &str, key: &str) {
 /// it, so it works in a game with that rule and in one without it.
 pub(crate) fn death_name(unit: &str, key: &str) -> String {
     format!("{}_{key}", unit.to_lowercase())
+}
+
+/// Where the weapon file for library weapon `key` on `unit` goes (issue
+/// #3068), or `None` for a unit whose name cannot be part of a file name.
+///
+/// Every equipped weapon goes into the shared weapon table this way as well
+/// as into the unit's own `weapondefs`. A slot and a death explosion name it
+/// `<unit>_<key>`, and the engine looks that name up in the shared table.
+/// Only a game's `gamedata/weapondefs_post.lua` copies a unit's own weapons
+/// there, and SpringMCLegacy's and THIS's do not, so without this file the
+/// name finds nothing. The base content's `gamedata/weapondefs.lua` reads
+/// every `weapons/*.lua` into the table before any post file runs, and Beyond
+/// All Reason's does the same. A game whose post file does copy the unit's
+/// weapons, as the base content's, Balanced Annihilation's and Beyond All
+/// Reason's all do, writes the unit's entry over this one under the same
+/// name, so it loads exactly as it did without the file.
+pub(crate) fn weapon_file_path(unit: &str, key: &str) -> Option<String> {
+    weapon_file_name(unit, key).map(|name| format!("weapons/{name}"))
+}
+
+/// The file name alone of [`weapon_file_path`], for the in-place route to put
+/// in whichever spelling of `weapons` the game already has.
+pub(crate) fn weapon_file_name(unit: &str, key: &str) -> Option<String> {
+    let unit = unit.to_lowercase();
+    (valid_unit_key(&unit) && valid_unit_key(key)).then(|| format!("coilbox_{unit}_{key}.lua"))
+}
+
+/// The weapon file [`weapon_file_path`] names: library weapon `key` and the
+/// library weapons it names, each under the full name it has on `unit`.
+pub(crate) fn weapon_file(
+    unit: &str,
+    key: &str,
+    weapons: &BTreeMap<String, LibraryWeapon>,
+) -> String {
+    let entries: Vec<String> = library_defs_for(unit, key, weapons)
+        .into_iter()
+        .map(|(name, def)| {
+            format!(
+                "  [{}] = {},",
+                lua_string(&death_name(unit, &name)),
+                lua_literal(&def, "  ")
+            )
+        })
+        .collect();
+    format!(
+        "-- Written by coilbox (issue #3068). A weapon from a project's weapon\n\
+         -- library that {unit} carries, under the name its slot or death\n\
+         -- explosion gives it. The engine looks that name up in the shared\n\
+         -- weapon table, and a game whose gamedata/weapondefs_post.lua adds a\n\
+         -- unit's own weapondefs to that table replaces this entry with the\n\
+         -- same weapon. One whose post file does not finds it here.\n\
+         return {{\n{}\n}}\n",
+        entries.join("\n")
+    )
+}
+
+/// Every weapon file the project's equipped weapons need, one per unit and
+/// library weapon, whether the unit is the game's or a copy.
+fn weapon_files(edits: &GameEdits, notes: &mut Vec<String>) -> Vec<CompiledFile> {
+    let mut pairs: Vec<(&str, &str)> = edits
+        .equipped
+        .iter()
+        .flat_map(|(unit, slots)| {
+            slots
+                .iter()
+                .filter(|(step, _)| equip_at(step).is_some())
+                .map(move |(_, key)| (unit.as_str(), key.as_str()))
+        })
+        .filter(|(_, key)| edits.weapons.contains_key(*key))
+        .collect();
+    pairs.sort_unstable();
+    pairs.dedup();
+    let mut files = Vec::new();
+    for (unit, key) in pairs {
+        match weapon_file_path(unit, key) {
+            Some(path) => files.push(CompiledFile {
+                path,
+                contents: weapon_file(unit, key, &edits.weapons),
+            }),
+            // A bad weapon name has a note of its own in `equip_notes`.
+            None if valid_unit_key(key) => notes.push(format!(
+                "{unit} has {key} equipped, but its name cannot be part of a file name, so {key} gets no file under weapons/. A game that does not add a unit's own weapons to its weapon table, such as SpringMCLegacy or THIS, will not find it."
+            )),
+            None => {}
+        }
+    }
+    files
 }
 
 /// The heading for the chunk of equipped weapons: slots, death explosions, or
@@ -2332,6 +2428,106 @@ mod tests {
         assert!(unit.contains("range = 450"), "{unit}");
     }
 
+    /// The table a compiled weapon file returns.
+    fn weapon_table(out: &CompiledMod, path: &str) -> Value {
+        coilbox_springlua::SpringLua::new(std::env::temp_dir())
+            .expect("vm")
+            .eval_value_raw(file(out, path), path)
+            .expect("the file runs")
+    }
+
+    /// Issue #3068. Each unit and library weapon it carries gets a file under
+    /// `weapons/` holding the weapon under the full name its slot and death
+    /// explosion give it, whether the unit is the game's or a copy. A weapon
+    /// in two places on one unit is one file, and the tweak slot export,
+    /// which cannot carry files, is still made.
+    #[test]
+    fn every_equipped_weapon_gets_a_weapon_file_under_its_full_name() {
+        let out = compile(&project(json!({
+            "weapons": library(),
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": { "weapons": [{ "name": "armcom_armcomlaser" }] }
+            } },
+            "equipped": {
+                "armcom": { "0": "heavylaser", "explodeas": "heavylaser" },
+                "supercom": { "0": "heavylaser" },
+            }
+        })));
+        let paths: Vec<&str> = out
+            .files
+            .iter()
+            .map(|f| f.path.as_str())
+            .filter(|p| p.starts_with("weapons/"))
+            .collect();
+        assert_eq!(
+            paths,
+            vec![
+                "weapons/coilbox_armcom_heavylaser.lua",
+                "weapons/coilbox_supercom_heavylaser.lua"
+            ]
+        );
+        let table = weapon_table(&out, "weapons/coilbox_armcom_heavylaser.lua");
+        assert_eq!(
+            table,
+            json!({ "armcom_heavylaser": { "range": 450, "damage": { "default": 75 } } })
+        );
+        assert!(out
+            .notes
+            .iter()
+            .any(|n| n.starts_with("2 weapon files written under weapons/")));
+        assert!(out.bar_tweakdefs.is_some());
+    }
+
+    /// Issue #3068, with #2641. The weapons a library weapon names go into
+    /// its weapon file too, each under the unit's full name for it, and a
+    /// full-name reference between them points at that name.
+    #[test]
+    fn a_weapon_file_carries_the_weapons_a_library_weapon_names() {
+        let out = compile(&project(json!({
+            "weapons": library_with_child(),
+            "equipped": { "armmship": { "0": "rocket_copy" } }
+        })));
+        let table = weapon_table(&out, "weapons/coilbox_armmship_rocket_copy.lua");
+        let names: Vec<&String> = table.as_object().expect("a table").keys().collect();
+        assert_eq!(
+            names,
+            vec![
+                "armmship_munition_copy",
+                "armmship_rocket_copy",
+                "armmship_rocket_split_copy"
+            ]
+        );
+        let params = &table["armmship_rocket_copy"]["customparams"];
+        assert_eq!(
+            params["speceffect_def"],
+            json!("armmship_rocket_split_copy")
+        );
+        assert_eq!(table["armmship_rocket_split_copy"]["range"], json!(350));
+    }
+
+    /// A unit whose name cannot be part of a file name gets no weapon file,
+    /// and a slot that is neither a number nor a death explosion none either.
+    #[test]
+    fn no_weapon_file_for_a_name_that_cannot_be_a_file_name() {
+        let out = compile(&project(json!({
+            "weapons": library(),
+            "equipped": {
+                "Arm Com": { "0": "heavylaser" },
+                "armcom": { "left": "heavylaser" },
+            }
+        })));
+        assert!(out.files.iter().all(|f| !f.path.starts_with("weapons/")));
+        assert!(
+            out.notes.iter().any(|n| n.starts_with(
+                "Arm Com has heavylaser equipped, but its name cannot be part of a file name"
+            )),
+            "{:?}",
+            out.notes
+        );
+    }
+
     /// A copy of Beyond All Reason's `armmship` as the page read it, with a
     /// rocket whose split effect names the unit's own unmounted definition by
     /// its full name, and a plasma shell whose cluster child the game's post
@@ -2447,7 +2643,8 @@ mod tests {
         let params = &own["rocket_copy"]["customparams"];
         assert_eq!(params["speceffect_def"], json!("myship_rocket_split_copy"));
         assert_eq!(params["cluster_def"], json!("munition_copy"));
-        assert!(out.notes.is_empty(), "{:?}", out.notes);
+        assert_eq!(out.notes.len(), 1, "{:?}", out.notes);
+        assert!(out.notes[0].contains("weapon file"), "{:?}", out.notes);
     }
 
     /// Issue #2641. Into a game unit, the block carries the weapons a library

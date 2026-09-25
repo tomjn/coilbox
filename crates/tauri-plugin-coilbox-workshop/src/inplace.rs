@@ -18,9 +18,11 @@
 //! them (issue #2634), each as a new file beside its source's, added to the
 //! build menus the project adds it to. `inplace_clone.rs` has the copy's
 //! half. A library weapon equipped into a game unit, in a slot or as a death
-//! explosion, goes into that unit's own `weapondefs` (issue #3055), and one
-//! that cannot, such as into an `.fbi` unit, is reported with the reason
-//! rather than stopping the write. Other build menu changes, words, switched-off units and copies that
+//! explosion, goes into that unit's own `weapondefs` (issue #3055), or only
+//! its name for an `.fbi` unit, which has no such table, and into a new file
+//! under `weapons/` that puts it in the game's weapon table (issue #3068).
+//! One that cannot be written is reported with the reason rather than
+//! stopping the write. Other build menu changes, words, switched-off units and copies that
 //! replace a game unit have no in-place form yet, and the outcome says which
 //! of them the project holds rather than dropping them quietly.
 //!
@@ -959,6 +961,10 @@ pub fn write(
         }
     }
 
+    // The weapon file each equipped library weapon goes into the game's
+    // shared weapon table by (issue #3068), whether this write adds the
+    // weapon to a game unit or to a copy.
+    let mut weapon_files: BTreeMap<PathBuf, String> = BTreeMap::new();
     write_equipped(
         game_dir,
         project,
@@ -966,6 +972,7 @@ pub fn write(
         &files,
         &mut texts,
         &mut included,
+        &mut weapon_files,
         &mut outcome,
     );
 
@@ -982,6 +989,7 @@ pub fn write(
         &mut texts,
         &mut included,
         &mut gamedata,
+        &mut weapon_files,
         &mut outcome,
     );
 
@@ -994,8 +1002,11 @@ pub fn write(
         .iter()
         .filter(|(file, text)| originals.get(*file) != Some(*text))
         .map(|(file, text)| (file, text, encodings.get(file).copied()));
+    // A weapon file already holding the same text needs no write.
+    weapon_files.retain(|file, text| std::fs::read_to_string(file).ok().as_deref() != Some(text));
     let others = included
         .iter()
+        .chain(weapon_files.iter())
         .map(|(file, text)| (file, text, None))
         .chain(
             created
@@ -1035,6 +1046,11 @@ pub fn write(
     }
 
     for (file, bytes) in &writes {
+        // A game with no `weapons` folder gets one for its first weapon file.
+        if let Some(parent) = file.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("could not make {}: {e}", parent.display()))?;
+        }
         MARKERS.write(file, bytes)?;
         outcome.written.push(rel(file));
     }
@@ -1070,6 +1086,11 @@ pub fn write(
 /// those post files leave alone and the engine then finds as the definition
 /// the unit carries (`compile::death_name`).
 ///
+/// An `.fbi` unit has no `weapondefs` table and no `def` in a slot, so for
+/// one only the name is written (issue #3068). The weapon file beside it,
+/// which [`write_equipped`] adds for every unit, is what puts the weapon in
+/// the game's table under that name.
+///
 /// `def` is the game's read of the unit, which a slot's step is read against
 /// the way [`segments`] reads a field's.
 fn equip_edits(
@@ -1078,6 +1099,7 @@ fn equip_edits(
     key: &str,
     edits: &GameEdits,
     def: Option<&Value>,
+    fbi: bool,
 ) -> Result<Vec<Edit>, String> {
     let Some(at) = crate::compile::equip_at(step) else {
         return Err(format!(
@@ -1095,7 +1117,12 @@ fn equip_edits(
         op: Op::Set(value),
     };
     let mut out = Vec::new();
-    for (name, weapon) in crate::compile::library_defs_for(unit, key, &edits.weapons) {
+    let own = if fbi {
+        Vec::new()
+    } else {
+        crate::compile::library_defs_for(unit, key, &edits.weapons)
+    };
+    for (name, weapon) in own {
         let value = PatchValue::from_json(&weapon)
             .map_err(|reason| format!("The weapon {name} cannot be written as Lua. {reason}"))?;
         out.push(set(
@@ -1118,7 +1145,9 @@ fn equip_edits(
                 path.push(Segment::Key(field.to_string()));
                 path
             };
-            out.push(set(at("def"), PatchValue::String(key.to_string())));
+            if !fbi {
+                out.push(set(at("def"), PatchValue::String(key.to_string())));
+            }
             out.push(set(at("name"), PatchValue::String(full)));
         }
     }
@@ -1130,12 +1159,18 @@ fn equip_edits(
 ///
 /// Each weapon is all or nothing: its edits are made to a scratch copy of the
 /// file and kept only if every one goes through. One that cannot be written,
-/// such as into an `.fbi` unit, which has no `weapondefs` table, is said in
+/// such as into a unit whose table other units share, is said in
 /// `not_carried` with the reason, and left to the mutator. It does not stop
 /// the rest of the write, since it changes nothing on disk.
 ///
+/// Each one written also gets its weapon file under `weapons/`, in
+/// `weapon_files`, for the reason `compile::weapon_file_path` gives: a game
+/// whose `weapondefs_post.lua` never adds a unit's own weapons to the shared
+/// table finds it there (issue #3068).
+///
 /// A copy's equipped weapons are not written here. They are part of the
 /// copy's definition, and go into its own file with it.
+#[allow(clippy::too_many_arguments)]
 fn write_equipped(
     game_dir: &Path,
     project: &ModProject,
@@ -1143,6 +1178,7 @@ fn write_equipped(
     files: &[PathBuf],
     texts: &mut BTreeMap<PathBuf, String>,
     included: &mut BTreeMap<PathBuf, String>,
+    weapon_files: &mut BTreeMap<PathBuf, String>,
     outcome: &mut WriteOutcome,
 ) {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
@@ -1163,13 +1199,6 @@ fn write_equipped(
                     "{about} is not written into the game, and still needs a mutator. {reason}"
                 ));
             };
-            let list = match equip_edits(unit, step, weapon, edits, sources.get(unit)) {
-                Ok(list) => list,
-                Err(reason) => {
-                    report(reason);
-                    continue;
-                }
-            };
             let file = match find_unit_file(unit, files, texts, |file, text| {
                 locate_unit(file, text, unit)
             }) {
@@ -1183,6 +1212,14 @@ fn write_equipped(
                     continue;
                 }
             };
+            let list =
+                match equip_edits(unit, step, weapon, edits, sources.get(unit), is_fbi(&file)) {
+                    Ok(list) => list,
+                    Err(reason) => {
+                        report(reason);
+                        continue;
+                    }
+                };
             let mut text = texts[&file].clone();
             let mut pending = included.clone();
             let mut into = file.clone();
@@ -1217,6 +1254,11 @@ fn write_equipped(
                 report(format!("{} ({at}{line})", refusal.message));
                 continue;
             }
+            if let Some((path, contents)) = weapon_file(game_dir, unit, weapon, edits) {
+                changed |=
+                    std::fs::read_to_string(&path).ok().as_deref() != Some(contents.as_str());
+                weapon_files.insert(path, contents);
+            }
             texts.insert(file, text);
             *included = pending;
             if changed {
@@ -1232,6 +1274,30 @@ fn write_equipped(
             });
         }
     }
+}
+
+/// The weapon file that puts library weapon `key` into the game's shared
+/// weapon table under the name `unit` fires it by (issue #3068), as its path
+/// under `game_dir` and its text: `compile::weapon_file`, in the `weapons`
+/// folder the game already has, however it spells it. `None` for a unit whose
+/// name cannot be part of a file name.
+///
+/// A file already there is written over, with a backup like any other, so
+/// undo puts back whatever an earlier write left.
+fn weapon_file(
+    game_dir: &Path,
+    unit: &str,
+    key: &str,
+    edits: &GameEdits,
+) -> Option<(PathBuf, String)> {
+    let name = crate::compile::weapon_file_name(unit, key)?;
+    let dir = std::fs::read_dir(game_dir)
+        .ok()?
+        .flatten()
+        .find(|entry| entry.path().is_dir() && entry.file_name().eq_ignore_ascii_case("weapons"))
+        .map_or_else(|| game_dir.join("weapons"), |entry| entry.path());
+    let path = inplace_clone::file_taken(&dir.join(&name)).unwrap_or_else(|| dir.join(&name));
+    Some((path, crate::compile::weapon_file(unit, key, &edits.weapons)))
 }
 
 /// Add `unit` to `builder`'s build menu in `gamedata/sidedata.tdf` (issue
@@ -1335,6 +1401,7 @@ fn write_copies(
     texts: &mut BTreeMap<PathBuf, String>,
     included: &mut BTreeMap<PathBuf, String>,
     gamedata: &mut BTreeMap<PathBuf, (String, Encoding)>,
+    weapon_files: &mut BTreeMap<PathBuf, String>,
     outcome: &mut WriteOutcome,
 ) -> Vec<(PathBuf, String, Encoding)> {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
@@ -1465,6 +1532,22 @@ fn write_copies(
             .collect();
         match clone_unit(&file, &originals[&file], source, unit, &list, game_dir) {
             Ok(cloned) => {
+                // The library weapons equipped into the copy are in its
+                // definition, and reach the shared table the way a game
+                // unit's do (issue #3068).
+                let equipped = project.edits.equipped.get(unit).into_iter().flatten();
+                for (step, weapon) in equipped {
+                    if crate::compile::equip_at(step).is_none()
+                        || !project.edits.weapons.contains_key(weapon)
+                    {
+                        continue;
+                    }
+                    if let Some((path, contents)) =
+                        weapon_file(game_dir, unit, weapon, &project.edits)
+                    {
+                        weapon_files.insert(path, contents);
+                    }
+                }
                 let encoding = read_unit_file(&file).map_or(Encoding::Utf8, |(_, e)| e);
                 created.push((target.clone(), cloned.text, encoding));
                 created.extend(
@@ -2510,7 +2593,13 @@ mod tests {
 
         assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
         assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
-        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        assert_eq!(
+            outcome.written,
+            vec![
+                "units/armdfly.lua",
+                "weapons/coilbox_armdfly_heavylaser.lua"
+            ]
+        );
         assert_eq!(
             outcome.equipped,
             vec![WrittenEquip {
@@ -2529,8 +2618,12 @@ mod tests {
         assert_eq!(unit["weapons"]["[1]"]["name"], "armdfly_heavylaser");
         assert_eq!(unit["weapons"]["[1]"]["onlytargetcategory"], "NOTSUB");
 
+        // Issue #3068. The weapon file holds the weapon under its full name.
+        let weapon_file = game.join("weapons/coilbox_armdfly_heavylaser.lua");
+        assert!(read(&weapon_file).contains("[\"armdfly_heavylaser\"] = {"));
+
         let diffs = crate::diff::disk_diffs(&game).unwrap();
-        assert_eq!(diffs.len(), 1);
+        assert_eq!(diffs.len(), 2);
         assert!(diffs[0]
             .lines
             .iter()
@@ -2538,6 +2631,7 @@ mod tests {
 
         undo(&game).unwrap();
         assert_eq!(read(&dfly), before);
+        assert!(!weapon_file.exists());
     }
 
     /// Issue #3055, with #2642. A death explosion is written by the full
@@ -2609,16 +2703,25 @@ mod tests {
 
         let longer = equipping(weapons(450), equipped, serde_json::json!({}));
         let outcome = super::write(&game, &longer, &armdfly_read()).unwrap();
-        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        assert_eq!(
+            outcome.written,
+            vec![
+                "units/armdfly.lua",
+                "weapons/coilbox_armdfly_heavylaser.lua"
+            ]
+        );
         let unit = unit_in(&game, "units/armdfly.lua", "armdfly");
         assert_eq!(unit["weapondefs"]["heavylaser"]["range"], 450);
+        let weapon_file = read(&game.join("weapons/coilbox_armdfly_heavylaser.lua"));
+        assert!(weapon_file.contains("range = 450"), "{weapon_file}");
     }
 
-    /// An `.fbi` unit has no `weapondefs` table, so its equipped weapon is
-    /// left to the mutator with that reason, and the rest of the project is
-    /// still written.
+    /// Issue #3068. An `.fbi` unit has no `weapondefs` table, so only its
+    /// slot's name and its death explosion are written into its file, and
+    /// the weapon file is what puts the weapon in the game's table under that
+    /// name. Undo takes both back out.
     #[test]
-    fn an_equipped_weapon_on_an_fbi_unit_is_reported_and_the_rest_is_written() {
+    fn an_equipped_weapon_on_an_fbi_unit_names_the_weapon_its_file_holds() {
         let (_root, game) = fbi_game();
         let armcom = game.join("units/ARMCOM.FBI");
         let armcom_before = read(&armcom);
@@ -2635,20 +2738,26 @@ mod tests {
         let outcome = super::write(&game, &project, &sources).unwrap();
 
         assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
-        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
-        assert!(outcome.equipped.is_empty());
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(
+            outcome.written,
+            vec![
+                "units/ARMCOM.FBI",
+                "units/armdfly.lua",
+                "weapons/coilbox_armcom_heavylaser.lua"
+            ]
+        );
+        assert_eq!(outcome.equipped.len(), 2);
+        let text = read(&armcom).to_lowercase();
+        assert!(text.contains("weapon1=armcom_heavylaser;"), "{text}");
+        assert!(text.contains("explodeas=armcom_heavylaser;"), "{text}");
+        assert!(!text.contains("weapondefs"), "{text}");
+        let weapon_file = game.join("weapons/coilbox_armcom_heavylaser.lua");
+        assert!(read(&weapon_file).contains("[\"armcom_heavylaser\"] = {"));
+
+        undo(&game).unwrap();
         assert_eq!(read(&armcom), armcom_before);
-        assert_eq!(outcome.not_carried.len(), 2, "{:?}", outcome.not_carried);
-        assert!(outcome.not_carried[0].starts_with(
-            "Library weapon heavylaser in armcom's weapon slot 0 is not written into the game"
-        ));
-        assert!(outcome.not_carried[1].starts_with(
-            "Library weapon heavylaser as armcom's explodeas is not written into the game"
-        ));
-        assert!(outcome
-            .not_carried
-            .iter()
-            .all(|line| line.contains("An .fbi unit file holds single values only")));
+        assert!(!weapon_file.exists());
     }
 
     /// SplinterFaction's unit files set the unit's `weaponDefs` after
