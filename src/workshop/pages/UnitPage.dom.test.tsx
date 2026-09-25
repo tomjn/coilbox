@@ -17,6 +17,7 @@
  * page did when it had a game picker instead of a route.
  */
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -277,6 +278,9 @@ const { installSettingsStorage, memorySettingsStorage } = await import(
   "@/lib/storedSetting"
 );
 const { PROJECTS_KEY } = await import("../project");
+const { CHECKPOINTS_KEY, AUTOSAVE_INTERVAL_MS } = await import(
+  "../checkpoints"
+);
 const { resetEditHistory } = await import("../history");
 const { clearInPlaceChecks } = await import("../inPlaceCheck");
 const { readStoredSetting } = await import("@/lib/storedSetting");
@@ -408,6 +412,12 @@ const saved = () =>
     PROJECTS_KEY,
     [],
   );
+
+/** Every checkpoint saved for a project, newest first (issue #2657). */
+const checkpointsSaved = (projectId: string) =>
+  readStoredSetting<
+    Record<string, { id: string; name: string; kind: "manual" | "autosave" }[]>
+  >(CHECKPOINTS_KEY, {})[projectId] ?? [];
 
 const type = (input: HTMLInputElement, value: string) => {
   fireEvent.change(input, { target: { value } });
@@ -3255,6 +3265,88 @@ describe("UnitPage", () => {
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
       expect(healthBox().value).toBe("3000");
       expect(saved()[0].name).toBe("Slower tanks");
+    });
+  });
+
+  /** Named, described snapshots of the whole project, restorable in one
+   *  action, and autosaved on a timer (issue #2657). */
+  describe("checkpoints", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("saves a named checkpoint from the drawer and lists it", async () => {
+      openNew(GAME.name);
+      type(healthBox(), "5000");
+
+      fireEvent.click(screen.getByRole("button", { name: /^Checkpoints/ }));
+      fireEvent.change(
+        await screen.findByPlaceholderText("Before the health rebalance"),
+        { target: { value: "Health at 5000" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Save checkpoint/ }));
+
+      expect(screen.getByText("Health at 5000")).toBeTruthy();
+      const list = checkpointsSaved(saved()[0].id);
+      expect(list).toHaveLength(1);
+      expect(list[0]).toMatchObject({ name: "Health at 5000", kind: "manual" });
+    });
+
+    it("restores a checkpoint's edits as one undo step", async () => {
+      openNew(GAME.name);
+      type(healthBox(), "5000");
+
+      fireEvent.click(screen.getByRole("button", { name: /^Checkpoints/ }));
+      fireEvent.change(
+        await screen.findByPlaceholderText("Before the health rebalance"),
+        { target: { value: "At 5000" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Save checkpoint/ }));
+
+      // Keep editing past the checkpoint. The drawer stays open, which does
+      // not stop the field underneath it from taking a change.
+      type(healthBox(), "6000");
+      expect(healthBox().value).toBe("6000");
+
+      fireEvent.click(screen.getByRole("button", { name: "Restore At 5000" }));
+      expect(healthBox().value).toBe("5000");
+
+      // One undo step takes the restore back, not the health field alone.
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(healthBox().value).toBe("6000");
+    });
+
+    it("autosaves on a timer and skips a tick where nothing changed", async () => {
+      vi.useFakeTimers();
+      await act(async () => {
+        openNew(GAME.name);
+      });
+      await act(async () => {
+        type(healthBox(), "5000");
+      });
+      const id = saved()[0].id;
+      expect(checkpointsSaved(id)).toHaveLength(0);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_INTERVAL_MS);
+      });
+      expect(checkpointsSaved(id)).toHaveLength(1);
+      expect(checkpointsSaved(id)[0].kind).toBe("autosave");
+
+      // Nothing changed since, so the next tick takes no new autosave.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_INTERVAL_MS);
+      });
+      expect(checkpointsSaved(id)).toHaveLength(1);
+
+      // A further edit gives the next tick something new to keep.
+      await act(async () => {
+        type(healthBox(), "7000");
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(AUTOSAVE_INTERVAL_MS);
+      });
+      expect(checkpointsSaved(id)).toHaveLength(2);
     });
   });
 

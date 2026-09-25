@@ -73,6 +73,7 @@ import {
   Code2,
   Crosshair,
   FolderTree,
+  History,
   Pencil,
   Redo2,
   RotateCcw,
@@ -131,6 +132,7 @@ import {
   moveBeforeInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
+import { AUTOSAVE_INTERVAL_MS, useCheckpoints } from "../checkpoints";
 import { isCloneMutatorOnly } from "../cloneMutatorOnly";
 import {
   addClone,
@@ -188,6 +190,7 @@ import {
   editCounts,
   editSlot,
   type GameEdits,
+  isEmptyEdits,
   type ModProject,
   useModProjects,
 } from "../project";
@@ -255,6 +258,7 @@ import {
 import { ArmorClassPanel } from "./components/ArmorClassPanel";
 import { BatchEditDrawer } from "./components/BatchEditDrawer";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
+import { CheckpointsDrawer } from "./components/CheckpointsDrawer";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
@@ -314,6 +318,13 @@ export default function UnitPage() {
     updateProjectDetails,
   } = useModProjects();
   const history = useEditHistory();
+  const {
+    checkpointsFor,
+    saveCheckpoint,
+    autosaveCheckpoint,
+    renameCheckpoint,
+    removeCheckpoint,
+  } = useCheckpoints();
   /** Whether the details drawer is up to rename the open project (issue #2711). */
   const [renaming, setRenaming] = useState(false);
   /** Whether the generated Lua is on screen (issue #1275). */
@@ -322,6 +333,8 @@ export default function UnitPage() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** Whether the project's collections are on screen (issue #2654). */
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  /** Whether the project's checkpoints are on screen (issue #2657). */
+  const [checkpointsOpen, setCheckpointsOpen] = useState(false);
   /** Whether the batch edit drawer is on screen (issue #2655). */
   const [batchEditOpen, setBatchEditOpen] = useState(false);
   /**
@@ -399,6 +412,7 @@ export default function UnitPage() {
   const equipped = edits.equipped ?? NO_EQUIPPED;
   // Absent on a project saved before collections existed (issue #2654).
   const collections = edits.collections ?? NO_COLLECTIONS;
+  const checkpoints = checkpointsFor(projectId);
 
   /**
    * Record one change, as one undo step.
@@ -1460,6 +1474,49 @@ export default function UnitPage() {
     if (next) setEdits(project.id, next);
   };
 
+  /**
+   * Put the project back to a checkpoint's edits, as one undo step (issue
+   * #2657). Through `commit`, the same way every other change on this page
+   * is recorded, so restoring is one press of undo away from being undone.
+   * State outside `edits` - `writtenInPlace` and its neighbours - is left
+   * exactly as it was, for the reason `checkpoints.ts` gives.
+   */
+  const restoreCheckpoint = (checkpointEdits: GameEdits) => {
+    commit(() => checkpointEdits);
+  };
+
+  // Autosave a checkpoint on a timer, so a crash costs minutes rather than a
+  // session (issue #2657). A ref rather than an effect dependency for the
+  // current edits and project id: the interval must keep firing on its own
+  // schedule while somebody types, not get pushed back to "five minutes from
+  // the last keystroke" every time `edits` changes underneath it.
+  const autosaveRef = useRef({
+    projectId: "",
+    edits,
+    isEmpty: true,
+    autosaveCheckpoint,
+  });
+  autosaveRef.current = {
+    projectId: project?.id ?? "",
+    edits,
+    isEmpty: !project || isEmptyEdits(edits),
+    autosaveCheckpoint,
+  };
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the project id alone, so the interval keeps its own schedule while `edits` changes underneath it, reading the ref for whatever is current when it fires rather than being torn down and rebuilt.
+  useEffect(() => {
+    if (!project) return;
+    const timer = window.setInterval(() => {
+      const current = autosaveRef.current;
+      if (!current.projectId) return;
+      current.autosaveCheckpoint(
+        current.projectId,
+        current.edits,
+        current.isEmpty,
+      );
+    }, AUTOSAVE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [project?.id]);
+
   // The usual keys, and only outside a text box: a browser undoes typing in an
   // input on its own, and taking that over would make a half-typed number
   // impossible to correct without losing an unrelated edit.
@@ -1958,6 +2015,24 @@ export default function UnitPage() {
                 )}
               </Button>
             )}
+            {/* Named, described snapshots of the whole project, restorable
+              in one action (issue #2657). Needs a project to snapshot. */}
+            {project && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCheckpointsOpen(true)}
+                title="Named states of the project, to go back to in one action"
+              >
+                <History className="mr-1 size-3.5" />
+                Checkpoints
+                {checkpoints.length > 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    {checkpoints.length}
+                  </span>
+                )}
+              </Button>
+            )}
             {/* One arithmetic change across a whole collection, previewed
               before it writes anything (issue #2655). Needs a collection to
               pick from, but is offered either way so the empty state can
@@ -2107,6 +2182,28 @@ export default function UnitPage() {
               setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
             )
           }
+        />
+      )}
+
+      {project && (
+        <CheckpointsDrawer
+          open={checkpointsOpen}
+          onOpenChange={setCheckpointsOpen}
+          checkpoints={checkpoints}
+          onSave={(name, description) =>
+            saveCheckpoint(project.id, name, description, edits)
+          }
+          onRestore={(checkpoint) => {
+            restoreCheckpoint(checkpoint.edits);
+            // So the field the restore changed is back on screen straight
+            // away, the same way picking a checkpoint is meant to feel: one
+            // action, not a restore followed by a second click to see it.
+            setCheckpointsOpen(false);
+          }}
+          onRename={(id, name, description) =>
+            renameCheckpoint(project.id, id, { name, description })
+          }
+          onDelete={(id) => removeCheckpoint(project.id, id)}
         />
       )}
 
