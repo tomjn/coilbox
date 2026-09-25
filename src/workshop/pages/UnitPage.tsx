@@ -85,6 +85,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { gameIdentityForName } from "@/container/gameIdentity";
 import { assetIndex } from "@/content/assetKinds";
 import {
+  invalidateGameInfo,
+  invalidateUnitDataset,
   useScanTargetSelection,
   useUnitsyncArchiveTree,
   useUnitsyncGameInfo,
@@ -230,7 +232,7 @@ export default function UnitPage() {
   // The names, from the read that already answers for a game whose defs carry
   // none. Cheap next to the def table and cached for the session by its own
   // hook, and the list renders off the def table meanwhile rather than waiting.
-  const { dataset } = useUnitsyncUnitDataset(
+  const { dataset, reload: reloadDataset } = useUnitsyncUnitDataset(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
@@ -599,11 +601,45 @@ export default function UnitPage() {
   // thing that tells Beyond All Reason's four "Advanced Aircraft Plant" rows
   // apart. One walk for the page: the left-hand list names the side on the row,
   // and a builder's roster uses the same answer to mark a unit from another one.
-  const { info: gameInfo, status: gameInfoStatus } = useUnitsyncGameInfo(
+  const {
+    info: gameInfo,
+    status: gameInfoStatus,
+    reload: reloadGameInfo,
+  } = useUnitsyncGameInfo(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
   );
+
+  // The edit-in-place route changes a unit's own file (issue #2635), and the
+  // Rust side already bumps the game folder's own mtime so the worker's next
+  // read is not served from its own cache (issue #2637). Every unitsync read
+  // this page holds is still cached for the session on the frontend too, so
+  // each one is dropped and asked for again rather than left to serve what it
+  // read before the write.
+  const refreshAfterInPlaceWrite = useCallback(() => {
+    invalidateGameInfo(
+      selected?.enginePath,
+      selected?.rootPath,
+      game?.primaryArchive.name,
+    );
+    invalidateUnitDataset(
+      selected?.enginePath,
+      selected?.rootPath,
+      game?.primaryArchive.name,
+    );
+    reload();
+    reloadGameInfo();
+    reloadDataset();
+  }, [
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    reload,
+    reloadGameInfo,
+    reloadDataset,
+  ]);
+
   const sides = useMemo(
     () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
     [gameInfo],
@@ -977,6 +1013,7 @@ export default function UnitPage() {
                 onApplyFix={(finding) =>
                   commit(finding.fix?.apply ?? ((e) => e))
                 }
+                onInPlaceWrite={refreshAfterInPlaceWrite}
               />
             )}
             {/* What the project compiles to (issue #1275). A game reads Lua,

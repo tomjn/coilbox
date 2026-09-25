@@ -230,6 +230,7 @@ function RoutesSection({
   gamePath,
   checking,
   project,
+  onInPlaceWrite,
 }: {
   gameName: string;
   options: ConfigOption[] | undefined;
@@ -240,6 +241,9 @@ function RoutesSection({
   checking: boolean;
   /** The open project, which the edit-in-place route writes (issue #2635). */
   project: ModProject | undefined;
+  /** Called after the edit-in-place route changes a file on disk, so the
+   *  page can drop its own unitsync reads of the game (issue #2637). */
+  onInPlaceWrite: () => void;
 }) {
   return (
     <section className="flex flex-col gap-2">
@@ -269,7 +273,11 @@ function RoutesSection({
                 </span>
                 {r.route === "edit-in-place" && r.available && gamePath && (
                   <div className="mt-1.5">
-                    <InPlaceWrite gameDir={gamePath} project={project} />
+                    <InPlaceWrite
+                      gameDir={gamePath}
+                      project={project}
+                      onWritten={onInPlaceWrite}
+                    />
                   </div>
                 )}
               </div>
@@ -628,6 +636,7 @@ export function ChecksButton({
   project,
   compatibility,
   onApplyFix,
+  onInPlaceWrite,
 }: {
   gameName: string;
   /** The game's own archives, its primary one first, for the post-processing
@@ -655,6 +664,9 @@ export function ChecksButton({
    *  which is where the game's definitions already are. */
   compatibility: CompatState | null;
   onApplyFix: (finding: CompatFinding) => void;
+  /** Called after the edit-in-place route changes a file on disk, so the
+   *  page can drop its own unitsync reads of the game (issue #2637). */
+  onInPlaceWrite: () => void;
 }) {
   const [open, setOpen] = useState(false);
   // Read whenever a project is open, not only while the drawer is up: see
@@ -770,6 +782,7 @@ export function ChecksButton({
             gamePath={gameArchives[0]?.path}
             checking={routesChecking}
             project={project}
+            onInPlaceWrite={onInPlaceWrite}
           />
           <PostHookSection
             gameName={gameName}

@@ -62,8 +62,17 @@ afterEach(() => {
   calls.length = 0;
 });
 
-function renderWrite(p: ModProject | undefined = project) {
-  return render(<InPlaceWrite gameDir="/spring/games/dev.sdd" project={p} />);
+function renderWrite(
+  p: ModProject | undefined = project,
+  onWritten: () => void = vi.fn(),
+) {
+  return render(
+    <InPlaceWrite
+      gameDir="/spring/games/dev.sdd"
+      project={p}
+      onWritten={onWritten}
+    />,
+  );
 }
 
 describe("the edit-in-place actions", () => {
@@ -95,7 +104,7 @@ describe("the edit-in-place actions", () => {
     ).toBeTruthy();
   });
 
-  it("lists every refusal and says nothing was written", async () => {
+  it("lists every refusal, says nothing was written, and does not ask for a refresh", async () => {
     writeResponse = {
       written: [],
       changed: 0,
@@ -115,7 +124,8 @@ describe("the edit-in-place actions", () => {
       ],
       notCarried: [],
     };
-    renderWrite();
+    const onWritten = vi.fn();
+    renderWrite(project, onWritten);
     fireEvent.click(
       screen.getByRole("button", { name: "Write changes into the game" }),
     );
@@ -126,9 +136,10 @@ describe("the edit-in-place actions", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
+    expect(onWritten).not.toHaveBeenCalled();
   });
 
-  it("reports what it wrote and then offers undo", async () => {
+  it("reports what it wrote, offers undo, and asks the caller to refresh", async () => {
     writeResponse = {
       written: ["units/armcom.lua"],
       changed: 1,
@@ -136,7 +147,8 @@ describe("the edit-in-place actions", () => {
       refused: [],
       notCarried: ["Build menu changes are not written into the game yet."],
     };
-    renderWrite();
+    const onWritten = vi.fn();
+    renderWrite(project, onWritten);
     fireEvent.click(
       screen.getByRole("button", { name: "Write changes into the game" }),
     );
@@ -147,11 +159,13 @@ describe("the edit-in-place actions", () => {
       screen.getByText("Build menu changes are not written into the game yet."),
     ).toBeTruthy();
     expect(await screen.findByRole("button", { name: "Undo" })).toBeTruthy();
+    expect(onWritten).toHaveBeenCalledTimes(1);
   });
 
-  it("asks before accepting, since accept deletes the backups", async () => {
+  it("asks before accepting, since accept deletes the backups, then asks the caller to refresh", async () => {
     status = { backups: 1, created: 0 };
-    renderWrite();
+    const onWritten = vi.fn();
+    renderWrite(project, onWritten);
     fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
     expect(screen.getByText("Keep the changes?")).toBeTruthy();
     expect(calls).not.toContain("workshop_accept_in_place");
@@ -167,12 +181,15 @@ describe("the edit-in-place actions", () => {
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: "Undo" })).toBeNull(),
     );
+    expect(onWritten).toHaveBeenCalledTimes(1);
   });
 
-  it("undoes without asking, since the project can write again", async () => {
+  it("undoes without asking, since the project can write again, then asks the caller to refresh", async () => {
     status = { backups: 1, created: 0 };
-    renderWrite();
+    const onWritten = vi.fn();
+    renderWrite(project, onWritten);
     fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Put 1 file back as it was.")).toBeTruthy();
+    expect(onWritten).toHaveBeenCalledTimes(1);
   });
 });
