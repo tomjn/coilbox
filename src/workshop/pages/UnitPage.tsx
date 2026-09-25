@@ -76,6 +76,7 @@ import {
   Pencil,
   Redo2,
   RotateCcw,
+  Sigma,
   Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -112,6 +113,7 @@ import {
   unknownDamageClasses,
 } from "../armorClasses";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
+import { applyBatchRows } from "../batchEdit";
 import {
   adoptBeforePost,
   copiedFrom,
@@ -251,6 +253,7 @@ import {
   weaponSlotView,
 } from "../weaponSlots";
 import { ArmorClassPanel } from "./components/ArmorClassPanel";
+import { BatchEditDrawer } from "./components/BatchEditDrawer";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
@@ -319,6 +322,8 @@ export default function UnitPage() {
   const [libraryOpen, setLibraryOpen] = useState(false);
   /** Whether the project's collections are on screen (issue #2654). */
   const [collectionsOpen, setCollectionsOpen] = useState(false);
+  /** Whether the batch edit drawer is on screen (issue #2655). */
+  const [batchEditOpen, setBatchEditOpen] = useState(false);
   /**
    * The collection filtering the unit list, or `undefined` for every unit
    * (issue #2654). Page state rather than part of the saved project: which
@@ -1953,6 +1958,21 @@ export default function UnitPage() {
                 )}
               </Button>
             )}
+            {/* One arithmetic change across a whole collection, previewed
+              before it writes anything (issue #2655). Needs a collection to
+              pick from, but is offered either way so the empty state can
+              point back at the Collections button. */}
+            {game && defs && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBatchEditOpen(true)}
+                title="Change one field across every unit in a collection, with a preview first"
+              >
+                <Sigma className="mr-1 size-3.5" />
+                Batch edit
+              </Button>
+            )}
             {/* What the project compiles to (issue #1275). A game reads Lua,
               and the fastest way to find out whether coilbox understood the
               edit is to read what it wrote. */}
@@ -2086,6 +2106,21 @@ export default function UnitPage() {
             updateCollections((c) =>
               setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
             )
+          }
+        />
+      )}
+
+      {game && defs && (
+        <BatchEditDrawer
+          open={batchEditOpen}
+          onOpenChange={setBatchEditOpen}
+          collections={collections}
+          units={units}
+          overrides={overrides}
+          nameOf={nameOf}
+          beforePost={defs.beforePost}
+          onApply={(rows) =>
+            updateOverrides((o) => applyBatchRows(o, rows, units))
           }
         />
       )}
