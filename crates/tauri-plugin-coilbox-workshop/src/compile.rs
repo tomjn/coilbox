@@ -35,10 +35,11 @@
 use crate::before_post;
 use crate::lua::{lua_literal, lua_string, PatchTree};
 use crate::model::{
-    through_a_position, BuildMenuOp, GameEdits, LibraryWeapon, ModProject, UnitClone,
+    through_a_position, BuildMenuOp, CegClass, ExplosionGenerator, GameEdits, LibraryWeapon,
+    ModProject, UnitClone,
 };
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 /// Which of the two forms a chunk is written in.
@@ -464,6 +465,19 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             if edits.armor_classes.moves.len() == 1 { "" } else { "s" }
         ));
     }
+    if !edits.explosion_generators.is_empty() {
+        for generator in edits.explosion_generators.values() {
+            files.push(CompiledFile {
+                path: format!("effects/{}.lua", generator.key),
+                contents: ceg_file(generator),
+            });
+        }
+        notes.push(format!(
+            "{} explosion effect{} written under effects/. The engine reads these from a real file in the game's own archive tree (rts/Sim/Projectiles/ExplosionGenerator.cpp), so a BAR tweak slot cannot carry them: this project's tweakdefs export is left empty and the mutator or edit-in-place route is needed to see the effect in game.",
+            edits.explosion_generators.len(),
+            if edits.explosion_generators.len() == 1 { "" } else { "s" }
+        ));
+    }
 
     // Every block, in the order they were compiled, which is the order they have
     // to run in: a copy standing in for a game unit before a menu is replayed
@@ -486,7 +500,12 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         ));
     }
 
-    let bar_tweakdefs = if added_entries.is_empty() && patches.is_empty() && post_blocks.is_empty()
+    // A tweak slot can carry a field pointing at a generator's name, but never
+    // the effects/<key>.lua file the name resolves to (see the note above), so
+    // a project with any generator gets no tweakdefs export at all rather than
+    // one that quietly points at nothing in game.
+    let bar_tweakdefs = if !edits.explosion_generators.is_empty()
+        || (added_entries.is_empty() && patches.is_empty() && post_blocks.is_empty())
     {
         None
     } else {
@@ -1806,6 +1825,136 @@ fn armor_defs_lua(classes: &BTreeMap<String, Vec<String>>) -> String {
     out
 }
 
+/// A constant colour as `CColorMap::LoadFromDefString` reads one: whitespace
+/// separated floats, at least two RGBA groups
+/// (`rts/Rendering/Textures/ColorMap.cpp:98,143`). A flat colour is just the
+/// same stop written twice, which is enough for what the form offers.
+fn ceg_colormap(color: &crate::model::CegColor) -> String {
+    let stop = format!("{} {} {} 1", color.r, color.g, color.b);
+    format!("{stop} {stop}")
+}
+
+/// One generator's class specific properties, keyed by the name the engine's
+/// `GetMemberInfo` chain reads for that class (`ExpGenSpawnableMemberInfo.h`,
+/// and the class's own `.cpp`, see `explosionGenerators.ts`'s doc comment for
+/// the file and line of each). Ground flash takes no `properties` table at
+/// all, so it never calls this function. Its own reserved shape is
+/// [`ceg_groundflash_value`].
+fn ceg_properties(generator: &ExplosionGenerator) -> Value {
+    let mut props = serde_json::Map::new();
+    match generator.class {
+        CegClass::CBitmapMuzzleFlame => {
+            if let Some(texture) = &generator.texture {
+                props.insert("sidetexture".to_string(), json!(texture));
+                props.insert("fronttexture".to_string(), json!(texture));
+            }
+            if let Some(color) = &generator.color {
+                props.insert("colormap".to_string(), json!(ceg_colormap(color)));
+            }
+            if let Some(size) = generator.size {
+                props.insert("size".to_string(), json!(size));
+            }
+            if let Some(lifetime) = generator.lifetime {
+                props.insert("ttl".to_string(), json!(lifetime as i64));
+            }
+        }
+        CegClass::CSimpleParticleSystem => {
+            if let Some(texture) = &generator.texture {
+                props.insert("texture".to_string(), json!(texture));
+            }
+            if let Some(color) = &generator.color {
+                props.insert("colormap".to_string(), json!(ceg_colormap(color)));
+            }
+            if let Some(size) = generator.size {
+                props.insert("particlesize".to_string(), json!(size));
+            }
+            if let Some(lifetime) = generator.lifetime {
+                props.insert("particlelife".to_string(), json!(lifetime));
+            }
+            if let Some(particles) = generator.particles {
+                props.insert("numparticles".to_string(), json!(particles));
+            }
+        }
+        CegClass::CHeatCloudProjectile => {
+            if let Some(texture) = &generator.texture {
+                props.insert("texture".to_string(), json!(texture));
+            }
+            if let Some(size) = generator.size {
+                props.insert("size".to_string(), json!(size));
+            }
+            if let Some(lifetime) = generator.lifetime {
+                props.insert("heatfalloff".to_string(), json!(lifetime));
+            }
+        }
+        CegClass::CStandardGroundFlash => {}
+    }
+    Value::Object(props)
+}
+
+/// The reserved `groundflash` sub-table `CCustomExplosionGenerator::Load`
+/// parses outside the ordinary spawn loop, and always gates on `ground`
+/// itself (`ExplosionGenerator.cpp:1027-1039`), so neither a repeat count
+/// nor the gating flags the other three classes take are written here.
+fn ceg_groundflash_value(generator: &ExplosionGenerator) -> Value {
+    let mut flash = serde_json::Map::new();
+    if let Some(lifetime) = generator.lifetime {
+        flash.insert("ttl".to_string(), json!(lifetime as i64));
+    }
+    if let Some(color) = &generator.color {
+        flash.insert("color".to_string(), json!([color.r, color.g, color.b]));
+    }
+    if let Some(size) = generator.size {
+        flash.insert("flashSize".to_string(), json!(size));
+    }
+    Value::Object(flash)
+}
+
+/// One generator's spawn entry, for every class but ground flash: `class`,
+/// the repeat `count` (default 1, `ExplosionGenerator.cpp:978`), the gating
+/// flags read straight off the spawn table rather than `properties`
+/// (`GetFlagsFromTable`, `ExplosionGenerator.cpp:60`), and the class's own
+/// `properties`.
+fn ceg_spawn_value(generator: &ExplosionGenerator) -> Value {
+    let class_name = match generator.class {
+        CegClass::CBitmapMuzzleFlame => "CBitmapMuzzleFlame",
+        CegClass::CSimpleParticleSystem => "CSimpleParticleSystem",
+        CegClass::CHeatCloudProjectile => "CHeatCloudProjectile",
+        CegClass::CStandardGroundFlash => unreachable!("ground flash has no spawn entry"),
+    };
+    json!({
+        "class": class_name,
+        "count": generator.count,
+        "ground": generator.ground,
+        "water": generator.water,
+        "air": generator.air,
+        "underwater": generator.underwater,
+        "properties": ceg_properties(generator),
+    })
+}
+
+/// One generator's whole CEG entry: `{ groundflash = {...} }` for
+/// `CStandardGroundFlash`, `{ spawn1 = {...} }` for the other three.
+fn ceg_entry_value(generator: &ExplosionGenerator) -> Value {
+    if generator.class == CegClass::CStandardGroundFlash {
+        json!({ "groundflash": ceg_groundflash_value(generator) })
+    } else {
+        json!({ "spawn1": ceg_spawn_value(generator) })
+    }
+}
+
+/// A generator's whole `effects/<key>.lua` (issue #2643): a table of CEG name
+/// to entry, the same shape every file under `effects/` returns
+/// (`gamedata/explosions.lua`'s `LoadLuas`, in `cont/base/springcontent`).
+/// One file per generator, one entry per file, since the form edits one
+/// generator at a time.
+fn ceg_file(generator: &ExplosionGenerator) -> String {
+    format!(
+        "-- Written by coilbox (issue #2643). The engine merges every file under\n-- effects/ into the shared table gamedata/explosions.lua returns\n-- (rts/Sim/Projectiles/ExplosionGenerator.cpp), keyed by the name a weapon\n-- field names.\nreturn {{\n  [{}] = {},\n}}\n",
+        lua_string(&generator.key),
+        lua_literal(&ceg_entry_value(generator), "  "),
+    )
+}
+
 /// The patch table with the code that applies it: every field change, merged
 /// onto whatever `UnitDefs` already holds. Shared by [`post_file`] and
 /// [`bar_tweakdefs_body`], which both run this over the same `UnitDefs` the
@@ -3048,5 +3197,175 @@ mod tests {
         let lua = file(&out, ARMOR_FILE);
         assert!(lua.contains("[\"flyingcircus\"]"));
         assert!(lua.contains("\"armkam\""));
+    }
+
+    /// A VM only ever evaluates a string this test built, never reads a file,
+    /// so which directory it is rooted at is never consulted (the same
+    /// reasoning `preflight::lua_root` gives).
+    fn ceg_lua_root() -> std::path::PathBuf {
+        std::env::temp_dir()
+    }
+
+    /// A generator's file, evaluated the way the engine's own `LoadLuas`
+    /// would read it (`gamedata/explosions.lua`), so a test checks the real
+    /// table shape rather than a substring of the source.
+    fn eval_ceg(lua: &str) -> Value {
+        coilbox_springlua::SpringLua::new(ceg_lua_root())
+            .expect("start the Lua VM")
+            .eval_value_raw(lua, "effects/test.lua")
+            .expect("effects file should evaluate")
+    }
+
+    #[test]
+    fn a_muzzle_flame_writes_a_spawn_with_colour_and_texture_in_properties() {
+        let out = compile(&project(json!({
+            "explosionGenerators": {
+                "purpleflash": {
+                    "key": "purpleflash",
+                    "class": "CBitmapMuzzleFlame",
+                    "count": 1,
+                    "ground": true,
+                    "water": true,
+                    "air": true,
+                    "underwater": true,
+                    "texture": "flare.tga",
+                    "color": { "r": 1.0, "g": 0.0, "b": 1.0 },
+                    "size": 8.0,
+                    "lifetime": 30.0,
+                }
+            }
+        })));
+        let lua = file(&out, "effects/purpleflash.lua");
+        let value = eval_ceg(lua);
+        let entry = &value["purpleflash"]["spawn1"];
+        assert_eq!(entry["class"], "CBitmapMuzzleFlame");
+        assert_eq!(entry["ground"], true);
+        assert_eq!(entry["properties"]["sidetexture"], "flare.tga");
+        assert_eq!(entry["properties"]["fronttexture"], "flare.tga");
+        assert_eq!(entry["properties"]["size"], 8.0);
+        assert_eq!(entry["properties"]["ttl"], 30);
+        // A flat colour is the same RGBA stop written twice.
+        assert_eq!(entry["properties"]["colormap"], "1 0 1 1 1 0 1 1");
+    }
+
+    #[test]
+    fn a_particle_system_writes_numparticles_and_particlelife() {
+        let out = compile(&project(json!({
+            "explosionGenerators": {
+                "smoke": {
+                    "key": "smoke",
+                    "class": "CSimpleParticleSystem",
+                    "count": 2,
+                    "ground": true,
+                    "water": false,
+                    "air": true,
+                    "underwater": false,
+                    "texture": "smoke.tga",
+                    "size": 4.5,
+                    "lifetime": 60.0,
+                    "particles": 20,
+                }
+            }
+        })));
+        let lua = file(&out, "effects/smoke.lua");
+        let value = eval_ceg(lua);
+        let entry = &value["smoke"]["spawn1"];
+        assert_eq!(entry["class"], "CSimpleParticleSystem");
+        assert_eq!(entry["count"], 2);
+        assert_eq!(entry["water"], false);
+        assert_eq!(entry["properties"]["particlesize"], 4.5);
+        assert_eq!(entry["properties"]["particlelife"], 60.0);
+        assert_eq!(entry["properties"]["numparticles"], 20);
+        assert!(entry["properties"].get("colormap").is_none());
+    }
+
+    #[test]
+    fn a_heat_cloud_has_no_colour_and_uses_heatfalloff_for_lifetime() {
+        let out = compile(&project(json!({
+            "explosionGenerators": {
+                "warmth": {
+                    "key": "warmth",
+                    "class": "CHeatCloudProjectile",
+                    "count": 1,
+                    "ground": true,
+                    "water": true,
+                    "air": true,
+                    "underwater": true,
+                    "size": 3.0,
+                    "lifetime": 0.5,
+                }
+            }
+        })));
+        let lua = file(&out, "effects/warmth.lua");
+        let value = eval_ceg(lua);
+        let entry = &value["warmth"]["spawn1"];
+        assert_eq!(entry["class"], "CHeatCloudProjectile");
+        assert_eq!(entry["properties"]["heatfalloff"], 0.5);
+        assert!(entry["properties"].get("colormap").is_none());
+    }
+
+    /// Ground flash is the reserved `groundflash` key, not a generic spawn:
+    /// no `spawn1`, no repeat count, no gating flags, matching the shape
+    /// real CEG files use and `ExplosionGenerator.cpp:1027-1039` parses
+    /// unconditionally alongside whatever else the entry holds.
+    #[test]
+    fn a_ground_flash_writes_the_reserved_key_not_a_spawn() {
+        let out = compile(&project(json!({
+            "explosionGenerators": {
+                "bigflash": {
+                    "key": "bigflash",
+                    "class": "CStandardGroundFlash",
+                    "count": 1,
+                    "ground": false,
+                    "water": false,
+                    "air": false,
+                    "underwater": false,
+                    "color": { "r": 1.0, "g": 1.0, "b": 0.8 },
+                    "size": 100.0,
+                    "lifetime": 20.0,
+                }
+            }
+        })));
+        let lua = file(&out, "effects/bigflash.lua");
+        let value = eval_ceg(lua);
+        let entry = &value["bigflash"];
+        assert!(entry.get("spawn1").is_none());
+        let flash = &entry["groundflash"];
+        assert_eq!(flash["ttl"], 20);
+        assert_eq!(flash["flashSize"], 100.0);
+        let color: Vec<f64> = flash["color"]
+            .as_array()
+            .expect("color is an array")
+            .iter()
+            .map(|v| v.as_f64().expect("color channel is a number"))
+            .collect();
+        assert_eq!(color, vec![1.0, 1.0, 0.8]);
+    }
+
+    /// The engine only ever loads a CEG from a real file under `effects/`
+    /// (`ExplosionGenerator.cpp:208`), which a BAR tweak slot has no way to
+    /// carry, so a project holding one gets no tweakdefs export at all
+    /// rather than one that points at a generator nothing delivers.
+    #[test]
+    fn a_project_with_an_explosion_generator_gets_no_bar_tweakdefs() {
+        let out = compile(&project(json!({
+            "overrides": { "armcom": { "weapondefs.disintegrator.explosionGenerator": "custom:purpleflash" } },
+            "explosionGenerators": {
+                "purpleflash": {
+                    "key": "purpleflash",
+                    "class": "CBitmapMuzzleFlame",
+                    "count": 1,
+                    "ground": true,
+                    "water": true,
+                    "air": true,
+                    "underwater": true,
+                }
+            }
+        })));
+        assert!(out.bar_tweakdefs.is_none());
+        assert!(out
+            .notes
+            .iter()
+            .any(|n| n.contains("tweak slot") && n.contains("effects/")));
     }
 }
