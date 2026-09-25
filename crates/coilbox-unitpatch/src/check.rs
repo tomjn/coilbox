@@ -156,6 +156,55 @@ fn differences(before: &Json, after: &Json, path: &mut Vec<String>, out: &mut Ve
     }
 }
 
+/// Every path, dotted, at which `a` and `b` differ.
+pub fn differing(a: &Json, b: &Json) -> Vec<String> {
+    let mut found = Vec::new();
+    differences(a, b, &mut Vec::new(), &mut found);
+    found.iter().map(|path| path.join(".")).collect()
+}
+
+fn json(value: &Value) -> Json {
+    match value {
+        Value::Bool(b) => Json::Bool(*b),
+        Value::Number(n) => serde_json::Number::from_f64(*n).map_or(Json::Null, Json::Number),
+        Value::String(s) => Json::String(s.clone()),
+    }
+}
+
+/// The table at `path` in `root`, made on the way where it is missing.
+fn table_at<'a>(root: &'a mut Json, path: &[String]) -> &'a mut Map<String, Json> {
+    let mut current = root;
+    for key in path {
+        if !current.is_object() {
+            *current = Json::Object(Map::new());
+        }
+        current = current
+            .as_object_mut()
+            .expect("made an object above")
+            .entry(key.clone())
+            .or_insert_with(|| Json::Object(Map::new()));
+    }
+    if !current.is_object() {
+        *current = Json::Object(Map::new());
+    }
+    current.as_object_mut().expect("made an object above")
+}
+
+/// `root` with `value` at `path`, as a set would leave it.
+pub fn set(root: &mut Json, path: &[String], value: &Value) {
+    let Some((last, parent)) = path.split_last() else {
+        return;
+    };
+    table_at(root, parent).insert(last.clone(), json(value));
+}
+
+/// `root` with `value` on the end of the list at `path`, as a push would
+/// leave it.
+pub fn push(root: &mut Json, path: &[String], value: &Value) {
+    let length = list_length(root, path);
+    table_at(root, path).insert(format!("[{}]", length + 1), json(value));
+}
+
 /// Confirm `after` is `before` with only the value at `expected` changed, to
 /// `value`. The error is a sentence for the person who asked for the edit.
 pub fn confirm(

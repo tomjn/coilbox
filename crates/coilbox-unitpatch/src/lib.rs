@@ -214,6 +214,8 @@ pub enum RefusalKind {
     EvalFailed,
     /// Evaluating the patched file did not show exactly the requested change.
     PostCheckFailed,
+    /// A new unit's name, or its file's, is one the game already uses.
+    NameTaken,
 }
 
 /// A refusal to patch, with a reason a person can read and, where there is
@@ -348,6 +350,134 @@ pub fn check_fields(
             Ok(plan.location)
         })
         .collect()
+}
+
+/// Where the returned table keys `unit` in `source`, worked out from the
+/// file's text alone. The cheap way to find which file defines a unit before
+/// [`clone_unit`] runs it.
+pub fn locate_unit(source: &str, unit: &str) -> Result<Location, Refusal> {
+    locate::rename(source, unit, unit).map(|plan| plan.location)
+}
+
+/// What `source` returns when it runs, keys lowercased and list positions
+/// written `[1]`, `[2]`, as the post-check reads it. Parent classes from
+/// other files stand in as empty tables, so this is the file's own table and
+/// not the unit as the engine sees it.
+pub fn evaluate(source: &str, game_root: &Path) -> Result<serde_json::Value, Refusal> {
+    evaluate_original(source, game_root)
+}
+
+/// One reason [`clone_unit`] would not make a copy.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CloneRefusal {
+    /// The edit it is about, as a position in the list given, or `None` when
+    /// it is about the copy as a whole.
+    pub edit: Option<usize>,
+    pub refusal: Refusal,
+}
+
+/// A new unit file for `new_unit`, made from the file `source` that defines
+/// `unit`, with `edits` made to the copy (issue #2634).
+///
+/// The copy is the source file's own text with the unit's key renamed and the
+/// file's other units taken out, so it is in the shape the game's author
+/// wrote it. Each edit then goes through [`patch`] against the copy, with the
+/// post-check that brings. Last, the whole copy is run and has to return
+/// exactly one unit, `new_unit`, whose table is the source unit's with the
+/// edits made and nothing else different.
+///
+/// Every edit is tried, so the refusals list all of those the copy cannot
+/// take rather than only the first.
+pub fn clone_unit(
+    source: &str,
+    unit: &str,
+    new_unit: &str,
+    edits: &[(Vec<Segment>, Op)],
+    game_root: &Path,
+) -> Result<String, Vec<CloneRefusal>> {
+    let whole = |refusal| {
+        vec![CloneRefusal {
+            edit: None,
+            refusal,
+        }]
+    };
+    let plan = locate::rename(source, unit, new_unit).map_err(whole)?;
+    let before = evaluate_original(source, game_root).map_err(whole)?;
+    let Some(mut expected) = before.get(unit.to_lowercase()).cloned() else {
+        return Err(whole(Refusal::new(
+            RefusalKind::EvalFailed,
+            format!("The file does not return `{unit}` when it runs, so there is nothing to copy."),
+        )));
+    };
+    let key = new_unit.to_lowercase();
+    let mut text = plan.apply(source);
+    confirm_copy(&text, &key, &expected, plan.location, game_root).map_err(whole)?;
+
+    let mut refused = Vec::new();
+    for (at, (path, op)) in edits.iter().enumerate() {
+        let edit = Edit {
+            unit: new_unit.to_string(),
+            path: path.clone(),
+            op: op.clone(),
+        };
+        match patch(&text, &edit, game_root) {
+            Ok(patched) => {
+                text = patched.text;
+                let steps: Vec<String> = path.iter().map(Segment::canonical).collect();
+                match op {
+                    Op::Set(value) => check::set(&mut expected, &steps, value),
+                    Op::Push(value) => check::push(&mut expected, &steps, value),
+                }
+            }
+            Err(refusal) => refused.push(CloneRefusal {
+                edit: Some(at),
+                refusal,
+            }),
+        }
+    }
+    if !refused.is_empty() {
+        return Err(refused);
+    }
+    confirm_copy(&text, &key, &expected, plan.location, game_root).map_err(whole)?;
+    Ok(text)
+}
+
+/// Run a copy's file and confirm it returns only `key`, holding `expected`.
+fn confirm_copy(
+    text: &str,
+    key: &str,
+    expected: &serde_json::Value,
+    location: Location,
+    game_root: &Path,
+) -> Result<(), Refusal> {
+    let refuse = |message: String| Refusal::new(RefusalKind::PostCheckFailed, message).at(location);
+    let after = check::evaluate(text, game_root, "copy")
+        .map_err(|e| refuse(format!("The copy's file does not run: {e}")))?;
+    let keys: Vec<&String> = after
+        .as_object()
+        .map(|units| units.keys().collect())
+        .unwrap_or_default();
+    if keys != [key] {
+        let names: Vec<&str> = keys.iter().map(|k| k.as_str()).collect();
+        return Err(refuse(format!(
+            "The copy's file returns {} rather than only `{key}`.",
+            if names.is_empty() {
+                "no units".to_string()
+            } else {
+                names.join(", ")
+            }
+        )));
+    }
+    let differ = check::differing(expected, &after[key]);
+    if !differ.is_empty() {
+        let shown: Vec<&str> = differ.iter().take(5).map(String::as_str).collect();
+        return Err(refuse(format!(
+            "The copy's table would differ from the one asked for at {}, so it was not made.",
+            shown.join(", ")
+        )));
+    }
+    Ok(())
 }
 
 /// A value of the same type as `value` that is not equal to it.
