@@ -810,6 +810,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "coilbox-gamebackup"
+version = "0.0.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "coilbox-lobby-protocol"
 version = "0.0.0"
 dependencies = [
@@ -6372,6 +6379,7 @@ name = "tauri-plugin-coilbox-content"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-proc",
  "flate2",
@@ -6625,8 +6633,10 @@ name = "tauri-plugin-coilbox-workshop"
 version = "0.0.0"
 dependencies = [
  "base64 0.22.1",
+ "coilbox-gamebackup",
  "coilbox-portable",
  "coilbox-springlua",
+ "coilbox-unitpatch",
  "picoframe-core",
  "serde",
  "serde_json",

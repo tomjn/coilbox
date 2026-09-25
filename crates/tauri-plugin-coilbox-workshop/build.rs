@@ -10,6 +10,10 @@ const COMMANDS: &[&str] = &[
     "workshop_pack_bar_slots",
     "workshop_decode_tweak_set",
     "workshop_change_ledger",
+    "workshop_write_in_place",
+    "workshop_in_place_status",
+    "workshop_undo_in_place",
+    "workshop_accept_in_place",
 ];
 
 fn main() {
