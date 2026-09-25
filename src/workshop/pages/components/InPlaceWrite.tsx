@@ -24,7 +24,8 @@
  * cannot write it (issue #2633) is skipped by the write rather than refused,
  * and listed here as still needing a mutator, before anything is pressed.
  *
- * A text diff of what changed is #2636.
+ * The disk diff behind a pending backup or created file, with Undo and
+ * Accept offered a second way inside it, is `DiskDiffDrawer` (issue #2636).
  */
 import { Button } from "@picoframe/frame";
 import { useCallback, useEffect, useState } from "react";
@@ -45,6 +46,7 @@ import {
 import type { InPlaceDone } from "../../inPlaceProject";
 import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
 import type { ModProject } from "../../project";
+import { DiskDiffDrawer } from "./DiskDiffDrawer";
 
 type Busy = "write" | "undo" | "accept" | null;
 
@@ -76,6 +78,7 @@ export function InPlaceWrite({
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmAccept, setConfirmAccept] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -154,6 +157,14 @@ export function InPlaceWrite({
         </Button>
         {pending > 0 && (
           <>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy !== null || reading}
+              onClick={() => setReviewing(true)}
+            >
+              Review the disk diff
+            </Button>
             <Button
               size="sm"
               variant="outline"
@@ -246,6 +257,16 @@ export function InPlaceWrite({
       {error && <p className="text-destructive text-xs">{error}</p>}
       {done && <p className="text-xs">{done}</p>}
       {outcome && <WriteResult outcome={outcome} />}
+      <DiskDiffDrawer
+        open={reviewing}
+        onOpenChange={setReviewing}
+        gameDir={gameDir}
+        reading={reading}
+        onDone={(drawerDone) => {
+          onDone(drawerDone);
+          void refresh();
+        }}
+      />
     </div>
   );
 }

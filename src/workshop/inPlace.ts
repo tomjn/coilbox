@@ -6,6 +6,10 @@
  * original aside, so undo and accept read the backups on disk and work after
  * a restart. A write is all or nothing: if the patcher refuses any change,
  * nothing is written and `refused` lists every change that stopped it.
+ *
+ * `workshop_in_place_diffs` (issue #2636) reads a line diff of every file that
+ * carries a backup or created marker, computed in `diff.rs` so the frontend
+ * needs no diff library of its own.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ModProject } from "./project";
@@ -116,6 +120,36 @@ export const workshopCheckInPlace = defineCommand<
   { gameDir: string; unit: string; fields: FieldProbe[] },
   InPlaceCheck
 >("coilbox-workshop", "workshop_check_in_place");
+
+/** What one line of a diff is, from the old side, the new side, or both. */
+export type LineChange = "equal" | "removed" | "added";
+
+/** One line of a diff, numbered on whichever side(s) it appears on. Counted
+ *  from 1. */
+export interface DiffLine {
+  kind: LineChange;
+  oldLine: number | null;
+  newLine: number | null;
+  text: string;
+}
+
+/** One file's diff for the disk-diff drawer (issue #2636): either a workshop
+ *  backup against the current file, or a whole file addition when coilbox
+ *  created it. */
+export interface FileDiff {
+  /** The file, relative to the game. */
+  file: string;
+  /** Whether coilbox created this file rather than changing an existing one.
+   *  A created file has no backup to diff against, so `lines` is the whole
+   *  file as an addition. */
+  created: boolean;
+  lines: DiffLine[];
+}
+
+export const workshopInPlaceDiffs = defineCommand<
+  { gameDir: string },
+  FileDiff[]
+>("coilbox-workshop", "workshop_in_place_diffs");
 
 /** One refused change as a line a person reads. */
 export function describeRefusal(r: RefusedChange): string {
