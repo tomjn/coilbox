@@ -1,0 +1,29 @@
+[UNITINFO]
+{
+	unitname=ARMCOM;
+	side=Arm;
+	soundcategory=ARM_COM;
+	movementclass=SPID3;
+	SelfDestructAs=CSDEATH;
+	selfdestructcountdown=10;
+	explodeas=CSCOMMANDER_BLAST;
+	weapon1=CSARMCOMLASER;
+	weapon3=CSARM_DISINTEGRATOR;
+	Name=Arm;
+	BuildCostEnergy=1;
+	BuildCostMetal=2200;
+	BuildTime=4000;
+	Category=ARM commander LEVEL10 WEAPON NOTAIR NOTSUB CTRL_C ALL;
+	Description=Sniper;
+	FootprintX=2;
+	FootprintZ=2;
+	MaxDamage=3500;
+	ObjectName=ARM_COMMANDER;
+	TEDClass=COMMANDER;
+	BrakeRate=0.6;
+	Acceleration=0.9;
+	collisionVolumeType = box;
+	collisionVolumeScales =28 35 20;
+	collisionVolumeOffsets = 0 1 0;
+	collisionVolumeTest = 1;
+}

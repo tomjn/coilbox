@@ -26,10 +26,15 @@
 //! A second file that more than one unit file includes is refused, since an
 //! edit to it would change every unit that includes it.
 //!
+//! A unit written in Total Annihilation's older `.fbi` format goes through
+//! [`fbi`] instead, which makes the same edits with the same refusals
+//! (issue #2638).
+//!
 //! Nothing here writes to disk. The caller gets the patched text or a
 //! [`Refusal`] that says why, with the place in the file it is about.
 
 mod check;
+pub mod fbi;
 mod locate;
 mod render;
 
