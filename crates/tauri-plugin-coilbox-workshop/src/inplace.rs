@@ -253,6 +253,46 @@ fn walk_units(at: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// The `gamedata` folder directly under `game_dir`, matched without regard to
+/// case as the engine's archive lookups are.
+fn gamedata_dir(game_dir: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(game_dir)
+        .ok()?
+        .flatten()
+        .find(|entry| entry.path().is_dir() && entry.file_name().eq_ignore_ascii_case("gamedata"))
+        .map(|entry| entry.path())
+}
+
+/// A file directly under `dir` named `name`, matched without regard to case.
+fn find_file_ci(dir: &Path, name: &str) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .find(|entry| entry.file_name().eq_ignore_ascii_case(name))
+        .map(|entry| entry.path())
+}
+
+/// The Lua file that overrides this game's build menus instead of the engine
+/// reading them from `gamedata/sidedata.tdf`'s `[CANBUILD]` section (issue
+/// #3040), or `None` when nothing does.
+///
+/// `gamedata/buildoptions.lua` exists in a game for exactly this: setting
+/// `UnitDefs[x].buildoptions` itself, as THIS's does for three of its
+/// factories. A game may instead do it inline in `unitdefs_post.lua`, so that
+/// file is checked too, for whether it mentions `buildoptions` at all. Either
+/// way, a `canbuild` key written into `sidedata.tdf` would be a change the
+/// engine never reads, so a copy is refused from that builder's menu rather
+/// than silently writing a file with no effect.
+fn lua_build_menu_override(game_dir: &Path) -> Option<PathBuf> {
+    let gamedata = gamedata_dir(game_dir)?;
+    if let Some(file) = find_file_ci(&gamedata, "buildoptions.lua") {
+        return Some(file);
+    }
+    let post = find_file_ci(&gamedata, "unitdefs_post.lua")?;
+    let text = std::fs::read_to_string(&post).ok()?;
+    text.to_lowercase().contains("buildoptions").then_some(post)
+}
+
 /// [`patch_pending`], or its `.fbi` form for a unit written in that format
 /// (issue #2638). An `.fbi` unit never includes another file, so `included`
 /// does not apply to it.
@@ -899,6 +939,10 @@ pub fn write(
         }
     }
 
+    // A game's own `gamedata/sidedata.tdf`, read and patched as a copy joins
+    // an `.fbi` builder's menu (issue #3040), cached here so a second copy or
+    // builder in the same write sees the first one's change.
+    let mut gamedata: BTreeMap<PathBuf, (String, Encoding)> = BTreeMap::new();
     let created = write_copies(
         game_dir,
         project,
@@ -907,6 +951,7 @@ pub fn write(
         &originals,
         &mut texts,
         &mut included,
+        &mut gamedata,
         &mut outcome,
     );
 
@@ -926,6 +971,11 @@ pub fn write(
             created
                 .iter()
                 .map(|(file, text, encoding)| (file, text, Some(*encoding))),
+        )
+        .chain(
+            gamedata
+                .iter()
+                .map(|(file, (text, encoding))| (file, text, Some(*encoding))),
         );
     let mut writes = Vec::new();
     for (file, text, encoding) in changed.chain(others) {
@@ -975,6 +1025,84 @@ pub fn write(
     Ok(outcome)
 }
 
+/// Add `unit` to `builder`'s build menu in `gamedata/sidedata.tdf` (issue
+/// #3040), for a builder whose own file is `.fbi` and so does not hold its
+/// menu itself. `gamedata` caches the file's text and encoding once it is
+/// read or changed, so a second copy or builder added in the same write sees
+/// the first one's change rather than the file on disk.
+fn add_fbi_builder(
+    game_dir: &Path,
+    builder: &str,
+    unit: &str,
+    gamedata: &mut BTreeMap<PathBuf, (String, Encoding)>,
+) -> Option<Refused> {
+    let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
+    let refuse = |file: Option<String>, kind, message: String| Refused {
+        unit: builder.to_string(),
+        field: "buildoptions".into(),
+        file,
+        kind,
+        message,
+        location: None,
+    };
+    if let Some(lua_file) = lua_build_menu_override(game_dir) {
+        let shown = rel(&lua_file);
+        return Some(refuse(
+            Some(shown.clone()),
+            RefusalKind::FieldComputed,
+            format!(
+                "This game works out its build menus in {shown}, so a canbuild key in gamedata/sidedata.tdf would not be what the engine reads for {builder}."
+            ),
+        ));
+    }
+    let Some(dir) = gamedata_dir(game_dir) else {
+        return Some(refuse(
+            None,
+            RefusalKind::ParentMissing,
+            "This game has no gamedata folder, so there is nowhere to add a build menu."
+                .to_string(),
+        ));
+    };
+    let Some(path) = find_file_ci(&dir, "sidedata.tdf") else {
+        return Some(refuse(
+            None,
+            RefusalKind::ParentMissing,
+            "This game has no gamedata/sidedata.tdf, so there is nowhere to add a build menu."
+                .to_string(),
+        ));
+    };
+    let shown = rel(&path);
+    let (text, encoding) = match gamedata.get(&path) {
+        Some(cached) => cached.clone(),
+        None => {
+            let Ok(bytes) = std::fs::read(&path) else {
+                return Some(refuse(
+                    Some(shown),
+                    RefusalKind::Syntax,
+                    "This file could not be read.".to_string(),
+                ));
+            };
+            coilbox_tdf::decode(&bytes)
+        }
+    };
+    match fbi::add_to_build_menu(&text, builder, unit) {
+        Ok(patched) => {
+            if patched.changed {
+                gamedata.insert(path, (patched.text, encoding));
+            }
+            None
+        }
+        Err(r) => Some(Refused {
+            unit: builder.to_string(),
+            field: "buildoptions".into(),
+            file: Some(shown),
+            kind: r.kind,
+            message: r.message,
+            location: r.location,
+        }),
+    }
+}
+
 /// Make each copy's file and add it to its builders' lists (issue #2634).
 ///
 /// The copy is made from the source's file as the game has it now, from
@@ -997,6 +1125,7 @@ fn write_copies(
     originals: &BTreeMap<PathBuf, String>,
     texts: &mut BTreeMap<PathBuf, String>,
     included: &mut BTreeMap<PathBuf, String>,
+    gamedata: &mut BTreeMap<PathBuf, (String, Encoding)>,
     outcome: &mut WriteOutcome,
 ) -> Vec<(PathBuf, String, Encoding)> {
     let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
@@ -1149,20 +1278,48 @@ fn write_copies(
 
         let builders = inplace_clone::builders_adding(&project.edits, unit);
         for builder in &builders {
+            let found = find_unit_file(builder, files, texts, |file, text| {
+                locate_unit(file, text, builder)
+            });
+            let file = match found {
+                Found::File(file, Ok(_)) => file,
+                Found::File(file, Err(r)) => {
+                    outcome.refused.push(Refused {
+                        unit: builder.to_string(),
+                        field: "buildoptions".into(),
+                        file: Some(rel(r.file.as_deref().unwrap_or(&file))),
+                        kind: r.kind,
+                        message: r.message,
+                        location: r.location,
+                    });
+                    continue;
+                }
+                Found::None(file_level) => {
+                    outcome.refused.push(Refused {
+                        field: "buildoptions".into(),
+                        ..no_file_refusal(builder, file_level, game_dir)
+                    });
+                    continue;
+                }
+            };
+            // An `.fbi` builder's menu is not in its own file, but in
+            // `gamedata/sidedata.tdf`'s `[CANBUILD]` section (issue #3040).
+            if is_fbi(&file) {
+                if let Some(refused) = add_fbi_builder(game_dir, builder, unit, gamedata) {
+                    outcome.refused.push(refused);
+                }
+                continue;
+            }
+            if inplace_clone::already_lists(&texts[&file], builder, unit, game_dir) {
+                continue;
+            }
             let push = Edit {
                 unit: builder.to_string(),
                 path: vec![Segment::Key("buildoptions".into())],
                 op: Op::Push(PatchValue::String(unit.to_string())),
             };
-            let found = find_unit_file(builder, files, texts, |file, text| {
-                if !is_fbi(file) && inplace_clone::already_lists(text, builder, unit, game_dir) {
-                    return Ok(None);
-                }
-                patch_file(file, text, &push, game_dir, included).map(Some)
-            });
-            match found {
-                Found::File(_, Ok(None)) => {}
-                Found::File(file, Ok(Some(patched))) => match patched.file {
+            match patch_file(&file, &texts[&file], &push, game_dir, included) {
+                Ok(patched) => match patched.file {
                     Some(path) => {
                         included.insert(path, patched.text);
                     }
@@ -1170,17 +1327,13 @@ fn write_copies(
                         texts.insert(file, patched.text);
                     }
                 },
-                Found::File(file, Err(r)) => outcome.refused.push(Refused {
+                Err(r) => outcome.refused.push(Refused {
                     unit: builder.to_string(),
                     field: "buildoptions".into(),
                     file: Some(rel(r.file.as_deref().unwrap_or(&file))),
                     kind: r.kind,
                     message: r.message,
                     location: r.location,
-                }),
-                Found::None(file_level) => outcome.refused.push(Refused {
-                    field: "buildoptions".into(),
-                    ..no_file_refusal(builder, file_level, game_dir)
                 }),
             }
         }
@@ -2574,6 +2727,125 @@ mod tests {
         // The name is taken once the copy exists.
         let again = super::write(&game, &project, &sources).unwrap();
         assert_eq!(again.refused[0].kind, RefusalKind::NameTaken);
+    }
+
+    /// A project cloning `dagger` as `dagger2` and adding it to `armcom`'s
+    /// build menu, `armcom` being XTA's commander in `fbi_game()`.
+    fn dagger_copy_project(menus: Value) -> (BTreeMap<String, Value>, ModProject) {
+        let sources: BTreeMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "dagger": { "maxdamage": 650, "unitname": "dagger", "name": "Dagger" },
+        }))
+        .unwrap();
+        let mut def = sources["dagger"].clone();
+        def["unitname"] = serde_json::json!("dagger2");
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "In place",
+            "gameName": "THIS",
+            "edits": {
+                "clones": { "dagger2": {
+                    "key": "dagger2",
+                    "source": "dagger",
+                    "replacesGameUnit": false,
+                    "def": def,
+                } },
+                "menus": menus,
+            },
+        }))
+        .unwrap();
+        (sources, project)
+    }
+
+    /// Issue #3040: an `.fbi` builder's menu is not in its own file, so a
+    /// copy added to it goes into `gamedata/sidedata.tdf`'s `[CANBUILD]`
+    /// section instead, as the next `canbuildN` key in the builder's own
+    /// subsection. The write backs the shared file up like any other, and
+    /// undo puts it back.
+    #[test]
+    fn a_copy_joins_an_fbi_builders_menu_in_sidedata_tdf() {
+        let (_root, game) = fbi_game();
+        std::fs::create_dir_all(game.join("gamedata")).unwrap();
+        let sidedata = game.join("gamedata/sidedata.tdf");
+        let before =
+            "[CANBUILD]\n{\n\t[ARMCOM]\n\t{\n\t\tcanbuild1=armsolar;\n\t\tcanbuild2=armmex;\n\t}\n}\n";
+        std::fs::write(&sidedata, before).unwrap();
+        let (sources, project) = dagger_copy_project(
+            serde_json::json!({ "armcom": [{ "op": "add", "unit": "dagger2" }] }),
+        );
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        let mut written = outcome.written.clone();
+        written.sort();
+        assert_eq!(written, vec!["gamedata/sidedata.tdf", "units/dagger2.fbi"]);
+        assert_eq!(
+            outcome.copies,
+            vec![WrittenCopy {
+                unit: "dagger2".into(),
+                file: "units/dagger2.fbi".into(),
+                builders: vec!["armcom".into()],
+            }]
+        );
+        assert_eq!(
+            read(&sidedata),
+            before.replacen(
+                "canbuild2=armmex;\n",
+                "canbuild2=armmex;\n\t\tcanbuild3=dagger2;\n",
+                1
+            )
+        );
+
+        let undone = undo(&game).unwrap();
+        assert!(undone.deleted.contains(&"units/dagger2.fbi".to_string()));
+        assert_eq!(read(&sidedata), before);
+    }
+
+    /// A game that works its build menus out in Lua, such as THIS's
+    /// `gamedata/buildoptions.lua`, does not read `sidedata.tdf` for them at
+    /// all, so the write is refused rather than writing a file the engine
+    /// never looks at. Being all-or-nothing, nothing else is written either.
+    #[test]
+    fn a_game_that_overrides_build_menus_in_lua_refuses_the_fbi_route() {
+        let (_root, game) = fbi_game();
+        std::fs::create_dir_all(game.join("gamedata")).unwrap();
+        std::fs::write(
+            game.join("gamedata/sidedata.tdf"),
+            "[CANBUILD]\n{\n\t[ARMCOM]\n\t{\n\t\tcanbuild1=armsolar;\n\t}\n}\n",
+        )
+        .unwrap();
+        std::fs::write(
+            game.join("gamedata/buildoptions.lua"),
+            "for i, v in pairs({}) do UnitDefs[i].buildoptions = v end\n",
+        )
+        .unwrap();
+        let (sources, project) = dagger_copy_project(
+            serde_json::json!({ "armcom": [{ "op": "add", "unit": "dagger2" }] }),
+        );
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        let refused = &outcome.refused[0];
+        assert_eq!(refused.kind, RefusalKind::FieldComputed);
+        assert_eq!(refused.file.as_deref(), Some("gamedata/buildoptions.lua"));
+        assert!(outcome.written.is_empty());
+        assert!(!game.join("units/dagger2.fbi").exists());
+    }
+
+    /// A game with no `gamedata/sidedata.tdf` at all has nowhere for the menu
+    /// to go, so the copy's placement is refused rather than the copy itself.
+    #[test]
+    fn an_fbi_builder_with_no_sidedata_file_is_refused() {
+        let (_root, game) = fbi_game();
+        let (sources, project) = dagger_copy_project(
+            serde_json::json!({ "armcom": [{ "op": "add", "unit": "dagger2" }] }),
+        );
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert_eq!(outcome.refused.len(), 1, "{:?}", outcome.refused);
+        assert_eq!(outcome.refused[0].kind, RefusalKind::ParentMissing);
+        assert!(outcome.written.is_empty());
     }
 
     #[test]

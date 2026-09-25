@@ -351,7 +351,7 @@ fn target(
         }
         "buildoptions" => {
             return Err(computed(
-                "An .fbi unit's build menu is not in its file. The engine reads it from gamedata/sidedata.tdf, which coilbox does not write yet.".into(),
+                "An .fbi unit's build menu is not in its file. The engine reads it from gamedata/sidedata.tdf, which coilbox only writes to add a copy to a builder's menu, not for a direct edit here.".into(),
             ))
         }
         "sounds" => {
@@ -500,6 +500,103 @@ fn explosion(doc: &Document, source: &str, path: &[Segment], op: &Op) -> Result<
     ]))
 }
 
+/// Add `unit` to `builder`'s build menu (issue #3040): the next `canbuildN`
+/// key in `builder`'s own section under `[CANBUILD]` in `source`, which is
+/// `gamedata/sidedata.tdf`'s text. `parse_fbi.lua` reads that section by the
+/// builder's name, matched without regard to case as every name in a `.tdf`
+/// file is, and sorts whatever `canbuildN` keys it finds by their number
+/// rather than requiring them to run without a gap, so a new key only has to
+/// be one no existing key in the section already uses.
+///
+/// `unit` already in the section, under any `canbuildN`, is left alone: the
+/// menu already has it, so nothing is added.
+///
+/// The caller is responsible for knowing this file is what the engine reads
+/// for `builder`'s menu at all. A game that works its build menus out in Lua,
+/// such as THIS's `gamedata/buildoptions.lua`, ignores this file, and a copy
+/// added here would not appear anywhere the engine looks.
+pub fn add_to_build_menu(source: &str, builder: &str, unit: &str) -> Result<Patched, Refusal> {
+    let doc = coilbox_tdf::parse(source).map_err(|e| syntax(source, &e))?;
+    let tree = doc.tree();
+    let section = match tree.get("canbuild") {
+        Some(Node::Table(canbuild)) => match canbuild.get(&builder.to_lowercase()) {
+            Some(Node::Table(section)) => Some(section),
+            _ => None,
+        },
+        _ => None,
+    };
+    let count = (1..)
+        .take_while(|n| section.is_some_and(|s| s.contains_key(&format!("canbuild{n}"))))
+        .count();
+    for n in 1..=count {
+        let key = format!("canbuild{n}");
+        if let Ok(Some(pair)) = doc.lookup(&["CANBUILD", builder, &key]) {
+            if pair.value.trim().eq_ignore_ascii_case(unit) {
+                return Ok(Patched {
+                    text: source.to_string(),
+                    changed: false,
+                    location: Location::of(source, pair.value_start, pair.value_end),
+                    file: None,
+                });
+            }
+        }
+    }
+    let key = format!("canbuild{}", count + 1);
+    let change = coilbox_tdf::set(source, &["CANBUILD", builder, &key], unit)
+        .map_err(|e| menu_refusal(e, builder))?;
+    Ok(Patched {
+        text: change.text,
+        changed: change.changed,
+        location: Location::of(source, change.start, change.end),
+        file: None,
+    })
+}
+
+/// A `coilbox_tdf` refusal from [`add_to_build_menu`], said in terms of
+/// `builder`'s build menu rather than a unit's field.
+fn menu_refusal(e: SetError, builder: &str) -> Refusal {
+    match e {
+        SetError::Syntax(e) => Refusal::new(
+            RefusalKind::Syntax,
+            format!("The engine could not read this file: {e}"),
+        ),
+        SetError::SectionMissing { section } if section.eq_ignore_ascii_case(builder) => {
+            Refusal::new(
+                RefusalKind::ParentMissing,
+                format!(
+                    "This file's [CANBUILD] section has no [{builder}] section, so {builder} has no build menu here to add to."
+                ),
+            )
+        }
+        SetError::SectionMissing { section } => Refusal::new(
+            RefusalKind::ParentMissing,
+            format!("This file has no [{section}] section."),
+        ),
+        SetError::SectionAmbiguous { section, .. } => Refusal::new(
+            RefusalKind::FieldAmbiguous,
+            format!(
+                "This file has more than one [{section}] section, so it is not clear which one holds {builder}'s build menu."
+            ),
+        ),
+        SetError::NotASection { key, .. } => Refusal::new(
+            RefusalKind::NotATable,
+            format!("{key} is a single value in this file, not a section."),
+        ),
+        SetError::KeyAmbiguous { key, .. } => Refusal::new(
+            RefusalKind::FieldAmbiguous,
+            format!(
+                "{key} is written more than once in {builder}'s section, so it is not clear which one to change."
+            ),
+        ),
+        SetError::NotAValue { section, .. } => Refusal::new(
+            RefusalKind::NotATable,
+            format!("{section} is a section in this file, so it cannot hold a single value."),
+        ),
+        SetError::InvalidValue(message) => Refusal::new(RefusalKind::InvalidValue, message),
+        SetError::PostCheck(message) => Refusal::new(RefusalKind::PostCheckFailed, message),
+    }
+}
+
 /// A `coilbox_tdf` refusal as this crate says it.
 fn refusal(e: SetError, source: &str, path: &[Segment]) -> Refusal {
     let shown = dotted(path);
@@ -595,5 +692,56 @@ mod tests {
     fn paths_read_as_the_unit_page_writes_them() {
         let path = crate::parse_path("weapons[2].name").unwrap();
         assert_eq!(dotted(&path), "weapons[2].name");
+    }
+
+    /// XTA's own style for `[CANBUILD]`, tabs and a trailing comment included.
+    const SIDEDATA: &str = "[CANBUILD]\n{\n\t[arm_adv_aircraft_plant]\n\t{\n\t\tcanbuild1=arm_adv_construction_aircraft;\n\t\tcanbuild2=arm_peeper;//xtaids\n\t}\n}\n";
+
+    #[test]
+    fn adding_to_a_build_menu_appends_the_next_canbuild_key() {
+        let patched = add_to_build_menu(SIDEDATA, "arm_adv_aircraft_plant", "armdfly2").unwrap();
+
+        assert!(patched.changed);
+        assert_eq!(
+            patched.text,
+            SIDEDATA.replacen(
+                "canbuild2=arm_peeper;//xtaids\n",
+                "canbuild2=arm_peeper;//xtaids\n\t\tcanbuild3=armdfly2;\n",
+                1
+            )
+        );
+    }
+
+    /// Basically OTA spells its sections in a different case than a copy's
+    /// builder key would, since the unit page lowercases everything.
+    #[test]
+    fn a_builder_section_is_matched_without_regard_to_case() {
+        let patched = add_to_build_menu(SIDEDATA, "ARM_ADV_AIRCRAFT_PLANT", "armdfly2").unwrap();
+
+        assert!(patched.text.contains("canbuild3=armdfly2;"));
+    }
+
+    #[test]
+    fn a_unit_already_in_the_menu_is_not_added_twice() {
+        let patched = add_to_build_menu(SIDEDATA, "arm_adv_aircraft_plant", "ARM_Peeper").unwrap();
+
+        assert!(!patched.changed);
+        assert_eq!(patched.text, SIDEDATA);
+    }
+
+    #[test]
+    fn a_builder_with_no_section_is_refused() {
+        let refusal = add_to_build_menu(SIDEDATA, "arm_vehicle_plant", "armdfly2").unwrap_err();
+
+        assert_eq!(refusal.kind, RefusalKind::ParentMissing);
+        assert!(refusal.message.contains("arm_vehicle_plant"));
+    }
+
+    #[test]
+    fn a_file_with_no_canbuild_section_is_refused() {
+        let refusal =
+            add_to_build_menu("[SIDE0]\n{\n\tName=Arm;\n}\n", "armlab", "armdfly2").unwrap_err();
+
+        assert_eq!(refusal.kind, RefusalKind::ParentMissing);
     }
 }
