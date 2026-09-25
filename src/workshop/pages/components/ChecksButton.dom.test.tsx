@@ -243,6 +243,7 @@ describe("the checks button", () => {
         notCarried: [],
         carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
         copies: [],
+        equipped: [],
       };
       const { rerenderWith } = renderButton({
         gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],

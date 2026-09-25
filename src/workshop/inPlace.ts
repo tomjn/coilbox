@@ -59,13 +59,25 @@ export interface WrittenCopy {
   builders: string[];
 }
 
+/** A library weapon a game unit's file now carries in its own `weapondefs`,
+ *  with the slot or death explosion pointed at it (issue #3055). */
+export interface WrittenEquip {
+  unit: string;
+  /** The slot's step as the project holds it, or `explodeas` or
+   *  `selfdestructas`. */
+  at: string;
+  weapon: string;
+  /** The file it went into, relative to the game. */
+  file: string;
+}
+
 /** What `workshop_write_in_place` did. */
 export interface InPlaceWriteOutcome {
   /** Files written, relative to the game. Empty when anything was refused. */
   written: string[];
-  /** Field changes the written files now carry. */
+  /** Field changes and equipped weapons the written files now carry. */
   changed: number;
-  /** Field changes the files already held. */
+  /** Field changes and equipped weapons the files already held. */
   unchanged: number;
   refused: RefusedChange[];
   /** Parts of the project this route cannot carry yet, one sentence each. */
@@ -76,6 +88,22 @@ export interface InPlaceWriteOutcome {
   /** Every copy written as a unit file of its own (issue #2634). Empty when
    *  anything was refused. */
   copies: WrittenCopy[];
+  /** Every library weapon written into a game unit (issue #3055). Empty
+   *  when anything was refused. */
+  equipped: WrittenEquip[];
+}
+
+/**
+ * Whether the project equips a library weapon into a game unit, which the
+ * write carries into that unit's file (issue #3055). A copy's equipped
+ * weapons are part of the copy and go with it.
+ */
+export function equipsGameUnits(project: ModProject | undefined): boolean {
+  const clones = project?.edits.clones ?? {};
+  return Object.entries(project?.edits.equipped ?? {}).some(
+    ([unit, slots]) =>
+      !Object.hasOwn(clones, unit) && Object.keys(slots).length > 0,
+  );
 }
 
 /** How many files carry a workshop backup, or a marker saying coilbox
@@ -117,10 +145,12 @@ const throughAPosition = (path: string) =>
 
 /**
  * The game's read of every unit the write needs one for: each unit
- * `project`'s copies were made from, and each game unit with a field change
- * through a list position. A digit step is a position counted from zero in a
- * list numbered 1 to n, and the Lua key itself in a table with a gap in it,
- * so the write reads it against the table the page showed (issue #3041).
+ * `project`'s copies were made from, each game unit with a field change
+ * through a list position, and each game unit with a library weapon equipped
+ * in a slot. A digit step is a position counted from zero in a list numbered
+ * 1 to n, and the Lua key itself in a table with a gap in it, so the write
+ * reads it against the table the page showed (issue #3041). A slot's step is
+ * read the same way (issue #3055).
  */
 export function writeSources(
   project: ModProject | undefined,
@@ -135,6 +165,10 @@ export function writeSources(
   for (const [unit, fields] of Object.entries(edits?.overrides ?? {})) {
     if (Object.hasOwn(edits?.clones ?? {}, unit)) continue;
     if (Object.keys(fields).some(throughAPosition)) add(unit);
+  }
+  for (const [unit, slots] of Object.entries(edits?.equipped ?? {})) {
+    if (Object.hasOwn(edits?.clones ?? {}, unit)) continue;
+    if (Object.keys(slots).some((step) => /^\d+$/.test(step))) add(unit);
   }
   return out;
 }
