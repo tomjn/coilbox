@@ -33,6 +33,8 @@ use picoframe_core::CliResult;
 use serde::Serialize;
 use serde_json::json;
 
+use coilbox_gamebackup::key;
+
 /// What a backup file this feature wrote is named after the file it holds a
 /// copy of. Distinct from a plain `.bak` so [`undo`] only ever restores what
 /// an install here actually touched, never a stray backup a user's own editor
@@ -80,11 +82,7 @@ pub struct UndoOutcome {
 /// `game_dir` must be a `.sdd`: a `.sdz`/`.sd7` is one file, and there is no
 /// sound way to rewrite one of those in place (issue #2622 point 3).
 fn require_sdd(game_dir: &Path) -> Result<(), String> {
-    let is_sdd = game_dir
-        .extension()
-        .and_then(|e| e.to_str())
-        .is_some_and(|e| e.eq_ignore_ascii_case("sdd"));
-    if !is_sdd || !game_dir.is_dir() {
+    if !coilbox_gamebackup::is_sdd(game_dir) {
         return Err(
             "only a .sdd game can be installed into directly. A packed .sdz or .sd7 is one \
              file, so copy the converted output over the game and remove the original .3do \
@@ -101,22 +99,12 @@ fn require_sdd(game_dir: &Path) -> Result<(), String> {
 /// check is cheap and this feature can rewrite many files, so it is worth
 /// having its own backstop rather than trusting the caller alone.
 fn require_in_games_dir(game_dir: &Path) -> Result<(), String> {
-    let parent_ok = game_dir
-        .parent()
-        .and_then(|p| p.file_name())
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.eq_ignore_ascii_case("games"));
-    if !parent_ok {
+    if !coilbox_gamebackup::in_games_dir(game_dir) {
         return Err(
             "only a game in a content root's games folder can be installed into".to_string(),
         );
     }
     Ok(())
-}
-
-/// A relative path, forward-slash separated regardless of platform.
-fn key(rel: &Path) -> String {
-    rel.to_string_lossy().replace('\\', "/")
 }
 
 /// Every model the conversion wrote, as the path (forward slashes, original
@@ -186,9 +174,7 @@ fn copy_tree(src: &Path, dst: &Path) -> Result<usize, String> {
 
 /// Where a backup of `path` goes.
 fn backup_path(path: &Path) -> PathBuf {
-    let mut os = path.as_os_str().to_os_string();
-    os.push(BACKUP_SUFFIX);
-    PathBuf::from(os)
+    coilbox_gamebackup::with_suffix(path, BACKUP_SUFFIX)
 }
 
 /// Where a converted `stem`'s original `.3do` would sit in the game, in the
@@ -387,29 +373,6 @@ pub fn install(game_dir: &Path, out_dir: &Path) -> Result<InstallOutcome, String
     })
 }
 
-fn collect_backups(at: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = std::fs::read_dir(at) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            collect_backups(&path, out);
-        } else if path
-            .file_name()
-            .map(|n| n.to_string_lossy().ends_with(BACKUP_SUFFIX))
-            .unwrap_or(false)
-        {
-            out.push(path);
-        }
-    }
-}
-
-fn strip_backup_suffix(path: &Path) -> Option<PathBuf> {
-    let s = path.as_os_str().to_string_lossy();
-    s.strip_suffix(BACKUP_SUFFIX).map(PathBuf::from)
-}
-
 /// How many files an earlier [`install`] into `game_dir` left a backup for,
 /// which is exactly what [`undo`] would restore. Used to decide whether to
 /// offer an undo at all, independent of whatever the current session's
@@ -418,9 +381,7 @@ pub fn status(game_dir: &Path) -> usize {
     if !game_dir.is_dir() {
         return 0;
     }
-    let mut backups = Vec::new();
-    collect_backups(game_dir, &mut backups);
-    backups.len()
+    coilbox_gamebackup::collect(game_dir, BACKUP_SUFFIX).len()
 }
 
 /// Reverse every [`install`] into `game_dir`: for every backup file found,
@@ -433,12 +394,11 @@ pub fn status(game_dir: &Path) -> usize {
 /// something undo also has to track and remove.
 pub fn undo(game_dir: &Path) -> Result<UndoOutcome, String> {
     require_sdd(game_dir)?;
-    let mut backups = Vec::new();
-    collect_backups(game_dir, &mut backups);
+    let backups = coilbox_gamebackup::collect(game_dir, BACKUP_SUFFIX);
 
     let mut restored = Vec::new();
     for backup in backups {
-        let Some(original) = strip_backup_suffix(&backup) else {
+        let Some(original) = coilbox_gamebackup::without_suffix(&backup, BACKUP_SUFFIX) else {
             continue;
         };
         if original.exists() {

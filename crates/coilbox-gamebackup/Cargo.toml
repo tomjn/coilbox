@@ -1,0 +1,11 @@
+[package]
+name = "coilbox-gamebackup"
+version = "0.0.0"
+description = "Moves a file in a loose .sdd game aside before coilbox writes over it, and puts it back on undo."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+[dev-dependencies]
+tempfile = { workspace = true }
