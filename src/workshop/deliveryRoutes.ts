@@ -29,11 +29,9 @@
  * offered only when the selected game is a loose `.sdd` directory under a
  * content root's `games` folder, since that is the only shape a rewrite in
  * place can safely target (`isEditInPlaceEligible` in `content/format.ts`
- * mirrors the Rust guard that will enforce it). This module only offers and
- * explains the route: the patching, backup and undo it unlocks are separate
- * issues (#2632, #2635, #2636), so `available` here means "this game's
- * layout supports writing into it directly", not that the write is built
- * yet.
+ * mirrors the Rust guard in `inplace.rs` that enforces it). This module only
+ * offers and explains the route. The write, its backups and undo are
+ * `inPlace.ts` (issue #2635), reached from the checks drawer.
  */
 import type { ConfigOption } from "@/content/bindings";
 import { isEditInPlaceEligible } from "@/content/format";
@@ -146,7 +144,7 @@ export function deliveryRoutes(
       label: "Edit in place",
       available: inPlace,
       detail: inPlace
-        ? `${gameName} is a loose .sdd game under a content root's games folder, so a change can be written straight into its own files. Writing it is not built yet, so use the mutator route above for now.`
+        ? `${gameName} is a loose .sdd game under a content root's games folder, so field changes can be written straight into its own unit files. Coilbox keeps the original of each file it changes until you undo or accept.`
         : `${gameName} is not a loose .sdd game directly under a content root's games folder, so its files cannot be rewritten in place. The mutator route above still works.`,
     },
   ];

@@ -47,10 +47,15 @@
 //! where the trace can place it, the numbered BAR slot that carries it. See
 //! `ledger`'s own doc comment for why that is a read over the other six
 //! commands' output rather than a new compiled artefact of its own.
+//!
+//! `workshop_write_in_place` (issue #2635) is the one command that writes
+//! into a game's own folder, and three more go with it: a status count of the
+//! backups it left, undo and accept. See `inplace`'s own doc comment.
 
 mod bar_pack;
 mod compile;
 mod decode;
+mod inplace;
 mod ledger;
 mod lua;
 mod model;
@@ -245,6 +250,53 @@ fn workshop_change_ledger(project: ModProject) -> CliResult {
     envelope(&ledger::build_ledger(&project))
 }
 
+/// Run a blocking in-place operation off the async runtime and wrap its
+/// answer. The patcher evaluates each unit file twice, so a project with many
+/// changes is too slow to run on the thread that answers the window.
+async fn blocking<T, F>(what: &str, job: F) -> CliResult
+where
+    T: Serialize + Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    match tauri::async_runtime::spawn_blocking(job).await {
+        Ok(Ok(value)) => envelope(&value),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("{what} task failed: {e}")),
+    }
+}
+
+/// Patch a project's field changes into the loose `.sdd` game at `gameDir`
+/// (issue #2635). Answers with what was written, or with every refusal and
+/// nothing written.
+#[tauri::command]
+async fn workshop_write_in_place(game_dir: String, project: ModProject) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("write", move || inplace::write(&game, &project)).await
+}
+
+/// How many files under `gameDir` hold a workshop backup or created marker,
+/// so undo is offered after a restart too.
+#[tauri::command]
+async fn workshop_in_place_status(game_dir: String) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("status", move || Ok(inplace::status(&game))).await
+}
+
+/// Put every file the workshop wrote under `gameDir` back as it was.
+#[tauri::command]
+async fn workshop_undo_in_place(game_dir: String) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("undo", move || inplace::undo(&game)).await
+}
+
+/// Keep every change the workshop wrote under `gameDir`, and delete the
+/// backups.
+#[tauri::command]
+async fn workshop_accept_in_place(game_dir: String) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    blocking("accept", move || inplace::accept(&game)).await
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-workshop")
         .invoke_handler(tauri::generate_handler![
@@ -254,7 +306,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_package_mutator,
             workshop_pack_bar_slots,
             workshop_decode_tweak_set,
-            workshop_change_ledger
+            workshop_change_ledger,
+            workshop_write_in_place,
+            workshop_in_place_status,
+            workshop_undo_in_place,
+            workshop_accept_in_place
         ])
         .build()
 }
@@ -340,6 +396,57 @@ mod tests {
 
         let ledger = unwrap_as_the_frontend_does(workshop_change_ledger(saved_project()));
         assert!(ledger.get("units").is_some_and(Value::is_array));
+    }
+
+    /// The in-place commands answer in the same envelope (issue #2635), and a
+    /// refusal to write outside a loose game reaches the caller as its own
+    /// words.
+    #[test]
+    fn the_in_place_commands_answer_in_the_envelope() {
+        let root = tempfile::tempdir().expect("temp dir");
+        let game = root.path().join("games/dev.sdd");
+        std::fs::create_dir_all(game.join("units")).expect("game dir");
+        std::fs::write(
+            game.join("units/armcom.lua"),
+            "return { armcom = { metalcost = 1 } }\n",
+        )
+        .expect("unit file");
+        let dir = || game.to_string_lossy().into_owned();
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "In place",
+            "gameName": "Dev",
+            "edits": { "overrides": { "armcom": { "metalcost": 2 } } },
+        }))
+        .expect("parse");
+
+        let written = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
+            workshop_write_in_place(dir(), project),
+        ));
+        assert_eq!(written["written"], serde_json::json!(["units/armcom.lua"]));
+        let status = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
+            workshop_in_place_status(dir()),
+        ));
+        assert_eq!(status["backups"], Value::from(1));
+        let undone = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
+            workshop_undo_in_place(dir()),
+        ));
+        assert_eq!(undone["restored"], serde_json::json!(["units/armcom.lua"]));
+        let accepted = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
+            workshop_accept_in_place(dir()),
+        ));
+        assert_eq!(accepted["kept"], serde_json::json!([]));
+
+        let outside = root.path().join("dev.sdd");
+        std::fs::create_dir_all(&outside).expect("outside dir");
+        let response = serde_json::to_value(tauri::async_runtime::block_on(
+            workshop_undo_in_place(outside.to_string_lossy().into_owned()),
+        ))
+        .expect("the answer serialises");
+        assert_eq!(response.get("success"), Some(&Value::Bool(false)));
+        assert!(response
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("games folder")));
     }
 
     /// A project that changes nothing is what the editor holds for the whole
