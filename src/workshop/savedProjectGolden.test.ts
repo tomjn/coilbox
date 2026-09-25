@@ -262,6 +262,19 @@ function buildProject(): ModProject {
     // has no edit a file can take (issue #3035). The Rust model reads this
     // one too.
     cloneMutatorOnly: ["supercom"],
+    // The seed, scope, fields and tier weights this project was randomised
+    // from (issue #3090). Not read by `model.rs`, and this proves it still
+    // parses a project that holds it.
+    randomModRecipe: {
+      seed: 4242,
+      scope: {
+        kind: "collection",
+        sourceProjectId: "5f6c1d9e-0000-4000-8000-0000000000ab",
+        collectionId: "bots",
+      },
+      fields: ["cost", "health"],
+      tierWeights: { common: 60, uncommon: 25, rare: 12, legendary: 3 },
+    },
     createdAt: "2026-09-08T11:44:47.201Z",
     updatedAt: "2026-09-08T11:47:21.638Z",
   };

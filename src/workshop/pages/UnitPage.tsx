@@ -72,6 +72,7 @@ import {
   ArrowLeft,
   Code2,
   Crosshair,
+  Dice5,
   FolderTree,
   History,
   Pencil,
@@ -183,6 +184,7 @@ import {
   readPath,
   resolvedDef,
   setOverride,
+  type UnitOverrides,
 } from "../overrides";
 import {
   defaultProjectName,
@@ -195,6 +197,7 @@ import {
   type ModProject,
   useModProjects,
 } from "../project";
+import type { RandomModRecipe } from "../randomMod";
 import { projectPath, referencePath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
@@ -271,6 +274,7 @@ import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PackageMutatorButton } from "./components/PackageMutatorButton";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
+import { RegenerateRandomModDrawer } from "./components/RandomModDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import {
   controlKind,
@@ -311,6 +315,7 @@ export default function UnitPage() {
     createProject,
     applyEdits,
     setEdits,
+    regenerateRandomMod,
     recordAuthoredChecksum,
     settleInPlaceAction,
     adoptInPlaceChecksum,
@@ -339,6 +344,9 @@ export default function UnitPage() {
   const [checkpointsOpen, setCheckpointsOpen] = useState(false);
   /** Whether the batch edit drawer is on screen (issue #2655). */
   const [batchEditOpen, setBatchEditOpen] = useState(false);
+  /** Whether the randomiser is on screen to regenerate the project (issue
+   *  #3090). */
+  const [regenerateOpen, setRegenerateOpen] = useState(false);
   /**
    * The collection filtering the unit list, or `undefined` for every unit
    * (issue #2654). Page state rather than part of the saved project: which
@@ -1258,6 +1266,18 @@ export default function UnitPage() {
     if (done.changed) refreshAfterInPlaceWrite();
   };
 
+  /**
+   * Apply a regenerate (issue #3090): the drawer has already worked out which
+   * overrides the new run writes and which of the project's own it keeps
+   * because a person edited them by hand, so this is one write, and one undo
+   * step, like `commit` gives every other change on this page.
+   */
+  const onRegenerate = (overrides: UnitOverrides, recipe: RandomModRecipe) => {
+    if (!project) return;
+    const changed = regenerateRandomMod(project.id, overrides, recipe);
+    if (changed) history.push(project.id, changed.before);
+  };
+
   const sides = useMemo(
     () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
     [gameInfo],
@@ -2031,6 +2051,21 @@ export default function UnitPage() {
                 Batch edit
               </Button>
             )}
+            {/* Reopens the randomiser drawer against the recipe this project
+              was made from, to change the seed or a rule and replay it
+              (issue #3090). Only offered when there is a recipe to reopen: a
+              project started any other way has nothing to regenerate. */}
+            {project?.randomModRecipe && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRegenerateOpen(true)}
+                title="Reopen the seed and rules this project was made from, to change one and replay it"
+              >
+                <Dice5 className="mr-1 size-3.5" />
+                Regenerate
+              </Button>
+            )}
             {/* The sortable table and comparison view over every unit in the
               project, resolved through its own edits (issue #1316). Needs a
               saved project: `/workshop/new` has no id for the route to name
@@ -2228,6 +2263,19 @@ export default function UnitPage() {
           onApply={(rows) =>
             updateOverrides((o) => applyBatchRows(o, rows, units))
           }
+        />
+      )}
+
+      {project?.randomModRecipe && (
+        <RegenerateRandomModDrawer
+          open={regenerateOpen}
+          onOpenChange={setRegenerateOpen}
+          project={project}
+          games={games}
+          projects={projects}
+          enginePath={selected?.enginePath}
+          dataDir={selected?.rootPath}
+          onRegenerate={onRegenerate}
         />
       )}
 

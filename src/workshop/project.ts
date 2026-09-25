@@ -90,6 +90,11 @@ import {
 } from "./mutatorOnly";
 import type { UnitOverrides } from "./overrides";
 import { overrideCount } from "./overrides";
+import type {
+  RandomModRecipe,
+  RandomRecipeScope,
+  TierWeights,
+} from "./randomMod";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
 import type { TextField, UnitTextEdits } from "./unitText";
 import { BASE_LANGUAGE, textEditCount } from "./unitText";
@@ -388,6 +393,17 @@ export interface ModProject {
    * decision about where a copy goes.
    */
   cloneMutatorOnly?: CloneMutatorOnly;
+  /**
+   * The seed, scope, fields and tier weights this project was randomised
+   * from, when it was (issue #3090). Absent for a project started any other
+   * way. The project's "Regenerate" action reopens the randomiser drawer
+   * from this, and updates it to whatever was just regenerated with.
+   *
+   * Carried in the container payload, like `mutatorOnly`: it is part of what
+   * the project's author decided, and a shared project should let whoever
+   * receives it regenerate too.
+   */
+  randomModRecipe?: RandomModRecipe;
   createdAt: string;
   updatedAt: string;
 }
@@ -403,6 +419,7 @@ export interface NewProject {
   readOnlyLua?: ReadOnlyLuaBlock[];
   mutatorOnly?: MutatorOnly;
   cloneMutatorOnly?: CloneMutatorOnly;
+  randomModRecipe?: RandomModRecipe;
 }
 
 /** A name for a project nobody has named: the game, and which one it is. */
@@ -454,6 +471,9 @@ export function useModProjects() {
       ...(input.cloneMutatorOnly?.length
         ? { cloneMutatorOnly: input.cloneMutatorOnly }
         : {}),
+      ...(input.randomModRecipe
+        ? { randomModRecipe: input.randomModRecipe }
+        : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -501,6 +521,44 @@ export function useModProjects() {
   /** Put a project's edits back to a state undo or redo produced. */
   function setEdits(id: string, edits: GameEdits) {
     applyEdits(id, () => edits);
+  }
+
+  /**
+   * Replace a project's overrides with a freshly regenerated plan, and
+   * record the recipe that produced them (issue #3090).
+   *
+   * One write, so replacing the overrides is one undo step like any other
+   * change to the project (`before`/`after` follow `applyEdits`'s own
+   * pattern). The recipe itself is not part of `edits` and so does not
+   * rewind with undo, the same way `distributionVersion` and
+   * `authoredChecksum` do not either: it is a fact about where the project
+   * last stood, not one of its five stores.
+   */
+  function regenerateRandomMod(
+    id: string,
+    overrides: UnitOverrides,
+    recipe: RandomModRecipe,
+  ): { before: GameEdits; after: GameEdits } | null {
+    const now = new Date().toISOString();
+    const changed: { before: GameEdits; after: GameEdits }[] = [];
+    write((prev) => {
+      const target = prev.find((p) => p.id === id);
+      if (!target) return prev;
+      const after = editSlot(target.edits, "overrides", () => overrides);
+      const editsChanged = after !== target.edits;
+      if (editsChanged) changed.push({ before: target.edits, after });
+      return prev.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              edits: after,
+              randomModRecipe: recipe,
+              ...(editsChanged ? { updatedAt: now } : {}),
+            }
+          : p,
+      );
+    });
+    return changed[0] ?? null;
   }
 
   /**
@@ -721,6 +779,7 @@ export function useModProjects() {
     createProject,
     applyEdits,
     setEdits,
+    regenerateRandomMod,
     recordAuthoredChecksum,
     settleInPlaceAction,
     adoptInPlaceChecksum,
@@ -784,6 +843,9 @@ export interface ModProjectPayload {
   /** Optional and additive, so the kind version stays where it is (issue
    *  #3035). */
   cloneMutatorOnly?: CloneMutatorOnly;
+  /** Optional and additive, so the kind version stays where it is (issue
+   *  #3090). */
+  randomModRecipe?: RandomModRecipe;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -811,6 +873,9 @@ export function modProjectPayload(
       : {}),
     ...(project.cloneMutatorOnly?.length
       ? { cloneMutatorOnly: project.cloneMutatorOnly }
+      : {}),
+    ...(project.randomModRecipe
+      ? { randomModRecipe: project.randomModRecipe }
       : {}),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
@@ -1070,6 +1135,58 @@ export interface ImportedProject extends NewProject {
 }
 
 /**
+ * Read a recipe's scope out of untrusted JSON, or `undefined` when it names
+ * none of the three kinds `RandomRecipeScope` allows.
+ */
+function parseRandomRecipeScope(value: unknown): RandomRecipeScope | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  if (record.kind === "all") return { kind: "all" };
+  if (record.kind === "query" && typeof record.query === "string")
+    return { kind: "query", query: record.query };
+  if (
+    record.kind === "collection" &&
+    typeof record.sourceProjectId === "string" &&
+    typeof record.collectionId === "string"
+  ) {
+    return {
+      kind: "collection",
+      sourceProjectId: record.sourceProjectId,
+      collectionId: record.collectionId,
+    };
+  }
+  return undefined;
+}
+
+/**
+ * Read a randomised mod's recipe out of untrusted JSON, or `undefined` when
+ * it is missing a field a recipe cannot do without (issue #3090). A project
+ * saved before the recipe existed, or one that never came from the
+ * randomiser, reads back with none, which is the same as a project that was
+ * never regenerated.
+ */
+function parseRandomModRecipe(value: unknown): RandomModRecipe | undefined {
+  const record = asRecord(value);
+  if (!record) return undefined;
+  const scope = parseRandomRecipeScope(record.scope);
+  if (!scope) return undefined;
+  if (typeof record.seed !== "number" || !Number.isFinite(record.seed))
+    return undefined;
+  if (!Array.isArray(record.fields)) return undefined;
+  const fields = record.fields.filter(
+    (f): f is string => typeof f === "string",
+  );
+  const weightsRecord = asRecord(record.tierWeights);
+  if (!weightsRecord) return undefined;
+  const tierWeights: TierWeights = {};
+  for (const [tier, weight] of Object.entries(weightsRecord)) {
+    if (typeof weight === "number" && Number.isFinite(weight))
+      tierWeights[tier] = weight;
+  }
+  return { seed: record.seed, scope, fields, tierWeights };
+}
+
+/**
  * Read a shared project out of a file's text or a pasted code, or `null` when
  * it is not one.
  *
@@ -1101,6 +1218,7 @@ export function parseModProjectJson(text: string): ImportedProject | null {
   const readOnlyLua = parseReadOnlyLua(payload.readOnlyLua);
   const mutatorOnly = parseMutatorOnly(payload.mutatorOnly);
   const cloneMutatorOnly = parseCloneMutatorOnly(payload.cloneMutatorOnly);
+  const randomModRecipe = parseRandomModRecipe(payload.randomModRecipe);
   return {
     name,
     ...(description ? { description } : {}),
@@ -1112,6 +1230,7 @@ export function parseModProjectJson(text: string): ImportedProject | null {
     edits: parseGameEdits(payload.edits),
     ...(readOnlyLua.length ? { readOnlyLua } : {}),
     ...(Object.keys(mutatorOnly).length > 0 ? { mutatorOnly } : {}),
+    ...(randomModRecipe ? { randomModRecipe } : {}),
     ...(cloneMutatorOnly.length ? { cloneMutatorOnly } : {}),
   };
 }

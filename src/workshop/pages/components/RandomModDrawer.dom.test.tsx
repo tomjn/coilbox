@@ -66,7 +66,9 @@ vi.mock("@/components/OptionSelect", () => ({
   ),
 }));
 
-const { RandomModDrawer } = await import("./RandomModDrawer");
+const { RandomModDrawer, RegenerateRandomModDrawer } = await import(
+  "./RandomModDrawer"
+);
 
 afterEach(() => cleanup());
 
@@ -202,5 +204,122 @@ describe("RandomModDrawer", () => {
     // time, so with all four fields on and this seed at least one override
     // lands somewhere.
     expect(Object.keys(input.edits.overrides).length).toBeGreaterThan(0);
+    // Issue #3090: what was just rolled is kept on the project as a recipe,
+    // so "Regenerate" can reopen this same form from it.
+    expect(input.randomModRecipe).toEqual({
+      seed: 4242,
+      scope: { kind: "all" },
+      fields: expect.arrayContaining(["cost", "health", "speed", "buildtime"]),
+      tierWeights: expect.any(Object),
+    });
+  });
+});
+
+const TIER_WEIGHTS = { common: 60, uncommon: 25, rare: 12, legendary: 3 };
+
+/**
+ * A project the generator already made, its recipe only rolling cost, with
+ * one field (`buildTime`) overridden by hand after the fact - the recipe
+ * never touches that field, so it is exactly what a regenerate must not
+ * silently replace.
+ */
+function regeneratableProject() {
+  return {
+    id: "proj-1",
+    name: "Test Game random 4242",
+    gameName: GAME.name,
+    edits: {
+      overrides: { armcom: { buildTime: 99999 } },
+      clones: {},
+      menus: {},
+      text: {},
+      disabled: [],
+    },
+    randomModRecipe: {
+      seed: 4242,
+      scope: { kind: "all" },
+      fields: ["cost"],
+      tierWeights: TIER_WEIGHTS,
+    },
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
+    // biome-ignore lint/suspicious/noExplicitAny: test-only ModProject stub
+  } as any;
+}
+
+describe("RegenerateRandomModDrawer", () => {
+  it("fixes the game to the project's own and prefills the recipe", () => {
+    const project = regeneratableProject();
+    render(
+      <RegenerateRandomModDrawer
+        open
+        onOpenChange={() => {}}
+        project={project}
+        games={[GAME]}
+        projects={[project]}
+        enginePath="/engines/105"
+        dataDir="/data"
+        onRegenerate={() => {}}
+      />,
+    );
+
+    expect(screen.queryByLabelText("Game to randomise")).toBeNull();
+    expect(screen.getByText(GAME.name)).toBeTruthy();
+    expect((screen.getByLabelText("Seed") as HTMLInputElement).value).toBe(
+      "4242",
+    );
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Metal cost" })
+        .getAttribute("aria-checked"),
+    ).toBe("true");
+    expect(
+      screen
+        .getByRole("checkbox", { name: "Health" })
+        .getAttribute("aria-checked"),
+    ).toBe("false");
+    expect(screen.getByRole("button", { name: "Regenerate" })).toBeTruthy();
+  });
+
+  it("keeps a hand-edited field the recipe never wrote, on top of the new roll", () => {
+    const project = regeneratableProject();
+    const onRegenerate = vi.fn();
+    render(
+      <RegenerateRandomModDrawer
+        open
+        onOpenChange={() => {}}
+        project={project}
+        games={[GAME]}
+        projects={[project]}
+        enginePath="/engines/105"
+        dataDir="/data"
+        onRegenerate={onRegenerate}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+
+    expect(onRegenerate).toHaveBeenCalledTimes(1);
+    const [overrides, recipe] = onRegenerate.mock.calls[0];
+    expect(overrides.armcom.buildTime).toBe(99999);
+    expect(recipe.fields).toEqual(["cost"]);
+  });
+
+  it("says how many hand-edited fields will be kept", () => {
+    const project = regeneratableProject();
+    render(
+      <RegenerateRandomModDrawer
+        open
+        onOpenChange={() => {}}
+        project={project}
+        games={[GAME]}
+        projects={[project]}
+        enginePath="/engines/105"
+        dataDir="/data"
+        onRegenerate={() => {}}
+      />,
+    );
+
+    expect(screen.getByText(/1 hand-edited field/)).toBeTruthy();
   });
 });

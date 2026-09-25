@@ -14,14 +14,14 @@
  *
  * Reproducibility is the seed plus the rules: given the same unit defs, the
  * same seed and the same rules always produce the same overrides, checked by
- * a golden test below. What is deliberately not built is a stored recipe a
- * project remembers and a "regenerate" button that replays it. That is a
- * second feature: undo would have to make sense of a wholesale replacement,
- * and the container payload would need a new optional slot. For a first
- * version the project's description records the seed and rules in words,
- * which is enough for someone to retype them here and get the same mod back,
- * or to hand the seed and rules to somebody else the way a `conquest`
- * challenge code does.
+ * a golden test below. The project's description still records the seed and
+ * rules in words, but a project made this way also keeps a `RandomModRecipe`
+ * of its own (issue #3090), which is what the "Regenerate" button on the
+ * project's page reopens the drawer from, and what a share carries so the
+ * person who receives it can regenerate too. {@link recipeOverrides},
+ * {@link handEditedOverrides} and {@link regeneratedOverrides} are the three
+ * functions that let a regenerate replace what the last run wrote without
+ * touching a field somebody has since edited by hand.
  *
  * Every roll for a unit comes from a PRNG seeded off that unit's own key
  * (`hashString`, `mulberry32`, both from `src/conquest/rng.ts`, the seeded PRNG
@@ -38,7 +38,7 @@
 import { hashString, mulberry32 } from "../conquest/rng";
 import { findField, toNumber } from "./batchEdit";
 import { type Collections, collectionUnits } from "./collections";
-import { setOverride, type UnitOverrides } from "./overrides";
+import { sameValue, setOverride, type UnitOverrides } from "./overrides";
 import { evaluateUnitQuery, parseUnitQuery, resolveField } from "./searchQuery";
 
 /** One numeric field the generator can touch, in a fixed order so a unit's
@@ -261,9 +261,8 @@ export function randomModProjectName(gameName: string, seed: number): string {
 }
 
 /** The seed and rules in words, for the project's description. Written so
- *  retyping the same values here reproduces the same mod (see this module's
- *  own doc comment for why that is a description rather than a stored
- *  recipe). */
+ *  retyping the same values here reproduces the same mod even without the
+ *  stored recipe below. */
 export function describeRandomModRules(
   rules: RandomModRules,
   scope: RandomScope,
@@ -280,4 +279,128 @@ export function describeRandomModRules(
     `Fields: ${fieldLabels.length > 0 ? fieldLabels.join(", ") : "none"}.`,
     `Tier weights: ${tierText}.`,
   ].join(" ");
+}
+
+/**
+ * A recipe's scope as stored on a project (issue #3090).
+ *
+ * A live {@link RandomScope}'s `collection` variant embeds the whole
+ * `Collections` table, which is fine for a form that is about to plan against
+ * it once and close. A recipe outlives that: it sits on the project between
+ * visits and travels with a share, so it names the collection's own project
+ * and id instead of copying the table, the same way `mutatorOnly` names
+ * fields rather than duplicating the def they came from.
+ */
+export type RandomRecipeScope =
+  | { kind: "all" }
+  | { kind: "query"; query: string }
+  | { kind: "collection"; sourceProjectId: string; collectionId: string };
+
+/**
+ * A project's recipe: everything {@link RandomModRules} holds, plus the scope,
+ * so a project made by the generator can be regenerated without retyping what
+ * was picked (issue #3090). Optional on the project, the same way
+ * `mutatorOnly` is: a project nobody ever ran the generator on has none.
+ */
+export interface RandomModRecipe {
+  seed: number;
+  scope: RandomRecipeScope;
+  fields: readonly string[];
+  tierWeights: TierWeights;
+}
+
+/**
+ * A stored scope resolved back to a live one, against whichever project
+ * `projects` says defined the collection it names. A collection whose project
+ * is missing - deleted on this machine, or never received on one a shared
+ * recipe landed on - resolves to an empty collection table, which
+ * {@link resolveRandomScope} already reads as "no such collection" for a bad
+ * id, rather than throwing.
+ */
+export function resolveRandomRecipeScope(
+  scope: RandomRecipeScope,
+  projects: readonly { id: string; edits: { collections?: Collections } }[],
+): RandomScope {
+  if (scope.kind !== "collection") return scope;
+  const source = projects.find((p) => p.id === scope.sourceProjectId);
+  return {
+    kind: "collection",
+    collections: source?.edits.collections ?? {},
+    collectionId: scope.collectionId,
+  };
+}
+
+/**
+ * The override set `recipe` alone would write against `units` today,
+ * resolving its scope through `projects` the way
+ * {@link resolveRandomRecipeScope} does. Read at regenerate time to tell a
+ * generated field from a hand edit: a field equal to what this produces is
+ * what the recipe wrote, anything else is something a person typed in
+ * afterwards.
+ */
+export function recipeOverrides(
+  recipe: RandomModRecipe,
+  units: Record<string, Record<string, unknown> | undefined>,
+  projects: readonly { id: string; edits: { collections?: Collections } }[],
+): UnitOverrides {
+  const scope = resolveRandomRecipeScope(recipe.scope, projects);
+  const unitKeys = resolveRandomScope(scope, units);
+  const rows = planRandomMod(unitKeys, units, recipe);
+  return applyRandomModPlan(rows);
+}
+
+/**
+ * Every field in `overrides` that is not what `generated` holds for it: the
+ * recipe never wrote it, wrote something else there, or no longer scopes
+ * that unit at all. This is what a regenerate must never touch (issue
+ * #3090's "do not silently discard a hand edit").
+ */
+export function handEditedOverrides(
+  overrides: UnitOverrides,
+  generated: UnitOverrides,
+): UnitOverrides {
+  const out: UnitOverrides = {};
+  for (const [unit, fields] of Object.entries(overrides)) {
+    for (const [path, value] of Object.entries(fields)) {
+      if (sameValue(generated[unit]?.[path], value)) continue;
+      out[unit] = { ...out[unit], [path]: value };
+    }
+  }
+  return out;
+}
+
+/**
+ * Replace a project's generated changes with a fresh plan, keeping every
+ * field a person edited by hand since the last generation (issue #3090).
+ *
+ * `oldGenerated` is what the project's previous recipe would still write
+ * today, from {@link recipeOverrides}. Everything in `overrides` equal to it
+ * is what that run wrote and nobody has touched since, so it is dropped in
+ * favour of `newRows`. Everything else - a field the old recipe never wrote,
+ * or a value someone typed over it - is kept exactly as it stands, even where
+ * the new plan would also touch that field: a hand edit always wins over a
+ * regenerate.
+ */
+export function regeneratedOverrides(
+  overrides: UnitOverrides,
+  oldGenerated: UnitOverrides,
+  newRows: readonly RandomModRow[],
+): UnitOverrides {
+  const kept = handEditedOverrides(overrides, oldGenerated);
+  let next: UnitOverrides = {};
+  for (const [unit, fields] of Object.entries(kept)) next[unit] = { ...fields };
+  for (const row of newRows) {
+    for (const change of row.changes) {
+      if (kept[row.unit] && Object.hasOwn(kept[row.unit], change.path))
+        continue;
+      next = setOverride(
+        next,
+        row.unit,
+        change.path,
+        change.after,
+        change.before,
+      );
+    }
+  }
+  return next;
 }

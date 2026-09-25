@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import type { Collections } from "./collections";
+import { setOverride } from "./overrides";
 import {
   applyRandomModPlan,
   DEFAULT_TIER_WEIGHTS,
   describeRandomModRules,
+  handEditedOverrides,
   planRandomMod,
   RARITY_TIERS,
+  type RandomModRecipe,
   randomModChangeCount,
   randomModProjectName,
+  recipeOverrides,
+  regeneratedOverrides,
+  resolveRandomRecipeScope,
   resolveRandomScope,
 } from "./randomMod";
 
@@ -202,6 +208,176 @@ describe("describeRandomModRules", () => {
     expect(text).toContain("Scope: all units");
     expect(text).toContain("Metal cost, Health");
     expect(text).toContain("Common 60");
+  });
+});
+
+describe("resolveRandomRecipeScope", () => {
+  it("passes an all or query scope through unchanged", () => {
+    expect(resolveRandomRecipeScope({ kind: "all" }, [])).toEqual({
+      kind: "all",
+    });
+    expect(
+      resolveRandomRecipeScope({ kind: "query", query: "cost < 100" }, []),
+    ).toEqual({ kind: "query", query: "cost < 100" });
+  });
+
+  it("resolves a collection scope against the project that defined it", () => {
+    const collections: Collections = {
+      cheap: {
+        id: "cheap",
+        name: "Cheap stuff",
+        units: [],
+        rule: "cost < 100",
+      },
+    };
+    const projects = [{ id: "proj-1", edits: { collections } }];
+    expect(
+      resolveRandomRecipeScope(
+        {
+          kind: "collection",
+          sourceProjectId: "proj-1",
+          collectionId: "cheap",
+        },
+        projects,
+      ),
+    ).toEqual({ kind: "collection", collections, collectionId: "cheap" });
+  });
+
+  it("resolves to an empty collection table when the project is missing", () => {
+    expect(
+      resolveRandomRecipeScope(
+        { kind: "collection", sourceProjectId: "gone", collectionId: "cheap" },
+        [],
+      ),
+    ).toEqual({ kind: "collection", collections: {}, collectionId: "cheap" });
+  });
+});
+
+describe("recipeOverrides", () => {
+  const recipe: RandomModRecipe = {
+    seed: 4242,
+    scope: { kind: "all" },
+    fields: ["cost", "health", "speed", "buildtime"],
+    tierWeights: DEFAULT_TIER_WEIGHTS,
+  };
+
+  it("matches planning and applying the same rules by hand", () => {
+    const rows = planRandomMod(Object.keys(UNITS), UNITS, recipe);
+    expect(recipeOverrides(recipe, UNITS, [])).toEqual(
+      applyRandomModPlan(rows),
+    );
+  });
+
+  it("resolves a collection scope through the projects it is given", () => {
+    const collections: Collections = {
+      cheap: {
+        id: "cheap",
+        name: "Cheap stuff",
+        units: [],
+        rule: "cost < 100",
+      },
+    };
+    const projects = [{ id: "proj-1", edits: { collections } }];
+    const scoped: RandomModRecipe = {
+      ...recipe,
+      scope: {
+        kind: "collection",
+        sourceProjectId: "proj-1",
+        collectionId: "cheap",
+      },
+    };
+    const rows = planRandomMod(["armflash", "armpw"], UNITS, scoped);
+    expect(recipeOverrides(scoped, UNITS, projects)).toEqual(
+      applyRandomModPlan(rows),
+    );
+  });
+});
+
+describe("handEditedOverrides", () => {
+  it("finds nothing when every override matches what the recipe generated", () => {
+    const rows = planRandomMod(["armpw", "armflash"], UNITS, {
+      seed: 4242,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const generated = applyRandomModPlan(rows);
+    expect(handEditedOverrides(generated, generated)).toEqual({});
+  });
+
+  it("keeps a field the generator never wrote", () => {
+    const generated = { armpw: { metalCost: 49 } };
+    const overrides = { armpw: { metalCost: 49 }, armflash: { speed: 200 } };
+    expect(handEditedOverrides(overrides, generated)).toEqual({
+      armflash: { speed: 200 },
+    });
+  });
+
+  it("keeps a field the generator wrote something else for", () => {
+    const generated = { armpw: { metalCost: 49 } };
+    const overrides = { armpw: { metalCost: 999 } };
+    expect(handEditedOverrides(overrides, generated)).toEqual({
+      armpw: { metalCost: 999 },
+    });
+  });
+});
+
+describe("regeneratedOverrides", () => {
+  const scopedUnits = ["armpw", "armflash"];
+
+  it("drops a field the old recipe wrote and nobody has touched since", () => {
+    const oldRows = planRandomMod(scopedUnits, UNITS, {
+      seed: 4242,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const oldGenerated = applyRandomModPlan(oldRows);
+    const newRows = planRandomMod(scopedUnits, UNITS, {
+      seed: 7,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const newGenerated = applyRandomModPlan(newRows);
+
+    const result = regeneratedOverrides(oldGenerated, oldGenerated, newRows);
+    expect(result).toEqual(newGenerated);
+  });
+
+  it("keeps a hand-edited field instead of replacing it with the new roll", () => {
+    const oldRows = planRandomMod(scopedUnits, UNITS, {
+      seed: 4242,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const oldGenerated = applyRandomModPlan(oldRows);
+    // Somebody typed their own number over what the generator wrote.
+    const current = setOverride(oldGenerated, "armpw", "metalCost", 999, 55);
+
+    const newRows = planRandomMod(scopedUnits, UNITS, {
+      seed: 7,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const result = regeneratedOverrides(current, oldGenerated, newRows);
+
+    expect(result.armpw.metalCost).toBe(999);
+    const newRow = newRows.find((r) => r.unit === "armflash");
+    expect(result.armflash?.metalCost).toBe(newRow?.changes[0]?.after);
+  });
+
+  it("keeps every existing override on a first regenerate with no prior recipe", () => {
+    const current = { armpw: { metalCost: 999 } };
+    const newRows = planRandomMod(scopedUnits, UNITS, {
+      seed: 7,
+      fields: ["cost"],
+      tierWeights: DEFAULT_TIER_WEIGHTS,
+    });
+    const result = regeneratedOverrides(current, {}, newRows);
+
+    // The hand edit survives, and the new run still writes fields it never
+    // held an opinion on before.
+    expect(result.armpw.metalCost).toBe(999);
+    const newRow = newRows.find((r) => r.unit === "armflash");
+    expect(result.armflash?.metalCost).toBe(newRow?.changes[0]?.after);
   });
 });
 
