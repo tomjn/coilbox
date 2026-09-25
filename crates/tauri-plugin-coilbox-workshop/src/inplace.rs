@@ -17,7 +17,10 @@
 //! Field changes to the game's own units go this way, and so do copies of
 //! them (issue #2634), each as a new file beside its source's, added to the
 //! build menus the project adds it to. `inplace_clone.rs` has the copy's
-//! half. Other build menu changes, words, switched-off units and copies that
+//! half. A library weapon equipped into a game unit, in a slot or as a death
+//! explosion, goes into that unit's own `weapondefs` (issue #3055), and one
+//! that cannot, such as into an `.fbi` unit, is reported with the reason
+//! rather than stopping the write. Other build menu changes, words, switched-off units and copies that
 //! replace a game unit have no in-place form yet, and the outcome says which
 //! of them the project holds rather than dropping them quietly.
 //!
@@ -102,6 +105,23 @@ pub struct WriteOutcome {
     /// Every copy written as a new unit file (issue #2634). Empty when
     /// anything was refused.
     pub copies: Vec<WrittenCopy>,
+    /// Every library weapon the game's own units now carry (issue #3055).
+    /// Empty when anything was refused.
+    pub equipped: Vec<WrittenEquip>,
+}
+
+/// A library weapon a game unit's file now carries in its own `weapondefs`,
+/// with the slot or death explosion pointed at it (issue #3055).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WrittenEquip {
+    pub unit: String,
+    /// The slot's step as the project holds it, or `explodeas` or
+    /// `selfdestructas`.
+    pub at: String,
+    pub weapon: String,
+    /// The file it went into, relative to the game.
+    pub file: String,
 }
 
 /// A copy the game now holds as a unit file of its own. Undo always reaches
@@ -403,26 +423,6 @@ fn not_carried(project: &ModProject) -> Vec<String> {
     }
     if !edits.disabled.is_empty() {
         out.push("Switched-off units are not written into the game yet.".to_string());
-    }
-    let deaths = edits.death_explosion_count();
-    let equipped = edits.equipped_count() - deaths;
-    if equipped > 0 {
-        out.push(format!(
-            "{equipped} weapon{} equipped from the project's weapon library {} not written into the game yet. {} still need{} a mutator.",
-            if equipped == 1 { "" } else { "s" },
-            if equipped == 1 { "is" } else { "are" },
-            if equipped == 1 { "It" } else { "They" },
-            if equipped == 1 { "s" } else { "" },
-        ));
-    }
-    if deaths > 0 {
-        out.push(format!(
-            "{deaths} death explosion{} copied into the project's weapon library {} not written into the game yet. {} still need{} a mutator.",
-            if deaths == 1 { "" } else { "s" },
-            if deaths == 1 { "is" } else { "are" },
-            if deaths == 1 { "It" } else { "They" },
-            if deaths == 1 { "s" } else { "" },
-        ));
     }
     if edits.text_edit_count() > 0 {
         out.push("Name and description changes are not written into the game yet.".to_string());
@@ -959,6 +959,16 @@ pub fn write(
         }
     }
 
+    write_equipped(
+        game_dir,
+        project,
+        sources,
+        &files,
+        &mut texts,
+        &mut included,
+        &mut outcome,
+    );
+
     // A game's own `gamedata/sidedata.tdf`, read and patched as a copy joins
     // an `.fbi` builder's menu (issue #3040), cached here so a second copy or
     // builder in the same write sees the first one's change.
@@ -1020,6 +1030,7 @@ pub fn write(
         outcome.changed = 0;
         outcome.unchanged = 0;
         outcome.copies.clear();
+        outcome.equipped.clear();
         return Ok(outcome);
     }
 
@@ -1043,6 +1054,184 @@ pub fn write(
         coilbox_gamebackup::touch(game_dir);
     }
     Ok(outcome)
+}
+
+/// The edits that equip library weapon `key` at `step` on the game unit
+/// `unit` (issue #3055), or why there are none.
+///
+/// The same changes the mutator's equip block makes at load time
+/// (`compile::equip_block`), made to the file instead. The weapon, and each
+/// library weapon it names, goes into the unit's own `weapondefs` under its
+/// library key, with the values from before the game's post files ran
+/// (`compile::library_def`). A slot is pointed at it by `def`, which the
+/// base content's `weapondefs_post.lua` and every game's copy of it turn into
+/// `<unit>_<key>`, and by `name` set to that full name, for a game that reads
+/// only the name. A death explosion field is set to `<unit>_<key>`, which
+/// those post files leave alone and the engine then finds as the definition
+/// the unit carries (`compile::death_name`).
+///
+/// `def` is the game's read of the unit, which a slot's step is read against
+/// the way [`segments`] reads a field's.
+fn equip_edits(
+    unit: &str,
+    step: &str,
+    key: &str,
+    edits: &GameEdits,
+    def: Option<&Value>,
+) -> Result<Vec<Edit>, String> {
+    let Some(at) = crate::compile::equip_at(step) else {
+        return Err(format!(
+            "{step:?} is not a weapon slot or a death explosion."
+        ));
+    };
+    if !edits.weapons.contains_key(key) || !crate::compile::valid_unit_key(key) {
+        return Err(
+            "The weapon is not in the library under a name the compiler can use.".to_string(),
+        );
+    }
+    let set = |path: Vec<Segment>, value: PatchValue| Edit {
+        unit: unit.to_string(),
+        path,
+        op: Op::Set(value),
+    };
+    let mut out = Vec::new();
+    for (name, weapon) in crate::compile::library_defs_for(unit, key, &edits.weapons) {
+        let value = PatchValue::from_json(&weapon)
+            .map_err(|reason| format!("The weapon {name} cannot be written as Lua. {reason}"))?;
+        out.push(set(
+            vec![Segment::Key("weapondefs".into()), Segment::Key(name)],
+            value,
+        ));
+    }
+    let full = crate::compile::death_name(unit, key);
+    match at {
+        crate::compile::EquipAt::Death(field) => {
+            out.push(set(
+                vec![Segment::Key(field.to_string())],
+                PatchValue::String(full),
+            ));
+        }
+        crate::compile::EquipAt::Slot(_) => {
+            let slot = segments(&format!("weapons.{step}"), def)?;
+            let at = |field: &str| {
+                let mut path = slot.clone();
+                path.push(Segment::Key(field.to_string()));
+                path
+            };
+            out.push(set(at("def"), PatchValue::String(key.to_string())));
+            out.push(set(at("name"), PatchValue::String(full)));
+        }
+    }
+    Ok(out)
+}
+
+/// Write each library weapon equipped into a game unit into that unit's file
+/// (issue #3055), after the field changes, into `texts` and `included`.
+///
+/// Each weapon is all or nothing: its edits are made to a scratch copy of the
+/// file and kept only if every one goes through. One that cannot be written,
+/// such as into an `.fbi` unit, which has no `weapondefs` table, is said in
+/// `not_carried` with the reason, and left to the mutator. It does not stop
+/// the rest of the write, since it changes nothing on disk.
+///
+/// A copy's equipped weapons are not written here. They are part of the
+/// copy's definition, and go into its own file with it.
+fn write_equipped(
+    game_dir: &Path,
+    project: &ModProject,
+    sources: &BTreeMap<String, Value>,
+    files: &[PathBuf],
+    texts: &mut BTreeMap<PathBuf, String>,
+    included: &mut BTreeMap<PathBuf, String>,
+    outcome: &mut WriteOutcome,
+) {
+    let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
+    let edits = &project.edits;
+    for (unit, slots) in &edits.equipped {
+        if edits.clones.contains_key(unit) {
+            continue;
+        }
+        for (step, weapon) in slots {
+            let about = match crate::compile::equip_at(step) {
+                Some(crate::compile::EquipAt::Death(field)) => {
+                    format!("Library weapon {weapon} as {unit}'s {field}")
+                }
+                _ => format!("Library weapon {weapon} in {unit}'s weapon slot {step}"),
+            };
+            let mut report = |reason: String| {
+                outcome.not_carried.push(format!(
+                    "{about} is not written into the game, and still needs a mutator. {reason}"
+                ));
+            };
+            let list = match equip_edits(unit, step, weapon, edits, sources.get(unit)) {
+                Ok(list) => list,
+                Err(reason) => {
+                    report(reason);
+                    continue;
+                }
+            };
+            let file = match find_unit_file(unit, files, texts, |file, text| {
+                locate_unit(file, text, unit)
+            }) {
+                Found::File(file, Ok(_)) => file,
+                Found::File(_, Err(r)) => {
+                    report(r.message);
+                    continue;
+                }
+                Found::None(file_level) => {
+                    report(no_file_refusal(unit, file_level, game_dir).message);
+                    continue;
+                }
+            };
+            let mut text = texts[&file].clone();
+            let mut pending = included.clone();
+            let mut into = file.clone();
+            let mut changed = false;
+            let mut failed = None;
+            for edit in &list {
+                match patch_file(&file, &text, edit, game_dir, &pending) {
+                    Ok(patched) => {
+                        changed |= patched.changed;
+                        match patched.file {
+                            Some(path) => {
+                                into = path.clone();
+                                if patched.changed {
+                                    pending.insert(path, patched.text);
+                                }
+                            }
+                            None if patched.changed => text = patched.text,
+                            None => {}
+                        }
+                    }
+                    Err(refusal) => {
+                        failed = Some(refusal);
+                        break;
+                    }
+                }
+            }
+            if let Some(refusal) = failed {
+                let at = rel(refusal.file.as_deref().unwrap_or(&file));
+                let line = refusal
+                    .location
+                    .map_or(String::new(), |l| format!(", line {}", l.start.line));
+                report(format!("{} ({at}{line})", refusal.message));
+                continue;
+            }
+            texts.insert(file, text);
+            *included = pending;
+            if changed {
+                outcome.changed += 1;
+            } else {
+                outcome.unchanged += 1;
+            }
+            outcome.equipped.push(WrittenEquip {
+                unit: unit.clone(),
+                at: step.clone(),
+                weapon: weapon.clone(),
+                file: rel(&into),
+            });
+        }
+    }
 }
 
 /// Add `unit` to `builder`'s build menu in `gamedata/sidedata.tdf` (issue
@@ -2059,6 +2248,38 @@ mod tests {
         .unwrap()
     }
 
+    /// Issue #3055. A library weapon equipped into a copy is part of the
+    /// copy's definition, so it goes into the copy's own file with it, the
+    /// weapon as a whole `weapondefs` table.
+    #[test]
+    fn a_copys_equipped_death_explosion_goes_into_its_file() {
+        let (_root, game) = game();
+        let project = copying(
+            "armdfly",
+            "armdfly2",
+            serde_json::json!({}),
+            serde_json::json!({
+                "weapons": { "blast": { "key": "blast", "def": { "areaofeffect": 300 } } },
+                "equipped": { "armdfly2": { "explodeas": "blast" } },
+            }),
+        );
+
+        let outcome = super::write(&game, &project, &sources()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert!(
+            outcome.equipped.is_empty(),
+            "the copy carries it, not a game unit"
+        );
+        let unit = unit_in(&game, "units/armdfly2.lua", "armdfly2");
+        assert_eq!(unit["explodeas"], "armdfly2_blast");
+        assert_eq!(
+            unit["weapondefs"],
+            serde_json::json!({ "blast": { "areaofeffect": 300 } })
+        );
+    }
+
     /// Issue #2634, in Beyond All Reason's shape. The copy is the source's
     /// file with the key renamed and its one change made, beside it, and the
     /// factory the project adds it to lists it. Undo takes both back.
@@ -2242,43 +2463,368 @@ mod tests {
         assert!(outcome.not_carried[0].contains("replaces a unit"));
     }
 
-    /// Issue #2640. A weapon equipped from the library is left to the
-    /// mutator, and says so, rather than stopping the rest of the write.
-    #[test]
-    fn an_equipped_library_weapon_is_not_carried() {
-        let project: ModProject = serde_json::from_value(serde_json::json!({
-            "name": "x",
-            "gameName": "g",
-            "edits": {
-                "weapons": { "heavylaser": { "key": "heavylaser", "def": { "range": 300 } } },
-                "equipped": { "armdfly": { "0": "heavylaser" } }
-            }
+    /// A project equipping library weapons, with `overrides` beside them.
+    fn equipping(weapons: Value, equipped: Value, overrides: Value) -> ModProject {
+        serde_json::from_value(serde_json::json!({
+            "name": "TEST in place (delete me)",
+            "gameName": "Dev",
+            "edits": { "weapons": weapons, "equipped": equipped, "overrides": overrides },
         }))
-        .unwrap();
-        let lines = super::not_carried(&project);
-        assert_eq!(lines.len(), 1, "{lines:?}");
-        assert!(lines[0]
-            .starts_with("1 weapon equipped from the project's weapon library is not written"));
+        .expect("parse")
     }
 
-    /// Issue #2642. A death explosion out of the library is left to the
-    /// mutator too, and counted apart from the slots.
+    /// The game's read of armdfly, as the page sends it for a slot.
+    fn armdfly_read() -> BTreeMap<String, Value> {
+        serde_json::from_value(serde_json::json!({
+            "armdfly": { "weapons": [
+                { "name": "armdfly_armdfly_paralyzer", "onlytargetcategory": "NOTSUB" }
+            ] }
+        }))
+        .unwrap()
+    }
+
+    fn unit_in(game: &Path, file: &str, unit: &str) -> Value {
+        let path = game.join(file);
+        evaluate(&path, &read(&path), game).expect("runs")[unit].clone()
+    }
+
+    /// Issue #3055. A library weapon equipped into a game unit's slot goes
+    /// into the unit's own `weapondefs`, created here since armdfly has none,
+    /// and the slot names it by `def` and by full name, as the mutator's
+    /// block does. Undo puts the file back byte for byte.
     #[test]
-    fn a_death_explosion_from_the_library_is_not_carried() {
-        let project: ModProject = serde_json::from_value(serde_json::json!({
-            "name": "x",
-            "gameName": "g",
-            "edits": {
-                "weapons": { "blast": { "key": "blast", "def": { "areaofeffect": 300 } } },
-                "equipped": { "armdfly": { "explodeas": "blast", "selfdestructas": "blast" } }
-            }
+    fn an_equipped_library_weapon_is_written_into_the_units_file_and_undo_takes_it_out() {
+        let (_root, game) = game();
+        let dfly = game.join("units/armdfly.lua");
+        let before = read(&dfly);
+        let project = equipping(
+            serde_json::json!({ "heavylaser": {
+                "key": "heavylaser",
+                "def": { "range": 300, "damage": { "default": 100 } },
+            } }),
+            serde_json::json!({ "armdfly": { "0": "heavylaser" } }),
+            serde_json::json!({}),
+        );
+
+        let outcome = super::write(&game, &project, &armdfly_read()).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        assert_eq!(
+            outcome.equipped,
+            vec![WrittenEquip {
+                unit: "armdfly".into(),
+                at: "0".into(),
+                weapon: "heavylaser".into(),
+                file: "units/armdfly.lua".into(),
+            }]
+        );
+        let unit = unit_in(&game, "units/armdfly.lua", "armdfly");
+        assert_eq!(
+            unit["weapondefs"],
+            serde_json::json!({ "heavylaser": { "range": 300, "damage": { "default": 100 } } })
+        );
+        assert_eq!(unit["weapons"]["[1]"]["def"], "heavylaser");
+        assert_eq!(unit["weapons"]["[1]"]["name"], "armdfly_heavylaser");
+        assert_eq!(unit["weapons"]["[1]"]["onlytargetcategory"], "NOTSUB");
+
+        let diffs = crate::diff::disk_diffs(&game).unwrap();
+        assert_eq!(diffs.len(), 1);
+        assert!(diffs[0]
+            .lines
+            .iter()
+            .any(|l| l.text.contains("heavylaser = {")));
+
+        undo(&game).unwrap();
+        assert_eq!(read(&dfly), before);
+    }
+
+    /// Issue #3055, with #2642. A death explosion is written by the full
+    /// name the game gives a definition the unit carries, `<unit>_<key>`,
+    /// the same name the mutator's block writes. The file's own spelling of
+    /// the field is kept.
+    #[test]
+    fn a_death_explosion_is_written_by_its_full_name() {
+        let (_root, game) = game();
+        let file = "units/cloakingtower.lua";
+        std::fs::write(game.join(file), fixture("sf_cloakingtower.lua")).unwrap();
+        let project = equipping(
+            serde_json::json!({ "blast": { "key": "blast", "def": { "areaofeffect": 300 } } }),
+            serde_json::json!({ "cloakingtower": { "explodeas": "blast" } }),
+            serde_json::json!({}),
+        );
+
+        let outcome = write(&game, &project).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        let text = read(&game.join(file));
+        assert!(text.contains("explodeAs                     = \"cloakingtower_blast\""));
+        let unit = unit_in(&game, file, "cloakingtower");
+        assert_eq!(unit["explodeas"], "cloakingtower_blast");
+        assert_eq!(
+            unit["selfdestructas"], "smallBuildingExplosionGenericPurple",
+            "the self-destruct keeps its own"
+        );
+        assert_eq!(
+            unit["weapondefs"],
+            serde_json::json!({ "blast": { "areaofeffect": 300 } })
+        );
+    }
+
+    /// Issue #3054. A library weapon goes into the file with the values the
+    /// game's own files had, so the game post-processes it once.
+    #[test]
+    fn an_equipped_weapon_is_written_with_the_values_before_post_processing() {
+        let (_root, game) = game();
+        let project = equipping(
+            serde_json::json!({ "heavylaser": {
+                "key": "heavylaser",
+                "def": { "range": 300, "cratermult": 0.03 },
+                "beforePost": { "values": { "cratermult": 0.1 }, "added": [] },
+            } }),
+            serde_json::json!({ "armdfly": { "0": "heavylaser" } }),
+            serde_json::json!({}),
+        );
+        let outcome = super::write(&game, &project, &armdfly_read()).unwrap();
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        let unit = unit_in(&game, "units/armdfly.lua", "armdfly");
+        assert_eq!(unit["weapondefs"]["heavylaser"]["cratermult"], 0.1);
+    }
+
+    /// Writing the same project twice changes nothing the second time, and
+    /// a change to the library weapon since replaces the table it wrote.
+    #[test]
+    fn a_second_write_follows_the_library_weapon() {
+        let (_root, game) = game();
+        let weapons = |range: u32| serde_json::json!({ "heavylaser": { "key": "heavylaser", "def": { "range": range } } });
+        let equipped = serde_json::json!({ "armdfly": { "0": "heavylaser" } });
+        let first = equipping(weapons(300), equipped.clone(), serde_json::json!({}));
+        super::write(&game, &first, &armdfly_read()).unwrap();
+
+        let again = super::write(&game, &first, &armdfly_read()).unwrap();
+        assert!(again.written.is_empty(), "{:?}", again.written);
+        assert_eq!(again.unchanged, 1);
+
+        let longer = equipping(weapons(450), equipped, serde_json::json!({}));
+        let outcome = super::write(&game, &longer, &armdfly_read()).unwrap();
+        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        let unit = unit_in(&game, "units/armdfly.lua", "armdfly");
+        assert_eq!(unit["weapondefs"]["heavylaser"]["range"], 450);
+    }
+
+    /// An `.fbi` unit has no `weapondefs` table, so its equipped weapon is
+    /// left to the mutator with that reason, and the rest of the project is
+    /// still written.
+    #[test]
+    fn an_equipped_weapon_on_an_fbi_unit_is_reported_and_the_rest_is_written() {
+        let (_root, game) = fbi_game();
+        let armcom = game.join("units/ARMCOM.FBI");
+        let armcom_before = read(&armcom);
+        let sources: BTreeMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "armcom": { "weapons": [{ "name": "ARM_LIGHTLASER" }] }
         }))
         .unwrap();
-        let lines = super::not_carried(&project);
-        assert_eq!(lines.len(), 1, "{lines:?}");
-        assert!(lines[0].starts_with(
-            "2 death explosions copied into the project's weapon library are not written"
+        let project = equipping(
+            serde_json::json!({ "heavylaser": { "key": "heavylaser", "def": { "range": 300 } } }),
+            serde_json::json!({ "armcom": { "0": "heavylaser", "explodeas": "heavylaser" } }),
+            serde_json::json!({ "armdfly": { "metalcost": 400 } }),
+        );
+
+        let outcome = super::write(&game, &project, &sources).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert_eq!(outcome.written, vec!["units/armdfly.lua"]);
+        assert!(outcome.equipped.is_empty());
+        assert_eq!(read(&armcom), armcom_before);
+        assert_eq!(outcome.not_carried.len(), 2, "{:?}", outcome.not_carried);
+        assert!(outcome.not_carried[0].starts_with(
+            "Library weapon heavylaser in armcom's weapon slot 0 is not written into the game"
         ));
+        assert!(outcome.not_carried[1].starts_with(
+            "Library weapon heavylaser as armcom's explodeas is not written into the game"
+        ));
+        assert!(outcome
+            .not_carried
+            .iter()
+            .all(|line| line.contains("An .fbi unit file holds single values only")));
+    }
+
+    /// SplinterFaction's unit files set the unit's `weaponDefs` after
+    /// including its table, so a weapon added to the table would be thrown
+    /// away. Reported with the line that does it, and nothing is written for
+    /// that weapon.
+    #[test]
+    fn an_equipped_weapon_the_file_cannot_take_is_reported_with_the_reason() {
+        let (_root, game) = sf_game();
+        let basedef = game.join(BEACON_BASEDEF);
+        let before = read(&basedef);
+        let project = equipping(
+            serde_json::json!({ "blast": { "key": "blast", "def": { "areaofeffect": 300 } } }),
+            serde_json::json!({ "beacon": { "explodeas": "blast" } }),
+            serde_json::json!({}),
+        );
+
+        let outcome = write(&game, &project).unwrap();
+
+        assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+        assert!(outcome.written.is_empty(), "{:?}", outcome.written);
+        assert_eq!(read(&basedef), before);
+        assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
+        assert!(
+            outcome.not_carried[0]
+                .contains("sets this value again after the unit's table is built"),
+            "{:?}",
+            outcome.not_carried
+        );
+    }
+
+    /// A loose game whose `weapondefs_post.lua` does what the base content's
+    /// does with a unit's own weapons: puts each into the shared table as
+    /// `<unit>_<name>`, turns a slot's `def` into that name, and turns a
+    /// death explosion naming exactly one of them into it too. Balanced
+    /// Annihilation's, Beyond All Reason's and SplinterFaction's do the same.
+    fn post_processing_game() -> (tempfile::TempDir, PathBuf) {
+        let root = tempfile::tempdir().expect("temp dir");
+        let game = root.path().join("games/model.sdd");
+        for (path, text) in [
+            (
+                "gamedata/weapondefs_post.lua",
+                r#"
+for udName, ud in pairs(DEFS.unitDefs) do
+  if type(ud.weapondefs) == 'table' then
+    for wdName, wd in pairs(ud.weapondefs) do WeaponDefs[udName .. '_' .. wdName] = wd end
+  end
+  if type(ud.weapons) == 'table' then
+    for i = 1, 32 do
+      local w = ud.weapons[i]
+      if type(w) == 'table' then
+        if type(w.def) == 'string' then
+          local fullName = udName .. '_' .. string.lower(w.def)
+          if type(WeaponDefs[fullName]) == 'table' then w.name = fullName end
+        end
+        w.def = nil
+      end
+    end
+  end
+  for _, f in ipairs({ 'explodeas', 'selfdestructas' }) do
+    if type(ud[f]) == 'string' and WeaponDefs[udName .. '_' .. ud[f]] then
+      ud[f] = udName .. '_' .. ud[f]
+    end
+  end
+end
+"#,
+            ),
+            (
+                "units/armcom.lua",
+                "return {\n\tarmcom = {\n\t\texplodeas = \"COMMANDER_BLAST\",\n\t\tselfdestructas = \"COMMANDER_BLAST\",\n\t\tweapons = {\n\t\t\t[1] = {\n\t\t\t\tdef = \"ARMCOMLASER\",\n\t\t\t},\n\t\t},\n\t\tweapondefs = {\n\t\t\tarmcomlaser = {\n\t\t\t\trange = 300,\n\t\t\t},\n\t\t},\n\t},\n}\n",
+            ),
+            (
+                "weapons/commander_blast.lua",
+                "return { commander_blast = { areaofeffect = 720 } }\n",
+            ),
+        ] {
+            let path = game.join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        }
+        (root, game)
+    }
+
+    /// Load `game` the way the engine's own def loaders do, with `over`
+    /// read in place of the files on disk: the unit file, the game's or the
+    /// mutator's `unitdefs_post.lua` with `UnitDefs` in scope, the weapon
+    /// file, then `weapondefs_post.lua`. The units and the shared weapon
+    /// table that come out.
+    fn load(game: &Path, over: &[(String, String)]) -> Value {
+        let files = over
+            .iter()
+            .map(|(path, text)| (game.join(path), text.clone()))
+            .collect();
+        let vm = coilbox_springlua::SpringLua::with_files(game, files).expect("vm");
+        vm.eval_expr_value(
+            r#"(function()
+  Spring.GetModOptions = function() return {} end
+  DEFS = {}
+  UnitDefs = VFS.Include('units/armcom.lua')
+  if VFS.FileExists('gamedata/unitdefs_post.lua') then VFS.Include('gamedata/unitdefs_post.lua') end
+  DEFS.unitDefs = UnitDefs
+  UnitDefs = nil
+  WeaponDefs = VFS.Include('weapons/commander_blast.lua')
+  VFS.Include('gamedata/weapondefs_post.lua')
+  return { units = DEFS.unitDefs, weapons = WeaponDefs }
+end)()"#,
+            "load.lua",
+        )
+        .unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// Issue #3055. Written in place, a library weapon in a slot and one as
+    /// a death explosion load under the same names, holding the same
+    /// definitions, as the mutator route loads them.
+    #[test]
+    fn written_in_place_the_weapons_load_as_the_mutator_loads_them() {
+        let (_root, game) = post_processing_game();
+        let project = equipping(
+            serde_json::json!({
+                "heavylaser": { "key": "heavylaser", "def": { "range": 450 } },
+                "blast": { "key": "blast", "def": { "areaofeffect": 300 } },
+            }),
+            serde_json::json!({ "armcom": { "0": "heavylaser", "explodeas": "blast" } }),
+            serde_json::json!({}),
+        );
+        let mutator: Vec<(String, String)> = crate::compile(&project)
+            .files
+            .into_iter()
+            .map(|file| (file.path, file.contents))
+            .collect();
+        let by_mutator = load(&game, &mutator);
+
+        let sources: BTreeMap<String, Value> = serde_json::from_value(serde_json::json!({
+            "armcom": { "weapons": [{ "name": "armcom_armcomlaser" }] }
+        }))
+        .unwrap();
+        let outcome = super::write(&game, &project, &sources).unwrap();
+        assert!(outcome.not_carried.is_empty(), "{:?}", outcome.not_carried);
+        assert_eq!(outcome.equipped.len(), 2);
+        let in_place = load(&game, &[]);
+
+        let armcom = &in_place["units"]["armcom"];
+        assert_eq!(armcom["weapons"][0]["name"], "armcom_heavylaser");
+        assert_eq!(armcom["explodeas"], "armcom_blast");
+        assert_eq!(armcom["selfdestructas"], "COMMANDER_BLAST");
+        assert_eq!(in_place["weapons"]["armcom_heavylaser"]["range"], 450);
+        assert_eq!(in_place["weapons"]["armcom_blast"]["areaofeffect"], 300);
+        for path in [
+            "/units/armcom/weapons/0/name",
+            "/units/armcom/explodeas",
+            "/units/armcom/selfdestructas",
+            "/weapons/armcom_heavylaser",
+            "/weapons/armcom_blast",
+        ] {
+            assert_eq!(
+                in_place.pointer(path),
+                by_mutator.pointer(path),
+                "{path} in place against the mutator"
+            );
+        }
+    }
+
+    /// A slot the page sent no read of the unit for cannot be told apart
+    /// from a list position, so it is reported rather than guessed.
+    #[test]
+    fn an_equipped_slot_with_no_read_of_the_unit_is_reported() {
+        let (_root, game) = game();
+        let project = equipping(
+            serde_json::json!({ "heavylaser": { "key": "heavylaser", "def": { "range": 300 } } }),
+            serde_json::json!({ "armdfly": { "0": "heavylaser" } }),
+            serde_json::json!({}),
+        );
+        let outcome = write(&game, &project).unwrap();
+        assert!(outcome.written.is_empty());
+        assert_eq!(outcome.not_carried.len(), 1, "{:?}", outcome.not_carried);
+        assert!(outcome.not_carried[0].contains("read of this unit"));
     }
 
     /// Issue #3035. A copy sent to the mutator route is skipped by the write,
@@ -2332,7 +2878,7 @@ mod tests {
         let game = root.path().join("games/dev.sdd");
         std::fs::create_dir_all(&game).unwrap();
         let mut def = sources()["armdfly"].clone();
-        def["featuredefs"] = serde_json::json!({ "dead": { "metal": 1 } });
+        def.as_object_mut().unwrap().remove("maxvelocity");
         let clone: UnitClone = serde_json::from_value(serde_json::json!({
             "key": "armdfly2",
             "source": "armdfly",
@@ -2344,7 +2890,7 @@ mod tests {
         let outcome = check_clone(&game, &clone, None, None, &sources()["armdfly"]).unwrap();
 
         assert_eq!(outcome.unwritable.len(), 1, "{:?}", outcome.unwritable);
-        assert_eq!(outcome.unwritable[0].field, "featuredefs");
+        assert_eq!(outcome.unwritable[0].field, "maxvelocity");
     }
 
     /// A copy with no source, or one that replaces a game unit, is never

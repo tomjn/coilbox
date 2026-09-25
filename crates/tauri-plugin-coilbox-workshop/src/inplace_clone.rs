@@ -51,10 +51,11 @@ pub struct Unwritable {
 /// The edits that turn the source unit's table into the copy's, and the
 /// differences no edit can make.
 ///
-/// A changed value is a set. Entries added to the end of a list are pushes,
-/// which is how a copy's own build menu grows. A table added, a field taken
-/// out, or a list that lost entries has no edit the patcher makes, so each is
-/// refused, apart from a top-level `name` or `humanName` the copy dropped:
+/// A changed value is a set, and so is a table added where the source had
+/// none, written whole. Entries added to the end of a list are pushes, which
+/// is how a copy's own build menu grows. A field taken out, a list that lost
+/// entries, or a table added to a list has no edit the patcher makes, so each
+/// is refused, apart from a top-level `name` or `humanName` the copy dropped:
 /// `clones.ts` drops those for a game that reads names from its language
 /// files, which never reads them from the definition.
 pub(crate) fn copy_edits(source: &Value, copy: &Value) -> (Vec<CopyEdit>, Vec<Unwritable>) {
@@ -188,12 +189,18 @@ impl Walk {
                 (None, Some(a)) => match scalar(a) {
                     Some(value) => self.edit(Op::Set(value)),
                     None if is_empty_table(a) => {}
-                    None => {
-                        let field = self.field();
-                        self.refuse(format!(
-                            "The copy adds the table {field}, and coilbox can only write single values into a file."
-                        ));
-                    }
+                    // A table the copy adds is written whole, as a weapon
+                    // equipped into the copy adds its `weapondefs` entry
+                    // (issue #3055).
+                    None => match PatchValue::from_json(a) {
+                        Ok(value) => self.edit(Op::Set(value)),
+                        Err(reason) => {
+                            let field = self.field();
+                            self.refuse(format!(
+                                "The copy adds the table {field}, which cannot be written as Lua. {reason}"
+                            ));
+                        }
+                    },
                 },
                 (Some(_), None) => {
                     let lower = key.to_lowercase();
@@ -531,12 +538,15 @@ mod tests {
 
         let (edits, refused) = copy_edits(&source, &copy);
 
-        assert!(edits.is_empty(), "{edits:?}");
-        let found: Vec<&str> = refused.iter().map(|r| r.field.as_str()).collect();
+        // A table the copy adds is written whole (issue #3055).
+        assert_eq!(edits.len(), 1, "{edits:?}");
+        assert_eq!(edits[0].field, "featuredefs");
         assert_eq!(
-            found,
-            vec!["buildoptions", "category", "featuredefs", "sounds"]
+            edits[0].op,
+            Op::Set(PatchValue::from_json(&json!({ "dead": { "metal": 1 } })).expect("a table"))
         );
+        let found: Vec<&str> = refused.iter().map(|r| r.field.as_str()).collect();
+        assert_eq!(found, vec!["buildoptions", "category", "sounds"]);
     }
 
     #[test]

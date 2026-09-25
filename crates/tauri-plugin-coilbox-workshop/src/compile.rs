@@ -816,7 +816,7 @@ pub(crate) fn library_support(weapons: &BTreeMap<String, LibraryWeapon>, key: &s
 /// its library key, with every full-name reference to one of them turned into
 /// the name the game gives it in that unit, `<unit>_<key>`. A short-name
 /// reference is left as the key, which the game's post files prefix itself.
-fn library_defs_for(
+pub(crate) fn library_defs_for(
     unit: &str,
     key: &str,
     weapons: &BTreeMap<String, LibraryWeapon>,
@@ -988,7 +988,7 @@ fn point_slot(slot: &mut Value, unit: &str, key: &str) {
 /// and leave the field alone otherwise. The full name finds nothing under
 /// that rule and is left alone, and the engine then finds the definition by
 /// it, so it works in a game with that rule and in one without it.
-fn death_name(unit: &str, key: &str) -> String {
+pub(crate) fn death_name(unit: &str, key: &str) -> String {
     format!("{}_{key}", unit.to_lowercase())
 }
 

@@ -543,7 +543,7 @@ mod tests {
             "key": "armcom2",
             "source": "armcom",
             "replacesGameUnit": false,
-            "def": { "metalcost": 1, "featuredefs": { "dead": { "metal": 1 } } },
+            "def": { "metalcost": 1 },
         }))
         .expect("clone");
         let clone_checked = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
@@ -552,10 +552,10 @@ mod tests {
                 clone,
                 None,
                 None,
-                serde_json::json!({ "metalcost": 1 }),
+                serde_json::json!({ "metalcost": 1, "maxvelocity": 2 }),
             ),
         ));
-        assert_eq!(clone_checked["unwritable"][0]["field"], "featuredefs");
+        assert_eq!(clone_checked["unwritable"][0]["field"], "maxvelocity");
 
         let outside = root.path().join("dev.sdd");
         std::fs::create_dir_all(&outside).expect("outside dir");
