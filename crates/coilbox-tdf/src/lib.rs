@@ -414,6 +414,8 @@ pub enum SetError {
     },
     /// The key is a section, so it has no single value to change.
     NotAValue { section: String, at: usize },
+    /// [`add_section`] was asked to add a section already there.
+    SectionExists { section: String },
     /// The key or the value cannot be written in this format.
     InvalidValue(String),
     /// The changed file did not read back as exactly the change asked for.
@@ -440,6 +442,9 @@ impl fmt::Display for SetError {
             ),
             SetError::NotAValue { section, .. } => {
                 write!(f, "{section} is a section here, not a single value.")
+            }
+            SetError::SectionExists { section } => {
+                write!(f, "[{section}] is already in this file.")
             }
             SetError::InvalidValue(message) | SetError::PostCheck(message) => {
                 f.write_str(message)
@@ -653,6 +658,169 @@ fn insertion(text: &str, container: &Container, key: &str, value: &str) -> (usiz
         _ if text.is_empty() || text.ends_with('\n') => (text.len(), format!("{line}{eol}")),
         _ => (text.len(), format!("{eol}{line}{eol}")),
     }
+}
+
+/// Add a new `[name] { key=value; }` subsection inside the section at
+/// `parent`, styled after the last subsection `parent` already has: its own
+/// indentation, its brace placement and the indentation of its own keys are
+/// all copied from that sibling. A `parent` with no subsection to copy from
+/// gets one indented a tab deeper than `parent` itself, brace on its own
+/// line.
+///
+/// Refused when `parent` does not exist, or already has an entry named
+/// `name`. As with [`set`], the result is parsed back and the change refused
+/// unless it added exactly one new subsection, holding exactly `key`.
+pub fn add_section(
+    text: &str,
+    parent: &[&str],
+    name: &str,
+    key: &str,
+    value: &str,
+) -> Result<Change, SetError> {
+    let doc = parse(text).map_err(SetError::Syntax)?;
+    check_section_name(name)?;
+    check_key(key)?;
+    let container = doc.container(parent)?;
+    match matching(container.entries, name).last() {
+        None => {}
+        Some(Entry::Pair(pair)) => {
+            return Err(SetError::NotASection {
+                key: pair.key.clone(),
+                start: pair.key_start,
+                end: pair.end,
+            })
+        }
+        Some(Entry::Section(_)) => {
+            return Err(SetError::SectionExists {
+                section: name.to_string(),
+            })
+        }
+    }
+    let written = format_value(value, false)?;
+    let (at, block) = section_insertion(text, &container, name, key, &written);
+    let mut new = String::with_capacity(text.len() + block.len());
+    new.push_str(&text[..at]);
+    new.push_str(&block);
+    new.push_str(&text[at..]);
+    post_check_section(&doc, &new, parent, name, key, &written)?;
+    Ok(Change {
+        text: new,
+        changed: true,
+        start: at,
+        end: at,
+    })
+}
+
+/// A section name the engine would read back as the same name.
+fn check_section_name(name: &str) -> Result<(), SetError> {
+    check_key(name)?;
+    if name.contains(']') {
+        return Err(SetError::InvalidValue(format!(
+            "{name:?} cannot be a section name in this file."
+        )));
+    }
+    Ok(())
+}
+
+/// Where a new `[name] { key=value; }` subsection goes in `container`, and
+/// the text to put there, styled after the last subsection already in it.
+fn section_insertion(
+    text: &str,
+    container: &Container,
+    name: &str,
+    key: &str,
+    value: &str,
+) -> (usize, String) {
+    let eol = eol(text);
+    let sibling = container.entries.iter().rev().find_map(|e| match e {
+        Entry::Section(s) => Some(s),
+        Entry::Pair(_) => None,
+    });
+    let block = match sibling {
+        Some(sibling) => {
+            let name_indent = indent_of(text, sibling.start);
+            let name_end = sibling.start + 1 + sibling.name.len() + 1;
+            let between = &text[name_end..sibling.open];
+            let inner_indent = sibling
+                .entries
+                .first()
+                .map(|e| indent_of(text, e.start()).to_string())
+                .unwrap_or_else(|| format!("{name_indent}\t"));
+            let close_indent = indent_of(text, sibling.close);
+            format!(
+                "{name_indent}[{name}]{between}{{{eol}{inner_indent}{key}={value};{eol}{close_indent}}}{eol}"
+            )
+        }
+        None => {
+            let base = container
+                .open
+                .map(|open| indent_of(text, open))
+                .unwrap_or_default();
+            format!(
+                "{base}\t[{name}]{eol}{base}\t{{{eol}{base}\t\t{key}={value};{eol}{base}\t}}{eol}"
+            )
+        }
+    };
+    let at = match container.entries.last() {
+        Some(last) => {
+            let end = match last {
+                Entry::Pair(pair) => pair.end,
+                Entry::Section(section) => section.close + 1,
+            };
+            match text[end..].find('\n').map(|at| end + at) {
+                Some(nl) => nl + 1,
+                None => text.len(),
+            }
+        }
+        None => match (container.open, container.close) {
+            (Some(open), Some(close)) => match text[open..close].find('\n') {
+                Some(at) => open + at + 1,
+                None => open + 1,
+            },
+            _ => text.len(),
+        },
+    };
+    (at, block)
+}
+
+/// Confirm `new` reads as `doc` with a new `name` subsection under `parent`
+/// holding exactly `key`, and nothing else different.
+fn post_check_section(
+    doc: &Document,
+    new: &str,
+    parent: &[&str],
+    name: &str,
+    key: &str,
+    value: &str,
+) -> Result<(), SetError> {
+    let after = parse(new)
+        .map_err(|e| SetError::PostCheck(format!("The changed file would not parse: {e}")))?
+        .tree();
+    let mut expected = doc.tree();
+    let mut at = &mut expected;
+    for section in parent {
+        match at.get_mut(&section.to_ascii_lowercase()) {
+            Some(Node::Table(table)) => at = table,
+            _ => {
+                return Err(SetError::PostCheck(format!(
+                    "[{section}] did not read as a section."
+                )))
+            }
+        }
+    }
+    let mut inner = BTreeMap::new();
+    inner.insert(key.to_ascii_lowercase(), Node::Value(value.to_string()));
+    at.insert(name.to_ascii_lowercase(), Node::Table(inner));
+    let mut differ = Vec::new();
+    differing(&expected, &after, &mut Vec::new(), &mut differ);
+    if differ.is_empty() {
+        return Ok(());
+    }
+    let shown: Vec<&str> = differ.iter().take(5).map(String::as_str).collect();
+    Err(SetError::PostCheck(format!(
+        "The changed file would read differently from the change asked for at {}, so it was not made.",
+        shown.join(", ")
+    )))
 }
 
 /// Confirm `new` reads as `doc` with `path` set to `value` and nothing else

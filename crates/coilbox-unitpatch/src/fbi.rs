@@ -511,6 +511,13 @@ fn explosion(doc: &Document, source: &str, path: &[Segment], op: &Op) -> Result<
 /// `unit` already in the section, under any `canbuildN`, is left alone: the
 /// menu already has it, so nothing is added.
 ///
+/// A `builder` with no section here yet gets one added under `[CANBUILD]`
+/// with a single `canbuild1` key (issue #3048), styled after whichever
+/// builder's section in the file comes last. `parse_fbi.lua` reads every
+/// `[CANBUILD]` subsection through Lua's `pairs`, so a new one is read
+/// wherever in the file it lands, and by whatever name the `[section]`
+/// itself is given, matched without regard to case like any other name here.
+///
 /// The caller is responsible for knowing this file is what the engine reads
 /// for `builder`'s menu at all. A game that works its build menus out in Lua,
 /// such as THIS's `gamedata/buildoptions.lua`, ignores this file, and a copy
@@ -525,8 +532,18 @@ pub fn add_to_build_menu(source: &str, builder: &str, unit: &str) -> Result<Patc
         },
         _ => None,
     };
+    let Some(section) = section else {
+        let change = coilbox_tdf::add_section(source, &["CANBUILD"], builder, "canbuild1", unit)
+            .map_err(|e| menu_refusal(e, builder))?;
+        return Ok(Patched {
+            text: change.text,
+            changed: change.changed,
+            location: Location::of(source, change.start, change.end),
+            file: None,
+        });
+    };
     let count = (1..)
-        .take_while(|n| section.is_some_and(|s| s.contains_key(&format!("canbuild{n}"))))
+        .take_while(|n| section.contains_key(&format!("canbuild{n}")))
         .count();
     for n in 1..=count {
         let key = format!("canbuild{n}");
@@ -592,6 +609,10 @@ fn menu_refusal(e: SetError, builder: &str) -> Refusal {
             RefusalKind::NotATable,
             format!("{section} is a section in this file, so it cannot hold a single value."),
         ),
+        SetError::SectionExists { section } => Refusal::new(
+            RefusalKind::FieldAmbiguous,
+            format!("This file already has a [{section}] section here."),
+        ),
         SetError::InvalidValue(message) => Refusal::new(RefusalKind::InvalidValue, message),
         SetError::PostCheck(message) => Refusal::new(RefusalKind::PostCheckFailed, message),
     }
@@ -627,6 +648,10 @@ fn refusal(e: SetError, source: &str, path: &[Segment]) -> Refusal {
             format!("{section} is a section in this file, so it cannot hold a single value."),
         )
         .at(at(start, start)),
+        SetError::SectionExists { section } => Refusal::new(
+            RefusalKind::FieldAmbiguous,
+            format!("This file already has a [{section}] section here."),
+        ),
         SetError::InvalidValue(message) => Refusal::new(RefusalKind::InvalidValue, message),
         SetError::PostCheck(message) => Refusal::new(RefusalKind::PostCheckFailed, message),
     }
@@ -729,12 +754,21 @@ mod tests {
         assert_eq!(patched.text, SIDEDATA);
     }
 
+    /// A builder with no build list yet gets a new section added under
+    /// `[CANBUILD]` with a single `canbuild1` key (issue #3048).
     #[test]
-    fn a_builder_with_no_section_is_refused() {
-        let refusal = add_to_build_menu(SIDEDATA, "arm_vehicle_plant", "armdfly2").unwrap_err();
+    fn a_builder_with_no_section_gets_one_added() {
+        let patched = add_to_build_menu(SIDEDATA, "arm_vehicle_plant", "armdfly2").unwrap();
 
-        assert_eq!(refusal.kind, RefusalKind::ParentMissing);
-        assert!(refusal.message.contains("arm_vehicle_plant"));
+        assert!(patched.changed);
+        assert_eq!(
+            patched.text,
+            SIDEDATA.replacen(
+                "\t}\n}\n",
+                "\t}\n\t[arm_vehicle_plant]\n\t{\n\t\tcanbuild1=armdfly2;\n\t}\n}\n",
+                1
+            )
+        );
     }
 
     #[test]

@@ -213,3 +213,104 @@ fn latin1_text_goes_back_as_the_same_bytes() {
     );
     assert_eq!(Encoding::Latin1.encode("\u{263a}"), None);
 }
+
+/// XTA's own `[CANBUILD]` style (issue #3048): CRLF, the parent's brace on
+/// its own line at no indent, each subsection's brace one tab in from its
+/// name.
+const XTA_CANBUILD: &str = "[CANBUILD]\r\n{\r\n\t[arm_adv_aircraft_plant]\r\n\t{\r\n\t\tcanbuild1=arm_adv_construction_aircraft;\r\n\t\tcanbuild2=arm_peeper;//xtaids\r\n\t}\r\n}\r\n";
+
+/// Basically OTA's style for the same section: the parent's own brace and
+/// every subsection are indented a tab deeper than XTA's.
+const OTA_CANBUILD: &str = "[CANBUILD]\r\n\t{\r\n\t[ARM_Commander]\r\n\t\t{\r\n\t\tcanbuild1=ARM_T1_ECO_SolarCollector;\r\n\t\t}\r\n\t}\r\n";
+
+#[test]
+fn a_new_subsection_copies_a_siblings_indentation_and_brace_placement() {
+    let change = add_section(
+        XTA_CANBUILD,
+        &["CANBUILD"],
+        "arm_vehicle_plant",
+        "canbuild1",
+        "armdfly2",
+    )
+    .unwrap();
+
+    assert!(change.changed);
+    assert_eq!(
+        change.text,
+        XTA_CANBUILD.replacen(
+            "\t}\r\n}\r\n",
+            "\t}\r\n\t[arm_vehicle_plant]\r\n\t{\r\n\t\tcanbuild1=armdfly2;\r\n\t}\r\n}\r\n",
+            1
+        )
+    );
+}
+
+#[test]
+fn a_new_subsection_matches_a_more_deeply_indented_sibling() {
+    let change = add_section(
+        OTA_CANBUILD,
+        &["CANBUILD"],
+        "ARM_T1_LAB_KbotLab",
+        "canbuild1",
+        "ARM_T1_BOT_Flea",
+    )
+    .unwrap();
+
+    assert!(change.changed);
+    assert_eq!(
+        change.text,
+        OTA_CANBUILD.replacen(
+            "\t\t}\r\n\t}\r\n",
+            "\t\t}\r\n\t[ARM_T1_LAB_KbotLab]\r\n\t\t{\r\n\t\tcanbuild1=ARM_T1_BOT_Flea;\r\n\t\t}\r\n\t}\r\n",
+            1
+        )
+    );
+}
+
+#[test]
+fn a_new_subsection_in_an_empty_parent_gets_a_default_style() {
+    let change = add_section(
+        "[CANBUILD]\n{\n}\n",
+        &["CANBUILD"],
+        "armlab",
+        "canbuild1",
+        "armcv",
+    )
+    .unwrap();
+
+    assert!(change.changed);
+    assert_eq!(
+        change.text,
+        "[CANBUILD]\n{\n\t[armlab]\n\t{\n\t\tcanbuild1=armcv;\n\t}\n}\n"
+    );
+}
+
+#[test]
+fn a_subsection_already_there_is_refused() {
+    let refusal = add_section(
+        XTA_CANBUILD,
+        &["CANBUILD"],
+        "arm_adv_aircraft_plant",
+        "canbuild3",
+        "x",
+    )
+    .unwrap_err();
+
+    assert!(matches!(refusal, SetError::SectionExists { .. }));
+}
+
+#[test]
+fn a_name_that_is_already_a_key_is_refused() {
+    let text = "[UNITINFO] { name=1; }";
+    let refusal = add_section(text, &["UNITINFO"], "name", "k", "v").unwrap_err();
+
+    assert!(matches!(refusal, SetError::NotASection { .. }));
+}
+
+#[test]
+fn a_new_subsection_is_refused_when_its_parent_does_not_exist() {
+    let refusal =
+        add_section("[SIDE0] { }", &["CANBUILD"], "armlab", "canbuild1", "armcv").unwrap_err();
+
+    assert!(matches!(refusal, SetError::SectionMissing { .. }));
+}
