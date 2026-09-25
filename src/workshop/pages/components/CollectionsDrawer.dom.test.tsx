@@ -7,6 +7,7 @@
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
+import type { UnitClones } from "../../clones";
 import {
   type Collections,
   createCollection,
@@ -16,6 +17,7 @@ import {
   setCollectionParent,
   setCollectionRule,
 } from "../../collections";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 import { CollectionsDrawer } from "./CollectionsDrawer";
 
 const UNITS = {
@@ -27,7 +29,17 @@ const UNITS = {
 function draw(
   collections: Collections = {},
   units: Record<string, Record<string, unknown>> = UNITS,
+  weapons: {
+    weaponDefs?: Record<string, Record<string, unknown>>;
+    library?: WeaponLibrary;
+    equipped?: EquippedWeapons;
+    clones?: UnitClones;
+  } = {},
 ) {
+  const weaponDefs = weapons.weaponDefs ?? {};
+  const library = weapons.library ?? {};
+  const equipped = weapons.equipped ?? {};
+  const clones = weapons.clones ?? {};
   let current = collections;
   const onCreate = (name: string, parentId: string | undefined) => {
     current = createCollection(current, name, parentId).collections;
@@ -62,6 +74,10 @@ function draw(
       units={units}
       overrides={{}}
       nameOf={(key) => `Unit ${key}`}
+      weaponDefs={weaponDefs}
+      library={library}
+      equipped={equipped}
+      clones={clones}
       onCreate={onCreate}
       onRename={onRename}
       onDelete={onDelete}
@@ -79,6 +95,10 @@ function draw(
         units={units}
         overrides={{}}
         nameOf={(key) => `Unit ${key}`}
+        weaponDefs={weaponDefs}
+        library={library}
+        equipped={equipped}
+        clones={clones}
         onCreate={onCreate}
         onRename={onRename}
         onDelete={onDelete}
@@ -181,6 +201,26 @@ describe("rule-based membership (issue #2656)", () => {
       target: { value: "cost >" },
     });
     expect(screen.getByText(/needs a value/)).toBeTruthy();
+  });
+
+  it("counts a unit a dps rule matches (issue #3085)", () => {
+    const tank = {
+      metalCost: 200,
+      weapons: [{ name: "armtank_laser" }],
+      weapondefs: {
+        laser: { range: 300, reloadTime: 2, damage: { default: 50 } },
+      },
+    };
+    const { collections } = createCollection({}, "Hard hitters");
+    draw(collections, { armtank: tank });
+    fireEvent.click(screen.getByRole("button", { name: /^hard hitters/i }));
+    fireEvent.change(screen.getByPlaceholderText("e.g. cost < 200"), {
+      target: { value: "dps > 20" },
+    });
+    expect(
+      screen.getByRole("heading", { name: /units in hard hitters/i })
+        .textContent,
+    ).toContain("1");
   });
 });
 

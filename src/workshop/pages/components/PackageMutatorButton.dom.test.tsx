@@ -76,15 +76,20 @@ function compiled(files: { path: string; contents: string }[]) {
 function draw(
   onPackaged = vi.fn(),
   routeOptions?: { key: string; name: string }[],
+  units: Record<string, Record<string, unknown>> = {},
 ) {
   render(
     <PackageMutatorButton
       // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject
       project={project as any}
-      units={{}}
+      units={units}
       onPackaged={onPackaged}
       // biome-ignore lint/suspicious/noExplicitAny: a trimmed ConfigOption fixture
       routeOptions={routeOptions as any}
+      weaponDefs={{}}
+      library={{}}
+      equipped={{}}
+      clones={{}}
     />,
   );
   return onPackaged;
@@ -216,6 +221,10 @@ describe("PackageMutatorButton", () => {
           project={withCollections as any}
           units={{}}
           onPackaged={vi.fn()}
+          weaponDefs={{}}
+          library={{}}
+          equipped={{}}
+          clones={{}}
         />,
       );
       fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
@@ -233,6 +242,64 @@ describe("PackageMutatorButton", () => {
             project: expect.objectContaining({
               edits: expect.objectContaining({
                 overrides: { armcom: { maxDamage: 5000 } },
+              }),
+            }),
+          }),
+        ),
+      );
+    });
+  });
+
+  describe("a rule naming a derived field (issue #3085)", () => {
+    it("restricts the export to a unit a dps rule matches", async () => {
+      const tank = {
+        metalCost: 200,
+        weapons: [{ name: "armtank_laser" }],
+        weapondefs: {
+          laser: { range: 300, reloadTime: 2, damage: { default: 50 } },
+        },
+      };
+      const withRuleCollection = {
+        ...project,
+        edits: {
+          ...project.edits,
+          overrides: {
+            armtank: { buildTime: 900 },
+            armcom: { buildTime: 100 },
+          },
+          collections: {
+            hard: { id: "hard", name: "Hard", units: [], rule: "dps > 20" },
+          },
+        },
+      };
+      mockCompiled = compiled([{ path: "units/armtank.lua", contents: "" }]);
+      render(
+        <PackageMutatorButton
+          // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture
+          project={withRuleCollection as any}
+          units={{ armtank: tank, armcom: { metalCost: 500 } }}
+          onPackaged={vi.fn()}
+          weaponDefs={{}}
+          library={{}}
+          equipped={{}}
+          clones={{}}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
+      fireEvent.click(
+        screen.getByRole("combobox", {
+          name: /restrict this export to a collection/i,
+        }),
+      );
+      fireEvent.click(screen.getByRole("option", { name: "Hard" }));
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackageMutator).toHaveBeenCalledWith(
+          expect.objectContaining({
+            project: expect.objectContaining({
+              edits: expect.objectContaining({
+                overrides: { armtank: { buildTime: 900 } },
               }),
             }),
           }),

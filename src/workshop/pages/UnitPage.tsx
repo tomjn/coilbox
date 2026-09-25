@@ -2075,6 +2075,10 @@ export default function UnitPage() {
                   recordPackagedVersion(project.id, version)
                 }
                 routeOptions={gameInfo?.options}
+                weaponDefs={weaponDefs}
+                library={library}
+                equipped={equipped}
+                clones={clones}
               />
             )}
           </>
@@ -2148,6 +2152,10 @@ export default function UnitPage() {
           units={units}
           overrides={overrides}
           nameOf={nameOf}
+          weaponDefs={weaponDefs}
+          library={library}
+          equipped={equipped}
+          clones={clones}
           onCreate={(name, parentId) =>
             updateCollections(
               (c) =>
@@ -2213,6 +2221,10 @@ export default function UnitPage() {
           overrides={overrides}
           nameOf={nameOf}
           beforePost={defs.beforePost}
+          weaponDefs={weaponDefs}
+          library={library}
+          equipped={equipped}
+          clones={clones}
           onApply={(rows) =>
             updateOverrides((o) => applyBatchRows(o, rows, units))
           }

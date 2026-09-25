@@ -45,6 +45,7 @@ import {
   barSlotFit,
   workshopPackBarSlots,
 } from "../../barPack";
+import type { UnitClones } from "../../clones";
 import {
   collectionTree,
   collectionUnits,
@@ -54,6 +55,7 @@ import { useCompiledProject } from "../../compile";
 import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 type Phase =
   | { state: "idle" }
@@ -243,6 +245,10 @@ export function PackageMutatorButton({
   units,
   onPackaged,
   routeOptions,
+  weaponDefs,
+  library,
+  equipped,
+  clones,
 }: {
   project: ModProject;
   /** The game's units with the project's own already in among them, the same
@@ -257,6 +263,13 @@ export function PackageMutatorButton({
    *  while unread, in which case the BAR mode is offered but cannot yet warn
    *  about a shortfall. */
   routeOptions?: ConfigOption[];
+  /** The game's own weapon table, the project's weapon library and what is
+   *  equipped where (issue #3085), so the export restriction's rule can match
+   *  a `derivedStats.ts` number the same way `UnitPage`'s own filter does. */
+  weaponDefs: Record<string, Record<string, unknown>>;
+  library: WeaponLibrary;
+  equipped: EquippedWeapons;
+  clones: UnitClones;
 }) {
   const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -275,6 +288,7 @@ export function PackageMutatorButton({
       ? collectionUnits(collections, restrictTo, {
           units,
           overrides: project.edits.overrides,
+          weapons: { weaponDefs, library, equipped, clones },
         })
       : undefined;
   const scopedProject = useMemo(

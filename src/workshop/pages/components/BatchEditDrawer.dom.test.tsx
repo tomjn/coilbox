@@ -8,7 +8,11 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BatchRow } from "../../batchEdit";
-import { createCollection, setCollectionMembership } from "../../collections";
+import {
+  createCollection,
+  setCollectionMembership,
+  setCollectionRule,
+} from "../../collections";
 
 vi.mock("@/components/OptionSelect", () => ({
   OptionSelect: ({
@@ -69,6 +73,10 @@ describe("picking a field and an operation", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     fireEvent.change(screen.getByLabelText("Collection"), {
@@ -103,6 +111,10 @@ describe("picking a field and an operation", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     fireEvent.change(screen.getByLabelText("Collection"), {
@@ -133,6 +145,10 @@ describe("picking a field and an operation", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     fireEvent.change(screen.getByLabelText("Collection"), {
@@ -155,6 +171,10 @@ describe("picking a field and an operation", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     fireEvent.change(screen.getByLabelText("Collection"), {
@@ -193,6 +213,10 @@ describe("picking a field and an operation", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     expect(
@@ -239,6 +263,10 @@ describe("applying", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={onApply}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     fireEvent.change(screen.getByLabelText("Collection"), {
@@ -262,6 +290,49 @@ describe("applying", () => {
   });
 });
 
+describe("a rule naming a derived field (issue #3085)", () => {
+  it("reaches a unit a dps rule matches", () => {
+    const tank = {
+      metalCost: 200,
+      weapons: [{ name: "armtank_laser" }],
+      weapondefs: {
+        laser: { range: 300, reloadTime: 2, damage: { default: 50 } },
+      },
+    };
+    let collections = createCollection({}, "Hard hitters").collections;
+    const id = Object.keys(collections)[0];
+    collections = setCollectionRule(collections, id, "dps > 20");
+    render(
+      <BatchEditDrawer
+        open
+        onOpenChange={() => {}}
+        collections={collections}
+        units={{ armtank: tank }}
+        overrides={{}}
+        nameOf={(key) => key}
+        onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText("Collection"), {
+      target: { value: id },
+    });
+    fireEvent.change(screen.getByPlaceholderText("e.g. cost"), {
+      target: { value: "cost" },
+    });
+    fireEvent.change(screen.getByPlaceholderText("0.9"), {
+      target: { value: "0.5" },
+    });
+
+    expect(
+      screen.getByRole("heading", { name: /preview/i }).textContent,
+    ).toContain("1 of 1 unit change");
+  });
+});
+
 describe("no collections yet", () => {
   it("points at the Collections button instead of showing the form", () => {
     render(
@@ -273,6 +344,10 @@ describe("no collections yet", () => {
         overrides={{}}
         nameOf={(key) => key}
         onApply={() => {}}
+        weaponDefs={{}}
+        library={{}}
+        equipped={{}}
+        clones={{}}
       />,
     );
     expect(screen.getByText(/no collections yet/i)).toBeTruthy();
