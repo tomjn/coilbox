@@ -79,7 +79,9 @@ mod preflight;
 pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
-pub use inplace::{write as write_in_place, WriteOutcome as InPlaceWriteOutcome};
+pub use inplace::{
+    dry_run as inplace_dry_run, write as write_in_place, WriteOutcome as InPlaceWriteOutcome,
+};
 pub use ledger::{build_ledger, BarSlotMiss, BarSlotRef, ChangeLedger, LedgerChange, UnitLedger};
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
@@ -352,6 +354,73 @@ async fn workshop_settle_typed_values(
     .await
 }
 
+/// [`workshop_settle_typed_values`], for edit in place rather than the
+/// mutator route (issue #3093): loads `archive` at `gameDir` with the game's
+/// own files patched the way `workshop_write_in_place` would leave them
+/// (`inplace::dry_run`), for exactly the fields that route carries, a clone's
+/// and a field sent to the mutator route on purpose left out. `sources` is
+/// the same read of game units the write itself takes.
+#[tauri::command]
+async fn workshop_settle_typed_values_in_place(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    game_dir: String,
+    project: ModProject,
+    sources: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+) -> CliResult {
+    let game = std::path::PathBuf::from(game_dir);
+    let sources = sources.unwrap_or_default();
+    blocking("settle in place", move || {
+        let start = std::time::Instant::now();
+        let mut load = |runs: &[loads_as::ProbeRun]| {
+            let input = serde_json::to_string(&serde_json::json!({ "runs": runs }))
+                .map_err(|e| format!("could not write the probe: {e}"))?;
+            let out = tauri_plugin_coilbox_unitsync::defs_probe_blocking(
+                &engine_path,
+                &data_dir,
+                &archive,
+                &input,
+            )?;
+            let out: ProbeOutput = serde_json::from_str(&out)
+                .map_err(|e| format!("could not read the probe's answer: {e}"))?;
+            if out.runs.len() != runs.len() {
+                return Err(if out.errors.is_empty() {
+                    "the game could not be loaded".to_string()
+                } else {
+                    out.errors.join("; ")
+                });
+            }
+            Ok(out.runs)
+        };
+        let mut compile = |p: &ModProject, w: &loads_as::Written| {
+            let patched = if w.is_empty() {
+                p.clone()
+            } else {
+                loads_as::with_written(p, w)
+            };
+            inplace::dry_run(&game, &patched, &sources)
+        };
+        let carries_field = |unit: &str, field: &str| {
+            !project.edits.clones.contains_key(unit) && !project.is_mutator_only(unit, field)
+        };
+        let carries_equip = |unit: &str| !project.edits.clones.contains_key(unit);
+        let settled = loads_as::settle_scoped(
+            &project,
+            loads_as::Precision::F32,
+            &carries_field,
+            &carries_equip,
+            &mut compile,
+            &mut load,
+        )?;
+        Ok(SettledResult {
+            settled,
+            elapsed_ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+        })
+    })
+    .await
+}
+
 /// Run a blocking in-place operation off the async runtime and wrap its
 /// answer. The patcher evaluates each unit file twice, so a project with many
 /// changes is too slow to run on the thread that answers the window.
@@ -373,14 +442,24 @@ where
 /// from, and of each unit with a field change through a list position
 /// (issue #3041). Answers with what was written, or with every refusal and
 /// nothing written.
+///
+/// `written` is what `workshop_settle_typed_values_in_place` worked out for
+/// this project (issue #3093): values the game's own files turn into the
+/// typed ones on this route, each proven by loading the game with exactly
+/// these files.
 #[tauri::command]
 async fn workshop_write_in_place(
     game_dir: String,
     project: ModProject,
     sources: Option<std::collections::BTreeMap<String, serde_json::Value>>,
+    written: Option<loads_as::Written>,
 ) -> CliResult {
     let game = std::path::PathBuf::from(game_dir);
     let sources = sources.unwrap_or_default();
+    let project = match written {
+        Some(w) if !w.is_empty() => loads_as::with_written(&project, &w),
+        _ => project,
+    };
     blocking("write", move || inplace::write(&game, &project, &sources)).await
 }
 
@@ -479,7 +558,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_check_in_place,
             workshop_check_clone_in_place,
             workshop_in_place_diffs,
-            workshop_settle_typed_values
+            workshop_settle_typed_values,
+            workshop_settle_typed_values_in_place
         ])
         .build()
 }
@@ -624,7 +704,7 @@ mod tests {
         .expect("parse");
 
         let written = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(
-            workshop_write_in_place(dir(), project, None),
+            workshop_write_in_place(dir(), project, None, None),
         ));
         assert_eq!(written["written"], serde_json::json!(["units/armcom.lua"]));
         let status = unwrap_as_the_frontend_does(tauri::async_runtime::block_on(

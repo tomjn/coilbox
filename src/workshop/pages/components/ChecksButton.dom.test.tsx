@@ -50,6 +50,16 @@ vi.mock("@picoframe/plugin-sdk", () => ({
     },
 }));
 
+// `InPlaceWrite` checks typed values against the game before a write (issue
+// #3093), through these two hooks. This suite does not cover that: it is
+// about the drawer's own routing between checks, test, package and write.
+vi.mock("@/content/config", () => ({
+  useUnitsyncScan: () => ({ data: undefined, loading: false, error: null }),
+}));
+vi.mock("@/play/config", () => ({
+  usePreferredTarget: () => ({ target: undefined, loading: false }),
+}));
+
 import type { CompatFinding, CompatState } from "../../compatibility";
 import type { ModProject } from "../../project";
 import { ChecksButton } from "./ChecksButton";

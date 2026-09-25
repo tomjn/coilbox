@@ -64,6 +64,26 @@ export const workshopSettleTypedValues = defineCommand<
   SettledTypedValues
 >("coilbox-workshop", "workshop_settle_typed_values");
 
+/**
+ * [`workshopSettleTypedValues`], for edit in place rather than the mutator
+ * route (issue #3093): loads `archive` at `gameDir` with the game's own files
+ * patched the way `workshopWriteInPlace` would leave them, for exactly the
+ * fields that route carries. `sources` is the same read of game units the
+ * write itself takes.
+ */
+export const workshopSettleTypedValuesInPlace = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    /** The game's primary archive, as unitsync names it. */
+    archive: string;
+    gameDir: string;
+    project: ModProject;
+    sources: Record<string, Record<string, unknown>>;
+  },
+  SettledTypedValues
+>("coilbox-workshop", "workshop_settle_typed_values_in_place");
+
 /** Where a typed number is, for a person. */
 export function fieldLabel(report: TypedValueReport): string {
   return report.field.kind === "unit"
@@ -105,6 +125,22 @@ export async function settleTypedValues(
 > {
   try {
     return { ok: true, settled: await workshopSettleTypedValues(args) };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/** [`settleTypedValues`], for edit in place (issue #3093). */
+export async function settleTypedValuesInPlace(
+  args: Parameters<typeof workshopSettleTypedValuesInPlace>[0],
+): Promise<
+  { ok: true; settled: SettledTypedValues } | { ok: false; message: string }
+> {
+  try {
+    return { ok: true, settled: await workshopSettleTypedValuesInPlace(args) };
   } catch (e) {
     return {
       ok: false,

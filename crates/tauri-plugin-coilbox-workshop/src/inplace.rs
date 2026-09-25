@@ -847,11 +847,28 @@ fn unit_encodings(files: &[PathBuf]) -> BTreeMap<PathBuf, Encoding> {
 /// each unit with a field change through a list position, which [`segments`]
 /// reads that position against. See `inplace_clone.rs` for why the unit's
 /// file cannot stand in for it.
-pub fn write(
+/// Everything [`write`] works out before touching disk: the outcome so far,
+/// and every file it would write, with its final text. Shared with
+/// [`dry_run`], which needs the same patched text without writing it, to
+/// prove a value the game's own files turn into a typed one on this route
+/// (issue #3093).
+struct Prepared {
+    outcome: WriteOutcome,
+    /// Every file to write, in the order [`WriteOutcome::written`] lists
+    /// them: its final text, and the encoding to write it in when it is not
+    /// UTF-8.
+    writes: Vec<(PathBuf, String, Option<Encoding>)>,
+    /// Which file each accepted field change landed in, for [`write`] to turn
+    /// into [`WriteOutcome::carried`] once it knows which files it actually
+    /// wrote.
+    held: Vec<(String, String, PathBuf)>,
+}
+
+fn prepare(
     game_dir: &Path,
     project: &ModProject,
     sources: &BTreeMap<String, Value>,
-) -> Result<WriteOutcome, String> {
+) -> Result<Prepared, String> {
     require_loose_game(game_dir)?;
     let mut outcome = WriteOutcome {
         not_carried: not_carried(project),
@@ -994,36 +1011,81 @@ pub fn write(
         &mut outcome,
     );
 
-    // Every file to write, as the bytes to write, in the order the outcome
-    // lists them. A file read one character per byte goes back the same way,
-    // and a change that brings in a character it has no byte for is refused
-    // before anything is written.
+    // `held`'s files carry a change once `write` has written them, whether
+    // undo reaches it depends on the backup or created marker `write` leaves
+    // beside the file, so that answer waits for `write` itself rather than
+    // being worked out here (issue #3093): a probe load never writes either.
+    let held: Vec<(String, String, PathBuf)> = held
+        .into_iter()
+        .map(|(unit, field, file)| (unit.to_string(), field.to_string(), file))
+        .collect();
+
+    // Every file to write, with its final text, in the order the outcome
+    // lists them. `write` turns this into bytes, refusing a file whose change
+    // brings in a character its own encoding has no byte for. `dry_run` reads
+    // the text straight, since a probe load never touches disk.
     let encodings = unit_encodings(&files);
     let changed = texts
         .iter()
         .filter(|(file, text)| originals.get(*file) != Some(*text))
-        .map(|(file, text)| (file, text, encodings.get(file).copied()));
+        .map(|(file, text)| (file.clone(), text.clone(), encodings.get(file).copied()));
     // A weapon file already holding the same text needs no write.
     weapon_files.retain(|file, text| std::fs::read_to_string(file).ok().as_deref() != Some(text));
-    let others = included
-        .iter()
-        .chain(weapon_files.iter())
-        .map(|(file, text)| (file, text, None))
+    let writes = changed
+        .chain(
+            included
+                .iter()
+                .chain(weapon_files.iter())
+                .map(|(file, text)| (file.clone(), text.clone(), encodings.get(file).copied())),
+        )
         .chain(
             created
-                .iter()
-                .map(|(file, text, encoding)| (file, text, Some(*encoding))),
+                .into_iter()
+                .map(|(file, text, encoding)| (file, text, Some(encoding))),
         )
         .chain(
             gamedata
-                .iter()
-                .map(|(file, (text, encoding))| (file, text, Some(*encoding))),
-        );
-    let mut writes = Vec::new();
-    for (file, text, encoding) in changed.chain(others) {
+                .into_iter()
+                .map(|(file, (text, encoding))| (file, text, Some(encoding))),
+        )
+        .collect();
+
+    Ok(Prepared {
+        outcome,
+        writes,
+        held,
+    })
+}
+
+/// Patch every field change in `project` into the game's unit files under
+/// `game_dir`, add each copy as a unit file of its own, and write them if the
+/// patcher accepted every one.
+///
+/// `sources` is the game's own read of units, keyed by unit: each unit a copy
+/// was made from, which is what a copy's changes are worked out against, and
+/// each unit with a field change through a list position, which [`segments`]
+/// reads that position against. See `inplace_clone.rs` for why the unit's
+/// file cannot stand in for it.
+pub fn write(
+    game_dir: &Path,
+    project: &ModProject,
+    sources: &BTreeMap<String, Value>,
+) -> Result<WriteOutcome, String> {
+    let Prepared {
+        mut outcome,
+        writes,
+        held,
+    } = prepare(game_dir, project, sources)?;
+    let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
+
+    // A change that brings in a character its file's own encoding has no byte
+    // for is refused here rather than in `prepare`, since only a real write
+    // needs the bytes at all.
+    let mut encoded = Vec::new();
+    for (file, text, encoding) in &writes {
         let encoding = encoding.unwrap_or(Encoding::Utf8);
         match encoding.encode(text) {
-            Some(bytes) => writes.push((file.clone(), bytes)),
+            Some(bytes) => encoded.push((file, bytes)),
             None => outcome.refused.push(Refused {
                 unit: file
                     .file_stem()
@@ -1043,10 +1105,11 @@ pub fn write(
         outcome.unchanged = 0;
         outcome.copies.clear();
         outcome.equipped.clear();
+        outcome.carried.clear();
         return Ok(outcome);
     }
 
-    for (file, bytes) in &writes {
+    for (file, bytes) in &encoded {
         // A game with no `weapons` folder gets one for its first weapon file.
         if let Some(parent) = file.parent() {
             std::fs::create_dir_all(parent)
@@ -1058,10 +1121,10 @@ pub fn write(
     outcome.carried = held
         .into_iter()
         .map(|(unit, field, file)| Carried {
-            unit: unit.to_string(),
-            field: field.to_string(),
             undoable: coilbox_gamebackup::with_suffix(&file, MARKERS.backup).exists()
                 || coilbox_gamebackup::with_suffix(&file, MARKERS.created).exists(),
+            unit,
+            field,
         })
         .collect();
     // The unitsync worker and the engine's own archive cache both key a loose
@@ -1071,6 +1134,42 @@ pub fn write(
         coilbox_gamebackup::touch(game_dir);
     }
     Ok(outcome)
+}
+
+/// The text every file `write` would write into `game_dir` carries once every
+/// field change in `project` has gone in, without writing anything (issue
+/// #3093). This is what a value that the game's own files turn into a typed
+/// one is proven against on this route: the probe overlays exactly these
+/// files on the game the way [`write`] would leave it, and reads the typed
+/// fields back.
+///
+/// A refusal is a fact about the whole write, not about one field, so this
+/// fails the same way [`write`] refuses the whole batch, with every reason
+/// joined into one message.
+pub fn dry_run(
+    game_dir: &Path,
+    project: &ModProject,
+    sources: &BTreeMap<String, Value>,
+) -> Result<Vec<crate::loads_as::ProbeFile>, String> {
+    let prepared = prepare(game_dir, project, sources)?;
+    if !prepared.outcome.refused.is_empty() {
+        let reasons: Vec<String> = prepared
+            .outcome
+            .refused
+            .iter()
+            .map(|r| format!("{} {}: {}", r.unit, r.field, r.message))
+            .collect();
+        return Err(reasons.join("; "));
+    }
+    let rel = |path: &Path| key(path.strip_prefix(game_dir).unwrap_or(path));
+    Ok(prepared
+        .writes
+        .into_iter()
+        .map(|(file, text, _)| crate::loads_as::ProbeFile {
+            path: rel(&file),
+            contents: text,
+        })
+        .collect())
 }
 
 /// The edits that equip library weapon `key` at `step` on the game unit
@@ -1931,6 +2030,51 @@ mod tests {
             read(&game.join("units/factory.lua")),
             "return { factory = { buildoptions = { \"brv\" } } }\n"
         );
+        assert!(
+            !coilbox_gamebackup::with_suffix(&game.join("units/factory.lua"), MARKERS.backup)
+                .exists()
+        );
+    }
+
+    /// [`dry_run`] answers the same patched text a write would carry, and
+    /// touches nothing on disk (issue #3093).
+    #[test]
+    fn dry_run_answers_the_patched_text_without_writing_it() {
+        let (_root, game) = game();
+        let dfly = game.join("units/armdfly.lua");
+        let before = read(&dfly);
+
+        let files = dry_run(
+            &game,
+            &project(serde_json::json!({ "armdfly": { "metalcost": 400 } })),
+            &BTreeMap::new(),
+        )
+        .expect("dry run");
+
+        assert_eq!(read(&dfly), before, "nothing was written to disk");
+        assert!(!coilbox_gamebackup::with_suffix(&dfly, MARKERS.backup).exists());
+        let armdfly = files
+            .iter()
+            .find(|f| f.path == "units/armdfly.lua")
+            .expect("the patched file");
+        assert_eq!(
+            armdfly.contents,
+            before.replacen("metalcost = 320", "metalcost = 400", 1)
+        );
+    }
+
+    /// A change the patcher refuses stops [`dry_run`] the same way it stops
+    /// [`write`]: as one error, rather than a partial answer.
+    #[test]
+    fn dry_run_fails_the_same_way_a_refused_write_does() {
+        let (_root, game) = game();
+        let err = dry_run(
+            &game,
+            &project(serde_json::json!({ "armdfly": { "weapons": [] } })),
+            &BTreeMap::new(),
+        )
+        .expect_err("a refusal");
+        assert!(err.contains("armdfly"), "{err}");
         assert!(
             !coilbox_gamebackup::with_suffix(&game.join("units/factory.lua"), MARKERS.backup)
                 .exists()
