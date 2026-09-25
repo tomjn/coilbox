@@ -2,7 +2,9 @@
 //! instruction cap, and the Lua-side bootstrap (`__lowerkeys`, missing-global
 //! recording).
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use mlua::{HookTriggers, Lua, LuaOptions, StdLib, Value};
 
@@ -26,8 +28,9 @@ const EXEC_HATCHES: &[&str] = &[
     "setfenv",
 ];
 
-/// Build a fresh sandboxed VM rooted at `root`.
-pub fn sandbox(root: &Path) -> mlua::Result<Lua> {
+/// Build a fresh sandboxed VM rooted at `root`, reading `files` in place of
+/// the disk where it has them.
+pub fn sandbox(root: &Path, files: Arc<BTreeMap<PathBuf, String>>) -> mlua::Result<Lua> {
     // Only the pure-data stdlib. `os`/`io`/`package`/`debug` are never loaded,
     // so those globals simply don't exist.
     let lua = Lua::new_with(
@@ -51,7 +54,7 @@ pub fn sandbox(root: &Path) -> mlua::Result<Lua> {
         globals.set(*name, Value::Nil)?;
     }
 
-    vfs::install(&lua, root)?;
+    vfs::install(&lua, root, files)?;
     install_spring_stub(&lua)?;
     bootstrap(&lua)?;
     Ok(lua)

@@ -11,8 +11,10 @@
 //! This is the boundary that keeps untrusted (downloaded) map Lua inside the
 //! working folder.
 
+use std::collections::BTreeMap;
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use mlua::{Lua, Value, Variadic};
 
@@ -34,7 +36,12 @@ const MODES: &[(&str, &str)] = &[
 ];
 
 /// Install the `VFS` global into `lua`, rooted at `root`.
-pub fn install(lua: &Lua, root: &Path) -> mlua::Result<()> {
+///
+/// `files` holds text to read in place of what is on disk, keyed by the path
+/// [`resolve`] gives, so a caller can run Lua against an edit it has not
+/// written yet. `Include`, `LoadFile` and `FileExists` read it. `DirList` and
+/// `SubDirs` list the disk only.
+pub fn install(lua: &Lua, root: &Path, files: Arc<BTreeMap<PathBuf, String>>) -> mlua::Result<()> {
     let vfs = lua.create_table()?;
     for (k, v) in MODES {
         vfs.set(*k, *v)?;
@@ -42,12 +49,13 @@ pub fn install(lua: &Lua, root: &Path) -> mlua::Result<()> {
 
     // VFS.Include(name, env?, mode?) -> evaluate the file, return its result.
     let r = root.to_path_buf();
+    let f = files.clone();
     vfs.set(
         "Include",
         lua.create_function(move |lua, args: Variadic<Value>| {
             let name = arg_str(&args, 0, "VFS.Include")?;
             let p = resolve(&r, &name).ok_or_else(|| escape_err("VFS.Include", &name))?;
-            let src = std::fs::read_to_string(&p)
+            let src = read(&f, &p)
                 .map_err(|e| mlua::Error::RuntimeError(format!("VFS.Include: {name}: {e}")))?;
             // env (args[1]) is ignored; chunks run in the shared sandbox.
             lua.load(&src).set_name(&name).eval::<Value>()
@@ -56,11 +64,12 @@ pub fn install(lua: &Lua, root: &Path) -> mlua::Result<()> {
 
     // VFS.LoadFile(name, mode?) -> file contents as a string, or nil.
     let r = root.to_path_buf();
+    let f = files.clone();
     vfs.set(
         "LoadFile",
         lua.create_function(move |_, args: Variadic<Value>| {
             let name = arg_str(&args, 0, "VFS.LoadFile")?;
-            Ok(resolve(&r, &name).and_then(|p| std::fs::read_to_string(p).ok()))
+            Ok(resolve(&r, &name).and_then(|p| read(&f, &p).ok()))
         })?,
     )?;
 
@@ -70,7 +79,7 @@ pub fn install(lua: &Lua, root: &Path) -> mlua::Result<()> {
         "FileExists",
         lua.create_function(move |_, args: Variadic<Value>| {
             let name = arg_str(&args, 0, "VFS.FileExists")?;
-            Ok(resolve(&r, &name).map(|p| p.is_file()).unwrap_or(false))
+            Ok(resolve(&r, &name).is_some_and(|p| handed_in(&files, &p).is_some() || p.is_file()))
         })?,
     )?;
 
@@ -102,6 +111,28 @@ pub fn install(lua: &Lua, root: &Path) -> mlua::Result<()> {
 
     lua.globals().set("VFS", vfs)?;
     Ok(())
+}
+
+/// The text the caller handed in for `path`. A file not on disk yet keeps
+/// the spelling the Lua asked for, so it is matched without regard to case,
+/// as the engine matches every name.
+fn handed_in<'a>(files: &'a BTreeMap<PathBuf, String>, path: &Path) -> Option<&'a String> {
+    files.get(path).or_else(|| {
+        let wanted = path.to_string_lossy().to_lowercase();
+        files
+            .iter()
+            .find(|(key, _)| key.to_string_lossy().to_lowercase() == wanted)
+            .map(|(_, text)| text)
+    })
+}
+
+/// The text at `path`: the caller's own when it gave some, the disk's
+/// otherwise.
+fn read(files: &BTreeMap<PathBuf, String>, path: &Path) -> std::io::Result<String> {
+    match handed_in(files, path) {
+        Some(text) => Ok(text.clone()),
+        None => std::fs::read_to_string(path),
+    }
 }
 
 fn arg_str(args: &Variadic<Value>, i: usize, who: &str) -> mlua::Result<String> {
