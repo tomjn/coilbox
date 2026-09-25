@@ -224,7 +224,15 @@ function CompatibilitySection({
 
 /** Which of the two delivery routes this game supports, and why when one is
  *  not. Third in the drawer: once the game reads cleanly and the project still
- *  fits it, this is how an edit actually reaches it. */
+ *  fits it, this is how an edit actually reaches it.
+ *
+ *  Once `options` has answered once, a re-read (`checking` true again) keeps
+ *  the list on screen rather than swapping it for the "Reading…" line. An
+ *  in-place write, undo or accept makes the page re-read the game (issue
+ *  #2637), which re-reads options too, and swapping the list out would
+ *  unmount `InPlaceWrite` mid re-read and take its own "Wrote …" message with
+ *  it (issue #3028). The stale list briefly shown during that re-read is the
+ *  same one already on screen, not a wrong answer. */
 function RoutesSection({
   gameName,
   options,
@@ -254,7 +262,7 @@ function RoutesSection({
   return (
     <section className="flex flex-col gap-2">
       <h3 className="font-medium text-sm">Delivery routes</h3>
-      {checking ? (
+      {checking && !options ? (
         <p className="text-muted-foreground text-sm">
           Reading which routes {gameName} supports…
         </p>
