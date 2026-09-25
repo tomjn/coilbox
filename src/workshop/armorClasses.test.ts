@@ -16,15 +16,19 @@ const BA_ARMOR_DEFS: Record<string, string[]> = {
 };
 
 describe("normaliseArmorDefs", () => {
-  it("keeps only classes whose value is an array of strings", () => {
+  it("keeps every class the game declared as an array, even an empty one", () => {
     expect(
       normaliseArmorDefs({
         commanders: ["armcom", "corcom"],
         broken: "not an array",
-        empty: [],
+        shields: [],
         mixed: ["armkam", 5, null],
       }),
-    ).toEqual({ commanders: ["armcom", "corcom"], mixed: ["armkam"] });
+    ).toEqual({
+      commanders: ["armcom", "corcom"],
+      shields: [],
+      mixed: ["armkam"],
+    });
   });
 
   it("is empty for undefined", () => {
@@ -68,6 +72,13 @@ describe("resolvedArmorDefs", () => {
       vtol: ["armkam"],
     });
   });
+
+  it("keeps a class the game declares with nothing in it, even once something moves", () => {
+    const withShields = { ...BA_ARMOR_DEFS, shields: [] };
+    expect(
+      resolvedArmorDefs(withShields, { armcom: "heavyunits" }).shields,
+    ).toEqual([]);
+  });
 });
 
 describe("armorClassesOf", () => {
@@ -79,11 +90,23 @@ describe("armorClassesOf", () => {
     ]);
   });
 
-  it("counts a moved unit against its new class", () => {
+  it("counts a moved unit against its new class, keeping its old one at zero", () => {
     expect(armorClassesOf(BA_ARMOR_DEFS, { armkam: "commanders" })).toEqual([
       { name: "commanders", units: 3 },
       { name: "default", units: 0 },
+      { name: "vtol", units: 0 },
     ]);
+  });
+
+  /** Beyond All Reason ships exactly this: a `shields` class with nobody in
+   *  it yet. A weapon's damage table naming it is naming a real class, and
+   *  {@link unknownDamageClasses} has to be given it as one (issue #2645). */
+  it("lists a class the game declares with no members", () => {
+    const withShields = { ...BA_ARMOR_DEFS, shields: [] };
+    expect(armorClassesOf(withShields, undefined)).toContainEqual({
+      name: "shields",
+      units: 0,
+    });
   });
 });
 

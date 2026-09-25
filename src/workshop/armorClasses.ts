@@ -85,8 +85,12 @@ export function normaliseArmorDefs(
   const out: Record<string, string[]> = {};
   if (!raw) return out;
   for (const [name, value] of Object.entries(raw)) {
-    const members = classMembers(value);
-    if (members.length > 0) out[name] = members;
+    // An array the game declared is a real class, even with nothing in it
+    // yet: Beyond All Reason ships a `shields` class with no members today,
+    // and dropping it here would make coilbox call it unknown the moment a
+    // weapon's damage table names it. Only a value that is not an array at
+    // all says nothing usable.
+    if (Array.isArray(value)) out[name] = classMembers(value);
   }
   return out;
 }
@@ -126,10 +130,11 @@ export function resolvedArmorDefs(
     Object.entries(moves).map(([unit, cls]) => [unit.toLowerCase(), cls]),
   );
   const out: Record<string, string[]> = {};
-  for (const [name, members] of Object.entries(armorDefs)) {
-    const kept = members.filter((m) => !moved.has(m.toLowerCase()));
-    if (kept.length > 0) out[name] = kept;
-  }
+  // Every class the game declared stays, even one a move empties: a class
+  // with nothing in it is still a class, the same reason `normaliseArmorDefs`
+  // keeps one the game declares with nothing in it yet.
+  for (const [name, members] of Object.entries(armorDefs))
+    out[name] = members.filter((m) => !moved.has(m.toLowerCase()));
   for (const [unit, className] of Object.entries(moves)) {
     if (className.toLowerCase() === "default") continue;
     out[className] = [...(out[className] ?? []), unit];
