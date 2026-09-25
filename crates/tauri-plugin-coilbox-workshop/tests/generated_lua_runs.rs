@@ -163,6 +163,69 @@ fn the_post_file_and_bar_tweakdefs_change_the_weapon_the_page_showed() {
     }
 }
 
+/// Issue #2639. Balanced Annihilation's commander carries its weapon
+/// definitions itself, and so does a second unit that happens to call one of
+/// its own the same thing. A slot edit and a definition edit on the first
+/// land in its own slot and its own definition, through both routes, and the
+/// second unit's definition of the same name is untouched.
+#[test]
+fn a_weapon_edit_changes_this_units_slot_and_definition_and_no_other() {
+    let project: ModProject = serde_json::from_value(json!({
+        "name": "Test project",
+        "gameName": "Balanced Annihilation V15.9.8",
+        "edits": { "overrides": { "armcom": {
+            "weapons.0.onlytargetcategory": "SURFACE",
+            "weapondefs.armcomlaser.range": 400,
+            "weapondefs.armcomlaser.damage.subs": 20
+        } } },
+    }))
+    .expect("parse");
+    let compiled = compile(&project);
+    let post = compiled
+        .files
+        .iter()
+        .find(|f| f.path == "gamedata/unitdefs_post.lua")
+        .expect("a post file");
+    let unit_defs = r#"{
+        armcom = {
+            weapons = { { name = "armcom_armcomlaser", onlytargetcategory = "NOTSUB" } },
+            weapondefs = { armcomlaser = { range = 300, damage = { default = 75, subs = 5 } } },
+        },
+        corcom = {
+            weapons = { { name = "corcom_armcomlaser" } },
+            weapondefs = { armcomlaser = { range = 300, damage = { default = 75, subs = 5 } } },
+        },
+    }"#;
+    for (what, lua) in [
+        ("post file", post.contents.clone()),
+        (
+            "tweakdefs",
+            compiled.bar_tweakdefs.clone().expect("tweakdefs"),
+        ),
+    ] {
+        let root = tempfile::tempdir().expect("tempdir");
+        let vm = SpringLua::new(root.path()).expect("vm");
+        let source =
+            format!("(function()\nUnitDefs = {unit_defs}\n(function()\n{lua}\nend)()\nreturn UnitDefs\nend)()");
+        let out = vm
+            .eval_expr_value(&source, "generated.lua")
+            .unwrap_or_else(|e| panic!("{what}: {e}\n\n{source}"));
+        assert_eq!(
+            out["armcom"],
+            json!({
+                "weapons": [{ "name": "armcom_armcomlaser", "onlytargetcategory": "SURFACE" }],
+                "weapondefs": { "armcomlaser": { "range": 400, "damage": { "default": 75, "subs": 20 } } }
+            }),
+            "{what}"
+        );
+        assert_eq!(
+            out["corcom"]["weapondefs"],
+            json!({ "armcomlaser": { "range": 300, "damage": { "default": 75, "subs": 5 } } }),
+            "{what}"
+        );
+    }
+}
+
 /// Tech Annihilation comments entries out of its build lists and leaves the
 /// numbers after them as they were. The engine keeps every numbered entry, so
 /// a replay that stopped at the first gap would drop the rest from the game.

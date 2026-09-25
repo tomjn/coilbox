@@ -26,11 +26,13 @@ import {
   Gamepad2,
   Grid2x2,
   HeartPulse,
+  ImageIcon,
   type LucideIcon,
   Move,
   Package,
   Radar,
   Settings2,
+  Shield,
   Skull,
   Swords,
   Tags,
@@ -68,6 +70,12 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
   customParams: Braces,
   unplaced: Settings2,
   game: Gamepad2,
+  // The weapons tab's own sections (issue #2639, and `weaponSlots.ts`).
+  slot: Crosshair,
+  damage: Swords,
+  weapon: Crosshair,
+  shield: Shield,
+  textures: ImageIcon,
 };
 
 export function UnitFieldGroups({
@@ -120,6 +128,11 @@ export function UnitFieldGroups({
             {group.label}
             <span className="h-px flex-1 bg-border/50" />
           </h3>
+          {group.note && (
+            <p className="max-w-prose text-xs text-muted-foreground">
+              {group.note}
+            </p>
+          )}
           {group.sections.map((section) => {
             const changed = section.rows.filter(
               (r) => r.state === "overridden",
@@ -155,7 +168,8 @@ export function UnitFieldGroups({
                     choices={choices?.[row.path.toLowerCase()]}
                     warning={warnings?.[row.path.toLowerCase()]}
                     inheritedLabel={inheritedLabel}
-                    inPlace={inPlace?.(row)}
+                    readOnly={group.readOnly}
+                    inPlace={group.readOnly ? undefined : inPlace?.(row)}
                     onChange={(value) => onChange(row, value)}
                     onReset={() => onReset(row)}
                   />

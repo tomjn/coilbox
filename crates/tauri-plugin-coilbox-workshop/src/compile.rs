@@ -461,6 +461,9 @@ pub(crate) fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value 
             write_path(&mut def, &steps, value.clone());
         }
     }
+    if let Some(source) = clone.source.as_deref() {
+        mount_own_weapons(&mut def, source, &clone.key);
+    }
     if let Some(ops) = edits.menus.get(&clone.key) {
         let key = build_options_key(&def);
         let resolved = apply_build_menu(&build_options_of(&def), ops);
@@ -472,6 +475,74 @@ pub(crate) fn resolved_clone_def(clone: &UnitClone, edits: &GameEdits) -> Value 
         );
     }
     def
+}
+
+/// Point a copy's weapon slots at the definitions the copy carries itself
+/// (issue #2639).
+///
+/// A copy is made from a unit as the game loaded it, after the base content's
+/// `gamedata/weapondefs_post.lua` has run. That script copies each definition
+/// a unit carries into the game's shared table as `<unit>_<name>` and points
+/// the slot at it, so a copy of `armcom` holds `weapondefs.armcomlaser` and a
+/// slot naming `armcom_armcomlaser`. Loaded as a unit of its own, the copy's
+/// definition becomes `supercom_armcomlaser` and nothing mounts it: the slot
+/// still fires armcom's weapon, and an edit to the copy's weapon reaches the
+/// game as nothing at all. Renaming the slot to the copy's own prefix is what
+/// makes the definition the copy carries the one it fires.
+///
+/// Only a slot whose name is the source's prefix on a definition the copy
+/// carries. A slot naming a shared weapon, or one another unit carries, is left
+/// alone.
+fn mount_own_weapons(def: &mut Value, source: &str, key: &str) {
+    if source.eq_ignore_ascii_case(key) {
+        return;
+    }
+    let Some(map) = def.as_object_mut() else {
+        return;
+    };
+    let own: Vec<String> = map
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("weapondefs"))
+        .and_then(|(_, v)| v.as_object())
+        .map(|defs| defs.keys().map(|k| k.to_lowercase()).collect())
+        .unwrap_or_default();
+    if own.is_empty() {
+        return;
+    }
+    let Some(weapons) = map
+        .iter_mut()
+        .find(|(k, _)| k.eq_ignore_ascii_case("weapons"))
+        .map(|(_, v)| v)
+    else {
+        return;
+    };
+    let prefix = format!("{}_", source.to_lowercase());
+    let slots: Vec<&mut Value> = match weapons {
+        Value::Array(items) => items.iter_mut().collect(),
+        Value::Object(items) => items.values_mut().collect(),
+        _ => return,
+    };
+    for slot in slots {
+        let Some(name) = slot
+            .as_object_mut()
+            .and_then(|table| {
+                table
+                    .iter_mut()
+                    .find(|(k, _)| k.eq_ignore_ascii_case("name"))
+            })
+            .map(|(_, v)| v)
+        else {
+            continue;
+        };
+        let Some(lower) = name.as_str().map(|n| n.trim().to_lowercase()) else {
+            continue;
+        };
+        if let Some(short) = lower.strip_prefix(&prefix) {
+            if own.iter().any(|k| k == short) {
+                *name = Value::String(format!("{}_{short}", key.to_lowercase()));
+            }
+        }
+    }
 }
 
 /// The key a definition spells its build list under, so a rewrite lands on the
@@ -1215,6 +1286,76 @@ mod tests {
             assert!(route.contains(&block.lua));
             assert!(route.contains("maxDamage = 5000"));
         }
+    }
+
+    /// Issue #2639. A slot field and a definition field are written into two
+    /// different tables of the same unit: the slot through its position in
+    /// the list, the definition by name inside the unit's own `weapondefs`.
+    #[test]
+    fn a_slot_edit_and_a_definition_edit_land_in_their_own_tables() {
+        let out = compile(&project(json!({
+            "overrides": { "armcom": {
+                "weapons.0.onlytargetcategory": "SURFACE",
+                "weapondefs.armcomlaser.range": 400,
+                "weapondefs.armcomlaser.damage.subs": 20
+            } }
+        })));
+        let table = &out.chunks[0];
+        assert_eq!(table.form, LuaForm::Table);
+        assert!(table
+            .lua
+            .contains("weapondefs = {\n      armcomlaser = {\n        damage = { subs = 20 },\n        range = 400,"));
+        assert!(!table.lua.contains("onlytargetcategory"));
+        let block = &out.chunks[1];
+        assert_eq!(block.form, LuaForm::Block);
+        assert!(block
+            .lua
+            .contains("{ \"armcom\", { \"weapons\", 0, \"onlytargetcategory\" }, \"SURFACE\" },"));
+        assert!(!block.lua.contains("weapondefs"));
+    }
+
+    /// Issue #2639. A copy's slots name the unit it was copied from, which
+    /// would fire the source's weapon and leave the copy's own definition, and
+    /// every edit to it, mounted by nothing. See [`mount_own_weapons`].
+    #[test]
+    fn a_copys_slots_mount_the_definitions_the_copy_carries() {
+        let out = compile(&project(json!({
+            "clones": { "supercom": {
+                "key": "supercom", "source": "armcom",
+                "replacesGameUnit": false,
+                "def": {
+                    "weapons": [
+                        { "name": "armcom_armcomlaser", "onlytargetcategory": "NOTSUB" },
+                        { "name": "ARM_LIGHTLASER" },
+                        { "name": "corcom_corlaser" }
+                    ],
+                    "weapondefs": { "armcomlaser": { "range": 300 } }
+                }
+            } },
+            "overrides": { "supercom": { "weapondefs.armcomlaser.range": 450 } }
+        })));
+        let unit = file(&out, "units/supercom.lua");
+        assert!(unit.contains("name = \"supercom_armcomlaser\""), "{unit}");
+        assert!(unit.contains("range = 450"), "{unit}");
+        // A shared weapon, and one another unit carries, are left as they were.
+        assert!(unit.contains("name = \"ARM_LIGHTLASER\""), "{unit}");
+        assert!(unit.contains("name = \"corcom_corlaser\""), "{unit}");
+    }
+
+    /// A copy standing in for the unit it was copied from already has the
+    /// prefix its slots use.
+    #[test]
+    fn a_replacing_copy_keeps_its_slot_names() {
+        let clone: UnitClone = serde_json::from_value(json!({
+            "key": "armcom", "source": "armcom", "replacesGameUnit": true,
+            "def": {
+                "weapons": [{ "name": "armcom_armcomlaser" }],
+                "weapondefs": { "armcomlaser": {} }
+            }
+        }))
+        .expect("parse");
+        let def = resolved_clone_def(&clone, &GameEdits::default());
+        assert_eq!(def["weapons"][0]["name"], json!("armcom_armcomlaser"));
     }
 
     /// The archive loads an added unit out of `units/`, so that file stays a

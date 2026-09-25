@@ -344,6 +344,7 @@ export function UnitFieldRow({
   warning,
   inheritedLabel = "Game value",
   inPlace,
+  readOnly: locked = false,
   onChange,
   onReset,
 }: {
@@ -368,6 +369,10 @@ export function UnitFieldRow({
    *  and only when there is something to say: the field cannot be written in
    *  place, or its change was sent through the mutator route (issue #2633). */
   inPlace?: InPlaceField;
+  /** Shown and not offered, for a field nothing on this page can change, such
+   *  as one on a weapon definition several units share (issue #2639). The
+   *  reason is said once above the rows rather than on each of them. */
+  readOnly?: boolean;
   onChange: (value: unknown) => void;
   onReset: () => void;
 }) {
@@ -376,7 +381,8 @@ export function UnitFieldRow({
   const muted = !overridden;
   // Read only until the user sends the change through the mutator route. A
   // reset stays on offer, since taking a change out never stops a write.
-  const readOnly = Boolean(inPlace?.check.refusal) && !inPlace?.routed;
+  const readOnly =
+    locked || (Boolean(inPlace?.check.refusal) && !inPlace?.routed);
 
   const [picking, setPicking] = useState(false);
   // Only once the archive listing has landed. Without it there is nothing to
