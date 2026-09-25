@@ -103,7 +103,14 @@ function unitFieldKeys(): Map<string, string> {
 /** Built once. The registry this reads is a module-level constant generated
  *  from the engine, so there is nothing here that changes between calls. */
 let unitFieldKeyCache: Map<string, string> | undefined;
-function resolveField(
+/**
+ * Resolve a field name typed by a person to the real engine keys to try, in
+ * the same order and with the same alias table {@link parseUnitQuery} uses.
+ * Exported so a batch edit's field picker (issue #2655) resolves a field the
+ * same way a search or a rule does, rather than keeping a second table of
+ * spellings.
+ */
+export function resolveField(
   identifier: string,
 ): { ok: true; keys: string[] } | { ok: false; error: string } {
   const lower = identifier.toLowerCase();
