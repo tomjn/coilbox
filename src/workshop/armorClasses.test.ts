@@ -34,6 +34,14 @@ describe("normaliseArmorDefs", () => {
   it("is empty for undefined", () => {
     expect(normaliseArmorDefs(undefined)).toEqual({});
   });
+
+  /** The worker's Lua-to-JSON encoder writes a truly empty table as `{}`,
+   *  not `[]`, because an empty table has no `1..n` run to read as an array
+   *  (`weaponSlots.ts`'s `mountNames` hits the same shape). Beyond All
+   *  Reason's `shields` class is exactly this: real, and empty. */
+  it("reads a table the encoder wrote as an empty object as an empty class", () => {
+    expect(normaliseArmorDefs({ shields: {} })).toEqual({ shields: [] });
+  });
 });
 
 describe("armorClassOf", () => {

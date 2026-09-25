@@ -75,6 +75,16 @@ function classMembers(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === "string");
 }
 
+/** Whether a value is a table the game's own Lua wrote, whichever shape the
+ *  worker's encoder gave an empty one. A Lua table with a `1..n` run of keys
+ *  arrives as a JSON array, but an *empty* table has no such run, so the
+ *  worker (same as `dataset.rs`'s `mountNames`, see `weaponSlots.ts`) writes
+ *  it as `{}` rather than `[]`. Both are "an empty class", never "not a
+ *  class". */
+function isTableValue(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
 /** The worker's raw `armorDefs`, shaped into class name to member list. Keys
  *  arrive lowercased already (the worker lowercases every def-table key the
  *  same way it does for `units` and `weaponDefs`), so this only has to shape
@@ -85,12 +95,15 @@ export function normaliseArmorDefs(
   const out: Record<string, string[]> = {};
   if (!raw) return out;
   for (const [name, value] of Object.entries(raw)) {
-    // An array the game declared is a real class, even with nothing in it
-    // yet: Beyond All Reason ships a `shields` class with no members today,
-    // and dropping it here would make coilbox call it unknown the moment a
-    // weapon's damage table names it. Only a value that is not an array at
-    // all says nothing usable.
-    if (Array.isArray(value)) out[name] = classMembers(value);
+    // A table the game declared is a real class, even with nothing in it yet:
+    // Beyond All Reason ships a `shields` class with no members today, and
+    // dropping it here would make coilbox call it unknown the moment a
+    // weapon's damage table names it. Only a value that is not a table at all
+    // says nothing usable.
+    if (isTableValue(value))
+      out[name] = classMembers(
+        Array.isArray(value) ? value : Object.values(value),
+      );
   }
   return out;
 }
