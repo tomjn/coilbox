@@ -25,6 +25,9 @@ let compileResponse: unknown = {
  *  Keyed rather than one shared answer, so a dependency can hold one while the
  *  game's own archive does not. */
 let archivesWithPostFile: string[] = [];
+/** What `workshop_write_in_place` answers, for the in-place write tests
+ *  (issue #3028). Null until a test sets it. */
+let writeResponse: unknown = null;
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
     (_plugin: string, command: string) => async (args: unknown) => {
@@ -33,6 +36,7 @@ vi.mock("@picoframe/plugin-sdk", () => ({
       if (command === "workshop_compile") return compileResponse;
       if (command === "workshop_in_place_status")
         return { backups: 0, created: 0 };
+      if (command === "workshop_write_in_place") return writeResponse;
       if (command === "unitsync_archive_tree") {
         const archive = (args as { archive: string }).archive;
         return {
@@ -59,17 +63,30 @@ const project: ModProject = {
   updatedAt: "2026-09-01T00:00:00.000Z",
 };
 
+/** A project with a field change to write, for the in-place write tests
+ *  (issue #3028). */
+const projectWithFieldChange: ModProject = {
+  ...project,
+  edits: {
+    ...project.edits,
+    overrides: { armcom: { metalcost: 2 } },
+  },
+};
+
 afterEach(() => {
   cleanup();
   preflightResponse = { blockers: [], review: [], passes: [] };
   changeLedgerResponse = { units: [], notes: [] };
   compileResponse = { chunks: [], files: [], notes: [], barTweakdefs: null };
   archivesWithPostFile = [];
+  writeResponse = null;
 });
 
-/** The single toolbar button, whichever state it is asked to render in. */
-function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
-  return render(
+/** The JSX one render of the button is, so a rerender can ask for the same
+ *  tree with different props (issue #3028: a rerender that flips
+ *  `routesChecking` must not remount the drawer's contents). */
+function buttonElement(props: Partial<Parameters<typeof ChecksButton>[0]>) {
+  return (
     <MemoryRouter>
       <ChecksButton
         gameName="Balanced Annihilation V15.9.8"
@@ -86,8 +103,20 @@ function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
         onInPlaceWrite={() => {}}
         {...props}
       />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+/** The single toolbar button, whichever state it is asked to render in.
+ *  `rerenderWith` asks for the same tree again with different props, on the
+ *  render result testing-library already gave back. */
+function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
+  const result = render(buttonElement(props));
+  return {
+    ...result,
+    rerenderWith: (next: Partial<Parameters<typeof ChecksButton>[0]>) =>
+      result.rerender(buttonElement({ ...props, ...next })),
+  };
 }
 
 describe("the checks button", () => {
@@ -202,6 +231,50 @@ describe("the checks button", () => {
       expect(
         screen.queryByRole("button", { name: "Write changes into the game" }),
       ).toBeNull();
+    });
+
+    it("keeps the write outcome on screen once routes are re-read afterwards (issue #3028)", async () => {
+      writeResponse = {
+        written: ["units/armcom.lua"],
+        changed: 1,
+        unchanged: 0,
+        refused: [],
+        notCarried: [],
+        carried: [{ unit: "armcom", field: "metalcost", undoable: true }],
+      };
+      const { rerenderWith } = renderButton({
+        gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
+        project: projectWithFieldChange,
+      });
+      fireEvent.click(
+        await screen.findByRole("button", { name: "No problems found" }),
+      );
+      fireEvent.click(
+        await screen.findByRole("button", {
+          name: "Write changes into the game",
+        }),
+      );
+      expect(
+        await screen.findByText("Wrote 1 change into units/armcom.lua."),
+      ).toBeTruthy();
+
+      // The page drops its unitsync reads of the game and asks again once a
+      // write lands (issue #2637/#3026), which flips `routesChecking` true
+      // then false while the message is still meant to be on screen.
+      rerenderWith({
+        gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
+        project: projectWithFieldChange,
+        routesChecking: true,
+      });
+      rerenderWith({
+        gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
+        project: projectWithFieldChange,
+        routesChecking: false,
+      });
+
+      expect(
+        screen.getByText("Wrote 1 change into units/armcom.lua."),
+      ).toBeTruthy();
     });
 
     it("keeps a blocker, a review item and a pass in three separate groups", async () => {
