@@ -14,6 +14,11 @@ indent_size = 4
 [*.lua]
 indent_style = tab
 
+# Copies of real unit files. The patcher's tests rely on their exact bytes.
+[crates/coilbox-unitpatch/tests/fixtures/*.lua]
+trim_trailing_whitespace = false
+insert_final_newline = false
+
 # Two trailing spaces are a hard line break in markdown, so trimming them
 # silently changes how the file renders. max_line_length = off stops editors
 # auto-wrapping long lines as you type. The existing hard wrapped specs are
