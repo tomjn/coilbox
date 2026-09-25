@@ -119,9 +119,18 @@ export function deliveryRoutes(
   options: ConfigOption[],
   gameName: string,
   gamePath?: string,
+  /**
+   * Whether the project holds any custom explosion generator (issue #2643).
+   * The engine loads a CEG from a real file under `effects/` in the game's
+   * own archive tree, which a tweak slot has no way to carry, so a project
+   * with one of these gets no tweak-slots route regardless of what the game
+   * declares: it would otherwise offer a route that writes the field naming
+   * the generator, with no way to deliver the generator itself.
+   */
+  hasExplosionGenerators?: boolean,
 ): RouteAvailability[] {
   const { defs, units } = tweakSlotCounts(options);
-  const available = defs > 0 || units > 0;
+  const available = (defs > 0 || units > 0) && !hasExplosionGenerators;
   const inPlace = isEditInPlaceEligible(gamePath);
   return [
     {
@@ -135,9 +144,11 @@ export function deliveryRoutes(
       route: "tweak-slots",
       label: "BAR tweak slots",
       available,
-      detail: available
-        ? `${gameName} declares ${defs} tweakdefs slot${defs === 1 ? "" : "s"} and ${units} tweakunits slot${units === 1 ? "" : "s"} for base64 Lua.`
-        : `${gameName} does not declare any tweakdefs or tweakunits mod options, so there is no slot to carry base64 Lua. The mutator route above still works.`,
+      detail: hasExplosionGenerators
+        ? "This project has a custom explosion effect, and the engine only reads one from a real file, which a tweak slot cannot carry. The mutator and edit-in-place routes below still work."
+        : available
+          ? `${gameName} declares ${defs} tweakdefs slot${defs === 1 ? "" : "s"} and ${units} tweakunits slot${units === 1 ? "" : "s"} for base64 Lua.`
+          : `${gameName} does not declare any tweakdefs or tweakunits mod options, so there is no slot to carry base64 Lua. The mutator route above still works.`,
     },
     {
       route: "edit-in-place",

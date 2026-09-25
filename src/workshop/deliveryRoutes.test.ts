@@ -100,6 +100,18 @@ describe("deliveryRoutes", () => {
     expect(slots?.available).toBe(true);
   });
 
+  it("refuses the tweak-slot route for a game that declares slots when the project has a custom explosion effect", () => {
+    const routes = deliveryRoutes(
+      [opt("tweakdefs")],
+      "Beyond All Reason",
+      undefined,
+      true,
+    );
+    const slots = routes.find((r) => r.route === "tweak-slots");
+    expect(slots?.available).toBe(false);
+    expect(slots?.detail).toContain("custom explosion effect");
+  });
+
   it("refuses the edit-in-place route when no game path is given", () => {
     const routes = deliveryRoutes([], "Some Game");
     const inPlace = routes.find((r) => r.route === "edit-in-place");
