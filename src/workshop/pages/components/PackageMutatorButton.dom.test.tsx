@@ -81,6 +81,7 @@ function draw(
     <PackageMutatorButton
       // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject
       project={project as any}
+      units={{}}
       onPackaged={onPackaged}
       // biome-ignore lint/suspicious/noExplicitAny: a trimmed ConfigOption fixture
       routeOptions={routeOptions as any}
@@ -213,6 +214,7 @@ describe("PackageMutatorButton", () => {
         <PackageMutatorButton
           // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture
           project={withCollections as any}
+          units={{}}
           onPackaged={vi.fn()}
         />,
       );

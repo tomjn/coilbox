@@ -146,6 +146,7 @@ import {
   renameCollection,
   setCollectionMembership,
   setCollectionParent,
+  setCollectionRule,
 } from "../collections";
 import { compatibilityState } from "../compatibility";
 import { useCompiledProject } from "../compile";
@@ -1977,6 +1978,7 @@ export default function UnitPage() {
             {project && (
               <PackageMutatorButton
                 project={project}
+                units={units}
                 onPackaged={(version) =>
                   recordPackagedVersion(project.id, version)
                 }
@@ -2052,6 +2054,7 @@ export default function UnitPage() {
           onOpenChange={setCollectionsOpen}
           collections={collections}
           units={units}
+          overrides={overrides}
           nameOf={nameOf}
           onCreate={(name, parentId) =>
             updateCollections(
@@ -2077,6 +2080,11 @@ export default function UnitPage() {
           onToggleMember={(id, unit, member) =>
             updateCollections((c) =>
               setCollectionMembership(c ?? NO_COLLECTIONS, id, unit, member),
+            )
+          }
+          onSetRule={(id, rule) =>
+            updateCollections((c) =>
+              setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
             )
           }
         />
@@ -2213,7 +2221,10 @@ export default function UnitPage() {
               factionOf={factionOf}
               restrictTo={
                 activeCollectionId && collections[activeCollectionId]
-                  ? collectionUnits(collections, activeCollectionId)
+                  ? collectionUnits(collections, activeCollectionId, {
+                      units,
+                      overrides,
+                    })
                   : undefined
               }
               onSelect={(key) => select({ unit: key })}

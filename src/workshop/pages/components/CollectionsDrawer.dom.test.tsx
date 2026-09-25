@@ -14,6 +14,7 @@ import {
   renameCollection,
   setCollectionMembership,
   setCollectionParent,
+  setCollectionRule,
 } from "../../collections";
 import { CollectionsDrawer } from "./CollectionsDrawer";
 
@@ -23,7 +24,10 @@ const UNITS = {
   armpw: {},
 };
 
-function draw(collections: Collections = {}) {
+function draw(
+  collections: Collections = {},
+  units: Record<string, Record<string, unknown>> = UNITS,
+) {
   let current = collections;
   const onCreate = (name: string, parentId: string | undefined) => {
     current = createCollection(current, name, parentId).collections;
@@ -45,19 +49,25 @@ function draw(collections: Collections = {}) {
     current = setCollectionMembership(current, id, unit, member);
     rerender();
   };
+  const onSetRule = (id: string, rule: string) => {
+    current = setCollectionRule(current, id, rule);
+    rerender();
+  };
 
   const view = render(
     <CollectionsDrawer
       open
       onOpenChange={() => {}}
       collections={current}
-      units={UNITS}
+      units={units}
+      overrides={{}}
       nameOf={(key) => `Unit ${key}`}
       onCreate={onCreate}
       onRename={onRename}
       onDelete={onDelete}
       onSetParent={onSetParent}
       onToggleMember={onToggleMember}
+      onSetRule={onSetRule}
     />,
   );
   function rerender() {
@@ -66,13 +76,15 @@ function draw(collections: Collections = {}) {
         open
         onOpenChange={() => {}}
         collections={current}
-        units={UNITS}
+        units={units}
+        overrides={{}}
         nameOf={(key) => `Unit ${key}`}
         onCreate={onCreate}
         onRename={onRename}
         onDelete={onDelete}
         onSetParent={onSetParent}
         onToggleMember={onToggleMember}
+        onSetRule={onSetRule}
       />,
     );
   }
@@ -139,6 +151,36 @@ describe("nesting", () => {
     const parentPad = Number.parseFloat(rows[0].style.paddingLeft);
     const childPad = Number.parseFloat(rows[1].style.paddingLeft);
     expect(childPad).toBeGreaterThan(parentPad);
+  });
+});
+
+describe("rule-based membership (issue #2656)", () => {
+  const UNITS_WITH_COST = {
+    armcom: { metalCost: 900 },
+    armflash: { metalCost: 50 },
+    armpw: { metalCost: 30 },
+  };
+
+  it("counts every unit the rule matches, on top of the explicit list", () => {
+    const { collections } = createCollection({}, "Cheap");
+    draw(collections, UNITS_WITH_COST);
+    fireEvent.click(screen.getByRole("button", { name: /^cheap/i }));
+    fireEvent.change(screen.getByPlaceholderText("e.g. cost < 200"), {
+      target: { value: "cost < 200" },
+    });
+    expect(
+      screen.getByRole("heading", { name: /units in cheap/i }).textContent,
+    ).toContain("2");
+  });
+
+  it("shows the rule's own parse error inline", () => {
+    const { collections } = createCollection({}, "Broken");
+    draw(collections, UNITS_WITH_COST);
+    fireEvent.click(screen.getByRole("button", { name: /^broken/i }));
+    fireEvent.change(screen.getByPlaceholderText("e.g. cost < 200"), {
+      target: { value: "cost >" },
+    });
+    expect(screen.getByText(/needs a value/)).toBeTruthy();
   });
 });
 

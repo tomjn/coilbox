@@ -263,3 +263,48 @@ describe("picking a unit", () => {
     expect(onSelect).toHaveBeenCalledWith("unit003");
   });
 });
+
+describe("searching by stat (issue #2656)", () => {
+  function unitsWithHealth(): Record<string, Record<string, unknown>> {
+    return {
+      unit000: { health: 1000 },
+      unit001: { health: 5000 },
+      unit002: { health: 9000 },
+    };
+  }
+
+  it("filters by a comparison against the unit's own fields", () => {
+    draw({ units: unitsWithHealth() });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "hp > 4000" },
+    });
+    expect(screen.getByText("2 of 3 units")).toBeTruthy();
+  });
+
+  it("reads an override before the game's own field", () => {
+    draw({
+      units: unitsWithHealth(),
+      overrides: { unit000: { health: 9999 } },
+    });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "hp > 9000" },
+    });
+    expect(screen.getByText("1 of 3 units")).toBeTruthy();
+  });
+
+  it("shows a bad query's own error rather than matching nothing quietly", () => {
+    draw({ units: unitsWithHealth() });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "hp > vtol" },
+    });
+    expect(screen.getByText(/needs a number/)).toBeTruthy();
+  });
+
+  it("still does a plain name search when the query has no comparison", () => {
+    draw({ units: unitsWithHealth() });
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "unit001" },
+    });
+    expect(screen.getByText("1 of 3 units")).toBeTruthy();
+  });
+});

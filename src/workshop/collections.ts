@@ -11,21 +11,28 @@
  * never loop back on itself once {@link setCollectionParent}'s cycle guard has
  * run.
  *
- * Membership today is an explicit list of unit keys, the same sparse shape
- * `disabled.ts` uses: lowercased, de-duplicated and sorted, so two projects
- * that added the same units in a different order hold the same thing. Issue
- * #2656 plans to add a second way to belong to a collection, a stat predicate
- * evaluated against the game's live fields rather than a fixed list. That is
- * why {@link Collection} does not try to be a single flat array of unit keys:
- * `units` is named for what it holds today, leaving room for a sibling field
- * such as `rule` to sit beside it without moving anything that already
- * exists, the same way `weapons` and `equipped` sit beside `overrides`
- * instead of folding into it.
+ * Membership is two things, both resolved by {@link collectionUnits}. `units`
+ * is an explicit list, the same sparse shape `disabled.ts` uses: lowercased,
+ * de-duplicated and sorted, so two projects that added the same units in a
+ * different order hold the same thing. `rule` is the second way in (issue
+ * #2656): a `searchQuery.ts` predicate evaluated against the game's live
+ * fields, so a collection can be "every unit cheaper than 200 metal" and stay
+ * current as values change rather than needing to be rebuilt by hand. The two
+ * are additive. A collection with both includes every unit either one names.
+ * `rule` sits beside `units` rather than folding into it, the same way
+ * `weapons` and `equipped` sit beside `overrides` instead of folding in.
  *
  * A project-wide store, one of the optional slots on `GameEdits` in
  * `project.ts`, absent for a project saved before this and read back as
  * empty.
+ *
+ * A rule's name terms (a bare word with no comparison) match a unit's key
+ * only, not its display name, because this module is pure and has no `nameOf`
+ * to call. The unit list's own search box matches both, so a rule and a typed
+ * search can disagree about a plain word.
  */
+import type { UnitOverrides } from "./overrides";
+import { evaluateUnitQuery, parseUnitQuery } from "./searchQuery";
 
 /** A single named set of units, nestable under another collection. */
 export interface Collection {
@@ -38,6 +45,14 @@ export interface Collection {
    *  parent *includes* is this list plus every descendant's, resolved by
    *  {@link collectionUnits}. */
   units: string[];
+  /** A `searchQuery.ts` predicate, matched against every unit in the game
+   *  (issue #2656). A unit belongs to this collection if it is in `units`,
+   *  matches `rule`, or both. Absent for a collection with no rule, the same
+   *  way a project saved before this reads back with none. A rule that fails
+   *  to parse (an import from a build that allowed something this one does
+   *  not, or a game whose fields moved) matches nothing rather than
+   *  throwing. */
+  rule?: string;
 }
 
 /** Every collection in the project, by id. */
@@ -135,6 +150,26 @@ export function setCollectionParent(
   };
 }
 
+/** Set or clear a collection's rule. An all-whitespace `rule` clears it
+ *  rather than storing an empty predicate, the same way {@link
+ *  renameCollection} treats a blank name. Returns `collections` unchanged
+ *  when nothing would change. */
+export function setCollectionRule(
+  collections: Collections,
+  id: string,
+  rule: string,
+): Collections {
+  const target = collections[id];
+  if (!target) return collections;
+  const trimmed = rule.trim();
+  if ((target.rule ?? "") === trimmed) return collections;
+  if (!trimmed) {
+    const { rule: _dropped, ...rest } = target;
+    return { ...collections, [id]: rest };
+  }
+  return { ...collections, [id]: { ...target, rule: trimmed } };
+}
+
 /** Remove a collection. Its own children are re-parented to whatever it was
  *  nested under, rather than removed with it. Deleting a folder should not
  *  throw away what was inside it, and a child's own membership is untouched
@@ -182,20 +217,49 @@ export function setCollectionMembership(
   return { ...collections, [id]: { ...target, units } };
 }
 
-/** Every unit `id` includes: its own members plus every descendant's,
- *  resolved recursively. `undefined` for an id the project holds no
- *  collection for, so a stale reference (a collection deleted out from under
- *  a selector still holding its id) resolves to nothing rather than to the
- *  wrong thing. */
+/** The game's units, live, needed to resolve a rule-based collection into a
+ *  concrete set. Optional on {@link collectionUnits}: a caller that has not
+ *  got the game's own def table handy leaves it out, in which case a rule
+ *  matches nothing rather than the caller crashing for want of it. */
+export interface LiveUnits {
+  /** The game's units with the project's own clones already in among them,
+   *  the same table `UnitList`'s own `units` prop takes. */
+  units: Record<string, Record<string, unknown>>;
+  overrides: UnitOverrides;
+}
+
+/** Every unit `id` includes: its own members plus every descendant's, plus
+ *  every unit any of them matches by rule when `live` is given. `undefined`
+ *  for an id the project holds no collection for, so a stale reference (a
+ *  collection deleted out from under a selector still holding its id)
+ *  resolves to nothing rather than to the wrong thing. */
 export function collectionUnits(
   collections: Collections,
   id: string,
+  live?: LiveUnits,
 ): Set<string> | undefined {
   if (!Object.hasOwn(collections, id)) return undefined;
   const ids = selfAndDescendantIds(collections, id);
   const out = new Set<string>();
   for (const memberId of ids) {
-    for (const unit of collections[memberId]?.units ?? []) out.add(unit);
+    const collection = collections[memberId];
+    for (const unit of collection?.units ?? []) out.add(unit);
+    if (!collection?.rule || !live) continue;
+    const parsed = parseUnitQuery(collection.rule);
+    if (!parsed.ok) continue;
+    for (const [key, def] of Object.entries(live.units)) {
+      if (out.has(key)) continue;
+      if (
+        evaluateUnitQuery(parsed.query, {
+          key,
+          name: key,
+          def,
+          overrides: live.overrides[key],
+        })
+      ) {
+        out.add(key);
+      }
+    }
   }
   return out;
 }
@@ -278,6 +342,9 @@ export function parseCollections(value: unknown): Collections {
         ? { parentId: entry.parentId }
         : {}),
       units: parseUnitKeys(entry.units),
+      ...(typeof entry.rule === "string" && entry.rule.trim()
+        ? { rule: entry.rule.trim() }
+        : {}),
     };
   }
   return out;
