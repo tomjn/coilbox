@@ -1,0 +1,22 @@
+[package]
+name = "coilbox-unitpatch"
+version = "0.0.0"
+description = "Changes one field in a game's unit Lua file and leaves every other byte alone, or says why it will not."
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+# A lossless Lua parser, the one StyLua is built on. Every token keeps its
+# byte position and the whitespace and comments around it, so an edit can be a
+# splice into the original text. With default features off it parses Lua 5.1
+# only, which is the dialect Spring and Recoil run. The `serde` feature it
+# enables by default is for serialising its syntax tree, which nothing here does.
+full_moon = { version = "2.2.0", default-features = false }
+# Evaluates the file before and after the edit, to prove only the edited field
+# changed.
+coilbox-springlua = { path = "../coilbox-springlua" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

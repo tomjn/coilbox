@@ -1,0 +1,25 @@
+local BRV = Tank:New{
+	name              	= "Heavy BRV",
+	description         = "Support Vehicle - Loads an entire wreck and deposits it at the salvage yard for recovery or scrapping.",
+	trackWidth			= 37,--width to render the decal
+	
+	holdSteady = true,
+	--weapons	= {	
+	--},
+	
+	customparams = {
+		tonnage			= 80,
+		variant         = "",
+		speed			= 50,
+		price			= 10170,
+		heatlimit 		= 10,
+		armor			= 6,
+		squadsize 		= 1,
+		mods			= {"ferrofibrousarmour"},
+		hitchmaxy		= 60,
+	},
+}
+
+return lowerkeys({
+	["BRV"] = BRV:New(),
+})
