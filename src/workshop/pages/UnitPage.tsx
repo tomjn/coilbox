@@ -163,7 +163,7 @@ import {
   explosionEditCount,
   unitsExplodingAs,
 } from "../deathExplosions";
-import { unitDerivedStats, type WeaponInput } from "../derivedStats";
+import { unitDerivedStats } from "../derivedStats";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
 import { useEditHistory } from "../history";
 import type { FieldProbe } from "../inPlace";
@@ -217,6 +217,7 @@ import {
   unitTextCount,
   unitTextRows,
 } from "../unitText";
+import { unitEffectiveWeapons } from "../unitWeapons";
 import {
   addLibraryWeapon,
   clearLibraryField,
@@ -807,33 +808,14 @@ export default function UnitPage() {
   // #2644), off the same resolved values everything else on the page reads:
   // a library weapon equipped into a slot stands in for the game's own
   // (issue #2640), and a definition the unit carries itself reads through
-  // the project's overrides the same way a field row does. A slot naming
-  // nothing (`kind: "missing"`) fires nothing, so it contributes nothing.
-  const derivedWeapons = useMemo((): WeaponInput[] => {
-    return slots.flatMap((s): WeaponInput[] => {
-      const fires = unitEquipped?.[s.step];
-      const equippedWeapon = fires ? library[fires] : undefined;
-      const def = equippedWeapon
-        ? libraryWeaponDef(equippedWeapon)
-        : s.definition.kind === "own"
-          ? ((readPath(edited, s.definition.path) as
-              | Record<string, unknown>
-              | undefined) ?? s.definition.def)
-          : s.definition.kind === "shared"
-            ? s.definition.def
-            : undefined;
-      if (!def) return [];
-      // `slaveTo` is the unit's own weapon mount field, a weapon number
-      // (1-based) it fires alongside, 0 meaning not slaved
-      // (`UnitDef.cpp`'s `slavedTo`).
-      const slaveToKey = s.table
-        ? Object.keys(s.table).find((k) => k.toLowerCase() === "slaveto")
-        : undefined;
-      const slaveTo = slaveToKey ? s.table?.[slaveToKey] : undefined;
-      const slaved = typeof slaveTo === "number" && slaveTo !== 0;
-      return [{ def, excludeFromSum: slaved ? "slaved" : undefined }];
-    });
-  }, [slots, unitEquipped, library, edited]);
+  // the project's overrides the same way a field row does. Shared with the
+  // reference table (issue #3081) as `unitEffectiveWeapons`, so an equipped
+  // weapon's numbers agree between the editor and the table.
+  const derivedWeapons = useMemo(
+    () =>
+      unitEffectiveWeapons(edited, weaponDefs, owners, library, unitEquipped),
+    [edited, weaponDefs, owners, library, unitEquipped],
+  );
   const derived = useMemo(
     () => unitDerivedStats({ def: edited }, derivedWeapons),
     [edited, derivedWeapons],
@@ -2366,11 +2348,15 @@ export default function UnitPage() {
               picOf={picOf}
               picsPending={picsPending}
               factionOf={factionOf}
+              weaponDefs={weaponDefs}
+              library={library}
+              equipped={equipped}
               restrictTo={
                 activeCollectionId && collections[activeCollectionId]
                   ? collectionUnits(collections, activeCollectionId, {
                       units,
                       overrides,
+                      weapons: { weaponDefs, library, equipped, clones },
                     })
                   : undefined
               }

@@ -74,6 +74,42 @@ describe("unitReferenceRow", () => {
   });
 });
 
+describe("unitReferenceRow with an equipped library weapon", () => {
+  const library = {
+    bigcannon: {
+      key: "bigcannon",
+      source: "bigcannon",
+      def: {
+        weaponType: "Cannon",
+        range: 500,
+        reloadTime: 1,
+        damage: { default: 100 },
+      },
+    },
+  };
+
+  it("resolves the equipped weapon's numbers rather than the slot's own (issue #3081)", () => {
+    const row = unitReferenceRow("armtank", "Tank", tank(), {}, library, {
+      "0": "bigcannon",
+    });
+    // 100 damage every second, not the game's laser (50 damage / 2s = 25).
+    expect(row.derived.dps).toBe(100);
+    expect(row.maxRange).toBe(500);
+  });
+
+  it("falls back to the slot's own weapon when nothing is equipped", () => {
+    const row = unitReferenceRow(
+      "armtank",
+      "Tank",
+      tank(),
+      {},
+      library,
+      undefined,
+    );
+    expect(row.derived.dps).toBe(25);
+  });
+});
+
 describe("unitReferenceRows", () => {
   it("joins every unit against the game's shared weapon table", () => {
     const rows = unitReferenceRows({ armtank: tank() }, {}, (key) => `${key}!`);

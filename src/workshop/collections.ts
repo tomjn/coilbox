@@ -31,8 +31,16 @@
  * to call. The unit list's own search box matches both, so a rule and a typed
  * search can disagree about a plain word.
  */
-import type { UnitOverrides } from "./overrides";
-import { evaluateUnitQuery, parseUnitQuery } from "./searchQuery";
+import type { UnitClones } from "./clones";
+import type { UnitDerivedStats } from "./derivedStats";
+import { resolvedDef, type UnitOverrides } from "./overrides";
+import {
+  evaluateUnitQuery,
+  parseUnitQuery,
+  queryNeedsDerivedFields,
+} from "./searchQuery";
+import { unitEffectiveDerivedStats } from "./unitWeapons";
+import type { EquippedWeapons, WeaponLibrary } from "./weaponLibrary";
 
 /** A single named set of units, nestable under another collection. */
 export interface Collection {
@@ -226,6 +234,17 @@ export interface LiveUnits {
    *  the same table `UnitList`'s own `units` prop takes. */
   units: Record<string, Record<string, unknown>>;
   overrides: UnitOverrides;
+  /** What a rule needs to answer a `derivedStats.ts` number (issue #3074):
+   *  the same weapon resolution the unit editor and the reference table use
+   *  (`unitWeapons.ts`). Absent, a rule naming a derived field matches
+   *  nothing rather than the resolver crashing for want of it, the same as a
+   *  rule that fails to parse. */
+  weapons?: {
+    weaponDefs: Record<string, Record<string, unknown>>;
+    library: WeaponLibrary;
+    equipped: EquippedWeapons;
+    clones: UnitClones;
+  };
 }
 
 /** Every unit `id` includes: its own members plus every descendant's, plus
@@ -247,6 +266,27 @@ export function collectionUnits(
     if (!collection?.rule || !live) continue;
     const parsed = parseUnitQuery(collection.rule);
     if (!parsed.ok) continue;
+    const weapons = live.weapons;
+    const derivedCache = new Map<string, UnitDerivedStats>();
+    const derivedFor =
+      weapons && queryNeedsDerivedFields(parsed.query)
+        ? (key: string, def: Record<string, unknown>): UnitDerivedStats => {
+            const cached = derivedCache.get(key);
+            if (cached) return cached;
+            const cloneSource = weapons.clones[key]?.source;
+            const owners = cloneSource ? [key, cloneSource] : [key];
+            const resolved = resolvedDef(def, live.overrides[key]);
+            const stats = unitEffectiveDerivedStats(
+              { def: resolved },
+              weapons.weaponDefs,
+              owners,
+              weapons.library,
+              weapons.equipped[key],
+            );
+            derivedCache.set(key, stats);
+            return stats;
+          }
+        : undefined;
     for (const [key, def] of Object.entries(live.units)) {
       if (out.has(key)) continue;
       if (
@@ -255,6 +295,7 @@ export function collectionUnits(
           name: key,
           def,
           overrides: live.overrides[key],
+          derived: derivedFor ? () => derivedFor(key, def) : undefined,
         })
       ) {
         out.add(key);
