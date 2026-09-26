@@ -358,6 +358,45 @@ function RecordingExplainer() {
   );
 }
 
+/**
+ * The Relevant/All toggle and the count it changes the meaning of, at the top
+ * of a field list. Fields, Weapons and Explosions each have one, because each
+ * tab has its own list to pick a view over and its own count to describe
+ * (issue #3103): the toggle and the count used to sit once above all three
+ * tabs, where they went on describing whichever list they had last acted on
+ * even after a tab switch put another list on screen.
+ */
+function FieldViewBar({
+  view,
+  onViewChange,
+  counted,
+}: {
+  view: FieldView;
+  onViewChange: (view: FieldView) => void;
+  counted: { shown: number; hidden: number };
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        value={view}
+        onValueChange={(v) => v && onViewChange(v as FieldView)}
+        aria-label="Which fields to show"
+      >
+        <ToggleGroupItem value="relevant">Relevant</ToggleGroupItem>
+        <ToggleGroupItem value="all">All</ToggleGroupItem>
+      </ToggleGroup>
+      <span className="text-xs text-muted-foreground">
+        {view === "relevant"
+          ? `${counted.shown} shown, ${counted.hidden} hidden`
+          : `${counted.shown} shown`}
+      </span>
+    </div>
+  );
+}
+
 export default function UnitPage() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -1986,7 +2025,7 @@ export default function UnitPage() {
     : builtBy
       ? "Value in the game"
       : undefined;
-  /** What the count beside the tabs is counting. */
+  /** What the count at the top of the open tab's list is counting. */
   const counted =
     tab === "weapons" || tab === "explosions"
       ? (weaponView ?? { shown: 0, hidden: 0 })
@@ -2548,12 +2587,14 @@ export default function UnitPage() {
                 under the unit's key, in the left half, where it widened that
                 half and wrapped the controls beside it onto their own line, so
                 the switch that had just been pressed was somewhere else. It is
-                below the whole row now. So is the field count, which the
-                Relevant/All toggle changes the width of: it is a fact about the
-                list below rather than a control, and beside the toggle it moved
-                the toggle. The three controls that come and go are first, so a
-                copy taking the details link away and putting the delete button
-                there moves nothing that was pressed. */}
+                below the whole row now. The three controls that come and go
+                are first, so a copy taking the details link away and putting
+                the delete button there moves nothing that was pressed.
+
+                The Relevant/All toggle and the field count used to sit here
+                too, but they describe the list on whichever tab is open, not
+                the unit, so each tab now draws its own at the top of its own
+                list (issue #3103). */}
               <div className="flex flex-col gap-2 lg:shrink-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-2.5">
@@ -2645,19 +2686,6 @@ export default function UnitPage() {
                       nameOf={nameOf}
                       onCreate={createClone}
                     />
-                    <ToggleGroup
-                      type="single"
-                      variant="outline"
-                      size="sm"
-                      value={view}
-                      onValueChange={(v) => v && setView(v as FieldView)}
-                      aria-label="Which fields to show"
-                    >
-                      <ToggleGroupItem value="relevant">
-                        Relevant
-                      </ToggleGroupItem>
-                      <ToggleGroupItem value="all">All</ToggleGroupItem>
-                    </ToggleGroup>
                   </div>
                 </div>
 
@@ -2668,32 +2696,26 @@ export default function UnitPage() {
                 <DerivedStatsStrip stats={derived} />
 
                 {/* The unit's own fields, its weapons (issue #2639), or its
-                  death explosions (issue #3105), and how much of whichever
-                  it is the list below is showing. The count is against the
-                  right edge, so it reads with the toggle it belongs to
-                  without being able to move it. */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <TabsList aria-label="Which part of the unit to edit">
-                    <TabsTrigger value="fields">Fields</TabsTrigger>
-                    <TabsTrigger value="weapons">
-                      Weapons
-                      <span className="text-xs text-muted-foreground">
-                        {slots.length}
-                      </span>
-                    </TabsTrigger>
-                    <TabsTrigger value="explosions">
-                      Explosions
-                      <span className="text-xs text-muted-foreground">
-                        {explosions.length}
-                      </span>
-                    </TabsTrigger>
-                  </TabsList>
-                  <span className="text-xs text-muted-foreground">
-                    {view === "relevant"
-                      ? `${counted.shown} shown, ${counted.hidden} hidden`
-                      : `${counted.shown} shown`}
-                  </span>
-                </div>
+                  death explosions (issue #3105). Which of a unit's fields the
+                  Relevant/All toggle picks used to show here too, but it
+                  describes only the list under the tab that is open, so it
+                  now sits at the top of each tab's own list instead (issue
+                  #3103). */}
+                <TabsList aria-label="Which part of the unit to edit">
+                  <TabsTrigger value="fields">Fields</TabsTrigger>
+                  <TabsTrigger value="weapons">
+                    Weapons
+                    <span className="text-xs text-muted-foreground">
+                      {slots.length}
+                    </span>
+                  </TabsTrigger>
+                  <TabsTrigger value="explosions">
+                    Explosions
+                    <span className="text-xs text-muted-foreground">
+                      {explosions.length}
+                    </span>
+                  </TabsTrigger>
+                </TabsList>
 
                 {/* What is true of this unit: where it came from, and whether
                   it is switched off. The width cap is for reading length now,
@@ -2752,7 +2774,15 @@ export default function UnitPage() {
                     onRoute={onRouteClone}
                   />
                 )}
-                <TabsContent value="weapons" className="flex-none">
+                <TabsContent
+                  value="weapons"
+                  className="flex flex-none flex-col gap-3"
+                >
+                  <FieldViewBar
+                    view={view}
+                    onViewChange={setView}
+                    counted={counted}
+                  />
                   <WeaponSlotsPanel
                     slots={slots}
                     selected={slot}
@@ -2795,7 +2825,15 @@ export default function UnitPage() {
                     }}
                   />
                 </TabsContent>
-                <TabsContent value="explosions" className="flex-none">
+                <TabsContent
+                  value="explosions"
+                  className="flex flex-none flex-col gap-3"
+                >
+                  <FieldViewBar
+                    view={view}
+                    onViewChange={setView}
+                    counted={counted}
+                  />
                   <DeathExplosionsPanel
                     view={weaponView}
                     consumers={consumers}
@@ -2818,6 +2856,11 @@ export default function UnitPage() {
                   value="fields"
                   className="flex flex-none flex-col gap-3"
                 >
+                  <FieldViewBar
+                    view={view}
+                    onViewChange={setView}
+                    counted={counted}
+                  />
                   <ArmorClassPanel
                     unitName={nameOf(unitKey, unit)}
                     current={currentArmorClass}

@@ -2542,6 +2542,33 @@ describe("UnitPage", () => {
       expect(screen.queryByLabelText(/Only shoots at/)).toBeNull();
     });
 
+    /**
+     * Issue #3103. The Relevant/All toggle and its count used to sit above
+     * every tab, so switching to Weapons left the Fields count on screen
+     * describing a list you could no longer see. Each tab now draws its own,
+     * so exactly one is ever on screen, and it changes to match whichever
+     * list is open.
+     */
+    it("shows the Relevant/All filter and count only inside the open tab", () => {
+      openGunner();
+      expect(screen.getAllByText("Relevant")).toHaveLength(1);
+      const fieldsCount = screen.getByText(/shown, .* hidden/).textContent;
+
+      openWeapons();
+      // Only the weapons tab's own filter and count are on screen: nothing
+      // still describes the fields list, which is no longer showing.
+      expect(screen.getAllByText("Relevant")).toHaveLength(1);
+      expect(screen.getAllByText(/shown, .* hidden/)).toHaveLength(1);
+      const weaponsCount = screen.getByText(/shown, .* hidden/).textContent;
+      expect(weaponsCount).not.toBe(fieldsCount);
+
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
+      expect(screen.getAllByText("Relevant")).toHaveLength(1);
+      expect(screen.getByText(/shown, .* hidden/).textContent).toBe(
+        fieldsCount,
+      );
+    });
+
     it("writes a slot field to the slot and a definition field to the unit's own definition", () => {
       openGunner();
       openWeapons();
