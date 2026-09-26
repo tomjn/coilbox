@@ -77,6 +77,43 @@ export function unitEditPath(
 }
 
 /**
+ * The parts of an open project, each a page of its own under the project's
+ * path (issue #3111). Units is the project's own path with no segment, so every
+ * link to a unit, a tab or a field that was written before the sections
+ * existed still lands on the unit editor.
+ *
+ * Adding a section is one entry here and one case in `UnitPage.tsx`'s body.
+ */
+export const PROJECT_SECTIONS = [
+  { id: "units", label: "Units" },
+  { id: "weapons", label: "Weapons" },
+  { id: "collections", label: "Collections" },
+  { id: "checks", label: "Checks" },
+  { id: "package", label: "Package" },
+] as const;
+
+export type ProjectSection = (typeof PROJECT_SECTIONS)[number]["id"];
+
+/** The section a `:section` route param names, with no segment, or one no
+ *  section answers to, falling back on Units. */
+export function projectSectionOf(param: string | undefined): ProjectSection {
+  return PROJECT_SECTIONS.find((s) => s.id === param)?.id ?? "units";
+}
+
+/** What a section is called, for the tab bar and the breadcrumb. Undefined
+ *  for a segment no section answers to. */
+export function projectSectionLabel(
+  param: string | undefined,
+): string | undefined {
+  return PROJECT_SECTIONS.find((s) => s.id === param)?.label;
+}
+
+/** Where one section of a project is. Units is the project's own path. */
+export function sectionPath(id: string, section: ProjectSection): string {
+  return section === "units" ? `/workshop/${id}` : `/workshop/${id}/${section}`;
+}
+
+/**
  * A project's reference table and comparison view (issue #1316), resolved
  * through that project's own overrides. `id` must name a saved project: the
  * table has nothing to show for `/workshop/new`, since there is no project's
