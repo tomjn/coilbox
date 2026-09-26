@@ -14,7 +14,9 @@
 
 use coilbox_springlua::SpringLua;
 use serde_json::{json, Value};
-use tauri_plugin_coilbox_workshop::{compile, LuaForm, ModProject};
+use tauri_plugin_coilbox_workshop::{
+    compile, decode_many, pack_tweak_slots, Chunk, LuaForm, ModProject, ReadOnlyLuaBlock,
+};
 
 /// Run every block a project compiled to, over a stand-in unit table, and hand
 /// back what the table became.
@@ -822,5 +824,81 @@ fn a_copied_death_explosion_is_what_that_unit_explodes_as() {
             "{what}"
         );
         assert_eq!(raw["units"]["armflash"]["explodeas"], Value::Null, "{what}");
+    }
+}
+
+/// The numbered tweak-slot route's `!bset` lines, decoded back into runnable
+/// Lua in slot order. `pack_tweak_slots` hands back the same lines a lobby's
+/// mod options would carry, so decoding them the way `decode_many` reads a
+/// battle's options is how a test proves this route runs a project's chunks
+/// in the order it compiled them, without reaching into the packer's own
+/// base64 and minifier internals.
+fn numbered_slot_lua(chunks: &[Chunk]) -> String {
+    let pack = pack_tweak_slots(chunks);
+    assert!(pack.complete(), "not every chunk reached a slot: {pack:?}");
+    let entries: std::collections::BTreeMap<String, String> = pack
+        .tweakdefs
+        .iter()
+        .map(|line| {
+            let rest = line.strip_prefix("!bset ").expect("a !bset line");
+            let (key, payload) = rest.split_once(' ').expect("a key and a payload");
+            (key.to_string(), payload.to_string())
+        })
+        .collect();
+    let decoded = decode_many(&entries).expect("decode");
+    decoded
+        .tweakdefs
+        .iter()
+        .map(|slot| slot.lua.clone().expect("decoded lua"))
+        .collect::<Vec<_>>()
+        .join("\n\n")
+}
+
+/// Issue #3129. A project can carry Lua imported from somebody else's tweak
+/// slots, such as a program that doubles every unit's health. The project's
+/// own typed field change is meant to land on top of that import, not the
+/// other way round: importing a doubler and then typing 5000 for one unit's
+/// health has to leave that unit at 5000, not 10000. All three delivery
+/// routes have to agree: the mutator's `gamedata/unitdefs_post.lua`, the bare
+/// `tweakdefs` slot a local skirmish writes, and the numbered slots a lobby
+/// gets.
+#[test]
+fn a_typed_field_change_wins_over_a_carried_import_that_scales_the_same_field() {
+    let mut project: ModProject = serde_json::from_value(json!({
+        "name": "Test project",
+        "gameName": "Balanced Annihilation V15.9.8",
+        "edits": { "overrides": { "armcom": { "health": 5000 } } },
+    }))
+    .expect("parse");
+    project.read_only_lua = vec![ReadOnlyLuaBlock {
+        title: "Imported doubler".to_string(),
+        lua: "for _, def in pairs(UnitDefs) do\n  if def.health then\n    def.health = def.health * 2\n  end\nend\n".to_string(),
+        note: "Decoded as a program, not data.".to_string(),
+        form: Some("block".to_string()),
+    }];
+    let compiled = compile(&project);
+    let post = compiled
+        .files
+        .iter()
+        .find(|f| f.path == "gamedata/unitdefs_post.lua")
+        .expect("a post file")
+        .contents
+        .clone();
+    let routes = vec![
+        ("post file", post),
+        ("tweakdefs", compiled.tweakdefs.clone().expect("tweakdefs")),
+        ("numbered slots", numbered_slot_lua(&compiled.chunks)),
+    ];
+    let unit_defs = r#"{ armcom = { health = 100 } }"#;
+    for (what, lua) in routes {
+        let root = tempfile::tempdir().expect("tempdir");
+        let vm = SpringLua::new(root.path()).expect("vm");
+        let source = format!(
+            "(function()\nUnitDefs = {unit_defs}\n(function()\n{lua}\nend)()\nreturn UnitDefs\nend)()"
+        );
+        let out = vm
+            .eval_expr_value(&source, "generated.lua")
+            .unwrap_or_else(|e| panic!("{what}: {e}\n\n{source}"));
+        assert_eq!(out["armcom"]["health"], json!(5000), "{what}");
     }
 }
