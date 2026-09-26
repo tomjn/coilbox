@@ -16,6 +16,10 @@
 //! `VFS.FileExists` and `VFS.DirList` are wrapped to answer from the files
 //! first, for any read the game's own mode string lets reach a game archive.
 //!
+//! A run can carry mod options too, for the `tweakdefs` and `tweakunits`
+//! slots (issue #3092). Those reach the game through `Spring.GetModOptions()`, so
+//! the run installs one that answers with them before anything else runs.
+//!
 //! Two things about the numbers. The engine's Lua holds them as 32 bit
 //! floats (`LUA_NUMBER` is `float` in `rts/lib/lua/include/luaconf.h`), and
 //! `tostring` prints at most ten characters of one, which is not enough to
@@ -28,6 +32,7 @@
 
 use crate::ffi::Unitsync;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// VFS modes for the parser, the set `unitdefs.rs` uses.
@@ -45,6 +50,10 @@ struct Run {
     files: Vec<File>,
     #[serde(default)]
     reads: Vec<Read>,
+    /// The mod options a lobby would hand the game, key to value, the way
+    /// `Spring.GetModOptions()` answers in a running game (issue #3092).
+    #[serde(default, rename = "modOptions")]
+    mod_options: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -128,8 +137,9 @@ pub fn render(lib: &str, game: &str, input: &str) -> DefsProbeOutput {
         .iter()
         .map(|run| {
             let script = format!(
-                "{}{}{}",
+                "{}{}{}{}",
                 crate::lua::CHUNKED_RESULT,
+                mod_options_script(&run.mod_options),
                 crate::lua::DEFS_ENV_SHIM,
                 probe_script(run)
             );
@@ -183,6 +193,28 @@ fn lua_number(x: f64) -> String {
     } else {
         "nil".to_string()
     }
+}
+
+/// `Spring.GetModOptions()` answering with `options`, installed ahead of
+/// [`crate::lua::DEFS_ENV_SHIM`] so the shim's empty stand-in never takes its
+/// place. Nothing at all when there are none, which leaves the shim's.
+///
+/// The engine's own answers with a new table of strings on every call
+/// (`LuaSyncedRead::GetModOptions`), so this does too. What a game does with
+/// the answer is its own business. Beyond All Reason, for example, converts
+/// each value by the type its `modoptions.lua` declares, and runs the
+/// `tweakdefs` and `tweakunits` slots from that in `gamedata/unitdefs_post.lua`.
+fn mod_options_script(options: &BTreeMap<String, String>) -> String {
+    if options.is_empty() {
+        return String::new();
+    }
+    let entries: String = options
+        .iter()
+        .map(|(key, value)| format!("  [{}] = {},\n", lua_string(key), lua_string(value)))
+        .collect();
+    format!(
+        "if type(Spring) == 'table' then\n  local __cb_modoptions = {{\n{entries}  }}\n  Spring.GetModOptions = function()\n    local copy = {{}}\n    for k, v in pairs(__cb_modoptions) do copy[k] = v end\n    return copy\n  end\nend\n"
+    )
 }
 
 /// The overlay, the load and the reads for one run.
@@ -421,6 +453,25 @@ mod tests {
         assert_eq!(
             lua_string("a\"b\\c\nd\u{e9}"),
             "\"a\\\"b\\\\c\\010d\\195\\169\""
+        );
+    }
+
+    #[test]
+    fn no_mod_options_leave_the_shim_to_answer() {
+        assert_eq!(mod_options_script(&BTreeMap::new()), "");
+    }
+
+    #[test]
+    fn mod_options_are_installed_as_strings_the_game_reads() {
+        let options = BTreeMap::from([("tweakdefs".to_string(), "ZG8gZW5k".to_string())]);
+        let script = mod_options_script(&options);
+        assert!(
+            script.contains("[\"tweakdefs\"] = \"ZG8gZW5k\","),
+            "{script}"
+        );
+        assert!(
+            script.contains("Spring.GetModOptions = function()"),
+            "{script}"
         );
     }
 
