@@ -25,7 +25,6 @@ import {
 } from "@/container/container";
 import { rememberCarriedShortname } from "@/container/shortnames";
 import {
-  primeScan,
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncMapMeta,
@@ -40,10 +39,7 @@ import {
   exactMapRequirement,
 } from "@/content/resolveContent";
 import { useFactionLogos } from "@/factions/logos";
-import {
-  isWorkshopMutatorArchive,
-  withoutGeneratedGames,
-} from "@/lib/generatedGames";
+import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
 import { AccountPicker } from "@/multiplayer/AccountPicker";
 import { liveHostableKeys } from "@/multiplayer/protocol";
@@ -67,8 +63,8 @@ import { useImportParam } from "../../deeplink/useImportParam";
 import { useOneShotParam } from "../../deeplink/useOneShotParam";
 import { useRecordHubImport } from "../../hub/imports";
 import { getProfile } from "../../profile/profile";
-import { workshopTestMutator } from "../../workshop/mutator";
 import type { ModProject } from "../../workshop/project";
+import { applyTweakMutatorRoute } from "../applyTweakMutatorRoute";
 import type { BattleConfig } from "../bindings";
 import { playExportPreset, playImportPreset } from "../bindings";
 import {
@@ -740,23 +736,22 @@ export default function SkirmishPage() {
    */
   async function applyTweakMutator(project: ModProject) {
     if (!target) throw new Error("No engine selected.");
-    const written = await workshopTestMutator({
-      dataDir: target.dataDir,
+    const applied = await applyTweakMutatorRoute({
+      target,
+      gameArchive,
+      gameName,
       project,
     });
-    const rescanned = await primeScan(target.enginePath, target.dataDir, true);
-    const found = rescanned.games.find((g) =>
-      isWorkshopMutatorArchive(g.primaryArchive.name),
-    );
-    if (!found)
-      throw new Error(
-        `Wrote the archive to ${written.dir} but the rescan did not find it.`,
-      );
-    prevArchive.current = found.primaryArchive.name;
-    setGameName(found.name);
+    prevArchive.current = applied.archiveName;
+    setGameName(applied.gameType);
     notify({
       title: `Playing with "${project.name}"`,
-      body: `${gameName} has no tweak slots, so the project is carried by a generated game that depends on it.`,
+      body: [
+        `${gameName} has no tweak slots, so the project is carried by a generated game that depends on it.`,
+        applied.typedNote,
+      ]
+        .filter(Boolean)
+        .join(" "),
       level: "success",
     });
   }
