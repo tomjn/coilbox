@@ -25,6 +25,7 @@ import {
   RANGE_PER_COST_HELP,
   type UnitDerivedStats,
 } from "./derivedStats";
+import { evaluateUnitQuery, parseUnitQuery } from "./searchQuery";
 import { unitEffectiveDerivedStats } from "./unitWeapons";
 import type { EquippedWeapons, WeaponLibrary } from "./weaponLibrary";
 
@@ -209,7 +210,10 @@ export function sortReferenceRows(
 
 /** Two column values are the same unit for comparison purposes: both absent,
  *  or numerically equal past floating point noise. */
-function sameValue(a: number | undefined, b: number | undefined): boolean {
+export function sameValue(
+  a: number | undefined,
+  b: number | undefined,
+): boolean {
   if (a === undefined || b === undefined) return a === b;
   return Math.abs(a - b) < 1e-6;
 }
@@ -233,4 +237,41 @@ export function differingColumns(rows: UnitReferenceRow[]): ReferenceColumn[] {
 export function formatReferenceValue(value: number | undefined): string {
   if (value === undefined) return "—";
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+/** A faction filter's sentinel "no filter" value (issue #3110). Not a real
+ *  faction's name, since a game's side names are read straight off the game
+ *  rather than chosen by this page. */
+export const ALL_FACTIONS = "__all__";
+
+/**
+ * `rows`, by the same search query and faction filter the table and the
+ * scatter plot (issue #3115) both read: one filtered set for both, so a unit
+ * hidden from the table cannot still show up as a dot. `factionFilter` is
+ * ignored when `factionOf` is absent, the same as the table's own filter.
+ */
+export function filterReferenceRows(
+  rows: UnitReferenceRow[],
+  query: string,
+  factionFilter: string,
+  factionOf?: (key: string) => string | undefined,
+): { ok: boolean; error?: string; rows: UnitReferenceRow[] } {
+  const parsed = parseUnitQuery(query.trim());
+  if (!parsed.ok) return { ok: false, error: parsed.error, rows: [] };
+  const matched = rows.filter((row) =>
+    evaluateUnitQuery(parsed.query, {
+      key: row.key,
+      name: row.name,
+      def: row.def,
+      // Already computed for this row (issue #3074): no extra resolution to
+      // memoise, since the caller's `rows` is.
+      derived: () => row.derived,
+    }),
+  );
+  if (!factionOf || factionFilter === ALL_FACTIONS)
+    return { ok: true, rows: matched };
+  return {
+    ok: true,
+    rows: matched.filter((row) => factionOf(row.key) === factionFilter),
+  };
 }

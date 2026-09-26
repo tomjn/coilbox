@@ -181,6 +181,9 @@ export default function UnitReferencePage() {
             {row.name}
           </Link>
         )}
+        unitHref={(row) =>
+          `/library/games/${encodeURIComponent(game.name)}/units/${encodeURIComponent(row.key)}`
+        }
         picOf={picOf}
         picsPending={picsPending}
         factionOf={factionOf}
