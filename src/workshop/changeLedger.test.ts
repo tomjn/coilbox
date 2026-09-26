@@ -45,7 +45,7 @@ describe("ledgerByOutput", () => {
           unit: "armcom",
           changes: [
             change({
-              tweakSlot: { kind: "tweakunits", label: "tweakunits" },
+              tweakSlot: { kind: "tweakdefs", label: "tweakdefs" },
             }),
           ],
         },
@@ -54,7 +54,7 @@ describe("ledgerByOutput", () => {
     };
     const rows = ledgerByOutput(ledger);
     expect(rows.map((r) => r.label).sort()).toEqual([
-      "!bset tweakunits",
+      "!bset tweakdefs",
       "gamedata/unitdefs_post.lua",
     ]);
   });
@@ -67,7 +67,7 @@ describe("ledgerByOutput", () => {
           changes: [
             change({
               description: "Field change: maxDamage",
-              tweakSlot: { kind: "tweakunits", label: "tweakunits" },
+              tweakSlot: { kind: "tweakdefs", label: "tweakdefs1" },
             }),
             change({
               description: "Build menu: added armpw",
@@ -81,13 +81,13 @@ describe("ledgerByOutput", () => {
     };
     const rows = ledgerByOutput(ledger);
     const defsRow = rows.find((r) => r.label === "!bset tweakdefs");
-    const unitsRow = rows.find((r) => r.label === "!bset tweakunits");
+    const secondRow = rows.find((r) => r.label === "!bset tweakdefs1");
     expect(defsRow?.entries).toHaveLength(1);
-    expect(unitsRow?.entries).toHaveLength(1);
+    expect(secondRow?.entries).toHaveLength(1);
     expect(defsRow?.entries[0].change.description).toBe(
       "Build menu: added armpw",
     );
-    expect(unitsRow?.entries[0].change.description).toBe(
+    expect(secondRow?.entries[0].change.description).toBe(
       "Field change: maxDamage",
     );
   });

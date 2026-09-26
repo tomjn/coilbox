@@ -18,7 +18,6 @@ import {
 
 const pack = (over: Partial<TweakSlotPack> = {}): TweakSlotPack => ({
   tweakdefs: [],
-  tweakunits: [],
   oversized: [],
   unplaced: [],
   ...over,
@@ -139,18 +138,13 @@ describe("parseBsetLine", () => {
 });
 
 describe("deliverySlots", () => {
-  it("keeps the packed order, defs before units, with their tag keys", () => {
+  it("keeps the packed order, with their tag keys", () => {
     const slots = deliverySlots(
       pack({
         tweakdefs: ["!bset tweakdefs AAAA", "!bset tweakdefs1 BBBB"],
-        tweakunits: ["!bset tweakunits CCCC"],
       }),
     );
-    expect(slots.map((s) => s.name)).toEqual([
-      "tweakdefs",
-      "tweakdefs1",
-      "tweakunits",
-    ]);
+    expect(slots.map((s) => s.name)).toEqual(["tweakdefs", "tweakdefs1"]);
     expect(slots[1].tagKey).toBe("game/modoptions/tweakdefs1");
     expect(slots[0].bytes).toBe("!bset tweakdefs AAAA".length);
   });

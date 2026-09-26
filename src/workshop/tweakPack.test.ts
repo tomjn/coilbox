@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
-import { type TweakSlotPack, tweakSlotFit, tweakSlotsUsed } from "./tweakPack";
+import { type TweakSlotPack, tweakSlotFit } from "./tweakPack";
 
 function option(key: string): ConfigOption {
   return {
@@ -22,26 +22,15 @@ function option(key: string): ConfigOption {
 function pack(overrides: Partial<TweakSlotPack> = {}): TweakSlotPack {
   return {
     tweakdefs: [],
-    tweakunits: [],
     oversized: [],
     unplaced: [],
     ...overrides,
   };
 }
 
-describe("tweakSlotsUsed", () => {
-  it("counts each kind by how many lines the pack produced", () => {
-    const p = pack({
-      tweakdefs: ["!bset tweakdefs x", "!bset tweakdefs1 y"],
-      tweakunits: ["!bset tweakunits z"],
-    });
-    expect(tweakSlotsUsed(p)).toEqual({ defs: 2, units: 1 });
-  });
-});
-
 describe("tweakSlotFit", () => {
-  it("fits when the game declares at least as many slots as the pack needed", () => {
-    const p = pack({ tweakdefs: ["a", "b"], tweakunits: ["c"] });
+  it("fits when the game declares at least as many tweakdefs slots as the pack needed", () => {
+    const p = pack({ tweakdefs: ["a", "b"] });
     const options = [
       option("tweakdefs"),
       option("tweakdefs1"),
@@ -49,23 +38,33 @@ describe("tweakSlotFit", () => {
     ];
     const result = tweakSlotFit(p, options);
     expect(result.fits).toBe(true);
-    expect(result.needed).toEqual({ defs: 2, units: 1 });
-    expect(result.available).toEqual({ defs: 2, units: 1 });
+    expect(result.needed).toBe(2);
+    expect(result.available).toBe(2);
   });
 
-  it("does not fit when the pack needed more of one kind than the game declares", () => {
-    const p = pack({ tweakdefs: ["a", "b", "c"], tweakunits: [] });
+  it("does not fit when the pack needed more tweakdefs slots than the game declares", () => {
+    const p = pack({ tweakdefs: ["a", "b", "c"] });
     const options = [option("tweakdefs")];
     const result = tweakSlotFit(p, options);
     expect(result.fits).toBe(false);
-    expect(result.needed.defs).toBe(3);
-    expect(result.available.defs).toBe(1);
+    expect(result.needed).toBe(3);
+    expect(result.available).toBe(1);
+  });
+
+  it("does not count tweakunits slots, which a pack never fills", () => {
+    const p = pack({ tweakdefs: ["a"] });
+    const result = tweakSlotFit(p, [
+      option("tweakunits"),
+      option("tweakunits1"),
+    ]);
+    expect(result.fits).toBe(false);
+    expect(result.available).toBe(0);
   });
 
   it("does not fit when the game declares no tweak slots at all", () => {
     const p = pack({ tweakdefs: ["a"] });
     const result = tweakSlotFit(p, []);
     expect(result.fits).toBe(false);
-    expect(result.available).toEqual({ defs: 0, units: 0 });
+    expect(result.available).toBe(0);
   });
 });

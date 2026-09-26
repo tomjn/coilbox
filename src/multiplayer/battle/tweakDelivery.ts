@@ -117,7 +117,7 @@ export function parseBsetLine(
 /** Turn a pack into the slots to send, in the order they were packed. */
 export function deliverySlots(pack: TweakSlotPack): TweakSlot[] {
   const slots: TweakSlot[] = [];
-  for (const line of [...pack.tweakdefs, ...pack.tweakunits]) {
+  for (const line of pack.tweakdefs) {
     const parsed = parseBsetLine(line);
     if (!parsed) continue;
     slots.push({

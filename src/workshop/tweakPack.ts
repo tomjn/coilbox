@@ -31,10 +31,11 @@ import type { ModProject } from "./project";
 /** What packing a project's chunks across the game's slots produced. */
 export interface TweakSlotPack {
   /** One `!bset tweakdefs...` line per filled slot, in the order they have
-   *  to run. */
+   *  to run. The only kind a pack fills: a table-form edit goes in as a
+   *  block that merges it, because the games checked do not agree on how
+   *  to decode a `tweakunits` slot or when to run it (issue #3126,
+   *  `tweak_pack.rs`). */
   tweakdefs: string[];
-  /** One `!bset tweakunits...` line per filled slot. Always one chunk each. */
-  tweakunits: string[];
   /** A chunk whose own line would exceed the cap even alone in an empty
    *  slot. Named by its title. */
   oversized: string[];
@@ -63,36 +64,26 @@ export const workshopPackTweakSlots = defineCommand<
   TweakSlotPack
 >("coilbox-workshop", "workshop_pack_tweak_slots");
 
-/** How many slots a pack actually used, by kind. */
-export function tweakSlotsUsed(pack: TweakSlotPack): {
-  defs: number;
-  units: number;
-} {
-  return { defs: pack.tweakdefs.length, units: pack.tweakunits.length };
-}
-
 /**
- * Whether the selected game declares enough tweak slots for what a pack
- * needed, checked against the live count `tweakSlotCounts` reads off the
- * game's own mod options rather than the 30-slot maximum the convention BAR
- * popularized allows: a game can, and BAR itself sometimes does, expose fewer
- * than that. Reported before the export rather than after, per issue #1277:
- * a lobby chat line pasted into a slot the game never declared does nothing,
- * silently.
+ * Whether the selected game declares enough `tweakdefs` slots for what a
+ * pack needed, checked against the live count `tweakSlotCounts` reads off the
+ * game's own mod options rather than the 30-slot maximum the convention
+ * allows: Zero-K and older Beyond All Reason builds declare 10, and BAR's
+ * own `master` 30. Reported before the export rather than after, per issue
+ * #1277: a lobby chat line pasted into a slot the game never declared does
+ * nothing, silently.
  */
 export function tweakSlotFit(
   pack: TweakSlotPack,
   options: ConfigOption[],
 ): {
   fits: boolean;
-  needed: { defs: number; units: number };
-  available: { defs: number; units: number };
+  /** `tweakdefs` slots the pack filled. */
+  needed: number;
+  /** `tweakdefs` slots the game declares. */
+  available: number;
 } {
-  const needed = tweakSlotsUsed(pack);
-  const available = tweakSlotCounts(options);
-  return {
-    fits: needed.defs <= available.defs && needed.units <= available.units,
-    needed,
-    available,
-  };
+  const needed = pack.tweakdefs.length;
+  const available = tweakSlotCounts(options).defs;
+  return { fits: needed <= available, needed, available };
 }
