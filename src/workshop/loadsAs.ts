@@ -31,13 +31,19 @@ export interface WrittenValue {
 export interface Written {
   units?: Record<string, Record<string, WrittenValue>>;
   weapons?: Record<string, Record<string, WrittenValue>>;
+  /** A copy's own numbers, keyed by copy then dotted path into its `def`
+   * (issue #3095). */
+  clones?: Record<string, Record<string, WrittenValue>>;
 }
 
 /** One typed number, and what became of it. */
 export interface TypedValueReport {
   field:
     | { kind: "unit"; unit: string; path: string }
-    | { kind: "weapon"; weapon: string; path: string };
+    | { kind: "weapon"; weapon: string; path: string }
+    /** A copy's own number, differing from its source, on edit in place
+     * (issue #3095). */
+    | { kind: "clone"; unit: string; path: string };
   typed: number;
   /** What the game loads when the typed value is written. */
   loadsAsTyped: number | null;
@@ -112,9 +118,14 @@ export const workshopSettleTypedValuesTweaks = defineCommand<
 
 /** Where a typed number is, for a person. */
 export function fieldLabel(report: TypedValueReport): string {
-  return report.field.kind === "unit"
-    ? `${report.field.unit} ${report.field.path}`
-    : `library weapon ${report.field.weapon} ${report.field.path}`;
+  switch (report.field.kind) {
+    case "unit":
+      return `${report.field.unit} ${report.field.path}`;
+    case "clone":
+      return `${report.field.unit} ${report.field.path} (copy)`;
+    case "weapon":
+      return `library weapon ${report.field.weapon} ${report.field.path}`;
+  }
 }
 
 /**

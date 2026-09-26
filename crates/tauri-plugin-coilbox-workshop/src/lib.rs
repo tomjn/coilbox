@@ -377,8 +377,10 @@ async fn workshop_settle_typed_values(
 /// mutator route (issue #3093): loads `archive` at `gameDir` with the game's
 /// own files patched the way `workshop_write_in_place` would leave them
 /// (`inplace::dry_run`), for exactly the fields that route carries, a clone's
-/// and a field sent to the mutator route on purpose left out. `sources` is
-/// the same read of game units the write itself takes.
+/// override left out (its own numbers are settled separately, straight out
+/// of its `def`, since they never go through an override at all, issue
+/// #3095) and a field sent to the mutator route on purpose left out.
+/// `sources` is the same read of game units the write itself takes.
 #[tauri::command]
 async fn workshop_settle_typed_values_in_place(
     engine_path: String,
@@ -404,12 +406,27 @@ async fn workshop_settle_typed_values_in_place(
         let carries_field = |unit: &str, field: &str| {
             !project.edits.clones.contains_key(unit) && !project.is_mutator_only(unit, field)
         };
-        let carries_equip = |unit: &str| !project.edits.clones.contains_key(unit);
+        // A copy this route actually writes: sent to the mutator route on
+        // purpose, or otherwise not writable at all (it replaces a game unit,
+        // or was built with no source), never reaches the game through edit
+        // in place, so neither its equipped weapons nor its own numbers do
+        // (`inplace::write_copies`).
+        let carries_copy = |unit: &str| {
+            project.edits.clones.get(unit).is_some_and(|clone| {
+                inplace_clone::writable(clone) && !project.is_clone_mutator_only(unit)
+            })
+        };
+        let carries_equip =
+            |unit: &str| !project.edits.clones.contains_key(unit) || carries_copy(unit);
         let settled = loads_as::settle_scoped(
             &project,
+            &sources,
             loads_as::Precision::F32,
-            &carries_field,
-            &carries_equip,
+            &loads_as::RouteScope {
+                carries_field: &carries_field,
+                carries_equip: &carries_equip,
+                carries_clone_field: &carries_copy,
+            },
             &mut compile,
             &mut load,
         )?;
