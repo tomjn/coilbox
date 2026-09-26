@@ -45,25 +45,10 @@ export default function UpdatesSettingsSection() {
         <p className="text-sm text-muted-foreground">{inert}</p>
       ) : (
         <>
-          <div className="flex items-center gap-3">
-            <Button onClick={() => void runCheck()} disabled={checking}>
-              {checking ? "Checking…" : "Check for updates"}
-            </Button>
-            {lastChecked && (
-              <span className="text-xs text-muted-foreground">
-                Last checked {new Date(lastChecked).toLocaleTimeString()}
-              </span>
-            )}
-          </div>
-
-          {error && <p className="text-sm text-destructive">{error}</p>}
-
-          {!update && lastChecked && !checking && (
-            <p className="text-sm text-muted-foreground">You're up to date.</p>
-          )}
-
+          {/* An update available is the action worth taking, so it gets the
+            primary-styled card and button. Checking is the secondary one. */}
           {update && (
-            <div className="flex flex-col gap-3 rounded-lg border p-4">
+            <div className="flex flex-col gap-3 rounded-lg border border-primary/60 bg-primary/5 p-4">
               <div className="font-medium">
                 Version {update.version} available
               </div>
@@ -91,6 +76,27 @@ export default function UpdatesSettingsSection() {
                 </Button>
               )}
             </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => void runCheck()}
+              disabled={checking}
+            >
+              {checking ? "Checking…" : "Check for updates"}
+            </Button>
+            {lastChecked && (
+              <span className="text-xs text-muted-foreground">
+                Last checked {new Date(lastChecked).toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+
+          {error && <p className="text-sm text-destructive">{error}</p>}
+
+          {!update && lastChecked && !checking && (
+            <p className="text-sm text-muted-foreground">You're up to date.</p>
           )}
         </>
       )}
