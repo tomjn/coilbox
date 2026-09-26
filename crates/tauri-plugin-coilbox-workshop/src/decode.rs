@@ -1,7 +1,7 @@
 //! Decoding a base64 tweak payload back to Lua, and as far into the project
 //! model as its own shape allows (issue #1280).
 //!
-//! This is the inverse of `bar_pack.rs` (issue #1277): that module packs
+//! This is the inverse of `tweak_pack.rs` (issue #1277): that module packs
 //! compiled chunks into `!bset` lines, this one reads a line, or a whole set
 //! of a battle's mod options, back out. What it hands back is honest about
 //! what it found rather than forcing everything into one shape:
@@ -23,7 +23,7 @@
 //! stranger's payload through it rather than a project the local user typed:
 //!
 //!  1. **Size is checked before anything touches the VM.** A payload longer
-//!     than `bar_pack::PAYLOAD_CAP` (the same ceiling the packer enforces on
+//!     than `tweak_pack::PAYLOAD_CAP` (the same ceiling the packer enforces on
 //!     the way out) is refused outright: not decoded, not parsed, not run.
 //!  2. **A block is compiled, never executed.** [`parses_as_block`] reuses
 //!     `preflight.rs`'s own trick of defining the body inside a closure that
@@ -37,7 +37,7 @@
 //!     is exactly the "program disguised as an expression" case the
 //!     instruction cap alone does not rule out overallocating.
 
-use crate::bar_pack::PAYLOAD_CAP;
+use crate::tweak_pack::PAYLOAD_CAP;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use coilbox_springlua::SpringLua;
 use serde::Serialize;
@@ -66,7 +66,7 @@ pub struct DecodedSlot {
     pub key: String,
     pub kind: SlotKind,
     /// The numbered slot, when the key or an embedded `!bset` prefix named
-    /// one. `Some(0)` for the bare slot, matching `bar_pack::bset_prefix`.
+    /// one. `Some(0)` for the bare slot, matching `tweak_pack::bset_prefix`.
     pub slot: Option<usize>,
     /// The decoded Lua, verbatim, once decoding got that far. `None` only
     /// when the payload could not even be turned into text: see `error`.
@@ -87,7 +87,7 @@ pub struct DecodedSlot {
     pub error: Option<String>,
 }
 
-/// Every slot decode found, bucketed the way `bar_pack::BarSlotPack` buckets
+/// Every slot decode found, bucketed the way `tweak_pack::TweakSlotPack` buckets
 /// the other direction, and ordered by slot number within each bucket so
 /// the frontend can show `tweakdefs`, `tweakdefs1`, `tweakdefs2`... in the
 /// order they were meant to run.
@@ -238,7 +238,7 @@ pub fn decode_one(lua: &SpringLua, key_hint: &str, raw: &str) -> DecodedSlot {
 
 /// Strip a `!bset tweak<defs|units><n> ` prefix if the pasted text still has
 /// it (a real-world paste, issue #1280's own requirement), and read off the
-/// key it names. `bar_pack::bset_prefix` writes exactly this shape, and other
+/// key it names. `tweak_pack::bset_prefix` writes exactly this shape, and other
 /// tools write `!bSet`, so the command itself is matched case-insensitively.
 fn strip_bset_prefix(text: &str) -> (Option<String>, &str) {
     let trimmed = text.trim();
@@ -275,7 +275,7 @@ fn normalize_base64(text: &str) -> String {
 
 /// A key's kind and numbered slot, matching `deliveryRoutes.ts`'s own
 /// `TWEAK_KEY` pattern: `tweak(defs|units)(\d+)?`. The bare key is slot 0,
-/// numbered ones from 1, the same convention `bar_pack::bset_prefix` writes.
+/// numbered ones from 1, the same convention `tweak_pack::bset_prefix` writes.
 fn slot_kind_and_index(key: &str) -> (SlotKind, Option<usize>) {
     for (prefix, kind) in [
         ("tweakdefs", SlotKind::Tweakdefs),
@@ -370,7 +370,7 @@ fn looks_like_a_plain_table(src: &str) -> bool {
 /// Replace the contents of every double-quoted string with spaces, so a
 /// modder's own text (which may legally contain any character, `(` included)
 /// is never mistaken for Lua syntax. Lua single-quoted and long-bracket
-/// strings are not tracked, matching `bar_pack::minify_lua`'s own scope: this
+/// strings are not tracked, matching `tweak_pack::minify_lua`'s own scope: this
 /// crate never writes either, and neither is expected from a well-formed
 /// data table produced the way this project's own compiler writes one.
 fn blank_out_strings(src: &str) -> String {
@@ -405,7 +405,7 @@ fn blank_out_strings(src: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bar_pack;
+    use crate::tweak_pack;
     use crate::compile::{Chunk, LuaForm};
 
     fn lua() -> SpringLua {
@@ -705,11 +705,11 @@ mod tests {
         assert_eq!(set.unrecognised[0].form.as_deref(), Some("table"));
     }
 
-    /// The strongest test available: what `bar_pack::pack` produces for a
+    /// The strongest test available: what `tweak_pack::pack` produces for a
     /// real compiled project decodes back to the same Lua, with the same
     /// form the compiler wrote it in.
     #[test]
-    fn a_bar_pack_line_decodes_back_to_the_same_lua_and_form() {
+    fn a_tweak_pack_line_decodes_back_to_the_same_lua_and_form() {
         let chunks = vec![
             Chunk {
                 form: LuaForm::Table,
@@ -725,7 +725,7 @@ mod tests {
                     .to_string(),
             },
         ];
-        let pack = bar_pack::pack(&chunks);
+        let pack = tweak_pack::pack(&chunks);
         assert_eq!(pack.tweakunits.len(), 1);
         assert_eq!(pack.tweakdefs.len(), 1);
 

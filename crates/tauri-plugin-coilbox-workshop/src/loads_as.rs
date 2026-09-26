@@ -40,7 +40,7 @@
 //! every unit and weapon. A game that never reads the options loads its own
 //! values whatever is written, and every field stays as typed with the note.
 
-use crate::bar_pack;
+use crate::tweak_pack;
 use crate::compile::{compile, equip_at, CompiledMod};
 use crate::model::ModProject;
 use serde::{Deserialize, Serialize};
@@ -571,8 +571,8 @@ pub enum TweakRoute {
 }
 
 /// The mod options `project`, with `written` in place, hands a game on
-/// `route`: exactly what `localBar.ts` writes for a local launch,
-/// or what `workshop_pack_bar_slots` packs for a lobby. A slot a pack could
+/// `route`: exactly what `localTweakSlot.ts` writes for a local launch,
+/// or what `workshop_pack_tweak_slots` packs for a lobby. A slot a pack could
 /// not place is not in it, the same as in the lobby.
 pub fn tweak_mod_options(
     project: &ModProject,
@@ -582,10 +582,10 @@ pub fn tweak_mod_options(
     let compiled = compile_written(project, written);
     match route {
         TweakRoute::Bare => compiled
-            .bar_tweakdefs
-            .map(|lua| BTreeMap::from([("tweakdefs".to_string(), bar_pack::encode(&lua))]))
+            .tweakdefs
+            .map(|lua| BTreeMap::from([("tweakdefs".to_string(), tweak_pack::encode(&lua))]))
             .ok_or_else(|| "this project has nothing for the tweakdefs slot".to_string()),
-        TweakRoute::Numbered => Ok(bar_pack::mod_options(&bar_pack::pack(&compiled.chunks))),
+        TweakRoute::Numbered => Ok(tweak_pack::mod_options(&tweak_pack::pack(&compiled.chunks))),
     }
 }
 

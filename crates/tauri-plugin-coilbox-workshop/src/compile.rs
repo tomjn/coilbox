@@ -4,12 +4,12 @@
 //!
 //! A **table** is a plain map of unit name to definition. It says what a unit
 //! is and nothing about how to get there, so it can be read, diffed and pasted
-//! by hand. It is what Beyond All Reason's `tweakunits` slot carries, and what
-//! a game's own `units/<name>.lua` file returns. It cannot express a change
-//! that depends on what the game already says.
+//! by hand. It is what a `tweakunits` slot carries, and what a game's own
+//! `units/<name>.lua` file returns. It cannot express a change that depends
+//! on what the game already says.
 //!
 //! A **block** is executable Lua wrapped in `do ... end`, run with `UnitDefs`
-//! in scope. It is what BAR's `tweakdefs` slot carries, and what a mutator's
+//! in scope. It is what a `tweakdefs` slot carries, and what a mutator's
 //! `gamedata/unitdefs_post.lua` runs. It is needed the moment a change has to
 //! read a definition before writing it: replaying a build menu over whatever
 //! list the game ships today, dropping a unit from every builder in the game,
@@ -17,8 +17,8 @@
 //!
 //! So the compiler picks per change rather than per store, and says why. Those
 //! two forms are also why one compiler serves both delivery routes: the mutator
-//! archive is these chunks written into files, and the BAR export (issue #1277)
-//! is the same chunks base64ed into numbered slots.
+//! archive is these chunks written into files, and the numbered tweak-slot
+//! export (issue #1277) is the same chunks base64ed into numbered slots.
 //!
 //! One store is neither form, because it is not Lua. A game that keeps its
 //! unit names and descriptions in `language/<code>/units.json` rather than in
@@ -90,22 +90,23 @@ pub struct CompiledMod {
     /// What the compiler could not do, and what to watch out for in what it
     /// did. Empty is the ordinary case.
     pub notes: Vec<String>,
-    /// Every edit as one `do ... end` block, for Beyond All Reason's bare
-    /// `tweakdefs` mod option on a local skirmish launch (issue #1278). `None`
-    /// when there is nothing to tweak.
+    /// Every edit as one `do ... end` block, for a game's bare `tweakdefs`
+    /// mod option on a local skirmish launch (issue #1278). `None` when there
+    /// is nothing to tweak.
     ///
     /// Only `tweakdefs` is used, never `tweakunits`: a `tweakunits` slot is a
-    /// plain table BAR merges into `UnitDefs` by some rule of its own that
-    /// nothing here has confirmed, while `tweakdefs` runs as Lua with
-    /// `UnitDefs` in scope, the same contract `gamedata/unitdefs_post.lua`
-    /// already relies on and this project has already tested. So an added
-    /// unit is folded in here as a plain `UnitDefs[name] = def` assignment
-    /// rather than left for a `tweakunits` slot to interpret, and everything
-    /// this field carries is exactly as certain as the mutator route already
-    /// is. Splitting a large project across BAR's numbered slots is issue
-    /// #1277's, not this field's: a project too big for the one bare slot is
-    /// simply not offered this route (see `src/workshop/localBar.ts`).
-    pub bar_tweakdefs: Option<String>,
+    /// plain table a game merges into `UnitDefs` by some rule of its own that
+    /// nothing here has confirmed (BAR's own rule is the one this project has
+    /// verified), while `tweakdefs` runs as Lua with `UnitDefs` in scope, the
+    /// same contract `gamedata/unitdefs_post.lua` already relies on and this
+    /// project has already tested. So an added unit is folded in here as a
+    /// plain `UnitDefs[name] = def` assignment rather than left for a
+    /// `tweakunits` slot to interpret, and everything this field carries is
+    /// exactly as certain as the mutator route already is. Splitting a large
+    /// project across a game's numbered slots is issue #1277's, not this
+    /// field's: a project too big for the one bare slot is simply not offered
+    /// this route (see `src/workshop/localTweakSlot.ts`).
+    pub tweakdefs: Option<String>,
 }
 
 /// Where the executable half of a mutator has to live.
@@ -153,8 +154,9 @@ const ARMOR_FILE: &str = "gamedata/armordefs.lua";
 /// A mutator archive's version for every route except packaging.
 ///
 /// The local test route (`mutator.rs`) rewrites its folder whole on every
-/// test and the BAR route (`localBar.ts`) writes a mod option that is
-/// forgotten the moment the skirmish ends, so neither reads this field.
+/// test and the local tweak-slot route (`localTweakSlot.ts`) writes a mod
+/// option that is forgotten the moment the skirmish ends, so neither reads
+/// this field.
 /// Packaging a project for somebody else is the one route where the number
 /// has to mean something (issue #1283): two players on different builds of
 /// the same archive name is a sync error, not an error message, so
@@ -217,7 +219,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         .filter(|clone| clone.replaces_game_unit && valid_unit_key(&clone.key))
         .collect();
 
-    // Computed unconditionally, so `bar_tweakdefs` below can fold the same
+    // Computed unconditionally, so `tweakdefs` below can fold the same
     // added units in as assignments without resolving their definitions a
     // second time.
     let added_entries: Vec<(String, Value)> = added
@@ -232,7 +234,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // tweak into each one it finds a key for, so a key naming a unit the game
     // does not have matches nothing and the whole added unit is dropped with
     // no error. Only an assignment creates one, which is what
-    // `bar_tweakdefs_body` has always done for the single-slot route and what
+    // `tweakdefs_body` has always done for the single-slot route and what
     // the numbered-slot packer gets by carrying this as a block.
     //
     // The archive route is unaffected: it loads these out of `units/` beside
@@ -412,7 +414,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             .collect::<Vec<_>>()
             .join(", ");
         notes.push(format!(
-            "{carried} name and description edit{} {} in {paths}, added beside the game's own units.json rather than over it, so every unit the project does not name keeps the words the game gives it. Beyond All Reason's tweak slot route cannot carry these at all: that Lua runs in the definition parser, which has no Spring.I18N.",
+            "{carried} name and description edit{} {} in {paths}, added beside the game's own units.json rather than over it, so every unit the project does not name keeps the words the game gives it. A tweak slot cannot carry these at all: that Lua runs in the definition parser, which has no Spring.I18N.",
             if carried == 1 { "" } else { "s" },
             if carried == 1 { "is" } else { "are" },
         ));
@@ -460,7 +462,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     let weapon_files = weapon_files(edits, &mut notes);
     if !weapon_files.is_empty() {
         notes.push(format!(
-            "{} weapon file{} written under weapons/, one for each unit and library weapon it carries, so the weapon is in the game's shared weapon table under the name its slot gives it. A game that adds a unit's own weapons to that table itself, as Balanced Annihilation and Beyond All Reason do, replaces each one with the same weapon, and one that does not, such as SpringMCLegacy or THIS, finds it there. A BAR tweak slot carries no files, and needs none, because Beyond All Reason adds the unit's own weapons itself.",
+            "{} weapon file{} written under weapons/, one for each unit and library weapon it carries, so the weapon is in the game's shared weapon table under the name its slot gives it. A game that adds a unit's own weapons to that table itself, as Balanced Annihilation and Beyond All Reason do, replaces each one with the same weapon, and one that does not, such as SpringMCLegacy or THIS, finds it there. A tweak slot carries no files, and needs none for a game that adds a unit's own weapons itself the way Beyond All Reason does; a game that does not may need its weapon files delivered by another route.",
             weapon_files.len(),
             if weapon_files.len() == 1 { "" } else { "s" }
         ));
@@ -482,7 +484,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             });
         }
         notes.push(format!(
-            "{} explosion effect{} written under effects/. The engine reads these from a real file in the game's own archive tree (rts/Sim/Projectiles/ExplosionGenerator.cpp), so a BAR tweak slot cannot carry them: this project's tweakdefs export is left empty and the mutator or edit-in-place route is needed to see the effect in game.",
+            "{} explosion effect{} written under effects/. The engine reads these from a real file in the game's own archive tree (rts/Sim/Projectiles/ExplosionGenerator.cpp), so a tweak slot cannot carry them: this project's tweakdefs export is left empty and the mutator or edit-in-place route is needed to see the effect in game.",
             edits.explosion_generators.len(),
             if edits.explosion_generators.len() == 1 { "" } else { "s" }
         ));
@@ -513,12 +515,12 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // the effects/<key>.lua file the name resolves to (see the note above), so
     // a project with any generator gets no tweakdefs export at all rather than
     // one that quietly points at nothing in game.
-    let bar_tweakdefs = if !edits.explosion_generators.is_empty()
+    let tweakdefs = if !edits.explosion_generators.is_empty()
         || (added_entries.is_empty() && patches.is_empty() && post_blocks.is_empty())
     {
         None
     } else {
-        Some(bar_tweakdefs_body(
+        Some(tweakdefs_body(
             project,
             &added_entries,
             &patches,
@@ -530,7 +532,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
         chunks,
         files,
         notes,
-        bar_tweakdefs,
+        tweakdefs,
     }
 }
 
@@ -1508,7 +1510,7 @@ fn unit_table(entries: &[(String, Value)], indent: &str) -> String {
 
 /// Every unit a project adds, as assignments (issue #2962).
 ///
-/// The same thing [`bar_tweakdefs_body`] writes for the single-slot route,
+/// The same thing [`tweakdefs_body`] writes for the single-slot route,
 /// wrapped in `do ... end` so a numbered slot can carry it alongside another
 /// mod's. Assignment rather than a merge because there is nothing to merge
 /// onto: the game has no unit of this name, which is the whole point of a
@@ -2072,7 +2074,7 @@ fn ceg_file(generator: &ExplosionGenerator) -> String {
 
 /// The patch table with the code that applies it: every field change, merged
 /// onto whatever `UnitDefs` already holds. Shared by [`post_file`] and
-/// [`bar_tweakdefs_body`], which both run this over the same `UnitDefs` the
+/// [`tweakdefs_body`], which both run this over the same `UnitDefs` the
 /// engine loaded, just reached through a different slot.
 fn write_patches_section(out: &mut String, patches: &[(String, PatchTree)]) {
     if patches.is_empty() {
@@ -2105,7 +2107,7 @@ fn write_patches_section(out: &mut String, patches: &[(String, PatchTree)]) {
 }
 
 /// Every block, one after another. Shared by [`post_file`] and
-/// [`bar_tweakdefs_body`] for the reason [`write_patches_section`] is.
+/// [`tweakdefs_body`] for the reason [`write_patches_section`] is.
 fn write_blocks_section(out: &mut String, blocks: &[&str]) {
     for block in blocks {
         out.push('\n');
@@ -2123,11 +2125,11 @@ fn post_file(project: &ModProject, patches: &[(String, PatchTree)], blocks: &[&s
     out
 }
 
-/// The same edits as one payload for BAR's bare `tweakdefs` mod option
+/// The same edits as one payload for a game's bare `tweakdefs` mod option
 /// (issue #1278). Everything [`post_file`] runs, plus the units a project
 /// adds, folded in as plain assignments rather than left for a `tweakunits`
-/// slot: see [`CompiledMod::bar_tweakdefs`] for why.
-fn bar_tweakdefs_body(
+/// slot: see [`CompiledMod::tweakdefs`] for why.
+fn tweakdefs_body(
     project: &ModProject,
     added: &[(String, Value)],
     patches: &[(String, PatchTree)],
@@ -2267,7 +2269,7 @@ mod tests {
         assert!(out.chunks.is_empty());
         assert!(out.files.is_empty());
         assert!(out.notes.is_empty());
-        assert!(out.bar_tweakdefs.is_none());
+        assert!(out.tweakdefs.is_none());
     }
 
     /// The form the issue asks for on the simple case: a plain table, no code.
@@ -2309,7 +2311,7 @@ mod tests {
                 .find(|f| f.path == POST_FILE)
                 .expect("post file")
                 .contents,
-            out.bar_tweakdefs.as_ref().expect("tweakdefs"),
+            out.tweakdefs.as_ref().expect("tweakdefs"),
         ] {
             assert!(route.contains(&block.lua));
             assert!(route.contains("maxDamage = 5000"));
@@ -2414,7 +2416,7 @@ mod tests {
         assert!(!chunk.lua.contains("range = 300"), "{}", chunk.lua);
         assert!(chunk.lua.contains("{ \"armcom\", 0, \"heavylaser\" },"));
         assert!(!chunk.lua.contains("unused"));
-        assert!(out.bar_tweakdefs.expect("tweakdefs").contains("heavylaser"));
+        assert!(out.tweakdefs.expect("tweakdefs").contains("heavylaser"));
     }
 
     /// A copy's definition is the project's own, so a weapon equipped into
@@ -2496,7 +2498,7 @@ mod tests {
             .notes
             .iter()
             .any(|n| n.starts_with("2 weapon files written under weapons/")));
-        assert!(out.bar_tweakdefs.is_some());
+        assert!(out.tweakdefs.is_some());
     }
 
     /// Issue #3068, with #2641. The weapons a library weapon names go into
@@ -2820,8 +2822,8 @@ mod tests {
     }
 
     /// The archive loads an added unit out of `units/`, so that file stays a
-    /// plain table. The chunk is a block because the other route, a BAR slot,
-    /// has to assign it: see [`added_block`] and issue #2962.
+    /// plain table. The chunk is a block because the other route, a tweak
+    /// slot, has to assign it: see [`added_block`] and issue #2962.
     #[test]
     fn a_new_unit_is_assigned_in_its_chunk_and_plain_in_its_own_file() {
         let out = compile(&project(json!({
@@ -2868,7 +2870,7 @@ mod tests {
                 "def": { "maxDamage": 9000 }
             } }
         })));
-        let pack = crate::bar_pack::pack(&out.chunks);
+        let pack = crate::tweak_pack::pack(&out.chunks);
         assert_eq!(pack.tweakunits.len(), 0);
         assert_eq!(pack.tweakdefs.len(), 1);
         assert!(pack.complete());
@@ -3275,15 +3277,15 @@ mod tests {
         assert_eq!(def["customParams"]["tier"], json!("2"));
     }
 
-    /// A field change reaches `bar_tweakdefs` through exactly the same merge
+    /// A field change reaches `tweakdefs` through exactly the same merge
     /// code `POST_FILE` runs, since both have to apply the same patch onto the
     /// same `UnitDefs`.
     #[test]
-    fn a_field_change_lands_in_bar_tweakdefs_as_a_merge() {
+    fn a_field_change_lands_in_tweakdefs_as_a_merge() {
         let out = compile(&project(json!({
             "overrides": { "armcom": { "maxDamage": 5000 } }
         })));
-        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        let tweakdefs = out.tweakdefs.expect("tweakdefs");
         assert!(tweakdefs.contains("local changes = "));
         assert!(tweakdefs.contains("merge(def, patch)"));
         assert!(tweakdefs.contains("maxDamage = 5000"));
@@ -3292,7 +3294,7 @@ mod tests {
     /// An added unit cannot go through a merge: there is nothing in
     /// `UnitDefs` yet to merge onto, so it is a plain assignment instead.
     #[test]
-    fn an_added_unit_lands_in_bar_tweakdefs_as_an_assignment() {
+    fn an_added_unit_lands_in_tweakdefs_as_an_assignment() {
         let out = compile(&project(json!({
             "clones": { "supercom": {
                 "key": "supercom", "source": "armcom",
@@ -3300,7 +3302,7 @@ mod tests {
                 "def": { "maxDamage": 9000 }
             } }
         })));
-        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        let tweakdefs = out.tweakdefs.expect("tweakdefs");
         assert!(tweakdefs.contains("local added = "));
         assert!(tweakdefs.contains("UnitDefs[name] = def"));
         assert!(tweakdefs.contains("maxDamage = 9000"));
@@ -3309,11 +3311,11 @@ mod tests {
     }
 
     /// Every block-form edit (a replaced unit, a build menu, a disabled unit)
-    /// reaches `bar_tweakdefs` the same way it reaches `POST_FILE`: as the
+    /// reaches `tweakdefs` the same way it reaches `POST_FILE`: as the
     /// exact block the chunk list already shows the user, run in the same
     /// order.
     #[test]
-    fn block_form_edits_land_in_bar_tweakdefs_in_compiled_order() {
+    fn block_form_edits_land_in_tweakdefs_in_compiled_order() {
         let out = compile(&project(json!({
             "menus": { "armlab": [{ "op": "add", "unit": "armpw" }] },
             "disabled": ["armflash"],
@@ -3321,7 +3323,7 @@ mod tests {
                 "key": "armcom", "replacesGameUnit": true, "def": { "maxdamage": 1 }
             } }
         })));
-        let tweakdefs = out.bar_tweakdefs.expect("bar_tweakdefs");
+        let tweakdefs = out.tweakdefs.expect("tweakdefs");
         let blocks: Vec<&Chunk> = out
             .chunks
             .iter()
@@ -3332,20 +3334,20 @@ mod tests {
         for block in blocks {
             let found = tweakdefs[at..]
                 .find(&block.lua)
-                .unwrap_or_else(|| panic!("{} is not in bar_tweakdefs", block.title));
+                .unwrap_or_else(|| panic!("{} is not in tweakdefs", block.title));
             at += found + block.lua.len();
         }
     }
 
     /// A name and description edit is the one thing neither route can carry
     /// (compile.rs's own note), so it must not silently appear in
-    /// `bar_tweakdefs` either.
+    /// `tweakdefs` either.
     #[test]
-    fn text_only_edits_leave_bar_tweakdefs_empty() {
+    fn text_only_edits_leave_tweakdefs_empty() {
         let out = compile(&project(json!({
             "text": { "armcom": { "en": { "name": "Commander" } } }
         })));
-        assert!(out.bar_tweakdefs.is_none());
+        assert!(out.tweakdefs.is_none());
     }
 
     /// A project that has never moved a unit ships no armour class file at
@@ -3611,11 +3613,11 @@ mod tests {
     }
 
     /// The engine only ever loads a CEG from a real file under `effects/`
-    /// (`ExplosionGenerator.cpp:208`), which a BAR tweak slot has no way to
+    /// (`ExplosionGenerator.cpp:208`), which a tweak slot has no way to
     /// carry, so a project holding one gets no tweakdefs export at all
     /// rather than one that points at a generator nothing delivers.
     #[test]
-    fn a_project_with_an_explosion_generator_gets_no_bar_tweakdefs() {
+    fn a_project_with_an_explosion_generator_gets_no_tweakdefs() {
         let out = compile(&project(json!({
             "overrides": { "armcom": { "weapondefs.disintegrator.explosionGenerator": "custom:purpleflash" } },
             "explosionGenerators": {
@@ -3632,7 +3634,7 @@ mod tests {
                 }
             }
         })));
-        assert!(out.bar_tweakdefs.is_none());
+        assert!(out.tweakdefs.is_none());
         assert!(out
             .notes
             .iter()

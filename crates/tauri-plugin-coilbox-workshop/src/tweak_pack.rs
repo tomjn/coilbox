@@ -1,33 +1,42 @@
-//! Packing compiled chunks across Beyond All Reason's numbered tweak slots,
-//! for a player who does not control the host's own lobby (issue #1277).
+//! Packing compiled chunks across a game's numbered tweak slots, for a
+//! player who does not control the host's own lobby (issue #1277).
 //!
-//! A mutator archive cannot be loaded into a BAR lobby. The only route open
-//! to a player who is not hosting is asking the server to set a
+//! `tweakdefs`/`tweakunits` mod options predate Beyond All Reason: any game
+//! whose `modoptions.lua` declares the same bare-plus-numbered keys can take
+//! a project this way. BAR is the game this module's own research was done
+//! against, so the BAR-specific facts below (its decoder's quirks, the tools
+//! its players use) are named as BAR's rather than generalised past what is
+//! actually known about other games.
+//!
+//! A mutator archive cannot be loaded into somebody else's lobby. The only
+//! route open to a player who is not hosting is asking the server to set a
 //! `tweakdefs`/`tweakunits` mod option through the `!bset` chat command a
 //! SPADS-based autohost answers to, which is why every line this module
 //! produces carries the `!bset <slot> ` prefix rather than the bare base64:
-//! the length that matters is the whole chat line teiserver reads, not only
-//! the payload inside it.
+//! the length that matters is the whole chat line the lobby server reads,
+//! not only the payload inside it.
 //!
-//! The cap, and why it is not the more obvious 16,384 or 16,385: teiserver's
-//! `spring_in.ex` slices a `!bset tweakdefs`/`!bset tweakunits` `SAYBATTLE`
-//! line to 16,385 characters (`String.slice(0..16_384)`, an inclusive Elixir
-//! range) before silently truncating whatever is left, with no error sent
-//! back. Coilbox caps the base64 *payload* at 16,000 rather than pushing to
-//! that ceiling: Tom's decision on issue #1277, matching NuttyB's own
-//! configurator (`MAX_ENCODED_SIZE`, uncited but already familiar to the
-//! tooling BAR players use) over the 10,000 that issue's own research
-//! recommended, because he is getting uberserver's smaller 10,000-character
-//! refusal raised separately. 16,000 leaves 385 characters of headroom under
-//! teiserver's real limit once the longest prefix (`!bset tweakunits29 `, 19
-//! characters) is added. Every fit check below still measures the whole line
-//! rather than trusting that headroom, because BAR's own EditP tool shows
-//! what happens when a cap is checked against the payload alone. It compares
-//! only the base64 against its threshold, so it can hand teiserver a line the
-//! server then truncates without telling anyone (see issue #1277's own
-//! research comments). Uberserver refuses a line over 10,000 characters
-//! outright rather than truncating it. Surfacing that refusal is issue
-//! #1279's, not this module's to avoid by shrinking the cap.
+//! The cap, and why it is not the more obvious 16,384 or 16,385: this is a
+//! lobby-server limit, not a game one. teiserver's `spring_in.ex` slices a
+//! `!bset tweakdefs`/`!bset tweakunits` `SAYBATTLE` line to 16,385 characters
+//! (`String.slice(0..16_384)`, an inclusive Elixir range) before silently
+//! truncating whatever is left, with no error sent back, and uberserver
+//! enforces its own ceiling on the same kind of line by refusing it outright
+//! rather than truncating it (10,000 characters). Coilbox caps the base64
+//! *payload* at 16,000 rather than pushing to teiserver's ceiling: Tom's
+//! decision on issue #1277, matching NuttyB's own configurator
+//! (`MAX_ENCODED_SIZE`, uncited but already familiar to the tooling BAR
+//! players use) over the 10,000 that issue's own research recommended,
+//! because he is getting uberserver's smaller refusal raised separately.
+//! 16,000 leaves 385 characters of headroom under teiserver's real limit
+//! once the longest prefix (`!bset tweakunits29 `, 19 characters) is added.
+//! Every fit check below still measures the whole line rather than trusting
+//! that headroom, because BAR's own EditP tool shows what happens when a cap
+//! is checked against the payload alone. It compares only the base64 against
+//! its threshold, so it can hand the lobby server a line it then truncates
+//! without telling anyone (see issue #1277's own research comments).
+//! Surfacing uberserver's refusal is issue #1279's, not this module's to
+//! avoid by shrinking the cap.
 //!
 //! The two chunk forms `compile.rs` produces go to different slot kinds. A
 //! table (`tweakunits`) cannot be joined onto another the way two `do ... end`
@@ -81,16 +90,16 @@ pub const PAYLOAD_CAP: usize = 16_000;
 /// keeps proving it rather than assuming it, per this module's doc comment.
 pub const LINE_CAP: usize = 16_385;
 
-/// One slot key past the last one BAR's `modoptions.lua` declares: the bare
+/// One slot key past the last one a game's `modoptions.lua` declares: the bare
 /// option plus numbered `1` through `29` (`deliveryRoutes.ts`'s own doc
 /// comment, read off BAR's mod option generator), so 30 valid indices in
 /// total. 0 for the bare slot and 1..=29 for the numbered ones.
 const MAX_SLOTS: usize = 30;
 
-/// What packing a project's chunks across BAR's slots produced.
+/// What packing a project's chunks across the game's slots produced.
 #[derive(Debug, Clone, Default, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct BarSlotPack {
+pub struct TweakSlotPack {
     /// One `!bset tweakdefs...` line per filled slot, in the order they have
     /// to run.
     pub tweakdefs: Vec<String>,
@@ -102,12 +111,12 @@ pub struct BarSlotPack {
     /// slot. No packing decision could have placed it, and splitting it
     /// would break the Lua it carries.
     pub oversized: Vec<String>,
-    /// A chunk that would have fit a slot on its own, but every slot BAR
-    /// exposes was already spoken for by chunks compiled ahead of it.
+    /// A chunk that would have fit a slot on its own, but every slot the
+    /// game exposes was already spoken for by chunks compiled ahead of it.
     pub unplaced: Vec<String>,
 }
 
-impl BarSlotPack {
+impl TweakSlotPack {
     /// Whether every chunk handed to [`pack`] reached a slot. `false` is
     /// exactly the case issue #1277 asks to be said before the export rather
     /// than after.
@@ -336,7 +345,7 @@ fn fits_line(prefix_len: usize, payload_len: usize) -> bool {
 
 /// The mod options a lobby ends up holding once every line in `pack` has
 /// been said, slot key to payload (issue #3092).
-pub(crate) fn mod_options(pack: &BarSlotPack) -> std::collections::BTreeMap<String, String> {
+pub(crate) fn mod_options(pack: &TweakSlotPack) -> std::collections::BTreeMap<String, String> {
     pack.tweakdefs
         .iter()
         .chain(&pack.tweakunits)
@@ -345,18 +354,18 @@ pub(crate) fn mod_options(pack: &BarSlotPack) -> std::collections::BTreeMap<Stri
         .collect()
 }
 
-/// Pack every chunk `compile::compile` produced across BAR's numbered slots.
-pub fn pack(chunks: &[Chunk]) -> BarSlotPack {
-    let mut result = BarSlotPack::default();
+/// Pack every chunk `compile::compile` produced across the game's numbered slots.
+pub fn pack(chunks: &[Chunk]) -> TweakSlotPack {
+    let mut result = TweakSlotPack::default();
     pack_tables(chunks, &mut result);
     pack_blocks(chunks, &mut result);
     result
 }
 
-/// A table-form chunk gets a slot of its own. BAR's `tweakunits` carries a
+/// A table-form chunk gets a slot of its own. A `tweakunits` slot carries a
 /// plain table, and two of those cannot be joined into one without a rule
 /// for merging their keys that nothing here has been asked to invent.
-fn pack_tables(chunks: &[Chunk], result: &mut BarSlotPack) {
+fn pack_tables(chunks: &[Chunk], result: &mut TweakSlotPack) {
     let mut slot_index = 0usize;
     for chunk in chunks.iter().filter(|c| c.form == LuaForm::Table) {
         if slot_index >= MAX_SLOTS {
@@ -378,7 +387,7 @@ fn pack_tables(chunks: &[Chunk], result: &mut BarSlotPack) {
 /// Block-form chunks are concatenated into a slot until the next one would
 /// not fit, in the compiled order, which is the order they have to run in
 /// (see this module's doc comment).
-fn pack_blocks(chunks: &[Chunk], result: &mut BarSlotPack) {
+fn pack_blocks(chunks: &[Chunk], result: &mut TweakSlotPack) {
     let mut current = String::new();
     let mut slot_index = 0usize;
 
@@ -647,7 +656,7 @@ mod tests {
     }
 
     /// The headroom the packing decision banks on: a payload sitting exactly
-    /// at `PAYLOAD_CAP`, in the worst-prefixed slot BAR has, still clears
+    /// at `PAYLOAD_CAP`, in the worst-prefixed slot the convention has, still clears
     /// `LINE_CAP` with room to spare. Matches "16,019 characters against a
     /// 16,385 slice" from issue #1277's own research.
     #[test]
@@ -693,7 +702,7 @@ mod tests {
         assert!(!pack.complete());
     }
 
-    /// Ran out of the 30 slots BAR exposes: real for a large enough project,
+    /// Ran out of the 30 slots the game exposes: real for a large enough project,
     /// and exactly the failure issue #1277 asks to be said before the export.
     #[test]
     fn the_31st_table_chunk_is_unplaced_rather_than_silently_dropped() {

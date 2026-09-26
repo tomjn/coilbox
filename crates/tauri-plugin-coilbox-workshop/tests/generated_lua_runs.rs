@@ -115,7 +115,7 @@ fn a_field_change_through_a_list_position_lands_where_the_page_read_it() {
 /// change. Before issue #3041 both wrote the commander's D-gun change into a
 /// fourth weapon of its own.
 #[test]
-fn the_post_file_and_bar_tweakdefs_change_the_weapon_the_page_showed() {
+fn the_post_file_and_tweakdefs_change_the_weapon_the_page_showed() {
     let project: ModProject = serde_json::from_value(json!({
         "name": "Test project",
         "gameName": "XTA 9.65",
@@ -139,7 +139,7 @@ fn the_post_file_and_bar_tweakdefs_change_the_weapon_the_page_showed() {
         ("post file", post.contents.clone()),
         (
             "tweakdefs",
-            compiled.bar_tweakdefs.clone().expect("tweakdefs"),
+            compiled.tweakdefs.clone().expect("tweakdefs"),
         ),
     ] {
         let root = tempfile::tempdir().expect("tempdir");
@@ -200,7 +200,7 @@ fn a_weapon_edit_changes_this_units_slot_and_definition_and_no_other() {
         ("post file", post.contents.clone()),
         (
             "tweakdefs",
-            compiled.bar_tweakdefs.clone().expect("tweakdefs"),
+            compiled.tweakdefs.clone().expect("tweakdefs"),
         ),
     ] {
         let root = tempfile::tempdir().expect("tempdir");
@@ -446,7 +446,7 @@ fn every_generated_file_is_lua_that_parses() {
 }
 
 /// What a game's `weapondefs_post.lua` does with the unit table once the
-/// mutator's `unitdefs_post.lua` or a BAR tweak slot has run over it: put
+/// mutator's `unitdefs_post.lua` or a tweak slot has run over it: put
 /// each unit's own definitions into the shared table as `<unit>_<name>`,
 /// then, for a game that binds a slot by `def`, point the slot at one. The
 /// `def` half is the loop in the base content's `ProcessUnitDef`, Balanced
@@ -498,7 +498,7 @@ fn load_weapons(generated: &str, unit_defs: &str, shared: &str, by_def: bool) ->
         .unwrap_or_else(|e| panic!("{e}\n\n{source}"))
 }
 
-/// The mutator's post file and the BAR tweakdefs a project compiled to.
+/// The mutator's post file and the tweakdefs a project compiled to.
 fn both_routes(edits: Value) -> Vec<(&'static str, String)> {
     let project: ModProject = serde_json::from_value(json!({
         "name": "Test project",
@@ -516,7 +516,7 @@ fn both_routes(edits: Value) -> Vec<(&'static str, String)> {
         .clone();
     vec![
         ("post file", post),
-        ("tweakdefs", compiled.bar_tweakdefs.expect("tweakdefs")),
+        ("tweakdefs", compiled.tweakdefs.expect("tweakdefs")),
     ]
 }
 
