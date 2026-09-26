@@ -31,19 +31,11 @@ import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import type { ChangeLedger } from "../../changeLedger";
-import type { UnitClones } from "../../clones";
+import { type UnitClones, unitIsAdded } from "../../clones";
 import { overrideValue, readPath, type UnitOverrides } from "../../overrides";
 import { projectPath } from "../../routes";
 import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
 import { display } from "./UnitFieldRow";
-
-/**
- * One unit's changes, once the ledger has named them and this project's own
- * clones have said which of them is a whole added unit rather than a field.
- */
-function unitIsAdded(clones: UnitClones, unit: string): boolean {
-  return Object.hasOwn(clones, unit);
-}
 
 export function ChangesPanel({
   projectId,

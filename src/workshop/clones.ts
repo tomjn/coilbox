@@ -97,6 +97,14 @@ export interface UnitClone {
 /** Every unit the project adds, keyed by internal name. */
 export type UnitClones = Record<string, UnitClone>;
 
+/** Whether a unit is one the project added, copied or built from nothing.
+ *  Shared by the Changes page's own "added" line (issue #3112) and the unit
+ *  list's "changed" filter (issue #3109), so both call it a change the same
+ *  way rather than each keeping its own check. */
+export function unitIsAdded(clones: UnitClones, unit: string): boolean {
+  return Object.hasOwn(clones, unit);
+}
+
 /**
  * What an internal name may contain.
  *
