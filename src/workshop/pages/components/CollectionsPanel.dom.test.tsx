@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * The drawer that creates, nests, renames and deletes collections, and edits
+ * The Collections section that creates, nests, renames and deletes collections, and edits
  * one collection's own membership (issue #2654). Exercised against the pure
  * functions in `collections.ts` rather than mocked, so a create-then-nest
  * flow proves the whole round trip the way a person would drive it.
@@ -18,7 +18,7 @@ import {
   setCollectionRule,
 } from "../../collections";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
-import { CollectionsDrawer } from "./CollectionsDrawer";
+import { CollectionsPanel } from "./CollectionsPanel";
 
 const UNITS = {
   armcom: {},
@@ -67,9 +67,7 @@ function draw(
   };
 
   const view = render(
-    <CollectionsDrawer
-      open
-      onOpenChange={() => {}}
+    <CollectionsPanel
       collections={current}
       units={units}
       overrides={{}}
@@ -88,9 +86,7 @@ function draw(
   );
   function rerender() {
     view.rerender(
-      <CollectionsDrawer
-        open
-        onOpenChange={() => {}}
+      <CollectionsPanel
         collections={current}
         units={units}
         overrides={{}}

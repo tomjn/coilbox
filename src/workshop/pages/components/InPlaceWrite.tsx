@@ -104,7 +104,7 @@ export function InPlaceWrite({
   const [confirmAccept, setConfirmAccept] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   // The game, so typed values can be checked against it before a write
-  // (issue #3093), the same way `PackageMutatorButton` checks them before a
+  // (issue #3093), the same way `PackagePanel` checks them before a
   // package.
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);

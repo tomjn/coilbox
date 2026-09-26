@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 /**
- * The button that packages a workshop project as a `.sdz` (issue #1283).
+ * The Package section that packages a workshop project as a `.sdz` (issue
+ * #1283), with the generated Lua beside it (issue #3111).
  * What matters here is the gate and the version, not the compiler's own
  * output (`compile.test.ts` already covers that): preflight has to run and
  * come back clean before anything is written, a cancelled save dialog must
@@ -78,10 +79,19 @@ const {
 
 /** Reassigned per test, and read by the mock below at call time. */
 let mockCompiled: {
-  compiled: { files: { path: string; contents: string }[] } | null;
+  compiled: {
+    files: { path: string; contents: string }[];
+    chunks: never[];
+    notes: string[];
+    tweakdefs: null;
+  } | null;
   loading: boolean;
   error: string | null;
-} = { compiled: { files: [] }, loading: false, error: null };
+} = {
+  compiled: { files: [], chunks: [], notes: [], tweakdefs: null },
+  loading: false,
+  error: null,
+};
 
 vi.mock("../../compile", () => ({ useCompiledProject: () => mockCompiled }));
 vi.mock("../../preflight", () => ({ workshopPreflight }));
@@ -123,10 +133,14 @@ vi.mock("@/play/config", () => ({
   }),
 }));
 
-const { PackageMutatorButton } = await import("./PackageMutatorButton");
+const { PackagePanel } = await import("./PackagePanel");
 
 function compiled(files: { path: string; contents: string }[]) {
-  return { compiled: { files }, loading: false, error: null };
+  return {
+    compiled: { files, chunks: [], notes: [], tweakdefs: null },
+    loading: false,
+    error: null,
+  };
 }
 
 function draw(
@@ -135,7 +149,7 @@ function draw(
   units: Record<string, Record<string, unknown>> = {},
 ) {
   render(
-    <PackageMutatorButton
+    <PackagePanel
       // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject
       project={project as any}
       units={units}
@@ -173,10 +187,9 @@ afterEach(() => {
   mockCompiled = compiled([]);
 });
 
-describe("PackageMutatorButton", () => {
+describe("PackagePanel", () => {
   it("says there is nothing to package when the project has no edits", () => {
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
     expect(screen.getByText(/nothing to package yet/i)).toBeTruthy();
     expect(
       (
@@ -188,17 +201,25 @@ describe("PackageMutatorButton", () => {
     expect(workshopPreflight).not.toHaveBeenCalled();
   });
 
+  /** The Lua view the header's Lua button used to open (issue #3101). */
+  it("shows the Lua it would ship beside the export", () => {
+    mockCompiled = compiled([
+      { path: "units/armcom.lua", contents: "return {}" },
+    ]);
+    draw();
+    expect(screen.getByRole("heading", { name: "Generated Lua" })).toBeTruthy();
+    expect(screen.getByText("units/armcom.lua")).toBeTruthy();
+  });
+
   it("offers version 1 for a project never packaged before", () => {
     mockCompiled = compiled([{ path: "modinfo.lua", contents: "" }]);
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
     expect(screen.getByText(/version 1/i)).toBeTruthy();
   });
 
   it("checks preflight, writes the archive and reports the version it wrote", async () => {
     mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
     const onPackaged = draw();
-    fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
     fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
 
     await vi.waitFor(() =>
@@ -227,7 +248,6 @@ describe("PackageMutatorButton", () => {
     mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
     save.mockResolvedValue(null);
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
     fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
 
     await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
@@ -242,7 +262,6 @@ describe("PackageMutatorButton", () => {
       passes: [],
     });
     draw();
-    fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
     fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
 
     await vi.waitFor(() => expect(screen.getByText(/1 blocker/i)).toBeTruthy());
@@ -268,7 +287,6 @@ describe("PackageMutatorButton", () => {
 
     it("offers no selector when the project has no collections", () => {
       draw();
-      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
       expect(
         screen.queryByRole("combobox", {
           name: /restrict this export to a collection/i,
@@ -279,7 +297,7 @@ describe("PackageMutatorButton", () => {
     it("compiles and packages only the picked collection's units", async () => {
       mockCompiled = compiled([{ path: "units/armcom.lua", contents: "" }]);
       render(
-        <PackageMutatorButton
+        <PackagePanel
           // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture
           project={withCollections as any}
           units={{}}
@@ -290,7 +308,6 @@ describe("PackageMutatorButton", () => {
           clones={{}}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
       fireEvent.click(
         screen.getByRole("combobox", {
           name: /restrict this export to a collection/i,
@@ -337,7 +354,7 @@ describe("PackageMutatorButton", () => {
       };
       mockCompiled = compiled([{ path: "units/armtank.lua", contents: "" }]);
       render(
-        <PackageMutatorButton
+        <PackagePanel
           // biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture
           project={withRuleCollection as any}
           units={{ armtank: tank, armcom: { metalCost: 500 } }}
@@ -348,7 +365,6 @@ describe("PackageMutatorButton", () => {
           clones={{}}
         />,
       );
-      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
       fireEvent.click(
         screen.getByRole("combobox", {
           name: /restrict this export to a collection/i,
@@ -373,7 +389,6 @@ describe("PackageMutatorButton", () => {
 
   describe("tweak slots mode", () => {
     function openTweakMode() {
-      fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
       fireEvent.click(screen.getByRole("radio", { name: /tweak slots/i }));
     }
 

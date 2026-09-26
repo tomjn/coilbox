@@ -3,7 +3,7 @@
  * Applying a project from the presets panel (issue #3122): a game with tweak
  * slots must settle typed values against the game before packing, the same
  * check the workshop's own Package drawer runs before a tweak-slot pack
- * (`PackageMutatorButton.dom.test.tsx`). What matters here is that the settle
+ * (`PackagePanel.dom.test.tsx`). What matters here is that the settle
  * runs before `workshopPackTweakSlots`, that its `written` map reaches the pack
  * call, and that a failed or skipped settle still applies the project as
  * typed rather than blocking it.

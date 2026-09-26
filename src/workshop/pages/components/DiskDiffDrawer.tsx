@@ -4,7 +4,7 @@
  * A game author who has been tweaking a loose `.sdd` in coilbox commits the
  * result to git afterwards, and wants to see exactly what changed before
  * deciding to keep it, the way the other delivery routes let you read what
- * the compiler produced (`CompiledLuaDrawer`, issue #2653). Without this, the
+ * the compiler produced (`CompiledLuaPanel`, issue #2653). Without this, the
  * only way to answer that question is to leave coilbox and run `git diff`.
  *
  * `workshop_in_place_diffs` reads a line diff of every file the edit-in-place

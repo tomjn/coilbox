@@ -3,14 +3,15 @@
  * scope the unit list and, later, batch edits (#2655) and an export (issue
  * #2656's neighbour, restricting a package to one collection's units).
  *
- * A drawer rather than a page, matching `WeaponLibraryDrawer`: the unit being
- * worked on stays where it was. Creating a collection comes first, the tree
- * of what exists is next, and picking one opens a searchable checklist of
- * every unit in the game to add or remove from it, and a rule (issue #2656)
- * that adds every unit matching a `searchQuery.ts` predicate on top of
- * whatever is ticked.
+ * The project's Collections section (issue #3111), a page of its own rather
+ * than the drawer it was, matching `WeaponLibraryPanel`. Creating a
+ * collection comes first and the tree of what exists is under it, on the
+ * left. Picking one opens, on the right, a searchable checklist of every unit
+ * in the game to add or remove from it, and a rule (issue #2656) that adds
+ * every unit matching a `searchQuery.ts` predicate on top of whatever is
+ * ticked.
  */
-import { Button, Drawer, Input } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { FolderPlus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Field } from "@/components/Field";
@@ -62,9 +63,7 @@ function parentOptions(collections: Collections, excludeId?: string) {
   ];
 }
 
-export function CollectionsDrawer({
-  open,
-  onOpenChange,
+export function CollectionsPanel({
   collections,
   units,
   overrides,
@@ -80,8 +79,6 @@ export function CollectionsDrawer({
   equipped,
   clones,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   collections: Collections;
   /** The game's units with the project's own already in among them, the same
    *  set `UnitList` draws from. */
@@ -147,14 +144,12 @@ export function CollectionsDrawer({
   };
 
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Collections"
-      description="Named, nestable sets of units. A parent includes everything its children hold."
-      width="32rem"
-    >
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,30rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-6">
+        <p className="text-sm text-muted-foreground">
+          Named, nestable sets of units. A parent includes everything its
+          children hold.
+        </p>
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">New collection</h3>
           <form
@@ -227,9 +222,11 @@ export function CollectionsDrawer({
             </ul>
           )}
         </section>
+      </div>
 
+      <div className="flex min-w-0 flex-col gap-6">
         {active && (
-          <section className="flex flex-col gap-3 border-t border-border/60 pt-4">
+          <section className="flex flex-col gap-3">
             <h3 className="text-sm font-medium">
               Units in {active.name}{" "}
               <span className="text-xs font-normal text-muted-foreground">
@@ -305,7 +302,7 @@ export function CollectionsDrawer({
           </section>
         )}
       </div>
-    </Drawer>
+    </div>
   );
 }
 

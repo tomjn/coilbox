@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /**
- * What the drawer says about a compile (issue #1275).
+ * What the generated Lua view says about a compile (issue #1275).
  *
  * The Lua itself is checked in Rust, where it is generated and where a test can
  * run it. What is left here is the part the compiler cannot check for itself:
@@ -12,7 +12,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CompiledMod, CompileState } from "../../compile";
 import type { ModProject } from "../../project";
-import { CompiledLuaDrawer } from "./CompiledLuaDrawer";
+import { CompiledLuaPanel } from "./CompiledLuaPanel";
 
 const project: ModProject = {
   id: "p1",
@@ -30,18 +30,11 @@ const compiled = (over: Partial<CompiledMod> = {}): CompileState => ({
 });
 
 const draw = (state: CompileState) =>
-  render(
-    <CompiledLuaDrawer
-      open
-      onOpenChange={() => {}}
-      project={project}
-      state={state}
-    />,
-  );
+  render(<CompiledLuaPanel project={project} state={state} />);
 
 afterEach(cleanup);
 
-describe("the generated Lua drawer", () => {
+describe("the generated Lua view", () => {
   it("says which form each change took and why", () => {
     draw(
       compiled({
@@ -82,7 +75,7 @@ describe("the generated Lua drawer", () => {
     expect(screen.getByText("modinfo.lua")).toBeTruthy();
   });
 
-  it("says so rather than showing an empty drawer for a project with no edits", () => {
+  it("says so rather than showing an empty view for a project with no edits", () => {
     draw(compiled());
     expect(
       screen.getByText(
@@ -93,7 +86,7 @@ describe("the generated Lua drawer", () => {
 
   /** Issue #2743. A project whose only edits are names compiles to a language
    *  file and no Lua, so "nothing to compile" would be a lie about work that
-   *  is in the drawer underneath it. */
+   *  is in the view underneath it. */
   it("does not claim a rename-only project changes nothing", () => {
     draw(
       compiled({
@@ -123,9 +116,7 @@ describe("the generated Lua drawer", () => {
    */
   it("shows read-only Lua a decoded import carried, separate from the generated files", () => {
     render(
-      <CompiledLuaDrawer
-        open
-        onOpenChange={() => {}}
+      <CompiledLuaPanel
         project={{
           ...project,
           readOnlyLua: [

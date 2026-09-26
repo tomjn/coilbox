@@ -47,8 +47,13 @@
  * worth reading once you already know something is wrong. It is read only
  * while the drawer is open, unlike preflight, since nothing on the toolbar
  * face depends on it.
+ *
+ * The drawer became the project's Checks section (issue #3111), a page of its
+ * own, and the button became the verdict on that section's entry in the
+ * project's section bar. The verdict still reads live whichever section is
+ * open, and the change ledger still waits until the Checks page is.
  */
-import { Button, Drawer } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import {
   Check,
   CircleCheck,
@@ -59,12 +64,6 @@ import {
 import { useState } from "react";
 import { Link } from "react-router";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import type { Archive, ConfigOption } from "@/content/bindings";
 import type { ArmorProblem } from "../../armorClasses";
 import type { ChangeLedger, LedgerChange } from "../../changeLedger";
@@ -650,22 +649,8 @@ function verdict(
   return parts.join(", ");
 }
 
-export function ChecksButton({
-  gameName,
-  gameArchives,
-  enginePath,
-  dataDir,
-  diagnosticErrors,
-  diagnosticsChecking,
-  routeOptions,
-  routesChecking,
-  project,
-  gameUnits,
-  compatibility,
-  onApplyFix,
-  onInPlaceWrite,
-  armorClassProblems,
-}: {
+/** What the checks read, which the page already holds. */
+export type ChecksInput = {
   gameName: string;
   /** The game's own archives, its primary one first, for the post-processing
    *  check to read (issue #2744). The engine's base content is deliberately
@@ -694,11 +679,6 @@ export function ChecksButton({
    *  (issue #1281). Null when no project is open. Worked out by the page,
    *  which is where the game's definitions already are. */
   compatibility: CompatState | null;
-  onApplyFix: (finding: CompatFinding) => void;
-  /** Called after an edit-in-place action went through, so the page can
-   *  follow it in the project (issue #3023) and drop its own unitsync reads
-   *  of the game (issue #2637). */
-  onInPlaceWrite: (done: InPlaceDone) => void;
   /** A weapon's damage table naming an armour class this game does not have,
    *  across every unit the project has patched or copied and every weapon
    *  its library holds (issue #3104), so the finding is visible without
@@ -706,18 +686,37 @@ export function ChecksButton({
    *  `compatibility` is, since it already holds the project's edits and the
    *  game's live data. */
   armorClassProblems: ArmorProblem[];
-}) {
-  const [open, setOpen] = useState(false);
-  // Read whenever a project is open, not only while the drawer is up: see
-  // the module doc comment for why the button needs a live answer.
+};
+
+/**
+ * Every check's answer, and the one verdict they add up to.
+ *
+ * A hook of its own rather than inside the Checks page, because the verdict
+ * is on the project's section bar whichever section is open (issue #3111),
+ * and a count that only ran while you were looking at it could not warn you.
+ * `reading` is whether the Checks page itself is open, which only the change
+ * ledger waits for: see the module doc comment.
+ */
+export function useProjectChecks(input: ChecksInput, reading: boolean) {
+  const {
+    project,
+    enginePath,
+    dataDir,
+    gameArchives,
+    compatibility,
+    armorClassProblems,
+    diagnosticErrors,
+    diagnosticsChecking,
+    routesChecking,
+  } = input;
+  // Read whenever a project is open, not only while the page is up: see the
+  // module doc comment for why the verdict needs a live answer.
   const preflight = usePreflightReport(project, true);
-  // Only while the drawer is open: see the module doc comment for why the
-  // change ledger does not need the same always-on read preflight does.
-  const changeLedger = useChangeLedger(project, open);
+  const changeLedger = useChangeLedger(project, reading);
   // Also live, for the same reason preflight is: the post-processing check
-  // reaches the button's face, and it needs the compiler's own answer about
-  // which files this project produces rather than a second guess at the rule.
-  // One more compile per edit alongside the one preflight already runs.
+  // reaches the verdict, and it needs the compiler's own answer about which
+  // files this project produces rather than a second guess at the rule. One
+  // more compile per edit alongside the one preflight already runs.
   const compile = useCompiledProject(project, true);
   const postHook = usePostHookCheck(
     enginePath,
@@ -743,7 +742,7 @@ export function ChecksButton({
     armorClassProblems.length;
   const diagnostics = diagnosticErrors.length;
   // A command that failed to answer is not a clean project, it is a question
-  // this button could not settle. Kept apart from the counted severities
+  // the checks could not settle. Kept apart from the counted severities
   // rather than folded into "review", which would say preflight ran and
   // found one thing rather than that it never ran at all.
   const preflightFailed = !!project && !!preflight.error;
@@ -760,8 +759,7 @@ export function ChecksButton({
   const clean = !checking && !attention;
 
   const found = verdict(blockers, review, diagnostics);
-  const shortLabelText = preflightFailed ? "Preflight error" : (found ?? "");
-  const ariaLabel = checking
+  const summary = checking
     ? "Checking the project"
     : preflightFailed
       ? `Preflight could not run: ${preflight.error}`
@@ -769,90 +767,135 @@ export function ChecksButton({
         ? `${found} found`
         : "No problems found";
 
-  const colour = checking
+  return {
+    preflight,
+    changeLedger,
+    postHook,
+    checking,
+    clean,
+    blockers,
+    /** Everything counted, whatever its severity, for the section bar. */
+    total: blockers + review + diagnostics,
+    /** The verdict as a sentence, for an accessible name and a tooltip. */
+    summary,
+  };
+}
+
+export type ProjectChecksState = ReturnType<typeof useProjectChecks>;
+
+/**
+ * The verdict, small enough to sit on the Checks entry in the section bar
+ * (issue #3111): an icon, and a count once there is something to count.
+ * A clean project shows a tick and no number, for the reason the module doc
+ * comment gives. The full wording is the caller's to put in an accessible
+ * name, since this draws no text of its own a screen reader could use.
+ */
+export function ChecksBadge({ checks }: { checks: ProjectChecksState }) {
+  const colour = checks.checking
     ? "text-muted-foreground"
-    : clean
+    : checks.clean
       ? "text-emerald-600 dark:text-emerald-400"
-      : blockers > 0
+      : checks.blockers > 0
         ? "text-destructive"
         : "text-amber-700 dark:text-amber-400";
-
   return (
-    <>
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={checking}
-              className={colour}
-              aria-label={ariaLabel}
-              onClick={() => setOpen(true)}
-            >
-              {checking ? (
-                <Loader2 className="size-4 motion-safe:animate-spin" />
-              ) : clean ? (
-                <Check className="size-4" />
-              ) : (
-                <TriangleAlert className="size-4" />
-              )}
-              {checking && "Checking…"}
-              {!checking && !clean && shortLabelText}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>{ariaLabel}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <Drawer
-        open={open}
-        onOpenChange={setOpen}
-        title="Checks"
-        description={`Whether ${gameName} is in a fit state to use: the game's own definitions, whether the project still fits them, how an edit reaches it, what a mutator would cover of the game's own post-processing, what is wrong with what you have written, and which output each edit ended up in.`}
-        width="34rem"
-      >
-        <div className="flex flex-col gap-5">
-          <UnitsyncSection errors={diagnosticErrors} />
-          <CompatibilitySection
-            gameName={gameName}
-            state={compatibility}
-            onFix={onApplyFix}
-          />
-          <RoutesSection
-            gameName={gameName}
-            options={routeOptions}
-            gamePath={gameArchives[0]?.path}
-            checking={routesChecking}
-            project={project}
-            gameUnits={gameUnits}
-            reading={diagnosticsChecking}
-            onInPlaceWrite={onInPlaceWrite}
-          />
-          <PostHookSection
-            gameName={gameName}
-            primaryArchive={gameArchives[0]?.name ?? ""}
-            state={postHook.state}
-            loading={postHook.loading}
-          />
-          <PreflightGroup
-            heading="Armour classes"
-            lines={armorClassProblems.map((p) => p.message)}
-            className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
-          />
-          <PreflightSection
-            project={project}
-            report={preflight.report}
-            loading={preflight.loading}
-            error={preflight.error}
-          />
-          <ChangeLedgerSection
-            projectId={project?.id}
-            ledger={changeLedger.ledger}
-            loading={changeLedger.loading}
-            error={changeLedger.error}
-          />
-        </div>
-      </Drawer>
-    </>
+    <span
+      className={`inline-flex items-center gap-1 ${colour}`}
+      aria-hidden="true"
+    >
+      {checks.checking ? (
+        <Loader2 className="size-3.5 motion-safe:animate-spin" />
+      ) : checks.clean ? (
+        <Check className="size-3.5" />
+      ) : (
+        <TriangleAlert className="size-3.5" />
+      )}
+      {!checks.checking && checks.total > 0 && (
+        <span className="text-xs tabular-nums">{checks.total}</span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The project's Checks section (issue #3111): what used to be the checks
+ * drawer, as a page. The sections are the drawer's own, in the drawer's own
+ * order. Laying them out again for the room a page has is issue #3106.
+ */
+export function ChecksPanel({
+  input,
+  checks,
+  onApplyFix,
+  onInPlaceWrite,
+}: {
+  input: ChecksInput;
+  checks: ProjectChecksState;
+  onApplyFix: (finding: CompatFinding) => void;
+  /** Called after an edit-in-place action went through, so the page can
+   *  follow it in the project (issue #3023) and drop its own unitsync reads
+   *  of the game (issue #2637). */
+  onInPlaceWrite: (done: InPlaceDone) => void;
+}) {
+  const {
+    gameName,
+    gameArchives,
+    diagnosticErrors,
+    diagnosticsChecking,
+    routeOptions,
+    routesChecking,
+    project,
+    gameUnits,
+    compatibility,
+    armorClassProblems,
+  } = input;
+  const { preflight, changeLedger, postHook } = checks;
+  return (
+    <div className="flex max-w-3xl flex-col gap-5">
+      <p className="max-w-prose text-sm text-muted-foreground">
+        Whether {gameName} is in a fit state to use: the game's own definitions,
+        whether the project still fits them, how an edit reaches it, what a
+        mutator would cover of the game's own post-processing, what is wrong
+        with what you have written, and which output each edit ended up in.
+      </p>
+      <UnitsyncSection errors={diagnosticErrors} />
+      <CompatibilitySection
+        gameName={gameName}
+        state={compatibility}
+        onFix={onApplyFix}
+      />
+      <RoutesSection
+        gameName={gameName}
+        options={routeOptions}
+        gamePath={gameArchives[0]?.path}
+        checking={routesChecking}
+        project={project}
+        gameUnits={gameUnits}
+        reading={diagnosticsChecking}
+        onInPlaceWrite={onInPlaceWrite}
+      />
+      <PostHookSection
+        gameName={gameName}
+        primaryArchive={gameArchives[0]?.name ?? ""}
+        state={postHook.state}
+        loading={postHook.loading}
+      />
+      <PreflightGroup
+        heading="Armour classes"
+        lines={armorClassProblems.map((p) => p.message)}
+        className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+      />
+      <PreflightSection
+        project={project}
+        report={preflight.report}
+        loading={preflight.loading}
+        error={preflight.error}
+      />
+      <ChangeLedgerSection
+        projectId={project?.id}
+        ledger={changeLedger.ledger}
+        loading={changeLedger.loading}
+        error={changeLedger.error}
+      />
+    </div>
   );
 }

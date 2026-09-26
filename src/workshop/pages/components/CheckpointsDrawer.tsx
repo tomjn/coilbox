@@ -2,9 +2,9 @@
  * A project's checkpoints (issue #2657): named, described snapshots of its
  * edits, restorable in one action.
  *
- * A drawer rather than a page, matching `CollectionsDrawer` and
- * `WeaponLibraryDrawer`: the unit being worked on stays where it was. Saving a
- * new one comes first, then the list, newest first, mixing whatever autosave
+ * A drawer rather than a section of the project (issue #3111), opened from
+ * the header beside undo and redo because, like them, it applies to whichever
+ * section is open. Saving a new one comes first, then the list, newest first, mixing whatever autosave
  * has taken with whatever the person has named themselves.
  *
  * Restoring and deleting are the only actions here. Nothing renames an

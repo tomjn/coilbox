@@ -25,8 +25,11 @@
  * output as it stands, which is the only way an imported set means anything.
  * `compiled.notes` says how many went in and how many were left behind.
  * This is where the Lua behind those counts is.
+ *
+ * It was a drawer of its own behind a Lua button in the editor's header. Now
+ * it is part of the project's Package section (issue #3111, which covers
+ * #3101), because somebody reads it to see what they are about to ship.
  */
-import { Drawer } from "@picoframe/frame";
 import { CodeBlock } from "@/components/CodeBlock";
 import type { CompiledChunk, CompileState } from "../../compile";
 import type { ModProject } from "../../project";
@@ -46,26 +49,28 @@ const FORM_LABEL: Record<CompiledChunk["form"], string> = {
  */
 const langOf = (path: string) => (path.endsWith(".json") ? "json" : "lua");
 
-export function CompiledLuaDrawer({
-  open,
-  onOpenChange,
+export function CompiledLuaPanel({
   project,
   state,
+  scope,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   project: ModProject;
   state: CompileState;
+  /** The collection the export is restricted to, when it is, so the reader
+   *  knows this is the Lua for that part of the project only. */
+  scope?: string;
 }) {
   const { compiled, loading, error } = state;
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Generated Lua"
-      description={`What ${project.name} compiles to on top of ${project.gameName}. Built from the project every time it is opened, so there is nothing here to save.`}
-      width="48rem"
-    >
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold">Generated Lua</h2>
+        <p className="max-w-prose text-sm text-muted-foreground">
+          What {scope ? `the ${scope} collection of ` : ""}
+          {project.name} compiles to on top of {project.gameName}. Built from
+          the project every time it is opened, so there is nothing here to save.
+        </p>
+      </div>
       <div className="flex flex-col gap-5">
         {loading && <p className="text-muted-foreground text-sm">Compiling…</p>}
 
@@ -171,6 +176,6 @@ export function CompiledLuaDrawer({
           </section>
         )}
       </div>
-    </Drawer>
+    </section>
   );
 }

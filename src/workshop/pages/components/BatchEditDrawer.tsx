@@ -2,8 +2,9 @@
  * One arithmetic change across every unit in a collection, with a
  * before-and-after preview before anything is written (issue #2655).
  *
- * A drawer, matching `CollectionsDrawer` and `WeaponLibraryDrawer`: the unit
- * being worked on stays where it was. Picking a collection first, then a
+ * A drawer, so the unit being worked on stays where it was, opened from the
+ * project's section bar until issue #3113 folds it into the reference table.
+ * Picking a collection first, then a
  * field (resolved the same way `searchQuery.ts` resolves one for a search or
  * a rule), then an operation and a rounding rule, builds the preview in
  * `batchEdit.ts`. Applying writes one override per unit whose value would
@@ -34,7 +35,7 @@ import { resolveField } from "../../searchQuery";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 /** How many preview rows are drawn before asking to narrow the collection
- *  instead. Mirrors `CollectionsDrawer`'s `SHOWN`: the apply button still acts
+ *  instead. Mirrors `CollectionsPanel`'s `SHOWN`: the apply button still acts
  *  on every unit the collection names, this only caps what is rendered. */
 const SHOWN_ROWS = 300;
 
@@ -71,7 +72,7 @@ export function BatchEditDrawer({
   onOpenChange: (open: boolean) => void;
   collections: Collections;
   /** The game's units with the project's own clones already in among them,
-   *  the same table `UnitList` and `CollectionsDrawer` take. */
+   *  the same table `UnitList` and `CollectionsPanel` take. */
   units: Record<string, Record<string, unknown>>;
   overrides: UnitOverrides;
   nameOf: (key: string, def: Record<string, unknown>) => string;

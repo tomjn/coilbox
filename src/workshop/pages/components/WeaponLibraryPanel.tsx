@@ -3,12 +3,14 @@
  * under names of their own, edited here, and equipped into any unit's slot on
  * that unit's Weapons tab.
  *
- * A drawer rather than a page, so the unit being worked on stays where it was.
- * Adding comes first because an empty library is where everybody starts. The
- * field list is the same one the Weapons tab draws, so a weapon is edited here
- * exactly as it is in a slot.
+ * The project's Weapons section (issue #3111), a page of its own. It was a
+ * drawer over the unit editor, which left the field list a 48rem column. On
+ * a page the game's weapons and the library sit on the left and the weapon
+ * being edited takes the rest. Adding comes first because an empty library is
+ * where everybody starts. The field list is the same one the Weapons tab
+ * draws, so a weapon is edited here exactly as it is in a slot.
  */
-import { Button, Drawer, Input } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Field } from "@/components/Field";
@@ -44,9 +46,7 @@ function displayName(def: Record<string, unknown>): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
 
-export function WeaponLibraryDrawer({
-  open,
-  onOpenChange,
+export function WeaponLibraryPanel({
   gameName,
   gameWeapons,
   library,
@@ -60,8 +60,6 @@ export function WeaponLibraryDrawer({
   postOf,
   onOpenMount,
 }: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   gameName: string;
   /** The game's own weapon table, keyed by lowercased name. */
   gameWeapons: Record<string, Record<string, unknown>>;
@@ -130,14 +128,12 @@ export function WeaponLibraryDrawer({
   };
 
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Weapon library"
-      description={`Weapons this project owns. Copy one out of ${gameName}, change it here, then equip it into any unit's slot on that unit's Weapons tab.`}
-      width="48rem"
-    >
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
       <div className="flex flex-col gap-6">
+        <p className="text-sm text-muted-foreground">
+          Weapons this project owns. Copy one out of {gameName}, change it here,
+          then equip it into any unit's slot on that unit's Weapons tab.
+        </p>
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">Add a weapon from {gameName}</h3>
           <Field
@@ -268,7 +264,9 @@ export function WeaponLibraryDrawer({
             </ToggleGroup>
           )}
         </section>
+      </div>
 
+      <div className="flex min-w-0 flex-col gap-6">
         {selected && fields && (
           <section className="flex flex-col gap-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
@@ -336,7 +334,7 @@ export function WeaponLibraryDrawer({
           </section>
         )}
       </div>
-    </Drawer>
+    </div>
   );
 }
 
