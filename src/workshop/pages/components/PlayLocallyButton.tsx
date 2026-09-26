@@ -19,7 +19,7 @@
  */
 import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   primeScan,
   useUnitsyncGameInfo,
@@ -87,8 +87,21 @@ function uniqueByName<T extends { name: string }>(items: T[]): T[] {
   });
 }
 
-export function PlayLocallyButton({ project }: { project: ModProject }) {
+export function PlayLocallyButton({
+  project,
+  requestOpen,
+}: {
+  project: ModProject;
+  /** Bumped to open the drawer from outside the button itself, such as the
+   *  command palette's Test action (issue #3118). Every value opens it,
+   *  including the first, so a caller need not track whether this is the
+   *  drawer's first open before it bumps this. */
+  requestOpen?: number;
+}) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (requestOpen !== undefined) setOpen(true);
+  }, [requestOpen]);
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();

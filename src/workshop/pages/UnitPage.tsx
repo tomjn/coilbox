@@ -297,6 +297,7 @@ import { CheckpointsDrawer } from "./components/CheckpointsDrawer";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
 import { CollectionsPanel } from "./components/CollectionsPanel";
+import { CommandPalette } from "./components/CommandPalette";
 import { DerivedStatsStrip } from "./components/DerivedStatsStrip";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
 import { PackagePanel } from "./components/PackagePanel";
@@ -449,6 +450,15 @@ export default function UnitPage() {
   /** Whether the randomiser is on screen to regenerate the project (issue
    *  #3090). */
   const [regenerateOpen, setRegenerateOpen] = useState(false);
+  /** Whether the command palette is up (issue #3118). */
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  /**
+   * Bumped to run the Test action from the palette. `PlayLocallyButton` owns
+   * the drawer itself, so this is a signal to open it rather than the state
+   * of anything: undefined until the first request, so the button's own
+   * mount does not open the drawer on its own.
+   */
+  const [testRequest, setTestRequest] = useState<number | undefined>(undefined);
   /**
    * The collection filtering the unit list, or `undefined` for every unit
    * (issue #2654). Page state rather than part of the saved project: which
@@ -810,9 +820,18 @@ export default function UnitPage() {
         overrides,
         unitKey,
         view,
-        asksAboutMovement(edited) ? ["movementClass"] : [],
+        // A field a link named is drawn whether Relevant would otherwise hide
+        // it or not, the same way a missing movement class already is (issue
+        // #3118, the command palette's own "zeus range" opens a field the
+        // Relevant filter may not show). `unitFieldView` drops a weapon path
+        // out of this list regardless, so passing one through here costs
+        // nothing when the link is actually about the Weapons tab.
+        [
+          ...(asksAboutMovement(edited) ? ["movementClass"] : []),
+          ...(fieldKey ? [fieldKey] : []),
+        ],
       ),
-    [unit, overrides, unitKey, view, edited],
+    [unit, overrides, unitKey, view, edited, fieldKey],
   );
 
   // The unit's weapons, one slot at a time (issue #2639). Read off the def as
@@ -1002,7 +1021,14 @@ export default function UnitPage() {
             copyKey: explosionKey,
           })
         : support
-          ? supportingView(support, overrides, unitKey, view, unitName)
+          ? supportingView(
+              support,
+              overrides,
+              unitKey,
+              view,
+              unitName,
+              fieldKey,
+            )
           : slot
             ? weaponSlotView(
                 slot,
@@ -1014,6 +1040,7 @@ export default function UnitPage() {
                 firesWeapon
                   ? { weapon: firesWeapon, mounts: firesMounts }
                   : undefined,
+                fieldKey,
               )
             : null,
     [
@@ -1031,6 +1058,7 @@ export default function UnitPage() {
       mountedBy,
       firesWeapon,
       firesMounts,
+      fieldKey,
     ],
   );
   // References on this unit that name nothing (issue #2641): its own
@@ -1161,12 +1189,33 @@ export default function UnitPage() {
   // this render": the row itself carries no ref this page holds, and its id
   // is stable, so a plain `getElementById` after paint is enough rather than
   // threading a ref through every row for a link that is followed once.
+  // Focusing the row's own control is the same link finishing the job (issue
+  // #3118): a link that only scrolled left the cursor wherever it already
+  // was, and the command palette's "land with the cursor in the field" is
+  // this same effect with a focus call added, not a second code path.
   // biome-ignore lint/correctness/useExhaustiveDependencies: fields and weaponView retrigger this once the field list has actually rendered, not read in the body.
   useEffect(() => {
     if (!fieldKey) return;
     const row = document.getElementById(`field-${fieldKey}`);
     row?.scrollIntoView({ block: "center" });
+    row?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
   }, [fieldKey, fields, weaponView]);
+
+  // Cmd+K (Ctrl+K elsewhere), only while a project is open (issue #3118).
+  // Nothing else in coilbox binds it, so this is a plain window listener
+  // rather than something that has to defer to a focused control: even a
+  // field's own input should still open the palette, the way it does in
+  // every other command-palette app.
+  useEffect(() => {
+    if (!project) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() !== "k" || (!e.metaKey && !e.ctrlKey)) return;
+      e.preventDefault();
+      setPaletteOpen((current) => !current);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [project]);
 
   // What this game's units actually move on, so the class is picked out of a
   // list rather than spelled from memory against a file nobody has open (issue
@@ -2303,7 +2352,9 @@ export default function UnitPage() {
               #1278). The workshop stops being write only here: everything
               before this point edits a project, and this is the first thing
               that lets you find out whether the edits were right. */}
-            {project && <PlayLocallyButton project={project} />}
+            {project && (
+              <PlayLocallyButton project={project} requestOpen={testRequest} />
+            )}
           </>
         }
       >
@@ -2402,6 +2453,30 @@ export default function UnitPage() {
           enginePath={selected?.enginePath}
           dataDir={selected?.rootPath}
           onRegenerate={onRegenerate}
+        />
+      )}
+
+      {/* Cmd+K, jumping to a unit, a field, a section or an action (issue
+        #3118). Needs a saved project: `projectPath` and `sectionPath` both
+        need an id to link into, which `/workshop/new` has not made yet.
+        Mounted only while open, rather than always mounted with `open={false}`:
+        `CommandDialog`'s own accessible title sits outside the part Radix
+        gates on `open`, so an always-mounted palette would leave a second,
+        screen-reader-only heading on every page a project is open on. */}
+      {project && paletteOpen && (
+        <CommandPalette
+          open={paletteOpen}
+          onOpenChange={setPaletteOpen}
+          projectId={project.id}
+          units={units}
+          overrides={overrides}
+          weaponDefs={weaponDefs}
+          nameOf={nameOf}
+          currentUnitKey={unitKey}
+          onRequestTest={() => {
+            setPaletteOpen(false);
+            setTestRequest(Date.now());
+          }}
         />
       )}
 

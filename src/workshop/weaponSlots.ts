@@ -415,7 +415,7 @@ function overriddenBelow(
 }
 
 /** Leaves as the def spells them, keyed by lowercase so one field is one row. */
-function mergeLeaves(...lists: string[][]): string[] {
+function mergeLeaves(...lists: (readonly string[])[]): string[] {
   const out = new Map<string, string>();
   for (const list of lists)
     for (const leaf of list)
@@ -423,11 +423,28 @@ function mergeLeaves(...lists: string[][]): string[] {
   return [...out.values()];
 }
 
+/**
+ * The leaf under `prefix` a field path names, for a link that named it (issue
+ * #3118: the command palette's own "zeus range" must land in the field even
+ * with Relevant filtering the weapon definition down). A path with no
+ * matching prefix names nothing under it here, and an empty `prefix` is a
+ * library weapon's own paths, which already are bare leaves.
+ */
+function leafUnder(path: string | undefined, prefix: string): string[] {
+  if (!path) return [];
+  if (!prefix) return [path];
+  const marker = `${prefix.toLowerCase()}.`;
+  return path.toLowerCase().startsWith(marker)
+    ? [path.slice(prefix.length + 1)]
+    : [];
+}
+
 function slotGroup(
   slot: WeaponSlot,
   overrides: UnitOverrides,
   unitKey: string,
   view: FieldView,
+  linkedField?: string,
 ): { group: RenderedGroup; relevant: number; all: number } {
   const table = slot.table ?? {};
   const present = slot.table
@@ -439,7 +456,8 @@ function slotGroup(
   const extra = slot.table
     ? [...SLOT_KEYS.values()].filter((key) => key !== "name")
     : [];
-  const relevantLeaves = mergeLeaves(present, edited);
+  const always = leafUnder(linkedField, slot.path);
+  const relevantLeaves = mergeLeaves(present, edited, always);
   const allLeaves = mergeLeaves(present, edited, extra);
   const leaves = view === "all" ? allLeaves : relevantLeaves;
 
@@ -493,6 +511,10 @@ function slotGroup(
  * explosion is shown (issue #2642). Registry paths, and `damage` for every row
  * of the damage table. A field it leaves unset shows the value the engine
  * falls back on, read off the definition, where the registry names one.
+ *
+ * `always` adds a leaf to the relevant view on top of whatever it already
+ * has, rather than narrowing it the way `focus` does: a field a link named
+ * (issue #3118) must join the fields Relevant already shows, not replace them.
  */
 export function definitionSections(
   def: Record<string, unknown>,
@@ -501,6 +523,7 @@ export function definitionSections(
   view: FieldView,
   editable: boolean,
   focus?: readonly string[],
+  always: readonly string[] = [],
 ): { sections: RenderedSection[]; relevant: number; all: number } {
   const pathOf = (leaf: string) => (prefix ? `${prefix}.${leaf}` : leaf);
   const all = definitionLeaves(def);
@@ -538,8 +561,8 @@ export function definitionSections(
     // drawn as its keys and not again as one row.
     return ![...walked].some((leaf) => leaf.startsWith(`${lower}.`));
   });
-  const relevantLeaves = mergeLeaves(present, unset, edited);
-  const allLeaves = mergeLeaves(all, unset, edited, extra);
+  const relevantLeaves = mergeLeaves(present, unset, edited, always);
+  const allLeaves = mergeLeaves(all, unset, edited, extra, always);
   const leaves = view === "all" ? allLeaves : relevantLeaves;
 
   const bySection = new Map<string, FieldRow[]>();
@@ -616,6 +639,7 @@ function definitionGroup(
   view: FieldView,
   unitName: string,
   mountedBy: number,
+  linkedField?: string,
 ): { group: RenderedGroup; relevant: number; all: number } | null {
   const definition = slot.definition;
   if (definition.kind === "missing") return null;
@@ -629,6 +653,8 @@ function definitionGroup(
     prefix,
     view,
     own,
+    undefined,
+    leafUnder(linkedField, prefix),
   );
 
   return {
@@ -657,6 +683,7 @@ export function libraryWeaponGroup(
   weapon: LibraryWeapon,
   view: FieldView,
   note: string,
+  linkedField?: string,
 ): { group: RenderedGroup; relevant: number; all: number } {
   const { sections, relevant, all } = definitionSections(
     weapon.def,
@@ -664,6 +691,8 @@ export function libraryWeaponGroup(
     "",
     view,
     true,
+    undefined,
+    leafUnder(linkedField, ""),
   );
   return {
     group: {
@@ -697,14 +726,19 @@ export function weaponSlotView(
   unitName: string,
   mountedBy = 0,
   equipped?: { weapon: LibraryWeapon; mounts: number },
+  /** A field a link named (issue #3118), drawn whether Relevant would
+   *  otherwise hide it or not. Matched against the mount, the definition and
+   *  a library weapon in turn, whichever one the path is actually under. */
+  linkedField?: string,
 ): WeaponSlotView {
-  const mount = slotGroup(slot, overrides, unitKey, view);
+  const mount = slotGroup(slot, overrides, unitKey, view, linkedField);
   if (equipped) {
     const others = equipped.mounts - 1;
     const library = libraryWeaponGroup(
       equipped.weapon,
       view,
       `What the weapon does. ${unitName} carries it as its own, out of the project's weapon library. A change here is a change to the library weapon${others > 0 ? `, so it reaches the ${others} other slot${others === 1 ? "" : "s"} that fire${others === 1 ? "s" : ""} it too` : ""}.`,
+      linkedField,
     );
     const relevant = mount.relevant + library.relevant;
     const all = mount.all + library.all;
@@ -722,6 +756,7 @@ export function weaponSlotView(
     view,
     unitName,
     mountedBy,
+    linkedField,
   );
   const groups = [mount.group, ...(definition ? [definition.group] : [])];
   const relevant = mount.relevant + (definition?.relevant ?? 0);
@@ -744,6 +779,7 @@ export function supportingView(
   unitKey: string,
   view: FieldView,
   unitName: string,
+  linkedField?: string,
 ): WeaponSlotView {
   const { sections, relevant, all } = definitionSections(
     support.def,
@@ -751,6 +787,8 @@ export function supportingView(
     support.path,
     view,
     true,
+    undefined,
+    leafUnder(linkedField, support.path),
   );
   const users = support.usedBy.map((u) => `${u.from}'s ${u.field}`);
   const named =

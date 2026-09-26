@@ -643,6 +643,63 @@ describe("UnitPage", () => {
     });
   });
 
+  /** Cmd+K (issue #3118), wired into the page itself: a real keydown opens it,
+   *  only while a project is open, and picking a field result moves the page
+   *  the same way a link into it already does. */
+  describe("the command palette", () => {
+    const openWithProject = () => {
+      show(
+        { armcom: ARMCOM },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+      );
+      // Starts the project (issue #2696's own rule), so the palette, which
+      // needs an id to link into, has one.
+      type(healthBox(), "5000");
+    };
+
+    it("does nothing before a project exists", () => {
+      show(
+        { armcom: ARMCOM },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
+      );
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      expect(screen.queryByPlaceholderText(/Jump to a unit/)).toBeNull();
+    });
+
+    it("opens on Cmd+K, closes on a second press, and reopens on Ctrl+K", () => {
+      openWithProject();
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      expect(screen.getByPlaceholderText(/Jump to a unit/)).toBeTruthy();
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      expect(screen.queryByPlaceholderText(/Jump to a unit/)).toBeNull();
+      fireEvent.keyDown(window, { key: "k", ctrlKey: true });
+      expect(screen.getByPlaceholderText(/Jump to a unit/)).toBeTruthy();
+    });
+
+    it("finds a field by its unit and field words together, and opens it", () => {
+      openWithProject();
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      const dialog = screen.getByRole("dialog");
+      const input = within(dialog).getByPlaceholderText(/Jump to a unit/);
+      fireEvent.change(input, { target: { value: "commander metal cost" } });
+      const [item] = within(dialog).getAllByText(/Metal cost/i);
+      fireEvent.click(item);
+      const path = screen.getByTestId("location-path").textContent ?? "";
+      expect(path).toContain("unit=armcom");
+      expect(path).toContain("field=metalCost");
+    });
+
+    it("jumps to a project section", () => {
+      openWithProject();
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      const dialog = screen.getByRole("dialog");
+      fireEvent.click(within(dialog).getByText("Checks"));
+      expect(screen.getByTestId("location-path").textContent).toMatch(
+        /\/checks$/,
+      );
+    });
+  });
+
   /**
    * The defect a screenshot of BAR caught: every row read `armaak` twice, once
    * as the title and once as the key beneath it. BAR writes no name of any kind
