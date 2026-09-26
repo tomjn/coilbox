@@ -12,6 +12,7 @@
 import { cn, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useState } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -21,15 +22,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { UnitDisplay } from "@/content/bindings";
+import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { visibleRowWindow } from "@/lib/rowVirtualize";
 import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
 import {
   formatReferenceValue,
   REFERENCE_COLUMNS,
+  type ReferenceColumn,
   type SortState,
   sortReferenceRows,
   type UnitReferenceRow,
 } from "../../unitReference";
+
+/** A faction filter's sentinel "no filter" value. Not a real faction's name,
+ *  since a game's side names are read straight off the game rather than
+ *  chosen by this page. */
+const ALL_FACTIONS = "__all__";
 
 /** Pinned by an inline style on every row, the same belt-and-braces reason
  *  `UnitList.tsx`'s own `ROW_HEIGHT` gives. */
@@ -43,6 +58,9 @@ export function UnitReferenceTable({
   selected,
   onToggle,
   renderName,
+  picOf,
+  picsPending = false,
+  factionOf,
 }: {
   rows: UnitReferenceRow[];
   selected: ReadonlySet<string>;
@@ -50,8 +68,22 @@ export function UnitReferenceTable({
   /** How to render a row's name cell: a plain span, or a link to the unit's
    *  own page, whichever the caller's page offers. */
   renderName: (row: UnitReferenceRow) => ReactNode;
+  /** A row's build picture (issue #3110), the same lookup `UnitList.tsx` draws
+   *  its own rows from. Omitted entirely, rather than drawn as a "missing"
+   *  box on every row, when a caller has no picture read to offer (the
+   *  game's own reference page outside a project). */
+  picOf?: (key: string) => UnitDisplay | undefined;
+  /** The picture read has not landed yet, so a row's box is a loading
+   *  placeholder rather than a "missing" one. */
+  picsPending?: boolean;
+  /** Which faction reaches a unit, the same walk `UnitList.tsx` uses to tell
+   *  apart two rows that share a name (issue #3110). Omitted, alongside the
+   *  faction column and its filter, when a caller has no build graph to
+   *  answer from. */
+  factionOf?: (key: string) => string | undefined;
 }) {
   const [query, setQuery] = useState("");
+  const [factionFilter, setFactionFilter] = useState(ALL_FACTIONS);
   const [sort, setSort] = useState<SortState>({
     columnId: "name",
     direction: "asc",
@@ -85,9 +117,29 @@ export function UnitReferenceTable({
       }),
     );
   }, [rows, parsedQuery]);
+
+  // Every faction the rows answer for, in alphabetical order, so the filter
+  // beside the search box only ever offers a faction that is actually on the
+  // table (issue #3110). Absent entirely, alongside the column and the filter
+  // it feeds, when the caller has no `factionOf` to ask.
+  const factions = useMemo(() => {
+    if (!factionOf) return [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      const faction = factionOf(row.key);
+      if (faction) seen.add(faction);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  }, [rows, factionOf]);
+
+  const byFaction = useMemo(() => {
+    if (!factionOf || factionFilter === ALL_FACTIONS) return filtered;
+    return filtered.filter((row) => factionOf(row.key) === factionFilter);
+  }, [filtered, factionOf, factionFilter]);
+
   const sorted = useMemo(
-    () => sortReferenceRows(filtered, sort),
-    [filtered, sort],
+    () => sortReferenceRows(byFaction, sort),
+    [byFaction, sort],
   );
 
   const { start, end } = visibleRowWindow(
@@ -122,7 +174,25 @@ export function UnitReferenceTable({
     </button>
   );
 
-  const totalColumns = REFERENCE_COLUMNS.length + LEADING_COLUMNS;
+  /** A column's header: the sort button, wrapped in a tooltip explaining the
+   *  number when the column has one (issue #3110), so a derived column like
+   *  "DPS per 100 metal" reads the same on the header as it does on the
+   *  strip. */
+  const columnHeader = (column: ReferenceColumn) => {
+    const button = sortButton(column.id, column.label);
+    if (!column.help) return button;
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>{button}</TooltipTrigger>
+          <TooltipContent>{column.help}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    );
+  };
+
+  const totalColumns =
+    REFERENCE_COLUMNS.length + LEADING_COLUMNS + (factionOf ? 1 : 0);
 
   return (
     <div className="flex flex-col gap-2">
@@ -135,6 +205,21 @@ export function UnitReferenceTable({
           aria-label="Search units"
           className="h-9 max-w-sm"
         />
+        {factions.length > 0 && (
+          <OptionSelect
+            value={factionFilter}
+            onValueChange={setFactionFilter}
+            ariaLabel="Filter by faction"
+            className="h-9 w-auto"
+            options={[
+              { value: ALL_FACTIONS, label: "All factions" },
+              ...factions.map((faction) => ({
+                value: faction,
+                label: faction,
+              })),
+            ]}
+          />
+        )}
         <p
           className={cn(
             "text-xs",
@@ -143,7 +228,7 @@ export function UnitReferenceTable({
         >
           {!parsedQuery.ok
             ? parsedQuery.error
-            : needle
+            : needle || factionFilter !== ALL_FACTIONS
               ? `${sorted.length} of ${rows.length} units`
               : `${rows.length} unit${rows.length === 1 ? "" : "s"}`}
         </p>
@@ -158,9 +243,10 @@ export function UnitReferenceTable({
             <TableRow>
               <TableHead className="w-8" aria-hidden="true" />
               <TableHead>{sortButton("name", "Name")}</TableHead>
+              {factionOf && <TableHead>Faction</TableHead>}
               {REFERENCE_COLUMNS.map((column) => (
                 <TableHead key={column.id} className="text-right">
-                  {sortButton(column.id, column.label)}
+                  {columnHeader(column)}
                 </TableHead>
               ))}
             </TableRow>
@@ -187,7 +273,22 @@ export function UnitReferenceTable({
                     aria-label={`Select ${row.name} to compare`}
                   />
                 </TableCell>
-                <TableCell className="font-medium">{renderName(row)}</TableCell>
+                <TableCell className="font-medium">
+                  <span className="flex items-center gap-2">
+                    {picOf && (
+                      <UnitIcon
+                        display={picOf(row.key)}
+                        pending={picsPending}
+                      />
+                    )}
+                    {renderName(row)}
+                  </span>
+                </TableCell>
+                {factionOf && (
+                  <TableCell className="text-muted-foreground">
+                    {factionOf(row.key) ?? "—"}
+                  </TableCell>
+                )}
                 {REFERENCE_COLUMNS.map((column) => (
                   <TableCell
                     key={column.id}
@@ -215,7 +316,11 @@ export function UnitReferenceTable({
                   colSpan={totalColumns}
                   className="text-center text-sm text-muted-foreground"
                 >
-                  {needle ? `No unit matches "${needle}".` : "No units."}
+                  {needle
+                    ? `No unit matches "${needle}".`
+                    : factionFilter !== ALL_FACTIONS
+                      ? "No unit in this faction."
+                      : "No units."}
                 </TableCell>
               </TableRow>
             )}

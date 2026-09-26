@@ -12,7 +12,15 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { UnitDerivedStats } from "../../derivedStats";
+import {
+  ALPHA_DAMAGE_HELP,
+  COST_PER_HIT_POINT_HELP,
+  DPS_HELP,
+  DPS_PER_100_METAL_HELP,
+  HIT_POINTS_PER_BUILD_SECOND_HELP,
+  RANGE_PER_COST_HELP,
+  type UnitDerivedStats,
+} from "../../derivedStats";
 
 /** One figure on the strip. `undefined` when {@link UnitDerivedStats} could
  *  not compute it, in which case nothing is drawn for it at all. */
@@ -80,35 +88,36 @@ export function DerivedStatsStrip({ stats }: { stats: UnitDerivedStats }) {
     stats.rangePerCost === null;
   if (nothingToShow) return null;
 
-  const dpsHelp = `Damage per second against the default armour class, summed across every weapon that fires on its own${excludedNote ? `. Leaves out ${excludedNote}, which do not fire on a reload cycle of their own` : ""}. A weapon that deals different damage to some armour classes may hit harder or softer against them than this.`;
+  const dpsHelp = `${DPS_HELP}${excludedNote ? ` Leaves out ${excludedNote}, which do not fire on a reload cycle of their own.` : ""}`;
+  const alphaDamageHelp = `${ALPHA_DAMAGE_HELP}${excludedNote ? ` Leaves out ${excludedNote}.` : ""}`;
 
   return (
     <div className="flex flex-wrap items-stretch gap-2">
       <Stat label="DPS" value={stats.dps} help={dpsHelp} />
       <Stat
-        label="Alpha damage"
+        label="Volley damage"
         value={stats.alphaDamage}
-        help={`Total damage in one burst from every weapon counted in DPS above${excludedNote ? `, leaving out ${excludedNote}` : ""}.`}
+        help={alphaDamageHelp}
       />
       <Stat
         label="Cost per HP"
         value={stats.costPerHitPoint}
-        help="Metal cost divided by hit points. Lower is a tankier unit for its cost."
+        help={COST_PER_HIT_POINT_HELP}
       />
       <Stat
         label="DPS per 100 metal"
         value={stats.dpsPer100Metal}
-        help="DPS scaled to a metal cost of 100, so units of different cost can be compared directly."
+        help={DPS_PER_100_METAL_HELP}
       />
       <Stat
         label="HP per build second"
         value={stats.hitPointsPerBuildSecond}
-        help="Hit points divided by build time. Build time is already stated in seconds at a build power of 1, so this holds for a builder of any speed."
+        help={HIT_POINTS_PER_BUILD_SECOND_HELP}
       />
       <Stat
         label="Range per cost"
         value={stats.rangePerCost}
-        help="The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire."
+        help={RANGE_PER_COST_HELP}
       />
     </div>
   );

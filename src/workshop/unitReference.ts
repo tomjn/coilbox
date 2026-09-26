@@ -15,7 +15,16 @@
  * (issue #2640, #3081), absent outside a project, in which case a slot's own
  * definition is what fires, the same as before that feature existed.
  */
-import { numberField, type UnitDerivedStats } from "./derivedStats";
+import {
+  ALPHA_DAMAGE_HELP,
+  COST_PER_HIT_POINT_HELP,
+  DPS_HELP,
+  DPS_PER_100_METAL_HELP,
+  HIT_POINTS_PER_BUILD_SECOND_HELP,
+  numberField,
+  RANGE_PER_COST_HELP,
+  type UnitDerivedStats,
+} from "./derivedStats";
 import { unitEffectiveDerivedStats } from "./unitWeapons";
 import type { EquippedWeapons, WeaponLibrary } from "./weaponLibrary";
 
@@ -104,6 +113,11 @@ export interface ReferenceColumn {
   id: string;
   label: string;
   value: (row: UnitReferenceRow) => number | undefined;
+  /** What the number means, shown as a tooltip on the column header (issue
+   *  #3110). Left unset for a raw def field: those already carry an obvious
+   *  meaning ("Health", "Speed"), unlike a derived one ("DPS per 100
+   *  metal"). */
+  help?: string;
 }
 
 /**
@@ -121,31 +135,41 @@ export const REFERENCE_COLUMNS: ReferenceColumn[] = [
   { id: "sightDistance", label: "Sight", value: (r) => r.sightDistance },
   { id: "speed", label: "Speed", value: (r) => r.speed },
   { id: "maxRange", label: "Range", value: (r) => r.maxRange },
-  { id: "dps", label: "DPS", value: (r) => r.derived.dps ?? undefined },
+  {
+    id: "dps",
+    label: "DPS",
+    value: (r) => r.derived.dps ?? undefined,
+    help: DPS_HELP,
+  },
   {
     id: "alphaDamage",
-    label: "Alpha damage",
+    label: "Volley damage",
     value: (r) => r.derived.alphaDamage ?? undefined,
+    help: ALPHA_DAMAGE_HELP,
   },
   {
     id: "costPerHitPoint",
     label: "Cost per HP",
     value: (r) => r.derived.costPerHitPoint ?? undefined,
+    help: COST_PER_HIT_POINT_HELP,
   },
   {
     id: "dpsPer100Metal",
     label: "DPS per 100 metal",
     value: (r) => r.derived.dpsPer100Metal ?? undefined,
+    help: DPS_PER_100_METAL_HELP,
   },
   {
     id: "hitPointsPerBuildSecond",
     label: "HP per build second",
     value: (r) => r.derived.hitPointsPerBuildSecond ?? undefined,
+    help: HIT_POINTS_PER_BUILD_SECOND_HELP,
   },
   {
     id: "rangePerCost",
     label: "Range per cost",
     value: (r) => r.derived.rangePerCost ?? undefined,
+    help: RANGE_PER_COST_HELP,
   },
 ];
 
