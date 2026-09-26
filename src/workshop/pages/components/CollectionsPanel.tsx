@@ -10,9 +10,17 @@
  * in the game to add or remove from it, and a rule (issue #2656) that adds
  * every unit matching a `searchQuery.ts` predicate on top of whatever is
  * ticked.
+ *
+ * "Add from another project" (issue #3108) sits under the tree, offering
+ * every collection defined in one of the user's other projects for this same
+ * game (`project.ts`'s `collectionsFromOtherProjects` decides "same game" and
+ * "other project"). Picking one copies it in through `onImport`, which is
+ * `importCollection` in `collections.ts` wired the same way every other
+ * change on this panel is: through the project's own edit path, so undo
+ * reaches it too.
  */
 import { Button, Input } from "@picoframe/frame";
-import { FolderPlus, Trash2 } from "lucide-react";
+import { CopyPlus, FolderPlus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -27,6 +35,13 @@ import {
 import type { UnitOverrides } from "../../overrides";
 import { parseUnitQuery } from "../../searchQuery";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
+
+/** One other project's collections, offered for import (issue #3108). */
+export interface ImportableProject {
+  id: string;
+  name: string;
+  collections: Collection[];
+}
 
 /** How many units the membership checklist draws before asking for more of a
  *  search term. Only a limit on what is drawn: a game the size of Beyond All
@@ -78,6 +93,8 @@ export function CollectionsPanel({
   library,
   equipped,
   clones,
+  otherProjects = [],
+  onImport,
 }: {
   collections: Collections;
   /** The game's units with the project's own already in among them, the same
@@ -101,11 +118,23 @@ export function CollectionsPanel({
   library: WeaponLibrary;
   equipped: EquippedWeapons;
   clones: UnitClones;
+  /** Other projects for this same game, each with the collections it holds
+   *  (issue #3108). Empty when there is only one project for this game, in
+   *  which case "Add from another project" has nothing to offer and does not
+   *  show. */
+  otherProjects?: ImportableProject[];
+  /** Copy a collection from another project into this one. Returns what the
+   *  copy was actually named and which of its units this game does not have,
+   *  so the panel can say so. Required whenever `otherProjects` is non-empty. */
+  onImport?: (source: Collection) => { name: string; droppedUnits: string[] };
 }) {
   const [name, setName] = useState("");
   const [newParent, setNewParent] = useState("");
   const [selected, setSelected] = useState<string | undefined>();
   const [search, setSearch] = useState("");
+  const [importProjectId, setImportProjectId] = useState("");
+  const [importCollectionId, setImportCollectionId] = useState("");
+  const [importNote, setImportNote] = useState<string | undefined>();
 
   const tree = useMemo(() => collectionTree(collections), [collections]);
   const active = selected ? collections[selected] : undefined;
@@ -141,6 +170,23 @@ export function CollectionsPanel({
     onCreate(name, newParent || undefined);
     setName("");
     setNewParent("");
+  };
+
+  const importSourceProject = otherProjects.find(
+    (p) => p.id === importProjectId,
+  );
+  const importSourceCollection = importSourceProject?.collections.find(
+    (c) => c.id === importCollectionId,
+  );
+  const runImport = () => {
+    if (!importSourceCollection || !onImport) return;
+    const result = onImport(importSourceCollection);
+    setImportNote(
+      result.droppedUnits.length > 0
+        ? `Added "${result.name}". This game doesn't have ${result.droppedUnits.length === 1 ? "this unit" : "these units"}, so ${result.droppedUnits.length === 1 ? "it was" : "they were"} left out: ${result.droppedUnits.join(", ")}.`
+        : `Added "${result.name}".`,
+    );
+    setImportCollectionId("");
   };
 
   return (
@@ -184,6 +230,56 @@ export function CollectionsPanel({
             </Button>
           </form>
         </section>
+
+        {otherProjects.length > 0 && (
+          <section className="flex flex-col gap-3">
+            <h3 className="text-sm font-medium">Add from another project</h3>
+            <Field label="Project">
+              <OptionSelect
+                value={importProjectId}
+                onValueChange={(v) => {
+                  setImportProjectId(v);
+                  setImportCollectionId("");
+                }}
+                options={[
+                  { value: "", label: "Choose a project" },
+                  ...otherProjects.map((p) => ({ value: p.id, label: p.name })),
+                ]}
+                size="sm"
+                ariaLabel="Project to add a collection from"
+              />
+            </Field>
+            {importSourceProject && (
+              <Field label="Collection">
+                <OptionSelect
+                  value={importCollectionId}
+                  onValueChange={setImportCollectionId}
+                  options={[
+                    { value: "", label: "Choose a collection" },
+                    ...importSourceProject.collections.map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                    })),
+                  ]}
+                  size="sm"
+                  ariaLabel="Collection to add"
+                />
+              </Field>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={!importSourceCollection}
+              onClick={runImport}
+            >
+              <CopyPlus className="size-3.5" />
+              Add collection
+            </Button>
+            {importNote && (
+              <p className="text-xs text-muted-foreground">{importNote}</p>
+            )}
+          </section>
+        )}
 
         <section className="flex flex-col gap-3">
           <h3 className="text-sm font-medium">

@@ -9,8 +9,10 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { UnitClones } from "../../clones";
 import {
+  type Collection,
   type Collections,
   createCollection,
+  importCollection,
   removeCollection,
   renameCollection,
   setCollectionMembership,
@@ -18,7 +20,7 @@ import {
   setCollectionRule,
 } from "../../collections";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
-import { CollectionsPanel } from "./CollectionsPanel";
+import { CollectionsPanel, type ImportableProject } from "./CollectionsPanel";
 
 const UNITS = {
   armcom: {},
@@ -35,12 +37,23 @@ function draw(
     equipped?: EquippedWeapons;
     clones?: UnitClones;
   } = {},
+  otherProjects: ImportableProject[] = [],
 ) {
   const weaponDefs = weapons.weaponDefs ?? {};
   const library = weapons.library ?? {};
   const equipped = weapons.equipped ?? {};
   const clones = weapons.clones ?? {};
   let current = collections;
+  const onImport = (source: Collection) => {
+    const result = importCollection(
+      current,
+      source,
+      new Set(Object.keys(units)),
+    );
+    current = result.collections;
+    rerender();
+    return { name: result.name, droppedUnits: result.droppedUnits };
+  };
   const onCreate = (name: string, parentId: string | undefined) => {
     current = createCollection(current, name, parentId).collections;
     rerender();
@@ -82,6 +95,8 @@ function draw(
       onSetParent={onSetParent}
       onToggleMember={onToggleMember}
       onSetRule={onSetRule}
+      otherProjects={otherProjects}
+      onImport={onImport}
     />,
   );
   function rerender() {
@@ -101,6 +116,8 @@ function draw(
         onSetParent={onSetParent}
         onToggleMember={onToggleMember}
         onSetRule={onSetRule}
+        otherProjects={otherProjects}
+        onImport={onImport}
       />,
     );
   }
@@ -217,6 +234,94 @@ describe("rule-based membership (issue #2656)", () => {
       screen.getByRole("heading", { name: /units in hard hitters/i })
         .textContent,
     ).toContain("1");
+  });
+});
+
+describe("adding from another project (issue #3108)", () => {
+  function otherProject(
+    name: string,
+    collections: Collection[],
+  ): ImportableProject {
+    return { id: name, name, collections };
+  }
+
+  /** Opens a Radix `OptionSelect` by its label and picks the named option, the
+   *  way `fireEvent.change` cannot: the panel is not inside a `<form>`, so the
+   *  hidden native select Radix mirrors state onto for form submission does
+   *  not render, and there is nothing for `fireEvent.change` to fire at. */
+  function pickOption(label: string, option: string) {
+    fireEvent.click(screen.getByLabelText(label));
+    fireEvent.click(screen.getByRole("option", { name: option }));
+  }
+
+  it("hides the section when there is nothing to offer", () => {
+    draw();
+    expect(screen.queryByText("Add from another project")).toBeNull();
+  });
+
+  it("copies a hand-picked collection's units, dropping any this game lacks", () => {
+    const { collections: source, id } = createCollection({}, "Tier two");
+    const withMembers = setCollectionMembership(source, id, "armcom", true);
+    const both = setCollectionMembership(withMembers, id, "armpw", true);
+    const view = draw({}, UNITS, {}, [
+      otherProject("Other project", [both[id]]),
+    ]);
+
+    pickOption("Project to add a collection from", "Other project");
+    pickOption("Collection to add", "Tier two");
+    fireEvent.click(screen.getByRole("button", { name: /add collection/i }));
+
+    const [newId] = Object.keys(view.collections);
+    expect(view.collections[newId].name).toBe("Tier two");
+    expect(view.collections[newId].units).toEqual(["armcom", "armpw"]);
+    expect(screen.getByText(/Added "Tier two"/)).toBeTruthy();
+  });
+
+  it("drops a unit the current game does not have, and says which", () => {
+    const { collections: source, id } = createCollection({}, "Tier two");
+    const withMember = setCollectionMembership(source, id, "armsolar", true);
+    const view = draw({}, UNITS, {}, [
+      otherProject("Other project", [withMember[id]]),
+    ]);
+
+    pickOption("Project to add a collection from", "Other project");
+    pickOption("Collection to add", "Tier two");
+    fireEvent.click(screen.getByRole("button", { name: /add collection/i }));
+
+    const [newId] = Object.keys(view.collections);
+    expect(view.collections[newId].units).toEqual([]);
+    expect(screen.getByText(/armsolar/)).toBeTruthy();
+  });
+
+  it("copies a rule verbatim", () => {
+    const { collections: created, id } = createCollection({}, "Cheap");
+    const withRule = setCollectionRule(created, id, "cost < 200");
+    const view = draw({}, UNITS, {}, [
+      otherProject("Other project", [withRule[id]]),
+    ]);
+
+    pickOption("Project to add a collection from", "Other project");
+    pickOption("Collection to add", "Cheap");
+    fireEvent.click(screen.getByRole("button", { name: /add collection/i }));
+
+    const [newId] = Object.keys(view.collections);
+    expect(view.collections[newId].rule).toBe("cost < 200");
+  });
+
+  it("numbers the copy when the name is already used in this project", () => {
+    const { collections: existing } = createCollection({}, "Tier two");
+    const { collections: source, id } = createCollection({}, "Tier two");
+    const view = draw(existing, UNITS, {}, [
+      otherProject("Other project", [source[id]]),
+    ]);
+
+    pickOption("Project to add a collection from", "Other project");
+    pickOption("Collection to add", "Tier two");
+    fireEvent.click(screen.getByRole("button", { name: /add collection/i }));
+
+    const names = Object.values(view.collections).map((c) => c.name);
+    expect(names).toContain("Tier two 2");
+    expect(screen.getByText(/Added "Tier two 2"/)).toBeTruthy();
   });
 });
 

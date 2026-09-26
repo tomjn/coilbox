@@ -37,7 +37,6 @@ import {
   gameIdentityForName,
   type InstalledGameInfo,
 } from "@/container/gameIdentity";
-import { rememberedShortname } from "@/container/shortnames";
 import {
   useScanTargetSelection,
   useUnitsyncGameHeaders,
@@ -52,6 +51,7 @@ import { useCheckpoints } from "../checkpoints";
 import { forgetEditHistory } from "../history";
 import {
   describeEdits,
+  gameGroupKey,
   type ModProject,
   type NewProject,
   parseModProjectJson,
@@ -98,23 +98,6 @@ function sortProjects(list: ModProject[], sort: ProjectSort): ModProject[] {
   return arr;
 }
 
-/**
- * The key a project groups under: its game's stable shortname when one is
- * known, since a shortname survives the game moving from one exact build to
- * the next (issue #3071). `rememberedShortname` recovers it for a project
- * that predates `game` or whose game coilbox has never read a modinfo for in
- * this session. Falling back to the exact archive name still separates games
- * coilbox cannot identify from one another, rather than lumping them under
- * one catch-all group.
- */
-function groupKeyFor(project: ModProject): string {
-  return (
-    project.game?.shortname ||
-    rememberedShortname(project.gameName) ||
-    project.gameName
-  );
-}
-
 interface ProjectGroup {
   key: string;
   /** The game's display name for the heading. A shortname alone ("BA") means
@@ -136,7 +119,7 @@ function groupProjects(
 ): ProjectGroup[] {
   const byKey = new Map<string, ModProject[]>();
   for (const project of projects) {
-    const key = groupKeyFor(project);
+    const key = gameGroupKey(project);
     const list = byKey.get(key);
     if (list) list.push(project);
     else byKey.set(key, [project]);
