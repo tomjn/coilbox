@@ -285,6 +285,32 @@ export interface UnitDerivedStats {
 }
 
 /**
+ * Wording for what each derived number means, shared between
+ * `DerivedStatsStrip.tsx`'s tiles and the reference table's column headers
+ * (issue #3110), so both explain a stat the same way rather than growing two
+ * descriptions of the same arithmetic. `dps` and `alphaDamage` carry a
+ * per-unit exclusion note of their own (which weapons a unit's own tiles left
+ * out), added by the strip on top of the base text here.
+ */
+export const DPS_HELP =
+  "Damage per second against the default armour class, summed across every weapon that fires on its own. A weapon that deals different damage to some armour classes may hit harder or softer against them than this.";
+
+export const ALPHA_DAMAGE_HELP =
+  "Total damage in one burst from every weapon counted in DPS above. Sometimes called alpha damage.";
+
+export const COST_PER_HIT_POINT_HELP =
+  "Metal cost divided by hit points. Lower is a tankier unit for its cost.";
+
+export const DPS_PER_100_METAL_HELP =
+  "DPS scaled to a metal cost of 100, so units of different cost can be compared directly.";
+
+export const HIT_POINTS_PER_BUILD_SECOND_HELP =
+  "Hit points divided by build time. Build time is already stated in seconds at a build power of 1, so this holds for a builder of any speed.";
+
+export const RANGE_PER_COST_HELP =
+  "The longest range among the unit's weapons, divided by metal cost. Counts every weapon, including a manual-fire or slaved one: a threat range does not need a sustained rate of fire.";
+
+/**
  * A unit's derived combat and economy numbers, from its resolved fields and
  * its resolved weapons. `weapons` is in slot order. A definition nothing
  * mounts (issue #2641's supporting definitions) has no business being handed

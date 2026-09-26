@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { useUnitDefs } from "@/workshop/config";
 import { UnitReferenceView } from "@/workshop/pages/components/UnitReferenceView";
@@ -6,9 +6,12 @@ import { textRedirect, unitDisplayName } from "@/workshop/unitName";
 import { unitReferenceRows } from "@/workshop/unitReference";
 import {
   useScanTargetSelection,
+  useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "../config";
+import { buildTechForest } from "../techForest";
 import { DetailError, DetailLoading, NotFound } from "./components/states";
 
 /**
@@ -50,6 +53,11 @@ export default function UnitReferencePage() {
     selected?.rootPath,
     game?.primaryArchive.name,
   );
+  const { info: gameInfo } = useUnitsyncGameInfo(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
 
   const named = useMemo(
     () => new Map((dataset?.units ?? []).map((u) => [u.name, u])),
@@ -72,6 +80,51 @@ export default function UnitReferencePage() {
     if (!defs) return [];
     return unitReferenceRows(defs.units, defs.weaponDefs, nameOf);
   }, [defs, nameOf]);
+
+  // Which faction reaches each unit, the same walk ReferencePage.tsx uses to
+  // tell apart two rows that share a name (issue #3110/#3138): there is no
+  // project here to stand clones in among the dataset, so the game's own
+  // units are handed to `buildTechForest` as they come.
+  const sides = useMemo(
+    () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
+    [gameInfo],
+  );
+  const forest = useMemo(
+    () =>
+      buildTechForest(
+        dataset?.units ?? [],
+        sides.map((s) => s.startUnit as string),
+      ),
+    [dataset, sides],
+  );
+  const factionOf = useCallback(
+    (key: string): string | undefined => {
+      // A one-sided game answers nothing, because the same word on every row
+      // tells nobody anything.
+      if (sides.length < 2) return undefined;
+      const root = forest.factionOf.get(key);
+      if (root === undefined) return undefined;
+      return (
+        sides.find((s) => s.startUnit?.toLowerCase() === root)?.name ?? root
+      );
+    },
+    [forest, sides],
+  );
+
+  // A unit's build picture, the same read GameUnitsPage.tsx draws its grid
+  // from.
+  const picIds = useMemo(() => Object.keys(defs?.units ?? {}), [defs]);
+  const buildpics = useUnitsyncUnitBuildpics(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    picIds,
+  );
+  const picsPending = !buildpics && picIds.length > 0;
+  const picOf = useCallback(
+    (key: string) => buildpics?.units[key],
+    [buildpics],
+  );
 
   if (error && !data)
     return (
@@ -128,6 +181,9 @@ export default function UnitReferencePage() {
             {row.name}
           </Link>
         )}
+        picOf={picOf}
+        picsPending={picsPending}
+        factionOf={factionOf}
       />
     </div>
   );
