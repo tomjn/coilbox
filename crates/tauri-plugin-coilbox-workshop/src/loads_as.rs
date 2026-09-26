@@ -172,6 +172,10 @@ pub enum TypedField {
     Unit { unit: String, path: String },
     /// A change to a library weapon, in `edits.weapons[weapon].changes`.
     Weapon { weapon: String, path: String },
+    /// A copy's own number, differing from its source in `edits.clones[unit].def`,
+    /// which reaches the game only through its own file on edit in place
+    /// (issue #3095).
+    Clone { unit: String, path: String },
 }
 
 /// A value to write in place of a typed one.
@@ -193,17 +197,22 @@ pub struct Written {
     /// Library weapon, then dotted path, as its `changes` keys them.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub weapons: BTreeMap<String, BTreeMap<String, WrittenValue>>,
+    /// Copy, then dotted path into its `def`, as `copy_edits` spells one
+    /// (issue #3095).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub clones: BTreeMap<String, BTreeMap<String, WrittenValue>>,
 }
 
 impl Written {
     pub fn is_empty(&self) -> bool {
-        self.units.is_empty() && self.weapons.is_empty()
+        self.units.is_empty() && self.weapons.is_empty() && self.clones.is_empty()
     }
 
     fn insert(&mut self, field: &TypedField, typed: f64, written: f64) {
         let (map, key, path) = match field {
             TypedField::Unit { unit, path } => (&mut self.units, unit, path),
             TypedField::Weapon { weapon, path } => (&mut self.weapons, weapon, path),
+            TypedField::Clone { unit, path } => (&mut self.clones, unit, path),
         };
         map.entry(key.clone()).or_default().insert(
             path.clone(),
@@ -241,6 +250,28 @@ pub fn with_written(project: &ModProject, written: &Written) -> ModProject {
         let mut weapon = out.edits.weapons.get_mut(key);
         for (path, value) in paths {
             swap(weapon.as_mut().and_then(|w| w.changes.get_mut(path)), value);
+        }
+    }
+    // A copy's own value never sits in a sparse patch to swap in place: it is
+    // baked into `def` itself, folded with whatever override already sits on
+    // top of it (`compile::resolved_clone_def`). So the guard reads the
+    // resolved value at the path instead, and the written value lands as an
+    // override, which `resolved_clone_def` always applies last regardless of
+    // where the value it replaces came from.
+    for (unit, paths) in &written.clones {
+        let Some(source) = out.edits.clones.get(unit).cloned() else {
+            continue;
+        };
+        let resolved = crate::compile::resolved_clone_def(&source, &out.edits);
+        for (path, value) in paths {
+            let current = crate::compile::value_at(&resolved, path).and_then(Value::as_f64);
+            if current == value.typed.as_f64() {
+                out.edits
+                    .overrides
+                    .entry(unit.clone())
+                    .or_default()
+                    .insert(path.clone(), number(value.written));
+            }
         }
     }
     out
@@ -311,11 +342,18 @@ fn unit_place(unit: &str, path: &str) -> Place {
 /// equipping units this route carries at all: the mutator route carries
 /// everything, and edit in place skips a clone and a field sent to the
 /// mutator route on purpose (`ModProject::is_mutator_only`), the same way
-/// `inplace::write` does (issue #3093).
+/// `inplace::write` does (issue #3093). `carries_clone_field` says the same
+/// for a copy's own numbers: only edit in place carries them, straight into
+/// its own file rather than through an override at all (issue #3095).
+/// `sources` is the game's own read of each copy's source unit, which a
+/// copy's numbers are diffed against the same way `inplace_clone::copy_edits`
+/// does for the write.
 fn typed_fields(
     project: &ModProject,
+    sources: &BTreeMap<String, Value>,
     carries_field: &dyn Fn(&str, &str) -> bool,
     carries_equip: &dyn Fn(&str) -> bool,
+    carries_clone_field: &dyn Fn(&str) -> bool,
 ) -> Vec<Field> {
     let edits = &project.edits;
     let mut out = Vec::new();
@@ -373,6 +411,39 @@ fn typed_fields(
                         path: steps(path),
                     })
                     .collect(),
+            });
+        }
+    }
+    // A copy's own numbers: whatever differs between its source and its
+    // resolved definition, the same diff `inplace_clone::write_copies` patches
+    // into its file. A table a copy adds whole, such as a library weapon's
+    // `weapondefs` entry, comes back as one `Set` of a table rather than of a
+    // number, and is left for the equipping unit's own typed number above
+    // (issue #3055). Only a genuine scalar, at any depth, is a copy's own.
+    for clone in edits.clones.values() {
+        if !carries_clone_field(&clone.key) {
+            continue;
+        }
+        let Some(source) = clone.source.as_deref() else {
+            continue;
+        };
+        let Some(source_def) = sources.get(source) else {
+            continue;
+        };
+        let resolved = crate::compile::resolved_clone_def(clone, edits);
+        let (copy_edits, _) = crate::inplace_clone::copy_edits(source_def, &resolved);
+        for edit in copy_edits {
+            let coilbox_unitpatch::Op::Set(coilbox_unitpatch::Value::Number(typed)) = edit.op
+            else {
+                continue;
+            };
+            out.push(Field {
+                field: TypedField::Clone {
+                    unit: clone.key.clone(),
+                    path: edit.field.clone(),
+                },
+                typed,
+                places: vec![unit_place(&clone.key, &edit.field)],
             });
         }
     }
@@ -451,9 +522,24 @@ type Loader<'a> = dyn FnMut(&[ProbeRun]) -> Result<Vec<ProbeResult>, String> + '
 /// options (issue #3092).
 type Compiler<'a> = dyn FnMut(&ModProject, &Written) -> Result<Overlay, String> + 'a;
 
+/// What a route carries at all, for [`settle_scoped`]: the mutator route
+/// carries everything, and edit in place leaves out a clone's override, a
+/// field sent to the mutator route on purpose, and a copy this route does not
+/// write at all (issues #3093, #3095).
+pub struct RouteScope<'a> {
+    /// Which unit overrides this route carries.
+    pub carries_field: &'a dyn Fn(&str, &str) -> bool,
+    /// Which equipping units' mounts this route carries.
+    pub carries_equip: &'a dyn Fn(&str) -> bool,
+    /// Which copies' own numbers this route carries.
+    pub carries_clone_field: &'a dyn Fn(&str) -> bool,
+}
+
 /// [`settle_scoped`] for the mutator route specifically: every typed number,
 /// and the project compiled the way `workshop_test_mutator` and
-/// `workshop_package_mutator` do.
+/// `workshop_package_mutator` do. A copy's own numbers go through `compile()`
+/// with everything else on this route (#3059), so this route's scope leaves
+/// them for `typed_fields` to skip rather than reporting on them twice.
 pub fn settle(
     project: &ModProject,
     precision: Precision,
@@ -461,9 +547,13 @@ pub fn settle(
 ) -> Result<Settled, String> {
     settle_scoped(
         project,
+        &BTreeMap::new(),
         precision,
-        &|_, _| true,
-        &|_| true,
+        &RouteScope {
+            carries_field: &|_, _| true,
+            carries_equip: &|_| true,
+            carries_clone_field: &|_| false,
+        },
         &mut |p, w| Ok(Overlay::files(mutator_probe_files(p, w))),
         load,
     )
@@ -502,7 +592,9 @@ pub fn tweak_mod_options(
 /// [`settle_scoped`] for the tweak slots on `route`: every typed number,
 /// since a slot carries copies, field changes and library weapons alike, and
 /// each load hands the game the slots as mod options rather than putting
-/// files on top (issue #3092). The engine's Lua, so 32 bit.
+/// files on top (issue #3092). The engine's Lua, so 32 bit. A copy's own
+/// numbers travel inside the same compiled chunk as everything else on this
+/// route, so this route's scope leaves them for `typed_fields` to skip.
 pub fn settle_tweaks(
     project: &ModProject,
     route: TweakRoute,
@@ -510,9 +602,13 @@ pub fn settle_tweaks(
 ) -> Result<Settled, String> {
     settle_scoped(
         project,
+        &BTreeMap::new(),
         Precision::F32,
-        &|_, _| true,
-        &|_| true,
+        &RouteScope {
+            carries_field: &|_, _| true,
+            carries_equip: &|_| true,
+            carries_clone_field: &|_| false,
+        },
         &mut |p, w| {
             Ok(Overlay {
                 files: Vec::new(),
@@ -538,22 +634,30 @@ fn mutator_probe_files(project: &ModProject, written: &Written) -> Vec<ProbeFile
 
 /// Work out, for every number the project typed that this route carries, a
 /// value that the game loads as that number, and prove it by loading it.
-/// `carries_field`, `carries_equip` and `compile` say what the route carries
-/// and how it turns `written` values into files on top of the game. See
-/// [`settle`] for the mutator route's own answers to those (issue #3093).
+/// `scope` and `compile` say what the route carries and how it turns
+/// `written` values into files on top of the game. See [`settle`] for the
+/// mutator route's own answers to those (issue #3093). `sources` is the
+/// game's own read of each copy's source unit, passed straight to
+/// `typed_fields`.
 ///
 /// Fails only when the game will not load with the project as typed. That is
 /// a fact about the project or the game, not about any one field, and the
 /// caller writes every value as typed.
 pub fn settle_scoped(
     project: &ModProject,
+    sources: &BTreeMap<String, Value>,
     precision: Precision,
-    carries_field: &dyn Fn(&str, &str) -> bool,
-    carries_equip: &dyn Fn(&str) -> bool,
+    scope: &RouteScope<'_>,
     compile: &mut Compiler<'_>,
     load: &mut Loader<'_>,
 ) -> Result<Settled, String> {
-    let fields = typed_fields(project, carries_field, carries_equip);
+    let fields = typed_fields(
+        project,
+        sources,
+        scope.carries_field,
+        scope.carries_equip,
+        scope.carries_clone_field,
+    );
     let mut settled = Settled::default();
     if fields.is_empty() {
         return Ok(settled);
@@ -935,7 +1039,7 @@ mod tests {
             "weapons": { "gun": { "key": "gun", "def": {}, "changes": { "range": 900 } } },
             "equipped": { "armcom": { "0": "gun" }, "corcom": { "explodeas": "gun" } },
         }));
-        let fields = typed_fields(&p, &|_, _| true, &|_| true);
+        let fields = typed_fields(&p, &BTreeMap::new(), &|_, _| true, &|_| true, &|_| false);
         assert_eq!(fields.len(), 2);
         assert_eq!(
             fields[0].places,
@@ -961,7 +1065,13 @@ mod tests {
         }));
         let carries_field = |unit: &str, _: &str| unit != "corcom";
         let carries_equip = |unit: &str| unit != "corcom";
-        let fields = typed_fields(&p, &carries_field, &carries_equip);
+        let fields = typed_fields(
+            &p,
+            &BTreeMap::new(),
+            &carries_field,
+            &carries_equip,
+            &|_| false,
+        );
         assert_eq!(fields.len(), 2, "{fields:?}");
         let unit_field = fields
             .iter()
@@ -989,9 +1099,13 @@ mod tests {
             |p: &ModProject, w: &Written| Ok(Overlay::files(mutator_probe_files(p, w)));
         let settled = settle_scoped(
             &p,
+            &BTreeMap::new(),
             Precision::F32,
-            &|unit, _| unit == "armcom",
-            &|_| true,
+            &RouteScope {
+                carries_field: &|unit, _| unit == "armcom",
+                carries_equip: &|_| true,
+                carries_clone_field: &|_| false,
+            },
             &mut compile,
             &mut load,
         )
@@ -999,5 +1113,133 @@ mod tests {
         assert_eq!(settled.fields.len(), 1);
         assert_eq!(settled.fields[0].typed, 0.5);
         assert_eq!(settled.fields[0].outcome, Outcome::Written);
+    }
+
+    /// A copy's own number differs from its source in its `def`, and reaches
+    /// the game through its own file rather than an override (issue #3095):
+    /// `typed_fields` reads it from the diff `inplace_clone::copy_edits`
+    /// would patch into that file, and only when `carries_clone_field` lets
+    /// the copy through. A table the copy adds whole for an equipped weapon
+    /// is left alone, since that number is read as a `Weapon` field instead.
+    #[test]
+    fn a_copys_own_number_is_read_from_its_diff_with_its_source() {
+        let sources = BTreeMap::from([(
+            "armdfly".to_string(),
+            json!({ "metalcost": 320, "weapondefs": { "gun": { "cratermult": 0.5 } } }),
+        )]);
+        let p = project(json!({
+            "clones": { "armdfly2": {
+                "key": "armdfly2",
+                "source": "armdfly",
+                "replacesGameUnit": false,
+                "def": {
+                    "metalcost": 400,
+                    "weapondefs": { "gun": { "cratermult": 0.7 } },
+                },
+            } },
+            "equipped": { "armdfly2": { "explodeas": "blast" } },
+            "weapons": { "blast": { "key": "blast", "def": {}, "changes": { "areaofeffect": 300 } } },
+        }));
+
+        let fields = typed_fields(&p, &sources, &|_, _| true, &|_| true, &|_| true);
+
+        let clone_fields: Vec<&Field> = fields
+            .iter()
+            .filter(|f| matches!(&f.field, TypedField::Clone { .. }))
+            .collect();
+        assert_eq!(clone_fields.len(), 2, "{fields:?}");
+        let metalcost = clone_fields
+            .iter()
+            .find(|f| matches!(&f.field, TypedField::Clone { path, .. } if path == "metalcost"))
+            .expect("metalcost");
+        assert_eq!(metalcost.typed, 400.0);
+        assert_eq!(
+            metalcost.places,
+            vec![Place {
+                table: DefTable::Units,
+                key: "armdfly2".into(),
+                path: vec!["metalcost".into()],
+            }]
+        );
+        let cratermult = clone_fields
+            .iter()
+            .find(|f| {
+                matches!(&f.field, TypedField::Clone { path, .. } if path == "weapondefs.gun.cratermult")
+            })
+            .expect("cratermult");
+        assert_eq!(
+            cratermult.places,
+            vec![Place {
+                table: DefTable::Weapons,
+                key: "armdfly2_gun".into(),
+                path: vec!["cratermult".into()],
+            }]
+        );
+        // The equipped library weapon's own number is a `Weapon` field, not a
+        // second `Clone` field for the whole `weapondefs` table it added.
+        assert!(fields
+            .iter()
+            .any(|f| matches!(&f.field, TypedField::Weapon { weapon, .. } if weapon == "blast")));
+        assert!(!fields
+            .iter()
+            .any(|f| matches!(&f.field, TypedField::Clone { path, .. } if path.starts_with("weapondefs.blast"))));
+    }
+
+    /// `carries_clone_field` scopes a copy's own numbers out the same way
+    /// `carries_field` and `carries_equip` scope a game unit's out (issue
+    /// #3095).
+    #[test]
+    fn carries_clone_field_scopes_a_copys_own_numbers_out() {
+        let sources = BTreeMap::from([("armdfly".to_string(), json!({ "metalcost": 320 }))]);
+        let p = project(json!({
+            "clones": { "armdfly2": {
+                "key": "armdfly2",
+                "source": "armdfly",
+                "replacesGameUnit": false,
+                "def": { "metalcost": 400 },
+            } },
+        }));
+        let fields = typed_fields(&p, &sources, &|_, _| true, &|_| true, &|_| false);
+        assert!(fields.is_empty(), "{fields:?}");
+    }
+
+    /// A settled value for a copy's own number lands as an override on the
+    /// copy, which `compile::resolved_clone_def` always applies last over
+    /// whatever `def` held (issue #3095).
+    #[test]
+    fn a_copys_written_value_lands_as_an_override_on_the_copy() {
+        let p = project(json!({
+            "clones": { "armdfly2": {
+                "key": "armdfly2",
+                "source": "armdfly",
+                "replacesGameUnit": false,
+                "def": { "metalcost": 400 },
+            } },
+        }));
+        let mut written = Written::default();
+        written.insert(
+            &TypedField::Clone {
+                unit: "armdfly2".into(),
+                path: "metalcost".into(),
+            },
+            400.0,
+            444.0,
+        );
+        let patched = with_written(&p, &written);
+        assert_eq!(
+            patched.edits.overrides["armdfly2"]["metalcost"],
+            json!(444.0)
+        );
+        assert_eq!(
+            patched.edits.clones["armdfly2"].def["metalcost"],
+            json!(400)
+        );
+
+        // A stale written value, for a copy whose def has since changed, is
+        // skipped rather than clobbering the new one.
+        let mut changed = p.clone();
+        changed.edits.clones.get_mut("armdfly2").unwrap().def["metalcost"] = json!(500);
+        let unpatched = with_written(&changed, &written);
+        assert!(!unpatched.edits.overrides.contains_key("armdfly2"));
     }
 }

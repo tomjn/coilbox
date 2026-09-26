@@ -103,9 +103,11 @@ fn copy_tree(from: &Path, to: &Path) {
 }
 
 /// A scratch copy of THIS.sdd under a fresh temp `games` folder, with one
-/// line appended to its `unitdefs_post.lua` scaling `wraith`'s `maxdamage` by
-/// 0.3, so a typed value only loads as itself once coilbox has worked out
-/// what to write in its place.
+/// line appended to its `unitdefs_post.lua` scaling every unit's `maxdamage`
+/// by 0.3, so a typed value only loads as itself once coilbox has worked out
+/// what to write in its place. Every unit rather than just `wraith` so a copy
+/// of it, written under a name of its own, is scaled the same way its source
+/// is (issue #3095).
 ///
 /// The folder name alone is not enough to keep this scratch copy from
 /// resolving to the real installed game: the engine's archive resolution
@@ -119,9 +121,7 @@ fn scratch_game(real_games: &Path) -> (tempfile::TempDir, PathBuf) {
     copy_tree(&real_games.join(SOURCE_GAME), &game);
     let post = game.join("gamedata/unitdefs_post.lua");
     let mut text = std::fs::read_to_string(&post).expect("the post file");
-    text.push_str(&format!(
-        "\nif UnitDefs.{UNIT} then UnitDefs.{UNIT}.maxdamage = UnitDefs.{UNIT}.maxdamage * 0.3 end\n"
-    ));
+    text.push_str("\nfor _, def in pairs(UnitDefs) do def.maxdamage = def.maxdamage * 0.3 end\n");
     std::fs::write(&post, text).expect("append the scale");
     let modinfo = game.join("modinfo.lua");
     let mtext = std::fs::read_to_string(&modinfo).expect("modinfo.lua");
@@ -211,9 +211,13 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
     };
     let settled = loads_as::settle_scoped(
         &project,
+        &Default::default(),
         Precision::F32,
-        &|_, _| true,
-        &|_| true,
+        &loads_as::RouteScope {
+            carries_field: &|_, _| true,
+            carries_equip: &|_| true,
+            carries_clone_field: &|_| false,
+        },
         &mut compile,
         &mut load,
     )
@@ -248,5 +252,114 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
     }])
     .expect("a load");
     assert_eq!(back[0].reads[0].value, Some(TYPED));
+    assert!(back[0].reads[0].equal);
+}
+
+/// A copy's own number, baked into `UnitClone.def` rather than reaching the
+/// game through a project field change, is settled the same way and loads as
+/// typed once its own file sits in the game (issue #3095).
+#[test]
+fn a_copys_own_typed_maxdamage_loads_as_typed_in_the_engine() {
+    let engine = match setup() {
+        Ok(v) => v,
+        Err(why) => {
+            eprintln!("{why}, so this checks nothing");
+            return;
+        }
+    };
+    let real_games = PathBuf::from(std::env::var_os("HOME").unwrap()).join(".spring/games");
+    let (_root, game_dir) = scratch_game(&real_games);
+    let data_dir = game_dir.parent().unwrap().parent().unwrap().to_path_buf();
+
+    let mut load = worker(&engine, &data_dir);
+    match load(&[ProbeRun {
+        files: Vec::new(),
+        reads: vec![ProbeRead {
+            table: loads_as::DefTable::Units,
+            key: UNIT.into(),
+            path: vec!["maxdamage".into()],
+            expect: 0.0,
+        }],
+        ..Default::default()
+    }]) {
+        Err(e) if e.contains("unknown argument") => {
+            eprintln!("the worker in target/debug predates --defs-probe, so this checks nothing");
+            return;
+        }
+        Err(e) => panic!("the scratch game did not load: {e}"),
+        Ok(_) => {}
+    }
+
+    const COPY: &str = "wraith2";
+    // The copy's own maxdamage, scaled the same 0.3 the fixture's post file
+    // scales its source's by, so a bug that answers with the source's typed
+    // value rather than the copy's own cannot pass by accident.
+    const COPY_TYPED: f64 = 258.0;
+    let sources: std::collections::BTreeMap<String, serde_json::Value> =
+        std::collections::BTreeMap::from([(UNIT.to_string(), json!({ "maxdamage": 500.0 }))]);
+    let project: ModProject = serde_json::from_value(json!({
+        "name": "TEST in place loads as typed copy (delete me)",
+        "gameName": "THIS",
+        "edits": { "clones": { COPY: {
+            "key": COPY,
+            "source": UNIT,
+            "replacesGameUnit": false,
+            "def": { "maxdamage": COPY_TYPED },
+        } } },
+    }))
+    .expect("parse");
+
+    let mut compile = |p: &ModProject, w: &loads_as::Written| {
+        let patched = if w.is_empty() {
+            p.clone()
+        } else {
+            loads_as::with_written(p, w)
+        };
+        tauri_plugin_coilbox_workshop::inplace_dry_run(&game_dir, &patched, &sources)
+            .map(loads_as::Overlay::files)
+    };
+    let settled = loads_as::settle_scoped(
+        &project,
+        &sources,
+        Precision::F32,
+        &loads_as::RouteScope {
+            carries_field: &|_, _| true,
+            carries_equip: &|_| true,
+            carries_clone_field: &|_| true,
+        },
+        &mut compile,
+        &mut load,
+    )
+    .expect("settle");
+    eprintln!("{:?}", settled.fields);
+    let report = settled
+        .fields
+        .iter()
+        .find(|f| f.typed == COPY_TYPED)
+        .expect("the copy's maxdamage field");
+    assert_eq!(report.outcome, Outcome::Written);
+
+    // Write the settled value into the copy's own file, the way
+    // `workshop_write_in_place` does once
+    // `workshop_settle_typed_values_in_place` has answered.
+    let written_project = loads_as::with_written(&project, &settled.written);
+    let outcome = write_in_place(&game_dir, &written_project, &sources).expect("write");
+    assert!(outcome.refused.is_empty(), "{:?}", outcome.refused);
+    assert!(!outcome.written.is_empty());
+
+    // Load the scratch game exactly as it now sits on disk, apart from
+    // `settle`, and read the copy's typed field back.
+    let back = load(&[ProbeRun {
+        files: Vec::new(),
+        reads: vec![ProbeRead {
+            table: loads_as::DefTable::Units,
+            key: COPY.into(),
+            path: vec!["maxdamage".into()],
+            expect: COPY_TYPED,
+        }],
+        ..Default::default()
+    }])
+    .expect("a load");
+    assert_eq!(back[0].reads[0].value, Some(COPY_TYPED));
     assert!(back[0].reads[0].equal);
 }

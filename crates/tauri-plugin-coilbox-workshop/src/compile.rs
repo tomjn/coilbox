@@ -1473,6 +1473,22 @@ fn array_index(step: &str) -> Option<usize> {
     step.parse().ok()
 }
 
+/// Read a dotted path out of a JSON definition, the same steps [`write_path`]
+/// writes one with. `loads_as` uses this to read a copy's current value at a
+/// path before writing a settled one in its place (issue #3095), the same
+/// guard [`crate::loads_as::with_written`] already gives an ordinary field
+/// change: a value the project no longer holds is skipped.
+pub(crate) fn value_at<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
+    let mut current = value;
+    for step in path.split('.') {
+        current = match array_index(step) {
+            Some(index) => current.as_array()?.get(index)?,
+            None => current.as_object()?.get(step)?,
+        };
+    }
+    Some(current)
+}
+
 /// The table form: unit name to whole definition.
 fn unit_table(entries: &[(String, Value)], indent: &str) -> String {
     let inner = format!("{indent}  ");
