@@ -230,15 +230,15 @@ export function UnitReferenceTable({
                     aria-label={`Select ${row.name} to compare`}
                   />
                 </TableCell>
-                <TableCell className="font-medium">
-                  <span className="flex items-center gap-2">
+                <TableCell className="w-full max-w-0 font-medium">
+                  <span className="flex min-w-0 items-center gap-2">
                     {picOf && (
                       <UnitIcon
                         display={picOf(row.key)}
                         pending={picsPending}
                       />
                     )}
-                    {renderName(row)}
+                    <span className="min-w-0 truncate">{renderName(row)}</span>
                   </span>
                 </TableCell>
                 {factionOf && (

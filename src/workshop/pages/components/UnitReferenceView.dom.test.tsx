@@ -160,6 +160,29 @@ describe("UnitReferenceTable rename (issue #3110)", () => {
   });
 });
 
+describe("UnitReferenceTable name overflow (issue #3161)", () => {
+  it("truncates a long name instead of overlapping the Faction column", () => {
+    renderView(
+      <UnitReferenceView
+        rows={[
+          unitReferenceRow(
+            "armca",
+            "Advanced Construction Aircraft",
+            { health: 1000, metalCost: 200 },
+            {},
+          ),
+        ]}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+        factionOf={() => "Arm"}
+      />,
+    );
+    const name = screen.getByText("Advanced Construction Aircraft");
+    expect(name.className).toContain("truncate");
+    expect(name.closest("td")?.className).toContain("max-w-0");
+  });
+});
+
 describe("UnitReferenceTable faction column and filter (issue #3110)", () => {
   const factionOf = (key: string) => (key === "armtank" ? "Arm" : "Core");
 
