@@ -26,6 +26,7 @@ import {
   Gamepad2,
   Grid2x2,
   HeartPulse,
+  HelpCircle,
   ImageIcon,
   type LucideIcon,
   Move,
@@ -38,6 +39,12 @@ import {
   Tags,
 } from "lucide-react";
 import { SectionPanel } from "@/components/SectionPanel";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
@@ -131,11 +138,37 @@ export function UnitFieldGroups({
         <section key={group.id} className="flex flex-col gap-3">
           <h3 className="flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {group.label}
+            {group.identifier && (
+              <>
+                {" "}
+                <span className="font-mono normal-case text-foreground">
+                  {group.identifier}
+                </span>
+              </>
+            )}
             <span className="h-px flex-1 bg-border/50" />
           </h3>
           {group.note && (
-            <p className="max-w-prose text-xs text-muted-foreground">
+            <p className="flex max-w-prose items-start gap-1 text-xs text-muted-foreground">
               {group.note}
+              {group.noteDetail && (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="More about this"
+                        className="shrink-0 cursor-help text-muted-foreground hover:text-foreground"
+                      >
+                        <HelpCircle size={13} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="text-left leading-snug">
+                      {group.noteDetail}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </p>
           )}
           {group.sections.map((section) => {

@@ -628,9 +628,17 @@ export interface RenderedSection {
 export interface RenderedGroup {
   id: string;
   label: string;
+  /** An identifier the label names, shown in its own case in the monospace
+   *  style a field key uses rather than uppercased with the rest of the
+   *  heading (issue #3105). A weapon or definition name is written by
+   *  whoever made the game, and case is part of that spelling. */
+  identifier?: string;
   /** A line under the heading, for a group whose heading needs saying where
    *  its fields are written (issue #2639). */
   note?: string;
+  /** The rest of `note`, behind a help icon rather than shown on every visit
+   *  (issue #3105). Absent when `note` needs no more than the one line. */
+  noteDetail?: string;
   /** Whether every field in the group is shown and not offered. */
   readOnly?: boolean;
   sections: RenderedSection[];

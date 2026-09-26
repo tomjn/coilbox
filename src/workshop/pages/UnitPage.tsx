@@ -293,6 +293,7 @@ import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
 import { WeaponLibraryDrawer } from "./components/WeaponLibraryDrawer";
 import {
+  DeathExplosionsPanel,
   type ExplosionPanel,
   type SlotLibrary,
   WeaponSlotsPanel,
@@ -304,9 +305,10 @@ const NO_LIBRARY: WeaponLibrary = {};
 const NO_EQUIPPED: EquippedWeapons = {};
 const NO_COLLECTIONS: Collections = {};
 
-/** Which half of a unit the page is showing: its own fields, or its weapons
- *  one slot at a time (issue #2639). */
-type UnitTab = "fields" | "weapons";
+/** Which part of a unit the page is showing: its own fields, its weapons one
+ *  slot at a time (issue #2639), or its two death explosions, apart from the
+ *  weapons since neither is something the unit fires (issue #3105). */
+type UnitTab = "fields" | "weapons" | "explosions";
 
 /** The "only changed fields are recorded" explanation, held behind a help
  * icon rather than spelled out on every visit (issue #3102). A returning
@@ -715,29 +717,45 @@ export default function UnitPage() {
     [unit, edited, weaponDefs, owners],
   );
   const explosionParam = params.get("explosion") ?? "";
-  // A tab click always writes "weapons" or "fields" (issue #3097), so it wins
-  // outright over whatever else is open. Only a `tab`-less arrival, such as a
-  // link that only names a slot or an explosion, falls back to inferring the
-  // tab from what that link opened.
+  // A tab click always writes "weapons", "explosions" or "fields" (issue
+  // #3097), so it wins outright over whatever else is open. Only a
+  // `tab`-less arrival, such as a link that only names a slot, a support
+  // weapon or an explosion, falls back to inferring the tab from what that
+  // link opened. Death explosions get their own tab rather than reopening
+  // Weapons (issue #3105): they are not something the unit fires, and
+  // sharing a selection with the weapon slots used to make picking one
+  // quietly unselect the other.
   const tab: UnitTab =
-    tabParam === "weapons" ||
-    (tabParam === null && (linkedSlot || linkedSupport || explosionParam))
-      ? "weapons"
-      : "fields";
+    tabParam === "weapons" || tabParam === "explosions"
+      ? tabParam
+      : tabParam === null && (linkedSlot || linkedSupport)
+        ? "weapons"
+        : tabParam === null && explosionParam
+          ? "explosions"
+          : "fields";
   const slotParam = params.get("slot") ?? linkedSlot?.step;
   const supportParam =
     params.get("support") ?? (linkedSlot ? undefined : linkedSupport?.key);
-  // A unit with nothing mounted and something carried opens on the first
-  // thing it carries, and one with neither on its death explosion.
+  // A unit with nothing mounted opens on the first thing it carries.
   const support =
     supporting.find((s) => s.key === supportParam) ??
     (slots.length === 0 ? supporting[0] : undefined);
   const slot = slots.find((s) => s.step === slotParam) ?? slots[0];
+  // Only while the explosions tab is open. `explosion` in the URL survives a
+  // switch to another tab, on purpose, so coming back to Explosions restores
+  // it (issue #3097's own restore-on-return behaviour), but that means it is
+  // still there to read while Weapons is open, and this is the one thing
+  // that decides which of the three `weaponView` below draws. Read it there
+  // and a slot's own tab would show the death explosion's fields instead.
+  // The explosions tab always has one on screen, the way the fields tab
+  // always shows a field group: the named one, or the first when none is
+  // named or the name does not resolve.
   const explosion =
-    (isDeathMount(explosionParam)
-      ? explosions.find((e) => e.mount === explosionParam)
-      : undefined) ??
-    (slots.length === 0 && !support ? explosions[0] : undefined);
+    tab === "explosions"
+      ? ((isDeathMount(explosionParam)
+          ? explosions.find((e) => e.mount === explosionParam)
+          : undefined) ?? explosions[0])
+      : undefined;
   const explosionFires = explosion
     ? equippedKey(equipped, unitKey, explosion.mount)
     : undefined;
@@ -1837,7 +1855,7 @@ export default function UnitPage() {
       ),
     copyKey: explosionCopyKey,
     onSelect: (mount) =>
-      select({ tab: "weapons", explosion: mount, slot: "", support: "" }),
+      select({ tab: "explosions", explosion: mount, slot: "", support: "" }),
     onChange: (e, row, value) => {
       const fires = equippedKey(equipped, unitKey, e.mount);
       if (fires) return changeLibraryField(fires, row, value);
@@ -1898,7 +1916,9 @@ export default function UnitPage() {
       : undefined;
   /** What the count beside the tabs is counting. */
   const counted =
-    tab === "weapons" ? (weaponView ?? { shown: 0, hidden: 0 }) : fields;
+    tab === "weapons" || tab === "explosions"
+      ? (weaponView ?? { shown: 0, hidden: 0 })
+      : fields;
 
   // `h-full` against the frame's own scroll container, so from `lg` up the two
   // panes each take the height that is left and scroll themselves rather than
@@ -2220,7 +2240,7 @@ export default function UnitPage() {
               isDeathMount(mount.step)
                 ? {
                     unit: mount.unit,
-                    tab: "weapons",
+                    tab: "explosions",
                     explosion: mount.step,
                     slot: "",
                     support: "",
@@ -2628,10 +2648,11 @@ export default function UnitPage() {
                   `derivedStats.ts` could not compute honestly. */}
                 <DerivedStatsStrip stats={derived} />
 
-                {/* The unit's own fields or its weapons (issue #2639), and
-                  how much of whichever it is the list below is showing. The
-                  count is against the right edge, so it reads with the toggle
-                  it belongs to without being able to move it. */}
+                {/* The unit's own fields, its weapons (issue #2639), or its
+                  death explosions (issue #3105), and how much of whichever
+                  it is the list below is showing. The count is against the
+                  right edge, so it reads with the toggle it belongs to
+                  without being able to move it. */}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <TabsList aria-label="Which part of the unit to edit">
                     <TabsTrigger value="fields">Fields</TabsTrigger>
@@ -2639,6 +2660,12 @@ export default function UnitPage() {
                       Weapons
                       <span className="text-xs text-muted-foreground">
                         {slots.length}
+                      </span>
+                    </TabsTrigger>
+                    <TabsTrigger value="explosions">
+                      Explosions
+                      <span className="text-xs text-muted-foreground">
+                        {explosions.length}
                       </span>
                     </TabsTrigger>
                   </TabsList>
@@ -2740,7 +2767,25 @@ export default function UnitPage() {
                       })
                     }
                     problems={[...refIssues, ...armorProblems]}
+                    cegLibrary={{
+                      generators: edits.explosionGenerators ?? {},
+                      onChange: (next) =>
+                        commit((current) =>
+                          editSlot(current, "explosionGenerators", () => next),
+                        ),
+                    }}
+                  />
+                </TabsContent>
+                <TabsContent value="explosions" className="flex-none">
+                  <DeathExplosionsPanel
+                    view={weaponView}
+                    consumers={consumers}
+                    assets={assets}
+                    inheritedLabel={inheritedLabel}
+                    inPlace={inPlaceDir ? inPlaceOf : undefined}
+                    library={slotLibrary}
                     explosions={explosionPanel}
+                    problems={[...refIssues, ...armorProblems]}
                     cegLibrary={{
                       generators: edits.explosionGenerators ?? {},
                       onChange: (next) =>

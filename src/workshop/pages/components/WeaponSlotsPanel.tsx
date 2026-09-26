@@ -1,6 +1,6 @@
 /**
- * The unit page's weapons tab: one weapon slot at a time, its mount and its
- * definition in two labelled groups (issue #2639).
+ * `WeaponSlotsPanel` draws the unit page's weapons tab: one weapon slot at a
+ * time, its mount and its definition in two labelled groups (issue #2639).
  *
  * Which fields belong to which table, and where each edit is written, is
  * `weaponSlots.ts`'s. This only draws the slot picker and hands the chosen
@@ -18,9 +18,13 @@
  * fields are the unit's own, edited the way a mounted definition's are, and a
  * reference on the unit that names nothing is listed above both.
  *
- * Last are the unit's two death explosions (issue #2642,
- * `deathExplosions.ts`). Each is a weapon definition the game names, and a
- * change to a shared one gives the unit its own copy out of the library.
+ * `DeathExplosionsPanel` draws the unit's two death explosions on a tab of
+ * their own (issue #2642, `deathExplosions.ts`), apart from the weapons above
+ * rather than a third row sharing their selection: neither is something the
+ * unit fires, and picking one used to quietly unselect a weapon slot (issue
+ * #3105). Each is a weapon definition the game names, and a change to a
+ * shared one gives the unit its own copy out of the library the same way a
+ * shared slot weapon does.
  */
 import { Button, Input } from "@picoframe/frame";
 import { Plus, Undo2 } from "lucide-react";
@@ -113,6 +117,44 @@ function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
   );
 }
 
+/** Something wrong with this unit's weapons that only its neighbours or the
+ *  game's own data reveal: a reference that names nothing (issue #2641), in
+ *  error colour by default, and a damage table naming an armour class
+ *  nobody has (issue #2645), in warning colour since it does not stop the
+ *  project from building or loading (issue #3104). Shown on both the
+ *  weapons and the death explosions tab (issue #3105): the unit's own
+ *  weapondefs cover both, and a problem in one carried only for a death
+ *  explosion is still a problem worth seeing.
+ */
+export interface WeaponProblem {
+  id: string;
+  message: string;
+  severity?: "error" | "warning";
+}
+
+function WeaponProblems({ problems }: { problems: WeaponProblem[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <ul
+      className="flex max-w-prose flex-col gap-1 text-xs"
+      aria-label="Problems with this unit's weapons"
+    >
+      {problems.map((problem) => (
+        <li
+          key={problem.id}
+          className={
+            problem.severity === "warning"
+              ? "text-amber-700 dark:text-amber-400"
+              : "text-destructive"
+          }
+        >
+          {problem.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** What a slot is called on its button: the weapon's display name, or the
  *  name the slot holds when its definition gives none. */
 function slotTitle(slot: WeaponSlot, equipped: string | undefined): string {
@@ -143,7 +185,6 @@ export function WeaponSlotsPanel({
   selectedSupport,
   onSelectSupport,
   problems = [],
-  explosions,
   cegLibrary,
 }: {
   slots: WeaponSlot[];
@@ -171,75 +212,38 @@ export function WeaponSlotsPanel({
   /** The supporting definition on screen, by key, in place of a slot. */
   selectedSupport?: string;
   onSelectSupport?: (key: string) => void;
-  /** Things wrong with this unit's weapons that only its neighbours or the
-   *  game's own data reveal: a reference that names nothing (issue #2641),
-   *  in error colour by default, and a damage table naming an armour class
-   *  nobody has (issue #2645), in warning colour since it does not stop the
-   *  project from building or loading (issue #3104). */
-  problems?: { id: string; message: string; severity?: "error" | "warning" }[];
-  /** The unit's death explosions, and what the panel can do with them
-   *  (issue #2642). When one is selected, `view` is its fields. */
-  explosions?: ExplosionPanel;
+  /** Things wrong with this unit's weapons (issue #2641, #2645). */
+  problems?: WeaponProblem[];
   /** The project's custom explosion generators, and where a change to the
    *  library goes (issue #2643). Absent for a page that has not wired this
    *  up yet, in which case no control is offered. */
   cegLibrary?: CegLibrary;
 }) {
-  const hasExplosions = (explosions?.entries.length ?? 0) > 0;
-  if (slots.length === 0 && supporting.length === 0 && !hasExplosions)
+  if (slots.length === 0 && supporting.length === 0)
     return (
       <p className="text-sm text-muted-foreground">This unit has no weapons.</p>
     );
-  const activeExplosion =
-    explosions?.selected === undefined
-      ? undefined
-      : explosions.entries.find((e) => e.mount === explosions.selected);
-  const onSlot =
-    selectedSupport === undefined && activeExplosion === undefined
-      ? selected
-      : undefined;
+  const onSlot = selectedSupport === undefined ? selected : undefined;
 
   // Where "add a class" writes, when there is anywhere it can (issue #2645):
   // the supporting definition on screen, the library weapon the slot fires,
   // or the slot's own definition. A shared definition offers nothing, the
   // same as every other field on one.
   const activeSupport =
-    selectedSupport !== undefined && activeExplosion === undefined
+    selectedSupport !== undefined
       ? supporting.find((s) => s.key === selectedSupport)
       : undefined;
   const fires = onSlot ? library.equippedIn(onSlot.step) : undefined;
   const firesWeapon = fires ? library.weapons[fires] : undefined;
-  // A death explosion takes a new class the way it takes any other field: on
-  // its library weapon, on the definition the unit carries, or, for a shared
-  // one, by copying it first.
-  const explosionFires = activeExplosion
-    ? explosions?.equippedIn(activeExplosion.mount)
-    : undefined;
-  const explosionTarget = !activeExplosion
-    ? undefined
-    : explosionFires && library.weapons[explosionFires]
-      ? { prefix: "", def: library.weapons[explosionFires].def }
-      : activeExplosion.follows
-        ? undefined
-        : activeExplosion.definition.kind === "own"
-          ? {
-              prefix: activeExplosion.definition.path,
-              def: activeExplosion.definition.def,
-            }
-          : activeExplosion.definition.kind === "shared"
-            ? { prefix: "", def: activeExplosion.definition.def }
-            : undefined;
   const addTarget:
     | { prefix: string; def: Record<string, unknown> }
-    | undefined = activeExplosion
-    ? explosionTarget
-    : activeSupport
-      ? { prefix: activeSupport.path, def: activeSupport.def }
-      : firesWeapon
-        ? { prefix: "", def: firesWeapon.def }
-        : onSlot?.definition.kind === "own"
-          ? { prefix: onSlot.definition.path, def: onSlot.definition.def }
-          : undefined;
+    | undefined = activeSupport
+    ? { prefix: activeSupport.path, def: activeSupport.def }
+    : firesWeapon
+      ? { prefix: "", def: firesWeapon.def }
+      : onSlot?.definition.kind === "own"
+        ? { prefix: onSlot.definition.path, def: onSlot.definition.def }
+        : undefined;
   const onAddDamageClass = (className: string) => {
     if (!addTarget) return;
     const leaf = `damage.${className}`;
@@ -254,45 +258,23 @@ export function WeaponSlotsPanel({
       value: 0,
       state: "overridden",
     };
-    if (activeExplosion && explosions)
-      explosions.onChange(activeExplosion, row, 0);
-    else if (firesWeapon) library.onChange(fires, row, 0);
+    if (firesWeapon) library.onChange(fires, row, 0);
     else onChange(row, 0);
   };
 
-  // Where a field write goes: the death explosion on screen, the library
-  // weapon the slot fires, or the slot's or supporting definition's own row,
-  // the same three sinks `onAddDamageClass` already picks between. Used by
-  // the explosion generator control (issue #2643) to write the field it
-  // binds a generator to, wherever that field is on screen.
+  // Where a field write goes: the library weapon the slot fires, or the
+  // slot's or supporting definition's own row, the same sinks
+  // `onAddDamageClass` already picks between. Used by the explosion
+  // generator control (issue #2643) to write the field it binds a generator
+  // to, wherever that field is on screen.
   const writeField = (row: FieldRow, value: unknown) => {
-    if (activeExplosion && explosions)
-      explosions.onChange(activeExplosion, row, value);
-    else if (firesWeapon) library.onChange(fires, row, value);
+    if (firesWeapon) library.onChange(fires, row, value);
     else onChange(row, value);
   };
 
   return (
     <div className="flex flex-col gap-4">
-      {problems.length > 0 && (
-        <ul
-          className="flex max-w-prose flex-col gap-1 text-xs"
-          aria-label="Problems with this unit's weapons"
-        >
-          {problems.map((problem) => (
-            <li
-              key={problem.id}
-              className={
-                problem.severity === "warning"
-                  ? "text-amber-700 dark:text-amber-400"
-                  : "text-destructive"
-              }
-            >
-              {problem.message}
-            </li>
-          ))}
-        </ul>
-      )}
+      <WeaponProblems problems={problems} />
       <ToggleGroup
         type="single"
         variant="outline"
@@ -381,68 +363,6 @@ export function WeaponSlotsPanel({
         </div>
       )}
 
-      {explosions && hasExplosions && (
-        <div className="flex flex-col gap-1.5">
-          <p className="text-xs text-muted-foreground" id="death-explosions">
-            Death explosions: what the unit explodes as
-          </p>
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            spacing={1}
-            className="flex-wrap"
-            value={activeExplosion?.mount ?? ""}
-            onValueChange={(mount) =>
-              mount && explosions.onSelect(mount as DeathMount)
-            }
-            aria-labelledby="death-explosions"
-          >
-            {explosions.entries.map((explosion) => {
-              const changed = explosions.editCount(explosion);
-              const equippedHere = explosions.equippedIn(explosion.mount);
-              return (
-                <ToggleGroupItem
-                  key={explosion.mount}
-                  value={explosion.mount}
-                  aria-label={explosion.label}
-                  title={explosion.field}
-                  className="gap-1.5"
-                >
-                  <span>
-                    {explosion.mount === "explodeas"
-                      ? "Dies"
-                      : "Self-destructs"}
-                  </span>
-                  <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
-                    {equippedHere ??
-                      (explosion.follows
-                        ? "as it dies"
-                        : explosion.name || "nothing")}
-                  </span>
-                  {changed > 0 && (
-                    <span
-                      className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
-                      title={`${changed} field${changed === 1 ? "" : "s"} changed`}
-                    >
-                      {changed}
-                    </span>
-                  )}
-                </ToggleGroupItem>
-              );
-            })}
-          </ToggleGroup>
-        </div>
-      )}
-
-      {activeExplosion && explosions && (
-        <ExplosionActions
-          explosion={activeExplosion}
-          explosions={explosions}
-          library={library}
-        />
-      )}
-
       {onSlot && (
         <SlotWeaponActions
           slot={onSlot}
@@ -467,32 +387,7 @@ export function WeaponSlotsPanel({
         />
       )}
 
-      {view && activeExplosion && explosions && (
-        <UnitFieldGroups
-          view={view}
-          inPlace={
-            activeExplosion.definition.kind === "own" && !explosionFires
-              ? inPlace
-              : undefined
-          }
-          post={(row) => explosions.postOf(activeExplosion, row)}
-          consumers={consumers}
-          assets={assets}
-          inheritedLabel={
-            explosionFires
-              ? "Copied value"
-              : activeExplosion.definition.kind === "own"
-                ? inheritedLabel
-                : undefined
-          }
-          onChange={(row, value) =>
-            explosions.onChange(activeExplosion, row, value)
-          }
-          onReset={(row) => explosions.onReset(activeExplosion, row)}
-        />
-      )}
-
-      {view && !activeExplosion && (
+      {view && (
         <div className="flex flex-col gap-8">
           <UnitFieldGroups
             view={{
@@ -530,6 +425,188 @@ export function WeaponSlotsPanel({
             />
           )}
         </div>
+      )}
+      {addTarget && <AddDamageClass onAdd={onAddDamageClass} />}
+    </div>
+  );
+}
+
+/**
+ * The unit page's death explosions tab: what it explodes as when it dies and
+ * when it self-destructs, apart from the weapons tab so picking one does not
+ * quietly unselect a weapon slot (issue #3105). The two share one selection
+ * on the engine's own terms already, `follows` in `deathExplosions.ts`, so
+ * this only ever has to hold one of them apart from the weapons above.
+ */
+export function DeathExplosionsPanel({
+  view,
+  consumers,
+  assets,
+  inheritedLabel,
+  inPlace,
+  library,
+  explosions,
+  problems = [],
+  cegLibrary,
+}: {
+  /** The explosion on screen's fields, grouped. */
+  view: WeaponSlotView | null;
+  consumers: CustomParamsResult | null;
+  assets?: AssetBrowsing;
+  inheritedLabel?: string;
+  inPlace?: (row: FieldRow) => InPlaceField | undefined;
+  /** The project's weapon library, and what the panel can do with it (issue
+   *  #2640): a death explosion can be equipped with one the same way a slot
+   *  can. */
+  library: SlotLibrary;
+  /** The unit's death explosions, and what the panel can do with them
+   *  (issue #2642). */
+  explosions: ExplosionPanel;
+  /** Things wrong with this unit's weapons (issue #2641, #2645), the same
+   *  list the Weapons tab shows: the unit's own weapondefs cover both, so a
+   *  problem in one carried only for a death explosion is still worth
+   *  seeing here. */
+  problems?: WeaponProblem[];
+  /** The project's custom explosion generators, and where a change to the
+   *  library goes (issue #2643). Absent for a page that has not wired this
+   *  up yet, in which case no control is offered. */
+  cegLibrary?: CegLibrary;
+}) {
+  if (explosions.entries.length === 0)
+    return (
+      <p className="text-sm text-muted-foreground">
+        This unit has no death explosions.
+      </p>
+    );
+  // The page always names one once this tab is open (`UnitPage.tsx`), and
+  // the first entry stands in for the render before that URL write lands.
+  const activeExplosion =
+    explosions.entries.find((e) => e.mount === explosions.selected) ??
+    explosions.entries[0];
+  const explosionFires = explosions.equippedIn(activeExplosion.mount);
+
+  // A death explosion takes a new damage class the way it takes any other
+  // field: on its library weapon, on the definition the unit carries, or,
+  // for a shared one, by copying it first.
+  const addTarget:
+    | { prefix: string; def: Record<string, unknown> }
+    | undefined =
+    explosionFires && library.weapons[explosionFires]
+      ? { prefix: "", def: library.weapons[explosionFires].def }
+      : activeExplosion.follows
+        ? undefined
+        : activeExplosion.definition.kind === "own"
+          ? {
+              prefix: activeExplosion.definition.path,
+              def: activeExplosion.definition.def,
+            }
+          : activeExplosion.definition.kind === "shared"
+            ? { prefix: "", def: activeExplosion.definition.def }
+            : undefined;
+  const onAddDamageClass = (className: string) => {
+    if (!addTarget) return;
+    const leaf = `damage.${className}`;
+    const field = describeLeaf(leaf, addTarget.def);
+    const path = addTarget.prefix ? `${addTarget.prefix}.${leaf}` : leaf;
+    const row: FieldRow = {
+      path,
+      field,
+      label: field.label,
+      present: false,
+      inherited: field.default,
+      value: 0,
+      state: "overridden",
+    };
+    explosions.onChange(activeExplosion, row, 0);
+  };
+  const writeField = (row: FieldRow, value: unknown) =>
+    explosions.onChange(activeExplosion, row, value);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <WeaponProblems problems={problems} />
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        spacing={1}
+        className="flex-wrap"
+        value={activeExplosion.mount}
+        onValueChange={(mount) =>
+          mount && explosions.onSelect(mount as DeathMount)
+        }
+        aria-label="Death explosion"
+      >
+        {explosions.entries.map((explosion) => {
+          const changed = explosions.editCount(explosion);
+          const equippedHere = explosions.equippedIn(explosion.mount);
+          return (
+            <ToggleGroupItem
+              key={explosion.mount}
+              value={explosion.mount}
+              aria-label={explosion.label}
+              title={explosion.field}
+              className="gap-1.5"
+            >
+              <span>
+                {explosion.mount === "explodeas" ? "Dies" : "Self-destructs"}
+              </span>
+              <span className="max-w-48 truncate font-mono text-xs text-muted-foreground">
+                {equippedHere ??
+                  (explosion.follows
+                    ? "as it dies"
+                    : explosion.name || "nothing")}
+              </span>
+              {changed > 0 && (
+                <span
+                  className="rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground"
+                  title={`${changed} field${changed === 1 ? "" : "s"} changed`}
+                >
+                  {changed}
+                </span>
+              )}
+            </ToggleGroupItem>
+          );
+        })}
+      </ToggleGroup>
+
+      <ExplosionActions
+        explosion={activeExplosion}
+        explosions={explosions}
+        library={library}
+      />
+
+      {view && cegLibrary && (
+        <CegFieldControls
+          view={view}
+          cegLibrary={cegLibrary}
+          writeField={writeField}
+        />
+      )}
+
+      {view && (
+        <UnitFieldGroups
+          view={view}
+          inPlace={
+            activeExplosion.definition.kind === "own" && !explosionFires
+              ? inPlace
+              : undefined
+          }
+          post={(row) => explosions.postOf(activeExplosion, row)}
+          consumers={consumers}
+          assets={assets}
+          inheritedLabel={
+            explosionFires
+              ? "Copied value"
+              : activeExplosion.definition.kind === "own"
+                ? inheritedLabel
+                : undefined
+          }
+          onChange={(row, value) =>
+            explosions.onChange(activeExplosion, row, value)
+          }
+          onReset={(row) => explosions.onReset(activeExplosion, row)}
+        />
       )}
       {addTarget && <AddDamageClass onAdd={onAddDamageClass} />}
     </div>
@@ -716,6 +793,11 @@ function ExplosionActions({
                 : "Use a library weapon"
           }
           shared={shared}
+          // A death explosion's fields are already editable and copy
+          // themselves into the library on the first change (issue #3105),
+          // so this button is a secondary shortcut to the same result rather
+          // than the only way in, unlike a shared slot's weapon below.
+          primary={false}
           unitName={library.unitName}
           usesCopy={`the ${noun} is the copy`}
           copySource={copySource}
