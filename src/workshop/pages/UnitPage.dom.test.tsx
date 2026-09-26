@@ -139,12 +139,12 @@ vi.mock("@/play/PlayProvider", () => ({
   usePlay: () => ({ running: false, launch: async () => ({ exitCode: 0 }) }),
 }));
 
-/** What `workshop_preflight` answers with. The checks button (issue #2748)
- *  reads this the moment a project exists rather than only once its drawer
- *  is open, so a page under test needs an answer as soon as an edit starts
- *  one, not just in the one test that opens the drawer. Clean by default:
+/** What `workshop_preflight` answers with. The checks verdict (issue #2748)
+ *  reads this the moment a project exists rather than only once the Checks
+ *  section is open, so a page under test needs an answer as soon as an edit
+ *  starts one, not just in the tests that open Checks. Clean by default:
  *  most of this file is about the fields and stores, not the preflight
- *  check, which has its own coverage in `ChecksButton.dom.test.tsx`. */
+ *  check, which has its own coverage in `ProjectChecks.dom.test.tsx`. */
 let mockPreflightReport = { blockers: [], review: [], passes: [] };
 /** What the edit-in-place commands answer, for the tests of issue #3023.
  *  Empty elsewhere, where nothing presses them. */
@@ -332,8 +332,27 @@ const ARMLAB: Record<string, unknown> = {
  * would mean coilbox had gone back to forcing that render itself (issue #2739).
  */
 function LocationKey() {
-  return <span data-testid="location-key">{useLocation().key}</span>;
+  const { key, pathname, search } = useLocation();
+  return (
+    <>
+      <span data-testid="location-key">{key}</span>
+      <span data-testid="location-path">{`${pathname}${search}`}</span>
+    </>
+  );
 }
+
+/** Where the page is, path and query, as the router has it. */
+const location = () => screen.getByTestId("location-path").textContent;
+
+/** One entry in the project's section bar (issue #3111). */
+const sectionLink = (name: string | RegExp) =>
+  within(
+    screen.getByRole("navigation", { name: "Project sections" }),
+  ).getByRole("link", { name });
+const findSectionLink = async (name: string | RegExp) =>
+  within(
+    await screen.findByRole("navigation", { name: "Project sections" }),
+  ).findByRole("link", { name });
 
 function show(
   units: Record<string, Record<string, unknown>> = { armcom: ARMCOM },
@@ -369,7 +388,7 @@ function show(
               states link to. Only enough of it to be navigated to. */}
           <Route path="/workshop" element={<p>Tweak projects</p>} />
           <Route
-            path="/workshop/:id"
+            path="/workshop/:id/:section?"
             element={
               <>
                 <UnitPage />
@@ -707,36 +726,39 @@ describe("UnitPage", () => {
    * gives those panes the whole window height, so it never scrolled away.
    * Then it was its own button in the header, present in all three states the
    * read can be in for the reason the scenario editor's problems button is
-   * (issue #2272). Now it is one section of the checks drawer, and the button
-   * that opens it answers for delivery routes and preflight too, so a clean
-   * read only shows a tick with no label (see "the checks button" below for
-   * that state).
+   * (issue #2272). Then it was one section of the checks drawer, and now of
+   * the project's Checks section (issue #3111), whose entry in the section
+   * bar answers for delivery routes and preflight too, so a clean read only
+   * shows a tick with no count.
    */
-  describe("the checks button's diagnostics section", () => {
+  describe("the Checks section's diagnostics", () => {
     const errors = [
       "could not read units/armcom.lua",
       "unknown key in units/armaak.lua",
     ];
 
-    it("is disabled and says Checking while the defs are still being read", () => {
+    it("says Checking while the defs are still being read", () => {
       mockStatus = "loading";
       show();
-      const button = screen.getByRole("button", { name: /Checking/ });
-      expect(button.hasAttribute("disabled")).toBe(true);
+      expect(
+        sectionLink("Checks, Checking the project").getAttribute("href"),
+      ).toBe(
+        `/workshop/new/checks?${new URLSearchParams({ game: GAME.name })}`,
+      );
     });
 
-    it("is a quiet, enabled tick once the read lands with nothing to report", () => {
+    it("is a quiet tick with no count once the read lands with nothing to report", () => {
       show();
-      const button = screen.getByRole("button", { name: "No problems found" });
-      expect(button.hasAttribute("disabled")).toBe(false);
-      expect(button.textContent).toBe("");
+      expect(sectionLink("Checks, No problems found").textContent).toBe(
+        "Checks",
+      );
     });
 
-    it("counts what unitsync said without putting any of it on the page", async () => {
+    it("counts what unitsync said, and lists it on the Checks page", async () => {
       show({ armcom: ARMCOM }, undefined, undefined, errors);
       expect(screen.queryByText(errors[0])).toBeNull();
 
-      fireEvent.click(screen.getByRole("button", { name: /2 to review/ }));
+      fireEvent.click(sectionLink(/Checks, 2 to review/));
 
       expect(await screen.findByText(errors[0])).toBeTruthy();
       expect(screen.getByText(errors[1])).toBeTruthy();
@@ -745,9 +767,8 @@ describe("UnitPage", () => {
     it("says nothing about a read that has not happened, with no game picked", () => {
       show({ armcom: ARMCOM }, "/workshop/new");
       expect(
-        screen.queryByRole("button", { name: "No problems found" }),
+        screen.queryByRole("navigation", { name: "Project sections" }),
       ).toBeNull();
-      expect(screen.queryByRole("button", { name: /Checking/ })).toBeNull();
     });
   });
 
@@ -2330,9 +2351,7 @@ describe("UnitPage", () => {
       expect(screen.getByText("1 change")).toBeTruthy();
       expect(project().authoredChecksum).toBe("abc");
 
-      fireEvent.click(
-        await screen.findByRole("button", { name: "No problems found" }),
-      );
+      fireEvent.click(await findSectionLink("Checks, No problems found"));
       fireEvent.click(
         await screen.findByRole("button", {
           name: "Write changes into the game",
@@ -2347,17 +2366,25 @@ describe("UnitPage", () => {
       expect(project().writtenInPlace).toEqual({ armcom: { health: 5000 } });
       expect(screen.queryByText("1 change")).toBeNull();
       expect(screen.queryByText(/has been updated since/)).toBeNull();
-      expect(healthBox().value).toBe("5000");
 
-      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      // The in-place write's own undo, not the header's undo of the last
+      // edit, which the Checks page shows beside it.
+      const undoWrite = screen
+        .getAllByRole("button", { name: "Undo" })
+        .find((b) => b.getAttribute("title") !== "Undo the last change");
+      fireEvent.click(undoWrite as HTMLElement);
       expect(
         await screen.findByText("Put 1 file back as it was."),
       ).toBeTruthy();
+      // Back to Units, on the unit that was open before Checks.
+      fireEvent.click(sectionLink("Units"));
       await waitFor(() => expect(project().authoredChecksum).toBe("abc"));
       expect(project().edits.overrides).toEqual({ armcom: { health: 5000 } });
       expect(project().writtenInPlace).toBeUndefined();
       expect(screen.getByText("1 change")).toBeTruthy();
       expect(screen.queryByText(/has been updated since/)).toBeNull();
+      expect(location()).toBe(`/workshop/${project().id}?unit=armcom`);
+      expect(healthBox().value).toBe("5000");
     });
   });
 
@@ -2420,11 +2447,9 @@ describe("UnitPage", () => {
       type(healthBox(), "5000");
       expect(project().edits.overrides).toEqual({ armcom: { health: 5000 } });
 
-      // The Checks drawer says a mutator is still needed, and there is
+      // The Checks section says a mutator is still needed, and there is
       // nothing left for the in-place write to do.
-      fireEvent.click(
-        await screen.findByRole("button", { name: "No problems found" }),
-      );
+      fireEvent.click(await findSectionLink("Checks, No problems found"));
       expect(
         await screen.findByText(/you still need a mutator for it/),
       ).toBeTruthy();
@@ -2607,6 +2632,58 @@ describe("UnitPage", () => {
       expect(
         document.getElementById("field-weapondefs.rocket.range"),
       ).not.toBeNull();
+    });
+
+    /** The same link followed from the Checks section, which is a page of
+     *  its own now (issue #3111), back into the unit editor. */
+    it("lands on the unit and the slot a change ledger link on Checks names", async () => {
+      vi.spyOn(Element.prototype, "scrollIntoView").mockImplementation(
+        () => {},
+      );
+      mockInPlace = {
+        workshop_change_ledger: () => ({
+          units: [
+            {
+              unit: "gunner",
+              changes: [
+                {
+                  description: "Field change: weapondefs.rocket.range",
+                  fieldPath: "weapondefs.rocket.range",
+                  files: ["gamedata/unitdefs_post.lua"],
+                  tweakSlot: null,
+                  tweakMiss: null,
+                  uncompiledReason: null,
+                },
+              ],
+            },
+          ],
+          notes: [],
+        }),
+      };
+      openGunner();
+      openWeapons();
+      fireEvent.click(slotButton(2));
+      type(screen.getByLabelText("Range") as HTMLInputElement, "650");
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
+
+      fireEvent.click(await findSectionLink(/^Checks/));
+      fireEvent.click(
+        await screen.findByRole("link", {
+          name: "Field change: weapondefs.rocket.range",
+        }),
+      );
+
+      const id = readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.id;
+      expect(location()).toBe(
+        `/workshop/${id}?unit=gunner&field=weapondefs.rocket.range`,
+      );
+      expect(
+        screen
+          .getByRole("tab", { name: /Weapons/ })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+      expect(screen.getByText("Weapon 2 mount")).toBeTruthy();
+      expect(screen.getByLabelText("Range")).toHaveProperty("value", "650");
     });
 
     /** Issue #2633's dry run covers weapon fields as it does unit fields. */
@@ -3019,7 +3096,7 @@ describe("UnitPage", () => {
    * Issue #2640. The weapon library is reached from the project page itself,
    * and holds a weapon copied out of the game before any unit fires it.
    */
-  describe("the weapon library drawer", () => {
+  describe("the Weapons section", () => {
     it("copies a game weapon into the library and edits it there", async () => {
       mockWeaponDefs = {
         sharedgun: { name: "Shared Gun", range: 450 },
@@ -3029,10 +3106,9 @@ describe("UnitPage", () => {
         { armcom: ARMCOM },
         `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=armcom`,
       );
-      fireEvent.click(
-        screen.getByTitle(
-          "The weapons this project owns, to copy, change and equip",
-        ),
+      fireEvent.click(sectionLink("Weapons"));
+      expect(location()).toBe(
+        `/workshop/new/weapons?${new URLSearchParams({ game: GAME.name })}`,
       );
       const search = await screen.findByLabelText(/^Find a weapon/);
       fireEvent.change(search, { target: { value: "cannon" } });
@@ -3064,6 +3140,76 @@ describe("UnitPage", () => {
       expect(
         readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.weapons,
       ).toEqual({});
+    });
+  });
+
+  /**
+   * Issue #3111. A project's sections are pages, each one click from the
+   * section bar and each at its own URL, in place of the drawers the header
+   * used to open over the unit editor.
+   */
+  describe("project sections", () => {
+    const saved = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+
+    it("offers no Package section until there is a project to package", () => {
+      show();
+      expect(() => sectionLink("Package")).toThrow();
+      type(healthBox(), "5000");
+      expect(sectionLink("Package")).toBeTruthy();
+    });
+
+    it("reaches each section in one click, at its own URL, and comes back to the unit", () => {
+      show();
+      type(healthBox(), "5000");
+      const id = saved()?.id;
+
+      const visits: [string | RegExp, string, () => unknown][] = [
+        ["Weapons", "weapons", () => screen.getByLabelText(/^Find a weapon/)],
+        [
+          "Collections",
+          "collections",
+          () => screen.getByText("New collection"),
+        ],
+        [/^Checks/, "checks", () => screen.getByText("Game definitions")],
+        [
+          "Package",
+          "package",
+          () => screen.getByRole("heading", { name: "Generated Lua" }),
+        ],
+      ];
+      for (const [name, path, landed] of visits) {
+        fireEvent.click(sectionLink(name));
+        expect(location()).toBe(`/workshop/${id}/${path}`);
+        expect(landed()).toBeTruthy();
+        expect(sectionLink(name).getAttribute("aria-current")).toBe("page");
+        // The unit editor is not drawn under a section, as it was under a
+        // drawer.
+        expect(screen.queryByLabelText("Health")).toBeNull();
+      }
+
+      fireEvent.click(sectionLink("Units"));
+      expect(location()).toBe(`/workshop/${id}?unit=armcom`);
+      expect(healthBox().value).toBe("5000");
+    });
+
+    it("keeps the section when the first edit made there starts the project", () => {
+      mockWeaponDefs = { other_cannon: { name: "Cannon", range: 700 } };
+      show();
+      fireEvent.click(sectionLink("Weapons"));
+      fireEvent.click(screen.getByText("other_cannon"));
+      fireEvent.click(screen.getByRole("button", { name: "Add to library" }));
+
+      expect(location()).toBe(`/workshop/${saved()?.id}/weapons`);
+      fireEvent.click(sectionLink("Units"));
+      expect(location()).toBe(`/workshop/${saved()?.id}?unit=armcom`);
+    });
+
+    it("keeps undo in the header on every section", () => {
+      show();
+      type(healthBox(), "5000");
+      fireEvent.click(sectionLink("Collections"));
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(saved()?.edits.overrides).toEqual({});
     });
   });
 
@@ -3288,9 +3434,7 @@ describe("UnitPage", () => {
       ).toBeTruthy();
       // And the verdict on Checks counts it, so the tick cannot claim a
       // project whose edits land on nothing is clean.
-      expect(
-        await screen.findByRole("button", { name: "1 blocker found" }),
-      ).toBeTruthy();
+      expect(await findSectionLink("Checks, 1 blocker found")).toBeTruthy();
     });
 
     it("takes a dead reference out as one undoable step", async () => {
@@ -3299,9 +3443,7 @@ describe("UnitPage", () => {
       cleanup();
 
       reopen({ armlab: ARMLAB }, "moved on");
-      fireEvent.click(
-        await screen.findByRole("button", { name: "1 blocker found" }),
-      );
+      fireEvent.click(await findSectionLink("Checks, 1 blocker found"));
       expect(screen.getByText("Loses 1 field you set on armcom")).toBeTruthy();
       fireEvent.click(
         screen.getByRole("button", { name: "Remove these changes" }),

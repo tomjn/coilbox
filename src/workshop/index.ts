@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { insideSection } from "../general/nav";
 import { cachedProjectName } from "./project";
+import { projectSectionLabel } from "./routes";
 
 /**
  * The workshop: changing what a game's units are, rather than what they look
@@ -45,30 +46,34 @@ const workshopPlugin: FramePlugin = {
       crumb: "Unit tweaks",
     },
     {
+      // The reference table and comparison view (issue #1316), resolved
+      // through this project's own edits. A static segment past the opaque
+      // `:id`, which the router ranks above the optional `:section` below.
+      // Listed first because the breadcrumb takes the first pattern that
+      // matches, and the one below matches this path too.
+      path: "workshop/:id/reference",
+      lazy: gateAdvanced(() => import("./pages/ReferencePage")),
+      crumb: "Reference",
+    },
+    {
       // The unit is a query parameter rather than a path segment, so picking one
       // does not unmount the page and take the game's whole unit table with it.
-      // See the page's own note.
+      // See the page's own note. The project's sections (issue #3111) are an
+      // optional segment of the same route for the same reason: moving between
+      // Units and Checks keeps the page, and everything it has read, mounted.
       //
       // The route param is an opaque uuid, so the crumb resolves the project's
       // name from the settings store, falling back when it names no project.
       // `new` is the editor with no project yet, which is where a unit's
       // encyclopedia page sends somebody who has picked a unit and not a
       // project (see `routes.ts`).
-      path: "workshop/:id",
+      path: "workshop/:id/:section?",
       lazy: gateAdvanced(() => import("./pages/UnitPage")),
       crumb: (c) =>
-        c.params.id === "new"
+        projectSectionLabel(c.params.section) ??
+        (c.params.id === "new"
           ? "New project"
-          : (c.params.id && cachedProjectName(c.params.id)) || "Project",
-    },
-    {
-      // The reference table and comparison view (issue #1316), resolved
-      // through this project's own edits. A static segment past the opaque
-      // `:id` rather than a second dynamic one, so `workshop/:id` still
-      // matches the editor alone.
-      path: "workshop/:id/reference",
-      lazy: gateAdvanced(() => import("./pages/ReferencePage")),
-      crumb: "Reference",
+          : (c.params.id && cachedProjectName(c.params.id)) || "Project"),
     },
   ],
   settings: [],

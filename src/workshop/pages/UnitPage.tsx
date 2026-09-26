@@ -8,6 +8,12 @@
  * everything the page has read. `?unit=` keeps the deep link a separate detail
  * route would have given.
  *
+ * The project's other sections, Weapons, Collections, Checks and Package, are
+ * `/workshop/:id/<section>` on the same route (issue #3111), so this page
+ * stays mounted as somebody moves between them. They were drawers over the
+ * unit editor, each with a header button. The header keeps only what applies
+ * to every section: undo, redo, checkpoints and Test.
+ *
  * `/workshop/new?game=` is the same page with no project yet, which is where a
  * unit's encyclopedia page sends somebody who has picked a unit and no project
  * (issue #2696, and `routes.ts`). The first edit starts the project and the URL
@@ -70,10 +76,7 @@
 import { Button, buttonVariants, cn } from "@picoframe/frame";
 import {
   ArrowLeft,
-  Code2,
-  Crosshair,
   Dice5,
-  FolderTree,
   HelpCircle,
   History,
   Pencil,
@@ -84,7 +87,13 @@ import {
   Undo2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -163,7 +172,6 @@ import {
   setCollectionRule,
 } from "../collections";
 import { compatibilityState } from "../compatibility";
-import { useCompiledProject } from "../compile";
 import { useCustomParams, useUnitDefs } from "../config";
 import {
   type DeathExplosion,
@@ -206,7 +214,13 @@ import {
   useModProjects,
 } from "../project";
 import type { RandomModRecipe } from "../randomMod";
-import { projectPath, referencePath } from "../routes";
+import {
+  type ProjectSection,
+  projectPath,
+  projectSectionOf,
+  referencePath,
+  sectionPath,
+} from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
 import {
@@ -272,16 +286,20 @@ import { ArmorClassPanel } from "./components/ArmorClassPanel";
 import { BatchEditDrawer } from "./components/BatchEditDrawer";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { CheckpointsDrawer } from "./components/CheckpointsDrawer";
-import { ChecksButton } from "./components/ChecksButton";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
-import { CollectionsDrawer } from "./components/CollectionsDrawer";
-import { CompiledLuaDrawer } from "./components/CompiledLuaDrawer";
+import { CollectionsPanel } from "./components/CollectionsPanel";
 import { DerivedStatsStrip } from "./components/DerivedStatsStrip";
 import { DisableUnitSwitch } from "./components/DisableUnitSwitch";
-import { PackageMutatorButton } from "./components/PackageMutatorButton";
+import { PackagePanel } from "./components/PackagePanel";
 import { PlayLocallyButton } from "./components/PlayLocallyButton";
+import {
+  type ChecksInput,
+  ChecksPanel,
+  useProjectChecks,
+} from "./components/ProjectChecks";
 import { ProjectDetailsDrawer } from "./components/ProjectDetailsDrawer";
+import { ProjectSectionBar } from "./components/ProjectSectionBar";
 import { RegenerateRandomModDrawer } from "./components/RandomModDrawer";
 import { UnitFieldGroups } from "./components/UnitFieldGroups";
 import {
@@ -291,13 +309,18 @@ import {
 } from "./components/UnitFieldRow";
 import { UnitList } from "./components/UnitList";
 import { UnitTextPanel } from "./components/UnitTextPanel";
-import { WeaponLibraryDrawer } from "./components/WeaponLibraryDrawer";
+import { WeaponLibraryPanel } from "./components/WeaponLibraryPanel";
 import {
   DeathExplosionsPanel,
   type ExplosionPanel,
   type SlotLibrary,
   WeaponSlotsPanel,
 } from "./components/WeaponSlotsPanel";
+
+/** A section other than Units: the height that is left, scrolling on its own
+ *  from `lg` up the way the unit editor's panes do. */
+const SECTION_BODY =
+  "flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1";
 
 /** A stable empty, so a page with no game does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
@@ -369,12 +392,6 @@ export default function UnitPage() {
   } = useCheckpoints();
   /** Whether the details drawer is up to rename the open project (issue #2711). */
   const [renaming, setRenaming] = useState(false);
-  /** Whether the generated Lua is on screen (issue #1275). */
-  const [readingLua, setReadingLua] = useState(false);
-  /** Whether the project's weapon library is on screen (issue #2640). */
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  /** Whether the project's collections are on screen (issue #2654). */
-  const [collectionsOpen, setCollectionsOpen] = useState(false);
   /** Whether the project's checkpoints are on screen (issue #2657). */
   const [checkpointsOpen, setCheckpointsOpen] = useState(false);
   /** Whether the batch edit drawer is on screen (issue #2655). */
@@ -399,13 +416,38 @@ export default function UnitPage() {
   // first edit changes the URL without remounting the page and taking the
   // game's whole unit table down with it. No project's id can collide with it:
   // they are uuids.
-  const { id: routeId } = useParams();
+  const { id: routeId = "new", section: sectionParam } = useParams();
   const project = projects.find((p) => p.id === routeId);
   /** Whether the route names a project that is not in the list any more. */
   const missing = routeId !== "new" && !project;
+  /**
+   * Which of the project's sections is open (issue #3111). Package needs a
+   * saved project to package, so on `/workshop/new` it answers with Units.
+   */
+  const requested = projectSectionOf(sectionParam);
+  const section: ProjectSection =
+    requested === "package" && !project ? "units" : requested;
 
   const games = scan.data?.games ?? [];
   const gameName = project?.gameName ?? params.get("game") ?? "";
+
+  /**
+   * The unit editor's own query, from the last time Units was open, so going
+   * to Checks and back lands on the unit and tab you left rather than an
+   * empty editor. Held across sections because they are all one mounted page
+   * (see `index.ts`).
+   */
+  const location = useLocation();
+  const unitsSearch = useRef(location.search);
+  if (section === "units") unitsSearch.current = location.search;
+  /** Where each section is. A project not started yet has only its game to
+   *  say which one it is, so every section carries that. */
+  const sectionHref = (s: ProjectSection) =>
+    s === "units"
+      ? `${sectionPath(routeId, "units")}${unitsSearch.current}`
+      : `${sectionPath(routeId, s)}${
+          routeId === "new" ? `?${new URLSearchParams({ game: gameName })}` : ""
+        }`;
   const game = games.find((g) => g.name === gameName);
   const unitKey = params.get("unit") ?? "";
   // A link back to a field, from the change ledger (issue #2653). The field
@@ -504,10 +546,22 @@ export default function UnitPage() {
       const value = params.get(key);
       if (value) kept.set(key, value);
     }
-    navigate(
-      kept.size > 0 ? `${path}${path.includes("?") ? "&" : "?"}${kept}` : path,
-      { replace: true },
-    );
+    // The section comes along too (issue #3111): adding a weapon from the
+    // Weapons section starts the project there and stays there. The unit
+    // editor's own query is not in this URL, so the one Units last had is
+    // kept for the way back, less the game a project no longer needs.
+    if (section !== "units") {
+      const units = new URLSearchParams(unitsSearch.current);
+      units.delete("game");
+      unitsSearch.current = units.size > 0 ? `?${units}` : "";
+      navigate(sectionPath(started.id, section), { replace: true });
+    } else
+      navigate(
+        kept.size > 0
+          ? `${path}${path.includes("?") ? "&" : "?"}${kept}`
+          : path,
+        { replace: true },
+      );
     return started;
   };
 
@@ -1478,9 +1532,6 @@ export default function UnitPage() {
     counts.off > 0 ||
     counts.weapons > 0;
   const anythingToShow = anythingChanged || origins.length > 0;
-  // Only while the drawer is open, so a page nobody has asked to see the Lua
-  // for does not compile the project on every keystroke.
-  const compiled = useCompiledProject(project, readingLua);
 
   /**
    * Copy the selected unit, as the project has it, under a new name.
@@ -1651,6 +1702,27 @@ export default function UnitPage() {
     [project, defs, armorDefs, game?.name, consumers],
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
+
+  // Whether this project is in a fit state to use (issue #2748), read
+  // whichever section is open so the Checks entry in the section bar can say
+  // so (issue #3111). Only against a game whose definitions could be read,
+  // which is when the header used to show the checks button at all.
+  const checkable = !!game && status !== "error";
+  const checksInput: ChecksInput = {
+    gameName: game?.name ?? gameName,
+    gameArchives: game ? [game.primaryArchive, ...game.dependencyArchives] : [],
+    enginePath: checkable ? selected?.enginePath : undefined,
+    dataDir: checkable ? selected?.rootPath : undefined,
+    diagnosticErrors: defs?.unitErrors ?? [],
+    diagnosticsChecking: status !== "ready",
+    routeOptions: gameInfo?.options,
+    routesChecking: gameInfoStatus === "idle" || gameInfoStatus === "loading",
+    project: checkable ? project : undefined,
+    gameUnits,
+    compatibility,
+    armorClassProblems: projectArmorProblems,
+  };
+  const checks = useProjectChecks(checksInput, section === "checks");
 
   // One way to change a field, whichever tab it is on. A weapon field is an
   // override like any other: its path already says whether it is written to
@@ -2026,78 +2098,10 @@ export default function UnitPage() {
                 <Redo2 className="size-3.5" />
               </Button>
             </ButtonGroup>
-            {/* Whether this project is in a fit state to use, as one control
-              rather than three (issue #2748): what unitsync said reading the
-              game's defs, which delivery routes this game supports, and what
-              preflight found in the compiled output. Three verdicts sitting
-              next to each other and styled like the buttons beside them (Lua,
-              Test) were what made this toolbar unreadable, and all three
-              needed a game picked before there was anything to say. */}
-            {game && status !== "error" && (
-              <ChecksButton
-                gameName={game.name}
-                gameArchives={[game.primaryArchive, ...game.dependencyArchives]}
-                enginePath={selected?.enginePath}
-                dataDir={selected?.rootPath}
-                diagnosticErrors={defs?.unitErrors ?? []}
-                diagnosticsChecking={status !== "ready"}
-                routeOptions={gameInfo?.options}
-                routesChecking={
-                  gameInfoStatus === "idle" || gameInfoStatus === "loading"
-                }
-                project={project}
-                gameUnits={gameUnits}
-                compatibility={compatibility}
-                armorClassProblems={projectArmorProblems}
-                // Through `commit`, so taking a dead reference out is one undo
-                // step like every other edit on this page. Nothing here is
-                // irreversible, which is what makes an offer safe to press.
-                onApplyFix={(finding) =>
-                  commit(finding.fix?.apply ?? ((e) => e))
-                }
-                onInPlaceWrite={onInPlaceDone}
-              />
-            )}
-            {/* The weapons the project owns (issue #2640), to copy out of the
-              game, change and equip. Needs the game's weapon table, so only
-              once the definitions have been read. */}
-            {game && defs && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLibraryOpen(true)}
-                title="The weapons this project owns, to copy, change and equip"
-              >
-                <Crosshair className="mr-1 size-3.5" />
-                Weapons
-                {counts.weapons > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {counts.weapons}
-                  </span>
-                )}
-              </Button>
-            )}
-            {/* Named, nestable sets of units (issue #2654), which scope the
-              list on the left and, later, a batch edit or a restricted
-              export. */}
-            {game && defs && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCollectionsOpen(true)}
-                title="Named sets of units, to filter the list and scope what you work on"
-              >
-                <FolderTree className="mr-1 size-3.5" />
-                Collections
-                {counts.collections > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {counts.collections}
-                  </span>
-                )}
-              </Button>
-            )}
             {/* Named, described snapshots of the whole project, restorable
-              in one action (issue #2657). Needs a project to snapshot. */}
+              in one action (issue #2657). Needs a project to snapshot. Stays
+              in the header with undo and redo rather than becoming a section
+              (issue #3111), because like them it applies to every section. */}
             {project && (
               <Button
                 variant="outline"
@@ -2112,21 +2116,6 @@ export default function UnitPage() {
                     {checkpoints.length}
                   </span>
                 )}
-              </Button>
-            )}
-            {/* One arithmetic change across a whole collection, previewed
-              before it writes anything (issue #2655). Needs a collection to
-              pick from, but is offered either way so the empty state can
-              point back at the Collections button. */}
-            {game && defs && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setBatchEditOpen(true)}
-                title="Change one field across every unit in a collection, with a preview first"
-              >
-                <Sigma className="mr-1 size-3.5" />
-                Batch edit
               </Button>
             )}
             {/* Reopens the randomiser drawer against the recipe this project
@@ -2144,59 +2133,69 @@ export default function UnitPage() {
                 Regenerate
               </Button>
             )}
-            {/* The sortable table and comparison view over every unit in the
-              project, resolved through its own edits (issue #1316). Needs a
-              saved project: `/workshop/new` has no id for the route to name
-              and nothing of its own to resolve yet. */}
-            {project && defs && (
-              <Link
-                to={referencePath(project.id)}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-                title="Every unit in this project, sortable and compared side by side"
-              >
-                <Table2 className="mr-1 size-3.5" />
-                Reference
-              </Link>
-            )}
-            {/* What the project compiles to (issue #1275). A game reads Lua,
-              and the fastest way to find out whether coilbox understood the
-              edit is to read what it wrote. */}
-            {project && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setReadingLua(true)}
-                title="Read the Lua this project compiles to"
-              >
-                <Code2 className="mr-1 size-3.5" />
-                Lua
-              </Button>
-            )}
             {/* One button that plays the project on your own machine (issue
               #1278). The workshop stops being write only here: everything
               before this point edits a project, and this is the first thing
               that lets you find out whether the edits were right. */}
             {project && <PlayLocallyButton project={project} />}
-            {/* The step after Test: a file somebody else can play rather
-              than a folder only this machine's engine can see (issue
-              #1283). */}
-            {project && (
-              <PackageMutatorButton
-                project={project}
-                units={units}
-                onPackaged={(version) =>
-                  recordPackagedVersion(project.id, version)
-                }
-                routeOptions={gameInfo?.options}
-                weaponDefs={weaponDefs}
-                library={library}
-                equipped={equipped}
-                clones={clones}
-              />
-            )}
           </>
         }
-      />
+      >
+        {/* The project's sections (issue #3111), each a page, in place of
+          the row of drawer buttons this header used to wrap onto two lines
+          with. */}
+        {(project || gameName) && (
+          <ProjectSectionBar
+            current={section}
+            hrefOf={sectionHref}
+            shown={(s) => s !== "package" || !!project}
+            counts={{
+              weapons: counts.weapons,
+              collections: counts.collections,
+            }}
+            checks={checkable ? checks : undefined}
+            tools={
+              game &&
+              defs && (
+                <>
+                  {/* One arithmetic change across a whole collection,
+                    previewed before it writes anything (issue #2655). A
+                    drawer until issue #3113 folds it into the reference
+                    table. Offered with no collection too, so the empty state
+                    can point at the Collections section. */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setBatchEditOpen(true)}
+                    title="Change one field across every unit in a collection, with a preview first"
+                  >
+                    <Sigma className="mr-1 size-3.5" />
+                    Batch edit
+                  </Button>
+                  {/* The sortable table and comparison view over every unit
+                    in the project, resolved through its own edits (issue
+                    #1316). A page of its own. Needs a saved project:
+                    `/workshop/new` has no id for the route to name and
+                    nothing of its own to resolve yet. */}
+                  {project && (
+                    <Link
+                      to={referencePath(project.id)}
+                      className={buttonVariants({
+                        variant: "ghost",
+                        size: "sm",
+                      })}
+                      title="Every unit in this project, sortable and compared side by side"
+                    >
+                      <Table2 className="mr-1 size-3.5" />
+                      Reference
+                    </Link>
+                  )}
+                </>
+              )
+            }
+          />
+        )}
+      </PageHeader>
 
       {/* The list's own form, not a second one: the fields, the defaults and
         the one call that writes both are `ProjectDetailsDrawer`'s, so a rename
@@ -2213,93 +2212,6 @@ export default function UnitPage() {
             updateProjectDetails(project.id, details);
             setRenaming(false);
           }}
-        />
-      )}
-
-      {game && defs && (
-        <WeaponLibraryDrawer
-          open={libraryOpen}
-          onOpenChange={setLibraryOpen}
-          gameName={game.name}
-          gameWeapons={weaponDefs}
-          library={library}
-          equipped={equipped}
-          consumers={consumers}
-          describeMount={describeMount}
-          onAdd={(key, source) => {
-            const from = sharedCopy(source);
-            if (from) addToLibrary(key, from, gameChildOf);
-          }}
-          onDelete={deleteLibraryWeapon}
-          onChange={changeLibraryField}
-          onReset={resetLibraryField}
-          postOf={libraryPostOf}
-          onOpenMount={(mount) => {
-            setLibraryOpen(false);
-            select(
-              isDeathMount(mount.step)
-                ? {
-                    unit: mount.unit,
-                    tab: "explosions",
-                    explosion: mount.step,
-                    slot: "",
-                    support: "",
-                  }
-                : {
-                    unit: mount.unit,
-                    tab: "weapons",
-                    slot: mount.step,
-                    support: "",
-                    explosion: "",
-                  },
-            );
-          }}
-        />
-      )}
-
-      {game && defs && (
-        <CollectionsDrawer
-          open={collectionsOpen}
-          onOpenChange={setCollectionsOpen}
-          collections={collections}
-          units={units}
-          overrides={overrides}
-          nameOf={nameOf}
-          weaponDefs={weaponDefs}
-          library={library}
-          equipped={equipped}
-          clones={clones}
-          onCreate={(name, parentId) =>
-            updateCollections(
-              (c) =>
-                createCollection(c ?? NO_COLLECTIONS, name, parentId)
-                  .collections,
-            )
-          }
-          onRename={(id, name) =>
-            updateCollections((c) =>
-              renameCollection(c ?? NO_COLLECTIONS, id, name),
-            )
-          }
-          onDelete={(id) => {
-            updateCollections((c) => removeCollection(c ?? NO_COLLECTIONS, id));
-            if (activeCollectionId === id) setActiveCollectionId(undefined);
-          }}
-          onSetParent={(id, parentId) =>
-            updateCollections((c) =>
-              setCollectionParent(c ?? NO_COLLECTIONS, id, parentId),
-            )
-          }
-          onToggleMember={(id, unit, member) =>
-            updateCollections((c) =>
-              setCollectionMembership(c ?? NO_COLLECTIONS, id, unit, member),
-            )
-          }
-          onSetRule={(id, rule) =>
-            updateCollections((c) =>
-              setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
-            )
-          }
         />
       )}
 
@@ -2357,15 +2269,6 @@ export default function UnitPage() {
         />
       )}
 
-      {project && (
-        <CompiledLuaDrawer
-          open={readingLua}
-          onOpenChange={setReadingLua}
-          project={project}
-          state={compiled}
-        />
-      )}
-
       {/* The game has been updated and it broke something the project names
         (issue #1281). Only then: this used to fire on any checksum change and
         say the edits "may" have moved, which after a routine game update is a
@@ -2382,9 +2285,12 @@ export default function UnitPage() {
             {game?.name}
           </AlertTitle>
           <AlertDescription>
-            {game?.name} has been updated since this project was written. Open
-            Checks to read what changed underneath it and what can be done about
-            each one.
+            {game?.name} has been updated since this project was written. Open{" "}
+            <Link to={sectionHref("checks")} className="underline">
+              Checks
+            </Link>{" "}
+            to read what changed underneath it and what can be done about each
+            one.
           </AlertDescription>
         </Alert>
       )}
@@ -2416,6 +2322,22 @@ export default function UnitPage() {
         // never had it. Nothing is started in its place: the edits it named are
         // gone, and an empty project under the same link would say they were not.
         <EmptyState label="That project is not on this machine. Pick one under Unit tweaks." />
+      ) : section === "package" && project ? (
+        // Ahead of the game's own read, the way the Package button used to
+        // be: a project whose game is not installed here can still be
+        // packaged, and one whose game is still being read need not wait.
+        <div className={SECTION_BODY}>
+          <PackagePanel
+            project={project}
+            units={units}
+            onPackaged={(version) => recordPackagedVersion(project.id, version)}
+            routeOptions={gameInfo?.options}
+            weaponDefs={weaponDefs}
+            library={library}
+            equipped={equipped}
+            clones={clones}
+          />
+        </div>
       ) : !game ? (
         <EmptyState
           label={
@@ -2450,6 +2372,103 @@ export default function UnitPage() {
             archives and can take a while the first time.
           </p>
           <SkeletonList />
+        </div>
+      ) : section === "weapons" ? (
+        <div className={SECTION_BODY}>
+          <WeaponLibraryPanel
+            gameName={game.name}
+            gameWeapons={weaponDefs}
+            library={library}
+            equipped={equipped}
+            consumers={consumers}
+            describeMount={describeMount}
+            onAdd={(key, source) => {
+              const from = sharedCopy(source);
+              if (from) addToLibrary(key, from, gameChildOf);
+            }}
+            onDelete={deleteLibraryWeapon}
+            onChange={changeLibraryField}
+            onReset={resetLibraryField}
+            postOf={libraryPostOf}
+            // Back to Units, on the slot or death explosion that fires it.
+            onOpenMount={(mount) =>
+              select(
+                isDeathMount(mount.step)
+                  ? {
+                      unit: mount.unit,
+                      tab: "explosions",
+                      explosion: mount.step,
+                      slot: "",
+                      support: "",
+                    }
+                  : {
+                      unit: mount.unit,
+                      tab: "weapons",
+                      slot: mount.step,
+                      support: "",
+                      explosion: "",
+                    },
+              )
+            }
+          />
+        </div>
+      ) : section === "collections" ? (
+        <div className={SECTION_BODY}>
+          <CollectionsPanel
+            collections={collections}
+            units={units}
+            overrides={overrides}
+            nameOf={nameOf}
+            weaponDefs={weaponDefs}
+            library={library}
+            equipped={equipped}
+            clones={clones}
+            onCreate={(name, parentId) =>
+              updateCollections(
+                (c) =>
+                  createCollection(c ?? NO_COLLECTIONS, name, parentId)
+                    .collections,
+              )
+            }
+            onRename={(id, name) =>
+              updateCollections((c) =>
+                renameCollection(c ?? NO_COLLECTIONS, id, name),
+              )
+            }
+            onDelete={(id) => {
+              updateCollections((c) =>
+                removeCollection(c ?? NO_COLLECTIONS, id),
+              );
+              if (activeCollectionId === id) setActiveCollectionId(undefined);
+            }}
+            onSetParent={(id, parentId) =>
+              updateCollections((c) =>
+                setCollectionParent(c ?? NO_COLLECTIONS, id, parentId),
+              )
+            }
+            onToggleMember={(id, unit, member) =>
+              updateCollections((c) =>
+                setCollectionMembership(c ?? NO_COLLECTIONS, id, unit, member),
+              )
+            }
+            onSetRule={(id, rule) =>
+              updateCollections((c) =>
+                setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
+              )
+            }
+          />
+        </div>
+      ) : section === "checks" ? (
+        <div className={SECTION_BODY}>
+          <ChecksPanel
+            input={checksInput}
+            checks={checks}
+            // Through `commit`, so taking a dead reference out is one undo
+            // step like every other edit on this page. Nothing here is
+            // irreversible, which is what makes an offer safe to press.
+            onApplyFix={(finding) => commit(finding.fix?.apply ?? ((e) => e))}
+            onInPlaceWrite={onInPlaceDone}
+          />
         </div>
       ) : (
         <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-[18rem_minmax(0,1fr)]">

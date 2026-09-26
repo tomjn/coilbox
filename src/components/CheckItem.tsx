@@ -1,7 +1,7 @@
 /**
  * One row in a checks drawer: an icon for its severity, where it is and what
  * it says, and a tag naming what found it. The workshop's own checks drawer
- * (`ChecksButton.tsx`) set the icon and colour for each severity, and this is
+ * (`ProjectChecks.tsx`) set the icon and colour for each severity, and this is
  * the generic row so every other checks drawer in the app reads the same way
  * rather than each page inventing its own list styling.
  *

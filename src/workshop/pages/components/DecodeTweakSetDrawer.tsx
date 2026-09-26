@@ -1,7 +1,7 @@
 /**
  * Decoding a stranger's tweak payload back to Lua (issue #1280).
  *
- * The inverse of `PackageMutatorButton`'s BAR mode (issue #1277): that one
+ * The inverse of `PackagePanel`'s BAR mode (issue #1277): that one
  * packs a project into `!bset` lines to hand to somebody else, this one
  * reads one back. It lives on the projects list rather than inside an
  * editor, because decoding a blob is something you do before you have a

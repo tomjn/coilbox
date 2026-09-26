@@ -2,7 +2,7 @@
  * The one pure function here worth a test on its own: the file name a
  * packaged archive gets (issue #1283). Everything else in `package.ts` is a
  * thin `defineCommand` binding, exercised by
- * `PackageMutatorButton.dom.test.tsx` instead.
+ * `PackagePanel.dom.test.tsx` instead.
  */
 import { describe, expect, it } from "vitest";
 import { packagedMutatorFileName } from "./package";

@@ -1,13 +1,14 @@
 // @vitest-environment happy-dom
 /**
- * What the checks button says and shows (issue #2748).
+ * What the checks say and show (issue #2748): the verdict on the Checks entry
+ * in a project's section bar, and the Checks page itself (issue #3111).
  *
  * Four sources, one verdict: unitsync's own diagnostics, the compatibility
  * comparison in `compatibility.ts` (issue #1281), `deliveryRoutes()`, and a
  * `workshop_preflight` report. None of those checks are re-tested here.
  * `deliveryRoutes.test.ts`, `compatibility.test.ts` and the Rust preflight
- * suite own them, and this is about what a person reading the button and its
- * drawer sees.
+ * suite own them, and this is about what a person reading the verdict and its
+ * page sees.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
@@ -62,7 +63,12 @@ vi.mock("@/play/config", () => ({
 
 import type { CompatFinding, CompatState } from "../../compatibility";
 import type { ModProject } from "../../project";
-import { ChecksButton } from "./ChecksButton";
+import {
+  type ChecksInput,
+  ChecksPanel,
+  useProjectChecks,
+} from "./ProjectChecks";
+import { ProjectSectionBar } from "./ProjectSectionBar";
 
 const project: ModProject = {
   id: "p1",
@@ -92,13 +98,41 @@ afterEach(() => {
   writeResponse = null;
 });
 
-/** The JSX one render of the button is, so a rerender can ask for the same
- *  tree with different props (issue #3028: a rerender that flips
- *  `routesChecking` must not remount the drawer's contents). */
-function buttonElement(props: Partial<Parameters<typeof ChecksButton>[0]>) {
+type Props = ChecksInput & {
+  onApplyFix: (finding: CompatFinding) => void;
+  onInPlaceWrite: () => void;
+};
+
+/** The section bar's Checks entry and the Checks page, off one read of the
+ *  checks, the way `UnitPage` draws them (issue #3111). */
+function Checks({ onApplyFix, onInPlaceWrite, ...input }: Props) {
+  const checks = useProjectChecks(input, true);
+  return (
+    <>
+      <ProjectSectionBar
+        current="units"
+        hrefOf={(s) => `/workshop/p1/${s}`}
+        shown={(s) => s === "checks"}
+        counts={{}}
+        checks={checks}
+      />
+      <ChecksPanel
+        input={input}
+        checks={checks}
+        onApplyFix={onApplyFix}
+        onInPlaceWrite={onInPlaceWrite}
+      />
+    </>
+  );
+}
+
+/** The JSX one render is, so a rerender can ask for the same tree with
+ *  different props (issue #3028: a rerender that flips `routesChecking` must
+ *  not remount the page's contents). */
+function checksElement(props: Partial<Props>) {
   return (
     <MemoryRouter>
-      <ChecksButton
+      <Checks
         gameName="Balanced Annihilation V15.9.8"
         gameArchives={[{ name: "balanced_annihilation-v15.9.8.sdz" }]}
         enginePath="/engines/recoil"
@@ -119,50 +153,51 @@ function buttonElement(props: Partial<Parameters<typeof ChecksButton>[0]>) {
   );
 }
 
-/** The single toolbar button, whichever state it is asked to render in.
- *  `rerenderWith` asks for the same tree again with different props, on the
- *  render result testing-library already gave back. */
-function renderButton(props: Partial<Parameters<typeof ChecksButton>[0]> = {}) {
-  const result = render(buttonElement(props));
+function renderChecks(props: Partial<Props> = {}) {
+  const result = render(checksElement(props));
   return {
     ...result,
-    rerenderWith: (next: Partial<Parameters<typeof ChecksButton>[0]>) =>
-      result.rerender(buttonElement({ ...props, ...next })),
+    rerenderWith: (next: Partial<Props>) =>
+      result.rerender(checksElement({ ...props, ...next })),
   };
 }
 
-describe("the checks button", () => {
-  it("is disabled and says Checking while unitsync's own read is still going", () => {
-    renderButton({ diagnosticsChecking: true });
-    const button = screen.getByRole("button", { name: "Checking the project" });
-    expect(button.hasAttribute("disabled")).toBe(true);
-    expect(button.textContent).toContain("Checking");
+describe("the Checks entry in the section bar", () => {
+  it("says Checking while unitsync's own read is still going", () => {
+    renderChecks({ diagnosticsChecking: true });
+    expect(
+      screen.getByRole("link", { name: "Checks, Checking the project" }),
+    ).toBeTruthy();
   });
 
-  it("is disabled while delivery routes are still being read", () => {
-    renderButton({ routesChecking: true, routeOptions: undefined });
-    const button = screen.getByRole("button", { name: "Checking the project" });
-    expect(button.hasAttribute("disabled")).toBe(true);
+  it("says Checking while delivery routes are still being read", () => {
+    renderChecks({ routesChecking: true, routeOptions: undefined });
+    expect(
+      screen.getByRole("link", { name: "Checks, Checking the project" }),
+    ).toBeTruthy();
   });
 
-  it("is a quiet tick with no visible label when nothing is wrong", () => {
-    renderButton();
+  it("is a quiet tick with no count when nothing is wrong", () => {
+    renderChecks();
     // `aria-label` is the accessible name a screen reader gets. There is no
     // tooltip in a DOM test (it needs a hover Radix does not simulate), so
     // this is the one proof the verdict is not tooltip-only (issue #2748).
-    const button = screen.getByRole("button", { name: "No problems found" });
-    expect(button.hasAttribute("disabled")).toBe(false);
-    expect(button.textContent).toBe("");
+    const link = screen.getByRole("link", {
+      name: "Checks, No problems found",
+    });
+    expect(link.textContent).toBe("Checks");
   });
 
-  it("grows a visible label and turns amber when unitsync reports a diagnostic", () => {
-    renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
-    const button = screen.getByRole("button", { name: "1 to review found" });
-    expect(button.textContent).toBe("1 to review");
+  it("grows a count and turns amber when unitsync reports a diagnostic", () => {
+    renderChecks({ diagnosticErrors: ["could not read units/armcom.lua"] });
+    const link = screen.getByRole("link", {
+      name: "Checks, 1 to review found",
+    });
+    expect(link.textContent).toBe("Checks1");
   });
 
   it("counts an armour class finding as something to review", () => {
-    renderButton({
+    renderChecks({
       armorClassProblems: [
         {
           id: "armcom:gator_laser:damage",
@@ -172,8 +207,9 @@ describe("the checks button", () => {
         },
       ],
     });
-    const button = screen.getByRole("button", { name: "1 to review found" });
-    expect(button.textContent).toBe("1 to review");
+    expect(
+      screen.getByRole("link", { name: "Checks, 1 to review found" }),
+    ).toBeTruthy();
   });
 
   it("counts a blocker and a review item together, blocker first", async () => {
@@ -182,29 +218,29 @@ describe("the checks button", () => {
       review: ["2 blocks of read-only Lua are not compiled."],
       passes: [],
     };
-    renderButton({ project });
-    const button = await screen.findByRole("button", {
-      name: "1 blocker, 1 to review found",
+    renderChecks({ project });
+    const link = await screen.findByRole("link", {
+      name: "Checks, 1 blocker, 1 to review found",
     });
-    expect(button.textContent).toBe("1 blocker, 1 to review");
+    expect(link.textContent).toBe("Checks2");
   });
 
   it("reads as attention rather than clean when preflight fails to run", async () => {
     preflightResponse = Promise.reject(new Error("command not found"));
-    renderButton({ project });
+    renderChecks({ project });
     expect(
-      await screen.findByRole("button", {
-        name: "Preflight could not run: command not found",
+      await screen.findByRole("link", {
+        name: "Checks, Preflight could not run: command not found",
       }),
     ).toBeTruthy();
   });
 
-  describe("the drawer", () => {
+  describe("the Checks page", () => {
     it("orders its sections definitions, compatibility, routes, post-processing, preflight, then the change ledger", async () => {
-      renderButton({
+      renderChecks({
         diagnosticErrors: ["could not read units/armcom.lua"],
       });
-      fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+      screen.getByRole("link", { name: /to review/ });
       const headings = (
         await screen.findAllByRole("heading", { level: 3 })
       ).map((h) => h.textContent);
@@ -219,7 +255,7 @@ describe("the checks button", () => {
     });
 
     it("lists an armour class finding under its own heading, without opening the unit it is about", () => {
-      renderButton({
+      renderChecks({
         armorClassProblems: [
           {
             id: "armcom:gator_laser:damage",
@@ -229,36 +265,30 @@ describe("the checks button", () => {
           },
         ],
       });
-      fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+      screen.getByRole("link", { name: /to review/ });
       expect(screen.getByText("Armour classes")).toBeTruthy();
       expect(screen.getByText(/gator_laser's damage table/)).toBeTruthy();
     });
 
-    it("puts unitsync's own lines under Game definitions without showing them on the button", () => {
-      renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
-      expect(screen.queryByText("could not read units/armcom.lua")).toBeNull();
-      fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+    it("puts unitsync's own lines under Game definitions", () => {
+      renderChecks({ diagnosticErrors: ["could not read units/armcom.lua"] });
       expect(screen.getByText("could not read units/armcom.lua")).toBeTruthy();
     });
 
     it("lists both delivery routes, available and not", () => {
-      renderButton({
+      renderChecks({
         routeOptions: [{ key: "tweakdefs", name: "Tweak defs" }],
       });
-      fireEvent.click(
-        screen.getByRole("button", { name: "No problems found" }),
-      );
+      screen.getByRole("link", { name: "Checks, No problems found" });
       expect(screen.getByText("Mutator archive")).toBeTruthy();
       expect(screen.getByText("Tweak slots")).toBeTruthy();
     });
 
     it("offers the in-place write for a loose game in a games folder", async () => {
-      renderButton({
+      renderChecks({
         gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
       });
-      fireEvent.click(
-        screen.getByRole("button", { name: "No problems found" }),
-      );
+      screen.getByRole("link", { name: "Checks, No problems found" });
       expect(
         await screen.findByRole("button", {
           name: "Write changes into the game",
@@ -267,10 +297,8 @@ describe("the checks button", () => {
     });
 
     it("offers no in-place write for a packed game", () => {
-      renderButton();
-      fireEvent.click(
-        screen.getByRole("button", { name: "No problems found" }),
-      );
+      renderChecks();
+      screen.getByRole("link", { name: "Checks, No problems found" });
       expect(
         screen.queryByRole("button", { name: "Write changes into the game" }),
       ).toBeNull();
@@ -287,13 +315,11 @@ describe("the checks button", () => {
         copies: [],
         equipped: [],
       };
-      const { rerenderWith } = renderButton({
+      const { rerenderWith } = renderChecks({
         gameArchives: [{ name: "dev.sdd", path: "/spring/games/dev.sdd" }],
         project: projectWithFieldChange,
       });
-      fireEvent.click(
-        await screen.findByRole("button", { name: "No problems found" }),
-      );
+      await screen.findByRole("link", { name: "Checks, No problems found" });
       fireEvent.click(
         await screen.findByRole("button", {
           name: "Write changes into the game",
@@ -328,11 +354,10 @@ describe("the checks button", () => {
         review: ["2 blocks of read-only Lua are not compiled."],
         passes: ["2 table chunks compile to a Lua table."],
       };
-      renderButton({ project });
-      const button = await screen.findByRole("button", {
-        name: "1 blocker, 1 to review found",
+      renderChecks({ project });
+      await screen.findByRole("link", {
+        name: "Checks, 1 blocker, 1 to review found",
       });
-      fireEvent.click(button);
 
       expect(await screen.findByText("Blockers")).toBeTruthy();
       expect(screen.getByText("Worth a look")).toBeTruthy();
@@ -378,32 +403,34 @@ describe("the checks button", () => {
       });
 
       it("counts a broken reference as a blocker, so no tick hides it", async () => {
-        renderButton({ project, compatibility: moved([finding()]) });
+        renderChecks({ project, compatibility: moved([finding()]) });
         expect(
-          await screen.findByRole("button", { name: "1 blocker found" }),
+          await screen.findByRole("link", { name: "Checks, 1 blocker found" }),
         ).toBeTruthy();
       });
 
       it("counts one that still lands as something to review", async () => {
-        renderButton({
+        renderChecks({
           project,
           compatibility: moved([
             finding({ severity: "review", fix: undefined }),
           ]),
         });
         expect(
-          await screen.findByRole("button", { name: "1 to review found" }),
+          await screen.findByRole("link", {
+            name: "Checks, 1 to review found",
+          }),
         ).toBeTruthy();
       });
 
       it("shows what an offer costs beside the button that takes it", async () => {
         const onApplyFix = vi.fn();
-        renderButton({
+        renderChecks({
           project,
           compatibility: moved([finding()]),
           onApplyFix,
         });
-        fireEvent.click(await screen.findByRole("button", { name: /blocker/ }));
+        await screen.findByRole("link", { name: /blocker/ });
         expect(
           screen.getByText("Loses nothing, a mark is not an edit"),
         ).toBeTruthy();
@@ -415,7 +442,7 @@ describe("the checks button", () => {
       });
 
       it("offers nothing on a finding coilbox cannot safely act on", async () => {
-        renderButton({
+        renderChecks({
           project,
           compatibility: moved([
             finding({
@@ -427,17 +454,13 @@ describe("the checks button", () => {
             }),
           ]),
         });
-        fireEvent.click(
-          await screen.findByRole("button", { name: /to review/ }),
-        );
+        await screen.findByRole("link", { name: /to review/ });
         expect(screen.queryByText(/^Loses /)).toBeNull();
       });
 
       it("says the game is the same build when the checksums agree", async () => {
-        renderButton({ project, compatibility: { kind: "unmoved" } });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project, compatibility: { kind: "unmoved" } });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(
           screen.getByText(
             "Balanced Annihilation V15.9.8 is the same build this project was written against.",
@@ -446,20 +469,16 @@ describe("the checks button", () => {
       });
 
       it("says so when the game moved and nothing in the project did", async () => {
-        renderButton({ project, compatibility: moved([]) });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project, compatibility: moved([]) });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(
           screen.getByText(/everything the project names is still there/),
         ).toBeTruthy();
       });
 
       it("does not claim a clean bill of health with no checksum to compare", async () => {
-        renderButton({ project, compatibility: { kind: "unknown" } });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project, compatibility: { kind: "unknown" } });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(screen.getByText(/could not be checksummed/)).toBeTruthy();
       });
     });
@@ -480,27 +499,25 @@ describe("the checks button", () => {
 
       it("is silent for a project that writes no post file", async () => {
         archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(screen.getByText(/the mutator covers nothing of/)).toBeTruthy();
       });
 
       it("counts a covered post file as a blocker, so no tick hides it", async () => {
         compileResponse = withPostFile;
         archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
-        renderButton({ project });
+        renderChecks({ project });
         expect(
-          await screen.findByRole("button", { name: "1 blocker found" }),
+          await screen.findByRole("link", { name: "Checks, 1 blocker found" }),
         ).toBeTruthy();
       });
 
       it("names the game's own file and points at the other route", async () => {
         compileResponse = withPostFile;
         archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
-        renderButton({ project });
-        fireEvent.click(await screen.findByRole("button", { name: /blocker/ }));
+        renderChecks({ project });
+        await screen.findByRole("link", { name: /blocker/ });
         expect(
           screen.getByText(
             /post-processes its own units in gamedata\/unitdefs_post\.lua/,
@@ -514,11 +531,11 @@ describe("the checks button", () => {
       it("names the archive it is inherited from when a dependency holds it", async () => {
         compileResponse = withPostFile;
         archivesWithPostFile = ["base.sdz"];
-        renderButton({
+        renderChecks({
           project,
           gameArchives: [{ name: "some-mutator.sdz" }, { name: "base.sdz" }],
         });
-        fireEvent.click(await screen.findByRole("button", { name: /blocker/ }));
+        await screen.findByRole("link", { name: /blocker/ });
         expect(
           screen.getByText(
             /inherits a gamedata\/unitdefs_post\.lua from base\.sdz/,
@@ -528,10 +545,8 @@ describe("the checks button", () => {
 
       it("stays a tick when the mutator writes the file and the game has none", async () => {
         compileResponse = withPostFile;
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(
           screen.getByText(/has no file of its own there for it to cover/),
         ).toBeTruthy();
@@ -539,8 +554,8 @@ describe("the checks button", () => {
     });
 
     it("says there is nothing compiled to check when no project is open", () => {
-      renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
-      fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+      renderChecks({ diagnosticErrors: ["could not read units/armcom.lua"] });
+      screen.getByRole("link", { name: /to review/ });
       expect(
         screen.getByText(
           "No project is open yet, so there is nothing compiled to check.",
@@ -555,8 +570,8 @@ describe("the checks button", () => {
      */
     describe("change ledger", () => {
       it("says there is nothing to trace when no project is open", () => {
-        renderButton({ diagnosticErrors: ["could not read units/armcom.lua"] });
-        fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+        renderChecks({ diagnosticErrors: ["could not read units/armcom.lua"] });
+        screen.getByRole("link", { name: /to review/ });
         expect(
           screen.getByText(
             "No project is open yet, so there is nothing to trace.",
@@ -583,10 +598,8 @@ describe("the checks button", () => {
           ],
           notes: [],
         };
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         const link = await screen.findByRole("link", {
           name: "Field change: maxDamage",
         });
@@ -620,10 +633,8 @@ describe("the checks button", () => {
           ],
           notes: [],
         };
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(
           await screen.findByText(/too big for any tweak slot/),
         ).toBeTruthy();
@@ -653,10 +664,8 @@ describe("the checks button", () => {
           ],
           notes: [],
         };
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(
           await screen.findByText(
             /language\/en\/zz_coilbox\.json · no tweak slot can carry words/,
@@ -696,10 +705,8 @@ describe("the checks button", () => {
           ],
           notes: [],
         };
-        renderButton({ project });
-        fireEvent.click(
-          await screen.findByRole("button", { name: "No problems found" }),
-        );
+        renderChecks({ project });
+        await screen.findByRole("link", { name: "Checks, No problems found" });
         await screen.findByText("Change ledger");
         fireEvent.click(screen.getByRole("radio", { name: "By output" }));
         const fileRow = screen.getByText("gamedata/unitdefs_post.lua");

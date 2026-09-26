@@ -32,8 +32,14 @@
  * check worth trusting to the frontend alone. The tweak-slot mode runs the
  * same gate before packing, for the same reason: a lobby chat line is going
  * out to other people too.
+ *
+ * The drawer is now the project's Package section (issue #3111), a page of
+ * its own, with the generated Lua beside the export rather than behind a
+ * header button of its own (issue #3101). It is the Lua for whatever the
+ * export is restricted to, since that is what would ship. Both export modes
+ * pack the same compiled output, so one view covers both.
  */
-import { Button, Drawer } from "@picoframe/frame";
+import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Check, Copy, Package } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -64,6 +70,7 @@ import {
   workshopPackTweakSlots,
 } from "../../tweakPack";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
+import { CompiledLuaPanel } from "./CompiledLuaPanel";
 
 type Phase =
   | { state: "idle" }
@@ -278,7 +285,7 @@ function TweakSlotExportSection({
   );
 }
 
-export function PackageMutatorButton({
+export function PackagePanel({
   project,
   units,
   onPackaged,
@@ -309,7 +316,6 @@ export function PackageMutatorButton({
   equipped: EquippedWeapons;
   clones: UnitClones;
 }) {
-  const [open, setOpen] = useState(false);
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
   const busy =
     phase.state === "checking" ||
@@ -348,7 +354,7 @@ export function PackageMutatorButton({
     [project, restriction],
   );
 
-  const compiled = useCompiledProject(scopedProject, open);
+  const compiled = useCompiledProject(scopedProject, true);
 
   const nextVersion = (project.distributionVersion ?? 0) + 1;
   const nothingToPackage =
@@ -423,141 +429,126 @@ export function PackageMutatorButton({
   }
 
   return (
-    <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          setPhase({ state: "idle" });
-          setMode("mutator");
-          setOpen(true);
-        }}
-        title="Package this project as a file somebody else can play, or pack it for a lobby"
-      >
-        <Package className="mr-1 size-3.5" />
-        Package
-      </Button>
-      <Drawer
-        open={open}
-        onOpenChange={setOpen}
-        title="Package"
-        description={
-          mode === "mutator"
+    <div className="grid gap-8 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <section className="flex flex-col gap-5">
+        <p className="text-sm text-muted-foreground">
+          {mode === "mutator"
             ? `Write ${project.name} out as a .sdz for ${project.gameName}, ready to hand to somebody else or upload.`
-            : `Pack ${project.name} across ${project.gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`
-        }
-        width="26rem"
-      >
-        <div className="flex flex-col gap-5">
-          {/* Which export to prepare. Kept ahead of everything else so
+            : `Pack ${project.name} across ${project.gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`}
+        </p>
+        {/* Which export to prepare. Kept ahead of everything else so
             switching modes never disturbs a run already under way in the
             other one: `phase` and the tweak-slot section's own state are
             separate, so flipping this back and forth does not lose either
             result. */}
-          <ToggleGroup
-            type="single"
-            variant="outline"
-            size="sm"
-            value={mode}
-            onValueChange={(v) => v && setMode(v as ExportMode)}
-            aria-label="Which export to prepare"
-          >
-            <ToggleGroupItem value="mutator">Mutator archive</ToggleGroupItem>
-            <ToggleGroupItem value="tweak-slots">Tweak slots</ToggleGroupItem>
-          </ToggleGroup>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          size="sm"
+          value={mode}
+          onValueChange={(v) => v && setMode(v as ExportMode)}
+          aria-label="Which export to prepare"
+        >
+          <ToggleGroupItem value="mutator">Mutator archive</ToggleGroupItem>
+          <ToggleGroupItem value="tweak-slots">Tweak slots</ToggleGroupItem>
+        </ToggleGroup>
 
-          {/* Restrict what gets exported to one collection's units (issue
+        {/* Restrict what gets exported to one collection's units (issue
             #2654). Only offered once the project has a collection to name,
             so a project with none sees exactly what it saw before this
             existed. */}
-          {collections && Object.keys(collections).length > 0 && (
-            <OptionSelect
-              value={restrictTo}
-              onValueChange={setRestrictTo}
-              options={[
-                { value: "", label: "Whole project" },
-                ...collectionTree(collections).map((n) => ({
-                  value: n.collection.id,
-                  label: `${"— ".repeat(n.depth)}${n.collection.name}`,
-                })),
-              ]}
-              size="sm"
-              ariaLabel="Restrict this export to a collection"
-            />
-          )}
+        {collections && Object.keys(collections).length > 0 && (
+          <OptionSelect
+            value={restrictTo}
+            onValueChange={setRestrictTo}
+            options={[
+              { value: "", label: "Whole project" },
+              ...collectionTree(collections).map((n) => ({
+                value: n.collection.id,
+                label: `${"— ".repeat(n.depth)}${n.collection.name}`,
+              })),
+            ]}
+            size="sm"
+            ariaLabel="Restrict this export to a collection"
+          />
+        )}
 
-          {mode === "tweak-slots" ? (
-            nothingToPackage ? (
-              <p className="text-xs text-muted-foreground">
-                This project has no edits yet, so there is nothing to pack.
-              </p>
-            ) : (
-              <TweakSlotExportSection
-                project={scopedProject}
-                routeOptions={routeOptions}
-                game={
-                  target && game
-                    ? {
-                        enginePath: target.enginePath,
-                        dataDir: target.dataDir,
-                        archive: game.primaryArchive.name,
-                      }
-                    : null
-                }
-              />
-            )
+        {mode === "tweak-slots" ? (
+          nothingToPackage ? (
+            <p className="text-xs text-muted-foreground">
+              This project has no edits yet, so there is nothing to pack.
+            </p>
           ) : (
-            <>
-              <div className="flex flex-col gap-1 rounded border border-border/60 px-3 py-2 text-sm">
-                <span className="font-medium">Version {nextVersion}</span>
-                <span className="text-xs text-muted-foreground">
-                  {project.distributionVersion
-                    ? `Bumped from ${project.distributionVersion} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in.`
-                    : "This project has not been packaged before. Coilbox bumps this number itself on every export after this one, so a re-download never lands on the same version as a different build."}
-                </span>
-              </div>
+            <TweakSlotExportSection
+              project={scopedProject}
+              routeOptions={routeOptions}
+              game={
+                target && game
+                  ? {
+                      enginePath: target.enginePath,
+                      dataDir: target.dataDir,
+                      archive: game.primaryArchive.name,
+                    }
+                  : null
+              }
+            />
+          )
+        ) : (
+          <>
+            <div className="flex flex-col gap-1 rounded border border-border/60 px-3 py-2 text-sm">
+              <span className="font-medium">Version {nextVersion}</span>
+              <span className="text-xs text-muted-foreground">
+                {project.distributionVersion
+                  ? `Bumped from ${project.distributionVersion} automatically. Two players on different builds of the same name is a sync error, so the number always moves on rather than being typed in.`
+                  : "This project has not been packaged before. Coilbox bumps this number itself on every export after this one, so a re-download never lands on the same version as a different build."}
+              </span>
+            </div>
 
-              <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
-                <Button
-                  onClick={() => void run()}
-                  disabled={busy || nothingToPackage}
-                >
-                  <Package className="size-4" />
-                  {phase.state === "checking"
-                    ? "Checking"
-                    : phase.state === "settling"
-                      ? "Checking typed values against the game"
-                      : phase.state === "packaging"
-                        ? "Writing the archive"
-                        : nothingToPackage
-                          ? "Nothing to package yet"
-                          : "Save as .sdz…"}
-                </Button>
-              </div>
+            <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
+              <Button
+                onClick={() => void run()}
+                disabled={busy || nothingToPackage}
+              >
+                <Package className="size-4" />
+                {phase.state === "checking"
+                  ? "Checking"
+                  : phase.state === "settling"
+                    ? "Checking typed values against the game"
+                    : phase.state === "packaging"
+                      ? "Writing the archive"
+                      : nothingToPackage
+                        ? "Nothing to package yet"
+                        : "Save as .sdz…"}
+              </Button>
+            </div>
 
-              {nothingToPackage ? (
-                <p className="text-xs text-muted-foreground">
-                  This project has no edits yet, so there is nothing to package.
+            {nothingToPackage ? (
+              <p className="text-xs text-muted-foreground">
+                This project has no edits yet, so there is nothing to package.
+              </p>
+            ) : null}
+
+            {phase.state === "failed" ? (
+              <p className="text-xs text-destructive">{phase.message}</p>
+            ) : null}
+
+            {phase.state === "done" ? (
+              <div className="flex flex-col gap-2 text-xs text-muted-foreground">
+                <p>Wrote version {phase.version} to:</p>
+                <p className="break-all">
+                  <code>{phase.path}</code>
                 </p>
-              ) : null}
-
-              {phase.state === "failed" ? (
-                <p className="text-xs text-destructive">{phase.message}</p>
-              ) : null}
-
-              {phase.state === "done" ? (
-                <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-                  <p>Wrote version {phase.version} to:</p>
-                  <p className="break-all">
-                    <code>{phase.path}</code>
-                  </p>
-                  {phase.typedNote ? <p>{phase.typedNote}</p> : null}
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
-      </Drawer>
-    </>
+                {phase.typedNote ? <p>{phase.typedNote}</p> : null}
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
+      <CompiledLuaPanel
+        project={project}
+        state={compiled}
+        scope={restriction ? collections?.[restrictTo]?.name : undefined}
+      />
+    </div>
   );
 }

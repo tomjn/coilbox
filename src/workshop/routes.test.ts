@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { EMPTY_EDITS, type ModProject } from "./project";
-import { newestProjectForGame, projectPath, unitEditPath } from "./routes";
+import {
+  newestProjectForGame,
+  projectPath,
+  projectSectionLabel,
+  projectSectionOf,
+  sectionPath,
+  unitEditPath,
+} from "./routes";
 
 function project(fields: Partial<ModProject> & { id: string }): ModProject {
   return {
@@ -60,6 +67,26 @@ describe("unitEditPath", () => {
     expect(unitEditPath([], "Beyond All Reason test-1234", "armaak")).toBe(
       "/workshop/new?game=Beyond+All+Reason+test-1234&unit=armaak",
     );
+  });
+});
+
+describe("project sections", () => {
+  /** Every link written before the sections existed names the project's own
+   *  path, so Units has to stay there (issue #3111). */
+  it("puts Units on the project's own path and the rest under it", () => {
+    expect(sectionPath("abc", "units")).toBe("/workshop/abc");
+    expect(sectionPath("abc", "checks")).toBe("/workshop/abc/checks");
+  });
+
+  it("falls back on Units for no segment or one nothing answers to", () => {
+    expect(projectSectionOf(undefined)).toBe("units");
+    expect(projectSectionOf("nonsense")).toBe("units");
+    expect(projectSectionOf("package")).toBe("package");
+  });
+
+  it("names a section for the breadcrumb, and nothing it does not know", () => {
+    expect(projectSectionLabel("collections")).toBe("Collections");
+    expect(projectSectionLabel("reference")).toBeUndefined();
   });
 });
 
