@@ -41,6 +41,7 @@ import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
 import { collectionUnits, EMPTY_COLLECTIONS } from "../collections";
 import { useUnitDefs } from "../config";
+import { useFollowGame } from "../followGame";
 import { useEditHistory, useUndoRedoKeys } from "../history";
 import { resolvedDef, type UnitOverrides } from "../overrides";
 import { EMPTY_EDITS, editSlot, useModProjects } from "../project";
@@ -90,6 +91,7 @@ export default function ReferencePage() {
   );
   const {
     defs,
+    defsFor,
     status: defsStatus,
     error: defsError,
     reload: reloadDefs,
@@ -98,6 +100,20 @@ export default function ReferencePage() {
     selected?.rootPath,
     game?.primaryArchive.name,
   );
+  // Opening the project here works its relative changes out again too (issue
+  // #3174), so a number in this table is never one the game has moved past.
+  // What moved is listed on the project's Checks page, which reads the same
+  // session record.
+  useFollowGame({
+    project,
+    units:
+      defs && defsStatus === "ready" && defsFor === game?.primaryArchive.name
+        ? defs.units
+        : undefined,
+    checksum: defs?.checksum,
+    applyEdits,
+    onStep: (id, before) => history.push(id, before),
+  });
 
   const named = useMemo(
     () => new Map((dataset?.units ?? []).map((u) => [u.name, u])),
@@ -258,6 +274,7 @@ export default function ReferencePage() {
     ? {
         units,
         overrides,
+        relative: edits.relative,
         updateOverrides,
         // One row recomputed with a number that is still being typed, so its
         // derived columns follow along before anything is written.
