@@ -3238,6 +3238,20 @@ describe("UnitPage", () => {
       expect(healthBox().value).toBe("5000");
     });
 
+    // Issue #3162: overflow-y-auto on this wrapper computes the other axis
+    // as auto too, so a focus ring drawn outside a child's own box (the New
+    // collection Name input, in this case) was clipped at the left edge.
+    it("gives the section body left padding to match its right, so a focus ring is not clipped", () => {
+      show();
+      type(healthBox(), "5000");
+      fireEvent.click(sectionLink("Collections"));
+      const sectionBody = screen
+        .getByText("New collection")
+        .closest(".lg\\:overflow-y-auto");
+      expect(sectionBody?.className).toContain("lg:pl-1");
+      expect(sectionBody?.className).toContain("lg:pr-1");
+    });
+
     it("keeps the section when the first edit made there starts the project", () => {
       mockWeaponDefs = { other_cannon: { name: "Cannon", range: 700 } };
       show();

@@ -326,9 +326,14 @@ import {
 } from "./components/WeaponSlotsPanel";
 
 /** A section other than Units: the height that is left, scrolling on its own
- *  from `lg` up the way the unit editor's panes do. */
+ *  from `lg` up the way the unit editor's panes do.
+ *
+ *  `overflow-y-auto` computes the other axis as `auto` too (issue #3162), so
+ *  this clips horizontally as well as vertically. `pl-1` matches the `pr-1`
+ *  already here, wide enough to keep a focus ring from being cut off at the
+ *  left edge. */
 const SECTION_BODY =
-  "flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1";
+  "flex flex-col gap-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pl-1 lg:pr-1";
 
 /** A stable empty, so a page with no game does not re-derive on every render. */
 const NO_UNITS: Record<string, Record<string, unknown>> = {};
