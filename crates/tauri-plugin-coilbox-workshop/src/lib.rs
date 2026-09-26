@@ -27,7 +27,9 @@
 //! `workshop_package_mutator` (issue #1283) is the fourth: it checks the same
 //! way `workshop_preflight` does, then packs a compiled project into a `.sdz`
 //! at a caller-chosen path, versioned for handing to somebody else rather
-//! than for the local test route's own fixed folder. See `package`'s own doc
+//! than for the local test route's own fixed folder. `format: "sdd"` writes
+//! the same files as an unpacked folder instead, for a game kept as a loose
+//! directory under version control (issue #3160). See `package`'s own doc
 //! comment.
 //!
 //! `workshop_pack_tweak_slots` (issue #1277) is the fifth: it checks the same
@@ -193,12 +195,24 @@ pub struct PackagedMutatorResult {
     version: u32,
 }
 
-/// Compile a saved project, check it, and pack it as a `.sdz` at `dest`
-/// (issue #1283), for somebody else to play rather than for this machine's
-/// own test route. Refused the same way `workshop_test_mutator` is when
-/// there is nothing to package, and refused again when preflight finds a
-/// blocker: a file going out to other people is exactly the case a blocker
-/// should stop rather than only flag (issue #2748).
+/// Compile a saved project, check it, and pack it at `dest` (issue #1283),
+/// for somebody else to play rather than for this machine's own test route.
+/// Refused the same way `workshop_test_mutator` is when there is nothing to
+/// package, and refused again when preflight finds a blocker: a file going
+/// out to other people is exactly the case a blocker should stop rather than
+/// only flag (issue #2748).
+///
+/// `format` chooses the output shape: a `.sdz` archive (`None`, or `"sdz"`)
+/// or an unpacked `.sdd` folder (`"sdd"`, issue #3160) somebody keeping their
+/// game as a loose directory under version control can use as-is. Both write
+/// the same compiled files under the same relative paths, so the two cannot
+/// drift apart.
+///
+/// `overwrite` only matters for `"sdd"`: an existing folder at `dest` is
+/// refused unless it is set, since that destination is caller-chosen rather
+/// than coilbox's own fixed folder and might hold something unrelated. The
+/// frontend confirms a replace with the author before setting it, the same
+/// moment the native save dialog already asks for a `.sdz`.
 ///
 /// `written` is as `workshop_test_mutator` takes it (issue #3059).
 #[tauri::command]
@@ -206,6 +220,8 @@ fn workshop_package_mutator(
     project: ModProject,
     version: u32,
     dest: String,
+    format: Option<String>,
+    overwrite: Option<bool>,
     written: Option<loads_as::Written>,
 ) -> CliResult {
     let project = loads_as::with_written(&project, &written.unwrap_or_default());
@@ -226,7 +242,11 @@ fn workshop_package_mutator(
     }
     let files = package::versioned_files(&project, compiled.files, version);
     let dest_path = std::path::Path::new(&dest);
-    if let Err(e) = package::write_sdz(dest_path, &files) {
+    let write_result = match format.as_deref() {
+        Some("sdd") => package::write_sdd(dest_path, &files, overwrite.unwrap_or(false)),
+        _ => package::write_sdz(dest_path, &files),
+    };
+    if let Err(e) = write_result {
         return CliResult::err(e);
     }
     envelope(&PackagedMutatorResult {
@@ -676,6 +696,8 @@ mod tests {
             1,
             dest.to_string_lossy().into_owned(),
             None,
+            None,
+            None,
         ));
         assert!(packaged.get("files").is_some_and(Value::is_array));
         assert_eq!(packaged["version"], Value::from(1));
@@ -852,6 +874,8 @@ mod tests {
             1,
             dest.to_string_lossy().into_owned(),
             None,
+            None,
+            None,
         );
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
@@ -861,6 +885,62 @@ mod tests {
             .and_then(Value::as_str)
             .is_some_and(|e| e.contains("nothing to package")));
         assert!(!dest.exists(), "nothing should have been written");
+    }
+
+    /// The unpacked `.sdd` route (issue #3160) writes the same files the
+    /// `.sdz` route zips, refuses an existing destination without
+    /// `overwrite`, and clears it when the caller sets that flag.
+    #[test]
+    fn packaging_as_an_sdd_writes_the_same_files_and_guards_an_existing_folder() {
+        let project: ModProject = serde_json::from_value(serde_json::json!({
+            "name": "Faster commanders",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "edits": { "disabled": ["armflash"] },
+        }))
+        .expect("parse");
+        let dir = tempfile::tempdir().expect("temp dir");
+        let dest = dir.path().join("faster-commanders-v1.sdd");
+
+        let packaged = unwrap_as_the_frontend_does(workshop_package_mutator(
+            project.clone(),
+            1,
+            dest.to_string_lossy().into_owned(),
+            Some("sdd".to_string()),
+            None,
+            None,
+        ));
+        assert!(packaged.get("files").is_some_and(Value::is_array));
+        assert!(dest.join("modinfo.lua").exists());
+
+        // A caller-chosen destination is refused a second time without an
+        // explicit go-ahead, the same guard `package::write_sdd` enforces
+        // directly (issue #3160's "handle an existing target directory
+        // deliberately").
+        let refused = workshop_package_mutator(
+            project.clone(),
+            2,
+            dest.to_string_lossy().into_owned(),
+            Some("sdd".to_string()),
+            None,
+            None,
+        );
+        let refused = serde_json::to_value(&refused).expect("the answer serialises");
+        assert_eq!(refused.get("success"), Some(&Value::Bool(false)));
+        assert!(refused
+            .get("error")
+            .and_then(Value::as_str)
+            .is_some_and(|e| e.contains("already exists")));
+
+        // Setting overwrite clears it and writes the newer version.
+        let overwritten = unwrap_as_the_frontend_does(workshop_package_mutator(
+            project,
+            2,
+            dest.to_string_lossy().into_owned(),
+            Some("sdd".to_string()),
+            Some(true),
+            None,
+        ));
+        assert_eq!(overwritten["version"], Value::from(2));
     }
 
     /// A packaged mutator going out to other people is exactly the case a
@@ -881,8 +961,14 @@ mod tests {
         .expect("parse");
         let dest = std::env::temp_dir().join("cbx-workshop-package-blocker-test.sdz");
 
-        let result =
-            workshop_package_mutator(project, 1, dest.to_string_lossy().into_owned(), None);
+        let result = workshop_package_mutator(
+            project,
+            1,
+            dest.to_string_lossy().into_owned(),
+            None,
+            None,
+            None,
+        );
         let response = serde_json::to_value(&result).expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));

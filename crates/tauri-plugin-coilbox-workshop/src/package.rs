@@ -1,11 +1,14 @@
 //! Packaging a compiled project as a `.sdz` a game can load from anybody's
-//! downloads folder (issue #1283).
+//! downloads folder (issue #1283), or as an unpacked `.sdd` folder for
+//! somebody who keeps their game as a loose directory under version control
+//! instead (issue #3160).
 //!
 //! `mutator.rs`'s generated `.sdd` is already playable, on this machine,
 //! because its folder sits under a content root the engine scans. Handing it
 //! to somebody else needs the two things a folder that lives in coilbox's own
-//! generated `games/` never had to be: a file, and a version that means
-//! something once two people have it.
+//! generated `games/` never had to be: a file (or a folder with a name the
+//! caller chose), and a version that means something once two people have
+//! it.
 //!
 //! [`versioned_files`] takes what `compile::compile` already produced and
 //! rewrites only its `modinfo.lua`, with the version this export is being
@@ -13,7 +16,9 @@
 //! place (`compile::MUTATOR_VERSION`). [`write_sdz`] then packs the result
 //! into an archive the same shape `crates/tauri-plugin-coilbox-scenario/src/archive.rs`
 //! already reads back: a deflated zip holding the same relative paths the
-//! `.sdd` route writes to disk.
+//! `.sdd` route writes to disk. [`write_sdd`] writes the very same files
+//! under the very same relative paths, but as a plain directory rather than
+//! a zip, so the two outputs cannot drift apart.
 
 use crate::compile::{modinfo_versioned, CompiledFile};
 use crate::model::ModProject;
@@ -65,6 +70,47 @@ pub fn write_sdz(dest: &Path, files: &[CompiledFile]) -> Result<(), String> {
     }
     zip.finish()
         .map_err(|e| format!("could not finish the archive: {e}"))?;
+    Ok(())
+}
+
+/// Write `files` as an unpacked `.sdd` at `dest`, the same relative paths
+/// `write_sdz` zips instead written as a plain directory a game keeping
+/// itself in version control can hold as-is (issue #3160).
+///
+/// `dest` is a caller-chosen destination rather than the local test route's
+/// own fixed, coilbox-owned folder (`mutator.rs`'s `FOLDER`), so an existing
+/// directory there is left untouched unless `overwrite` is set: silently
+/// clearing a folder this command did not create could throw away something
+/// unrelated. The frontend is expected to confirm a replace with the author
+/// first, the same moment the native save dialog would ask for a `.sdz`
+/// already on disk, and only then set `overwrite`.
+pub fn write_sdd(dest: &Path, files: &[CompiledFile], overwrite: bool) -> Result<(), String> {
+    for file in files {
+        if !is_safe_rel(Path::new(&file.path)) {
+            return Err(format!("unsafe archive path: {}", file.path));
+        }
+    }
+    if dest.exists() {
+        if !overwrite {
+            return Err(format!(
+                "{} already exists; confirm a replace before packaging over it",
+                dest.display()
+            ));
+        }
+        std::fs::remove_dir_all(dest)
+            .map_err(|e| format!("could not clear {}: {e}", dest.display()))?;
+    }
+    std::fs::create_dir_all(dest)
+        .map_err(|e| format!("could not create {}: {e}", dest.display()))?;
+    for file in files {
+        let target = dest.join(&file.path);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("could not create {}: {e}", parent.display()))?;
+        }
+        std::fs::write(&target, file.contents.as_bytes())
+            .map_err(|e| format!("could not write {}: {e}", target.display()))?;
+    }
     Ok(())
 }
 
@@ -155,6 +201,76 @@ mod tests {
         }];
 
         assert!(write_sdz(&dest, &files).is_err());
+        assert!(!dest.exists());
+    }
+
+    /// An unpacked `.sdd` has to hold exactly the same files, under the same
+    /// relative paths, as the `.sdz` for the same compile: the two must not
+    /// be able to drift apart.
+    #[test]
+    fn writing_an_sdd_holds_the_same_files_as_the_sdz() {
+        let p = project(json!({ "disabled": ["armflash"] }));
+        let compiled = compile(&p);
+        let expected_paths: Vec<String> = compiled.files.iter().map(|f| f.path.clone()).collect();
+        let files = versioned_files(&p, compiled.files, 3);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("faster-commanders-v3.sdd");
+
+        write_sdd(&dest, &files, false).expect("write");
+
+        for path in &expected_paths {
+            let on_disk = dest.join(path);
+            assert!(on_disk.exists(), "{path} missing from the .sdd");
+        }
+        let modinfo = std::fs::read_to_string(dest.join("modinfo.lua")).expect("read modinfo.lua");
+        assert!(modinfo.contains("version = \"3\""));
+        assert!(modinfo.contains("Balanced Annihilation V15.9.8"));
+    }
+
+    #[test]
+    fn refuses_to_overwrite_an_existing_sdd_without_the_flag() {
+        let p = project(json!({ "disabled": ["armflash"] }));
+        let compiled = compile(&p);
+        let files = versioned_files(&p, compiled.files, 1);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("faster-commanders-v1.sdd");
+        std::fs::create_dir_all(&dest).expect("create");
+        let stray = dest.join("stray.txt");
+        std::fs::write(&stray, "leftover from something else").expect("write stray");
+
+        let err = write_sdd(&dest, &files, false).expect_err("should refuse");
+        assert!(err.contains("already exists"));
+        // Refused outright: the stray file must still be there.
+        assert!(stray.exists());
+    }
+
+    #[test]
+    fn overwriting_an_existing_sdd_clears_stale_files_the_new_compile_no_longer_writes() {
+        let p = project(json!({ "disabled": ["armflash"] }));
+        let compiled = compile(&p);
+        let files = versioned_files(&p, compiled.files, 1);
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("faster-commanders-v1.sdd");
+        std::fs::create_dir_all(&dest).expect("create");
+        let stray = dest.join("stray.txt");
+        std::fs::write(&stray, "leftover from an earlier export").expect("write stray");
+
+        write_sdd(&dest, &files, true).expect("write");
+
+        assert!(!stray.exists(), "a stale file from before must not survive");
+        assert!(dest.join("modinfo.lua").exists());
+    }
+
+    #[test]
+    fn rejects_an_sdd_path_that_would_escape_the_root() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let dest = dir.path().join("bad.sdd");
+        let files = vec![CompiledFile {
+            path: "../evil.lua".to_string(),
+            contents: "return {}".to_string(),
+        }];
+
+        assert!(write_sdd(&dest, &files, false).is_err());
         assert!(!dest.exists());
     }
 }

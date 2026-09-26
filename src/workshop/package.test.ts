@@ -5,7 +5,7 @@
  * `PackagePanel.dom.test.tsx` instead.
  */
 import { describe, expect, it } from "vitest";
-import { packagedMutatorFileName } from "./package";
+import { packagedMutatorFileName, packagedSddFolderName } from "./package";
 
 describe("packagedMutatorFileName", () => {
   it("slugs the project's own name and appends the version", () => {
@@ -32,5 +32,34 @@ describe("packagedMutatorFileName", () => {
       updatedAt: "2026-09-08T00:00:00.000Z",
     };
     expect(packagedMutatorFileName(project, 1)).toBe("tweak-project-v1.sdz");
+  });
+});
+
+describe("packagedSddFolderName", () => {
+  it("matches the archive's own slug and version, but ending in .sdd", () => {
+    const project = {
+      id: "p1",
+      name: "Faster Commanders!",
+      gameName: "Balanced Annihilation V15.9.8",
+      edits: { overrides: {}, clones: {}, menus: {}, text: {}, disabled: [] },
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+    expect(packagedSddFolderName(project, 3)).toBe("faster-commanders-v3.sdd");
+    expect(packagedMutatorFileName(project, 3)).toBe(
+      "faster-commanders-v3.sdz",
+    );
+  });
+
+  it("falls back to a generic name for a project nobody named", () => {
+    const project = {
+      id: "p1",
+      name: "   ",
+      gameName: "Balanced Annihilation V15.9.8",
+      edits: { overrides: {}, clones: {}, menus: {}, text: {}, disabled: [] },
+      createdAt: "2026-09-08T00:00:00.000Z",
+      updatedAt: "2026-09-08T00:00:00.000Z",
+    };
+    expect(packagedSddFolderName(project, 1)).toBe("tweak-project-v1.sdd");
   });
 });
