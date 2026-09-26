@@ -36,7 +36,12 @@ import {
   EmptyState,
 } from "@/content/pages/components/states";
 import { buildTechForest } from "@/content/techForest";
-import type { BatchOperation, BatchRounding } from "../batchEdit";
+import {
+  applyBatchRows,
+  type BatchOperation,
+  type BatchRounding,
+  computeBatchRows,
+} from "../batchEdit";
 import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
 import { collectionUnits, EMPTY_COLLECTIONS } from "../collections";
@@ -47,6 +52,7 @@ import { resolvedDef, type UnitOverrides } from "../overrides";
 import { EMPTY_EDITS, editSlot, useModProjects } from "../project";
 import { planRangeChanges, type RangeEditContext } from "../rangeEdit";
 import { setReferenceValue } from "../referenceEdit";
+import { applyFollowBatchRows } from "../relativeEdits";
 import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
@@ -189,6 +195,36 @@ export default function ReferencePage() {
     );
     if (changed) history.push(project.id, changed.before);
   };
+  // Bulk edit's own write (issue #3175): each changed row becomes a rule
+  // when `follow` is ticked and its field is not yet fixed, and a plain
+  // override otherwise. Not folded into `updateOverrides` above, since a
+  // rule lands beside `overrides` rather than only in it, and `setRelativeEdit`
+  // must not go through `editSlot`'s own stale-rule pruning.
+  const applyBatch = (
+    keys: string[],
+    fieldKeys: readonly string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+    follow: boolean,
+  ) => {
+    if (!project) return;
+    const changed = applyEdits(project.id, (current) => {
+      const rows = computeBatchRows(
+        keys,
+        fieldKeys,
+        units,
+        current.overrides,
+        operation,
+        rounding,
+      );
+      if (!follow)
+        return editSlot(current, "overrides", (o) =>
+          applyBatchRows(o, rows, units),
+        );
+      return applyFollowBatchRows(current, rows, units, operation, rounding);
+    });
+    if (changed) history.push(project.id, changed.before);
+  };
   const undo = () => {
     if (!project) return;
     const previous = history.undo(project.id, edits);
@@ -276,6 +312,7 @@ export default function ReferencePage() {
         overrides,
         relative: edits.relative,
         updateOverrides,
+        applyBatch,
         // One row recomputed with a number that is still being typed, so its
         // derived columns follow along before anything is written.
         draftRow: (key, columnId, value) => {

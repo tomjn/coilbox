@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { encodeContainerJson } from "../container/container";
+import type { BatchRow } from "./batchEdit";
 import { settleInPlace } from "./inPlaceProject";
 import { setOverride } from "./overrides";
 import {
@@ -15,15 +16,19 @@ import {
   parseModProjectJson,
 } from "./project";
 import {
+  applyFollowBatchRows,
   composeRelative,
   describeFollow,
   describeRelative,
   followGame,
+  makeFixed,
+  makeRelative,
   type RelativeRule,
   relativeResult,
   resetField,
   resetUnit,
   setRelativeEdit,
+  wouldFollow,
 } from "./relativeEdits";
 
 const PLUS_15: Omit<RelativeRule, "base"> = {
@@ -380,5 +385,130 @@ describe("saving and sharing a project with rules", () => {
     });
     expect(edits.overrides).toEqual({ armpw: { health: 299 } });
     expect(edits.relative).toEqual({});
+  });
+});
+
+describe("whether a field would follow the game (for issue #3175)", () => {
+  it("is true for a field with no change and for one already following", () => {
+    expect(wouldFollow(EMPTY_EDITS, "armpw", "health")).toBe(true);
+    expect(wouldFollow(tougher(), "armpw", "health")).toBe(true);
+  });
+
+  it("is false once a field holds a fixed number", () => {
+    const fixed = editSlot(EMPTY_EDITS, "overrides", (o) =>
+      setOverride(o, "armpw", "health", 350, 260),
+    );
+    expect(wouldFollow(fixed, "armpw", "health")).toBe(false);
+  });
+});
+
+describe("the field row's toggle (for issue #3175)", () => {
+  it("makes a fixed number a percentage of the game's value, exact", () => {
+    const fixed = editSlot(EMPTY_EDITS, "overrides", (o) =>
+      setOverride(o, "armpw", "health", 299, 260),
+    );
+    const made = makeRelative(fixed, "armpw", "health", 299, 260);
+    expect(made.overrides).toEqual({ armpw: { health: 299 } });
+    expect(made.relative?.armpw?.health).toEqual({
+      factor: 299 / 260,
+      offset: 0,
+      rounding: { kind: "none" },
+      base: 260,
+    });
+  });
+
+  it("falls back to an offset when the game's value is 0", () => {
+    const made = makeRelative(EMPTY_EDITS, "armpw", "health", 40, 0);
+    expect(made.relative?.armpw?.health).toEqual({
+      factor: 1,
+      offset: 40,
+      rounding: { kind: "none" },
+      base: 0,
+    });
+  });
+
+  it("takes the rule off and keeps the number as a fixed override", () => {
+    const made = makeFixed(tougher(), "armpw", "health");
+    expect(made.overrides).toEqual({ armpw: { health: 299 } });
+    expect(made.relative ?? {}).toEqual({});
+  });
+});
+
+describe("bulk edit's follow-game write (for issue #3175)", () => {
+  const game = { armpw: { health: 260 }, armrock: { health: 400 } };
+  const row = (unit: string, before: number, after: number): BatchRow => ({
+    unit,
+    before,
+    after,
+    changed: before !== after,
+    path: "health",
+  });
+
+  it("gives an unchanged field its own rule from the game's value", () => {
+    const rows = [row("armpw", 260, 299)];
+    const next = applyFollowBatchRows(
+      EMPTY_EDITS,
+      rows,
+      game,
+      { kind: "multiply", factor: 1.15 },
+      { kind: "integer" },
+    );
+    expect(next.overrides).toEqual({ armpw: { health: 299 } });
+    expect(next.relative?.armpw?.health).toEqual({
+      factor: 1.15,
+      offset: 0,
+      rounding: { kind: "integer" },
+      base: 260,
+    });
+  });
+
+  it("folds a second bulk edit into the same rule", () => {
+    const once = applyFollowBatchRows(
+      EMPTY_EDITS,
+      [row("armpw", 260, 299)],
+      game,
+      { kind: "multiply", factor: 1.15 },
+      { kind: "integer" },
+    );
+    const twice = applyFollowBatchRows(
+      once,
+      [row("armpw", 299, 329)],
+      game,
+      { kind: "offset", amount: 30 },
+      { kind: "integer" },
+    );
+    expect(twice.relative?.armpw?.health).toEqual({
+      factor: 1.15,
+      offset: 30,
+      rounding: { kind: "integer" },
+      base: 260,
+    });
+    expect(twice.overrides).toEqual({ armpw: { health: 329 } });
+  });
+
+  it("leaves a field already holding a fixed number fixed", () => {
+    const withFixed = editSlot(EMPTY_EDITS, "overrides", (o) =>
+      setOverride(o, "armrock", "health", 500, 400),
+    );
+    const next = applyFollowBatchRows(
+      withFixed,
+      [row("armrock", 500, 575)],
+      game,
+      { kind: "multiply", factor: 1.15 },
+      { kind: "integer" },
+    );
+    expect(next.overrides).toEqual({ armrock: { health: 575 } });
+    expect(next.relative ?? {}).toEqual({});
+  });
+
+  it("skips an unchanged row", () => {
+    const next = applyFollowBatchRows(
+      EMPTY_EDITS,
+      [row("armpw", 260, 260)],
+      game,
+      { kind: "multiply", factor: 1 },
+      { kind: "integer" },
+    );
+    expect(next).toBe(EMPTY_EDITS);
   });
 });

@@ -7,16 +7,21 @@
  *
  * Inline under the selection bar rather than a dialog, so the table the
  * selection came from stays in view. The arithmetic and the preview are
- * `batchEdit.ts`'s, and applying goes through the caller's `updateOverrides`
- * as one write, so it is one undo step however many units it touches.
+ * `batchEdit.ts`'s, and applying goes through the caller's `applyBatch` as
+ * one write, so it is one undo step however many units it touches.
+ *
+ * "Change by %" and "Add" offer "Follow game updates" (issue #3175), ticked
+ * by default: a changed row not yet fixed records a rule against the game's
+ * value instead of a plain number, through `relativeEdits.ts`'s
+ * `applyFollowBatchRows`. "Set to" always writes a fixed number, and so does
+ * Range, which has no rule of its own yet (see `rangeEdit.ts`).
  */
 import { Button, Input } from "@picoframe/frame";
 import { Sigma } from "lucide-react";
 import { useState } from "react";
-import { Field } from "@/components/Field";
+import { CheckField, Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
-  applyBatchRows,
   type BatchOperation,
   type BatchRounding,
   type BatchRow,
@@ -31,7 +36,7 @@ import {
   rangeChangeCount,
 } from "../../rangeEdit";
 import { editableColumnIds, editableFieldKeys } from "../../referenceEdit";
-import type { RelativeEdits } from "../../relativeEdits";
+import { type RelativeEdits, wouldFollow } from "../../relativeEdits";
 import { REFERENCE_COLUMNS, type UnitReferenceRow } from "../../unitReference";
 
 /** How many preview rows are drawn. The apply button still acts on every
@@ -75,6 +80,17 @@ export interface ReferenceEditing {
   relative?: RelativeEdits;
   /** Write the project's overrides as one undo step. */
   updateOverrides: (update: (current: UnitOverrides) => UnitOverrides) => void;
+  /** Bulk edit's own write (issue #3175): "Change by %" and "Add" against a
+   *  plain column, with `follow` saying whether a changed row that is not
+   *  yet fixed should record a rule rather than a number. One undo step. Not
+   *  offered for Range, which writes through `applyRange` instead. */
+  applyBatch: (
+    keys: string[],
+    fieldKeys: readonly string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+    follow: boolean,
+  ) => void;
   /** `key`'s row as it would read with `columnId` set to `value`, so the
    *  derived columns follow a number while it is typed. */
   draftRow: (
@@ -120,6 +136,11 @@ export function ReferenceBulkEdit({
     "none" | "integer" | "nearest"
   >("none");
   const [roundingStep, setRoundingStep] = useState("");
+  // Ticked by default (issue #3175): "Change by %" and "Add" are both stated
+  // against the value somebody is looking at, so following the game is what
+  // most people mean. "Set to" always records a fixed number and never
+  // offers this.
+  const [follow, setFollow] = useState(true);
 
   const amount = Number(opValue);
   const operation: BatchOperation | undefined =
@@ -165,6 +186,9 @@ export function ReferenceBulkEdit({
     ? rangeChangeCount(rangeRows)
     : batchChangeCount(preview);
   const nameOf = new Map(rows.map((row) => [row.key, row.name]));
+  // "Set to" always records a fixed number, and Range has no relative write
+  // of its own yet (see `rangeEdit.ts`'s doc comment).
+  const followOffered = !isRange && opKind !== "set";
 
   const apply = () => {
     if (changeCount === 0 || !operation || !rounding) return;
@@ -175,7 +199,13 @@ export function ReferenceBulkEdit({
         rounding,
       );
     } else {
-      editing.updateOverrides((o) => applyBatchRows(o, preview, editing.units));
+      editing.applyBatch(
+        rows.map((row) => row.key),
+        editableFieldKeys(columnId),
+        operation,
+        rounding,
+        followOffered && follow,
+      );
     }
     onDone();
   };
@@ -244,12 +274,25 @@ export function ReferenceBulkEdit({
         )}
       </div>
 
+      {followOffered && (
+        <CheckField
+          label="Follow game updates"
+          hint="A row already at a fixed number stays fixed, since that number does not move with the game."
+          checked={follow}
+          onChange={setFollow}
+        />
+      )}
+
       {isRange && rangeRows.length > 0 && (
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">
             {opKind === "set"
               ? "Changes only the weapon or weapons already at each unit's longest range."
               : "Changes every one of a unit's weapons, each from its own current range."}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Range does not offer Follow game updates yet: every change here is a
+            fixed number.
           </p>
           <p className="text-xs text-muted-foreground">
             {changeCount} of {rangeRows.length} unit
@@ -344,6 +387,18 @@ export function ReferenceBulkEdit({
                       {!row.changed && (
                         <span className="ml-1 text-muted-foreground">
                           (unchanged)
+                        </span>
+                      )}
+                      {followOffered && follow && row.changed && row.path && (
+                        <span
+                          className="ml-1 text-muted-foreground"
+                          title="Whether this row would record a rule that follows the game, or a fixed number, once follow game updates is ticked."
+                        >
+                          (
+                          {wouldFollow(editing, row.unit, row.path)
+                            ? "follows"
+                            : "fixed"}
+                          )
                         </span>
                       )}
                       {note && (

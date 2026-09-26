@@ -3433,6 +3433,71 @@ describe("UnitPage", () => {
       expect(stored()?.edits.overrides).toEqual({});
       expect(stored()?.edits.relative ?? {}).toEqual({});
     });
+
+    it("turns a fixed number into a rule through the field row toggle, and back (issue #3175)", () => {
+      resetFollowGameSession();
+      const fixedProject = {
+        ...project,
+        id: "3c1d8f2a-0000-4000-8000-0000000031f5",
+        edits: {
+          overrides: { armcom: { health: 3450 } },
+          clones: {},
+          menus: {},
+          text: {},
+          disabled: [],
+        },
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([fixedProject]));
+      show({ armcom: ARMCOM }, `/workshop/${fixedProject.id}?unit=armcom`);
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Make Health follow the game" }),
+      );
+      expect(stored()?.edits.relative?.armcom?.health).toEqual({
+        factor: 3450 / 3000,
+        offset: 0,
+        rounding: { kind: "none" },
+        base: 3000,
+      });
+      expect(healthBox().value).toBe("3450");
+
+      fireEvent.click(
+        screen.getByRole("button", { name: "Make Health a fixed number" }),
+      );
+      expect(stored()?.edits.relative ?? {}).toEqual({});
+      expect(stored()?.edits.overrides).toEqual({ armcom: { health: 3450 } });
+    });
+
+    it("counts a rule whose result equals the game's value, and the unit's reset clears it (issue #3180)", () => {
+      resetFollowGameSession();
+      const equalProject = {
+        ...project,
+        id: "3c1d8f2a-0000-4000-8000-0000000031f6",
+        edits: {
+          overrides: {},
+          clones: {},
+          menus: {},
+          text: {},
+          disabled: [],
+          relative: {
+            armcom: {
+              health: {
+                factor: 1,
+                offset: 0,
+                rounding: { kind: "integer" },
+                base: 3000,
+              },
+            },
+          },
+        },
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([equalProject]));
+      show({ armcom: ARMCOM }, `/workshop/${equalProject.id}?unit=armcom`);
+
+      fireEvent.click(screen.getByText(/Reset 1 change/));
+      expect(stored()?.edits.relative ?? {}).toEqual({});
+      expect(stored()?.edits.overrides ?? {}).toEqual({});
+    });
   });
 
   describe("the Changes section", () => {

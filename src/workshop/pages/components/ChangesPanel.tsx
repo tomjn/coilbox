@@ -30,13 +30,15 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
-import type { ChangeLedger } from "../../changeLedger";
+import type { ChangeLedger, UnitLedger } from "../../changeLedger";
 import { type UnitClones, unitIsAdded } from "../../clones";
 import { overrideValue, readPath, type UnitOverrides } from "../../overrides";
 import {
   describeRelative,
   type RelativeEdits,
+  relativeResult,
   relativeRuleOf,
+  rulePathsWithoutNumber,
 } from "../../relativeEdits";
 import { projectPath } from "../../routes";
 import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
@@ -86,11 +88,32 @@ export function ChangesPanel({
   const [query, setQuery] = useState("");
   const [faction, setFaction] = useState("");
 
-  const unitLedgers = useMemo(
-    () => ledger?.units.filter((u) => u.changes.length > 0) ?? [],
-    [ledger],
+  // A unit whose only change is a rule whose result equals the game's value
+  // has no compiled change to trace, so the ledger says nothing about it
+  // (issue #3180). It still belongs on this page, with an empty ledger of
+  // its own changes so the rule-without-number row below is all it shows.
+  const unitLedgers = useMemo(() => {
+    const traced = ledger?.units.filter((u) => u.changes.length > 0) ?? [];
+    if (!relative) return traced;
+    const known = new Set(traced.map((u) => u.unit));
+    const untraced: UnitLedger[] = Object.keys(relative)
+      .filter((unit) => !known.has(unit) && !unitIsAdded(clones, unit))
+      .filter(
+        (unit) =>
+          rulePathsWithoutNumber({ overrides, relative }, unit).length > 0,
+      )
+      .map((unit) => ({ unit, changes: [] }));
+    return [...traced, ...untraced];
+  }, [ledger, relative, overrides, clones]);
+  const totalChanges = unitLedgers.reduce(
+    (n, u) =>
+      n +
+      u.changes.length +
+      (relative
+        ? rulePathsWithoutNumber({ overrides, relative }, u.unit).length
+        : 0),
+    0,
   );
-  const totalChanges = unitLedgers.reduce((n, u) => n + u.changes.length, 0);
 
   const factions = useMemo(() => {
     const seen = new Set<string>();
@@ -188,6 +211,13 @@ export function ChangesPanel({
             const otherChanges = unitLedger.changes.filter(
               (c) => c.fieldPath === null,
             );
+            // A rule whose result equals the game's value writes no
+            // override, so it never reaches `unitLedger.changes` at all
+            // (issue #3180). Its own row is built from the rule alone.
+            const ruleGapPaths =
+              added || !relative
+                ? []
+                : rulePathsWithoutNumber({ overrides, relative }, unit);
             return (
               <li
                 key={unit}
@@ -260,6 +290,50 @@ export function ChangesPanel({
                               Follows the game: {describeRelative(rule)}
                             </span>
                           )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-6"
+                            onClick={() => onRevertField(unit, path)}
+                            title={`Revert ${path} to the game's value`}
+                            aria-label={`Revert ${path} to the game's value`}
+                          >
+                            <RotateCcw className="size-3" />
+                          </Button>
+                        </span>
+                      </li>
+                    );
+                  })}
+                  {ruleGapPaths.map((path) => {
+                    const rule = relativeRuleOf(relative, unit, path);
+                    if (!rule) return null;
+                    const result = relativeResult(rule);
+                    return (
+                      <li
+                        key={path}
+                        className="flex flex-col gap-0.5 rounded-md bg-primary/5 py-1 pl-2 pr-1"
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Link
+                            to={projectPath(projectId, unit, path)}
+                            className="truncate font-mono text-xs text-primary hover:underline"
+                            title={path}
+                          >
+                            {path}
+                          </Link>
+                          <span
+                            className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+                            title="This value has been changed from the game's default."
+                          >
+                            edited
+                          </span>
+                        </span>
+                        <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                          <span>Game: {display(result)}</span>
+                          <span>Project: {display(result)}</span>
+                          <span title="Worked out again from the game's value whenever the game changes.">
+                            Follows the game: {describeRelative(rule)}
+                          </span>
                           <Button
                             variant="ghost"
                             size="icon"
