@@ -82,7 +82,6 @@ import {
   Pencil,
   Redo2,
   RotateCcw,
-  Sigma,
   Table2,
   Undo2,
 } from "lucide-react";
@@ -134,7 +133,6 @@ import {
   unknownDamageClasses,
 } from "../armorClasses";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
-import { applyBatchRows } from "../batchEdit";
 import {
   adoptBeforePost,
   copiedFrom,
@@ -184,7 +182,7 @@ import {
 } from "../deathExplosions";
 import { unitDerivedStats } from "../derivedStats";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
-import { useEditHistory } from "../history";
+import { useEditHistory, useUndoRedoKeys } from "../history";
 import type { FieldProbe } from "../inPlace";
 import { useInPlaceChecks } from "../inPlaceCheck";
 import { useCloneInPlaceCheck } from "../inPlaceCloneCheck";
@@ -285,7 +283,6 @@ import {
   weaponSlotView,
 } from "../weaponSlots";
 import { ArmorClassPanel } from "./components/ArmorClassPanel";
-import { BatchEditDrawer } from "./components/BatchEditDrawer";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
 import { ChangesPanel } from "./components/ChangesPanel";
 import { CheckpointsDrawer } from "./components/CheckpointsDrawer";
@@ -436,8 +433,6 @@ export default function UnitPage() {
   const [renaming, setRenaming] = useState(false);
   /** Whether the project's checkpoints are on screen (issue #2657). */
   const [checkpointsOpen, setCheckpointsOpen] = useState(false);
-  /** Whether the batch edit drawer is on screen (issue #2655). */
-  const [batchEditOpen, setBatchEditOpen] = useState(false);
   /** Whether the randomiser is on screen to regenerate the project (issue
    *  #3090). */
   const [regenerateOpen, setRegenerateOpen] = useState(false);
@@ -1730,25 +1725,7 @@ export default function UnitPage() {
     return () => window.clearInterval(timer);
   }, [project?.id]);
 
-  // The usual keys, and only outside a text box: a browser undoes typing in an
-  // input on its own, and taking that over would make a half-typed number
-  // impossible to correct without losing an unrelated edit.
-  const shortcut = useRef({ undo, redo });
-  shortcut.current = { undo, redo };
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
-      const target = e.target as HTMLElement | null;
-      if (target?.isContentEditable) return;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      e.preventDefault();
-      if (e.shiftKey) shortcut.current.redo();
-      else shortcut.current.undo();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  useUndoRedoKeys(undo, redo);
 
   /**
    * What a game update did to this project's edits (issue #1281).
@@ -2274,25 +2251,13 @@ export default function UnitPage() {
               game &&
               defs && (
                 <>
-                  {/* One arithmetic change across a whole collection,
-                    previewed before it writes anything (issue #2655). A
-                    drawer until issue #3113 folds it into the reference
-                    table. Offered with no collection too, so the empty state
-                    can point at the Collections section. */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setBatchEditOpen(true)}
-                    title="Change one field across every unit in a collection, with a preview first"
-                  >
-                    <Sigma className="mr-1 size-3.5" />
-                    Batch edit
-                  </Button>
                   {/* The sortable table and comparison view over every unit
                     in the project, resolved through its own edits (issue
                     #1316). A page of its own. Needs a saved project:
                     `/workshop/new` has no id for the route to name and
-                    nothing of its own to resolve yet. */}
+                    nothing of its own to resolve yet. It is also where many
+                    units are changed at once (issue #3113), which is what
+                    the Batch edit drawer that used to sit here did. */}
                   {project && (
                     <Link
                       to={referencePath(project.id)}
@@ -2300,7 +2265,7 @@ export default function UnitPage() {
                         variant: "ghost",
                         size: "sm",
                       })}
-                      title="Every unit in this project, sortable and compared side by side"
+                      title="Every unit in this project, to compare side by side and change many at once"
                     >
                       <Table2 className="mr-1 size-3.5" />
                       Reference
@@ -2350,25 +2315,6 @@ export default function UnitPage() {
             renameCheckpoint(project.id, id, { name, description })
           }
           onDelete={(id) => removeCheckpoint(project.id, id)}
-        />
-      )}
-
-      {game && defs && (
-        <BatchEditDrawer
-          open={batchEditOpen}
-          onOpenChange={setBatchEditOpen}
-          collections={collections}
-          units={units}
-          overrides={overrides}
-          nameOf={nameOf}
-          beforePost={defs.beforePost}
-          weaponDefs={weaponDefs}
-          library={library}
-          equipped={equipped}
-          clones={clones}
-          onApply={(rows) =>
-            updateOverrides((o) => applyBatchRows(o, rows, units))
-          }
         />
       )}
 
