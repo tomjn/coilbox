@@ -166,10 +166,12 @@ import {
   unitsWithClones,
 } from "../clones";
 import {
+  type Collection,
   type Collections,
   collectionTree,
   collectionUnits,
   createCollection,
+  importCollection,
   removeCollection,
   renameCollection,
   setCollectionMembership,
@@ -208,6 +210,7 @@ import {
   type UnitOverrides,
 } from "../overrides";
 import {
+  collectionsFromOtherProjects,
   defaultProjectName,
   describeEdits,
   EMPTY_EDITS,
@@ -590,6 +593,25 @@ export default function UnitPage() {
   const collections = edits.collections ?? NO_COLLECTIONS;
   const checkpoints = checkpointsFor(projectId);
 
+  // What "this same game" means for "Add from another project" (issue
+  // #3108): the identity already on the project, or, for one not started
+  // yet, the same read `startProject` gives it the moment it is.
+  const currentGameIdentity =
+    project?.game ?? gameIdentityForName(gameName, games) ?? undefined;
+  const otherProjectCollections = useMemo(
+    () =>
+      collectionsFromOtherProjects(projects, {
+        id: project?.id,
+        gameName,
+        game: currentGameIdentity,
+      }).map(({ project: p, collections: cs }) => ({
+        id: p.id,
+        name: p.name,
+        collections: cs,
+      })),
+    [projects, project?.id, gameName, currentGameIdentity],
+  );
+
   /**
    * Record one change, as one undo step.
    *
@@ -721,6 +743,20 @@ export default function UnitPage() {
     () => unitsWithClones(gameUnits, clones),
     [gameUnits, clones],
   );
+
+  /**
+   * Copy a collection in from another project (issue #3108). Computed
+   * against the units this render already has, the same way `createClone`
+   * works out its copy before handing it to `commit`, so what lands is what
+   * was actually shown, and `updateCollections` still goes through the
+   * project's normal edit path so undo reaches an import too.
+   */
+  const importCollectionFromProject = (source: Collection) => {
+    const liveUnitKeys = new Set(Object.keys(units));
+    const result = importCollection(collections, source, liveUnitKeys);
+    updateCollections(() => result.collections);
+    return { name: result.name, droppedUnits: result.droppedUnits };
+  };
 
   // The archive behind the game, so a field that names a file in it can offer
   // the file rather than ask for a path (issue #2648). The listing is the one
@@ -2551,6 +2587,8 @@ export default function UnitPage() {
                 setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
               )
             }
+            otherProjects={otherProjectCollections}
+            onImport={importCollectionFromProject}
           />
         </div>
       ) : section === "changes" ? (

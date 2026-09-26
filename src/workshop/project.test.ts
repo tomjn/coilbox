@@ -23,14 +23,17 @@ import {
 } from "../lib/storedSetting";
 import { addToBuildMenu, moveBeforeInBuildMenu } from "./buildMenus";
 import { addClone, deriveClone } from "./clones";
+import { createCollection, EMPTY_COLLECTIONS } from "./collections";
 import { setUnitDisabled } from "./disabled";
 import { setOverride } from "./overrides";
 import {
+  collectionsFromOtherProjects,
   defaultProjectName,
   EMPTY_EDITS,
   editCounts,
   editSlot,
   type GameEdits,
+  gameGroupKey,
   isEmptyEdits,
   MOD_PROJECT_KIND_VERSION,
   modProjectCode,
@@ -616,6 +619,73 @@ describe("naming and copying", () => {
     const bar = result.current.projects.find((p) => p.name === "BAR tweaks");
     expect(ba?.edits.overrides.armcom).toEqual({ health: 5000 });
     expect(bar?.edits.overrides).toEqual({});
+  });
+});
+
+describe("gameGroupKey", () => {
+  it("prefers the game's stable shortname over its exact archive name", () => {
+    expect(
+      gameGroupKey({
+        gameName: "Balanced Annihilation V15.9.8",
+        game: { shortname: "BA" },
+      }),
+    ).toBe("BA");
+  });
+
+  it("falls back to the exact archive name when no shortname is known", () => {
+    expect(gameGroupKey({ gameName: "Balanced Annihilation V15.9.8" })).toBe(
+      "Balanced Annihilation V15.9.8",
+    );
+  });
+});
+
+describe("collectionsFromOtherProjects", () => {
+  it("offers a collection from another project for the same game, and skips the current one", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    const { collections } = createCollection(EMPTY_COLLECTIONS, "Tier two");
+    let current = "";
+    act(() => {
+      current = result.current.createProject({
+        name: "Current",
+        gameName: "Balanced Annihilation V15.9.8",
+        game: { shortname: "BA" },
+      }).id;
+      result.current.createProject({
+        name: "Other",
+        gameName: "Balanced Annihilation V15.9.8",
+        game: { shortname: "BA" },
+        edits: { ...EMPTY_EDITS, collections },
+      });
+      // A different game entirely, so its collections must not show up.
+      result.current.createProject({
+        name: "Unrelated",
+        gameName: "Some Other Game",
+        edits: { ...EMPTY_EDITS, collections },
+      });
+    });
+
+    const offered = collectionsFromOtherProjects(result.current.projects, {
+      id: current,
+      gameName: "Balanced Annihilation V15.9.8",
+      game: { shortname: "BA" },
+    });
+    expect(offered).toHaveLength(1);
+    expect(offered[0]?.project.name).toBe("Other");
+    expect(offered[0]?.collections.map((c) => c.name)).toEqual(["Tier two"]);
+  });
+
+  it("skips a project with no collections to offer", () => {
+    const { result } = renderHook(() => useModProjects(), { wrapper });
+    act(() => {
+      result.current.createProject({
+        name: "Empty",
+        gameName: "Balanced Annihilation V15.9.8",
+      });
+    });
+    const offered = collectionsFromOtherProjects(result.current.projects, {
+      gameName: "Balanced Annihilation V15.9.8",
+    });
+    expect(offered).toHaveLength(0);
   });
 });
 

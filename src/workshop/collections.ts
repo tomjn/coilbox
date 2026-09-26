@@ -225,6 +225,65 @@ export function setCollectionMembership(
   return { ...collections, [id]: { ...target, units } };
 }
 
+/** What copying a collection from another project produced: the updated set,
+ *  the new collection's own id, the name it was actually given, and which of
+ *  the source's units this game does not have. */
+export interface ImportedCollection {
+  collections: Collections;
+  id: string;
+  name: string;
+  /** The source's own def keys this game's table has nothing for, dropped
+   *  from the copy rather than kept as a member nothing can resolve. Always
+   *  empty for a rule with no explicit units. */
+  droppedUnits: string[];
+}
+
+/**
+ * Copy a collection from another project into this one (issue #3108), as a
+ * new top level collection: nesting is specific to the project it was built
+ * in, so the copy starts unattached rather than guessing where it belongs
+ * here.
+ *
+ * A rule copies verbatim. It is a `searchQuery.ts` predicate evaluated
+ * against whatever game reads it, so it stays current even when the two
+ * projects are for different builds of the same game. An explicit unit is
+ * only ever a fact about the source project's build, so anything this game's
+ * table does not have is dropped rather than kept as a member nothing can
+ * resolve. `droppedUnits` says which, so the caller can tell the person doing
+ * the copying.
+ *
+ * A name already used in `collections` gets a number after it, the same way
+ * {@link defaultProjectName} in `project.ts` disambiguates a project name.
+ */
+export function importCollection(
+  collections: Collections,
+  source: Collection,
+  liveUnitKeys: ReadonlySet<string>,
+): ImportedCollection {
+  const taken = new Set(Object.values(collections).map((c) => c.name));
+  let name = source.name;
+  if (taken.has(name)) {
+    let n = 2;
+    while (taken.has(`${source.name} ${n}`)) n += 1;
+    name = `${source.name} ${n}`;
+  }
+  const units = source.units.filter((u) => liveUnitKeys.has(u));
+  const droppedUnits = source.units.filter((u) => !liveUnitKeys.has(u));
+  const id = crypto.randomUUID();
+  const collection: Collection = {
+    id,
+    name,
+    units,
+    ...(source.rule ? { rule: source.rule } : {}),
+  };
+  return {
+    collections: { ...collections, [id]: collection },
+    id,
+    name,
+    droppedUnits,
+  };
+}
+
 /** The game's units, live, needed to resolve a rule-based collection into a
  *  concrete set. Optional on {@link collectionUnits}: a caller that has not
  *  got the game's own def table handy leaves it out, in which case a rule

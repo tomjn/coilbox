@@ -6,6 +6,7 @@ import {
   collectionUnits,
   createCollection,
   EMPTY_COLLECTIONS,
+  importCollection,
   parseCollections,
   removeCollection,
   renameCollection,
@@ -376,5 +377,76 @@ describe("restrictEditsToUnits", () => {
     // Left as they are: not per-unit stores.
     expect(restricted.weapons).toBe(edits.weapons);
     expect(restricted.explosionGenerators).toBe(edits.explosionGenerators);
+  });
+});
+
+describe("importCollection", () => {
+  it("copies a rule-based collection verbatim, since a rule stays current on its own", () => {
+    const { collections: source, id } = createCollection(
+      EMPTY_COLLECTIONS,
+      "Cheap",
+    );
+    const withRule = setCollectionRule(source, id, "cost < 200");
+    const result = importCollection(
+      EMPTY_COLLECTIONS,
+      withRule[id],
+      new Set(["armcom"]),
+    );
+    expect(result.collections[result.id]).toEqual({
+      id: result.id,
+      name: "Cheap",
+      units: [],
+      rule: "cost < 200",
+    });
+    expect(result.droppedUnits).toEqual([]);
+  });
+
+  it("drops units the current game does not have, and says which", () => {
+    const { collections: source, id } = createCollection(
+      EMPTY_COLLECTIONS,
+      "Tier two",
+    );
+    const withMembers = setCollectionMembership(source, id, "armcom", true);
+    const both = setCollectionMembership(withMembers, id, "armflash", true);
+    const result = importCollection(
+      EMPTY_COLLECTIONS,
+      both[id],
+      new Set(["armcom"]),
+    );
+    expect(result.collections[result.id].units).toEqual(["armcom"]);
+    expect(result.droppedUnits).toEqual(["armflash"]);
+  });
+
+  it("numbers the copy when its name is already taken in this project", () => {
+    const { collections: source, id: sourceId } = createCollection(
+      EMPTY_COLLECTIONS,
+      "Tier two",
+    );
+    const { collections: existing } = createCollection(
+      EMPTY_COLLECTIONS,
+      "Tier two",
+    );
+    const result = importCollection(
+      existing,
+      source[sourceId],
+      new Set(["armcom"]),
+    );
+    expect(result.name).toBe("Tier two 2");
+    expect(result.collections[result.id].name).toBe("Tier two 2");
+  });
+
+  it("copies in as a top level collection, ignoring the source's own nesting", () => {
+    const top = createCollection(EMPTY_COLLECTIONS, "Parent");
+    const { collections: source, id: childId } = createCollection(
+      top.collections,
+      "Child",
+      top.id,
+    );
+    const result = importCollection(
+      EMPTY_COLLECTIONS,
+      source[childId],
+      new Set(["armcom"]),
+    );
+    expect(result.collections[result.id].parentId).toBeUndefined();
   });
 });

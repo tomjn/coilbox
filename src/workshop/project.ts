@@ -51,6 +51,7 @@ import {
   type InstalledGameInfo,
   parseGameIdentity,
 } from "../container/gameIdentity";
+import { rememberedShortname } from "../container/shortnames";
 import { MAX_CODE_LENGTH } from "../deeplink/parse";
 import { readStoredSetting, updateStoredSetting } from "../lib/storedSetting";
 import {
@@ -68,6 +69,7 @@ import {
 } from "./cloneMutatorOnly";
 import type { UnitClone, UnitClones } from "./clones";
 import {
+  type Collection,
   type Collections,
   collectionCount,
   parseCollections,
@@ -433,6 +435,53 @@ export function defaultProjectName(
   let n = 2;
   while (taken.has(`${base} ${n}`)) n += 1;
   return `${base} ${n}`;
+}
+
+/**
+ * The key two projects share when they are for the same game: the game's
+ * stable modinfo shortname when one is known, since a shortname survives the
+ * game moving from one exact build to the next (issue #3071), else the exact
+ * archive name. `rememberedShortname` recovers it for a project that predates
+ * `game` or whose game coilbox has never read a modinfo for in this session.
+ *
+ * `ProjectsPage` groups its list by this and collection import (issue #3108)
+ * uses it to find another project's collections worth offering, so "same
+ * game" means one thing across the workshop.
+ */
+export function gameGroupKey(project: {
+  gameName: string;
+  game?: GameIdentity;
+}): string {
+  return (
+    project.game?.shortname ||
+    rememberedShortname(project.gameName) ||
+    project.gameName
+  );
+}
+
+/**
+ * Every collection defined in another project for the same game as `current`,
+ * grouped by the project it came from (issue #3108). Never includes
+ * `current` itself, and skips a project with no collections to offer. Ordered
+ * most recently changed project first, and each project's own collections
+ * alphabetically, matching the order the Collections section already lists
+ * them in.
+ */
+export function collectionsFromOtherProjects(
+  projects: readonly ModProject[],
+  current: { id?: string; gameName: string; game?: GameIdentity },
+): { project: ModProject; collections: Collection[] }[] {
+  const key = gameGroupKey(current);
+  return projects
+    .filter((p) => p.id !== current.id && gameGroupKey(p) === key)
+    .filter((p) => collectionCount(p.edits.collections) > 0)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((p) => ({
+      project: p,
+      collections: Object.values(p.edits.collections ?? {}).sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+    }));
 }
 
 /**
