@@ -44,6 +44,11 @@ import { visibleRowWindow } from "@/lib/rowVirtualize";
 import type { UnitOverrides } from "../../overrides";
 import { type ReferenceCell, referenceCell } from "../../referenceEdit";
 import {
+  describeRelative,
+  type RelativeEdits,
+  relativeRuleOf,
+} from "../../relativeEdits";
+import {
   formatDiff,
   formatReferenceValue,
   REFERENCE_COLUMNS,
@@ -54,6 +59,17 @@ import {
   type UnitReferenceRow,
 } from "../../unitReference";
 import { ReferenceEditableCell } from "./ReferenceEditableCell";
+
+/** One cell's rule as its hover says it, or `undefined` for a fixed number
+ *  (issue #3174). */
+function ruleText(
+  relative: RelativeEdits | undefined,
+  unit: string,
+  path: string,
+): string | undefined {
+  const rule = relativeRuleOf(relative, unit, path);
+  return rule && describeRelative(rule);
+}
 
 /** Range's own cell (issue #3157): it has no single path to check like the
  *  other editable columns, so its "edited" and "before this project's edits"
@@ -180,6 +196,9 @@ export function UnitReferenceTable({
   editing?: {
     units: Record<string, Record<string, unknown>>;
     overrides: UnitOverrides;
+    /** The project's changes that follow the game (issue #3174), for an
+     *  edited cell's hover. */
+    relative?: RelativeEdits;
     onDraft: (key: string, columnId: string, value: number | undefined) => void;
     onCommit: (key: string, columnId: string, value: number) => void;
   };
@@ -342,6 +361,11 @@ export function UnitReferenceTable({
                         {editing && cell ? (
                           <ReferenceEditableCell
                             cell={cell}
+                            rule={ruleText(
+                              editing.relative,
+                              row.key,
+                              cell.path,
+                            )}
                             shown={column.value(row)}
                             label={column.label}
                             unitName={row.name}

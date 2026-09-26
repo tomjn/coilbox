@@ -33,6 +33,7 @@ function parsed(text: string): number | undefined {
 
 export function ReferenceEditableCell({
   cell,
+  rule,
   shown,
   label,
   unitName,
@@ -40,6 +41,10 @@ export function ReferenceEditableCell({
   onCommit,
 }: {
   cell: ReferenceCell;
+  /** The rule this cell's change follows the game by, such as "+15% of 280
+   *  = 322", when it has one (issue #3174). Shown on hover with the game's
+   *  value. */
+  rule?: string;
   /** What the row shows for this column, which follows a draft while one is
    *  being typed. */
   shown: number | undefined;
@@ -87,9 +92,13 @@ export function ReferenceEditableCell({
     cell.edited && shown !== undefined && cell.gameValue !== undefined
       ? shown - cell.gameValue
       : undefined;
-  const before = cell.edited
-    ? `Before this project's edits: ${formatReferenceValue(cell.gameValue)}${diff !== undefined ? ` (${formatDiff(diff)})` : ""}`
-    : undefined;
+  const before = [
+    cell.edited &&
+      `Before this project's edits: ${formatReferenceValue(cell.gameValue)}${diff !== undefined ? ` (${formatDiff(diff)})` : ""}`,
+    rule && `Follows the game: ${rule}`,
+  ]
+    .filter(Boolean)
+    .join(". ");
   const button = (
     <button
       type="button"

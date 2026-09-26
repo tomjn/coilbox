@@ -396,6 +396,7 @@ export function UnitFieldRow({
   inheritedLabel = "Game value",
   inPlace,
   post,
+  relative,
   readOnly: locked = false,
   onChange,
   onReset,
@@ -428,6 +429,10 @@ export function UnitFieldRow({
   /** What the game's post files do to this field, when they change it (issue
    *  #3057). Said only on a row that can be typed into. */
   post?: PostNote;
+  /** The rule this change follows the game by, such as "+15% of 280 = 322",
+   *  when it has one (issue #3174). Typing a number over it makes the field
+   *  fixed again, and reset takes the rule away with the number. */
+  relative?: string;
   /** Shown and not offered, for a field nothing on this page can change, such
    *  as one on a weapon definition several units share (issue #2639). The
    *  reason is said once above the rows rather than on each of them. */
@@ -692,6 +697,14 @@ export function UnitFieldRow({
             {display(row.inherited)}
           </span>
         )}
+        {relative && (
+          <span
+            className="truncate text-[10px] text-muted-foreground"
+            title="Worked out again from the game's value whenever the game changes. Typing a number here makes it fixed."
+          >
+            Follows the game: {relative}
+          </span>
+        )}
         {!overridden && !row.present && (
           <span className="truncate text-[10px] text-muted-foreground">
             Not set by this game.{" "}
@@ -702,7 +715,7 @@ export function UnitFieldRow({
         )}
       </div>
 
-      {overridden ? (
+      {overridden || relative ? (
         <Button
           variant="ghost"
           size="icon"

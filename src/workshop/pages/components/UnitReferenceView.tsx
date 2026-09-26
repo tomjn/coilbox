@@ -307,6 +307,7 @@ export function UnitReferenceView({
           editing && {
             units: editing.units,
             overrides: editing.overrides,
+            relative: editing.relative,
             onDraft: (key, columnId, value) =>
               setDraft(
                 value === undefined ? undefined : { key, columnId, value },
