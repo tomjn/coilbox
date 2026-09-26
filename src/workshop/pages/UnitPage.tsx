@@ -2786,12 +2786,6 @@ export default function UnitPage() {
                   </div>
                 </div>
 
-                {/* DPS, alpha damage and the rest of the numbers players
-                  argue about (issue #2644), recomputed as the project's
-                  overrides change. Nothing is drawn for a figure
-                  `derivedStats.ts` could not compute honestly. */}
-                <DerivedStatsStrip stats={derived} />
-
                 {/* The unit's own fields, its weapons (issue #2639), or its
                   death explosions (issue #3105). Which of a unit's fields the
                   Relevant/All toggle picks used to show here too, but it
@@ -2853,6 +2847,13 @@ export default function UnitPage() {
               </div>
 
               <div className="flex flex-col gap-3 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-1">
+                {/* DPS, alpha damage and the rest of the numbers players
+                  argue about (issue #2644), recomputed as the project's
+                  overrides change. Nothing is drawn for a figure
+                  `derivedStats.ts` could not compute honestly. Scrolls away
+                  with the fields below it, unlike the name, picture and tabs
+                  above, so the field list keeps the height (issue #3099). */}
+                <DerivedStatsStrip stats={derived} />
                 {inPlaceChecks.error && (
                   <p className="text-xs text-destructive">
                     Coilbox could not check which fields can be written into the
