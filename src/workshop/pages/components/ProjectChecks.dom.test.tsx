@@ -502,6 +502,28 @@ describe("the Checks entry in the section bar", () => {
         expect(screen.queryByText(/^Loses /)).toBeNull();
       });
 
+      it("links a finding scoped to one field to that field, not to a unit named after it (issue #3116)", async () => {
+        renderChecks({
+          project,
+          compatibility: moved([
+            finding({
+              id: "overrides:armcom:weapons.0.name",
+              store: "overrides",
+              subject: "armcom.weapons.0.name",
+              detail:
+                "armcom no longer has weapons.0.name, so this is dead weight.",
+              fix: undefined,
+            }),
+          ]),
+        });
+        const link = await screen.findByRole("link", {
+          name: "armcom no longer has weapons.0.name, so this is dead weight.",
+        });
+        expect(link.getAttribute("href")).toBe(
+          "/workshop/p1?unit=armcom&field=weapons.0.name",
+        );
+      });
+
       it("says the game is the same build when the checksums agree", async () => {
         renderChecks({ project, compatibility: { kind: "unmoved" } });
         await screen.findByRole("link", { name: "Checks, No problems found" });

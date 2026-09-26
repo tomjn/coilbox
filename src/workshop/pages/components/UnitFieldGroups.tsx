@@ -48,6 +48,7 @@ import {
 import type { CustomParamsResult } from "@/content/bindings";
 import type { AssetBrowsing } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
+import type { CheckMarker } from "../../checkMarkers";
 import { consumerNote } from "../../customParamConsumers";
 import type { FieldRow, UnitFieldView } from "../../unitSections";
 import {
@@ -92,6 +93,7 @@ export function UnitFieldGroups({
   assets,
   choices,
   warnings,
+  checkMarkers,
   inheritedLabel,
   inPlace,
   post,
@@ -108,6 +110,9 @@ export function UnitFieldGroups({
   /** Something wrong with a field that only its neighbours reveal, keyed the
    *  same way (issue #2651). */
   warnings?: Record<string, string>;
+  /** What a compatibility check found about a field, keyed the same way
+   *  (issue #3116). */
+  checkMarkers?: Record<string, CheckMarker>;
   /** The game's archive, for the fields that name a file in it (issue #2648). */
   assets?: AssetBrowsing;
   /** The game's custom parameter consumer index, or `null` while it is still
@@ -205,6 +210,7 @@ export function UnitFieldGroups({
                     assets={assets}
                     choices={choices?.[row.path.toLowerCase()]}
                     warning={warnings?.[row.path.toLowerCase()]}
+                    checkMarker={checkMarkers?.[row.path.toLowerCase()]}
                     inheritedLabel={inheritedLabel}
                     readOnly={group.readOnly}
                     inPlace={group.readOnly ? undefined : inPlace?.(row)}

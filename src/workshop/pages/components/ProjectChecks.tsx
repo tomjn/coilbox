@@ -74,6 +74,7 @@ import type { Archive, ConfigOption } from "@/content/bindings";
 import type { ArmorProblem } from "../../armorClasses";
 import type { ChangeLedger, LedgerChange } from "../../changeLedger";
 import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
+import { compatSubject } from "../../checkMarkers";
 import type { CompatFinding, CompatState } from "../../compatibility";
 import { useCompiledProject } from "../../compile";
 import { deliveryRoutes } from "../../deliveryRoutes";
@@ -954,7 +955,10 @@ export function ChecksBadge({ checks }: { checks: ProjectChecksState }) {
 /** Where a compatibility finding's subject can be followed to, or undefined
  *  when the store it names does not hold a unit at all (issue #3106): a
  *  `menus` or `text` reference names something other than a unit key, and a
- *  link there would open the wrong page. */
+ *  link there would open the wrong page. An `overrides` finding scoped to one
+ *  field (issue #3116) opens on that field rather than merely on the unit, so
+ *  clicking it lands where the problem is instead of leaving it to be found
+ *  again in the field list. */
 function compatFindingLink(
   projectId: string | undefined,
   finding: CompatFinding,
@@ -964,8 +968,10 @@ function compatFindingLink(
     finding.store === "overrides" ||
     finding.store === "clones" ||
     finding.store === "disabled"
-  )
-    return projectPath(projectId, finding.subject);
+  ) {
+    const { unit, field } = compatSubject(finding);
+    return projectPath(projectId, unit, field);
+  }
   return undefined;
 }
 

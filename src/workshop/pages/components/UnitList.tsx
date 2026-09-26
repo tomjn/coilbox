@@ -47,6 +47,7 @@
  * its own error here rather than matching nothing silently.
  */
 import { cn, Input } from "@picoframe/frame";
+import { TriangleAlert } from "lucide-react";
 import {
   type KeyboardEvent,
   useEffect,
@@ -59,6 +60,7 @@ import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { scrollTopForRow, visibleRowWindow } from "@/lib/rowVirtualize";
 import type { BuildMenus } from "../../buildMenus";
+import type { CheckMarker } from "../../checkMarkers";
 import { type CloneOrigin, type UnitClones, unitIsAdded } from "../../clones";
 import type { UnitDerivedStats } from "../../derivedStats";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
@@ -135,6 +137,7 @@ export function UnitList({
   library,
   equipped,
   restrictTo,
+  markerOf,
   onSelect,
 }: {
   /** The game's units with the project's own already in among them. */
@@ -173,6 +176,10 @@ export function UnitList({
    *  search box below rather than instead of it. `undefined` for every unit,
    *  which is the whole game the same way it always was. */
   restrictTo?: ReadonlySet<string>;
+  /** What a check found about this unit, when it named one (issue #3116):
+   *  a compatibility finding or an armour class problem, whichever is worse
+   *  when a unit has both. `undefined` for a unit nothing has flagged. */
+  markerOf?: (key: string) => CheckMarker | undefined;
   onSelect: (key: string) => void;
 }) {
   const [query, setQuery] = useState("");
@@ -493,6 +500,7 @@ export function UnitList({
                 const menuEdits = menus[u.key]?.length ?? 0;
                 const off = isUnitDisabled(disabled, u.key);
                 const faction = factionOf(u.key);
+                const marker = markerOf?.(u.key);
                 return (
                   // The position and the total are said out loud, because a
                   // list that only has 30 of its rows in the DOM would
@@ -600,6 +608,19 @@ export function UnitList({
                             title={`${edits} field${edits === 1 ? "" : "s"} changed`}
                           >
                             {edits}
+                          </span>
+                        )}
+                        {marker && (
+                          <span
+                            className={cn(
+                              "flex size-4 shrink-0 items-center justify-center",
+                              marker.severity === "blocker"
+                                ? "text-destructive"
+                                : "text-amber-700 dark:text-amber-400",
+                            )}
+                            title={marker.messages.join(" ")}
+                          >
+                            <TriangleAlert className="size-3.5" />
                           </span>
                         )}
                       </span>
