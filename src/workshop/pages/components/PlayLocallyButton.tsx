@@ -36,8 +36,12 @@ import {
   usePreferredTarget,
 } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
-import { useCompiledProject } from "../../compile";
-import { settledSummary, settleTypedValues } from "../../loadsAs";
+import { useCompiledProject, workshopCompile } from "../../compile";
+import {
+  settledSummary,
+  settleTypedValues,
+  settleTypedValuesTweaks,
+} from "../../loadsAs";
 import { barRouteAvailable, barTweakModOptions } from "../../localBar";
 import { workshopTestMutator } from "../../mutator";
 import { workshopPreflight } from "../../preflight";
@@ -133,8 +137,8 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
         : "mutator";
 
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
-  // What the mutator route did about typed values the game's own Lua would
-  // change (issue #3059), for the run under way or the last one.
+  // What the route did about typed values the game's own Lua would change
+  // (issues #3059 and #3092), for the run under way or the last one.
   const [typedNote, setTypedNote] = useState<string | null>(null);
   const busy =
     phase.state === "settling" ||
@@ -183,7 +187,27 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
       let dir: string | null = null;
 
       if (route === "bar-tweak") {
-        modOptions = barTweakModOptions(compiled.compiled);
+        // The same for the bare tweakdefs slot, checked by loading the game
+        // with that slot set the way this launch sets it (issue #3092).
+        setPhase({ state: "settling" });
+        const settled = await settleTypedValuesTweaks({
+          enginePath: target.enginePath,
+          dataDir: target.dataDir,
+          archive: game.primaryArchive.name,
+          project,
+          route: "bare",
+        });
+        setTypedNote(
+          settled.ok ? settledSummary(settled.settled) : settled.message,
+        );
+        modOptions = barTweakModOptions(
+          settled.ok
+            ? await workshopCompile({
+                project,
+                written: settled.settled.written,
+              })
+            : compiled.compiled,
+        );
       } else {
         // A value the game's own Lua would turn into something else is
         // written as one it turns into the typed number, checked by loading

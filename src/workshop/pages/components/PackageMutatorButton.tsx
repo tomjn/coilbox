@@ -54,7 +54,11 @@ import {
   restrictEditsToUnits,
 } from "../../collections";
 import { useCompiledProject } from "../../compile";
-import { settledSummary, settleTypedValues } from "../../loadsAs";
+import {
+  settledSummary,
+  settleTypedValues,
+  settleTypedValuesTweaks,
+} from "../../loadsAs";
 import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
@@ -73,8 +77,9 @@ type ExportMode = "mutator" | "bar";
 type BarPhase =
   | { state: "idle" }
   | { state: "checking" }
+  | { state: "settling" }
   | { state: "packing" }
-  | { state: "done"; pack: BarSlotPack }
+  | { state: "done"; pack: BarSlotPack; typedNote: string | null }
   | { state: "failed"; message: string };
 
 /** One press to put a line on the clipboard. Local to this file rather than
@@ -159,12 +164,19 @@ function BarFitWarning({
 function BarSlotExportSection({
   project,
   routeOptions,
+  game,
 }: {
   project: ModProject;
   routeOptions: ConfigOption[] | undefined;
+  /** Where to load the game to check typed values (issue #3092), or `null`
+   *  when it is not installed here. */
+  game: { enginePath: string; dataDir: string; archive: string } | null;
 }) {
   const [phase, setPhase] = useState<BarPhase>({ state: "idle" });
-  const busy = phase.state === "checking" || phase.state === "packing";
+  const busy =
+    phase.state === "checking" ||
+    phase.state === "settling" ||
+    phase.state === "packing";
 
   async function run() {
     setPhase({ state: "checking" });
@@ -178,9 +190,28 @@ function BarSlotExportSection({
         });
         return;
       }
+      // A value the game's own Lua would turn into something else is
+      // written as one they turn into the typed number, checked by loading
+      // the game with these very slots (issue #3092).
+      setPhase({ state: "settling" });
+      const settled = game
+        ? await settleTypedValuesTweaks({ ...game, project, route: "numbered" })
+        : ({
+            ok: false,
+            message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+          } as const);
       setPhase({ state: "packing" });
-      const pack = await workshopPackBarSlots({ project });
-      setPhase({ state: "done", pack });
+      const pack = await workshopPackBarSlots({
+        project,
+        written: settled.ok ? settled.settled.written : undefined,
+      });
+      setPhase({
+        state: "done",
+        pack,
+        typedNote: settled.ok
+          ? settledSummary(settled.settled)
+          : settled.message,
+      });
     } catch (error) {
       setPhase({
         state: "failed",
@@ -205,9 +236,11 @@ function BarSlotExportSection({
         <Package className="size-4" />
         {phase.state === "checking"
           ? "Checking"
-          : phase.state === "packing"
-            ? "Packing"
-            : "Pack for BAR"}
+          : phase.state === "settling"
+            ? "Checking typed values against the game"
+            : phase.state === "packing"
+              ? "Packing"
+              : "Pack for BAR"}
       </Button>
 
       {phase.state === "failed" ? (
@@ -217,6 +250,9 @@ function BarSlotExportSection({
       {phase.state === "done" ? (
         <div className="flex flex-col gap-3">
           <BarFitWarning pack={phase.pack} routeOptions={routeOptions} />
+          {phase.typedNote ? (
+            <p className="text-xs text-muted-foreground">{phase.typedNote}</p>
+          ) : null}
           {lines.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               This project has nothing that packs into a tweak slot.
@@ -282,8 +318,8 @@ export function PackageMutatorButton({
     phase.state === "settling" ||
     phase.state === "packaging";
   const [mode, setMode] = useState<ExportMode>("mutator");
-  // The game, so typed values can be checked against it before packaging
-  // (issue #3059).
+  // The game, so typed values can be checked against it before packaging or
+  // packing (issues #3059 and #3092).
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const game = scan.data?.games.find((g) => g.name === project.gameName);
@@ -460,6 +496,15 @@ export function PackageMutatorButton({
               <BarSlotExportSection
                 project={scopedProject}
                 routeOptions={routeOptions}
+                game={
+                  target && game
+                    ? {
+                        enginePath: target.enginePath,
+                        dataDir: target.dataDir,
+                        archive: game.primaryArchive.name,
+                      }
+                    : null
+                }
               />
             )
           ) : (
