@@ -14,9 +14,12 @@ import {
 import { type ReactElement, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import { applyBatchRows, computeBatchRows } from "../../batchEdit";
 import { resolvedDef, type UnitOverrides } from "../../overrides";
+import { EMPTY_EDITS } from "../../project";
 import { planRangeChanges, type RangeEditContext } from "../../rangeEdit";
 import { setReferenceValue } from "../../referenceEdit";
+import { applyFollowBatchRows, type RelativeEdits } from "../../relativeEdits";
 import { type UnitReferenceRow, unitReferenceRow } from "../../unitReference";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 import type { ReferenceEditing } from "./ReferenceBulkEdit";
@@ -295,21 +298,47 @@ describe("UnitReferenceView editing (issue #3113)", () => {
     corcom: "Commander",
   };
 
-  /** A page that owns its overrides, counting each write the way the undo
-   *  history would record a step. */
+  /** A page that owns its overrides and its rules, counting each write the
+   *  way the undo history would record a step. */
   function Harness({ onWrite }: { onWrite: () => void }) {
     const [overrides, setOverrides] = useState<UnitOverrides>({});
+    const [relative, setRelative] = useState<RelativeEdits | undefined>();
     const rowOf = (key: string, o: UnitOverrides) =>
       unitReferenceRow(key, names[key], resolvedDef(units[key], o[key]), {});
     const editing: ReferenceEditing = {
       units,
       overrides,
+      relative,
       updateOverrides: (update) => {
         onWrite();
         setOverrides(update);
       },
       draftRow: (key, columnId, value) =>
         rowOf(key, setReferenceValue(overrides, units, key, columnId, value)),
+      applyBatch: (keys, fieldKeys, operation, rounding, follow) => {
+        onWrite();
+        const rows = computeBatchRows(
+          keys,
+          fieldKeys,
+          units,
+          overrides,
+          operation,
+          rounding,
+        );
+        if (!follow) {
+          setOverrides((o) => applyBatchRows(o, rows, units));
+          return;
+        }
+        const next = applyFollowBatchRows(
+          { ...EMPTY_EDITS, overrides, relative },
+          rows,
+          units,
+          operation,
+          rounding,
+        );
+        setOverrides(next.overrides);
+        setRelative(next.relative);
+      },
       rangePlan: () => ({ rows: [], overrides, library: {}, equipped: {} }),
       applyRange: () => {},
     };
@@ -444,6 +473,7 @@ describe("UnitReferenceView game/project difference on a derived column (issue #
           key,
           setReferenceValue(overrides, gameUnits, key, columnId, value),
         ),
+      applyBatch: () => {},
       rangePlan: () => ({ rows: [], overrides, library: {}, equipped: {} }),
       applyRange: () => {},
     };
@@ -559,6 +589,7 @@ describe("UnitReferenceView editing Range (issue #3157)", () => {
         );
         return rowOf(key, plan.overrides, plan.library, plan.equipped);
       },
+      applyBatch: () => {},
       rangePlan: (keys, operation, rounding) =>
         planRangeChanges(
           rangeCtx(overrides, library, equipped),

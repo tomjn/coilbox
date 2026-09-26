@@ -225,6 +225,7 @@ export function WeaponSlotsPanel({
   onSelect,
   onChange,
   onReset,
+  onToggleRelative,
   library,
   supporting = [],
   selectedSupport,
@@ -252,6 +253,8 @@ export function WeaponSlotsPanel({
   onSelect: (step: string) => void;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
+  /** The field row's toggle between a rule and a fixed number (issue #3175). */
+  onToggleRelative?: (row: FieldRow) => void;
   /** The project's weapon library, and what the panel can do with it (issue
    *  #2640). */
   library: SlotLibrary;
@@ -461,6 +464,7 @@ export function WeaponSlotsPanel({
             inheritedLabel={inheritedLabel}
             onChange={onChange}
             onReset={onReset}
+            onToggleRelative={onToggleRelative}
           />
           {view.library && onSlot && (
             <UnitFieldGroups

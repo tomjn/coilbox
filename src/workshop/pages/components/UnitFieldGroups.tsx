@@ -100,6 +100,7 @@ export function UnitFieldGroups({
   relative,
   onChange,
   onReset,
+  onToggleRelative,
 }: {
   view: UnitFieldView;
   /** What a field is allowed to name, keyed by lowercased path, for the fields
@@ -133,6 +134,8 @@ export function UnitFieldGroups({
   relative?: (row: FieldRow) => string | undefined;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
+  /** The field row's toggle between a rule and a fixed number (issue #3175). */
+  onToggleRelative?: (row: FieldRow) => void;
 }) {
   if (view.groups.length === 0)
     return (
@@ -222,6 +225,11 @@ export function UnitFieldGroups({
                     relative={relative?.(row)}
                     onChange={(value) => onChange(row, value)}
                     onReset={() => onReset(row)}
+                    onToggleRelative={
+                      onToggleRelative && !group.readOnly
+                        ? () => onToggleRelative(row)
+                        : undefined
+                    }
                   />
                 ))}
               </SectionPanel>

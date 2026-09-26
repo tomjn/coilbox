@@ -133,6 +133,7 @@ import {
   unknownDamageClasses,
 } from "../armorClasses";
 import { type AssetBrowsing, deriveAssetFields } from "../assetFields";
+import { toNumber } from "../batchEdit";
 import {
   adoptBeforePost,
   copiedFrom,
@@ -224,9 +225,12 @@ import {
 import type { RandomModRecipe } from "../randomMod";
 import {
   describeRelative,
+  makeFixed,
+  makeRelative,
   relativeRuleOf,
   resetField as resetEditedField,
   resetUnit,
+  unitRulesWithoutNumber,
 } from "../relativeEdits";
 import {
   type ProjectSection,
@@ -1727,7 +1731,10 @@ export default function UnitPage() {
   const unitEdits =
     Object.keys(overrides[unitKey] ?? {}).length +
     unitTextCount(text, unitKey) +
-    Object.keys(equipped[unitKey] ?? {}).length;
+    Object.keys(equipped[unitKey] ?? {}).length +
+    // A rule whose result equals the game's value holds no override key, but
+    // is still a change the author made (issue #3180).
+    unitRulesWithoutNumber(edits, unitKey);
   // Only the ones copied here. A unit the lego builder exported is already a
   // file in the game folder, so counting it as a project edit would have the
   // project claim work the user never did, and go stale against the file the
@@ -1983,6 +1990,22 @@ export default function UnitPage() {
   // the game's and so has no override key to clear (issue #3174).
   const resetField = (row: FieldRow) =>
     commit((current) => resetEditedField(current, unitKey, row.path));
+  /**
+   * The field row's toggle (issue #3175): make an existing change follow the
+   * game, or take a rule off and keep its number fixed.
+   */
+  const toggleRelative = (row: FieldRow) => {
+    if (relativeRuleOf(edits.relative, unitKey, row.path)) {
+      commit((current) => makeFixed(current, unitKey, row.path));
+      return;
+    }
+    const value = toNumber(row.value);
+    const gameValue = toNumber(row.inherited);
+    if (value === undefined || gameValue === undefined) return;
+    commit((current) =>
+      makeRelative(current, unitKey, row.path, value, gameValue),
+    );
+  };
   /**
    * What copying a slot's weapon into the library copies (issue #2640): the
    * definition as the page shows it, with the project's own changes to it,
@@ -3048,6 +3071,7 @@ export default function UnitPage() {
                     }
                     onChange={changeField}
                     onReset={resetField}
+                    onToggleRelative={toggleRelative}
                     library={slotLibrary}
                     supporting={supporting}
                     selectedSupport={support?.key}
@@ -3201,6 +3225,7 @@ export default function UnitPage() {
                     relative={relativeOf}
                     onChange={changeField}
                     onReset={resetField}
+                    onToggleRelative={toggleRelative}
                   />
                 </TabsContent>
               </div>

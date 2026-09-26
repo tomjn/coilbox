@@ -41,6 +41,8 @@ import {
   FileCog,
   FileLock2,
   FolderOpen,
+  Link2,
+  Link2Off,
   RotateCcw,
   TriangleAlert,
 } from "lucide-react";
@@ -400,6 +402,7 @@ export function UnitFieldRow({
   readOnly: locked = false,
   onChange,
   onReset,
+  onToggleRelative,
 }: {
   row: FieldRow;
   /** What this field is allowed to name, when the game declares a list of it
@@ -439,6 +442,10 @@ export function UnitFieldRow({
   readOnly?: boolean;
   onChange: (value: unknown) => void;
   onReset: () => void;
+  /** Make this change follow the game, or take its rule off and keep its
+   *  number fixed (issue #3175). Absent where neither is on offer: a row
+   *  that is not a number, or one nothing has changed yet. */
+  onToggleRelative?: () => void;
 }) {
   const kind = controlKind(row);
   const overridden = row.state === "overridden";
@@ -720,16 +727,45 @@ export function UnitFieldRow({
       </div>
 
       {overridden || relative ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="size-7"
-          onClick={onReset}
-          title={`Reset ${row.label} to the inherited value`}
-          aria-label={`Reset ${row.label} to the inherited value`}
-        >
-          <RotateCcw className="size-3.5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          {onToggleRelative &&
+            (relative ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={onToggleRelative}
+                title={`Make ${row.label} a fixed number`}
+                aria-label={`Make ${row.label} a fixed number`}
+              >
+                <Link2Off className="size-3.5" />
+              </Button>
+            ) : (
+              typeof row.value === "number" &&
+              typeof row.inherited === "number" && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-7"
+                  onClick={onToggleRelative}
+                  title={`Make ${row.label} follow the game`}
+                  aria-label={`Make ${row.label} follow the game`}
+                >
+                  <Link2 className="size-3.5" />
+                </Button>
+              )
+            ))}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-7"
+            onClick={onReset}
+            title={`Reset ${row.label} to the inherited value`}
+            aria-label={`Reset ${row.label} to the inherited value`}
+          >
+            <RotateCcw className="size-3.5" />
+          </Button>
+        </div>
       ) : (
         <span className="size-7" />
       )}

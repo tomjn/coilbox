@@ -36,6 +36,7 @@ import {
   applyBatchRounding,
   type BatchOperation,
   type BatchRounding,
+  type BatchRow,
   toNumber,
 } from "./batchEdit";
 import {
@@ -75,6 +76,29 @@ export function relativeValue(change: RelativeChange, base: number): number {
 /** The number a rule gives at its own `base`. */
 export function relativeResult(rule: RelativeRule): number {
   return relativeValue(rule, rule.base);
+}
+
+/** One unit's rules whose result equals the game's value, so `overrides`
+ *  holds no key for them (issue #3180): still a change the Changes page and
+ *  the unit's own edit count need to count, the way `project.ts`'s
+ *  `editCounts` already counts them project-wide. */
+export function rulePathsWithoutNumber(
+  edits: Pick<GameEdits, "overrides" | "relative">,
+  unit: string,
+): string[] {
+  const fields = edits.relative?.[unit];
+  if (!fields) return [];
+  return Object.keys(fields).filter(
+    (path) => !Object.hasOwn(edits.overrides[unit] ?? {}, path),
+  );
+}
+
+/** How many of them there are, for a count rather than the paths themselves. */
+export function unitRulesWithoutNumber(
+  edits: Pick<GameEdits, "overrides" | "relative">,
+  unit: string,
+): number {
+  return rulePathsWithoutNumber(edits, unit).length;
 }
 
 /** The rule on one field, or `undefined` when the field has none. */
@@ -190,6 +214,98 @@ export function setRelativeEdit(
   if (overrides === edits.overrides && relative === edits.relative)
     return edits;
   return withRelative({ ...edits, overrides }, relative);
+}
+
+/**
+ * Whether ticking "Follow game updates" on this field would record a rule
+ * rather than a fixed number (issue #3175): true when the field is not yet
+ * changed, or already follows the game. False once it holds a fixed number,
+ * since that number does not move with the game.
+ */
+export function wouldFollow(
+  edits: Pick<GameEdits, "overrides" | "relative">,
+  unit: string,
+  path: string,
+): boolean {
+  return (
+    relativeRuleOf(edits.relative, unit, path) !== undefined ||
+    !Object.hasOwn(edits.overrides[unit] ?? {}, path)
+  );
+}
+
+/**
+ * Bulk edit's follow-game write (issue #3175). Each changed row becomes a
+ * rule when {@link wouldFollow} says so, composing onto an existing one so a
+ * second bulk edit stays one rule, and a plain override otherwise, since a
+ * field already holding a fixed number stays fixed. `units` is the game's own
+ * table, read for the raw value a rule follows, never the project's own
+ * override.
+ */
+export function applyFollowBatchRows(
+  edits: GameEdits,
+  rows: readonly BatchRow[],
+  units: Record<string, Record<string, unknown> | undefined>,
+  operation: BatchOperation,
+  rounding: BatchRounding,
+): GameEdits {
+  let next = edits;
+  for (const row of rows) {
+    if (!row.changed || row.skipped || row.path === undefined) continue;
+    if (row.after === undefined) continue;
+    const path = row.path;
+    const after = row.after;
+    if (wouldFollow(next, row.unit, path)) {
+      const existing = relativeRuleOf(next.relative, row.unit, path);
+      const change = composeRelative(existing, operation, rounding);
+      const gameValue = toNumber(readPath(units[row.unit], path));
+      if (!change || gameValue === undefined) continue;
+      next = setRelativeEdit(next, row.unit, path, change, gameValue);
+      continue;
+    }
+    const inherited = readPath(units[row.unit], path);
+    const overrides = setOverride(
+      next.overrides,
+      row.unit,
+      path,
+      after,
+      inherited,
+    );
+    if (overrides !== next.overrides) next = { ...next, overrides };
+  }
+  return next;
+}
+
+/**
+ * The field row's toggle (issue #3175): turn a fixed number into a rule
+ * expressed as a percentage of `gameValue`, exact so the number on screen
+ * does not move the moment it is ticked. Falls back to a flat offset when
+ * `gameValue` is 0, since a percentage of zero is always zero.
+ */
+export function makeRelative(
+  edits: GameEdits,
+  unit: string,
+  path: string,
+  value: number,
+  gameValue: number,
+): GameEdits {
+  const change: RelativeChange =
+    gameValue === 0
+      ? { factor: 1, offset: value, rounding: { kind: "none" } }
+      : { factor: value / gameValue, offset: 0, rounding: { kind: "none" } };
+  return setRelativeEdit(edits, unit, path, change, gameValue);
+}
+
+/** The field row's toggle, the other way: take the rule off and keep the
+ *  number it last worked out to as a fixed override. */
+export function makeFixed(
+  edits: GameEdits,
+  unit: string,
+  path: string,
+): GameEdits {
+  const relative = clearRelative(edits.relative, unit, path);
+  return relative === edits.relative
+    ? edits
+    : withRelative(edits, relative ?? {});
 }
 
 /** Put a field back to the game's value: its override and its rule both go. */

@@ -212,6 +212,83 @@ describe("a row the edit-in-place route cannot write", () => {
   });
 });
 
+/** Issue #3175. The field row's toggle between a rule and a fixed number. */
+describe("a row's follow-the-game toggle", () => {
+  it("offers to make a fixed, overridden number follow the game", () => {
+    const onToggleRelative = vi.fn();
+    render(
+      <UnitFieldRow
+        row={{ ...row(field({})), value: 350, state: "overridden" }}
+        onToggleRelative={onToggleRelative}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make Some key follow the game" }),
+    );
+    expect(onToggleRelative).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers to make a rule a fixed number instead, with the rule shown", () => {
+    const onToggleRelative = vi.fn();
+    render(
+      <UnitFieldRow
+        row={{ ...row(field({})), value: 322, state: "overridden" }}
+        relative="+15% of 280 = 322"
+        onToggleRelative={onToggleRelative}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    expect(
+      screen.getByText("Follows the game: +15% of 280 = 322"),
+    ).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Make Some key a fixed number" }),
+    );
+    expect(onToggleRelative).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers neither toggle for a field nothing has changed", () => {
+    const onToggleRelative = vi.fn();
+    render(
+      <UnitFieldRow
+        row={row(field({}))}
+        onToggleRelative={onToggleRelative}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Make Some key follow the game" }),
+    ).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Make Some key a fixed number" }),
+    ).toBeNull();
+  });
+
+  it("offers no toggle for an overridden field that is not a number", () => {
+    const onToggleRelative = vi.fn();
+    render(
+      <UnitFieldRow
+        row={{
+          ...row(field({ type: "string" })),
+          value: "custom",
+          inherited: "default",
+          state: "overridden",
+        }}
+        onToggleRelative={onToggleRelative}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "Make Some key follow the game" }),
+    ).toBeNull();
+  });
+});
+
 /** Issue #3057. A field the game's post files change as it loads. */
 describe("a row the game's post files change", () => {
   const drawPost = (
