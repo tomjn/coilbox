@@ -935,6 +935,9 @@ export default function SkirmishPage() {
         thumbs={thumbs}
         currentGameName={gameName}
         modOptionsSchema={modOptions}
+        enginePath={enginePath}
+        dataDir={dataDir}
+        archive={gameArchive}
         // Over the top of whatever the options already say, which is the point
         // of applying a project after a preset rather than instead of one.
         onApplyTweaks={(slots) =>
