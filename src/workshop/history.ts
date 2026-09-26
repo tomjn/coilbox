@@ -45,7 +45,7 @@
  * inside a page that stayed mounted. Since #2696 it is a route change, and a
  * stack held in the page would go with the page.
  */
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { GameEdits } from "./project";
 
 interface Stacks {
@@ -111,6 +111,32 @@ export interface EditHistory {
   canRedo(key: string): boolean;
   /** Drop a deleted project's history, so a new project cannot inherit it. */
   forget(key: string): void;
+}
+
+/**
+ * Undo on Cmd or Ctrl+Z and redo with Shift as well, for a page that offers
+ * the project's undo and redo (the unit editor, and the Reference table since
+ * issue #3113). Only outside a text box: a browser undoes typing in an input
+ * on its own, and taking that over would make a half-typed number impossible
+ * to correct without losing an unrelated edit.
+ */
+export function useUndoRedoKeys(undo: () => void, redo: () => void) {
+  const shortcut = useRef({ undo, redo });
+  shortcut.current = { undo, redo };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      e.preventDefault();
+      if (e.shiftKey) shortcut.current.redo();
+      else shortcut.current.undo();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 }
 
 export function useEditHistory(): EditHistory {

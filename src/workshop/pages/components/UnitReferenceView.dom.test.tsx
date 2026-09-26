@@ -11,10 +11,13 @@ import {
   screen,
   within,
 } from "@testing-library/react";
-import type { ReactElement } from "react";
+import { type ReactElement, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
+import { resolvedDef, type UnitOverrides } from "../../overrides";
+import { setReferenceValue } from "../../referenceEdit";
 import { type UnitReferenceRow, unitReferenceRow } from "../../unitReference";
+import type { ReferenceEditing } from "./ReferenceBulkEdit";
 import { UnitReferenceView } from "./UnitReferenceView";
 
 afterEach(cleanup);
@@ -254,5 +257,110 @@ describe("UnitReferenceView select every shown row (issue #3113)", () => {
     // With every shown unit selected, it clears them.
     fireEvent.click(screen.getByLabelText("Select every unit shown"));
     expect(screen.queryByText(/selected/)).toBeNull();
+  });
+});
+
+describe("UnitReferenceView editing (issue #3113)", () => {
+  const units: Record<string, Record<string, unknown>> = {
+    armtank: { health: 1000, metalCost: 200 },
+    corcom: { health: 3000, metalCost: 1000 },
+  };
+  const names: Record<string, string> = {
+    armtank: "Tank",
+    corcom: "Commander",
+  };
+
+  /** A page that owns its overrides, counting each write the way the undo
+   *  history would record a step. */
+  function Harness({ onWrite }: { onWrite: () => void }) {
+    const [overrides, setOverrides] = useState<UnitOverrides>({});
+    const rowOf = (key: string, o: UnitOverrides) =>
+      unitReferenceRow(key, names[key], resolvedDef(units[key], o[key]), {});
+    const editing: ReferenceEditing = {
+      units,
+      overrides,
+      updateOverrides: (update) => {
+        onWrite();
+        setOverrides(update);
+      },
+      draftRow: (key, columnId, value) =>
+        rowOf(key, setReferenceValue(overrides, units, key, columnId, value)),
+    };
+    return (
+      <UnitReferenceView
+        rows={Object.keys(units).map((key) => rowOf(key, overrides))}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+        editing={editing}
+      />
+    );
+  }
+
+  it("is read only without a project to write to", () => {
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
+    expect(screen.queryByLabelText(/^Edit Health for Tank/)).toBeNull();
+    fireEvent.click(screen.getByLabelText("Select Tank to compare"));
+    expect(screen.queryByRole("button", { name: "Change values" })).toBeNull();
+  });
+
+  it("edits a cell in place and moves derived columns while typing", () => {
+    let writes = 0;
+    renderView(<Harness onWrite={() => writes++} />);
+    fireEvent.click(screen.getByLabelText(/^Edit Health for Tank/));
+    const box = screen.getByLabelText("Health for Tank");
+    fireEvent.change(box, { target: { value: "2000" } });
+    // Cost per HP is 200 / 2000 before anything is written.
+    expect(screen.getByText("0.1")).toBeTruthy();
+    expect(writes).toBe(0);
+
+    fireEvent.keyDown(box, { key: "Enter" });
+    expect(writes).toBe(1);
+    const cell = screen.getByLabelText(/^Edit Health for Tank/);
+    expect(cell.textContent).toBe("2,000");
+    expect(cell.className).toContain("text-primary");
+  });
+
+  it("puts a cell back on Escape without writing", () => {
+    let writes = 0;
+    renderView(<Harness onWrite={() => writes++} />);
+    fireEvent.click(screen.getByLabelText(/^Edit Health for Tank/));
+    const box = screen.getByLabelText("Health for Tank");
+    fireEvent.change(box, { target: { value: "2000" } });
+    fireEvent.keyDown(box, { key: "Escape" });
+    expect(writes).toBe(0);
+    expect(screen.getByLabelText(/^Edit Health for Tank/).textContent).toBe(
+      "1,000",
+    );
+  });
+
+  it("raises the selection's health by 10% with a preview, as one write", () => {
+    let writes = 0;
+    renderView(<Harness onWrite={() => writes++} />);
+    fireEvent.click(screen.getByLabelText("Select every unit shown"));
+    fireEvent.click(screen.getByRole("button", { name: "Change values" }));
+    fireEvent.change(screen.getByLabelText("Value"), {
+      target: { value: "10" },
+    });
+
+    const preview = within(screen.getByRole("list", { name: "Preview" }));
+    expect(preview.getByText(/1000 → 1100/)).toBeTruthy();
+    expect(preview.getByText(/3000 → 3300/)).toBeTruthy();
+    expect(screen.getByText("2 of 2 units change")).toBeTruthy();
+    expect(writes).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply to 2 units/ }));
+    expect(writes).toBe(1);
+    expect(screen.getByLabelText(/^Edit Health for Tank/).textContent).toBe(
+      "1,100",
+    );
+    expect(
+      screen.getByLabelText(/^Edit Health for Commander/).textContent,
+    ).toBe("3,300");
   });
 });
