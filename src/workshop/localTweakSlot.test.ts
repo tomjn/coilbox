@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
 import type { CompiledMod } from "./compile";
 import {
-  barRouteAvailable,
-  barTweakModOptions,
   encodeTweakSlot,
-} from "./localBar";
+  localTweakModOptions,
+  localTweakSlotAvailable,
+} from "./localTweakSlot";
 
 /** A `ConfigOption` with only the fields these tests care about. */
 function opt(key: string): ConfigOption {
@@ -13,8 +13,8 @@ function opt(key: string): ConfigOption {
 }
 
 /** A `CompiledMod` with only the field this module reads. */
-function compiled(barTweakdefs: string | null): CompiledMod {
-  return { chunks: [], files: [], notes: [], barTweakdefs };
+function compiled(tweakdefs: string | null): CompiledMod {
+  return { chunks: [], files: [], notes: [], tweakdefs };
 }
 
 describe("encodeTweakSlot", () => {
@@ -46,40 +46,42 @@ describe("encodeTweakSlot", () => {
   });
 });
 
-describe("barRouteAvailable", () => {
+describe("localTweakSlotAvailable", () => {
   it("is available when the game declares a bare tweakdefs slot and there is something to tweak", () => {
-    expect(barRouteAvailable([opt("tweakdefs")], compiled("do end"))).toBe(
-      true,
-    );
+    expect(
+      localTweakSlotAvailable([opt("tweakdefs")], compiled("do end")),
+    ).toBe(true);
   });
 
   it("is not available when the game declares no tweakdefs slot at all", () => {
-    expect(barRouteAvailable([opt("tweakunits")], compiled("do end"))).toBe(
-      false,
-    );
-    expect(barRouteAvailable([], compiled("do end"))).toBe(false);
+    expect(
+      localTweakSlotAvailable([opt("tweakunits")], compiled("do end")),
+    ).toBe(false);
+    expect(localTweakSlotAvailable([], compiled("do end"))).toBe(false);
   });
 
   it("is not available when the project compiles to nothing", () => {
-    expect(barRouteAvailable([opt("tweakdefs")], compiled(null))).toBe(false);
-    expect(barRouteAvailable([opt("tweakdefs")], null)).toBe(false);
+    expect(localTweakSlotAvailable([opt("tweakdefs")], compiled(null))).toBe(
+      false,
+    );
+    expect(localTweakSlotAvailable([opt("tweakdefs")], null)).toBe(false);
   });
 
   it("a numbered slot alone is not enough: only the bare slot is used", () => {
-    expect(barRouteAvailable([opt("tweakdefs1")], compiled("do end"))).toBe(
-      false,
-    );
+    expect(
+      localTweakSlotAvailable([opt("tweakdefs1")], compiled("do end")),
+    ).toBe(false);
   });
 });
 
-describe("barTweakModOptions", () => {
+describe("localTweakModOptions", () => {
   it("is empty when there is nothing to tweak", () => {
-    expect(barTweakModOptions(compiled(null))).toEqual({});
-    expect(barTweakModOptions(null)).toEqual({});
+    expect(localTweakModOptions(compiled(null))).toEqual({});
+    expect(localTweakModOptions(null)).toEqual({});
   });
 
   it("carries the compiled Lua as tweakdefs, encoded", () => {
-    const options = barTweakModOptions(compiled("do end"));
+    const options = localTweakModOptions(compiled("do end"));
     expect(Object.keys(options)).toEqual(["tweakdefs"]);
     expect(options.tweakdefs).toBe(encodeTweakSlot("do end"));
   });

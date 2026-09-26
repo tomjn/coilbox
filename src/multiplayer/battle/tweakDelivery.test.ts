@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BarSlotPack } from "@/workshop/barPack";
+import type { TweakSlotPack } from "@/workshop/tweakPack";
 import {
   AUTOHOST_COMMAND_GAP_MS,
   confirmTimeoutMs,
@@ -16,7 +16,7 @@ import {
   type TweakSlot,
 } from "./tweakDelivery";
 
-const pack = (over: Partial<BarSlotPack> = {}): BarSlotPack => ({
+const pack = (over: Partial<TweakSlotPack> = {}): TweakSlotPack => ({
   tweakdefs: [],
   tweakunits: [],
   oversized: [],
@@ -186,13 +186,13 @@ describe("optionTagSlots", () => {
 describe("ledgerKeyFor", () => {
   it("matches the key the change ledger files a slot's edits under", () => {
     expect(ledgerKeyFor(slot({ name: "tweakdefs" }))).toBe(
-      "bar:tweakdefs:tweakdefs",
+      "tweak:tweakdefs:tweakdefs",
     );
     expect(ledgerKeyFor(slot({ name: "tweakdefs7" }))).toBe(
-      "bar:tweakdefs:tweakdefs7",
+      "tweak:tweakdefs:tweakdefs7",
     );
     expect(ledgerKeyFor(slot({ name: "tweakunits2" }))).toBe(
-      "bar:tweakunits:tweakunits2",
+      "tweak:tweakunits:tweakunits2",
     );
   });
 });

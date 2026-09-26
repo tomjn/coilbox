@@ -9,11 +9,13 @@
  * skirmish, the same move the lego builder's and the scenario editor's own
  * test drawers make. That route works for every game.
  *
- * Beyond All Reason gets a second, cheaper route on top: a skirmish launch
- * writes its own `[modoptions]`, so the compiled Lua can go straight into
- * the bare `tweakdefs` slot with no generated game and no rescan needed
- * (`localBar.ts`). Offered only when the open game declares that slot, and
- * preferred by default when it does, since it is the cheaper path.
+ * A game that declares a bare `tweakdefs` mod option (a convention Beyond
+ * All Reason's `modoptions.lua` popularized, but the mod option itself
+ * predates it) gets a second, cheaper route on top: a skirmish launch writes
+ * its own `[modoptions]`, so the compiled Lua can go straight into that slot
+ * with no generated game and no rescan needed (`localTweakSlot.ts`). Offered
+ * only when the open game declares that slot, and preferred by default when
+ * it does, since it is the cheaper path.
  */
 import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
@@ -42,7 +44,10 @@ import {
   settleTypedValues,
   settleTypedValuesTweaks,
 } from "../../loadsAs";
-import { barRouteAvailable, barTweakModOptions } from "../../localBar";
+import {
+  localTweakModOptions,
+  localTweakSlotAvailable,
+} from "../../localTweakSlot";
 import { workshopTestMutator } from "../../mutator";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
@@ -50,7 +55,7 @@ import type { ModProject } from "../../project";
 /** Random start position: a test needs a spawn, not a chosen one. */
 const START_POS_RANDOM = 1;
 
-type Route = "bar-tweak" | "mutator";
+type Route = "tweak-slot" | "mutator";
 
 type Phase =
   | { state: "idle" }
@@ -102,7 +107,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
     open ? game?.primaryArchive.name : undefined,
   );
 
-  const barAvailable = barRouteAvailable(
+  const tweakAvailable = localTweakSlotAvailable(
     gameInfo?.options ?? [],
     compiled.compiled,
   );
@@ -114,10 +119,10 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
     detail: string;
   }[] = [
     {
-      route: "bar-tweak",
-      label: "Beyond All Reason mod options",
-      available: barAvailable,
-      detail: barAvailable
+      route: "tweak-slot",
+      label: "Local tweak-slot mod option",
+      available: tweakAvailable,
+      detail: tweakAvailable
         ? "No generated game and no rescan: the launch carries the edits itself."
         : `${project.gameName} does not declare a tweakdefs mod option, so this route is not on offer.`,
     },
@@ -132,8 +137,8 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
   const selectedRoute: Route =
     routeChoice && routes.find((r) => r.route === routeChoice)?.available
       ? routeChoice
-      : barAvailable
-        ? "bar-tweak"
+      : tweakAvailable
+        ? "tweak-slot"
         : "mutator";
 
   const [phase, setPhase] = useState<Phase>({ state: "idle" });
@@ -160,7 +165,8 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
               ? "A game is already running."
               : null;
 
-  const nothingToTest = !compiled.loading && !mutatorAvailable && !barAvailable;
+  const nothingToTest =
+    !compiled.loading && !mutatorAvailable && !tweakAvailable;
 
   async function run() {
     if (!target || !game || !map) return;
@@ -186,7 +192,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
       let modOptions: Record<string, string> = {};
       let dir: string | null = null;
 
-      if (route === "bar-tweak") {
+      if (route === "tweak-slot") {
         // The same for the bare tweakdefs slot, checked by loading the game
         // with that slot set the way this launch sets it (issue #3092).
         setPhase({ state: "settling" });
@@ -200,7 +206,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
         setTypedNote(
           settled.ok ? settledSummary(settled.settled) : settled.message,
         );
-        modOptions = barTweakModOptions(
+        modOptions = localTweakModOptions(
           settled.ok
             ? await workshopCompile({
                 project,
@@ -300,7 +306,7 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
         width="28rem"
       >
         <div className="flex flex-col gap-5">
-          {routes.some((r) => r.route === "bar-tweak" && r.available) && (
+          {routes.some((r) => r.route === "tweak-slot" && r.available) && (
             <div className="flex flex-col gap-2">
               <span className="text-sm font-medium">Route</span>
               <div className="flex flex-col gap-2">

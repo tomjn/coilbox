@@ -27,7 +27,7 @@ const {
   save,
   workshopPreflight,
   workshopPackageMutator,
-  workshopPackBarSlots,
+  workshopPackTweakSlots,
   settleTypedValues,
   settleTypedValuesTweaks,
 } = vi.hoisted(() => ({
@@ -69,7 +69,7 @@ const {
     files: ["modinfo.lua"],
     version: 1,
   })),
-  workshopPackBarSlots: vi.fn(async () => ({
+  workshopPackTweakSlots: vi.fn(async () => ({
     tweakdefs: ["!bset tweakdefs abc123"],
     tweakunits: [] as string[],
     oversized: [] as string[],
@@ -91,10 +91,10 @@ vi.mock("../../package", () => ({
   packagedMutatorFileName: (p: { name: string }, version: number) =>
     `${p.name.toLowerCase().replace(/\s+/g, "-")}-v${version}.sdz`,
 }));
-vi.mock("../../barPack", async () => {
+vi.mock("../../tweakPack", async () => {
   const actual =
-    await vi.importActual<typeof import("../../barPack")>("../../barPack");
-  return { ...actual, workshopPackBarSlots };
+    await vi.importActual<typeof import("../../tweakPack")>("../../tweakPack");
+  return { ...actual, workshopPackTweakSlots };
 });
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
 vi.mock("../../loadsAs", async () => {
@@ -164,9 +164,9 @@ afterEach(() => {
     files: ["modinfo.lua"],
     version: 1,
   });
-  workshopPackBarSlots.mockClear();
+  workshopPackTweakSlots.mockClear();
   settleTypedValuesTweaks.mockClear();
-  workshopPackBarSlots.mockResolvedValue({
+  workshopPackTweakSlots.mockResolvedValue({
     tweakdefs: ["!bset tweakdefs abc123"],
     tweakunits: [],
     oversized: [],
@@ -373,20 +373,22 @@ describe("PackageMutatorButton", () => {
     });
   });
 
-  describe("BAR tweak slots mode", () => {
-    function openBarMode() {
+  describe("tweak slots mode", () => {
+    function openTweakMode() {
       fireEvent.click(screen.getByRole("button", { name: /^package$/i }));
-      fireEvent.click(screen.getByRole("radio", { name: /bar tweak slots/i }));
+      fireEvent.click(screen.getByRole("radio", { name: /tweak slots/i }));
     }
 
     it("packs the project with the values settled for the numbered slots and shows one line per slot", async () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       draw(vi.fn(), [{ key: "tweakdefs", name: "tweakdefs" }]);
-      openBarMode();
-      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
 
       await vi.waitFor(() =>
-        expect(workshopPackBarSlots).toHaveBeenCalledWith({
+        expect(workshopPackTweakSlots).toHaveBeenCalledWith({
           project,
           written: WRITTEN,
         }),
@@ -412,11 +414,13 @@ describe("PackageMutatorButton", () => {
         message: "Coilbox could not load the game to check typed values",
       });
       draw();
-      openBarMode();
-      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
 
       await vi.waitFor(() =>
-        expect(workshopPackBarSlots).toHaveBeenCalledWith({
+        expect(workshopPackTweakSlots).toHaveBeenCalledWith({
           project,
           written: undefined,
         }),
@@ -434,18 +438,20 @@ describe("PackageMutatorButton", () => {
         passes: [],
       });
       draw();
-      openBarMode();
-      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
 
       await vi.waitFor(() =>
         expect(screen.getByText(/1 blocker/i)).toBeTruthy(),
       );
       expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
-      expect(workshopPackBarSlots).not.toHaveBeenCalled();
+      expect(workshopPackTweakSlots).not.toHaveBeenCalled();
     });
 
     it("warns before the export when the game declares fewer slots than the pack needs", async () => {
-      workshopPackBarSlots.mockResolvedValue({
+      workshopPackTweakSlots.mockResolvedValue({
         tweakdefs: ["!bset tweakdefs a", "!bset tweakdefs1 b"],
         tweakunits: [],
         oversized: [],
@@ -454,8 +460,10 @@ describe("PackageMutatorButton", () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       // Only the bare slot is declared, but the pack above needed two.
       draw(vi.fn(), [{ key: "tweakdefs", name: "tweakdefs" }]);
-      openBarMode();
-      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
 
       await vi.waitFor(() =>
         expect(
@@ -467,7 +475,7 @@ describe("PackageMutatorButton", () => {
     });
 
     it("says which chunks could not be placed", async () => {
-      workshopPackBarSlots.mockResolvedValue({
+      workshopPackTweakSlots.mockResolvedValue({
         tweakdefs: [],
         tweakunits: [],
         oversized: ["a huge patch"],
@@ -475,8 +483,10 @@ describe("PackageMutatorButton", () => {
       });
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       draw();
-      openBarMode();
-      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
 
       await vi.waitFor(() =>
         expect(screen.getByText(/a huge patch would exceed/i)).toBeTruthy(),

@@ -9,14 +9,20 @@
 //! crate made of it, and the hub vendors the file and runs its port over the
 //! same projects.
 //!
-//! So a failure here after a change to `compile.rs`, `lua.rs` or `bar_pack.rs`
-//! is not a test to fix and move on from. Regenerate the fixture, and the hub's
-//! vendor check goes red until its port is brought level:
+//! So a failure here after a change to `compile.rs`, `lua.rs` or
+//! `tweak_pack.rs` is not a test to fix and move on from. Regenerate the
+//! fixture, and the hub's vendor check goes red until its port is brought
+//! level:
 //!
-//!   UPDATE_GOLDEN=1 cargo test -p tauri-plugin-coilbox-workshop --test bar_pack_golden
+//!   UPDATE_GOLDEN=1 cargo test -p tauri-plugin-coilbox-workshop --test tweak_pack_golden
+//!
+//! The fixture keeps its `bar-pack-golden.json` name even though this test
+//! file has been renamed: the hub vendors that exact filename (coilbox-hub
+//! issue #418), and renaming it now would only force an immediate,
+//! purely-cosmetic follow-up there for no functional gain.
 
 use serde_json::{json, Value};
-use tauri_plugin_coilbox_workshop::{compile, pack_bar_slots, ModProject};
+use tauri_plugin_coilbox_workshop::{compile, pack_tweak_slots, ModProject};
 
 const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
@@ -31,7 +37,7 @@ fn outcome(project: &Value) -> (Value, Value) {
     let compiled = compile(&project);
     (
         json!(compiled.chunks),
-        json!(pack_bar_slots(&compiled.chunks)),
+        json!(pack_tweak_slots(&compiled.chunks)),
     )
 }
 

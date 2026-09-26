@@ -30,11 +30,13 @@
 //! than for the local test route's own fixed folder. See `package`'s own doc
 //! comment.
 //!
-//! `workshop_pack_bar_slots` (issue #1277) is the fifth: it checks the same
+//! `workshop_pack_tweak_slots` (issue #1277) is the fifth: it checks the same
 //! way the other two export routes do, then packs the compiled chunks across
-//! Beyond All Reason's numbered `tweakdefs`/`tweakunits` mod options, for a
-//! player who is not hosting their own lobby. See `bar_pack`'s own doc
-//! comment for the size and ordering rules this follows.
+//! a game's numbered `tweakdefs`/`tweakunits` mod options (a convention Beyond
+//! All Reason's `modoptions.lua` popularized, but the mod options themselves
+//! predate it), for a player who is not hosting their own lobby. See
+//! `tweak_pack`'s own doc comment for the size and ordering rules this
+//! follows.
 //!
 //! `workshop_decode_tweak_set` (issue #1280) is the sixth, and the inverse of
 //! the fifth: given a payload, or a whole set of slots read from a battle's
@@ -44,7 +46,7 @@
 //!
 //! `workshop_change_ledger` (issue #2653) is the seventh, and reads rather
 //! than writes: it traces every edit in a project to the mutator file and,
-//! where the trace can place it, the numbered BAR slot that carries it. See
+//! where the trace can place it, the numbered tweak slot that carries it. See
 //! `ledger`'s own doc comment for why that is a read over the other six
 //! commands' output rather than a new compiled artefact of its own.
 //!
@@ -61,7 +63,6 @@
 //! current, so a game author can see what changed on disk before accepting or
 //! undoing it. See `diff`'s own doc comment.
 
-mod bar_pack;
 mod before_post;
 mod compile;
 mod decode;
@@ -75,16 +76,19 @@ mod model;
 mod mutator;
 mod package;
 mod preflight;
+mod tweak_pack;
 
-pub use bar_pack::{pack as pack_bar_slots, BarSlotPack};
 pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
 pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
 pub use inplace::{
     dry_run as inplace_dry_run, write as write_in_place, WriteOutcome as InPlaceWriteOutcome,
 };
-pub use ledger::{build_ledger, BarSlotMiss, BarSlotRef, ChangeLedger, LedgerChange, UnitLedger};
+pub use ledger::{
+    build_ledger, ChangeLedger, LedgerChange, TweakSlotMiss, TweakSlotRef, UnitLedger,
+};
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
+pub use tweak_pack::{pack as pack_tweak_slots, TweakSlotPack};
 
 use picoframe_core::CliResult;
 use serde::Serialize;
@@ -111,7 +115,7 @@ fn envelope<T: Serialize>(value: &T) -> CliResult {
 
 /// Compile a saved project into the Lua a game reads. `written` is what a
 /// settle worked out for the route the result is for (issue #3092), which the
-/// local tweak slot launch needs because it writes `barTweakdefs` itself.
+/// local tweak slot launch needs because it writes `tweakdefs` itself.
 #[tauri::command]
 fn workshop_compile(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
     envelope(&loads_as::compile_written(
@@ -232,35 +236,35 @@ fn workshop_package_mutator(
     })
 }
 
-/// Compile a saved project, check it, and pack its chunks across Beyond All
-/// Reason's numbered tweak slots (issue #1277), for a player who is not
-/// hosting their own lobby. Refused the same way the other export routes are
-/// when there is nothing to pack or preflight finds a blocker: a lobby chat
-/// line going out to other people is exactly the case a blocker should stop
-/// rather than only flag (issue #2748). A chunk `bar_pack::pack` could not
-/// place, whether too big for any slot or simply out of slots, is not a
-/// refusal: the caller decides what to do with a partial pack, since some of
-/// the project reaching a lobby is better than none of it silently vanishing.
+/// Compile a saved project, check it, and pack its chunks across the game's
+/// numbered tweak slots (issue #1277), for a player who is not hosting their
+/// own lobby. Refused the same way the other export routes are when there is
+/// nothing to pack or preflight finds a blocker: a lobby chat line going out
+/// to other people is exactly the case a blocker should stop rather than
+/// only flag (issue #2748). A chunk `tweak_pack::pack` could not place,
+/// whether too big for any slot or simply out of slots, is not a refusal:
+/// the caller decides what to do with a partial pack, since some of the
+/// project reaching a lobby is better than none of it silently vanishing.
 ///
 /// `written` is what `workshop_settle_typed_values_tweaks` worked out for the
 /// numbered slots (issue #3092), as `workshop_test_mutator` takes it.
 #[tauri::command]
-fn workshop_pack_bar_slots(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
+fn workshop_pack_tweak_slots(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
     let project = loads_as::with_written(&project, &written.unwrap_or_default());
     // A numbered slot is still a tweak slot: it carries a field that names a
     // generator, never the effects/<key>.lua file the name resolves to
-    // (`compile.rs`'s own note on `bar_tweakdefs`). Refused outright, the
-    // same way an empty project is, rather than packed with a reference
-    // nothing in the lobby will deliver.
+    // (`compile.rs`'s own note on `tweakdefs`). Refused outright, the same
+    // way an empty project is, rather than packed with a reference nothing
+    // in the lobby will deliver.
     if !project.edits.explosion_generators.is_empty() {
         return CliResult::err(
-            "This project has a custom explosion effect. Beyond All Reason's tweak slots cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead.",
+            "This project has a custom explosion effect. A tweak slot cannot carry the effects file it needs, so packing it into a lobby chat line would silently break it. Use the mutator or edit-in-place route instead.",
         );
     }
     let compiled = compile(&project);
     if compiled.chunks.is_empty() {
         return CliResult::err(
-            "This project has no edits, so there is nothing to pack for a Beyond All Reason lobby.",
+            "This project has no edits, so there is nothing to pack for a lobby.",
         );
     }
     let report = preflight(&project, &compiled);
@@ -272,7 +276,7 @@ fn workshop_pack_bar_slots(project: ModProject, written: Option<loads_as::Writte
             report.blockers.join("; "),
         ));
     }
-    envelope(&bar_pack::pack(&compiled.chunks))
+    envelope(&tweak_pack::pack(&compiled.chunks))
 }
 
 /// Decode a payload, or a whole set of slots read from a battle's mod
@@ -589,7 +593,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_preflight,
             workshop_test_mutator,
             workshop_package_mutator,
-            workshop_pack_bar_slots,
+            workshop_pack_tweak_slots,
             workshop_settle_typed_values_tweaks,
             workshop_decode_tweak_set,
             workshop_change_ledger,
@@ -678,12 +682,12 @@ mod tests {
 
         // Cleared for this one call: a custom explosion generator (issue
         // #2643) makes the numbered-slot route refuse outright, checked on
-        // its own in `packing_bar_slots_refuses_a_project_with_an_explosion_generator`.
+        // its own in `packing_tweak_slots_refuses_a_project_with_an_explosion_generator`.
         let mut project = project;
         project.edits.explosion_generators.clear();
-        let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
-        assert!(bar_pack.get("tweakdefs").is_some_and(Value::is_array));
-        assert!(bar_pack.get("tweakunits").is_some_and(Value::is_array));
+        let tweak_pack = unwrap_as_the_frontend_does(workshop_pack_tweak_slots(project, None));
+        assert!(tweak_pack.get("tweakdefs").is_some_and(Value::is_array));
+        assert!(tweak_pack.get("tweakunits").is_some_and(Value::is_array));
 
         let mut entries = std::collections::BTreeMap::new();
         entries.insert("pasted".to_string(), "not valid base64 !!!".to_string());
@@ -813,7 +817,7 @@ mod tests {
 
         let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone(), None));
         assert_eq!(compiled["files"].as_array().map(Vec::len), Some(0));
-        assert_eq!(compiled["barTweakdefs"], Value::Null);
+        assert_eq!(compiled["tweakdefs"], Value::Null);
 
         let report = unwrap_as_the_frontend_does(workshop_preflight(empty));
         assert_eq!(report["blockers"].as_array().map(Vec::len), Some(0));
@@ -890,11 +894,11 @@ mod tests {
         assert!(!dest.exists(), "nothing should have been written");
     }
 
-    /// The same empty-project refusal, for the BAR tweak-slot route (issue
+    /// The same empty-project refusal, for the tweak-slot route (issue
     /// #1277). Nothing to compile means nothing to pack.
     #[test]
-    fn packing_bar_slots_for_an_empty_project_is_refused_with_its_own_reason() {
-        let response = serde_json::to_value(workshop_pack_bar_slots(ModProject::default(), None))
+    fn packing_tweak_slots_for_an_empty_project_is_refused_with_its_own_reason() {
+        let response = serde_json::to_value(workshop_pack_tweak_slots(ModProject::default(), None))
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
@@ -908,7 +912,7 @@ mod tests {
     /// blocker should stop rather than only flag (issue #2748), the same
     /// reasoning `workshop_package_mutator` already follows.
     #[test]
-    fn packing_bar_slots_is_refused_when_preflight_finds_a_blocker() {
+    fn packing_tweak_slots_is_refused_when_preflight_finds_a_blocker() {
         let project: ModProject = serde_json::from_value(serde_json::json!({
             "name": "Faster commanders",
             "gameName": "Balanced Annihilation V15.9.8",
@@ -921,7 +925,7 @@ mod tests {
         }))
         .expect("parse");
 
-        let response = serde_json::to_value(workshop_pack_bar_slots(project, None))
+        let response = serde_json::to_value(workshop_pack_tweak_slots(project, None))
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
@@ -945,7 +949,7 @@ mod tests {
         }))
         .expect("parse");
 
-        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
+        let pack = unwrap_as_the_frontend_does(workshop_pack_tweak_slots(project, None));
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
         assert_eq!(tweakdefs.len(), 1);
     }
@@ -958,10 +962,10 @@ mod tests {
     /// route cannot deliver, so that store is cleared here and checked on
     /// its own in the refusal test below.
     #[test]
-    fn packing_bar_slots_for_the_saved_project_fills_both_kinds_of_slot() {
+    fn packing_tweak_slots_for_the_saved_project_fills_both_kinds_of_slot() {
         let mut project = saved_project();
         project.edits.explosion_generators.clear();
-        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
+        let pack = unwrap_as_the_frontend_does(workshop_pack_tweak_slots(project, None));
 
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
         let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
@@ -982,9 +986,9 @@ mod tests {
     /// to carry, so the saved project (which has one, unmodified) is refused
     /// outright rather than packed with a broken reference (issue #2643).
     #[test]
-    fn packing_bar_slots_refuses_a_project_with_an_explosion_generator() {
+    fn packing_tweak_slots_refuses_a_project_with_an_explosion_generator() {
         let project = saved_project();
-        let result = workshop_pack_bar_slots(project, None);
+        let result = workshop_pack_tweak_slots(project, None);
         let response = serde_json::to_value(&result).expect("the answer serialises");
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
         assert!(response["error"]

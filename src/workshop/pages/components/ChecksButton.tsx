@@ -448,19 +448,19 @@ function PreflightSection({
 }
 
 /** What to say about where a change landed, or why it did not, under its
- *  description: the file(s) it reached, the BAR slot when the trace could
+ *  description: the file(s) it reached, the tweak slot when the trace could
  *  place it, and the reason when it could not reach anything at all. */
 function ChangeDestination({ change }: { change: LedgerChange }) {
   const parts: string[] = [...change.files];
-  if (change.barSlot) parts.push(`!bset ${change.barSlot.label}`);
-  else if (change.barMiss === "oversized")
-    parts.push("too big for any BAR slot");
-  else if (change.barMiss === "unplaced")
-    parts.push("no BAR slot left to hold it");
-  else if (change.barMiss === "unresolved")
-    parts.push("BAR slot not traced for this project");
-  else if (change.barMiss === "noSlotForWords")
-    parts.push("no BAR slot can carry words");
+  if (change.tweakSlot) parts.push(`!bset ${change.tweakSlot.label}`);
+  else if (change.tweakMiss === "oversized")
+    parts.push("too big for any tweak slot");
+  else if (change.tweakMiss === "unplaced")
+    parts.push("no tweak slot left to hold it");
+  else if (change.tweakMiss === "unresolved")
+    parts.push("tweak slot not traced for this project");
+  else if (change.tweakMiss === "noSlotForWords")
+    parts.push("no tweak slot can carry words");
   if (change.uncompiledReason) parts.push(change.uncompiledReason);
   if (parts.length === 0) return null;
   return (

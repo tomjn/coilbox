@@ -21,7 +21,7 @@ function compiled(paths: string[]): CompiledMod {
     chunks: [],
     files: paths.map((path) => ({ path, contents: "" })),
     notes: [],
-    barTweakdefs: null,
+    tweakdefs: null,
   };
 }
 

@@ -325,7 +325,7 @@ fn check_base64_round_trip(compiled: &CompiledMod, report: &mut PreflightReport)
     }
     let mut ok = true;
     for chunk in &compiled.chunks {
-        let encoded = crate::bar_pack::encode_for(chunk.form, &chunk.lua);
+        let encoded = crate::tweak_pack::encode_for(chunk.form, &chunk.lua);
         // A `tweakunits` payload reaches BAR through a step that rewrites
         // every `_` to `=` before decoding, so a `_` in one is a byte the
         // game will silently lose (issue #2963). Checked rather than assumed,
@@ -337,7 +337,7 @@ fn check_base64_round_trip(compiled: &CompiledMod, report: &mut PreflightReport)
                 chunk.title
             ));
         }
-        match crate::bar_pack::decode_for(chunk.form, &encoded) {
+        match crate::tweak_pack::decode_for(chunk.form, &encoded) {
             Ok(bytes) if bytes == chunk.lua.as_bytes() => {}
             Ok(_) => {
                 ok = false;

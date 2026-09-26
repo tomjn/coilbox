@@ -1,7 +1,7 @@
 //! Tracing a project's edits to what the compiler wrote them into (issue
 //! #2653).
 //!
-//! `compile.rs` and `bar_pack.rs` already say, for the whole project, which
+//! `compile.rs` and `tweak_pack.rs` already say, for the whole project, which
 //! file or which numbered lobby slot a change lands in. What they do not say
 //! is the question this module answers: given one field on one unit, which
 //! output carries it, so that a broken game and a large project can be
@@ -11,7 +11,7 @@
 //! starts from the edit and asks where it went, which is why every entry
 //! here is keyed by unit and field first and only reports its output second.
 //!
-//! Nothing in `compile.rs`, `bar_pack.rs` or `package.rs` changes for this.
+//! Nothing in `compile.rs`, `tweak_pack.rs` or `package.rs` changes for this.
 //! This module is a read over their public output, not a new source of
 //! truth: it re-derives, from the same `GameEdits` those modules are handed,
 //! the same category boundaries `compile::compile` uses to decide what
@@ -25,13 +25,13 @@
 //! `compile::compile`'s own rule for which file a category's Lua lands in is
 //! a fixed fact about the shape of a mutator archive (a copy's own file, or
 //! the one file a mutator can run code in) rather than something that
-//! depends on packing arithmetic. BAR slot attribution does need it, because
+//! depends on packing arithmetic. Tweak slot attribution does need it, because
 //! which of the 30 numbered slots a chunk lands in depends on how big every
 //! chunk ahead of it was.
 
-use crate::bar_pack::{self, BarSlotPack};
 use crate::compile::{compile, equip_at, Chunk, EquipAt, LuaForm};
 use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject};
+use crate::tweak_pack::{self, TweakSlotPack};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
@@ -69,25 +69,25 @@ fn valid_unit_key(key: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
 }
 
-/// Where a traced change landed in BAR's numbered tweak export.
+/// Where a traced change landed in the numbered tweak export.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct BarSlotRef {
+pub struct TweakSlotRef {
     /// `"tweakdefs"` or `"tweakunits"`.
     pub kind: String,
     /// The slot as `!bset` names it: bare for the first of its kind, numbered
-    /// from the second (`bar_pack`'s own convention).
+    /// from the second (`tweak_pack`'s own convention).
     pub label: String,
 }
 
-/// Why a traced change did not land in a numbered BAR slot.
+/// Why a traced change did not land in a numbered tweak slot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub enum BarSlotMiss {
-    /// Too big for any one slot on its own (`bar_pack::BarSlotPack::oversized`).
+pub enum TweakSlotMiss {
+    /// Too big for any one slot on its own (`tweak_pack::TweakSlotPack::oversized`).
     Oversized,
-    /// Every slot BAR exposes was already spoken for
-    /// (`bar_pack::BarSlotPack::unplaced`).
+    /// Every slot the game exposes was already spoken for
+    /// (`tweak_pack::TweakSlotPack::unplaced`).
     Unplaced,
     /// This project's chunk order could not be matched against the compiler's
     /// own, so which slot a change reached is not known rather than known to
@@ -116,8 +116,8 @@ pub struct LedgerChange {
     /// The mutator archive file(s) that carry this change. Empty when
     /// nothing does (see `uncompiled_reason`).
     pub files: Vec<String>,
-    pub bar_slot: Option<BarSlotRef>,
-    pub bar_miss: Option<BarSlotMiss>,
+    pub tweak_slot: Option<TweakSlotRef>,
+    pub tweak_miss: Option<TweakSlotMiss>,
     /// Why no output carries this change at all: a name or description edit
     /// for a game that keeps them in a localisation file, or a copy whose key
     /// the compiler already declined to use. Absent for everything else.
@@ -138,8 +138,8 @@ pub struct UnitLedger {
 #[serde(rename_all = "camelCase")]
 pub struct ChangeLedger {
     pub units: Vec<UnitLedger>,
-    /// Set when the BAR slot trace could not be verified for this project, so
-    /// every change's `bar_miss` reads `unresolved` rather than a slot number
+    /// Set when the tweak slot trace could not be verified for this project, so
+    /// every change's `tweak_miss` reads `unresolved` rather than a slot number
     /// nobody checked.
     pub notes: Vec<String>,
 }
@@ -177,8 +177,8 @@ enum PositionKey {
 /// Where a category's chunk landed once packed, or why it did not.
 #[derive(Debug, Clone)]
 enum SlotResolution {
-    Slot(BarSlotRef),
-    Miss(BarSlotMiss),
+    Slot(TweakSlotRef),
+    Miss(TweakSlotMiss),
 }
 
 /// The same category boundaries `compile::compile` uses, in the same order it
@@ -254,7 +254,7 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
 }
 
 /// A slot's label the way `!bset` names it: bare for the first of its kind,
-/// numbered from the second. Mirrors `bar_pack::bset_prefix`'s own naming,
+/// numbered from the second. Mirrors `tweak_pack::bset_prefix`'s own naming,
 /// minus the `!bset ` command and the trailing space that make it a whole
 /// chat line rather than a name for the slot.
 fn slot_label(kind: &str, index: usize) -> String {
@@ -277,7 +277,7 @@ fn decode_slot_line(line: &str) -> Option<String> {
 }
 
 /// Pair [`categorize`]'s reconstruction against the chunks `compile::compile`
-/// actually produced, and resolve each to where `bar_pack::pack` placed it.
+/// actually produced, and resolve each to where `tweak_pack::pack` placed it.
 ///
 /// `None` when the lengths or the forms at any position disagree, which means
 /// this reconstruction has drifted from `compile.rs`'s real order. That is
@@ -285,7 +285,7 @@ fn decode_slot_line(line: &str) -> Option<String> {
 fn resolve_slots(
     positions: &[(PositionKey, LuaForm)],
     chunks: &[Chunk],
-    pack: &BarSlotPack,
+    pack: &TweakSlotPack,
 ) -> Option<HashMap<PositionKey, SlotResolution>> {
     if positions.len() != chunks.len() {
         return None;
@@ -300,38 +300,38 @@ fn resolve_slots(
         }
 
         let resolution = if pack.oversized.contains(&chunk.title) {
-            SlotResolution::Miss(BarSlotMiss::Oversized)
+            SlotResolution::Miss(TweakSlotMiss::Oversized)
         } else if pack.unplaced.contains(&chunk.title) {
-            SlotResolution::Miss(BarSlotMiss::Unplaced)
+            SlotResolution::Miss(TweakSlotMiss::Unplaced)
         } else {
             match form {
-                // Exactly one chunk per slot (`bar_pack::pack_tables`), so the
+                // Exactly one chunk per slot (`tweak_pack::pack_tables`), so the
                 // n-th table chunk that was not oversized or unplaced is the
                 // n-th line `pack.tweakunits` holds.
                 LuaForm::Table => {
                     let index = table_index;
                     table_index += 1;
-                    SlotResolution::Slot(BarSlotRef {
+                    SlotResolution::Slot(TweakSlotRef {
                         kind: "tweakunits".to_string(),
                         label: slot_label("tweakunits", index),
                     })
                 }
-                // Several blocks can share one slot (`bar_pack::pack_blocks`
+                // Several blocks can share one slot (`tweak_pack::pack_blocks`
                 // concatenates until the next one would not fit), so the slot
                 // has to be found rather than counted: decode each line back
                 // to Lua and look for this chunk's own minified text inside
                 // it, the same identity check `compile.rs`'s own tests use.
                 LuaForm::Block => {
-                    let minified = bar_pack::minify_lua(&chunk.lua);
+                    let minified = tweak_pack::minify_lua(&chunk.lua);
                     let found = pack.tweakdefs.iter().enumerate().find(|(_, line)| {
                         decode_slot_line(line).is_some_and(|decoded| decoded.contains(&minified))
                     });
                     match found {
-                        Some((index, _)) => SlotResolution::Slot(BarSlotRef {
+                        Some((index, _)) => SlotResolution::Slot(TweakSlotRef {
                             kind: "tweakdefs".to_string(),
                             label: slot_label("tweakdefs", index),
                         }),
-                        // Placed by `bar_pack::pack` (not oversized, not
+                        // Placed by `tweak_pack::pack` (not oversized, not
                         // unplaced) yet not found in any slot's decoded text:
                         // this reconstruction has drifted from the real
                         // packing in a way the earlier checks did not catch.
@@ -346,19 +346,19 @@ fn resolve_slots(
     Some(resolved)
 }
 
-/// The `bar_slot`/`bar_miss` pair for one change, given its category's
+/// The `tweak_slot`/`tweak_miss` pair for one change, given its category's
 /// resolution and whether the whole trace could be verified.
 fn slot_fields(
     resolution: Option<&SlotResolution>,
     verified: bool,
-) -> (Option<BarSlotRef>, Option<BarSlotMiss>) {
+) -> (Option<TweakSlotRef>, Option<TweakSlotMiss>) {
     if !verified {
-        return (None, Some(BarSlotMiss::Unresolved));
+        return (None, Some(TweakSlotMiss::Unresolved));
     }
     match resolution {
         Some(SlotResolution::Slot(slot)) => (Some(slot.clone()), None),
         Some(SlotResolution::Miss(miss)) => (None, Some(*miss)),
-        None => (None, Some(BarSlotMiss::Unresolved)),
+        None => (None, Some(TweakSlotMiss::Unresolved)),
     }
 }
 
@@ -378,11 +378,11 @@ fn unit_home(unit: &str, edits: &GameEdits) -> (Vec<String>, Option<PositionKey>
     }
 }
 
-/// Trace every edit in `project` to the file and BAR slot it compiles into.
+/// Trace every edit in `project` to the file and tweak slot it compiles into.
 pub fn build_ledger(project: &ModProject) -> ChangeLedger {
     let edits = &project.edits;
     let compiled = compile(project);
-    let pack = bar_pack::pack(&compiled.chunks);
+    let pack = tweak_pack::pack(&compiled.chunks);
     let positions = categorize(project);
     let resolutions = resolve_slots(&positions, &compiled.chunks, &pack);
     let verified = resolutions.is_some();
@@ -390,7 +390,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
     let mut notes = Vec::new();
     if !verified && !positions.is_empty() {
         notes.push(
-            "This project's BAR slot trace could not be matched against the compiler's own \
+            "This project's tweak slot trace could not be matched against the compiler's own \
              chunk order, so no slot numbers are shown. The mutator file each change carries \
              is unaffected."
                 .to_string(),
@@ -418,8 +418,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     description: "Copy left out of the compile".to_string(),
                     field_path: None,
                     files: Vec::new(),
-                    bar_slot: None,
-                    bar_miss: None,
+                    tweak_slot: None,
+                    tweak_miss: None,
                     uncompiled_reason: Some(
                         "Its key can only hold lowercase letters, digits and underscores, and \
                          it becomes a file name in the generated game."
@@ -427,7 +427,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     ),
                 });
             } else if clone.replaces_game_unit {
-                let (bar_slot, bar_miss) = slot_fields(
+                let (tweak_slot, tweak_miss) = slot_fields(
                     resolution_of(&PositionKey::Replaced(unit.clone())),
                     verified,
                 );
@@ -435,19 +435,19 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     description: "Replaces the game's own unit".to_string(),
                     field_path: None,
                     files: vec![POST_FILE.to_string()],
-                    bar_slot,
-                    bar_miss,
+                    tweak_slot,
+                    tweak_miss,
                     uncompiled_reason: None,
                 });
             } else {
-                let (bar_slot, bar_miss) =
+                let (tweak_slot, tweak_miss) =
                     slot_fields(resolution_of(&PositionKey::Added), verified);
                 changes.push(LedgerChange {
                     description: "Added as a new unit".to_string(),
                     field_path: None,
                     files: vec![format!("units/{unit}.lua")],
-                    bar_slot,
-                    bar_miss,
+                    tweak_slot,
+                    tweak_miss,
                     uncompiled_reason: None,
                 });
             }
@@ -462,7 +462,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     }
                     other => other.clone(),
                 };
-                let (bar_slot, bar_miss) = match &home_key {
+                let (tweak_slot, tweak_miss) = match &home_key {
                     Some(key) => slot_fields(resolution_of(key), verified),
                     None => (None, None),
                 };
@@ -470,8 +470,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     description: format!("Field change: {path}"),
                     field_path: Some(path.clone()),
                     files: files.clone(),
-                    bar_slot,
-                    bar_miss,
+                    tweak_slot,
+                    tweak_miss,
                     uncompiled_reason: home_key.is_none().then(|| {
                         "This copy's key was already left out of the compile, so nothing \
                          carries its fields either."
@@ -495,7 +495,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     && edits.weapons.contains_key(key)
                     && valid_unit_key(key)
                     && home_key.is_some();
-                let (bar_slot, bar_miss) = match (&home_key, compiled) {
+                let (tweak_slot, tweak_miss) = match (&home_key, compiled) {
                     (Some(position), true) => slot_fields(resolution_of(position), verified),
                     _ => (None, None),
                 };
@@ -508,8 +508,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     },
                     field_path: None,
                     files: if compiled { files.clone() } else { Vec::new() },
-                    bar_slot,
-                    bar_miss,
+                    tweak_slot,
+                    tweak_miss,
                     uncompiled_reason: (!compiled).then(|| {
                         "The weapon is not in the library under a name the compiler can use, so the slot keeps the game's weapon."
                             .to_string()
@@ -529,7 +529,7 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                     )
                 };
                 for op in ops {
-                    let (bar_slot, bar_miss) = match &home_key {
+                    let (tweak_slot, tweak_miss) = match &home_key {
                         Some(key) => slot_fields(resolution_of(key), verified),
                         None => (None, None),
                     };
@@ -553,8 +553,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                         description,
                         field_path: None,
                         files: files.clone(),
-                        bar_slot,
-                        bar_miss,
+                        tweak_slot,
+                        tweak_miss,
                         uncompiled_reason: home_key.is_none().then(|| {
                             "This copy's key was already left out of the compile, so nothing \
                              carries its build menu either."
@@ -566,24 +566,25 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
         }
 
         if edits.disabled.iter().any(|off| off == &unit) {
-            let (bar_slot, bar_miss) = slot_fields(resolution_of(&PositionKey::Disabled), verified);
+            let (tweak_slot, tweak_miss) =
+                slot_fields(resolution_of(&PositionKey::Disabled), verified);
             changes.push(LedgerChange {
                 description: "Switched off".to_string(),
                 field_path: None,
                 files: vec![POST_FILE.to_string()],
-                bar_slot,
-                bar_miss,
+                tweak_slot,
+                tweak_miss,
                 uncompiled_reason: None,
             });
         }
 
         if let Some(languages) = edits.text.get(&unit) {
             for (lang, fields) in languages {
-                let (files, uncompiled_reason, bar_miss) = if valid_language_code(lang) {
+                let (files, uncompiled_reason, tweak_miss) = if valid_language_code(lang) {
                     (
                         vec![language_file_path(lang)],
                         None,
-                        Some(BarSlotMiss::NoSlotForWords),
+                        Some(TweakSlotMiss::NoSlotForWords),
                     )
                 } else {
                     (
@@ -604,8 +605,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
                         description: format!("{label} ({lang}): {value}"),
                         field_path: None,
                         files: files.clone(),
-                        bar_slot: None,
-                        bar_miss,
+                        tweak_slot: None,
+                        tweak_miss,
                         uncompiled_reason: uncompiled_reason.clone(),
                     });
                 }
@@ -670,7 +671,7 @@ mod tests {
                 .find(|c| c.field_path.as_deref() == Some(path))
                 .unwrap_or_else(|| panic!("no {path}"));
             assert_eq!(change.files, vec![POST_FILE.to_string()]);
-            change.bar_slot.as_ref().map(|s| s.label.clone())
+            change.tweak_slot.as_ref().map(|s| s.label.clone())
         };
         assert_eq!(slot("maxDamage").as_deref(), Some("tweakunits"));
         assert_eq!(slot("weapons.1.name").as_deref(), Some("tweakdefs"));
@@ -733,8 +734,8 @@ mod tests {
             .iter()
             .find(|c| c.description.starts_with("Build menu"))
             .expect("menu change");
-        let field_slot = field.bar_slot.as_ref().expect("field lands in a slot");
-        let menu_slot = menu.bar_slot.as_ref().expect("menu lands in a slot");
+        let field_slot = field.tweak_slot.as_ref().expect("field lands in a slot");
+        let menu_slot = menu.tweak_slot.as_ref().expect("menu lands in a slot");
         assert_eq!(field_slot.kind, "tweakunits");
         assert_eq!(menu_slot.kind, "tweakdefs");
         assert_ne!(field_slot.label, menu_slot.label);
@@ -745,10 +746,10 @@ mod tests {
 
     /// The other case the task calls out: one output that carries several
     /// units. Two small build menus are concatenated into the same
-    /// `tweakdefs` slot by `bar_pack::pack_blocks`, so both units' ledger
+    /// `tweakdefs` slot by `tweak_pack::pack_blocks`, so both units' ledger
     /// rows have to name that same slot.
     #[test]
-    fn one_bar_slot_carries_several_units() {
+    fn one_tweak_slot_carries_several_units() {
         let ledger = build_ledger(&project(json!({
             "menus": {
                 "armlab": [{ "op": "add", "unit": "armpw" }],
@@ -756,11 +757,11 @@ mod tests {
             }
         })));
         let a = changes_for(&ledger, "armlab")[0]
-            .bar_slot
+            .tweak_slot
             .clone()
             .expect("armlab lands in a slot");
         let b = changes_for(&ledger, "armvp")[0]
-            .bar_slot
+            .tweak_slot
             .clone()
             .expect("armvp lands in a slot");
         assert_eq!(
@@ -781,7 +782,7 @@ mod tests {
         let b = &changes_for(&ledger, "armrock")[0];
         assert_eq!(a.files, vec![POST_FILE.to_string()]);
         assert_eq!(a.files, b.files);
-        assert_eq!(a.bar_slot, b.bar_slot);
+        assert_eq!(a.tweak_slot, b.tweak_slot);
     }
 
     /// Two units added in the same project each get a file of their own (a
@@ -789,7 +790,7 @@ mod tests {
     /// table chunk, so BAR's numbered export puts both in the same
     /// `tweakunits` slot. The two output kinds do not have to agree.
     #[test]
-    fn two_added_units_get_different_files_but_the_same_bar_slot() {
+    fn two_added_units_get_different_files_but_the_same_tweak_slot() {
         let ledger = build_ledger(&project(json!({
             "clones": {
                 "supercom": {
@@ -804,7 +805,7 @@ mod tests {
         let b = &changes_for(&ledger, "megacom")[0];
         assert_ne!(a.files, b.files, "each added unit gets its own file");
         assert_eq!(
-            a.bar_slot, b.bar_slot,
+            a.tweak_slot, b.tweak_slot,
             "both are folded into the one combined tweakunits chunk"
         );
     }
@@ -823,19 +824,19 @@ mod tests {
         assert_eq!(changes[0].files, vec![POST_FILE.to_string()]);
     }
 
-    /// A name edit reaches the mutator's own language file and no BAR slot,
+    /// A name edit reaches the mutator's own language file and no tweak slot,
     /// and the ledger has to say both: the file it can be read in, and the
     /// route it will not travel by (issue #2743).
     #[test]
-    fn a_name_edit_names_its_language_file_and_no_bar_slot() {
+    fn a_name_edit_names_its_language_file_and_no_tweak_slot() {
         let ledger = build_ledger(&project(json!({
             "text": { "armcom": { "en": { "name": "Commander" } } }
         })));
         let changes = changes_for(&ledger, "armcom");
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].files, vec!["language/en/zz_coilbox.json"]);
-        assert!(changes[0].bar_slot.is_none());
-        assert_eq!(changes[0].bar_miss, Some(BarSlotMiss::NoSlotForWords));
+        assert!(changes[0].tweak_slot.is_none());
+        assert_eq!(changes[0].tweak_miss, Some(TweakSlotMiss::NoSlotForWords));
         assert!(changes[0].uncompiled_reason.is_none());
     }
 
@@ -901,7 +902,7 @@ mod tests {
             .find(|c| c.description.contains("library weapon heavylaser"))
             .expect("the equip is traced");
         assert_eq!(change.files, vec![POST_FILE.to_string()]);
-        assert!(change.bar_slot.is_some() || change.bar_miss.is_some());
+        assert!(change.tweak_slot.is_some() || change.tweak_miss.is_some());
         assert!(change.uncompiled_reason.is_none());
     }
 
@@ -974,7 +975,7 @@ mod tests {
     #[test]
     fn resolve_slots_refuses_to_guess_when_the_chunk_count_disagrees() {
         let positions = vec![(PositionKey::Added, LuaForm::Table)];
-        let pack = bar_pack::pack(&[]);
+        let pack = tweak_pack::pack(&[]);
         assert!(resolve_slots(&positions, &[], &pack).is_none());
     }
 
@@ -989,7 +990,7 @@ mod tests {
             lua: "do end".to_string(),
         };
         let chunks = [chunk];
-        let pack = bar_pack::pack(&chunks);
+        let pack = tweak_pack::pack(&chunks);
         let positions = vec![(PositionKey::Added, LuaForm::Table)];
         assert!(resolve_slots(&positions, &chunks, &pack).is_none());
     }
@@ -1002,6 +1003,6 @@ mod tests {
     fn slot_fields_reports_unresolved_rather_than_silence_when_unverified() {
         let (slot, miss) = slot_fields(None, false);
         assert!(slot.is_none());
-        assert_eq!(miss, Some(BarSlotMiss::Unresolved));
+        assert_eq!(miss, Some(TweakSlotMiss::Unresolved));
     }
 }
