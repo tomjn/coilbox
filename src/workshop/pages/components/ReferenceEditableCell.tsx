@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { ReferenceCell } from "../../referenceEdit";
-import { formatReferenceValue } from "../../unitReference";
+import { formatDiff, formatReferenceValue } from "../../unitReference";
 
 /** A typed number, or `undefined` for anything that is not one. */
 function parsed(text: string): number | undefined {
@@ -83,13 +83,20 @@ export function ReferenceEditableCell({
       />
     );
 
+  const diff =
+    cell.edited && shown !== undefined && cell.gameValue !== undefined
+      ? shown - cell.gameValue
+      : undefined;
+  const before = cell.edited
+    ? `Before this project's edits: ${formatReferenceValue(cell.gameValue)}${diff !== undefined ? ` (${formatDiff(diff)})` : ""}`
+    : undefined;
   const button = (
     <button
       type="button"
       onClick={() =>
         setDraft(cell.value === undefined ? "" : String(cell.value))
       }
-      aria-label={`Edit ${label} for ${unitName}, now ${formatReferenceValue(shown)}`}
+      aria-label={`Edit ${label} for ${unitName}, now ${formatReferenceValue(shown)}${before ? `. ${before}` : ""}`}
       className={cn(
         "w-full rounded px-1 text-right tabular-nums hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         cell.edited &&
@@ -99,14 +106,12 @@ export function ReferenceEditableCell({
       {formatReferenceValue(shown)}
     </button>
   );
-  if (!cell.edited) return button;
+  if (!before) return button;
   return (
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent>
-          Before this project's edits: {formatReferenceValue(cell.gameValue)}
-        </TooltipContent>
+        <TooltipContent>{before}</TooltipContent>
       </Tooltip>
     </TooltipProvider>
   );

@@ -1068,6 +1068,19 @@ export default function UnitPage() {
     [edited, derivedWeapons],
   );
 
+  // The same numbers, off the game's own unit rather than this project's edit
+  // (issue #3114), so the strip can show what an edit changed. `unitEquipped`
+  // is left unset: a project's own weapon-library equip is an edit in its own
+  // right, not something the game had.
+  const gameWeapons = useMemo(
+    () => unitEffectiveWeapons(unit, weaponDefs, owners, library, undefined),
+    [unit, weaponDefs, owners, library],
+  );
+  const gameDerived = useMemo(
+    () => unitDerivedStats({ def: unit }, gameWeapons),
+    [unit, gameWeapons],
+  );
+
   // Which of the fields on screen the edit-in-place route could write into
   // the unit's own file (issue #2633), asked at edit time so a field it
   // cannot is read only before the user types into it rather than refused at
@@ -2876,7 +2889,7 @@ export default function UnitPage() {
                   `derivedStats.ts` could not compute honestly. Scrolls away
                   with the fields below it, unlike the name, picture and tabs
                   above, so the field list keeps the height (issue #3099). */}
-                <DerivedStatsStrip stats={derived} />
+                <DerivedStatsStrip stats={derived} gameStats={gameDerived} />
                 {inPlaceChecks.error && (
                   <p className="text-xs text-destructive">
                     Coilbox could not check which fields can be written into the

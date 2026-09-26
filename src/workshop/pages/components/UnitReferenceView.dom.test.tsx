@@ -386,4 +386,88 @@ describe("UnitReferenceView editing (issue #3113)", () => {
       screen.getByLabelText(/^Edit Health for Commander/).textContent,
     ).toBe("3,300");
   });
+
+  it("shows a raw cell's game value and the difference on hover", () => {
+    renderView(<Harness onWrite={() => {}} />);
+    fireEvent.click(screen.getByLabelText(/^Edit Health for Tank/));
+    fireEvent.change(screen.getByLabelText("Health for Tank"), {
+      target: { value: "1200" },
+    });
+    fireEvent.keyDown(screen.getByLabelText("Health for Tank"), {
+      key: "Enter",
+    });
+    expect(
+      screen.getByLabelText(
+        /^Edit Health for Tank, now 1,200\. Before this project's edits: 1,000 \(\+200\)/,
+      ),
+    ).toBeTruthy();
+  });
+});
+
+describe("UnitReferenceView game/project difference on a derived column (issue #3114)", () => {
+  // A.K.'s own laser, cut down to what `weaponStats` reads: raising its
+  // damage is the issue's own worked example, and DPS has nowhere to be
+  // written directly, so it can only ever get a game value from the
+  // baseline row rather than from `referenceCell`.
+  const gameUnits: Record<string, Record<string, unknown>> = {
+    ak: {
+      health: 1000,
+      metalCost: 200,
+      weapons: [{ name: "ak_laser" }],
+      weapondefs: {
+        laser: {
+          weaponType: "Cannon",
+          range: 300,
+          reloadTime: 1,
+          damage: { default: 50 },
+        },
+      },
+    },
+  };
+
+  function Harness() {
+    const [overrides] = useState<UnitOverrides>({
+      ak: { "weapondefs.laser.damage.default": 65 },
+    });
+    const rowOf = (key: string, o: UnitOverrides) =>
+      unitReferenceRow(key, "A.K.", resolvedDef(gameUnits[key], o[key]), {});
+    const editing: ReferenceEditing = {
+      units: gameUnits,
+      overrides,
+      updateOverrides: () => {},
+      draftRow: (key, columnId, value) =>
+        rowOf(
+          key,
+          setReferenceValue(overrides, gameUnits, key, columnId, value),
+        ),
+    };
+    return (
+      <UnitReferenceView
+        rows={[rowOf("ak", overrides)]}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+        baselineOf={(key) => unitReferenceRow(key, "A.K.", gameUnits[key], {})}
+        editing={editing}
+      />
+    );
+  }
+
+  it("shows DPS's game value, the project's and the difference", () => {
+    renderView(<Harness />);
+    // Game DPS is 50 (damage 50 / reloadTime 1), the project's edit raises it
+    // to 65, a rise of 15.
+    expect(
+      screen.getByLabelText(
+        /^DPS for A\.K\., now 65\. Before this project's edits: 50 \(\+15\)/,
+      ),
+    ).toBeTruthy();
+  });
+
+  it("leaves an unmoved derived column as plain text", () => {
+    renderView(<Harness />);
+    // Cost per HP (metalCost / health) is untouched by the weapon edit, so
+    // there is no game value to compare against and no tooltip button.
+    expect(screen.queryByLabelText(/^Cost per HP for A\.K\./)).toBeNull();
+    expect(screen.getByText("0.2")).toBeTruthy();
+  });
 });
