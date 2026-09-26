@@ -131,6 +131,9 @@ vi.mock("@/content/config", () => ({
   // Read by the picker's preview once a file in it is selected.
   useUnitsyncArchiveFile: () => ({ data: null, loading: false }),
   useUnitsyncUnitModel: () => ({ model: null, loading: false, failed: false }),
+  // PlayLocallyButton's map picker (issue #3164): never opened in these
+  // tests, so an empty map is enough.
+  useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
 // PlayLocallyButton (issue #1278) reaches usePlay() on every render, so a

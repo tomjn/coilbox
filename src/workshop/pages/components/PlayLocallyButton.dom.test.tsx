@@ -7,7 +7,13 @@
  * else (the compiler's own output, the base64 codec) is
  * `localTweakSlot.test.ts`'s.
  */
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const project = {
@@ -27,7 +33,11 @@ const WORKSHOP_TEST_GAME = {
   name: "coilbox-workshop-test",
   primaryArchive: { name: "coilbox-workshop-test.sdd", path: "" },
 };
-const MAP = { name: "Comet Catcher Redux" };
+const MAP = {
+  name: "Comet Catcher Redux",
+  archives: [{ name: "cometcatcherredux.sd7", path: "/maps/ccr.sd7" }],
+  info: {},
+};
 
 const WRITTEN = {
   units: { armcom: { maxdamage: { typed: 0.5, written: 5.5555553 } } },
@@ -136,6 +146,7 @@ vi.mock("@/content/config", () => ({
     error: null,
   }),
   useUnitsyncGameInfo: () => ({ info: { options: mockGameInfoOptions } }),
+  useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
   primeScan,
 }));
 vi.mock("@/play/PlayProvider", () => ({
@@ -168,25 +179,6 @@ vi.mock("../../loadsAs", async () => {
   return { ...actual, settleTypedValues, settleTypedValuesTweaks };
 });
 vi.mock("../../preflight", () => ({ workshopPreflight }));
-vi.mock("@/components/OptionSelect", () => ({
-  OptionSelect: ({
-    value,
-    onValueChange,
-    options,
-  }: {
-    value: string;
-    onValueChange: (value: string) => void;
-    options: { value: string; label: string }[];
-  }) => (
-    <select value={value} onChange={(e) => onValueChange(e.target.value)}>
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
-  ),
-}));
 
 const { PlayLocallyButton } = await import("./PlayLocallyButton");
 const { PersistentStoreProvider } = await import("@picoframe/frame");
@@ -246,6 +238,24 @@ describe("PlayLocallyButton", () => {
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
+  });
+
+  it("picks the map from the same thumbnail grid drawer as the Skirmish page, not a dropdown", () => {
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+
+    // The trigger shows the current map and opens the searchable thumbnail
+    // grid rather than a plain dropdown (issue #3164).
+    fireEvent.click(screen.getByRole("button", { name: MAP.name }));
+    const picker = screen.getByRole("dialog", { name: "Choose a map" });
+    expect(within(picker).getByPlaceholderText(/Search 1 maps/)).toBeTruthy();
+
+    // Picking the map's card closes the picker and leaves the Test drawer's
+    // own trigger showing the chosen map, still open underneath.
+    fireEvent.click(within(picker).getByText(MAP.name));
+    expect(screen.queryByRole("dialog", { name: "Choose a map" })).toBeNull();
+    expect(screen.getByRole("button", { name: MAP.name })).toBeTruthy();
+    expect(screen.getByText("Play locally")).toBeTruthy();
   });
 
   it("offers only the mutator route when the game declares no tweakdefs slot", () => {
