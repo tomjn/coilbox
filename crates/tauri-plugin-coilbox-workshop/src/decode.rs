@@ -706,16 +706,17 @@ mod tests {
     }
 
     /// The strongest test available: what `tweak_pack::pack` produces for a
-    /// real compiled project decodes back to the same Lua, with the same
-    /// form the compiler wrote it in.
+    /// real compiled project decodes back to the same Lua. Both forms come
+    /// back as one block, since a table is packed as the block that merges
+    /// it (issue #3126).
     #[test]
-    fn a_tweak_pack_line_decodes_back_to_the_same_lua_and_form() {
+    fn a_tweak_pack_line_decodes_back_to_the_same_lua() {
         let chunks = vec![
             Chunk {
                 form: LuaForm::Table,
-                title: "1 unit added".to_string(),
+                title: "1 field change".to_string(),
                 reason: "test".to_string(),
-                lua: "{\n  [\"supercom\"] = { maxDamage = 9000 },\n}".to_string(),
+                lua: "{\n  [\"armcom\"] = { maxDamage = 9000 },\n}".to_string(),
             },
             Chunk {
                 form: LuaForm::Block,
@@ -726,25 +727,15 @@ mod tests {
             },
         ];
         let pack = tweak_pack::pack(&chunks);
-        assert_eq!(pack.tweakunits.len(), 1);
         assert_eq!(pack.tweakdefs.len(), 1);
-
-        let unit_slot = decode_one(&lua(), "pasted", &pack.tweakunits[0]);
-        assert_eq!(unit_slot.kind, SlotKind::Tweakunits);
-        assert_eq!(unit_slot.slot, Some(0));
-        assert_eq!(unit_slot.form.as_deref(), Some("table"));
-        assert_eq!(
-            unit_slot.table.expect("table")["supercom"]["maxDamage"],
-            serde_json::json!(9000)
-        );
 
         let defs_slot = decode_one(&lua(), "pasted", &pack.tweakdefs[0]);
         assert_eq!(defs_slot.kind, SlotKind::Tweakdefs);
+        assert_eq!(defs_slot.slot, Some(0));
         assert_eq!(defs_slot.form.as_deref(), Some("block"));
         assert!(defs_slot.table.is_none());
-        assert!(defs_slot
-            .lua
-            .expect("lua")
-            .contains("local off = { [\"armflash\"] = true }"));
+        let decoded = defs_slot.lua.expect("lua");
+        assert!(decoded.contains("local changes = { [\"armcom\"] = { maxDamage = 9000 }, }"));
+        assert!(decoded.contains("local off = { [\"armflash\"] = true }"));
     }
 }

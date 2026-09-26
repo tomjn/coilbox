@@ -31,8 +31,8 @@
 //! Three routes use it. The mutator route is [`settle`]. Edit in place
 //! patches the game's own files instead (issue #3093). The tweak slot route
 //! carries no files at all: the compiled chunks travel as base64 `tweakdefs`
-//! and `tweakunits` mod options, which a game that declares them decodes and
-//! runs in its own Lua. So [`settle_tweaks`] loads the game with those mod
+//! mod options, which a game that declares them decodes and runs in its own
+//! Lua. So [`settle_tweaks`] loads the game with those mod
 //! options set, the way a lobby would hand them over, and lets the game's own
 //! files decide where and when they run (issue #3092). Nothing here knows
 //! where a game does that. Beyond All Reason, the test case, runs them in

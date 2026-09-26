@@ -687,7 +687,6 @@ mod tests {
         project.edits.explosion_generators.clear();
         let tweak_pack = unwrap_as_the_frontend_does(workshop_pack_tweak_slots(project, None));
         assert!(tweak_pack.get("tweakdefs").is_some_and(Value::is_array));
-        assert!(tweak_pack.get("tweakunits").is_some_and(Value::is_array));
 
         let mut entries = std::collections::BTreeMap::new();
         entries.insert("pasted".to_string(), "not valid base64 !!!".to_string());
@@ -956,27 +955,20 @@ mod tests {
 
     /// The saved fixture carries both a table-form edit (an override) and
     /// several block-form ones (a copy, a menu, a disabled unit), so packing
-    /// it is a real check that both slot kinds come back non-empty rather
-    /// than only the one the other tests happen to build. It also carries a
+    /// it is a real check that both forms reach a `tweakdefs` slot and none
+    /// is left for `tweakunits` (issue #3126). It also carries a
     /// custom explosion generator (issue #2643), which the numbered-slot
     /// route cannot deliver, so that store is cleared here and checked on
     /// its own in the refusal test below.
     #[test]
-    fn packing_tweak_slots_for_the_saved_project_fills_both_kinds_of_slot() {
+    fn packing_tweak_slots_for_the_saved_project_puts_both_forms_in_tweakdefs() {
         let mut project = saved_project();
         project.edits.explosion_generators.clear();
         let pack = unwrap_as_the_frontend_does(workshop_pack_tweak_slots(project, None));
 
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
-        let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
-        assert!(
-            !tweakdefs.is_empty(),
-            "the saved project has block-form edits"
-        );
-        assert!(
-            !tweakunits.is_empty(),
-            "the saved project has table-form edits"
-        );
+        assert!(!tweakdefs.is_empty(), "the saved project has edits");
+        assert!(pack.get("tweakunits").is_none());
         assert!(pack["oversized"].as_array().is_some_and(Vec::is_empty));
         assert!(pack["unplaced"].as_array().is_some_and(Vec::is_empty));
     }

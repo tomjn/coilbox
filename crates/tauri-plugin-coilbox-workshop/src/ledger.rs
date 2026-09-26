@@ -73,7 +73,7 @@ fn valid_unit_key(key: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TweakSlotRef {
-    /// `"tweakdefs"` or `"tweakunits"`.
+    /// Always `"tweakdefs"` since issue #3126, the only kind a pack fills.
     pub kind: String,
     /// The slot as `!bset` names it: bare for the first of its kind, numbered
     /// from the second (`tweak_pack`'s own convention).
@@ -205,8 +205,8 @@ fn categorize(project: &ModProject) -> Vec<(PositionKey, LuaForm)> {
         .any(|(key, clone)| !clone.replaces_game_unit && valid_unit_key(key));
     if added_nonempty {
         // Block since issue #2962: an added unit has to be assigned, because
-        // BAR's tweakunits merge only ever writes onto a unit the game
-        // already has and drops the rest without saying so.
+        // the tweakunits merge in BAR and Zero-K only ever writes onto a unit
+        // the game already has and drops the rest without saying so.
         positions.push((PositionKey::Added, LuaForm::Block));
     }
 
@@ -266,8 +266,8 @@ fn slot_label(kind: &str, index: usize) -> String {
 }
 
 /// Decode one `!bset tweakdefs...`/`!bset tweakunits...` line back to the Lua
-/// it carries, for the containment check [`resolve_slots`] runs against a
-/// block-form chunk. `rsplit_once` rather than reconstructing the prefix:
+/// it carries, for the containment check [`resolve_slots`] runs against each
+/// chunk. `rsplit_once` rather than reconstructing the prefix:
 /// the payload is everything after the line's last space regardless of which
 /// kind or index the prefix names.
 fn decode_slot_line(line: &str) -> Option<String> {
@@ -290,7 +290,6 @@ fn resolve_slots(
     if positions.len() != chunks.len() {
         return None;
     }
-    let mut table_index = 0usize;
     let mut resolved = HashMap::new();
 
     for (i, (key, form)) in positions.iter().enumerate() {
@@ -304,40 +303,26 @@ fn resolve_slots(
         } else if pack.unplaced.contains(&chunk.title) {
             SlotResolution::Miss(TweakSlotMiss::Unplaced)
         } else {
-            match form {
-                // Exactly one chunk per slot (`tweak_pack::pack_tables`), so the
-                // n-th table chunk that was not oversized or unplaced is the
-                // n-th line `pack.tweakunits` holds.
-                LuaForm::Table => {
-                    let index = table_index;
-                    table_index += 1;
-                    SlotResolution::Slot(TweakSlotRef {
-                        kind: "tweakunits".to_string(),
-                        label: slot_label("tweakunits", index),
-                    })
-                }
-                // Several blocks can share one slot (`tweak_pack::pack_blocks`
-                // concatenates until the next one would not fit), so the slot
-                // has to be found rather than counted: decode each line back
-                // to Lua and look for this chunk's own minified text inside
-                // it, the same identity check `compile.rs`'s own tests use.
-                LuaForm::Block => {
-                    let minified = tweak_pack::minify_lua(&chunk.lua);
-                    let found = pack.tweakdefs.iter().enumerate().find(|(_, line)| {
-                        decode_slot_line(line).is_some_and(|decoded| decoded.contains(&minified))
-                    });
-                    match found {
-                        Some((index, _)) => SlotResolution::Slot(TweakSlotRef {
-                            kind: "tweakdefs".to_string(),
-                            label: slot_label("tweakdefs", index),
-                        }),
-                        // Placed by `tweak_pack::pack` (not oversized, not
-                        // unplaced) yet not found in any slot's decoded text:
-                        // this reconstruction has drifted from the real
-                        // packing in a way the earlier checks did not catch.
-                        None => return None,
-                    }
-                }
+            // Several chunks can share one slot (`tweak_pack::pack`
+            // concatenates until the next one would not fit), so the slot
+            // has to be found rather than counted: decode each line back to
+            // Lua and look for this chunk's own minified slot text inside
+            // it, the same identity check `compile.rs`'s own tests use. A
+            // table-form chunk is looked for as the block it is packed as.
+            let minified = tweak_pack::minify_lua(&tweak_pack::slot_lua(chunk));
+            let found = pack.tweakdefs.iter().enumerate().find(|(_, line)| {
+                decode_slot_line(line).is_some_and(|decoded| decoded.contains(&minified))
+            });
+            match found {
+                Some((index, _)) => SlotResolution::Slot(TweakSlotRef {
+                    kind: "tweakdefs".to_string(),
+                    label: slot_label("tweakdefs", index),
+                }),
+                // Placed by `tweak_pack::pack` (not oversized, not
+                // unplaced) yet not found in any slot's decoded text: this
+                // reconstruction has drifted from the real packing in a way
+                // the earlier checks did not catch.
+                None => return None,
             }
         };
         resolved.insert(key.clone(), resolution);
@@ -656,8 +641,8 @@ mod tests {
     }
 
     /// A change through a list position is a block of its own (issue
-    /// #3041), so it reaches a `tweakdefs` slot while the same unit's other
-    /// field changes stay in `tweakunits`, and the trace still lines up.
+    /// #3041), beside the same unit's other field changes, and the trace
+    /// still lines up. Both are small, so both share the first slot.
     #[test]
     fn a_change_through_a_list_position_traces_to_its_own_slot() {
         let ledger = build_ledger(&project(json!({
@@ -673,7 +658,7 @@ mod tests {
             assert_eq!(change.files, vec![POST_FILE.to_string()]);
             change.tweak_slot.as_ref().map(|s| s.label.clone())
         };
-        assert_eq!(slot("maxDamage").as_deref(), Some("tweakunits"));
+        assert_eq!(slot("maxDamage").as_deref(), Some("tweakdefs"));
         assert_eq!(slot("weapons.1.name").as_deref(), Some("tweakdefs"));
     }
 
@@ -713,13 +698,11 @@ mod tests {
         assert_eq!(field_change.files, vec!["units/supercom.lua".to_string()]);
     }
 
-    /// The case the task calls out by name: one unit's edits split across
-    /// two BAR outputs. A field change on a game unit is a table (a
-    /// `tweakunits` slot) and a build menu edit on the same unit is a block
-    /// (a `tweakdefs` slot), so the same unit's two changes land in two
-    /// different numbered slots.
+    /// One unit's field change is a table and its build menu edit a block,
+    /// but both are packed as blocks (issue #3126), so when they are small
+    /// the same unit's two changes land in the same numbered slot.
     #[test]
-    fn one_units_edits_split_across_two_bar_outputs() {
+    fn one_units_table_and_block_edits_share_a_tweakdefs_slot() {
         let ledger = build_ledger(&project(json!({
             "overrides": { "armlab": { "maxDamage": 1 } },
             "menus": { "armlab": [{ "op": "add", "unit": "armpw" }] }
@@ -736,17 +719,14 @@ mod tests {
             .expect("menu change");
         let field_slot = field.tweak_slot.as_ref().expect("field lands in a slot");
         let menu_slot = menu.tweak_slot.as_ref().expect("menu lands in a slot");
-        assert_eq!(field_slot.kind, "tweakunits");
-        assert_eq!(menu_slot.kind, "tweakdefs");
-        assert_ne!(field_slot.label, menu_slot.label);
-        // Both files are the same post file: the split is a BAR-slot fact,
-        // not a mutator-file fact.
+        assert_eq!(field_slot.kind, "tweakdefs");
+        assert_eq!(field_slot, menu_slot);
         assert_eq!(field.files, menu.files);
     }
 
     /// The other case the task calls out: one output that carries several
     /// units. Two small build menus are concatenated into the same
-    /// `tweakdefs` slot by `tweak_pack::pack_blocks`, so both units' ledger
+    /// `tweakdefs` slot by `tweak_pack::pack`, so both units' ledger
     /// rows have to name that same slot.
     #[test]
     fn one_tweak_slot_carries_several_units() {
@@ -787,8 +767,8 @@ mod tests {
 
     /// Two units added in the same project each get a file of their own (a
     /// mutator's `units/` folder has one file per unit), but they are one
-    /// table chunk, so BAR's numbered export puts both in the same
-    /// `tweakunits` slot. The two output kinds do not have to agree.
+    /// chunk, so the numbered export puts both in the same `tweakdefs` slot.
+    /// The two output kinds do not have to agree.
     #[test]
     fn two_added_units_get_different_files_but_the_same_tweak_slot() {
         let ledger = build_ledger(&project(json!({
@@ -806,7 +786,7 @@ mod tests {
         assert_ne!(a.files, b.files, "each added unit gets its own file");
         assert_eq!(
             a.tweak_slot, b.tweak_slot,
-            "both are folded into the one combined tweakunits chunk"
+            "both are folded into the one combined chunk"
         );
     }
 
