@@ -117,6 +117,44 @@ function AddDamageClass({ onAdd }: { onAdd: (className: string) => void }) {
   );
 }
 
+/** Something wrong with this unit's weapons that only its neighbours or the
+ *  game's own data reveal: a reference that names nothing (issue #2641), in
+ *  error colour by default, and a damage table naming an armour class
+ *  nobody has (issue #2645), in warning colour since it does not stop the
+ *  project from building or loading (issue #3104). Shown on both the
+ *  weapons and the death explosions tab (issue #3105): the unit's own
+ *  weapondefs cover both, and a problem in one carried only for a death
+ *  explosion is still a problem worth seeing.
+ */
+export interface WeaponProblem {
+  id: string;
+  message: string;
+  severity?: "error" | "warning";
+}
+
+function WeaponProblems({ problems }: { problems: WeaponProblem[] }) {
+  if (problems.length === 0) return null;
+  return (
+    <ul
+      className="flex max-w-prose flex-col gap-1 text-xs"
+      aria-label="Problems with this unit's weapons"
+    >
+      {problems.map((problem) => (
+        <li
+          key={problem.id}
+          className={
+            problem.severity === "warning"
+              ? "text-amber-700 dark:text-amber-400"
+              : "text-destructive"
+          }
+        >
+          {problem.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** What a slot is called on its button: the weapon's display name, or the
  *  name the slot holds when its definition gives none. */
 function slotTitle(slot: WeaponSlot, equipped: string | undefined): string {
@@ -174,10 +212,8 @@ export function WeaponSlotsPanel({
   /** The supporting definition on screen, by key, in place of a slot. */
   selectedSupport?: string;
   onSelectSupport?: (key: string) => void;
-  /** Things wrong with this unit's weapons that only its neighbours or the
-   *  game's own data reveal: a reference that names nothing (issue #2641)
-   *  and a damage table naming an armour class nobody has (issue #2645). */
-  problems?: { id: string; message: string }[];
+  /** Things wrong with this unit's weapons (issue #2641, #2645). */
+  problems?: WeaponProblem[];
   /** The project's custom explosion generators, and where a change to the
    *  library goes (issue #2643). Absent for a page that has not wired this
    *  up yet, in which case no control is offered. */
@@ -238,16 +274,7 @@ export function WeaponSlotsPanel({
 
   return (
     <div className="flex flex-col gap-4">
-      {problems.length > 0 && (
-        <ul
-          className="flex max-w-prose flex-col gap-1 text-xs text-destructive"
-          aria-label="Problems with this unit's weapons"
-        >
-          {problems.map((problem) => (
-            <li key={problem.id}>{problem.message}</li>
-          ))}
-        </ul>
-      )}
+      <WeaponProblems problems={problems} />
       <ToggleGroup
         type="single"
         variant="outline"
@@ -419,6 +446,7 @@ export function DeathExplosionsPanel({
   inPlace,
   library,
   explosions,
+  problems = [],
   cegLibrary,
 }: {
   /** The explosion on screen's fields, grouped. */
@@ -434,6 +462,11 @@ export function DeathExplosionsPanel({
   /** The unit's death explosions, and what the panel can do with them
    *  (issue #2642). */
   explosions: ExplosionPanel;
+  /** Things wrong with this unit's weapons (issue #2641, #2645), the same
+   *  list the Weapons tab shows: the unit's own weapondefs cover both, so a
+   *  problem in one carried only for a death explosion is still worth
+   *  seeing here. */
+  problems?: WeaponProblem[];
   /** The project's custom explosion generators, and where a change to the
    *  library goes (issue #2643). Absent for a page that has not wired this
    *  up yet, in which case no control is offered. */
@@ -491,6 +524,7 @@ export function DeathExplosionsPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      <WeaponProblems problems={problems} />
       <ToggleGroup
         type="single"
         variant="outline"

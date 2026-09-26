@@ -111,6 +111,7 @@ import {
   armorClassesOf,
   armorClassOf,
   normaliseArmorDefs,
+  projectDamageClassProblems,
   rebaseArmorClasses,
   setArmorClass,
   unknownDamageClasses,
@@ -1020,6 +1021,21 @@ export default function UnitPage() {
     });
     return [...ownProblems, ...firedProblems];
   }, [edited, armorClassOptions, unitEquipped, library]);
+
+  // The same check, project-wide rather than scoped to this unit, so the
+  // checks drawer can list the finding without the unit ever being opened
+  // (issue #3104).
+  const projectArmorProblems = useMemo(
+    () =>
+      projectDamageClassProblems(
+        overrides,
+        ownClones,
+        gameUnits,
+        library,
+        armorClassOptions.map((c) => c.name),
+      ),
+    [overrides, ownClones, gameUnits, library, armorClassOptions],
+  );
 
   const choices = useMemo((): Record<string, FieldChoices> | undefined => {
     if (moveClasses.length === 0) return undefined;
@@ -1987,6 +2003,7 @@ export default function UnitPage() {
                 project={project}
                 gameUnits={gameUnits}
                 compatibility={compatibility}
+                armorClassProblems={projectArmorProblems}
                 // Through `commit`, so taking a dead reference out is one undo
                 // step like every other edit on this page. Nothing here is
                 // irreversible, which is what makes an offer safe to press.
@@ -2723,6 +2740,7 @@ export default function UnitPage() {
                     inPlace={inPlaceDir ? inPlaceOf : undefined}
                     library={slotLibrary}
                     explosions={explosionPanel}
+                    problems={[...refIssues, ...armorProblems]}
                     cegLibrary={{
                       generators: edits.explosionGenerators ?? {},
                       onChange: (next) =>

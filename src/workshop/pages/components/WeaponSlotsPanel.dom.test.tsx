@@ -116,12 +116,31 @@ describe("WeaponSlotsPanel supporting definitions", () => {
     expect(screen.queryByText("This unit has no weapons.")).toBeNull();
   });
 
-  it("lists a reference that names nothing", () => {
+  it("lists a reference that names nothing, in error colour", () => {
     draw({ problems: [problem] });
-    expect(
-      screen.getByRole("list", {
-        name: "Problems with this unit's weapons",
-      }).textContent,
-    ).toBe(problem.message);
+    const list = screen.getByRole("list", {
+      name: "Problems with this unit's weapons",
+    });
+    expect(list.textContent).toBe(problem.message);
+    expect(list.querySelector("li")?.className).toContain("text-destructive");
+  });
+
+  it("lists an unknown armour class in warning colour rather than error colour", () => {
+    draw({
+      problems: [
+        {
+          id: "rocket:damage",
+          message: "rocket's damage table names 1 armour class...",
+          severity: "warning",
+        },
+      ],
+    });
+    const list = screen.getByRole("list", {
+      name: "Problems with this unit's weapons",
+    });
+    expect(list.querySelector("li")?.className).toContain("text-amber-700");
+    expect(list.querySelector("li")?.className).not.toContain(
+      "text-destructive",
+    );
   });
 });
