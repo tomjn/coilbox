@@ -12,7 +12,7 @@
  *
  * `tools` sits at the right-hand end of the row, for the things that act
  * across many units without being a section: the reference table, which is a
- * page of its own, and batch edit until issue #3113 folds it into that table.
+ * page of its own and where many units are changed at once (issue #3113).
  */
 import { cn } from "@picoframe/frame";
 import {

@@ -14,6 +14,10 @@
  * the same query and faction, so one is the filter both read rather than two
  * that could drift apart. This table receives the already-filtered rows and
  * only adds its own sort.
+ *
+ * Given `editing` (issue #3113, inside a project only), a raw field's number
+ * is a `ReferenceEditableCell` rather than plain text. A derived column stays
+ * text: it is worked out from the others and has nowhere to be written.
  */
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useState } from "react";
@@ -35,6 +39,8 @@ import {
 import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { visibleRowWindow } from "@/lib/rowVirtualize";
+import type { UnitOverrides } from "../../overrides";
+import { referenceCell } from "../../referenceEdit";
 import {
   formatReferenceValue,
   REFERENCE_COLUMNS,
@@ -43,6 +49,7 @@ import {
   sortReferenceRows,
   type UnitReferenceRow,
 } from "../../unitReference";
+import { ReferenceEditableCell } from "./ReferenceEditableCell";
 
 /** Pinned by an inline style on every row, the same belt-and-braces reason
  *  `UnitList.tsx`'s own `ROW_HEIGHT` gives. */
@@ -56,10 +63,13 @@ export function UnitReferenceTable({
   emptyMessage,
   selected,
   onToggle,
+  allShownSelected,
+  onToggleShown,
   renderName,
   picOf,
   picsPending = false,
   factionOf,
+  editing,
 }: {
   /** Already filtered by `UnitReferenceView`'s search box and faction
    *  filter: this table only sorts and windows it. */
@@ -69,6 +79,11 @@ export function UnitReferenceTable({
   emptyMessage: string;
   selected: ReadonlySet<string>;
   onToggle: (key: string) => void;
+  /** Whether every row in `rows` is selected, for the header checkbox. */
+  allShownSelected: boolean;
+  /** The header checkbox (issue #3113): select every row in `rows`, or clear
+   *  them when every one already is. */
+  onToggleShown: () => void;
   /** How to render a row's name cell: a plain span, or a link to the unit's
    *  own page, whichever the caller's page offers. */
   renderName: (row: UnitReferenceRow) => ReactNode;
@@ -85,6 +100,14 @@ export function UnitReferenceTable({
    *  faction column and its filter, when a caller has no build graph to
    *  answer from. */
   factionOf?: (key: string) => string | undefined;
+  /** The project's units and overrides to read an editable cell from, and
+   *  where a typed number goes (issue #3113). Absent, every cell is text. */
+  editing?: {
+    units: Record<string, Record<string, unknown>>;
+    overrides: UnitOverrides;
+    onDraft: (key: string, columnId: string, value: number | undefined) => void;
+    onCommit: (key: string, columnId: string, value: number) => void;
+  };
 }) {
   const [sort, setSort] = useState<SortState>({
     columnId: "name",
@@ -168,7 +191,14 @@ export function UnitReferenceTable({
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow>
-              <TableHead className="w-8" aria-hidden="true" />
+              <TableHead className="w-8">
+                <Checkbox
+                  checked={allShownSelected}
+                  disabled={rows.length === 0}
+                  onCheckedChange={onToggleShown}
+                  aria-label="Select every unit shown"
+                />
+              </TableHead>
               <TableHead>{sortButton("name", "Name")}</TableHead>
               {factionOf && <TableHead>Faction</TableHead>}
               {REFERENCE_COLUMNS.map((column) => (
@@ -216,14 +246,39 @@ export function UnitReferenceTable({
                     {factionOf(row.key) ?? "—"}
                   </TableCell>
                 )}
-                {REFERENCE_COLUMNS.map((column) => (
-                  <TableCell
-                    key={column.id}
-                    className="text-right tabular-nums"
-                  >
-                    {formatReferenceValue(column.value(row))}
-                  </TableCell>
-                ))}
+                {REFERENCE_COLUMNS.map((column) => {
+                  const cell =
+                    editing &&
+                    referenceCell(
+                      editing.units,
+                      editing.overrides,
+                      row.key,
+                      column.id,
+                    );
+                  return (
+                    <TableCell
+                      key={column.id}
+                      className="text-right tabular-nums"
+                    >
+                      {editing && cell ? (
+                        <ReferenceEditableCell
+                          cell={cell}
+                          shown={column.value(row)}
+                          label={column.label}
+                          unitName={row.name}
+                          onDraft={(value) =>
+                            editing.onDraft(row.key, column.id, value)
+                          }
+                          onCommit={(value) =>
+                            editing.onCommit(row.key, column.id, value)
+                          }
+                        />
+                      ) : (
+                        formatReferenceValue(column.value(row))
+                      )}
+                    </TableCell>
+                  );
+                })}
               </TableRow>
             ))}
             {sorted.length - end > 0 && (

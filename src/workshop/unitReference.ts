@@ -244,29 +244,40 @@ export function formatReferenceValue(value: number | undefined): string {
  *  rather than chosen by this page. */
 export const ALL_FACTIONS = "__all__";
 
+/** The collection filter's "no filter" value (issue #3146). A collection's id
+ *  is a uuid, so this can never name one. */
+export const ALL_COLLECTIONS = "__all__";
+
 /**
  * `rows`, by the same search query and faction filter the table and the
  * scatter plot (issue #3115) both read: one filtered set for both, so a unit
  * hidden from the table cannot still show up as a dot. `factionFilter` is
  * ignored when `factionOf` is absent, the same as the table's own filter.
+ *
+ * `inCollection` is the units of one of the project's collections (issue
+ * #3146), as `collectionUnits` resolves them: lowercased keys, so a row's key
+ * is lowercased before it is looked up. Absent for no collection filter.
  */
 export function filterReferenceRows(
   rows: UnitReferenceRow[],
   query: string,
   factionFilter: string,
   factionOf?: (key: string) => string | undefined,
+  inCollection?: ReadonlySet<string>,
 ): { ok: boolean; error?: string; rows: UnitReferenceRow[] } {
   const parsed = parseUnitQuery(query.trim());
   if (!parsed.ok) return { ok: false, error: parsed.error, rows: [] };
-  const matched = rows.filter((row) =>
-    evaluateUnitQuery(parsed.query, {
-      key: row.key,
-      name: row.name,
-      def: row.def,
-      // Already computed for this row (issue #3074): no extra resolution to
-      // memoise, since the caller's `rows` is.
-      derived: () => row.derived,
-    }),
+  const matched = rows.filter(
+    (row) =>
+      (!inCollection || inCollection.has(row.key.toLowerCase())) &&
+      evaluateUnitQuery(parsed.query, {
+        key: row.key,
+        name: row.name,
+        def: row.def,
+        // Already computed for this row (issue #3074): no extra resolution to
+        // memoise, since the caller's `rows` is.
+        derived: () => row.derived,
+      }),
   );
   if (!factionOf || factionFilter === ALL_FACTIONS)
     return { ok: true, rows: matched };

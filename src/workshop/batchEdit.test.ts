@@ -17,6 +17,19 @@ describe("applyBatchOperation", () => {
   it("offsets", () => {
     expect(applyBatchOperation(200, { kind: "offset", amount: -20 })).toBe(180);
   });
+
+  it("drops floating point noise from a percentage change (issue #3113)", () => {
+    // 340 * 1.1 is 374.00000000000006 in a double, which would be written
+    // into the project and the game's Lua as is.
+    expect(applyBatchOperation(340, { kind: "multiply", factor: 1.1 })).toBe(
+      374,
+    );
+    expect(applyBatchOperation(0.1, { kind: "offset", amount: 0.2 })).toBe(0.3);
+  });
+
+  it("sets a value outright (issue #3113)", () => {
+    expect(applyBatchOperation(200, { kind: "set", value: 75 })).toBe(75);
+  });
 });
 
 describe("applyBatchRounding", () => {
@@ -65,6 +78,25 @@ describe("computeBatchRows", () => {
         changed: true,
       },
     ]);
+  });
+
+  it("reads an override written under the def's own lowercase key", () => {
+    // A game like Balanced Annihilation declares `maxdamage`, and the first
+    // batch writes its override under that spelling. A second batch has to
+    // start from that override, not from the game's number underneath it.
+    const rows = computeBatchRows(
+      ["armpw"],
+      ["health", "maxDamage"],
+      { armpw: { maxdamage: 300 } },
+      { armpw: { maxdamage: 330 } },
+      { kind: "multiply", factor: 2 },
+      { kind: "none" },
+    );
+    expect(rows[0]).toMatchObject({
+      before: 330,
+      after: 660,
+      path: "maxdamage",
+    });
   });
 
   it("prefers an existing override to the def's own value", () => {
