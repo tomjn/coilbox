@@ -71,7 +71,6 @@ const {
   })),
   workshopPackTweakSlots: vi.fn(async () => ({
     tweakdefs: ["!bset tweakdefs abc123"],
-    tweakunits: [] as string[],
     oversized: [] as string[],
     unplaced: [] as string[],
   })),
@@ -168,7 +167,6 @@ afterEach(() => {
   settleTypedValuesTweaks.mockClear();
   workshopPackTweakSlots.mockResolvedValue({
     tweakdefs: ["!bset tweakdefs abc123"],
-    tweakunits: [],
     oversized: [],
     unplaced: [],
   });
@@ -407,6 +405,17 @@ describe("PackageMutatorButton", () => {
       ).toBeTruthy();
     });
 
+    it("says the route is unverified for a game it was never checked against", () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      draw();
+      openTweakMode();
+      expect(
+        screen.getByText(
+          /How Balanced Annihilation V15\.9\.8 reads a tweakdefs slot is unverified/,
+        ),
+      ).toBeTruthy();
+    });
+
     it("packs the typed values and says why when the game cannot be checked", async () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       settleTypedValuesTweaks.mockResolvedValueOnce({
@@ -453,7 +462,6 @@ describe("PackageMutatorButton", () => {
     it("warns before the export when the game declares fewer slots than the pack needs", async () => {
       workshopPackTweakSlots.mockResolvedValue({
         tweakdefs: ["!bset tweakdefs a", "!bset tweakdefs1 b"],
-        tweakunits: [],
         oversized: [],
         unplaced: [],
       });
@@ -477,7 +485,6 @@ describe("PackageMutatorButton", () => {
     it("says which chunks could not be placed", async () => {
       workshopPackTweakSlots.mockResolvedValue({
         tweakdefs: [],
-        tweakunits: [],
         oversized: ["a huge patch"],
         unplaced: [],
       });
