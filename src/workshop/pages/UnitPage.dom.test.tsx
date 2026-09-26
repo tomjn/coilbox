@@ -2731,6 +2731,48 @@ describe("UnitPage", () => {
       expect(project()?.edits.equipped).toEqual({});
     });
 
+    /**
+     * Issue #3097. Clicking Fields cleared the `tab` URL parameter, but the
+     * `explosion` parameter stayed, and the tab derivation reads a death
+     * explosion as reason to reopen the weapons tab whenever `tab` is absent.
+     * Clicking Fields must win over that.
+     */
+    it("switches to Fields when a death explosion is open", () => {
+      mockWeaponDefs = {
+        big_unitex: {
+          areaofeffect: 64,
+          impulsefactor: 0.123,
+          damage: { default: 25 },
+        },
+      };
+      show(
+        {
+          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
+          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
+        },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
+        [{ name: "blaster", fullName: "Blaster" }],
+      );
+      openWeapons();
+      expect(screen.getByText("Death explosion: BIG_UNITEX")).toBeTruthy();
+      // Picking a death explosion by name puts it in the URL (`?explosion=`),
+      // same as the self-destruct explosion here. That is issue #3097's
+      // actual trigger. The first explosion opens on arrival with nothing in
+      // the URL, and never reproduced the bug.
+      fireEvent.click(
+        screen.getByRole("radio", { name: "Self-destruct explosion" }),
+      );
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
+      expect(screen.getByLabelText("Name")).toHaveProperty("value", "Blaster");
+      expect(screen.queryByText("Death explosion: BIG_UNITEX")).toBeNull();
+      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
+      expect(
+        screen
+          .getByRole("tab", { name: "Fields" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+    });
+
     it("copies a weapon the unit carries with the project's changes, as one undo step", async () => {
       openGunner();
       openWeapons();

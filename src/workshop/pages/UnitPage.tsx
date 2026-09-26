@@ -682,6 +682,10 @@ export default function UnitPage() {
     [unit, edited, weaponDefs, owners],
   );
   const explosionParam = params.get("explosion") ?? "";
+  // A tab click always writes "weapons" or "fields" (issue #3097), so it wins
+  // outright over whatever else is open. Only a `tab`-less arrival, such as a
+  // link that only names a slot or an explosion, falls back to inferring the
+  // tab from what that link opened.
   const tab: UnitTab =
     tabParam === "weapons" ||
     (tabParam === null && (linkedSlot || linkedSupport || explosionParam))
@@ -2429,9 +2433,11 @@ export default function UnitPage() {
           ) : (
             <Tabs
               value={tab}
-              onValueChange={(next) =>
-                select({ tab: next === "weapons" ? next : "" })
-              }
+              // Always writes the tab explicitly (issue #3097), so clicking
+              // Fields wins outright over a death explosion, a weapon slot or
+              // a support weapon still named in the URL, rather than clearing
+              // `tab` and leaving those to reopen the weapons tab.
+              onValueChange={(next) => select({ tab: next })}
               className="flex min-w-0 flex-col gap-3 lg:min-h-0"
             >
               {/* Who the unit is on the left, everything that acts on it on the
