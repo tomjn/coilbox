@@ -239,6 +239,14 @@ export function formatReferenceValue(value: number | undefined): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 
+/** A game-to-project difference, with the sign written out (issue #3114): a
+ *  reader should not have to depend on colour, or on a stray "-" that reads
+ *  the same as a hyphen, to tell an increase from a decrease. */
+export function formatDiff(diff: number): string {
+  const sign = diff > 0 ? "+" : "";
+  return `${sign}${formatReferenceValue(diff)}`;
+}
+
 /** A faction filter's sentinel "no filter" value (issue #3110). Not a real
  *  faction's name, since a game's side names are read straight off the game
  *  rather than chosen by this page. */

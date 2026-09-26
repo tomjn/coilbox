@@ -16,8 +16,10 @@
  * only adds its own sort.
  *
  * Given `editing` (issue #3113, inside a project only), a raw field's number
- * is a `ReferenceEditableCell` rather than plain text. A derived column stays
- * text: it is worked out from the others and has nowhere to be written.
+ * is a `ReferenceEditableCell` rather than plain text. A derived column has
+ * nowhere to write an edit and stays a `ReferenceValueCell`, which still
+ * shows the game's own value on hover when an edit elsewhere has moved it
+ * (issue #3114).
  */
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useState } from "react";
@@ -42,14 +44,61 @@ import { visibleRowWindow } from "@/lib/rowVirtualize";
 import type { UnitOverrides } from "../../overrides";
 import { referenceCell } from "../../referenceEdit";
 import {
+  formatDiff,
   formatReferenceValue,
   REFERENCE_COLUMNS,
   type ReferenceColumn,
   type SortState,
+  sameValue,
   sortReferenceRows,
   type UnitReferenceRow,
 } from "../../unitReference";
 import { ReferenceEditableCell } from "./ReferenceEditableCell";
+
+/** A column's value for a row, beside the game's own unedited value when the
+ *  two differ (issue #3114): a derived column such as DPS has nowhere to
+ *  write an edit and so never gets a `ReferenceEditableCell`, but an edit
+ *  anywhere among the fields it is worked out from still moves it, and that
+ *  is exactly the number a change is judged by. Hover, the same as an edited
+ *  raw cell's own "before this project's edits" note, rather than a second
+ *  line: the table's row height is fixed for its virtualised scroll. */
+function ReferenceValueCell({
+  shown,
+  gameValue,
+  label,
+  unitName,
+}: {
+  shown: number | undefined;
+  gameValue: number | undefined;
+  label: string;
+  unitName: string;
+}) {
+  const text = formatReferenceValue(shown);
+  if (
+    shown === undefined ||
+    gameValue === undefined ||
+    sameValue(shown, gameValue)
+  )
+    return <>{text}</>;
+  const diff = shown - gameValue;
+  const before = `Before this project's edits: ${formatReferenceValue(gameValue)} (${formatDiff(diff)})`;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label={`${label} for ${unitName}, now ${text}. ${before}`}
+            className="underline decoration-dotted underline-offset-2"
+          >
+            {text}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{before}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 /** Pinned by an inline style on every row, the same belt-and-braces reason
  *  `UnitList.tsx`'s own `ROW_HEIGHT` gives. */
@@ -69,6 +118,7 @@ export function UnitReferenceTable({
   picOf,
   picsPending = false,
   factionOf,
+  gameRowOf,
   editing,
 }: {
   /** Already filtered by `UnitReferenceView`'s search box and faction
@@ -100,6 +150,11 @@ export function UnitReferenceTable({
    *  faction column and its filter, when a caller has no build graph to
    *  answer from. */
   factionOf?: (key: string) => string | undefined;
+  /** The unit's own unedited row (issue #3114), the same lookup the scatter
+   *  plot's faint "game position" dot uses (`ReferencePage.tsx`'s
+   *  `baselineOf`). Absent on a page with no project to compare against (the
+   *  game's own reference page), in which case no cell shows a difference. */
+  gameRowOf?: (key: string) => UnitReferenceRow | undefined;
   /** The project's units and overrides to read an editable cell from, and
    *  where a typed number goes (issue #3113). Absent, every cell is text. */
   editing?: {
@@ -246,39 +301,49 @@ export function UnitReferenceTable({
                     {factionOf(row.key) ?? "—"}
                   </TableCell>
                 )}
-                {REFERENCE_COLUMNS.map((column) => {
-                  const cell =
-                    editing &&
-                    referenceCell(
-                      editing.units,
-                      editing.overrides,
-                      row.key,
-                      column.id,
+                {(() => {
+                  const gameRow = gameRowOf?.(row.key);
+                  return REFERENCE_COLUMNS.map((column) => {
+                    const cell =
+                      editing &&
+                      referenceCell(
+                        editing.units,
+                        editing.overrides,
+                        row.key,
+                        column.id,
+                      );
+                    return (
+                      <TableCell
+                        key={column.id}
+                        className="text-right tabular-nums"
+                      >
+                        {editing && cell ? (
+                          <ReferenceEditableCell
+                            cell={cell}
+                            shown={column.value(row)}
+                            label={column.label}
+                            unitName={row.name}
+                            onDraft={(value) =>
+                              editing.onDraft(row.key, column.id, value)
+                            }
+                            onCommit={(value) =>
+                              editing.onCommit(row.key, column.id, value)
+                            }
+                          />
+                        ) : (
+                          <ReferenceValueCell
+                            shown={column.value(row)}
+                            gameValue={
+                              gameRow ? column.value(gameRow) : undefined
+                            }
+                            label={column.label}
+                            unitName={row.name}
+                          />
+                        )}
+                      </TableCell>
                     );
-                  return (
-                    <TableCell
-                      key={column.id}
-                      className="text-right tabular-nums"
-                    >
-                      {editing && cell ? (
-                        <ReferenceEditableCell
-                          cell={cell}
-                          shown={column.value(row)}
-                          label={column.label}
-                          unitName={row.name}
-                          onDraft={(value) =>
-                            editing.onDraft(row.key, column.id, value)
-                          }
-                          onCommit={(value) =>
-                            editing.onCommit(row.key, column.id, value)
-                          }
-                        />
-                      ) : (
-                        formatReferenceValue(column.value(row))
-                      )}
-                    </TableCell>
-                  );
-                })}
+                  });
+                })()}
               </TableRow>
             ))}
             {sorted.length - end > 0 && (
