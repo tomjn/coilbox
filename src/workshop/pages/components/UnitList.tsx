@@ -54,11 +54,12 @@ import {
   useMemo,
   useState,
 } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { scrollTopForRow, visibleRowWindow } from "@/lib/rowVirtualize";
 import type { BuildMenus } from "../../buildMenus";
-import type { CloneOrigin, UnitClones } from "../../clones";
+import { type CloneOrigin, type UnitClones, unitIsAdded } from "../../clones";
 import type { UnitDerivedStats } from "../../derivedStats";
 import { type DisabledUnits, isUnitDisabled } from "../../disabled";
 import { resolvedDef, type UnitOverrides } from "../../overrides";
@@ -67,6 +68,7 @@ import {
   parseUnitQuery,
   queryNeedsDerivedFields,
 } from "../../searchQuery";
+import { ALL_FACTIONS } from "../../unitReference";
 import { type UnitTextEdits, unitTextCount } from "../../unitText";
 import { unitEffectiveDerivedStats } from "../../unitWeapons";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
@@ -91,6 +93,30 @@ const ROW_HEIGHT = 48;
  * not show a blank strip while the next frame's window catches up.
  */
 const OVERSCAN = 8;
+
+/**
+ * Whether a unit carries any edit its row marks with a chip: a changed field
+ * or text, a changed build menu, a switched-off state, or being one of the
+ * project's own added or copied units. The "Changed" filter (issue #3109)
+ * reads exactly these signals, computed once here so the filter and the
+ * chips it is filtering by can never disagree with each other.
+ */
+function unitHasEdits(
+  key: string,
+  overrides: UnitOverrides,
+  text: UnitTextEdits,
+  clones: UnitClones,
+  menus: BuildMenus,
+  disabled: DisabledUnits,
+): boolean {
+  return (
+    Object.keys(overrides[key] ?? {}).length > 0 ||
+    unitTextCount(text, key) > 0 ||
+    unitIsAdded(clones, key) ||
+    (menus[key]?.length ?? 0) > 0 ||
+    isUnitDisabled(disabled, key)
+  );
+}
 
 export function UnitList({
   units,
@@ -150,14 +176,59 @@ export function UnitList({
   onSelect: (key: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [factionFilter, setFactionFilter] = useState(ALL_FACTIONS);
+  const [changedOnly, setChangedOnly] = useState(false);
+
+  // The collection scopes the candidate set before either filter below reads
+  // it, the same way it always scoped search (issue #3109): a collection of
+  // only Arm units should not offer Core as a faction to filter by.
+  const scoped = useMemo(
+    () =>
+      Object.entries(units).filter(
+        ([key]) => !restrictTo || restrictTo.has(key),
+      ),
+    [units, restrictTo],
+  );
+
+  // Every faction the scoped units answer for, so the picker never offers one
+  // that would empty the list. Alphabetical, the same order the reference
+  // table's own faction filter uses (issue #3110), and empty for a one-sided
+  // game the same way `factionOf` already answers nothing for one.
+  const factions = useMemo(() => {
+    const seen = new Set<string>();
+    for (const [key] of scoped) {
+      const faction = factionOf(key);
+      if (faction) seen.add(faction);
+    }
+    return [...seen].sort((a, b) => a.localeCompare(b));
+  }, [scoped, factionOf]);
 
   const all = useMemo(
     () =>
-      Object.entries(units)
-        .filter(([key]) => !restrictTo || restrictTo.has(key))
+      scoped
+        .filter(
+          ([key]) =>
+            factionFilter === ALL_FACTIONS || factionOf(key) === factionFilter,
+        )
+        .filter(
+          ([key]) =>
+            !changedOnly ||
+            unitHasEdits(key, overrides, text, clones, menus, disabled),
+        )
         .map(([key, def]) => ({ key, label: nameOf(key, def), def }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [units, nameOf, restrictTo],
+    [
+      scoped,
+      nameOf,
+      factionFilter,
+      factionOf,
+      changedOnly,
+      overrides,
+      text,
+      clones,
+      menus,
+      disabled,
+    ],
   );
 
   const needle = query.trim();
@@ -353,6 +424,35 @@ export function UnitList({
         aria-label="Search units"
         className="h-9 shrink-0"
       />
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        {factions.length > 0 && (
+          <OptionSelect
+            size="sm"
+            ariaLabel="Filter units by faction"
+            className="w-auto flex-1"
+            value={factionFilter}
+            onValueChange={setFactionFilter}
+            options={[
+              { value: ALL_FACTIONS, label: "All factions" },
+              ...factions.map((faction) => ({
+                value: faction,
+                label: faction,
+              })),
+            ]}
+          />
+        )}
+        <OptionSelect
+          size="sm"
+          ariaLabel="Filter units by changes"
+          className="w-auto flex-1"
+          value={changedOnly ? "changed" : "all"}
+          onValueChange={(v) => setChangedOnly(v === "changed")}
+          options={[
+            { value: "all", label: "All units" },
+            { value: "changed", label: "Changed only" },
+          ]}
+        />
+      </div>
       {rows.length === 0 ? (
         <p
           className={cn(
@@ -364,9 +464,11 @@ export function UnitList({
             ? parsedQuery.error
             : needle
               ? `No unit matches "${needle}".`
-              : restrictTo
-                ? "This collection has no units in it yet."
-                : 'No unit matches "".'}
+              : factionFilter !== ALL_FACTIONS || changedOnly
+                ? "No unit matches this filter."
+                : restrictTo
+                  ? "This collection has no units in it yet."
+                  : 'No unit matches "".'}
         </p>
       ) : (
         <div
