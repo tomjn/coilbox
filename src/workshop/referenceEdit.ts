@@ -3,10 +3,12 @@
  * the table's columns can be written, where each one lives on a unit, and what
  * the game had there before the project changed it.
  *
- * Only a raw def field is editable. A derived column (DPS, cost per HP) is
- * worked out from other fields and has nowhere to be written, and Range is
- * the longest of a unit's weapons, which belongs to the weapon rather than
- * the unit.
+ * Only a raw def field is editable through this module. A derived column
+ * (DPS, cost per HP) is worked out from other fields and has nowhere to be
+ * written. Range is also editable (issue #3157), but it is the longest of a
+ * unit's weapons rather than a field on the unit itself, so it is listed
+ * here as editable and written by `rangeEdit.ts` instead of the bare-field
+ * path below.
  *
  * A field is found the way a batch edit finds one (`batchEdit.ts`'s
  * `findField`): the override first, then the def, each case-insensitively, so
@@ -27,13 +29,18 @@ const EDITABLE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   speed: ["speed", "maxVelocity"],
 };
 
+/** Range, alongside the bare fields above: written by `rangeEdit.ts`, not by
+ *  this module, since it has no single path of its own to write (issue
+ *  #3157). */
+const RANGE_COLUMN = "maxRange";
+
 export function isEditableColumn(columnId: string): boolean {
-  return Object.hasOwn(EDITABLE_FIELDS, columnId);
+  return Object.hasOwn(EDITABLE_FIELDS, columnId) || columnId === RANGE_COLUMN;
 }
 
 /** The editable columns' ids, in the table's own order. */
 export function editableColumnIds(): string[] {
-  return Object.keys(EDITABLE_FIELDS);
+  return [...Object.keys(EDITABLE_FIELDS), RANGE_COLUMN];
 }
 
 /** The spellings a column's field goes by, for `computeBatchRows`. */

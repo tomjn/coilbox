@@ -15,8 +15,10 @@ import { type ReactElement, useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { resolvedDef, type UnitOverrides } from "../../overrides";
+import { planRangeChanges, type RangeEditContext } from "../../rangeEdit";
 import { setReferenceValue } from "../../referenceEdit";
 import { type UnitReferenceRow, unitReferenceRow } from "../../unitReference";
+import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 import type { ReferenceEditing } from "./ReferenceBulkEdit";
 import { UnitReferenceView } from "./UnitReferenceView";
 
@@ -308,6 +310,8 @@ describe("UnitReferenceView editing (issue #3113)", () => {
       },
       draftRow: (key, columnId, value) =>
         rowOf(key, setReferenceValue(overrides, units, key, columnId, value)),
+      rangePlan: () => ({ rows: [], overrides, library: {}, equipped: {} }),
+      applyRange: () => {},
     };
     return (
       <UnitReferenceView
@@ -440,6 +444,8 @@ describe("UnitReferenceView game/project difference on a derived column (issue #
           key,
           setReferenceValue(overrides, gameUnits, key, columnId, value),
         ),
+      rangePlan: () => ({ rows: [], overrides, library: {}, equipped: {} }),
+      applyRange: () => {},
     };
     return (
       <UnitReferenceView
@@ -469,5 +475,161 @@ describe("UnitReferenceView game/project difference on a derived column (issue #
     // there is no game value to compare against and no tooltip button.
     expect(screen.queryByLabelText(/^Cost per HP for A\.K\./)).toBeNull();
     expect(screen.getByText("0.2")).toBeTruthy();
+  });
+});
+
+describe("UnitReferenceView editing Range (issue #3157)", () => {
+  // Tank carries its own laser. Commander still fires the game's shared
+  // `arm_dgun`, uncopied, so raising its range takes copying it into the
+  // project's library first, the same as the Weapons tab's "Give this unit
+  // its own copy".
+  const gameUnits: Record<string, Record<string, unknown>> = {
+    armtank: {
+      health: 1000,
+      metalCost: 200,
+      weapons: [{ name: "armtank_laser" }],
+      weapondefs: { laser: { weaponType: "Cannon", range: 300 } },
+    },
+    corcom: {
+      health: 3000,
+      metalCost: 1000,
+      weapons: [{ name: "arm_dgun" }],
+    },
+  };
+  const weaponDefs: Record<string, Record<string, unknown>> = {
+    arm_dgun: { weaponType: "Cannon", range: 500 },
+  };
+  const names: Record<string, string> = {
+    armtank: "Tank",
+    corcom: "Commander",
+  };
+
+  function Harness({ onWrite }: { onWrite: () => void }) {
+    const [overrides, setOverrides] = useState<UnitOverrides>({});
+    const [library, setLibrary] = useState<WeaponLibrary>({});
+    const [equipped, setEquipped] = useState<EquippedWeapons>({});
+    const rowOf = (
+      key: string,
+      o: UnitOverrides,
+      lib: WeaponLibrary,
+      eq: EquippedWeapons,
+    ) =>
+      unitReferenceRow(
+        key,
+        names[key],
+        resolvedDef(gameUnits[key], o[key]),
+        weaponDefs,
+        lib,
+        eq[key],
+      );
+    const rangeCtx = (
+      o: UnitOverrides,
+      lib: WeaponLibrary,
+      eq: EquippedWeapons,
+    ): RangeEditContext => ({
+      units: gameUnits,
+      ownClones: {},
+      weaponDefs,
+      overrides: o,
+      library: lib,
+      equipped: eq,
+      checksum: undefined,
+      beforePostOf: () => undefined,
+    });
+    const editing: ReferenceEditing = {
+      units: gameUnits,
+      overrides,
+      updateOverrides: (update) => {
+        onWrite();
+        setOverrides(update);
+      },
+      draftRow: (key, columnId, value) => {
+        if (columnId !== "maxRange")
+          return rowOf(
+            key,
+            setReferenceValue(overrides, gameUnits, key, columnId, value),
+            library,
+            equipped,
+          );
+        const plan = planRangeChanges(
+          rangeCtx(overrides, library, equipped),
+          [key],
+          { kind: "set", value },
+          { kind: "none" },
+        );
+        return rowOf(key, plan.overrides, plan.library, plan.equipped);
+      },
+      rangePlan: (keys, operation, rounding) =>
+        planRangeChanges(
+          rangeCtx(overrides, library, equipped),
+          keys,
+          operation,
+          rounding,
+        ),
+      applyRange: (keys, operation, rounding) => {
+        const plan = planRangeChanges(
+          rangeCtx(overrides, library, equipped),
+          keys,
+          operation,
+          rounding,
+        );
+        onWrite();
+        setOverrides(plan.overrides);
+        setLibrary(plan.library);
+        setEquipped(plan.equipped);
+      },
+    };
+    return (
+      <UnitReferenceView
+        rows={Object.keys(gameUnits).map((key) =>
+          rowOf(key, overrides, library, equipped),
+        )}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+        editing={editing}
+      />
+    );
+  }
+
+  it("raises every selected unit's weapons by 10%, copying a shared one", () => {
+    let writes = 0;
+    renderView(<Harness onWrite={() => writes++} />);
+    fireEvent.click(screen.getByLabelText("Select every unit shown"));
+    fireEvent.click(screen.getByRole("button", { name: "Change values" }));
+    fireEvent.click(screen.getByLabelText("Column"));
+    fireEvent.click(screen.getByRole("option", { name: "Range" }));
+    fireEvent.change(screen.getByLabelText("Value"), {
+      target: { value: "10" },
+    });
+
+    const preview = within(screen.getByRole("list", { name: "Preview" }));
+    expect(preview.getByText(/300 → 330/)).toBeTruthy();
+    expect(preview.getByText(/500 → 550/)).toBeTruthy();
+    expect(screen.getByText("(copies into the library)")).toBeTruthy();
+    expect(screen.getByText("2 of 2 units change")).toBeTruthy();
+    expect(writes).toBe(0);
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply to 2 units/ }));
+    expect(writes).toBe(1);
+    expect(screen.getByLabelText(/^Edit Range for Tank/).textContent).toBe(
+      "330",
+    );
+    expect(screen.getByLabelText(/^Edit Range for Commander/).textContent).toBe(
+      "550",
+    );
+  });
+
+  it("edits one unit's Range cell in place, as one write", () => {
+    let writes = 0;
+    renderView(<Harness onWrite={() => writes++} />);
+    fireEvent.click(screen.getByLabelText(/^Edit Range for Tank/));
+    const box = screen.getByLabelText("Range for Tank");
+    fireEvent.change(box, { target: { value: "450" } });
+    fireEvent.keyDown(box, { key: "Enter" });
+
+    expect(writes).toBe(1);
+    expect(screen.getByLabelText(/^Edit Range for Tank/).textContent).toBe(
+      "450",
+    );
   });
 });

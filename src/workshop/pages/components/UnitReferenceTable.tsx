@@ -42,7 +42,7 @@ import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { visibleRowWindow } from "@/lib/rowVirtualize";
 import type { UnitOverrides } from "../../overrides";
-import { referenceCell } from "../../referenceEdit";
+import { type ReferenceCell, referenceCell } from "../../referenceEdit";
 import {
   formatDiff,
   formatReferenceValue,
@@ -54,6 +54,26 @@ import {
   type UnitReferenceRow,
 } from "../../unitReference";
 import { ReferenceEditableCell } from "./ReferenceEditableCell";
+
+/** Range's own cell (issue #3157): it has no single path to check like the
+ *  other editable columns, so its "edited" and "before this project's edits"
+ *  reading comes off the same before-and-after the scatter plot's faint dot
+ *  already uses (`gameRowOf`), rather than a def path. `undefined` for a unit
+ *  with no non-shield weapon at all, the same as a column the unit has no
+ *  field for. */
+function maxRangeCell(
+  row: UnitReferenceRow,
+  gameRow: UnitReferenceRow | undefined,
+): ReferenceCell | undefined {
+  if (row.maxRange === undefined) return undefined;
+  const gameValue = gameRow?.maxRange;
+  return {
+    path: "",
+    value: row.maxRange,
+    gameValue,
+    edited: gameValue !== undefined && !sameValue(row.maxRange, gameValue),
+  };
+}
 
 /** A column's value for a row, beside the game's own unedited value when the
  *  two differ (issue #3114): a derived column such as DPS has nowhere to
@@ -306,12 +326,14 @@ export function UnitReferenceTable({
                   return REFERENCE_COLUMNS.map((column) => {
                     const cell =
                       editing &&
-                      referenceCell(
-                        editing.units,
-                        editing.overrides,
-                        row.key,
-                        column.id,
-                      );
+                      (column.id === "maxRange"
+                        ? maxRangeCell(row, gameRow)
+                        : referenceCell(
+                            editing.units,
+                            editing.overrides,
+                            row.key,
+                            column.id,
+                          ));
                     return (
                       <TableCell
                         key={column.id}

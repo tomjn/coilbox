@@ -312,9 +312,15 @@ export function UnitReferenceView({
                 value === undefined ? undefined : { key, columnId, value },
               ),
             onCommit: (key, columnId, value) =>
-              editing.updateOverrides((o) =>
-                setReferenceValue(o, editing.units, key, columnId, value),
-              ),
+              columnId === "maxRange"
+                ? editing.applyRange(
+                    [key],
+                    { kind: "set", value },
+                    { kind: "none" },
+                  )
+                : editing.updateOverrides((o) =>
+                    setReferenceValue(o, editing.units, key, columnId, value),
+                  ),
           }
         }
       />

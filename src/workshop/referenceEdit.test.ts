@@ -12,11 +12,11 @@ const units = {
 };
 
 describe("isEditableColumn", () => {
-  it("offers raw def fields and never a derived number", () => {
+  it("offers raw def fields, Range, and never a derived number", () => {
     expect(isEditableColumn("health")).toBe(true);
     expect(isEditableColumn("metalCost")).toBe(true);
+    expect(isEditableColumn("maxRange")).toBe(true);
     expect(isEditableColumn("dps")).toBe(false);
-    expect(isEditableColumn("maxRange")).toBe(false);
   });
 
   it("lists the editable columns in table order", () => {
@@ -26,6 +26,7 @@ describe("isEditableColumn", () => {
       "buildTime",
       "sightDistance",
       "speed",
+      "maxRange",
     ]);
   });
 });
@@ -49,6 +50,10 @@ describe("referenceCell", () => {
   it("has no cell for a derived column or a field the unit lacks", () => {
     expect(referenceCell(units, {}, "armpw", "dps")).toBeUndefined();
     expect(referenceCell(units, {}, "armpw", "speed")).toBeUndefined();
+  });
+
+  it("has no cell for Range, which rangeEdit.ts writes instead", () => {
+    expect(referenceCell(units, {}, "armpw", "maxRange")).toBeUndefined();
   });
 });
 
