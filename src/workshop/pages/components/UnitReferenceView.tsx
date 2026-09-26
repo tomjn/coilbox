@@ -9,6 +9,12 @@
  * and one faction choice, so a unit hidden from the table cannot still turn
  * up as a dot. Inside a project the collection filter (issue #3146) joins
  * them for the same reason.
+ *
+ * Inside a project the table is also where units are edited (issue #3113):
+ * a click on a raw number edits it, and the selection bar opens
+ * `ReferenceBulkEdit` to change one column across every selected unit.
+ * `editing` is what turns both on, so the game's own reference page, with no
+ * project to write to, stays read only.
  */
 import { Button, Input } from "@picoframe/frame";
 import { type ReactNode, useMemo, useState } from "react";
@@ -16,12 +22,14 @@ import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDisplay } from "@/content/bindings";
 import { cn } from "@/lib/utils";
 import { type Collections, collectionTree } from "../../collections";
+import { setReferenceValue } from "../../referenceEdit";
 import {
   ALL_COLLECTIONS,
   ALL_FACTIONS,
   filterReferenceRows,
   type UnitReferenceRow,
 } from "../../unitReference";
+import { ReferenceBulkEdit, type ReferenceEditing } from "./ReferenceBulkEdit";
 import { UnitCompareDrawer } from "./UnitCompareDrawer";
 import { UnitReferenceTable } from "./UnitReferenceTable";
 import { UnitScatterPlot } from "./UnitScatterPlot";
@@ -35,6 +43,7 @@ export function UnitReferenceView({
   picsPending,
   factionOf,
   collections,
+  editing,
 }: {
   rows: UnitReferenceRow[];
   renderName: (row: UnitReferenceRow) => ReactNode;
@@ -61,9 +70,18 @@ export function UnitReferenceView({
     all: Collections;
     unitsOf: (id: string) => ReadonlySet<string> | undefined;
   };
+  /** The project to write to (issue #3113). Absent outside a project, which
+   *  leaves the table read only. */
+  editing?: ReferenceEditing;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  /** A number being typed into one cell (issue #3113), so the row's derived
+   *  columns follow it before it is written. */
+  const [draft, setDraft] = useState<
+    { key: string; columnId: string; value: number } | undefined
+  >();
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const [query, setQuery] = useState("");
@@ -108,7 +126,25 @@ export function UnitReferenceView({
       filterReferenceRows(rows, query, factionFilter, factionOf, inCollection),
     [rows, query, factionFilter, factionOf, inCollection],
   );
-  const filtered = filterResult.rows;
+  // The row being typed into, recomputed off the draft. Swapped in after the
+  // filters rather than before, so a row cannot drop off the table while
+  // somebody is still typing into it.
+  const draftRow = useMemo(
+    () =>
+      draft && editing
+        ? editing.draftRow(draft.key, draft.columnId, draft.value)
+        : undefined,
+    [draft, editing],
+  );
+  const filtered = useMemo(
+    () =>
+      draftRow
+        ? filterResult.rows.map((row) =>
+            row.key === draftRow.key ? draftRow : row,
+          )
+        : filterResult.rows,
+    [filterResult, draftRow],
+  );
 
   const emptyMessage = needle
     ? `No unit matches "${needle}".`
@@ -163,7 +199,10 @@ export function UnitReferenceView({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setSelected([])}
+              onClick={() => {
+                setSelected([]);
+                setBulkOpen(false);
+              }}
             >
               Clear
             </Button>
@@ -175,8 +214,26 @@ export function UnitReferenceView({
             >
               Compare
             </Button>
+            {editing && (
+              <Button
+                type="button"
+                size="sm"
+                variant={bulkOpen ? "secondary" : "default"}
+                aria-expanded={bulkOpen}
+                onClick={() => setBulkOpen((open) => !open)}
+              >
+                Change values
+              </Button>
+            )}
           </div>
         </div>
+      )}
+      {editing && bulkOpen && selectedRows.length > 0 && (
+        <ReferenceBulkEdit
+          rows={selectedRows}
+          editing={editing}
+          onDone={() => setBulkOpen(false)}
+        />
       )}
       <div className="flex items-center gap-3">
         <Input
@@ -245,6 +302,20 @@ export function UnitReferenceView({
         picOf={picOf}
         picsPending={picsPending}
         factionOf={factionOf}
+        editing={
+          editing && {
+            units: editing.units,
+            overrides: editing.overrides,
+            onDraft: (key, columnId, value) =>
+              setDraft(
+                value === undefined ? undefined : { key, columnId, value },
+              ),
+            onCommit: (key, columnId, value) =>
+              editing.updateOverrides((o) =>
+                setReferenceValue(o, editing.units, key, columnId, value),
+              ),
+          }
+        }
       />
       <UnitCompareDrawer
         open={compareOpen}

@@ -5,10 +5,12 @@
  * project's own overrides and its own added units, so a mutator's changed
  * numbers are what a reader compares rather than the game's stock ones.
  *
- * Read-only: nothing here writes to the project. `/workshop/:id` is still
- * where a unit's fields are changed, and this is where two or more of them
- * are read side by side. A unit's name in the table links back to that
- * editor.
+ * Also where many units are changed at once (issue #3113): a raw number in
+ * the table is edited in place, and a change to one column can be applied
+ * across every selected unit. Both write through `applyEdits` and push onto
+ * the project's undo history the same way the unit editor's own edits do, so
+ * undo and redo here and on `/workshop/:id` walk the one history. A unit's
+ * name in the table still links to that editor for everything else.
  *
  * A slot the project has equipped with a library weapon (`weaponLibrary.ts`,
  * issue #2640) is resolved here too (issue #3081), the same way
@@ -16,7 +18,8 @@
  * weapon shows that weapon's numbers rather than its own unequipped
  * definition's.
  */
-import { ArrowLeft } from "lucide-react";
+import { Button } from "@picoframe/frame";
+import { ArrowLeft, Redo2, Undo2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { PageHeader } from "@/components/PageHeader";
@@ -37,14 +40,17 @@ import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
 import { collectionUnits, EMPTY_COLLECTIONS } from "../collections";
 import { useUnitDefs } from "../config";
-import { resolvedDef } from "../overrides";
-import { EMPTY_EDITS, useModProjects } from "../project";
+import { useEditHistory, useUndoRedoKeys } from "../history";
+import { resolvedDef, type UnitOverrides } from "../overrides";
+import { EMPTY_EDITS, editSlot, useModProjects } from "../project";
+import { setReferenceValue } from "../referenceEdit";
 import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
-import { unitReferenceRows } from "../unitReference";
+import { unitReferenceRow, unitReferenceRows } from "../unitReference";
 import { nameEdit } from "../unitText";
 import type { EquippedWeapons, WeaponLibrary } from "../weaponLibrary";
+import type { ReferenceEditing } from "./components/ReferenceBulkEdit";
 import { UnitReferenceView } from "./components/UnitReferenceView";
 
 // Shared fallbacks, so a project with no library does not hand every memo
@@ -54,7 +60,8 @@ const NO_EQUIPPED: EquippedWeapons = {};
 
 export default function ReferencePage() {
   const { id } = useParams();
-  const { projects } = useModProjects();
+  const { projects, applyEdits, setEdits } = useModProjects();
+  const history = useEditHistory();
   const project = projects.find((p) => p.id === id);
   const edits = project?.edits ?? EMPTY_EDITS;
   const { overrides, text } = edits;
@@ -151,6 +158,61 @@ export default function ReferencePage() {
     }),
     [collections, units, overrides, defs, library, equipped, ownClones],
   );
+
+  // Every edit on this page, as one undo step each, the way the unit
+  // editor's own `commit` records one (issue #3113). A bulk change is one
+  // `update`, so it is one step however many units it touches.
+  const updateOverrides = (
+    update: (current: UnitOverrides) => UnitOverrides,
+  ) => {
+    if (!project) return;
+    const changed = applyEdits(project.id, (current) =>
+      editSlot(current, "overrides", update),
+    );
+    if (changed) history.push(project.id, changed.before);
+  };
+  const undo = () => {
+    if (!project) return;
+    const previous = history.undo(project.id, edits);
+    if (previous) setEdits(project.id, previous);
+  };
+  const redo = () => {
+    if (!project) return;
+    const next = history.redo(project.id, edits);
+    if (next) setEdits(project.id, next);
+  };
+  useUndoRedoKeys(undo, redo);
+
+  const editing: ReferenceEditing | undefined = defs
+    ? {
+        units,
+        overrides,
+        updateOverrides,
+        // One row recomputed with a number that is still being typed, so its
+        // derived columns follow along before anything is written.
+        draftRow: (key, columnId, value) => {
+          const def = units[key];
+          if (!def) return undefined;
+          const next = setReferenceValue(
+            overrides,
+            units,
+            key,
+            columnId,
+            value,
+          );
+          const resolved = resolvedDef(def, next[key]);
+          return unitReferenceRow(
+            key,
+            nameOf(key, resolved),
+            resolved,
+            defs.weaponDefs,
+            library,
+            equipped[key],
+          );
+        },
+        beforePost: defs.beforePost,
+      }
+    : undefined;
 
   // The game's own unedited row for a unit (issue #3115's scatter plot: the
   // faint "game position" dot), read the same way `UnitReferencePage.tsx`
@@ -289,7 +351,31 @@ export default function ReferencePage() {
           </Link>
         }
         title="Unit reference"
-        description={`Every unit in ${gameName}, with this project's own edits applied. Select two or more to compare them.`}
+        description={`Every unit in ${gameName}, with this project's own edits applied. Click a number to change it, or select units to compare them or change them together.`}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!history.canUndo(project.id)}
+              onClick={undo}
+              aria-label="Undo"
+              title="Undo the last change"
+            >
+              <Undo2 className="size-3.5" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!history.canRedo(project.id)}
+              onClick={redo}
+              aria-label="Redo"
+              title="Redo the change you undid"
+            >
+              <Redo2 className="size-3.5" />
+            </Button>
+          </>
+        }
       />
       <UnitReferenceView
         rows={rows}
@@ -307,6 +393,7 @@ export default function ReferencePage() {
         picsPending={picsPending}
         factionOf={factionOf}
         collections={collectionFilter}
+        editing={editing}
       />
     </div>
   );

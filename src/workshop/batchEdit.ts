@@ -36,7 +36,8 @@ import { readPath, setOverride, type UnitOverrides } from "./overrides";
 
 export type BatchOperation =
   | { kind: "multiply"; factor: number }
-  | { kind: "offset"; amount: number };
+  | { kind: "offset"; amount: number }
+  | { kind: "set"; value: number };
 
 export type BatchRounding =
   | { kind: "none" }
@@ -66,9 +67,15 @@ export function applyBatchOperation(
   value: number,
   operation: BatchOperation,
 ): number {
-  return operation.kind === "multiply"
-    ? value * operation.factor
-    : value + operation.amount;
+  if (operation.kind === "set") return operation.value;
+  const exact =
+    operation.kind === "multiply"
+      ? value * operation.factor
+      : value + operation.amount;
+  // 15 significant digits is as many as a double always carries exactly, so
+  // this keeps every real digit and drops the binary noise in, say,
+  // 0.1 + 0.2, rather than writing 0.30000000000000004 into the game.
+  return Number(exact.toPrecision(15));
 }
 
 /** `value` under `rounding`. A non-positive step leaves `value` alone rather
@@ -84,8 +91,11 @@ export function applyBatchRounding(
 }
 
 /** The field a unit holds one of `keys` under, checking its override before
- *  its def, case-insensitively against the def the way `searchQuery.ts`'s own
- *  field lookup does. `undefined` when neither holds any of `keys`.
+ *  its def, case-insensitively against both the way `searchQuery.ts`'s own
+ *  field lookup does. An override is written under the def's own spelling
+ *  (`maxdamage` in a game that declares it so), so an exact match against
+ *  `keys` alone would miss it and read the game's value underneath instead.
+ *  `undefined` when neither holds any of `keys`.
  *
  *  Exported for `randomMod.ts` (issue #1318), which resolves a unit's numeric
  *  fields the same way a batch edit does rather than keeping a second lookup. */
@@ -95,17 +105,27 @@ export function findField(
   keys: readonly string[],
 ): { path: string; raw: unknown } | undefined {
   for (const key of keys) {
-    if (unitOverrides && Object.hasOwn(unitOverrides, key)) {
-      return { path: key, raw: unitOverrides[key] };
-    }
+    const found = keyIn(unitOverrides, key);
+    if (found !== undefined)
+      return { path: found, raw: unitOverrides?.[found] };
   }
   for (const key of keys) {
-    const lower = key.toLowerCase();
-    const found =
-      def && Object.keys(def).find((k) => k.toLowerCase() === lower);
+    const found = keyIn(def, key);
     if (found !== undefined) return { path: found, raw: def?.[found] };
   }
   return undefined;
+}
+
+/** `key` as `table` spells it: the exact key when present, otherwise the first
+ *  one matching it case-insensitively. */
+function keyIn(
+  table: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  if (!table) return undefined;
+  if (Object.hasOwn(table, key)) return key;
+  const lower = key.toLowerCase();
+  return Object.keys(table).find((k) => k.toLowerCase() === lower);
 }
 
 /** Exported alongside {@link findField} for the same reason. */

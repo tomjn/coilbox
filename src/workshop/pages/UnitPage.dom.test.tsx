@@ -595,6 +595,18 @@ describe("UnitPage", () => {
     });
   });
 
+  it("offers Reference, not a Batch edit drawer, for changing many units", () => {
+    // Issue #3113 moved batch editing into the Reference table.
+    openNew(GAME.name);
+    type(healthBox(), "5000");
+    cleanup();
+
+    openSaved(GAME.name);
+    expect(screen.queryByRole("button", { name: /Batch edit/ })).toBeNull();
+    const reference = screen.getByRole("link", { name: /Reference/ });
+    expect(reference.getAttribute("href")).toMatch(/\/reference$/);
+  });
+
   /**
    * The change ledger's own link back to a field (issue #2653): `?field=`
    * scrolls to the row rather than leaving somebody to search the field
