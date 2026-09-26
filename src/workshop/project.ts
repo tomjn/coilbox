@@ -98,6 +98,11 @@ import type {
   TierWeights,
 } from "./randomMod";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
+import {
+  parseRelativeEdits,
+  type RelativeEdits,
+  withoutStaleRelative,
+} from "./relativeEdits";
 import type { TextField, UnitTextEdits } from "./unitText";
 import { BASE_LANGUAGE, textEditCount } from "./unitText";
 import {
@@ -152,6 +157,12 @@ export interface GameEdits {
   /** Named, nestable sets of units (issue #2654), by id. Optional for the
    *  same reason `weapons` is. See `collections.ts`. */
   collections?: Collections;
+  /** Changes kept as a rule against the game's value, so they follow the
+   *  game when it changes (issue #3174), by unit and field path. The number
+   *  each rule works out to is still in `overrides`, which is all the
+   *  compiler and an older build read. Optional and additive, so the kind
+   *  version stays where it is. See `relativeEdits.ts`. */
+  relative?: RelativeEdits;
 }
 
 /**
@@ -172,6 +183,7 @@ export const EMPTY_EDITS: GameEdits = {
   armorClasses: EMPTY_ARMOR_CLASSES,
   explosionGenerators: {},
   collections: {},
+  relative: {},
 };
 
 /** Whether a slot holds anything at all, whichever of the five it is. */
@@ -196,7 +208,8 @@ export function isEmptyEdits(edits: GameEdits): boolean {
     // `moves` counts, the same way `ArmorClasses::is_empty` reads it in Rust.
     Object.keys(edits.armorClasses?.moves ?? {}).length === 0 &&
     slotIsEmpty(edits.explosionGenerators) &&
-    slotIsEmpty(edits.collections)
+    slotIsEmpty(edits.collections) &&
+    slotIsEmpty(edits.relative)
   );
 }
 
@@ -222,7 +235,11 @@ export function editSlot<K extends keyof GameEdits>(
 ): GameEdits {
   const next = update(edits[slot]);
   if (next === edits[slot]) return edits;
-  return { ...edits, [slot]: next };
+  const after = { ...edits, [slot]: next };
+  // A number written without its rule is a typed number, which makes the
+  // field fixed again (issue #3174). The one place a store reaches into
+  // another, because a rule is only ever about a number in this one.
+  return slot === "overrides" ? withoutStaleRelative(edits, after) : after;
 }
 
 /** How much a project changes, in the four numbers the page counts. */
@@ -249,9 +266,22 @@ export interface EditCounts {
   collections: number;
 }
 
+/** Rules whose result equals the game's value, so `overrides` holds no key
+ *  for them. Still a change the author made (issue #3174). */
+function rulesWithoutNumber(edits: GameEdits): number {
+  let n = 0;
+  for (const [unit, fields] of Object.entries(edits.relative ?? {}))
+    for (const path of Object.keys(fields))
+      if (!Object.hasOwn(edits.overrides[unit] ?? {}, path)) n += 1;
+  return n;
+}
+
 export function editCounts(edits: GameEdits): EditCounts {
   return {
-    fields: overrideCount(edits.overrides) + textEditCount(edits.text),
+    fields:
+      overrideCount(edits.overrides) +
+      textEditCount(edits.text) +
+      rulesWithoutNumber(edits),
     added: Object.keys(edits.clones).length,
     menuOps: buildMenuOpCount(edits.menus),
     off: edits.disabled.length,
@@ -1173,6 +1203,7 @@ export function parseGameEdits(value: unknown): GameEdits {
     armorClasses: parseArmorClasses(source.armorClasses),
     explosionGenerators: parseExplosionGenerators(source.explosionGenerators),
     collections: parseCollections(source.collections),
+    relative: parseRelativeEdits(source.relative),
   };
 }
 

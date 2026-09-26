@@ -20,6 +20,7 @@ import {
 import { setOverride } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
 import { EMPTY_EDITS } from "./project";
+import { setRelativeEdit } from "./relativeEdits";
 import { setUnitText } from "./unitText";
 import {
   addLibraryWeapon,
@@ -207,18 +208,28 @@ function buildEdits(): GameEdits {
   );
   collections = setCollectionMembership(collections, "bots", "armcom", true);
 
-  return {
-    overrides,
-    clones,
-    menus,
-    text,
-    disabled,
-    weapons,
-    equipped,
-    armorClasses,
-    explosionGenerators,
-    collections,
-  };
+  // armflash's build time kept as "+12.5%" of the game's 800 (issue
+  // #3174). The rule's number is the 900 already in `overrides`, so the
+  // compiled output does not move, and `model.rs` has no field for the rule:
+  // this proves it still parses a project that holds one.
+  return setRelativeEdit(
+    {
+      overrides,
+      clones,
+      menus,
+      text,
+      disabled,
+      weapons,
+      equipped,
+      armorClasses,
+      explosionGenerators,
+      collections,
+    },
+    "armflash",
+    "buildTime",
+    { factor: 1.125, offset: 0, rounding: { kind: "integer" } },
+    800,
+  );
 }
 
 /**
