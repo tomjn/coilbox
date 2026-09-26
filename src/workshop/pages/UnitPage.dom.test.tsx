@@ -1015,6 +1015,16 @@ describe("UnitPage", () => {
       expect(screen.queryByText(/^\d+ changes?$/)).toBeNull();
     });
 
+    // Issue #3163: the rounded left accent bar that used to mark an
+    // overridden text field is now the same "edited" marker as everywhere
+    // else the app marks a changed field.
+    it("marks an overridden text field edited", () => {
+      bar();
+      expect(screen.queryByText("edited")).toBeNull();
+      type(descriptionBox(), "Shoots things that fly");
+      expect(screen.getByText("edited")).toBeTruthy();
+    });
+
     it("records nothing when the game's own name is typed back in", () => {
       bar();
       type(nameBox(), "Archangel");
@@ -3335,6 +3345,9 @@ describe("UnitPage", () => {
       );
       expect(screen.getByText("Game: 3000")).toBeTruthy();
       expect(screen.getByText("Project: 5000")).toBeTruthy();
+      // Issue #3163: the same "edited" marker the field and text rows use,
+      // in place of the change ledger's own rounded left accent bar.
+      expect(screen.getByText("edited")).toBeTruthy();
 
       fireEvent.click(screen.getByRole("button", { name: /^Revert health/ }));
       expect(

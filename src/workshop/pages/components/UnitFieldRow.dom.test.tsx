@@ -84,6 +84,42 @@ describe("a row whose label nobody wrote", () => {
   });
 });
 
+/** Issue #3163. The rounded left accent bar that used to mark a field
+ *  overridden from the game's default is now an "edited" marker instead,
+ *  which must stay readable alongside a check marker on the same row. */
+describe("a row overridden from the game's default", () => {
+  it("carries an edited marker, and none of the old accent bar classes", () => {
+    const { container } = render(
+      <UnitFieldRow
+        row={{ ...row(field({})), state: "overridden" }}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    expect(screen.getByText("edited")).toBeTruthy();
+    const rowDiv = container.querySelector("#field-someKey");
+    expect(rowDiv?.className).not.toMatch(/border-l/);
+  });
+
+  it("keeps the edited marker and a check marker both readable on one row", () => {
+    render(
+      <UnitFieldRow
+        row={{ ...row(field({})), state: "overridden" }}
+        checkMarker={{ severity: "blocker", messages: ["Out of range."] }}
+        onChange={() => {}}
+        onReset={() => {}}
+      />,
+    );
+    expect(screen.getByText("edited")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Blocker" })).toBeTruthy();
+  });
+
+  it("says nothing extra on a row still at the game's default", () => {
+    draw(field({}));
+    expect(screen.queryByText("edited")).toBeNull();
+  });
+});
+
 /** Issue #3116. A field a compatibility check found something about. */
 describe("a row a check has something to say about", () => {
   it("marks a blocker and puts the message in a tooltip", async () => {
