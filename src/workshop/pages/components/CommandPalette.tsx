@@ -34,20 +34,13 @@
 import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  Command,
+  CommandDialog,
   CommandEmpty,
   CommandGroup,
   CommandInput,
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import type { UnitOverrides } from "../../overrides";
 import {
   PROJECT_SECTIONS,
@@ -342,94 +335,84 @@ export function CommandPalette({
   };
 
   return (
-    <Dialog
+    <CommandDialog
       open={open}
       onOpenChange={(next) => {
         onOpenChange(next);
         if (!next) setQuery("");
       }}
+      title="Command palette"
+      description="Jump to a unit, a field, a section or an action"
+      // `shouldFilter={false}`: `buildResults` has already decided what
+      // matches the query, so cmdk's own fuzzy filter, which would score
+      // against each item's `value` rather than the label on screen, would
+      // only hide results a second time for the wrong reason.
+      commandProps={{ shouldFilter: false }}
     >
-      <DialogHeader className="sr-only">
-        <DialogTitle>Command palette</DialogTitle>
-        <DialogDescription>
-          Jump to a unit, a field, a section or an action
-        </DialogDescription>
-      </DialogHeader>
-      <DialogContent className="overflow-hidden p-0">
-        {/* `shouldFilter={false}`: `buildResults` has already decided what
-          matches the query, so cmdk's own fuzzy filter, which would score
-          against each item's `value` rather than the label on screen, would
-          only hide results a second time for the wrong reason. */}
-        <Command
-          shouldFilter={false}
-          className="**:data-[slot=command-input-wrapper]:h-12 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]]:px-2 [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5"
-        >
-          <CommandInput
-            placeholder="Jump to a unit, a field ('zeus range'), a section or an action..."
-            value={query}
-            onValueChange={setQuery}
-          />
-          <CommandList>
-            <CommandEmpty>Nothing found.</CommandEmpty>
-            {fields.length > 0 && (
-              <CommandGroup heading="Fields">
-                {fields.map((r) => (
-                  <CommandItem
-                    key={`f:${r.unitKey}:${r.hit.path}`}
-                    value={`f:${r.unitKey}:${r.hit.path}`}
-                    onSelect={() => runResult(r)}
-                  >
-                    {r.unitLabel}
-                    <span className="text-muted-foreground">
-                      {" "}
-                      &rsaquo; {r.hit.label}
-                    </span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {unitResults.length > 0 && (
-              <CommandGroup heading="Units">
-                {unitResults.map((r) => (
-                  <CommandItem
-                    key={`u:${r.key}`}
-                    value={`u:${r.key}`}
-                    onSelect={() => runResult(r)}
-                  >
-                    {r.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {sections.length > 0 && (
-              <CommandGroup heading="Sections">
-                {sections.map((r) => (
-                  <CommandItem
-                    key={`s:${r.id}`}
-                    value={`s:${r.id}`}
-                    onSelect={() => runResult(r)}
-                  >
-                    {r.label}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-            {actions.length > 0 && (
-              <CommandGroup heading="Actions">
-                {actions.map((r) => (
-                  <CommandItem
-                    key={r.kind}
-                    value={r.kind}
-                    onSelect={() => runResult(r)}
-                  >
-                    {r.kind === "reference" ? "Reference" : "Test"}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            )}
-          </CommandList>
-        </Command>
-      </DialogContent>
-    </Dialog>
+      <CommandInput
+        placeholder="Jump to a unit, a field ('zeus range'), a section or an action..."
+        value={query}
+        onValueChange={setQuery}
+      />
+      <CommandList>
+        <CommandEmpty>Nothing found.</CommandEmpty>
+        {fields.length > 0 && (
+          <CommandGroup heading="Fields">
+            {fields.map((r) => (
+              <CommandItem
+                key={`f:${r.unitKey}:${r.hit.path}`}
+                value={`f:${r.unitKey}:${r.hit.path}`}
+                onSelect={() => runResult(r)}
+              >
+                {r.unitLabel}
+                <span className="text-muted-foreground">
+                  {" "}
+                  &rsaquo; {r.hit.label}
+                </span>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {unitResults.length > 0 && (
+          <CommandGroup heading="Units">
+            {unitResults.map((r) => (
+              <CommandItem
+                key={`u:${r.key}`}
+                value={`u:${r.key}`}
+                onSelect={() => runResult(r)}
+              >
+                {r.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {sections.length > 0 && (
+          <CommandGroup heading="Sections">
+            {sections.map((r) => (
+              <CommandItem
+                key={`s:${r.id}`}
+                value={`s:${r.id}`}
+                onSelect={() => runResult(r)}
+              >
+                {r.label}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+        {actions.length > 0 && (
+          <CommandGroup heading="Actions">
+            {actions.map((r) => (
+              <CommandItem
+                key={r.kind}
+                value={r.kind}
+                onSelect={() => runResult(r)}
+              >
+                {r.kind === "reference" ? "Reference" : "Test"}
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        )}
+      </CommandList>
+    </CommandDialog>
   );
 }
