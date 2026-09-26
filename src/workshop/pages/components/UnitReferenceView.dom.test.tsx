@@ -11,11 +11,19 @@ import {
   screen,
   within,
 } from "@testing-library/react";
+import type { ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 import { type UnitReferenceRow, unitReferenceRow } from "../../unitReference";
 import { UnitReferenceView } from "./UnitReferenceView";
 
 afterEach(cleanup);
+
+// The scatter plot (issue #3115) navigates a dot's click with `useNavigate`,
+// which needs a router in context even when a test never clicks a dot.
+function renderView(ui: ReactElement) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 function rows(): UnitReferenceRow[] {
   return [
@@ -48,7 +56,13 @@ function rows(): UnitReferenceRow[] {
 
 describe("UnitReferenceView", () => {
   it("lists every unit and searches by name", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     expect(screen.getByText("Tank")).toBeTruthy();
     expect(screen.getByText("Commander")).toBeTruthy();
 
@@ -60,7 +74,13 @@ describe("UnitReferenceView", () => {
   });
 
   it("filters by a stat comparison", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     fireEvent.change(screen.getByPlaceholderText(/Search units/), {
       target: { value: "hp > 2000" },
     });
@@ -69,7 +89,13 @@ describe("UnitReferenceView", () => {
   });
 
   it("selects two units and compares only the fields where they differ", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     fireEvent.click(screen.getByLabelText("Select Tank to compare"));
     fireEvent.click(screen.getByLabelText("Select Commander to compare"));
 
@@ -85,7 +111,13 @@ describe("UnitReferenceView", () => {
   });
 
   it("disables Compare with fewer than two selected", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     fireEvent.click(screen.getByLabelText("Select Tank to compare"));
     expect(
       (screen.getByRole("button", { name: "Compare" }) as HTMLButtonElement)
@@ -96,7 +128,13 @@ describe("UnitReferenceView", () => {
 
 describe("UnitReferenceTable sorting", () => {
   it("sorts by a numeric column on header click", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     fireEvent.click(screen.getByRole("button", { name: /Health/ }));
     const table = screen.getAllByRole("table")[0];
     const bodyRows = within(table).getAllByRole("row").slice(1);
@@ -107,7 +145,13 @@ describe("UnitReferenceTable sorting", () => {
 
 describe("UnitReferenceTable rename (issue #3110)", () => {
   it("calls the alpha damage column volley damage", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     expect(screen.getByRole("button", { name: /Volley damage/ })).toBeTruthy();
     expect(screen.queryByText(/Alpha damage/)).toBeNull();
   });
@@ -117,15 +161,22 @@ describe("UnitReferenceTable faction column and filter (issue #3110)", () => {
   const factionOf = (key: string) => (key === "armtank" ? "Arm" : "Core");
 
   it("is absent with no factionOf", () => {
-    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
     expect(screen.queryByText("Faction")).toBeNull();
   });
 
   it("shows each row's faction and a filter beside the search box", () => {
-    render(
+    renderView(
       <UnitReferenceView
         rows={rows()}
         renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
         factionOf={factionOf}
       />,
     );

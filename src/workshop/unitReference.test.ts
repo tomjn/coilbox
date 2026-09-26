@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  ALL_FACTIONS,
   differingColumns,
+  filterReferenceRows,
   formatReferenceValue,
   REFERENCE_COLUMNS,
   sortReferenceRows,
@@ -192,4 +194,52 @@ it("every column resolves without throwing on a row with nothing", () => {
   const row = unitReferenceRow("empty", "Empty", {}, {});
   for (const column of REFERENCE_COLUMNS)
     expect(() => column.value(row)).not.toThrow();
+});
+
+describe("filterReferenceRows", () => {
+  function rows(): UnitReferenceRow[] {
+    return [
+      unitReferenceRow("armtank", "Tank", { health: 1000, metalCost: 200 }, {}),
+      unitReferenceRow(
+        "corcom",
+        "Commander",
+        { health: 3000, metalCost: 1000 },
+        {},
+      ),
+    ];
+  }
+  const factionOf = (key: string) => (key === "armtank" ? "Arm" : "Core");
+
+  it("matches every row with an empty query and no faction chosen", () => {
+    const result = filterReferenceRows(rows(), "", ALL_FACTIONS);
+    expect(result.ok).toBe(true);
+    expect(result.rows.map((r) => r.key)).toEqual(["armtank", "corcom"]);
+  });
+
+  it("filters by a stat comparison, the same query the table reads", () => {
+    const result = filterReferenceRows(rows(), "hp > 2000", ALL_FACTIONS);
+    expect(result.ok).toBe(true);
+    expect(result.rows.map((r) => r.key)).toEqual(["corcom"]);
+  });
+
+  it("reports a bad query rather than matching everything or nothing", () => {
+    const result = filterReferenceRows(rows(), "hp >", ALL_FACTIONS);
+    expect(result.ok).toBe(false);
+    expect(result.rows).toEqual([]);
+  });
+
+  it("filters by faction when given a factionOf", () => {
+    const result = filterReferenceRows(rows(), "", "Core", factionOf);
+    expect(result.rows.map((r) => r.key)).toEqual(["corcom"]);
+  });
+
+  it("ignores the faction filter when there is no factionOf to ask", () => {
+    const result = filterReferenceRows(rows(), "", "Core");
+    expect(result.rows.map((r) => r.key)).toEqual(["armtank", "corcom"]);
+  });
+
+  it("combines the query and the faction filter", () => {
+    const result = filterReferenceRows(rows(), "hp > 2000", "Arm", factionOf);
+    expect(result.rows).toEqual([]);
+  });
 });

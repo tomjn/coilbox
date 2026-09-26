@@ -120,6 +120,24 @@ export default function ReferencePage() {
     );
   }, [units, overrides, defs, nameOf, library, equipped]);
 
+  // The game's own unedited row for a unit (issue #3115's scatter plot: the
+  // faint "game position" dot), read the same way `UnitReferencePage.tsx`
+  // does outside any project, off `gameUnits` rather than `units` so a
+  // clone this project added (which the game has no row for at all) gets no
+  // ghost dot either.
+  const baselineRows = useMemo(() => {
+    if (!defs) return [];
+    return unitReferenceRows(gameUnits, defs.weaponDefs, nameOf);
+  }, [gameUnits, defs, nameOf]);
+  const baselineByKey = useMemo(
+    () => new Map(baselineRows.map((row) => [row.key, row])),
+    [baselineRows],
+  );
+  const baselineOf = useCallback(
+    (key: string) => baselineByKey.get(key),
+    [baselineByKey],
+  );
+
   // Which faction reaches each unit, the same walk `UnitPage.tsx`'s own list
   // uses to tell apart two rows that share a name (issue #3110): a game's own
   // dataset, with the project's copies stood in among it, so a unit this
@@ -251,6 +269,8 @@ export default function ReferencePage() {
             {row.name}
           </Link>
         )}
+        unitHref={(row) => projectPath(project.id, row.key)}
+        baselineOf={baselineOf}
         picOf={picOf}
         picsPending={picsPending}
         factionOf={factionOf}

@@ -8,11 +8,15 @@
  * Selecting two or more rows is how the comparison view (issue #1316's other
  * half) picks its units: a checkbox column here, read by the page that owns
  * `selected` and renders `UnitCompareDrawer` off it.
+ *
+ * The search box and faction filter live in `UnitReferenceView` (issue
+ * #3115), not here: the scatter plot it now draws beside this table reads
+ * the same query and faction, so one is the filter both read rather than two
+ * that could drift apart. This table receives the already-filtered rows and
+ * only adds its own sort.
  */
-import { cn, Input } from "@picoframe/frame";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { type ReactNode, useLayoutEffect, useMemo, useState } from "react";
-import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
@@ -31,7 +35,6 @@ import {
 import type { UnitDisplay } from "@/content/bindings";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { visibleRowWindow } from "@/lib/rowVirtualize";
-import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
 import {
   formatReferenceValue,
   REFERENCE_COLUMNS,
@@ -40,11 +43,6 @@ import {
   sortReferenceRows,
   type UnitReferenceRow,
 } from "../../unitReference";
-
-/** A faction filter's sentinel "no filter" value. Not a real faction's name,
- *  since a game's side names are read straight off the game rather than
- *  chosen by this page. */
-const ALL_FACTIONS = "__all__";
 
 /** Pinned by an inline style on every row, the same belt-and-braces reason
  *  `UnitList.tsx`'s own `ROW_HEIGHT` gives. */
@@ -55,6 +53,7 @@ const LEADING_COLUMNS = 2;
 
 export function UnitReferenceTable({
   rows,
+  emptyMessage,
   selected,
   onToggle,
   renderName,
@@ -62,7 +61,12 @@ export function UnitReferenceTable({
   picsPending = false,
   factionOf,
 }: {
+  /** Already filtered by `UnitReferenceView`'s search box and faction
+   *  filter: this table only sorts and windows it. */
   rows: UnitReferenceRow[];
+  /** What the empty table body says, decided by `UnitReferenceView` from
+   *  which filter is active. */
+  emptyMessage: string;
   selected: ReadonlySet<string>;
   onToggle: (key: string) => void;
   /** How to render a row's name cell: a plain span, or a link to the unit's
@@ -82,8 +86,6 @@ export function UnitReferenceTable({
    *  answer from. */
   factionOf?: (key: string) => string | undefined;
 }) {
-  const [query, setQuery] = useState("");
-  const [factionFilter, setFactionFilter] = useState(ALL_FACTIONS);
   const [sort, setSort] = useState<SortState>({
     columnId: "name",
     direction: "asc",
@@ -102,45 +104,7 @@ export function UnitReferenceTable({
     return () => observer.disconnect();
   }, [scroller]);
 
-  const needle = query.trim();
-  const parsedQuery = useMemo(() => parseUnitQuery(needle), [needle]);
-  const filtered = useMemo(() => {
-    if (!parsedQuery.ok) return [];
-    return rows.filter((row) =>
-      evaluateUnitQuery(parsedQuery.query, {
-        key: row.key,
-        name: row.name,
-        def: row.def,
-        // Already computed for this row (issue #3074): no extra resolution
-        // to memoise, since `rows` itself is.
-        derived: () => row.derived,
-      }),
-    );
-  }, [rows, parsedQuery]);
-
-  // Every faction the rows answer for, in alphabetical order, so the filter
-  // beside the search box only ever offers a faction that is actually on the
-  // table (issue #3110). Absent entirely, alongside the column and the filter
-  // it feeds, when the caller has no `factionOf` to ask.
-  const factions = useMemo(() => {
-    if (!factionOf) return [];
-    const seen = new Set<string>();
-    for (const row of rows) {
-      const faction = factionOf(row.key);
-      if (faction) seen.add(faction);
-    }
-    return [...seen].sort((a, b) => a.localeCompare(b));
-  }, [rows, factionOf]);
-
-  const byFaction = useMemo(() => {
-    if (!factionOf || factionFilter === ALL_FACTIONS) return filtered;
-    return filtered.filter((row) => factionOf(row.key) === factionFilter);
-  }, [filtered, factionOf, factionFilter]);
-
-  const sorted = useMemo(
-    () => sortReferenceRows(byFaction, sort),
-    [byFaction, sort],
-  );
+  const sorted = useMemo(() => sortReferenceRows(rows, sort), [rows, sort]);
 
   const { start, end } = visibleRowWindow(
     scrollTop,
@@ -196,43 +160,6 @@ export function UnitReferenceTable({
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-3">
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search units… (e.g. hp > 3000)"
-          aria-label="Search units"
-          className="h-9 max-w-sm"
-        />
-        {factions.length > 0 && (
-          <OptionSelect
-            value={factionFilter}
-            onValueChange={setFactionFilter}
-            ariaLabel="Filter by faction"
-            className="h-9 w-auto"
-            options={[
-              { value: ALL_FACTIONS, label: "All factions" },
-              ...factions.map((faction) => ({
-                value: faction,
-                label: faction,
-              })),
-            ]}
-          />
-        )}
-        <p
-          className={cn(
-            "text-xs",
-            parsedQuery.ok ? "text-muted-foreground" : "text-destructive",
-          )}
-        >
-          {!parsedQuery.ok
-            ? parsedQuery.error
-            : needle || factionFilter !== ALL_FACTIONS
-              ? `${sorted.length} of ${rows.length} units`
-              : `${rows.length} unit${rows.length === 1 ? "" : "s"}`}
-        </p>
-      </div>
       <div
         ref={setScroller}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
@@ -316,11 +243,7 @@ export function UnitReferenceTable({
                   colSpan={totalColumns}
                   className="text-center text-sm text-muted-foreground"
                 >
-                  {needle
-                    ? `No unit matches "${needle}".`
-                    : factionFilter !== ALL_FACTIONS
-                      ? "No unit in this faction."
-                      : "No units."}
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}
