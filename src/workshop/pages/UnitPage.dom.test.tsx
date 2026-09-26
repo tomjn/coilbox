@@ -3856,6 +3856,33 @@ describe("UnitPage", () => {
       vi.useRealTimers();
     });
 
+    /** An icon button beside undo and redo (issue #3100), not a labelled one,
+     *  so its accessible name and its badge count are the only way to tell
+     *  there is anything saved. */
+    it("names itself Checkpoints with no count until one is saved, then carries the count", async () => {
+      openNew(GAME.name);
+      type(healthBox(), "5000");
+
+      const button = screen.getByRole("button", { name: "Checkpoints" });
+      expect(within(button).queryByText("1")).toBeNull();
+
+      fireEvent.click(button);
+      fireEvent.change(
+        await screen.findByPlaceholderText("Before the health rebalance"),
+        { target: { value: "Health at 5000" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: /Save checkpoint/ }));
+
+      // Close the drawer: while it is open, Radix marks the rest of the page
+      // aria-hidden, which would hide the header button from this query too.
+      fireEvent.keyDown(document.body, { key: "Escape" });
+
+      const updated = await screen.findByRole("button", {
+        name: "Checkpoints, 1 saved",
+      });
+      expect(within(updated).getByText("1")).toBeTruthy();
+    });
+
     it("saves a named checkpoint from the drawer and lists it", async () => {
       openNew(GAME.name);
       type(healthBox(), "5000");

@@ -97,6 +97,7 @@ import {
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -2192,27 +2193,46 @@ export default function UnitPage() {
               >
                 <Redo2 className="size-3.5" />
               </Button>
+              {/* Named, described snapshots of the whole project, restorable
+                in one action (issue #2657). Needs a project to snapshot.
+                Stays beside undo and redo rather than becoming a section
+                (issue #3111), because like them it applies to every section.
+                An icon rather than a labelled button, with the count as a
+                badge, so it keeps the header to one row (issue #3100). */}
+              {project && (
+                <TooltipProvider delayDuration={150}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCheckpointsOpen(true)}
+                        aria-label={
+                          checkpoints.length > 0
+                            ? `Checkpoints, ${checkpoints.length} saved`
+                            : "Checkpoints"
+                        }
+                        className="relative"
+                      >
+                        <History className="size-3.5" />
+                        {checkpoints.length > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="-right-1.5 -top-1.5 absolute h-4 min-w-4 justify-center px-1 text-[10px]"
+                            aria-hidden="true"
+                          >
+                            {checkpoints.length}
+                          </Badge>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Named states of the project, to go back to in one action
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </ButtonGroup>
-            {/* Named, described snapshots of the whole project, restorable
-              in one action (issue #2657). Needs a project to snapshot. Stays
-              in the header with undo and redo rather than becoming a section
-              (issue #3111), because like them it applies to every section. */}
-            {project && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCheckpointsOpen(true)}
-                title="Named states of the project, to go back to in one action"
-              >
-                <History className="mr-1 size-3.5" />
-                Checkpoints
-                {checkpoints.length > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {checkpoints.length}
-                  </span>
-                )}
-              </Button>
-            )}
             {/* Reopens the randomiser drawer against the recipe this project
               was made from, to change the seed or a rule and replay it
               (issue #3090). Only offered when there is a recipe to reopen: a
