@@ -236,7 +236,7 @@ describe("the Checks entry in the section bar", () => {
   });
 
   describe("the Checks page", () => {
-    it("orders its sections definitions, compatibility, routes, post-processing, preflight, then the change ledger", async () => {
+    it("opens on Needs attention, then game definitions, compatibility, routes, post-processing, preflight, then the change ledger", async () => {
       renderChecks({
         diagnosticErrors: ["could not read units/armcom.lua"],
       });
@@ -244,17 +244,45 @@ describe("the Checks entry in the section bar", () => {
       const headings = (
         await screen.findAllByRole("heading", { level: 3 })
       ).map((h) => h.textContent);
+      // "Delivery routes1" is the heading plus its count, a visual-only
+      // sibling span the trigger button carries (`aria-hidden`, so it does
+      // not touch the accessible name, but it is still part of `textContent`).
       expect(headings).toEqual([
+        "Needs attention",
         "Game definitions",
         "Still fits Balanced Annihilation V15.9.8",
-        "Delivery routes",
+        "Delivery routes1",
         "Post-processing",
         "Preflight",
         "Change ledger",
       ]);
     });
 
-    it("lists an armour class finding under its own heading, without opening the unit it is about", () => {
+    it("puts the blockers and review items first, pulled together from every check", async () => {
+      preflightResponse = {
+        blockers: ["supercom is defined by 2 copies (first, second)."],
+        review: [],
+        passes: [],
+      };
+      renderChecks({ project });
+      await screen.findByRole("link", { name: "Checks, 1 blocker found" });
+      const headings = await screen.findAllByRole("heading", { level: 3 });
+      expect(headings[0].textContent).toBe("Needs attention");
+      const attention = headings[0].closest("section");
+      expect(
+        attention?.textContent?.includes(
+          "supercom is defined by 2 copies (first, second).",
+        ),
+      ).toBe(true);
+    });
+
+    it("says nothing needs attention when the project is clean", () => {
+      renderChecks();
+      screen.getByRole("link", { name: "Checks, No problems found" });
+      expect(screen.getByText("Nothing here needs attention.")).toBeTruthy();
+    });
+
+    it("lists an armour class finding under Needs attention, without opening the unit it is about", () => {
       renderChecks({
         armorClassProblems: [
           {
@@ -266,8 +294,24 @@ describe("the Checks entry in the section bar", () => {
         ],
       });
       screen.getByRole("link", { name: /to review/ });
-      expect(screen.getByText("Armour classes")).toBeTruthy();
       expect(screen.getByText(/gator_laser's damage table/)).toBeTruthy();
+    });
+
+    it("links an armour class finding on a unit back to that unit", () => {
+      renderChecks({
+        project,
+        armorClassProblems: [
+          {
+            id: "armcom:gator_laser:damage",
+            message: "gator_laser's damage table names an unknown class.",
+            severity: "warning",
+          },
+        ],
+      });
+      const link = screen.getByRole("link", {
+        name: "gator_laser's damage table names an unknown class.",
+      });
+      expect(link.getAttribute("href")).toBe("/workshop/p1?unit=armcom");
     });
 
     it("puts unitsync's own lines under Game definitions", () => {
@@ -501,6 +545,11 @@ describe("the Checks entry in the section bar", () => {
         archivesWithPostFile = ["balanced_annihilation-v15.9.8.sdz"];
         renderChecks({ project });
         await screen.findByRole("link", { name: "Checks, No problems found" });
+        // Nothing to report, so the section starts collapsed to one line
+        // (issue #3106).
+        fireEvent.click(
+          screen.getByRole("button", { name: "Post-processing" }),
+        );
         expect(screen.getByText(/the mutator covers nothing of/)).toBeTruthy();
       });
 
