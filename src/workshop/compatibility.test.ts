@@ -172,7 +172,28 @@ describe("field keys nothing reads any more (issue #2758)", () => {
     });
     expect(found.detail).toContain("engine has never read somekey");
     expect(found.fix?.cost).toBe("the value you set for somekey");
-    expect(found.fix?.apply(edits).overrides).toEqual({ armcom: {} });
+    expect(found.fix?.apply(edits).overrides).toEqual({});
+  });
+
+  it("takes a change's rule away with its number (issue #3174)", () => {
+    const edits: GameEdits = {
+      ...EMPTY_EDITS,
+      overrides: { armcom: { somekey: 12 } },
+      relative: {
+        armcom: {
+          somekey: {
+            factor: 1.2,
+            offset: 0,
+            rounding: { kind: "none" },
+            base: 10,
+          },
+        },
+      },
+    };
+    const found = only(check(edits, { units: { armcom: {} } }));
+    const fixed = found.fix?.apply(edits);
+    expect(fixed?.overrides).toEqual({});
+    expect(fixed?.relative ?? {}).toEqual({});
   });
 
   it("says nothing about a key the unit's own current definition still carries", () => {
@@ -269,7 +290,7 @@ describe("field keys nothing reads any more (issue #2758)", () => {
       });
       expect(found.detail).toContain("No Lua file in Test Game names");
       expect(found.detail).toContain("deadparam");
-      expect(found.fix?.apply(edits).overrides).toEqual({ armcom: {} });
+      expect(found.fix?.apply(edits).overrides).toEqual({});
     });
   });
 });

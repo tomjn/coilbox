@@ -37,6 +37,7 @@ import type { UnitClone } from "./clones";
 import type { CarriedChange, WrittenCopy } from "./inPlace";
 import { clearOverride, type UnitOverrides } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
+import { withoutStaleRelative } from "./relativeEdits";
 
 /** What one of the edit-in-place route's three actions did. */
 export type InPlaceDone =
@@ -151,7 +152,10 @@ function settleWrite(
     return project;
   return {
     ...withoutWritten(project),
-    edits: { ...moved.edits, overrides },
+    // A rule on a field the game now carries would follow the project's own
+    // write as if it were a game update, so it goes with the number (issue
+    // #3174).
+    edits: withoutStaleRelative(project.edits, { ...moved.edits, overrides }),
     ...(Object.keys(kept).length > 0 ? { writtenInPlace: kept } : {}),
     ...(Object.keys(moved.kept).length > 0
       ? { copiesWrittenInPlace: moved.kept }

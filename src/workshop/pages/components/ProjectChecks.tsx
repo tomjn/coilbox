@@ -814,6 +814,11 @@ export type ChecksInput = {
    *  (issue #1281). Null when no project is open. Worked out by the page,
    *  which is where the game's definitions already are. */
   compatibility: CompatState | null;
+  /** Changes that follow the game, and what opening the project against it
+   *  did to each (issue #3174): a number worked out again, or kept because
+   *  the game's field went. Review items, whether or not the checksum moved,
+   *  since the page works these out on every open. See `followGame.ts`. */
+  followFindings?: CompatFinding[];
   /** A weapon's damage table naming an armour class this game does not have,
    *  across every unit the project has patched or copied and every weapon
    *  its library holds (issue #3104), so the finding is visible without
@@ -839,6 +844,7 @@ export function useProjectChecks(input: ChecksInput, reading: boolean) {
     dataDir,
     gameArchives,
     compatibility,
+    followFindings = [],
     armorClassProblems,
     diagnosticErrors,
     diagnosticsChecking,
@@ -874,6 +880,7 @@ export function useProjectChecks(input: ChecksInput, reading: boolean) {
   const review =
     (preflight.report?.review.length ?? 0) +
     (moved?.review ?? 0) +
+    followFindings.length +
     armorClassProblems.length;
   const diagnostics = diagnosticErrors.length;
   // A command that failed to answer is not a clean project, it is a question
@@ -1013,6 +1020,7 @@ function buildAttention({
   project,
   preflight,
   compatibility,
+  followFindings,
   postHook,
   primaryArchive,
   armorClassProblems,
@@ -1022,6 +1030,7 @@ function buildAttention({
   project: ModProject | undefined;
   preflight: PreflightState;
   compatibility: CompatState | null;
+  followFindings: CompatFinding[];
   postHook: PostHookCheck;
   primaryArchive: string;
   armorClassProblems: ArmorProblem[];
@@ -1040,7 +1049,7 @@ function buildAttention({
     review.push({ key: `preflight-review:${line}`, text: line });
 
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
-  for (const finding of moved?.findings ?? []) {
+  for (const finding of [...(moved?.findings ?? []), ...followFindings]) {
     const item: AttentionItem = {
       key: finding.id,
       text: finding.detail,
@@ -1108,6 +1117,7 @@ export function ChecksPanel({
     project,
     gameUnits,
     compatibility,
+    followFindings = [],
     armorClassProblems,
   } = input;
   const { preflight, changeLedger, postHook } = checks;
@@ -1117,6 +1127,7 @@ export function ChecksPanel({
     project,
     preflight,
     compatibility,
+    followFindings,
     postHook,
     primaryArchive,
     armorClassProblems,

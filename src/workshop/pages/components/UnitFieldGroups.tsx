@@ -97,6 +97,7 @@ export function UnitFieldGroups({
   inheritedLabel,
   inPlace,
   post,
+  relative,
   onChange,
   onReset,
 }: {
@@ -127,6 +128,9 @@ export function UnitFieldGroups({
   /** What the game's post files do to a row's field, when they change it
    *  (issue #3057). */
   post?: (row: FieldRow) => PostNote | undefined;
+  /** A row's change as the rule it follows the game by, such as "+15% of
+   *  280 = 322", when it has one (issue #3174). */
+  relative?: (row: FieldRow) => string | undefined;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
 }) {
@@ -215,6 +219,7 @@ export function UnitFieldGroups({
                     readOnly={group.readOnly}
                     inPlace={group.readOnly ? undefined : inPlace?.(row)}
                     post={group.readOnly ? undefined : post?.(row)}
+                    relative={relative?.(row)}
                     onChange={(value) => onChange(row, value)}
                     onReset={() => onReset(row)}
                   />

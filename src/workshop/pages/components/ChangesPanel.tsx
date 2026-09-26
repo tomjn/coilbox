@@ -33,6 +33,11 @@ import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import type { ChangeLedger } from "../../changeLedger";
 import { type UnitClones, unitIsAdded } from "../../clones";
 import { overrideValue, readPath, type UnitOverrides } from "../../overrides";
+import {
+  describeRelative,
+  type RelativeEdits,
+  relativeRuleOf,
+} from "../../relativeEdits";
 import { projectPath } from "../../routes";
 import { evaluateUnitQuery, parseUnitQuery } from "../../searchQuery";
 import { display } from "./UnitFieldRow";
@@ -50,6 +55,7 @@ export function ChangesPanel({
   picOf,
   picsPending,
   factionOf,
+  relative,
   onRevertField,
 }: {
   projectId: string | undefined;
@@ -70,6 +76,9 @@ export function ChangesPanel({
   picOf: (key: string) => UnitDisplay | undefined;
   picsPending: boolean;
   factionOf: (key: string) => string | undefined;
+  /** The project's changes that follow the game (issue #3174), so a field
+   *  with a rule shows it beside the number. */
+  relative?: RelativeEdits;
   /** Clear one field's override, through the page's own edit path so undo
    *  puts it back (issue #3112). */
   onRevertField: (unit: string, fieldPath: string) => void;
@@ -217,6 +226,7 @@ export function ChangesPanel({
                   ))}
                   {fieldChanges.map((change) => {
                     const path = change.fieldPath as string;
+                    const rule = relativeRuleOf(relative, unit, path);
                     return (
                       <li
                         key={path}
@@ -245,6 +255,11 @@ export function ChangesPanel({
                             Project:{" "}
                             {display(overrideValue(overrides, unit, path))}
                           </span>
+                          {rule && (
+                            <span title="Worked out again from the game's value whenever the game changes.">
+                              Follows the game: {describeRelative(rule)}
+                            </span>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"

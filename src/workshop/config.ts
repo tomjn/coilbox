@@ -54,6 +54,10 @@ export function useUnitDefs(
   gameArchive?: string,
 ) {
   const [defs, setDefs] = useState<UnitDefsResult | null>(null);
+  /** Which game archive `defs` was read from. For a caller that must not act
+   *  on the previous game's table in the render before the next read starts
+   *  (issue #3174). */
+  const [defsFor, setDefsFor] = useState<string | null>(null);
   const [status, setStatus] = useState<UnitDefsStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [nonce, setNonce] = useState(0);
@@ -66,6 +70,7 @@ export function useUnitDefs(
   useEffect(() => {
     if (!enginePath || !dataDir || !gameArchive) {
       setDefs(null);
+      setDefsFor(null);
       setStatus("idle");
       setError(null);
       return;
@@ -73,6 +78,7 @@ export function useUnitDefs(
     const key = cacheKey(enginePath, dataDir, gameArchive);
     if (cached?.key === key) {
       setDefs(cached.result);
+      setDefsFor(gameArchive);
       setStatus("ready");
       setError(null);
       return;
@@ -99,6 +105,7 @@ export function useUnitDefs(
           unitErrors: res.unitErrors ?? [],
           errors: res.errors ?? [],
         });
+        setDefsFor(gameArchive);
         if (Object.keys(units).length === 0 && res.errors?.length) {
           setStatus("error");
           setError(res.errors[0]);
@@ -113,6 +120,7 @@ export function useUnitDefs(
       .catch((e: unknown) => {
         if (cancelled) return;
         setDefs(null);
+        setDefsFor(null);
         setStatus("error");
         setError(e instanceof Error ? e.message : String(e));
       });
@@ -121,7 +129,14 @@ export function useUnitDefs(
     };
   }, [enginePath, dataDir, gameArchive, nonce]);
 
-  return { defs, status, error, reload, loading: status === "loading" };
+  return {
+    defs,
+    defsFor,
+    status,
+    error,
+    reload,
+    loading: status === "loading",
+  };
 }
 
 /**

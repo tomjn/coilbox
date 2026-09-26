@@ -154,6 +154,18 @@
           "armcom"
         ]
       }
+    },
+    "relative": {
+      "armflash": {
+        "buildTime": {
+          "factor": 1.125,
+          "offset": 0,
+          "rounding": {
+            "kind": "integer"
+          },
+          "base": 800
+        }
+      }
     }
   },
   "writtenInPlace": {

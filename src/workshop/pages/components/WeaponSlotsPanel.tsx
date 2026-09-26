@@ -221,6 +221,7 @@ export function WeaponSlotsPanel({
   inheritedLabel,
   inPlace,
   post,
+  relative,
   onSelect,
   onChange,
   onReset,
@@ -245,6 +246,9 @@ export function WeaponSlotsPanel({
   inPlace?: (row: FieldRow) => InPlaceField | undefined;
   /** What the game's post files do to a field of the unit's (issue #3057). */
   post?: (row: FieldRow) => PostNote | undefined;
+  /** A unit field's change as the rule it follows the game by (issue
+   *  #3174). */
+  relative?: (row: FieldRow) => string | undefined;
   onSelect: (step: string) => void;
   onChange: (row: FieldRow, value: unknown) => void;
   onReset: (row: FieldRow) => void;
@@ -451,6 +455,7 @@ export function WeaponSlotsPanel({
             }}
             inPlace={inPlace}
             post={post}
+            relative={relative}
             consumers={consumers}
             assets={assets}
             inheritedLabel={inheritedLabel}

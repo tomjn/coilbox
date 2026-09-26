@@ -2357,6 +2357,30 @@ mod tests {
             .contents
     }
 
+    /// Issue #3174. A change kept as a rule against the game's value carries
+    /// its worked-out number in `overrides`, and the compiler reads only that,
+    /// so the project compiles exactly as the same number typed in would.
+    #[test]
+    fn a_change_that_follows_the_game_compiles_as_its_number() {
+        let typed = compile(&project(json!({
+            "overrides": { "armpw": { "health": 322 } }
+        })));
+        let relative = compile(&project(json!({
+            "overrides": { "armpw": { "health": 322 } },
+            "relative": { "armpw": { "health": {
+                "factor": 1.15,
+                "offset": 0,
+                "rounding": { "kind": "integer" },
+                "base": 280
+            } } }
+        })));
+        assert_eq!(
+            serde_json::to_value(&relative).expect("serialise"),
+            serde_json::to_value(&typed).expect("serialise"),
+        );
+        assert!(typed.chunks[0].lua.contains("health = 322"));
+    }
+
     #[test]
     fn a_project_that_changes_nothing_compiles_to_nothing() {
         let out = compile(&project(json!({})));

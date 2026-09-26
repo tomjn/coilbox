@@ -31,6 +31,7 @@ import {
   rangeChangeCount,
 } from "../../rangeEdit";
 import { editableColumnIds, editableFieldKeys } from "../../referenceEdit";
+import type { RelativeEdits } from "../../relativeEdits";
 import { REFERENCE_COLUMNS, type UnitReferenceRow } from "../../unitReference";
 
 /** How many preview rows are drawn. The apply button still acts on every
@@ -69,6 +70,9 @@ export interface ReferenceEditing {
    *  unedited. */
   units: Record<string, Record<string, unknown>>;
   overrides: UnitOverrides;
+  /** The project's changes that follow the game (issue #3174), for an
+   *  edited cell's hover. */
+  relative?: RelativeEdits;
   /** Write the project's overrides as one undo step. */
   updateOverrides: (update: (current: UnitOverrides) => UnitOverrides) => void;
   /** `key`'s row as it would read with `columnId` set to `value`, so the

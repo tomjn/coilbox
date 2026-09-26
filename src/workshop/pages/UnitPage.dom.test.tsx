@@ -221,8 +221,13 @@ let mockConsumers: CustomParamsResult | null = null;
 let mockConsumersByArchive: Record<string, CustomParamsResult | null> = {};
 
 vi.mock("../config", () => ({
-  useUnitDefs: () => ({
+  useUnitDefs: (
+    _enginePath?: string,
+    _dataDir?: string,
+    gameArchive?: string,
+  ) => ({
     defs: mockDefs,
+    defsFor: gameArchive ?? null,
     status: mockStatus,
     error: null,
     reload: () => {},
@@ -291,6 +296,7 @@ const { CHECKPOINTS_KEY, AUTOSAVE_INTERVAL_MS } = await import(
   "../checkpoints"
 );
 const { resetEditHistory } = await import("../history");
+const { resetFollowGameSession } = await import("../followGame");
 const { clearInPlaceChecks } = await import("../inPlaceCheck");
 const { readStoredSetting } = await import("@/lib/storedSetting");
 
@@ -3352,6 +3358,83 @@ describe("UnitPage", () => {
    * plus `ledger.rs`'s own Rust tests own whether a trace is right. This is
    * about what a person reading this page sees and can do from it.
    */
+  /**
+   * A change that follows the game (issue #3174), opened against a game whose
+   * value has moved since the project last worked it out.
+   */
+  describe("a change that follows the game", () => {
+    const project = {
+      id: "3c1d8f2a-0000-4000-8000-0000000031f4",
+      name: "Tougher commanders",
+      gameName: GAME.name,
+      authoredChecksum: "abc",
+      edits: {
+        overrides: { armcom: { health: 2300 } },
+        clones: {},
+        menus: {},
+        text: {},
+        disabled: [],
+        relative: {
+          armcom: {
+            health: {
+              factor: 1.15,
+              offset: 0,
+              rounding: { kind: "integer" },
+              base: 2000,
+            },
+          },
+        },
+      },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const stored = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+
+    it("shows the new number and its rule, lists it in checks, and undoes in one step", async () => {
+      resetFollowGameSession();
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show({ armcom: ARMCOM }, `/workshop/${project.id}?unit=armcom`);
+
+      expect(healthBox().value).toBe("3450");
+      expect(
+        screen.getByText("Follows the game: +15% of 3000 = 3450"),
+      ).toBeTruthy();
+      expect(stored()?.edits.relative?.armcom?.health?.base).toBe(3000);
+
+      fireEvent.click(sectionLink(/^Checks/));
+      expect(
+        await screen.findByText(
+          "armcom health follows the game: game 2000 to 3000, project 2300 to 3450.",
+        ),
+      ).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(stored()?.edits.overrides).toEqual({ armcom: { health: 2300 } });
+      expect(stored()?.edits.relative?.armcom?.health?.base).toBe(2000);
+    });
+
+    it("becomes a fixed number when one is typed in, and reset clears both", () => {
+      resetFollowGameSession();
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show({ armcom: ARMCOM }, `/workshop/${project.id}?unit=armcom`);
+
+      type(healthBox(), "4000");
+      expect(stored()?.edits.overrides).toEqual({ armcom: { health: 4000 } });
+      expect(stored()?.edits.relative ?? {}).toEqual({});
+      expect(screen.queryByText(/Follows the game/)).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(stored()?.edits.relative?.armcom?.health).toBeDefined();
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: "Reset Health to the inherited value",
+        }),
+      );
+      expect(stored()?.edits.overrides).toEqual({});
+      expect(stored()?.edits.relative ?? {}).toEqual({});
+    });
+  });
+
   describe("the Changes section", () => {
     const withOverrides = (
       overrides: Record<string, Record<string, unknown>>,

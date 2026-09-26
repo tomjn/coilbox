@@ -63,6 +63,7 @@ import type { UnitClone } from "./clones";
 import { customParamKey } from "./customParamConsumers";
 import { readPath, resolvedDef, sameValue } from "./overrides";
 import type { GameEdits } from "./project";
+import { resetField, resetUnit } from "./relativeEdits";
 import {
   type EquippedWeapons,
   isDeathMount,
@@ -380,10 +381,8 @@ function overrideFindings(
         fix: {
           label: "Remove these changes",
           cost: `${plural(fields.length, "field")} you set on ${unit}`,
-          apply: (edits) => ({
-            ...edits,
-            overrides: without(edits.overrides, unit),
-          }),
+          // The unit's rules go with its numbers (issue #3174).
+          apply: (edits) => resetUnit(edits, unit),
         },
       });
       continue;
@@ -395,13 +394,7 @@ function overrideFindings(
     const removeFix = (path: string): CompatFix => ({
       label: "Remove this change",
       cost: `the value you set for ${path}`,
-      apply: (edits) => ({
-        ...edits,
-        overrides: {
-          ...edits.overrides,
-          [unit]: without(edits.overrides[unit] ?? {}, path),
-        },
-      }),
+      apply: (edits) => resetField(edits, unit, path),
     });
     for (const path of fields) {
       const parent = parentPath(path);

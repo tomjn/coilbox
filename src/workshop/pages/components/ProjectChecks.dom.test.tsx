@@ -62,7 +62,9 @@ vi.mock("@/play/config", () => ({
 }));
 
 import type { CompatFinding, CompatState } from "../../compatibility";
+import { followFinding } from "../../followGame";
 import type { ModProject } from "../../project";
+import { projectPath } from "../../routes";
 import {
   type ChecksInput,
   ChecksPanel,
@@ -555,6 +557,60 @@ describe("the Checks entry in the section bar", () => {
         renderChecks({ project, compatibility: { kind: "unknown" } });
         await screen.findByRole("link", { name: "Checks, No problems found" });
         expect(screen.getByText(/could not be checksummed/)).toBeTruthy();
+      });
+    });
+
+    /** Changes that follow the game (issue #3174): what opening the project
+     *  worked out again is a review item, linked to its field, whether or
+     *  not the checksum moved. */
+    describe("changes that follow the game", () => {
+      it("lists a number worked out again as something to review", async () => {
+        renderChecks({
+          project,
+          compatibility: { kind: "unmoved" },
+          followFindings: [
+            followFinding({
+              kind: "moved",
+              unit: "armpw",
+              path: "health",
+              gameBefore: 260,
+              gameNow: 280,
+              projectBefore: 299,
+              projectNow: 322,
+            }),
+          ],
+        });
+        expect(
+          await screen.findByRole("link", {
+            name: "Checks, 1 to review found",
+          }),
+        ).toBeTruthy();
+        const item = screen.getByRole("link", {
+          name: "armpw health follows the game: game 260 to 280, project 299 to 322.",
+        });
+        expect(item.getAttribute("href")).toBe(
+          projectPath("p1", "armpw", "health"),
+        );
+      });
+
+      it("says when the game's field went and the last number was kept", async () => {
+        renderChecks({
+          project,
+          compatibility: { kind: "unmoved" },
+          followFindings: [
+            followFinding({
+              kind: "missing",
+              unit: "armpw",
+              path: "health",
+              kept: 299,
+            }),
+          ],
+        });
+        expect(
+          await screen.findByText(
+            "The game no longer has health on armpw, so the change that followed it keeps its last number, 299.",
+          ),
+        ).toBeTruthy();
       });
     });
 

@@ -189,6 +189,7 @@ import {
 } from "../deathExplosions";
 import { unitDerivedStats } from "../derivedStats";
 import { isUnitDisabled, setUnitDisabled } from "../disabled";
+import { useFollowGame } from "../followGame";
 import { useEditHistory, useUndoRedoKeys } from "../history";
 import type { FieldProbe } from "../inPlace";
 import { useInPlaceChecks } from "../inPlaceCheck";
@@ -203,7 +204,6 @@ import {
 import { isMutatorOnly } from "../mutatorOnly";
 import {
   clearOverride,
-  clearUnit,
   readPath,
   resolvedDef,
   setOverride,
@@ -222,6 +222,12 @@ import {
   useModProjects,
 } from "../project";
 import type { RandomModRecipe } from "../randomMod";
+import {
+  describeRelative,
+  relativeRuleOf,
+  resetField as resetEditedField,
+  resetUnit,
+} from "../relativeEdits";
 import {
   type ProjectSection,
   projectPath,
@@ -565,7 +571,7 @@ export default function UnitPage() {
   // a change the ledger names always is.
   const fieldKey = params.get("field") ?? "";
 
-  const { defs, status, error, reload } = useUnitDefs(
+  const { defs, defsFor, status, error, reload } = useUnitDefs(
     selected?.enginePath,
     selected?.rootPath,
     game?.primaryArchive.name,
@@ -1776,7 +1782,7 @@ export default function UnitPage() {
   const deleteClone = () => {
     commit((current) => {
       let next = editSlot(current, "clones", (c) => removeClone(c, unitKey));
-      next = editSlot(next, "overrides", (o) => clearUnit(o, unitKey));
+      next = resetUnit(next, unitKey);
       next = editSlot(next, "equipped", (e) => unequipUnit(e, unitKey));
       next = editSlot(next, "text", (t) => clearUnitTexts(t, unitKey));
       // The mark goes with it. A unit that no longer exists cannot be switched
@@ -1888,18 +1894,36 @@ export default function UnitPage() {
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
 
+  // Changes that follow the game, worked out again against the game as it is
+  // now (issue #3174), once a finished read of this project's own game is on
+  // the page. One undo step, and what moved is listed in the checks.
+  const followFindings = useFollowGame({
+    project,
+    units:
+      defs && status === "ready" && defsFor === game?.primaryArchive.name
+        ? defs.units
+        : undefined,
+    checksum: defs?.checksum,
+    applyEdits,
+    onStep: (id, before) => history.push(id, before),
+  });
+  const markedFindings = useMemo(
+    () => [...(moved?.findings ?? []), ...followFindings],
+    [moved, followFindings],
+  );
+
   // Where a compatibility finding or an armour class problem names a unit or
   // one of its fields (issue #3116), so the unit list and the field list can
   // mark it without waiting for anybody to open the Checks page and read it
   // there. `projectArmorProblems` below is this same armour class check,
   // project-wide rather than scoped to this unit.
   const unitMarkers = useMemo(
-    () => unitCheckMarkers(moved?.findings ?? [], projectArmorProblems),
-    [moved, projectArmorProblems],
+    () => unitCheckMarkers(markedFindings, projectArmorProblems),
+    [markedFindings, projectArmorProblems],
   );
   const fieldMarkers = useMemo(
-    () => fieldCheckMarkers(moved?.findings ?? []),
-    [moved],
+    () => fieldCheckMarkers(markedFindings),
+    [markedFindings],
   );
   const unitFieldMarkers = useMemo(
     () => fieldMarkersForUnit(fieldMarkers, unitKey),
@@ -1923,6 +1947,7 @@ export default function UnitPage() {
     project: checkable ? project : undefined,
     gameUnits,
     compatibility,
+    followFindings,
     armorClassProblems: projectArmorProblems,
   };
   const checks = useProjectChecks(checksInput, section === "checks");
@@ -1941,8 +1966,16 @@ export default function UnitPage() {
     updateOverrides((o) =>
       setOverride(o, unitKey, row.path, value, row.inherited),
     );
+  /** A field's rule, as the row shows it beside the number (issue #3174). */
+  const relativeOf = (row: FieldRow) => {
+    const rule = relativeRuleOf(edits.relative, unitKey, row.path);
+    return rule && describeRelative(rule);
+  };
+  // Through `resetField` rather than `clearOverride`, so a change that
+  // follows the game loses its rule too, including one whose number equals
+  // the game's and so has no override key to clear (issue #3174).
   const resetField = (row: FieldRow) =>
-    updateOverrides((o) => clearOverride(o, unitKey, row.path));
+    commit((current) => resetEditedField(current, unitKey, row.path));
   /**
    * What copying a slot's weapon into the library copies (issue #2640): the
    * definition as the page shows it, with the project's own changes to it,
@@ -2694,8 +2727,9 @@ export default function UnitPage() {
             picOf={picOf}
             picsPending={picsPending}
             factionOf={factionOf}
+            relative={edits.relative}
             onRevertField={(unit, path) =>
-              updateOverrides((o) => clearOverride(o, unit, path))
+              commit((current) => resetEditedField(current, unit, path))
             }
           />
         </div>
@@ -2857,9 +2891,7 @@ export default function UnitPage() {
                           commit((current) =>
                             editSlot(
                               editSlot(
-                                editSlot(current, "overrides", (o) =>
-                                  clearUnit(o, unitKey),
-                                ),
+                                resetUnit(current, unitKey),
                                 "text",
                                 (t) => clearUnitTexts(t, unitKey),
                               ),
@@ -2998,6 +3030,7 @@ export default function UnitPage() {
                     inheritedLabel={inheritedLabel}
                     inPlace={inPlaceDir ? inPlaceOf : undefined}
                     post={unitPostOf}
+                    relative={relativeOf}
                     onSelect={(step) =>
                       select({
                         tab: "weapons",
@@ -3158,6 +3191,7 @@ export default function UnitPage() {
                     checkMarkers={unitFieldMarkers}
                     inheritedLabel={inheritedLabel}
                     post={unitPostOf}
+                    relative={relativeOf}
                     onChange={changeField}
                     onReset={resetField}
                   />
