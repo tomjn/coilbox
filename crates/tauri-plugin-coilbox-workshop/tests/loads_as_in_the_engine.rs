@@ -175,6 +175,7 @@ fn a_typed_crater_multiplier_loads_as_typed_in_the_engine() {
                 path: vec!["cratermult".into()],
                 expect: 0.5,
             }],
+            ..Default::default()
         }])
         .expect("a load");
         assert_eq!(back[0].reads[0].value, Some(0.5), "{route}");

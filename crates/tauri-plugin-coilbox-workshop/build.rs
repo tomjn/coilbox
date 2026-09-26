@@ -19,6 +19,7 @@ const COMMANDS: &[&str] = &[
     "workshop_in_place_diffs",
     "workshop_settle_typed_values",
     "workshop_settle_typed_values_in_place",
+    "workshop_settle_typed_values_tweaks",
 ];
 
 fn main() {

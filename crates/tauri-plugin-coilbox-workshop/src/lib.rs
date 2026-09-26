@@ -109,10 +109,15 @@ fn envelope<T: Serialize>(value: &T) -> CliResult {
     }
 }
 
-/// Compile a saved project into the Lua a game reads.
+/// Compile a saved project into the Lua a game reads. `written` is what a
+/// settle worked out for the route the result is for (issue #3092), which the
+/// local tweak slot launch needs because it writes `barTweakdefs` itself.
 #[tauri::command]
-fn workshop_compile(project: ModProject) -> CliResult {
-    envelope(&compile(&project))
+fn workshop_compile(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
+    envelope(&loads_as::compile_written(
+        &project,
+        &written.unwrap_or_default(),
+    ))
 }
 
 /// Compile a saved project and check the result before it ever leaves the
@@ -236,8 +241,12 @@ fn workshop_package_mutator(
 /// place, whether too big for any slot or simply out of slots, is not a
 /// refusal: the caller decides what to do with a partial pack, since some of
 /// the project reaching a lobby is better than none of it silently vanishing.
+///
+/// `written` is what `workshop_settle_typed_values_tweaks` worked out for the
+/// numbered slots (issue #3092), as `workshop_test_mutator` takes it.
 #[tauri::command]
-fn workshop_pack_bar_slots(project: ModProject) -> CliResult {
+fn workshop_pack_bar_slots(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
+    let project = loads_as::with_written(&project, &written.unwrap_or_default());
     // A numbered slot is still a tweak slot: it carries a field that names a
     // generator, never the effects/<key>.lua file the name resolves to
     // (`compile.rs`'s own note on `bar_tweakdefs`). Refused outright, the
@@ -311,6 +320,35 @@ struct ProbeOutput {
     errors: Vec<String>,
 }
 
+/// The unitsync worker's `--defs-probe` mode over the game at `archive`, as
+/// `loads_as`'s loader.
+fn worker_loader<'a>(
+    engine_path: &'a str,
+    data_dir: &'a str,
+    archive: &'a str,
+) -> impl FnMut(&[loads_as::ProbeRun]) -> Result<Vec<loads_as::ProbeResult>, String> + 'a {
+    move |runs: &[loads_as::ProbeRun]| {
+        let input = serde_json::to_string(&serde_json::json!({ "runs": runs }))
+            .map_err(|e| format!("could not write the probe: {e}"))?;
+        let out = tauri_plugin_coilbox_unitsync::defs_probe_blocking(
+            engine_path,
+            data_dir,
+            archive,
+            &input,
+        )?;
+        let out: ProbeOutput = serde_json::from_str(&out)
+            .map_err(|e| format!("could not read the probe's answer: {e}"))?;
+        if out.runs.len() != runs.len() {
+            return Err(if out.errors.is_empty() {
+                "the game could not be loaded".to_string()
+            } else {
+                out.errors.join("; ")
+            });
+        }
+        Ok(out.runs)
+    }
+}
+
 /// Work out, for every number a project typed, a value that the game at
 /// `archive` loads as that number on the mutator route, proven by loading the
 /// game with the compiled mutator on top (issue #3059). Loads the game at
@@ -325,26 +363,7 @@ async fn workshop_settle_typed_values(
 ) -> CliResult {
     blocking("settle", move || {
         let start = std::time::Instant::now();
-        let mut load = |runs: &[loads_as::ProbeRun]| {
-            let input = serde_json::to_string(&serde_json::json!({ "runs": runs }))
-                .map_err(|e| format!("could not write the probe: {e}"))?;
-            let out = tauri_plugin_coilbox_unitsync::defs_probe_blocking(
-                &engine_path,
-                &data_dir,
-                &archive,
-                &input,
-            )?;
-            let out: ProbeOutput = serde_json::from_str(&out)
-                .map_err(|e| format!("could not read the probe's answer: {e}"))?;
-            if out.runs.len() != runs.len() {
-                return Err(if out.errors.is_empty() {
-                    "the game could not be loaded".to_string()
-                } else {
-                    out.errors.join("; ")
-                });
-            }
-            Ok(out.runs)
-        };
+        let mut load = worker_loader(&engine_path, &data_dir, &archive);
         let settled = loads_as::settle(&project, loads_as::Precision::F32, &mut load)?;
         Ok(SettledResult {
             settled,
@@ -373,33 +392,14 @@ async fn workshop_settle_typed_values_in_place(
     let sources = sources.unwrap_or_default();
     blocking("settle in place", move || {
         let start = std::time::Instant::now();
-        let mut load = |runs: &[loads_as::ProbeRun]| {
-            let input = serde_json::to_string(&serde_json::json!({ "runs": runs }))
-                .map_err(|e| format!("could not write the probe: {e}"))?;
-            let out = tauri_plugin_coilbox_unitsync::defs_probe_blocking(
-                &engine_path,
-                &data_dir,
-                &archive,
-                &input,
-            )?;
-            let out: ProbeOutput = serde_json::from_str(&out)
-                .map_err(|e| format!("could not read the probe's answer: {e}"))?;
-            if out.runs.len() != runs.len() {
-                return Err(if out.errors.is_empty() {
-                    "the game could not be loaded".to_string()
-                } else {
-                    out.errors.join("; ")
-                });
-            }
-            Ok(out.runs)
-        };
+        let mut load = worker_loader(&engine_path, &data_dir, &archive);
         let mut compile = |p: &ModProject, w: &loads_as::Written| {
             let patched = if w.is_empty() {
                 p.clone()
             } else {
                 loads_as::with_written(p, w)
             };
-            inplace::dry_run(&game, &patched, &sources)
+            inplace::dry_run(&game, &patched, &sources).map(loads_as::Overlay::files)
         };
         let carries_field = |unit: &str, field: &str| {
             !project.edits.clones.contains_key(unit) && !project.is_mutator_only(unit, field)
@@ -413,6 +413,30 @@ async fn workshop_settle_typed_values_in_place(
             &mut compile,
             &mut load,
         )?;
+        Ok(SettledResult {
+            settled,
+            elapsed_ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+        })
+    })
+    .await
+}
+
+/// [`workshop_settle_typed_values`], for the tweak slot route (issue #3092):
+/// loads `archive` with the project handed over as mod options on `route`,
+/// the bare `tweakdefs` slot a local launch writes or the numbered slots a
+/// lobby gets, and lets the game's own Lua decide what to do with them.
+#[tauri::command]
+async fn workshop_settle_typed_values_tweaks(
+    engine_path: String,
+    data_dir: String,
+    archive: String,
+    project: ModProject,
+    route: loads_as::TweakRoute,
+) -> CliResult {
+    blocking("settle for tweak slots", move || {
+        let start = std::time::Instant::now();
+        let mut load = worker_loader(&engine_path, &data_dir, &archive);
+        let settled = loads_as::settle_tweaks(&project, route, &mut load)?;
         Ok(SettledResult {
             settled,
             elapsed_ms: u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
@@ -549,6 +573,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_test_mutator,
             workshop_package_mutator,
             workshop_pack_bar_slots,
+            workshop_settle_typed_values_tweaks,
             workshop_decode_tweak_set,
             workshop_change_ledger,
             workshop_write_in_place,
@@ -605,7 +630,7 @@ mod tests {
     fn every_command_answers_in_the_envelope_the_frontend_unwraps() {
         let project = saved_project();
 
-        let compiled = unwrap_as_the_frontend_does(workshop_compile(project.clone()));
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(project.clone(), None));
         assert!(compiled.get("files").is_some_and(Value::is_array));
 
         let report = unwrap_as_the_frontend_does(workshop_preflight(project.clone()));
@@ -639,7 +664,7 @@ mod tests {
         // its own in `packing_bar_slots_refuses_a_project_with_an_explosion_generator`.
         let mut project = project;
         project.edits.explosion_generators.clear();
-        let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+        let bar_pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
         assert!(bar_pack.get("tweakdefs").is_some_and(Value::is_array));
         assert!(bar_pack.get("tweakunits").is_some_and(Value::is_array));
 
@@ -769,7 +794,7 @@ mod tests {
     fn a_project_with_no_edits_is_answered_not_refused() {
         let empty = ModProject::default();
 
-        let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone()));
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone(), None));
         assert_eq!(compiled["files"].as_array().map(Vec::len), Some(0));
         assert_eq!(compiled["barTweakdefs"], Value::Null);
 
@@ -852,7 +877,7 @@ mod tests {
     /// #1277). Nothing to compile means nothing to pack.
     #[test]
     fn packing_bar_slots_for_an_empty_project_is_refused_with_its_own_reason() {
-        let response = serde_json::to_value(workshop_pack_bar_slots(ModProject::default()))
+        let response = serde_json::to_value(workshop_pack_bar_slots(ModProject::default(), None))
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
@@ -879,8 +904,8 @@ mod tests {
         }))
         .expect("parse");
 
-        let response =
-            serde_json::to_value(workshop_pack_bar_slots(project)).expect("the answer serialises");
+        let response = serde_json::to_value(workshop_pack_bar_slots(project, None))
+            .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
         assert!(response
@@ -903,7 +928,7 @@ mod tests {
         }))
         .expect("parse");
 
-        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
         assert_eq!(tweakdefs.len(), 1);
     }
@@ -919,7 +944,7 @@ mod tests {
     fn packing_bar_slots_for_the_saved_project_fills_both_kinds_of_slot() {
         let mut project = saved_project();
         project.edits.explosion_generators.clear();
-        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project));
+        let pack = unwrap_as_the_frontend_does(workshop_pack_bar_slots(project, None));
 
         let tweakdefs = pack["tweakdefs"].as_array().expect("tweakdefs array");
         let tweakunits = pack["tweakunits"].as_array().expect("tweakunits array");
@@ -942,7 +967,7 @@ mod tests {
     #[test]
     fn packing_bar_slots_refuses_a_project_with_an_explosion_generator() {
         let project = saved_project();
-        let result = workshop_pack_bar_slots(project);
+        let result = workshop_pack_bar_slots(project, None);
         let response = serde_json::to_value(&result).expect("the answer serialises");
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));
         assert!(response["error"]
