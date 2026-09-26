@@ -22,6 +22,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ConfigOption } from "@/content/bindings";
 import { tweakSlotCounts } from "./deliveryRoutes";
+import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
 /** What packing a project's chunks across BAR's slots produced. */
@@ -50,7 +51,12 @@ export interface BarSlotPack {
  * failing the whole export over one edit.
  */
 export const workshopPackBarSlots = defineCommand<
-  { project: ModProject },
+  {
+    project: ModProject;
+    /** What `workshopSettleTypedValuesTweaks` worked out for the numbered slots
+     *  (issue #3092). */
+    written?: Written;
+  },
   BarSlotPack
 >("coilbox-workshop", "workshop_pack_bar_slots");
 

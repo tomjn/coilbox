@@ -29,7 +29,27 @@ const {
   workshopPackageMutator,
   workshopPackBarSlots,
   settleTypedValues,
+  settleTypedValuesTweaks,
 } = vi.hoisted(() => ({
+  settleTypedValuesTweaks: vi.fn(
+    async (_args: unknown): Promise<unknown> => ({
+      ok: true,
+      settled: {
+        written: WRITTEN,
+        fields: [
+          {
+            field: { kind: "unit", unit: "armcom", path: "maxdamage" },
+            typed: 0.5,
+            loadsAsTyped: 0.045,
+            outcome: "written",
+            written: 5.5555553,
+          },
+        ],
+        loads: 3,
+        elapsedMs: 1417,
+      },
+    }),
+  ),
   settleTypedValues: vi.fn(
     async (_args: unknown): Promise<unknown> => ({
       ok: true,
@@ -80,7 +100,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
 vi.mock("../../loadsAs", async () => {
   const actual =
     await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
-  return { ...actual, settleTypedValues };
+  return { ...actual, settleTypedValues, settleTypedValuesTweaks };
 });
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({
@@ -145,6 +165,7 @@ afterEach(() => {
     version: 1,
   });
   workshopPackBarSlots.mockClear();
+  settleTypedValuesTweaks.mockClear();
   workshopPackBarSlots.mockResolvedValue({
     tweakdefs: ["!bset tweakdefs abc123"],
     tweakunits: [],
@@ -358,17 +379,51 @@ describe("PackageMutatorButton", () => {
       fireEvent.click(screen.getByRole("radio", { name: /bar tweak slots/i }));
     }
 
-    it("packs the project and shows one line per slot with a copy button", async () => {
+    it("packs the project with the values settled for the numbered slots and shows one line per slot", async () => {
       mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
       draw(vi.fn(), [{ key: "tweakdefs", name: "tweakdefs" }]);
       openBarMode();
       fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
 
       await vi.waitFor(() =>
-        expect(workshopPackBarSlots).toHaveBeenCalledWith({ project }),
+        expect(workshopPackBarSlots).toHaveBeenCalledWith({
+          project,
+          written: WRITTEN,
+        }),
       );
       expect(workshopPreflight).toHaveBeenCalledWith({ project });
+      expect(settleTypedValuesTweaks).toHaveBeenCalledWith({
+        enginePath: "/engines/105",
+        dataDir: "/data",
+        archive: "ba.sdz",
+        project,
+        route: "numbered",
+      });
       expect(screen.getByText("!bset tweakdefs abc123")).toBeTruthy();
+      expect(
+        screen.getByText(/1 typed value is written so the game's own Lua/),
+      ).toBeTruthy();
+    });
+
+    it("packs the typed values and says why when the game cannot be checked", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      settleTypedValuesTweaks.mockResolvedValueOnce({
+        ok: false,
+        message: "Coilbox could not load the game to check typed values",
+      });
+      draw();
+      openBarMode();
+      fireEvent.click(screen.getByRole("button", { name: /pack for bar/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackBarSlots).toHaveBeenCalledWith({
+          project,
+          written: undefined,
+        }),
+      );
+      expect(
+        screen.getByText(/could not load the game to check typed values/),
+      ).toBeTruthy();
     });
 
     it("refuses to pack when preflight finds a blocker, before packing runs", async () => {

@@ -15,6 +15,7 @@
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
+import type { Written } from "./loadsAs";
 import type { ModProject } from "./project";
 
 /**
@@ -60,7 +61,11 @@ export interface CompiledMod {
 }
 
 export const workshopCompile = defineCommand<
-  { project: ModProject },
+  {
+    project: ModProject;
+    /** What a settle worked out for the route the result is for (issue #3092). */
+    written?: Written;
+  },
   CompiledMod
 >("coilbox-workshop", "workshop_compile");
 

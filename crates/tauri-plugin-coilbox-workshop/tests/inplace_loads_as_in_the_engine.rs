@@ -183,6 +183,7 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
             path: vec!["maxdamage".into()],
             expect: 0.0,
         }],
+        ..Default::default()
     }]) {
         Err(e) if e.contains("unknown argument") => {
             eprintln!("the worker in target/debug predates --defs-probe, so this checks nothing");
@@ -206,6 +207,7 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
             loads_as::with_written(p, w)
         };
         tauri_plugin_coilbox_workshop::inplace_dry_run(&game_dir, &patched, &Default::default())
+            .map(loads_as::Overlay::files)
     };
     let settled = loads_as::settle_scoped(
         &project,
@@ -242,6 +244,7 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
             path: vec!["maxdamage".into()],
             expect: TYPED,
         }],
+        ..Default::default()
     }])
     .expect("a load");
     assert_eq!(back[0].reads[0].value, Some(TYPED));

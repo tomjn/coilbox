@@ -1,7 +1,7 @@
 /**
  * Writing a value the game's post-processing turns into the one the modder
- * typed, on the mutator route (issue #3059), over
- * `workshop_settle_typed_values`.
+ * typed, on the mutator route (issue #3059), edit in place (issue #3093) and
+ * the tweak slot route (issue #3092).
  *
  * A game's own Lua can change a typed number as it loads it. Balanced
  * Annihilation V15.9.8 turns a crater multiplier of 0.5 on a copied unit into
@@ -9,12 +9,14 @@
  * side loads the game with this project's own compiled mutator on top, works
  * out a value that loads as the typed one, and loads that to prove it
  * (`loads_as.rs`). The answer goes to `workshopTestMutator` and
- * `workshopPackageMutator` as `written`.
+ * `workshopPackageMutator` as `written`. The tweak slots carry no files, so
+ * their settle loads the game with the slots set as mod options instead, and its
+ * answer goes to `workshopCompile` for a local launch and
+ * `workshopPackBarSlots` for a lobby.
  *
  * It loads the game at least once for a project with any typed number, so
- * it is asked for just before a test or a package, not on every keystroke.
- * Beyond All Reason's tweak slots and edit in place still write the typed
- * value.
+ * it is asked for just before a test, a package or a pack, not on every
+ * keystroke.
  */
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { ModProject } from "./project";
@@ -84,6 +86,30 @@ export const workshopSettleTypedValuesInPlace = defineCommand<
   SettledTypedValues
 >("coilbox-workshop", "workshop_settle_typed_values_in_place");
 
+/**
+ * Which tweak slot route a project takes to a game that declares the slots:
+ * the one bare `tweakdefs` slot a local launch writes (`localBar.ts`), or the
+ * numbered slots a lobby gets (`barPack.ts`).
+ */
+export type TweakRoute = "bare" | "numbered";
+
+/**
+ * [`workshopSettleTypedValues`], for the tweak slot route (issue
+ * #3092): loads `archive` with the project handed over as mod options on
+ * `route`, and lets the game's own Lua decide where and when they run.
+ */
+export const workshopSettleTypedValuesTweaks = defineCommand<
+  {
+    enginePath: string;
+    dataDir: string;
+    /** The game's primary archive, as unitsync names it. */
+    archive: string;
+    project: ModProject;
+    route: TweakRoute;
+  },
+  SettledTypedValues
+>("coilbox-workshop", "workshop_settle_typed_values_tweaks");
+
 /** Where a typed number is, for a person. */
 export function fieldLabel(report: TypedValueReport): string {
   return report.field.kind === "unit"
@@ -141,6 +167,22 @@ export async function settleTypedValuesInPlace(
 > {
   try {
     return { ok: true, settled: await workshopSettleTypedValuesInPlace(args) };
+  } catch (e) {
+    return {
+      ok: false,
+      message: `Coilbox could not load the game to check typed values, so they are written as typed: ${e instanceof Error ? e.message : String(e)}`,
+    };
+  }
+}
+
+/** [`settleTypedValues`], for the tweak slot route (issue #3092). */
+export async function settleTypedValuesTweaks(
+  args: Parameters<typeof workshopSettleTypedValuesTweaks>[0],
+): Promise<
+  { ok: true; settled: SettledTypedValues } | { ok: false; message: string }
+> {
+  try {
+    return { ok: true, settled: await workshopSettleTypedValuesTweaks(args) };
   } catch (e) {
     return {
       ok: false,

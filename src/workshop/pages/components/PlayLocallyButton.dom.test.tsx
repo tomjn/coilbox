@@ -38,7 +38,34 @@ const {
   workshopTestMutator,
   workshopPreflight,
   settleTypedValues,
+  settleTypedValuesTweaks,
+  workshopCompile,
 } = vi.hoisted(() => ({
+  settleTypedValuesTweaks: vi.fn(
+    async (_args: unknown): Promise<unknown> => ({
+      ok: true,
+      settled: {
+        written: WRITTEN,
+        fields: [
+          {
+            field: { kind: "unit", unit: "armcom", path: "maxdamage" },
+            typed: 0.5,
+            loadsAsTyped: 0.045,
+            outcome: "written",
+            written: 5.5555553,
+          },
+        ],
+        loads: 3,
+        elapsedMs: 1349,
+      },
+    }),
+  ),
+  workshopCompile: vi.fn(async (_args: unknown) => ({
+    chunks: [],
+    files: [],
+    notes: [],
+    barTweakdefs: "do x = 5.5555553 end",
+  })),
   settleTypedValues: vi.fn(
     async (_args: unknown): Promise<unknown> => ({
       ok: true,
@@ -97,7 +124,10 @@ let mockCompiled: {
 };
 let mockGameInfoOptions: { key: string; name: string }[] = [];
 
-vi.mock("../../compile", () => ({ useCompiledProject: () => mockCompiled }));
+vi.mock("../../compile", () => ({
+  useCompiledProject: () => mockCompiled,
+  workshopCompile,
+}));
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({
     data: { games: [GAME], maps: [MAP] },
@@ -134,7 +164,7 @@ vi.mock("../../mutator", () => ({ workshopTestMutator }));
 vi.mock("../../loadsAs", async () => {
   const actual =
     await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
-  return { ...actual, settleTypedValues };
+  return { ...actual, settleTypedValues, settleTypedValuesTweaks };
 });
 vi.mock("../../preflight", () => ({ workshopPreflight }));
 vi.mock("@/components/OptionSelect", () => ({
@@ -196,6 +226,8 @@ afterEach(() => {
   launch.mockClear();
   workshopTestMutator.mockClear();
   workshopPreflight.mockClear();
+  settleTypedValuesTweaks.mockClear();
+  workshopCompile.mockClear();
   workshopPreflight.mockResolvedValue({ blockers: [], review: [], passes: [] });
   mockCompiled = compiled({});
   mockGameInfoOptions = [];
@@ -222,7 +254,7 @@ describe("PlayLocallyButton", () => {
     expect(screen.queryByText("Beyond All Reason mod options")).toBeNull();
   });
 
-  it("plays the BAR route with no mutator write and no rescan", async () => {
+  it("plays the tweak slot route with the values settled for the bare slot, with no mutator write and no rescan", async () => {
     mockCompiled = compiled({
       files: [{ path: "modinfo.lua", contents: "" }],
       barTweakdefs: "do end",
@@ -238,9 +270,45 @@ describe("PlayLocallyButton", () => {
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
     expect(workshopTestMutator).not.toHaveBeenCalled();
     expect(primeScan).not.toHaveBeenCalled();
+    expect(settleTypedValuesTweaks).toHaveBeenCalledWith({
+      enginePath: "/engines/105",
+      dataDir: "/data",
+      archive: "ba.sdd",
+      project,
+      route: "bare",
+    });
+    expect(workshopCompile).toHaveBeenCalledWith({ project, written: WRITTEN });
     const [, opts] = launch.mock.calls[0];
     expect(opts.config.gameType).toBe(project.gameName);
+    expect(opts.config.modOptions).toEqual({
+      tweakdefs: "ZG8geCA9IDUuNTU1NTU1MyBlbmQ",
+    });
+    expect(
+      screen.getByText(/1 typed value is written so the game's own Lua/),
+    ).toBeTruthy();
+  });
+
+  it("plays the tweak slot route as typed and says why when the game cannot be checked", async () => {
+    mockCompiled = compiled({
+      files: [{ path: "modinfo.lua", contents: "" }],
+      barTweakdefs: "do end",
+    });
+    mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
+    settleTypedValuesTweaks.mockResolvedValueOnce({
+      ok: false,
+      message: "Coilbox could not load the game to check typed values",
+    });
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+    await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+    expect(workshopCompile).not.toHaveBeenCalled();
+    const [, opts] = launch.mock.calls[0];
     expect(opts.config.modOptions).toEqual({ tweakdefs: "ZG8gZW5k" });
+    expect(
+      screen.getByText(/could not load the game to check typed values/),
+    ).toBeTruthy();
   });
 
   it("plays the mutator route by writing the test game and rescanning for it", async () => {

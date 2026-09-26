@@ -28,10 +28,19 @@
 //! holds numbers as 32 bit floats, so [`Precision`] says which grid a written
 //! value has to sit on.
 //!
-//! Only the mutator route. Beyond All Reason's tweak slots and the edit in
-//! place route still write the typed value, and the note beside the field
-//! says so.
+//! Three routes use it. The mutator route is [`settle`]. Edit in place
+//! patches the game's own files instead (issue #3093). The tweak slot route
+//! carries no files at all: the compiled chunks travel as base64 `tweakdefs`
+//! and `tweakunits` mod options, which a game that declares them decodes and
+//! runs in its own Lua. So [`settle_tweaks`] loads the game with those mod
+//! options set, the way a lobby would hand them over, and lets the game's own
+//! files decide where and when they run (issue #3092). Nothing here knows
+//! where a game does that. Beyond All Reason, the test case, runs them in
+//! `gamedata/unitdefs_post.lua` before its `alldefs_post.lua` post-processes
+//! every unit and weapon. A game that never reads the options loads its own
+//! values whatever is written, and every field stays as typed with the note.
 
+use crate::bar_pack;
 use crate::compile::{compile, equip_at, CompiledMod};
 use crate::model::ModProject;
 use serde::{Deserialize, Serialize};
@@ -69,11 +78,37 @@ pub struct ProbeFile {
     pub contents: String,
 }
 
-/// One load of the game with `files` on top, and what to read out of it.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// One load of the game with `files` on top and `mod_options` set, and what
+/// to read out of it.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ProbeRun {
     pub files: Vec<ProbeFile>,
     pub reads: Vec<ProbeRead>,
+    /// What `Spring.GetModOptions()` answers with, key to value, the way a
+    /// lobby hands them to a game. Empty leaves the worker's own "no game set
+    /// up" answer.
+    #[serde(
+        rename = "modOptions",
+        default,
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub mod_options: BTreeMap<String, String>,
+}
+
+/// What a route puts on top of the game for one load.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Overlay {
+    pub files: Vec<ProbeFile>,
+    pub mod_options: BTreeMap<String, String>,
+}
+
+impl Overlay {
+    pub fn files(files: Vec<ProbeFile>) -> Self {
+        Overlay {
+            files,
+            ..Default::default()
+        }
+    }
 }
 
 /// What one read found.
@@ -409,11 +444,12 @@ struct Trial {
 
 type Loader<'a> = dyn FnMut(&[ProbeRun]) -> Result<Vec<ProbeResult>, String> + 'a;
 
-/// Turn `project` with `written` in place of each typed value into the files
-/// a load needs on top of the game, for a route. The mutator route compiles
-/// the whole project, and edit in place patches the game's own files instead
-/// (`inplace::dry_run`, issue #3093).
-type Compiler<'a> = dyn FnMut(&ModProject, &Written) -> Result<Vec<ProbeFile>, String> + 'a;
+/// Turn `project` with `written` in place of each typed value into what a
+/// load needs on top of the game, for a route. The mutator route compiles the
+/// whole project into files, edit in place patches the game's own files
+/// instead (`inplace::dry_run`, issue #3093), and the tweak slots are mod
+/// options (issue #3092).
+type Compiler<'a> = dyn FnMut(&ModProject, &Written) -> Result<Overlay, String> + 'a;
 
 /// [`settle_scoped`] for the mutator route specifically: every typed number,
 /// and the project compiled the way `workshop_test_mutator` and
@@ -428,7 +464,61 @@ pub fn settle(
         precision,
         &|_, _| true,
         &|_| true,
-        &mut |p, w| Ok(mutator_probe_files(p, w)),
+        &mut |p, w| Ok(Overlay::files(mutator_probe_files(p, w))),
+        load,
+    )
+}
+
+/// Which of the two tweak slot routes a project takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TweakRoute {
+    /// Every edit in the one bare `tweakdefs` slot, which a local skirmish
+    /// launch writes into its own start script (issue #1278).
+    Bare,
+    /// The chunks packed across the numbered slots, for a lobby (issue #1277).
+    Numbered,
+}
+
+/// The mod options `project`, with `written` in place, hands a game on
+/// `route`: exactly what `localBar.ts` writes for a local launch,
+/// or what `workshop_pack_bar_slots` packs for a lobby. A slot a pack could
+/// not place is not in it, the same as in the lobby.
+pub fn tweak_mod_options(
+    project: &ModProject,
+    written: &Written,
+    route: TweakRoute,
+) -> Result<BTreeMap<String, String>, String> {
+    let compiled = compile_written(project, written);
+    match route {
+        TweakRoute::Bare => compiled
+            .bar_tweakdefs
+            .map(|lua| BTreeMap::from([("tweakdefs".to_string(), bar_pack::encode(&lua))]))
+            .ok_or_else(|| "this project has nothing for the tweakdefs slot".to_string()),
+        TweakRoute::Numbered => Ok(bar_pack::mod_options(&bar_pack::pack(&compiled.chunks))),
+    }
+}
+
+/// [`settle_scoped`] for the tweak slots on `route`: every typed number,
+/// since a slot carries copies, field changes and library weapons alike, and
+/// each load hands the game the slots as mod options rather than putting
+/// files on top (issue #3092). The engine's Lua, so 32 bit.
+pub fn settle_tweaks(
+    project: &ModProject,
+    route: TweakRoute,
+    load: &mut Loader<'_>,
+) -> Result<Settled, String> {
+    settle_scoped(
+        project,
+        Precision::F32,
+        &|_, _| true,
+        &|_| true,
+        &mut |p, w| {
+            Ok(Overlay {
+                files: Vec::new(),
+                mod_options: tweak_mod_options(p, w, route)?,
+            })
+        },
         load,
     )
 }
@@ -633,7 +723,7 @@ fn load_once(
     for (&i, &x) in values {
         written.insert(&fields[i].field, fields[i].typed, x);
     }
-    let files = compile(project, &written)?;
+    let overlay = compile(project, &written)?;
     let reads: Vec<ProbeRead> = fields
         .iter()
         .flat_map(|f| {
@@ -647,10 +737,14 @@ fn load_once(
         .collect();
     let count = reads.len();
     settled.loads += 1;
-    let result = load(&[ProbeRun { files, reads }])?
-        .into_iter()
-        .next()
-        .ok_or_else(|| "the loader answered with nothing".to_string())?;
+    let result = load(&[ProbeRun {
+        files: overlay.files,
+        reads,
+        mod_options: overlay.mod_options,
+    }])?
+    .into_iter()
+    .next()
+    .ok_or_else(|| "the loader answered with nothing".to_string())?;
     if let Some(e) = result.error {
         return Err(e);
     }
@@ -891,7 +985,8 @@ mod tests {
             "overrides": { "armcom": { "maxdamage": 0.5 }, "corcom": { "maxdamage": 3000 } },
         }));
         let mut load = game(|x| x * 0.3 * 0.3, Precision::F32);
-        let mut compile = |p: &ModProject, w: &Written| Ok(mutator_probe_files(p, w));
+        let mut compile =
+            |p: &ModProject, w: &Written| Ok(Overlay::files(mutator_probe_files(p, w)));
         let settled = settle_scoped(
             &p,
             Precision::F32,

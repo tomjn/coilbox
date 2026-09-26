@@ -265,7 +265,7 @@ fn long_bracket_close(chars: &[char], from: usize, level: usize) -> Option<usize
 
 /// The URL-safe, unpadded base64 a `tweakdefs` slot carries. BAR hands that
 /// slot straight to its own decoder, which reads this alphabet.
-fn encode(text: &str) -> String {
+pub(crate) fn encode(text: &str) -> String {
     URL_SAFE_NO_PAD.encode(text.as_bytes())
 }
 
@@ -332,6 +332,17 @@ fn fits_payload(payload_len: usize) -> bool {
 /// be proven at the boundary independently of `PAYLOAD_CAP`'s current value.
 fn fits_line(prefix_len: usize, payload_len: usize) -> bool {
     prefix_len + payload_len <= LINE_CAP
+}
+
+/// The mod options a lobby ends up holding once every line in `pack` has
+/// been said, slot key to payload (issue #3092).
+pub(crate) fn mod_options(pack: &BarSlotPack) -> std::collections::BTreeMap<String, String> {
+    pack.tweakdefs
+        .iter()
+        .chain(&pack.tweakunits)
+        .filter_map(|line| line.strip_prefix("!bset ")?.split_once(' '))
+        .map(|(key, payload)| (key.to_string(), payload.to_string()))
+        .collect()
 }
 
 /// Pack every chunk `compile::compile` produced across BAR's numbered slots.
@@ -530,6 +541,20 @@ mod tests {
             URL_SAFE_NO_PAD.decode(payload).expect("decodes"),
             minify_lua(lua).as_bytes(),
         );
+    }
+
+    #[test]
+    fn a_pack_becomes_the_mod_options_a_lobby_holds() {
+        let pack = pack(&[
+            table_chunk("t", "{ [\"a\"] = { x = 1 } }"),
+            block_chunk("b", "do x = 1 end"),
+        ]);
+        let options = mod_options(&pack);
+        assert_eq!(
+            options.keys().collect::<Vec<_>>(),
+            vec!["tweakdefs", "tweakunits"]
+        );
+        assert_eq!(options["tweakdefs"], encode("do x = 1 end"));
     }
 
     // -- minify_lua -----------------------------------------------------
