@@ -5,10 +5,10 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ConfigOption } from "@/content/bindings";
 import { deliverySlots } from "@/multiplayer/battle/tweakDelivery";
 import { notify } from "@/notify/notify";
-import { barSlotFit, workshopPackBarSlots } from "@/workshop/barPack";
 import { deliveryRoutes } from "@/workshop/deliveryRoutes";
 import { settledSummary, settleTypedValuesTweaks } from "@/workshop/loadsAs";
 import { type ModProject, useModProjects } from "@/workshop/project";
+import { tweakSlotFit, workshopPackTweakSlots } from "@/workshop/tweakPack";
 
 /**
  * Applying a unit tweak project on top of whatever options are already set.
@@ -90,7 +90,7 @@ export function PresetTweaksView({
   progress?: ReactNode;
   /** Where to load the game to check a slot-bound project's typed values
    *  before packing (issue #3122), the same check the workshop's own Package
-   *  drawer runs before a BAR pack. Absent while the engine or game are not
+   *  drawer runs before a tweak-slot pack. Absent while the engine or game are not
    *  resolved yet, in which case the slots are packed as typed. */
   enginePath?: string;
   dataDir?: string;
@@ -139,11 +139,11 @@ export function PresetTweaksView({
               ok: false,
               message: `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
             } as const);
-      const pack = await workshopPackBarSlots({
+      const pack = await workshopPackTweakSlots({
         project,
         written: settled.ok ? settled.settled.written : undefined,
       });
-      const fit = barSlotFit(pack, modOptionsSchema);
+      const fit = tweakSlotFit(pack, modOptionsSchema);
       const missing = pack.oversized.length + pack.unplaced.length;
       if (missing > 0 || !fit.fits) {
         setError(

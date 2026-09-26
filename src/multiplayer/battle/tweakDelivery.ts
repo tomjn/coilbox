@@ -29,14 +29,14 @@
  * sent it anyway would sit and wait for a confirmation that is never coming.
  */
 
-import type { BarSlotPack } from "@/workshop/barPack";
+import type { TweakSlotPack } from "@/workshop/tweakPack";
 import { MODOPT_PREFIX } from "./battleOptions";
 
 /** One packed slot, ready to send. */
 export interface TweakSlot {
   /** The mod option's name, e.g. `tweakdefs` or `tweakdefs3`. */
   name: string;
-  /** The base64 payload `bar_pack` produced for it. */
+  /** The base64 payload `tweak_pack` produced for it. */
   value: string;
   /** The script tag the battle confirms it under. */
   tagKey: string;
@@ -100,11 +100,11 @@ export function confirmTimeoutMs(bytes: number, viaAutohost: boolean): number {
 /**
  * Read the option name and payload back out of a `!bSet <name> <value>` line.
  *
- * `bar_pack` builds whole lines because a line is what a player pastes, so this
- * takes them apart again for the send that does not go through chat. It also
- * means a line somebody was handed rather than packed here works the same way.
- * Null for anything that is not one, which is how a pasted blob that is not a
- * tweak line gets refused rather than sent.
+ * `tweak_pack` builds whole lines because a line is what a player pastes, so
+ * this takes them apart again for the send that does not go through chat. It
+ * also means a line somebody was handed rather than packed here works the
+ * same way. Null for anything that is not one, which is how a pasted blob
+ * that is not a tweak line gets refused rather than sent.
  */
 export function parseBsetLine(
   line: string,
@@ -115,7 +115,7 @@ export function parseBsetLine(
 }
 
 /** Turn a pack into the slots to send, in the order they were packed. */
-export function deliverySlots(pack: BarSlotPack): TweakSlot[] {
+export function deliverySlots(pack: TweakSlotPack): TweakSlot[] {
   const slots: TweakSlot[] = [];
   for (const line of [...pack.tweakdefs, ...pack.tweakunits]) {
     const parsed = parseBsetLine(line);
@@ -151,12 +151,12 @@ export function optionTagSlots(tags: Record<string, string>): TweakSlot[] {
  * slot that did not land can name the edits that went with it.
  *
  * The ledger's own label is the slot name (`slot_label` in `ledger.rs` builds
- * the same string `bar_pack` puts in the line), so the only thing to work out
- * is which of the two kinds it is.
+ * the same string `tweak_pack` puts in the line), so the only thing to work
+ * out is which of the two kinds it is.
  */
 export function ledgerKeyFor(slot: TweakSlot): string {
   const kind = slot.name.startsWith("tweakunits") ? "tweakunits" : "tweakdefs";
-  return `bar:${kind}:${slot.name}`;
+  return `tweak:${kind}:${slot.name}`;
 }
 
 export type SlotState =

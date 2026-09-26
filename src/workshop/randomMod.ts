@@ -10,7 +10,7 @@
  * there for exactly this), scopes to a query the same way `searchQuery.ts`
  * does, and writes through `setOverride`'s own sparseness guarantee. The
  * compiler and every delivery route already turn an override set into a
- * mutator or BAR tweak slots, so none of that needed to change.
+ * mutator or tweak slots, so none of that needed to change.
  *
  * Reproducibility is the seed plus the rules: given the same unit defs, the
  * same seed and the same rules always produce the same overrides, checked by

@@ -1,7 +1,7 @@
 /**
  * Package the open project as a `.sdz` somebody else can play (issue #1283),
- * or pack it across Beyond All Reason's numbered tweak slots for somebody
- * else's lobby (issue #1277).
+ * or pack it across a game's numbered tweak slots for somebody else's lobby
+ * (issue #1277).
  *
  * The two are kept as one toolbar control rather than two. Both are "hand
  * this project to somebody who is not at this machine" and both need the
@@ -9,7 +9,7 @@
  * control, Lua, Test and Package by the time this was written (issue #2748).
  * A fifth button for a second export route would have made that worse for a
  * feature most projects will never reach for (most players are not hosting
- * their own BAR lobby), so the BAR route is a second mode inside this
+ * their own lobby), so the tweak-slot route is a second mode inside this
  * drawer instead, chosen with the toggle at its top. The default mode and
  * every element the existing tests look for are unchanged: opening the
  * drawer still shows the mutator export first.
@@ -29,9 +29,9 @@
  * whoever downloads the file broken, which is exactly the case issue #2748's
  * checks control exists to stop before it leaves the app. The Rust command
  * checks again regardless, since a file going out to other people is not a
- * check worth trusting to the frontend alone. The BAR mode runs the same
- * gate before packing, for the same reason: a lobby chat line is going out
- * to other people too.
+ * check worth trusting to the frontend alone. The tweak-slot mode runs the
+ * same gate before packing, for the same reason: a lobby chat line is going
+ * out to other people too.
  */
 import { Button, Drawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
@@ -42,11 +42,6 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { ConfigOption } from "@/content/bindings";
 import { useUnitsyncScan } from "@/content/config";
 import { usePreferredTarget } from "@/play/config";
-import {
-  type BarSlotPack,
-  barSlotFit,
-  workshopPackBarSlots,
-} from "../../barPack";
 import type { UnitClones } from "../../clones";
 import {
   collectionTree,
@@ -62,6 +57,11 @@ import {
 import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
+import {
+  type TweakSlotPack,
+  tweakSlotFit,
+  workshopPackTweakSlots,
+} from "../../tweakPack";
 import type { EquippedWeapons, WeaponLibrary } from "../../weaponLibrary";
 
 type Phase =
@@ -72,14 +72,14 @@ type Phase =
   | { state: "done"; path: string; version: number; typedNote: string | null }
   | { state: "failed"; message: string };
 
-type ExportMode = "mutator" | "bar";
+type ExportMode = "mutator" | "tweak-slots";
 
-type BarPhase =
+type TweakSlotPhase =
   | { state: "idle" }
   | { state: "checking" }
   | { state: "settling" }
   | { state: "packing" }
-  | { state: "done"; pack: BarSlotPack; typedNote: string | null }
+  | { state: "done"; pack: TweakSlotPack; typedNote: string | null }
   | { state: "failed"; message: string };
 
 /** One press to put a line on the clipboard. Local to this file rather than
@@ -113,14 +113,14 @@ function CopyLineButton({ value, label }: { value: string; label: string }) {
  * (issue #1277's "say so before the export rather than after"), plus every
  * chunk that could not be placed at all regardless of the game's own count.
  */
-function BarFitWarning({
+function TweakFitWarning({
   pack,
   routeOptions,
 }: {
-  pack: BarSlotPack;
+  pack: TweakSlotPack;
   routeOptions: ConfigOption[] | undefined;
 }) {
-  const fit = barSlotFit(pack, routeOptions ?? []);
+  const fit = tweakSlotFit(pack, routeOptions ?? []);
   const messages: string[] = [];
   if (!fit.fits) {
     if (fit.needed.defs > fit.available.defs) {
@@ -136,12 +136,12 @@ function BarFitWarning({
   }
   for (const title of pack.oversized) {
     messages.push(
-      `${title} would exceed BAR's per-slot limit even alone in an empty slot, so it was left out.`,
+      `${title} would exceed the per-slot limit even alone in an empty slot, so it was left out.`,
     );
   }
   for (const title of pack.unplaced) {
     messages.push(
-      `${title} would have fit a slot on its own, but every slot BAR exposes was already used, so it was left out.`,
+      `${title} would have fit a slot on its own, but every slot the game exposes was already used, so it was left out.`,
     );
   }
   if (messages.length === 0) return null;
@@ -155,13 +155,14 @@ function BarFitWarning({
 }
 
 /**
- * The BAR export mode: pack the project across numbered tweak slots and show
- * one `!bset` line per slot, each with its own copy button. Nothing is
- * written by coilbox itself: pasting a line into the target lobby's chat is
- * the player's own action, since a player who is not hosting has no other
- * way to set the mod option (see this file's own doc comment).
+ * The numbered tweak-slot export mode: pack the project across numbered
+ * tweak slots and show one `!bset` line per slot, each with its own copy
+ * button. Nothing is written by coilbox itself: pasting a line into the
+ * target lobby's chat is the player's own action, since a player who is not
+ * hosting has no other way to set the mod option (see this file's own doc
+ * comment).
  */
-function BarSlotExportSection({
+function TweakSlotExportSection({
   project,
   routeOptions,
   game,
@@ -172,7 +173,7 @@ function BarSlotExportSection({
    *  when it is not installed here. */
   game: { enginePath: string; dataDir: string; archive: string } | null;
 }) {
-  const [phase, setPhase] = useState<BarPhase>({ state: "idle" });
+  const [phase, setPhase] = useState<TweakSlotPhase>({ state: "idle" });
   const busy =
     phase.state === "checking" ||
     phase.state === "settling" ||
@@ -201,7 +202,7 @@ function BarSlotExportSection({
             message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
           } as const);
       setPhase({ state: "packing" });
-      const pack = await workshopPackBarSlots({
+      const pack = await workshopPackTweakSlots({
         project,
         written: settled.ok ? settled.settled.written : undefined,
       });
@@ -228,9 +229,9 @@ function BarSlotExportSection({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-muted-foreground">
-        Packs this project into `!bset` lines for BAR's numbered tweak slots.
-        Paste each line into the target lobby's chat, in order, for a server
-        that answers to `!bset` (a SPADS-based autohost).
+        Packs this project into `!bset` lines for the game's numbered tweak
+        slots. Paste each line into the target lobby's chat, in order, for a
+        server that answers to `!bset` (a SPADS-based autohost).
       </p>
       <Button onClick={() => void run()} disabled={busy}>
         <Package className="size-4" />
@@ -240,7 +241,7 @@ function BarSlotExportSection({
             ? "Checking typed values against the game"
             : phase.state === "packing"
               ? "Packing"
-              : "Pack for BAR"}
+              : "Pack for tweak slots"}
       </Button>
 
       {phase.state === "failed" ? (
@@ -249,7 +250,7 @@ function BarSlotExportSection({
 
       {phase.state === "done" ? (
         <div className="flex flex-col gap-3">
-          <BarFitWarning pack={phase.pack} routeOptions={routeOptions} />
+          <TweakFitWarning pack={phase.pack} routeOptions={routeOptions} />
           {phase.typedNote ? (
             <p className="text-xs text-muted-foreground">{phase.typedNote}</p>
           ) : null}
@@ -298,10 +299,10 @@ export function PackageMutatorButton({
   /** Called with the version a package was just written under, so the page
    *  can record it and offer the next number after this one. */
   onPackaged: (version: number) => void;
-  /** The selected game's mod options, so the BAR mode can compare what it
-   *  packed against how many tweak slots the game actually declares. `undefined`
-   *  while unread, in which case the BAR mode is offered but cannot yet warn
-   *  about a shortfall. */
+  /** The selected game's mod options, so the tweak-slot mode can compare what
+   *  it packed against how many tweak slots the game actually declares.
+   *  `undefined` while unread, in which case the tweak-slot mode is offered
+   *  but cannot yet warn about a shortfall. */
   routeOptions?: ConfigOption[];
   /** The game's own weapon table, the project's weapon library and what is
    *  equipped where (issue #3085), so the export restriction's rule can match
@@ -434,7 +435,7 @@ export function PackageMutatorButton({
           setMode("mutator");
           setOpen(true);
         }}
-        title="Package this project as a file somebody else can play, or pack it for a BAR lobby"
+        title="Package this project as a file somebody else can play, or pack it for a lobby"
       >
         <Package className="mr-1 size-3.5" />
         Package
@@ -446,15 +447,16 @@ export function PackageMutatorButton({
         description={
           mode === "mutator"
             ? `Write ${project.name} out as a .sdz for ${project.gameName}, ready to hand to somebody else or upload.`
-            : `Pack ${project.name} across Beyond All Reason's numbered tweak slots, for a lobby you are not hosting yourself.`
+            : `Pack ${project.name} across ${project.gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`
         }
         width="26rem"
       >
         <div className="flex flex-col gap-5">
           {/* Which export to prepare. Kept ahead of everything else so
             switching modes never disturbs a run already under way in the
-            other one: `phase` and the BAR section's own state are separate,
-            so flipping this back and forth does not lose either result. */}
+            other one: `phase` and the tweak-slot section's own state are
+            separate, so flipping this back and forth does not lose either
+            result. */}
           <ToggleGroup
             type="single"
             variant="outline"
@@ -464,7 +466,7 @@ export function PackageMutatorButton({
             aria-label="Which export to prepare"
           >
             <ToggleGroupItem value="mutator">Mutator archive</ToggleGroupItem>
-            <ToggleGroupItem value="bar">BAR tweak slots</ToggleGroupItem>
+            <ToggleGroupItem value="tweak-slots">Tweak slots</ToggleGroupItem>
           </ToggleGroup>
 
           {/* Restrict what gets exported to one collection's units (issue
@@ -487,13 +489,13 @@ export function PackageMutatorButton({
             />
           )}
 
-          {mode === "bar" ? (
+          {mode === "tweak-slots" ? (
             nothingToPackage ? (
               <p className="text-xs text-muted-foreground">
                 This project has no edits yet, so there is nothing to pack.
               </p>
             ) : (
-              <BarSlotExportSection
+              <TweakSlotExportSection
                 project={scopedProject}
                 routeOptions={routeOptions}
                 game={

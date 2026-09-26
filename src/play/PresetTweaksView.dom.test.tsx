@@ -2,9 +2,9 @@
 /**
  * Applying a project from the presets panel (issue #3122): a game with tweak
  * slots must settle typed values against the game before packing, the same
- * check the workshop's own Package drawer runs before a BAR pack
+ * check the workshop's own Package drawer runs before a tweak-slot pack
  * (`PackageMutatorButton.dom.test.tsx`). What matters here is that the settle
- * runs before `workshopPackBarSlots`, that its `written` map reaches the pack
+ * runs before `workshopPackTweakSlots`, that its `written` map reaches the pack
  * call, and that a failed or skipped settle still applies the project as
  * typed rather than blocking it.
  */
@@ -26,7 +26,7 @@ const WRITTEN = {
 
 const TWEAK_SCHEMA = [{ key: "tweakdefs", name: "tweakdefs" }];
 
-const { settleTypedValuesTweaks, workshopPackBarSlots, notify } = vi.hoisted(
+const { settleTypedValuesTweaks, workshopPackTweakSlots, notify } = vi.hoisted(
   () => ({
     settleTypedValuesTweaks: vi.fn(
       async (_args: unknown): Promise<unknown> => ({
@@ -47,7 +47,7 @@ const { settleTypedValuesTweaks, workshopPackBarSlots, notify } = vi.hoisted(
         },
       }),
     ),
-    workshopPackBarSlots: vi.fn(async () => ({
+    workshopPackTweakSlots: vi.fn(async () => ({
       tweakdefs: ["!bset tweakdefs abc123"],
       tweakunits: [] as string[],
       oversized: [] as string[],
@@ -61,12 +61,11 @@ vi.mock("@/workshop/project", () => ({
   useModProjects: () => ({ projects: [project] }),
 }));
 vi.mock("@/notify/notify", () => ({ notify }));
-vi.mock("@/workshop/barPack", async () => {
-  const actual =
-    await vi.importActual<typeof import("@/workshop/barPack")>(
-      "@/workshop/barPack",
-    );
-  return { ...actual, workshopPackBarSlots };
+vi.mock("@/workshop/tweakPack", async () => {
+  const actual = await vi.importActual<typeof import("@/workshop/tweakPack")>(
+    "@/workshop/tweakPack",
+  );
+  return { ...actual, workshopPackTweakSlots };
 });
 vi.mock("@/workshop/loadsAs", async () => {
   const actual =
@@ -81,7 +80,7 @@ const { PresetTweaksView } = await import("./PresetTweaksView");
 afterEach(() => {
   cleanup();
   settleTypedValuesTweaks.mockClear();
-  workshopPackBarSlots.mockClear();
+  workshopPackTweakSlots.mockClear();
   notify.mockClear();
 });
 
@@ -115,7 +114,7 @@ describe("applying a project onto tweak slots", () => {
       project,
       route: "numbered",
     });
-    expect(workshopPackBarSlots).toHaveBeenCalledWith({
+    expect(workshopPackTweakSlots).toHaveBeenCalledWith({
       project,
       written: WRITTEN,
     });
@@ -140,7 +139,7 @@ describe("applying a project onto tweak slots", () => {
     await vi.waitFor(() => expect(onApply).toHaveBeenCalled());
 
     expect(settleTypedValuesTweaks).not.toHaveBeenCalled();
-    expect(workshopPackBarSlots).toHaveBeenCalledWith({
+    expect(workshopPackTweakSlots).toHaveBeenCalledWith({
       project,
       written: undefined,
     });
@@ -162,7 +161,7 @@ describe("applying a project onto tweak slots", () => {
 
     await vi.waitFor(() => expect(onApply).toHaveBeenCalled());
 
-    expect(workshopPackBarSlots).toHaveBeenCalledWith({
+    expect(workshopPackTweakSlots).toHaveBeenCalledWith({
       project,
       written: undefined,
     });
@@ -177,7 +176,7 @@ describe("applying a project onto tweak slots", () => {
   });
 
   it("blocks a project that does not fit the game's slots without applying or notifying", async () => {
-    workshopPackBarSlots.mockResolvedValueOnce({
+    workshopPackTweakSlots.mockResolvedValueOnce({
       tweakdefs: ["!bset tweakdefs abc123", "!bset tweakdefs def456"],
       tweakunits: [],
       oversized: [],

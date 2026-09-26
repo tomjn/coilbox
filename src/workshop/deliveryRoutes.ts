@@ -142,7 +142,7 @@ export function deliveryRoutes(
     },
     {
       route: "tweak-slots",
-      label: "BAR tweak slots",
+      label: "Tweak slots",
       available,
       detail: hasExplosionGenerators
         ? "This project has a custom explosion effect, and the engine only reads one from a real file, which a tweak slot cannot carry. The mutator and edit-in-place routes below still work."

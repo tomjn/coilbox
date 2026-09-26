@@ -14,8 +14,8 @@ function change(over: Partial<LedgerChange> = {}): LedgerChange {
     description: "Field change: maxDamage",
     fieldPath: "maxDamage",
     files: ["gamedata/unitdefs_post.lua"],
-    barSlot: null,
-    barMiss: null,
+    tweakSlot: null,
+    tweakMiss: null,
     uncompiledReason: null,
     ...over,
   };
@@ -45,7 +45,7 @@ describe("ledgerByOutput", () => {
           unit: "armcom",
           changes: [
             change({
-              barSlot: { kind: "tweakunits", label: "tweakunits" },
+              tweakSlot: { kind: "tweakunits", label: "tweakunits" },
             }),
           ],
         },
@@ -67,12 +67,12 @@ describe("ledgerByOutput", () => {
           changes: [
             change({
               description: "Field change: maxDamage",
-              barSlot: { kind: "tweakunits", label: "tweakunits" },
+              tweakSlot: { kind: "tweakunits", label: "tweakunits" },
             }),
             change({
               description: "Build menu: added armpw",
               fieldPath: null,
-              barSlot: { kind: "tweakdefs", label: "tweakdefs" },
+              tweakSlot: { kind: "tweakdefs", label: "tweakdefs" },
             }),
           ],
         },

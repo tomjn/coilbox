@@ -1,9 +1,9 @@
 /**
  * Tracing a project's edits to what they compiled into (issue #2653).
  *
- * `compile.ts`/`barPack.ts` answer "what did this project compile to". This
+ * `compile.ts`/`tweakPack.ts` answer "what did this project compile to". This
  * answers the other direction: given a unit and a field, which mutator file
- * or numbered BAR slot carries it, so that a large project and a broken
+ * or numbered tweak slot carries it, so that a large project and a broken
  * game can be joined back to the one line that needs changing rather than
  * left as a table of outputs somebody has to search. `ledger.rs` is the
  * whole trace. This file only wraps the command and groups its flat answer
@@ -15,18 +15,18 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import { useEffect, useRef, useState } from "react";
 import type { ModProject } from "./project";
 
-/** Where a change landed in BAR's numbered tweak export. */
-export interface BarSlotRef {
+/** Where a change landed in the numbered tweak export. */
+export interface TweakSlotRef {
   kind: "tweakdefs" | "tweakunits";
   /** As `!bset` names it: bare for the first of its kind, numbered from the
    *  second. */
   label: string;
 }
 
-/** Why a change did not land in a numbered BAR slot. `noSlotForWords` is a
+/** Why a change did not land in a numbered tweak slot. `noSlotForWords` is a
  *  name or description edit, which the mutator carries in a language file and
  *  no slot can carry at all (issue #2743). */
-export type BarSlotMiss =
+export type TweakSlotMiss =
   | "oversized"
   | "unplaced"
   | "unresolved"
@@ -40,8 +40,8 @@ export interface LedgerChange {
   fieldPath: string | null;
   /** The mutator archive file(s) that carry this change. */
   files: string[];
-  barSlot: BarSlotRef | null;
-  barMiss: BarSlotMiss | null;
+  tweakSlot: TweakSlotRef | null;
+  tweakMiss: TweakSlotMiss | null;
   /** Why no output carries this change at all. */
   uncompiledReason: string | null;
 }
@@ -119,7 +119,7 @@ export function useChangeLedger(
   return state;
 }
 
-/** One row in the "by output" view: one file or one BAR slot, and every
+/** One row in the "by output" view: one file or one tweak slot, and every
  *  (unit, change) pair that lands in it. */
 export interface OutputRow {
   key: string;
@@ -158,9 +158,9 @@ export function ledgerByOutput(ledger: ChangeLedger): OutputRow[] {
           change,
         });
       }
-      if (change.barSlot) {
-        const slotKey = `bar:${change.barSlot.kind}:${change.barSlot.label}`;
-        rowFor(slotKey, `!bset ${change.barSlot.label}`).entries.push({
+      if (change.tweakSlot) {
+        const slotKey = `tweak:${change.tweakSlot.kind}:${change.tweakSlot.label}`;
+        rowFor(slotKey, `!bset ${change.tweakSlot.label}`).entries.push({
           unit: unitLedger.unit,
           change,
         });
