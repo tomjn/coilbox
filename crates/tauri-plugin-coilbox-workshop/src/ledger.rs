@@ -29,9 +29,9 @@
 //! which of the 30 numbered slots a chunk lands in depends on how big every
 //! chunk ahead of it was.
 
-use crate::tweak_pack::{self, TweakSlotPack};
 use crate::compile::{compile, equip_at, Chunk, EquipAt, LuaForm};
 use crate::model::{through_a_position, BuildMenuOp, GameEdits, ModProject};
+use crate::tweak_pack::{self, TweakSlotPack};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
 use std::collections::{BTreeSet, HashMap};
@@ -566,7 +566,8 @@ pub fn build_ledger(project: &ModProject) -> ChangeLedger {
         }
 
         if edits.disabled.iter().any(|off| off == &unit) {
-            let (tweak_slot, tweak_miss) = slot_fields(resolution_of(&PositionKey::Disabled), verified);
+            let (tweak_slot, tweak_miss) =
+                slot_fields(resolution_of(&PositionKey::Disabled), verified);
             changes.push(LedgerChange {
                 description: "Switched off".to_string(),
                 field_path: None,

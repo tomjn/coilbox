@@ -83,7 +83,9 @@ pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
 pub use inplace::{
     dry_run as inplace_dry_run, write as write_in_place, WriteOutcome as InPlaceWriteOutcome,
 };
-pub use ledger::{build_ledger, ChangeLedger, LedgerChange, TweakSlotMiss, TweakSlotRef, UnitLedger};
+pub use ledger::{
+    build_ledger, ChangeLedger, LedgerChange, TweakSlotMiss, TweakSlotRef, UnitLedger,
+};
 pub use model::{GameEdits, ModProject, ReadOnlyLuaBlock};
 pub use preflight::{preflight, PreflightReport};
 pub use tweak_pack::{pack as pack_tweak_slots, TweakSlotPack};
@@ -247,10 +249,7 @@ fn workshop_package_mutator(
 /// `written` is what `workshop_settle_typed_values_tweaks` worked out for the
 /// numbered slots (issue #3092), as `workshop_test_mutator` takes it.
 #[tauri::command]
-fn workshop_pack_tweak_slots(
-    project: ModProject,
-    written: Option<loads_as::Written>,
-) -> CliResult {
+fn workshop_pack_tweak_slots(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
     let project = loads_as::with_written(&project, &written.unwrap_or_default());
     // A numbered slot is still a tweak slot: it carries a field that names a
     // generator, never the effects/<key>.lua file the name resolves to
@@ -264,7 +263,9 @@ fn workshop_pack_tweak_slots(
     }
     let compiled = compile(&project);
     if compiled.chunks.is_empty() {
-        return CliResult::err("This project has no edits, so there is nothing to pack for a lobby.");
+        return CliResult::err(
+            "This project has no edits, so there is nothing to pack for a lobby.",
+        );
     }
     let report = preflight(&project, &compiled);
     if !report.blockers.is_empty() {
@@ -897,8 +898,7 @@ mod tests {
     /// #1277). Nothing to compile means nothing to pack.
     #[test]
     fn packing_tweak_slots_for_an_empty_project_is_refused_with_its_own_reason() {
-        let response =
-            serde_json::to_value(workshop_pack_tweak_slots(ModProject::default(), None))
+        let response = serde_json::to_value(workshop_pack_tweak_slots(ModProject::default(), None))
             .expect("the answer serialises");
 
         assert_eq!(response.get("success"), Some(&Value::Bool(false)));

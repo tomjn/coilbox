@@ -137,10 +137,7 @@ fn the_post_file_and_tweakdefs_change_the_weapon_the_page_showed() {
     } } }"#;
     for (what, lua) in [
         ("post file", post.contents.clone()),
-        (
-            "tweakdefs",
-            compiled.tweakdefs.clone().expect("tweakdefs"),
-        ),
+        ("tweakdefs", compiled.tweakdefs.clone().expect("tweakdefs")),
     ] {
         let root = tempfile::tempdir().expect("tempdir");
         let vm = SpringLua::new(root.path()).expect("vm");
@@ -198,10 +195,7 @@ fn a_weapon_edit_changes_this_units_slot_and_definition_and_no_other() {
     }"#;
     for (what, lua) in [
         ("post file", post.contents.clone()),
-        (
-            "tweakdefs",
-            compiled.tweakdefs.clone().expect("tweakdefs"),
-        ),
+        ("tweakdefs", compiled.tweakdefs.clone().expect("tweakdefs")),
     ] {
         let root = tempfile::tempdir().expect("tempdir");
         let vm = SpringLua::new(root.path()).expect("vm");

@@ -40,9 +40,9 @@
 //! every unit and weapon. A game that never reads the options loads its own
 //! values whatever is written, and every field stays as typed with the note.
 
-use crate::tweak_pack;
 use crate::compile::{compile, equip_at, CompiledMod};
 use crate::model::ModProject;
+use crate::tweak_pack;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;

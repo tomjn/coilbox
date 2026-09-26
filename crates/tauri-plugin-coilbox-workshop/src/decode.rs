@@ -405,8 +405,8 @@ fn blank_out_strings(src: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tweak_pack;
     use crate::compile::{Chunk, LuaForm};
+    use crate::tweak_pack;
 
     fn lua() -> SpringLua {
         SpringLua::new(std::env::temp_dir()).expect("lua")
