@@ -127,7 +127,14 @@ describe("deathExplosionView", () => {
     // Camera shake is unset, so the engine reads the default damage.
     expect(shown.find((r) => r.path === "cameraShake")?.inherited).toBe(25);
     expect(view.groups[0].readOnly).toBeFalsy();
-    expect(view.groups[0].note).toMatch(
+    expect(view.groups[0].label).toBe("Death explosion:");
+    expect(view.groups[0].identifier).toBe("big_unitex");
+    // Shortened to one line (issue #3105), with the detail behind a help
+    // icon rather than shown on every visit.
+    expect(view.groups[0].note).toBe(
+      "Shared with 2 other units. Editing makes a copy for Peewee.",
+    );
+    expect(view.groups[0].noteDetail).toMatch(
       /2 other units use it\. Changing a field here copies it into the project's weapon library as big_unitex_copy/,
     );
     expect(view.hidden).toBeGreaterThan(0);
@@ -151,9 +158,8 @@ describe("deathExplosionView", () => {
       value: 200,
       inherited: 64,
     });
-    expect(view.groups[0].label).toBe(
-      "Death explosion: library weapon big_unitex_copy",
-    );
+    expect(view.groups[0].label).toBe("Death explosion: library weapon");
+    expect(view.groups[0].identifier).toBe("big_unitex_copy");
   });
 
   it("reads a definition the unit carries through the unit's own overrides", () => {

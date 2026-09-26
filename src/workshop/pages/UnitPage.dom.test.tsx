@@ -2662,117 +2662,6 @@ describe("UnitPage", () => {
       expect(project()?.edits.weapons).toHaveProperty("sharedgun_copy");
     });
 
-    /**
-     * Issue #2642. A death explosion is a named weapon out of the game's
-     * shared table. Its effect is on screen and editable, and the first edit
-     * copies it into the library and makes the copy this unit's, as one undo
-     * step, so the other unit that dies with it keeps the game's.
-     */
-    it("edits a death explosion by giving the unit its own copy of it", () => {
-      mockWeaponDefs = {
-        big_unitex: {
-          areaofeffect: 64,
-          impulsefactor: 0.123,
-          damage: { default: 25 },
-        },
-      };
-      show(
-        {
-          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
-          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
-        },
-        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
-        [{ name: "blaster", fullName: "Blaster" }],
-      );
-      openWeapons();
-      // No slots and nothing carried, so the death explosion is on screen.
-      expect(screen.getByText("Death explosion: BIG_UNITEX")).toBeTruthy();
-      expect(screen.getByText(/1 other unit uses it/)).toBeTruthy();
-      expect(screen.getByLabelText("Splash diameter")).toHaveProperty(
-        "value",
-        "64",
-      );
-      // Unset, so it shows what the engine falls back on: the default damage.
-      expect(screen.getByLabelText("Camera shake strength")).toHaveProperty(
-        "value",
-        "25",
-      );
-
-      type(screen.getByLabelText("Splash diameter") as HTMLInputElement, "200");
-      expect(project()?.edits.weapons).toEqual({
-        big_unitex_copy: {
-          key: "big_unitex_copy",
-          source: "big_unitex",
-          sourceChecksum: "abc",
-          def: mockWeaponDefs.big_unitex,
-          changes: { areaofeffect: 200 },
-        },
-      });
-      expect(project()?.edits.equipped).toEqual({
-        blaster: { explodeas: "big_unitex_copy" },
-      });
-      expect(project()?.edits.overrides).toEqual({});
-      expect(
-        screen.getByText("Death explosion: library weapon big_unitex_copy"),
-      ).toBeTruthy();
-      expect(screen.getByText(/Copied value: 64/)).toBeTruthy();
-
-      // It sets no self-destruct explosion, so that one follows.
-      fireEvent.click(
-        screen.getByRole("radio", { name: "Self-destruct explosion" }),
-      );
-      expect(
-        screen.getByText(/sets no selfDestructAs, so the engine uses/),
-      ).toBeTruthy();
-      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
-
-      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
-      expect(project()?.edits.weapons).toEqual({});
-      expect(project()?.edits.equipped).toEqual({});
-    });
-
-    /**
-     * Issue #3097. Clicking Fields cleared the `tab` URL parameter, but the
-     * `explosion` parameter stayed, and the tab derivation reads a death
-     * explosion as reason to reopen the weapons tab whenever `tab` is absent.
-     * Clicking Fields must win over that.
-     */
-    it("switches to Fields when a death explosion is open", () => {
-      mockWeaponDefs = {
-        big_unitex: {
-          areaofeffect: 64,
-          impulsefactor: 0.123,
-          damage: { default: 25 },
-        },
-      };
-      show(
-        {
-          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
-          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
-        },
-        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
-        [{ name: "blaster", fullName: "Blaster" }],
-      );
-      openWeapons();
-      expect(screen.getByText("Death explosion: BIG_UNITEX")).toBeTruthy();
-      // Picking a death explosion by name puts it in the URL (`?explosion=`),
-      // same as the self-destruct explosion here. That is issue #3097's
-      // actual trigger. The first explosion opens on arrival with nothing in
-      // the URL, and never reproduced the bug.
-      fireEvent.click(
-        screen.getByRole("radio", { name: "Self-destruct explosion" }),
-      );
-      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
-      expect(screen.getByLabelText("Name")).toHaveProperty("value", "Blaster");
-      expect(screen.queryByText("Death explosion: BIG_UNITEX")).toBeNull();
-      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
-      expect(
-        screen
-          .getByRole("tab", { name: "Fields" })
-          .getAttribute("aria-selected"),
-      ).toBe("true");
-    });
-
     it("copies a weapon the unit carries with the project's changes, as one undo step", async () => {
       openGunner();
       openWeapons();
@@ -2874,6 +2763,166 @@ describe("UnitPage", () => {
       expect(
         screen.getByText(/it reaches the 1 other slot that fires it too/),
       ).toBeTruthy();
+    });
+  });
+
+  /**
+   * Issue #3105. Death explosions moved off the Weapons tab onto one of
+   * their own, so picking one no longer shares a selection with a weapon
+   * slot.
+   */
+  describe("the death explosions tab", () => {
+    // Radix picks a tab on mouse down rather than on click.
+    const openExplosions = () =>
+      fireEvent.mouseDown(screen.getByRole("tab", { name: /Explosions/ }));
+    const project = () => readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0];
+    /**
+     * The heading splits the identifier it names into its own `<span>`
+     * (issue #3105), so its own text content is no longer one run
+     * `getByText`'s default matcher can see (that only reads a node's direct
+     * text-node children). A function matcher reads the whole heading.
+     */
+    const heading = (text: string) => (_: string, element: Element | null) =>
+      element?.tagName === "H3" && element.textContent === text;
+
+    /**
+     * Issue #2642. A death explosion is a named weapon out of the game's
+     * shared table. Its effect is on screen and editable, and the first edit
+     * copies it into the library and makes the copy this unit's, as one undo
+     * step, so the other unit that dies with it keeps the game's.
+     */
+    it("edits a death explosion by giving the unit its own copy of it", () => {
+      mockWeaponDefs = {
+        big_unitex: {
+          areaofeffect: 64,
+          impulsefactor: 0.123,
+          damage: { default: 25 },
+        },
+      };
+      show(
+        {
+          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
+          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
+        },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
+        [{ name: "blaster", fullName: "Blaster" }],
+      );
+      openExplosions();
+      // No tab param and no slots, so the first death explosion is on screen.
+      expect(
+        screen.getByText(heading("Death explosion: BIG_UNITEX")),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(
+          "Shared with 1 other unit. Editing makes a copy for Blaster.",
+        ),
+      ).toBeTruthy();
+      expect(screen.getByLabelText("Splash diameter")).toHaveProperty(
+        "value",
+        "64",
+      );
+      // Unset, so it shows what the engine falls back on: the default damage.
+      expect(screen.getByLabelText("Camera shake strength")).toHaveProperty(
+        "value",
+        "25",
+      );
+
+      type(screen.getByLabelText("Splash diameter") as HTMLInputElement, "200");
+      expect(project()?.edits.weapons).toEqual({
+        big_unitex_copy: {
+          key: "big_unitex_copy",
+          source: "big_unitex",
+          sourceChecksum: "abc",
+          def: mockWeaponDefs.big_unitex,
+          changes: { areaofeffect: 200 },
+        },
+      });
+      expect(project()?.edits.equipped).toEqual({
+        blaster: { explodeas: "big_unitex_copy" },
+      });
+      expect(project()?.edits.overrides).toEqual({});
+      expect(
+        screen.getByText(
+          heading("Death explosion: library weapon big_unitex_copy"),
+        ),
+      ).toBeTruthy();
+      expect(screen.getByText(/Copied value: 64/)).toBeTruthy();
+
+      // It sets no self-destruct explosion, so that one follows.
+      fireEvent.click(
+        screen.getByRole("radio", { name: "Self-destruct explosion" }),
+      );
+      expect(
+        screen.getByText(/sets no selfDestructAs, so the engine uses/),
+      ).toBeTruthy();
+      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(project()?.edits.weapons).toEqual({});
+      expect(project()?.edits.equipped).toEqual({});
+    });
+
+    /**
+     * Issue #3097, and #3105's move of the tab derivation's `explosion`
+     * fallback onto the Explosions tab rather than Weapons. Clicking Fields
+     * cleared the `tab` URL parameter, but the `explosion` parameter stayed,
+     * and the old derivation read a death explosion as reason to reopen the
+     * weapons tab whenever `tab` was absent. Clicking Fields must win over
+     * that, and clicking back to Explosions must restore the one that was
+     * open rather than resetting to the first.
+     */
+    it("switches to Fields when a death explosion is open, and back restores it", () => {
+      mockWeaponDefs = {
+        big_unitex: {
+          areaofeffect: 64,
+          impulsefactor: 0.123,
+          damage: { default: 25 },
+        },
+      };
+      show(
+        {
+          blaster: { humanName: "Blaster", explodeas: "BIG_UNITEX" },
+          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
+        },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
+        [{ name: "blaster", fullName: "Blaster" }],
+      );
+      openExplosions();
+      expect(
+        screen.getByText(heading("Death explosion: BIG_UNITEX")),
+      ).toBeTruthy();
+      // Picking a death explosion by name puts it in the URL (`?explosion=`),
+      // same as the self-destruct explosion here. That is issue #3097's
+      // actual trigger. The first explosion opens on arrival with nothing in
+      // the URL, and never reproduced the bug.
+      fireEvent.click(
+        screen.getByRole("radio", { name: "Self-destruct explosion" }),
+      );
+      expect(
+        screen.getByText(/sets no selfDestructAs, so the engine uses/),
+      ).toBeTruthy();
+
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Fields" }));
+      expect(screen.getByLabelText("Name")).toHaveProperty("value", "Blaster");
+      expect(
+        screen.queryByText(heading("Death explosion: BIG_UNITEX")),
+      ).toBeNull();
+      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
+      expect(
+        screen
+          .getByRole("tab", { name: "Fields" })
+          .getAttribute("aria-selected"),
+      ).toBe("true");
+
+      // Back on Explosions, the self-destruct explosion is still the one
+      // open, not the first one again.
+      openExplosions();
+      expect(
+        screen.getByText(/sets no selfDestructAs, so the engine uses/),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(heading("Death explosion: BIG_UNITEX")),
+      ).toBeNull();
     });
   });
 

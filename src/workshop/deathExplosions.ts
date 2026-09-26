@@ -228,7 +228,8 @@ export function deathExplosionView(
     return draw(
       {
         id: "explosion",
-        label: `${explosion.label}: library weapon ${fires.weapon.key}`,
+        label: `${explosion.label}: library weapon`,
+        identifier: fires.weapon.key,
         note: `${what} It is ${fires.weapon.key}, copied from ${fires.weapon.source} into the project's weapon library. A change here is a change to the library weapon${others > 0 ? `, so it reaches the ${others} other place${others === 1 ? "" : "s"} it is equipped too` : ", and no unit uses it but this one"}.`,
       },
       fires.weapon.def,
@@ -243,7 +244,8 @@ export function deathExplosionView(
     return draw(
       {
         id: "explosion",
-        label: `${explosion.label}: ${definition.key}`,
+        label: `${explosion.label}:`,
+        identifier: definition.key,
         note: `${what} ${unitName} carries this definition itself, so a change here reaches no other unit.`,
       },
       definition.def,
@@ -254,8 +256,13 @@ export function deathExplosionView(
   return draw(
     {
       id: "explosion",
-      label: `${explosion.label}: ${explosion.name}`,
-      note: `${what} ${explosion.name} is in the game's shared weapon table${others > 0 ? `, and ${others} other unit${others === 1 ? "" : "s"} use${others === 1 ? "s" : ""} it` : ""}. Changing a field here copies it into the project's weapon library as ${options.copyKey} and makes that ${unitName}'s, so ${others > 0 ? "every other unit keeps" : "the game keeps"} its own.`,
+      label: `${explosion.label}:`,
+      identifier: explosion.name,
+      note:
+        others > 0
+          ? `Shared with ${others} other unit${others === 1 ? "" : "s"}. Editing makes a copy for ${unitName}.`
+          : `Editing makes a copy for ${unitName}.`,
+      noteDetail: `${what} ${explosion.name} is in the game's shared weapon table${others > 0 ? `, and ${others} other unit${others === 1 ? "" : "s"} use${others === 1 ? "s" : ""} it` : ""}. Changing a field here copies it into the project's weapon library as ${options.copyKey}, so ${others > 0 ? "every other unit keeps" : "the game keeps"} its own.`,
     },
     definition.def,
     {},

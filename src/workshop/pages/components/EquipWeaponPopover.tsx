@@ -26,6 +26,7 @@ import {
 export function EquipWeaponPopover({
   label,
   shared,
+  primary = shared,
   unitName,
   usesCopy,
   copySource,
@@ -42,6 +43,14 @@ export function EquipWeaponPopover({
   /** Whether the slot's weapon is out of the game's shared table, which is
    *  when the copy is the thing to do and the button says so. */
   shared: boolean;
+  /** Whether this is the page's emphasised action for this weapon, drawn as
+   *  a filled button, rather than a secondary one drawn like any other
+   *  (issue #3105). Defaults to `shared`: a shared slot weapon's fields are
+   *  read-only until copied, so the button is the only way in. A shared
+   *  death explosion's fields are already editable and copy themselves on
+   *  the first change, so its caller passes `false` rather than making the
+   *  button repeat what editing a field already does. */
+  primary?: boolean;
   unitName: string;
   /** What happens to the copy, finishing the sentence "Copies X into the
    *  library, and": "weapon 2 fires the copy". */
@@ -80,7 +89,7 @@ export function EquipWeaponPopover({
   return (
     <Popover open={open} onOpenChange={toggle}>
       <PopoverTrigger asChild>
-        <Button variant={shared ? "default" : "outline"} size="sm">
+        <Button variant={primary ? "default" : "outline"} size="sm">
           {shared ? (
             <Copy className="size-3.5" />
           ) : (
