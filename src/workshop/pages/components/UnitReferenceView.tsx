@@ -302,6 +302,7 @@ export function UnitReferenceView({
         picOf={picOf}
         picsPending={picsPending}
         factionOf={factionOf}
+        gameRowOf={baselineOf}
         editing={
           editing && {
             units: editing.units,
