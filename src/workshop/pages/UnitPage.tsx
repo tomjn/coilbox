@@ -1218,7 +1218,14 @@ export default function UnitPage() {
     if (!fieldKey) return;
     const row = document.getElementById(`field-${fieldKey}`);
     row?.scrollIntoView({ block: "center" });
-    row?.querySelector<HTMLElement>("input, textarea, select, button")?.focus();
+    // The value column (`data-field-value`, `UnitFieldRow.tsx`) rather than
+    // the row as a whole: the row also carries a help button ahead of the
+    // value in document order, and a bare "first control" search always
+    // landed there instead of the field the link named (issue #3176).
+    const valueCol = row?.querySelector<HTMLElement>("[data-field-value]");
+    valueCol
+      ?.querySelector<HTMLElement>("input, textarea, select, button")
+      ?.focus();
   }, [fieldKey, fields, weaponView]);
 
   // Cmd+K (Ctrl+K elsewhere), only while a project is open (issue #3118).

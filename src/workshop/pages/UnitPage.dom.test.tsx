@@ -695,6 +695,23 @@ describe("UnitPage", () => {
       expect(path).toContain("field=metalCost");
     });
 
+    /**
+     * Issue #3176. Health carries the engine's own help text, so its row
+     * draws a "?" button before the input in document order. A jump that
+     * grabbed the row's first control rather than its value control left the
+     * cursor on that button instead of in the field, and typing did nothing.
+     */
+    it("lands focus in the field's input, not its help button", () => {
+      openWithProject();
+      fireEvent.keyDown(window, { key: "k", metaKey: true });
+      const dialog = screen.getByRole("dialog");
+      const input = within(dialog).getByPlaceholderText(/Jump to a unit/);
+      fireEvent.change(input, { target: { value: "commander health" } });
+      const [item] = within(dialog).getAllByText(/Health/i);
+      fireEvent.click(item);
+      expect(document.activeElement).toBe(healthBox());
+    });
+
     it("jumps to a project section", () => {
       openWithProject();
       fireEvent.keyDown(window, { key: "k", metaKey: true });

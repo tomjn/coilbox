@@ -595,7 +595,11 @@ export function UnitFieldRow({
         </span>
       </div>
 
-      <div className="flex min-w-0 flex-col gap-0.5">
+      {/* data-field-value: what the command palette and a `?field=` link
+          focus (issue #3176). The label column's help button and the row's
+          own reset button sit outside it, so a plain "first control in the
+          row" search no longer lands on either. */}
+      <div className="flex min-w-0 flex-col gap-0.5" data-field-value="">
         {kind === "boolean" ? (
           <Switch
             checked={row.value === true}
