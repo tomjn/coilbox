@@ -26,6 +26,8 @@ const WRITTEN = {
 
 const {
   save,
+  open,
+  ask,
   workshopPreflight,
   workshopPackageMutator,
   workshopPackTweakSlots,
@@ -60,6 +62,8 @@ const {
   save: vi.fn(
     async (): Promise<string | null> => "/home/tom/faster-commanders-v1.sdz",
   ),
+  open: vi.fn(async (): Promise<string | null> => "/home/tom"),
+  ask: vi.fn(async (): Promise<boolean> => true),
   workshopPreflight: vi.fn(async () => ({
     blockers: [] as string[],
     review: [] as string[],
@@ -99,13 +103,18 @@ vi.mock("../../package", () => ({
   workshopPackageMutator,
   packagedMutatorFileName: (p: { name: string }, version: number) =>
     `${p.name.toLowerCase().replace(/\s+/g, "-")}-v${version}.sdz`,
+  packagedSddFolderName: (p: { name: string }, version: number) =>
+    `${p.name.toLowerCase().replace(/\s+/g, "-")}-v${version}.sdd`,
 }));
 vi.mock("../../tweakPack", async () => {
   const actual =
     await vi.importActual<typeof import("../../tweakPack")>("../../tweakPack");
   return { ...actual, workshopPackTweakSlots };
 });
-vi.mock("@tauri-apps/plugin-dialog", () => ({ save }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ save, open, ask }));
+vi.mock("@tauri-apps/api/path", () => ({
+  join: async (...parts: string[]) => parts.join("/"),
+}));
 vi.mock("../../loadsAs", async () => {
   const actual =
     await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
@@ -169,6 +178,10 @@ afterEach(() => {
   cleanup();
   save.mockClear();
   save.mockResolvedValue("/home/tom/faster-commanders-v1.sdz");
+  open.mockClear();
+  open.mockResolvedValue("/home/tom");
+  ask.mockClear();
+  ask.mockResolvedValue(true);
   workshopPreflight.mockClear();
   workshopPreflight.mockResolvedValue({ blockers: [], review: [], passes: [] });
   workshopPackageMutator.mockClear();
@@ -236,6 +249,7 @@ describe("PackagePanel", () => {
       project,
       version: 1,
       dest: "/home/tom/faster-commanders-v1.sdz",
+      format: "sdz",
       written: WRITTEN,
     });
     expect(onPackaged).toHaveBeenCalledWith(1);
@@ -268,6 +282,100 @@ describe("PackagePanel", () => {
     expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
     expect(save).not.toHaveBeenCalled();
     expect(workshopPackageMutator).not.toHaveBeenCalled();
+  });
+
+  describe("the .sdd (unpacked folder) shape", () => {
+    function chooseSddShape() {
+      fireEvent.click(screen.getByRole("radio", { name: /folder \(\.sdd\)/i }));
+    }
+
+    it("opens a folder picker instead of a save dialog and writes the .sdd there", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      workshopPackageMutator.mockResolvedValue({
+        path: "/home/tom/faster-commanders-v1.sdd",
+        files: ["modinfo.lua"],
+        version: 1,
+      });
+      const onPackaged = draw();
+      chooseSddShape();
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackageMutator).toHaveBeenCalledTimes(1),
+      );
+      expect(open).toHaveBeenCalledWith(
+        expect.objectContaining({ directory: true }),
+      );
+      expect(save).not.toHaveBeenCalled();
+      expect(workshopPackageMutator).toHaveBeenCalledWith({
+        project,
+        version: 1,
+        dest: "/home/tom/faster-commanders-v1.sdd",
+        format: "sdd",
+        written: WRITTEN,
+      });
+      expect(onPackaged).toHaveBeenCalledWith(1);
+      await vi.waitFor(() =>
+        expect(screen.getByText(/faster-commanders-v1\.sdd/)).toBeTruthy(),
+      );
+    });
+
+    it("writes nothing when the folder picker is cancelled", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      open.mockResolvedValue(null);
+      draw();
+      chooseSddShape();
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
+
+      await vi.waitFor(() => expect(open).toHaveBeenCalledTimes(1));
+      expect(workshopPackageMutator).not.toHaveBeenCalled();
+    });
+
+    it("confirms before replacing a folder that already exists, then retries with overwrite", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      workshopPackageMutator
+        .mockRejectedValueOnce(
+          new Error("/home/tom/faster-commanders-v1.sdd already exists"),
+        )
+        .mockResolvedValueOnce({
+          path: "/home/tom/faster-commanders-v1.sdd",
+          files: ["modinfo.lua"],
+          version: 1,
+        });
+      draw();
+      chooseSddShape();
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
+
+      await vi.waitFor(() =>
+        expect(workshopPackageMutator).toHaveBeenCalledTimes(2),
+      );
+      expect(ask).toHaveBeenCalledTimes(1);
+      expect(workshopPackageMutator).toHaveBeenNthCalledWith(2, {
+        project,
+        version: 1,
+        dest: "/home/tom/faster-commanders-v1.sdd",
+        format: "sdd",
+        written: WRITTEN,
+        overwrite: true,
+      });
+      await vi.waitFor(() =>
+        expect(screen.getByText(/faster-commanders-v1\.sdd/)).toBeTruthy(),
+      );
+    });
+
+    it("writes nothing when the author declines to replace the existing folder", async () => {
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      workshopPackageMutator.mockRejectedValueOnce(
+        new Error("/home/tom/faster-commanders-v1.sdd already exists"),
+      );
+      ask.mockResolvedValue(false);
+      draw();
+      chooseSddShape();
+      fireEvent.click(screen.getByRole("button", { name: /save as \.sdd/i }));
+
+      await vi.waitFor(() => expect(ask).toHaveBeenCalledTimes(1));
+      expect(workshopPackageMutator).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe("restricting the export to a collection", () => {

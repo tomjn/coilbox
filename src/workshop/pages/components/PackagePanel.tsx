@@ -40,7 +40,8 @@
  * pack the same compiled output, so one view covers both.
  */
 import { Button } from "@picoframe/frame";
-import { save } from "@tauri-apps/plugin-dialog";
+import { join } from "@tauri-apps/api/path";
+import { ask, open, save } from "@tauri-apps/plugin-dialog";
 import { Check, Copy, Package } from "lucide-react";
 import { useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -61,7 +62,11 @@ import {
   settleTypedValues,
   settleTypedValuesTweaks,
 } from "../../loadsAs";
-import { packagedMutatorFileName, workshopPackageMutator } from "../../package";
+import {
+  packagedMutatorFileName,
+  packagedSddFolderName,
+  workshopPackageMutator,
+} from "../../package";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
 import {
@@ -81,6 +86,11 @@ type Phase =
   | { state: "failed"; message: string };
 
 type ExportMode = "mutator" | "tweak-slots";
+
+/** The mutator mode's own output shape: a zipped `.sdz` archive, or an
+ *  unpacked `.sdd` folder for a game kept as a loose directory under version
+ *  control (issue #3160). */
+type ExportShape = "sdz" | "sdd";
 
 type TweakSlotPhase =
   | { state: "idle" }
@@ -322,6 +332,7 @@ export function PackagePanel({
     phase.state === "settling" ||
     phase.state === "packaging";
   const [mode, setMode] = useState<ExportMode>("mutator");
+  const [shape, setShape] = useState<ExportShape>("sdz");
   // The game, so typed values can be checked against it before packaging or
   // packing (issues #3059 and #3092).
   const { target } = usePreferredTarget();
@@ -377,14 +388,34 @@ export function PackagePanel({
         return;
       }
 
-      const dest = await save({
-        title: "Package tweak project",
-        defaultPath: packagedMutatorFileName(project, nextVersion),
-        filters: [{ name: "Mutator archive", extensions: ["sdz"] }],
-      });
-      if (!dest) {
-        setPhase({ state: "idle" });
-        return;
+      let dest: string;
+      if (shape === "sdd") {
+        // A directory picker rather than a file save dialog, since an .sdd
+        // is a folder the engine expects to find at that name (issue #3160).
+        const parentDir = await open({
+          title: "Choose where to write the .sdd",
+          directory: true,
+          multiple: false,
+        });
+        if (typeof parentDir !== "string") {
+          setPhase({ state: "idle" });
+          return;
+        }
+        dest = await join(
+          parentDir,
+          packagedSddFolderName(project, nextVersion),
+        );
+      } else {
+        const picked = await save({
+          title: "Package tweak project",
+          defaultPath: packagedMutatorFileName(project, nextVersion),
+          filters: [{ name: "Mutator archive", extensions: ["sdz"] }],
+        });
+        if (!picked) {
+          setPhase({ state: "idle" });
+          return;
+        }
+        dest = picked;
       }
 
       // A value the game's own Lua would turn into something else is written
@@ -405,12 +436,42 @@ export function PackagePanel({
             } as const);
 
       setPhase({ state: "packaging" });
-      const written = await workshopPackageMutator({
+      const packageArgs = {
         project: scopedProject,
         version: nextVersion,
         dest,
+        format: shape,
         written: settled.ok ? settled.settled.written : undefined,
-      });
+      };
+      let written: Awaited<ReturnType<typeof workshopPackageMutator>>;
+      try {
+        written = await workshopPackageMutator(packageArgs);
+      } catch (error) {
+        // A folder picker offers no native "replace?" prompt the way the
+        // save dialog already does for a `.sdz` on disk, so an existing
+        // `.sdd` is confirmed here instead, then packaged again with the
+        // author's go-ahead to clear it (this file's own doc comment).
+        if (
+          shape === "sdd" &&
+          error instanceof Error &&
+          error.message.includes("already exists")
+        ) {
+          const replace = await ask(
+            `${dest} already exists. Replace it? Anything already there will be deleted first.`,
+            { title: "Replace existing folder?", kind: "warning" },
+          );
+          if (!replace) {
+            setPhase({ state: "idle" });
+            return;
+          }
+          written = await workshopPackageMutator({
+            ...packageArgs,
+            overwrite: true,
+          });
+        } else {
+          throw error;
+        }
+      }
       onPackaged(written.version);
       setPhase({
         state: "done",
@@ -433,7 +494,9 @@ export function PackagePanel({
       <section className="flex flex-col gap-5">
         <p className="text-sm text-muted-foreground">
           {mode === "mutator"
-            ? `Write ${project.name} out as a .sdz for ${project.gameName}, ready to hand to somebody else or upload.`
+            ? shape === "sdd"
+              ? `Write ${project.name} out as an unpacked .sdd folder for ${project.gameName}, for a game you keep as a loose directory under version control.`
+              : `Write ${project.name} out as a .sdz for ${project.gameName}, ready to hand to somebody else or upload.`
             : `Pack ${project.name} across ${project.gameName}'s numbered tweak slots, for a lobby you are not hosting yourself.`}
         </p>
         {/* Which export to prepare. Kept ahead of everything else so
@@ -452,6 +515,25 @@ export function PackagePanel({
           <ToggleGroupItem value="mutator">Mutator archive</ToggleGroupItem>
           <ToggleGroupItem value="tweak-slots">Tweak slots</ToggleGroupItem>
         </ToggleGroup>
+
+        {/* The mutator mode's own output shape: a zipped .sdz somebody else
+            can download and play, or the same compiled files written out as
+            a loose .sdd folder for a game kept in version control (issue
+            #3160). Only offered in mutator mode: the tweak-slot mode has no
+            output shape of its own. */}
+        {mode === "mutator" && (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            size="sm"
+            value={shape}
+            onValueChange={(v) => v && setShape(v as ExportShape)}
+            aria-label="What shape to write the export as"
+          >
+            <ToggleGroupItem value="sdz">Archive (.sdz)</ToggleGroupItem>
+            <ToggleGroupItem value="sdd">Folder (.sdd)</ToggleGroupItem>
+          </ToggleGroup>
+        )}
 
         {/* Restrict what gets exported to one collection's units (issue
             #2654). Only offered once the project has a collection to name,
@@ -515,10 +597,14 @@ export function PackagePanel({
                   : phase.state === "settling"
                     ? "Checking typed values against the game"
                     : phase.state === "packaging"
-                      ? "Writing the archive"
+                      ? shape === "sdd"
+                        ? "Writing the folder"
+                        : "Writing the archive"
                       : nothingToPackage
                         ? "Nothing to package yet"
-                        : "Save as .sdz…"}
+                        : shape === "sdd"
+                          ? "Save as .sdd…"
+                          : "Save as .sdz…"}
               </Button>
             </div>
 
