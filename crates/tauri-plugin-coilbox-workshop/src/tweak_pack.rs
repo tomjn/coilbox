@@ -406,6 +406,7 @@ mod tests {
             title: title.to_string(),
             reason: "test".to_string(),
             lua: lua.to_string(),
+            unit: None,
         }
     }
 
@@ -415,6 +416,7 @@ mod tests {
             title: title.to_string(),
             reason: "test".to_string(),
             lua: lua.to_string(),
+            unit: None,
         }
     }
 

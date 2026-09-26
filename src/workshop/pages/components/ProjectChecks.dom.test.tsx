@@ -263,6 +263,9 @@ describe("the Checks entry in the section bar", () => {
         blockers: ["supercom is defined by 2 copies (first, second)."],
         review: [],
         passes: [],
+        unitRefs: {
+          "supercom is defined by 2 copies (first, second).": "supercom",
+        },
       };
       renderChecks({ project });
       await screen.findByRole("link", { name: "Checks, 1 blocker found" });
@@ -274,6 +277,12 @@ describe("the Checks entry in the section bar", () => {
           "supercom is defined by 2 copies (first, second).",
         ),
       ).toBe(true);
+      // The blocker names supercom by construction (issue #3155), so it
+      // opens on that unit rather than only being readable as text.
+      const blockerLink = attention?.querySelector('a[href*="unit=supercom"]');
+      expect(blockerLink?.textContent).toBe(
+        "supercom is defined by 2 copies (first, second).",
+      );
     });
 
     it("says nothing needs attention when the project is clean", () => {
