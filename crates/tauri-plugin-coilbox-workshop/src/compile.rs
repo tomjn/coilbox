@@ -244,7 +244,11 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // the game's own, so [`added_block`] is deliberately left out of the post
     // file below rather than restating every definition a second time.
     let mut unit_files = Vec::new();
-    let added_chunk = (!added_entries.is_empty()).then_some(chunks.len());
+    // Where carried Lua ends and added units begin, so the mutator's post
+    // file and the bare tweakdefs slot can tell the two groups of blocks
+    // apart below rather than only the numbered slots getting this right.
+    let added_boundary = chunks.len();
+    let added_chunk = (!added_entries.is_empty()).then_some(added_boundary);
     if !added_entries.is_empty() {
         chunks.push(Chunk {
             form: LuaForm::Block,
@@ -309,6 +313,11 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             patches.push((unit.clone(), tree));
         }
     }
+    // Where the blocks that have to run before the typed field changes end
+    // (carried Lua, added units, replaced units) and the ones that read a
+    // definition the changes already touched begin, captured here whether or
+    // not there turns out to be a patches chunk at all.
+    let patches_boundary = chunks.len();
     if !patches.is_empty() {
         chunks.push(Chunk {
             form: LuaForm::Table,
@@ -494,20 +503,41 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     }
 
     // Every block, in the order they were compiled, which is the order they have
-    // to run in: a copy standing in for a game unit before a menu is replayed
-    // over it, and switching a unit off last so it reaches every list either of
-    // the first two left behind. Taken from the chunks rather than rebuilt, so
-    // the file and the Lua the user reads cannot say different things.
-    let post_blocks: Vec<&str> = chunks
-        .iter()
-        .enumerate()
-        .filter(|(i, chunk)| chunk.form == LuaForm::Block && Some(*i) != added_chunk)
-        .map(|(_, chunk)| chunk.lua.as_str())
+    // to run in: carried Lua before anything of the project's own, a copy
+    // standing in for a game unit before a menu is replayed over it, and
+    // switching a unit off last so it reaches every list either of the first
+    // two left behind. Taken from the chunks rather than rebuilt, so the file
+    // and the Lua the user reads cannot say different things.
+    //
+    // Split at the same two boundaries the chunk list itself turns on
+    // (issue #3129). Blocks before the added-units chunk are carried Lua,
+    // blocks between that and the patches chunk are replaced units, and
+    // blocks after it are the rest (positional changes, equip, menus,
+    // disabled). `post_file` has no added-units section of its own, so it
+    // runs the first two groups back to back ahead of the field changes.
+    // `tweakdefs_body` keeps them apart so the assignment can sit between
+    // them, in the same place the chunk list puts it.
+    let is_block = |i: usize| chunks[i].form == LuaForm::Block && Some(i) != added_chunk;
+    let pre_added_blocks: Vec<&str> = (0..added_boundary)
+        .filter(|i| is_block(*i))
+        .map(|i| chunks[i].lua.as_str())
         .collect();
-    if !patches.is_empty() || !post_blocks.is_empty() {
+    let added_to_patches_blocks: Vec<&str> = (added_boundary..patches_boundary)
+        .filter(|i| is_block(*i))
+        .map(|i| chunks[i].lua.as_str())
+        .collect();
+    let post_patch_blocks: Vec<&str> = (patches_boundary..chunks.len())
+        .filter(|i| is_block(*i))
+        .map(|i| chunks[i].lua.as_str())
+        .collect();
+    let mut pre_patch_blocks = pre_added_blocks.clone();
+    pre_patch_blocks.extend(added_to_patches_blocks.iter().copied());
+    let blocks_and_patches_empty =
+        pre_patch_blocks.is_empty() && post_patch_blocks.is_empty() && patches.is_empty();
+    if !blocks_and_patches_empty {
         files.push(CompiledFile {
             path: POST_FILE.to_string(),
-            contents: post_file(project, &patches, &post_blocks),
+            contents: post_file(project, &pre_patch_blocks, &patches, &post_patch_blocks),
         });
         notes.push(format!(
             "The mutator's {POST_FILE} takes the place of the base game's own file of that name, if it has one. The engine's definition parser gives a mutator no way to reach a file its own archive covers up, so a game that post-processes its units there needs the tweak slot route instead."
@@ -519,15 +549,17 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     // a project with any generator gets no tweakdefs export at all rather than
     // one that quietly points at nothing in game.
     let tweakdefs = if !edits.explosion_generators.is_empty()
-        || (added_entries.is_empty() && patches.is_empty() && post_blocks.is_empty())
+        || (added_entries.is_empty() && blocks_and_patches_empty)
     {
         None
     } else {
         Some(tweakdefs_body(
             project,
+            &pre_added_blocks,
             &added_entries,
+            &added_to_patches_blocks,
             &patches,
-            &post_blocks,
+            &post_patch_blocks,
         ))
     };
 
@@ -2135,26 +2167,40 @@ fn write_blocks_section(out: &mut String, blocks: &[&str]) {
     }
 }
 
-/// The executable half of the mutator: the patch table with the code that
-/// applies it, then every block.
-fn post_file(project: &ModProject, patches: &[(String, PatchTree)], blocks: &[&str]) -> String {
+/// The executable half of the mutator: carried Lua and replaced units first,
+/// then the patch table with the code that applies it, then every other
+/// block (issue #3129). Carried Lua has to run before a typed field change
+/// reaches the same field, or an imported block that scales it scales the
+/// typed value too, the same reason [`compile`] compiles carried Lua first.
+fn post_file(
+    project: &ModProject,
+    pre_patch_blocks: &[&str],
+    patches: &[(String, PatchTree)],
+    post_patch_blocks: &[&str],
+) -> String {
     let mut out = header(project);
+    write_blocks_section(&mut out, pre_patch_blocks);
     write_patches_section(&mut out, patches);
-    write_blocks_section(&mut out, blocks);
+    write_blocks_section(&mut out, post_patch_blocks);
     out
 }
 
 /// The same edits as one payload for a game's bare `tweakdefs` mod option
 /// (issue #1278). Everything [`post_file`] runs, plus the units a project
 /// adds, folded in as plain assignments rather than left for a `tweakunits`
-/// slot: see [`CompiledMod::tweakdefs`] for why.
+/// slot: see [`CompiledMod::tweakdefs`] for why. In the same order the chunk
+/// list itself runs: carried Lua, added units, replaced units, then the typed
+/// field changes and everything after them (issue #3129).
 fn tweakdefs_body(
     project: &ModProject,
+    pre_added_blocks: &[&str],
     added: &[(String, Value)],
+    added_to_patches_blocks: &[&str],
     patches: &[(String, PatchTree)],
-    blocks: &[&str],
+    post_patch_blocks: &[&str],
 ) -> String {
     let mut out = header(project);
+    write_blocks_section(&mut out, pre_added_blocks);
     if !added.is_empty() {
         out.push_str(
             "\n-- Units added. Assigned directly: none of these existed before, so there is\n",
@@ -2163,8 +2209,9 @@ fn tweakdefs_body(
         out.push_str(&format!("local added = {}\n", unit_table(added, "")));
         out.push_str("for name, def in pairs(added) do\n  UnitDefs[name] = def\nend\n");
     }
+    write_blocks_section(&mut out, added_to_patches_blocks);
     write_patches_section(&mut out, patches);
-    write_blocks_section(&mut out, blocks);
+    write_blocks_section(&mut out, post_patch_blocks);
     out
 }
 
