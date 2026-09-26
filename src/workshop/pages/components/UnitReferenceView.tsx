@@ -7,14 +7,17 @@
  * The search box and faction filter live here rather than in the table,
  * because the plot reads the same filtered rows the table does: one query
  * and one faction choice, so a unit hidden from the table cannot still turn
- * up as a dot.
+ * up as a dot. Inside a project the collection filter (issue #3146) joins
+ * them for the same reason.
  */
 import { Button, Input } from "@picoframe/frame";
 import { type ReactNode, useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import type { UnitDisplay } from "@/content/bindings";
 import { cn } from "@/lib/utils";
+import { type Collections, collectionTree } from "../../collections";
 import {
+  ALL_COLLECTIONS,
   ALL_FACTIONS,
   filterReferenceRows,
   type UnitReferenceRow,
@@ -31,6 +34,7 @@ export function UnitReferenceView({
   picOf,
   picsPending,
   factionOf,
+  collections,
 }: {
   rows: UnitReferenceRow[];
   renderName: (row: UnitReferenceRow) => ReactNode;
@@ -50,6 +54,13 @@ export function UnitReferenceView({
    *  omitted alongside the faction column and its filter on a page with no
    *  build graph to answer from. */
   factionOf?: (key: string) => string | undefined;
+  /** The project's collections (issue #3146) and the units each one
+   *  includes, for a filter beside the faction one. Absent outside a
+   *  project, which has no collections. */
+  collections?: {
+    all: Collections;
+    unitsOf: (id: string) => ReadonlySet<string> | undefined;
+  };
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -57,6 +68,25 @@ export function UnitReferenceView({
 
   const [query, setQuery] = useState("");
   const [factionFilter, setFactionFilter] = useState(ALL_FACTIONS);
+  const [collectionFilter, setCollectionFilter] = useState(ALL_COLLECTIONS);
+
+  const collectionOptions = useMemo(
+    () =>
+      collectionTree(collections?.all ?? {}).map(({ collection, depth }) => ({
+        value: collection.id,
+        label: `${"— ".repeat(depth)}${collection.name}`,
+      })),
+    [collections],
+  );
+  // A collection that no longer resolves (deleted elsewhere) filters nothing
+  // rather than hiding every row.
+  const inCollection = useMemo(
+    () =>
+      collectionFilter === ALL_COLLECTIONS
+        ? undefined
+        : collections?.unitsOf(collectionFilter),
+    [collectionFilter, collections],
+  );
 
   // Every faction the rows answer for, in alphabetical order, so the filter
   // beside the search box only ever offers a faction that is actually on the
@@ -74,8 +104,9 @@ export function UnitReferenceView({
 
   const needle = query.trim();
   const filterResult = useMemo(
-    () => filterReferenceRows(rows, query, factionFilter, factionOf),
-    [rows, query, factionFilter, factionOf],
+    () =>
+      filterReferenceRows(rows, query, factionFilter, factionOf, inCollection),
+    [rows, query, factionFilter, factionOf, inCollection],
   );
   const filtered = filterResult.rows;
 
@@ -83,7 +114,10 @@ export function UnitReferenceView({
     ? `No unit matches "${needle}".`
     : factionFilter !== ALL_FACTIONS
       ? "No unit in this faction."
-      : "No units.";
+      : inCollection
+        ? "No unit in this collection."
+        : "No units.";
+  const narrowed = !!needle || factionFilter !== ALL_FACTIONS || !!inCollection;
 
   const toggle = (key: string) =>
     setSelected((current) =>
@@ -91,6 +125,22 @@ export function UnitReferenceView({
         ? current.filter((k) => k !== key)
         : [...current, key],
     );
+
+  /** The header checkbox (issue #3113): select every row the filters leave
+   *  on the table, or, when every one already is, clear them. Rows outside
+   *  the filters keep whatever state they had. */
+  const shownKeys = useMemo(() => filtered.map((row) => row.key), [filtered]);
+  const allShownSelected =
+    shownKeys.length > 0 && shownKeys.every((key) => selectedSet.has(key));
+  const toggleShown = () =>
+    setSelected((current) => {
+      if (allShownSelected) {
+        const shown = new Set(shownKeys);
+        return current.filter((key) => !shown.has(key));
+      }
+      const have = new Set(current);
+      return [...current, ...shownKeys.filter((key) => !have.has(key))];
+    });
 
   const byKey = useMemo(
     () => new Map(rows.map((row) => [row.key, row])),
@@ -152,6 +202,18 @@ export function UnitReferenceView({
             ]}
           />
         )}
+        {collectionOptions.length > 0 && (
+          <OptionSelect
+            value={collectionFilter}
+            onValueChange={setCollectionFilter}
+            ariaLabel="Filter by collection"
+            className="h-9 w-auto"
+            options={[
+              { value: ALL_COLLECTIONS, label: "All collections" },
+              ...collectionOptions,
+            ]}
+          />
+        )}
         <p
           className={cn(
             "text-xs",
@@ -160,7 +222,7 @@ export function UnitReferenceView({
         >
           {!filterResult.ok
             ? filterResult.error
-            : needle || factionFilter !== ALL_FACTIONS
+            : narrowed
               ? `${filtered.length} of ${rows.length} units`
               : `${rows.length} unit${rows.length === 1 ? "" : "s"}`}
         </p>
@@ -177,6 +239,8 @@ export function UnitReferenceView({
         emptyMessage={emptyMessage}
         selected={selectedSet}
         onToggle={toggle}
+        allShownSelected={allShownSelected}
+        onToggleShown={toggleShown}
         renderName={renderName}
         picOf={picOf}
         picsPending={picsPending}
