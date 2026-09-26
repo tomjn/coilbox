@@ -12,7 +12,7 @@
  * `workshopPackageMutator` as `written`. The tweak slots carry no files, so
  * their settle loads the game with the slots set as mod options instead, and its
  * answer goes to `workshopCompile` for a local launch and
- * `workshopPackBarSlots` for a lobby.
+ * `workshopPackTweakSlots` for a lobby.
  *
  * It loads the game at least once for a project with any typed number, so
  * it is asked for just before a test, a package or a pack, not on every
@@ -94,8 +94,8 @@ export const workshopSettleTypedValuesInPlace = defineCommand<
 
 /**
  * Which tweak slot route a project takes to a game that declares the slots:
- * the one bare `tweakdefs` slot a local launch writes (`localBar.ts`), or the
- * numbered slots a lobby gets (`barPack.ts`).
+ * the one bare `tweakdefs` slot a local launch writes (`localTweakSlot.ts`),
+ * or the numbered slots a lobby gets (`tweakPack.ts`).
  */
 export type TweakRoute = "bare" | "numbered";
 

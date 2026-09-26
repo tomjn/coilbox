@@ -1,10 +1,11 @@
 // @vitest-environment happy-dom
 /**
  * The one button that plays a workshop project on your own machine (issue
- * #1278). What matters here is which route each launch takes: the BAR route
- * writes nothing and rescans nothing, and the mutator route writes the test
- * game and rescans for it before naming it in the launch. Everything else
- * (the compiler's own output, the base64 codec) is `localBar.test.ts`'s.
+ * #1278). What matters here is which route each launch takes: the tweak-slot
+ * route writes nothing and rescans nothing, and the mutator route writes the
+ * test game and rescans for it before naming it in the launch. Everything
+ * else (the compiler's own output, the base64 codec) is
+ * `localTweakSlot.test.ts`'s.
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -64,7 +65,7 @@ const {
     chunks: [],
     files: [],
     notes: [],
-    barTweakdefs: "do x = 5.5555553 end",
+    tweakdefs: "do x = 5.5555553 end",
   })),
   settleTypedValues: vi.fn(
     async (_args: unknown): Promise<unknown> => ({
@@ -113,12 +114,12 @@ let mockCompiled: {
     chunks: unknown[];
     files: { path: string; contents: string }[];
     notes: string[];
-    barTweakdefs: string | null;
+    tweakdefs: string | null;
   } | null;
   loading: boolean;
   error: string | null;
 } = {
-  compiled: { chunks: [], files: [], notes: [], barTweakdefs: null },
+  compiled: { chunks: [], files: [], notes: [], tweakdefs: null },
   loading: false,
   error: null,
 };
@@ -196,14 +197,14 @@ const { installSettingsStorage, memorySettingsStorage } = await import(
 /** A `CompileState` with only the fields these tests care about. */
 function compiled(over: {
   files?: { path: string; contents: string }[];
-  barTweakdefs?: string | null;
+  tweakdefs?: string | null;
 }) {
   return {
     compiled: {
       chunks: [],
       files: over.files ?? [],
       notes: [],
-      barTweakdefs: over.barTweakdefs ?? null,
+      tweakdefs: over.tweakdefs ?? null,
     },
     loading: false,
     error: null,
@@ -251,20 +252,20 @@ describe("PlayLocallyButton", () => {
     mockCompiled = compiled({ files: [{ path: "modinfo.lua", contents: "" }] });
     draw();
     fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
-    expect(screen.queryByText("Beyond All Reason mod options")).toBeNull();
+    expect(screen.queryByText("Local tweak-slot mod option")).toBeNull();
   });
 
   it("plays the tweak slot route with the values settled for the bare slot, with no mutator write and no rescan", async () => {
     mockCompiled = compiled({
       files: [{ path: "modinfo.lua", contents: "" }],
-      barTweakdefs: "do end",
+      tweakdefs: "do end",
     });
     mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
     draw();
     fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
 
-    // The BAR route is the default once it is available, so Play launches
-    // it without any further selection.
+    // The tweak-slot route is the default once it is available, so Play
+    // launches it without any further selection.
     fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
 
     await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
@@ -291,7 +292,7 @@ describe("PlayLocallyButton", () => {
   it("plays the tweak slot route as typed and says why when the game cannot be checked", async () => {
     mockCompiled = compiled({
       files: [{ path: "modinfo.lua", contents: "" }],
-      barTweakdefs: "do end",
+      tweakdefs: "do end",
     });
     mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
     settleTypedValuesTweaks.mockResolvedValueOnce({

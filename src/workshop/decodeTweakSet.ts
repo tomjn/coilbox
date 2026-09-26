@@ -1,7 +1,7 @@
 /**
  * Decoding a base64 tweak payload back to Lua (issue #1280).
  *
- * The inverse of `barPack.ts` (issue #1277): that file wraps the command that
+ * The inverse of `tweakPack.ts` (issue #1277): that file wraps the command that
  * packs a project into `!bset` lines, this one wraps the command that reads
  * one, or a whole set of a battle's mod options, back out. The decoding
  * itself, classification, size cap and everything about which payloads are
@@ -15,7 +15,7 @@ import { defineCommand } from "@picoframe/plugin-sdk";
 import { checkCloneName, type UnitClone } from "./clones";
 import type { ReadOnlyLuaBlock } from "./readOnlyLua";
 
-/** Which BAR mod option a slot's key names. */
+/** Which tweak-slot mod option a slot's key names. */
 export type SlotKind = "tweakdefs" | "tweakunits" | "unknown";
 
 /** What decoding one payload found, matching `decode.rs`'s `DecodedSlot`. */

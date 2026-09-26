@@ -21,7 +21,7 @@ import type { ModProject } from "./project";
 /**
  * Which of the two forms a piece of generated Lua is written in.
  *
- * `table` is a plain map of unit name to definition, which is what BAR's
+ * `table` is a plain map of unit name to definition, which is what a
  * `tweakunits` slot carries and what a game's own `units/<name>.lua` returns.
  * `block` is executable Lua wrapped in `do ... end` with `UnitDefs` in scope,
  * which is what `tweakdefs` carries. The second is needed the moment a change
@@ -53,11 +53,11 @@ export interface CompiledMod {
   /** What the compiler could not do, and what to watch in what it did. */
   notes: string[];
   /**
-   * Every edit as one `do ... end` block, for Beyond All Reason's bare
-   * `tweakdefs` mod option on a local skirmish launch (issue #1278). `null`
-   * when there is nothing to tweak. See `localBar.ts`.
+   * Every edit as one `do ... end` block, for a game's bare `tweakdefs` mod
+   * option on a local skirmish launch (issue #1278). `null` when there is
+   * nothing to tweak. See `localTweakSlot.ts`.
    */
-  barTweakdefs: string | null;
+  tweakdefs: string | null;
 }
 
 export const workshopCompile = defineCommand<

@@ -19,7 +19,7 @@ let compileResponse: unknown = {
   chunks: [],
   files: [],
   notes: [],
-  barTweakdefs: null,
+  tweakdefs: null,
 };
 /** Which archives the fake unitsync says hold a post file, by archive name.
  *  Keyed rather than one shared answer, so a dependency can hold one while the
@@ -87,7 +87,7 @@ afterEach(() => {
   cleanup();
   preflightResponse = { blockers: [], review: [], passes: [] };
   changeLedgerResponse = { units: [], notes: [] };
-  compileResponse = { chunks: [], files: [], notes: [], barTweakdefs: null };
+  compileResponse = { chunks: [], files: [], notes: [], tweakdefs: null };
   archivesWithPostFile = [];
   writeResponse = null;
 });
@@ -217,7 +217,7 @@ describe("the checks button", () => {
         screen.getByRole("button", { name: "No problems found" }),
       );
       expect(screen.getByText("Mutator archive")).toBeTruthy();
-      expect(screen.getByText("BAR tweak slots")).toBeTruthy();
+      expect(screen.getByText("Tweak slots")).toBeTruthy();
     });
 
     it("offers the in-place write for a loose game in a games folder", async () => {
@@ -443,7 +443,7 @@ describe("the checks button", () => {
         chunks: [],
         files: [{ path: "gamedata/unitdefs_post.lua", contents: "-- edits" }],
         notes: [],
-        barTweakdefs: null,
+        tweakdefs: null,
       };
 
       it("is silent for a project that writes no post file", async () => {
@@ -542,8 +542,8 @@ describe("the checks button", () => {
                   description: "Field change: maxDamage",
                   fieldPath: "maxDamage",
                   files: ["gamedata/unitdefs_post.lua"],
-                  barSlot: { kind: "tweakunits", label: "tweakunits" },
-                  barMiss: null,
+                  tweakSlot: { kind: "tweakunits", label: "tweakunits" },
+                  tweakMiss: null,
                   uncompiledReason: null,
                 },
               ],
@@ -569,7 +569,7 @@ describe("the checks button", () => {
         ).toBeTruthy();
       });
 
-      it("says why a change reached no BAR slot", async () => {
+      it("says why a change reached no tweak slot", async () => {
         changeLedgerResponse = {
           units: [
             {
@@ -579,8 +579,8 @@ describe("the checks button", () => {
                   description: "Switched off",
                   fieldPath: null,
                   files: ["gamedata/unitdefs_post.lua"],
-                  barSlot: null,
-                  barMiss: "oversized",
+                  tweakSlot: null,
+                  tweakMiss: "oversized",
                   uncompiledReason: null,
                 },
               ],
@@ -593,7 +593,7 @@ describe("the checks button", () => {
           await screen.findByRole("button", { name: "No problems found" }),
         );
         expect(
-          await screen.findByText(/too big for any BAR slot/),
+          await screen.findByText(/too big for any tweak slot/),
         ).toBeTruthy();
       });
 
@@ -612,8 +612,8 @@ describe("the checks button", () => {
                   description: "Name (en): Commander",
                   fieldPath: null,
                   files: ["language/en/zz_coilbox.json"],
-                  barSlot: null,
-                  barMiss: "noSlotForWords",
+                  tweakSlot: null,
+                  tweakMiss: "noSlotForWords",
                   uncompiledReason: null,
                 },
               ],
@@ -627,7 +627,7 @@ describe("the checks button", () => {
         );
         expect(
           await screen.findByText(
-            /language\/en\/zz_coilbox\.json · no BAR slot can carry words/,
+            /language\/en\/zz_coilbox\.json · no tweak slot can carry words/,
           ),
         ).toBeTruthy();
       });
@@ -642,8 +642,8 @@ describe("the checks button", () => {
                   description: "Switched off",
                   fieldPath: null,
                   files: ["gamedata/unitdefs_post.lua"],
-                  barSlot: { kind: "tweakdefs", label: "tweakdefs" },
-                  barMiss: null,
+                  tweakSlot: { kind: "tweakdefs", label: "tweakdefs" },
+                  tweakMiss: null,
                   uncompiledReason: null,
                 },
               ],
@@ -655,8 +655,8 @@ describe("the checks button", () => {
                   description: "Switched off",
                   fieldPath: null,
                   files: ["gamedata/unitdefs_post.lua"],
-                  barSlot: { kind: "tweakdefs", label: "tweakdefs" },
-                  barMiss: null,
+                  tweakSlot: { kind: "tweakdefs", label: "tweakdefs" },
+                  tweakMiss: null,
                   uncompiledReason: null,
                 },
               ],
