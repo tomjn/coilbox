@@ -33,6 +33,11 @@
  * asking the compiler to fetch it again. Every move after the first reads
  * against that snapshot.
  */
+import type { UnitClones } from "./clones";
+import type { UnitOverrides } from "./overrides";
+import { resolvedDef } from "./overrides";
+import { libraryWeaponDef, type WeaponLibrary } from "./weaponLibrary";
+import { ownWeaponDefs } from "./weaponRefs";
 
 /** One class, and how many of the game's units are in it. */
 export interface ArmorClassSummary {
@@ -295,11 +300,14 @@ export function rebaseArmorClasses(
 }
 
 /** One thing wrong with a definition, for the same rendering `RefProblem`
- *  already has in `WeaponSlotsPanel`. */
+ *  already has in `WeaponSlotsPanel`. Always a warning (issue #3104): an
+ *  unknown armour class falls back to default damage rather than stopping
+ *  the project from building or loading. */
 export interface ArmorProblem {
   /** Stable within a report, so React can key on it and a test can name one. */
   id: string;
   message: string;
+  severity: "warning";
 }
 
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
@@ -307,7 +315,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * The keys of a weapon's `damage` table that name no armour class, in the game
- * or in the project's own moves.
+ * or in the project's own moves, grouped into one finding per weapon (issue
+ * #3104).
  *
  * `"default"` is never one of them: it is the engine's own distinguished key,
  * matched literally rather than against the class list (`WeaponDef.cpp` reads
@@ -317,6 +326,12 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * reports: it is silently read as the default damage instead, which is why
  * this has to be a coilbox check rather than something the game would catch
  * first.
+ *
+ * A weapon with several unknown keys used to get one paragraph per key, which
+ * for a weapon copied between games with a renamed class read as a wall of
+ * near-identical text. One finding per weapon reads the whole table at once,
+ * and is a warning rather than an error: it does not stop the project from
+ * building or loading, it only means those rows fall back to default damage.
  */
 export function unknownDamageClasses(
   def: Record<string, unknown> | undefined,
@@ -329,13 +344,62 @@ export function unknownDamageClasses(
   if (!isPlainObject(damage)) return [];
   const known = new Set(knownClasses.map((c) => c.toLowerCase()));
   known.add("default");
+  const unknown = Object.keys(damage).filter(
+    (key) => !known.has(key.toLowerCase()),
+  );
+  if (unknown.length === 0) return [];
+  const noun = unknown.length === 1 ? "class" : "classes";
+  const rows = unknown.length === 1 ? "row" : "rows";
+  return [
+    {
+      id: `${holder}:damage`,
+      message: `${holder}'s damage table names ${unknown.length} armour ${noun} this game does not have: ${unknown.join(", ")}. The engine uses the default damage for them instead, so ${unknown.length === 1 ? "this" : "these"} ${rows} ${unknown.length === 1 ? "has" : "have"} no effect.`,
+      severity: "warning",
+    },
+  ];
+}
+
+/**
+ * Every {@link unknownDamageClasses} finding across the whole project, for the
+ * checks drawer (issue #3104).
+ *
+ * `UnitPage.tsx` already runs the same check for the unit on screen, scoped to
+ * that unit's own weapon definitions and the library weapons its slots fire.
+ * The checks drawer needs the same finding without anybody having opened the
+ * unit it is about, so this runs it again over every unit the project has
+ * patched or copied, plus every weapon the project's library holds outright:
+ * a library weapon can be fired by a unit nowhere in `overrides` or `clones`,
+ * so it is scanned on its own rather than only through a unit that equips it.
+ */
+export function projectDamageClassProblems(
+  overrides: UnitOverrides,
+  clones: UnitClones,
+  gameUnits: Record<string, Record<string, unknown>>,
+  library: WeaponLibrary,
+  knownClasses: readonly string[],
+): ArmorProblem[] {
+  const units = new Set([...Object.keys(overrides), ...Object.keys(clones)]);
   const out: ArmorProblem[] = [];
-  for (const key of Object.keys(damage)) {
-    if (known.has(key.toLowerCase())) continue;
-    out.push({
-      id: `${holder}:damage:${key}`,
-      message: `${holder}'s damage table names ${key}, which is not an armour class in this game or in the project. The engine reads an unknown class as the default damage instead, so this row has no effect.`,
-    });
+  for (const unit of [...units].sort()) {
+    const base = clones[unit]?.def ?? gameUnits[unit];
+    if (!base) continue;
+    const resolved = resolvedDef(base, overrides[unit]);
+    const own = ownWeaponDefs(resolved).defs;
+    for (const [key, value] of Object.entries(own)) {
+      if (!isPlainObject(value)) continue;
+      // Two units can both carry a weapon called the same thing, so the id
+      // is namespaced by unit even though the message reads by weapon name
+      // alone (issue #3104).
+      for (const problem of unknownDamageClasses(value, knownClasses, key))
+        out.push({ ...problem, id: `${unit}:${problem.id}` });
+    }
   }
+  for (const weapon of Object.values(library))
+    for (const problem of unknownDamageClasses(
+      libraryWeaponDef(weapon),
+      knownClasses,
+      weapon.key,
+    ))
+      out.push({ ...problem, id: `library:${problem.id}` });
   return out;
 }

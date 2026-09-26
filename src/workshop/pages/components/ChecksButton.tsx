@@ -66,6 +66,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { Archive, ConfigOption } from "@/content/bindings";
+import type { ArmorProblem } from "../../armorClasses";
 import type { ChangeLedger, LedgerChange } from "../../changeLedger";
 import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
 import type { CompatFinding, CompatState } from "../../compatibility";
@@ -663,6 +664,7 @@ export function ChecksButton({
   compatibility,
   onApplyFix,
   onInPlaceWrite,
+  armorClassProblems,
 }: {
   gameName: string;
   /** The game's own archives, its primary one first, for the post-processing
@@ -697,6 +699,13 @@ export function ChecksButton({
    *  follow it in the project (issue #3023) and drop its own unitsync reads
    *  of the game (issue #2637). */
   onInPlaceWrite: (done: InPlaceDone) => void;
+  /** A weapon's damage table naming an armour class this game does not have,
+   *  across every unit the project has patched or copied and every weapon
+   *  its library holds (issue #3104), so the finding is visible without
+   *  opening the unit it is about. Worked out by the page, the same way
+   *  `compatibility` is, since it already holds the project's edits and the
+   *  game's live data. */
+  armorClassProblems: ArmorProblem[];
 }) {
   const [open, setOpen] = useState(false);
   // Read whenever a project is open, not only while the drawer is up: see
@@ -728,7 +737,10 @@ export function ChecksButton({
   const covered = postHook.state?.kind === "covered" ? 1 : 0;
   const blockers =
     (preflight.report?.blockers.length ?? 0) + (moved?.broken ?? 0) + covered;
-  const review = (preflight.report?.review.length ?? 0) + (moved?.review ?? 0);
+  const review =
+    (preflight.report?.review.length ?? 0) +
+    (moved?.review ?? 0) +
+    armorClassProblems.length;
   const diagnostics = diagnosticErrors.length;
   // A command that failed to answer is not a clean project, it is a question
   // this button could not settle. Kept apart from the counted severities
@@ -821,6 +833,11 @@ export function ChecksButton({
             primaryArchive={gameArchives[0]?.name ?? ""}
             state={postHook.state}
             loading={postHook.loading}
+          />
+          <PreflightGroup
+            heading="Armour classes"
+            lines={armorClassProblems.map((p) => p.message)}
+            className="border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400"
           />
           <PreflightSection
             project={project}
