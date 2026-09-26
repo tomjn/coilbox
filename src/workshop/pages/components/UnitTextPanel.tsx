@@ -142,7 +142,7 @@ function TextRow({
   // offered for editing when editing it would change nothing.
   if (row.redirect)
     return (
-      <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-start gap-3 rounded-md border-l-2 border-l-transparent py-1.5 pl-2 pr-1">
+      <div className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-start gap-3 rounded-md py-1.5 pl-2 pr-1">
         <div className="flex min-w-0 flex-col gap-0.5 pt-1.5">
           <span className="text-xs font-medium">{label}</span>
           <span className="text-[10px] text-muted-foreground">{hint}</span>
@@ -167,12 +167,22 @@ function TextRow({
   return (
     <div
       className={cn(
-        "grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-start gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
-        overridden ? "border-l-primary bg-primary/5" : "border-l-transparent",
+        "grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-start gap-3 rounded-md py-1.5 pl-2 pr-1",
+        overridden && "bg-primary/5",
       )}
     >
       <div className="flex min-w-0 flex-col gap-0.5 pt-1.5">
-        <span className="text-xs font-medium">{label}</span>
+        <span className="flex items-center gap-1.5 text-xs font-medium">
+          {label}
+          {overridden && (
+            <span
+              className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+              title="This value has been changed from the game's default."
+            >
+              edited
+            </span>
+          )}
+        </span>
         <span className="text-[10px] text-muted-foreground">{hint}</span>
       </div>
 

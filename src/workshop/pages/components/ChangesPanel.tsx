@@ -220,15 +220,23 @@ export function ChangesPanel({
                     return (
                       <li
                         key={path}
-                        className="flex flex-col gap-0.5 rounded-md border-l-2 border-l-primary bg-primary/5 py-1 pl-2 pr-1"
+                        className="flex flex-col gap-0.5 rounded-md bg-primary/5 py-1 pl-2 pr-1"
                       >
-                        <Link
-                          to={projectPath(projectId, unit, path)}
-                          className="truncate font-mono text-xs text-primary hover:underline"
-                          title={path}
-                        >
-                          {path}
-                        </Link>
+                        <span className="flex items-center gap-1.5">
+                          <Link
+                            to={projectPath(projectId, unit, path)}
+                            className="truncate font-mono text-xs text-primary hover:underline"
+                            title={path}
+                          >
+                            {path}
+                          </Link>
+                          <span
+                            className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+                            title="This value has been changed from the game's default."
+                          >
+                            edited
+                          </span>
+                        </span>
                         <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                           <span>
                             Game: {display(readPath(gameUnits[unit], path))}

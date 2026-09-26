@@ -516,9 +516,9 @@ export function UnitFieldRow({
       // what the ledger already carries.
       id={`field-${row.path}`}
       className={cn(
-        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md border-l-2 py-1.5 pl-2 pr-1",
+        "grid grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto] gap-3 rounded-md py-1.5 pl-2 pr-1",
         tall ? "items-start" : "items-center",
-        overridden ? "border-l-primary bg-primary/5" : "border-l-transparent",
+        overridden && "bg-primary/5",
       )}
     >
       <div className="flex min-w-0 flex-col gap-0.5">
@@ -527,6 +527,14 @@ export function UnitFieldRow({
             {row.label}
           </span>
           {row.field.help && <HelpTip>{row.field.help}</HelpTip>}
+          {overridden && (
+            <span
+              className="shrink-0 rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary"
+              title="This value has been changed from the game's default."
+            >
+              edited
+            </span>
+          )}
           {checkMarker && (
             <TooltipProvider delayDuration={150}>
               <Tooltip>
