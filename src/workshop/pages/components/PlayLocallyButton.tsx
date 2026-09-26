@@ -20,11 +20,11 @@
 import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useState } from "react";
-import { OptionSelect } from "@/components/OptionSelect";
 import {
   primeScan,
   useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncThumbnails,
 } from "@/content/config";
 import {
   isWorkshopMutatorArchive,
@@ -38,6 +38,7 @@ import {
   usePreferredTarget,
 } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
+import { MapPickerDrawer } from "@/play/pages/components/MapPickerDrawer";
 import { useCompiledProject, workshopCompile } from "../../compile";
 import {
   settledSummary,
@@ -98,6 +99,12 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
   const maps = uniqueByName(scan.data?.maps ?? []);
   const [mapName, setMapName] = useSetting<string>("workshop.testMap", "");
   const map = maps.find((m) => m.name === mapName) ?? maps[0];
+  const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  // Only rendered while the drawer is open, for the reason `gameInfo` is.
+  const { thumbs } = useUnitsyncThumbnails(
+    open ? target?.enginePath : undefined,
+    open ? target?.dataDir : undefined,
+  );
 
   // The mod options a bare tweakdefs slot needs the game to declare, read
   // only while the drawer is open for the reason `useCompiledProject` is.
@@ -337,14 +344,24 @@ export function PlayLocallyButton({ project }: { project: ModProject }) {
 
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Map</span>
-            <OptionSelect
-              value={map?.name ?? ""}
-              onValueChange={setMapName}
-              options={maps.map((m) => ({ value: m.name, label: m.name }))}
-              placeholder={waiting ? "Reading maps" : "No map installed"}
+            <Button
+              variant="outline"
+              className="justify-start font-normal"
+              onClick={() => setMapPickerOpen(true)}
               disabled={busy || maps.length === 0}
-            />
+            >
+              {map?.name ?? (waiting ? "Reading maps" : "No map installed")}
+            </Button>
           </div>
+          <MapPickerDrawer
+            open={mapPickerOpen}
+            onOpenChange={setMapPickerOpen}
+            maps={maps}
+            thumbs={thumbs}
+            selectedName={map?.name ?? ""}
+            onSelect={setMapName}
+            mapsLoading={waiting}
+          />
 
           <div className="flex flex-col gap-2 border-t border-border/60 pt-4">
             <Button
