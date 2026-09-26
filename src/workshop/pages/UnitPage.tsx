@@ -709,13 +709,21 @@ export default function UnitPage() {
     supporting.find((s) => s.key === supportParam) ??
     (slots.length === 0 ? supporting[0] : undefined);
   const slot = slots.find((s) => s.step === slotParam) ?? slots[0];
+  // Only while the explosions tab is open. `explosion` in the URL survives a
+  // switch to another tab, on purpose, so coming back to Explosions restores
+  // it (issue #3097's own restore-on-return behaviour), but that means it is
+  // still there to read while Weapons is open, and this is the one thing
+  // that decides which of the three `weaponView` below draws. Read it there
+  // and a slot's own tab would show the death explosion's fields instead.
   // The explosions tab always has one on screen, the way the fields tab
   // always shows a field group: the named one, or the first when none is
   // named or the name does not resolve.
   const explosion =
-    (isDeathMount(explosionParam)
-      ? explosions.find((e) => e.mount === explosionParam)
-      : undefined) ?? (tab === "explosions" ? explosions[0] : undefined);
+    tab === "explosions"
+      ? ((isDeathMount(explosionParam)
+          ? explosions.find((e) => e.mount === explosionParam)
+          : undefined) ?? explosions[0])
+      : undefined;
   const explosionFires = explosion
     ? equippedKey(equipped, unitKey, explosion.mount)
     : undefined;

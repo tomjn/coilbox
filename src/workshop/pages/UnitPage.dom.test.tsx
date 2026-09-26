@@ -2924,6 +2924,53 @@ describe("UnitPage", () => {
         screen.queryByText(heading("Death explosion: BIG_UNITEX")),
       ).toBeNull();
     });
+
+    /**
+     * The `explosion` URL parameter survives a switch to Weapons on purpose,
+     * so coming back to Explosions restores it (the test above). But the
+     * page's own `weaponView` used to be driven by that same lingering
+     * parameter rather than by which tab was open, so a unit with both a
+     * weapon and a death explosion showed the explosion's fields under the
+     * weapon slot picker the moment the URL still named one.
+     */
+    it("shows the weapon's own fields on Weapons, not a death explosion left open in the URL", () => {
+      mockWeaponDefs = {
+        big_unitex: {
+          areaofeffect: 64,
+          impulsefactor: 0.123,
+          damage: { default: 25 },
+        },
+      };
+      show(
+        {
+          blaster: {
+            humanName: "Blaster",
+            explodeas: "BIG_UNITEX",
+            selfdestructas: "BIG_UNITEX",
+            weapons: [{ name: "disintegrator" }],
+          },
+          other: { explodeas: "big_unitex", selfdestructas: "big_unitex" },
+        },
+        `/workshop/new?game=${encodeURIComponent(GAME.name)}&unit=blaster`,
+        [{ name: "blaster", fullName: "Blaster" }],
+      );
+      openExplosions();
+      // Picking a mount by name is what puts `explosion=` in the URL (the
+      // first one opens on arrival with nothing there yet, same as the test
+      // above), and that is what the old code kept reading regardless of
+      // which tab was open.
+      fireEvent.click(
+        screen.getByRole("radio", { name: "Self-destruct explosion" }),
+      );
+      expect(screen.queryByLabelText("Splash diameter")).toBeTruthy();
+
+      fireEvent.mouseDown(screen.getByRole("tab", { name: /Weapons/ }));
+      expect(
+        screen.queryByText(heading("Death explosion: BIG_UNITEX")),
+      ).toBeNull();
+      expect(screen.getByRole("radio", { name: /^Weapon 1,/ })).toBeTruthy();
+      expect(screen.queryByLabelText("Splash diameter")).toBeNull();
+    });
   });
 
   /**
