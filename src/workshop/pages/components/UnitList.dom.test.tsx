@@ -14,6 +14,36 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { UnitList } from "./UnitList";
 
+// The real `OptionSelect` is a Radix `Select`, whose trigger is a button
+// rather than a form control: `fireEvent.change` has nothing to act on. A
+// plain native select stands in, the same swap `UnitPage.dom.test.tsx` makes
+// for the same reason (issue #3109's faction and changed filters).
+vi.mock("@/components/OptionSelect", () => ({
+  OptionSelect: ({
+    value,
+    onValueChange,
+    options,
+    ariaLabel,
+  }: {
+    value: string;
+    onValueChange: (value: string) => void;
+    options: { value: string; label: string }[];
+    ariaLabel?: string;
+  }) => (
+    <select
+      aria-label={ariaLabel}
+      value={value}
+      onChange={(e) => onValueChange(e.target.value)}
+    >
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
+}));
+
 /** happy-dom's ResizeObserver is a stub that never calls back, so a test that
  *  needs a measured container brings its own, firing once with a fixed height.
  *  Copied from `MissionLuaCode.test.tsx`, which windows the same way. */
@@ -309,6 +339,123 @@ describe("searching by stat (issue #2656)", () => {
       target: { value: "unit001" },
     });
     expect(screen.getByText("1 of 3 units")).toBeTruthy();
+  });
+});
+
+describe("the faction and changed filters (issue #3109)", () => {
+  function twoFactions(): Record<string, Record<string, unknown>> {
+    return {
+      unit000: {},
+      unit001: {},
+      unit002: {},
+    };
+  }
+
+  /** Arm for even-numbered units, Core for odd, so a two-faction game is one
+   *  fixture rather than a build graph. */
+  const factionOf = (key: string) =>
+    Number(key.slice(-3)) % 2 === 0 ? "Arm" : "Core";
+
+  it("offers no faction picker when factionOf answers nothing for any unit", () => {
+    draw();
+    expect(screen.queryByLabelText("Filter units by faction")).toBeNull();
+  });
+
+  it("narrows the list to the picked faction", () => {
+    draw({ units: twoFactions(), factionOf });
+    expect(screen.getByText("3 units")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Filter units by faction"), {
+      target: { value: "Core" },
+    });
+    expect(screen.getByText("1 unit")).toBeTruthy();
+    expect(rowButtons()).toHaveLength(1);
+    expect(rowButtons()[0].textContent).toContain("unit001");
+  });
+
+  it("narrows to units with edits, including an added unit", () => {
+    draw({
+      units: twoFactions(),
+      overrides: { unit000: { health: 5000 } },
+      clones: {
+        unit002: {
+          key: "unit002",
+          replacesGameUnit: false,
+          def: {},
+        },
+      },
+    });
+    expect(screen.getByText("3 units")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Filter units by changes"), {
+      target: { value: "changed" },
+    });
+    expect(screen.getByText("2 units")).toBeTruthy();
+    const shown = rowButtons().map((b) => b.textContent);
+    expect(shown.some((t) => t?.includes("unit000"))).toBe(true);
+    expect(shown.some((t) => t?.includes("unit002"))).toBe(true);
+    expect(shown.some((t) => t?.includes("unit001"))).toBe(false);
+  });
+
+  it("combines the faction and changed filters", () => {
+    draw({
+      units: twoFactions(),
+      // Even-numbered units are Arm, odd are Core: unit000 and unit002 are
+      // both Arm, so only a changed Core unit tells the two filters apart.
+      factionOf,
+      overrides: { unit000: { health: 5000 } },
+      clones: {
+        unit001: {
+          key: "unit001",
+          replacesGameUnit: false,
+          def: {},
+        },
+      },
+    });
+    fireEvent.change(screen.getByLabelText("Filter units by faction"), {
+      target: { value: "Arm" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter units by changes"), {
+      target: { value: "changed" },
+    });
+    // unit000 and unit001 both have edits, but only unit000 is Arm.
+    expect(screen.getByText("1 unit")).toBeTruthy();
+    expect(rowButtons()).toHaveLength(1);
+    expect(rowButtons()[0].textContent).toContain("unit000");
+  });
+
+  it("combines with the search box and the collection restriction too", () => {
+    draw({
+      units: { ...twoFactions(), unit003: {} },
+      factionOf,
+      restrictTo: new Set(["unit000", "unit001", "unit002"]),
+      overrides: { unit000: { health: 5000 }, unit002: { health: 6000 } },
+    });
+    fireEvent.change(screen.getByLabelText("Filter units by faction"), {
+      target: { value: "Arm" },
+    });
+    fireEvent.change(screen.getByLabelText("Filter units by changes"), {
+      target: { value: "changed" },
+    });
+    // Arm plus changed leaves unit000 and unit002. unit003 is excluded by
+    // the collection, and unit001 is neither Arm nor changed.
+    expect(screen.getByText("2 units")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Search units"), {
+      target: { value: "unit002" },
+    });
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
+  });
+
+  it("counts a disabled unit and a build-menu edit as changed too", () => {
+    draw({
+      units: twoFactions(),
+      menus: { unit000: [{ op: "add", unit: "unit001" }] },
+      disabled: ["unit002"],
+    });
+    fireEvent.change(screen.getByLabelText("Filter units by changes"), {
+      target: { value: "changed" },
+    });
+    expect(screen.getByText("2 units")).toBeTruthy();
+    const shown = rowButtons().map((b) => b.textContent);
+    expect(shown.some((t) => t?.includes("unit001"))).toBe(false);
   });
 });
 
