@@ -331,6 +331,23 @@ export interface CopySource {
   beforePost?: PostChange;
 }
 
+/** A weapon out of the game's own shared table, ready to copy, or `undefined`
+ *  for a name the game does not define. `beforePostOf` is what the game's
+ *  post files changed in it, when the game could say (issue #3054): a unit
+ *  page asks its own `defs.beforePost.weaponDefs`, and the Reference table's
+ *  bulk range edit (issue #3157) asks the same table, so both copy a shared
+ *  weapon the same way. */
+export function sharedWeaponCopy(
+  name: string,
+  weaponDefs: Record<string, Record<string, unknown>>,
+  beforePostOf: (name: string) => PostChange | undefined,
+): CopySource | undefined {
+  const def = weaponDefs[name];
+  return def
+    ? { source: name, def, beforePost: beforePostOf(name) }
+    : undefined;
+}
+
 /** One weapon to add to the library, and the name it gets there. */
 export interface PlannedCopy {
   key: string;

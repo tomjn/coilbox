@@ -277,6 +277,7 @@ import {
   planLibraryCopy,
   refProblems,
   resolveRef,
+  sharedWeaponCopy,
   supportingDefs,
   type WeaponRef,
 } from "../weaponRefs";
@@ -1939,13 +1940,7 @@ export default function UnitPage() {
   };
   /** A weapon out of the game's shared table, to copy. */
   const sharedCopy = (name: string): CopySource | undefined =>
-    weaponDefs[name]
-      ? {
-          source: name,
-          def: weaponDefs[name],
-          beforePost: gameWeaponBeforePost(name),
-        }
-      : undefined;
+    sharedWeaponCopy(name, weaponDefs, gameWeaponBeforePost);
   /** What a reference on a weapon out of the game's shared table names, to
    *  copy along with it (issue #2641). */
   const gameChildOf = (ref: WeaponRef) => sharedCopy(ref.value.toLowerCase());

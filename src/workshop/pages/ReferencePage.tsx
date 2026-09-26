@@ -36,6 +36,7 @@ import {
   EmptyState,
 } from "@/content/pages/components/states";
 import { buildTechForest } from "@/content/techForest";
+import type { BatchOperation, BatchRounding } from "../batchEdit";
 import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
 import { collectionUnits, EMPTY_COLLECTIONS } from "../collections";
@@ -43,6 +44,7 @@ import { useUnitDefs } from "../config";
 import { useEditHistory, useUndoRedoKeys } from "../history";
 import { resolvedDef, type UnitOverrides } from "../overrides";
 import { EMPTY_EDITS, editSlot, useModProjects } from "../project";
+import { planRangeChanges, type RangeEditContext } from "../rangeEdit";
 import { setReferenceValue } from "../referenceEdit";
 import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
@@ -183,6 +185,75 @@ export default function ReferencePage() {
   };
   useUndoRedoKeys(undo, redo);
 
+  // What the game's post files changed in a shared weapon (issue #3054), for
+  // a copy Range's own writer makes of one (issue #3157), the same read
+  // `UnitPage.tsx`'s own copy button asks.
+  const rangeBeforePostOf = (name: string) =>
+    defs?.beforePost && (defs.beforePost.weaponDefs[name] ?? {});
+  const rangeContext = (
+    overridesArg: UnitOverrides,
+    libraryArg: WeaponLibrary,
+    equippedArg: EquippedWeapons,
+  ): RangeEditContext => ({
+    units,
+    ownClones,
+    weaponDefs: defs?.weaponDefs ?? {},
+    overrides: overridesArg,
+    library: libraryArg,
+    equipped: equippedArg,
+    checksum: defs?.checksum,
+    beforePostOf: rangeBeforePostOf,
+  });
+  // Range's own preview, off this render's own state (issue #3157), the same
+  // as every other column's preview reads `overrides` straight off the page.
+  const rangePlan = (
+    keys: string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+  ) =>
+    planRangeChanges(
+      rangeContext(overrides, library, equipped),
+      keys,
+      operation,
+      rounding,
+    );
+  // Range's own writer, folding the overrides, library and equipped stores it
+  // touches into one commit (issue #3157), the same one `updateOverrides`
+  // makes for a plain column. Recomputed off `current` rather than this
+  // render's own state, the way `applyEdits`'s own doc comment asks every
+  // updater to (a render behind a write made earlier in the same pass).
+  const applyRange = (
+    keys: string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+  ) => {
+    if (!project) return;
+    const changed = applyEdits(project.id, (current) => {
+      const plan = planRangeChanges(
+        rangeContext(
+          current.overrides,
+          current.weapons ?? NO_LIBRARY,
+          current.equipped ?? NO_EQUIPPED,
+        ),
+        keys,
+        operation,
+        rounding,
+      );
+      const withOverrides = editSlot(
+        current,
+        "overrides",
+        () => plan.overrides,
+      );
+      const withLibrary = editSlot(
+        withOverrides,
+        "weapons",
+        () => plan.library,
+      );
+      return editSlot(withLibrary, "equipped", () => plan.equipped);
+    });
+    if (changed) history.push(project.id, changed.before);
+  };
+
   const editing: ReferenceEditing | undefined = defs
     ? {
         units,
@@ -193,6 +264,22 @@ export default function ReferencePage() {
         draftRow: (key, columnId, value) => {
           const def = units[key];
           if (!def) return undefined;
+          if (columnId === "maxRange") {
+            const plan = rangePlan(
+              [key],
+              { kind: "set", value },
+              { kind: "none" },
+            );
+            const resolved = resolvedDef(def, plan.overrides[key]);
+            return unitReferenceRow(
+              key,
+              nameOf(key, resolved),
+              resolved,
+              defs.weaponDefs,
+              plan.library,
+              plan.equipped[key],
+            );
+          }
           const next = setReferenceValue(
             overrides,
             units,
@@ -211,6 +298,8 @@ export default function ReferencePage() {
           );
         },
         beforePost: defs.beforePost,
+        rangePlan,
+        applyRange,
       }
     : undefined;
 

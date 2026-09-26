@@ -25,6 +25,11 @@ import {
 } from "../../batchEdit";
 import { type PostChange, postNoteOf } from "../../beforePost";
 import type { UnitOverrides } from "../../overrides";
+import {
+  type RangePlan,
+  type RangeUnitRow,
+  rangeChangeCount,
+} from "../../rangeEdit";
 import { editableColumnIds, editableFieldKeys } from "../../referenceEdit";
 import { REFERENCE_COLUMNS, type UnitReferenceRow } from "../../unitReference";
 
@@ -76,6 +81,21 @@ export interface ReferenceEditing {
   /** What the game's post files change per unit (issue #3057), for the note
    *  beside a preview row. Absent when the game's read has not said. */
   beforePost?: { units: Record<string, PostChange> };
+  /** Range's own preview (issue #3157): it is a weapon field, and several
+   *  weapons can change for one unit, so it does not fit a single
+   *  before-and-after and gets its own preview and its own writer rather
+   *  than `updateOverrides`/`computeBatchRows`. */
+  rangePlan: (
+    keys: string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+  ) => RangePlan;
+  /** Write `rangePlan`'s answer for the same arguments, as one undo step. */
+  applyRange: (
+    keys: string[],
+    operation: BatchOperation,
+    rounding: BatchRounding,
+  ) => void;
 }
 
 export function ReferenceBulkEdit({
@@ -117,8 +137,9 @@ export function ReferenceBulkEdit({
           ? { kind: "nearest", step }
           : undefined;
 
+  const isRange = columnId === "maxRange";
   const preview: BatchRow[] =
-    operation && rounding
+    !isRange && operation && rounding
       ? computeBatchRows(
           rows.map((row) => row.key),
           editableFieldKeys(columnId),
@@ -128,12 +149,30 @@ export function ReferenceBulkEdit({
           rounding,
         )
       : [];
-  const changeCount = batchChangeCount(preview);
+  const rangeRows: RangeUnitRow[] =
+    isRange && operation && rounding
+      ? editing.rangePlan(
+          rows.map((row) => row.key),
+          operation,
+          rounding,
+        ).rows
+      : [];
+  const changeCount = isRange
+    ? rangeChangeCount(rangeRows)
+    : batchChangeCount(preview);
   const nameOf = new Map(rows.map((row) => [row.key, row.name]));
 
   const apply = () => {
-    if (changeCount === 0) return;
-    editing.updateOverrides((o) => applyBatchRows(o, preview, editing.units));
+    if (changeCount === 0 || !operation || !rounding) return;
+    if (isRange) {
+      editing.applyRange(
+        rows.map((row) => row.key),
+        operation,
+        rounding,
+      );
+    } else {
+      editing.updateOverrides((o) => applyBatchRows(o, preview, editing.units));
+    }
     onDone();
   };
 
@@ -201,7 +240,70 @@ export function ReferenceBulkEdit({
         )}
       </div>
 
-      {preview.length > 0 && (
+      {isRange && rangeRows.length > 0 && (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs text-muted-foreground">
+            {opKind === "set"
+              ? "Changes only the weapon or weapons already at each unit's longest range."
+              : "Changes every one of a unit's weapons, each from its own current range."}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {changeCount} of {rangeRows.length} unit
+            {rangeRows.length === 1 ? "" : "s"} change
+          </p>
+          <ul
+            aria-label="Preview"
+            className="flex max-h-60 flex-col gap-1 overflow-y-auto rounded-md border border-border/60 p-1 text-sm"
+          >
+            {rangeRows.slice(0, SHOWN_ROWS).map((row) => (
+              <li
+                key={row.unit}
+                className="flex flex-col gap-0.5 rounded px-2 py-1"
+              >
+                <span className="min-w-0 truncate font-medium">
+                  {nameOf.get(row.unit) ?? row.unit}
+                </span>
+                {row.skipped ? (
+                  <span className="text-xs text-muted-foreground">
+                    No weapons to change
+                  </span>
+                ) : (
+                  row.weapons.map((weapon) => (
+                    <span
+                      key={weapon.label}
+                      className="flex items-center justify-between gap-2 pl-2 text-xs text-muted-foreground"
+                    >
+                      <span className="min-w-0 truncate">{weapon.label}</span>
+                      <span className="shrink-0 font-mono">
+                        {weapon.before} {"→"} {weapon.after}
+                        {!weapon.changed && (
+                          <span className="ml-1">(unchanged)</span>
+                        )}
+                        {weapon.copiedAs && (
+                          <span
+                            className="ml-1"
+                            title={`Shared with other units, so it is copied into the project's weapon library first, as ${weapon.copiedAs}.`}
+                          >
+                            (copies into the library)
+                          </span>
+                        )}
+                      </span>
+                    </span>
+                  ))
+                )}
+              </li>
+            ))}
+          </ul>
+          {rangeRows.length > SHOWN_ROWS && (
+            <p className="text-xs text-muted-foreground">
+              Showing the first {SHOWN_ROWS} of {rangeRows.length} units. All of
+              them still apply.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!isRange && preview.length > 0 && (
         <div className="flex flex-col gap-1">
           <p className="text-xs text-muted-foreground">
             {changeCount} of {preview.length} unit
