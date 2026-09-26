@@ -74,6 +74,7 @@ import {
   Crosshair,
   Dice5,
   FolderTree,
+  HelpCircle,
   History,
   Pencil,
   Redo2,
@@ -90,6 +91,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { gameIdentityForName } from "@/container/gameIdentity";
 import { assetIndex } from "@/content/assetKinds";
 import {
@@ -300,6 +307,31 @@ const NO_COLLECTIONS: Collections = {};
 /** Which half of a unit the page is showing: its own fields, or its weapons
  *  one slot at a time (issue #2639). */
 type UnitTab = "fields" | "weapons";
+
+/** The "only changed fields are recorded" explanation, held behind a help
+ * icon rather than spelled out on every visit (issue #3102). A returning
+ * user already knows it, and a first-time one can still find it here. */
+function RecordingExplainer() {
+  return (
+    <TooltipProvider delayDuration={150}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="How edits are recorded"
+            className="cursor-help text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HelpCircle size={13} />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs text-left leading-snug">
+          Only the fields you change are recorded, so the rest still follow the
+          game when it updates.
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 export default function UnitPage() {
   const [params] = useSearchParams();
@@ -1911,22 +1943,27 @@ export default function UnitPage() {
             "Unit tweaks"
           )
         }
-        // One paragraph, which includes which game is being edited and where
-        // the edits go. There is no save button, so it says so rather than
-        // leaving somebody to wonder.
-        //
-        // It used to end by saying a unit can be copied and put on a builder's
-        // menu. That is two lines of the window, kept for the life of the page,
-        // describing the Copy unit button a few pixels away. What is left is
-        // the part that is not on screen anywhere: a project records only what
-        // you changed.
-        description={`${
-          project
-            ? `Change a unit's numbers in ${project.gameName}, saved as you work.`
-            : gameName
-              ? `Change a unit's numbers in ${gameName}. The first change starts a project.`
-              : "Change a unit's numbers. No project is open."
-        } Only the fields you change are recorded, so the rest still follow the game when it updates.`}
+        // One short line naming which game is open, not the paragraph this
+        // used to be (issue #3102). A returning user already knows what the
+        // page does and does not need it repeated on every visit. The "only
+        // changed fields are recorded" explanation still matters to a
+        // first-time user, so it moved behind the help icon rather than off
+        // the page.
+        description={
+          project ? (
+            <span className="inline-flex items-center gap-1.5">
+              {project.gameName}
+              <RecordingExplainer />
+            </span>
+          ) : gameName ? (
+            <span className="inline-flex items-center gap-1.5">
+              {gameName}. The first change starts a project.
+              <RecordingExplainer />
+            </span>
+          ) : (
+            "Change a unit's numbers. No project is open."
+          )
+        }
         actions={
           <>
             {/* What is in the project, beside the buttons that step through it:

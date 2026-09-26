@@ -528,6 +528,48 @@ describe("UnitPage", () => {
   });
 
   /**
+   * The header description used to spell out how edits are recorded on every
+   * visit. Issue #3102 cuts it to the game and version, and moves the
+   * explanation behind a help icon so a first-time user can still find it.
+   */
+  describe("the header description", () => {
+    it("is just the game name with no project open", () => {
+      openNew(GAME.name);
+      expect(
+        screen.getByText(`${GAME.name}. The first change starts a project.`),
+      ).toBeTruthy();
+      expect(
+        screen.queryByText(/only the fields you change are recorded/i),
+      ).toBeNull();
+    });
+
+    it("is just the game name once a project is open", () => {
+      openNew(GAME.name);
+      type(healthBox(), "5000");
+      cleanup();
+
+      openSaved(GAME.name);
+      expect(screen.getByText(GAME.name)).toBeTruthy();
+      expect(
+        screen.queryByText(/only the fields you change are recorded/i),
+      ).toBeNull();
+    });
+
+    it("still finds the recording explanation behind the help icon", () => {
+      openNew(GAME.name);
+      type(healthBox(), "5000");
+      cleanup();
+
+      openSaved(GAME.name);
+      const help = screen.getByLabelText("How edits are recorded");
+      fireEvent.focus(help);
+      expect(
+        screen.getByText(/only the fields you change are recorded/i),
+      ).toBeTruthy();
+    });
+  });
+
+  /**
    * The change ledger's own link back to a field (issue #2653): `?field=`
    * scrolls to the row rather than leaving somebody to search the field
    * list for a path they were handed by name.
@@ -3266,7 +3308,12 @@ describe("UnitPage", () => {
       type(healthBox(), "5000");
 
       openRename();
-      expect(await screen.findByText(GAME.name)).toBeTruthy();
+      // Scoped to the drawer's own "Game" field, since the shortened header
+      // description (issue #3102) now also names the game on its own.
+      const gameField = (await screen.findByText("Game")).closest(
+        "label",
+      ) as HTMLElement;
+      expect(within(gameField).getByText(GAME.name)).toBeTruthy();
       expect(screen.queryByLabelText("Game for the new project")).toBeNull();
     });
 
