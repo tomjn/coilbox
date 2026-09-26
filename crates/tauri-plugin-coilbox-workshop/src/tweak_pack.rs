@@ -54,18 +54,19 @@
 //! sort here.
 //!
 //! Minifying happens here, not in `compile.rs`: the mutator archive and the
-//! local BAR route (`localBar.ts`) both want to show or ship Lua a person can
-//! read, and only the numbered-slot export is squeezed for size. Comments are
-//! dropped and whitespace is collapsed to single spaces, tracking whether a
-//! `"` has opened a string so a modder's own text (which can legally contain
-//! `--`) is never mistaken for a comment. Nothing here generates a
-//! single-quoted or long-bracket Lua string (`lua.rs`'s `lua_string` always
-//! double-quotes), so neither is tracked.
+//! local tweak-slot route (`localTweakSlot.ts`) both want to show or ship Lua
+//! a person can read, and only the numbered-slot export is squeezed for
+//! size. Comments are dropped and whitespace is collapsed to single spaces,
+//! tracking whether a `"` has opened a string so a modder's own text (which
+//! can legally contain `--`) is never mistaken for a comment. Nothing here
+//! generates a single-quoted or long-bracket Lua string (`lua.rs`'s
+//! `lua_string` always double-quotes), so neither is tracked.
 //!
 //! Encoding is unpadded base64 both ways, and the alphabet differs by slot
 //! kind because BAR reads the two kinds differently (issue #2963).
 //! `tweakdefs` goes straight to BAR's decoder and carries the URL-safe
-//! alphabet `localBar.ts` already uses for the local single-slot route.
+//! alphabet `localTweakSlot.ts` already uses for the local single-slot
+//! route.
 //! `tweakunits` goes through one step more, `CustomKeyToUsefulTable`, which
 //! rewrites every `_` to `=` before decoding and so destroys the URL-safe
 //! spelling of 63. That slot carries the standard alphabet instead, which

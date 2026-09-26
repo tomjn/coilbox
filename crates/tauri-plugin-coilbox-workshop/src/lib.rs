@@ -113,7 +113,7 @@ fn envelope<T: Serialize>(value: &T) -> CliResult {
 
 /// Compile a saved project into the Lua a game reads. `written` is what a
 /// settle worked out for the route the result is for (issue #3092), which the
-/// local tweak slot launch needs because it writes `barTweakdefs` itself.
+/// local tweak slot launch needs because it writes `tweakdefs` itself.
 #[tauri::command]
 fn workshop_compile(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
     envelope(&loads_as::compile_written(
@@ -816,7 +816,7 @@ mod tests {
 
         let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone(), None));
         assert_eq!(compiled["files"].as_array().map(Vec::len), Some(0));
-        assert_eq!(compiled["barTweakdefs"], Value::Null);
+        assert_eq!(compiled["tweakdefs"], Value::Null);
 
         let report = unwrap_as_the_frontend_does(workshop_preflight(empty));
         assert_eq!(report["blockers"].as_array().map(Vec::len), Some(0));
