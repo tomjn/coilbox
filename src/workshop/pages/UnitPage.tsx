@@ -151,6 +151,7 @@ import {
   moveBeforeInBuildMenu,
   removeFromBuildMenu,
 } from "../buildMenus";
+import { useChangeLedger } from "../changeLedger";
 import { AUTOSAVE_INTERVAL_MS, useCheckpoints } from "../checkpoints";
 import { isCloneMutatorOnly } from "../cloneMutatorOnly";
 import {
@@ -285,6 +286,7 @@ import {
 import { ArmorClassPanel } from "./components/ArmorClassPanel";
 import { BatchEditDrawer } from "./components/BatchEditDrawer";
 import { BuildMenuPanel } from "./components/BuildMenuPanel";
+import { ChangesPanel } from "./components/ChangesPanel";
 import { CheckpointsDrawer } from "./components/CheckpointsDrawer";
 import { CloneUnitButton, DeleteCloneButton } from "./components/CloneActions";
 import { CloneInPlaceNotice } from "./components/CloneInPlaceNotice";
@@ -425,8 +427,55 @@ export default function UnitPage() {
    * saved project to package, so on `/workshop/new` it answers with Units.
    */
   const requested = projectSectionOf(sectionParam);
+  /**
+   * Which project this page has already landed on once (issue #3112). A
+   * project's first visit and an internal navigation back to its own bare
+   * path look identical in the URL: deleting the unit on screen, for one,
+   * sends the page to the project's plain `/workshop/:id` to say "nothing is
+   * selected", the same path a fresh visit arrives at. Deciding the landing
+   * section only the first time this id is seen, rather than on every render
+   * that happens to carry no query params, is what keeps the second case on
+   * Units instead of bouncing it to Changes out from under whatever the page
+   * was doing.
+   */
+  const landedOn = useRef<string | undefined>(undefined);
+  const freshVisit = !!project && landedOn.current !== project.id;
+  /**
+   * A project with edits opens on Changes rather than Units, on that first
+   * visit: "what have I changed" is the first question somebody balancing a
+   * game asks. Only when nothing else already named where to land: a deep
+   * link that names a unit, a tab, a weapon slot, a death explosion or a
+   * field (every one of them a query param on this same no-segment path)
+   * still opens the unit editor those params are about, and a project with
+   * no edits yet has nothing for Changes to show.
+   */
+  const landOnChanges =
+    freshVisit &&
+    !sectionParam &&
+    !!project &&
+    !isEmptyEdits(project.edits) &&
+    !params.get("unit") &&
+    !params.get("tab") &&
+    !params.get("slot") &&
+    !params.get("explosion") &&
+    !params.get("field");
   const section: ProjectSection =
-    requested === "package" && !project ? "units" : requested;
+    requested === "package" && !project
+      ? "units"
+      : landOnChanges
+        ? "changes"
+        : requested;
+
+  // Marks the visit decided, and puts the redirect in the URL too when it
+  // lands on Changes, so the section bar's own links and the back button
+  // agree with what is on screen rather than both naming the bare project
+  // path as "Units" while it shows Changes. Runs at most once per project id.
+  useEffect(() => {
+    if (!project || landedOn.current === project.id) return;
+    landedOn.current = project.id;
+    if (landOnChanges)
+      navigate(sectionPath(project.id, "changes"), { replace: true });
+  }, [project, landOnChanges, navigate]);
 
   const games = scan.data?.games ?? [];
   const gameName = project?.gameName ?? params.get("game") ?? "";
@@ -1724,6 +1773,13 @@ export default function UnitPage() {
   };
   const checks = useProjectChecks(checksInput, section === "checks");
 
+  // The change ledger, for the Changes section (issue #3112). Read only while
+  // that section is open, the same way the Checks page's own copy is: nothing
+  // else on the page depends on it, so there is no reason to trace every
+  // edit's compiled destination on every keystroke nobody is reading the
+  // result of.
+  const changeLedger = useChangeLedger(project, section === "changes");
+
   // One way to change a field, whichever tab it is on. A weapon field is an
   // override like any other: its path already says whether it is written to
   // the slot or to the definition the unit carries (`weaponSlots.ts`).
@@ -2150,6 +2206,7 @@ export default function UnitPage() {
             hrefOf={sectionHref}
             shown={(s) => s !== "package" || !!project}
             counts={{
+              changes: counts.fields + counts.added,
               weapons: counts.weapons,
               collections: counts.collections,
             }}
@@ -2455,6 +2512,26 @@ export default function UnitPage() {
               updateCollections((c) =>
                 setCollectionRule(c ?? NO_COLLECTIONS, id, rule),
               )
+            }
+          />
+        </div>
+      ) : section === "changes" ? (
+        <div className={SECTION_BODY}>
+          <ChangesPanel
+            projectId={project?.id}
+            ledger={changeLedger.ledger}
+            loading={changeLedger.loading}
+            error={changeLedger.error}
+            gameUnits={gameUnits}
+            units={units}
+            clones={ownClones}
+            overrides={overrides}
+            nameOf={nameOf}
+            picOf={picOf}
+            picsPending={picsPending}
+            factionOf={factionOf}
+            onRevertField={(unit, path) =>
+              updateOverrides((o) => clearOverride(o, unit, path))
             }
           />
         </div>

@@ -86,6 +86,7 @@ export function unitEditPath(
  */
 export const PROJECT_SECTIONS = [
   { id: "units", label: "Units" },
+  { id: "changes", label: "Changes" },
   { id: "weapons", label: "Weapons" },
   { id: "collections", label: "Collections" },
   { id: "checks", label: "Checks" },
