@@ -628,6 +628,7 @@ function BattleRoomPage() {
                 gameName={battle.modname}
                 enginePath={room.enginePath}
                 dataDir={room.dataDir}
+                archive={room.localGame?.primaryArchive.name}
                 canEditRestrictions={room.canEditRestrictions}
                 modOptionsSchema={room.modOptionsSchema}
                 // Through the same route every other option takes, so a

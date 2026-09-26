@@ -47,6 +47,7 @@ export function ApplySkirmishPresetDrawer({
   gameName,
   enginePath,
   dataDir,
+  archive,
   disabled,
   canEditRestrictions,
   modOptionsSchema,
@@ -67,6 +68,9 @@ export function ApplySkirmishPresetDrawer({
   gameName: string;
   enginePath?: string;
   dataDir?: string;
+  /** The room's game's primary archive, as unitsync names it, for checking a
+   *  slot-bound project's typed values before packing (issue #3122). */
+  archive?: string;
   disabled?: boolean;
   /** Whether unit restrictions can be written here at all. They are
    *  `game/restrict/*` script tags with no autohost path, so on a bot-hosted
@@ -162,6 +166,9 @@ export function ApplySkirmishPresetDrawer({
             <PresetTweaksView
               gameName={gameName}
               modOptionsSchema={modOptionsSchema}
+              enginePath={enginePath}
+              dataDir={dataDir}
+              archive={archive}
               disabled={disabled}
               onApply={(slots) => {
                 onApplyTweaks(slots);

@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { ConfigOption } from "@/content/bindings";
 import { deliverySlots } from "@/multiplayer/battle/tweakDelivery";
+import { notify } from "@/notify/notify";
 import { barSlotFit, workshopPackBarSlots } from "@/workshop/barPack";
 import { deliveryRoutes } from "@/workshop/deliveryRoutes";
+import { settledSummary, settleTypedValuesTweaks } from "@/workshop/loadsAs";
 import { type ModProject, useModProjects } from "@/workshop/project";
 
 /**
@@ -63,6 +65,9 @@ export function PresetTweaksView({
   onApply,
   onApplyMutator,
   progress,
+  enginePath,
+  dataDir,
+  archive,
 }: {
   /** The game the setup or room is on. A project is written against one game. */
   gameName: string;
@@ -83,6 +88,14 @@ export function PresetTweaksView({
   /** How a slow apply is going, where applying starts a run rather than
    *  finishing one. */
   progress?: ReactNode;
+  /** Where to load the game to check a slot-bound project's typed values
+   *  before packing (issue #3122), the same check the workshop's own Package
+   *  drawer runs before a BAR pack. Absent while the engine or game are not
+   *  resolved yet, in which case the slots are packed as typed. */
+  enginePath?: string;
+  dataDir?: string;
+  /** The game's primary archive, as unitsync names it. */
+  archive?: string;
 }) {
   const [packing, setPacking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +121,28 @@ export function PresetTweaksView({
         await onApplyMutator(project);
         return;
       }
-      const pack = await workshopPackBarSlots({ project });
+      // A value the game's own Lua would turn into something else is written
+      // as one it turns into the typed number, checked by loading the game
+      // with these very slots (issue #3122, following the workshop's own
+      // Package drawer). A failed settle is not a stop: the slots go out as
+      // typed and the reason is surfaced instead.
+      const settled =
+        enginePath && dataDir && archive
+          ? await settleTypedValuesTweaks({
+              enginePath,
+              dataDir,
+              archive,
+              project,
+              route: "numbered",
+            })
+          : ({
+              ok: false,
+              message: `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+            } as const);
+      const pack = await workshopPackBarSlots({
+        project,
+        written: settled.ok ? settled.settled.written : undefined,
+      });
       const fit = barSlotFit(pack, modOptionsSchema);
       const missing = pack.oversized.length + pack.unplaced.length;
       if (missing > 0 || !fit.fits) {
@@ -119,6 +153,18 @@ export function PresetTweaksView({
       }
       const slots: Record<string, string> = {};
       for (const slot of deliverySlots(pack)) slots[slot.name] = slot.value;
+      // The drawer closes as soon as `onApply` runs, so what the settle did is
+      // said through a toast rather than left in a panel about to disappear.
+      const note = settled.ok
+        ? settledSummary(settled.settled)
+        : settled.message;
+      if (note) {
+        notify({
+          title: `Applied "${project.name}"`,
+          body: note,
+          level: settled.ok ? "success" : "warning",
+        });
+      }
       onApply(slots, project);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

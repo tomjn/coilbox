@@ -41,6 +41,9 @@ export function PresetsDrawer({
   thumbs,
   currentGameName,
   modOptionsSchema,
+  enginePath,
+  dataDir,
+  archive,
   onApplyTweaks,
   onApplyMutator,
   onLoad,
@@ -62,6 +65,13 @@ export function PresetsDrawer({
   currentGameName: string;
   /** The game's declared options, for deciding whether it has tweak slots. */
   modOptionsSchema: ConfigOption[];
+  /** Where to load the game to check a slot-bound project's typed values
+   *  before packing (issue #3122). Absent while the engine or game are not
+   *  resolved yet, in which case the slots are packed as typed. */
+  enginePath?: string;
+  dataDir?: string;
+  /** The current game's primary archive, as unitsync names it. */
+  archive?: string;
   /** Write a packed project's slots over whatever the options already say. */
   onApplyTweaks: (slots: Record<string, string>) => void;
   /** Carry a project by mutator archive instead, for a game with no slots. */
@@ -149,6 +159,9 @@ export function PresetsDrawer({
             <PresetTweaksView
               gameName={currentGameName}
               modOptionsSchema={modOptionsSchema}
+              enginePath={enginePath}
+              dataDir={dataDir}
+              archive={archive}
               disabled={disabled}
               onApply={(slots) => {
                 onApplyTweaks(slots);
