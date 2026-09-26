@@ -190,3 +190,69 @@ describe("UnitReferenceTable faction column and filter (issue #3110)", () => {
     expect(screen.queryByText("Tank")).toBeNull();
   });
 });
+
+describe("UnitReferenceView collection filter (issue #3146)", () => {
+  const collections = {
+    all: {
+      tanks: { id: "tanks", name: "Tanks", units: ["armtank"] },
+    },
+    unitsOf: (id: string) =>
+      id === "tanks" ? new Set(["armtank"]) : undefined,
+  };
+
+  it("is absent with no collections", () => {
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
+    expect(screen.queryByLabelText("Filter by collection")).toBeNull();
+  });
+
+  it("narrows the table to one collection's units", () => {
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+        collections={collections}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("Filter by collection"));
+    fireEvent.click(screen.getByRole("option", { name: "Tanks" }));
+    expect(screen.getByText("Tank")).toBeTruthy();
+    expect(screen.queryByText("Commander")).toBeNull();
+    expect(screen.getByText("1 of 2 units")).toBeTruthy();
+  });
+});
+
+describe("UnitReferenceView select every shown row (issue #3113)", () => {
+  it("selects only the rows the filters leave on the table", () => {
+    renderView(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        unitHref={(r) => `/unit/${r.key}`}
+      />,
+    );
+    fireEvent.change(screen.getByPlaceholderText(/Search units/), {
+      target: { value: "hp > 2000" },
+    });
+    fireEvent.click(screen.getByLabelText("Select every unit shown"));
+    expect(screen.getByText("1 unit selected")).toBeTruthy();
+
+    // Clearing the search keeps the selection, and the header box now reads
+    // as "not every shown unit", so a second press adds the rest.
+    fireEvent.change(screen.getByPlaceholderText(/Search units/), {
+      target: { value: "" },
+    });
+    fireEvent.click(screen.getByLabelText("Select every unit shown"));
+    expect(screen.getByText("2 units selected")).toBeTruthy();
+
+    // With every shown unit selected, it clears them.
+    fireEvent.click(screen.getByLabelText("Select every unit shown"));
+    expect(screen.queryByText(/selected/)).toBeNull();
+  });
+});

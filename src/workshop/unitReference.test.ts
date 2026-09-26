@@ -242,4 +242,38 @@ describe("filterReferenceRows", () => {
     const result = filterReferenceRows(rows(), "hp > 2000", "Arm", factionOf);
     expect(result.rows).toEqual([]);
   });
+
+  it("narrows to a collection's units, on top of the query and faction", () => {
+    const inCollection = new Set(["armtank"]);
+    expect(
+      filterReferenceRows(
+        rows(),
+        "",
+        ALL_FACTIONS,
+        factionOf,
+        inCollection,
+      ).rows.map((r) => r.key),
+    ).toEqual(["armtank"]);
+    expect(
+      filterReferenceRows(
+        rows(),
+        "hp > 2000",
+        ALL_FACTIONS,
+        factionOf,
+        inCollection,
+      ).rows,
+    ).toEqual([]);
+  });
+
+  it("matches a collection's lowercased keys against any key casing", () => {
+    const mixed = [unitReferenceRow("ArmTank", "Tank", { health: 1000 }, {})];
+    const result = filterReferenceRows(
+      mixed,
+      "",
+      ALL_FACTIONS,
+      undefined,
+      new Set(["armtank"]),
+    );
+    expect(result.rows.map((r) => r.key)).toEqual(["ArmTank"]);
+  });
 });

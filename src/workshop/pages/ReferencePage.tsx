@@ -35,6 +35,7 @@ import {
 import { buildTechForest } from "@/content/techForest";
 import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
+import { collectionUnits, EMPTY_COLLECTIONS } from "../collections";
 import { useUnitDefs } from "../config";
 import { resolvedDef } from "../overrides";
 import { EMPTY_EDITS, useModProjects } from "../project";
@@ -43,7 +44,13 @@ import { textRedirect, unitDisplayName } from "../unitName";
 import { unitPicLookup } from "../unitPics";
 import { unitReferenceRows } from "../unitReference";
 import { nameEdit } from "../unitText";
+import type { EquippedWeapons, WeaponLibrary } from "../weaponLibrary";
 import { UnitReferenceView } from "./components/UnitReferenceView";
+
+// Shared fallbacks, so a project with no library does not hand every memo
+// below a new empty object on each render.
+const NO_LIBRARY: WeaponLibrary = {};
+const NO_EQUIPPED: EquippedWeapons = {};
 
 export default function ReferencePage() {
   const { id } = useParams();
@@ -53,8 +60,10 @@ export default function ReferencePage() {
   const { overrides, text } = edits;
   const ownClones = edits.clones;
   // Absent on a project saved before the library existed (issue #2640).
-  const library = edits.weapons ?? {};
-  const equipped = edits.equipped ?? {};
+  const library = edits.weapons ?? NO_LIBRARY;
+  const equipped = edits.equipped ?? NO_EQUIPPED;
+  // Absent on a project saved before collections existed (issue #2654).
+  const collections = edits.collections ?? EMPTY_COLLECTIONS;
 
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
@@ -119,6 +128,29 @@ export default function ReferencePage() {
       equipped,
     );
   }, [units, overrides, defs, nameOf, library, equipped]);
+
+  // The project's collections, for the filter beside the faction one (issue
+  // #3146). A rule is matched against the same resolved units the unit
+  // list's own collection filter reads, so both agree on who is in one.
+  const collectionFilter = useMemo(
+    () => ({
+      all: collections,
+      unitsOf: (collectionId: string) =>
+        collectionUnits(collections, collectionId, {
+          units,
+          overrides,
+          weapons: defs
+            ? {
+                weaponDefs: defs.weaponDefs,
+                library,
+                equipped,
+                clones: ownClones,
+              }
+            : undefined,
+        }),
+    }),
+    [collections, units, overrides, defs, library, equipped, ownClones],
+  );
 
   // The game's own unedited row for a unit (issue #3115's scatter plot: the
   // faint "game position" dot), read the same way `UnitReferencePage.tsx`
@@ -274,6 +306,7 @@ export default function ReferencePage() {
         picOf={picOf}
         picsPending={picsPending}
         factionOf={factionOf}
+        collections={collectionFilter}
       />
     </div>
   );

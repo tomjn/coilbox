@@ -56,6 +56,8 @@ export function UnitReferenceTable({
   emptyMessage,
   selected,
   onToggle,
+  allShownSelected,
+  onToggleShown,
   renderName,
   picOf,
   picsPending = false,
@@ -69,6 +71,11 @@ export function UnitReferenceTable({
   emptyMessage: string;
   selected: ReadonlySet<string>;
   onToggle: (key: string) => void;
+  /** Whether every row in `rows` is selected, for the header checkbox. */
+  allShownSelected: boolean;
+  /** The header checkbox (issue #3113): select every row in `rows`, or clear
+   *  them when every one already is. */
+  onToggleShown: () => void;
   /** How to render a row's name cell: a plain span, or a link to the unit's
    *  own page, whichever the caller's page offers. */
   renderName: (row: UnitReferenceRow) => ReactNode;
@@ -168,7 +175,14 @@ export function UnitReferenceTable({
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-background">
             <TableRow>
-              <TableHead className="w-8" aria-hidden="true" />
+              <TableHead className="w-8">
+                <Checkbox
+                  checked={allShownSelected}
+                  disabled={rows.length === 0}
+                  onCheckedChange={onToggleShown}
+                  aria-label="Select every unit shown"
+                />
+              </TableHead>
               <TableHead>{sortButton("name", "Name")}</TableHead>
               {factionOf && <TableHead>Faction</TableHead>}
               {REFERENCE_COLUMNS.map((column) => (
