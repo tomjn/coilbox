@@ -717,6 +717,7 @@ mod tests {
                 title: "1 field change".to_string(),
                 reason: "test".to_string(),
                 lua: "{\n  [\"armcom\"] = { maxDamage = 9000 },\n}".to_string(),
+                unit: Some("armcom".to_string()),
             },
             Chunk {
                 form: LuaForm::Block,
@@ -724,6 +725,7 @@ mod tests {
                 reason: "test".to_string(),
                 lua: "-- Units switched off.\ndo\n  local off = { [\"armflash\"] = true }\nend"
                     .to_string(),
+                unit: Some("armflash".to_string()),
             },
         ];
         let pack = tweak_pack::pack(&chunks);

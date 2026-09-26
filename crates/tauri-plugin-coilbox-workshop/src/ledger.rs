@@ -968,6 +968,7 @@ mod tests {
             title: "1 unit added".to_string(),
             reason: "test".to_string(),
             lua: "do end".to_string(),
+            unit: None,
         };
         let chunks = [chunk];
         let pack = tweak_pack::pack(&chunks);

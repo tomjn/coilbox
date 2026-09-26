@@ -3,20 +3,25 @@
  * and the field rows show beside the checks page's own summary (issue
  * #3116).
  *
- * Only two of the checks the Checks page pulls into "Needs attention"
+ * Three of the checks the Checks page pulls into "Needs attention"
  * (`ProjectChecks.tsx`) carry a name structured enough to place a marker
- * with: a compatibility finding's `subject` (`compatibility.ts`) and an
- * armour class problem's `id` (`armorClasses.ts`), both of which already
- * carry a unit key by construction rather than in a sentence a marker would
- * have to parse to find one.
+ * with: a compatibility finding's `subject` (`compatibility.ts`), an armour
+ * class problem's `id` (`armorClasses.ts`), and a preflight blocker whose
+ * compiled chunk or file named exactly one unit (`PreflightReport.unitRefs`,
+ * issue #3155). The first two carry a unit key by construction. The third is
+ * looked up by the blocker's own sentence rather than parsed out of it,
+ * since Rust already knows which unit a blocker is about when it is about
+ * one at all.
  *
- * Preflight's blockers and review items, and unitsync's own diagnostics, are
- * plain sentences with nothing else on them (`preflight.ts`): the Rust side
- * that produces them has no unit or field reference to carry, only text
- * meant for a human to read. They stay in the checks summary alone. Giving
- * preflight a structured reference of its own is a follow-up, filed as issue
- * #3155, and not attempted here: it touches the Rust check and its wire
- * format, not just the page that reads it.
+ * Preflight's review items, and unitsync's own diagnostics, stay plain
+ * sentences with nothing else on them (`preflight.ts`, `defs.unitErrors` in
+ * `UnitPage.tsx`). Every preflight review item today is a compiler note
+ * (`CompiledMod::notes`) with no unit key threaded through it, and
+ * unitsync's diagnostics are the engine's own log lines, which may or may
+ * not name a unit and never in a shape coilbox controls. Parsing either
+ * would mean parsing free text meant for a human, the exact thing a
+ * structured reference exists to avoid, so both stay in the checks summary
+ * alone (issue #3155).
  *
  * A weapon's damage table naming an unknown armour class and a reference
  * that names no weapon (`armorClasses.ts`'s `unknownDamageClasses`,
@@ -27,6 +32,7 @@
  */
 import type { ArmorProblem } from "./armorClasses";
 import type { CompatFinding } from "./compatibility";
+import type { PreflightReport } from "./preflight";
 
 /** One or more checks about the same unit or field, folded into the worse of
  *  the severities involved: a blocker would reach the game broken, and a
@@ -146,4 +152,18 @@ export function fieldMarkersForUnit(
   for (const [key, marker] of markers)
     if (key.startsWith(prefix)) out[key.slice(prefix.length)] = marker;
   return out;
+}
+
+/**
+ * The unit a preflight blocker's sentence is about, or `undefined` when its
+ * compiled chunk or file batched more than one unit, or named none
+ * (issue #3155). Looked up in `PreflightReport.unitRefs` by the blocker's
+ * own sentence rather than reparsed from it, matching the map Rust already
+ * built while it still had the compiled chunk or file to read the unit off.
+ */
+export function preflightBlockerUnit(
+  report: Pick<PreflightReport, "unitRefs"> | null | undefined,
+  message: string,
+): string | undefined {
+  return report?.unitRefs?.[message];
 }

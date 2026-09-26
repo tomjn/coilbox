@@ -4,6 +4,7 @@ import {
   compatSubject,
   fieldCheckMarkers,
   fieldMarkersForUnit,
+  preflightBlockerUnit,
   unitCheckMarkers,
 } from "./checkMarkers";
 import type { CompatFinding } from "./compatibility";
@@ -146,5 +147,28 @@ describe("fieldCheckMarkers", () => {
     expect(fieldMarkersForUnit(markers, "corcom")).toEqual({
       range: { severity: "blocker", messages: ["b"] },
     });
+  });
+});
+
+describe("preflightBlockerUnit", () => {
+  it("looks up the unit reference by the blocker's own sentence", () => {
+    const report = {
+      unitRefs: { "supercom is defined by 2 copies": "supercom" },
+    };
+    expect(
+      preflightBlockerUnit(report, "supercom is defined by 2 copies"),
+    ).toBe("supercom");
+  });
+
+  it("returns undefined for a blocker with no reference", () => {
+    const report = { unitRefs: {} };
+    expect(preflightBlockerUnit(report, "modinfo.lua does not parse")).toBe(
+      undefined,
+    );
+  });
+
+  it("returns undefined when there is no report yet", () => {
+    expect(preflightBlockerUnit(null, "anything")).toBe(undefined);
+    expect(preflightBlockerUnit(undefined, "anything")).toBe(undefined);
   });
 });

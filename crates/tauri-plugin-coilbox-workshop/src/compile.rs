@@ -67,6 +67,26 @@ pub struct Chunk {
     /// Why the compiler wrote it in this form rather than the other.
     pub reason: String,
     pub lua: String,
+    /// The one unit this chunk is about, when every part of it names the
+    /// same one (issue #3155): a copy that replaces a game unit, or a build
+    /// menu, always does. A chunk built by folding several units' changes
+    /// into one table or block, such as the field-change table or the added
+    /// units block, carries `None` instead, since attributing it to a
+    /// single unit would be wrong for every project with more than one
+    /// change in that chunk.
+    pub unit: Option<String>,
+}
+
+/// The one name every item in `units` shares, or `None` when there is more
+/// than one distinct name (a chunk that batches several units) or none at
+/// all.
+pub(crate) fn singleton_unit<'a>(units: impl Iterator<Item = &'a str>) -> Option<String> {
+    let mut set: std::collections::BTreeSet<&str> = units.collect();
+    if set.len() == 1 {
+        set.pop_first().map(str::to_string)
+    } else {
+        None
+    }
 }
 
 /// One file of the generated mutator archive.
@@ -191,6 +211,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             title: block.title.clone(),
             reason: "Carried from a decoded import as it stands. Coilbox never runs it, and cannot edit it either, so it is written out the way it arrived.".to_string(),
             lua: block.lua.clone(),
+            unit: None,
         });
     }
 
@@ -259,6 +280,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             ),
             reason: "A copy owns its whole definition, and the game has no unit of that name to merge onto, so it has to be assigned rather than merged.".to_string(),
             lua: added_block(&added_entries),
+            unit: singleton_unit(added_entries.iter().map(|(key, _)| key.as_str())),
         });
         for (key, def) in &added_entries {
             unit_files.push(CompiledFile {
@@ -282,6 +304,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
                 clone.key
             ),
             lua: replace_block(clone, &def),
+            unit: Some(clone.key.clone()),
         });
     }
 
@@ -327,6 +350,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             ),
             reason: "Each one is a value the user typed, so none of them has to read the game's own first.".to_string(),
             lua: patch_table(&patches, ""),
+            unit: singleton_unit(patches.iter().map(|(unit, _)| unit.as_str())),
         });
     }
     if !positional.is_empty() {
@@ -339,6 +363,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             ),
             reason: "A list with a gap in it, such as weapons 1 and 3 and no 2, keeps its own numbers, so which entry each change is for has to be read off the game's own list.".to_string(),
             lua: positional_block(&positional),
+            unit: singleton_unit(positional.iter().map(|(unit, _, _)| *unit)),
         });
     }
 
@@ -372,6 +397,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             }
             .to_string(),
             lua: equip_block(&equips, &edits.weapons),
+            unit: singleton_unit(equips.iter().map(|(unit, _, _)| *unit)),
         });
     }
 
@@ -388,6 +414,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             title: format!("{builder} build menu"),
             reason: "Replayed over the list the game ships, so a unit it adds to this builder later is still there.".to_string(),
             lua: menu_block(builder, ops),
+            unit: Some(builder.clone()),
         });
     }
 
@@ -405,6 +432,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
             reason: "It reads every builder in the game before it writes to any of them."
                 .to_string(),
             lua: disabled_block(&edits.disabled),
+            unit: singleton_unit(edits.disabled.iter().map(String::as_str)),
         });
     }
 

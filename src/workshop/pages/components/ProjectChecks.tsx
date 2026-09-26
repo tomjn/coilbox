@@ -74,7 +74,7 @@ import type { Archive, ConfigOption } from "@/content/bindings";
 import type { ArmorProblem } from "../../armorClasses";
 import type { ChangeLedger, LedgerChange } from "../../changeLedger";
 import { ledgerByOutput, useChangeLedger } from "../../changeLedger";
-import { compatSubject } from "../../checkMarkers";
+import { compatSubject, preflightBlockerUnit } from "../../checkMarkers";
 import type { CompatFinding, CompatState } from "../../compatibility";
 import { useCompiledProject } from "../../compile";
 import { deliveryRoutes } from "../../deliveryRoutes";
@@ -988,6 +988,20 @@ function armorProblemLink(
   return projectPath(projectId, unit);
 }
 
+/** Where a preflight blocker can be followed to: `PreflightReport.unitRefs`
+ *  by the blocker's own sentence (issue #3155), for the blockers whose
+ *  compiled chunk or file named exactly one unit. A blocker that batched
+ *  several units, or that named none, has no entry and opens nowhere. */
+function preflightBlockerLink(
+  projectId: string | undefined,
+  report: PreflightReport | null,
+  message: string,
+): string | undefined {
+  if (!projectId) return undefined;
+  const unit = preflightBlockerUnit(report, message);
+  return unit ? projectPath(projectId, unit) : undefined;
+}
+
 /**
  * Every blocker and review item, from every check, in one pair of lists
  * (issue #3106): the module doc comment's five sources plus the armour class
@@ -1017,7 +1031,11 @@ function buildAttention({
   const review: AttentionItem[] = [];
 
   for (const line of preflight.report?.blockers ?? [])
-    blockers.push({ key: `preflight-blocker:${line}`, text: line });
+    blockers.push({
+      key: `preflight-blocker:${line}`,
+      text: line,
+      link: preflightBlockerLink(project?.id, preflight.report, line),
+    });
   for (const line of preflight.report?.review ?? [])
     review.push({ key: `preflight-review:${line}`, text: line });
 

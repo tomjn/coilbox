@@ -66,6 +66,42 @@ pub struct PreflightReport {
     pub review: Vec<String>,
     /// What was checked and came back clean.
     pub passes: Vec<String>,
+    /// The unit a blocker's sentence is about, keyed by that sentence
+    /// itself, for the blockers whose compiled chunk or file names exactly
+    /// one (issue #3155): a copy that replaces a game unit, a generated
+    /// `units/<key>.lua` file, or a build menu, always does. A batch check
+    /// that folds several units into one chunk has no entry here and stays
+    /// sentence-only, the same as before this field existed. `review` never
+    /// gets an entry either: every review item today is a compiler note
+    /// (`CompiledMod::notes`), carried in as plain text with no structured
+    /// reference behind it.
+    ///
+    /// Keyed by sentence rather than added onto `blockers` itself, so a
+    /// caller with no interest in a marker keeps reading a plain array of
+    /// strings exactly as it always could.
+    pub unit_refs: BTreeMap<String, String>,
+}
+
+impl PreflightReport {
+    /// Record a blocker, and its unit reference when the chunk or file
+    /// behind it named exactly one.
+    fn blocker(&mut self, message: String, unit: Option<String>) {
+        if let Some(unit) = unit {
+            self.unit_refs.insert(message.clone(), unit);
+        }
+        self.blockers.push(message);
+    }
+}
+
+/// The unit a generated per-unit file is about, when its path is one this
+/// compiler wrote itself (`units/<key>.lua`, from [`crate::compile::compile`]'s
+/// `unit_files` loop). Parsed off our own naming convention rather than off
+/// anything the engine wrote, so this can never be fooled by a stray colon
+/// or file name the way parsing an engine log line would be.
+fn unit_from_generated_path(path: &str) -> Option<String> {
+    path.strip_prefix("units/")?
+        .strip_suffix(".lua")
+        .map(str::to_string)
 }
 
 /// Run every check over what a project compiled to.
@@ -127,10 +163,13 @@ fn check_files_parse(compiled: &CompiledMod, report: &mut PreflightReport) {
     for file in compiled.files.iter().filter(|f| f.path.ends_with(".json")) {
         if let Err(e) = serde_json::from_str::<serde_json::Value>(&file.contents) {
             ok = false;
-            report.blockers.push(format!(
-                "{} does not parse as JSON, so the mutator route would ship a game that reads none of it: {e}",
-                file.path
-            ));
+            report.blocker(
+                format!(
+                    "{} does not parse as JSON, so the mutator route would ship a game that reads none of it: {e}",
+                    file.path
+                ),
+                unit_from_generated_path(&file.path),
+            );
         }
     }
 
@@ -138,9 +177,7 @@ fn check_files_parse(compiled: &CompiledMod, report: &mut PreflightReport) {
         let lua = match SpringLua::new(lua_root()) {
             Ok(lua) => lua,
             Err(e) => {
-                report
-                    .blockers
-                    .push(format!("Could not start the Lua syntax check: {e}"));
+                report.blocker(format!("Could not start the Lua syntax check: {e}"), None);
                 return;
             }
         };
@@ -151,10 +188,13 @@ fn check_files_parse(compiled: &CompiledMod, report: &mut PreflightReport) {
             );
             if let Err(e) = lua.eval_value_raw(&source, &file.path) {
                 ok = false;
-                report.blockers.push(format!(
-                    "{} does not parse as Lua, so the mutator route would ship a game with this file broken: {e}",
-                    file.path
-                ));
+                report.blocker(
+                    format!(
+                        "{} does not parse as Lua, so the mutator route would ship a game with this file broken: {e}",
+                        file.path
+                    ),
+                    unit_from_generated_path(&file.path),
+                );
             }
         }
     }
@@ -191,9 +231,7 @@ fn check_table_chunks_are_tables(compiled: &CompiledMod, report: &mut PreflightR
     let lua = match SpringLua::new(lua_root()) {
         Ok(lua) => lua,
         Err(e) => {
-            report
-                .blockers
-                .push(format!("Could not start the Lua syntax check: {e}"));
+            report.blocker(format!("Could not start the Lua syntax check: {e}"), None);
             return;
         }
     };
@@ -207,16 +245,20 @@ fn check_table_chunks_are_tables(compiled: &CompiledMod, report: &mut PreflightR
             Ok(value) if value.is_object() => {}
             Ok(_) => {
                 ok = false;
-                report.blockers.push(format!(
-                    "{} does not compile to a table, so the merge that carries it would fail.",
-                    chunk.title
-                ));
+                report.blocker(
+                    format!(
+                        "{} does not compile to a table, so the merge that carries it would fail.",
+                        chunk.title
+                    ),
+                    chunk.unit.clone(),
+                );
             }
             Err(e) => {
                 ok = false;
-                report
-                    .blockers
-                    .push(format!("{} does not parse as Lua: {e}", chunk.title));
+                report.blocker(
+                    format!("{} does not parse as Lua: {e}", chunk.title),
+                    chunk.unit.clone(),
+                );
             }
         }
     }
@@ -248,10 +290,13 @@ fn check_block_chunks_are_wrapped(compiled: &CompiledMod, report: &mut Preflight
     for chunk in &block_chunks {
         if !is_wrapped_in_do_end(&chunk.lua) {
             ok = false;
-            report.blockers.push(format!(
-                "{} is not wrapped in do ... end, so a tweakdefs slot could not run it alongside another mod's.",
-                chunk.title
-            ));
+            report.blocker(
+                format!(
+                    "{} is not wrapped in do ... end, so a tweakdefs slot could not run it alongside another mod's.",
+                    chunk.title
+                ),
+                chunk.unit.clone(),
+            );
         }
     }
     if ok {
@@ -297,11 +342,14 @@ fn check_duplicate_clone_keys(project: &ModProject, report: &mut PreflightReport
     for (unit, slots) in &owners {
         if slots.len() > 1 {
             ok = false;
-            report.blockers.push(format!(
-                "{unit} is defined by {} copies ({}), and only one of them will reach the game.",
-                slots.len(),
-                slots.join(", "),
-            ));
+            report.blocker(
+                format!(
+                    "{unit} is defined by {} copies ({}), and only one of them will reach the game.",
+                    slots.len(),
+                    slots.join(", "),
+                ),
+                Some(unit.to_string()),
+            );
         }
     }
     if ok {
@@ -334,17 +382,20 @@ fn check_base64_round_trip(compiled: &CompiledMod, report: &mut PreflightReport)
             Ok(bytes) if bytes == lua.as_bytes() => {}
             Ok(_) => {
                 ok = false;
-                report.blockers.push(format!(
-                    "{}'s base64 payload decodes back to different Lua than it started as.",
-                    chunk.title
-                ));
+                report.blocker(
+                    format!(
+                        "{}'s base64 payload decodes back to different Lua than it started as.",
+                        chunk.title
+                    ),
+                    chunk.unit.clone(),
+                );
             }
             Err(e) => {
                 ok = false;
-                report.blockers.push(format!(
-                    "{}'s base64 payload does not decode: {e}",
-                    chunk.title
-                ));
+                report.blocker(
+                    format!("{}'s base64 payload does not decode: {e}", chunk.title),
+                    chunk.unit.clone(),
+                );
             }
         }
     }
@@ -451,10 +502,14 @@ mod tests {
                 "second": { "key": "supercom", "replacesGameUnit": false, "def": { "maxDamage": 2 } }
             }
         }));
-        assert!(report
+        let message = report
             .blockers
             .iter()
-            .any(|b| b.contains("supercom") && b.contains("2 copies")));
+            .find(|b| b.contains("supercom") && b.contains("2 copies"))
+            .expect("the duplicate-key blocker");
+        // The blocker names supercom by construction (issue #3155), so a
+        // marker can be placed against it without parsing the sentence.
+        assert_eq!(report.unit_refs.get(message), Some(&"supercom".to_string()));
         // Not also reported clean: a blocker and a pass about the same fact
         // would be the exact confusion the three-way split exists to avoid.
         assert!(report
@@ -515,5 +570,34 @@ mod tests {
         }));
         assert!(report.blockers.is_empty());
         assert!(!report.passes.is_empty());
+    }
+
+    #[test]
+    fn unit_from_generated_path_reads_a_units_file_and_nothing_else() {
+        assert_eq!(
+            unit_from_generated_path("units/armcom.lua"),
+            Some("armcom".to_string())
+        );
+        assert_eq!(unit_from_generated_path("modinfo.lua"), None);
+        assert_eq!(unit_from_generated_path("gamedata/unitdefs_post.lua"), None);
+    }
+
+    /// A copy added under a name the game does not have (issue #3155): the
+    /// added-units chunk covers exactly one unit here, so a blocker against
+    /// it, were the compiler ever to produce one, would carry that unit's
+    /// key. Standing in for that case directly on the chunk, since a
+    /// project with a genuinely broken added chunk is not one this compiler
+    /// can produce today.
+    #[test]
+    fn singleton_unit_names_the_one_unit_a_batch_would_otherwise_hide() {
+        assert_eq!(
+            crate::compile::singleton_unit(["armcom"].into_iter()),
+            Some("armcom".to_string())
+        );
+        assert_eq!(
+            crate::compile::singleton_unit(["armcom", "corcom"].into_iter()),
+            None
+        );
+        assert_eq!(crate::compile::singleton_unit(std::iter::empty()), None);
     }
 }

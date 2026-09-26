@@ -26,6 +26,15 @@ export interface PreflightReport {
   review: string[];
   /** What was checked and came back clean. */
   passes: string[];
+  /**
+   * The unit a blocker's sentence is about, keyed by that sentence itself,
+   * for the blockers whose compiled chunk or file names exactly one (issue
+   * #3155). A blocker that folds several units into one batch, or any
+   * review item, has no entry here: `blockers` and `review` stay the plain
+   * arrays of sentences they always were, so this is additive rather than a
+   * replacement.
+   */
+  unitRefs: Record<string, string>;
 }
 
 export const workshopPreflight = defineCommand<
