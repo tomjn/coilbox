@@ -52,6 +52,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Switch } from "@/components/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 // The "?" tooltip mapconv already built for its own labelled fields. Shared
 // rather than copied: it is a generic control that happens to live in that
 // plugin's folder.
@@ -63,6 +69,7 @@ import {
   assetState,
 } from "../../assetFields";
 import type { PostNote } from "../../beforePost";
+import type { CheckMarker } from "../../checkMarkers";
 import type { ConsumerNote } from "../../customParamConsumers";
 import type { FieldCheck, LuaExcerpt } from "../../inPlace";
 import type { FieldRow } from "../../unitSections";
@@ -385,6 +392,7 @@ export function UnitFieldRow({
   assets,
   choices,
   warning,
+  checkMarker,
   inheritedLabel = "Game value",
   inPlace,
   post,
@@ -399,6 +407,10 @@ export function UnitFieldRow({
   /** Something wrong with the value that only its neighbours reveal, such as a
    *  movement class on a unit that does not move (issue #2651). */
   warning?: string;
+  /** What a compatibility check found about this field (issue #3116): the
+   *  game no longer has the table this value is written into, or the table
+   *  itself but nothing left that reads it. */
+  checkMarker?: CheckMarker;
   /** The game's archive, for a field that names a file in it (issue #2648).
    *  Absent until the listing lands, and on a page with no game picked. */
   assets?: AssetBrowsing;
@@ -515,6 +527,34 @@ export function UnitFieldRow({
             {row.label}
           </span>
           {row.field.help && <HelpTip>{row.field.help}</HelpTip>}
+          {checkMarker && (
+            <TooltipProvider delayDuration={150}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={(e) => e.preventDefault()}
+                    className={cn(
+                      "inline-flex shrink-0 cursor-help",
+                      checkMarker.severity === "blocker"
+                        ? "text-destructive"
+                        : "text-amber-700 dark:text-amber-400",
+                    )}
+                    aria-label={
+                      checkMarker.severity === "blocker"
+                        ? "Blocker"
+                        : "Worth a look"
+                    }
+                  >
+                    <TriangleAlert className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-left leading-snug">
+                  {checkMarker.messages.join(" ")}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
           {!row.field.known && (
             <span
               className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground"

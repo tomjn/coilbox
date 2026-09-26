@@ -6,9 +6,15 @@
  */
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { deathExplosions } from "../../deathExplosions";
 import type { RefProblem, SupportingDef } from "../../weaponRefs";
 import { weaponSlots } from "../../weaponSlots";
-import { type SlotLibrary, WeaponSlotsPanel } from "./WeaponSlotsPanel";
+import {
+  DeathExplosionsPanel,
+  type ExplosionPanel,
+  type SlotLibrary,
+  WeaponSlotsPanel,
+} from "./WeaponSlotsPanel";
 
 afterEach(cleanup);
 
@@ -142,5 +148,67 @@ describe("WeaponSlotsPanel supporting definitions", () => {
     expect(list.querySelector("li")?.className).not.toContain(
       "text-destructive",
     );
+  });
+});
+
+/** Issue #3116. A problem's `holder` names the same definition as a slot. */
+describe("the slot a weapon problem is about", () => {
+  it("marks the slot whose own definition the problem's holder names", () => {
+    draw({ problems: [problem] });
+    const slot = screen.getByRole("radio", { name: "Weapon 1, ship_rocket" });
+    const marker = slot.querySelector("[title]");
+    expect(marker?.getAttribute("title")).toBe(problem.message);
+  });
+
+  it("marks nothing when no problem's holder names this slot", () => {
+    draw({
+      problems: [{ ...problem, holder: { kind: "own", key: "elsewhere" } }],
+    });
+    const slot = screen.getByRole("radio", { name: "Weapon 1, ship_rocket" });
+    expect(slot.querySelector("[title]")).toBeNull();
+  });
+});
+
+describe("the death explosion a weapon problem is about", () => {
+  const def = {
+    weapons: [{ name: "ship_rocket" }],
+    weapondefs: { rocket: {}, rocket_split: {}, leftover: {} },
+    explodeAs: "ship_rocket",
+  };
+  const explosions = deathExplosions(def, def, {}, ["ship"]);
+
+  const explosionPanel: ExplosionPanel = {
+    entries: explosions,
+    selected: "explodeas",
+    equippedIn: () => undefined,
+    editCount: () => 0,
+    copyKey: () => "",
+    onSelect: () => {},
+    onChange: () => {},
+    onReset: () => {},
+    postOf: () => undefined,
+    onCopy: () => {},
+    onEquip: () => {},
+    onPutBack: () => {},
+  };
+
+  const drawExplosions = (
+    over: Partial<Parameters<typeof DeathExplosionsPanel>[0]> = {},
+  ) =>
+    render(
+      <DeathExplosionsPanel
+        view={null}
+        consumers={null}
+        library={library}
+        explosions={explosionPanel}
+        {...over}
+      />,
+    );
+
+  it("marks the death explosion whose own definition the problem's holder names", () => {
+    drawExplosions({ problems: [problem] });
+    const explosion = screen.getByRole("radio", { name: "Death explosion" });
+    const marker = explosion.querySelector("[title]");
+    expect(marker?.getAttribute("title")).toBe(problem.message);
   });
 });

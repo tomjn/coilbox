@@ -151,6 +151,11 @@ import {
   removeFromBuildMenu,
 } from "../buildMenus";
 import { useChangeLedger } from "../changeLedger";
+import {
+  fieldCheckMarkers,
+  fieldMarkersForUnit,
+  unitCheckMarkers,
+} from "../checkMarkers";
 import { AUTOSAVE_INTERVAL_MS, useCheckpoints } from "../checkpoints";
 import { isCloneMutatorOnly } from "../cloneMutatorOnly";
 import {
@@ -1179,7 +1184,10 @@ export default function UnitPage() {
   // A weapon's damage table naming an armour class this game and this project
   // neither one has (issue #2645), across every definition the unit carries
   // itself and every library weapon its slots fire, the same scope `refIssues`
-  // above checks references in.
+  // above checks references in. Each carries which definition it is about
+  // (issue #3116), the same shape a `RefProblem` already carries, so the
+  // weapons and death explosions tabs can mark the one slot or explosion a
+  // problem belongs to rather than only listing it above them.
   const armorProblems = useMemo(() => {
     const known = armorClassOptions.map((c) => c.name);
     const asDef = (value: unknown): Record<string, unknown> | undefined =>
@@ -1189,12 +1197,19 @@ export default function UnitPage() {
     const own = ownWeaponDefs(edited).defs;
     const ownProblems = Object.entries(own).flatMap(([key, value]) => {
       const def = asDef(value);
-      return def ? unknownDamageClasses(def, known, key) : [];
+      return def
+        ? unknownDamageClasses(def, known, key).map((p) => ({
+            ...p,
+            holder: { kind: "own" as const, key },
+          }))
+        : [];
     });
     const firedProblems = Object.values(unitEquipped ?? {}).flatMap((key) => {
       const weapon = library[key];
       return weapon
-        ? unknownDamageClasses(libraryWeaponDef(weapon), known, key)
+        ? unknownDamageClasses(libraryWeaponDef(weapon), known, key).map(
+            (p) => ({ ...p, holder: { kind: "library" as const, key } }),
+          )
         : [];
     });
     return [...ownProblems, ...firedProblems];
@@ -1768,6 +1783,24 @@ export default function UnitPage() {
     [project, defs, armorDefs, game?.name, consumers],
   );
   const moved = compatibility?.kind === "moved" ? compatibility.report : null;
+
+  // Where a compatibility finding or an armour class problem names a unit or
+  // one of its fields (issue #3116), so the unit list and the field list can
+  // mark it without waiting for anybody to open the Checks page and read it
+  // there. `projectArmorProblems` below is this same armour class check,
+  // project-wide rather than scoped to this unit.
+  const unitMarkers = useMemo(
+    () => unitCheckMarkers(moved?.findings ?? [], projectArmorProblems),
+    [moved, projectArmorProblems],
+  );
+  const fieldMarkers = useMemo(
+    () => fieldCheckMarkers(moved?.findings ?? []),
+    [moved],
+  );
+  const unitFieldMarkers = useMemo(
+    () => fieldMarkersForUnit(fieldMarkers, unitKey),
+    [fieldMarkers, unitKey],
+  );
 
   // Whether this project is in a fit state to use (issue #2748), read
   // whichever section is open so the Checks entry in the section bar can say
@@ -2599,6 +2632,7 @@ export default function UnitPage() {
                     })
                   : undefined
               }
+              markerOf={(key) => unitMarkers.get(key.toLowerCase())}
               onSelect={(key) => select({ unit: key })}
             />
           </div>
@@ -2995,6 +3029,7 @@ export default function UnitPage() {
                     assets={assets}
                     choices={choices}
                     warnings={warnings}
+                    checkMarkers={unitFieldMarkers}
                     inheritedLabel={inheritedLabel}
                     post={unitPostOf}
                     onChange={changeField}

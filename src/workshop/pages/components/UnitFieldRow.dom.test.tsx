@@ -11,6 +11,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ResolvedField } from "@/content/unitFields";
+import type { CheckMarker } from "../../checkMarkers";
 import type { FieldRow } from "../../unitSections";
 import { UnitFieldRow } from "./UnitFieldRow";
 
@@ -36,6 +37,16 @@ const row = (f: ResolvedField): FieldRow => ({
 
 const draw = (f: ResolvedField) =>
   render(<UnitFieldRow row={row(f)} onChange={() => {}} onReset={() => {}} />);
+
+const draw2 = (checkMarker: CheckMarker) =>
+  render(
+    <UnitFieldRow
+      row={row(field({}))}
+      checkMarker={checkMarker}
+      onChange={() => {}}
+      onReset={() => {}}
+    />,
+  );
 
 afterEach(cleanup);
 
@@ -70,6 +81,36 @@ describe("a row whose label nobody wrote", () => {
     draw(field({ known: false, described: false, label: "unitgroup" }));
     expect(screen.getByText("game")).toBeTruthy();
     expect(screen.queryByText("engine key")).toBeNull();
+  });
+});
+
+/** Issue #3116. A field a compatibility check found something about. */
+describe("a row a check has something to say about", () => {
+  it("marks a blocker and puts the message in a tooltip", async () => {
+    draw2({
+      severity: "blocker",
+      messages: ["armcom no longer has weapondefs, so this is dead weight."],
+    });
+    const marker = screen.getByRole("button", { name: "Blocker" });
+    expect(marker.className).toMatch(/text-destructive/);
+    fireEvent.focus(marker);
+    expect(
+      await screen.findByText(
+        "armcom no longer has weapondefs, so this is dead weight.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("marks a review item differently from a blocker", () => {
+    draw2({ severity: "review", messages: ["worth a look"] });
+    const marker = screen.getByRole("button", { name: "Worth a look" });
+    expect(marker.className).toMatch(/amber/);
+  });
+
+  it("says nothing extra for a field no check has flagged", () => {
+    draw(field({}));
+    expect(screen.queryByRole("button", { name: "Blocker" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Worth a look" })).toBeNull();
   });
 });
 

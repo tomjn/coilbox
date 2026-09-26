@@ -26,8 +26,8 @@
  * shared one gives the unit its own copy out of the library the same way a
  * shared slot weapon does.
  */
-import { Button, Input } from "@picoframe/frame";
-import { Plus, Undo2 } from "lucide-react";
+import { Button, cn, Input } from "@picoframe/frame";
+import { Plus, TriangleAlert, Undo2 } from "lucide-react";
 import { useState } from "react";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import type { CustomParamsResult } from "@/content/bindings";
@@ -130,6 +130,50 @@ export interface WeaponProblem {
   id: string;
   message: string;
   severity?: "error" | "warning";
+  /** Which definition this is about, when the check that found it names one
+   *  (issue #3116): the unit's own, or a library weapon a slot fires. Used to
+   *  place the same problem on the slot or death explosion button it is
+   *  about, rather than only in the flat list above them. Every `RefProblem`
+   *  already carries this. An `ArmorProblem` does not, since it is also read
+   *  project-wide where no single slot is on screen to mark, so the two call
+   *  sites below attach one when they build this unit's own list. */
+  holder?: { kind: "own" | "library"; key: string };
+}
+
+/** {@link problems} whose holder matches one slot or death explosion, for the
+ *  marker on its own button (issue #3116). `key` is the slot's own definition
+ *  key when it fires nothing out of the library, or the library weapon's key
+ *  when it does. `undefined` for a slot with neither, which nothing can be
+ *  wrong about here since there is no definition to check. */
+function problemsForHolder(
+  kind: "own" | "library",
+  key: string | undefined,
+  problems: WeaponProblem[],
+): WeaponProblem[] {
+  if (key === undefined) return [];
+  return problems.filter(
+    (p) => p.holder?.kind === kind && p.holder.key === key,
+  );
+}
+
+/** The marker a slot or death explosion button carries when
+ *  {@link problemsForHolder} found something about it: worse of the two
+ *  colours `WeaponProblems` uses, and every message in the title so a mouse
+ *  finds them without opening the flat list above. */
+function SlotMarker({ problems }: { problems: WeaponProblem[] }) {
+  if (problems.length === 0) return null;
+  const isError = problems.some((p) => p.severity !== "warning");
+  return (
+    <span
+      className={cn(
+        "flex size-4 shrink-0 items-center justify-center",
+        isError ? "text-destructive" : "text-amber-700 dark:text-amber-400",
+      )}
+      title={problems.map((p) => p.message).join(" ")}
+    >
+      <TriangleAlert className="size-3.5" />
+    </span>
+  );
 }
 
 function WeaponProblems({ problems }: { problems: WeaponProblem[] }) {
@@ -289,6 +333,15 @@ export function WeaponSlotsPanel({
           const fires = library.equippedIn(slot.step);
           const changed =
             slotEditCount(slot, overrides, unitKey) + (fires ? 1 : 0);
+          const slotProblems = fires
+            ? problemsForHolder("library", fires, problems)
+            : problemsForHolder(
+                "own",
+                slot.definition.kind === "own"
+                  ? slot.definition.key
+                  : undefined,
+                problems,
+              );
           return (
             <ToggleGroupItem
               key={slot.step}
@@ -311,6 +364,7 @@ export function WeaponSlotsPanel({
                   {changed}
                 </span>
               )}
+              <SlotMarker problems={slotProblems} />
             </ToggleGroupItem>
           );
         })}
@@ -540,6 +594,15 @@ export function DeathExplosionsPanel({
         {explosions.entries.map((explosion) => {
           const changed = explosions.editCount(explosion);
           const equippedHere = explosions.equippedIn(explosion.mount);
+          const explosionProblems = equippedHere
+            ? problemsForHolder("library", equippedHere, problems)
+            : problemsForHolder(
+                "own",
+                explosion.definition.kind === "own"
+                  ? explosion.definition.key
+                  : undefined,
+                problems,
+              );
           return (
             <ToggleGroupItem
               key={explosion.mount}
@@ -565,6 +628,7 @@ export function DeathExplosionsPanel({
                   {changed}
                 </span>
               )}
+              <SlotMarker problems={explosionProblems} />
             </ToggleGroupItem>
           );
         })}

@@ -297,6 +297,36 @@ describe("picking a unit", () => {
   });
 });
 
+/** Issue #3116. A check that names a unit in the game. */
+describe("a unit a check has flagged", () => {
+  it("marks the row a blocker names, with the message in its title", () => {
+    draw({
+      markerOf: (key) =>
+        key === "unit001"
+          ? { severity: "blocker", messages: ["armcom no longer resolves"] }
+          : undefined,
+    });
+    const marker = screen.getByTitle("armcom no longer resolves");
+    expect(marker.className).toMatch(/text-destructive/);
+  });
+
+  it("marks a review item differently from a blocker", () => {
+    draw({
+      markerOf: (key) =>
+        key === "unit001"
+          ? { severity: "review", messages: ["worth a look"] }
+          : undefined,
+    });
+    const marker = screen.getByTitle("worth a look");
+    expect(marker.className).toMatch(/amber/);
+  });
+
+  it("marks no row when nothing has flagged any unit", () => {
+    draw({ markerOf: () => undefined });
+    expect(screen.queryByTitle(/./)).toBeNull();
+  });
+});
+
 describe("searching by stat (issue #2656)", () => {
   function unitsWithHealth(): Record<string, Record<string, unknown>> {
     return {
