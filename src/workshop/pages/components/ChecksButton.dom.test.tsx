@@ -111,6 +111,7 @@ function buttonElement(props: Partial<Parameters<typeof ChecksButton>[0]>) {
         compatibility={null}
         onApplyFix={() => {}}
         onInPlaceWrite={() => {}}
+        armorClassProblems={[]}
         {...props}
         gameUnits={props.gameUnits ?? {}}
       />
@@ -160,6 +161,21 @@ describe("the checks button", () => {
     expect(button.textContent).toBe("1 to review");
   });
 
+  it("counts an armour class finding as something to review", () => {
+    renderButton({
+      armorClassProblems: [
+        {
+          id: "armcom:gator_laser:damage",
+          message:
+            "gator_laser's damage table names 4 armour classes this game does not have: bombers, fighters, subs, vtol. The engine uses the default damage for them instead, so these rows have no effect.",
+          severity: "warning",
+        },
+      ],
+    });
+    const button = screen.getByRole("button", { name: "1 to review found" });
+    expect(button.textContent).toBe("1 to review");
+  });
+
   it("counts a blocker and a review item together, blocker first", async () => {
     preflightResponse = {
       blockers: ["supercom is defined by 2 copies (first, second)."],
@@ -200,6 +216,22 @@ describe("the checks button", () => {
         "Preflight",
         "Change ledger",
       ]);
+    });
+
+    it("lists an armour class finding under its own heading, without opening the unit it is about", () => {
+      renderButton({
+        armorClassProblems: [
+          {
+            id: "armcom:gator_laser:damage",
+            message:
+              "gator_laser's damage table names 4 armour classes this game does not have: bombers, fighters, subs, vtol. The engine uses the default damage for them instead, so these rows have no effect.",
+            severity: "warning",
+          },
+        ],
+      });
+      fireEvent.click(screen.getByRole("button", { name: /to review/ }));
+      expect(screen.getByText("Armour classes")).toBeTruthy();
+      expect(screen.getByText(/gator_laser's damage table/)).toBeTruthy();
     });
 
     it("puts unitsync's own lines under Game definitions without showing them on the button", () => {

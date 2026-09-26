@@ -172,9 +172,11 @@ export function WeaponSlotsPanel({
   selectedSupport?: string;
   onSelectSupport?: (key: string) => void;
   /** Things wrong with this unit's weapons that only its neighbours or the
-   *  game's own data reveal: a reference that names nothing (issue #2641)
-   *  and a damage table naming an armour class nobody has (issue #2645). */
-  problems?: { id: string; message: string }[];
+   *  game's own data reveal: a reference that names nothing (issue #2641),
+   *  in error colour by default, and a damage table naming an armour class
+   *  nobody has (issue #2645), in warning colour since it does not stop the
+   *  project from building or loading (issue #3104). */
+  problems?: { id: string; message: string; severity?: "error" | "warning" }[];
   /** The unit's death explosions, and what the panel can do with them
    *  (issue #2642). When one is selected, `view` is its fields. */
   explosions?: ExplosionPanel;
@@ -274,11 +276,20 @@ export function WeaponSlotsPanel({
     <div className="flex flex-col gap-4">
       {problems.length > 0 && (
         <ul
-          className="flex max-w-prose flex-col gap-1 text-xs text-destructive"
+          className="flex max-w-prose flex-col gap-1 text-xs"
           aria-label="Problems with this unit's weapons"
         >
           {problems.map((problem) => (
-            <li key={problem.id}>{problem.message}</li>
+            <li
+              key={problem.id}
+              className={
+                problem.severity === "warning"
+                  ? "text-amber-700 dark:text-amber-400"
+                  : "text-destructive"
+              }
+            >
+              {problem.message}
+            </li>
           ))}
         </ul>
       )}

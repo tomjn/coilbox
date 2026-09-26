@@ -5,11 +5,15 @@ import {
   EMPTY_ARMOR_CLASSES,
   normaliseArmorDefs,
   parseArmorClasses,
+  projectDamageClassProblems,
   rebaseArmorClasses,
   resolvedArmorDefs,
   setArmorClass,
   unknownDamageClasses,
 } from "./armorClasses";
+import type { UnitClones } from "./clones";
+import type { UnitOverrides } from "./overrides";
+import type { WeaponLibrary } from "./weaponLibrary";
 
 const BA_ARMOR_DEFS: Record<string, string[]> = {
   commanders: ["armcom", "corcom"],
@@ -327,6 +331,27 @@ describe("unknownDamageClasses", () => {
     expect(problems).toHaveLength(1);
     expect(problems[0].message).toContain("subs");
     expect(problems[0].message).toContain("armcomlaser");
+    expect(problems[0].severity).toBe("warning");
+  });
+
+  it("groups several unknown classes on one weapon into one finding", () => {
+    const problems = unknownDamageClasses(
+      {
+        damage: {
+          default: 100,
+          bombers: 10,
+          fighters: 10,
+          subs: 10,
+          vtol2: 10,
+        },
+      },
+      known,
+      "gator_laser",
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0].message).toBe(
+      "gator_laser's damage table names 4 armour classes this game does not have: bombers, fighters, subs, vtol2. The engine uses the default damage for them instead, so these rows have no effect.",
+    );
   });
 
   it("says nothing about a weapon with no damage table", () => {
@@ -334,5 +359,69 @@ describe("unknownDamageClasses", () => {
       [],
     );
     expect(unknownDamageClasses(undefined, known, "armcomlaser")).toEqual([]);
+  });
+});
+
+describe("projectDamageClassProblems", () => {
+  const known = ["commanders", "vtol"];
+  const gameUnits: Record<string, Record<string, unknown>> = {
+    armcom: { weapondefs: { armcomlaser: { damage: { default: 100 } } } },
+  };
+
+  it("scans a unit's own weapondefs, with the project's overrides applied", () => {
+    const overrides: UnitOverrides = {
+      armcom: { "weapondefs.armcomlaser.damage.subs": 20 },
+    };
+    const problems = projectDamageClassProblems(
+      overrides,
+      {},
+      gameUnits,
+      {},
+      known,
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0].id).toBe("armcom:armcomlaser:damage");
+    expect(problems[0].message).toContain("subs");
+  });
+
+  it("scans a project clone's own weapondefs", () => {
+    const clones: UnitClones = {
+      armkam2: {
+        key: "armkam2",
+        replacesGameUnit: false,
+        def: { weapondefs: { laser: { damage: { subs: 20 } } } },
+      },
+    };
+    const problems = projectDamageClassProblems(
+      {},
+      clones,
+      gameUnits,
+      {},
+      known,
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0].id).toBe("armkam2:laser:damage");
+  });
+
+  it("scans every weapon the project's library holds, not only ones a unit fires", () => {
+    const library: WeaponLibrary = {
+      mylaser: { key: "mylaser", source: "armcomlaser", def: {} },
+    };
+    library.mylaser.changes = { "damage.subs": 20 };
+    const problems = projectDamageClassProblems(
+      {},
+      {},
+      gameUnits,
+      library,
+      known,
+    );
+    expect(problems).toHaveLength(1);
+    expect(problems[0].id).toBe("library:mylaser:damage");
+  });
+
+  it("is empty for a project that touches nothing and holds no weapons", () => {
+    expect(projectDamageClassProblems({}, {}, gameUnits, {}, known)).toEqual(
+      [],
+    );
   });
 });
