@@ -104,3 +104,38 @@ describe("UnitReferenceTable sorting", () => {
     expect(within(bodyRows[0]).getByText("Tank")).toBeTruthy();
   });
 });
+
+describe("UnitReferenceTable rename (issue #3110)", () => {
+  it("calls the alpha damage column volley damage", () => {
+    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    expect(screen.getByRole("button", { name: /Volley damage/ })).toBeTruthy();
+    expect(screen.queryByText(/Alpha damage/)).toBeNull();
+  });
+});
+
+describe("UnitReferenceTable faction column and filter (issue #3110)", () => {
+  const factionOf = (key: string) => (key === "armtank" ? "Arm" : "Core");
+
+  it("is absent with no factionOf", () => {
+    render(<UnitReferenceView rows={rows()} renderName={(r) => r.name} />);
+    expect(screen.queryByText("Faction")).toBeNull();
+  });
+
+  it("shows each row's faction and a filter beside the search box", () => {
+    render(
+      <UnitReferenceView
+        rows={rows()}
+        renderName={(r) => r.name}
+        factionOf={factionOf}
+      />,
+    );
+    expect(screen.getByText("Faction")).toBeTruthy();
+    expect(screen.getByText("Arm")).toBeTruthy();
+    expect(screen.getByText("Core")).toBeTruthy();
+
+    fireEvent.click(screen.getByLabelText("Filter by faction"));
+    fireEvent.click(screen.getByRole("option", { name: "Core" }));
+    expect(screen.getByText("Commander")).toBeTruthy();
+    expect(screen.queryByText("Tank")).toBeNull();
+  });
+});

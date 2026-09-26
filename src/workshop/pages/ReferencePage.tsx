@@ -16,11 +16,15 @@
  * weapon shows that weapon's numbers rather than its own unequipped
  * definition's.
  */
-import { useMemo } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useCallback, useMemo } from "react";
 import { Link, useParams } from "react-router";
+import { PageHeader } from "@/components/PageHeader";
 import {
   useScanTargetSelection,
+  useUnitsyncGameInfo,
   useUnitsyncScan,
+  useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import {
@@ -28,12 +32,15 @@ import {
   DetailLoading,
   EmptyState,
 } from "@/content/pages/components/states";
+import { buildTechForest } from "@/content/techForest";
+import { buildOptionsOf } from "../buildMenus";
 import { unitsWithClones } from "../clones";
 import { useUnitDefs } from "../config";
 import { resolvedDef } from "../overrides";
 import { EMPTY_EDITS, useModProjects } from "../project";
 import { projectPath } from "../routes";
 import { textRedirect, unitDisplayName } from "../unitName";
+import { unitPicLookup } from "../unitPics";
 import { unitReferenceRows } from "../unitReference";
 import { nameEdit } from "../unitText";
 import { UnitReferenceView } from "./components/UnitReferenceView";
@@ -113,6 +120,77 @@ export default function ReferencePage() {
     );
   }, [units, overrides, defs, nameOf, library, equipped]);
 
+  // Which faction reaches each unit, the same walk `UnitPage.tsx`'s own list
+  // uses to tell apart two rows that share a name (issue #3110): a game's own
+  // dataset, with the project's copies stood in among it, so a unit this
+  // project added still resolves through whichever build graph reaches its
+  // clone's source.
+  const pickerUnits = useMemo(() => {
+    const byName = new Map(
+      (dataset?.units ?? []).map((u) => [u.name.toLowerCase(), u]),
+    );
+    for (const clone of Object.values(ownClones)) {
+      const borrowed = textRedirect(clone.def);
+      byName.set(clone.key, {
+        name: clone.key,
+        fullName: unitDisplayName(
+          clone.key,
+          clone.def,
+          undefined,
+          borrowed === undefined ? undefined : byName.get(borrowed),
+        ),
+        buildOptions: buildOptionsOf(clone.def),
+      });
+    }
+    return [...byName.values()];
+  }, [dataset, ownClones]);
+
+  const { info: gameInfo } = useUnitsyncGameInfo(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+  );
+  const sides = useMemo(
+    () => (gameInfo?.sides ?? []).filter((s) => !!s.startUnit),
+    [gameInfo],
+  );
+  const forest = useMemo(
+    () =>
+      buildTechForest(
+        pickerUnits,
+        sides.map((s) => s.startUnit as string),
+      ),
+    [pickerUnits, sides],
+  );
+  const factionOf = useCallback(
+    (key: string): string | undefined => {
+      // A one-sided game answers nothing, because the same word on every row
+      // tells nobody anything.
+      if (sides.length < 2) return undefined;
+      const root = forest.factionOf.get(key);
+      if (root === undefined) return undefined;
+      return (
+        sides.find((s) => s.startUnit?.toLowerCase() === root)?.name ?? root
+      );
+    },
+    [forest, sides],
+  );
+
+  // A unit's build picture (issue #3110), the same read `UnitPage.tsx`'s own
+  // list draws its rows from.
+  const picIds = useMemo(() => Object.keys(gameUnits), [gameUnits]);
+  const buildpics = useUnitsyncUnitBuildpics(
+    selected?.enginePath,
+    selected?.rootPath,
+    game?.primaryArchive.name,
+    picIds,
+  );
+  const picsPending = !buildpics && picIds.length > 0;
+  const picOf = useMemo(
+    () => unitPicLookup({ buildpics, clones: ownClones, units, overrides }),
+    [buildpics, ownClones, units, overrides],
+  );
+
   const backTo = project ? projectPath(project.id) : "/workshop";
 
   // Covers both a deleted or never-owned project id and `/workshop/new`
@@ -151,19 +229,18 @@ export default function ReferencePage() {
 
   return (
     <div className="flex flex-col gap-4 p-4">
-      <div className="flex flex-col gap-1">
-        <Link
-          to={backTo}
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
-        >
-          {project?.name ?? "Unit tweaks"}
-        </Link>
-        <h1 className="text-lg font-semibold">Unit reference</h1>
-        <p className="text-sm text-muted-foreground">
-          Every unit in {gameName}, with this project's own edits applied.
-          Select two or more to compare them.
-        </p>
-      </div>
+      <PageHeader
+        back={
+          <Link
+            to={backTo}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+          >
+            <ArrowLeft className="size-3.5" /> {project?.name ?? "Unit tweaks"}
+          </Link>
+        }
+        title="Unit reference"
+        description={`Every unit in ${gameName}, with this project's own edits applied. Select two or more to compare them.`}
+      />
       <UnitReferenceView
         rows={rows}
         renderName={(row) => (
@@ -174,6 +251,9 @@ export default function ReferencePage() {
             {row.name}
           </Link>
         )}
+        picOf={picOf}
+        picsPending={picsPending}
+        factionOf={factionOf}
       />
     </div>
   );

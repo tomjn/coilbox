@@ -6,6 +6,7 @@
  */
 import { Button } from "@picoframe/frame";
 import { type ReactNode, useMemo, useState } from "react";
+import type { UnitDisplay } from "@/content/bindings";
 import type { UnitReferenceRow } from "../../unitReference";
 import { UnitCompareDrawer } from "./UnitCompareDrawer";
 import { UnitReferenceTable } from "./UnitReferenceTable";
@@ -13,9 +14,21 @@ import { UnitReferenceTable } from "./UnitReferenceTable";
 export function UnitReferenceView({
   rows,
   renderName,
+  picOf,
+  picsPending,
+  factionOf,
 }: {
   rows: UnitReferenceRow[];
   renderName: (row: UnitReferenceRow) => ReactNode;
+  /** See `UnitReferenceTable`: a row's build picture and the picture read's
+   *  own pending state (issue #3110), omitted entirely on a page with no
+   *  picture read to offer. */
+  picOf?: (key: string) => UnitDisplay | undefined;
+  picsPending?: boolean;
+  /** See `UnitReferenceTable`: which faction reaches a unit (issue #3110),
+   *  omitted alongside the faction column and its filter on a page with no
+   *  build graph to answer from. */
+  factionOf?: (key: string) => string | undefined;
 }) {
   const [selected, setSelected] = useState<string[]>([]);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -69,6 +82,9 @@ export function UnitReferenceView({
         selected={selectedSet}
         onToggle={toggle}
         renderName={renderName}
+        picOf={picOf}
+        picsPending={picsPending}
+        factionOf={factionOf}
       />
       <UnitCompareDrawer
         open={compareOpen}
