@@ -3,10 +3,31 @@
 //!
 //! `tweakdefs`/`tweakunits` mod options predate Beyond All Reason: any game
 //! whose `modoptions.lua` declares the same bare-plus-numbered keys can take
-//! a project this way. BAR is the game this module's own research was done
-//! against, so the BAR-specific facts below (its decoder's quirks, the tools
-//! its players use) are named as BAR's rather than generalised past what is
-//! actually known about other games.
+//! a project this way. Two games declaring them have had their own decoding
+//! code read and their definitions loaded with slots set (issue #3126):
+//! Beyond All Reason and Zero-K. BAR's code is Zero-K's with changes: the
+//! same `modoptions.lua` loop, the same `CustomKeyToUsefulTable`, and the
+//! same 2006 base64 library by Alex Kloss. What each does, from its own
+//! `gamedata/unitdefs_post.lua`:
+//!
+//! | | `tweakdefs` | `tweakunits` | order |
+//! |-|-|-|-|
+//! | Zero-K v1.14.8.0 | URL-safe base64 only, then `loadstring` | `_` rewritten to `=`, then URL-safe only, then merged into units the game has | every `tweakdefs` slot, then every `tweakunits` slot, each stopping at the first empty one |
+//! | BAR `test-30922-8064a43` (August 2026) | URL-safe only | as Zero-K | every `tweakdefs` slot, then every `tweakunits` slot, by number, gaps skipped |
+//! | BAR `master`, September 2026 | both alphabets since upstream `7089c3c` (8 September) | as Zero-K, but reads both alphabets | every `tweakunits` slot first since upstream #6597 (4 September) |
+//!
+//! A `tweakunits` payload therefore has no spelling every game reads: the
+//! value 63 is `_`, which the rewrite destroys everywhere, or `/`, which only
+//! BAR `master` reads, and 62 as `+` fails the same way. A character a
+//! decoder cannot read either drops a byte or stops the whole slot loading,
+//! depending on where in its group of four it falls. And whether
+//! it runs before or after the `tweakdefs` slots depends on the BAR build.
+//! So this module packs everything into `tweakdefs` slots, in URL-safe
+//! base64, which every decoder above reads unchanged, in the one order all
+//! three agree on. A table-form chunk goes in as a block that merges it with
+//! the same code the mutator route runs (`compile::table_as_block`). No
+//! game past these two has been checked, which the delivery route says on
+//! screen (`src/workshop/deliveryRoutes.ts`).
 //!
 //! A mutator archive cannot be loaded into somebody else's lobby. The only
 //! route open to a player who is not hosting is asking the server to set a
@@ -38,10 +59,7 @@
 //! Surfacing uberserver's refusal is issue #1279's, not this module's to
 //! avoid by shrinking the cap.
 //!
-//! The two chunk forms `compile.rs` produces go to different slot kinds. A
-//! table (`tweakunits`) cannot be joined onto another the way two `do ... end`
-//! blocks can be concatenated into one Lua chunk, so every table-form chunk
-//! gets a slot of its own. A block (`tweakdefs`) is a self-contained
+//! Every chunk, once a table has become a block, is a self-contained
 //! statement, so as many as fit are joined into one slot before the next slot
 //! is started, in the order `compile.rs` already produced them. That order is
 //! already the order they have to run in (see `CompiledMod`'s own doc
@@ -62,25 +80,15 @@
 //! generates a single-quoted or long-bracket Lua string (`lua.rs`'s
 //! `lua_string` always double-quotes), so neither is tracked.
 //!
-//! Encoding is unpadded base64 both ways, and the alphabet differs by slot
-//! kind because BAR reads the two kinds differently (issue #2963).
-//! `tweakdefs` goes straight to BAR's decoder and carries the URL-safe
-//! alphabet `localTweakSlot.ts` already uses for the local single-slot
-//! route.
-//! `tweakunits` goes through one step more, `CustomKeyToUsefulTable`, which
-//! rewrites every `_` to `=` before decoding and so destroys the URL-safe
-//! spelling of 63. That slot carries the standard alphabet instead, which
-//! passes through untouched and which BAR's decoder reads just as happily:
-//! its table holds `['+'] = 62, ['/'] = 63` beside the URL-safe pair.
-//! Neither is padded, because that decoder walks its input four characters
-//! at a time and a short final group simply yields fewer bytes.
+//! Encoding is unpadded URL-safe base64, the alphabet `localTweakSlot.ts`
+//! already uses for the local single-slot route. It is not padded, because
+//! every decoder above walks its input four characters at a time and a short
+//! final group simply yields fewer bytes.
 
-use crate::compile::{Chunk, LuaForm};
-use base64::{
-    engine::general_purpose::{STANDARD_NO_PAD, URL_SAFE_NO_PAD},
-    Engine as _,
-};
+use crate::compile::{table_as_block, Chunk, LuaForm};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use serde::Serialize;
+use std::borrow::Cow;
 
 /// The base64 payload cap, per slot. Tom's decision on issue #1277.
 pub const PAYLOAD_CAP: usize = 16_000;
@@ -91,10 +99,11 @@ pub const PAYLOAD_CAP: usize = 16_000;
 /// keeps proving it rather than assuming it, per this module's doc comment.
 pub const LINE_CAP: usize = 16_385;
 
-/// One slot key past the last one a game's `modoptions.lua` declares: the bare
-/// option plus numbered `1` through `29` (`deliveryRoutes.ts`'s own doc
-/// comment, read off BAR's mod option generator), so 30 valid indices in
-/// total. 0 for the bare slot and 1..=29 for the numbered ones.
+/// The most slots any checked game declares: the bare option plus numbered
+/// `1` through `29`, which is BAR `master` since upstream #6597. Zero-K and
+/// BAR `test-30922-8064a43` declare `1` through `9`, so the frontend compares
+/// what a pack used against the game's own count (`tweakSlotFit` in
+/// `tweakPack.ts`) rather than trusting this ceiling.
 const MAX_SLOTS: usize = 30;
 
 /// What packing a project's chunks across the game's slots produced.
@@ -102,12 +111,8 @@ const MAX_SLOTS: usize = 30;
 #[serde(rename_all = "camelCase")]
 pub struct TweakSlotPack {
     /// One `!bset tweakdefs...` line per filled slot, in the order they have
-    /// to run.
+    /// to run. The only kind a pack fills (see this module's doc comment).
     pub tweakdefs: Vec<String>,
-    /// One `!bset tweakunits...` line per filled slot. Always one chunk each,
-    /// since a plain table cannot be joined onto another (see this module's
-    /// doc comment).
-    pub tweakunits: Vec<String>,
     /// A chunk whose own line would exceed the cap even alone in an empty
     /// slot. No packing decision could have placed it, and splitting it
     /// would break the Lua it carries.
@@ -273,50 +278,26 @@ fn long_bracket_close(chars: &[char], from: usize, level: usize) -> Option<usize
     None
 }
 
-/// The URL-safe, unpadded base64 a `tweakdefs` slot carries. BAR hands that
-/// slot straight to its own decoder, which reads this alphabet.
+/// The URL-safe, unpadded base64 a `tweakdefs` slot carries. Every decoder
+/// in this module's doc comment reads this alphabet with no rewrite first.
 pub(crate) fn encode(text: &str) -> String {
     URL_SAFE_NO_PAD.encode(text.as_bytes())
 }
 
-/// The same bytes for a `tweakunits` slot, which BAR reads through one step
-/// more and that step destroys the URL-safe alphabet (issue #2963).
-///
-/// `CustomKeyToUsefulTable` runs `string.gsub(dataRaw, "_", "=")` before it
-/// decodes, so every `_` becomes padding, which its table maps to nil, and
-/// the byte is dropped. The line still packs, still encodes and still
-/// decodes here. It fails only when a game loads it, and the only trace is a
-/// line in the infolog.
-///
-/// The standard alphabet goes through that `gsub` untouched, because it
-/// spells 62 and 63 as `+` and `/`. BAR's decoder reads both alphabets, with
-/// `['+'] = 62, ['/'] = 63` beside the URL-safe pair, so the bytes arrive as
-/// written. Padding stays off: the decoder walks the input four characters
-/// at a time and a short final group simply yields fewer bytes, which is why
-/// the unpadded form this project already sends has always worked.
-///
-/// `_` only encodes to 63 on the third byte of a group, so plain English
-/// rarely produces one and this went unnoticed. Any text outside ASCII makes
-/// it likely, since UTF-8 sets the high bits of every byte it uses.
-fn encode_tweakunits(text: &str) -> String {
-    STANDARD_NO_PAD.encode(text.as_bytes())
+/// The other half of [`encode`], for a caller checking the round trip.
+pub(crate) fn decode(payload: &str) -> Result<Vec<u8>, base64::DecodeError> {
+    URL_SAFE_NO_PAD.decode(payload)
 }
 
-/// The payload for a chunk, in whichever alphabet its own slot kind needs.
-/// Shared with `preflight.rs` so the round trip it checks is the encoding
-/// that actually ships, rather than a second opinion about it.
-pub(crate) fn encode_for(form: LuaForm, text: &str) -> String {
-    match form {
-        LuaForm::Table => encode_tweakunits(text),
-        LuaForm::Block => encode(text),
-    }
-}
-
-/// The other half of [`encode_for`], for a caller checking the round trip.
-pub(crate) fn decode_for(form: LuaForm, payload: &str) -> Result<Vec<u8>, base64::DecodeError> {
-    match form {
-        LuaForm::Table => STANDARD_NO_PAD.decode(payload),
-        LuaForm::Block => URL_SAFE_NO_PAD.decode(payload),
+/// The Lua a chunk puts in a `tweakdefs` slot: a block as it stands, and a
+/// table as a block that merges it onto `UnitDefs` (see this module's doc
+/// comment for why no chunk goes to a `tweakunits` slot). Shared with
+/// `preflight.rs` and `ledger.rs`, so the round trip one checks and the slot
+/// the other finds are the Lua that actually ships.
+pub(crate) fn slot_lua(chunk: &Chunk) -> Cow<'_, str> {
+    match chunk.form {
+        LuaForm::Table => Cow::Owned(table_as_block(&chunk.lua)),
+        LuaForm::Block => Cow::Borrowed(&chunk.lua),
     }
 }
 
@@ -349,56 +330,27 @@ fn fits_line(prefix_len: usize, payload_len: usize) -> bool {
 pub(crate) fn mod_options(pack: &TweakSlotPack) -> std::collections::BTreeMap<String, String> {
     pack.tweakdefs
         .iter()
-        .chain(&pack.tweakunits)
         .filter_map(|line| line.strip_prefix("!bset ")?.split_once(' '))
         .map(|(key, payload)| (key.to_string(), payload.to_string()))
         .collect()
 }
 
-/// Pack every chunk `compile::compile` produced across the game's numbered slots.
+/// Pack every chunk `compile::compile` produced across the game's numbered
+/// `tweakdefs` slots. Chunks are concatenated into a slot until the next one
+/// would not fit, in the compiled order, which is the order they have to run
+/// in (see this module's doc comment).
 pub fn pack(chunks: &[Chunk]) -> TweakSlotPack {
     let mut result = TweakSlotPack::default();
-    pack_tables(chunks, &mut result);
-    pack_blocks(chunks, &mut result);
-    result
-}
-
-/// A table-form chunk gets a slot of its own. A `tweakunits` slot carries a
-/// plain table, and two of those cannot be joined into one without a rule
-/// for merging their keys that nothing here has been asked to invent.
-fn pack_tables(chunks: &[Chunk], result: &mut TweakSlotPack) {
-    let mut slot_index = 0usize;
-    for chunk in chunks.iter().filter(|c| c.form == LuaForm::Table) {
-        if slot_index >= MAX_SLOTS {
-            result.unplaced.push(chunk.title.clone());
-            continue;
-        }
-        let minified = minify_lua(&chunk.lua);
-        let payload = encode_tweakunits(&minified);
-        let prefix = bset_prefix("tweakunits", slot_index);
-        if !fits_payload(payload.len()) || !fits_line(prefix.len(), payload.len()) {
-            result.oversized.push(chunk.title.clone());
-            continue;
-        }
-        result.tweakunits.push(format!("{prefix}{payload}"));
-        slot_index += 1;
-    }
-}
-
-/// Block-form chunks are concatenated into a slot until the next one would
-/// not fit, in the compiled order, which is the order they have to run in
-/// (see this module's doc comment).
-fn pack_blocks(chunks: &[Chunk], result: &mut TweakSlotPack) {
     let mut current = String::new();
     let mut slot_index = 0usize;
 
-    for chunk in chunks.iter().filter(|c| c.form == LuaForm::Block) {
+    for chunk in chunks {
         if current.is_empty() && slot_index >= MAX_SLOTS {
             result.unplaced.push(chunk.title.clone());
             continue;
         }
 
-        let minified = minify_lua(&chunk.lua);
+        let minified = minify_lua(&slot_lua(chunk));
         let candidate = if current.is_empty() {
             minified.clone()
         } else {
@@ -441,6 +393,7 @@ fn pack_blocks(chunks: &[Chunk], result: &mut TweakSlotPack) {
             .tweakdefs
             .push(format!("{}{payload}", bset_prefix("tweakdefs", slot_index)));
     }
+    result
 }
 
 #[cfg(test)]
@@ -465,91 +418,119 @@ mod tests {
         }
     }
 
-    /// Beyond All Reason reading a `tweakunits` payload, in its own two
-    /// steps: `CustomKeyToUsefulTable`'s `string.gsub(dataRaw, "_", "=")`,
-    /// then `base64Decode` from `common/luaUtilities/base64.lua`. That
-    /// decoder's table maps both alphabets (`-` and `+` to 62, `_` and `/`
-    /// to 63) and drops `=`, and it reads four characters at a time so a
-    /// short final group just yields fewer bytes.
+    /// How the decoders checked in this module's doc comment read a payload:
+    /// the 2006 Kloss library as Zero-K v1.14.8.0 and BAR
+    /// `test-30922-8064a43` ship it, with only the URL-safe pair in its table.
+    /// `underscore_rewrite` adds `CustomKeyToUsefulTable`'s
+    /// `string.gsub(dataRaw, "_", "=")`, the extra step a `tweakunits` slot
+    /// takes and a `tweakdefs` slot does not.
+    ///
+    /// A character outside the table reads as nil, and the Lua then does one
+    /// of two things depending on where in its group of four the nil falls.
+    /// In the first two places, or the third with a fourth after it, the
+    /// arithmetic on nil raises an error and the slot is lost, which is
+    /// `None` here. In the last place the byte is dropped and decoding goes
+    /// on, so the Lua arrives short.
     ///
     /// Written out rather than reached for from the `base64` crate on
-    /// purpose: no engine here does the `gsub`, and that step is the bug.
-    fn as_bar_reads_tweakunits(payload: &str) -> Vec<u8> {
-        let mut bits = Vec::new();
-        for c in payload.replace('_', "=").chars() {
-            let value = match c {
-                'A'..='Z' => c as u8 - b'A',
-                'a'..='z' => c as u8 - b'a' + 26,
-                '0'..='9' => c as u8 - b'0' + 52,
-                '-' | '+' => 62,
-                '/' => 63,
-                _ => continue, // `=`, which the table maps to nil.
-            };
-            bits.push(value);
-        }
+    /// purpose: no library here reads the way that Lua does.
+    fn as_the_checked_games_decode(payload: &str, underscore_rewrite: bool) -> Option<Vec<u8>> {
+        let text = if underscore_rewrite {
+            payload.replace('_', "=")
+        } else {
+            payload.to_string()
+        };
+        let value = |c: char| -> Option<u8> {
+            match c {
+                'A'..='Z' => Some(c as u8 - b'A'),
+                'a'..='z' => Some(c as u8 - b'a' + 26),
+                '0'..='9' => Some(c as u8 - b'0' + 52),
+                '-' => Some(62),
+                '_' => Some(63),
+                _ => None,
+            }
+        };
+        let chars: Vec<char> = text.chars().collect();
         let mut out = Vec::new();
-        for group in bits.chunks(4) {
-            out.push((group[0] << 2) | (group.get(1).copied().unwrap_or(0) >> 4));
-            if group.len() > 2 {
-                out.push((group[1] << 4) | (group[2] >> 2));
-            }
-            if group.len() > 3 {
-                out.push((group[2] << 6) | group[3]);
+        for group in chars.chunks(4) {
+            let v: Vec<Option<u8>> = (0..4)
+                .map(|i| group.get(i).and_then(|c| value(*c)))
+                .collect();
+            let (a, b) = (v[0]?, v[1]?);
+            out.push((a << 2) | (b >> 4));
+            match (v[2], v[3]) {
+                (Some(c), Some(d)) => {
+                    out.push((b << 4) | (c >> 2));
+                    out.push((c << 6) | d);
+                }
+                (Some(c), None) => out.push((b << 4) | (c >> 2)),
+                (None, Some(_)) => return None,
+                (None, None) => {}
             }
         }
-        out
+        Some(out)
     }
 
-    /// The bug (issue #2963). A unit renamed in Russian inside a copied
-    /// definition is ordinary data, and its URL-safe payload holds a `_`
-    /// that BAR turns into padding before decoding, so the table arrives
-    /// truncated and the whole slot fails to load.
-    #[test]
-    fn a_tweakunits_payload_survives_bars_own_underscore_rewrite() {
-        let lua = "{ [\"armcom\"] = { name = \"привет\" } }";
-        let pack = pack(&[table_chunk("Field changes", lua)]);
-        let payload = pack.tweakunits[0]
-            .rsplit_once(' ')
-            .expect("a payload")
-            .1
-            .to_string();
+    /// A field change naming a unit in Russian ("heavy tank"), chosen
+    /// because its table encodes a 63, which is where the checked games'
+    /// `tweakunits` decoding goes wrong.
+    const RUSSIAN_FIELD_CHANGE: &str = "{ [\"armcom\"] = { name = \"Тяжёлый танк\" } }";
 
-        assert!(!payload.contains('_'), "payload: {payload}");
-        assert_eq!(
-            String::from_utf8(as_bar_reads_tweakunits(&payload)).expect("utf8"),
-            minify_lua(lua),
-        );
-    }
-
-    /// The same bytes under the alphabet this project used before, to show
-    /// the test above is testing something. BAR would read this one short.
+    /// The bug (issue #3126). Put in a `tweakunits` slot, that table has no
+    /// spelling the checked decoders read back: the URL-safe `_` becomes
+    /// padding in the rewrite (issue #2963), and the standard `+` and `/`
+    /// are not in their table at all, so the #2963 fix only moved the break.
     #[test]
-    fn the_url_safe_spelling_of_the_same_payload_is_what_bar_damages() {
-        let lua = "{ [\"armcom\"] = { name = \"привет\" } }";
-        let url_safe = encode(&minify_lua(lua));
+    fn no_alphabet_carries_this_table_through_a_tweakunits_slot() {
+        let minified = minify_lua(RUSSIAN_FIELD_CHANGE);
+        let url_safe = encode(&minified);
+        let standard = base64::engine::general_purpose::STANDARD_NO_PAD.encode(minified.as_bytes());
         assert!(url_safe.contains('_'));
-        assert_ne!(
-            String::from_utf8_lossy(&as_bar_reads_tweakunits(&url_safe)),
-            minify_lua(lua),
-        );
+        assert!(standard.contains('+') || standard.contains('/'));
+        for payload in [url_safe, standard] {
+            assert_ne!(
+                as_the_checked_games_decode(&payload, true).as_deref(),
+                Some(minified.as_bytes()),
+                "{payload}"
+            );
+        }
     }
 
-    /// `tweakdefs` reaches BAR's decoder with no rewrite in the way, so it
-    /// keeps the alphabet every other route in this project speaks.
+    /// The fix. The same table packs into a `tweakdefs` slot as a block that
+    /// merges it, and that slot is decoded with no rewrite first, so the
+    /// URL-safe `_` reads back as 63 and the Lua arrives whole.
+    #[test]
+    fn a_table_chunk_packs_into_a_tweakdefs_slot_the_checked_games_read_whole() {
+        let pack = pack(&[table_chunk("Field changes", RUSSIAN_FIELD_CHANGE)]);
+        assert_eq!(pack.tweakdefs.len(), 1);
+        assert!(pack.tweakdefs[0].starts_with("!bset tweakdefs "));
+        let payload = pack.tweakdefs[0].rsplit_once(' ').expect("a payload").1;
+        let expected = minify_lua(&table_as_block(RUSSIAN_FIELD_CHANGE));
+        assert_eq!(
+            as_the_checked_games_decode(payload, false).as_deref(),
+            Some(expected.as_bytes()),
+        );
+        assert!(expected.starts_with("do "));
+        assert!(expected.contains("local changes = { [\"armcom\"]"));
+        assert!(expected.contains("merge(def, patch)"));
+        assert!(expected.ends_with(" end"));
+    }
+
+    /// `tweakdefs` reaches every checked decoder with no rewrite in the way,
+    /// so it keeps the alphabet every other route in this project speaks.
     #[test]
     fn a_tweakdefs_payload_keeps_the_url_safe_alphabet() {
-        // Chosen because the two alphabets spell this one differently: it
-        // encodes a 63, so the standard form holds a `/` where the URL-safe
-        // form holds a `_`.
+        // Chosen because it encodes a 63, which the URL-safe alphabet spells
+        // as `_`.
         let lua = "do x = \"?\" end";
-        assert_ne!(encode(lua), STANDARD_NO_PAD.encode(lua.as_bytes()));
+        assert!(encode(lua).contains('_'));
 
         let pack = pack(&[block_chunk("Block", lua)]);
         let payload = pack.tweakdefs[0].rsplit_once(' ').expect("a payload").1;
         assert_eq!(payload, encode(&minify_lua(lua)));
         assert_eq!(
-            URL_SAFE_NO_PAD.decode(payload).expect("decodes"),
-            minify_lua(lua).as_bytes(),
+            decode(payload).expect("decodes"),
+            minify_lua(lua).as_bytes()
         );
     }
 
@@ -560,11 +541,12 @@ mod tests {
             block_chunk("b", "do x = 1 end"),
         ]);
         let options = mod_options(&pack);
+        assert_eq!(options.keys().collect::<Vec<_>>(), vec!["tweakdefs"]);
+        let table = minify_lua(&table_as_block("{ [\"a\"] = { x = 1 } }"));
         assert_eq!(
-            options.keys().collect::<Vec<_>>(),
-            vec!["tweakdefs", "tweakunits"]
+            options["tweakdefs"],
+            encode(&format!("{table} do x = 1 end"))
         );
-        assert_eq!(options["tweakdefs"], encode("do x = 1 end"));
     }
 
     // -- minify_lua -----------------------------------------------------
@@ -670,23 +652,29 @@ mod tests {
     // -- pack: table chunks ------------------------------------------------
 
     #[test]
-    fn a_single_table_chunk_becomes_one_bare_tweakunits_line() {
-        let pack = pack(&[table_chunk("added", "{ [\"a\"] = { x = 1 } }")]);
-        assert_eq!(pack.tweakunits.len(), 1);
-        assert!(pack.tweakunits[0].starts_with("!bset tweakunits "));
-        assert!(pack.tweakdefs.is_empty());
+    fn a_single_table_chunk_becomes_one_bare_tweakdefs_line() {
+        let pack = pack(&[table_chunk("changes", "{ [\"a\"] = { x = 1 } }")]);
+        assert_eq!(pack.tweakdefs.len(), 1);
+        assert!(pack.tweakdefs[0].starts_with("!bset tweakdefs "));
         assert!(pack.complete());
     }
 
+    /// A table is a block once packed, so it shares a slot with the blocks
+    /// around it, in compiled order, rather than taking one of its own.
     #[test]
-    fn two_table_chunks_take_two_slots_numbered_from_the_second() {
+    fn a_table_chunk_shares_a_slot_with_the_blocks_around_it_in_order() {
         let pack = pack(&[
-            table_chunk("first", "{ [\"a\"] = { x = 1 } }"),
-            table_chunk("second", "{ [\"b\"] = { x = 2 } }"),
+            block_chunk("before", "do x = 1 end"),
+            table_chunk("changes", "{ [\"a\"] = { x = 2 } }"),
+            block_chunk("after", "do y = 3 end"),
         ]);
-        assert_eq!(pack.tweakunits.len(), 2);
-        assert!(pack.tweakunits[0].starts_with("!bset tweakunits "));
-        assert!(pack.tweakunits[1].starts_with("!bset tweakunits1 "));
+        assert_eq!(pack.tweakdefs.len(), 1);
+        let decoded = String::from_utf8(
+            decode(pack.tweakdefs[0].strip_prefix("!bset tweakdefs ").unwrap()).unwrap(),
+        )
+        .unwrap();
+        let table = minify_lua(&table_as_block("{ [\"a\"] = { x = 2 } }"));
+        assert_eq!(decoded, format!("do x = 1 end {table} do y = 3 end"));
     }
 
     /// A table chunk whose own payload already exceeds the cap cannot be
@@ -698,22 +686,8 @@ mod tests {
         // past 16,000.
         let big = format!("{{ x = \"{}\" }}", "a".repeat(12_100));
         let pack = pack(&[table_chunk("huge", &big)]);
-        assert!(pack.tweakunits.is_empty());
+        assert!(pack.tweakdefs.is_empty());
         assert_eq!(pack.oversized, vec!["huge".to_string()]);
-        assert!(!pack.complete());
-    }
-
-    /// Ran out of the 30 slots the game exposes: real for a large enough project,
-    /// and exactly the failure issue #1277 asks to be said before the export.
-    #[test]
-    fn the_31st_table_chunk_is_unplaced_rather_than_silently_dropped() {
-        let chunks: Vec<Chunk> = (0..31)
-            .map(|i| table_chunk(&format!("c{i}"), "{ [\"a\"] = 1 }"))
-            .collect();
-        let pack = pack(&chunks);
-        assert_eq!(pack.tweakunits.len(), 30);
-        assert_eq!(pack.unplaced, vec!["c30".to_string()]);
-        assert!(pack.oversized.is_empty());
         assert!(!pack.complete());
     }
 
@@ -783,18 +757,30 @@ mod tests {
         assert!(pack.tweakdefs[0].starts_with("!bset tweakdefs "));
     }
 
+    /// Ran out of the 30 slots the convention allows: real for a large
+    /// enough project, and exactly the failure issue #1277 asks to be said
+    /// before the export. Each block here is too big to share a slot.
     #[test]
-    fn a_project_with_nothing_of_one_form_packs_only_the_other() {
-        let pack = pack(&[block_chunk("only", "do x = 1 end")]);
-        assert!(pack.tweakunits.is_empty());
-        assert_eq!(pack.tweakdefs.len(), 1);
+    fn the_31st_slot_worth_of_chunks_is_unplaced_rather_than_silently_dropped() {
+        let chunks: Vec<Chunk> = (0..31)
+            .map(|i| {
+                block_chunk(
+                    &format!("c{i}"),
+                    &format!("do x = \"{}\" end", "a".repeat(7_000)),
+                )
+            })
+            .collect();
+        let pack = pack(&chunks);
+        assert_eq!(pack.tweakdefs.len(), 30);
+        assert_eq!(pack.unplaced, vec!["c30".to_string()]);
+        assert!(pack.oversized.is_empty());
+        assert!(!pack.complete());
     }
 
     #[test]
     fn an_empty_project_packs_to_nothing_and_is_complete() {
         let pack = pack(&[]);
         assert!(pack.tweakdefs.is_empty());
-        assert!(pack.tweakunits.is_empty());
         assert!(pack.complete());
     }
 }

@@ -21,9 +21,10 @@
 //!    syntax check the issue asks for first, run through the same sandbox
 //!    that reads a game's own config (`coilbox-springlua`), or through a JSON
 //!    parser for the one file that is not Lua (issue #2743).
-//!  - Every table-form chunk evaluates to a Lua table. Beyond All Reason's
-//!    `tweakunits` route gives a plain table payload a slot of its own, and
-//!    issue #1277 packs the transport. A chunk is what would go in one slot.
+//!  - Every table-form chunk evaluates to a Lua table. Every route merges
+//!    it onto `UnitDefs` as `local changes = <chunk>`, the numbered slots
+//!    included (issue #3126), so a chunk that is not a map of unit name to
+//!    definition would not merge.
 //!  - Every block-form chunk is wrapped in `do ... end`, checked on the
 //!    rendered text rather than by running it: that shape is what lets BAR
 //!    concatenate several into one `tweakdefs` slot without one block's
@@ -33,8 +34,9 @@
 //!    `key`. The compiler would then write two files to the same path, or two
 //!    entries under the same table key, and one would silently overwrite the
 //!    other.
-//!  - A chunk's Lua survives a base64 round trip under the same alphabet
-//!    issue #1277 will encode it with (URL-safe, unpadded). This project
+//!  - A chunk's Lua, as its tweak slot carries it, survives a base64 round
+//!    trip under the alphabet the packer encodes it with (URL-safe,
+//!    unpadded). This project
 //!    never produces the bytes any other way today, so the check cannot catch
 //!    a mistake in a user's project. It catches a mistake in coilbox's own
 //!    encoding the moment one is introduced, on every project rather than
@@ -172,10 +174,11 @@ fn check_files_parse(compiled: &CompiledMod, report: &mut PreflightReport) {
     }
 }
 
-/// A `tweakunits` slot is a plain table (issue #1277). A table-form chunk
-/// that is not one, once rendered, would still be accepted as Lua by
-/// `return <chunk>` but would not be the map of unit name to definition BAR
-/// expects, so evaluating it and checking its shape is the only way to know.
+/// A table-form chunk is merged as a plain table (issue #1277). One that is
+/// not a table, once rendered, would still be accepted as Lua by
+/// `return <chunk>` but would not be the map of unit name to definition the
+/// merge expects, so evaluating it and checking its shape is the only way to
+/// know.
 fn check_table_chunks_are_tables(compiled: &CompiledMod, report: &mut PreflightReport) {
     let table_chunks: Vec<&Chunk> = compiled
         .chunks
@@ -205,7 +208,7 @@ fn check_table_chunks_are_tables(compiled: &CompiledMod, report: &mut PreflightR
             Ok(_) => {
                 ok = false;
                 report.blockers.push(format!(
-                    "{} does not compile to a table, so a tweakunits slot would reject it.",
+                    "{} does not compile to a table, so the merge that carries it would fail.",
                     chunk.title
                 ));
             }
@@ -325,20 +328,10 @@ fn check_base64_round_trip(compiled: &CompiledMod, report: &mut PreflightReport)
     }
     let mut ok = true;
     for chunk in &compiled.chunks {
-        let encoded = crate::tweak_pack::encode_for(chunk.form, &chunk.lua);
-        // A `tweakunits` payload reaches BAR through a step that rewrites
-        // every `_` to `=` before decoding, so a `_` in one is a byte the
-        // game will silently lose (issue #2963). Checked rather than assumed,
-        // because nothing downstream of here would notice.
-        if chunk.form == LuaForm::Table && encoded.contains('_') {
-            ok = false;
-            report.blockers.push(format!(
-                "{}'s tweakunits payload holds a character BAR rewrites before decoding, so the game would read it short.",
-                chunk.title
-            ));
-        }
-        match crate::tweak_pack::decode_for(chunk.form, &encoded) {
-            Ok(bytes) if bytes == chunk.lua.as_bytes() => {}
+        let lua = crate::tweak_pack::slot_lua(chunk);
+        let encoded = crate::tweak_pack::encode(&lua);
+        match crate::tweak_pack::decode(&encoded) {
+            Ok(bytes) if bytes == lua.as_bytes() => {}
             Ok(_) => {
                 ok = false;
                 report.blockers.push(format!(

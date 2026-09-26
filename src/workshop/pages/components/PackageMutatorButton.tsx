@@ -49,6 +49,7 @@ import {
   restrictEditsToUnits,
 } from "../../collections";
 import { useCompiledProject } from "../../compile";
+import { tweakSlotsUncheckedNote } from "../../deliveryRoutes";
 import {
   settledSummary,
   settleTypedValues,
@@ -123,16 +124,9 @@ function TweakFitWarning({
   const fit = tweakSlotFit(pack, routeOptions ?? []);
   const messages: string[] = [];
   if (!fit.fits) {
-    if (fit.needed.defs > fit.available.defs) {
-      messages.push(
-        `This pack needs ${fit.needed.defs} tweakdefs slot${fit.needed.defs === 1 ? "" : "s"}, but this game only declares ${fit.available.defs}.`,
-      );
-    }
-    if (fit.needed.units > fit.available.units) {
-      messages.push(
-        `This pack needs ${fit.needed.units} tweakunits slot${fit.needed.units === 1 ? "" : "s"}, but this game only declares ${fit.available.units}.`,
-      );
-    }
+    messages.push(
+      `This pack needs ${fit.needed} tweakdefs slot${fit.needed === 1 ? "" : "s"}, but this game only declares ${fit.available}.`,
+    );
   }
   for (const title of pack.oversized) {
     messages.push(
@@ -221,10 +215,8 @@ function TweakSlotExportSection({
     }
   }
 
-  const lines =
-    phase.state === "done"
-      ? [...phase.pack.tweakdefs, ...phase.pack.tweakunits]
-      : [];
+  const lines = phase.state === "done" ? phase.pack.tweakdefs : [];
+  const unchecked = tweakSlotsUncheckedNote(project.gameName);
 
   return (
     <div className="flex flex-col gap-3">
@@ -233,6 +225,11 @@ function TweakSlotExportSection({
         slots. Paste each line into the target lobby's chat, in order, for a
         server that answers to `!bset` (a SPADS-based autohost).
       </p>
+      {unchecked ? (
+        <p className="text-xs text-amber-700 dark:text-amber-400">
+          {unchecked}
+        </p>
+      ) : null}
       <Button onClick={() => void run()} disabled={busy}>
         <Package className="size-4" />
         {phase.state === "checking"

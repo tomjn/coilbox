@@ -17,7 +17,8 @@ import type { ModProject } from "./project";
 
 /** Where a change landed in the numbered tweak export. */
 export interface TweakSlotRef {
-  kind: "tweakdefs" | "tweakunits";
+  /** Always `tweakdefs` since issue #3126, the only kind a pack fills. */
+  kind: "tweakdefs";
   /** As `!bset` names it: bare for the first of its kind, numbered from the
    *  second. */
   label: string;

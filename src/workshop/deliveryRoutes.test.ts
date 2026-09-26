@@ -4,6 +4,8 @@ import {
   deliveryRoutes,
   tweakSlotCounts,
   tweakSlotOptions,
+  tweakSlotsChecked,
+  tweakSlotsUncheckedNote,
 } from "./deliveryRoutes";
 
 /** A `ConfigOption` with only the fields these tests care about. */
@@ -64,6 +66,23 @@ describe("tweakSlotOptions", () => {
   });
 });
 
+describe("tweakSlotsChecked", () => {
+  it("knows every version of the two games it was checked against", () => {
+    expect(tweakSlotsChecked("Beyond All Reason test-30922-8064a43")).toBe(
+      true,
+    );
+    expect(tweakSlotsChecked("Zero-K v1.14.8.0")).toBe(true);
+    expect(tweakSlotsUncheckedNote("Zero-K v1.14.8.0")).toBeNull();
+  });
+
+  it("does not claim a game it was never checked against", () => {
+    expect(tweakSlotsChecked("Balanced Annihilation V15.9.8")).toBe(false);
+    expect(tweakSlotsUncheckedNote("Balanced Annihilation V15.9.8")).toContain(
+      "unverified",
+    );
+  });
+});
+
 describe("deliveryRoutes", () => {
   it("always offers the mutator route", () => {
     const routes = deliveryRoutes([], "Some Game");
@@ -87,17 +106,27 @@ describe("deliveryRoutes", () => {
       opt("tweakdefs1"),
       opt("tweakdefs2"),
     ];
-    const routes = deliveryRoutes(options, "Beyond All Reason");
+    const routes = deliveryRoutes(options, "Beyond All Reason test-30922");
     const slots = routes.find((r) => r.route === "tweak-slots");
     expect(slots?.available).toBe(true);
     expect(slots?.detail).toContain("3 tweakdefs slots");
-    expect(slots?.detail).toContain("2 tweakunits slots");
+    expect(slots?.detail).not.toContain("unverified");
   });
 
-  it("offers the tweak-slot route when a game declares only one kind of slot", () => {
+  it("refuses the tweak-slot route for a game that declares only tweakunits slots, which the packer never fills", () => {
     const routes = deliveryRoutes([opt("tweakunits1")], "One Slot Game");
     const slots = routes.find((r) => r.route === "tweak-slots");
+    expect(slots?.available).toBe(false);
+    expect(slots?.detail).toContain("does not declare any tweakdefs");
+  });
+
+  it("says the route is unverified for a game it was not checked against", () => {
+    const routes = deliveryRoutes([opt("tweakdefs")], "Some Other Game 1.0");
+    const slots = routes.find((r) => r.route === "tweak-slots");
     expect(slots?.available).toBe(true);
+    expect(slots?.detail).toContain(
+      "Some Other Game 1.0 reads a tweakdefs slot is unverified",
+    );
   });
 
   it("refuses the tweak-slot route for a game that declares slots when the project has a custom explosion effect", () => {

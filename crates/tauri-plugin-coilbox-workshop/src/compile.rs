@@ -4,8 +4,9 @@
 //!
 //! A **table** is a plain map of unit name to definition. It says what a unit
 //! is and nothing about how to get there, so it can be read, diffed and pasted
-//! by hand. It is what a `tweakunits` slot carries, and what a game's own
-//! `units/<name>.lua` file returns. It cannot express a change that depends
+//! by hand. It is the shape a game's `tweakunits` slot reads, though the
+//! numbered export merges it from a `tweakdefs` slot instead (`tweak_pack.rs`
+//! says why), and what a game's own `units/<name>.lua` file returns. It cannot express a change that depends
 //! on what the game already says.
 //!
 //! A **block** is executable Lua wrapped in `do ... end`, run with `UnitDefs`
@@ -95,11 +96,12 @@ pub struct CompiledMod {
     /// is nothing to tweak.
     ///
     /// Only `tweakdefs` is used, never `tweakunits`: a `tweakunits` slot is a
-    /// plain table a game merges into `UnitDefs` by some rule of its own that
-    /// nothing here has confirmed (BAR's own rule is the one this project has
-    /// verified), while `tweakdefs` runs as Lua with `UnitDefs` in scope, the
-    /// same contract `gamedata/unitdefs_post.lua` already relies on and this
-    /// project has already tested. So an added unit is folded in here as a
+    /// plain table a game merges into `UnitDefs` by a rule of its own, and
+    /// the games checked do not agree on how they decode it or when it runs
+    /// (`tweak_pack.rs` sets out what Beyond All Reason and Zero-K each do).
+    /// `tweakdefs` runs as Lua with `UnitDefs` in scope, the same contract
+    /// `gamedata/unitdefs_post.lua` already relies on and this project has
+    /// already tested. So an added unit is folded in here as a
     /// plain `UnitDefs[name] = def` assignment rather than left for a
     /// `tweakunits` slot to interpret, and everything this field carries is
     /// exactly as certain as the mutator route already is. Splitting a large
@@ -229,11 +231,12 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     for (key, def) in &added_entries {
         notes.extend(reference_notes(key, def));
     }
-    // Assigned rather than left as a plain table (issue #2962). BAR's
-    // `tweakunits` route walks the units the game already has and merges a
-    // tweak into each one it finds a key for, so a key naming a unit the game
-    // does not have matches nothing and the whole added unit is dropped with
-    // no error. Only an assignment creates one, which is what
+    // Assigned rather than left as a plain table (issue #2962). The
+    // `tweakunits` rule in both Beyond All Reason and Zero-K walks the units
+    // the game already has and merges a tweak into each one it finds a key
+    // for, so a key naming a unit the game does not have matches nothing and
+    // the whole added unit is dropped with no error. Only an assignment
+    // creates one, which is what
     // `tweakdefs_body` has always done for the single-slot route and what
     // the numbered-slot packer gets by carrying this as a block.
     //
@@ -2080,9 +2083,25 @@ fn write_patches_section(out: &mut String, patches: &[(String, PatchTree)]) {
     if patches.is_empty() {
         return;
     }
+    write_changes_section(out, &patch_table(patches, ""));
+}
+
+/// A table-form chunk as a `do ... end` block, for the numbered tweak slots
+/// (issue #3126). The table is merged onto `UnitDefs` by the same code the
+/// mutator and the bare slot run, rather than by a game's own `tweakunits`
+/// rule, so it reaches every game the same way (see `tweak_pack.rs`).
+pub(crate) fn table_as_block(table: &str) -> String {
+    let mut out = String::from("do");
+    write_changes_section(&mut out, table);
+    out.push_str("end");
+    out
+}
+
+/// [`write_patches_section`] for a patch table already written out.
+fn write_changes_section(out: &mut String, table: &str) {
     out.push_str("\n-- Field changes. Only the fields the project set are here, so everything\n");
     out.push_str("-- else still follows the game when it updates.\n");
-    out.push_str(&format!("local changes = {}\n", patch_table(patches, "")));
+    out.push_str(&format!("local changes = {table}\n"));
     out.push_str(
         "\nlocal function merge(dest, src)\n\
          \x20 for key, value in pairs(src) do\n\
@@ -2871,7 +2890,6 @@ mod tests {
             } }
         })));
         let pack = crate::tweak_pack::pack(&out.chunks);
-        assert_eq!(pack.tweakunits.len(), 0);
         assert_eq!(pack.tweakdefs.len(), 1);
         assert!(pack.complete());
     }

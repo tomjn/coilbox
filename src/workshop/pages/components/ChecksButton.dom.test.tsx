@@ -542,7 +542,7 @@ describe("the checks button", () => {
                   description: "Field change: maxDamage",
                   fieldPath: "maxDamage",
                   files: ["gamedata/unitdefs_post.lua"],
-                  tweakSlot: { kind: "tweakunits", label: "tweakunits" },
+                  tweakSlot: { kind: "tweakdefs", label: "tweakdefs" },
                   tweakMiss: null,
                   uncompiledReason: null,
                 },
@@ -565,7 +565,7 @@ describe("the checks button", () => {
         // post-processing section names the same path, so a loose match finds
         // two elements.
         expect(
-          screen.getByText("gamedata/unitdefs_post.lua · !bset tweakunits"),
+          screen.getByText("gamedata/unitdefs_post.lua · !bset tweakdefs"),
         ).toBeTruthy();
       });
 
