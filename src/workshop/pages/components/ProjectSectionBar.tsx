@@ -1,6 +1,6 @@
 /**
- * The open project's sections, one click each (issue #3111): Units, Weapons,
- * Collections, Checks and Package, each a page with its own URL.
+ * The open project's sections, one click each (issue #3111): Units, Changes,
+ * Weapons, Collections, Checks and Package, each a page with its own URL.
  *
  * A tab bar under the project title rather than a rail down the side. The
  * Units section already spends the left of the page on its unit list, so a
@@ -17,6 +17,7 @@
 import { cn } from "@picoframe/frame";
 import {
   Crosshair,
+  Diff,
   FolderTree,
   type LucideIcon,
   Package,
@@ -30,6 +31,7 @@ import { ChecksBadge, type ProjectChecksState } from "./ProjectChecks";
 
 const ICONS: Record<ProjectSection, LucideIcon> = {
   units: SquareStack,
+  changes: Diff,
   weapons: Crosshair,
   collections: FolderTree,
   checks: ShieldCheck,

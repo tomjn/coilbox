@@ -113,7 +113,7 @@ const isTable = (
  * this is the one-line summary under an overridden row, where a table's own
  * line breaks would push the rows below it off the screen.
  */
-function display(value: unknown): string {
+export function display(value: unknown): string {
   if (value === undefined) return "not set";
   if (typeof value === "string") return value;
   return luaLiteral(value).replace(/\s*\n\s*/g, " ");

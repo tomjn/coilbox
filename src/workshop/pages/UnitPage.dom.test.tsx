@@ -155,11 +155,17 @@ let mockInPlace: Record<string, () => unknown> = {};
 let mockRefusals: Record<string, string> = {};
 /** Every field the dry run was asked about, in order. */
 let checkedFields: string[] = [];
+/** What `workshop_change_ledger` answers with, for the Changes section (issue
+ *  #3112). Empty by default, like `mockPreflightReport`: most of this file is
+ *  about the editor's own fields and stores, and `changeLedger.test.ts` plus
+ *  `ledger.rs`'s own Rust tests cover whether a trace is right. */
+let mockChangeLedgerResponse: unknown = { units: [], notes: [] };
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
     (_plugin: string, command: string) => async (args: unknown) => {
       if (command === "workshop_preflight") return mockPreflightReport;
       if (Object.hasOwn(mockInPlace, command)) return mockInPlace[command]();
+      if (command === "workshop_change_ledger") return mockChangeLedgerResponse;
       if (command === "workshop_check_in_place") {
         const { unit, fields } = args as {
           unit: string;
@@ -533,6 +539,7 @@ afterEach(() => {
   mockConsumersByArchive = {};
   mockLegoProjects = [];
   mockPreflightReport = { blockers: [], review: [], passes: [] };
+  mockChangeLedgerResponse = { units: [], notes: [] };
   mockInPlace = {};
   mockRefusals = {};
   checkedFields = [];
@@ -3237,6 +3244,226 @@ describe("UnitPage", () => {
       fireEvent.click(sectionLink("Collections"));
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
       expect(saved()?.edits.overrides).toEqual({});
+    });
+  });
+
+  /**
+   * The project's Changes section (issue #3112): every changed field,
+   * grouped by unit, with the game's own value and the project's beside it,
+   * so "what have I changed" does not mean opening one unit's fields at a
+   * time to compare. Reads the same change ledger the Checks page traces
+   * delivery from (`changeLedger.ts`, issue #2653), and `changeLedger.test.ts`
+   * plus `ledger.rs`'s own Rust tests own whether a trace is right. This is
+   * about what a person reading this page sees and can do from it.
+   */
+  describe("the Changes section", () => {
+    const withOverrides = (
+      overrides: Record<string, Record<string, unknown>>,
+    ) => ({
+      id: "3c1d8f2a-0000-4000-8000-000000000001",
+      name: "Faster commanders",
+      gameName: GAME.name,
+      authoredChecksum: "abc",
+      edits: { overrides, clones: {}, menus: {}, text: {}, disabled: [] },
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    });
+
+    it("is where a project with edits opens", () => {
+      const project = withOverrides({ armcom: { health: 5000 } });
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show({ armcom: ARMCOM }, `/workshop/${project.id}`);
+      expect(location()).toBe(`/workshop/${project.id}/changes`);
+      expect(sectionLink(/^Changes/).getAttribute("aria-current")).toBe("page");
+    });
+
+    it("still opens Units for a deep link, even with edits already made", () => {
+      const project = withOverrides({ armcom: { health: 5000 } });
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show({ armcom: ARMCOM }, `/workshop/${project.id}?unit=armcom`);
+      expect(location()).toBe(`/workshop/${project.id}?unit=armcom`);
+      expect(healthBox().value).toBe("5000");
+    });
+
+    it("opens on Units for a project with no edits", () => {
+      const project = withOverrides({});
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      show({ armcom: ARMCOM }, `/workshop/${project.id}`);
+      expect(location()).toBe(`/workshop/${project.id}`);
+      expect(sectionLink("Units").getAttribute("aria-current")).toBe("page");
+    });
+
+    it("shows a changed field's game and project values, links to it, and reverts through the normal edit path", async () => {
+      const project = withOverrides({ armcom: { health: 5000 } });
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      mockChangeLedgerResponse = {
+        units: [
+          {
+            unit: "armcom",
+            changes: [
+              {
+                description: "Field change: health",
+                fieldPath: "health",
+                files: ["gamedata/unitdefs_post.lua"],
+                tweakSlot: null,
+                tweakMiss: null,
+                uncompiledReason: null,
+              },
+            ],
+          },
+        ],
+        notes: [],
+      };
+      show({ armcom: ARMCOM }, `/workshop/${project.id}?unit=armcom`);
+      fireEvent.click(sectionLink(/^Changes/));
+
+      const link = await screen.findByRole("link", { name: "health" });
+      expect(link.getAttribute("href")).toBe(
+        `/workshop/${project.id}?unit=armcom&field=health`,
+      );
+      expect(screen.getByText("Game: 3000")).toBeTruthy();
+      expect(screen.getByText("Project: 5000")).toBeTruthy();
+
+      fireEvent.click(screen.getByRole("button", { name: /^Revert health/ }));
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.overrides,
+      ).toEqual({});
+
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      expect(
+        readStoredSetting<ModProject[]>(PROJECTS_KEY, [])[0]?.edits.overrides,
+      ).toEqual({ armcom: { health: 5000 } });
+    });
+
+    it("shows an added unit as one added line rather than a row per field", async () => {
+      const project = {
+        id: "3c1d8f2a-0000-4000-8000-000000000002",
+        name: "New commander",
+        gameName: GAME.name,
+        authoredChecksum: "abc",
+        edits: {
+          overrides: {},
+          clones: {
+            armcom2: {
+              key: "armcom2",
+              source: "armcom",
+              replacesGameUnit: false,
+              def: { ...structuredClone(ARMCOM), health: 4000 },
+            },
+          },
+          menus: {},
+          text: {},
+          disabled: [],
+        },
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      };
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      // A clone's own overrides trace to a "Field change" entry too, the same
+      // as any other unit's, which this page must fold into the one "added"
+      // line rather than show as a field row. The whole unit is new, so
+      // there is no game value for `health` to compare against.
+      mockChangeLedgerResponse = {
+        units: [
+          {
+            unit: "armcom2",
+            changes: [
+              {
+                description: "Added as a new unit",
+                fieldPath: null,
+                files: ["units/armcom2.lua"],
+                tweakSlot: null,
+                tweakMiss: null,
+                uncompiledReason: null,
+              },
+              {
+                description: "Field change: health",
+                fieldPath: "health",
+                files: ["units/armcom2.lua"],
+                tweakSlot: null,
+                tweakMiss: null,
+                uncompiledReason: null,
+              },
+            ],
+          },
+        ],
+        notes: [],
+      };
+      show({ armcom: ARMCOM }, `/workshop/${project.id}?unit=armcom`);
+      fireEvent.click(sectionLink(/^Changes/));
+
+      await screen.findByText("Added as a new unit");
+      expect(screen.queryByRole("link", { name: "health" })).toBeNull();
+    });
+
+    it("narrows the list with the search box and the faction filter", async () => {
+      mockSides = [
+        { name: "Arm", startUnit: "armcom" },
+        { name: "Core", startUnit: "corcom" },
+      ];
+      const units = {
+        armcom: ARMCOM,
+        corcom: { name: "corcom", humanName: "Core Commander", health: 2000 },
+      };
+      const dataset = [
+        { name: "armcom", fullName: "Commander" },
+        { name: "corcom", fullName: "Core Commander" },
+      ];
+      const project = withOverrides({
+        armcom: { health: 5000 },
+        corcom: { health: 2500 },
+      });
+      storage.set(PROJECTS_KEY, JSON.stringify([project]));
+      mockChangeLedgerResponse = {
+        units: [
+          {
+            unit: "armcom",
+            changes: [
+              {
+                description: "Field change: health",
+                fieldPath: "health",
+                files: [],
+                tweakSlot: null,
+                tweakMiss: null,
+                uncompiledReason: null,
+              },
+            ],
+          },
+          {
+            unit: "corcom",
+            changes: [
+              {
+                description: "Field change: health",
+                fieldPath: "health",
+                files: [],
+                tweakSlot: null,
+                tweakMiss: null,
+                uncompiledReason: null,
+              },
+            ],
+          },
+        ],
+        notes: [],
+      };
+      show(units, `/workshop/${project.id}?unit=armcom`, dataset);
+      fireEvent.click(sectionLink(/^Changes/));
+      await screen.findByText("armcom");
+      expect(screen.getByText("corcom")).toBeTruthy();
+
+      fireEvent.change(screen.getByLabelText("Search changed units"), {
+        target: { value: "core" },
+      });
+      expect(screen.queryByText("armcom")).toBeNull();
+      expect(screen.getByText("corcom")).toBeTruthy();
+
+      fireEvent.change(screen.getByLabelText("Search changed units"), {
+        target: { value: "" },
+      });
+      fireEvent.change(screen.getByLabelText("Filter changes by faction"), {
+        target: { value: "Arm" },
+      });
+      expect(screen.getByText("armcom")).toBeTruthy();
+      expect(screen.queryByText("corcom")).toBeNull();
     });
   });
 
