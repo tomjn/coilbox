@@ -162,9 +162,6 @@ export function MemberRow({
   onAlly: (ally: number) => void;
   onColor: (hex: string) => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const canSpectate =
-    row.kind === "human" && !row.spectator && !!control?.onForceSpectator;
   // Ordinary players get no subtitle at all (#3196): "Player" told nobody
   // anything and made every common row taller than it needed to be.
   const subtitle = row.host
@@ -435,73 +432,93 @@ export function MemberRow({
 
       {showActions && (
         <TableCell className="px-2 py-2 text-right">
-          {control && (
-            <Popover open={menuOpen} onOpenChange={setMenuOpen}>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-label={`Actions for ${row.name}`}
-                  className="inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
-                >
-                  <MoreVertical className="size-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-44 p-1">
-                {canSpectate && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      control.onForceSpectator?.();
-                    }}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  >
-                    <Eye className="size-4" />
-                    Force spectate
-                  </button>
-                )}
-                {control.onAppointBoss && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      control.onAppointBoss?.();
-                    }}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  >
-                    <Crown className="size-4" />
-                    Make boss
-                  </button>
-                )}
-                {control.onUnboss && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMenuOpen(false);
-                      control.onUnboss?.();
-                    }}
-                    className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
-                  >
-                    <Crown className="size-4" />
-                    Stand boss down
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    control.onKick();
-                  }}
-                  className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
-                >
-                  <UserX className="size-4" />
-                  {row.kind === "bot" ? "Remove" : "Kick"}
-                </button>
-              </PopoverContent>
-            </Popover>
-          )}
+          <MemberActionsMenu row={row} control={control ?? null} />
         </TableCell>
       )}
     </TableRow>
+  );
+}
+
+/**
+ * The trailing "⋮" action menu (force spectate, appoint/stand down boss,
+ * kick/remove). Shared between a full player row and the compact spectator
+ * list (#3194) — a spectator can still be kicked or, if a bot, removed, and a
+ * human spectator can still be made boss.
+ */
+export function MemberActionsMenu({
+  row,
+  control,
+}: {
+  row: Row;
+  control: MemberControls | null;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  if (!control) return null;
+  const canSpectate =
+    row.kind === "human" && !row.spectator && !!control.onForceSpectator;
+  return (
+    <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={`Actions for ${row.name}`}
+          className="inline-flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+        >
+          <MoreVertical className="size-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-44 p-1">
+        {canSpectate && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              control.onForceSpectator?.();
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          >
+            <Eye className="size-4" />
+            Force spectate
+          </button>
+        )}
+        {control.onAppointBoss && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              control.onAppointBoss?.();
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          >
+            <Crown className="size-4" />
+            Make boss
+          </button>
+        )}
+        {control.onUnboss && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              control.onUnboss?.();
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          >
+            <Crown className="size-4" />
+            Stand boss down
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setMenuOpen(false);
+            control.onKick();
+          }}
+          className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-destructive hover:bg-destructive/10"
+        >
+          <UserX className="size-4" />
+          {row.kind === "bot" ? "Remove" : "Kick"}
+        </button>
+      </PopoverContent>
+    </Popover>
   );
 }
