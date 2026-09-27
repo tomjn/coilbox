@@ -66,6 +66,7 @@ vi.mock("@picoframe/frame", () => ({
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
   useSetting: () => [false, vi.fn()],
+  useTheme: () => ({ resolved: "dark" }),
 }));
 
 afterEach(() => {

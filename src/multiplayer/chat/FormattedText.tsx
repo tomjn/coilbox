@@ -2,7 +2,17 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import type { ReactNode } from "react";
 import { dispatchDeepLink } from "../../deeplink/bus";
 import { jumbojiCount } from "./jumboji";
+import { splitOnNames } from "./nameHighlight";
 import { type Inline, parseMessage } from "./parseMessage";
+
+/** Highlighting for player names inside a message's plain text (issue
+ * #3189), e.g. an autohost line naming the players it's talking about.
+ * `colorFor` returns the readable colour to draw a matched name in
+ * (already contrast-adjusted per #3197), or undefined to leave it plain. */
+export interface NameHighlight {
+  names: string[];
+  colorFor: (name: string) => string | undefined;
+}
 
 /**
  * Render a chat message string with inline formatting: leading autohost command,
@@ -10,32 +20,79 @@ import { type Inline, parseMessage } from "./parseMessage";
  * no HTML injection. The command chip inherits its text colour (rather than
  * forcing an accent) so it stays legible on both the muted and primary bubbles.
  */
-export function FormattedText({ text }: { text: string }) {
+export function FormattedText({
+  text,
+  highlight,
+}: {
+  text: string;
+  /** Player names to pick out of plain text, e.g. an autohost's own
+   * messages. Omit where there is nothing to highlight. */
+  highlight?: NameHighlight;
+}) {
   // Jumboji: a message that is only a handful of emoji renders enlarged, the
   // way Slack/Discord do. Above the small cap it falls back to normal rendering.
   const jumbo = jumbojiCount(text);
   if (jumbo >= 1 && jumbo <= 3) {
     return <span className="text-5xl leading-none">{text.trim()}</span>;
   }
-  return <>{render(parseMessage(text))}</>;
+  return <>{render(parseMessage(text), highlight)}</>;
 }
 
 /** A list item. Split out so the key is built where the rest of them are, rather
  * than from an index at the JSX. */
-function renderItem(item: Inline[], key: string): ReactNode {
-  return <li key={key}>{render(item)}</li>;
+function renderItem(
+  item: Inline[],
+  key: string,
+  highlight: NameHighlight | undefined,
+): ReactNode {
+  return <li key={key}>{render(item, highlight)}</li>;
 }
 
-function render(nodes: Inline[]): ReactNode[] {
+function render(
+  nodes: Inline[],
+  highlight: NameHighlight | undefined,
+): ReactNode[] {
   // Tokens are derived fresh from the text and never reorder, so a per-node
   // type+position key is stable for React's reconciliation.
-  return nodes.map((n, i) => renderNode(n, `${i}-${n.type}`));
+  return nodes.map((n, i) => renderNode(n, `${i}-${n.type}`, highlight));
 }
 
-function renderNode(n: Inline, key: string): ReactNode {
+/** Render a "text" node's raw value, picking out any player name in
+ * `highlight` the same way a sender's own name is drawn elsewhere in chat. */
+function renderPlainText(
+  value: string,
+  key: string,
+  highlight: NameHighlight | undefined,
+): ReactNode {
+  if (!highlight || highlight.names.length === 0) {
+    return <span key={key}>{value}</span>;
+  }
+  const segments = splitOnNames(value, highlight.names);
+  return (
+    <span key={key}>
+      {segments.map((s, i) => {
+        const segKey = `${i}-${s.text}`;
+        const color = s.name ? highlight.colorFor(s.name) : undefined;
+        return color ? (
+          <span key={segKey} className="font-medium" style={{ color }}>
+            {s.text}
+          </span>
+        ) : (
+          <span key={segKey}>{s.text}</span>
+        );
+      })}
+    </span>
+  );
+}
+
+function renderNode(
+  n: Inline,
+  key: string,
+  highlight: NameHighlight | undefined,
+): ReactNode {
   switch (n.type) {
     case "text":
-      return <span key={key}>{n.value}</span>;
+      return renderPlainText(n.value, key, highlight);
     case "code":
       return (
         <code key={key} className="rounded bg-foreground/10 px-1 font-mono">
@@ -85,19 +142,19 @@ function renderNode(n: Inline, key: string): ReactNode {
     case "bold":
       return (
         <strong key={key} className="font-semibold">
-          {render(n.children)}
+          {render(n.children, highlight)}
         </strong>
       );
     case "italic":
       return (
         <em key={key} className="italic">
-          {render(n.children)}
+          {render(n.children, highlight)}
         </em>
       );
     case "strike":
       return (
         <s key={key} className="line-through">
-          {render(n.children)}
+          {render(n.children, highlight)}
         </s>
       );
     case "list":
@@ -105,18 +162,18 @@ function renderNode(n: Inline, key: string): ReactNode {
       // own marker, which the bubble's narrow column makes common.
       return (
         <ul key={key} className="my-0.5 list-inside list-disc">
-          {n.items.map((item, i) => renderItem(item, `${key}-${i}`))}
+          {n.items.map((item, i) => renderItem(item, `${key}-${i}`, highlight))}
         </ul>
       );
     case "quote":
-      // Inherit the bubble's text colour (own bubbles use a dark foreground);
+      // Inherit the bubble's text colour (own bubbles use a dark foreground),
       // opacity dims the whole quote so it reads as secondary on either bubble.
       return (
         <blockquote
           key={key}
           className="my-0.5 border-l-2 border-current pl-2 opacity-70"
         >
-          {render(n.children)}
+          {render(n.children, highlight)}
         </blockquote>
       );
     case "mention":

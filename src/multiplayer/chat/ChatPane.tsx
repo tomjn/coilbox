@@ -1,4 +1,4 @@
-import { Button, cn } from "@picoframe/frame";
+import { Button, cn, useTheme } from "@picoframe/frame";
 import {
   ArrowUp,
   Bold,
@@ -26,6 +26,7 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller";
 import { Textarea } from "@/components/ui/textarea";
+import { readableTeamTextColor } from "@/lib/teamColor";
 import type { ChatMsg } from "../bindings";
 import { composeDraft } from "./compose";
 import { EmojiPicker } from "./EmojiPicker";
@@ -36,7 +37,7 @@ import {
   emojiMatches,
   emojiQuery,
 } from "./emojiMenu";
-import { FormattedText } from "./FormattedText";
+import { FormattedText, type NameHighlight } from "./FormattedText";
 import { type Format, formatSelection, listContinuation } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
 import { PRESENCE_META, type Presence } from "./presence";
@@ -169,6 +170,10 @@ export interface ChatPaneProps {
    * dragging across several) still yields the literal command, which is how
    * players learn autohost commands in the first place. */
   messageAction?: (m: ChatMsg) => ReactNode;
+  /** Usernames currently in the battle, so a bot's own message can highlight
+   * the player names inside it (issue #3189), e.g. an autohost vote line.
+   * Only bot-sent messages are searched. Omit outside a battle's chat. */
+  battleMemberNames?: string[];
 }
 
 /**
@@ -194,7 +199,24 @@ export function ChatPane({
   completions,
   maxChars = null,
   messageAction,
+  battleMemberNames,
 }: ChatPaneProps) {
+  const { resolved: theme } = useTheme();
+  // Highlight the battle's own players inside a bot's message (issue #3189),
+  // e.g. an autohost vote line naming who it's talking about. Each matched
+  // name is drawn in that player's own readable colour (issue #3197), the
+  // same way a sender's name is drawn elsewhere in this pane. Non-bot senders
+  // never get this: it is autohost output that reads as plain text today.
+  const nameHighlightFor = (bot: boolean): NameHighlight | undefined =>
+    bot && battleMemberNames
+      ? {
+          names: battleMemberNames,
+          colorFor: (name: string) => {
+            const raw = senderColor?.(name);
+            return raw ? readableTeamTextColor(raw, theme) : undefined;
+          },
+        }
+      : undefined;
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
@@ -469,9 +491,15 @@ export function ChatPane({
 
                     let body: ReactNode;
                     if (isNotice(m.kind)) {
-                      const color = senderColor?.(m.from);
+                      const rawColor = senderColor?.(m.from);
+                      const color = rawColor
+                        ? readableTeamTextColor(rawColor, theme)
+                        : undefined;
+                      // Left-aligned like every other line (issue #3188) rather
+                      // than centred, which put a join/leave notice a long way
+                      // from the messages around it in a wide chat.
                       body = (
-                        <div className="py-0.5 text-center text-xs text-muted-foreground">
+                        <div className="px-1 py-0.5 text-left text-xs text-muted-foreground">
                           {m.kind === "system" ? (
                             m.text
                           ) : (
@@ -494,7 +522,10 @@ export function ChatPane({
                       // sender tinted. Reads the same whoever sent it (no
                       // own/other bubble). Bots keep their glyph + monospace here
                       // too (SPADS autohosts also emit `/me` lines).
-                      const color = senderColor?.(m.from);
+                      const rawColor = senderColor?.(m.from);
+                      const color = rawColor
+                        ? readableTeamTextColor(rawColor, theme)
+                        : undefined;
                       const bot = isBot?.(m.from) ?? false;
                       body = (
                         <div className="px-1 text-sm italic text-muted-foreground [overflow-wrap:anywhere]">
@@ -518,12 +549,18 @@ export function ChatPane({
                             {m.from}
                           </span>{" "}
                           <span className={cn(bot && "font-mono")}>
-                            <FormattedText text={m.text} />
+                            <FormattedText
+                              text={m.text}
+                              highlight={nameHighlightFor(bot)}
+                            />
                           </span>
                         </div>
                       );
                     } else {
-                      const color = senderColor?.(m.from);
+                      const rawColor = senderColor?.(m.from);
+                      const color = rawColor
+                        ? readableTeamTextColor(rawColor, theme)
+                        : undefined;
                       const bot = isBot?.(m.from) ?? false;
                       const highlighted = isHighlighted?.(m) ?? false;
                       body = (
@@ -574,12 +611,15 @@ export function ChatPane({
                               className={cn(
                                 "whitespace-pre-wrap [overflow-wrap:anywhere]",
                                 // Bot output (SPADS command lists / stats tables)
-                                // relies on monospace alignment; human chat reads
+                                // relies on monospace alignment, human chat reads
                                 // better proportional.
                                 bot && "font-mono",
                               )}
                             >
-                              <FormattedText text={m.text} />
+                              <FormattedText
+                                text={m.text}
+                                highlight={nameHighlightFor(bot)}
+                              />
                             </span>
                           </div>
                           {messageAction?.(m)}
