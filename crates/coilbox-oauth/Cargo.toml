@@ -18,8 +18,9 @@ sha2 = { workspace = true }
 base64 = { workspace = true }
 getrandom = "0.3"
 # "sync" is for the per-account refresh lock in account.rs, which is held across
-# awaits and so cannot be a std one.
-tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time"] }
+# awaits and so cannot be a std one. "macros" is for the select! in loopback.rs
+# that accepts connections while collecting what each one settled.
+tokio = { version = "1", features = ["net", "io-util", "rt", "sync", "time", "macros"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
