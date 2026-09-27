@@ -30,6 +30,7 @@ import {
 } from "./downloadRate";
 import { errMessage } from "./pages/components/states";
 import { type ProgressSink, progressChannel } from "./progressChannel";
+import { laneOf, type QueueLane, startable } from "./queueLanes";
 import { installEngine } from "./warmEngineCache";
 
 /**
@@ -37,7 +38,7 @@ import { installEngine } from "./warmEngineCache";
  * command; `args` mirror that command's arguments (minus `opId`/`onProgress`,
  * which the runner supplies). `label` is the human name shown in the widget.
  */
-export type EnqueueInput =
+export type EnqueueInput = (
   | {
       kind: "rapid";
       label: string;
@@ -78,7 +79,15 @@ export type EnqueueInput =
       kind: "engineSpring";
       label: string;
       args: { version: string; writePath?: string };
-    };
+    }
+) & {
+  /**
+   * The archive's size in bytes, when the catalog the request came from lists
+   * one. Only shown while the item waits in the queue. Once it runs, the size
+   * the source reports takes over.
+   */
+  sizeBytes?: number;
+};
 
 export type QueueStatus = "queued" | "active" | "done" | "error" | "canceled";
 
@@ -157,6 +166,15 @@ export function identityOf(input: EnqueueInput): string {
 
 interface DownloadQueueValue {
   items: QueueItem[];
+  /**
+   * Every download running now, one at most per lane (see `queueLanes`), in
+   * the order they were queued.
+   */
+  running: QueueItem[];
+  /**
+   * The first running download, or null when nothing is running. Most screens
+   * only ask whether anything is downloading, which this still answers.
+   */
   active: QueueItem | null;
   queued: QueueItem[];
   /**
@@ -229,8 +247,10 @@ function isPending(item: QueueItem): boolean {
 }
 
 /**
- * App-wide serial download queue. Downloads run one at a time (two ops must never
- * write the same content dir); many can be stacked. Each item drives the backend
+ * App-wide download queue. Downloads run one at a time per lane, with maps,
+ * games, engines and other files each in a lane of their own (see
+ * `queueLanes`), so a long run of maps does not hold up a game. Many can be
+ * stacked. Each item drives the backend
  * start command matching its `kind`, streams progress back, and on completion
  * runs that kind's side effects (scan-cache invalidation / content rescan) before
  * the next item starts. Cancellation reuses the per-op `dlCancel`. Mounted above
@@ -260,9 +280,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   /** The identities whose last attempt finished, kept the same way. */
   const [completions, setCompletions] = useState<Record<string, true>>({});
 
-  // Set synchronously in startNext so the pump can't launch a second item before
-  // the "active" status commits to state.
-  const activeIdRef = useRef<string | null>(null);
+  // The item running in each lane. Set synchronously in startNext so the pump
+  // can't launch a second item into a lane before the "active" status commits
+  // to state.
+  const busyLanesRef = useRef(new Map<QueueLane, string>());
 
   // The progress samples behind each running download's rate estimate, queued
   // and reported alike, keyed by id. Kept out of React state because they change
@@ -429,7 +450,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         if (!canceled) setFailures((f) => ({ ...f, [item.identity]: msg }));
         settled = { ...item, ...meta } as QueueItem;
       } finally {
-        activeIdRef.current = null;
+        busyLanesRef.current.delete(laneOf(item));
         samplesRef.current.delete(item.id);
         settle(settled);
         prune(item.id);
@@ -438,20 +459,21 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [patch, prune, settle, start],
   );
 
-  // Promote the next queued item whenever nothing is active. `activeIdRef` guards
-  // the synchronous gap before the "active" status is committed.
+  // Promote the next queued item in every lane with nothing running.
+  // `busyLanesRef` guards the synchronous gap before the "active" status is
+  // committed.
   const startNext = useCallback(() => {
-    if (activeIdRef.current) return;
-    const next = itemsRef.current.find((i) => i.status === "queued");
-    if (!next) return;
-    activeIdRef.current = next.id;
-    patch(next.id, {
-      status: "active",
-      progress: null,
-      rate: IDLE_RATE,
-      startedAt: Date.now(),
-    });
-    void run(next);
+    const busy = new Set(busyLanesRef.current.keys());
+    for (const next of startable(itemsRef.current, busy)) {
+      busyLanesRef.current.set(laneOf(next), next.id);
+      patch(next.id, {
+        status: "active",
+        progress: null,
+        rate: IDLE_RATE,
+        startedAt: Date.now(),
+      });
+      void run(next);
+    }
   }, [patch, run]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `items` is the trigger that re-pumps the queue when a slot frees up, not read in the body
@@ -598,10 +620,11 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     [itemByIdentity],
   );
 
-  const active = useMemo(
-    () => items.find((i) => i.status === "active") ?? null,
+  const running = useMemo(
+    () => items.filter((i) => i.status === "active"),
     [items],
   );
+  const active = running[0] ?? null;
   const queued = useMemo(
     () => items.filter((i) => i.status === "queued"),
     [items],
@@ -612,9 +635,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   // downloads too, since an app update can lose its connection the same way a
   // map can. Only writes when the answer actually changed.
   const runningIds = useRef<string[]>([]);
-  runningIds.current = [active?.id, ...reported.map((r) => r.id)].filter(
-    (id): id is string => id != null,
-  );
+  runningIds.current = [
+    ...running.map((i) => i.id),
+    ...reported.map((r) => r.id),
+  ];
   const anyRunning = runningIds.current.length > 0;
   useEffect(() => {
     if (!anyRunning) return;
@@ -641,6 +665,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   const value: DownloadQueueValue = useMemo(
     () => ({
       items,
+      running,
       active,
       queued,
       reported,
@@ -656,6 +681,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     }),
     [
       items,
+      running,
       active,
       queued,
       reported,

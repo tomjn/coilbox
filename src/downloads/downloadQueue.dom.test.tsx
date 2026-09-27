@@ -16,6 +16,7 @@
 import {
   act,
   cleanup,
+  fireEvent,
   render,
   renderHook,
   screen,
@@ -24,6 +25,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type DownloadProgress, dlDownloadEngineRecoil } from "./bindings";
+import DownloadQueueBadge from "./DownloadQueueBadge";
 import {
   DownloadQueueProvider,
   useDownloadQueue,
@@ -144,6 +146,37 @@ describe("the download queue", () => {
       "Map: Comet Catcher",
     ]);
     expect(pending).toHaveLength(1);
+  });
+
+  it("runs a game beside a map, since they sit in different lanes", async () => {
+    const { dlDownloadFile } = await import("./bindings");
+    vi.mocked(dlDownloadFile).mockImplementation(() => new Promise(() => {}));
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+      result.current.enqueue(mapRequest("Comet Catcher"));
+      result.current.enqueue({
+        kind: "file",
+        label: "Game: SplinterFaction",
+        args: {
+          url: "https://example.test/sf.sdz",
+          destDir: "/root/games",
+          filename: "sf.sdz",
+        },
+      });
+    });
+
+    await waitFor(() =>
+      expect(result.current.running.map((i) => i.label)).toEqual([
+        "Map: Isis",
+        "Game: SplinterFaction",
+      ]),
+    );
+    expect(result.current.queued.map((i) => i.label)).toEqual([
+      "Map: Comet Catcher",
+    ]);
+    expect(dlDownloadFile).toHaveBeenCalledTimes(1);
   });
 
   it("hands back the running download's id when asked for the same one twice", async () => {
@@ -700,5 +733,54 @@ describe("a download reported from outside the queue", () => {
     expect(dlDownloadEngineRecoil).toHaveBeenCalledWith(
       expect.objectContaining({ version: "2026.07.04" }),
     );
+  });
+});
+
+describe("the indicator's popover", () => {
+  it("says what each download is and how big the queue is (issue #3141)", async () => {
+    const { dlDownloadFile } = await import("./bindings");
+    vi.mocked(dlDownloadFile).mockImplementation(() => new Promise(() => {}));
+    let queue: ReturnType<typeof useDownloadQueue> | null = null;
+    function Grab() {
+      queue = useDownloadQueue();
+      return null;
+    }
+    render(
+      <DownloadQueueProvider>
+        <Grab />
+        <DownloadQueueBadge />
+      </DownloadQueueProvider>,
+    );
+
+    act(() => {
+      queue?.enqueue({ ...mapRequest("Isis"), sizeBytes: 1024 * 1024 });
+      queue?.enqueue({
+        ...mapRequest("Comet Catcher"),
+        sizeBytes: 2 * 1024 * 1024,
+      });
+      queue?.enqueue(mapRequest("Tabula"));
+      queue?.enqueue({
+        kind: "file",
+        label: "Game: SplinterFaction",
+        args: {
+          url: "https://example.test/sf.sdz",
+          destDir: "/root/games",
+          filename: "sf.sdz",
+        },
+      });
+    });
+
+    const pill = await screen.findByRole("button", { name: /^Downloads: 4/ });
+    fireEvent.click(pill);
+
+    const heading = await screen.findByText(
+      "Queued (2) · 2.0 MB + 1 of unknown size",
+    );
+    const list = heading.nextElementSibling;
+    expect(list?.tagName).toBe("UL");
+    expect(list?.className).toContain("overflow-y-auto");
+    expect(screen.getAllByRole("img", { name: "Map" })).toHaveLength(3);
+    expect(screen.getAllByRole("img", { name: "Game" })).toHaveLength(1);
+    expect(screen.getByText("2.0 MB")).toBeTruthy();
   });
 });
