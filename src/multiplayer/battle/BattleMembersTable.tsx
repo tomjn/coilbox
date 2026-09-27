@@ -286,7 +286,7 @@ export function BattleMembersTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {displayOrder.map((row) => {
+            {displayOrder.map((row, index) => {
               // A seated row whose team is led by an earlier row: it shows the
               // branch glyph / Co-player badge instead of duplicated controls.
               const leader = row.spectator
@@ -360,6 +360,7 @@ export function BattleMembersTable({
                   aiInvalid={aiInvalid}
                   control={control}
                   sharedWith={sharedWith}
+                  striped={index % 2 === 1}
                   showActions={showActions}
                   serverAssignsSeat={serverAssignsSeat}
                   flashIngame={justWentIngame.has(row.name)}

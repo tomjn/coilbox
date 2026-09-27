@@ -82,6 +82,7 @@ export function MemberRow({
   aiInvalid,
   control,
   sharedWith,
+  striped,
   showActions,
   serverAssignsSeat,
   flashIngame,
@@ -111,6 +112,9 @@ export function MemberRow({
    * display-only; the member's own wire state is untouched and the team picker
    * stays live so they can leave. */
   sharedWith?: Row;
+  /** Every other row (#3191): a faint tint so the eye can track a row across
+   * the gap between the name on the left and faction/team/ally on the right. */
+  striped?: boolean;
   showActions: boolean;
   /**
    * The server picks colours, factions and teams, so those three cells are
@@ -209,6 +213,7 @@ export function MemberRow({
     <TableRow
       className={cn(
         "border-border/40 hover:bg-transparent",
+        striped && "bg-muted/30",
         flashIngame && "ingame-flash",
       )}
     >
