@@ -249,6 +249,7 @@ export default function GamesPage() {
     enqueue({
       kind: "file",
       label: game.name,
+      sizeBytes: game.size || undefined,
       args: {
         url: game.url,
         destDir: `${writePath}/games`,

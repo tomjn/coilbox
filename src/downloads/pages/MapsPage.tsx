@@ -33,6 +33,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { parseApacheSize } from "../queueLanes";
 import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
 import { QueueProgress } from "./components/ProgressBar";
@@ -75,6 +76,8 @@ interface MapItem {
    * path (`dlDownloadFile`) over the pr-downloader sidecar (`dlDownloadMap`). */
   url?: string;
   author?: string;
+  /** Archive size in bytes, when the source lists one. Shown in the queue. */
+  sizeBytes?: number;
   /** Map dimensions; sorted by area (width × height). */
   width?: number;
   height?: number;
@@ -188,6 +191,7 @@ export default function MapsPage() {
             springName: m.filename, // no springname on the mirror; filename is unique
             title: m.filename.replace(/\.(sd7|sdz)$/i, ""),
             subtitle: m.size || undefined,
+            sizeBytes: parseApacheSize(m.size),
             filename: m.filename,
             url: m.url, // marks the direct-fetch path
           })),
@@ -199,6 +203,7 @@ export default function MapsPage() {
             springName: m.filename, // no springname on the mirror; filename is unique
             title: m.filename.replace(/\.(sd7|sdz)$/i, ""),
             subtitle: m.size ? formatBytes(m.size) : undefined,
+            sizeBytes: m.size || undefined,
             filename: m.filename,
             url: m.url, // marks the direct-fetch path
           })),
@@ -212,6 +217,7 @@ export default function MapsPage() {
             springName: a.filename, // no springname; filename is unique
             title: a.filename.replace(/\.(sd7|sdz)$/i, ""),
             subtitle: archiveSubtitle(a),
+            sizeBytes: a.size || undefined,
             filename: a.filename,
             url: a.url, // marks the direct-fetch path
           })),
@@ -223,6 +229,7 @@ export default function MapsPage() {
             springName: f.springname,
             title: f.name || f.springname,
             subtitle: springSubtitle(f),
+            sizeBytes: f.size || undefined,
             thumb: f.mapimages[0],
             filename: f.filename,
             author: f.metadata.author,
@@ -280,6 +287,7 @@ export default function MapsPage() {
         return {
           kind: "file",
           label: item.title,
+          sizeBytes: item.sizeBytes,
           args: {
             url: item.url,
             destDir: `${writePath}/maps`,
@@ -290,6 +298,7 @@ export default function MapsPage() {
       return {
         kind: "map",
         label: item.title,
+        sizeBytes: item.sizeBytes,
         args: { springName: item.springName, writePath },
       };
     },

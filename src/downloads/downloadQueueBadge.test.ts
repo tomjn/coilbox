@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DownloadProgress } from "./bindings";
-import { badgeSummary } from "./DownloadQueueBadge";
+import { badgeSummary, queuedHeading } from "./DownloadQueueBadge";
 import type { QueueItem } from "./DownloadQueueProvider";
 import { type DownloadRate, IDLE_RATE } from "./downloadRate";
 
@@ -63,5 +63,23 @@ describe("badgeSummary", () => {
     expect(
       badgeSummary(item({ progress: { downloadedBytes: 1024 } })),
     ).toBeNull();
+  });
+});
+
+describe("queuedHeading", () => {
+  it("gives just the count when no item's size is known", () => {
+    expect(queuedHeading([{}, {}])).toBe("Queued (2)");
+  });
+
+  it("adds the total when every size is known", () => {
+    expect(
+      queuedHeading([{ sizeBytes: 1024 * 1024 }, { sizeBytes: 1024 * 1024 }]),
+    ).toBe("Queued (2) · 2.0 MB");
+  });
+
+  it("says how many it could not count rather than pass the total off as whole", () => {
+    expect(queuedHeading([{ sizeBytes: 3 * 1024 * 1024 }, {}, {}])).toBe(
+      "Queued (3) · 3.0 MB + 2 of unknown size",
+    );
   });
 });
