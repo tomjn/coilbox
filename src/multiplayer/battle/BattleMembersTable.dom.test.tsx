@@ -62,7 +62,14 @@ const noopHostControls = {
   changeBotAi: vi.fn(),
 };
 
-function renderTable(rows: Row[]) {
+function renderTable(
+  rows: Row[],
+  overrides?: {
+    noteFor?: (row: Row) => string;
+    onSetNote?: (row: Row, text: string) => void;
+    statsSummaryFor?: (row: Row) => string | null;
+  },
+) {
   return render(
     <BattleMembersTable
       serverKey={null}
@@ -83,6 +90,7 @@ function renderTable(rows: Row[]) {
       onTeam={vi.fn()}
       onAlly={vi.fn()}
       onColor={vi.fn()}
+      {...overrides}
     />,
   );
 }
@@ -192,6 +200,19 @@ describe("spectators in a compact list (#3194)", () => {
     ]);
     expect(
       screen.getByRole("button", { name: "Actions for Carol" }),
+    ).toBeTruthy();
+  });
+
+  it("still offers the private note button on a spectator", () => {
+    renderTable(
+      [
+        row({ name: "Me", self: true, host: true }),
+        row({ name: "Carol", spectator: true }),
+      ],
+      { noteFor: () => "", onSetNote: vi.fn() },
+    );
+    expect(
+      screen.getByRole("button", { name: "Add note for Carol" }),
     ).toBeTruthy();
   });
 });

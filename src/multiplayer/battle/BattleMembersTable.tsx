@@ -28,6 +28,7 @@ import {
   orderedAis,
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
+import { NoteButton } from "../NoteButton";
 import { useConnection } from "../store";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
@@ -472,6 +473,14 @@ export function BattleMembersTable({
                   {row.name}
                 </span>
                 {row.rank != null && <RankBadge rank={row.rank} />}
+                {row.kind === "human" && !row.self && onSetNote && (
+                  <NoteButton
+                    name={row.name}
+                    note={noteFor?.(row) ?? ""}
+                    onSave={(text) => onSetNote(row, text)}
+                    statsSummary={statsSummaryFor?.(row)}
+                  />
+                )}
                 {control && <MemberActionsMenu row={row} control={control} />}
               </span>
             );
