@@ -385,6 +385,7 @@ function ServerBattles({
       joinedId={joinedId}
       inProgressIds={inProgressIds}
       canJoin={canJoin}
+      linkable={ready}
       onJoin={onJoin}
       onLeave={leave}
       enginePath={selected?.enginePath}

@@ -5,6 +5,7 @@ import { BattleRow } from "./BattleRow";
 
 type RowProps = {
   canJoin: boolean;
+  linkable: boolean;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
   enginePath?: string;
@@ -28,6 +29,7 @@ export function BattleList({
   joinedId,
   inProgressIds,
   canJoin,
+  linkable,
   onJoin,
   onLeave,
   enginePath,
@@ -42,6 +44,11 @@ export function BattleList({
   joinedId: number | null;
   inProgressIds: Set<number>;
   canJoin: boolean;
+  /** Whether the invite link is worth handing out: connected to the server,
+   * full stop. Unlike `canJoin`, it doesn't gate on being busy or already in a
+   * battle elsewhere. A link to a full battle, or to the one you're already
+   * in, is still a reasonable thing to send (issue #2372). */
+  linkable: boolean;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
   enginePath?: string;
@@ -68,6 +75,7 @@ export function BattleList({
   const rowProps: RowProps = useMemo(
     () => ({
       canJoin,
+      linkable,
       onJoin,
       onLeave,
       enginePath,
@@ -78,6 +86,7 @@ export function BattleList({
     }),
     [
       canJoin,
+      linkable,
       onJoin,
       onLeave,
       enginePath,

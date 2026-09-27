@@ -30,6 +30,7 @@ function BattleRowInner({
   battle,
   joined,
   canJoin,
+  linkable = true,
   inProgress = false,
   onJoin,
   onLeave,
@@ -42,6 +43,12 @@ function BattleRowInner({
   battle: Battle;
   joined: boolean;
   canJoin: boolean;
+  /** Whether the invite link is worth handing out: connected to the server,
+   * full stop. Defaults true for callers (tests, mainly) that don't track
+   * connection state separately from `canJoin`. Unlike `canJoin`, a full
+   * battle or one already joined still gets a link (issue #2372): both are
+   * things worth sending, so only "not connected" disables it. */
+  linkable?: boolean;
   /** The battle is already running (host in-game): the row offers "Watch live",
    * joining as a spectator, rather than "Join". */
   inProgress?: boolean;
@@ -139,6 +146,7 @@ function BattleRowInner({
           variant="ghost"
           size="icon"
           className="size-8 shrink-0"
+          disabled={!linkable}
           aria-label={`Copy an invite link for ${battle.title}`}
           title="Copy invite link"
           onClick={() => copyDeepLink(invite)}
