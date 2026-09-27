@@ -1707,8 +1707,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("coilbox-unitsync")
         // The model-texture cache only ever grows (issue #1919): nothing deleted
         // an entry a bumped `CACHE_VERSION` or an uninstalled game orphaned.
-        // Swept here, at the one moment nothing can be mid-render and every file
-        // still under the current version is provably live: see `modelcache`.
+        // Swept here, at the one moment nothing can be mid-render, against each
+        // key's own archive on disk rather than unitsync: see `modelcache`.
         .setup(|app, _api| {
             if let Some(dir) = model_texture_dir(app) {
                 modelcache::sweep(&dir);
