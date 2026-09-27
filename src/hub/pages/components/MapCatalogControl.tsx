@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { useState } from "react";
+import { Progress } from "@/components/ui/progress";
 import { usePreferredTarget } from "@/play/config";
 import {
   type SweepProgress,
@@ -95,6 +96,13 @@ export function MapCatalogControl({
           </span>
         )}
       </div>
+      {progress && (
+        <Progress
+          value={progressPercent(progress)}
+          className="h-1.5 bg-muted"
+          aria-label="Reading and sending your maps"
+        />
+      )}
       {!target?.enginePath && (
         <p className="text-sm text-muted-foreground">
           Coilbox needs an engine installed before it can read your maps.
@@ -114,4 +122,11 @@ function phaseWords({ phase, done, total }: SweepProgress): string {
   if (phase === "asking") return `Asking the hub about${of || " your maps"}`;
   if (phase === "sending") return `Sending${of || ""}`;
   return total > 0 ? `Read${of}` : "Reading your maps";
+}
+
+/** How far a phase has got, 0 to 100. Zero before a total is known, which is
+ *  the moment right after a phase starts and before its first map has been
+ *  read or its first batch answered. */
+function progressPercent({ done, total }: SweepProgress): number {
+  return total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
 }

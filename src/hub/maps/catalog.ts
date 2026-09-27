@@ -1,4 +1,5 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
+import { Channel } from "@tauri-apps/api/core";
 import type { MapCatalogEntry } from "../../content/bindings";
 
 /**
@@ -51,13 +52,24 @@ export interface MapSubmitResult {
   said?: string;
 }
 
+/** One sample as a have check or a submission works through its batches, after
+ *  every request rather than once at the end (issue #3147). */
+export interface MapBatchProgress {
+  done: number;
+  total: number;
+}
+
 const hubMapsHave = defineCommand<
-  { hubUrl: string; keys: MapHaveKey[] },
+  { hubUrl: string; keys: MapHaveKey[]; onProgress: Channel<MapBatchProgress> },
   { results: MapHaveResult[] }
 >("coilbox-hub", "hub_maps_have");
 
 const hubPublishMaps = defineCommand<
-  { hubUrl: string; entries: MapCatalogEntry[] },
+  {
+    hubUrl: string;
+    entries: MapCatalogEntry[];
+    onProgress: Channel<MapBatchProgress>;
+  },
   { results: MapSubmitResult[] }
 >("coilbox-hub", "hub_publish_maps");
 
@@ -66,14 +78,18 @@ const hubPublishMaps = defineCommand<
  * were given.
  *
  * An empty set asks nobody, because the hub refuses an empty batch and the
- * caller of this is a loop.
+ * caller of this is a loop. `onProgress` takes a sample after every request a
+ * large set is split into.
  */
 export async function mapsTheHubWants(
   hubUrl: string,
   keys: MapHaveKey[],
+  onProgress: (sample: MapBatchProgress) => void = () => {},
 ): Promise<MapHaveResult[]> {
   if (keys.length === 0) return [];
-  const { results } = await hubMapsHave({ hubUrl, keys });
+  const channel = new Channel<MapBatchProgress>();
+  channel.onmessage = onProgress;
+  const { results } = await hubMapsHave({ hubUrl, keys, onProgress: channel });
   return results;
 }
 
@@ -82,12 +98,20 @@ export async function mapsTheHubWants(
  *
  * One outcome per entry in the order they were given. A batch is split to the
  * hub's caps on the Rust side, so this takes as many entries as the caller has.
+ * `onProgress` takes a sample after every request a large set is split into.
  */
 export async function publishMapFacts(
   hubUrl: string,
   entries: MapCatalogEntry[],
+  onProgress: (sample: MapBatchProgress) => void = () => {},
 ): Promise<MapSubmitResult[]> {
   if (entries.length === 0) return [];
-  const { results } = await hubPublishMaps({ hubUrl, entries });
+  const channel = new Channel<MapBatchProgress>();
+  channel.onmessage = onProgress;
+  const { results } = await hubPublishMaps({
+    hubUrl,
+    entries,
+    onProgress: channel,
+  });
   return results;
 }

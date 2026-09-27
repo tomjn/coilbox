@@ -1234,6 +1234,10 @@ async fn unitsync_local_renders<R: Runtime>(
 /// One call is one `Init` however many maps it covers, and the archive hashes are
 /// cached on file identity, so a second sweep over an unchanged library reads no
 /// archives at all.
+///
+/// `on_progress` takes a sample per map as the walk reads it, the same way
+/// `unitsync_convert_3do`'s does, so a library that takes tens of seconds to hash
+/// is not a window that sits at zero the whole time (issue #3147).
 #[tauri::command]
 async fn unitsync_map_catalog<R: Runtime>(
     app: AppHandle<R>,
@@ -1241,6 +1245,7 @@ async fn unitsync_map_catalog<R: Runtime>(
     data_dir: String,
     maps: Option<Vec<String>>,
     keys_only: bool,
+    on_progress: tauri::ipc::Channel<serde_json::Value>,
 ) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
@@ -1268,11 +1273,29 @@ async fn unitsync_map_catalog<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "map catalog", None).await;
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        run_worker_streaming(
+            bin,
+            args,
+            envs,
+            SCAN_TIMEOUT,
+            "map catalog".to_string(),
+            None,
+            on_progress,
+        )
+    })
+    .await;
     if let Some(path) = maps_file {
         let _ = std::fs::remove_file(&path);
     }
-    out
+    match result {
+        Ok(Ok(stdout)) => match serde_json::from_str::<serde_json::Value>(&stdout) {
+            Ok(value) => CliResult::ok(value),
+            Err(e) => CliResult::err(format!("could not parse unitsync output: {e}")),
+        },
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("map catalog task failed: {e}")),
+    }
 }
 
 /// `unitsync_map_minimaps` names what every installed map's minimap would be
