@@ -43,32 +43,66 @@ function tools(
   const catalogCalls: { maps?: string[]; keysOnly: boolean }[] = [];
   const asked: string[][] = [];
   return {
-    catalog: vi.fn(async (args: { maps?: string[]; keysOnly: boolean }) => {
-      catalogCalls.push(args);
-      const wanted = args.maps ?? names;
-      return {
-        maps: wanted.map((mapName) => ({
-          mapName,
-          sourceHash: "src-a",
-          catalogVersion: 1,
-          ...(args.keysOnly ? {} : { entry: entry(mapName) }),
-        })),
-        skipped: args.keysOnly ? skipped : [],
-        errors: [],
-      };
-    }) as unknown as SweepTools["catalog"],
-    ask: vi.fn(async (_hubUrl: string, keys: { map_name: string }[]) => {
-      asked.push(keys.map((key) => key.map_name));
-      return keys.map((key) => ({
-        map_name: key.map_name,
-        status: statuses[key.map_name] ?? "missing",
-      }));
-    }) as unknown as SweepTools["ask"],
-    send: vi.fn(async (_hubUrl: string, entries: MapCatalogEntry[]) =>
-      entries.map((sent) => ({
-        map_name: sent.map_name,
-        outcome: outcomes[sent.map_name] ?? "stored",
-      })),
+    catalog: vi.fn(
+      async (
+        args: { maps?: string[]; keysOnly: boolean },
+        onProgress: (sample: {
+          done: number;
+          total: number;
+        }) => void = () => {},
+      ) => {
+        catalogCalls.push(args);
+        const wanted = args.maps ?? names;
+        // A sample per map, the way the worker's own progress lines do, so a
+        // test can tell a sweep that only heard the start and the end from one
+        // that heard every map in between.
+        for (let index = 0; index < wanted.length; index += 1) {
+          onProgress({ done: index + 1, total: wanted.length });
+        }
+        return {
+          maps: wanted.map((mapName) => ({
+            mapName,
+            sourceHash: "src-a",
+            catalogVersion: 1,
+            ...(args.keysOnly ? {} : { entry: entry(mapName) }),
+          })),
+          skipped: args.keysOnly ? skipped : [],
+          errors: [],
+        };
+      },
+    ) as unknown as SweepTools["catalog"],
+    ask: vi.fn(
+      async (
+        _hubUrl: string,
+        keys: { map_name: string }[],
+        onProgress: (sample: {
+          done: number;
+          total: number;
+        }) => void = () => {},
+      ) => {
+        asked.push(keys.map((key) => key.map_name));
+        onProgress({ done: keys.length, total: keys.length });
+        return keys.map((key) => ({
+          map_name: key.map_name,
+          status: statuses[key.map_name] ?? "missing",
+        }));
+      },
+    ) as unknown as SweepTools["ask"],
+    send: vi.fn(
+      async (
+        _hubUrl: string,
+        entries: MapCatalogEntry[],
+        onProgress: (sample: {
+          done: number;
+          total: number;
+        }) => void = () => {},
+      ) => {
+        onProgress({ done: entries.length, total: entries.length });
+        return entries.map((sent) => ({
+          map_name: sent.map_name,
+          outcome: outcomes[sent.map_name] ?? "stored",
+        }));
+      },
     ) as unknown as SweepTools["send"],
     asked: () => asked,
     catalogCalls: () => catalogCalls,
@@ -167,6 +201,37 @@ describe("sweepMapCatalog", () => {
     expect(seen.map((p) => p.phase)).toContain("asking");
     expect(seen.map((p) => p.phase)).toContain("sending");
     expect(seen.at(-1)).toEqual({ phase: "sending", done: 2, total: 2 });
+  });
+
+  /// Issue #3147: a reader watching the "reading" phase must see it move
+  /// map by map, not sit at zero until the whole library has been hashed and
+  /// then jump straight to the total.
+  it("reports reading progress for every map rather than only the start and the end", async () => {
+    const kit = tools(["Isis 1.3", "Tabula 3", "Comet Catcher Remake 1.8"]);
+    const seen: SweepProgress[] = [];
+
+    await sweepMapCatalog(target, (p) => seen.push(p), kit);
+
+    const reading = seen.filter((p) => p.phase === "reading");
+    // One sample per map in the keys-only pass, not just a start and an end.
+    expect(reading.map((p) => p.done)).toContain(1);
+    expect(reading.map((p) => p.done)).toContain(2);
+    expect(reading.map((p) => p.done)).toContain(3);
+    expect(reading.every((p) => p.total === 3 || p.total === 0)).toBe(true);
+  });
+
+  /// The have check and the submission are also batched requests under the
+  /// hood, and a caller must hear from each request rather than only the last.
+  it("forwards the have check's and the submission's own batch progress", async () => {
+    const kit = tools(["Isis 1.3", "Tabula 3"]);
+    const seen: SweepProgress[] = [];
+
+    await sweepMapCatalog(target, (p) => seen.push(p), kit);
+
+    const asking = seen.filter((p) => p.phase === "asking");
+    const sending = seen.filter((p) => p.phase === "sending");
+    expect(asking.some((p) => p.done === 2 && p.total === 2)).toBe(true);
+    expect(sending.some((p) => p.done === 2 && p.total === 2)).toBe(true);
   });
 
   it("does nothing with an empty library", async () => {

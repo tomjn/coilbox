@@ -1,4 +1,9 @@
-import type { MapCatalogEntry, MapCatalogResult } from "../../content/bindings";
+import { Channel } from "@tauri-apps/api/core";
+import type {
+  MapCatalogEntry,
+  MapCatalogProgress,
+  MapCatalogResult,
+} from "../../content/bindings";
 import { unitsyncMapCatalog } from "../../content/bindings";
 import type {
   HubSweepProgress,
@@ -12,6 +17,30 @@ import {
   publishMapFacts,
   wantsSubmission,
 } from "./catalog";
+
+/**
+ * Read the map library, through a plain callback rather than the raw
+ * `Channel` `unitsyncMapCatalog` itself takes.
+ *
+ * A fresh channel per call, never reused: a `Channel` stops delivering once the
+ * command it was made for has returned. Wrapping it here, rather than in
+ * {@link sweepMapCatalog} itself, is also what keeps a test able to swap the
+ * whole call out through {@link SweepTools} without a real `Channel` ever being
+ * constructed, since that needs a webview to exist.
+ */
+async function readMapCatalog(
+  args: {
+    enginePath: string;
+    dataDir: string;
+    maps?: string[];
+    keysOnly: boolean;
+  },
+  onProgress: (sample: MapCatalogProgress) => void = () => {},
+): Promise<MapCatalogResult> {
+  const channel = new Channel<MapCatalogProgress>();
+  channel.onmessage = onProgress;
+  return unitsyncMapCatalog({ ...args, onProgress: channel });
+}
 
 /**
  * Reading the installed map library and sending the hub what it does not have
@@ -71,13 +100,13 @@ export interface SweepReport
 
 /** Everything this reaches outside itself, so a test can count the calls. */
 export interface SweepTools {
-  catalog: typeof unitsyncMapCatalog;
+  catalog: typeof readMapCatalog;
   ask: typeof mapsTheHubWants;
   send: typeof publishMapFacts;
 }
 
 export const liveSweepTools: SweepTools = {
-  catalog: unitsyncMapCatalog,
+  catalog: readMapCatalog,
   ask: mapsTheHubWants,
   send: publishMapFacts,
 };
@@ -116,16 +145,24 @@ export async function sweepMapCatalog(
 ): Promise<SweepReport> {
   const { hubUrl, enginePath, dataDir } = target;
 
-  // Pass one: every map's archive, hashed. No infomaps, no height grids.
+  // Pass one: every map's archive, hashed. No infomaps, no height grids. The
+  // worker reports one sample per map as it hashes, rather than one at the end,
+  // because this pass alone is close to a minute on a large library (issue
+  // #3147).
   onProgress({ phase: "reading", done: 0, total: 0 });
-  const keys = await tools.catalog({ enginePath, dataDir, keysOnly: true });
+  const keys = await tools.catalog(
+    { enginePath, dataDir, keysOnly: true },
+    (sample) => onProgress({ phase: "reading", ...sample }),
+  );
   const rows = keys.maps;
   onProgress({ phase: "reading", done: rows.length, total: rows.length });
   if (rows.length === 0) {
     return { ...nothing, skipped: keys.skipped, errors: keys.errors };
   }
 
-  // The have check, which is what turns a library into a handful.
+  // The have check, which is what turns a library into a handful. Reported
+  // after every request it takes, so a library split into six batches moves in
+  // six steps rather than sitting at zero until the last one lands.
   onProgress({ phase: "asking", done: 0, total: rows.length });
   const answers = await tools.ask(
     hubUrl,
@@ -134,6 +171,7 @@ export async function sweepMapCatalog(
       source_hash: row.sourceHash,
       catalog_version: row.catalogVersion,
     })),
+    (sample) => onProgress({ phase: "asking", ...sample }),
   );
   onProgress({ phase: "asking", done: rows.length, total: rows.length });
 
@@ -158,12 +196,10 @@ export async function sweepMapCatalog(
 
   // Pass two: the facts, for the wanted maps alone.
   onProgress({ phase: "reading", done: 0, total: wanted.length });
-  const facts = await tools.catalog({
-    enginePath,
-    dataDir,
-    maps: wanted,
-    keysOnly: false,
-  });
+  const facts = await tools.catalog(
+    { enginePath, dataDir, maps: wanted, keysOnly: false },
+    (sample) => onProgress({ phase: "reading", ...sample }),
+  );
   const entries = facts.maps
     .map((row) => row.entry)
     .filter((entry): entry is MapCatalogEntry => entry !== undefined);
@@ -174,7 +210,9 @@ export async function sweepMapCatalog(
   });
 
   onProgress({ phase: "sending", done: 0, total: entries.length });
-  const results = await tools.send(hubUrl, entries);
+  const results = await tools.send(hubUrl, entries, (sample) =>
+    onProgress({ phase: "sending", ...sample }),
+  );
   onProgress({ phase: "sending", done: entries.length, total: entries.length });
 
   const problems = results.filter((result) => !isHeld(result.outcome));

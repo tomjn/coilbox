@@ -2028,6 +2028,13 @@ export interface MapCatalogResult {
   errors: string[];
 }
 
+/** One sample as a map catalog walk works through the library, per map read
+ *  rather than once at the end (issue #3147). */
+export interface MapCatalogProgress {
+  done: number;
+  total: number;
+}
+
 /**
  * Read the installed map library into the entries the hub takes (issue #1737).
  *
@@ -2040,6 +2047,10 @@ export interface MapCatalogResult {
  * One call is one session however many maps it covers, and the archive hashes
  * are cached on file identity, so a second sweep over an unchanged library reads
  * no archives at all.
+ *
+ * `onProgress` takes a sample per map as the walk reads it, so a library that
+ * takes tens of seconds to hash is not a window that sits at zero the whole
+ * time.
  */
 export const unitsyncMapCatalog = defineCommand<
   {
@@ -2048,6 +2059,7 @@ export const unitsyncMapCatalog = defineCommand<
     /** The maps to read. Absent walks the whole library. */
     maps?: string[];
     keysOnly: boolean;
+    onProgress: Channel<MapCatalogProgress>;
   },
   MapCatalogResult
 >("coilbox-unitsync", "unitsync_map_catalog");
