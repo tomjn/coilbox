@@ -24,12 +24,16 @@
  */
 
 import { containerKindName, containerKindPlural } from "@/container/names";
+import type { SuggestedMap } from "@/content/branding";
 
 /** Response envelopes, from `lib/api/items.ts` in tomjn/coilbox-hub. */
 const ITEMS_FORMAT = "coilbox-hub-items";
 const ITEM_FORMAT = "coilbox-hub-item";
 /** From `lib/api/gameList.ts` in tomjn/coilbox-hub. */
 const GAMES_FORMAT = "coilbox-hub-games";
+/** `GET /api/v1/map-packs` (issue #3143), proposed but not yet built on the hub -
+ * see `./maps/mapPacks.ts` for how a missing route is handled until it exists. */
+const MAP_PACKS_FORMAT = "coilbox-hub-map-packs";
 
 /** The API version this build was written against. A higher one is refused. */
 export const HUB_API_VERSION = 1;
@@ -420,6 +424,63 @@ export function fetchHubGames(
   signal?: AbortSignal,
 ): Promise<HubResult<HubGame[]>> {
   return getJson(hubGamesUrl(base), readGamesBody, signal);
+}
+
+/**
+ * A named pack of maps as `GET /api/v1/map-packs` would list it (issue #3143).
+ * `maps` reuses {@link SuggestedMap} unchanged - the same shape a branding
+ * catalog pack uses - so a hub pack drops into `mergeMapLists` and
+ * `suggestedMapToInput` with no conversion beyond dropping `featured`. See
+ * `./maps/mapPacks.ts`.
+ *
+ * This route does not exist on the hub yet (tomjn/coilbox-hub has no concept
+ * of a map pack at all: individual maps carry a moderator `featured_at`, but
+ * there is no grouping of maps into a pack and no public listing route for
+ * maps). `fetchHubMapPacks` is written against this shape so featured hub
+ * packs work the moment the hub grows the route, the same way `blueprint` and
+ * `mod-project` waited here as {@link HubKind}s before the hub carried them.
+ */
+export interface HubMapPack {
+  id: string;
+  title: string;
+  blurb?: string;
+  featured: boolean;
+  maps: SuggestedMap[];
+}
+
+/** Build the map packs listing URL. */
+export function hubMapPacksUrl(base: string): string {
+  return hubUrl(base, "/api/v1/map-packs").toString();
+}
+
+/** Read a map-packs response that already came back 2xx. */
+export function readMapPacksBody(body: unknown): HubResult<HubMapPack[]> {
+  const envelope = readEnvelope(body, MAP_PACKS_FORMAT);
+  if (!envelope.ok) return { ok: false, reason: envelope.reason };
+  const { packs } = envelope.body;
+  if (!Array.isArray(packs)) {
+    return {
+      ok: false,
+      reason: "The hub sent a map pack list with no packs in it.",
+    };
+  }
+  return { ok: true, value: packs as HubMapPack[] };
+}
+
+/**
+ * Fetch every map pack the hub holds. Never throws.
+ *
+ * Until the route exists this always resolves `ok: false` (a 404, read the
+ * same way any other unrecognised route would be), which `useFeaturedHubMapPacks`
+ * treats as "no hub packs today" rather than an error banner - see that
+ * module for why silence is the right behaviour here and not for
+ * {@link fetchHubGames}.
+ */
+export function fetchHubMapPacks(
+  base: string,
+  signal?: AbortSignal,
+): Promise<HubResult<HubMapPack[]>> {
+  return getJson(hubMapPacksUrl(base), readMapPacksBody, signal);
 }
 
 /**
