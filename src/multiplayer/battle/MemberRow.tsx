@@ -263,13 +263,13 @@ export function MemberRow({
                 handle rather than a sentence, so the pair reads as one thing. */}
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
               <div className="flex items-center gap-1 truncate">
-                {(row.host || row.boss) && (
-                  <Crown className="size-3.5 text-amber-500" />
-                )}
                 {row.kind === "bot" && (
                   <BotIcon className="size-3.5 text-muted-foreground" />
                 )}
                 {row.country && <CountryFlag country={row.country} />}
+                {(row.host || row.boss) && (
+                  <Crown className="size-3.5 text-amber-500" />
+                )}
                 <span
                   className={cn("truncate", row.self && "font-medium")}
                   title={note || undefined}
