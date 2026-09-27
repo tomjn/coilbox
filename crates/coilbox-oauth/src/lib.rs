@@ -53,6 +53,12 @@ use loopback::Loopback;
 /// a listener bound for the rest of the session.
 pub const CALLBACK_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// How long the listener keeps answering after the code arrives, for a second
+/// copy of the same redirect (#2377). It is the wait the first arrival was given,
+/// so the port is never open longer after a sign-in than it could already be
+/// before one.
+const CALLBACK_GRACE: Duration = CALLBACK_TIMEOUT;
+
 /// The three things a service has to put on its authorization URL, handed to it
 /// once the loopback listener is bound.
 pub struct AuthRequest {
@@ -136,7 +142,7 @@ where
     open_browser(url.as_str()).map_err(AuthError::Browser)?;
 
     let code = loopback
-        .wait_for_code(&request.state, CALLBACK_TIMEOUT)
+        .wait_for_code(&request.state, CALLBACK_TIMEOUT, CALLBACK_GRACE)
         .await?;
     Ok(Authorization {
         code,

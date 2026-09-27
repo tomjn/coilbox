@@ -131,6 +131,10 @@ fn page(tone: Tone, heading: &str, message: &str) -> String {
 /// one: the sign-in is started from Coilbox, not from here.
 const TRY_AGAIN: &str = "You can close this window and try again in Coilbox.";
 
+/// What a callback carrying somebody else's `state` is told.
+const NOT_OURS: &str =
+    "This sign-in was not the one Coilbox started. You can close this window and try again in Coilbox.";
+
 /// Write one HTTP response and close. Anything the browser sends after this is of
 /// no interest to us.
 async fn respond(sock: &mut TcpStream, status: &str, body: &str) {
@@ -205,7 +209,19 @@ impl Loopback {
     /// A callback carrying the wrong `state` is refused rather than ignored.
     /// Ignoring it would leave the real browser able to finish, but it would also
     /// mean a process on this machine could keep guessing without us ever noticing.
-    pub async fn wait_for_code(self, state: &str, timeout: Duration) -> Result<String, AuthError> {
+    ///
+    /// Once the code is in hand the listener stays up for `grace` in a task of its
+    /// own, so the sign-in carries on without waiting for it. The same callback URL
+    /// can arrive more than once, for example when the Discord desktop app follows
+    /// the redirect and then hands it to the browser, and a second arrival that
+    /// found the port closed would show "refused to connect" over a sign-in that
+    /// worked. See [`linger`] for what it answers.
+    pub async fn wait_for_code(
+        self,
+        state: &str,
+        timeout: Duration,
+        grace: Duration,
+    ) -> Result<String, AuthError> {
         let listener = self.listener;
         let wait = async {
             loop {
@@ -241,11 +257,7 @@ impl Loopback {
                 }
 
                 if params.get("state").map(String::as_str) != Some(state) {
-                    let body = page(
-                        Tone::Failed,
-                        "Sign-in refused",
-                        "This sign-in was not the one Coilbox started. You can close this window and try again in Coilbox.",
-                    );
+                    let body = page(Tone::Failed, "Sign-in refused", NOT_OURS);
                     respond(&mut sock, "400 Bad Request", &body).await;
                     return Err(AuthError::StateMismatch);
                 }
@@ -261,11 +273,67 @@ impl Loopback {
                 return Ok(code);
             }
         };
-        match tokio::time::timeout(timeout, wait).await {
-            Ok(result) => result,
-            Err(_) => Err(AuthError::TimedOut),
-        }
+        let code = match tokio::time::timeout(timeout, wait).await {
+            Ok(result) => result?,
+            Err(_) => return Err(AuthError::TimedOut),
+        };
+        tokio::spawn(linger(listener, state.to_owned(), grace));
+        Ok(code)
     }
+}
+
+/// Keep answering on the callback port for `grace` after the code was taken, then
+/// close it.
+///
+/// Nothing that arrives here is acted on. A callback carrying our `state` is a
+/// copy of the redirect that already finished, so it gets the signed in page.
+/// Anything else on the callback path gets the refused page, and every other path
+/// the not found page. All three are fixed text, so nothing from the query is
+/// echoed and a second code goes nowhere.
+///
+/// Each connection is served in its own task under the same deadline, so a
+/// browser that opens a socket and sends nothing cannot hold up the next request
+/// or keep the port open past `grace`.
+async fn linger(listener: TcpListener, state: String, grace: Duration) {
+    let deadline = tokio::time::Instant::now() + grace;
+    let state: std::sync::Arc<str> = state.into();
+    let serve = async {
+        while let Ok((mut sock, _)) = listener.accept().await {
+            let state = state.clone();
+            tokio::spawn(tokio::time::timeout_at(deadline, async move {
+                let (status, body) = match read_target(&mut sock)
+                    .await
+                    .and_then(|target| Url::parse(&format!("http://127.0.0.1{target}")).ok())
+                {
+                    None => (
+                        "400 Bad Request",
+                        page(Tone::Failed, "Bad request", TRY_AGAIN),
+                    ),
+                    Some(url) if url.path() != CALLBACK_PATH => (
+                        "404 Not Found",
+                        page(Tone::Failed, "Not found", "You can close this window."),
+                    ),
+                    Some(url)
+                        if url
+                            .query_pairs()
+                            .any(|(key, value)| key == "state" && *value == *state) =>
+                    {
+                        (
+                            "200 OK",
+                            page(Tone::Done, "Signed in", "You can close this window."),
+                        )
+                    }
+                    Some(_) => (
+                        "400 Bad Request",
+                        page(Tone::Failed, "Sign-in refused", NOT_OURS),
+                    ),
+                };
+                respond(&mut sock, status, &body).await;
+            }));
+        }
+    };
+    // The listener drops when this returns, which releases the port.
+    let _ = tokio::time::timeout_at(deadline, serve).await;
 }
 
 #[cfg(test)]
@@ -276,7 +344,7 @@ mod tests {
     async fn the_listener_gives_up_rather_than_waiting_for_a_browser_that_never_comes() {
         let loopback = Loopback::bind().await.unwrap();
         let err = loopback
-            .wait_for_code("some-state", Duration::from_millis(50))
+            .wait_for_code("some-state", Duration::from_millis(50), Duration::ZERO)
             .await
             .unwrap_err();
         assert!(matches!(err, AuthError::TimedOut), "{err:?}");
@@ -317,7 +385,11 @@ mod tests {
     async fn a_refused_callback_never_echoes_what_the_server_sent() {
         let loopback = Loopback::bind().await.unwrap();
         let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
-        let wait = tokio::spawn(loopback.wait_for_code("real-state", Duration::from_secs(5)));
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_secs(5),
+            Duration::ZERO,
+        ));
         let response = request(
             port,
             "/oauth2callback?error=access_denied&error_description=%3Csvg+onload%3Dalert(1)%3E",
@@ -336,13 +408,104 @@ mod tests {
     async fn a_stray_request_gets_the_same_page_rather_than_bare_text() {
         let loopback = Loopback::bind().await.unwrap();
         let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
-        let wait = tokio::spawn(loopback.wait_for_code("real-state", Duration::from_millis(300)));
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_millis(300),
+            Duration::ZERO,
+        ));
         let response = request(port, "/somewhere-else").await;
         assert!(response.starts_with("HTTP/1.1 404 Not Found"), "{response}");
         assert!(response.contains("Not found"), "{response}");
         assert!(response.contains("<style>"), "{response}");
         // The wait carries on, because a stray request is not the browser.
         assert!(matches!(wait.await.unwrap(), Err(AuthError::TimedOut)));
+    }
+
+    /// The Windows report in #2377. With the Discord desktop app installed, the
+    /// callback URL reaches the listener twice, and whatever arrives second used to
+    /// find the port closed and show "refused to connect" over a sign-in that
+    /// worked.
+    #[tokio::test]
+    async fn a_second_arrival_at_the_callback_still_gets_the_signed_in_page() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let grace = Duration::from_secs(5);
+        let wait =
+            tokio::spawn(loopback.wait_for_code("real-state", Duration::from_secs(5), grace));
+        let callback = "/oauth2callback?code=the-code&state=real-state";
+        let first = request(port, callback).await;
+        assert!(first.contains("Signed in"), "{first}");
+        // The code comes back straight away rather than after the grace window.
+        let code = tokio::time::timeout(grace / 5, wait)
+            .await
+            .expect("the sign-in waited for the grace window")
+            .unwrap()
+            .unwrap();
+        assert_eq!(code, "the-code");
+
+        // A socket that connects and sends nothing, the way a browser opens one
+        // speculatively, must not hold up the request behind it.
+        let _silent = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let second = tokio::time::timeout(grace / 5, request(port, callback))
+            .await
+            .expect("a silent socket held up the second arrival");
+        assert!(second.starts_with("HTTP/1.1 200 OK"), "{second}");
+        assert!(second.contains("Signed in"), "{second}");
+    }
+
+    /// After the code is taken, a callback that is not a copy of ours is told it
+    /// was refused, and nothing it carried comes back in the page.
+    #[tokio::test]
+    async fn a_callback_that_is_not_ours_after_sign_in_is_refused_without_echo() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        ));
+        request(port, "/oauth2callback?code=the-code&state=real-state").await;
+        wait.await.unwrap().unwrap();
+
+        for target in [
+            "/oauth2callback?code=another-code&state=guessed-state",
+            "/oauth2callback?code=another-code",
+            "/oauth2callback",
+        ] {
+            let response = request(port, target).await;
+            assert!(
+                response.starts_with("HTTP/1.1 400 Bad Request"),
+                "{response}"
+            );
+            assert!(response.contains("Sign-in refused"), "{response}");
+            assert!(!response.contains("another-code"), "{response}");
+            assert!(!response.contains("guessed-state"), "{response}");
+        }
+        let elsewhere = request(port, "/favicon.ico").await;
+        assert!(
+            elsewhere.starts_with("HTTP/1.1 404 Not Found"),
+            "{elsewhere}"
+        );
+    }
+
+    /// The port closes when the grace window ends, even with a connection held
+    /// open that never sends a request.
+    #[tokio::test]
+    async fn the_port_is_released_when_the_grace_window_ends() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let grace = Duration::from_millis(200);
+        let wait =
+            tokio::spawn(loopback.wait_for_code("real-state", Duration::from_secs(5), grace));
+        request(port, "/oauth2callback?code=the-code&state=real-state").await;
+        wait.await.unwrap().unwrap();
+        let _silent = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+
+        tokio::time::sleep(grace * 2).await;
+        assert!(
+            TcpStream::connect(("127.0.0.1", port)).await.is_err(),
+            "port {port} is still accepting after the grace window"
+        );
     }
 
     #[tokio::test]
