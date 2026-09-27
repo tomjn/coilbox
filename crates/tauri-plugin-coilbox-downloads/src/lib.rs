@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::process::{Child, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, TryLockError};
 use std::time::Duration;
 use tauri::{
     ipc::Channel,
@@ -181,6 +181,33 @@ fn next_idle(idle: Duration, active: bool, unsized_transfer: bool) -> Duration {
     }
 }
 
+/// Held for the whole of every streamed pr-downloader run. The frontend queue
+/// runs maps, games and engines in parallel lanes (issue #3141), and more than
+/// one lane can fall back to pr-downloader. Two copies writing one rapid pool
+/// at once is unsafe, since pr-downloader takes no lock of its own, so runs
+/// take turns here instead.
+static SIDECAR_TURN: Mutex<()> = Mutex::new(());
+
+/// How often a run waiting for its turn checks whether it was cancelled.
+const SIDECAR_WAIT_POLL: Duration = Duration::from_millis(100);
+
+/// Wait for `turn`, or give up and return None if `cancel` is set first, so a
+/// download cancelled while it waits does not sit there until the one ahead of
+/// it finishes. A poisoned lock still hands out the turn, because the `()` it
+/// guards cannot be left half-written.
+fn wait_for_turn<'a>(turn: &'a Mutex<()>, cancel: &AtomicBool) -> Option<MutexGuard<'a, ()>> {
+    loop {
+        if cancel.load(Ordering::Relaxed) {
+            return None;
+        }
+        match turn.try_lock() {
+            Ok(guard) => return Some(guard),
+            Err(TryLockError::Poisoned(p)) => return Some(p.into_inner()),
+            Err(TryLockError::WouldBlock) => std::thread::sleep(SIDECAR_WAIT_POLL),
+        }
+    }
+}
+
 /// Captured result of a streamed sidecar run, shaped for [`sidecar::parse_download`].
 struct SidecarRun {
     stdout: String,
@@ -210,6 +237,14 @@ async fn run_sidecar_streaming(
     use std::io::BufReader;
     let path = sidecar::resolve_sidecar().ok_or(SIDECAR_MISSING)?;
     tauri::async_runtime::spawn_blocking(move || {
+        let Some(_turn) = wait_for_turn(&SIDECAR_TURN, &cancel) else {
+            return Ok(SidecarRun {
+                stdout: String::new(),
+                stderr: String::new(),
+                code: None,
+                aborted: Some(CANCELLED_MSG.to_string()),
+            });
+        };
         let mut cmd = coilbox_proc::command(&path);
         cmd.args(&args)
             .stdout(Stdio::piped())
@@ -1487,6 +1522,44 @@ mod watchdog_tests {
         idle = next_idle(idle, false, true);
         assert_eq!(idle, Duration::ZERO);
         assert_eq!(next_idle(idle, false, false), DL_POLL);
+    }
+}
+
+#[cfg(test)]
+mod sidecar_turn_tests {
+    use super::*;
+
+    #[test]
+    fn a_second_run_waits_for_the_first() {
+        let turn = Arc::new(Mutex::new(()));
+        let first = turn.lock().unwrap();
+        let got = Arc::new(AtomicBool::new(false));
+        let waiter = {
+            let (turn, got) = (turn.clone(), got.clone());
+            std::thread::spawn(move || {
+                let cancel = AtomicBool::new(false);
+                let guard = wait_for_turn(&turn, &cancel);
+                got.store(guard.is_some(), Ordering::SeqCst);
+            })
+        };
+        std::thread::sleep(SIDECAR_WAIT_POLL * 3);
+        assert!(!got.load(Ordering::SeqCst), "took a turn that was held");
+        drop(first);
+        waiter.join().unwrap();
+        assert!(got.load(Ordering::SeqCst), "never got its turn");
+    }
+
+    #[test]
+    fn a_cancelled_run_stops_waiting() {
+        let turn = Arc::new(Mutex::new(()));
+        let _held = turn.lock().unwrap();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let waiter = {
+            let (turn, cancel) = (turn.clone(), cancel.clone());
+            std::thread::spawn(move || wait_for_turn(&turn, &cancel).is_none())
+        };
+        cancel.store(true, Ordering::SeqCst);
+        assert!(waiter.join().unwrap(), "should give up once cancelled");
     }
 }
 
