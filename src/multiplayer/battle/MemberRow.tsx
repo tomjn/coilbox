@@ -161,6 +161,8 @@ export function MemberRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const canSpectate =
     row.kind === "human" && !row.spectator && !!control?.onForceSpectator;
+  // Ordinary players get no subtitle at all (#3196): "Player" told nobody
+  // anything and made every common row taller than it needed to be.
   const subtitle = row.host
     ? "Host"
     : row.boss
@@ -169,7 +171,7 @@ export function MemberRow({
         ? `Bot · ${row.aiDll ?? "AI"}`
         : row.self
           ? "You"
-          : "Player";
+          : undefined;
 
   // Colour is settable by us on our own row (MYBATTLESTATUS) or by the host on
   // another HUMAN's row (FORCETEAMCOLOR). Bots keep a read-only swatch: a bot
@@ -300,7 +302,7 @@ export function MemberRow({
                 {row.aiDll} isn't available in this game
               </span>
             )}
-            {!canChangeAi && !aiInvalid && (
+            {!canChangeAi && !aiInvalid && subtitle && (
               <span className="text-[11px] text-muted-foreground">
                 {subtitle}
               </span>
