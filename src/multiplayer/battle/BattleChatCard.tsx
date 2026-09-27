@@ -214,6 +214,7 @@ export function BattleChatCard({
         maxChars={conv.maxChars}
         onSend={conv.send}
         messageAction={messageAction}
+        battleMemberNames={rows.map((r) => r.name)}
       />
     </div>
   );

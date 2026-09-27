@@ -402,6 +402,7 @@ function ChatPage() {
           completions={completions}
           maxChars={conv.maxChars}
           onSend={conv.send}
+          battleMemberNames={battle ? Object.keys(battle.members) : undefined}
           headerActions={
             desc.kind === "dm" ? (
               <TooltipProvider delayDuration={150}>
