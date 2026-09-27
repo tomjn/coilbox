@@ -29,6 +29,7 @@ import type { SyncState } from "./config";
 import { linkifyTitle } from "./linkifyTitle";
 import { SyncStatusPill } from "./SyncStatusPill";
 import { startAnywayWarning } from "./startBlockers";
+import { startButtonLabel } from "./startButtonLabel";
 
 /**
  * The battle room's top bar: the battle name (replacing the singleplayer
@@ -61,6 +62,7 @@ export function BattleRoomHeader({
   onLeave,
   onStart,
   selfHost,
+  canStartDirectly,
   closesRoom,
   locked,
   onToggleLock,
@@ -84,6 +86,9 @@ export function BattleRoomHeader({
   onLeave: () => void;
   onStart: () => void;
   selfHost: boolean;
+  /** Whether the click actually starts the match rather than asking the room
+   * to vote on it: the founder, or a Tachyon lobby's boss (issue #3198). */
+  canStartDirectly: boolean;
   /** Whether closing this battle takes down the LAN room it is in as well, which
    * is what the confirmation has to promise (issue #2057). */
   closesRoom: boolean;
@@ -155,11 +160,14 @@ export function BattleRoomHeader({
             ? "The match is already running"
             : !allReady
               ? "All players must be ready first"
-              : (startWarning ?? "Ask the autohost to start the match")
+              : (startWarning ??
+                (canStartDirectly
+                  ? "Ask the autohost to start the match"
+                  : "Ask the room to vote on starting the match"))
       }
     >
       <Play className="size-4 fill-current" />
-      {hostIngame ? "In game" : "Start"}
+      {hostIngame ? "In game" : startButtonLabel(canStartDirectly)}
     </Button>
   );
 

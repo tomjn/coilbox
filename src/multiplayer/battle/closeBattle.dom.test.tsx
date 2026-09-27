@@ -78,6 +78,7 @@ function drawHeader(over: { closesRoom?: boolean } = {}) {
       onLeave={() => {}}
       onStart={() => {}}
       selfHost={true}
+      canStartDirectly={true}
       closesRoom={over.closesRoom ?? false}
       locked={false}
       onToggleLock={() => {}}

@@ -466,6 +466,7 @@ function BattleRoomPage() {
         onLeave={onLeave}
         onStart={onStart}
         selfHost={room.selfHost}
+        canStartDirectly={room.isFounder || room.iAmBoss}
         closesRoom={endsTheRoom}
         locked={battle.locked}
         onToggleLock={room.setLocked}
