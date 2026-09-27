@@ -103,7 +103,7 @@ pub(crate) fn resolve(
 
     let teamtex = crate::unitmodel::read_teamtex(us, handle, &list);
     let palette = crate::unitmodel::read_palette(us);
-    let key_base = crate::unitmodel::cache_key_base(us, game_archive);
+    let key_base = crate::unitmodel::cache_key_base(us, game_archive, Some(cache_dir));
     let mut models = BTreeMap::new();
     let mut skipped = BTreeMap::new();
 

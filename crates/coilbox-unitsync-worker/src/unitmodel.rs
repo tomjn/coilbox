@@ -172,7 +172,7 @@ pub fn render(
 
     let teamtex = read_teamtex(&us, handle, &list);
     let palette = read_palette(&us);
-    let key_base = cache_key_base(&us, game_archive);
+    let key_base = cache_key_base(&us, game_archive, cache_dir);
     let cache = cache_dir.zip(key_base.as_deref());
     let mut out = read_model(
         &us,
@@ -1191,7 +1191,15 @@ pub(crate) fn find_member(list: &[(String, String)], target_lc: &str) -> Option<
 
 /// Cheap, stable per-game cache identity (path + size + mtime + version salt).
 /// Mirrors `factionlogo::cache_key_base`.
-pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
+///
+/// With a `cache_dir`, also writes the key's source record there (see
+/// [`record_source`]) before anything is cached under the key, so the startup
+/// sweep can tell when the archive behind it is gone or has changed.
+pub(crate) fn cache_key_base(
+    us: &Unitsync,
+    archive_name: &str,
+    cache_dir: Option<&Path>,
+) -> Option<String> {
     use std::hash::{Hash, Hasher};
     let dir = us.archive_path(archive_name)?;
     let path = Path::new(&dir).join(archive_name);
@@ -1207,7 +1215,38 @@ pub(crate) fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String
     path.hash(&mut h);
     md.len().hash(&mut h);
     mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
+    let key = format!("{:016x}", h.finish());
+    if let Some(cache_dir) = cache_dir {
+        record_source(cache_dir, &key, &path, md.len(), mtime);
+    }
+    Some(key)
+}
+
+/// Write `v<CACHE_VERSION>-<key>.source` into the cache dir: the archive path,
+/// size and mtime the key was worked out from, as JSON (issue #1921).
+///
+/// The key is a hash, so nothing can read those three back out of a file name.
+/// The record lets `tauri-plugin-coilbox-unitsync`'s startup sweep
+/// (`modelcache.rs`) check them against the file system without unitsync: once
+/// the archive is deleted, or replaced by a new version, the record no longer
+/// matches and every file under the key goes. A key with no record is deleted
+/// too, so a failed write here costs a re-extract rather than a leak.
+///
+/// Skipped when the record is already there, since every file under one key
+/// shares it.
+pub(crate) fn record_source(cache_dir: &Path, key: &str, archive: &Path, size: u64, mtime: u64) {
+    let dest = cache_dir.join(format!("v{CACHE_VERSION}-{key}.source"));
+    if dest.is_file() {
+        return;
+    }
+    // A path that is not UTF-8 cannot go into JSON, and gets no record. Its
+    // files are then swept on every launch and re-extracted on demand.
+    let Some(archive) = archive.to_str() else {
+        return;
+    };
+    let record = serde_json::json!({ "path": archive, "size": size, "mtime": mtime });
+    let _ = std::fs::create_dir_all(cache_dir);
+    let _ = std::fs::write(dest, record.to_string());
 }
 
 /// The cache file for one archive member:
@@ -1497,6 +1536,24 @@ mod tests {
             name.starts_with(&format!("v{CACHE_VERSION}-")),
             "got: {name}"
         );
+    }
+
+    /// The sweep in `modelcache.rs` reads this record back by name and field,
+    /// so both are pinned here.
+    #[test]
+    fn a_key_s_source_record_names_the_archive_it_was_worked_out_from() {
+        let dir = std::env::temp_dir().join(format!("coilbox-source-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+
+        record_source(&dir, "abcd", Path::new("/games/ba.sdz"), 42, 1700000000);
+
+        let raw = std::fs::read_to_string(dir.join(format!("v{CACHE_VERSION}-abcd.source")))
+            .expect("the record was written");
+        let back: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(back["path"], "/games/ba.sdz");
+        assert_eq!(back["size"], 42);
+        assert_eq!(back["mtime"], 1700000000);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A transcoded texture is named for what it was written as, not what it
