@@ -158,13 +158,33 @@ const AA_CONTRAST = 4.5;
 /**
  * The app's own background under this theme, matching picoframe's default
  * `--background` in `theme.css` (light is white, dark is `hsl(240 6% 7%)`).
- * `readableTeamTextColor` measures against these rather than `--card`,
- * because neither `BattleChatCard` nor the chat hub's `ChatPane` paints a
- * card background behind a name. Both sit directly on the page.
+ * `readableTeamTextColor` measures against these by default, because neither
+ * `BattleChatCard` nor the chat hub's `ChatPane` paints a card background
+ * behind a name. Both sit directly on the page.
  */
 const THEME_BACKGROUND_HEX: Record<"dark" | "light", string> = {
   light: "#ffffff",
   dark: hslToHex(240, 0.06, 0.07),
+};
+
+/**
+ * picoframe's `--card` in `theme.css`: identical to `--background` in light
+ * mode, but a touch lighter in dark mode (`hsl(240 5% 10%)` vs `hsl(240 6%
+ * 7%)`). A surface painted with `bg-card`, like the match stats chart, needs
+ * contrast measured against this rather than the page background, or a
+ * label can compute as readable on paper and still fall short on screen.
+ */
+const THEME_CARD_HEX: Record<"dark" | "light", string> = {
+  light: "#ffffff",
+  dark: hslToHex(240, 0.05, 0.1),
+};
+
+/** Which surface a label sits on, each with its own background per theme. */
+type Surface = "background" | "card";
+
+const SURFACE_HEX: Record<Surface, Record<"dark" | "light", string>> = {
+  background: THEME_BACKGROUND_HEX,
+  card: THEME_CARD_HEX,
 };
 
 /** sRGB 0..255 channel -> linearised channel, for WCAG relative luminance. */
@@ -206,18 +226,23 @@ const readableCache = new Map<string, string>();
  *
  * Only for text. A swatch (e.g. `MemberList`'s dot) shows the real colour,
  * because that is what the player sees in-game, per issue #3197.
+ *
+ * `surface` picks which background to measure against and defaults to
+ * `"background"`, the page itself, matching every caller before the match
+ * stats chart (#3202) needed `"card"` for its `bg-card` container.
  */
 export function readableTeamTextColor(
   rawHex: string,
   theme: "dark" | "light",
+  surface: Surface = "background",
 ): string {
   const hex = normalizeHex(rawHex);
   if (!hex) return rawHex;
-  const cacheKey = `${theme}:${hex}`;
+  const cacheKey = `${surface}:${theme}:${hex}`;
   const cached = readableCache.get(cacheKey);
   if (cached) return cached;
 
-  const bg = THEME_BACKGROUND_HEX[theme];
+  const bg = SURFACE_HEX[surface][theme];
   let result = hex;
   if (contrastRatio(hex, bg) < AA_CONTRAST) {
     const [h, s, l] = hexToHsl(hex);

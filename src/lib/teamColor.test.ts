@@ -68,6 +68,9 @@ function hslToHexForTest(h: number, s: number, l: number): string {
 }
 const DARK_BG = hslToHexForTest(240, 0.06, 0.07);
 const LIGHT_BG = "#ffffff";
+/** Same formula as `THEME_CARD_HEX`'s dark entry: a touch lighter than
+ * `DARK_BG`, matching picoframe's `--card` in dark mode. */
+const DARK_CARD_BG = hslToHexForTest(240, 0.05, 0.1);
 
 describe("normalizeHex", () => {
   it("lowercases and prefixes a bare 6-digit hex", () => {
@@ -206,5 +209,26 @@ describe("readableTeamTextColor", () => {
 
   it("passes through invalid input unchanged", () => {
     expect(readableTeamTextColor("notacolor", "dark")).toBe("notacolor");
+  });
+
+  it("lightens a dark navy on the dark card surface until it clears 4.5:1", () => {
+    const adjusted = readableTeamTextColor("#001030", "dark", "card");
+    expect(contrast(adjusted, DARK_CARD_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(hueOf(adjusted)).toBeCloseTo(hueOf("#001030"), 0);
+  });
+
+  it("needs more lightening for the card surface than the page background", () => {
+    // The card is lighter than the page in dark mode, so a colour adjusted
+    // against the page background alone can still fall short on the card.
+    const onBackground = readableTeamTextColor("#001030", "dark");
+    expect(contrast(onBackground, DARK_CARD_BG)).toBeLessThan(4.5);
+    const onCard = readableTeamTextColor("#001030", "dark", "card");
+    expect(contrast(onCard, DARK_CARD_BG)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("defaults to the page background when no surface is given", () => {
+    expect(readableTeamTextColor("#001030", "dark")).toBe(
+      readableTeamTextColor("#001030", "dark", "background"),
+    );
   });
 });
