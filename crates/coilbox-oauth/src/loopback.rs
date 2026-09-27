@@ -1,10 +1,13 @@
 //! The loopback listener the browser is redirected back to, per RFC 8252.
 
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinSet;
+use tokio::time::Instant;
 use url::Url;
 
 use crate::AuthError;
@@ -215,7 +218,12 @@ impl Loopback {
     /// can arrive more than once, for example when the Discord desktop app follows
     /// the redirect and then hands it to the browser, and a second arrival that
     /// found the port closed would show "refused to connect" over a sign-in that
-    /// worked. See [`linger`] for what it answers.
+    /// worked. See [`Callback::answer`] for what it answers then.
+    ///
+    /// Every connection is served in its own task, before the code and after it,
+    /// so a socket that opens and sends nothing cannot hold up the one behind it
+    /// (#3213). The tasks live in a [`JoinSet`] owned alongside the listener, so
+    /// they all end when the listener closes.
     pub async fn wait_for_code(
         self,
         state: &str,
@@ -223,117 +231,181 @@ impl Loopback {
         grace: Duration,
     ) -> Result<String, AuthError> {
         let listener = self.listener;
-        let wait = async {
-            loop {
-                let (mut sock, _) = listener
-                    .accept()
-                    .await
-                    .map_err(|e| AuthError::Listener(e.to_string()))?;
-                let bad_request = page(Tone::Failed, "Bad request", TRY_AGAIN);
-                let Some(target) = read_target(&mut sock).await else {
-                    respond(&mut sock, "400 Bad Request", &bad_request).await;
-                    continue;
-                };
-                // The target is a path, so it needs any origin to parse as a URL.
-                // Ours is the one it arrived on.
-                let Ok(url) = Url::parse(&format!("http://127.0.0.1{target}")) else {
-                    respond(&mut sock, "400 Bad Request", &bad_request).await;
-                    continue;
-                };
-                if url.path() != CALLBACK_PATH {
-                    let body = page(Tone::Failed, "Not found", "You can close this window.");
-                    respond(&mut sock, "404 Not Found", &body).await;
-                    continue;
-                }
-                let params: HashMap<String, String> = url.query_pairs().into_owned().collect();
-
-                if let Some(error) = params.get("error") {
-                    let body = page(Tone::Failed, "Sign-in did not finish", TRY_AGAIN);
-                    respond(&mut sock, "200 OK", &body).await;
-                    return Err(AuthError::Denied {
-                        error: error.clone(),
-                        description: params.get("error_description").cloned(),
-                    });
-                }
-
-                if params.get("state").map(String::as_str) != Some(state) {
-                    let body = page(Tone::Failed, "Sign-in refused", NOT_OURS);
-                    respond(&mut sock, "400 Bad Request", &body).await;
-                    return Err(AuthError::StateMismatch);
-                }
-
-                let Some(code) = params.get("code").filter(|c| !c.is_empty()) else {
-                    let body = page(Tone::Failed, "Sign-in did not finish", TRY_AGAIN);
-                    respond(&mut sock, "400 Bad Request", &body).await;
-                    return Err(AuthError::BadCallback("no code".into()));
-                };
-                let code = code.clone();
-                let body = page(Tone::Done, "Signed in", "You can close this window.");
-                respond(&mut sock, "200 OK", &body).await;
-                return Ok(code);
-            }
+        let callback = Arc::new(Callback {
+            state: state.to_owned(),
+            phase: Mutex::new(Phase::Waiting),
+        });
+        let mut conns = JoinSet::new();
+        let deadline = Instant::now() + timeout;
+        let code = match serve_until(&listener, &mut conns, &callback, deadline).await {
+            Some(result) => result?,
+            None => return Err(AuthError::TimedOut),
         };
-        let code = match tokio::time::timeout(timeout, wait).await {
-            Ok(result) => result?,
-            Err(_) => return Err(AuthError::TimedOut),
-        };
-        tokio::spawn(linger(listener, state.to_owned(), grace));
+        tokio::spawn(async move {
+            let deadline = Instant::now() + grace;
+            let _ = serve_until(&listener, &mut conns, &callback, deadline).await;
+            // The listener and every connection task drop here, which releases the
+            // port.
+        });
         Ok(code)
     }
 }
 
-/// Keep answering on the callback port for `grace` after the code was taken, then
-/// close it.
+/// What a connection's task hands back: the end of the wait if its request
+/// settled the sign-in, or nothing.
+type Outcome = Option<Result<String, AuthError>>;
+
+/// Accept connections until one settles the sign-in or `deadline` passes, serving
+/// each in its own task in `conns`.
 ///
-/// Nothing that arrives here is acted on. A callback carrying our `state` is a
-/// copy of the redirect that already finished, so it gets the signed in page.
-/// Anything else on the callback path gets the refused page, and every other path
-/// the not found page. All three are fixed text, so nothing from the query is
-/// echoed and a second code goes nowhere.
-///
-/// Each connection is served in its own task under the same deadline, so a
-/// browser that opens a socket and sends nothing cannot hold up the next request
-/// or keep the port open past `grace`.
-async fn linger(listener: TcpListener, state: String, grace: Duration) {
-    let deadline = tokio::time::Instant::now() + grace;
-    let state: std::sync::Arc<str> = state.into();
+/// Returns the settling result, an error if accepting fails, or `None` at the
+/// deadline. Finished tasks are reaped as it goes, so a stream of connections
+/// does not pile up in `conns`.
+async fn serve_until(
+    listener: &TcpListener,
+    conns: &mut JoinSet<Outcome>,
+    callback: &Arc<Callback>,
+    deadline: Instant,
+) -> Outcome {
     let serve = async {
-        while let Ok((mut sock, _)) = listener.accept().await {
-            let state = state.clone();
-            tokio::spawn(tokio::time::timeout_at(deadline, async move {
-                let (status, body) = match read_target(&mut sock)
-                    .await
-                    .and_then(|target| Url::parse(&format!("http://127.0.0.1{target}")).ok())
-                {
-                    None => (
-                        "400 Bad Request",
-                        page(Tone::Failed, "Bad request", TRY_AGAIN),
-                    ),
-                    Some(url) if url.path() != CALLBACK_PATH => (
-                        "404 Not Found",
-                        page(Tone::Failed, "Not found", "You can close this window."),
-                    ),
-                    Some(url)
-                        if url
-                            .query_pairs()
-                            .any(|(key, value)| key == "state" && *value == *state) =>
-                    {
-                        (
-                            "200 OK",
-                            page(Tone::Done, "Signed in", "You can close this window."),
-                        )
+        loop {
+            tokio::select! {
+                accepted = listener.accept() => match accepted {
+                    Ok((sock, _)) => {
+                        conns.spawn(serve(sock, Arc::clone(callback)));
                     }
-                    Some(_) => (
-                        "400 Bad Request",
-                        page(Tone::Failed, "Sign-in refused", NOT_OURS),
-                    ),
-                };
-                respond(&mut sock, status, &body).await;
-            }));
+                    Err(e) => return Some(Err(AuthError::Listener(e.to_string()))),
+                },
+                Some(joined) = conns.join_next() => {
+                    if let Ok(Some(result)) = joined {
+                        return Some(result);
+                    }
+                }
+            }
         }
     };
-    // The listener drops when this returns, which releases the port.
-    let _ = tokio::time::timeout_at(deadline, serve).await;
+    tokio::time::timeout_at(deadline, serve)
+        .await
+        .unwrap_or(None)
+}
+
+/// Read one request, answer it, and hand back what it settled, if anything.
+///
+/// The page is written before the outcome is handed back, because the wait
+/// closes the listener and every connection task as soon as it has an error.
+async fn serve(mut sock: TcpStream, callback: Arc<Callback>) -> Outcome {
+    // The target is a path, so it needs any origin to parse as a URL. Ours is the
+    // one it arrived on.
+    let url = read_target(&mut sock)
+        .await
+        .and_then(|target| Url::parse(&format!("http://127.0.0.1{target}")).ok());
+    let (status, body, outcome) = match url {
+        None => (
+            "400 Bad Request",
+            page(Tone::Failed, "Bad request", TRY_AGAIN),
+            None,
+        ),
+        Some(url) if url.path() != CALLBACK_PATH => (
+            "404 Not Found",
+            page(Tone::Failed, "Not found", "You can close this window."),
+            None,
+        ),
+        Some(url) => callback.answer(&url),
+    };
+    respond(&mut sock, status, &body).await;
+    outcome
+}
+
+/// Where the sign-in stands, shared by every connection's task.
+enum Phase {
+    /// No callback has settled it yet.
+    Waiting,
+    /// A callback carried our `state` and a code, and the code was handed back.
+    SignedIn,
+    /// A callback settled it with an error.
+    Failed,
+}
+
+/// The sign-in every connection answers for.
+struct Callback {
+    state: String,
+    phase: Mutex<Phase>,
+}
+
+impl Callback {
+    /// Answer a request to [`CALLBACK_PATH`] with a status, a page and what it
+    /// settled.
+    ///
+    /// Only the first callback to arrive while [`Phase::Waiting`] settles anything.
+    /// The phase moves on under the same lock, so exactly one outcome is ever
+    /// handed back, whichever order the connections finish reading in.
+    ///
+    /// A callback carrying the wrong `state` is refused rather than ignored.
+    /// Ignoring it would leave the real browser able to finish, but it would also
+    /// mean a process on this machine could keep guessing without us ever noticing.
+    ///
+    /// Once the code is taken nothing is acted on. A callback carrying our `state`
+    /// is a copy of the redirect that already finished, so it gets the signed in
+    /// page, and anything else gets the refused page. Every page is fixed text, so
+    /// nothing from the query is echoed and a second code goes nowhere.
+    fn answer(&self, url: &Url) -> (&'static str, String, Outcome) {
+        let params: HashMap<String, String> = url.query_pairs().into_owned().collect();
+        let ours = params.get("state") == Some(&self.state);
+        let mut phase = self.phase.lock().unwrap_or_else(|e| e.into_inner());
+        match *phase {
+            Phase::SignedIn if ours => (
+                "200 OK",
+                page(Tone::Done, "Signed in", "You can close this window."),
+                None,
+            ),
+            Phase::SignedIn => (
+                "400 Bad Request",
+                page(Tone::Failed, "Sign-in refused", NOT_OURS),
+                None,
+            ),
+            Phase::Failed => (
+                "400 Bad Request",
+                page(Tone::Failed, "Sign-in did not finish", TRY_AGAIN),
+                None,
+            ),
+            Phase::Waiting => {
+                let (status, body, result) = if let Some(error) = params.get("error") {
+                    (
+                        "200 OK",
+                        page(Tone::Failed, "Sign-in did not finish", TRY_AGAIN),
+                        Err(AuthError::Denied {
+                            error: error.clone(),
+                            description: params.get("error_description").cloned(),
+                        }),
+                    )
+                } else if !ours {
+                    (
+                        "400 Bad Request",
+                        page(Tone::Failed, "Sign-in refused", NOT_OURS),
+                        Err(AuthError::StateMismatch),
+                    )
+                } else if let Some(code) = params.get("code").filter(|c| !c.is_empty()) {
+                    (
+                        "200 OK",
+                        page(Tone::Done, "Signed in", "You can close this window."),
+                        Ok(code.clone()),
+                    )
+                } else {
+                    (
+                        "400 Bad Request",
+                        page(Tone::Failed, "Sign-in did not finish", TRY_AGAIN),
+                        Err(AuthError::BadCallback("no code".into())),
+                    )
+                };
+                *phase = if result.is_ok() {
+                    Phase::SignedIn
+                } else {
+                    Phase::Failed
+                };
+                (status, body, Some(result))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -453,6 +525,59 @@ mod tests {
         assert!(second.contains("Signed in"), "{second}");
     }
 
+    /// #3213. Before the code arrives, a local connection that sends nothing used
+    /// to hold up the browser's callback until the whole wait timed out.
+    #[tokio::test]
+    async fn a_silent_connection_does_not_hold_up_the_callback() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let timeout = Duration::from_secs(5);
+        let wait = tokio::spawn(loopback.wait_for_code("real-state", timeout, Duration::ZERO));
+
+        let _silent = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let response = tokio::time::timeout(
+            timeout / 5,
+            request(port, "/oauth2callback?code=the-code&state=real-state"),
+        )
+        .await
+        .expect("a silent socket held up the callback");
+        assert!(response.contains("Signed in"), "{response}");
+        let code = tokio::time::timeout(timeout / 5, wait)
+            .await
+            .expect("the code did not come back after the callback was answered")
+            .unwrap()
+            .unwrap();
+        assert_eq!(code, "the-code");
+    }
+
+    /// A connection opened before the code arrived, whose request only comes in
+    /// after, is answered as a copy of the finished sign-in. Its code goes nowhere.
+    #[tokio::test]
+    async fn a_request_that_straddles_the_code_is_answered_but_not_acted_on() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        ));
+
+        let mut early = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        request(port, "/oauth2callback?code=the-code&state=real-state").await;
+        assert_eq!(wait.await.unwrap().unwrap(), "the-code");
+
+        early
+            .write_all(b"GET /oauth2callback?code=another-code&state=real-state HTTP/1.1\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf = Vec::new();
+        early.read_to_end(&mut buf).await.unwrap();
+        let response = String::from_utf8_lossy(&buf);
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+        assert!(response.contains("Signed in"), "{response}");
+        assert!(!response.contains("another-code"), "{response}");
+    }
+
     /// After the code is taken, a callback that is not a copy of ours is told it
     /// was refused, and nothing it carried comes back in the page.
     #[tokio::test]
@@ -505,6 +630,27 @@ mod tests {
         assert!(
             TcpStream::connect(("127.0.0.1", port)).await.is_err(),
             "port {port} is still accepting after the grace window"
+        );
+    }
+
+    /// A callback that ends the sign-in with an error closes the port straight
+    /// away, with no grace window, even with a silent connection held open.
+    #[tokio::test]
+    async fn the_port_is_released_as_soon_as_the_sign_in_fails() {
+        let loopback = Loopback::bind().await.unwrap();
+        let port = Url::parse(loopback.redirect_uri()).unwrap().port().unwrap();
+        let wait = tokio::spawn(loopback.wait_for_code(
+            "real-state",
+            Duration::from_secs(5),
+            Duration::from_secs(5),
+        ));
+        let _silent = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let response = request(port, "/oauth2callback?code=a-code&state=guessed-state").await;
+        assert!(response.contains("Sign-in refused"), "{response}");
+        assert!(matches!(wait.await.unwrap(), Err(AuthError::StateMismatch)));
+        assert!(
+            TcpStream::connect(("127.0.0.1", port)).await.is_err(),
+            "port {port} is still accepting after the sign-in failed"
         );
     }
 
