@@ -41,6 +41,25 @@ use crate::archive::MapArchives;
 use crate::ffi::{MapAppearance, Unitsync};
 use crate::infocache;
 
+/// A line printed as a library walk goes, so a walk of hundreds of maps is not
+/// four silent seconds (or, on the maintainer's own library, forty eight of
+/// them: see the module doc on `walk`). The plugin reads these off stdout and
+/// forwards them to the webview, the same way `--convert-3do`'s do.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Progress {
+    done: usize,
+    total: usize,
+}
+
+/// Print one progress line. A whole JSON object per line, so the reader can
+/// tell a progress line from the final result by the key it carries.
+fn report(progress: Progress) {
+    if let Ok(line) = serde_json::to_string(&serde_json::json!({ "progress": progress })) {
+        println!("{line}");
+    }
+}
+
 /// What a density sample is worth on a map that says nothing about it, from
 /// `CMapInfo::ReadGlobal`. The engine's default rather than coilbox's choice.
 const ENGINE_DEFAULT_MAX_METAL: f32 = 0.02;
@@ -516,8 +535,10 @@ pub fn walk(
     let archives = MapArchives::index(&us);
     let _ = us.drain_errors();
 
+    let total = wanted.len();
+    report(Progress { done: 0, total });
     let mut maps = Vec::with_capacity(wanted.len());
-    for (index, map_name) in wanted {
+    for (step, (index, map_name)) in wanted.into_iter().enumerate() {
         let read = if keys_only {
             source_in_session(&us, index, &map_name, Some(&archives), cache_dir).map(|source| {
                 MapCatalogRow {
@@ -543,6 +564,10 @@ pub fn walk(
             Ok(row) => maps.push(row),
             Err(reason) => skipped.push(MapCatalogSkipped { map_name, reason }),
         }
+        report(Progress {
+            done: step + 1,
+            total,
+        });
     }
 
     errors.extend(us.drain_errors());

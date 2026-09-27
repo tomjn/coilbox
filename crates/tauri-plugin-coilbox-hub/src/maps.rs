@@ -134,6 +134,21 @@ struct MapHaveBody {
     results: Vec<MapHaveResult>,
 }
 
+/// One progress sample from a batched map call: the have check or the
+/// submission, reported after every request it makes rather than once at the
+/// end (issue #3147). A library's worth of maps is several chunked requests
+/// under `have_keys`/`submit_maps`, and a caller that only hears about the
+/// first and the last cannot tell those requests from one long silent one.
+///
+/// Flat and camelCase over a `tauri::ipc::Channel`, the same shape
+/// `AssetUploadProgress` is.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapBatchProgress {
+    pub done: usize,
+    pub total: usize,
+}
+
 /// What the hub did with one map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -188,10 +203,14 @@ struct MapSubmitBody {
 /// machine, and is the reason this takes an argument it never reads. It is asked
 /// for here rather than only at the submission because this is the first call the
 /// path makes, the same way [`crate::have::have`] is for pictures.
+///
+/// `on_progress` is called after every request the have check makes, not once
+/// at the end: see [`MapBatchProgress`].
 pub async fn have_maps(
     hub_url: &str,
     keys: &[MapHaveKey],
     _consent: &AssetUploadConsent,
+    on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapHaveResult>, String> {
     if keys.is_empty() {
         return Ok(Vec::new());
@@ -205,23 +224,31 @@ pub async fn have_maps(
         .await
         .map_err(|e| auth::explain(&e, hub_url))?;
 
-    have_in_batches(&url, &token, keys).await
+    have_in_batches(&url, &token, keys, on_progress).await
 }
 
 /// Split the keys into requests the hub will accept and join the answers back
 /// up.
 ///
 /// One client for all of them, so a library of three thousand maps reuses the
-/// connection rather than paying a fresh TLS handshake six times.
+/// connection rather than paying a fresh TLS handshake six times. Reports after
+/// every request, so a caller waiting on the whole set sees it move in six
+/// batches rather than sitting at zero until they all land.
 async fn have_in_batches(
     url: &str,
     token: &str,
     keys: &[MapHaveKey],
+    on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapHaveResult>, String> {
     let client = json_client()?;
     let mut answers = Vec::with_capacity(keys.len());
+    let total = keys.len();
     for batch in keys.chunks(caps().have_keys) {
         answers.extend(ask(&client, url, token, batch).await?);
+        on_progress(MapBatchProgress {
+            done: answers.len(),
+            total,
+        });
     }
     Ok(answers)
 }
@@ -308,10 +335,14 @@ async fn ask(
 /// call have already landed, and their results are lost with the error, which is
 /// the cost of not inventing a shape for a partial failure the caller has no
 /// decision to make about.
+///
+/// `on_progress` is called after every request the submission makes, not once at
+/// the end: see [`MapBatchProgress`].
 pub async fn publish_maps(
     hub_url: &str,
     entries: &[MapCatalogEntry],
     _consent: &AssetUploadConsent,
+    on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapSubmitResult>, String> {
     if entries.is_empty() {
         return Ok(Vec::new());
@@ -325,7 +356,7 @@ pub async fn publish_maps(
         .await
         .map_err(|e| auth::explain(&e, hub_url))?;
 
-    publish_in_batches(&url, &token, entries).await
+    publish_in_batches(&url, &token, entries, on_progress).await
 }
 
 /// Build the batches and send them, writing each answer back where its entry
@@ -333,29 +364,38 @@ pub async fn publish_maps(
 ///
 /// Two caps, and both are the hub's own. A batch fills up on maps or on bytes,
 /// whichever comes first, because fifty entries are small until one carries a
-/// description and six hundred metal spots.
+/// description and six hundred metal spots. Reports after every request, so a
+/// batch of a hundred and thirty four maps moves in several steps rather than
+/// jumping from nothing sent to all of them.
 async fn publish_in_batches(
     url: &str,
     token: &str,
     entries: &[MapCatalogEntry],
+    on_progress: &(dyn Fn(MapBatchProgress) + Send + Sync),
 ) -> Result<Vec<MapSubmitResult>, String> {
     let client = json_client()?;
     let mut results: Vec<Option<MapSubmitResult>> = vec![None; entries.len()];
     let mut batch: Vec<(usize, &MapCatalogEntry)> = Vec::new();
     let mut batch_bytes = 0usize;
+    let total = entries.len();
+    let mut done = 0usize;
 
     for (index, entry) in entries.iter().enumerate() {
         let size = match measure(entry) {
             Ok(size) => size,
             Err(said) => {
                 results[index] = Some(refused_locally(entry, said));
+                done += 1;
+                on_progress(MapBatchProgress { done, total });
                 continue;
             }
         };
         let full = batch.len() >= caps().submit_maps
             || (!batch.is_empty() && batch_bytes + size > body_budget());
         if full {
+            done += batch.len();
             send_batch(&client, url, token, &batch, &mut results).await?;
+            on_progress(MapBatchProgress { done, total });
             batch.clear();
             batch_bytes = 0;
         }
@@ -363,7 +403,9 @@ async fn publish_in_batches(
         batch_bytes += size;
     }
     if !batch.is_empty() {
+        done += batch.len();
         send_batch(&client, url, token, &batch, &mut results).await?;
+        on_progress(MapBatchProgress { done, total });
     }
 
     // Every index was either sent and answered, or refused before it was sent.
@@ -563,6 +605,9 @@ mod tests {
         api_url(&hub.base(), SUBMIT_PATH, "Sending").unwrap()
     }
 
+    /// For a test that has nothing to say about batch progress.
+    fn no_progress(_: MapBatchProgress) {}
+
     // ------------------------------------------------------------------ shape
 
     /// The body the hub is sent, by the names `parseMapHaveBody` insists on. It
@@ -712,6 +757,7 @@ mod tests {
             "https://hub.example",
             &[key("", "src-a")],
             &AssetUploadConsent::for_test(),
+            &no_progress,
         )
         .await
         .unwrap_err();
@@ -721,15 +767,25 @@ mod tests {
     #[tokio::test]
     async fn an_empty_set_asks_nobody() {
         assert_eq!(
-            have_maps("http://hub.example", &[], &AssetUploadConsent::for_test())
-                .await
-                .unwrap(),
+            have_maps(
+                "http://hub.example",
+                &[],
+                &AssetUploadConsent::for_test(),
+                &no_progress
+            )
+            .await
+            .unwrap(),
             Vec::new()
         );
         assert_eq!(
-            publish_maps("http://hub.example", &[], &AssetUploadConsent::for_test())
-                .await
-                .unwrap(),
+            publish_maps(
+                "http://hub.example",
+                &[],
+                &AssetUploadConsent::for_test(),
+                &no_progress
+            )
+            .await
+            .unwrap(),
             Vec::new()
         );
     }
@@ -759,7 +815,7 @@ mod tests {
             older,
         ];
 
-        let answers = have_in_batches(&have_url(&hub), "a-token", &keys)
+        let answers = have_in_batches(&have_url(&hub), "a-token", &keys, &no_progress)
             .await
             .unwrap();
 
@@ -787,7 +843,7 @@ mod tests {
             .collect();
         let hub = MapHubServer::holding(&[]);
 
-        let answers = have_in_batches(&have_url(&hub), "a-token", &keys)
+        let answers = have_in_batches(&have_url(&hub), "a-token", &keys, &no_progress)
             .await
             .unwrap();
 
@@ -796,12 +852,53 @@ mod tests {
         assert_eq!(answers[1199].map_name, "Map 1199");
     }
 
+    /// The whole point of #3147: a caller watching `on_progress` sees the count
+    /// move after every request the have check makes, not once at the end.
+    #[tokio::test]
+    async fn have_progress_reports_after_every_batch_rather_than_only_at_the_end() {
+        let keys: Vec<MapHaveKey> = (0..1200)
+            .map(|n| key(&format!("Map {n}"), "src-a"))
+            .collect();
+        let hub = MapHubServer::holding(&[]);
+        let seen: std::sync::Mutex<Vec<MapBatchProgress>> = std::sync::Mutex::new(Vec::new());
+
+        have_in_batches(&have_url(&hub), "a-token", &keys, &|sample| {
+            seen.lock().unwrap().push(sample);
+        })
+        .await
+        .unwrap();
+
+        let seen = seen.into_inner().unwrap();
+        assert_eq!(
+            seen,
+            vec![
+                MapBatchProgress {
+                    done: 500,
+                    total: 1200
+                },
+                MapBatchProgress {
+                    done: 1000,
+                    total: 1200
+                },
+                MapBatchProgress {
+                    done: 1200,
+                    total: 1200
+                },
+            ]
+        );
+    }
+
     #[tokio::test]
     async fn the_token_goes_out_as_a_bearer_header() {
         let hub = MapHubServer::holding(&[]);
-        have_in_batches(&have_url(&hub), "a-token", &[key("Isis 1.3", "src-a")])
-            .await
-            .unwrap();
+        have_in_batches(
+            &have_url(&hub),
+            "a-token",
+            &[key("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap();
         assert!(hub.last_headers().contains("authorization: bearer a-token"));
     }
 
@@ -825,7 +922,7 @@ mod tests {
             entry("Nuclear Winter 1.2", "src-d"),
         ];
 
-        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries)
+        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries, &no_progress)
             .await
             .unwrap();
 
@@ -855,7 +952,7 @@ mod tests {
             .chain((0..9).map(|n| entry(&format!("Map {n}"), "src-a")))
             .collect();
 
-        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries)
+        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries, &no_progress)
             .await
             .unwrap();
 
@@ -873,7 +970,7 @@ mod tests {
             .collect();
         let hub = MapHubServer::holding(&[]);
 
-        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries)
+        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries, &no_progress)
             .await
             .unwrap();
 
@@ -881,6 +978,43 @@ mod tests {
         assert_eq!(results.len(), 120);
         assert_eq!(results[119].map_name, "Map 119");
         assert_eq!(hub.submitted().len(), 120);
+    }
+
+    /// The submission's half of the same claim: progress moves after every batch
+    /// the hub answers, matching the sizes `a_batch_larger_than_the_map_cap_is_split_and_every_part_is_sent`
+    /// already checks the requests are split into.
+    #[tokio::test]
+    async fn publish_progress_reports_after_every_batch_rather_than_only_at_the_end() {
+        let entries: Vec<MapCatalogEntry> = (0..120)
+            .map(|n| entry(&format!("Map {n}"), "src-a"))
+            .collect();
+        let hub = MapHubServer::holding(&[]);
+        let seen: std::sync::Mutex<Vec<MapBatchProgress>> = std::sync::Mutex::new(Vec::new());
+
+        publish_in_batches(&submit_url(&hub), "a-token", &entries, &|sample| {
+            seen.lock().unwrap().push(sample);
+        })
+        .await
+        .unwrap();
+
+        let seen = seen.into_inner().unwrap();
+        assert_eq!(
+            seen,
+            vec![
+                MapBatchProgress {
+                    done: 50,
+                    total: 120
+                },
+                MapBatchProgress {
+                    done: 100,
+                    total: 120
+                },
+                MapBatchProgress {
+                    done: 120,
+                    total: 120
+                },
+            ]
+        );
     }
 
     /// The second cap, and the reason it exists: fifty entries are small until
@@ -894,7 +1028,7 @@ mod tests {
             .collect();
         let hub = MapHubServer::holding(&[]);
 
-        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries)
+        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries, &no_progress)
             .await
             .unwrap();
 
@@ -926,7 +1060,7 @@ mod tests {
             entry("Tabula 3", "src-b"),
         ];
 
-        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries)
+        let results = publish_in_batches(&submit_url(&hub), "a-token", &entries, &no_progress)
             .await
             .unwrap();
 
@@ -957,7 +1091,7 @@ mod tests {
         let hub = MapHubServer::misordering();
         let keys = [key("Isis 1.3", "src-a"), key("Tabula 3", "src-b")];
 
-        let refused = have_in_batches(&have_url(&hub), "a-token", &keys)
+        let refused = have_in_batches(&have_url(&hub), "a-token", &keys, &no_progress)
             .await
             .unwrap_err();
 
@@ -971,9 +1105,14 @@ mod tests {
             200,
             serde_json::json!({ "format": HAVE_FORMAT, "version": 1, "results": [] }),
         );
-        let refused = have_in_batches(&have_url(&hub), "a-token", &[key("Isis 1.3", "src-a")])
-            .await
-            .unwrap_err();
+        let refused = have_in_batches(
+            &have_url(&hub),
+            "a-token",
+            &[key("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(refused.contains("answered 0 of 1"), "{refused}");
     }
 
@@ -983,10 +1122,14 @@ mod tests {
             200,
             serde_json::json!({ "format": SUBMIT_FORMAT, "version": 2, "results": [] }),
         );
-        let refused =
-            publish_in_batches(&submit_url(&hub), "a-token", &[entry("Isis 1.3", "src-a")])
-                .await
-                .unwrap_err();
+        let refused = publish_in_batches(
+            &submit_url(&hub),
+            "a-token",
+            &[entry("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(refused.contains("Update coilbox"), "{refused}");
     }
 
@@ -995,9 +1138,14 @@ mod tests {
     #[tokio::test]
     async fn something_that_is_not_a_hub_is_not_read_as_an_answer() {
         let hub = MapHubServer::answering(200, serde_json::json!({ "results": [] }));
-        let refused = have_in_batches(&have_url(&hub), "a-token", &[key("Isis 1.3", "src-a")])
-            .await
-            .unwrap_err();
+        let refused = have_in_batches(
+            &have_url(&hub),
+            "a-token",
+            &[key("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(
             refused.contains("did not answer with a have check"),
             "{refused}"
@@ -1011,6 +1159,7 @@ mod tests {
             &have_url(&wrong_envelope),
             "a-token",
             &[key("Isis 1.3", "src-a")],
+            &no_progress,
         )
         .await
         .unwrap_err();
@@ -1027,10 +1176,14 @@ mod tests {
             401,
             serde_json::json!({ "error": "Send an access token as \"Authorization: Bearer <token>\"." }),
         );
-        let refused =
-            publish_in_batches(&submit_url(&hub), "a-token", &[entry("Isis 1.3", "src-a")])
-                .await
-                .unwrap_err();
+        let refused = publish_in_batches(
+            &submit_url(&hub),
+            "a-token",
+            &[entry("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(refused.contains("Sign in again"), "{refused}");
         assert_eq!(hub.submit_batches().len(), 1);
     }
@@ -1051,10 +1204,14 @@ mod tests {
             ),
         ]);
 
-        let results =
-            publish_in_batches(&submit_url(&hub), "a-token", &[entry("Isis 1.3", "src-a")])
-                .await
-                .unwrap();
+        let results = publish_in_batches(
+            &submit_url(&hub),
+            "a-token",
+            &[entry("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(results[0].outcome, MapSubmitOutcome::Stored);
         assert_eq!(hub.submit_batches().len(), 2);
@@ -1065,9 +1222,14 @@ mod tests {
     #[tokio::test]
     async fn a_hub_that_never_recovers_costs_three_requests() {
         let hub = MapHubServer::answering(503, serde_json::json!({ "error": "no" }));
-        let refused = have_in_batches(&have_url(&hub), "a-token", &[key("Isis 1.3", "src-a")])
-            .await
-            .unwrap_err();
+        let refused = have_in_batches(
+            &have_url(&hub),
+            "a-token",
+            &[key("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(refused.contains("refused"), "{refused}");
         assert_eq!(hub.have_batches().len(), UPLOAD_ATTEMPTS as usize);
     }
@@ -1080,10 +1242,14 @@ mod tests {
             400,
             serde_json::json!({ "error": "maps[3] Unknown field: sourceHash" }),
         );
-        let refused =
-            publish_in_batches(&submit_url(&hub), "a-token", &[entry("Isis 1.3", "src-a")])
-                .await
-                .unwrap_err();
+        let refused = publish_in_batches(
+            &submit_url(&hub),
+            "a-token",
+            &[entry("Isis 1.3", "src-a")],
+            &no_progress,
+        )
+        .await
+        .unwrap_err();
         assert!(refused.contains("Unknown field: sourceHash"), "{refused}");
     }
 

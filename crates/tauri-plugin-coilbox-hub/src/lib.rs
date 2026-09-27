@@ -279,17 +279,25 @@ async fn hub_upload_assets<R: Runtime>(
 /// Behind the same consent gate the pictures use. This spends the hub's request
 /// allowance as the signed-in account, and what it is asking about is what
 /// coilbox read off local archives, which is the thing the switch is about.
+///
+/// `on_progress` takes a sample after every request, so a library that costs six
+/// requests reports six times rather than sitting at zero until the last one
+/// lands (issue #3147).
 #[tauri::command]
 async fn hub_maps_have<R: Runtime>(
     app: AppHandle<R>,
     hub_url: String,
     keys: Vec<maps::MapHaveKey>,
+    on_progress: Channel<maps::MapBatchProgress>,
 ) -> CliResult {
     let consent = match consent::AssetUploadConsent::check(&app) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
-    match maps::have_maps(&hub_url, &keys, &consent).await {
+    let report = move |sample: maps::MapBatchProgress| {
+        let _ = on_progress.send(sample);
+    };
+    match maps::have_maps(&hub_url, &keys, &consent, &report).await {
         Ok(results) => CliResult::ok(json!({ "results": results })),
         Err(said) => CliResult::err(said),
     }
@@ -305,17 +313,24 @@ async fn hub_maps_have<R: Runtime>(
 /// Only `conflict` and `refused` are worth surfacing, and only as a count. A
 /// conflict is the interesting one: it means an archive on this machine differs
 /// from the one everybody else has under that name.
+///
+/// `on_progress` takes a sample after every request, for the reason
+/// `hub_maps_have`'s does.
 #[tauri::command]
 async fn hub_publish_maps<R: Runtime>(
     app: AppHandle<R>,
     hub_url: String,
     entries: Vec<coilbox_map_catalog::MapCatalogEntry>,
+    on_progress: Channel<maps::MapBatchProgress>,
 ) -> CliResult {
     let consent = match consent::AssetUploadConsent::check(&app) {
         Ok(consent) => consent,
         Err(refused) => return CliResult::err(refused),
     };
-    match maps::publish_maps(&hub_url, &entries, &consent).await {
+    let report = move |sample: maps::MapBatchProgress| {
+        let _ = on_progress.send(sample);
+    };
+    match maps::publish_maps(&hub_url, &entries, &consent, &report).await {
         Ok(results) => CliResult::ok(json!({ "results": results })),
         Err(said) => CliResult::err(said),
     }
