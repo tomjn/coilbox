@@ -4,15 +4,18 @@ import {
   describeItem,
   fetchHubGames,
   fetchHubItems,
+  fetchHubMapPacks,
   HUB_KINDS,
   hubGamesUrl,
   hubItemsUrl,
   hubItemUrl,
+  hubMapPacksUrl,
   kindLabelPlural,
   kindsPlural,
   readGamesBody,
   readItemBody,
   readItemsBody,
+  readMapPacksBody,
 } from "./api";
 
 const BASE = "https://hub.example";
@@ -349,6 +352,108 @@ describe("fetchHubGames", () => {
     });
     const result = await fetchHubGames(BASE);
     expect(result).toEqual({ ok: true, value: [A_GAME] });
+  });
+});
+
+function mapPacksBody(packs: unknown[] = []) {
+  return {
+    format: "coilbox-hub-map-packs",
+    version: 1,
+    packs,
+  };
+}
+
+const A_MAP_PACK = {
+  id: "bar-classics",
+  title: "BAR classics",
+  blurb: "The maps everyone plays",
+  featured: true,
+  maps: [
+    {
+      id: "isis",
+      title: "Isis",
+      download: { kind: "map", springName: "Isis 1.3" },
+    },
+  ],
+};
+
+describe("hubMapPacksUrl", () => {
+  it("builds the map packs listing address", () => {
+    expect(hubMapPacksUrl(BASE)).toBe(`${BASE}/api/v1/map-packs`);
+  });
+
+  it("keeps a hub served under a path prefix working", () => {
+    expect(hubMapPacksUrl("https://example.com/hub/")).toBe(
+      "https://example.com/hub/api/v1/map-packs",
+    );
+  });
+});
+
+describe("readMapPacksBody", () => {
+  it("reads a listing", () => {
+    const result = readMapPacksBody(mapPacksBody([A_MAP_PACK]));
+    expect(result).toEqual({ ok: true, value: [A_MAP_PACK] });
+  });
+
+  it("reads an empty listing as no packs, not a failure", () => {
+    const result = readMapPacksBody(mapPacksBody([]));
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+
+  it("refuses a version this build predates", () => {
+    const result = readMapPacksBody({ ...mapPacksBody(), version: 2 });
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).toContain("newer than this copy");
+  });
+
+  it("refuses a response that is not the hub's map packs route at all", () => {
+    const result = readMapPacksBody({ hello: "world" });
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) expect(result.reason).toContain("not a coilbox hub");
+  });
+
+  it("refuses a listing whose packs are missing", () => {
+    const result = readMapPacksBody({ ...mapPacksBody(), packs: undefined });
+    expect(result).toMatchObject({ ok: false });
+  });
+});
+
+describe("fetchHubMapPacks", () => {
+  it("names the host when the hub cannot be reached", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Failed to fetch");
+      }),
+    );
+    const result = await fetchHubMapPacks(BASE);
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) {
+      expect(result.reason).toContain("hub.example");
+      expect(result.reason).toContain("waking up");
+    }
+  });
+
+  // The route does not exist on the hub yet (issue #3143), so a live hub
+  // answers this with its ordinary 404 for an unknown path until it does.
+  it("reads a 404 as no packs to offer, not a crash", async () => {
+    stubFetch({
+      ok: false,
+      status: 404,
+      json: async () => ({ error: "not found" }),
+    });
+    const result = await fetchHubMapPacks(BASE);
+    expect(result).toMatchObject({ ok: false });
+  });
+
+  it("returns the packs on a good response", async () => {
+    stubFetch({
+      ok: true,
+      status: 200,
+      json: async () => mapPacksBody([A_MAP_PACK]),
+    });
+    const result = await fetchHubMapPacks(BASE);
+    expect(result).toEqual({ ok: true, value: [A_MAP_PACK] });
   });
 });
 

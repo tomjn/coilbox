@@ -209,4 +209,21 @@ describe("mergeMapLists", () => {
     expect(merged.map((l) => l.id)).toEqual(["dup", "extra"]);
     expect(merged[0].maps[0].id).toBe("cat");
   });
+
+  /** `MapPacksBanner` folds in a third source, the hub's featured packs, by
+   * nesting two calls rather than widening this function's signature. A pack
+   * the hub publishes under the same id as a branding catalog pack must lose
+   * to the catalog's, the same way a profile pack already does. */
+  it("folds a third, hub, source in behind catalog and profile", () => {
+    const catalog = [list("dup", [mapEntry({ id: "cat" })])];
+    const profile = [list("profile-only")];
+    const hub = [list("dup", [mapEntry({ id: "hub" })]), list("hub-only")];
+    const merged = mergeMapLists(mergeMapLists(catalog, profile), hub);
+    expect(merged.map((l) => l.id)).toEqual([
+      "dup",
+      "profile-only",
+      "hub-only",
+    ]);
+    expect(merged[0].maps[0].id).toBe("cat");
+  });
 });

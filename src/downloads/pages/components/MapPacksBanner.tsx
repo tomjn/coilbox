@@ -1,6 +1,7 @@
 import { ChevronRight, Layers } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { type SuggestedMap, useSuggestedMapLists } from "@/content/branding";
+import { useFeaturedHubMapPacks } from "@/hub/maps/mapPacks";
 import { getProfileMapLists } from "@/profile/profile";
 import {
   mergeMapLists,
@@ -14,12 +15,20 @@ import { MapPacksDrawer } from "./MapPacksDrawer";
 type ThumbSource = { filename: string; thumb?: string };
 
 /**
- * Curated map packs (from the branding catalog and/or the distribution profile),
- * shown as a single banner that opens a drawer. The drawer lists each pack's maps
- * with per-map status and a "Download all"; every download goes through the shared
- * queue, which dedupes and runs serially. The banner counts only packs with maps
- * still to fetch, so fully-downloaded packs stop drawing the eye but stay
- * reviewable inside. Renders nothing when no packs are defined.
+ * Curated map packs - from the branding catalog, the distribution profile, and
+ * the hub's featured packs (issue #3143) - shown as a single banner that opens
+ * a drawer. The drawer lists each pack's maps with per-map status and a
+ * "Download all", every download goes through the shared queue, which dedupes
+ * and runs serially. The banner counts only packs with maps still to fetch, so
+ * fully-downloaded packs stop drawing the eye but stay reviewable inside.
+ * Renders nothing when no packs are defined.
+ *
+ * The branding catalog and profile are merged first and win any `id` clash, so
+ * a hub pack can never shadow a pack coilbox itself curated. The hub's own
+ * pack ids are only ever a fallback. A hub that is unreachable, cold, or has
+ * nothing featured this week resolves to an empty list from
+ * `useFeaturedHubMapPacks` rather than an error, so this banner never shows a
+ * wall of red where the branding catalog's packs used to be alone.
  *
  * Used both on the Downloads > Maps page (above the browsable grid, with the loaded
  * remote list as `items` for opportunistic thumbnails) and on the welcome card
@@ -35,7 +44,11 @@ export function MapPacksBanner({
   items?: ThumbSource[];
 }) {
   const catalogLists = useSuggestedMapLists();
-  const packs = mergeMapLists(catalogLists, getProfileMapLists());
+  const hubLists = useFeaturedHubMapPacks();
+  const packs = mergeMapLists(
+    mergeMapLists(catalogLists, getProfileMapLists()),
+    hubLists,
+  );
   const [open, setOpen] = useState(false);
 
   // Opportunistic thumbnails: reuse a passed-in list's remote preview for any pack
