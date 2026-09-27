@@ -1,3 +1,4 @@
+import { useTheme } from "@picoframe/frame";
 import { useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -23,6 +24,7 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/lib/format";
+import { readableTeamTextColor } from "@/lib/teamColor";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import {
   allySeries,
@@ -253,6 +255,12 @@ function EndLabels({ points }: { points: EndPoint[] }) {
   const xScale = useXAxisScale();
   const yScale = useYAxisScale();
   const plot = usePlotArea();
+  // The chart sits on the card background (`bg-card` on the wrapping div
+  // below), the closest of the two backgrounds `readableTeamTextColor`
+  // assumes to what's actually behind this text, so its fixed light/dark
+  // split applies here too. Only the label text is adjusted, never the line
+  // or leader.
+  const { resolved: theme } = useTheme();
   if (!xScale || !yScale || !plot) return null;
 
   const placed = points
@@ -285,7 +293,13 @@ function EndLabels({ points }: { points: EndPoint[] }) {
                 opacity={0.6}
               />
             )}
-            <text x={p.x + 6} y={p.y} dy={4} fill={p.color} fontSize={11}>
+            <text
+              x={p.x + 6}
+              y={p.y}
+              dy={4}
+              fill={readableTeamTextColor(p.color, theme)}
+              fontSize={11}
+            >
               {clip(p.label)}
             </text>
           </g>
