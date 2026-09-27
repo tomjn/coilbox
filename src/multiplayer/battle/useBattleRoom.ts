@@ -281,6 +281,8 @@ export interface BattleRoomView {
   canKick: boolean;
   /** Whether we may appoint and stand down bosses in this lobby. */
   canBoss: boolean;
+  /** Whether we are a boss of this (Tachyon) lobby ourselves. */
+  iAmBoss: boolean;
   /** Whether we may change the map: the founder, or a boss of a Tachyon lobby. */
   canChangeMap: boolean;
   /** Host controls over another member (self-hosted battles only, no-op otherwise). */
@@ -1286,6 +1288,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     serverAssignsSeat,
     canKick,
     canBoss,
+    iAmBoss,
     canChangeMap,
     target,
     targetLoading,

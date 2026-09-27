@@ -185,7 +185,7 @@ export function MapCard({
       </MinimapPreview>
 
       <div className="mt-3">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           <h2 className="min-w-0 truncate text-sm font-semibold">
             {map?.name ?? (mapsLoading ? "Loading maps…" : "No map selected")}
           </h2>

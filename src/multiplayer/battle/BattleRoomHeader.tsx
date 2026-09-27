@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Link as LinkIcon, Lock, LogOut, Play } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
@@ -25,8 +26,10 @@ import { inviteLink } from "@/direct/invite";
 import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
+import { linkifyTitle } from "./linkifyTitle";
 import { SyncStatusPill } from "./SyncStatusPill";
 import { startAnywayWarning } from "./startBlockers";
+import { startButtonLabel } from "./startButtonLabel";
 
 /**
  * The battle room's top bar: the battle name (replacing the singleplayer
@@ -59,6 +62,7 @@ export function BattleRoomHeader({
   onLeave,
   onStart,
   selfHost,
+  canStartDirectly,
   closesRoom,
   locked,
   onToggleLock,
@@ -82,6 +86,9 @@ export function BattleRoomHeader({
   onLeave: () => void;
   onStart: () => void;
   selfHost: boolean;
+  /** Whether the click actually starts the match rather than asking the room
+   * to vote on it: the founder, or a Tachyon lobby's boss (issue #3198). */
+  canStartDirectly: boolean;
   /** Whether closing this battle takes down the LAN room it is in as well, which
    * is what the confirmation has to promise (issue #2057). */
   closesRoom: boolean;
@@ -153,11 +160,14 @@ export function BattleRoomHeader({
             ? "The match is already running"
             : !allReady
               ? "All players must be ready first"
-              : (startWarning ?? "Ask the autohost to start the match")
+              : (startWarning ??
+                (canStartDirectly
+                  ? "Ask the autohost to start the match"
+                  : "Ask the room to vote on starting the match"))
       }
     >
       <Play className="size-4 fill-current" />
-      {hostIngame ? "In game" : "Start"}
+      {hostIngame ? "In game" : startButtonLabel(canStartDirectly)}
     </Button>
   );
 
@@ -165,7 +175,27 @@ export function BattleRoomHeader({
     <header className="flex items-center justify-between gap-4 border-b border-border p-4">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <h1 className="break-words text-lg font-semibold">
-          {battle.title || `Battle ${battle.id}`}
+          {battle.title
+            ? linkifyTitle(battle.title).map((part, i) =>
+                part.url ? (
+                  <a
+                    // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived fresh from the title on every render and never reorder
+                    key={i}
+                    href={part.url}
+                    className="underline"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      openUrl(part.url as string).catch(() => {});
+                    }}
+                  >
+                    {part.text}
+                  </a>
+                ) : (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: parts are derived fresh from the title on every render and never reorder
+                  <span key={i}>{part.text}</span>
+                ),
+              )
+            : `Battle ${battle.id}`}
         </h1>
         {/* "Out of sync" on its own leaves the player hunting. Name the thing,
             but never on a green pill, where the label collapses into a tooltip
