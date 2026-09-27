@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { ChevronUp, Percent, StickyNote } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -9,6 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Side } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
@@ -21,9 +28,11 @@ import {
   orderedAis,
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
+import { NoteButton } from "../NoteButton";
 import { useConnection } from "../store";
+import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
-import { type MemberControls, MemberRow } from "./MemberRow";
+import { MemberActionsMenu, type MemberControls, MemberRow } from "./MemberRow";
 
 // A stable empty set for a room with no connection behind it.
 const NO_NAMES: ReadonlySet<string> = new Set();
@@ -159,6 +168,64 @@ export function BattleMembersTable({
   const ownsABot = rows.some((r) => r.kind === "bot" && r.owner === me);
   const showActions = selfHost || ownsABot || canKick || canBoss;
 
+  // The host controls other members: humans get force/kick, bots get
+  // team/ally edits (UPDATEBOT) plus removal, MemberRow keeps a bot's colour
+  // read-only, so onForceColor/onForceSpectator stay no-ops. Our own row
+  // stays the self-editable path. Outside a battle we host, we still control
+  // the bots we added. Shared between the player table and the compact
+  // spectator list (#3194) below it.
+  const controlFor = (row: Row): MemberControls | null => {
+    if (row.kind === "human" && !row.self && (selfHost || canKick)) {
+      return {
+        // Only a host forces another member's seat. Tachyon has no such
+        // command, so a member there gets the menu for the lobby-scoped
+        // actions alone.
+        onForceTeam: selfHost
+          ? (t) => hostControls.forceTeam(row.name, t)
+          : undefined,
+        onForceAlly: selfHost
+          ? (a) => hostControls.forceAlly(row.name, a)
+          : undefined,
+        onForceColor: selfHost
+          ? (c) => hostControls.forceColor(row.name, c)
+          : undefined,
+        onForceSpectator: selfHost
+          ? () => hostControls.forceSpectator(row.name)
+          : undefined,
+        onKick: () => hostControls.kick(row.name),
+        onAppointBoss:
+          canBoss && !row.boss
+            ? () => hostControls.appointBoss(row.name)
+            : undefined,
+        onUnboss:
+          canBoss && row.boss ? () => hostControls.unboss(row.name) : undefined,
+      };
+    }
+    if (row.kind === "bot" && (selfHost || row.owner === me)) {
+      return {
+        // Tachyon's bot update carries the AI, the name and the bot's
+        // options, and nothing about where it sits, so a bot's seat is the
+        // server's there. Zero-K sits between: its update carries an ally
+        // team but no team number, which nothing on that protocol has.
+        onForceTeam: serverAssignsSeat
+          ? undefined
+          : (t) => hostControls.updateBot(row.name, { teamId: t }),
+        onForceAlly: canSetBotAlly
+          ? (a) => hostControls.updateBot(row.name, { ally: a })
+          : undefined,
+        onKick: () => hostControls.removeBot(row.name),
+        onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
+      };
+    }
+    return null;
+  };
+
+  // Spectators get a compact list below the table instead of a full row
+  // (#3194): their Faction/Team/Ally cells are always empty, so a room with
+  // more spectators than players was mostly dashes.
+  const players = rows.filter((r) => !r.spectator);
+  const spectators = rows.filter((r) => r.spectator);
+
   const slots = Math.max(2, Math.min(maxSlots || 0, 16));
   // First seated member per team, in row order: the "leader" whose colour marks
   // the team in the picker, and whom later members of the same team visually
@@ -171,9 +238,8 @@ export function BattleMembersTable({
   // joined, and everyone else would be badged as their co-player.
   const leaderByTeamId = new Map<number, Row>();
   if (!serverAssignsSeat) {
-    for (const r of rows) {
-      if (!r.spectator && !leaderByTeamId.has(r.teamId))
-        leaderByTeamId.set(r.teamId, r);
+    for (const r of players) {
+      if (!leaderByTeamId.has(r.teamId)) leaderByTeamId.set(r.teamId, r);
     }
   }
   const showFaction = showsFactionColumn(sides);
@@ -183,13 +249,10 @@ export function BattleMembersTable({
   // a team belongs to exactly one ally team, and it is the ally column that
   // says who is with whom.
   const showTeam = !serverAssignsSeat;
-  // Group rows by team so shared teams sit together; spectators sink to the
-  // bottom. Stable, so join order is kept within a team (leader stays first).
-  const displayOrder = [...rows].sort(
-    (a, b) =>
-      (a.spectator ? Number.MAX_SAFE_INTEGER : a.teamId) -
-      (b.spectator ? Number.MAX_SAFE_INTEGER : b.teamId),
-  );
+  // Group players by team so shared teams sit together. Stable, so join order
+  // is kept within a team (leader stays first). Spectators are listed
+  // separately below, not in this table (#3194).
+  const displayOrder = [...players].sort((a, b) => a.teamId - b.teamId);
   const sideOptions = sides.map((s: Side, i) => {
     const logo = factionLogos?.[s.name.toLowerCase()];
     return {
@@ -201,12 +264,11 @@ export function BattleMembersTable({
     };
   });
   // Offer only as many teams as there are seated members (like the skirmish
-  // table) rather than every battle slot — but never drop a team number someone
+  // table) rather than every battle slot, but never drop a team number someone
   // already holds, so the select always has its current value.
-  const seated = rows.filter((r) => !r.spectator);
   const teamSlots = Math.min(
     slots,
-    Math.max(seated.length, ...seated.map((r) => r.teamId + 1), 1),
+    Math.max(players.length, ...players.map((r) => r.teamId + 1), 1),
   );
   const teamOptions = range(teamSlots).map((i) => {
     const leader = leaderByTeamId.get(i);
@@ -258,91 +320,69 @@ export function BattleMembersTable({
       <div className="max-h-[50vh] overflow-auto">
         <Table className="border-collapse">
           <TableHeader className="sticky top-0 z-10 bg-card">
-            <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
-              <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                Ready
-              </TableHead>
-              <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Player
-              </TableHead>
-              {showFaction && (
+            <TooltipProvider>
+              <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
+                <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  Ready
+                </TableHead>
+                <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                  Player
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <ChevronUp className="size-3.5" aria-hidden />
+                      <span className="sr-only">Rank</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Rank</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <StickyNote className="size-3.5" aria-hidden />
+                      <span className="sr-only">Note</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Private note</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <Percent className="size-3.5" aria-hidden />
+                      <span className="sr-only">Bonus</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Resource bonus</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                {showFaction && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    Faction
+                  </TableHead>
+                )}
+                {showTeam && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    Team
+                  </TableHead>
+                )}
                 <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Faction
+                  Ally
                 </TableHead>
-              )}
-              {showTeam && (
-                <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Team
-                </TableHead>
-              )}
-              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Ally
-              </TableHead>
-              {showActions && (
-                <TableHead className="px-2 pb-2 pt-3">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              )}
-            </TableRow>
+                {showActions && (
+                  <TableHead className="px-2 pb-2 pt-3">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
+              </TableRow>
+            </TooltipProvider>
           </TableHeader>
           <TableBody>
-            {displayOrder.map((row) => {
+            {displayOrder.map((row, index) => {
               // A seated row whose team is led by an earlier row: it shows the
               // branch glyph / Co-player badge instead of duplicated controls.
-              const leader = row.spectator
-                ? undefined
-                : leaderByTeamId.get(row.teamId);
+              const leader = leaderByTeamId.get(row.teamId);
               const sharedWith = leader && leader !== row ? leader : undefined;
-              // The host controls other members: humans get force/kick, bots get
-              // team/ally edits (UPDATEBOT) plus removal — MemberRow keeps a bot's
-              // colour read-only, so onForceColor/onForceSpectator stay no-ops. Our
-              // own row stays the self-editable path. Outside a battle we host, we
-              // still control the bots we added.
-              let control: MemberControls | null = null;
-              if (row.kind === "human" && !row.self && (selfHost || canKick)) {
-                control = {
-                  // Only a host forces another member's seat. Tachyon has no
-                  // such command, so a member there gets the menu for the
-                  // lobby-scoped actions alone.
-                  onForceTeam: selfHost
-                    ? (t) => hostControls.forceTeam(row.name, t)
-                    : undefined,
-                  onForceAlly: selfHost
-                    ? (a) => hostControls.forceAlly(row.name, a)
-                    : undefined,
-                  onForceColor: selfHost
-                    ? (c) => hostControls.forceColor(row.name, c)
-                    : undefined,
-                  onForceSpectator: selfHost
-                    ? () => hostControls.forceSpectator(row.name)
-                    : undefined,
-                  onKick: () => hostControls.kick(row.name),
-                  onAppointBoss:
-                    canBoss && !row.boss
-                      ? () => hostControls.appointBoss(row.name)
-                      : undefined,
-                  onUnboss:
-                    canBoss && row.boss
-                      ? () => hostControls.unboss(row.name)
-                      : undefined,
-                };
-              } else if (row.kind === "bot" && (selfHost || row.owner === me)) {
-                control = {
-                  // Tachyon's bot update carries the AI, the name and the bot's
-                  // options, and nothing about where it sits, so a bot's seat is
-                  // the server's there. Zero-K sits between: its update carries
-                  // an ally team but no team number, which nothing on that
-                  // protocol has.
-                  onForceTeam: serverAssignsSeat
-                    ? undefined
-                    : (t) => hostControls.updateBot(row.name, { teamId: t }),
-                  onForceAlly: canSetBotAlly
-                    ? (a) => hostControls.updateBot(row.name, { ally: a })
-                    : undefined,
-                  onKick: () => hostControls.removeBot(row.name),
-                  onChangeAi: (ai) => hostControls.changeBotAi(row.name, ai),
-                };
-              }
+              const control = controlFor(row);
               // Defensive flag (#501): a bot whose AI isn't in this game's
               // addable list at all (a preset or hand-add from another game or
               // version) reads as invalid rather than as a normal bot.
@@ -360,6 +400,7 @@ export function BattleMembersTable({
                   aiInvalid={aiInvalid}
                   control={control}
                   sharedWith={sharedWith}
+                  striped={index % 2 === 1}
                   showActions={showActions}
                   serverAssignsSeat={serverAssignsSeat}
                   flashIngame={justWentIngame.has(row.name)}
@@ -396,10 +437,10 @@ export function BattleMembersTable({
                 />
               );
             })}
-            {rows.length === 0 && (
+            {players.length === 0 && (
               <TableRow className="border-border/40 hover:bg-transparent">
                 <TableCell
-                  colSpan={showActions ? 6 : 5}
+                  colSpan={showActions ? 9 : 8}
                   className="px-3 py-6 text-center text-sm text-muted-foreground"
                 >
                   Waiting for players…
@@ -409,6 +450,43 @@ export function BattleMembersTable({
           </TableBody>
         </Table>
       </div>
+
+      {spectators.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-border/40 px-3 py-2">
+          <span className="text-xs font-medium text-muted-foreground">
+            Spectating
+          </span>
+          {spectators.map((row) => {
+            const control = controlFor(row);
+            return (
+              <span
+                key={`${row.kind}:${row.name}`}
+                className="inline-flex items-center gap-1.5 rounded-md bg-muted/40 py-1 pl-2 pr-1 text-sm"
+              >
+                <span
+                  aria-hidden
+                  className="size-3 shrink-0 rounded-full border border-white/25"
+                  style={{ background: row.colorHex }}
+                />
+                {row.country && <CountryFlag country={row.country} />}
+                <span className={cn(row.self && "font-medium")}>
+                  {row.name}
+                </span>
+                {row.rank != null && <RankBadge rank={row.rank} />}
+                {row.kind === "human" && !row.self && onSetNote && (
+                  <NoteButton
+                    name={row.name}
+                    note={noteFor?.(row) ?? ""}
+                    onSave={(text) => onSetNote(row, text)}
+                    statsSummary={statsSummaryFor?.(row)}
+                  />
+                )}
+                {control && <MemberActionsMenu row={row} control={control} />}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {!canAddBot && botsRefused && (
         <div className="border-t border-border/40 p-2 text-xs text-muted-foreground">
