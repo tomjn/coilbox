@@ -146,7 +146,7 @@ export function StartBoxPresetsPopover({
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm">
           <LayoutGrid className="size-3.5" />
-          Presets
+          Box presets
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-3 text-xs">
