@@ -1,4 +1,8 @@
-import type { MapMinimapRow, MapMinimapsResult } from "@/content/bindings";
+import type {
+  MapMinimapRow,
+  MapMinimapSkip,
+  MapMinimapsResult,
+} from "@/content/bindings";
 import { unitsyncMapMinimaps } from "@/content/bindings";
 import { recordBackfillWrites, writesLeftNow } from "../assets/budget";
 import {
@@ -13,6 +17,7 @@ import {
   type HubSweepProgress,
   type HubSweepReport,
   type HubSweepTarget,
+  skipSummary,
 } from "../sweepFrame";
 
 /**
@@ -320,15 +325,70 @@ export const lastMapSweptAt = sweptAt.lastSweptAt;
 export const rememberMapSweptAt = sweptAt.rememberSweptAt;
 
 /**
+ * The order a map picture skip is worth mentioning in, and what to call it.
+ *
+ * `no-source` first, because a map with nothing to draw is the ordinary case
+ * (issue #2390): most maps that never get pictures fail here, and it is not
+ * worth dwelling on. The rest are worth naming, because each is coilbox
+ * finding a problem rather than a map simply having no picture: a duplicate
+ * install is worth knowing about on its own, and the others are failures a
+ * player has no other way to learn about.
+ */
+const MINIMAP_SKIP_ORDER: readonly MapMinimapSkip[] = [
+  "no-source",
+  "duplicate-map",
+  "working-folder",
+  "blank",
+  "no-extent",
+  "no-bounds",
+  "read-failed",
+  "encode-failed",
+  "too-large",
+  "not-written",
+];
+
+const MINIMAP_SKIP_CLAUSES: Record<MapMinimapSkip, string> = {
+  "no-source": "with no minimap to draw",
+  "duplicate-map": "listed twice in the library",
+  "working-folder": "in a loose working folder",
+  blank: "with a minimap that is one flat colour",
+  "no-extent": "whose size coilbox could not work out",
+  "no-bounds": "whose bounds coilbox could not read",
+  "read-failed": "coilbox could not read",
+  "encode-failed": "whose picture coilbox could not encode",
+  "too-large": "whose picture would be too large to send",
+  "not-written": "whose picture could not be saved",
+};
+
+/** What to tell somebody about the maps a sweep skipped, in one sentence, or
+ *  `null` when nothing was skipped. */
+export function mapPictureSkipSummary(
+  skipped: MapPictureSweepReport["skipped"],
+): string | null {
+  return skipSummary(skipped, MINIMAP_SKIP_ORDER, MINIMAP_SKIP_CLAUSES);
+}
+
+/**
  * What to tell somebody a sweep did, in one sentence.
  *
  * The number that matters is how many maps are still waiting, because that is
- * the one that says whether pressing the button again is worth anything.
+ * the one that says whether pressing the button again is worth anything. A
+ * skip account is appended when there is one, because "every map" is not true
+ * of a library that had any (issue #2390).
  */
 export function mapPictureSweepSummary(report: MapPictureSweepReport): string {
-  if (report.read === 0) return "Coilbox found no maps to draw.";
+  const skipNote = mapPictureSkipSummary(report.skipped);
+  const say = (sentence: string): string =>
+    skipNote ? `${sentence} ${skipNote}` : sentence;
+
+  if (report.read === 0) return say("Coilbox found no maps to draw.");
+  const whole = report.skipped.length === 0;
   if (report.wanted === 0) {
-    return "The hub already has a picture of every map on this computer.";
+    return say(
+      whole
+        ? "The hub already has a picture of every map on this computer."
+        : "The hub already has a picture of every map coilbox could draw one for.",
+    );
   }
   const sent =
     report.sent === 0
@@ -337,8 +397,14 @@ export function mapPictureSweepSummary(report: MapPictureSweepReport): string {
         ? "Sent one map's picture."
         : `Sent ${report.sent} maps' pictures.`;
   if (report.left === 0) {
-    return `${sent} The hub now has a picture of every map on this computer.`;
+    return say(
+      whole
+        ? `${sent} The hub now has a picture of every map on this computer.`
+        : `${sent} The hub now has a picture of every map coilbox could draw one for.`,
+    );
   }
   const maps = report.left === 1 ? "map is" : "maps are";
-  return `${sent} ${report.left} more ${maps} still waiting. Press it again later to carry on.`;
+  return say(
+    `${sent} ${report.left} more ${maps} still waiting. Press it again later to carry on.`,
+  );
 }
