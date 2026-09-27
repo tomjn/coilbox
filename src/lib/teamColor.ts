@@ -40,6 +40,22 @@ export function isBlackHex(hex: string): boolean {
   return channels(n).every((c) => c <= BLACK_MAX_CHANNEL);
 }
 
+/** `#rrggbb` -> HSL (h in 0..360, s/l in 0..1). Inverse of {@link hslToHex}. */
+function hexToHsl(hex: string): [number, number, number] {
+  const [r, g, b] = channels(hex).map((c) => c / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h: number;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return [h * 60, s, l];
+}
+
 /** HSL (h in 0..360, s/l in 0..1) -> `#rrggbb`. */
 function hslToHex(h: number, s: number, l: number): string {
   const c = (1 - Math.abs(2 * l - 1)) * s;
@@ -131,4 +147,100 @@ export function pickTeamColorHex(opts: {
     }
   }
   return best;
+}
+
+/**
+ * WCAG AA contrast floor for normal-size text (2.2 SC 1.4.3), used by
+ * {@link readableTeamTextColor}.
+ */
+const AA_CONTRAST = 4.5;
+
+/**
+ * The app's own background under this theme, matching picoframe's default
+ * `--background` in `theme.css` (light is white, dark is `hsl(240 6% 7%)`).
+ * `readableTeamTextColor` measures against these rather than `--card`,
+ * because neither `BattleChatCard` nor the chat hub's `ChatPane` paints a
+ * card background behind a name. Both sit directly on the page.
+ */
+const THEME_BACKGROUND_HEX: Record<"dark" | "light", string> = {
+  light: "#ffffff",
+  dark: hslToHex(240, 0.06, 0.07),
+};
+
+/** sRGB 0..255 channel -> linearised channel, for WCAG relative luminance. */
+function linearize(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+
+/** WCAG relative luminance of a validated `#rrggbb` colour. */
+function relativeLuminance(hex: string): number {
+  const [r, g, b] = channels(hex).map(linearize);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** WCAG contrast ratio (1..21) between two validated `#rrggbb` colours. */
+function contrastRatio(a: string, b: string): number {
+  const la = relativeLuminance(a);
+  const lb = relativeLuminance(b);
+  const lighter = Math.max(la, lb);
+  const darker = Math.min(la, lb);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+/** Lightness step the search below nudges by, fine enough that the result
+ * never lands short of {@link AA_CONTRAST} once rounded to the nearest hex
+ * channel. */
+const LIGHTNESS_STEP = 0.002;
+
+/** Memoises {@link readableTeamTextColor} by input, since a chat re-render
+ * calls it once per visible line and the search below is not free. */
+const readableCache = new Map<string, string>();
+
+/**
+ * A player's team colour, adjusted so its text reads at WCAG AA (4.5:1) on
+ * this theme's background: lightened on dark, darkened on light, hue and
+ * saturation untouched so the name still matches the player's swatch. A
+ * colour that already clears the bar is returned unchanged. Invalid input is
+ * returned as-is (callers already treat an unparsable colour as "no colour").
+ *
+ * Only for text. A swatch (e.g. `MemberList`'s dot) shows the real colour,
+ * because that is what the player sees in-game, per issue #3197.
+ */
+export function readableTeamTextColor(
+  rawHex: string,
+  theme: "dark" | "light",
+): string {
+  const hex = normalizeHex(rawHex);
+  if (!hex) return rawHex;
+  const cacheKey = `${theme}:${hex}`;
+  const cached = readableCache.get(cacheKey);
+  if (cached) return cached;
+
+  const bg = THEME_BACKGROUND_HEX[theme];
+  let result = hex;
+  if (contrastRatio(hex, bg) < AA_CONTRAST) {
+    const [h, s, l] = hexToHsl(hex);
+    if (theme === "dark") {
+      result = "#ffffff";
+      for (let candidateL = l; candidateL <= 1; candidateL += LIGHTNESS_STEP) {
+        const candidate = hslToHex(h, s, candidateL);
+        if (contrastRatio(candidate, bg) >= AA_CONTRAST) {
+          result = candidate;
+          break;
+        }
+      }
+    } else {
+      result = "#000000";
+      for (let candidateL = l; candidateL >= 0; candidateL -= LIGHTNESS_STEP) {
+        const candidate = hslToHex(h, s, candidateL);
+        if (contrastRatio(candidate, bg) >= AA_CONTRAST) {
+          result = candidate;
+          break;
+        }
+      }
+    }
+  }
+  readableCache.set(cacheKey, result);
+  return result;
 }

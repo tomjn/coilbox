@@ -4,7 +4,70 @@ import {
   normalizeHex,
   pickTeamColorHex,
   randomTeamColorHex,
+  readableTeamTextColor,
 } from "./teamColor";
+
+/** Independent re-implementation of WCAG contrast, so the test does not just
+ * re-run the production formula against itself. */
+function channelsOf(hex: string): [number, number, number] {
+  const n = Number.parseInt(hex.slice(1), 16);
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+function luminance(hex: string): number {
+  const linear = (c: number) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
+  const [r, g, b] = channelsOf(hex).map(linear);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+function contrast(a: string, b: string): number {
+  const la = luminance(a);
+  const lb = luminance(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+/** Hue only, 0..360, matching the standard RGB->HSL conversion. */
+function hueOf(hex: string): number {
+  const [r, g, b] = channelsOf(hex).map((c) => c / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  if (max === min) return 0;
+  const d = max - min;
+  let h: number;
+  if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+  else if (max === g) h = (b - r) / d + 2;
+  else h = (r - g) / d + 4;
+  return h * 60;
+}
+/** Same HSL->hex formula the production background constant is built from,
+ * so the test's background matches `readableTeamTextColor`'s exactly rather
+ * than an eyeballed guess. */
+function hslToHexForTest(h: number, s: number, l: number): string {
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  const rgb =
+    h < 60
+      ? [c, x, 0]
+      : h < 120
+        ? [x, c, 0]
+        : h < 180
+          ? [0, c, x]
+          : h < 240
+            ? [0, x, c]
+            : h < 300
+              ? [x, 0, c]
+              : [c, 0, x];
+  return `#${rgb
+    .map((v) =>
+      Math.round((v + m) * 255)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+const DARK_BG = hslToHexForTest(240, 0.06, 0.07);
+const LIGHT_BG = "#ffffff";
 
 describe("normalizeHex", () => {
   it("lowercases and prefixes a bare 6-digit hex", () => {
@@ -108,5 +171,40 @@ describe("pickTeamColorHex", () => {
     for (let i = 0; i < 50; i++) {
       expect(used).not.toContain(pickTeamColorHex({ used }));
     }
+  });
+});
+
+describe("readableTeamTextColor", () => {
+  it("lightens a dark navy on the dark theme until it clears 4.5:1", () => {
+    const adjusted = readableTeamTextColor("#001030", "dark");
+    expect(contrast(adjusted, DARK_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(hueOf(adjusted)).toBeCloseTo(hueOf("#001030"), 0);
+  });
+
+  it("darkens a pale yellow on the light theme until it clears 4.5:1", () => {
+    const adjusted = readableTeamTextColor("#ffffcc", "light");
+    expect(contrast(adjusted, LIGHT_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(hueOf(adjusted)).toBeCloseTo(hueOf("#ffffcc"), 0);
+  });
+
+  it("leaves a colour unchanged when it already clears the bar", () => {
+    // A saturated orange already reads at 4.5:1+ against the dark background.
+    const readable = "#ffa500";
+    expect(contrast(readable, DARK_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(readableTeamTextColor(readable, "dark")).toBe(readable);
+  });
+
+  it("preserves hue for a mid-tone colour that fails on both themes", () => {
+    const midBlue = "#3050a0";
+    const onDark = readableTeamTextColor(midBlue, "dark");
+    const onLight = readableTeamTextColor(midBlue, "light");
+    expect(contrast(onDark, DARK_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(onLight, LIGHT_BG)).toBeGreaterThanOrEqual(4.5);
+    expect(hueOf(onDark)).toBeCloseTo(hueOf(midBlue), 0);
+    expect(hueOf(onLight)).toBeCloseTo(hueOf(midBlue), 0);
+  });
+
+  it("passes through invalid input unchanged", () => {
+    expect(readableTeamTextColor("notacolor", "dark")).toBe("notacolor");
   });
 });
