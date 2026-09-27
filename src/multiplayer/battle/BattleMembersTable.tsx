@@ -1,4 +1,5 @@
 import { Button } from "@picoframe/frame";
+import { ChevronUp, Percent, StickyNote } from "lucide-react";
 import { useEffect, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -9,6 +10,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import type { Side } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
@@ -258,32 +265,61 @@ export function BattleMembersTable({
       <div className="max-h-[50vh] overflow-auto">
         <Table className="border-collapse">
           <TableHeader className="sticky top-0 z-10 bg-card">
-            <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
-              <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
-                Ready
-              </TableHead>
-              <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Player
-              </TableHead>
-              {showFaction && (
+            <TooltipProvider>
+              <TableRow className="text-[11px] uppercase tracking-wide text-muted-foreground border-border/40 hover:bg-transparent">
+                <TableHead className="px-3 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  Ready
+                </TableHead>
+                <TableHead className="w-full px-3 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                  Player
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <ChevronUp className="size-3.5" aria-hidden />
+                      <span className="sr-only">Rank</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Rank</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <StickyNote className="size-3.5" aria-hidden />
+                      <span className="sr-only">Note</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Private note</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="px-2 pb-2 pt-3 text-center font-medium text-muted-foreground">
+                  <Tooltip>
+                    <TooltipTrigger className="inline-flex items-center rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      <Percent className="size-3.5" aria-hidden />
+                      <span className="sr-only">Bonus</span>
+                    </TooltipTrigger>
+                    <TooltipContent>Resource bonus</TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                {showFaction && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    Faction
+                  </TableHead>
+                )}
+                {showTeam && (
+                  <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
+                    Team
+                  </TableHead>
+                )}
                 <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Faction
+                  Ally
                 </TableHead>
-              )}
-              {showTeam && (
-                <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                  Team
-                </TableHead>
-              )}
-              <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
-                Ally
-              </TableHead>
-              {showActions && (
-                <TableHead className="px-2 pb-2 pt-3">
-                  <span className="sr-only">Actions</span>
-                </TableHead>
-              )}
-            </TableRow>
+                {showActions && (
+                  <TableHead className="px-2 pb-2 pt-3">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
+                )}
+              </TableRow>
+            </TooltipProvider>
           </TableHeader>
           <TableBody>
             {displayOrder.map((row, index) => {
@@ -400,7 +436,7 @@ export function BattleMembersTable({
             {rows.length === 0 && (
               <TableRow className="border-border/40 hover:bg-transparent">
                 <TableCell
-                  colSpan={showActions ? 6 : 5}
+                  colSpan={showActions ? 9 : 8}
                   className="px-3 py-6 text-center text-sm text-muted-foreground"
                 >
                   Waiting for players…

@@ -283,7 +283,6 @@ export function MemberRow({
                 >
                   {row.name}
                 </span>
-                {row.rank != null && <RankBadge rank={row.rank} />}
                 <RatingBadge rating={row.rating} />
               </div>
               {canChangeAi && (
@@ -313,22 +312,36 @@ export function MemberRow({
               </span>
             )}
           </div>
-          {onSetNote && (
-            <NoteButton
-              name={row.name}
-              note={note ?? ""}
-              onSave={onSetNote}
-              statsSummary={statsSummary}
-            />
-          )}
-          {row.kind === "human" && onSetBonus && (
-            <BonusButton
-              name={row.name}
-              confirmed={row.handicap}
-              onSend={onSetBonus}
-            />
-          )}
         </div>
+      </TableCell>
+
+      {/* Rank, note and bonus each get their own narrow column (#3190) rather
+          than trailing the name, so they line up down the table instead of
+          starting at a different place on every row. Empty when a row has
+          nothing to show. */}
+      <TableCell className="px-2 py-2 text-center">
+        {row.rank != null && <RankBadge rank={row.rank} />}
+      </TableCell>
+
+      <TableCell className="px-2 py-2 text-center">
+        {onSetNote && (
+          <NoteButton
+            name={row.name}
+            note={note ?? ""}
+            onSave={onSetNote}
+            statsSummary={statsSummary}
+          />
+        )}
+      </TableCell>
+
+      <TableCell className="px-2 py-2 text-center">
+        {row.kind === "human" && onSetBonus && (
+          <BonusButton
+            name={row.name}
+            confirmed={row.handicap}
+            onSend={onSetBonus}
+          />
+        )}
       </TableCell>
 
       {showFaction && (
