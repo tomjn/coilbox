@@ -16,11 +16,7 @@ describe("skipSummary", () => {
 
   it("counts by reason in the order given, not the order skipped", () => {
     const said = skipSummary<Reason>(
-      [
-        { reason: "notable" },
-        { reason: "ordinary" },
-        { reason: "notable" },
-      ],
+      [{ reason: "notable" }, { reason: "ordinary" }, { reason: "notable" }],
       ["ordinary", "notable"],
       { ordinary: "for the ordinary reason", notable: "for the notable one" },
     );

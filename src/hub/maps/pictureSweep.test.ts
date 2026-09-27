@@ -4,9 +4,9 @@ import type { MapMinimapRow, MapMinimapsResult } from "@/content/bindings";
 import type { AssetKey, HaveResult } from "../assets/have";
 import {
   MAP_PICTURES_SUBJECT,
-  mapPictureSkipSummary,
   type MapPictureSweepProgress,
   type MapPictureSweepTools,
+  mapPictureSkipSummary,
   mapPictureSweepSummary,
   mapsTheHubHasNoPictureOf,
   minimapUpload,

@@ -301,9 +301,7 @@ describe("sweepSummary", () => {
       ...base,
       skipped: [{ mapName: "Old Working Copy", reason: "duplicate-map" }],
     });
-    expect(said).toContain(
-      "1 map was skipped: 1 listed twice in the library.",
-    );
+    expect(said).toContain("1 map was skipped: 1 listed twice in the library.");
   });
 });
 
