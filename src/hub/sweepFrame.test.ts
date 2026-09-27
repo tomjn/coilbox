@@ -1,6 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createSweptAtTracker } from "./sweepFrame";
+import { createSweptAtTracker, skipSummary } from "./sweepFrame";
+
+type Reason = "ordinary" | "notable";
+
+describe("skipSummary", () => {
+  it("is null when nothing was skipped", () => {
+    expect(
+      skipSummary<Reason>([], ["ordinary", "notable"], {
+        ordinary: "for the ordinary reason",
+        notable: "for the notable one",
+      }),
+    ).toBeNull();
+  });
+
+  it("counts by reason in the order given, not the order skipped", () => {
+    const said = skipSummary<Reason>(
+      [
+        { reason: "notable" },
+        { reason: "ordinary" },
+        { reason: "notable" },
+      ],
+      ["ordinary", "notable"],
+      { ordinary: "for the ordinary reason", notable: "for the notable one" },
+    );
+    expect(said).toBe(
+      "3 maps were skipped: 1 for the ordinary reason, 2 for the notable one.",
+    );
+  });
+
+  it("uses singular wording for one skip", () => {
+    const said = skipSummary<Reason>(
+      [{ reason: "ordinary" }],
+      ["ordinary", "notable"],
+      { ordinary: "for the ordinary reason", notable: "for the notable one" },
+    );
+    expect(said).toBe("1 map was skipped: 1 for the ordinary reason.");
+  });
+});
 
 /** The node test environment has no `localStorage`, so this is one. */
 function installStorage(seed: Record<string, string> = {}) {

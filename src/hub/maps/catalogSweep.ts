@@ -3,12 +3,14 @@ import type {
   MapCatalogEntry,
   MapCatalogProgress,
   MapCatalogResult,
+  MapCatalogSkip,
 } from "../../content/bindings";
 import { unitsyncMapCatalog } from "../../content/bindings";
-import type {
-  HubSweepProgress,
-  HubSweepReport,
-  HubSweepTarget,
+import {
+  type HubSweepProgress,
+  type HubSweepReport,
+  type HubSweepTarget,
+  skipSummary,
 } from "../sweepFrame";
 import {
   type MapSubmitOutcome,
@@ -232,25 +234,62 @@ export async function sweepMapCatalog(
 }
 
 /**
+ * The order a map catalog skip is worth mentioning in, and what to call it.
+ * There is no ordinary case here the way `no-source` is for a picture: every
+ * one of these is coilbox finding a problem with an archive rather than a map
+ * simply having nothing to offer.
+ */
+const CATALOG_SKIP_ORDER: readonly MapCatalogSkip[] = [
+  "no-archive-file",
+  "unreadable-archive",
+  "duplicate-map",
+  "no-extent",
+  "no-height-range",
+];
+
+const CATALOG_SKIP_CLAUSES: Record<MapCatalogSkip, string> = {
+  "no-archive-file": "whose archive file is missing",
+  "unreadable-archive": "whose archive coilbox could not read",
+  "duplicate-map": "listed twice in the library",
+  "no-extent": "whose size coilbox could not work out",
+  "no-height-range": "whose height range coilbox could not read",
+};
+
+/** What to tell somebody about the maps a sweep skipped, in one sentence, or
+ *  `null` when nothing was skipped. */
+export function catalogSkipSummary(
+  skipped: SweepReport["skipped"],
+): string | null {
+  return skipSummary(skipped, CATALOG_SKIP_ORDER, CATALOG_SKIP_CLAUSES);
+}
+
+/**
  * What to tell somebody a sweep did, in one sentence, or `null` when there is
  * nothing worth saying.
  *
  * A conflict is worded as what it means for this machine rather than as a hub
  * problem, because that is the more useful reading and the one nobody else can
- * tell them.
+ * tell them. A skip account is appended when there is one, since those maps
+ * were never asked about at all (issue #2390).
  */
 export function sweepSummary(report: SweepReport): string | null {
-  if (report.read === 0) return "Coilbox found no maps to read.";
+  const skipNote = catalogSkipSummary(report.skipped);
+  const say = (sentence: string): string =>
+    skipNote ? `${sentence} ${skipNote}` : sentence;
+
+  if (report.read === 0) return say("Coilbox found no maps to read.");
   const sent =
     report.sent === 0
       ? "The hub already had every map on this machine."
       : `Sent facts for ${report.sent} ${report.sent === 1 ? "map" : "maps"}.`;
-  if (report.refused === 0) return sent;
+  if (report.refused === 0) return say(sent);
   const conflicts = report.problems.filter(
     (problem) => problem.outcome === "conflict",
   ).length;
   if (conflicts === report.refused) {
-    return `${sent} ${conflicts} ${conflicts === 1 ? "map differs" : "maps differ"} from the version everyone else has under the same name, so ${conflicts === 1 ? "it" : "they"} would not match in a game.`;
+    return say(
+      `${sent} ${conflicts} ${conflicts === 1 ? "map differs" : "maps differ"} from the version everyone else has under the same name, so ${conflicts === 1 ? "it" : "they"} would not match in a game.`,
+    );
   }
-  return `${sent} The hub would not take ${report.refused} of them.`;
+  return say(`${sent} The hub would not take ${report.refused} of them.`);
 }

@@ -65,6 +65,38 @@ export interface HubSweepReport<Skipped> {
  * that cannot start. A write that fails is swallowed: the sweep still ran,
  * it just cannot say so next launch.
  */
+/**
+ * One sentence naming why a sweep skipped what it skipped (issue #2390).
+ *
+ * `order` and `clauses` are declared by the caller as an exhaustive `Record`
+ * over its own reason type, so a new reason added to the union fails to
+ * compile here until it is given a clause. `order` puts the ordinary reason
+ * first, since it is not worth dwelling on, and the ones worth knowing about
+ * after it.
+ *
+ * `null` when nothing was skipped, so a caller can leave it out of its
+ * summary rather than append an empty sentence.
+ */
+export function skipSummary<Reason extends string>(
+  skipped: readonly { reason: Reason }[],
+  order: readonly Reason[],
+  clauses: Record<Reason, string>,
+): string | null {
+  if (skipped.length === 0) return null;
+  const counts = new Map<Reason, number>();
+  for (const { reason } of skipped) {
+    counts.set(reason, (counts.get(reason) ?? 0) + 1);
+  }
+  const parts = order
+    .map((reason) => {
+      const n = counts.get(reason);
+      return n ? `${n} ${clauses[reason]}` : null;
+    })
+    .filter((part): part is string => part !== null);
+  const noun = skipped.length === 1 ? "map was" : "maps were";
+  return `${skipped.length} ${noun} skipped: ${parts.join(", ")}.`;
+}
+
 export function createSweptAtTracker(key: string): {
   lastSweptAt(): number | null;
   rememberSweptAt(now?: number): void;

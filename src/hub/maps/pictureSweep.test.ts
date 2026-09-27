@@ -4,6 +4,7 @@ import type { MapMinimapRow, MapMinimapsResult } from "@/content/bindings";
 import type { AssetKey, HaveResult } from "../assets/have";
 import {
   MAP_PICTURES_SUBJECT,
+  mapPictureSkipSummary,
   type MapPictureSweepProgress,
   type MapPictureSweepTools,
   mapPictureSweepSummary,
@@ -362,5 +363,63 @@ describe("what a sweep is reported as", () => {
         errors: [],
       }),
     ).toBe("Coilbox found no maps to draw.");
+  });
+
+  /// Follows on from #2379: the closing sentence claimed every map had a
+  /// picture, which was not true of a library that had any skips (#2390).
+  it("stops short of 'every map' once any were skipped", () => {
+    expect(
+      mapPictureSweepSummary({
+        read: 10,
+        wanted: 1,
+        sent: 1,
+        left: 0,
+        skipped: [{ mapName: "Empty Quarter", reason: "no-source" }],
+        errors: [],
+      }),
+    ).toContain("every map coilbox could draw one for");
+  });
+
+  it("still says 'every map' when nothing was skipped", () => {
+    expect(
+      mapPictureSweepSummary({
+        read: 10,
+        wanted: 1,
+        sent: 1,
+        left: 0,
+        skipped: [],
+        errors: [],
+      }),
+    ).toContain("every map on this computer");
+  });
+});
+
+describe("mapPictureSkipSummary", () => {
+  it("says nothing when nothing was skipped", () => {
+    expect(mapPictureSkipSummary([])).toBeNull();
+  });
+
+  /// A map with nothing to draw is the ordinary case (#2390), so it leads the
+  /// sentence rather than being singled out.
+  it("puts the ordinary reason first and names the rest", () => {
+    const said = mapPictureSkipSummary([
+      { mapName: "A", reason: "no-source" },
+      { mapName: "B", reason: "no-source" },
+      { mapName: "C", reason: "duplicate-map" },
+      { mapName: "D", reason: "working-folder" },
+    ]);
+    expect(said).toBe(
+      "4 maps were skipped: 2 with no minimap to draw, 1 listed twice in the library, 1 in a loose working folder.",
+    );
+  });
+
+  it("names a reason coilbox has no ordinary case for", () => {
+    const said = mapPictureSkipSummary([
+      { mapName: "A", reason: "blank" },
+      { mapName: "B", reason: "no-extent" },
+    ]);
+    expect(said).toBe(
+      "2 maps were skipped: 1 with a minimap that is one flat colour, 1 whose size coilbox could not work out.",
+    );
   });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MapCatalogEntry, MapCatalogResult } from "../../content/bindings";
 import type { MapHaveResult, MapSubmitResult } from "./catalog";
 import {
+  catalogSkipSummary,
   type SweepProgress,
   type SweepTools,
   sweepMapCatalog,
@@ -291,5 +292,34 @@ describe("sweepSummary", () => {
       ],
     });
     expect(said).toContain("would not take 2 of them");
+  });
+
+  /// Follow-up to #1737: a map skipped before the have check was never asked
+  /// about at all, so its absence deserves its own sentence (#2390).
+  it("appends the skip account when maps were skipped", () => {
+    const said = sweepSummary({
+      ...base,
+      skipped: [{ mapName: "Old Working Copy", reason: "duplicate-map" }],
+    });
+    expect(said).toContain(
+      "1 map was skipped: 1 listed twice in the library.",
+    );
+  });
+});
+
+describe("catalogSkipSummary", () => {
+  it("says nothing when nothing was skipped", () => {
+    expect(catalogSkipSummary([])).toBeNull();
+  });
+
+  it("names each reason", () => {
+    const said = catalogSkipSummary([
+      { mapName: "A", reason: "no-archive-file" },
+      { mapName: "B", reason: "unreadable-archive" },
+      { mapName: "C", reason: "no-height-range" },
+    ]);
+    expect(said).toBe(
+      "3 maps were skipped: 1 whose archive file is missing, 1 whose archive coilbox could not read, 1 whose height range coilbox could not read.",
+    );
   });
 });
