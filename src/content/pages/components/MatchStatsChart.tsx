@@ -256,10 +256,8 @@ function EndLabels({ points }: { points: EndPoint[] }) {
   const yScale = useYAxisScale();
   const plot = usePlotArea();
   // The chart sits on the card background (`bg-card` on the wrapping div
-  // below), the closest of the two backgrounds `readableTeamTextColor`
-  // assumes to what's actually behind this text, so its fixed light/dark
-  // split applies here too. Only the label text is adjusted, never the line
-  // or leader.
+  // below), so the label text (never the line or leader) is measured against
+  // that surface rather than the page.
   const { resolved: theme } = useTheme();
   if (!xScale || !yScale || !plot) return null;
 
@@ -297,7 +295,7 @@ function EndLabels({ points }: { points: EndPoint[] }) {
               x={p.x + 6}
               y={p.y}
               dy={4}
-              fill={readableTeamTextColor(p.color, theme)}
+              fill={readableTeamTextColor(p.color, theme, "card")}
               fontSize={11}
             >
               {clip(p.label)}
