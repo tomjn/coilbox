@@ -188,9 +188,15 @@ fn write_model(
         return Ok(out);
     }
     let json = serde_json::to_vec(&model).map_err(|e| format!("could not write {file}: {e}"))?;
+    let target = cache_dir.join(&file);
+    let tmp = cache_dir.join(format!("{file}.{}.tmp", std::process::id()));
     std::fs::create_dir_all(cache_dir)
-        .and_then(|()| std::fs::write(cache_dir.join(&file), &json))
-        .map_err(|e| format!("could not write {file}: {e}"))?;
+        .and_then(|()| std::fs::write(&tmp, &json))
+        .and_then(|()| std::fs::rename(&tmp, &target))
+        .map_err(|e| {
+            let _ = std::fs::remove_file(&tmp);
+            format!("could not write {file}: {e}")
+        })?;
     Ok(out)
 }
 
@@ -263,6 +269,26 @@ mod tests {
             std::fs::read_to_string(dir.join(&second.file)).unwrap(),
             "the first write"
         );
+    }
+
+    /// The write lands via a rename, so the final file holds the full content
+    /// and no temp file is left behind for a reader to trip over.
+    #[test]
+    fn a_model_write_leaves_no_temp_file_behind() {
+        let dir = temp_dir("atomic");
+        let mut written = BTreeSet::new();
+        let out = write_model(&dir, "abcd", model("objects3d/armcom.s3o"), &mut written).unwrap();
+
+        let raw = std::fs::read_to_string(dir.join(&out.file)).expect("the model file was written");
+        let back: serde_json::Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(back["path"], "objects3d/armcom.s3o");
+
+        let leftovers: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.file_name().to_string_lossy().contains(".tmp"))
+            .collect();
+        assert!(leftovers.is_empty(), "{leftovers:?}");
     }
 
     /// A unit whose model the archive does not hold is skipped and says so,

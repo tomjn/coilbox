@@ -309,7 +309,7 @@ fn serve_file(
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime)
                 .header(header::ACCEPT_RANGES, "bytes")
-                .header(header::CONTENT_LENGTH, len.to_string())
+                .header(header::CONTENT_LENGTH, bytes.len().to_string())
                 .header(header::CACHE_CONTROL, cache_control)
                 .header(header::ACCESS_CONTROL_ALLOW_ORIGIN, "*")
                 .body(Cow::Owned(bytes))
@@ -379,6 +379,30 @@ fn cache_control(root: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The header must match the body actually sent, not an earlier `metadata`
+    /// call, so a reader landing mid-rewrite of the file never gets a length
+    /// that disagrees with what it received.
+    #[test]
+    fn serve_file_content_length_matches_the_bytes_read() {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-asset-protocol-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("model.json");
+        std::fs::write(&path, b"hello world").unwrap();
+
+        let response = serve_file(&path, None, "no-cache");
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::CONTENT_LENGTH)
+                .and_then(|v| v.to_str().ok()),
+            Some(response.body().len().to_string()).as_deref()
+        );
+        assert_eq!(response.body().as_ref(), b"hello world");
+    }
 
     #[test]
     fn percent_decode_handles_escapes() {
