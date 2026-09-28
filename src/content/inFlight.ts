@@ -19,3 +19,24 @@ export function shareInFlight<T>(
   pending.set(key, read);
   return read;
 }
+
+/**
+ * `read`, or a rejection with `message` once `ms` have passed without it
+ * settling (issue #1916).
+ *
+ * A read shared by {@link shareInFlight} that never settles is worse than one
+ * that fails, because every later caller for the key is handed the same stuck
+ * promise, a retry included. Bounding it here means the shared read always
+ * ends, is forgotten, and the next ask starts a fresh one.
+ */
+export function settleWithin<T>(
+  read: Promise<T>,
+  ms: number,
+  message: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const limit = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([read, limit]).finally(() => clearTimeout(timer));
+}

@@ -5,18 +5,22 @@
  * test exercises the preview's own render, not a real scan or a real WebGL
  * canvas.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { UnitModelResult } from "../../bindings";
 
 let mockModel: UnitModelResult | null = null;
+let mockError: string | null = null;
+const retry = vi.fn();
 
 vi.mock("../../config", () => ({
   useUnitsyncUnitModel: () => ({
     model: mockModel,
     loading: false,
-    failed: false,
+    failed: mockError !== null,
+    error: mockError,
+    retry,
   }),
 }));
 
@@ -27,7 +31,11 @@ vi.mock("./ModelViewport", () => ({
 
 const { ArchiveModelPreview } = await import("./ArchiveModelPreview");
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  mockError = null;
+  retry.mockClear();
+});
 
 function modelFixture(format: "s3o" | "3do"): UnitModelResult {
   return {
@@ -83,5 +91,21 @@ describe("ArchiveModelPreview's open-in-the-builder button", () => {
     expect(
       screen.getByRole("button", { name: /open in the builder/i }),
     ).toBeTruthy();
+  });
+});
+
+// Issue #1916: a read that cannot finish must end in something the screen says,
+// with a way to ask again, rather than a loading line that never changes.
+describe("ArchiveModelPreview when the read fails", () => {
+  it("says why and reads again on Try again", () => {
+    mockError = "unitsync unit models timed out after 120s";
+    renderPreview("s3o");
+    expect(
+      screen.getByText(
+        "Could not read this model: unitsync unit models timed out after 120s.",
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });

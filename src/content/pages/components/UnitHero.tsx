@@ -15,6 +15,7 @@
 
 import type { UnitModelResult } from "@/content/bindings";
 import { countTriangles } from "../../unitModel";
+import { ModelReadFailed } from "./ModelReadFailed";
 import { ModelNotes, ModelViewport, Note } from "./ModelViewport";
 
 export function UnitHero({
@@ -22,12 +23,16 @@ export function UnitHero({
   model,
   loading,
   failed,
+  error,
+  onRetry,
   gameArchive,
 }: {
   object?: string;
   model: UnitModelResult | null;
   loading: boolean;
   failed: boolean;
+  error: string | null;
+  onRetry: () => void;
   gameArchive: string;
 }) {
   if (!object) {
@@ -48,7 +53,13 @@ export function UnitHero({
   }
   if (failed) {
     return (
-      <Note>Could not reach unitsync to read this unit&apos;s model.</Note>
+      <Note>
+        <ModelReadFailed
+          error={error}
+          fallback="Could not reach unitsync to read this unit's model."
+          onRetry={onRetry}
+        />
+      </Note>
     );
   }
   if (!model) return null;

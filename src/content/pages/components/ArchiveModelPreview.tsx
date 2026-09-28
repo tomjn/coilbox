@@ -22,6 +22,7 @@ import {
 } from "../../archiveModel";
 import { useUnitsyncUnitModel } from "../../config";
 import { countPieces, countTriangles, modelFormatLabel } from "../../unitModel";
+import { ModelReadFailed } from "./ModelReadFailed";
 import { ModelNotes, ModelViewport } from "./ModelViewport";
 import { Centered } from "./states";
 
@@ -51,7 +52,7 @@ export function ArchiveModelPreview({
   // message of floats, so a file that big would stall the window rather than
   // draw late.
   const tooLarge = modelTooLargeToPreview(size);
-  const { model, loading, failed } = useUnitsyncUnitModel(
+  const { model, loading, failed, error, retry } = useUnitsyncUnitModel(
     enginePath,
     dataDir,
     archive,
@@ -78,7 +79,15 @@ export function ArchiveModelPreview({
     return <Centered>Reading this model out of {archive}.</Centered>;
   }
   if (failed) {
-    return <Centered>Could not reach unitsync to read this model.</Centered>;
+    return (
+      <Centered>
+        <ModelReadFailed
+          error={error}
+          fallback="Could not reach unitsync to read this model."
+          onRetry={retry}
+        />
+      </Centered>
+    );
   }
   if (!model) return <Centered>Could not read this file.</Centered>;
 

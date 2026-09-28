@@ -38,6 +38,7 @@ import {
   modelTooLargeToPreview,
 } from "@/content/archiveModel";
 import { useUnitsyncArchiveFile, useUnitsyncUnitModel } from "@/content/config";
+import { ModelReadFailed } from "@/content/pages/components/ModelReadFailed";
 import { ModelViewport } from "@/content/pages/components/ModelViewport";
 import { builderOpenUrl, openableInBuilder } from "@/lego/archiveOpen";
 import { formatBytes } from "@/lib/format";
@@ -117,7 +118,7 @@ function ModelPreview({
   const [open, setOpen] = useState(false);
   const size = sizeOf(assets, member);
   const tooLarge = modelTooLargeToPreview(size);
-  const { model, loading, failed } = useUnitsyncUnitModel(
+  const { model, loading, failed, error, retry } = useUnitsyncUnitModel(
     assets.enginePath,
     assets.dataDir,
     assets.archive,
@@ -193,7 +194,11 @@ function ModelPreview({
           </span>
         ) : failed ? (
           <span className="text-[10px] text-muted-foreground">
-            Could not reach unitsync to read this model.
+            <ModelReadFailed
+              error={error}
+              fallback="Could not reach unitsync to read this model."
+              onRetry={retry}
+            />
           </span>
         ) : model?.root ? (
           <ModelViewport
