@@ -43,6 +43,14 @@ const WORKER_MISSING: &str =
 /// generous room. Cancellation (below) is the primary stop mechanism; this is a
 /// safety net against a wedged worker, not a normal-path limit.
 const SCAN_TIMEOUT: Duration = Duration::from_secs(300);
+/// A unit model read, one model or a batch (issue #1916).
+///
+/// The slowest read measured was 36.87s, one of 666 run sixteen at a time over
+/// XTA and Basically OTA. A whole roster in one batch took at most 2.96s
+/// (Zero-K), and a cold engine archive cache costs 23.4s on top once. This is a
+/// little over three times the slowest, so a read that gets here is stuck rather
+/// than slow, and the screen asking for it says so and offers a retry.
+const MODEL_TIMEOUT: Duration = Duration::from_secs(120);
 /// A single minimap is a fast, bounded operation.
 const MINIMAP_TIMEOUT: Duration = Duration::from_secs(30);
 /// REPL replay re-runs the whole session each eval, so its cost grows with
@@ -870,7 +878,7 @@ async fn unitsync_unit_model<R: Runtime>(
         cache_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit model", None).await
+    run_worker(bin, args, envs, MODEL_TIMEOUT, "unit model", None).await
 }
 
 /// `unitsync_unit_script`: find and read one unit's animation script inside a
@@ -945,7 +953,7 @@ async fn unitsync_unit_models<R: Runtime>(
         &cache_dir.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit models", None).await;
+    let out = run_worker(bin, args, envs, MODEL_TIMEOUT, "unit models", None).await;
     let _ = std::fs::remove_file(&units_file);
     out
 }

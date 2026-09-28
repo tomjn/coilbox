@@ -16,7 +16,7 @@ use libloading::{Library, Symbol};
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uint};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // --- C ABI signatures (reused across same-shaped symbols) -------------------
 
@@ -169,6 +169,8 @@ fn read_chunked_field(
 /// kept alive in `_lib` so the copied function pointers stay valid.
 pub struct Unitsync {
     _lib: Library,
+    /// The lock file `init` and `uninit` hold, one per engine. See `initlock`.
+    init_lock: PathBuf,
     init_fn: InitFn,
     uninit_fn: VoidFn,
     get_next_error_fn: StrFn,
@@ -409,6 +411,7 @@ impl Unitsync {
             set_spring_config_int_fn: opt(&lib, b"SetSpringConfigInt\0"),
             set_spring_config_float_fn: opt(&lib, b"SetSpringConfigFloat\0"),
             spring_config_file_fn: opt(&lib, b"GetSpringConfigFile\0"),
+            init_lock: crate::initlock::path_for(libpath),
             _lib: lib,
         };
         Ok(us)
@@ -416,11 +419,19 @@ impl Unitsync {
 
     /// `Init(isServer, id)` — returns nonzero on success. Must be called before
     /// any enumeration.
+    ///
+    /// Held under the engine's init lock, because `Init` reads the archive cache
+    /// and rewrites it in place, and a read that overlaps another worker's
+    /// rewrite rescans archives for seconds (issue #1916).
     pub fn init(&self, is_server: bool, id: i32) -> i32 {
+        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
         unsafe { (self.init_fn)(is_server, id) }
     }
 
+    /// `UnInit`, under the same lock as `init`, because it writes the archive
+    /// cache again when anything worked out a checksum.
     pub fn uninit(&self) {
+        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
         unsafe { (self.uninit_fn)() }
     }
 

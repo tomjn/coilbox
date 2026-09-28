@@ -24,6 +24,7 @@ import type {
 import { unitsyncUnitRender } from "../../bindings";
 import { useUnitsyncUnitModel } from "../../config";
 import { countPieces, countTriangles, modelFormatLabel } from "../../unitModel";
+import { ModelReadFailed } from "./ModelReadFailed";
 import { ModelNotes, ModelViewport, Note } from "./ModelViewport";
 
 interface Props {
@@ -56,7 +57,7 @@ export function UnitModelPanel({
   hideTitle,
 }: Props) {
   const object = unit?.objectName?.trim();
-  const { model, loading, failed } = useUnitsyncUnitModel(
+  const { model, loading, failed, error, retry } = useUnitsyncUnitModel(
     enginePath,
     dataDir,
     gameArchive,
@@ -95,6 +96,8 @@ export function UnitModelPanel({
         model={model}
         loading={loading}
         failed={failed}
+        error={error}
+        onRetry={retry}
         gameArchive={gameArchive}
       />
 
@@ -123,12 +126,16 @@ function Body({
   model,
   loading,
   failed,
+  error,
+  onRetry,
   gameArchive,
 }: {
   object?: string;
   model: UnitModelResult | null;
   loading: boolean;
   failed: boolean;
+  error: string | null;
+  onRetry: () => void;
   gameArchive: string;
 }) {
   if (!object) {
@@ -148,7 +155,15 @@ function Body({
     );
   }
   if (failed) {
-    return <Note>Could not reach unitsync to read this unit's model.</Note>;
+    return (
+      <Note>
+        <ModelReadFailed
+          error={error}
+          fallback="Could not reach unitsync to read this unit's model."
+          onRetry={onRetry}
+        />
+      </Note>
+    );
   }
   if (!model) return null;
 

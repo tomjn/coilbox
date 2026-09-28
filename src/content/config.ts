@@ -68,7 +68,7 @@ import {
 } from "./bindings";
 import { liveCacheHit } from "./cachedFile";
 import { engineLabel, newestEngineId } from "./engineVersion";
-import { shareInFlight } from "./inFlight";
+import { settleWithin, shareInFlight } from "./inFlight";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { readCachedModel } from "./modelFile";
 import { deriveSetup } from "./setup";
@@ -766,6 +766,15 @@ export function invalidateUnitDataset(
   unitDatasetCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
 }
 
+/**
+ * How long a model read may take before the screen asking for it stops waiting
+ * and offers a retry (issue #1916). The same limit as the worker's
+ * `MODEL_TIMEOUT` in the unitsync plugin, where the measurements behind it are
+ * written down. This one also covers reading the files back and a reply that
+ * never arrives, which the worker's cannot.
+ */
+const MODEL_READ_TIMEOUT_MS = 120_000;
+
 /** Session cache of read models, keyed by `dataDir::engine::game::object`.
  *  Null for an object the game has no model for, so it is not asked again. */
 const unitModelCache = new Map<string, UnitModelResult | null>();
@@ -809,25 +818,32 @@ export async function loadUnitsyncUnitModels(
   const read = await shareInFlight(
     unitModelsPending,
     `${prefix}::${wanted.join("|")}`,
-    async () => {
-      const res = await unitsyncUnitModels({
-        enginePath,
-        dataDir,
-        gameArchive,
-        objects: wanted,
-      });
-      const got = new Map<string, UnitModelResult | null>();
-      await Promise.all(
-        wanted.map(async (object) => {
-          const file = res.models[object];
-          got.set(object, file ? await readCachedModel(file.file) : null);
-        }),
-      );
-      for (const [object, model] of got) {
-        unitModelCache.set(`${prefix}::${object}`, model);
-      }
-      return got;
-    },
+    () =>
+      settleWithin(
+        (async () => {
+          const res = await unitsyncUnitModels({
+            enginePath,
+            dataDir,
+            gameArchive,
+            objects: wanted,
+          });
+          const got = new Map<string, UnitModelResult | null>();
+          await Promise.all(
+            wanted.map(async (object) => {
+              const file = res.models[object];
+              got.set(object, file ? await readCachedModel(file.file) : null);
+            }),
+          );
+          return got;
+        })(),
+        MODEL_READ_TIMEOUT_MS,
+        `reading the model out of ${gameArchive} took longer than ${MODEL_READ_TIMEOUT_MS / 1000} seconds`,
+      ).then((got) => {
+        for (const [object, model] of got) {
+          unitModelCache.set(`${prefix}::${object}`, model);
+        }
+        return got;
+      }),
   );
   for (const [object, model] of read) out.set(object, model);
   return out;
@@ -849,8 +865,23 @@ export function useUnitsyncUnitModel(
   const [model, setModel] = useState<UnitModelResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
+  // A retry reads again rather than answering from the session cache, which
+  // also remembers a model the game had none of.
+  const retry = useCallback(() => {
+    if (enginePath && dataDir && gameArchive && object) {
+      unitModelCache.delete(
+        `${dataDir}::${enginePath}::${gameArchive}::${object}`,
+      );
+    }
+    setAttempt((n) => n + 1);
+  }, [enginePath, dataDir, gameArchive, object]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is only here so a retry runs the read again
   useEffect(() => {
+    setError(null);
     if (!enginePath || !dataDir || !gameArchive || !object) {
       setModel(null);
       setLoading(false);
@@ -877,17 +908,18 @@ export function useUnitsyncUnitModel(
         setFailed(res === null);
         setLoading(false);
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (cancelled) return;
+        setError(e instanceof Error ? e.message : String(e));
         setFailed(true);
         setLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, object]);
+  }, [enginePath, dataDir, gameArchive, object, attempt]);
 
-  return { model, loading, failed };
+  return { model, loading, failed, error, retry };
 }
 
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */

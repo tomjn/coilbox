@@ -40,6 +40,7 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../../../content/config";
+import { ModelReadFailed } from "../../../content/pages/components/ModelReadFailed";
 import { UnitPickerButton } from "../../../content/pages/components/UnitPicker";
 import { unitLabel } from "../../../content/unitChoices";
 import { countTriangles, missingTextures } from "../../../content/unitModel";
@@ -93,7 +94,7 @@ export function ReferencePicker({
   const unit = units.find((u) => u.name === unitName);
   const object = unit?.objectName?.trim();
 
-  const { model, loading, failed } = useUnitsyncUnitModel(
+  const { model, loading, failed, error, retry } = useUnitsyncUnitModel(
     target?.enginePath,
     target?.dataDir,
     archive,
@@ -177,6 +178,8 @@ export function ReferencePicker({
           drawable={drawable}
           loading={loading}
           failed={failed}
+          error={error}
+          onRetry={retry}
           datasetFailed={
             dataset.status === "error" || dataset.status === "unsyncable"
           }
@@ -202,6 +205,8 @@ function Note({
   drawable,
   loading,
   failed,
+  error,
+  onRetry,
   datasetFailed,
 }: {
   scanning: boolean;
@@ -212,6 +217,8 @@ function Note({
   drawable: boolean;
   loading: boolean;
   failed: boolean;
+  error: string | null;
+  onRetry: () => void;
   datasetFailed: boolean;
 }) {
   if (!game) {
@@ -247,7 +254,11 @@ function Note({
   if (failed) {
     return (
       <Text>
-        Could not reach unitsync to read {object}. Showing the solar collector.
+        <ModelReadFailed
+          error={error}
+          fallback={`Could not reach unitsync to read ${object}. Showing the solar collector.`}
+          onRetry={onRetry}
+        />
       </Text>
     );
   }

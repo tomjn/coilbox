@@ -138,6 +138,8 @@ export default function GameUnitPage() {
     model,
     loading: modelLoading,
     failed: modelFailed,
+    error: modelError,
+    retry: retryModel,
   } = useUnitsyncUnitModel(
     selected?.enginePath,
     selected?.rootPath,
@@ -325,6 +327,8 @@ export default function GameUnitPage() {
         model={model}
         loading={modelLoading}
         failed={modelFailed}
+        error={modelError}
+        onRetry={retryModel}
         gameArchive={game.primaryArchive.name}
       />
 
