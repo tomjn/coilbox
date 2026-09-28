@@ -28,6 +28,7 @@ mod game;
 mod heightfield;
 mod heightmap;
 mod infocache;
+mod initlock;
 mod lua;
 mod mapcatalog;
 mod mapmeta;
