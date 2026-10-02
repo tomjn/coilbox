@@ -156,7 +156,7 @@ jobs:
           # binary suffix on Windows.
           # `cache_rust` restores the release-profile dependency cache primed on
           # main by release-cache.yml. Windows only - see the step below.
-          - platform: macos-14 # arm64
+          - platform: macos-26 # arm64
             smcng_platform: macos-arm64
             exe: ""
             cache_rust: false
