@@ -156,7 +156,7 @@ jobs:
           # binary suffix on Windows.
           # `cache_rust` restores the release-profile dependency cache primed on
           # main by release-cache.yml. Windows only - see the step below.
-          - platform: macos-26 # arm64
+          - platform: macos-15 # arm64
             smcng_platform: macos-arm64
             exe: ""
             cache_rust: false
@@ -269,8 +269,15 @@ jobs:
       #
       # --timings writes target/cargo-timings/cargo-timing-<timestamp>.html,
       # uploaded below alongside the app build's own report (issue #2801).
+      #
+      # Without a deployment target the cc crate compiles the worker's Assimp
+      # for the runner's SDK version, so the oldest macOS the worker runs on
+      # would move with every runner upgrade. 11.0 is what rustc already
+      # stamps on the arm64 binaries. Only Apple targets read the variable.
       - name: Build unitsync worker and relay agent sidecars
         shell: bash
+        env:
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
         run: bash scripts/build-sidecars.sh --timings coilbox-unitsync-worker coilbox-relay-agent
 
       # Assemble the pr-downloader resource folder for this runner's platform:
