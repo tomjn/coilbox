@@ -66,7 +66,7 @@ impl AssetUploadConsent {
         let profile = coilbox_portable::portable_root().map(|root| root.join("profile.json"));
         let read = |path: &Path| std::fs::read_to_string(path).ok();
         if permitted(
-            profile.as_deref().and_then(&read).as_deref(),
+            profile.as_deref().and_then(read).as_deref(),
             read(&settings).as_deref(),
         ) {
             Ok(Self(()))
