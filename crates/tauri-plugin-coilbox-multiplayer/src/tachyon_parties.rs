@@ -408,7 +408,7 @@ fn project(parties: &Parties, state: &mut LobbyState) -> Vec<Delta> {
         max_members: party.max_members,
     };
 
-    let current = parties.current.as_ref().map(&named);
+    let current = parties.current.as_ref().map(named);
     let invites: Vec<Party> = parties.invites.iter().map(&named).collect();
     if state.party == current && state.party_invites == invites {
         return vec![];
