@@ -162,6 +162,136 @@ describe("after an in-place write", () => {
   });
 });
 
+/** Issue #3184. A field that follows the game goes back with its rule. */
+describe("an in-place write of a field that follows the game", () => {
+  const rule = {
+    factor: 1.15,
+    offset: 0,
+    rounding: { kind: "integer" as const },
+    base: 260,
+  };
+  const other = { ...rule, factor: 2, base: 100 };
+  const followed: ModProject = {
+    ...project,
+    edits: {
+      ...project.edits,
+      overrides: { brv: { health: 299, trackwidth: 40 } },
+      relative: { brv: { health: rule }, atlas: { metalcost: other } },
+    },
+  };
+  const writeBoth: CarriedChange[] = [
+    { unit: "brv", field: "health", undoable: true },
+    { unit: "brv", field: "trackwidth", undoable: true },
+  ];
+  const write = (p: ModProject, c: CarriedChange[] = writeBoth) =>
+    settleInPlace(
+      p,
+      { kind: "write", carried: c, copies: [], changed: true },
+      BEFORE,
+    );
+  const undo = (p: ModProject) =>
+    settleInPlace(p, { kind: "undo", changed: true }, WRITTEN);
+
+  it("takes the rule off the project and keeps it for undo", () => {
+    const written = write(followed);
+    expect(written.edits.relative).toEqual({ atlas: { metalcost: other } });
+    expect(written.writtenRulesInPlace).toEqual({ brv: { health: rule } });
+  });
+
+  it("puts the number and the rule back on undo", () => {
+    const undone = undo(write(followed));
+    expect(undone.edits.overrides.brv).toEqual({ health: 299, trackwidth: 40 });
+    expect(undone.edits.relative).toEqual(followed.edits.relative);
+    expect(undone.writtenRulesInPlace).toBeUndefined();
+  });
+
+  it("keeps no rules for a project whose fields are all fixed", () => {
+    const written = write(project, carried);
+    expect(written.writtenRulesInPlace).toBeUndefined();
+    expect(undo(written).edits.relative).toBeUndefined();
+  });
+
+  it("undoes an old saved project, with numbers and no rules, as before", () => {
+    const old: ModProject = {
+      ...project,
+      edits: { ...project.edits, overrides: { atlas: { metalcost: 900 } } },
+      writtenInPlace: { brv: { health: 299 } },
+    };
+    const undone = undo(old);
+    expect(undone.edits.overrides.brv).toEqual({ health: 299 });
+    expect(undone.edits.relative).toBeUndefined();
+    expect(undone.writtenInPlace).toBeUndefined();
+  });
+
+  it("leaves a field edited since the write as it is now", () => {
+    const written = write(followed);
+    const edited = {
+      ...written,
+      edits: {
+        ...written.edits,
+        overrides: { ...written.edits.overrides, brv: { health: 500 } },
+      },
+    };
+    const undone = undo(edited);
+    expect(undone.edits.overrides.brv).toEqual({ health: 500, trackwidth: 40 });
+    expect(undone.edits.relative?.brv).toBeUndefined();
+  });
+
+  it("does not replace a rule made on the field since the write", () => {
+    const written = write(followed);
+    const newer = { ...rule, factor: 3 };
+    const undone = undo({
+      ...written,
+      edits: {
+        ...written.edits,
+        relative: { ...written.edits.relative, brv: { health: newer } },
+      },
+    });
+    expect(undone.edits.relative?.brv).toEqual({ health: newer });
+  });
+
+  it("keeps the newest write's rule when a field is written twice", () => {
+    const first = write(followed);
+    const newer = { ...rule, factor: 3 };
+    const again = write({
+      ...first,
+      edits: {
+        ...first.edits,
+        overrides: { ...first.edits.overrides, brv: { health: 780 } },
+        relative: { brv: { health: newer } },
+      },
+    });
+    expect(again.writtenRulesInPlace).toEqual({ brv: { health: newer } });
+    // A third write of the same field as a fixed number drops the rule.
+    const fixed = write({
+      ...again,
+      edits: {
+        ...again.edits,
+        overrides: { brv: { health: 800 } },
+        relative: {},
+      },
+    });
+    expect(fixed.writtenRulesInPlace).toBeUndefined();
+    expect(fixed.writtenInPlace).toEqual({
+      brv: { health: 800, trackwidth: 40 },
+    });
+  });
+
+  it("leaves a rule alone whose result equals the game's value", () => {
+    // No override key, so the write has no number to move.
+    const equal: ModProject = {
+      ...followed,
+      edits: {
+        ...followed.edits,
+        overrides: { brv: { trackwidth: 40 } },
+      },
+    };
+    const written = write(equal);
+    expect(written.edits.relative?.brv).toEqual({ health: rule });
+    expect(written.writtenRulesInPlace).toBeUndefined();
+  });
+});
+
 /** Issue #2634. A copy the write added as a unit file leaves the project the
  *  way a written field does, and undo brings it back whole. */
 describe("after an in-place write of a copy", () => {
