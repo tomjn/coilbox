@@ -533,6 +533,32 @@ describe("PlayLocallyButton", () => {
       });
     });
 
+    it("says the game's version is not on the map when the copy cannot be made, and does not ask for one", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      draw({ key: "arm-zeus", label: "Zeus", inGame: true });
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      expect(
+        screen.getByText(/lowercase letters, digits and underscores/i),
+      ).toBeTruthy();
+      chooseStart(true);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopTestMutator).toHaveBeenCalledWith({
+        dataDir: "/data",
+        project,
+        written: WRITTEN,
+      });
+      const [args] = writeStartWithUnit.mock.calls[0] as unknown as [
+        { scenario: { teams: Record<string, { startUnits: string[] }> } },
+      ];
+      expect(Object.values(args.scenario.teams)[0].startUnits).toEqual([
+        "arm-zeus",
+      ]);
+    });
+
     it("shows the error and does not launch when the mission cannot be written", async () => {
       mockCompiled = compiled({
         files: [{ path: "modinfo.lua", contents: "return {}" }],

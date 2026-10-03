@@ -97,6 +97,13 @@ describe("buildTestScenario", () => {
     expect(s.teams["p-you"]?.startUnits).toEqual(["armzeus"]);
   });
 
+  it("places only the unit when the game's copy cannot be made", () => {
+    for (const key of ["arm-zeus", "ArmZeus", "arm.zeus", ""]) {
+      const s = scenario({ ...ZEUS, key });
+      expect(s.teams["p-you"]?.startUnits).toEqual([key]);
+    }
+  });
+
   it("gives the player's side a bank, because the runtime empties it at frame 1", () => {
     const resources = scenario().teams["p-you"]?.resources;
     expect(resources?.metal).toBeGreaterThan(0);
