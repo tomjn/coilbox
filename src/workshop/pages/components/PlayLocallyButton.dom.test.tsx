@@ -51,7 +51,11 @@ const {
   settleTypedValues,
   settleTypedValuesTweaks,
   workshopCompile,
+  writeStartWithUnit,
 } = vi.hoisted(() => ({
+  writeStartWithUnit: vi.fn(async (_args: unknown) => ({
+    dir: "/data/games/coilbox-workshop-test.sdd",
+  })),
   settleTypedValuesTweaks: vi.fn(
     async (_args: unknown): Promise<unknown> => ({
       ok: true,
@@ -135,7 +139,8 @@ let mockCompiled: {
 };
 let mockGameInfoOptions: { key: string; name: string }[] = [];
 
-vi.mock("../../compile", () => ({
+vi.mock("../../compile", async () => ({
+  ...(await vi.importActual<typeof import("../../compile")>("../../compile")),
   useCompiledProject: () => mockCompiled,
   workshopCompile,
 }));
@@ -179,6 +184,12 @@ vi.mock("../../loadsAs", async () => {
   return { ...actual, settleTypedValues, settleTypedValuesTweaks };
 });
 vi.mock("../../preflight", () => ({ workshopPreflight }));
+vi.mock("../../testMission", async () => ({
+  ...(await vi.importActual<typeof import("../../testMission")>(
+    "../../testMission",
+  )),
+  writeStartWithUnit,
+}));
 
 const { PlayLocallyButton } = await import("./PlayLocallyButton");
 const { PersistentStoreProvider } = await import("@picoframe/frame");
@@ -203,12 +214,14 @@ function compiled(over: {
   };
 }
 
-function draw() {
+const ZEUS = { key: "armzeus", label: "Zeus", inGame: true };
+
+function draw(unit?: { key: string; label: string; inGame: boolean }) {
   installSettingsStorage(memorySettingsStorage());
   return render(
     <PersistentStoreProvider>
       {/** biome-ignore lint/suspicious/noExplicitAny: a trimmed test fixture, not the real ModProject */}
-      <PlayLocallyButton project={project as any} />
+      <PlayLocallyButton project={project as any} unit={unit} />
     </PersistentStoreProvider>,
   );
 }
@@ -221,6 +234,7 @@ afterEach(() => {
   workshopPreflight.mockClear();
   settleTypedValuesTweaks.mockClear();
   workshopCompile.mockClear();
+  writeStartWithUnit.mockClear();
   workshopPreflight.mockResolvedValue({ blockers: [], review: [], passes: [] });
   mockCompiled = compiled({});
   mockGameInfoOptions = [];
@@ -390,5 +404,153 @@ describe("PlayLocallyButton", () => {
     expect(screen.getByText(/supercom is defined by 2 copies/)).toBeTruthy();
     expect(workshopTestMutator).not.toHaveBeenCalled();
     expect(launch).not.toHaveBeenCalled();
+  });
+
+  describe("start with the unit on the map (issue #3178)", () => {
+    const startOption = () =>
+      screen.getByRole("checkbox", { name: /start with zeus on the map/i });
+    /** The choice is a saved setting that outlives a test's own render, so a
+     *  test sets it rather than clicking and trusting where it started. */
+    const chooseStart = (on: boolean) => {
+      const box = startOption();
+      if ((box.getAttribute("aria-checked") === "true") !== on) {
+        fireEvent.click(box);
+      }
+    };
+
+    it("is offered only when a unit is open", () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      draw();
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      expect(screen.queryByRole("checkbox")).toBeNull();
+    });
+
+    it("leaves the launch as it was while it is off", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      draw(ZEUS);
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      chooseStart(false);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopTestMutator).toHaveBeenCalledWith({
+        dataDir: "/data",
+        project,
+        written: WRITTEN,
+      });
+      expect(writeStartWithUnit).not.toHaveBeenCalled();
+      expect(launch.mock.calls[0][1].config.modOptions).toEqual({});
+    });
+
+    it("on the mutator route copies the game's unit, adds the mission and names it in the mod options", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      draw(ZEUS);
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      chooseStart(true);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopTestMutator).toHaveBeenCalledWith({
+        dataDir: "/data",
+        project,
+        written: WRITTEN,
+        baseCopies: ["armzeus"],
+      });
+      expect(writeStartWithUnit).toHaveBeenCalledTimes(1);
+      const [args] = writeStartWithUnit.mock.calls[0] as unknown as [
+        {
+          scenario: { teams: Record<string, { startUnits: string[] }> };
+          modinfo?: string;
+        },
+      ];
+      expect(args.modinfo).toBeUndefined();
+      expect(Object.values(args.scenario.teams)[0].startUnits).toEqual([
+        "armzeus",
+        "armzeus_coilbox_base",
+      ]);
+      // The mission is written before the rescan that registers the game.
+      expect(writeStartWithUnit.mock.invocationCallOrder[0]).toBeLessThan(
+        primeScan.mock.invocationCallOrder[0],
+      );
+      const [, opts] = launch.mock.calls[0];
+      expect(opts.config.gameType).toBe(WORKSHOP_TEST_GAME.name);
+      expect(opts.config.modOptions).toEqual({
+        coilbox_mission: "coilbox-workshop-test",
+      });
+    });
+
+    it("on the tweak slot route compiles the copy into the slot, writes a game with no compiled files and rescans", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "" }],
+        tweakdefs: "do end",
+      });
+      mockGameInfoOptions = [{ key: "tweakdefs", name: "tweakdefs" }];
+      draw(ZEUS);
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      chooseStart(true);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopCompile).toHaveBeenCalledWith({
+        project,
+        written: WRITTEN,
+        baseCopies: ["armzeus"],
+      });
+      expect(workshopTestMutator).not.toHaveBeenCalled();
+      const [args] = writeStartWithUnit.mock.calls[0] as unknown as [
+        { modinfo?: string },
+      ];
+      expect(args.modinfo).toContain(project.gameName);
+      expect(primeScan).toHaveBeenCalledWith("/engines/105", "/data", true);
+      const [, opts] = launch.mock.calls[0];
+      expect(opts.config.gameType).toBe(WORKSHOP_TEST_GAME.name);
+      expect(opts.config.modOptions).toEqual({
+        tweakdefs: "ZG8geCA9IDUuNTU1NTU1MyBlbmQ",
+        coilbox_mission: "coilbox-workshop-test",
+      });
+    });
+
+    it("places only the unit when the game has no version of it", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      draw({ ...ZEUS, inGame: false });
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      chooseStart(true);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() => expect(launch).toHaveBeenCalledTimes(1));
+      expect(workshopTestMutator).toHaveBeenCalledWith({
+        dataDir: "/data",
+        project,
+        written: WRITTEN,
+      });
+    });
+
+    it("shows the error and does not launch when the mission cannot be written", async () => {
+      mockCompiled = compiled({
+        files: [{ path: "modinfo.lua", contents: "return {}" }],
+      });
+      writeStartWithUnit.mockRejectedValueOnce(
+        new Error("could not find the bundled mission runtime"),
+      );
+      draw(ZEUS);
+      fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+      chooseStart(true);
+      fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+      await vi.waitFor(() =>
+        expect(
+          screen.getByText(/could not find the bundled mission runtime/),
+        ).toBeTruthy(),
+      );
+      expect(launch).not.toHaveBeenCalled();
+    });
   });
 });
