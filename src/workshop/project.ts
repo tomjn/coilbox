@@ -390,6 +390,14 @@ export interface ModProject {
    */
   writtenInPlace?: UnitOverrides;
   /**
+   * The rules that followed the game on the fields in `writtenInPlace`, kept
+   * so undo puts a field back as it was, number and rule together (issue
+   * #3184). Absent on a project saved before this existed, and for a project
+   * with no rules, in which case undo restores numbers only. Left out of the
+   * container payload for the same reason as `writtenInPlace`.
+   */
+  writtenRulesInPlace?: RelativeEdits;
+  /**
    * Copies an in-place write added to the game as unit files of their own
    * (issue #2634), by name, with their own changes and the build menus they
    * were added to. Kept for undo, like `writtenInPlace`, and left out of the
@@ -836,6 +844,7 @@ export function useModProjects() {
     // wrote them. A copy holding them too would put them back a second time.
     const {
       writtenInPlace: _kept,
+      writtenRulesInPlace: _keptRules,
       copiesWrittenInPlace: _copies,
       ...rest
     } = source;

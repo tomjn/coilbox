@@ -37,7 +37,12 @@ import type { UnitClone } from "./clones";
 import type { CarriedChange, WrittenCopy } from "./inPlace";
 import { clearOverride, type UnitOverrides } from "./overrides";
 import type { GameEdits, ModProject } from "./project";
-import { withoutStaleRelative } from "./relativeEdits";
+import {
+  type RelativeEdits,
+  relativeRuleOf,
+  withoutStaleRelative,
+  withRule,
+} from "./relativeEdits";
 
 /** What one of the edit-in-place route's three actions did. */
 export type InPlaceDone =
@@ -69,11 +74,13 @@ export interface KeptCopy {
 function withoutWritten(project: ModProject): ModProject {
   if (
     project.writtenInPlace === undefined &&
+    project.writtenRulesInPlace === undefined &&
     project.copiesWrittenInPlace === undefined
   )
     return project;
   const {
     writtenInPlace: _fields,
+    writtenRulesInPlace: _rules,
     copiesWrittenInPlace: _copies,
     ...rest
   } = project;
@@ -138,14 +145,24 @@ function settleWrite(
   );
   let overrides = moved.edits.overrides;
   let kept: UnitOverrides = project.writtenInPlace ?? {};
+  let keptRules: RelativeEdits = project.writtenRulesInPlace ?? {};
   for (const { unit, field, undoable } of carried) {
     const fields = overrides[unit];
     if (!fields || !Object.hasOwn(fields, field)) continue;
     // A field the file already held, with no backup under it, is the game's
     // own value. Nothing will ever take it back out, so there is nothing to
     // put back either.
-    if (undoable)
+    if (undoable) {
       kept = { ...kept, [unit]: { ...kept[unit], [field]: fields[field] } };
+      // The newest write wins here too, so a field written again as a fixed
+      // number does not keep the rule an earlier write held for it.
+      keptRules = withRule(
+        keptRules,
+        unit,
+        field,
+        relativeRuleOf(project.edits.relative, unit, field),
+      );
+    }
     overrides = clearOverride(overrides, unit, field);
   }
   if (overrides === project.edits.overrides && moved.edits === project.edits)
@@ -157,6 +174,9 @@ function settleWrite(
     // #3174).
     edits: withoutStaleRelative(project.edits, { ...moved.edits, overrides }),
     ...(Object.keys(kept).length > 0 ? { writtenInPlace: kept } : {}),
+    ...(Object.keys(keptRules).length > 0
+      ? { writtenRulesInPlace: keptRules }
+      : {}),
     ...(Object.keys(moved.kept).length > 0
       ? { copiesWrittenInPlace: moved.kept }
       : {}),
@@ -198,9 +218,22 @@ function settleUndo(project: ModProject): ModProject {
   if (kept !== undefined) {
     const current = edits.overrides;
     const overrides: UnitOverrides = { ...current };
-    for (const [unit, fields] of Object.entries(kept))
+    let relative = edits.relative;
+    for (const [unit, fields] of Object.entries(kept)) {
       overrides[unit] = { ...fields, ...current[unit] };
-    edits = { ...edits, overrides };
+      // A rule goes back with its number, and only when the number came back.
+      // A field edited since keeps what it holds now, rule or not.
+      for (const field of Object.keys(fields)) {
+        const rule = relativeRuleOf(project.writtenRulesInPlace, unit, field);
+        if (
+          rule &&
+          !Object.hasOwn(current[unit] ?? {}, field) &&
+          !relativeRuleOf(relative, unit, field)
+        )
+          relative = withRule(relative, unit, field, rule);
+      }
+    }
+    edits = { ...edits, overrides, ...(relative ? { relative } : {}) };
   }
   for (const [unit, copy] of Object.entries(copies ?? {}))
     edits = restoreCopy(edits, unit, copy);

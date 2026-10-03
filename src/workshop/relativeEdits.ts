@@ -137,7 +137,7 @@ export function composeRelative(
 
 /** `relative` with one field's rule set, or taken off when `rule` is
  *  undefined. A unit left with no rules drops out. */
-function withRule(
+export function withRule(
   relative: RelativeEdits | undefined,
   unit: string,
   path: string,
