@@ -2424,7 +2424,19 @@ export default function UnitPage() {
               before this point edits a project, and this is the first thing
               that lets you find out whether the edits were right. */}
             {project && (
-              <PlayLocallyButton project={project} requestOpen={testRequest} />
+              <PlayLocallyButton
+                project={project}
+                unit={
+                  unit
+                    ? {
+                        key: unitKey,
+                        label: unitName,
+                        inGame: unitKey in gameUnits && clone === undefined,
+                      }
+                    : undefined
+                }
+                requestOpen={testRequest}
+              />
             )}
           </>
         }

@@ -24,6 +24,9 @@ picoframe-core = "0.0.4"
 # that run the generated blocks the same way. `workshop_preflight` now calls
 # it at runtime too.
 coilbox-springlua = { path = "../coilbox-springlua" }
+# `runtime::install` and `runtime_dir`, so a test mission ships the runtime the
+# way `scenario_test_mutator` does (issue #3178).
+tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 # The codec issue #1277's BAR export will encode a slot's payload with. The
 # preflight check proves a chunk survives that same round trip before #1277
 # exists to produce the real payload.

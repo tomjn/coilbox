@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "workshop_compile",
     "workshop_preflight",
     "workshop_test_mutator",
+    "workshop_test_mission",
     "workshop_package_mutator",
     "workshop_pack_tweak_slots",
     "workshop_decode_tweak_set",

@@ -42,3 +42,22 @@ export const workshopTestMutator = defineCommand<
   },
   TestMutatorResult
 >("coilbox-workshop", "workshop_test_mutator");
+
+/**
+ * Put a generated mission into the same test game, and the mission runtime
+ * where the base game lacks it (issue #3178). The mutator route calls it
+ * after `workshopTestMutator` and passes no `modinfo`. The tweak slot route
+ * has no compiled files, so it passes the `modinfo` and the folder is
+ * cleared first, which is what keeps it free of any `gamedata/`.
+ */
+export const workshopTestMission = defineCommand<
+  {
+    dataDir: string;
+    missionId: string;
+    mission: string;
+    modinfo?: string;
+    /** False for a base game that already bundles a new enough runtime. */
+    shipRuntime: boolean;
+  },
+  TestMutatorResult
+>("coilbox-workshop", "workshop_test_mission");

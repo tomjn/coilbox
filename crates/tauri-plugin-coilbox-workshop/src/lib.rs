@@ -78,6 +78,7 @@ mod model;
 mod mutator;
 mod package;
 mod preflight;
+mod test_mission;
 mod tweak_pack;
 
 pub use compile::{
@@ -99,7 +100,7 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 use tauri::{
     plugin::{Builder, TauriPlugin},
-    Runtime,
+    AppHandle, Runtime,
 };
 
 /// A payload in the envelope the frontend unwraps.
@@ -198,6 +199,63 @@ fn workshop_test_mutator(
         dir: dir.to_string_lossy().into_owned(),
         folder: mutator::FOLDER,
         files: compiled.files.into_iter().map(|f| f.path).collect(),
+    })
+}
+
+/// Put a generated mission, and the mission runtime where the base game lacks
+/// it, into coilbox's own test game under `data_dir` (issue #3178).
+///
+/// This is the "Start with this unit on the map" half of a local test launch.
+/// The mission is the frontend's, built in memory and never saved. `modinfo`
+/// starts the folder afresh for the tweak slot route, which has no compiled
+/// files and must ship no `gamedata/`. Without it the folder is the one
+/// `workshop_test_mutator` just wrote and this adds to it.
+///
+/// `ship_runtime` false is a base game that already bundles a runtime new
+/// enough for the mission: shipping a second one would shadow it.
+#[tauri::command]
+fn workshop_test_mission<R: Runtime>(
+    app: AppHandle<R>,
+    data_dir: String,
+    mission_id: String,
+    mission: String,
+    modinfo: Option<String>,
+    ship_runtime: bool,
+) -> CliResult {
+    let dir = match mutator::mutator_dir(&data_dir) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
+    let src = if ship_runtime {
+        match tauri_plugin_coilbox_scenario::runtime::runtime_dir(&app) {
+            Some(src) => Some(src),
+            None => return CliResult::err("could not find the bundled mission runtime"),
+        }
+    } else {
+        None
+    };
+    let files = match test_mission::write(
+        &dir,
+        src.as_deref(),
+        &mission_id,
+        &mission,
+        modinfo.as_deref(),
+    ) {
+        Ok(files) => files,
+        Err(e) => return CliResult::err(e),
+    };
+    // Read back through the sandbox the gadget's own `VFS.Include` uses, so a
+    // runtime copy that half succeeded is a refusal here and not a game that
+    // starts with no mission and says nothing.
+    if ship_runtime {
+        if let Err(e) = tauri_plugin_coilbox_scenario::runtime::read_marker(&dir) {
+            return CliResult::err(e);
+        }
+    }
+    envelope(&TestMutatorResult {
+        dir: dir.to_string_lossy().into_owned(),
+        folder: mutator::FOLDER,
+        files,
     })
 }
 
@@ -631,6 +689,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             workshop_compile,
             workshop_preflight,
             workshop_test_mutator,
+            workshop_test_mission,
             workshop_package_mutator,
             workshop_pack_tweak_slots,
             workshop_settle_typed_values_tweaks,

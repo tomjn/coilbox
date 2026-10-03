@@ -327,7 +327,7 @@ const refuse = (
  * things only a folder has. A packaged `.sd7`/`.sdz` has no folder to root that
  * read at, so its marker comes out of the archive instead.
  */
-async function installedRuntime(
+export async function installedRuntime(
   root: string,
   loose: boolean,
 ): Promise<number | null> {

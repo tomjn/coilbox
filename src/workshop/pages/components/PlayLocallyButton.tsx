@@ -20,6 +20,7 @@
 import { Button, Drawer, useSetting } from "@picoframe/frame";
 import { Rocket } from "lucide-react";
 import { useEffect, useState } from "react";
+import { CheckField } from "@/components/Field";
 import {
   primeScan,
   useUnitsyncGameInfo,
@@ -52,6 +53,13 @@ import {
 import { workshopTestMutator } from "../../mutator";
 import { workshopPreflight } from "../../preflight";
 import type { ModProject } from "../../project";
+import {
+  buildTestGameModInfo,
+  buildTestScenario,
+  type TestUnit,
+  testMissionModOptions,
+  writeStartWithUnit,
+} from "../../testMission";
 
 /** Random start position: a test needs a spawn, not a chosen one. */
 const START_POS_RANDOM = 1;
@@ -87,11 +95,26 @@ function uniqueByName<T extends { name: string }>(items: T[]): T[] {
   });
 }
 
+/** Rescan, then find the test game the engine now knows about. */
+async function findGeneratedGame(target: {
+  enginePath: string;
+  dataDir: string;
+}) {
+  const rescanned = await primeScan(target.enginePath, target.dataDir, true);
+  return rescanned.games.find((g) =>
+    isWorkshopMutatorArchive(g.primaryArchive.name),
+  );
+}
+
 export function PlayLocallyButton({
   project,
+  unit,
   requestOpen,
 }: {
   project: ModProject;
+  /** The unit open on the page. With one, the drawer offers to start the game
+   *  with it on the map (issue #3178). */
+  unit?: TestUnit;
   /** Bumped to open the drawer from outside the button itself, such as the
    *  command palette's Test action (issue #3118). Every value opens it,
    *  including the first, so a caller need not track whether this is the
@@ -113,6 +136,11 @@ export function PlayLocallyButton({
   const [mapName, setMapName] = useSetting<string>("workshop.testMap", "");
   const map = maps.find((m) => m.name === mapName) ?? maps[0];
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
+  const [startWithUnitSetting, setStartWithUnit] = useSetting<boolean>(
+    "workshop.testStartWithUnit",
+    false,
+  );
+  const startWithUnit = !!unit && startWithUnitSetting;
   // Only rendered while the drawer is open, for the reason `gameInfo` is.
   const { thumbs } = useUnitsyncThumbnails(
     open ? target?.enginePath : undefined,
@@ -143,7 +171,9 @@ export function PlayLocallyButton({
       label: "Local tweak-slot mod option",
       available: tweakAvailable,
       detail: tweakAvailable
-        ? "No generated game and no rescan: the launch carries the edits itself."
+        ? startWithUnit
+          ? `The launch carries the edits itself. Placing the unit adds a generated game, ${WORKSHOP_MUTATOR_FOLDER}, and a rescan.`
+          : "No generated game and no rescan: the launch carries the edits itself."
         : `${project.gameName} does not declare a tweakdefs mod option, so this route is not on offer.`,
     },
     {
@@ -211,6 +241,12 @@ export function PlayLocallyButton({
       let gameType = game.name;
       let modOptions: Record<string, string> = {};
       let dir: string | null = null;
+      // The game's own version goes on the map beside the edited unit, so it is
+      // compiled in under another name (issue #3177). Left out entirely when
+      // the option is off, which keeps that launch what it always was.
+      const baseCopies = startWithUnit && unit?.inGame ? [unit.key] : undefined;
+      const copyArg = baseCopies ? { baseCopies } : {};
+      const participants = initialParticipants();
 
       if (route === "tweak-slot") {
         // The same for the bare tweakdefs slot, checked by loading the game
@@ -226,14 +262,43 @@ export function PlayLocallyButton({
         setTypedNote(
           settled.ok ? settledSummary(settled.settled) : settled.message,
         );
-        modOptions = localTweakModOptions(
-          settled.ok
+        const tweaks =
+          settled.ok || baseCopies
             ? await workshopCompile({
                 project,
-                written: settled.settled.written,
+                written: settled.ok ? settled.settled.written : undefined,
+                ...copyArg,
               })
-            : compiled.compiled,
-        );
+            : compiled.compiled;
+        modOptions = localTweakModOptions(tweaks);
+        if (startWithUnit && unit) {
+          // The edits stay in the slot. The game it depends on is the only
+          // thing written, so the game's own `unitdefs_post.lua` still reads
+          // `tweakdefs`, and this route now needs the rescan it skipped.
+          setPhase({ state: "writing" });
+          const generated = await writeStartWithUnit({
+            dataDir: target.dataDir,
+            game,
+            scenario: buildTestScenario({
+              unit,
+              gameName: game.name,
+              mapName: map.name,
+              participants,
+            }),
+            modinfo: buildTestGameModInfo(game.name, unit.label),
+          });
+          dir = generated.dir;
+          modOptions = { ...modOptions, ...testMissionModOptions() };
+          const found = await findGeneratedGame(target);
+          if (!found) {
+            setPhase({
+              state: "failed",
+              message: `The engine did not pick up ${WORKSHOP_MUTATOR_FOLDER}. Check that ${game.name} is still installed.`,
+            });
+            return;
+          }
+          gameType = found.name;
+        }
       } else {
         // A value the game's own Lua would turn into something else is
         // written as one it turns into the typed number, checked by loading
@@ -253,17 +318,24 @@ export function PlayLocallyButton({
           dataDir: target.dataDir,
           project,
           written: settled.ok ? settled.settled.written : undefined,
+          ...copyArg,
         });
         dir = written.dir;
+        if (startWithUnit && unit) {
+          await writeStartWithUnit({
+            dataDir: target.dataDir,
+            game,
+            scenario: buildTestScenario({
+              unit,
+              gameName: game.name,
+              mapName: map.name,
+              participants,
+            }),
+          });
+          modOptions = { ...modOptions, ...testMissionModOptions() };
+        }
         setPhase({ state: "scanning" });
-        const rescanned = await primeScan(
-          target.enginePath,
-          target.dataDir,
-          true,
-        );
-        const found = rescanned.games.find((g) =>
-          isWorkshopMutatorArchive(g.primaryArchive.name),
-        );
+        const found = await findGeneratedGame(target);
         if (!found) {
           setPhase({
             state: "failed",
@@ -277,7 +349,7 @@ export function PlayLocallyButton({
       setPhase({ state: "playing" });
       const result = await launch("skirmish", {
         config: toBattleConfig({
-          participants: initialParticipants(),
+          participants,
           mapName: map.name,
           gameType,
           startPosType: START_POS_RANDOM,
@@ -355,6 +427,19 @@ export function PlayLocallyButton({
             </div>
           )}
 
+          {unit ? (
+            <CheckField
+              label={`Start with ${unit.label} on the map`}
+              hint={
+                unit.inGame
+                  ? `Places the edited ${unit.label} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                  : `Places the edited ${unit.label} when the game starts, so there is nothing to build first. ${game?.name ?? "The game"} has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+              }
+              checked={startWithUnit}
+              onChange={setStartWithUnit}
+            />
+          ) : null}
+
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium">Map</span>
             <Button
@@ -410,7 +495,7 @@ export function PlayLocallyButton({
           {phase.state === "done" ? (
             <div className="flex flex-col gap-2 text-xs text-muted-foreground">
               <p>The game has closed. Play it again to test another change.</p>
-              {phase.route === "mutator" && phase.dir ? (
+              {phase.dir ? (
                 <>
                   <p className="break-all">
                     <code>{phase.dir}</code>
