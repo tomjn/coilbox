@@ -33,6 +33,12 @@ export interface TestMutatorResult {
  * carry, since there would be nothing to test.
  */
 export const workshopTestMutator = defineCommand<
-  { dataDir: string; project: ModProject; written?: Written },
+  {
+    dataDir: string;
+    project: ModProject;
+    written?: Written;
+    /** As `workshopCompile` takes it (issue #3177). */
+    baseCopies?: string[];
+  },
   TestMutatorResult
 >("coilbox-workshop", "workshop_test_mutator");

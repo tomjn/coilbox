@@ -40,7 +40,7 @@
 //! every unit and weapon. A game that never reads the options loads its own
 //! values whatever is written, and every field stays as typed with the note.
 
-use crate::compile::{compile, equip_at, CompiledMod};
+use crate::compile::{compile_with_base_copies, equip_at, CompiledMod};
 use crate::model::ModProject;
 use crate::tweak_pack;
 use serde::{Deserialize, Serialize};
@@ -279,10 +279,20 @@ pub fn with_written(project: &ModProject, written: &Written) -> ModProject {
 
 /// Compile `project` for the mutator route, with `written` in place.
 pub fn compile_written(project: &ModProject, written: &Written) -> CompiledMod {
+    compile_written_with_base_copies(project, written, &[])
+}
+
+/// [`compile_written`] with a copy of the game's own version of each unit in
+/// `base_copies` (issue #3177). Only the two local test commands pass any.
+pub fn compile_written_with_base_copies(
+    project: &ModProject,
+    written: &Written,
+    base_copies: &[String],
+) -> CompiledMod {
     if written.is_empty() {
-        compile(project)
+        compile_with_base_copies(project, base_copies)
     } else {
-        compile(&with_written(project, written))
+        compile_with_base_copies(&with_written(project, written), base_copies)
     }
 }
 
