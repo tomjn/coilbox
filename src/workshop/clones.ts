@@ -116,6 +116,15 @@ export function unitIsAdded(clones: UnitClones, unit: string): boolean {
  */
 const KEY_PATTERN = /^[a-z0-9_]+$/;
 
+/**
+ * Whether a unit's internal name is one the workshop compiler will write under.
+ * The mirror of `valid_unit_key` in the workshop crate's `compile.rs`, so the two
+ * must change together.
+ */
+export function isValidUnitKey(key: string): boolean {
+  return KEY_PATTERN.test(key);
+}
+
 /** An internal name as it will be stored, whatever case it was typed in. */
 export function normaliseCloneKey(raw: string): string {
   return raw.trim().toLowerCase();
@@ -145,7 +154,7 @@ export function checkCloneName(
   const key = normaliseCloneKey(raw);
   const verdict = ((): CloneVerdict => {
     if (!key) return "empty";
-    if (!KEY_PATTERN.test(key)) return "invalid";
+    if (!isValidUnitKey(key)) return "invalid";
     // Your own unit is refused rather than silently overwritten. Replacing the
     // game's unit is a decision about the game. Replacing your own would only
     // throw away work you can edit or delete instead.

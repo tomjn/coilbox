@@ -56,6 +56,7 @@ import type { ModProject } from "../../project";
 import {
   buildTestGameModInfo,
   buildTestScenario,
+  canPlaceBaseCopy,
   type TestUnit,
   testMissionModOptions,
   writeStartWithUnit,
@@ -244,7 +245,10 @@ export function PlayLocallyButton({
       // The game's own version goes on the map beside the edited unit, so it is
       // compiled in under another name (issue #3177). Left out entirely when
       // the option is off, which keeps that launch what it always was.
-      const baseCopies = startWithUnit && unit?.inGame ? [unit.key] : undefined;
+      const baseCopies =
+        startWithUnit && unit && canPlaceBaseCopy(unit)
+          ? [unit.key]
+          : undefined;
       const copyArg = baseCopies ? { baseCopies } : {};
       const participants = initialParticipants();
 
@@ -431,9 +435,11 @@ export function PlayLocallyButton({
             <CheckField
               label={`Start with ${unit.label} on the map`}
               hint={
-                unit.inGame
-                  ? `Places the edited ${unit.label} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
-                  : `Places the edited ${unit.label} when the game starts, so there is nothing to build first. ${game?.name ?? "The game"} has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                unit.inGame && !canPlaceBaseCopy(unit)
+                  ? `Places the edited ${unit.label} when the game starts, so there is nothing to build first. The game's own version is not placed beside it, because a unit's internal name can only hold lowercase letters, digits and underscores and ${unit.key} does not. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                  : unit.inGame
+                    ? `Places the edited ${unit.label} and the game's own beside it when the game starts, so there is nothing to build first. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
+                    : `Places the edited ${unit.label} when the game starts, so there is nothing to build first. ${game?.name ?? "The game"} has no version of its own to put beside it. Coilbox writes ${WORKSHOP_MUTATOR_FOLDER} to do it, and it is never packaged.`
               }
               checked={startWithUnit}
               onChange={setStartWithUnit}

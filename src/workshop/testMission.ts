@@ -26,6 +26,7 @@ import {
 } from "../scenario/launch";
 import type { Scenario } from "../scenario/model";
 import { isBlocking, validateCompiledMissionText } from "../scenario/validate";
+import { isValidUnitKey } from "./clones";
 import { baseCopyName } from "./compile";
 import { workshopTestMission } from "./mutator";
 
@@ -61,6 +62,19 @@ export interface TestUnit {
 }
 
 /**
+ * Whether the compiler can make the game's copy of `unit`. It leaves the copy
+ * out when the unit's name or the copy's fails `valid_unit_key`, and the engine
+ * cannot spawn a unit that does not exist, so the mission must not list it.
+ */
+export function canPlaceBaseCopy(unit: TestUnit): boolean {
+  return (
+    unit.inGame &&
+    isValidUnitKey(unit.key) &&
+    isValidUnitKey(baseCopyName(unit.key))
+  );
+}
+
+/**
  * The scenario that places `unit` for the player's side.
  *
  * Only the player's side is given a team entry. The AI's is left out so it
@@ -89,7 +103,7 @@ export function buildTestScenario(opts: {
     teams: player
       ? {
           [player.id]: {
-            startUnits: unit.inGame
+            startUnits: canPlaceBaseCopy(unit)
               ? [unit.key, baseCopyName(unit.key)]
               : [unit.key],
             resources: { metal: TEST_BANK, energy: TEST_BANK },
