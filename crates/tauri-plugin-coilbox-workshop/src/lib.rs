@@ -80,7 +80,9 @@ mod package;
 mod preflight;
 mod tweak_pack;
 
-pub use compile::{compile, Chunk, CompiledFile, CompiledMod, LuaForm};
+pub use compile::{
+    base_copy_name, compile, compile_with_base_copies, Chunk, CompiledFile, CompiledMod, LuaForm,
+};
 pub use decode::{decode_many, DecodedSlot, DecodedTweakSet, SlotKind};
 pub use inplace::{
     dry_run as inplace_dry_run, write as write_in_place, WriteOutcome as InPlaceWriteOutcome,
@@ -118,11 +120,21 @@ fn envelope<T: Serialize>(value: &T) -> CliResult {
 /// Compile a saved project into the Lua a game reads. `written` is what a
 /// settle worked out for the route the result is for (issue #3092), which the
 /// local tweak slot launch needs because it writes `tweakdefs` itself.
+///
+/// `base_copies` names units to copy as the game has them, under
+/// `base_copy_name`, ahead of every edit (issue #3177). Only a local test
+/// launch passes it. The packaging and lobby export commands take no such
+/// argument, so what they ship never carries a copy.
 #[tauri::command]
-fn workshop_compile(project: ModProject, written: Option<loads_as::Written>) -> CliResult {
-    envelope(&loads_as::compile_written(
+fn workshop_compile(
+    project: ModProject,
+    written: Option<loads_as::Written>,
+    base_copies: Option<Vec<String>>,
+) -> CliResult {
+    envelope(&loads_as::compile_written_with_base_copies(
         &project,
         &written.unwrap_or_default(),
+        &base_copies.unwrap_or_default(),
     ))
 }
 
@@ -156,13 +168,20 @@ pub struct TestMutatorResult {
 /// `written` is what `workshop_settle_typed_values` worked out for this
 /// project (issue #3059): values the game's post files turn into the typed
 /// ones, each proven by loading the game with exactly these files.
+///
+/// `base_copies` is as `workshop_compile` takes it (issue #3177).
 #[tauri::command]
 fn workshop_test_mutator(
     data_dir: String,
     project: ModProject,
     written: Option<loads_as::Written>,
+    base_copies: Option<Vec<String>>,
 ) -> CliResult {
-    let compiled = loads_as::compile_written(&project, &written.unwrap_or_default());
+    let compiled = loads_as::compile_written_with_base_copies(
+        &project,
+        &written.unwrap_or_default(),
+        &base_copies.unwrap_or_default(),
+    );
     if compiled.files.is_empty() {
         return CliResult::err(
             "This project has no edits a mutator archive can carry, so there is nothing to test.",
@@ -671,7 +690,7 @@ mod tests {
     fn every_command_answers_in_the_envelope_the_frontend_unwraps() {
         let project = saved_project();
 
-        let compiled = unwrap_as_the_frontend_does(workshop_compile(project.clone(), None));
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(project.clone(), None, None));
         assert!(compiled.get("files").is_some_and(Value::is_array));
 
         let report = unwrap_as_the_frontend_does(workshop_preflight(project.clone()));
@@ -686,6 +705,7 @@ mod tests {
         let written = unwrap_as_the_frontend_does(workshop_test_mutator(
             dir.path().to_string_lossy().into_owned(),
             project.clone(),
+            None,
             None,
         ));
         assert!(written.get("files").is_some_and(Value::is_array));
@@ -741,6 +761,7 @@ mod tests {
             dir.path().to_string_lossy().into_owned(),
             project,
             Some(written),
+            None,
         ));
         let post = std::path::Path::new(out["dir"].as_str().expect("a dir"))
             .join("gamedata/unitdefs_post.lua");
@@ -836,7 +857,7 @@ mod tests {
     fn a_project_with_no_edits_is_answered_not_refused() {
         let empty = ModProject::default();
 
-        let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone(), None));
+        let compiled = unwrap_as_the_frontend_does(workshop_compile(empty.clone(), None, None));
         assert_eq!(compiled["files"].as_array().map(Vec::len), Some(0));
         assert_eq!(compiled["tweakdefs"], Value::Null);
 
@@ -852,6 +873,7 @@ mod tests {
         let result = workshop_test_mutator(
             std::env::temp_dir().to_string_lossy().into_owned(),
             ModProject::default(),
+            None,
             None,
         );
         let response = serde_json::to_value(&result).expect("the answer serialises");

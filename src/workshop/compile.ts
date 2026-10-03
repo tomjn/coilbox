@@ -65,9 +65,20 @@ export const workshopCompile = defineCommand<
     project: ModProject;
     /** What a settle worked out for the route the result is for (issue #3092). */
     written?: Written;
+    /**
+     * Units to copy as the game has them, ahead of every edit (issue #3177).
+     * Only a local test launch passes this. Each copy is named by
+     * `baseCopyName`.
+     */
+    baseCopies?: string[];
   },
   CompiledMod
 >("coilbox-workshop", "workshop_compile");
+
+/** What the copy of the game's own version of `unit` is called in a test game. */
+export function baseCopyName(unit: string): string {
+  return `${unit}_coilbox_base`;
+}
 
 /** What the caller has: the Lua, or the reason there is none yet. */
 export interface CompileState {

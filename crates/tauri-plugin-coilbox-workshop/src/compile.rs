@@ -186,11 +186,58 @@ const ARMOR_FILE: &str = "gamedata/armordefs.lua";
 /// [`modinfo_versioned`] with the version the author is publishing.
 const MUTATOR_VERSION: &str = "1";
 
-/// Compile a project.
+/// What a copy of the game's own version of `unit` is called (issue #3177).
+///
+/// The suffix keeps a copy from clashing with a real unit, and the result is
+/// held to [`valid_unit_key`] before anything is written under it.
+pub fn base_copy_name(unit: &str) -> String {
+    format!("{unit}{BASE_COPY_SUFFIX}")
+}
+
+const BASE_COPY_SUFFIX: &str = "_coilbox_base";
+
+/// Compile a project. Never copies the game's units: only a local test launch
+/// asks for those, through [`compile_with_base_copies`], so packaging and the
+/// lobby export cannot emit them by passing the wrong argument.
 pub fn compile(project: &ModProject) -> CompiledMod {
+    compile_with_base_copies(project, &[])
+}
+
+/// [`compile`], plus a copy of the game's own version of each unit in
+/// `base_copies`, under [`base_copy_name`] (issue #3177).
+///
+/// The project changes a unit under its own name, so a test game would have
+/// only the changed one. The copy is taken ahead of every other chunk, which
+/// is what keeps it the game's version. A local test launch is the only
+/// caller: the copies are for putting both on the map at once.
+pub fn compile_with_base_copies(project: &ModProject, base_copies: &[String]) -> CompiledMod {
     let edits = &project.edits;
     let mut chunks = Vec::new();
     let mut notes = Vec::new();
+
+    let mut copied: Vec<&str> = Vec::new();
+    for unit in base_copies {
+        if !valid_unit_key(unit) || !valid_unit_key(&base_copy_name(unit)) {
+            notes.push(format!(
+                "No copy of the game's {unit:?} was made. A unit's internal name can only hold lowercase letters, digits and underscores."
+            ));
+        } else if !copied.contains(&unit.as_str()) {
+            copied.push(unit);
+        }
+    }
+    if !copied.is_empty() {
+        chunks.push(Chunk {
+            form: LuaForm::Block,
+            title: format!(
+                "{} unit{} copied",
+                copied.len(),
+                if copied.len() == 1 { "" } else { "s" }
+            ),
+            reason: "A copy of the game's own version, taken before any change applies, so a test game can have it on the map beside the changed unit.".to_string(),
+            lua: base_copy_block(&copied),
+            unit: singleton_unit(copied.iter().copied()),
+        });
+    }
 
     // Lua the project carries but cannot edit (issue #1280), compiled first
     // so everything the user did in coilbox lands on top of it. An imported
@@ -491,7 +538,7 @@ pub fn compile(project: &ModProject) -> CompiledMod {
     }
 
     let mut files = Vec::new();
-    if !edits.is_empty() {
+    if !edits.is_empty() || !copied.is_empty() {
         files.push(CompiledFile {
             path: "modinfo.lua".to_string(),
             contents: modinfo(project),
@@ -1814,6 +1861,38 @@ fn disabled_block(disabled: &[String]) -> String {
     )
 }
 
+/// A copy of the game's own definition of each unit, under [`base_copy_name`].
+///
+/// The engine looks for `scripts/<name>.cob` when `script` is unset
+/// (`udTable.GetString("script", unitName + ".cob")`), so a copy under another
+/// name needs the original's name written in or it loads with no animation.
+fn base_copy_block(units: &[&str]) -> String {
+    let mut out = String::from(
+        "-- Copies of the game's own units, taken before any change below applies.\n\
+         do\n\
+         \x20 local function copy(t)\n\
+         \x20   local out = {}\n\
+         \x20   for k, v in pairs(t) do out[k] = type(v) == \"table\" and copy(v) or v end\n\
+         \x20   return out\n\
+         \x20 end\n",
+    );
+    for unit in units {
+        let name = lua_string(unit);
+        let copy = lua_string(&base_copy_name(unit));
+        let script = lua_string(&format!("{unit}.cob"));
+        out.push_str(&format!(
+            "  if UnitDefs[{name}] then\n\
+             \x20   local base = copy(UnitDefs[{name}])\n\
+             \x20   -- The engine looks for scripts/<name>.cob when script is unset.\n\
+             \x20   base.script = base.script or {script}\n\
+             \x20   UnitDefs[{copy}] = base\n\
+             \x20 end\n"
+        ));
+    }
+    out.push_str("end");
+    out
+}
+
 /// Text that is safe to put in a `--` comment: one line, no control characters.
 ///
 /// A newline inside one would end the comment and leave whatever came after it
@@ -2379,6 +2458,90 @@ mod tests {
             serde_json::to_value(&typed).expect("serialise"),
         );
         assert!(typed.chunks[0].lua.contains("health = 322"));
+    }
+
+    fn project_with_carried_lua_and_a_change() -> ModProject {
+        serde_json::from_value(json!({
+            "name": "Faster commanders",
+            "gameName": "Balanced Annihilation V15.9.8",
+            "readOnlyLua": [{
+                "title": "Carried",
+                "lua": "do -- carried marker\nend",
+                "note": "",
+                "form": "block"
+            }],
+            "edits": {
+                "overrides": { "armzeus": { "health": 322 } },
+                "disabled": ["armpw"]
+            },
+        }))
+        .expect("parse")
+    }
+
+    /// Issue #3177. The copy has to be taken before any edit applies, or it
+    /// picks the edits up, so it comes ahead of carried Lua, the field changes
+    /// and the later blocks, in the mutator's post file and in `tweakdefs`.
+    #[test]
+    fn a_base_copy_runs_ahead_of_every_other_chunk() {
+        let out = compile_with_base_copies(
+            &project_with_carried_lua_and_a_change(),
+            &["armzeus".to_string()],
+        );
+        assert!(out.chunks[0]
+            .lua
+            .contains("UnitDefs[\"armzeus_coilbox_base\"] = base"));
+        assert_eq!(out.chunks[0].unit.as_deref(), Some("armzeus"));
+
+        let post = file(&out, POST_FILE);
+        let tweakdefs = out.tweakdefs.as_deref().expect("tweakdefs");
+        for lua in [post, tweakdefs] {
+            let copy = lua.find("armzeus_coilbox_base").expect("the copy");
+            for later in ["carried marker", "health = 322", "units switched off"] {
+                let at = lua
+                    .to_lowercase()
+                    .find(later)
+                    .unwrap_or_else(|| panic!("no {later} in {lua}"));
+                assert!(copy < at, "the copy comes after {later} in {lua}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_base_copy_keeps_the_original_script_name() {
+        let out = compile_with_base_copies(
+            &project(json!({ "overrides": { "armzeus": { "health": 322 } } })),
+            &["armzeus".to_string()],
+        );
+        assert!(out.chunks[0]
+            .lua
+            .contains("base.script = base.script or \"armzeus.cob\""));
+    }
+
+    #[test]
+    fn a_compile_asked_for_no_copies_is_the_compile_it_always_was() {
+        let project = project_with_carried_lua_and_a_change();
+        let plain = serde_json::to_value(compile(&project)).expect("serialise");
+        let none =
+            serde_json::to_value(compile_with_base_copies(&project, &[])).expect("serialise");
+        assert_eq!(plain, none);
+        assert!(!plain.to_string().contains("coilbox_base"));
+    }
+
+    #[test]
+    fn a_base_copy_name_is_a_valid_unit_key_and_a_bad_unit_is_left_out() {
+        assert!(valid_unit_key(&base_copy_name("armzeus")));
+        let out = compile_with_base_copies(
+            &project(json!({ "overrides": { "armzeus": { "health": 322 } } })),
+            &["../armzeus".to_string(), "Arm Zeus".to_string()],
+        );
+        assert!(!out.chunks.iter().any(|c| c.lua.contains("coilbox_base")));
+        assert_eq!(
+            out.notes
+                .iter()
+                .filter(|n| n.starts_with("No copy of the game's"))
+                .count(),
+            2
+        );
     }
 
     #[test]
