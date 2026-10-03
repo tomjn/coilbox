@@ -178,11 +178,18 @@ export interface Battle {
    *  appoint one, so the room offers it only when this is set. */
   bossesEnabled: boolean;
   /**
-   * Whether a battle is running in this lobby, so the row offers Watch live
-   * rather than Join. Tachyon says so on the lobby itself. Always false on a
+   * Whether a battle is running in this lobby, so the row is listed as in
+   * progress. Tachyon says so on the lobby itself. Always false on a
    * TASServer connection, where the list reads the host's ingame bit instead.
    */
   inProgress: boolean;
+  /**
+   * When the running match started, in unix millis, or null when no match is
+   * running or nothing says when it began. Zero-K sends it. On TASServer it is
+   * the moment we saw the host go in game, so a match that was already running
+   * when we logged in has none.
+   */
+  runningSince: number | null;
   /**
    * The room's mode where the protocol has one: `custom`, `teams`, `1v1`,
    * `ffa`, `coop` or `planetwars`. Zero-K only, and null everywhere else.
@@ -284,6 +291,9 @@ export interface LobbyState {
   battles: Record<string, Battle>;
   currentBattle: number | null;
   lastBattle: number | null;
+  /** The battle whose running match we were in the room for when it started,
+   * or null. Only a TASServer connection sets it. */
+  witnessedStart: number | null;
   /** The UDP port the server assigned for a battle we host (`HOSTPORT`). */
   hostPort: number | null;
   channelDirectory: DirChannel[];

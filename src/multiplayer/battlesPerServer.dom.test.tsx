@@ -177,6 +177,7 @@ function battle(id: number, title: string, host = "Host"): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    runningSince: null,
     mode: null,
   };
 }
@@ -257,6 +258,17 @@ describe("the battle room nav item with two connections", () => {
     expect(view.getByRole("img", { name: "Game in progress" })).toBeTruthy();
   });
 
+  // Readable from any page, so somebody elsewhere in the app can tell how far
+  // in their match is without opening the room.
+  it("says how long ago that battle's match started, where that is known", async () => {
+    const started = { ...battle(7, "Battle on B"), runningSince: Date.now() };
+    wire.states.set(KEY_B, lobbyState("Zeta", [started], 7));
+    const view = await mount();
+    expect(
+      view.getByRole("img", { name: "Game in progress. Started just now" }),
+    ).toBeTruthy();
+  });
+
   it("hides when neither connection is in a battle", async () => {
     wire.states.set(
       KEY_B,
@@ -321,6 +333,24 @@ describe("the battle room with two connections", () => {
     await openRoom(`/battle?server=${encodeURIComponent(KEY_A)}`);
     expect(room.serverKey).toBe(KEY_A);
     expect(room.battle).toBeUndefined();
+  });
+
+  // What decides between launching the engine for somebody and leaving them in
+  // the room with a Watch button.
+  it("counts the player as there at the start when the lobby saw it from this battle", async () => {
+    const state = lobbyState("Zeta", [battle(7, "Battle on B")], 7);
+    wire.states.set(KEY_B, { ...state, witnessedStart: 7 });
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    expect(room.hostIngame).toBe(true);
+    expect(room.presentAtStart).toBe(true);
+  });
+
+  it("counts the player as a late arrival in a room that was already running", async () => {
+    const state = lobbyState("Zeta", [battle(7, "Battle on B")], 7);
+    wire.states.set(KEY_B, { ...state, witnessedStart: null });
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    expect(room.hostIngame).toBe(true);
+    expect(room.presentAtStart).toBe(false);
   });
 
   it("leaves the battle on its own connection", async () => {

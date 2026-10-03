@@ -352,6 +352,25 @@ pub enum Delta {
     },
 }
 
+/// Record a host going in game or coming out of it on the battle they host.
+///
+/// TASServer never says when a match started, so the moment we see it start is
+/// the only start time there is. A status replayed during login is not that, and
+/// neither is a call with no clock, so both leave the battle without one.
+fn match_started_or_ended(state: &mut LobbyState, host: &str, ingame: bool, now_ms: u64) {
+    let seen_live = ingame && state.login_complete;
+    let since = (seen_live && now_ms != 0).then_some(now_ms);
+    for battle in state.battles.values_mut().filter(|b| b.host == host) {
+        battle.running_since = since;
+        if !ingame && state.witnessed_start == Some(battle.id) {
+            state.witnessed_start = None;
+        }
+        if seen_live && state.current_battle == Some(battle.id) {
+            state.witnessed_start = Some(battle.id);
+        }
+    }
+}
+
 /// Apply a server message to the lobby state, returning the deltas produced.
 /// `now_ms` stamps any chat message created (unix millis; pass 0 when no clock).
 pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec<Delta> {
@@ -405,6 +424,9 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     deltas.push(Delta::PlayerWentIngame {
                         name: username.clone(),
                     });
+                }
+                if new_status.ingame != was_ingame {
+                    match_started_or_ended(state, &username, new_status.ingame, now_ms);
                 }
             } else {
                 deltas.push(Delta::UserStatusChanged {
@@ -762,6 +784,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             state.current_battle = Some(id);
             state.last_battle = Some(id);
             state.current_vote = None;
+            state.witnessed_start = None;
             vec![Delta::EnteredBattle { id, own: false }]
         }
         ServerMessage::JoinBattleFailed { reason } => {
@@ -893,6 +916,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             state.current_battle = Some(id);
             state.last_battle = Some(id);
             state.current_vote = None;
+            state.witnessed_start = None;
             // A fresh host port arrives via HOSTPORT right after this ack; drop any
             // stale one from a previous host session.
             state.host_port = None;
@@ -1117,9 +1141,12 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
             vec![]
         }
         ServerMessage::FriendRequestListEnd => vec![Delta::FriendRequestsChanged],
+        ServerMessage::LoginInfoEnd => {
+            state.login_complete = true;
+            vec![]
+        }
         // Messages carrying no state change / handled by the login machine.
         ServerMessage::TasServer { .. }
-        | ServerMessage::LoginInfoEnd
         | ServerMessage::RequestBattleStatus
         | ServerMessage::Ping { .. }
         | ServerMessage::Pong { .. }
@@ -1865,6 +1892,80 @@ mod tests {
         // still ingame; no new edge
         let d2 = reduce(&mut s, parse_line("CLIENTSTATUS bob 1"));
         assert!(!d2.contains(&Delta::PlayerWentIngame { name: "bob".into() }));
+    }
+
+    /// A logged-in state holding battle 9, hosted by alice, who is not in game.
+    fn alice_hosting(login_finished: bool) -> LobbyState {
+        let mut s = LobbyState::new();
+        reduce(&mut s, parse_line("ADDUSER alice GB 5 agent"));
+        reduce(
+            &mut s,
+            parse_line(
+                "BATTLEOPENED 9 0 0 alice 1.2.3.4 8452 12 0 0 -1 spring\t105\tMap\tTitle\tBAR",
+            ),
+        );
+        if login_finished {
+            reduce(&mut s, parse_line("LOGININFOEND"));
+        }
+        s
+    }
+
+    #[test]
+    fn a_match_that_starts_while_connected_is_stamped() {
+        let mut s = alice_hosting(true);
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        assert_eq!(s.battles[&9].running_since, Some(5_000));
+    }
+
+    #[test]
+    fn a_match_already_running_at_login_has_no_start_time() {
+        let mut s = alice_hosting(false);
+        // The login burst replays alice's status. That is when we heard of the
+        // match, not when it started.
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        reduce_at(&mut s, parse_line("LOGININFOEND"), 5_001);
+        assert_eq!(s.battles[&9].running_since, None);
+        // In game and now away as well: no new start, so still no time.
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 3"), 9_000);
+        assert_eq!(s.battles[&9].running_since, None);
+    }
+
+    #[test]
+    fn the_start_time_goes_when_the_match_ends() {
+        let mut s = alice_hosting(true);
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 0"), 9_000);
+        assert_eq!(s.battles[&9].running_since, None);
+    }
+
+    #[test]
+    fn a_start_seen_from_inside_the_battle_is_remembered() {
+        let mut s = alice_hosting(true);
+        reduce(&mut s, parse_line("JOINBATTLE 9 12345"));
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        assert_eq!(s.witnessed_start, Some(9));
+        // The match ending is the end of having been there for it.
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 0"), 9_000);
+        assert_eq!(s.witnessed_start, None);
+    }
+
+    #[test]
+    fn a_start_seen_from_outside_the_battle_is_not_ours() {
+        let mut s = alice_hosting(true);
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        assert_eq!(s.witnessed_start, None);
+        // Walking in afterwards does not make us somebody who was there.
+        reduce(&mut s, parse_line("JOINBATTLE 9 12345"));
+        assert_eq!(s.witnessed_start, None);
+    }
+
+    #[test]
+    fn joining_a_battle_again_forgets_the_start_we_saw() {
+        let mut s = alice_hosting(true);
+        reduce(&mut s, parse_line("JOINBATTLE 9 12345"));
+        reduce_at(&mut s, parse_line("CLIENTSTATUS alice 1"), 5_000);
+        reduce(&mut s, parse_line("JOINBATTLE 9 12345"));
+        assert_eq!(s.witnessed_start, None);
     }
 
     #[test]

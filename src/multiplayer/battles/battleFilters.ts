@@ -30,8 +30,8 @@ export function occupancy(
   return Object.hasOwn(b.members, b.host) ? m : m + 1;
 }
 
-/** The affordance a non-joined battle row offers: join an open battle, or watch a
- * running one live as a spectator. */
+/** The affordance a non-joined battle row offers: join an open battle, or walk
+ * into the room of a running one, where the match can be watched. */
 export interface BattleRowAction {
   kind: "join" | "watch";
   label: string;
@@ -41,8 +41,9 @@ export interface BattleRowAction {
 /**
  * Decide the action for a battle row you are not already in. An open battle offers
  * Join, gated on being joinable and not full. A running battle (host in-game)
- * offers Watch live: you join as a spectator, which doesn't consume a player slot,
- * so a full player roster never blocks watching. Both require `canJoin` (connected,
+ * is joined too, and never blocked by a full roster: nobody walking into a running
+ * room takes a player slot in the match. Joining starts no engine. The room's own
+ * button offers to watch, once you are in it. Both require `canJoin` (connected,
  * not busy, not already in a battle). Pure — no snapshot access.
  */
 export function battleRowAction(
@@ -50,7 +51,7 @@ export function battleRowAction(
   opts: { canJoin: boolean; inProgress: boolean },
 ): BattleRowAction {
   if (opts.inProgress) {
-    return { kind: "watch", label: "Watch live", disabled: !opts.canJoin };
+    return { kind: "watch", label: "Join", disabled: !opts.canJoin };
   }
   const full = occupancy(b) >= b.maxPlayers;
   return { kind: "join", label: "Join", disabled: !opts.canJoin || full };

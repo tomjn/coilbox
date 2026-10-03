@@ -219,6 +219,9 @@ export interface BattleRoomView {
   actionError: string | null;
   /** Whether the battle host (autohost) is in-game — i.e. the match has started. */
   hostIngame: boolean;
+  /** Whether we were in this room when the running match started, which is
+   * what makes us a participant in it rather than somebody who walked in on it. */
+  presentAtStart: boolean;
   /**
    * Bumped each time a Tachyon server tells us where the match is. That is the
    * launch signal on a Tachyon lobby, which has no host to go in-game: the
@@ -601,6 +604,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // all-bot match with the host spectating still starts (the autohost/engine
   // enforces its own rules).
   const hostIngame = !!battle && !!state?.users[battle.host]?.status.ingame;
+  const presentAtStart = !!battle && state?.witnessedStart === battle.id;
   const allReady = battleStartable(rows);
   const startPosType = battle ? startPosTypeOf(battle) : 0;
 
@@ -1327,6 +1331,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     sync,
     actionError,
     hostIngame,
+    presentAtStart,
     battleStartSeq: mirror.battleStartSeq,
     currentVote,
     castVote,

@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Link as LinkIcon, Lock, LogOut, Play } from "lucide-react";
+import { Eye, Link as LinkIcon, Lock, LogIn, LogOut, Play } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ButtonGroup } from "@/components/ui/button-group";
@@ -27,6 +27,8 @@ import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
 import { linkifyTitle } from "./linkifyTitle";
+import type { MatchAction } from "./matchAction";
+import { lateWatchWarning, startedAgo, useNow } from "./runningMatch";
 import { SyncStatusPill } from "./SyncStatusPill";
 import { startAnywayWarning } from "./startBlockers";
 import { startButtonLabel } from "./startButtonLabel";
@@ -55,12 +57,13 @@ export function BattleRoomHeader({
   blockShort,
   blockReason,
   unsynced,
-  hostIngame,
+  action,
   allReady,
   onToggleReady,
   onToggleSpectate,
   onLeave,
   onStart,
+  onJoinMatch,
   selfHost,
   canStartDirectly,
   closesRoom,
@@ -79,12 +82,16 @@ export function BattleRoomHeader({
   /** Other people in the room whose own sync bit says they cannot play this
    * battle (issue #1605). Start asks before leaving them behind. */
   unsynced: string[];
-  hostIngame: boolean;
+  /** What the main button does: start the match, or get into the running one.
+   * See `matchAction`. */
+  action: MatchAction;
   allReady: boolean;
   onToggleReady: (ready: boolean) => void;
   onToggleSpectate: (spectator: boolean) => void;
   onLeave: () => void;
   onStart: () => void;
+  /** Launch the engine into the running match, to rejoin it or to watch. */
+  onJoinMatch: () => void;
   selfHost: boolean;
   /** Whether the click actually starts the match rather than asking the room
    * to vote on it: the founder, or a Tachyon lobby's boss (issue #3198). */
@@ -148,26 +155,54 @@ export function BattleRoomHeader({
   const routeLabel = selfHost
     ? battleRouteLabel(hostingRoute, { lanRoom: directRoom })
     : joinedBattleRouteLabel(battle.relayed);
-  const startDisabled = hostIngame || !allReady || !!blockReason;
-  const startButton = (
+  // A match is running. Zero-K says so on the battle, where there is no host
+  // whose in-game bit could.
+  const matchRunning = action !== "start" || battle.inProgress;
+  const now = useNow(matchRunning);
+  // The one thing worth asking before the click goes ahead: leaving somebody
+  // behind at a start, or a long wait in front of a late watch.
+  const warning =
+    action === "start"
+      ? startWarning
+      : action === "watch"
+        ? lateWatchWarning(battle.runningSince, now)
+        : null;
+  const go = action === "start" ? onStart : onJoinMatch;
+  const mainDisabled =
+    action === "ingame" || !!blockReason || (action === "start" && !allReady);
+  const mainTitle = (() => {
+    if (blockReason) return blockReason;
+    if (action === "ingame") return "The match is already running";
+    if (action === "rejoin") return "Return to the running match";
+    if (action === "watch") return warning ?? "Join the running match to watch";
+    if (!allReady) return "All players must be ready first";
+    return (
+      warning ??
+      (canStartDirectly
+        ? "Ask the autohost to start the match"
+        : "Ask the room to vote on starting the match")
+    );
+  })();
+  const mainButton = (
     <Button
-      onClick={startWarning ? undefined : onStart}
-      disabled={startDisabled}
-      title={
-        blockReason
-          ? blockReason
-          : hostIngame
-            ? "The match is already running"
-            : !allReady
-              ? "All players must be ready first"
-              : (startWarning ??
-                (canStartDirectly
-                  ? "Ask the autohost to start the match"
-                  : "Ask the room to vote on starting the match"))
-      }
+      onClick={warning ? undefined : go}
+      disabled={mainDisabled}
+      title={mainTitle}
     >
-      <Play className="size-4 fill-current" />
-      {hostIngame ? "In game" : startButtonLabel(canStartDirectly)}
+      {action === "rejoin" ? (
+        <LogIn className="size-4" />
+      ) : action === "watch" ? (
+        <Eye className="size-4" />
+      ) : (
+        <Play className="size-4 fill-current" />
+      )}
+      {action === "start"
+        ? startButtonLabel(canStartDirectly)
+        : action === "rejoin"
+          ? "Rejoin"
+          : action === "watch"
+            ? "Watch"
+            : "In game"}
     </Button>
   );
 
@@ -289,6 +324,11 @@ export function BattleRoomHeader({
             Locked
           </label>
         )}
+        {matchRunning && (
+          <span className="text-sm text-muted-foreground">
+            {startedAgo(battle.runningSince, now)}
+          </span>
+        )}
         <ButtonGroup>
           {selfHost ? (
             <Popover open={confirmClose} onOpenChange={setConfirmClose}>
@@ -331,33 +371,33 @@ export function BattleRoomHeader({
               Leave
             </Button>
           )}
-          {startWarning && !startDisabled ? (
+          {warning && !mainDisabled ? (
             <Popover open={confirmStart} onOpenChange={setConfirmStart}>
-              <PopoverTrigger asChild>{startButton}</PopoverTrigger>
+              <PopoverTrigger asChild>{mainButton}</PopoverTrigger>
               <PopoverContent align="end" className="w-72 space-y-3">
-                <p className="text-sm">{startWarning}</p>
+                <p className="text-sm">{warning}</p>
                 <div className="flex justify-end gap-2">
                   <Button
                     variant="secondary"
                     size="sm"
                     onClick={() => setConfirmStart(false)}
                   >
-                    Wait for them
+                    {action === "start" ? "Wait for them" : "Not now"}
                   </Button>
                   <Button
                     size="sm"
                     onClick={() => {
                       setConfirmStart(false);
-                      onStart();
+                      go();
                     }}
                   >
-                    Start anyway
+                    {action === "start" ? "Start anyway" : "Watch anyway"}
                   </Button>
                 </div>
               </PopoverContent>
             </Popover>
           ) : (
-            startButton
+            mainButton
           )}
         </ButtonGroup>
       </div>

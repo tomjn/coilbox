@@ -51,6 +51,7 @@ function battle(): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    runningSince: null,
     mode: "custom",
   };
 }

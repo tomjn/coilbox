@@ -35,6 +35,7 @@ function mk(p: Partial<Battle>): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    runningSince: null,
     mode: null,
     ...p,
   };
@@ -97,12 +98,14 @@ describe("battleRowAction", () => {
     expect(a.disabled).toBe(true);
   });
 
-  it("offers Watch live on a running battle", () => {
+  // The row gets you into the room. Whether to start the engine and watch is
+  // decided there, so the row does not promise a match on the other side of it.
+  it("offers Join on a running battle too", () => {
     const a = battleRowAction(mk({}), { canJoin: true, inProgress: true });
-    expect(a).toEqual({ kind: "watch", label: "Watch live", disabled: false });
+    expect(a).toEqual({ kind: "watch", label: "Join", disabled: false });
   });
 
-  it("watches a full running battle: spectators don't need a player slot", () => {
+  it("joins a full running battle, where nobody is taking a player slot", () => {
     const a = battleRowAction(mk({ maxPlayers: 2, members: { x: M } }), {
       canJoin: true,
       inProgress: true,
@@ -111,7 +114,7 @@ describe("battleRowAction", () => {
     expect(a.disabled).toBe(false);
   });
 
-  it("disables Watch live when not joinable", () => {
+  it("disables joining a running battle when not joinable", () => {
     const a = battleRowAction(mk({}), { canJoin: false, inProgress: true });
     expect(a.disabled).toBe(true);
   });

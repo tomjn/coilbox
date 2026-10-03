@@ -186,7 +186,7 @@ function ServerBattles({
 
   // `key` is supplied by the row's password popover for passworded battles. A
   // battle in progress is joined the same way — the server places a late joiner as
-  // a spectator, and the room auto-launches the engine to watch the running game.
+  // a spectator. Nothing launches, and the room's own button offers to watch.
   // Wrapped so the identity is stable: it reaches every row, and a new function
   // each render would re-render all of them (see `BattleRow`'s memo).
   //

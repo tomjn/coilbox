@@ -69,6 +69,7 @@ function battle(relayed = false): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    runningSince: null,
     mode: null,
   };
 }
@@ -102,7 +103,8 @@ function drawHeader(
       blockShort={null}
       blockReason={null}
       unsynced={[]}
-      hostIngame={false}
+      action="start"
+      onJoinMatch={() => {}}
       allReady={false}
       onToggleReady={() => {}}
       onToggleSpectate={() => {}}
