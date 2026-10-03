@@ -9,6 +9,7 @@
  * changing the parent item's hook count.
  */
 import { useSetting } from "@picoframe/frame";
+import { startedAgo, useNow } from "../battle/runningMatch";
 import { useInBattleKey } from "../battle/useBattleRoomKey";
 import { HIGHLIGHT_OWN_KEY, HIGHLIGHT_WORDS_KEY } from "../chat/highlight";
 import {
@@ -67,20 +68,32 @@ export function BattleNavBadge() {
   // #2844). With no battle anywhere there is nothing to count.
   const serverKey = useInBattleKey();
   const state = useConnection(serverKey)?.mirror.state;
+  const live = !!state && battleLive(state);
+  const now = useNow(live);
   if (!state || !serverKey) return null;
 
   const n = battleBadgeCount(state, (id, count) =>
     unreadFor(id, count, serverKey),
   );
-  const live = battleLive(state);
   if (n <= 0 && !live) return null;
+  // How far in the match is, where anything says when it started, so it can be
+  // read from any page without opening the room.
+  const since =
+    state.currentBattle === null
+      ? null
+      : (state.battles[String(state.currentBattle)]?.runningSince ?? null);
+  const liveLabel =
+    since === null
+      ? "Game in progress"
+      : `Game in progress. ${startedAgo(since, now)}`;
 
   return (
     <span className="flex items-center gap-1.5">
       {live && (
         <span
           role="img"
-          aria-label="Game in progress"
+          aria-label={liveLabel}
+          title={liveLabel}
           className="size-2 shrink-0 rounded-full bg-primary"
         />
       )}

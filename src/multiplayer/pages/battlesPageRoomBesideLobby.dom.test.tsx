@@ -242,6 +242,7 @@ function battle(id: number, title: string): Battle {
     bosses: [],
     bossesEnabled: false,
     inProgress: false,
+    runningSince: null,
     mode: null,
   };
 }

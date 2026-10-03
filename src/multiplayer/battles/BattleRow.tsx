@@ -3,6 +3,7 @@ import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
 import { memo, useState } from "react";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
+import { startedAgo, useNow } from "../battle/runningMatch";
 import type { Battle } from "../bindings";
 import { BattleRowMapThumb } from "./BattleRowMapThumb";
 import { battleRowAction, occupancy } from "./battleFilters";
@@ -13,8 +14,8 @@ import { JoinBattlePopover } from "./JoinBattlePopover";
  * passworded/locked), map · game · host, occupancy and spectators, and a join
  * affordance. When actionable, the title area is itself a button that triggers
  * the action (a second path to the action button). A running battle (host
- * in-game) offers "Watch live" instead of "Join": `onJoin` is reused, joining as a
- * spectator to watch the running game. `joined` highlights the battle the user is
+ * in-game) is joined the same way and says how long ago its match started.
+ * Joining it starts no engine, and the room offers to watch. `joined` highlights the battle the user is
  * in. `canJoin` gates the action (ready, not busy, not already in a battle).
  * Passworded battles act via a password popover. Others act via a plain button.
  * `onJoin`'s optional `key` carries the popover password.
@@ -49,8 +50,8 @@ function BattleRowInner({
    * battle or one already joined still gets a link (issue #2372): both are
    * things worth sending, so only "not connected" disables it. */
   linkable?: boolean;
-  /** The battle is already running (host in-game): the row offers "Watch live",
-   * joining as a spectator, rather than "Join". */
+  /** The battle is already running (host in-game): the row says how long ago
+   * the match started, and joining is never blocked by a full roster. */
   inProgress?: boolean;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
@@ -77,6 +78,10 @@ function BattleRowInner({
   // Built rather than assumed: a connection that has no link worth giving out
   // shows no button, instead of one that copies something nobody can act on.
   const invite = inviteLink(serverAddress, directRoom, String(battle.id));
+  // How far in a running match is, where anything says when it started. A row
+  // with no start time already sits under the "In progress" heading.
+  const started = inProgress ? battle.runningSince : null;
+  const now = useNow(started !== null);
 
   // Clicking the title is a second path to the same action as the button:
   // passworded battles open the password popover, others act directly (join, or
@@ -133,6 +138,9 @@ function BattleRowInner({
         </button>
       )}
       <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+        {started !== null && (
+          <span className="mr-2">{startedAgo(started, now)}</span>
+        )}
         <Users className="size-3.5" aria-hidden />
         <span>
           {players}/{battle.maxPlayers}

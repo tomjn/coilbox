@@ -1,6 +1,6 @@
 import { Button, NavGate } from "@picoframe/frame";
-import { Bookmark, Gamepad2, LogIn } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Bookmark, Gamepad2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
 import { useHostedRoom } from "@/direct/hostedRoom";
@@ -39,8 +39,8 @@ import { launchBlock, startedWithoutYou } from "../battle/contentBlock";
 import { draftToHostSeed, hostSeedAiNotice } from "../battle/fromSkirmish";
 import { GameTypePresetsControls } from "../battle/GameTypePresetsControls";
 import { MissingContentCard } from "../battle/MissingContentCard";
+import { launchesOnItsOwn, matchAction } from "../battle/matchAction";
 import { matchStartAction } from "../battle/matchStart";
-import { canRejoinMatch } from "../battle/rejoin";
 import { StartPosOptions } from "../battle/StartPosOptions";
 import { unsyncedPlayers } from "../battle/startBlockers";
 import { battleToSkirmishDraft } from "../battle/toSkirmish";
@@ -60,8 +60,9 @@ import { useMultiplayer } from "../store";
  * `useBattleRoom` and lays out a header + two columns: the roster with
  * the battle chat filling the remaining height on the left, and the map/game/
  * start-position/host-command panel on the right. The engine launches itself when
- * the autohost starts the match (host goes in-game), so the only manual launch is
- * the Rejoin button shown after our engine exits mid-match.
+ * the autohost starts the match (host goes in-game) for anybody who was in the
+ * room at the time. The header's main button is the manual way in: back into a
+ * match our engine dropped out of, or in to watch one we walked in on.
  */
 function BattleRoomPage() {
   const room = useBattleRoom(useBattleRoomKey());
@@ -299,6 +300,9 @@ function BattleRoomPage() {
   // relaunching within one game; reset once the host leaves in-game. When we host it
   // ourselves we launch via the Start button instead (see `onStart`), so this is
   // skipped — our own in-game flag must not trigger a client launch.
+  //
+  // Only for a match we were in the room for. Walking into a room that is
+  // already running launches nothing, and the header offers to watch instead.
   const launchedRef = useRef(false);
   const canRun =
     !!room.target &&
@@ -306,21 +310,31 @@ function BattleRoomPage() {
     !room.mapMissing &&
     !room.gameMissing;
   const { launch: doLaunch } = launch;
-  // Our launch for this match has finished, so the engine is no longer ours to
-  // be in. With the host still in-game that means we dropped out of a running
-  // match, which is what the manual Rejoin button offers to undo (issue #453).
-  const [launchSettled, setLaunchSettled] = useState(false);
-  useEffect(() => {
-    if (room.selfHost) return;
-    if (!room.hostIngame) {
-      launchedRef.current = false;
-      setLaunchSettled(false);
-      return;
+  // A launch of ours is on its way or has an engine up. Once it is over and the
+  // host is still in-game we have dropped out of a running match, which is what
+  // the header's Rejoin offers to undo (issue #453).
+  const [launching, setLaunching] = useState(false);
+  const runLaunch = useCallback(async () => {
+    setLaunching(true);
+    try {
+      await doLaunch();
+    } finally {
+      setLaunching(false);
     }
-    if (launchedRef.current || !canRun) return;
+  }, [doLaunch]);
+  useEffect(() => {
+    if (!room.hostIngame) launchedRef.current = false;
+    const go = launchesOnItsOwn({
+      selfHost: room.selfHost,
+      hostIngame: room.hostIngame,
+      presentAtStart: room.presentAtStart,
+      launched: launchedRef.current,
+      canRun,
+    });
+    if (!go) return;
     launchedRef.current = true;
-    doLaunch().finally(() => setLaunchSettled(true));
-  }, [room.selfHost, room.hostIngame, canRun, doLaunch]);
+    void runLaunch();
+  }, [room.selfHost, room.hostIngame, room.presentAtStart, canRun, runLaunch]);
 
   // A Tachyon lobby has no host to go in-game. The server picks an autohost and
   // sends every player its address, which the connection answers and reports by
@@ -358,28 +372,19 @@ function BattleRoomPage() {
       return;
     }
     startedRef.current = battleStartSeq;
-    setLaunchSettled(false);
-    doLaunch().finally(() => setLaunchSettled(true));
-  }, [battleStartSeq, blockReason, canRun, doLaunch]);
+    void runLaunch();
+  }, [battleStartSeq, blockReason, canRun, runLaunch]);
 
-  // Never automatic: an engine that exited may have exited on purpose, so
-  // getting back in has to be a deliberate click.
-  const rejoinable = canRejoinMatch({
+  // What the header's main button does. Getting into a running match is never
+  // automatic past the first launch: an engine that exited may have exited on
+  // purpose, so going back has to be a deliberate click.
+  const action = matchAction({
     selfHost: room.selfHost,
     hostIngame: room.hostIngame,
-    launchSettled,
+    presentAtStart: room.presentAtStart,
+    launching,
     running: launch.running,
-    canRun,
   });
-
-  async function onRejoin() {
-    setLaunchSettled(false);
-    try {
-      await doLaunch();
-    } finally {
-      setLaunchSettled(true);
-    }
-  }
 
   // Host start: flip our in-game flag (so joiners' clients auto-launch and connect),
   // launch the engine in host mode, then clear the flag once it exits. A joined
@@ -459,12 +464,13 @@ function BattleRoomPage() {
         blockShort={block?.short ?? null}
         blockReason={blockReason}
         unsynced={unsyncedPlayers(room.rows)}
-        hostIngame={room.hostIngame}
+        action={action}
         allReady={room.allReady}
         onToggleReady={room.setReady}
         onToggleSpectate={room.setSpectator}
         onLeave={onLeave}
         onStart={onStart}
+        onJoinMatch={runLaunch}
         selfHost={room.selfHost}
         canStartDirectly={room.isFounder || room.iAmBoss}
         closesRoom={endsTheRoom}
@@ -511,24 +517,14 @@ function BattleRoomPage() {
           {hostSeedError}
         </p>
       )}
-      {rejoinable && (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
-          <span>
-            The match is still running and you've left it. Rejoin to return to
-            your slot.
-          </span>
-          <Button size="sm" onClick={onRejoin}>
-            <LogIn className="size-4" /> Rejoin
-          </Button>
-        </div>
-      )}
-      {/* Named the moment we know, not at launch. Once the host is in-game the
-          same fact is reworded, because by then the match is running without us
-          and sitting still needs explaining. Our own in-game flag is not that,
-          so a self-hosted room never says it. */}
+      {/* Named the moment we know, not at launch. Once a match we were here for
+          has started the same fact is reworded, because by then it is running
+          without us and sitting still needs explaining. Our own in-game flag is
+          not that, so a self-hosted room never says it, and neither does a room
+          we walked into mid-match, where nothing was ever going to launch. */}
       {block && (
         <p className="border-b border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
-          {room.hostIngame && !room.selfHost
+          {room.presentAtStart && !room.selfHost
             ? startedWithoutYou(block)
             : block.reason}
         </p>
