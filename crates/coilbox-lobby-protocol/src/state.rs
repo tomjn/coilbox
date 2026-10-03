@@ -282,11 +282,16 @@ pub struct Battle {
     /// Whether this lobby allows bosses at all. A lobby with them switched off
     /// refuses `lobby/appointBoss`, so the room offers it only when this is set.
     pub bosses_enabled: bool,
-    /// Whether a battle is running in this lobby, so the row offers Watch live
-    /// rather than Join. Tachyon says so on the lobby itself. Always false on a
+    /// Whether a battle is running in this lobby, so the row is listed as in
+    /// progress. Tachyon says so on the lobby itself. Always false on a
     /// TASServer connection, which says nothing about the battle and where the
     /// list reads the host's ingame bit instead.
     pub in_progress: bool,
+    /// When the running match started, in unix millis, or `None` when no match
+    /// is running or nothing says when it began. Zero-K sends it. TASServer does
+    /// not, so there it is the moment we saw the host go in game, and a match
+    /// that was already running when we logged in has none.
+    pub running_since: Option<u64>,
     /// The room's mode, where the protocol has one: `custom`, `teams`, `1v1`,
     /// `ffa`, `coop` or `planetwars`. Zero-K only, and `None` everywhere else,
     /// including on a Zero-K room whose header never named one.
@@ -467,6 +472,15 @@ pub struct LobbyState {
     pub battles: HashMap<u32, Battle>,
     pub current_battle: Option<u32>,
     pub last_battle: Option<u32>,
+    /// The battle whose running match we were in the room for when it started,
+    /// or `None`. Somebody who was there gets the engine launched for them and a
+    /// way back in if it exits. Somebody who walked into a running room does not.
+    /// Only a TASServer connection sets it.
+    pub witnessed_start: Option<u32>,
+    /// Whether the server has finished replaying its state after login. Until
+    /// then a user's in-game bit is news about the past, not a match starting.
+    #[serde(skip)]
+    pub login_complete: bool,
     /// The UDP port the server told us to host our battle on (`HOSTPORT`), set only
     /// while we are the founder of `current_battle`. The host-mode start script binds
     /// the engine to this; cleared when we open a fresh battle.

@@ -25,7 +25,7 @@
 //!
 //! # What is parsed and not kept
 //!
-//! `IsMatchMaker`, `TimeQueueEnabled`, `MaxEvenPlayers` and `RunningSince` are
+//! `IsMatchMaker`, `TimeQueueEnabled` and `MaxEvenPlayers` are
 //! read off the wire by the generated types and go no further, which is what the
 //! `lobby-protocol-gap` label tracks.
 
@@ -112,8 +112,17 @@ fn put(state: &mut LobbyState, header: &BattleHeader) -> Vec<Delta> {
         // room asks for one and the join has to prompt.
         battle.passworded = !password.is_empty();
     }
+    if let Some(running_since) = &header.running_since {
+        battle.running_since = unix_millis(running_since);
+    }
     if let Some(is_running) = header.is_running {
         battle.in_progress = is_running;
+        if !is_running {
+            // A null `RunningSince` is left out of the JSON like any other unset
+            // member, so the match ending is the only thing that says the start
+            // time no longer applies.
+            battle.running_since = None;
+        }
     }
 
     let changed = battle != before;
@@ -146,6 +155,64 @@ fn close(state: &mut LobbyState, id: i32) -> Vec<Delta> {
         });
     }
     deltas
+}
+
+/// A Json.NET `DateTime` as unix millis, e.g. `2026-10-03T12:00:00.1234567Z`.
+///
+/// `None` for anything that is not a date and time with a zone on it. A time
+/// with no zone may be the server's local time, and reading that as UTC would
+/// put the start of a match hours out, which is worse than not knowing it.
+fn unix_millis(iso: &str) -> Option<u64> {
+    let (date, rest) = iso.split_once('T')?;
+    let (clock, offset_minutes) = match rest.strip_suffix('Z') {
+        Some(clock) => (clock, 0),
+        None => {
+            let (clock, zone) = rest.split_at(rest.rfind(['+', '-'])?);
+            let (hours, minutes) = zone[1..].split_once(':')?;
+            let offset = hours.parse::<i64>().ok()? * 60 + minutes.parse::<i64>().ok()?;
+            (
+                clock,
+                if zone.starts_with('-') {
+                    -offset
+                } else {
+                    offset
+                },
+            )
+        }
+    };
+
+    let mut date = date.split('-').map(|part| part.parse::<i64>().ok());
+    let (year, month, day) = (date.next()??, date.next()??, date.next()??);
+    let (clock, fraction) = clock.split_once('.').unwrap_or((clock, ""));
+    let mut clock = clock.split(':').map(|part| part.parse::<i64>().ok());
+    let (hour, minute, second) = (clock.next()??, clock.next()??, clock.next()??);
+    if date.next().is_some()
+        || clock.next().is_some()
+        || !(1..=12).contains(&month)
+        || !(1..=31).contains(&day)
+        || !(0..24).contains(&hour)
+        || !(0..60).contains(&minute)
+        || !(0..=60).contains(&second)
+    {
+        return None;
+    }
+    // Whole milliseconds, from however many fractional digits were written.
+    let millis = match fraction {
+        "" => 0,
+        digits => format!("{digits:0<3}").get(..3)?.parse::<i64>().ok()?,
+    };
+
+    // Days since 1970-01-01 in the proleptic Gregorian calendar, counting years
+    // from March so the leap day falls at the end of one.
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = year.div_euclid(400);
+    let year_of_era = year.rem_euclid(400);
+    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+
+    let seconds = days * 86_400 + hour * 3_600 + minute * 60 + second - offset_minutes * 60;
+    u64::try_from(seconds * 1_000 + millis).ok()
 }
 
 /// A count off the wire. The header types these as plain integers, so a negative
@@ -291,6 +358,74 @@ mod tests {
             r#"BattleAdded {"Header":{"BattleID":42,"IsRunning":true}}"#,
         );
         assert!(state.battles[&42].in_progress);
+    }
+
+    #[test]
+    fn a_running_battle_says_when_it_started() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":42,"IsRunning":true,"RunningSince":"2026-10-03T12:00:00Z"}}"#,
+        );
+        assert_eq!(state.battles[&42].running_since, Some(1_791_028_800_000));
+    }
+
+    #[test]
+    fn an_update_that_names_no_start_time_keeps_the_one_held() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":42,"IsRunning":true,"RunningSince":"2026-10-03T12:00:00Z"}}"#,
+        );
+        feed(
+            &mut state,
+            r#"BattleUpdate {"Header":{"BattleID":42,"PlayerCount":3}}"#,
+        );
+        assert_eq!(state.battles[&42].running_since, Some(1_791_028_800_000));
+    }
+
+    #[test]
+    fn a_battle_that_stops_running_loses_its_start_time() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            r#"BattleAdded {"Header":{"BattleID":42,"IsRunning":true,"RunningSince":"2026-10-03T12:00:00Z"}}"#,
+        );
+        // The serialiser leaves a null member out, so the end of a match arrives
+        // as `IsRunning` alone.
+        feed(
+            &mut state,
+            r#"BattleUpdate {"Header":{"BattleID":42,"IsRunning":false}}"#,
+        );
+        assert_eq!(state.battles[&42].running_since, None);
+    }
+
+    #[test]
+    fn a_start_time_is_read_to_the_millisecond_in_any_zone() {
+        // Json.NET writes seven fractional digits.
+        assert_eq!(
+            unix_millis("2024-02-29T23:59:59.1234567Z"),
+            Some(1_709_251_199_123)
+        );
+        // 01:59:59 at +02:00 is the same instant as 23:59:59 UTC the day before.
+        assert_eq!(
+            unix_millis("2024-03-01T01:59:59+02:00"),
+            Some(1_709_251_199_000)
+        );
+        assert_eq!(
+            unix_millis("2024-02-29T18:59:59-05:00"),
+            Some(1_709_251_199_000)
+        );
+    }
+
+    #[test]
+    fn a_start_time_that_cannot_be_trusted_is_no_start_time() {
+        // No zone: this could be the server's local time, and a guess would put
+        // the start hours out.
+        assert_eq!(unix_millis("2026-10-03T12:00:00"), None);
+        assert_eq!(unix_millis("yesterday"), None);
+        assert_eq!(unix_millis("2026-13-03T12:00:00Z"), None);
+        assert_eq!(unix_millis(""), None);
     }
 
     #[test]
