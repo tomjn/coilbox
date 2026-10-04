@@ -443,10 +443,20 @@ end
 
 --- Something happened that triggers may care about. The runtime raises
 -- `unit_created`, `unit_finished`, `unit_destroyed`, `unit_captured`,
--- `command_given` and `selection_changed`; a condition may declare any name, and
--- whatever raises it must use the same one.
+-- `command_given`, `selection_changed` and `dialogue_dismissed`. A condition may
+-- declare any name, and whatever raises it must use the same one.
 function Engine:event(name, payload)
 	self:run({ name = name, payload = payload })
+end
+
+--- Ask the polled triggers now, off the beat, without running the samplers.
+--
+-- A paused game sends no frames, so nothing in `frame` below runs for as long as
+-- the pause lasts. A player dismissing a held line of dialogue is the one thing
+-- that happens in a paused lesson, and the trigger waiting on it may be a polled
+-- one, so whoever hears the dismissal calls this after raising its event.
+function Engine:poll()
+	self:run(nil)
 end
 
 --- Called every game frame. The engine owns the polled rate so that the tick is

@@ -173,6 +173,14 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     command: { kind: "enum", values: GIVEN_COMMANDS, optional: true },
     unitDef: { kind: "string", optional: true, label: "unit to build" },
   },
+  /**
+   * Holds once a player has clicked away a line the mission held on screen,
+   * since the trigger was armed or since it last fired. It is how a lesson
+   * carries on after the player has read an instruction (issue #3552).
+   */
+  dialogue_dismissed: {
+    line: { kind: "dialogueId", label: "dialogue line" },
+  },
   time_elapsed: {
     seconds: { kind: "number" },
   },
@@ -225,7 +233,14 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   disable_trigger: { trigger: { kind: "triggerId" } },
   complete_objective: { objective: { kind: "objectiveId" } },
   fail_objective: { objective: { kind: "objectiveId" } },
-  dialogue: { line: { kind: "dialogueId" } },
+  /**
+   * `hold` keeps the line on the panel until the player clicks it away, where
+   * a line otherwise leaves when its reading time is up (issue #3552).
+   */
+  dialogue: {
+    line: { kind: "dialogueId" },
+    hold: { kind: "boolean", optional: true, label: "wait for the player" },
+  },
   /** A sound file beside the compiled mission, by name. */
   play_sound: { sound: { kind: "string" } },
   reveal_area: {
@@ -311,6 +326,13 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     metal: { kind: "amount", optional: true, label: "metal storage" },
     energy: { kind: "amount", optional: true, label: "energy storage" },
   },
+  /**
+   * Stop the game clock, and start it again. Single player only: the runtime
+   * ignores both in a game with more than one player, because a pause stops
+   * the game for everybody in it (issue #3552).
+   */
+  pause_game: {},
+  unpause_game: {},
 };
 
 /**
@@ -341,6 +363,8 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
     "Holds while a player has a unit selected: any unit, one of a type, or one you placed.",
   command_given:
     "Holds once a player has given an order after this trigger was armed: any order, one command, or building a unit type.",
+  dialogue_dismissed:
+    "Holds once a player has clicked away a dialogue line that was set to wait for them.",
   time_elapsed:
     "True once a set number of seconds has passed since the mission began.",
   var: "Compares a variable to a number, or to another variable.",
@@ -362,7 +386,8 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   disable_trigger: "Disarms a trigger until something enables it again.",
   complete_objective: "Marks an objective as done.",
   fail_objective: "Marks an objective as failed.",
-  dialogue: "Plays one of the mission's dialogue lines.",
+  dialogue:
+    "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away.",
   play_sound: "Plays a named sound file.",
   reveal_area:
     "Lifts the fog over a zone for a team, for a set time or the rest of the mission.",
@@ -380,6 +405,9 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   set_income:
     "Sets what a team is paid per second from now on. A negative number bleeds it instead.",
   give_storage: "Moves how much metal or energy a team can hold.",
+  pause_game:
+    "Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line.",
+  unpause_game: "Starts a paused game again, in single player only.",
 };
 
 /**
@@ -409,6 +437,7 @@ export const TYPE_GROUPS: Record<string, string> = {
   unit_captured: "Units",
   unit_selected: "Player",
   command_given: "Player",
+  dialogue_dismissed: "Player",
   var: "Variables",
   time_elapsed: "Time",
   zone_held_for: "Time",
@@ -435,6 +464,8 @@ export const TYPE_GROUPS: Record<string, string> = {
   reveal_area: "Presentation",
   camera_pan: "Presentation",
   map_marker: "Presentation",
+  pause_game: "Presentation",
+  unpause_game: "Presentation",
   victory: "Ending",
   defeat: "Ending",
 };
@@ -489,6 +520,12 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
    *  lesson waiting on one waits for ever. */
   unit_selected: 8,
   command_given: 8,
+  /** Issue #3552. A runtime behind 9 has no implementation for any of them,
+   *  so a lesson would run on without pausing, or wait for ever on a dismissal
+   *  that cannot come. */
+  pause_game: 9,
+  unpause_game: 9,
+  dialogue_dismissed: 9,
 };
 
 /**

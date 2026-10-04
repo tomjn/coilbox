@@ -47,6 +47,14 @@ M.SECONDS_PER_CHARACTER = 0.06
 -- would otherwise build a backlog the player is still hearing minutes later.
 M.MAX_QUEUED = 6
 
+-- What a held line starts its dismissal message with. A contract with the
+-- gadget's player conditions, which keep their own copy because a gadget cannot
+-- read anything under luaui/.
+M.DISMISSED_MESSAGE = "coilbox_mission_dismissed:"
+
+-- What a held line says under its text, so the player knows it is waiting.
+M.HOLD_HINT = "Click to continue"
+
 local DEFAULT_GAME_SPEED = 30
 
 --- The scenario id from the modoption, or nothing.
@@ -152,6 +160,10 @@ end
 -- than interrupt, because a trigger with two lines in it is an author writing an
 -- exchange, and showing only the second would lose half of it.
 --
+-- A held line is the exception to "for how long". It stays until `dismiss` is
+-- called, which is the player clicking it away, so a lesson can put up an
+-- instruction and know it was read.
+--
 -- `options.lines` is the scenario's dialogue by id. Everything else has a
 -- default: `gameSpeed`, `minSeconds`, `maxSeconds`, `secondsPerCharacter` and
 -- `maxQueued`.
@@ -164,25 +176,44 @@ function M.newQueue(options)
 	options.maxQueued = tonumber(options.maxQueued) or M.MAX_QUEUED
 
 	local lines = options.lines or {}
+	-- Each entry is { line =, hold = }.
 	local waiting = {}
 	local showing = nil
 	local untilFrame = 0
 
 	local queue = {}
 
+	--- The oldest waiting line that is not held, or nothing.
+	local function oldestTimed()
+		for index, entry in ipairs(waiting) do
+			if not entry.hold then
+				return index
+			end
+		end
+		return nil
+	end
+
 	--- Take a line the mission just fired. An id nothing declared is dropped
 	-- here as well as in the synced half, because a widget reading a mission the
 	-- gadget refused should still not draw a blank box.
-	function queue.push(id)
+	--
+	-- `hold` keeps the line on the panel until it is dismissed.
+	function queue.push(id, hold)
 		local line = lines[id]
 		if not line then
 			return nil
 		end
-		waiting[#waiting + 1] = line
+		waiting[#waiting + 1] = { line = line, hold = hold == true }
 		-- Oldest first. A backlog means the player is behind the mission, and the
-		-- line worth keeping is the one nearest to now.
+		-- line worth keeping is the one nearest to now. A held line is never the
+		-- one dropped: the mission may be waiting to hear it was dismissed, and a
+		-- line the player never saw is one they can never dismiss.
 		while #waiting > options.maxQueued do
-			table.remove(waiting, 1)
+			local index = oldestTimed()
+			if not index then
+				break
+			end
+			table.remove(waiting, index)
 		end
 		return line
 	end
@@ -191,20 +222,54 @@ function M.newQueue(options)
 	-- the caller knows when to start its clip, and nothing on a frame where the
 	-- panel did not change.
 	function queue.update(frame)
-		if showing and frame >= untilFrame then
+		if showing and not showing.hold and frame >= untilFrame then
 			showing = nil
 		end
 		if not showing and #waiting > 0 then
 			showing = table.remove(waiting, 1)
-			untilFrame = frame + duration(showing, options)
-			return showing
+			untilFrame = frame + duration(showing.line, options)
+			return showing.line
 		end
 		return nil
 	end
 
 	--- The line on the panel now, or nothing.
 	function queue.current()
-		return showing
+		return showing and showing.line
+	end
+
+	--- Whether the line on the panel is waiting to be dismissed.
+	function queue.holding()
+		return showing ~= nil and showing.hold
+	end
+
+	--- Take a held line off the panel. Returns the line, so the caller can say
+	-- which one was dismissed, and nothing when the panel is not holding one.
+	function queue.dismiss()
+		if not queue.holding() then
+			return nil
+		end
+		local line = showing.line
+		showing = nil
+		return line
+	end
+
+	--- Whether a held line is stuck behind a line that is counting down.
+	--
+	-- Dialogue runs on game time, and a paused game has none. A lesson that
+	-- pauses and then holds a line would never show it if an earlier line were
+	-- still on the panel, so the caller lets the clock run through a pause for
+	-- as long as this is true.
+	function queue.blocked()
+		if not showing or showing.hold then
+			return false
+		end
+		for _, entry in ipairs(waiting) do
+			if entry.hold then
+				return true
+			end
+		end
+		return false
 	end
 
 	--- How many lines are waiting their turn.
@@ -407,11 +472,16 @@ local function dialoguePanel(L, scene, measure, view)
 	local wrapWidth = (x0 + width - M.PAD) - textLeft
 
 	local rows = M.wrap(line.text, wrapWidth / M.TEXT_SIZE, measure)
-	local body = (M.PAD * 2) + M.LINE_HEIGHT + (#rows * M.LINE_HEIGHT)
+	-- A held line gets one more row, for the hint that says it is waiting.
+	local hintRows = scene.hold and 1 or 0
+	local body = (M.PAD * 2) + M.LINE_HEIGHT + ((#rows + hintRows) * M.LINE_HEIGHT)
 	local height = math.max(body, M.PORTRAIT_SIZE + (M.PAD * 2))
 
 	L.rects[#L.rects + 1] = { x = x0, y = y0, w = width, h = height,
 		color = M.BACKDROP, kind = "dialogue" }
+	if scene.hold then
+		L.dialogueBox = { x0, y0, x0 + width, y0 + height }
+	end
 
 	if portrait then
 		L.portrait = {
@@ -430,6 +500,11 @@ local function dialoguePanel(L, scene, measure, view)
 		y = y - M.LINE_HEIGHT
 		L.texts[#L.texts + 1] = { x = textLeft, y = y, size = M.TEXT_SIZE,
 			text = row, color = M.COLOUR.active, options = "o" }
+	end
+	if scene.hold then
+		y = y - M.LINE_HEIGHT
+		L.texts[#L.texts + 1] = { x = textLeft, y = y, size = M.TEXT_SIZE,
+			text = M.HOLD_HINT, color = M.COLOUR.heading, options = "o" }
 	end
 end
 
@@ -458,13 +533,15 @@ end
 --- Lay a scene out: every rectangle and every line of text the widget draws,
 -- in screen coordinates with the origin at the bottom left.
 -- @param scene table objectives (from M.objectives), line (from the queue),
---   portraitBad (the line's portrait would not load), debrief (from M.debrief)
+--   hold (the line is waiting to be dismissed), portraitBad (the line's
+--   portrait would not load), debrief (from M.debrief)
 -- @param measure function(text) -> width in multiples of the font size
 -- @param view table w, h of the screen
 -- @return table rects { x, y, w, h, color, kind }, texts { x, y, size, text,
 --   color, options }, portrait { x, y, w, h, file } or nil, and debriefBox
---   { x0, y0, x1, y1 } or nil, which is what a dismissing click is tested
---   against.
+--   and dialogueBox, each { x0, y0, x1, y1 } or nil, which are what a
+--   dismissing click is tested against. dialogueBox is there only for a held
+--   line.
 function M.layout(scene, measure, view)
 	local L = { rects = {}, texts = {} }
 	objectivesPanel(L, scene.objectives or {}, measure, view)
@@ -483,6 +560,7 @@ function M.sceneKey(scene)
 		parts[#parts + 1] = entry.id .. "=" .. entry.state
 	end
 	parts[#parts + 1] = scene.line and tostring(scene.line.id) or ""
+	parts[#parts + 1] = scene.hold and "hold" or ""
 	parts[#parts + 1] = scene.portraitBad and "bad" or ""
 	parts[#parts + 1] = scene.debrief and scene.debrief.outcome or ""
 	return table.concat(parts, "|")

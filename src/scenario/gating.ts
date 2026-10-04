@@ -142,6 +142,24 @@ function negatesACondition(scenario: Scenario): boolean {
   );
 }
 
+/**
+ * The runtime that first held a dialogue line until the player dismissed it
+ * (issue #3552). A runtime behind this reads past the flag and takes the line
+ * down on its timer, so the instruction a lesson meant to wait on is gone
+ * before a new player has read it.
+ */
+const HELD_DIALOGUE_VERSION = 9;
+
+/** Whether any dialogue action holds its line. A flag written `false` is the
+ *  timed line every runtime has always said, so it asks for nothing. */
+function holdsADialogueLine(scenario: Scenario): boolean {
+  return scenario.triggers.some((trigger) =>
+    trigger.actions.some(
+      (step) => step.type === "dialogue" && step.params.hold === true,
+    ),
+  );
+}
+
 /** Every string a value carries, however deeply nested. */
 function stringsIn(value: unknown, out: Set<string>): void {
   if (typeof value === "string") out.add(value);
@@ -218,6 +236,9 @@ export function requiredRuntimeVersion(
   }
   if (negatesACondition(scenario)) {
     version = Math.max(version, NEGATED_CONDITION_VERSION);
+  }
+  if (holdsADialogueLine(scenario)) {
+    version = Math.max(version, HELD_DIALOGUE_VERSION);
   }
   return version;
 }
