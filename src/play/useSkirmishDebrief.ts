@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
-import { contentDemoInfo } from "../content/bindings";
+import { contentDemoInfo, type DemoInfo } from "../content/bindings";
 import type { ReplayProvenance } from "../content/replayUserState";
+import type { GameResult, ResultChange } from "../records/bestResult";
 import type { PlayTarget } from "./config";
 import {
   type DebriefOutcome,
@@ -8,6 +9,7 @@ import {
   describeOutcome,
 } from "./debrief";
 import { resultFromDemoInfo } from "./detect";
+import { describeChange } from "./presetRecord";
 import { tagFreshReplay } from "./tagReplayProvenance";
 
 export interface SkirmishDebrief {
@@ -19,6 +21,10 @@ export interface SkirmishDebrief {
   /** The fresh replay's filename, for the "view replay" link; null when none
    * was found. */
   replayFilename: string | null;
+  /** What this game did to the record of the preset it was launched from, or
+   * null when the game did not count against one (the setup was changed, or
+   * the replay was already recorded). */
+  presetLine: string | null;
 }
 
 /**
@@ -48,7 +54,13 @@ export function useSkirmishDebrief() {
    * rather than skipping the panel. */
   const markUndetectable = useCallback(() => {
     const { outcome, headline } = describeOutcome("no-replay");
-    show({ outcome, headline, durationSec: null, replayFilename: null });
+    show({
+      outcome,
+      headline,
+      durationSec: null,
+      replayFilename: null,
+      presetLine: null,
+    });
   }, [show]);
 
   const resolve = useCallback(
@@ -57,8 +69,26 @@ export function useSkirmishDebrief() {
       beforePaths: ReadonlySet<string>;
       playerName: string;
       setProvenance: (filename: string, provenance: ReplayProvenance) => void;
+      /** The preset the launched setup counted against, or null when it
+       * counted against none. */
+      preset: { key: string; name: string } | null;
+      /** Merge the game into that preset's record. Called once per replay. */
+      recordResult: (key: string, result: GameResult) => ResultChange;
     }) => {
-      const { target, beforePaths, playerName, setProvenance } = opts;
+      const {
+        target,
+        beforePaths,
+        playerName,
+        setProvenance,
+        preset,
+        recordResult,
+      } = opts;
+      // The record is written here, when the replay is first read. The write is
+      // keyed on the replay's filename, so reading it again cannot count it twice.
+      const countAgainstPreset = (result: GameResult): string | null =>
+        preset
+          ? describeChange(recordResult(preset.key, result), preset.name)
+          : null;
       setChecking(true);
       try {
         const replay = await tagFreshReplay(
@@ -69,31 +99,42 @@ export function useSkirmishDebrief() {
         );
         if (!replay) {
           const { outcome, headline } = describeOutcome("no-replay");
-          show({ outcome, headline, durationSec: null, replayFilename: null });
-          return;
-        }
-        try {
-          const { info } = await contentDemoInfo({
-            enginePath: target.enginePath,
-            replayPath: replay.path,
-          });
-          const reason: DebriefReason = resultFromDemoInfo(info, playerName);
-          const { outcome, headline } = describeOutcome(reason);
-          show({
-            outcome,
-            headline,
-            durationSec: info.durationSec,
-            replayFilename: replay.filename,
-          });
-        } catch {
-          const { outcome, headline } = describeOutcome("decode-failed");
           show({
             outcome,
             headline,
             durationSec: null,
-            replayFilename: replay.filename,
+            replayFilename: null,
+            presetLine: null,
           });
+          return;
         }
+        let info: DemoInfo | null = null;
+        try {
+          info = (
+            await contentDemoInfo({
+              enginePath: target.enginePath,
+              replayPath: replay.path,
+            })
+          ).info;
+        } catch {
+          info = null;
+        }
+        const reason: DebriefReason = info
+          ? resultFromDemoInfo(info, playerName)
+          : "decode-failed";
+        const { outcome, headline } = describeOutcome(reason);
+        const durationSec = info?.durationSec ?? null;
+        show({
+          outcome,
+          headline,
+          durationSec,
+          replayFilename: replay.filename,
+          presetLine: countAgainstPreset({
+            replayFilename: replay.filename,
+            outcome,
+            durationSec,
+          }),
+        });
       } finally {
         setChecking(false);
       }

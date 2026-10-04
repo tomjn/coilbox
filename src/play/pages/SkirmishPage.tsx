@@ -25,6 +25,7 @@ import {
 } from "@/container/container";
 import { rememberCarriedShortname } from "@/container/shortnames";
 import {
+  useReplays,
   useUnitsyncGameHeaders,
   useUnitsyncGameInfo,
   useUnitsyncMapMeta,
@@ -69,6 +70,7 @@ import { useImportParam } from "../../deeplink/useImportParam";
 import { useOneShotParam } from "../../deeplink/useOneShotParam";
 import { useRecordHubImport } from "../../hub/imports";
 import { getProfile } from "../../profile/profile";
+import { useResultRecords } from "../../records/useResultRecords";
 import type { ModProject } from "../../workshop/project";
 import { applyTweakMutatorRoute } from "../applyTweakMutatorRoute";
 import type { BattleConfig } from "../bindings";
@@ -107,6 +109,11 @@ import {
   type PresetPart,
   type PresetSelection,
 } from "../presetParts";
+import {
+  launchedPreset,
+  PRESET_RECORDS_KEY,
+  presetRecordKey,
+} from "../presetRecord";
 import {
   PRESET_KIND_VERSION,
   parsePresetJson,
@@ -210,6 +217,22 @@ export default function SkirmishPage() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
+  // Best results sit under a key of their own, so sharing a preset never carries
+  // them. The replay list tells a row whether its best replay still exists, and
+  // is read again each time the sheet opens, because a game just played adds one.
+  const {
+    records: presetRecords,
+    record: recordPresetResult,
+    clear: clearPresetRecord,
+  } = useResultRecords(PRESET_RECORDS_KEY);
+  const { replays, refresh: refreshReplays } = useReplays(dataDir);
+  const replayFilenames = useMemo(
+    () => new Set(replays.map((r) => r.filename)),
+    [replays],
+  );
+  useEffect(() => {
+    if (presetsOpen) void refreshReplays();
+  }, [presetsOpen, refreshReplays]);
 
   // Hosting is always offered, because a room on this computer needs no login at
   // all. A lobby server is one more place to host it, and only a live connection
@@ -600,6 +623,13 @@ export default function SkirmishPage() {
     if (!target) return;
     const config = await buildConfig(parts);
     if (!config) return;
+    // Whether this game counts against a preset is settled now, from the setup
+    // as it stands at launch. The sheet is locked while a game runs, so nothing
+    // can change between here and the debrief.
+    const preset = launchedPreset(presets, {
+      ...currentDraft(),
+      participants: parts,
+    });
     setError(null);
     resetDebrief();
     // Snapshot the replays that exist before the engine runs, so any new file
@@ -633,6 +663,8 @@ export default function SkirmishPage() {
         beforePaths,
         playerName: config.myPlayerName,
         setProvenance,
+        preset,
+        recordResult: recordPresetResult,
       });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -957,6 +989,9 @@ export default function SkirmishPage() {
         onLoad={loadPreset}
         onSave={saveCurrentPreset}
         onDelete={removePreset}
+        records={presetRecords}
+        replayExists={(filename) => replayFilenames.has(filename)}
+        onClearRecord={(p) => clearPresetRecord(presetRecordKey(p))}
         onExportPreset={onExportPreset}
         onCopyPresetLink={onCopyPresetLink}
         onImport={onImportPreset}
