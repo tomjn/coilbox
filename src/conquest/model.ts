@@ -101,8 +101,6 @@ export function posZ(pos: NodePos): number {
 
 /** Describes a node's real star, when it has one. Absent on procedural nodes,
  * whose appearance stays a hash of the node id. */
-export type LinkKind = "border" | "crossing" | "road";
-
 export interface NodeStar {
   /** One spectral type per component, brightest first ("A1.0 V", "DA2"). */
   spectral: string[];
@@ -166,16 +164,6 @@ export interface GalaxyDoc {
   nodes: GalaxyNode[];
   /** Undirected node-id pairs. */
   links: [string, string][];
-  terrain?: {
-    image: string; // URL the webview can load (data:, blob:, asset or http)
-    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
-    width: number; // map units
-    height: number; // map units
-    heightScale?: number; // map units of height for a white heightmap pixel
-    projection?: "flat";
-  };
-  linkKinds?: [string, string, LinkKind][];
-  blockedBorders?: [string, string][];
   rules?: {
     graceTurns?: number;
     /** Hide systems more than two jumps from your territory (see `../fog`). */
