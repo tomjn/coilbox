@@ -17,7 +17,7 @@
  * The counterpart on the website is `components/ItemPreview.tsx` and
  * `lib/gallery/*` in tomjn/coilbox-hub, which had to vendor coilbox's galaxy
  * and run generators and mirror their validation to do this. Here all four are
- * the originals: `parseConquestChallengeSettings` and `generateGalaxy`,
+ * the originals: `parseConquestChallengeSettings` and `generateMap`,
  * `parseWarpathChallengeSettings` and `generateRun`, are the same functions the
  * app generates a real galaxy or run with, so a preview cannot drift from it.
  */
@@ -33,7 +33,7 @@ import {
   optionsFromChallenge,
   parseConquestChallengeSettings,
 } from "@/conquest/challenge";
-import { generateGalaxy } from "@/conquest/generate";
+import { generateMap } from "@/conquest/mapStyle";
 import { type GalaxyDoc, NEUTRAL, type NodePos } from "@/conquest/model";
 import type { Container } from "@/container/container";
 import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
@@ -360,7 +360,7 @@ function rebuildGalaxy(
   settings: Parameters<typeof optionsFromChallenge>[0],
 ): GalaxyShape | null {
   try {
-    const galaxy = generateGalaxy(
+    const galaxy = generateMap(
       optionsFromChallenge(settings, { maps: [] }, "hub-preview"),
     );
     return galaxy.nodes.length > 0 ? shapeOf(galaxy) : null;

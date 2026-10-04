@@ -102,7 +102,7 @@ describe("RunSetupPanel Regenerate button", () => {
   it("is disabled on a failed scan, and the panel gives the reason", () => {
     h.scan = { data: null, error: REASON, loading: false };
     renderPanel();
-    const button = screen.getByRole("button", { name: /Regenerate galaxy/ });
+    const button = screen.getByRole("button", { name: /Regenerate map/ });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(new RegExp(REASON))).toBeTruthy();
   });
@@ -110,7 +110,7 @@ describe("RunSetupPanel Regenerate button", () => {
   it("shows no failure while the scan is still running", () => {
     h.scan = { data: null, error: null, loading: true };
     renderPanel();
-    const button = screen.getByRole("button", { name: /Regenerate galaxy/ });
+    const button = screen.getByRole("button", { name: /Regenerate map/ });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(screen.queryByText(/The scan failed/)).toBeNull();
   });
@@ -122,7 +122,7 @@ describe("RunSetupPanel Regenerate button", () => {
       loading: false,
     };
     renderPanel();
-    const button = screen.getByRole("button", { name: /Regenerate galaxy/ });
+    const button = screen.getByRole("button", { name: /Regenerate map/ });
     expect((button as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByText(/The scan failed/)).toBeNull();
   });

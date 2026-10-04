@@ -494,7 +494,10 @@ export function layoutStrategicMap(
   const extent = playExtentFor(galaxy.nodes.length);
   const spec = terrainSpecOf(galaxy);
   if (!spec) {
-    const skin = galaxy.theme?.skin ?? "galaxy";
+    // A land style whose document has no terrain has nothing to stand on, so
+    // it is drawn as the flat chart.
+    const skin =
+      (galaxy.theme?.skin ?? "galaxy") === "galaxy" ? "galaxy" : "theatre";
     const positions = layoutNodes(galaxy.nodes, extent);
     // A theatre map is a flat chart: drop the galactic Y jitter.
     if (skin === "theatre") {

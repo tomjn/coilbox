@@ -285,6 +285,14 @@ describe("layoutStrategicMap", () => {
     expect(laid.bounds).toEqual(playBounds(expected.values()));
   });
 
+  it("draws a land style that has no terrain as the flat chart", () => {
+    for (const skin of ["cities", "territories"] as const) {
+      const laid = layoutStrategicMap({ nodes, theme: { skin } });
+      expect(laid.surface).toBeUndefined();
+      expect(laid.skin).toBe("theatre");
+    }
+  });
+
   it("lays a theatre map out as before, flattened", () => {
     const extent = playExtentFor(nodes.length);
     const expected = layoutNodes(nodes, extent);

@@ -3,10 +3,10 @@ import {
   applyChallengeMaps,
   type GenerateOptions,
   generateGalaxy,
-  regenerateGalaxy,
   restoreChallengeMap,
   substituteExcludedMaps,
 } from "./generate";
+import { regenerateGalaxy } from "./mapStyle";
 import { parseGalaxyJson } from "./model";
 
 const maps = Array.from({ length: 12 }, (_, i) => ({
