@@ -131,6 +131,34 @@ export const isChanged = (o: ConfigOption, value?: string) =>
   !sameOptionValue(o, value, o.default ?? "");
 
 /**
+ * The options among `options` whose value, as `readValue` reports it, differs
+ * from their default. The set a "reset" has to change, and the number it shows.
+ */
+export const changedOptions = (
+  options: ConfigOption[],
+  readValue: (o: ConfigOption) => string | undefined,
+): ConfigOption[] => options.filter((o) => isChanged(o, readValue(o)));
+
+/**
+ * `values` with the override of every changed option in `options` dropped.
+ *
+ * Dropping the key is how a sparse setup says "at default" (see `withOption`),
+ * so a reset leaves the option following the game if the game changes its mind,
+ * and `effectiveOptions` fills the declared default in at launch. An option with
+ * no declared default goes back to empty the same way. Keys outside `options`
+ * are untouched.
+ */
+export function resetOptionValues(
+  options: ConfigOption[],
+  values: Record<string, string>,
+): Record<string, string> {
+  return changedOptions(options, (o) => values[o.key]).reduce(
+    (next, o) => withOption(next, o.key, undefined),
+    values,
+  );
+}
+
+/**
  * An option's declared default as a reader would say it: On or Off for a bool,
  * the item's name for a list, "empty" for an empty one, otherwise as written.
  */

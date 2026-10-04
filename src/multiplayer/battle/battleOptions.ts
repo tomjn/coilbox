@@ -1,5 +1,5 @@
 import type { ConfigOption } from "@/content/bindings";
-import { effectiveOptions, isChanged } from "@/play/modOptions";
+import { changedOptions, effectiveOptions, isChanged } from "@/play/modOptions";
 import type { PresetPart, PresetSelection } from "@/play/presetParts";
 import { isTweakSlotKey, tweakSlotOptions } from "@/workshop/deliveryRoutes";
 import { RESTRICT_PREFIX } from "./restrictTags";
@@ -219,6 +219,40 @@ export function changedCount(
   return options.filter((o) =>
     isChanged(o, displayedValue(pending, scriptTags, scope, o.key)),
   ).length;
+}
+
+/** One option write: its script tag, the name SPADS knows it by, and the value. */
+export interface OptionEdit {
+  tagKey: string;
+  spadsName: string;
+  value: string;
+}
+
+/**
+ * The writes that put every changed option in `parts` back to the default its
+ * game or map declares, counting an edit in flight the way the fields do.
+ *
+ * The value is the declared default, or empty where there is none, and not the
+ * removal of the tag: a battle we host carries a tag for every declared option
+ * (#1837), so withdrawing one would hand the option to the engine's built-in
+ * value rather than the game's. This is the same value a field writes when
+ * cleared. A part is one scope's options, so a section is one part and a tab
+ * that holds both scopes is two.
+ */
+export function resetEdits(
+  parts: { scope: OptionScope; options: ConfigOption[] }[],
+  scriptTags: Record<string, string>,
+  pending: PendingMap = {},
+): OptionEdit[] {
+  return parts.flatMap(({ scope, options }) =>
+    changedOptions(options, (o) =>
+      displayedValue(pending, scriptTags, scope, o.key),
+    ).map((o) => ({
+      tagKey: scriptTagKey(scope, o.key),
+      spadsName: o.key,
+      value: o.default ?? "",
+    })),
+  );
 }
 
 /**

@@ -1159,6 +1159,7 @@ export default function SkirmishPage() {
             onOptionChange={(key, value) =>
               setModOptionValues((m) => withOption(m, key, value))
             }
+            onOptionValuesChange={setModOptionValues}
             disabled={running}
           />
         </div>

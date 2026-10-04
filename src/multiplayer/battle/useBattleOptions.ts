@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { lookupTag, type PendingMap, reconcilePending } from "./battleOptions";
+import {
+  lookupTag,
+  type OptionEdit,
+  type PendingMap,
+  reconcilePending,
+} from "./battleOptions";
+import { AUTOHOST_COMMAND_GAP_MS } from "./tweakDelivery";
 
 /** How long to wait for the server to echo an edit before reverting the control. */
 const ECHO_TIMEOUT_MS = 8000;
@@ -22,10 +28,20 @@ const SEND_DEBOUNCE_MS = 400;
  *
  * `send(tagKey, spadsName, value)` performs the actual dispatch (founder
  * `mpSetScriptTags` vs autohost `!bSet`); this hook is agnostic to which.
+ *
+ * `setOptions` is the same for many edits at once (a reset). It is not
+ * debounced, since a click is one decision and not a stream, and it hands the
+ * whole set to `sendMany` in one call so the caller can batch or pace it
+ * rather than fire one command per option. A run through an autohost sends one
+ * option every `AUTOHOST_COMMAND_GAP_MS`, so each edit's echo wait is lengthened
+ * by its place in the run when `paced`, and a later option does not snap back
+ * while still queued.
  */
 export function useBattleOptions(
   scriptTags: Record<string, string>,
   send: (tagKey: string, spadsName: string, value: string) => void,
+  sendMany?: (edits: OptionEdit[]) => void,
+  paced = false,
 ) {
   const [pending, setPending] = useState<PendingMap>({});
   // Echo-revert timers (started once a value is sent) and the debounced-send
@@ -77,6 +93,35 @@ export function useBattleOptions(
     [scriptTags, send, clearTimer],
   );
 
+  const setOptions = useCallback(
+    (edits: OptionEdit[]) => {
+      if (edits.length === 0 || !sendMany) return;
+      const prevs = edits.map((e) => lookupTag(scriptTags, e.tagKey) ?? "");
+      setPending((p) => {
+        const next = { ...p };
+        edits.forEach((e, i) => {
+          next[e.tagKey.toLowerCase()] = { target: e.value, prev: prevs[i] };
+        });
+        return next;
+      });
+      edits.forEach((e, i) => {
+        const lower = e.tagKey.toLowerCase();
+        // Cancels a debounced send of an earlier edit to this option, which
+        // would otherwise land after the reset and undo it.
+        clearTimer(lower);
+        timers.current[lower] = setTimeout(
+          () => {
+            setPending(({ [lower]: _dropped, ...rest }) => rest);
+            delete timers.current[lower];
+          },
+          ECHO_TIMEOUT_MS + (paced ? i * AUTOHOST_COMMAND_GAP_MS : 0),
+        );
+      });
+      sendMany(edits);
+    },
+    [scriptTags, sendMany, paced, clearTimer],
+  );
+
   // Clear any outstanding timers on unmount (both echo-revert and debounced-send).
   useEffect(() => {
     const echo = timers.current;
@@ -87,5 +132,5 @@ export function useBattleOptions(
     };
   }, []);
 
-  return { pending, setOption };
+  return { pending, setOption, setOptions };
 }
