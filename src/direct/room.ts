@@ -1,3 +1,4 @@
+import { battlePasswordProblem } from "../deeplink/parse";
 import type { LobbyServer } from "../lobby-servers/config";
 import { addressOfKey } from "../lobby-servers/hostForms";
 import type { DirectRoomStatus } from "./bindings";
@@ -380,8 +381,11 @@ export function playerNameProblem(typed: string): string | null {
  * side can tell afterwards, so it is refused here, before a port is bound.
  */
 export function roomPasswordProblem(typed: string): string | null {
-  if (!/\s/.test(typed.trim())) return null;
-  return "No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip.";
+  if (/\s/.test(typed.trim())) {
+    return "No spaces in a room password. A room sends it in a single wire field, so a password with a space in it does not survive the trip.";
+  }
+  // Anything else the join line cannot carry, by the rule a joiner is held to.
+  return battlePasswordProblem(typed);
 }
 
 /** What to tell a host whose room started but opened no battle. Pure.

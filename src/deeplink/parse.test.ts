@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  BATTLE_PASSWORD_REFUSAL,
+  battlePasswordProblem,
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
   openScreenRoute,
@@ -500,5 +502,18 @@ describe("openScreenRoute", () => {
 
   it("returns the static route for an idless screen", () => {
     expect(openScreenRoute({ screen: "battles" })).toBe("/battles");
+  });
+});
+
+describe("battlePasswordProblem", () => {
+  it("takes no password, and an ordinary one, whatever space is at the edges", () => {
+    expect(battlePasswordProblem("")).toBeNull();
+    expect(battlePasswordProblem("   ")).toBeNull();
+    expect(battlePasswordProblem("  s3cret!  ")).toBeNull();
+  });
+
+  it("refuses a space inside the password and a character outside the basic keyboard", () => {
+    expect(battlePasswordProblem("let me in")).toBe(BATTLE_PASSWORD_REFUSAL);
+    expect(battlePasswordProblem("pässword")).toBe(BATTLE_PASSWORD_REFUSAL);
   });
 });
