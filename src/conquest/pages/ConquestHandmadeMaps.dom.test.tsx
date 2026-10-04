@@ -126,6 +126,7 @@ const TWO_SHORES: HandmadeMapSummary = {
   game: { shortname: "TG" },
   source: "imported",
   pictureUrl: "coilbox://localhost/conquestmap/sample-two-shores/picture.png",
+  warpath: false,
 };
 
 function conquest(change: Partial<ConquestState> = {}): ConquestState {
