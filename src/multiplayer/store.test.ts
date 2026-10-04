@@ -31,7 +31,11 @@ import {
   mirrorReducer,
   RECONNECT_DELAYS_MS,
   reconnectDelay,
+  serverAddressFromKey,
+  serverHostFromKey,
   serverMessagesSince,
+  serverNameFor,
+  usernameFromKey,
 } from "./store";
 
 const emptyState = {} as LobbyState;
@@ -315,6 +319,133 @@ describe("mirrorReducer Tachyon battle start", () => {
       ev: { kind: "delta", delta: { kind: "battleOpened", id: 4 } },
     });
     expect(m.battleStartSeq).toBe(0);
+  });
+});
+
+/** A saved host and the host a connection key was built with, for one server. */
+const SAME_SERVER_SPELLINGS = [
+  ["IPv6 saved bare, key bracketed", "::1", "[::1]"],
+  ["IPv6 saved bracketed, key bare", "[::1]", "::1"],
+  ["IPv6 long form", "2001:0db8:0:0:0:0:0:1", "2001:db8::1"],
+  ["host name case", "Lobby.Example.com", "lobby.example.com"],
+  ["trailing dot on the saved host", "lobby.example.com.", "lobby.example.com"],
+  ["trailing dot on the key", "lobby.example.com", "lobby.example.com."],
+  ["IPv4 in hex", "0x7f.0.0.1", "127.0.0.1"],
+  ["IPv4 as one number", "127.0.0.1", "2130706433"],
+] as const;
+
+function savedAt(host: string, id = "mine", name = "Mine") {
+  return {
+    id,
+    name,
+    host,
+    port: 8200,
+    tls: false,
+    allowSelfSigned: false,
+  };
+}
+
+describe("serverNameFor with the server written another way (issue #3437)", () => {
+  for (const [label, saved, keyed] of SAME_SERVER_SPELLINGS) {
+    it(`names the saved server: ${label}`, () => {
+      expect(serverNameFor(`me@${keyed}:8200`, [savedAt(saved)])).toBe("Mine");
+    });
+  }
+
+  it("falls back to the address for a different server", () => {
+    expect(serverNameFor("me@[::2]:8200", [savedAt("::1")])).toBe("[::2]:8200");
+  });
+
+  it("names a host the normaliser refuses by its exact text", () => {
+    expect(
+      serverNameFor("me@fe80::1%eth0:8200", [savedAt("fe80::1%eth0")]),
+    ).toBe("Mine");
+    expect(
+      serverNameFor("me@fe80::1%eth1:8200", [savedAt("fe80::1%eth0")]),
+    ).toBe("[fe80::1%eth1]:8200");
+  });
+
+  it("takes the entry spelled exactly as the key first", () => {
+    const servers = [
+      savedAt("[::1]", "a", "Brackets"),
+      savedAt("::1", "b", "Bare"),
+    ];
+    expect(serverNameFor("me@::1:8200", servers)).toBe("Bare");
+    expect(serverNameFor("me@[::1]:8200", servers)).toBe("Brackets");
+  });
+});
+
+describe("a key whose username has an @ in it (issue #3437)", () => {
+  // An email address is typed as the name in the password recovery form, and a
+  // direct room is named for whoever typed its name.
+  it("reads the address and the username either side of the last @", () => {
+    expect(serverAddressFromKey("a@b.example@[::1]:8200")).toBe("[::1]:8200");
+    expect(serverAddressFromKey("a@b.example@::1:8200")).toBe("[::1]:8200");
+    expect(usernameFromKey("a@b.example@[::1]:8200")).toBe("a@b.example");
+    expect(serverHostFromKey("a@b.example@Lobby.Example.com:8200")).toBe(
+      "lobby.example.com",
+    );
+  });
+
+  it("reads a plain key as it did", () => {
+    expect(usernameFromKey("me@lobby.example.com:8200")).toBe("me");
+    expect(serverAddressFromKey("me@lobby.example.com:8200")).toBe(
+      "lobby.example.com:8200",
+    );
+  });
+});
+
+describe("serverHostFromKey with the server written another way (issue #3437)", () => {
+  for (const [label, saved, keyed] of SAME_SERVER_SPELLINGS) {
+    it(`gives both spellings one host: ${label}`, () => {
+      expect(serverHostFromKey(`me@${saved}:8200`)).toBe(
+        serverHostFromKey(`me@${keyed}:8200`),
+      );
+    });
+  }
+
+  it("keeps two different hosts apart", () => {
+    expect(serverHostFromKey("me@[::1]:8200")).not.toBe(
+      serverHostFromKey("me@[::2]:8200"),
+    );
+    expect(serverHostFromKey("me@127.0.0.1:8200")).not.toBe(
+      serverHostFromKey("me@127.0.0.2:8200"),
+    );
+  });
+
+  it("keeps two zone ids apart and one zone id together", () => {
+    expect(serverHostFromKey("me@fe80::1%eth0:8200")).not.toBe(
+      serverHostFromKey("me@fe80::1%eth1:8200"),
+    );
+    expect(serverHostFromKey("me@fe80::1%eth0:8200")).toBe(
+      serverHostFromKey("me@fe80::1%eth0:8201"),
+    );
+  });
+});
+
+describe("connectBlockedReason with the server written another way (issue #3437)", () => {
+  const live = (serverKey: string) => ({
+    serverKey,
+    opening: false,
+    direct: false,
+  });
+
+  for (const [label, saved, keyed] of SAME_SERVER_SPELLINGS) {
+    it(`treats both spellings as one lobby server: ${label}`, () => {
+      expect(
+        connectBlockedReason(
+          [live(`a@${saved}:8200`)],
+          `b@${keyed}:8200`,
+          false,
+        ),
+      ).toContain("already logged in");
+    });
+  }
+
+  it("lets a different host through", () => {
+    expect(
+      connectBlockedReason([live("a@[::1]:8200")], "b@[::2]:8200", false),
+    ).toBeNull();
   });
 });
 
