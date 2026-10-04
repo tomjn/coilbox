@@ -9,9 +9,15 @@ import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
+import { buildCityLayer } from "./cityLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
+import {
+  type PlacedModelSources,
+  placedModelLoaders,
+} from "./placedModelLoaders";
+import { buildPlacedModels } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
 import { createSelection } from "./selection";
 import {
@@ -169,6 +175,12 @@ interface GalaxyViewProps {
    * between renders, because a new object rebuilds the scene.
    */
   terrainPixels?: TerrainPixels;
+  /**
+   * Where `galaxy.models` are read from: the installed game and the map's
+   * folder. A model whose source is absent is reported as missing. Keep it
+   * stable between renders, because a new object rebuilds the scene.
+   */
+  modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
@@ -409,6 +421,7 @@ export function GalaxyView({
   focusNodeId,
   focusBiasX = 0,
   terrainPixels,
+  modelSources,
   display,
   className,
 }: GalaxyViewProps) {
@@ -522,6 +535,17 @@ export function GalaxyView({
         terrainColor ?? terrainSpec.image,
         renderRef,
       );
+      // Scenery. It loads in the background and never holds the map up.
+      if (galaxy.models?.length && !modelSources?.pending) {
+        buildPlacedModels(
+          scene,
+          disposables,
+          surface,
+          galaxy.models,
+          placedModelLoaders(modelSources),
+          renderRef,
+        );
+      }
     } else {
       buildBackdrop(
         scene,
@@ -599,6 +623,7 @@ export function GalaxyView({
       prevFactionRef,
       burstRef,
       applyBurstRef,
+      surface,
     );
 
     /* ------------------------------- labels -------------------------------- */
@@ -630,6 +655,22 @@ export function GalaxyView({
         scene.add(label);
       });
     }
+
+    // A terrain map's point locations and roads. See cityLayer.ts.
+    const cities = surface
+      ? buildCityLayer(
+          scene,
+          disposables,
+          galaxy,
+          surface,
+          ownerColor,
+          ownersRef,
+          laneDim,
+          dimOf,
+          labelObjects,
+          cores,
+        )
+      : undefined;
 
     /* ------------------------ renderer + camera ---------------------------- */
 
@@ -769,6 +810,9 @@ export function GalaxyView({
 
     const render = () => {
       if (!renderer || !labelRenderer) return;
+      if (cities && controls) {
+        cities.fitToCamera(camera.position.distanceTo(controls.target));
+      }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     };
@@ -794,7 +838,8 @@ export function GalaxyView({
       laneDim,
       ownerColor,
       dimOf,
-      trimmedSeg,
+      // A terrain map has no lanes. Its roads are drawn by cityLayer.ts.
+      surface ? () => null : trimmedSeg,
       setLanePair,
       layoutChevrons,
       lanes,
@@ -809,7 +854,11 @@ export function GalaxyView({
       ringGeoFor,
       () => selection.getIndex(),
     );
-    applyOwnersRef.current = owners.apply;
+    const applyOwners = () => {
+      owners.apply();
+      cities?.apply();
+    };
+    applyOwnersRef.current = applyOwners;
 
     // Selection enlarges the node's own ownership ring and pulses its
     // colour, in the animation loop below, no second ring. See selection.ts.
@@ -826,7 +875,11 @@ export function GalaxyView({
       ownersRef,
       owners.styleRing,
     );
-    applySelectionRef.current = selection.apply;
+    const applySelection = () => {
+      selection.apply();
+      cities?.select(selectedRef.current ?? null);
+    };
+    applySelectionRef.current = applySelection;
 
     // Fog of war + graded emphasis: dim/hide styling for every node, plus the
     // lazily-built "done" check marker and ambient combat flash. See
@@ -851,8 +904,8 @@ export function GalaxyView({
     );
     applyVisibilityRef.current = visibility.apply;
 
-    owners.apply();
-    selection.apply();
+    applyOwners();
+    applySelection();
     visibility.apply();
 
     /* ------------------------------ picking -------------------------------- */
@@ -907,7 +960,8 @@ export function GalaxyView({
       // node's lanes means rebuilding them. That is the same work an ownership
       // change already does, and it only runs when the hovered node changes.
       hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
-      owners.apply();
+      cities?.hover(hoveredNodeId);
+      applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
@@ -1141,6 +1195,7 @@ export function GalaxyView({
               dimOf(galaxy.nodes[vp.i].id);
           }
           selection.tick(now);
+          cities?.tick(now);
         }
         winBurst.tick(now);
 
@@ -1222,6 +1277,7 @@ export function GalaxyView({
     terrainReady,
     terrainHeights,
     terrainColor,
+    modelSources,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
