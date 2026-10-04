@@ -1092,3 +1092,26 @@ Supplies system/faction names — and whole lore factions — for **[Galactic Co
 - `factions` — lore factions assigned in order (the player first); each is `{ name, color?, side?, aggression? }`.
 
 See the [Names and factions](conquest.md#names-and-factions) section for how the pools are drawn and the full merge order (profile over catalog over built-ins).
+
+### Bundling a hand-made map
+
+A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map folder inside `.coilbox/galaxies/`, the same folder that holds [bundled galaxy files](conquest.md#bundling-a-galaxy). No `profile.json` entry is needed.
+
+```
+<YourGameFolder>/
+  .coilbox/
+    profile.json
+    galaxies/
+      two-shores/           # a hand-made map folder
+        map.json
+        picture.png
+        provinces.png
+        heightmap.png
+```
+
+- Any folder directly inside `galaxies/` that holds a `map.json` is a map. The folder can have any name.
+- A bundled map is read-only. A player cannot replace it or remove it, and cannot import a map with the same id.
+- If a player already imported a map with the same id, the bundled map is the one coilbox lists.
+- Coilbox finds the folder and reads its manifest today. The Conquest page does not offer a hand-made map to the player yet.
+
+The [hand-made maps guide](hand-made-maps.md) covers what goes in the folder.
