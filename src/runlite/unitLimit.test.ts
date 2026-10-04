@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "../content/bindings";
 import { buildBuildGraph, buildEdgeMap } from "../content/buildTree";
 import { morphEdgeMap } from "../content/morphGraph";
+import { generateRun } from "./generate";
 import type { RogueliteRun } from "./model";
 import {
+  buildGraphFor,
   limitHold,
   limitReadiness,
   noLimitMessage,
   noLimitReason,
+  setupLimitNote,
   setupLimitWarning,
+  startSetFor,
   unitLimitFor,
 } from "./unitLimit";
 
@@ -520,5 +524,290 @@ describe("setupLimitWarning", () => {
         units: CLAW,
       }),
     ).toBeNull();
+  });
+});
+
+// Shaped like the measured Zero-K v1.14.8.0 data: every commander builds the
+// same roster, the upgrade levels are morph targets, a chicken queen builds
+// chickens, and a planetwars structure builds things but is not mobile. The
+// game's own start unit, `update_your_damn_engine`, is not in the data.
+const mobile = (
+  name: string,
+  buildOptions: string[] = [],
+  morphInto: string[] = [],
+): UnitDatasetEntry => ({
+  ...unit(name, buildOptions, morphInto),
+  mobile: true,
+});
+
+const COMM_BUILDS = ["factoryplane", "staticmex", "cloakcon"];
+const ZK: UnitDatasetEntry[] = [
+  mobile("comm_strike_0", COMM_BUILDS, ["comm_strike_1"]),
+  mobile("comm_strike_1", COMM_BUILDS),
+  mobile("comm_riot_0", COMM_BUILDS),
+  mobile("chickenbroodqueen", ["chicken_s"]),
+  unit("pw_dropfac", ["pw_ship"]),
+  mobile("pw_ship"),
+  unit("factoryplane", ["bomberprec", "gunshipsupport"]),
+  unit("staticmex"),
+  mobile("cloakcon", ["factoryplane"]),
+  mobile("bomberprec"),
+  mobile("gunshipsupport"),
+  mobile("chicken_s"),
+];
+const PLACEHOLDER = "update_your_damn_engine";
+
+describe("startSetFor", () => {
+  it("derives the start set from the unit data when the start unit is a placeholder", () => {
+    expect(startSetFor(PLACEHOLDER, ZK)).toEqual({
+      roots: ["chickenbroodqueen", "comm_riot_0", "comm_strike_0"],
+      derived: true,
+    });
+  });
+
+  it("leaves out a form a unit morphs into, a built unit and a structure", () => {
+    const { roots } = startSetFor(PLACEHOLDER, ZK);
+    expect(roots).not.toContain("comm_strike_1");
+    expect(roots).not.toContain("cloakcon");
+    expect(roots).not.toContain("pw_dropfac");
+  });
+
+  it("keeps a real start unit as it is", () => {
+    expect(startSetFor("CLAW_COMMANDER", CLAW)).toEqual({
+      roots: ["claw_commander"],
+      derived: false,
+    });
+  });
+
+  it("has no start set for a run with no start unit", () => {
+    expect(startSetFor(undefined, ZK)).toEqual({ roots: [], derived: false });
+  });
+
+  it("derives nothing when no unit is mobile, as the older fixtures are not", () => {
+    expect(startSetFor(PLACEHOLDER, CLAW)).toEqual({
+      roots: [],
+      derived: false,
+    });
+  });
+
+  it("derives nothing when the candidates build only units outside the data", () => {
+    const lonely = [mobile("lonely", ["ghost"])];
+    expect(startSetFor(PLACEHOLDER, lonely)).toEqual({
+      roots: [],
+      derived: false,
+    });
+  });
+
+  it("derives the union of the real sides for a Random side", () => {
+    const mf = [
+      mobile("aven_commander", ["aven_plant"]),
+      mobile("claw_commander", ["claw_plant"]),
+      unit("aven_plant", ["aven_tank"]),
+      mobile("aven_tank"),
+      unit("claw_plant", ["claw_knife"]),
+      mobile("claw_knife"),
+    ];
+    expect(startSetFor("random", mf).roots).toEqual([
+      "aven_commander",
+      "claw_commander",
+    ]);
+  });
+
+  it("derives a set for a Random side whose start unit is in the data but builds nothing", () => {
+    const ca = [
+      mobile("random_comm"),
+      mobile("armcom", ["armmex"]),
+      mobile("corcom", ["cormex"]),
+      unit("armmex"),
+      unit("cormex"),
+    ];
+    expect(startSetFor("random_comm", ca)).toEqual({
+      roots: ["armcom", "corcom"],
+      derived: true,
+    });
+  });
+});
+
+describe("a run with a derived start set", () => {
+  it("disables what the start set reaches, and leaves the start units alone", () => {
+    const readiness = limitReadiness(run(["factoryplane"], PLACEHOLDER), {
+      status: "ready",
+      units: ZK,
+    });
+    if (readiness.kind !== "ready" || readiness.limit.kind !== "limited") {
+      throw new Error("expected a limit");
+    }
+    expect(readiness.limit.disabled.sort()).toEqual([
+      "bomberprec",
+      "chicken_s",
+      "cloakcon",
+      "gunshipsupport",
+      "staticmex",
+    ]);
+  });
+
+  it("frees a unit once it is unlocked", () => {
+    const readiness = limitReadiness(
+      run(["factoryplane", "bomberprec"], PLACEHOLDER),
+      { status: "ready", units: ZK },
+    );
+    if (readiness.kind !== "ready" || readiness.limit.kind !== "limited") {
+      throw new Error("expected a limit");
+    }
+    expect(readiness.limit.disabled).not.toContain("bomberprec");
+  });
+
+  it("still gives no limit when the derived set is empty", () => {
+    expect(
+      limitReadiness(run([], PLACEHOLDER), { status: "ready", units: CLAW }),
+    ).toEqual({
+      kind: "ready",
+      limit: { kind: "none", reason: "start-unit-not-in-data" },
+    });
+  });
+
+  it("leaves a real start unit's limit as it was", () => {
+    const readiness = limitReadiness(
+      run(["claw_commander"], "claw_commander"),
+      { status: "ready", units: CLAW },
+    );
+    expect(readiness).toEqual({
+      kind: "ready",
+      limit: unitLimitFor(
+        run(["claw_commander"], "claw_commander"),
+        buildEdgeMap(CLAW),
+        morphEdgeMap(CLAW),
+      ),
+    });
+  });
+
+  it("starts a new run with a small arsenal that rewards can grow", () => {
+    // Zero-K has 188 units past the commanders. The starter kit takes the
+    // first twelve, so the fixture needs more than that for a reward to offer.
+    const fillers = Array.from({ length: 20 }, (_, i) => `filler_${i}`);
+    const big = [
+      ...ZK.map((u) =>
+        u.name === "factoryplane"
+          ? unit("factoryplane", [...(u.buildOptions ?? []), ...fillers])
+          : u,
+      ),
+      ...fillers.map((name) => mobile(name)),
+    ];
+    const build = buildGraphFor(PLACEHOLDER, big);
+    if (!build) throw new Error("expected a build graph");
+    const generated = generateRun({
+      seed: 7,
+      length: "long",
+      difficulty: 2,
+      game: { shortname: "zk" },
+      factionId: "player",
+      skin: "galaxy",
+      maps: [{ name: "Small", size: 64 }],
+      build,
+      now: "2026-10-04T00:00:00.000Z",
+    });
+    const start = generated.progress.unlockedUnits;
+    expect(start.length).toBeGreaterThan(0);
+    expect(start).not.toContain("comm_strike_0");
+    const offered = generated.nodes.flatMap((n) =>
+      (n.reward?.options ?? []).flatMap((o) =>
+        o.kind === "unlock" ? [o.unit] : [],
+      ),
+    );
+    expect(offered.length).toBeGreaterThan(0);
+    for (const unit of offered) {
+      expect([
+        "comm_strike_0",
+        "comm_riot_0",
+        "chickenbroodqueen",
+      ]).not.toContain(unit);
+    }
+    const readiness = limitReadiness(generated, {
+      status: "ready",
+      units: big,
+    });
+    if (readiness.kind !== "ready" || readiness.limit.kind !== "limited") {
+      throw new Error("expected a limit");
+    }
+    const locked = new Set(readiness.limit.disabled);
+    expect(locked.size).toBeGreaterThan(0);
+    for (const unit of start) expect(locked.has(unit)).toBe(false);
+    for (const unit of offered) expect(locked.has(unit)).toBe(true);
+  });
+});
+
+describe("buildGraphFor", () => {
+  it("builds the graph from a real start unit as before", () => {
+    const build = buildGraphFor("CLAW_COMMANDER", CLAW);
+    expect(build?.startUnit).toBe("claw_commander");
+    expect(build?.roots).toBeUndefined();
+  });
+
+  it("carries the derived start set for a placeholder", () => {
+    expect(buildGraphFor(PLACEHOLDER, ZK)?.roots).toEqual([
+      "chickenbroodqueen",
+      "comm_riot_0",
+      "comm_strike_0",
+    ]);
+  });
+
+  it("gives no graph without a start unit", () => {
+    expect(buildGraphFor(undefined, ZK)).toBeUndefined();
+  });
+
+  it("keeps the placeholder as the start unit when nothing can be derived", () => {
+    const build = buildGraphFor(PLACEHOLDER, CLAW);
+    expect(build?.startUnit).toBe(PLACEHOLDER);
+    expect(build?.roots).toBeUndefined();
+  });
+});
+
+describe("setup form with a derived start set", () => {
+  const side = { gameName: "Zero-K v1.14.8.0", sideName: "Robots" };
+
+  it("does not warn when a start set can be derived", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: PLACEHOLDER,
+        status: "ready",
+        units: ZK,
+      }),
+    ).toBeNull();
+  });
+
+  it("says in one line what the limit is based on", () => {
+    expect(
+      setupLimitNote({
+        ...side,
+        startUnit: PLACEHOLDER,
+        status: "ready",
+        units: ZK,
+      }),
+    ).toBe(
+      "Robots has no usable start unit in Zero-K v1.14.8.0, so the unit limit is based on the 3 mobile units that can build and that no other unit builds or morphs into.",
+    );
+  });
+
+  it("has no note for a real start unit", () => {
+    expect(
+      setupLimitNote({
+        ...side,
+        startUnit: "claw_commander",
+        status: "ready",
+        units: CLAW,
+      }),
+    ).toBeNull();
+  });
+
+  it("warns, and has no note, when nothing can be derived", () => {
+    const input = {
+      ...side,
+      startUnit: PLACEHOLDER,
+      status: "ready" as const,
+      units: CLAW,
+    };
+    expect(setupLimitWarning(input)).not.toBeNull();
+    expect(setupLimitNote(input)).toBeNull();
   });
 });

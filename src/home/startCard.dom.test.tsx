@@ -15,6 +15,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Campaign } from "../campaign/model";
+import type { Scenario } from "../scenario/model";
 import type { ResumeCandidate } from "./continue";
 
 // Same stubs `continueZone.test.ts` uses, for the same reasons.
@@ -177,5 +178,63 @@ describe("the start card", () => {
     scan.mockReturnValue(null);
     renderZone();
     expect(screen.getByText("Landfall")).toBeTruthy();
+  });
+});
+
+/** Issue #3549: `start` naming a scenario bundled on its own. */
+describe("the start card for a scenario", () => {
+  const SCENARIO = {
+    id: "s1",
+    name: "First Steps",
+    setup: { gameName: "Ironhold 1.2", mapName: "Red Comet" },
+  } as unknown as Scenario;
+
+  beforeEach(() => {
+    resume.mockReturnValue({
+      candidates: [
+        {
+          id: "start:scenario:s1",
+          kind: "start",
+          title: SCENARIO.name,
+          detail: "Ironhold 1.2 · Red Comet",
+          to: "/scenarios?scenario=s1",
+          touchedAt: 0,
+          startScenario: SCENARIO,
+        },
+      ],
+      loading: false,
+    });
+  });
+
+  it("offers the scenario and opens its play drawer", () => {
+    image.mockClear();
+    const { container } = renderZone();
+    expect(screen.getByRole("heading").textContent).toBe("Start here");
+    expect(screen.getByText("First Steps")).toBeTruthy();
+    expect(screen.getByText("Ironhold 1.2 · Red Comet")).toBeTruthy();
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("/scenarios?scenario=s1");
+    expect(link.getAttribute("aria-label")).toBe("Start mission: First Steps");
+    // A scenario has no picture of its own, so nothing asks for one.
+    expect(container.querySelector("img")).toBeNull();
+    expect(image).not.toHaveBeenCalled();
+  });
+
+  it("opens the list, where the download is, when the map is not installed", () => {
+    scan.mockReturnValue({ games: [{ name: "Ironhold 1.2" }], maps: [] });
+    renderZone();
+    expect(screen.getByText("Download Red Comet first")).toBeTruthy();
+    const link = screen.getByRole("link");
+    expect(link.getAttribute("href")).toBe("/scenarios");
+    expect(link.getAttribute("aria-label")).toBe(
+      "Download and start: First Steps",
+    );
+  });
+
+  it("asks for the engine when there is none to read the install with", () => {
+    target.mockReturnValue(null);
+    scan.mockReturnValue(null);
+    renderZone();
+    expect(screen.getByText("Download the engine first")).toBeTruthy();
   });
 });

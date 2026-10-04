@@ -19,17 +19,27 @@ export interface FriendEntry {
   serverFriend: boolean;
 }
 
-/** The battle a user sits in, as host or member, or null. */
+/**
+ * The battle a user sits in, as host or member, or null.
+ *
+ * Where no battle names them, the lobby their own record points at counts. That
+ * is Tachyon, whose lobby list has no member names but whose user records can
+ * carry the uuid of the lobby the person is in.
+ */
 export function battleOf(
   state: LobbyState,
   name: string,
 ): { id: number; title: string } | null {
-  for (const battle of Object.values(state.battles)) {
+  const battles = Object.values(state.battles);
+  for (const battle of battles) {
     if (battle.host === name || name in battle.members) {
       return { id: battle.id, title: battle.title };
     }
   }
-  return null;
+  const lobby = state.users[name]?.currentLobby;
+  if (!lobby) return null;
+  const battle = battles.find((b) => b.tachyonId === lobby);
+  return battle ? { id: battle.id, title: battle.title } : null;
 }
 
 /** Sort group: anyone present, then offline, then unknown. */

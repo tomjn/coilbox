@@ -3,6 +3,7 @@ import { buildEdgeMap, reachableFrom } from "../content/buildTree";
 import type { UnitsyncInfoStatus } from "../content/config";
 import { morphEdgeMap } from "../content/morphGraph";
 import { disabledUnitsFor } from "./build";
+import type { GenBuildGraph } from "./generate";
 import type { RogueliteRun } from "./model";
 
 /**
@@ -48,12 +49,101 @@ export function noLimitReason(
   return reachableFrom(startUnit, edges).size > 1 ? null : "reaches-nothing";
 }
 
+/** The units a run starts from, and whether coilbox worked them out itself. */
+export interface StartSet {
+  roots: string[];
+  derived: boolean;
+}
+
+/**
+ * The units a run starts from.
+ *
+ * A start unit that is in the unit data and builds something is the start set
+ * by itself. Otherwise the side names no usable start unit, as Zero-K's
+ * `update_your_damn_engine` placeholder (the game spawns commanders from Lua),
+ * and Random sides do. The set is then read from the unit data: every mobile
+ * unit that has build options and that no unit builds or morphs into. That is
+ * what a commander looks like in the data, and a Random side gets the
+ * commanders of every real side. It is kept only when it reaches units beyond
+ * itself, so a game it does not fit still gets the "no limit" warning.
+ */
+export function startSetFor(
+  startUnit: string | undefined,
+  units: UnitDatasetEntry[],
+): StartSet {
+  if (!startUnit) return { roots: [], derived: false };
+  const edges = buildEdgeMap(units);
+  if (noLimitReason(startUnit, edges) === null) {
+    return { roots: [startUnit.toLowerCase()], derived: false };
+  }
+  const morphs = morphEdgeMap(units);
+  const taken = new Set<string>();
+  for (const options of edges.values()) {
+    for (const option of options) taken.add(option);
+  }
+  for (const [from, targets] of morphs) {
+    for (const to of targets) if (to !== from) taken.add(to);
+  }
+  const roots = units
+    .filter(
+      (u) =>
+        u.mobile === true &&
+        !taken.has(u.name.toLowerCase()) &&
+        (edges.get(u.name.toLowerCase()) ?? []).some((o) => edges.has(o)),
+    )
+    .map((u) => u.name.toLowerCase())
+    .sort();
+  const reach = reachableFromAll(roots, edges);
+  return roots.length > 0 && reach.size > roots.length
+    ? { roots, derived: true }
+    : { roots: [], derived: false };
+}
+
+/** The units reachable from any of `roots` through build options. */
+export function reachableFromAll(
+  roots: string[],
+  edges: Map<string, string[]>,
+): Set<string> {
+  const reach = new Set<string>();
+  for (const root of roots) {
+    for (const unit of reachableFrom(root, edges)) reach.add(unit);
+  }
+  return reach;
+}
+
+/**
+ * The build graph the unlock rewards are drawn from, or undefined when there is
+ * no start unit. A derived start set rides along as `roots`.
+ */
+export function buildGraphFor(
+  startUnit: string | undefined,
+  units: UnitDatasetEntry[],
+): GenBuildGraph | undefined {
+  if (!startUnit) return undefined;
+  const set = startSetFor(startUnit, units);
+  const names = new Map<string, string>();
+  for (const u of units) names.set(u.name.toLowerCase(), u.fullName ?? u.name);
+  return {
+    startUnit: startUnit.toLowerCase(),
+    ...(set.derived ? { roots: set.roots } : {}),
+    edges: buildEdgeMap(units),
+    names,
+  };
+}
+
 /** The limit for `run` over a game's build edges. */
 export function unitLimitFor(
   run: RogueliteRun,
   edges: Map<string, string[]>,
   morphEdges: Map<string, string[]>,
+  derivedRoots?: string[],
 ): UnitLimit {
+  if (derivedRoots && derivedRoots.length > 0) {
+    return {
+      kind: "limited",
+      disabled: disabledUnitsFor(run, edges, morphEdges, derivedRoots),
+    };
+  }
   const reason = noLimitReason(run.startUnit, edges);
   return reason
     ? { kind: "none", reason }
@@ -77,12 +167,14 @@ export function limitReadiness(
     return { kind: "loading" };
   }
   if (data.status === "error" || !data.units) return { kind: "failed" };
+  const set = startSetFor(run.startUnit, data.units);
   return {
     kind: "ready",
     limit: unitLimitFor(
       run,
       buildEdgeMap(data.units),
       morphEdgeMap(data.units),
+      set.derived ? set.roots : undefined,
     ),
   };
 }
@@ -144,6 +236,7 @@ export function setupLimitWarning(input: {
   if (status !== "ready" && status !== "unsyncable") return null;
   if (!startUnit)
     return `${sideName} has no start unit in ${gameName}, ${tail}`;
+  if (startSetFor(startUnit, units ?? []).derived) return null;
   const reason = noLimitReason(startUnit, buildEdgeMap(units ?? []));
   if (reason === "start-unit-not-in-data") {
     return `The start unit for ${sideName}, ${startUnit}, is not one of the units in ${gameName}, ${tail}`;
@@ -152,4 +245,23 @@ export function setupLimitWarning(input: {
     return `Nothing can be built from ${startUnit}, the start unit for ${sideName}, ${tail}`;
   }
   return null;
+}
+
+/**
+ * The one line the setup screen shows when the limit rests on a start set that
+ * coilbox derived from the unit data, or null when the side's own start unit
+ * gives the limit or there is no limit.
+ */
+export function setupLimitNote(input: {
+  gameName: string;
+  sideName: string;
+  startUnit?: string;
+  status: UnitsyncInfoStatus;
+  units?: UnitDatasetEntry[];
+}): string | null {
+  const { gameName, sideName, startUnit, status, units } = input;
+  if ((status !== "ready" && status !== "unsyncable") || !units) return null;
+  const set = startSetFor(startUnit, units);
+  if (!set.derived) return null;
+  return `${sideName} has no usable start unit in ${gameName}, so the unit limit is based on the ${set.roots.length} mobile units that can build and that no other unit builds or morphs into.`;
 }

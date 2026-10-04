@@ -57,6 +57,9 @@ export interface GenRunMap {
 /** The game's build graph, for coherent unit-unlock rewards. */
 export interface GenBuildGraph {
   startUnit: string;
+  /** The start set derived from the unit data when `startUnit` is a
+   * placeholder that is not in it. Absent for a real start unit. */
+  roots?: string[];
   /** Lowercased adjacency (unit -> buildOptions), from `buildEdgeMap`. */
   edges: Map<string, string[]>;
   /** Display names by lowercased internal name. */
@@ -178,8 +181,12 @@ function makeEncounter(
 // ---------------------------------------------------------------------------
 
 export interface UnlockPlanner {
-  /** BFS discovery order, root first. */
+  /** BFS discovery order, root first. A derived start set has no root in it. */
   order: string[];
+  /** The unit whose build options a loadout branch is chosen from. */
+  start: string;
+  /** Derived start units, which no branch or reward includes. */
+  skipped: Set<string>;
   /** child -> parent in the BFS spanning tree. */
   parent: Map<string, string>;
   /** parent -> children in the BFS spanning tree. */
@@ -188,7 +195,20 @@ export interface UnlockPlanner {
 }
 
 export function planUnlocks(build: GenBuildGraph): UnlockPlanner {
-  const { order, treeEdges } = buildBuildGraph(build.startUnit, build.edges);
+  const derived = build.roots && build.roots.length > 0 ? build.roots : null;
+  // A derived start set has several roots. A virtual root over them gives one
+  // tree, and the roots drop out of it. They are available from the start, so
+  // they take no starter slot and no reward offers them.
+  const edges = derived
+    ? new Map(build.edges).set(DERIVED_ROOT, derived)
+    : build.edges;
+  const graph = buildBuildGraph(
+    derived ? DERIVED_ROOT : build.startUnit,
+    edges,
+  );
+  const skip = new Set(derived ? [DERIVED_ROOT, ...derived] : []);
+  const order = graph.order.filter((u) => !skip.has(u));
+  const treeEdges = graph.treeEdges.filter((e) => !skip.has(e.child));
   const parent = new Map<string, string>();
   const children = new Map<string, string[]>();
   for (const e of treeEdges) {
@@ -197,8 +217,18 @@ export function planUnlocks(build: GenBuildGraph): UnlockPlanner {
     if (kids) kids.push(e.child);
     else children.set(e.parent, [e.child]);
   }
-  return { order, parent, children, names: build.names };
+  return {
+    order,
+    start: derived ? derived[0] : order[0],
+    skipped: skip,
+    parent,
+    children,
+    names: build.names,
+  };
 }
+
+/** The virtual unit that a derived start set's roots hang from. */
+const DERIVED_ROOT = "\u0000start-set";
 
 /** The connected unit set an unlock of `unit` grants: its path back to the
  * start plus its direct children (so both `unit` and what it builds become
@@ -209,7 +239,7 @@ function unlockBranch(planner: UnlockPlanner, unit: string): string[] {
   const guard = new Set<string>();
   while (cur && !guard.has(cur)) {
     guard.add(cur);
-    set.add(cur);
+    if (!planner.skipped.has(cur)) set.add(cur);
     cur = planner.parent.get(cur);
   }
   for (const child of planner.children.get(unit) ?? []) set.add(child);
@@ -629,7 +659,7 @@ export function assembleRun(
     ? planner.order.slice(0, STARTER_UNIT_COUNT)
     : [];
   if (planner && opts.loadoutBranch != null && opts.loadoutBranch >= 0) {
-    const roots = planner.children.get(planner.order[0]) ?? [];
+    const roots = planner.children.get(planner.start) ?? [];
     const root = roots[opts.loadoutBranch];
     if (root) {
       unlockedUnits = [

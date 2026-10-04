@@ -25,15 +25,23 @@ export function disabledUnitsFor(
   run: RogueliteRun,
   edges: Map<string, string[]>,
   morphEdges: Map<string, string[]>,
+  /** A start set derived from the unit data, for a start unit that is not in
+   * it. These units are available from the start and never disabled. */
+  derivedRoots?: string[],
 ): string[] {
   if (!run.startUnit) return [];
-  const reachable = reachableFrom(run.startUnit, edges);
+  const roots = derivedRoots ?? [run.startUnit.toLowerCase()];
+  const reachable = new Set<string>();
+  for (const root of roots) {
+    for (const unit of reachableFrom(root, edges)) reachable.add(unit);
+  }
   const unlocked = new Set(
     run.progress.unlockedUnits.map((u) => u.toLowerCase()),
   );
+  const exempt = new Set(derivedRoots ?? []);
   const disabled: string[] = [];
   for (const unit of reachable) {
-    if (!unlocked.has(unit)) disabled.push(unit);
+    if (!unlocked.has(unit) && !exempt.has(unit)) disabled.push(unit);
   }
 
   // Forms: what morphing, and building from a form, reaches beyond the build
@@ -51,7 +59,7 @@ export function disabledUnitsFor(
       }
     }
   }
-  const available = new Set([...unlocked, run.startUnit.toLowerCase()]);
+  const available = new Set([...unlocked, ...roots]);
   const open = [...available];
   while (open.length > 0) {
     // biome-ignore lint/style/noNonNullAssertion: open is non-empty in the loop

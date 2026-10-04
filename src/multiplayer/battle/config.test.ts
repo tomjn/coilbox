@@ -245,6 +245,7 @@ describe("membersToRows", () => {
           bot: false,
         },
         rating: { casual: 1650, matchmaking: 1720, overall: null },
+        currentLobby: null,
       },
     };
     const rows = membersToRows(battle, "alice", users);

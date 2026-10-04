@@ -15,6 +15,8 @@ export type HandmadeMapError =
   | { code: "duplicate-id"; id: string; message: string }
   /** The manifest names a file the folder does not hold. */
   | { code: "file-missing"; file: string; message: string }
+  /** An image is in the folder but cannot be decoded. */
+  | { code: "image-unreadable"; file: string; message: string }
   /** The province image and the map picture are different sizes. */
   | {
       code: "size-mismatch";

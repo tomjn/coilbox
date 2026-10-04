@@ -60,6 +60,19 @@ export async function refreshScenarios(): Promise<LoadedScenario[]> {
 }
 
 /**
+ * The stored and bundled scenarios, from the session cache when it is warm and
+ * from disk when it is not. A game's own missions are left out.
+ *
+ * For a caller that wants a bundled scenario and must not start the content
+ * scan to get it, which {@link useScenarios} does on every mount. The home
+ * page's start card is that caller (issue #3549).
+ */
+export async function storedScenarios(): Promise<LoadedScenario[]> {
+  storedCache ??= await listScenarios();
+  return storedCache;
+}
+
+/**
  * Fold in a mission an author has just moved into a game (`moveIntoGame.ts`).
  *
  * The games half is read from the installed games list rather than on demand, so

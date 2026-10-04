@@ -82,6 +82,20 @@ export function scenarioMediaUrl(scenarioId: string, file: string): string {
   return schemeUrl("scenario", `${scenarioId}/${file}`);
 }
 
+/** URL for a file of an imported hand-made map, under `conquestmap/<id>/<file>`. */
+export function conquestMapUrl(mapId: string, file: string): string {
+  return schemeUrl("conquestmap", `${mapId}/${file}`);
+}
+
+/**
+ * URL for a file of a hand-made map that is still being imported, under
+ * `conquestmapstaging/<token>/<file>`. It stops resolving once the import is
+ * committed or discarded, so nothing built from it should be kept.
+ */
+export function conquestMapStagingUrl(token: string, file: string): string {
+  return schemeUrl("conquestmapstaging", `${token}/${file}`);
+}
+
 /** URL for a file in the unit builder's base parts pack, under `legopack/<file>`. */
 export function legoPackUrl(file: string): string {
   return schemeUrl("legopack", file);

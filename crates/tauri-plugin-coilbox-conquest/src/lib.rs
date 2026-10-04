@@ -7,6 +7,8 @@
 //! On-disk layout under `<data_dir>/conquest/`:
 //!   - `galaxies/<id>.json`  one document per local (created/imported) galaxy
 //!   - `state.json`          opaque per-run conquest state, keyed by galaxy id
+//!   - `maps/<id>/`          one folder per imported hand-made map (see `maps`)
+//!   - `map-staging/`        a zip being imported, until the frontend has read it
 //!
 //! A distribution profile can additionally ship *read-only* galaxies as export
 //! files in the portable `.coilbox/galaxies/` folder; [`conquest_list`] merges
@@ -15,6 +17,8 @@
 //!
 //! Registered as `"coilbox-conquest"`; the frontend invokes
 //! `plugin:coilbox-conquest|<cmd>`.
+
+mod maps;
 
 use coilbox_portable::valid_id;
 use picoframe_core::CliResult;
@@ -156,6 +160,96 @@ async fn conquest_state_save<R: Runtime>(app: AppHandle<R>, json: String) -> Cli
     }
 }
 
+/// Imported hand-made maps: `<data_dir>/conquest/maps/<id>/`. The
+/// `coilbox://conquestmap/` asset root serves images out of it.
+fn maps_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(conquest_dir(app)?.join("maps"))
+}
+
+/// Where a zip is unpacked until the frontend has read it. The
+/// `coilbox://conquestmapstaging/` asset root serves images out of it.
+fn map_staging_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
+    Ok(conquest_dir(app)?.join("map-staging"))
+}
+
+/// Bundled map folders sit beside the bundled galaxy files.
+fn bundled_maps_dir() -> Option<PathBuf> {
+    coilbox_portable::portable_root().map(|root| root.join("galaxies"))
+}
+
+/// `conquest_map_list` — every hand-made map folder: imported ones under
+/// app-data first, then the read-only ones bundled in `.coilbox/galaxies/`.
+#[tauri::command]
+async fn conquest_map_list<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    let mut items = Vec::new();
+    if let Ok(dir) = maps_dir(&app) {
+        maps::list_maps(&dir, "imported", &mut items);
+    }
+    if let Some(dir) = bundled_maps_dir() {
+        maps::list_maps(&dir, "bundled", &mut items);
+    }
+    CliResult::ok(json!({ "items": items }))
+}
+
+/// `conquest_map_stage` — unpack the zip at `path` into staging and return its
+/// manifest and file list. Nothing is installed until `conquest_map_commit`.
+#[tauri::command]
+async fn conquest_map_stage<R: Runtime>(app: AppHandle<R>, path: String) -> CliResult {
+    let staging = match map_staging_dir(&app) {
+        Ok(d) => d,
+        Err(e) => return CliResult::err(e),
+    };
+    match maps::stage(Path::new(&path), &staging, maps::Limits::DEFAULT) {
+        Ok(staged) => CliResult::ok(json!(staged)),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `conquest_map_commit` — install a staged map. `status` is `"exists"` when a
+/// map with that id is installed and `replace` was not set, and the staged
+/// copy is kept so the caller can ask and commit again.
+#[tauri::command]
+async fn conquest_map_commit<R: Runtime>(
+    app: AppHandle<R>,
+    token: String,
+    replace: bool,
+) -> CliResult {
+    let (staging, installed) = match (map_staging_dir(&app), maps_dir(&app)) {
+        (Ok(s), Ok(m)) => (s, m),
+        (Err(e), _) | (_, Err(e)) => return CliResult::err(e),
+    };
+    let bundled = bundled_maps_dir();
+    match maps::commit(&staging, &installed, bundled.as_deref(), &token, replace) {
+        Ok((outcome, id)) => {
+            let status = match outcome {
+                maps::Commit::Imported => "imported",
+                maps::Commit::Exists => "exists",
+            };
+            CliResult::ok(json!({ "status": status, "id": id }))
+        }
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `conquest_map_discard` — throw away a staged map.
+#[tauri::command]
+async fn conquest_map_discard<R: Runtime>(app: AppHandle<R>, token: String) -> CliResult {
+    match map_staging_dir(&app).and_then(|dir| maps::discard(&dir, &token)) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `conquest_map_remove` — remove an imported map. A bundled one is refused.
+#[tauri::command]
+async fn conquest_map_remove<R: Runtime>(app: AppHandle<R>, id: String) -> CliResult {
+    let bundled = bundled_maps_dir();
+    match maps_dir(&app).and_then(|dir| maps::remove(&dir, bundled.as_deref(), &id)) {
+        Ok(()) => CliResult::ok(json!({})),
+        Err(e) => CliResult::err(e),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-conquest"` (crate name minus the
 /// `tauri-plugin-` prefix); the frontend invokes `plugin:coilbox-conquest|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
@@ -165,7 +259,12 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             conquest_save,
             conquest_delete,
             conquest_state_load,
-            conquest_state_save
+            conquest_state_save,
+            conquest_map_list,
+            conquest_map_stage,
+            conquest_map_commit,
+            conquest_map_discard,
+            conquest_map_remove
         ])
         .build()
 }
