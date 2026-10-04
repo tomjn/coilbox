@@ -1,6 +1,6 @@
 import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, Check, Trophy, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
@@ -21,7 +21,9 @@ import {
 } from "../../content/pages/components/states";
 import { UnitPicker } from "../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../play/config";
+import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
+import { useGameCatalog } from "../../play/useGameCatalog";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
 import {
@@ -38,6 +40,7 @@ import {
   salvageReward,
 } from "../progress";
 import { RunMapView } from "../RunMapView";
+import { runGameNotice } from "../runContent";
 import { useRun, useRunMeta } from "../runs";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
@@ -45,6 +48,7 @@ import {
   RewardOverlay,
   ShopOverlay,
 } from "./components/NodeOverlays";
+import { RunContentNotice } from "./components/RunContentNotice";
 import { RunHud } from "./components/RunHud";
 
 /**
@@ -76,8 +80,17 @@ export default function RunPage() {
   const drawer = useDrawer();
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
-  const { target } = usePreferredTarget();
+  const {
+    target,
+    loading: targetLoading,
+    refresh: refreshTarget,
+  } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { run: runScan } = scan;
+  const refreshScan = useCallback(async () => {
+    await runScan(true);
+  }, [runScan]);
+  const gameCatalog = useGameCatalog();
   // A saved run can outlive the map rules it was generated under, so nodes
   // sitting on a now-excluded map are re-pointed on the way in (issue #696).
   const { isExcluded } = useMapEligibility();
@@ -97,6 +110,18 @@ export default function RunPage() {
   const game = run
     ? resolveGameByShortname(run.settings.game, scan.data?.games ?? [])
     : undefined;
+  // What to say about the run's game and engine on opening the run (issue
+  // #3369). The map a battle needs is checked by that battle's own briefing.
+  const gameNotice = run
+    ? runGameNotice({
+        hasTarget: !!target,
+        targetLoading,
+        scanned: !!scan.data,
+        scanErrors: scan.data?.errors ?? [],
+        gameInstalled: !!game,
+        download: resolveGameDownload(run.settings.game, gameCatalog),
+      })
+    : { kind: "none" as const };
   const { dataset } = useUnitsyncUnitDataset(
     target?.enginePath,
     target?.dataDir,
@@ -303,6 +328,17 @@ export default function RunPage() {
             />
           </div>
         </div>
+        {/* A battle's briefing has its own gate for a missing game, so this one
+            stays out of its way. Only it can offer an engine. */}
+        {(!active || gameNotice.kind === "no-engine") && (
+          <RunContentNotice
+            notice={gameNotice}
+            game={run.settings.game}
+            targetLoading={targetLoading}
+            refreshTarget={refreshTarget}
+            refreshScan={refreshScan}
+          />
+        )}
         {selectedId && !active && (
           <div className="flex justify-end">
             <InspectPanel

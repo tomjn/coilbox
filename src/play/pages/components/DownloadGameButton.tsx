@@ -1,10 +1,10 @@
 import { Button } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
+import type { GameRef } from "../../../conquest/model";
 import { invalidateScans } from "../../../content/config";
-import { useLaunchContent } from "../../../play/LaunchContentProvider";
 import { type GameDownload, gameRequirement } from "../../gameOffer";
-import type { GameRef } from "../../model";
+import { useLaunchContent } from "../../LaunchContentProvider";
 
 /**
  * Download the game a galaxy names, through the shared launch check (issue
