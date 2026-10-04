@@ -1,4 +1,5 @@
 import type { ConquestState, GalaxyDoc } from "./model";
+import { BASE_SIZES, LARGE_SIZES } from "./size";
 import { MAX_THREAT_LEVEL, readThreatLevel } from "./threat";
 
 /**
@@ -150,4 +151,42 @@ export function levelChoices(ceiling: number): LevelChoices {
         top === 0 ? "Win a conquest" : `Win a conquest at level ${top}`,
     },
   };
+}
+
+/** One entry in the setup's size list. */
+export interface SizeOption {
+  value: string;
+  label: string;
+  description?: string;
+  disabled?: boolean;
+}
+
+/**
+ * The size options the setup shows for a game whose highest unlocked threat
+ * level is `ceiling` (issue #3433). Every size that was always on offer, every
+ * unlocked larger size, and the next larger one greyed out with what unlocks it.
+ * Sizes beyond that are not shown, the way the threat level control shows one
+ * locked level.
+ *
+ * A larger size opens with the threat level it is tied to, so what unlocks it is
+ * what unlocks that level: a win at the level before.
+ */
+export function sizeOptions(ceiling: number): SizeOption[] {
+  const options: SizeOption[] = [...BASE_SIZES];
+  const next = LARGE_SIZES.find((s) => ceiling < s.level);
+  for (const size of LARGE_SIZES) {
+    const label = `${size.label} (${size.count} systems)`;
+    if (ceiling >= size.level) {
+      options.push({ value: String(size.count), label });
+    } else if (size === next) {
+      const requirement = levelChoices(size.level - 1).locked?.requirement;
+      options.push({
+        value: String(size.count),
+        label,
+        description: `Locked. ${requirement}.`,
+        disabled: true,
+      });
+    }
+  }
+  return options;
 }

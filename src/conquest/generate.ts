@@ -16,6 +16,7 @@ import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
+import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel, threatAggression } from "./threat";
 
@@ -102,7 +103,7 @@ export interface GenerateOptions {
    *  battle launches that game (issue #3465). */
   game: GameRef;
   maps: GenMap[];
-  /** Total nodes, clamped to 8..80. */
+  /** Total nodes, clamped to 8..`MAX_NODE_COUNT`. */
   nodeCount: number;
   /** Enemy factions, clamped to 1..3. */
   factionCount: number;
@@ -495,7 +496,12 @@ export function generateGalaxy(
         ? Math.min(requested, names.starNames.length)
         : requested;
     source = flatSource(
-      scatterFor(layout, rng, Math.min(80, Math.max(8, capped)), 100),
+      scatterFor(
+        layout,
+        rng,
+        Math.min(MAX_NODE_COUNT, Math.max(8, capped)),
+        100,
+      ),
     );
   }
   const nodeCount = source.length;

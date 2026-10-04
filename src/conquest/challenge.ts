@@ -18,6 +18,7 @@ import {
 } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 import type { FactionPreset } from "./names";
+import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel } from "./threat";
 
@@ -176,7 +177,7 @@ export function parseConquestChallengeSettings(
           : undefined,
     },
     title: v.title,
-    nodeCount: clamp(Math.round(v.nodeCount), MIN_NODE_COUNT, 80),
+    nodeCount: clamp(Math.round(v.nodeCount), MIN_NODE_COUNT, MAX_NODE_COUNT),
     factionCount: clamp(Math.round(v.factionCount), 1, 3),
     radiusLy:
       typeof v.radiusLy === "number" && Number.isFinite(v.radiusLy)

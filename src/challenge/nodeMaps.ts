@@ -23,8 +23,8 @@
 export type NodeMaps = Record<string, string>;
 
 /**
- * Most entries read from a payload. The biggest galaxy coilbox generates is 80
- * systems, and the real-star catalogue tops out at 113, so this is well clear
+ * Most entries read from a payload. The biggest galaxy coilbox generates is 160
+ * systems (`MAX_NODE_COUNT`), and the real-star catalogue tops out at 113, so this is well clear
  * of any honest challenge while keeping a hostile payload bounded.
  */
 export const MAX_NODE_MAPS = 256;
