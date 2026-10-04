@@ -3,6 +3,7 @@ import type { SuggestedGame } from "../content/branding";
 import type { InstalledContentSnapshot } from "../content/resolveContent";
 import type { GameRepo } from "../downloads/gameRepos";
 import {
+  challengeGameRequirement,
   distinctGames,
   type GameCatalog,
   gameRequirement,
@@ -171,6 +172,48 @@ describe("offerableGames", () => {
         download: { label: "MechCommander: Legacy", downloadKey: "mcl:test" },
       },
     ]);
+  });
+});
+
+// A Conquest challenge names its game as a GameRef that may pin a build. A
+// Warpath challenge names it as a bare shortname. Both go through the same
+// helper (issue #3401), so each shape is checked here.
+describe("challengeGameRequirement", () => {
+  it("names the download for a Conquest game the catalog knows", () => {
+    const req = challengeGameRequirement({ shortname: "mcl" }, catalog());
+    expect(req.downloadKey).toBe("mcl:test");
+    expect(req.noDownload).toBeUndefined();
+  });
+
+  it("names the pinned build for a Conquest game that pins one", () => {
+    const req = challengeGameRequirement(
+      { shortname: "anything", pinnedName: "Anything 1.0" },
+      catalog(),
+    );
+    expect(req.downloadKey).toBe("Anything 1.0");
+    expect(req.noDownload).toBeUndefined();
+  });
+
+  it("says a Conquest game outside the catalog cannot be downloaded", () => {
+    const req = challengeGameRequirement({ shortname: "mystery" }, catalog());
+    expect(req.noDownload).toBe(true);
+    expect(req.downloadKey).toBeUndefined();
+  });
+
+  it("says a Warpath shortname outside the catalog cannot be downloaded", () => {
+    const req = challengeGameRequirement({ shortname: "Orphan" }, catalog());
+    expect(req.noDownload).toBe(true);
+    expect(req.downloadKey).toBeUndefined();
+  });
+
+  it("says a catalog game with no usable source cannot be downloaded", () => {
+    const req = challengeGameRequirement({ shortname: "XTA" }, catalog());
+    expect(req.noDownload).toBe(true);
+  });
+
+  it("does not hand the bare shortname to the downloader", () => {
+    const req = challengeGameRequirement({ shortname: "mystery" }, catalog());
+    expect(req.downloadKey).not.toBe("mystery");
   });
 });
 

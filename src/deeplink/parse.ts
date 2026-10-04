@@ -11,7 +11,7 @@
  *
  * Grammar (the action is the URL's authority, params are the query string):
  *
- *   coilbox://join?server=<host[:port]>&battle=<id>[&password=<pw>]
+ *   coilbox://join?server=<host:port>&battle=<id>[&password=<pw>]
  *   coilbox://room?address=<host>&port=<port>
  *   coilbox://import?code=<container code>
  *   coilbox://import?url=<https url>
@@ -20,11 +20,14 @@
  * `open` screens are allow-listed. `map`, `game` and `replay` require an `id`.
  *
  * `join` and `room` are not the same thing. A `join` names a battle on a lobby
- * server this client is already logged in to. A `room` names a machine hosting a
+ * server, by the server's address, and the player is offered the way onto that
+ * server if they are not on it (issue #3382). A `room` names a machine hosting a
  * room of its own with no server behind it (issue #1612), which has one battle in
  * it and no id worth putting in a link, so it carries the address and the port a
  * joiner would otherwise be reading out over voice chat.
  */
+
+import { normaliseServerAddress } from "../lobby-servers/address";
 
 /** The scheme every coilbox deep link must use. */
 export const DEEP_LINK_SCHEME = "coilbox";
@@ -118,16 +121,57 @@ function field(params: URLSearchParams, name: string): string | null {
   return trimmed;
 }
 
+/** The largest battle id the join command holds, which is a `u32` in
+ * `mp_join_battle`. */
+const MAX_BATTLE_ID = 4294967295;
+
+/**
+ * A battle id as the one number it is, without leading zeros, or null when it
+ * is anything but digits. Pure.
+ */
+export function battleIdFrom(raw: string): string | null {
+  if (!/^[0-9]{1,10}$/.test(raw)) return null;
+  const id = Number(raw);
+  return id <= MAX_BATTLE_ID ? String(id) : null;
+}
+
+/**
+ * Whether a battle password can go in a link. Pure. It is sent as one word of
+ * `JOINBATTLE <id> <password> <scriptPassword>`, so a space would make it two
+ * and a line break would make it a second command. Printable ASCII is all it
+ * may hold.
+ */
+export function validBattlePassword(raw: string): boolean {
+  return raw.length <= MAX_FIELD_LENGTH && /^[\x21-\x7e]+$/.test(raw);
+}
+
+/**
+ * A battle on a lobby server (issue #3382). Every field is checked for what it
+ * has to be, not only for being there, because the server decides whether a
+ * saved login is offered and the other two end up in a lobby command. The
+ * server comes back in the form it is compared and shown in.
+ */
 function parseJoin(params: URLSearchParams): DeepLinkParseResult {
   const server = field(params, "server");
   const battle = field(params, "battle");
   if (!server) return invalid("This join link has no server.");
   if (!battle) return invalid("This join link has no battle.");
-  const password = field(params, "password");
+  const address = normaliseServerAddress(server);
+  if (!address) {
+    return invalid("This join link's server is not an address and a port.");
+  }
+  const id = battleIdFrom(battle);
+  if (!id) return invalid("This join link's battle is not a battle number.");
+  // Not trimmed, unlike the others. A password with a space in it is refused
+  // rather than turned into a different password.
+  const password = params.get("password") ?? "";
+  if (password !== "" && !validBattlePassword(password)) {
+    return invalid("This join link's password is not a battle password.");
+  }
   return {
     kind: "join",
-    server,
-    battle,
+    server: address.address,
+    battle: id,
     ...(password ? { password } : {}),
   };
 }

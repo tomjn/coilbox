@@ -7,10 +7,10 @@ import { LOOPBACK_HOST } from "./room";
  * when there is none worth handing out. Pure.
  *
  * A server and a room are passed on differently, and the wrong one is worse than
- * none. A `join` link only acts for a recipient already connected to the server
- * it names, which on a room is nobody: a room is one machine holding one battle,
- * and the recipient has never dialled it, so they are told they are not
- * connected and that is the end of it (issue #1617).
+ * none. A `join` link names a lobby server, and a recipient who is not on it is
+ * offered a login to it (issue #3382). A room has no logins to offer: it is one
+ * machine holding one battle, so a `join` link to one would send the recipient
+ * to a login screen for a server that is not there (issue #1617).
  *
  * A room is therefore passed on as the address to dial, which is what
  * `coilbox://room` carries. The address used is the one this client is connected

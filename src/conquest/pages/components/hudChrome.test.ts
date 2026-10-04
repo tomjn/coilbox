@@ -934,6 +934,7 @@ describe("no importer outside the two dark routes", () => {
     "conquest/pages/components/RunSetup.tsx",
     "runlite/pages/components/EncounterOverlay.tsx",
     "runlite/pages/components/NodeOverlays.tsx",
+    "runlite/pages/components/RunContentNotice.tsx",
     "runlite/pages/components/RunHud.tsx",
   ];
 
