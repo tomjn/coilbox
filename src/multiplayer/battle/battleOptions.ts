@@ -1,5 +1,5 @@
 import type { ConfigOption } from "@/content/bindings";
-import { effectiveOptions } from "@/play/modOptions";
+import { effectiveOptions, isChanged } from "@/play/modOptions";
 import type { PresetPart, PresetSelection } from "@/play/presetParts";
 import { isTweakSlotKey, tweakSlotOptions } from "@/workshop/deliveryRoutes";
 import { RESTRICT_PREFIX } from "./restrictTags";
@@ -206,16 +206,19 @@ export function staleMapOptionTags(
   });
 }
 
-/** How many of `options` are set away from their default. */
+/**
+ * How many of `options` are set away from their default, counting an edit in
+ * flight the way the fields do.
+ */
 export function changedCount(
   options: ConfigOption[],
   scriptTags: Record<string, string>,
   scope: OptionScope,
+  pending: PendingMap = {},
 ): number {
-  return options.filter((o) => {
-    const v = optionValue(scriptTags, scope, o.key);
-    return v !== undefined && v !== (o.default ?? "");
-  }).length;
+  return options.filter((o) =>
+    isChanged(o, displayedValue(pending, scriptTags, scope, o.key)),
+  ).length;
 }
 
 /**
