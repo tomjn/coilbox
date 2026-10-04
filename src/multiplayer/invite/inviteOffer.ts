@@ -10,6 +10,7 @@ import {
   serverProtocol,
   sortAccountsByRecency,
 } from "../../lobby-servers/config";
+import { addressOfKey } from "../../lobby-servers/hostForms";
 
 /** A `coilbox://join` link, checked and in the form the rest of this reads. */
 export interface InviteLink {
@@ -107,9 +108,9 @@ export function inviteLinkFrom(action: {
 /** Whether a connection is a lobby login at exactly the link's address. */
 function isAt(connection: InviteConnection, link: InviteLink): boolean {
   if (connection.direct) return false;
-  const address = connection.serverKey.slice(
-    connection.serverKey.indexOf("@") + 1,
-  );
+  // Read through `addressOfKey` so a key built from a bare IPv6 host, which has
+  // no brackets to tell its port by, reads as the server it names (issue #3407).
+  const address = addressOfKey(connection.serverKey);
   return normaliseServerAddress(address)?.address === link.address;
 }
 

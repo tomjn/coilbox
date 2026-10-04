@@ -72,15 +72,18 @@ export function ownRoomHeard(rooms: DirectLanRoom[]): boolean {
  * The address and port in one typed string, so `192.168.1.5:8200` read out over
  * a sofa or pasted from a host's screen lands in both fields. Pure.
  *
- * IPv6 is deliberately not split: `::1` is all colons and nothing here could
- * tell its last group from a port. It is passed through whole, which leaves the
- * port field as the person typed it.
+ * A bare IPv6 address is deliberately not split: `::1` is all colons and nothing
+ * here could tell its last group from a port. It is passed through whole, which
+ * leaves the port field as the person typed it. In brackets the port can be
+ * told, so `[::1]:8200` splits and the address keeps its brackets.
  */
 export function splitHostPort(typed: string): {
   address: string;
   port: string | null;
 } {
   const value = typed.trim();
+  const bracketed = /^(\[[^\]]*\]):(\d+)$/.exec(value);
+  if (bracketed) return { address: bracketed[1], port: bracketed[2] };
   const colons = value.match(/:/g)?.length ?? 0;
   if (colons !== 1) return { address: value, port: null };
   const [address, port] = value.split(":");

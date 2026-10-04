@@ -160,6 +160,14 @@ describe("a room link", () => {
     expect(screen.queryByText(/Tom-Laptop/)).toBeNull();
   });
 
+  it("shows an IPv6 address in brackets, with its port (issue #3420)", () => {
+    draw();
+    arrive("coilbox://room?address=%5B2001%3ADB8%3A%3A1%5D&port=8200");
+    expect(
+      screen.getByText("Join the room at [2001:db8::1]:8200?"),
+    ).toBeTruthy();
+  });
+
   it("is refused with a notice when its address is not an address", () => {
     draw();
     arrive("coilbox://room?address=known%40evil.example&port=8200");
