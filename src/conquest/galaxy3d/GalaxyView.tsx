@@ -14,6 +14,7 @@ import { buildCueLayer } from "./cueLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
+import { pickLocation } from "./picking";
 import {
   type PlacedModelSources,
   placedModelLoaders,
@@ -117,7 +118,9 @@ interface GalaxyViewProps {
   /**
    * Fog of war: the node ids the player can see. `undefined` means no fog —
    * everything is shown. Fogged nodes render as dim, unlabelled, unselectable
-   * ghosts; lanes into the fog fade out.
+   * ghosts; lanes into the fog fade out. On a terrain map a fogged province
+   * keeps its shape and loses its owner colour, name and capital marker, and
+   * a fogged city is a plain grey marker. A theatre map draws no fog.
    */
   visibleIds?: Set<string>;
   /**
@@ -715,6 +718,7 @@ export function GalaxyView({
               selectedId: selectedRef.current,
               attackable: attackableRef.current,
               incursionNodeId: incursionRef.current?.nodeId,
+              visible: visibleRef.current,
               run: laneFlow ? { pathLinks: pathLinksRef.current } : undefined,
             }),
           )
@@ -976,16 +980,15 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      let idx = hit?.instanceId ?? -1;
-      // A province is picked by its whole area, so its anchor's hit target
-      // is ignored and the ground under the pointer decides. A point location
-      // standing inside a province keeps its own hit target and wins.
-      if (provinces && (idx < 0 || provinces.isProvince(idx))) {
-        idx = provinces.pick(raycaster.ray);
-      }
-      // Fogged systems aren't selectable.
-      if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
-      return idx;
+      // Fogged locations aren't selectable. See picking.ts.
+      return pickLocation(
+        hit?.instanceId ?? -1,
+        provinces && {
+          isProvince: provinces.isProvince,
+          pick: () => provinces.pick(raycaster.ray),
+        },
+        (i) => !isVisible(nodeIds[i]),
+      );
     };
 
     /** Hover: swell the corona and lift the ownership ring (the selection
