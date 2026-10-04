@@ -39,6 +39,8 @@ export {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setAiBonus,
+  setAllAiBonus,
   setParticipantTeam,
   showsFactionColumn,
   toBattleConfig,

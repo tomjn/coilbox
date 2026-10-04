@@ -88,6 +88,8 @@ import {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setAiBonus,
+  setAllAiBonus,
   setParticipantTeam,
   toBattleConfig,
   useLastAi,
@@ -675,9 +677,9 @@ export default function SkirmishPage() {
     onStart();
   };
 
-  // "Rematch with a tweak" (#370, keeping #354's richer per-AI control
-  // separate): nudge every AI's handicap by a fixed delta, persist it onto the
-  // visible setup, and relaunch. The tweaked array is threaded through
+  // "Rematch with a tweak" (#370): nudge every AI's handicap by a fixed delta,
+  // persist it onto the visible setup (where each AI's bonus control shows it),
+  // and relaunch. The tweaked array is threaded through
   // explicitly rather than read back from `participants` — `setParticipants`
   // hasn't committed by the time `onStart` would otherwise read it.
   const onRematchWithTweak = (deltaPercent: number) => {
@@ -1186,6 +1188,12 @@ export default function SkirmishPage() {
             }
             onRemove={removeParticipant}
             onAddAi={addAi}
+            onSetAiBonus={(id, percent) =>
+              setParticipants((ps) => setAiBonus(ps, id, percent))
+            }
+            onSetAllAiBonus={(percent) =>
+              setParticipants((ps) => setAllAiBonus(ps, percent))
+            }
           />
           <GameOptionsPanel
             selectedGame={selectedGame}
