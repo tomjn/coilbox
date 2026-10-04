@@ -144,7 +144,7 @@ describe("parseGalaxyJson", () => {
     const parsed = parseGalaxyJson(JSON.stringify(raw));
     expect(parsed?.generated?.seed).toBe(7);
     expect(parsed?.generated?.layout).toBeUndefined();
-    expect(parsed?.generated?.nodeCount).toBe(80);
+    expect(parsed?.generated?.nodeCount).toBe(160);
   });
 
   it("filters playableFactionIds to known factions", () => {

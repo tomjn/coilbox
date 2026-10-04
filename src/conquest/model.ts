@@ -2,6 +2,7 @@ import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import { expandRevealed } from "./fog";
+import { MAX_NODE_COUNT } from "./size";
 import { readThreatLevel } from "./threat";
 
 /**
@@ -374,7 +375,7 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
     seed: g.seed,
     nodeCount:
       typeof g.nodeCount === "number" && Number.isFinite(g.nodeCount)
-        ? clamp(Math.round(g.nodeCount), MIN_NODE_COUNT, 80)
+        ? clamp(Math.round(g.nodeCount), MIN_NODE_COUNT, MAX_NODE_COUNT)
         : undefined,
     factionCount:
       typeof g.factionCount === "number" && Number.isFinite(g.factionCount)

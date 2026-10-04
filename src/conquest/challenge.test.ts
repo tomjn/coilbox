@@ -50,6 +50,41 @@ describe("conquest challenge codec", () => {
     expect(rebuilt.generated?.threatLevel).toBe(3);
   });
 
+  it("carries a 160 system galaxy through a code, with every system's map", () => {
+    const galaxy = generateGalaxy({ ...base, nodeCount: 160 }, "t0");
+    const decoded = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    expect(decoded.settings.nodeCount).toBe(160);
+    expect(Object.keys(decoded.settings.nodeMaps ?? {})).toHaveLength(160);
+    const rebuilt = galaxyFromChallenge(
+      decoded.settings,
+      { maps, names: undefined },
+      galaxy.id,
+      "t0",
+    );
+    expect(rebuilt.nodes).toHaveLength(160);
+    expect(rebuilt.nodes.map((n) => n.battle.mapName)).toEqual(
+      galaxy.nodes.map((n) => n.battle.mapName),
+    );
+  });
+
+  it("clamps a size a code makes up to 160, and leaves 80 as it was", () => {
+    const settings = challengeSettingsFromGalaxy(generateGalaxy(base, "t0"));
+    const decode = (nodeCount: number) => {
+      const out = decodeConquestChallenge(
+        encodeChallenge("conquest", { ...settings, nodeCount }),
+      );
+      if (!out.ok) throw new Error("expected a successful decode");
+      return out.settings.nodeCount;
+    };
+    expect(decode(80)).toBe(80);
+    expect(decode(81)).toBe(81);
+    expect(decode(5000)).toBe(160);
+    expect(decode(1)).toBe(5);
+  });
+
   it("writes no level into a level 0 code, so the code is the one it was", () => {
     const galaxy = generateGalaxy({ ...base, threatLevel: 0 }, "t0");
     expect(encodeConquestChallenge(galaxy)).toBe(

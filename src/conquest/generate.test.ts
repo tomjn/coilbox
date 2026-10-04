@@ -181,12 +181,12 @@ describe("generateGalaxy", () => {
     expect(doc.nodes).toHaveLength(30);
   });
 
-  it("clamps node and faction counts (cap raised to 80)", () => {
+  it("clamps node and faction counts (cap raised to 160, issue #3433)", () => {
     const doc = generateGalaxy(
       { ...base, nodeCount: 500, factionCount: 9 },
       "t0",
     );
-    expect(doc.nodes).toHaveLength(80);
+    expect(doc.nodes).toHaveLength(160);
     expect(doc.factions).toHaveLength(4);
   });
 
@@ -536,5 +536,47 @@ describe("restoreChallengeMap", () => {
 
   it("leaves the galaxy alone for a system it does not have", () => {
     expect(restoreChallengeMap(substituted, "node-999")).toBe(substituted);
+  });
+});
+
+describe("galaxies above 80 systems (issue #3433)", () => {
+  const reachable = (g: ReturnType<typeof generateGalaxy>) => {
+    const adj = new Map<string, string[]>(g.nodes.map((n) => [n.id, []]));
+    for (const [a, b] of g.links) {
+      adj.get(a)?.push(b);
+      adj.get(b)?.push(a);
+    }
+    const seen = new Set([g.nodes[0].id]);
+    const queue = [g.nodes[0].id];
+    while (queue.length > 0) {
+      const cur = queue.pop() as string;
+      for (const n of adj.get(cur) ?? []) {
+        if (!seen.has(n)) {
+          seen.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    return seen.size;
+  };
+
+  it("builds the size it is asked for, connected, up to 160", () => {
+    for (const layout of ["scatter", "spiral", "clusters", "ring"] as const) {
+      const g = generateGalaxy(
+        { ...base, nodeCount: 160, factionCount: 3, layout },
+        "t0",
+      );
+      expect(g.nodes, layout).toHaveLength(160);
+      expect(reachable(g), layout).toBe(160);
+      expect(g.generated?.nodeCount).toBe(160);
+      expect(g.nodes.filter((n) => n.kind === "capital")).toHaveLength(4);
+    }
+  });
+
+  it("keeps a saved galaxy of that size loading at that size", () => {
+    const g = generateGalaxy({ ...base, nodeCount: 160 }, "t0");
+    const loaded = parseGalaxyJson(JSON.stringify(g));
+    expect(loaded?.nodes).toHaveLength(160);
+    expect(loaded?.generated?.nodeCount).toBe(160);
   });
 });

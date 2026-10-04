@@ -76,7 +76,8 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import { unlockedLevel } from "../unlocks";
+import { maxUnlockedNodeCount } from "../size";
+import { sizeOptions, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
@@ -503,14 +504,6 @@ function GalaxyCard({
   );
 }
 
-const SIZE_OPTIONS = [
-  { value: "12", label: "Small (12 systems)" },
-  { value: "18", label: "Medium (18 systems)" },
-  { value: "28", label: "Large (28 systems)" },
-  { value: "40", label: "Sprawling (40 systems)" },
-  { value: "56", label: "Vast (56 systems)" },
-  { value: "80", label: "Immense (80 systems)" },
-];
 const FACTION_OPTIONS = [
   { value: "1", label: "One enemy faction" },
   { value: "2", label: "Two enemy factions" },
@@ -653,6 +646,9 @@ function GenerateGalaxyForm({
   const { unlocks } = useConquestUnlocks();
   const ceiling = unlockedLevel(unlocks, effectiveShort);
   const threat = Math.min(threatChoice, ceiling);
+  // A size above 80 follows the same unlocks, so one chosen for a game that has
+  // not earned it is held to the largest it has.
+  const nodeCount = Math.min(Number(size), maxUnlockedNodeCount(ceiling));
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
   );
@@ -682,7 +678,7 @@ function GenerateGalaxyForm({
       seed: Number(seed) || 1,
       game: { shortname: effectiveShort, pinnedName: selected?.name },
       maps,
-      nodeCount: Number(size),
+      nodeCount,
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
       radiusLy: Number(radius),
@@ -700,7 +696,7 @@ function GenerateGalaxyForm({
       effectiveShort,
       selected?.name,
       maps,
-      size,
+      nodeCount,
       factions,
       layout,
       radius,
@@ -820,9 +816,9 @@ function GenerateGalaxyForm({
               />
             ) : (
               <OptionSelect
-                value={size}
+                value={String(nodeCount)}
                 onValueChange={setSize}
-                options={SIZE_OPTIONS}
+                options={sizeOptions(ceiling)}
               />
             )}
             {realStars && (
@@ -911,7 +907,7 @@ function GenerateGalaxyForm({
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Preview</span>
               <GalaxyPreview2D galaxy={preview} />
-              {preview.nodes.length < Number(size) && (
+              {preview.nodes.length < nodeCount && (
                 <span className="text-xs text-muted-foreground">
                   Capped at {preview.nodes.length} named systems.
                 </span>

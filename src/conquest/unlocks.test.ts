@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy } from "./generate";
 import { newConquestState } from "./model";
+import { maxUnlockedNodeCount } from "./size";
 import { MAX_THREAT_LEVEL } from "./threat";
 import {
   type FinishedConquest,
   finishedConquest,
   foldFinishedConquest,
   levelChoices,
+  sizeOptions,
   unlockedLevel,
 } from "./unlocks";
 
@@ -156,5 +158,49 @@ describe("finishedConquest", () => {
     expect(
       finishedConquest(authored, { ...active, status: "won" })?.level,
     ).toBe(null);
+  });
+});
+
+describe("size choices (issue #3433)", () => {
+  it("offers the 80 and under sizes to everyone and locks the next one, naming what unlocks it", () => {
+    const options = sizeOptions(0);
+    expect(options.filter((o) => !o.disabled).map((o) => o.value)).toEqual([
+      "12",
+      "18",
+      "28",
+      "40",
+      "56",
+      "80",
+    ]);
+    const locked = options.filter((o) => o.disabled);
+    expect(locked.map((o) => o.value)).toEqual(["120"]);
+    expect(locked[0].description).toBe("Locked. Win a conquest at level 1.");
+  });
+
+  it("unlocks 120 at threat level 2 and 160 at threat level 3, the levels they are tied to", () => {
+    const at2 = sizeOptions(2);
+    expect(at2.filter((o) => !o.disabled).map((o) => o.value)).toContain("120");
+    expect(at2.find((o) => o.value === "160")?.disabled).toBe(true);
+    expect(at2.find((o) => o.value === "160")?.description).toBe(
+      "Locked. Win a conquest at level 2.",
+    );
+    const at3 = sizeOptions(MAX_THREAT_LEVEL);
+    expect(at3.every((o) => !o.disabled)).toBe(true);
+    expect(at3.map((o) => o.value).slice(-2)).toEqual(["120", "160"]);
+  });
+
+  it("never locks a size that was on offer before", () => {
+    const open = sizeOptions(0)
+      .filter((o) => !o.disabled)
+      .map((o) => Number(o.value));
+    expect(open).toEqual([12, 18, 28, 40, 56, 80]);
+  });
+
+  it("caps what a game may build at its largest unlocked size", () => {
+    expect(maxUnlockedNodeCount(0)).toBe(80);
+    expect(maxUnlockedNodeCount(1)).toBe(80);
+    expect(maxUnlockedNodeCount(2)).toBe(120);
+    expect(maxUnlockedNodeCount(3)).toBe(160);
+    expect(maxUnlockedNodeCount(99)).toBe(160);
   });
 });
