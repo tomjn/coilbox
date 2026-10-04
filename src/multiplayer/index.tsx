@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { isProfileHidden } from "../profile/hidden";
+import { InviteLinkHost } from "./invite/InviteLinkHost";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
 import {
@@ -42,12 +43,16 @@ import { MultiplayerProvider } from "./store";
  */
 /**
  * The two things that have to outlive every route: the lobby connection and its
- * state mirror, and the room this client hosts.
+ * state mirror, and the room this client hosts. The invite link host sits
+ * inside both, because an invite waits for a login whichever page is showing.
  */
 function LobbyProviders({ children }: { children: ReactNode }) {
   return (
     <MultiplayerProvider>
-      <HostedRoomProvider>{children}</HostedRoomProvider>
+      <HostedRoomProvider>
+        {children}
+        <InviteLinkHost />
+      </HostedRoomProvider>
     </MultiplayerProvider>
   );
 }

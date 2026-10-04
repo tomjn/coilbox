@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_CODE_LENGTH, openScreenRoute, parseDeepLink } from "./parse";
+import {
+  MAX_CODE_LENGTH,
+  MAX_FIELD_LENGTH,
+  openScreenRoute,
+  parseDeepLink,
+} from "./parse";
 
 describe("parseDeepLink", () => {
   describe("rejects malformed input", () => {
@@ -72,22 +77,21 @@ describe("parseDeepLink", () => {
   });
 
   describe("join", () => {
+    const join = (query: string) => parseDeepLink(`coilbox://join?${query}`);
+    const server = encodeURIComponent("lobby.example.com:8200");
+
     it("parses a valid join link", () => {
-      expect(
-        parseDeepLink("coilbox://join?server=lobby.example.com&battle=42"),
-      ).toEqual({
+      expect(join(`server=${server}&battle=42`)).toEqual({
         kind: "join",
-        server: "lobby.example.com",
+        server: "lobby.example.com:8200",
         battle: "42",
       });
     });
 
     it("carries an optional password", () => {
-      expect(
-        parseDeepLink("coilbox://join?server=h&battle=42&password=secret"),
-      ).toEqual({
+      expect(join(`server=${server}&battle=42&password=secret`)).toEqual({
         kind: "join",
-        server: "h",
+        server: "lobby.example.com:8200",
         battle: "42",
         password: "secret",
       });
@@ -98,7 +102,119 @@ describe("parseDeepLink", () => {
     });
 
     it("rejects a join with no battle", () => {
-      expect(parseDeepLink("coilbox://join?server=h").kind).toBe("invalid");
+      expect(join(`server=${server}`).kind).toBe("invalid");
+    });
+
+    // The link is written by whoever sent it (issue #3382). Everything below
+    // is a link that must be refused here, before anything is offered.
+    describe("a hostile link", () => {
+      it("hands back the server in the one form it is compared and shown in", () => {
+        expect(
+          join(
+            `server=${encodeURIComponent("Lobby.EXAMPLE.com.:08200")}&battle=42`,
+          ),
+        ).toMatchObject({ server: "lobby.example.com:8200" });
+      });
+
+      it("rejects a server with no port rather than assuming one", () => {
+        expect(join("server=lobby.example.com&battle=42").kind).toBe("invalid");
+      });
+
+      it("rejects a server that names two hosts", () => {
+        for (const raw of [
+          "lobby.example.com@evil.example:8200",
+          "evil.example:8200/lobby.example.com",
+          "lobby.example.com:8200#evil.example",
+          "lobby.еxample.com:8200",
+          "lobby.example.com:8200 evil.example:8200",
+        ]) {
+          expect(
+            join(`server=${encodeURIComponent(raw)}&battle=42`).kind,
+            raw,
+          ).toBe("invalid");
+        }
+      });
+
+      it("reads the first server when a link repeats the field", () => {
+        expect(
+          join(
+            `server=${server}&server=${encodeURIComponent("evil.example:8200")}&battle=42`,
+          ),
+        ).toMatchObject({ server: "lobby.example.com:8200" });
+      });
+
+      it("takes a battle that is a number and nothing else", () => {
+        for (const raw of [
+          "42 1",
+          "42\nLOGIN x",
+          "4a",
+          "-1",
+          "4.2",
+          "0x10",
+          "1e3",
+          "<b>42</b>",
+          // One past what the join command's battle id holds.
+          "4294967296",
+          "99999999999",
+        ]) {
+          expect(
+            join(`server=${server}&battle=${encodeURIComponent(raw)}`).kind,
+            JSON.stringify(raw),
+          ).toBe("invalid");
+        }
+      });
+
+      it("writes a battle number one way", () => {
+        expect(join(`server=${server}&battle=0042`)).toMatchObject({
+          battle: "42",
+        });
+        expect(join(`server=${server}&battle=4294967295`)).toMatchObject({
+          battle: "4294967295",
+        });
+      });
+
+      it("rejects a password that could not be one word of a lobby command", () => {
+        for (const raw of [
+          "two words",
+          "line\nLOGIN x",
+          "line\rbreak",
+          "tab\there",
+          "nul\u0000",
+          "pässword",
+          "x".repeat(MAX_FIELD_LENGTH + 1),
+        ]) {
+          expect(
+            join(
+              `server=${server}&battle=42&password=${encodeURIComponent(raw)}`,
+            ).kind,
+            JSON.stringify(raw.slice(0, 20)),
+          ).toBe("invalid");
+        }
+      });
+
+      it("does not trim a password into a valid one", () => {
+        expect(
+          join(`server=${server}&battle=42&password=%20secret%20`).kind,
+        ).toBe("invalid");
+      });
+
+      it("reads an empty password as none", () => {
+        expect(join(`server=${server}&battle=42&password=`)).toEqual({
+          kind: "join",
+          server: "lobby.example.com:8200",
+          battle: "42",
+        });
+      });
+
+      it("carries nothing a link adds beyond the three fields", () => {
+        expect(
+          join(`server=${server}&battle=42&tls=0&account=bob&name=Official`),
+        ).toEqual({
+          kind: "join",
+          server: "lobby.example.com:8200",
+          battle: "42",
+        });
+      });
     });
   });
 

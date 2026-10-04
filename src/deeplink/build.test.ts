@@ -59,7 +59,7 @@ describe("buildDeepLink", () => {
     it("round-trips a join link with a password", () => {
       const action = {
         kind: "join" as const,
-        server: "h",
+        server: "lobby.example.com:8200",
         battle: "42",
         password: "secret",
       };
@@ -79,7 +79,11 @@ describe("buildDeepLink", () => {
     });
 
     it("rejects a join with no battle", () => {
-      const built = buildDeepLink({ kind: "join", server: "h", battle: "" });
+      const built = buildDeepLink({
+        kind: "join",
+        server: "lobby.example.com:8200",
+        battle: "",
+      });
       expect(built.ok).toBe(false);
     });
 
