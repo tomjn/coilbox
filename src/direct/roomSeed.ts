@@ -1,6 +1,6 @@
 import { reconcileAi } from "@/conquest/ai";
-import type { SkirmishDraft } from "@/play/drafts";
-import { effectiveTeams } from "@/play/participants";
+import { defaultSkirmishDraft, type SkirmishDraft } from "@/play/drafts";
+import { effectiveTeams, initialParticipants } from "@/play/participants";
 import { botWireName } from "../multiplayer/battle/fromSkirmish";
 import { DEFAULT_ROOM_MAX_PLAYERS } from "./room";
 
@@ -87,5 +87,40 @@ export function draftToRoomSeed(opts: {
     openHumanSlots: DEFAULT_ROOM_MAX_PLAYERS - 1,
     bots,
     skippedBots,
+  };
+}
+
+/** What the room form tells the host the setup brings with it. Pure. */
+export function roomSeedSummary(seed: RoomSeed): string {
+  const n = seed.bots.length;
+  const bots = n === 0 ? "no bots" : n === 1 ? "1 bot" : `${n} bots`;
+  const s = seed.openHumanSlots;
+  const seats = s === 1 ? "1 seat is left open" : `${s} seats are left open`;
+  const parts = [`Opens with ${bots}.`, `${seats} for people.`];
+  if (seed.skippedBots.length > 0) {
+    parts.push(
+      `This game offers no AI for ${seed.skippedBots.join(", ")}, so ${seed.skippedBots.length === 1 ? "it is" : "they are"} left out.`,
+    );
+  }
+  return parts.join(" ");
+}
+
+/**
+ * The setup behind the one-button room: the same start a new skirmish setup has
+ * (you against one AI, no options changed), on the game and map the host's
+ * content list opens on. The AI is left blank on purpose. The battle room fills
+ * a blank AI with the game's standard one once the room is up and the game's own
+ * AI list is known (`reconcileAi`), which is the same rule the skirmish page
+ * uses for a new opponent. Pure apart from the participant ids.
+ */
+export function quickRoomDraft(
+  gameName: string,
+  mapName: string,
+): SkirmishDraft {
+  return {
+    ...defaultSkirmishDraft,
+    participants: initialParticipants(),
+    gameName,
+    mapName,
   };
 }

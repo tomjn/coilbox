@@ -35,6 +35,7 @@ import {
   battleOpened,
   hostBlockedReason,
   hostedRoomKey,
+  NEW_ROOM_TARGET,
   noBattleFailure,
   startRoomFailure,
 } from "../../direct/room";
@@ -91,7 +92,14 @@ import {
  * When that connection's `currentBattle` is set, its list sends the player to
  * the battle room. `seeded` forwards a "Host as battle" draft to the room.
  */
-type PendingEntry = { serverKey: string; seeded: boolean } | null;
+type PendingEntry = {
+  serverKey: string;
+  seeded: boolean;
+  /** A draft to carry to the room on landing that no connection's own
+   *  `hostDraft` stands for, which is every hosted room: its key does not
+   *  exist until the host has picked a name and a port. */
+  draft?: SkirmishDraft;
+} | null;
 
 type DeeplinkJoin = { server: string; battle: string; password?: string };
 
@@ -172,9 +180,10 @@ function ServerBattles({
     const entry = pending.current;
     if (joinedId == null || entry?.serverKey !== serverKey) return;
     pending.current = null;
+    const carried = entry.draft ?? (entry.seeded ? hostDraft : undefined);
     navigate(
       battleRoomHref(serverKey),
-      entry.seeded && hostDraft ? { state: { hostDraft } } : undefined,
+      carried ? { state: { hostDraft: carried } } : undefined,
     );
   }, [joinedId, navigate, hostDraft, serverKey, pending]);
   const joinedBattle =
@@ -577,7 +586,15 @@ function BattlesPage() {
     hostTitle?: string;
     hostServerKey?: string;
   } | null;
-  const hostDraft = hostState?.hostDraft;
+  //
+  // `NEW_ROOM_TARGET` says "a room on this computer" instead of a connection. A
+  // room has no key until it is started, so the draft cannot be bound to one
+  // here. It opens the room form instead, and `onStartRoom` carries it to the
+  // battle room once the room is up. Everything after that is the same code
+  // that applies it on a lobby server.
+  const hostsInRoom = hostState?.hostServerKey === NEW_ROOM_TARGET;
+  const hostDraft = hostsInRoom ? undefined : hostState?.hostDraft;
+  const roomDraft = hostsInRoom ? hostState?.hostDraft : undefined;
   const hostTargetKey = hostState?.hostServerKey ?? activeKey;
 
   // A confirmed coilbox://join deep link (issue #388) navigates here with the
@@ -644,7 +661,7 @@ function BattlesPage() {
     try {
       const key = await connectDirect(port, args.host);
       clearJoinError(key);
-      pending.current = { serverKey: key, seeded: false };
+      pending.current = { serverKey: key, seeded: false, draft: args.draft };
       await mpOpenBattle({ serverKey: key, ...args.battle });
       // Sending the line is not opening the battle. Everything that can swallow
       // it leaves a room listening with nobody able to join and nothing on
@@ -786,6 +803,7 @@ function BattlesPage() {
       blocked={hostBlockedReason(roomKey)}
       leaves={roomRule.notice("host")}
       defaultName={lastLogin?.username}
+      draft={roomDraft}
       busy={roomBusy || busy}
       error={stopError}
       onStart={onStartRoom}

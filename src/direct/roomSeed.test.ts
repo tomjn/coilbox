@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { SkirmishDraft } from "@/play/drafts";
 import { type Participant, RANDOM_SIDE } from "@/play/participants";
 import { DEFAULT_ROOM_MAX_PLAYERS } from "./room";
-import { draftToRoomSeed } from "./roomSeed";
+import { draftToRoomSeed, quickRoomDraft, roomSeedSummary } from "./roomSeed";
 
 const you = (p: Partial<Participant> = {}): Participant => ({
   id: "you",
@@ -147,5 +147,65 @@ describe("draftToRoomSeed", () => {
     expect(seed.gameName).toBe("");
     expect(seed.mapName).toBe("");
     expect(seed.openHumanSlots).toBe(DEFAULT_ROOM_MAX_PLAYERS - 1);
+  });
+});
+
+describe("roomSeedSummary", () => {
+  it("counts the bots and the seats left for people", () => {
+    const seed = draftToRoomSeed({ draft: draft() });
+    expect(roomSeedSummary(seed)).toBe(
+      "Opens with 1 bot. 7 seats are left open for people.",
+    );
+  });
+
+  it("says one seat in the singular", () => {
+    const seed = {
+      ...draftToRoomSeed({ draft: draft() }),
+      openHumanSlots: 1,
+    };
+    expect(roomSeedSummary(seed)).toBe(
+      "Opens with 1 bot. 1 seat is left open for people.",
+    );
+  });
+
+  it("names the bots the game has no AI for", () => {
+    const seed = draftToRoomSeed({
+      draft: draft(),
+      ais: [{ shortName: "Sandbox" }],
+    });
+    expect(roomSeedSummary(seed)).toBe(
+      "Opens with no bots. 7 seats are left open for people. This game offers no AI for AI1, so it is left out.",
+    );
+  });
+
+  it("leaves the bots out of the sentence for an empty setup", () => {
+    const seed = draftToRoomSeed({
+      draft: draft({ participants: [] }),
+    });
+    expect(roomSeedSummary(seed)).toBe(
+      "Opens with no bots. 7 seats are left open for people.",
+    );
+  });
+});
+
+describe("quickRoomDraft", () => {
+  it("is you against one AI on the given game and map", () => {
+    const d = quickRoomDraft("Some Game", "Some Map");
+    expect(d.gameName).toBe("Some Game");
+    expect(d.mapName).toBe("Some Map");
+    expect(d.participants.map((p) => p.kind)).toEqual(["you", "ai"]);
+    expect(d.participants[0].allyTeam).not.toBe(d.participants[1].allyTeam);
+    expect(d.modOptionValues).toEqual({});
+  });
+
+  it("leaves the AI for the game's standard one", () => {
+    const d = quickRoomDraft("Some Game", "Some Map");
+    expect(d.participants[1].ai).toBeUndefined();
+    const seed = draftToRoomSeed({
+      draft: d,
+      ais: [{ shortName: "Sandbox" }, { shortName: "SimpleAI" }],
+    });
+    expect(seed.bots).toHaveLength(1);
+    expect(seed.bots[0].ai).toBe("SimpleAI");
   });
 });
