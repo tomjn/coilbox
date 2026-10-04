@@ -248,10 +248,10 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `downloads.games`    | Downloads > Games     |
 | `library.games`      | Library > Games       |
 | `content.setupPacks` | Coilbox hub's "Share a pack" button |
-| `multiplayer.stats`  | Multiplayer > Player stats |
+| `multiplayer.stats`  | Records > Player stats |
 | `conquest.list`      | Play > Conquest       |
 | `runlite.list`       | Play > Warpath        |
-| `career.overview`    | Play > Career         |
+| `career.overview`    | Records > Career      |
 | `campaign.builder`   | Campaign Builder > Builder |
 
 ```json

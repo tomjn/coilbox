@@ -19,7 +19,7 @@ import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 /**
- * Personal stats profile ("Player stats" in the Multiplayer nav, moved from
+ * Personal stats profile ("Player stats" in the Records nav, moved from
  * Content's "Stats" in #467) — a minimal, offline view over the local
  * replay-stats database (see `stats.rs`). It ingests the library's demos on
  * open, then shows one player's games, win rate, streak, favourite maps and

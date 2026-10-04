@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { isProfileHidden } from "../profile/hidden";
+import { RECORDS_GROUP } from "../recordsGroup";
 import { InviteLinkHost } from "./invite/InviteLinkHost";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
@@ -127,15 +128,6 @@ const multiplayerPlugin: FramePlugin = {
           badge: () => <BattleNavBadge />,
         },
         {
-          id: "multiplayer.stats",
-          label: "Player stats",
-          to: "/stats",
-          order: 5,
-          icon: BarChart3,
-          // A distribution profile can hide the stats view like any other nav item.
-          useVisible: () => !isProfileHidden("multiplayer.stats"),
-        },
-        {
           id: "multiplayer.admin",
           label: "Server admin",
           to: "/admin",
@@ -145,6 +137,21 @@ const multiplayerPlugin: FramePlugin = {
           // uberserver moderators and admins only (issue #2772). Also folds in
           // isProfileHidden("multiplayer.admin"), same as the page's NavGate.
           useVisible: useMpServerAdmin,
+        },
+      ],
+    },
+    {
+      ...RECORDS_GROUP,
+      items: [
+        {
+          id: "multiplayer.stats",
+          label: "Player stats",
+          to: "/stats",
+          // Between Career (0) and Replays (2): the detail behind the summary.
+          order: 1,
+          icon: BarChart3,
+          // A distribution profile can hide the stats view like any other nav item.
+          useVisible: () => !isProfileHidden("multiplayer.stats"),
         },
       ],
     },
