@@ -26,8 +26,10 @@
 
 import type { ConfigOption, GameItem } from "../content/bindings";
 import { isSdd } from "../content/format";
+import { dependencyBlockReason } from "../content/gameDependencies";
 import { isMutatorArchive } from "../lib/generatedGames";
 import type { BattleConfig } from "../play/bindings";
+import { missingLaunchDependency } from "../play/launchContent";
 import { applyRestrictions, toBattleConfig } from "../play/participants";
 import {
   scenarioGameMissionFile,
@@ -270,6 +272,10 @@ export function scenarioLaunchBlock(opts: {
         ...(mapMissing ? { map: mapName } : {}),
       },
     };
+  }
+  const dependency = games ? missingLaunchDependency(gameName, games) : null;
+  if (dependency?.gameName) {
+    return text(dependencyBlockReason(dependency.label, dependency.gameName));
   }
   if (running) return text("A game is already running.");
   return null;

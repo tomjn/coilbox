@@ -18,12 +18,19 @@
 
 import { type ScanReading, scanInitFailure } from "./scanSettled";
 
-export type ContentRequirementKind = "game" | "map" | "engine";
+export type ContentRequirementKind = "game" | "map" | "engine" | "dependency";
 
 /** A snapshot of what's installed, built from a unitsync scan (games/maps) plus
  * every known content root's engines (engine versions). */
 export interface InstalledContentSnapshot {
-  games: { name: string; shortname?: string; version?: string }[];
+  games: {
+    name: string;
+    shortname?: string;
+    version?: string;
+    /** Dependency archives the scan found no installed archive for, as the
+     *  engine names them. Absent reads as none known (issue #3489). */
+    missingDependencies?: string[];
+  }[];
   maps: string[];
   engineVersions: string[];
 }
@@ -45,6 +52,15 @@ export interface ContentRequirement {
   /** True when coilbox knows no download for this, so the gate shows a plain
    *  message instead of a Download button that would fail (issue #3401). */
   noDownload?: boolean;
+  /** For a `dependency`: the installed game that needs the archive. */
+  gameName?: string;
+  /**
+   * Requirements this one only knows once it can read what is installed. A game
+   * cannot name its missing dependency archives before the scan has said what
+   * they are, so it names them here, and `computeMissingRequirements` checks
+   * them beside the requirement itself (issue #3489).
+   */
+  derive?: (installed: InstalledContentSnapshot) => ContentRequirement[];
   isInstalled: (installed: InstalledContentSnapshot) => boolean;
 }
 
@@ -168,6 +184,41 @@ export function exactGameRequirement(name: string): ContentRequirement {
   };
 }
 
+/**
+ * The requirement for a game a launch is about to run: the game itself, and
+ * once the scan has read it, each dependency archive it lacks (issue #3489).
+ * Importing a preset or a pack for the same game uses `exactGameRequirement`,
+ * because saving a document does not run the game.
+ */
+export function launchGameRequirement(name: string): ContentRequirement {
+  return {
+    ...exactGameRequirement(name),
+    derive: (i) =>
+      (i.games.find((g) => g.name === name)?.missingDependencies ?? []).map(
+        (archive) => dependencyRequirement(name, archive),
+      ),
+  };
+}
+
+/**
+ * An archive an installed game depends on and this machine lacks. It is always
+ * unmet, since it is only built from a scan that said so, and it carries no
+ * download: the engine reports the name lower-cased, which the download
+ * resolver cannot match (issue #3489).
+ */
+export function dependencyRequirement(
+  gameName: string,
+  archive: string,
+): ContentRequirement {
+  return {
+    kind: "dependency",
+    label: archive,
+    gameName,
+    noDownload: true,
+    isInstalled: () => false,
+  };
+}
+
 /** See {@link exactGameRequirement}. */
 export function exactMapRequirement(name: string): ContentRequirement {
   return {
@@ -209,7 +260,8 @@ export function computeMissingRequirements(
   reqs: readonly ContentRequirement[],
   installed: InstalledContentSnapshot,
 ): ContentRequirement[] {
-  return dedupeRequirements(reqs).filter((r) => !r.isInstalled(installed));
+  const expanded = reqs.flatMap((r) => [r, ...(r.derive?.(installed) ?? [])]);
+  return dedupeRequirements(expanded).filter((r) => !r.isInstalled(installed));
 }
 
 /** Every reading the resolve gate decides from, as plain values. */

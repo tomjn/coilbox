@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import { contentListReplays } from "../content/bindings";
 import { primeScan, useUnitsyncScan } from "../content/config";
+import { dependencyBlockReason } from "../content/gameDependencies";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
 import {
@@ -14,6 +15,7 @@ import {
   detectBattleResult,
   engineFailureMessage,
 } from "../play/detect";
+import { missingLaunchDependency } from "../play/launchContent";
 import { usePlay } from "../play/PlayProvider";
 import { launchScenario } from "../scenario/launch";
 import { type Difficulty, usesDifficulty } from "../scenario/model";
@@ -138,6 +140,16 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           ? { kind: "map", name: snapshot.mapName }
           : null;
 
+  // A game that is installed but lacks an archive it depends on would stop in
+  // the engine, so the briefing stops first and names the archive (issue #3489).
+  const dependency =
+    !unfinished && scanReady
+      ? missingLaunchDependency(snapshot.gameName, games)
+      : null;
+  const dependencyBlock = dependency?.gameName
+    ? dependencyBlockReason(dependency.label, dependency.gameName)
+    : null;
+
   // How hard to play it (issue #2220). The level is the run's, held in progress
   // so it carries from one mission to the next, and offered only on a mission
   // whose scenario actually varies by it: a picker that changes nothing about
@@ -164,6 +176,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     scanReady &&
     !unfinished &&
     !missing &&
+    !dependencyBlock &&
     !running &&
     !scan.loading;
 
@@ -199,7 +212,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     if (!target) return;
     const game = games.find((g) => g.name === snapshot.gameName);
     const map = maps.find((m) => m.name === snapshot.mapName);
-    if (!game || !map) return;
+    if (!game || !map || dependencyBlock) return;
     setError(null);
     // Snapshot the replay files that exist before the engine runs, so a diff
     // afterwards finds the one this launch just wrote. A failure here (content
@@ -369,6 +382,7 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     setProvenance,
     variesByDifficulty,
     difficulty,
+    dependencyBlock,
   ]);
 
   /**
@@ -420,6 +434,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     error,
     canStart,
     missing,
+    /** The dependency archive the mission's game lacks, worded, else null. */
+    dependencyBlock,
     /** Why the mission cannot be played at all, whatever is installed. */
     unfinished,
     noEngine,

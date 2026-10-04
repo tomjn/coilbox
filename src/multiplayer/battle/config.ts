@@ -288,9 +288,15 @@ export function deriveSync(
     mapMissing: boolean;
     gameMissing: boolean;
     engineMissing?: boolean;
+    dependencyMissing?: boolean;
   },
 ): SyncState {
-  if (content.mapMissing || content.gameMissing || content.engineMissing)
+  if (
+    content.mapMissing ||
+    content.gameMissing ||
+    content.engineMissing ||
+    content.dependencyMissing
+  )
     return "error";
   const players = Object.values(battle.members)
     .filter((m) => m.battleStatus.mode)

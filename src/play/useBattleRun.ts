@@ -24,6 +24,7 @@ import type { GameAiConfig } from "./gameAi";
 import { mergeGameAi } from "./gameAi";
 import type { GameChoice, GameOffer, InstalledGame } from "./installedGames";
 import { decideLaunchGame } from "./installedGames";
+import { missingLaunchDependency } from "./launchContent";
 import { usePlay } from "./PlayProvider";
 
 /* -------------------------------------------------------------------------- *
@@ -167,6 +168,9 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   // A scan whose `Init` failed has empty lists that are not a report of an
   // empty machine, so it names nothing missing and cannot start a battle
   // (issue #3398).
+  const dependency = installedGame
+    ? missingLaunchDependency(installedGame.name, games)
+    : null;
   const missing: BattleRequirement | null =
     !scanReady || scanFailure
       ? null
@@ -174,11 +178,11 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         ? { kind: "game", name: decision.name }
         : gameOffer
           ? null
-          : installedGame?.missingDependencies?.length
+          : dependency
             ? {
                 kind: "dependency",
-                name: installedGame.missingDependencies[0],
-                gameName: installedGame.name,
+                name: dependency.label,
+                gameName: dependency.gameName,
               }
             : !maps.some((m) => m.name === mapName)
               ? { kind: "map", name: mapName }

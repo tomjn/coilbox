@@ -101,6 +101,61 @@ describe("missingLaunchContent", () => {
       ),
     ).toEqual([]);
   });
+
+  describe("a game's missing dependency archives (issue #3489)", () => {
+    const bench = "Zero-K Benchmark v3";
+    const needs = { game: bench, map: "Comet Catcher Redux" };
+    const withDependencies = (missingDependencies?: string[]) =>
+      installed({
+        games: [
+          {
+            name: bench,
+            ...(missingDependencies ? { missingDependencies } : {}),
+          },
+        ],
+      });
+
+    it("reports each archive the installed game depends on and lacks", () => {
+      const missing = missingLaunchContent(
+        needs,
+        withDependencies(["zero-k v1.7.6.4", "other v2"]),
+      );
+      expect(missing.map((r) => [r.kind, r.label])).toEqual([
+        ["dependency", "zero-k v1.7.6.4"],
+        ["dependency", "other v2"],
+      ]);
+    });
+
+    it("offers no download, because the name the engine gives cannot be resolved", () => {
+      const [req] = missingLaunchContent(
+        needs,
+        withDependencies(["zero-k v1.7.6.4"]),
+      );
+      expect(req.noDownload).toBe(true);
+      expect(req.gameName).toBe(bench);
+    });
+
+    it("launches a game with no missing dependency as it does today", () => {
+      expect(missingLaunchContent(needs, withDependencies([]))).toEqual([]);
+    });
+
+    it("reads a scan from an older worker, with no field, as none known", () => {
+      expect(missingLaunchContent(needs, withDependencies())).toEqual([]);
+    });
+
+    it("names the game and not its dependency when the game is not installed", () => {
+      const missing = missingLaunchContent(needs, installed({ games: [] }));
+      expect(missing.map((r) => r.kind)).toEqual(["game"]);
+    });
+
+    it("reports the dependency beside a missing map", () => {
+      const missing = missingLaunchContent(
+        { game: bench, map: "Tabula" },
+        withDependencies(["zero-k v1.7.6.4"]),
+      );
+      expect(missing.map((r) => r.kind)).toEqual(["dependency", "map"]);
+    });
+  });
 });
 
 describe("launchTargets", () => {

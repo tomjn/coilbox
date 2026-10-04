@@ -130,6 +130,7 @@ export function useResolveContent(
         name: g.name,
         shortname: g.info.shortname,
         version: g.info.version,
+        missingDependencies: g.missingDependencies,
       })),
       maps: (scan.data?.maps ?? []).map((m) => m.name),
       engineVersions:

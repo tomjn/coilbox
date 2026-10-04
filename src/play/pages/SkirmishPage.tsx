@@ -33,9 +33,13 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { dependencyBlockReason } from "@/content/gameDependencies";
 import { mergeMapTiers } from "@/content/mapTiers";
 import { ResolveContentGate } from "@/content/pages/components/ResolveContentDrawer";
-import { ScanFailed } from "@/content/pages/components/states";
+import {
+  DependencyBlocked,
+  ScanFailed,
+} from "@/content/pages/components/states";
 import {
   exactGameRequirement,
   exactMapRequirement,
@@ -53,6 +57,10 @@ import {
   usernameFromKey,
 } from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
+import {
+  launchRequirements,
+  missingLaunchDependency,
+} from "@/play/launchContent";
 import type { StartRect } from "@/startbox/geometry";
 import { isBoxMode, startPosNote } from "@/startbox/mode";
 import {
@@ -286,6 +294,14 @@ export default function SkirmishPage() {
   // waiting for the auto-pick effect below to commit `mapName`.
   const selectedMap = maps.find((m) => m.name === mapName) ?? maps[0] ?? null;
   const gameArchive = selectedGame?.primaryArchive.name;
+  // A game that lacks an archive it depends on stops in the engine, so the page
+  // stops first and names the archive (issue #3489).
+  const dependency = selectedGame
+    ? missingLaunchDependency(selectedGame.name, games)
+    : null;
+  const dependencyBlock = dependency?.gameName
+    ? dependencyBlockReason(dependency.label, dependency.gameName)
+    : null;
   // The selected game's AI catalogue, for the AI picker's difficulty pips.
   const brandingAi = useBrandingEntry(selectedGame ?? undefined)?.ai;
   const aiConfig = mergeGameAi(getProfile().ai, brandingAi);
@@ -494,6 +510,7 @@ export default function SkirmishPage() {
     !!selectedMap &&
     activeCount >= 2 &&
     aiRowsReady &&
+    !dependencyBlock &&
     !running;
 
   const updateParticipant = (id: string, patch: Partial<Participant>) => {
@@ -599,7 +616,8 @@ export default function SkirmishPage() {
   ) {
     const installed =
       games.some((g) => g.name === draft.gameName) &&
-      maps.some((m) => m.name === draft.mapName);
+      maps.some((m) => m.name === draft.mapName) &&
+      !missingLaunchDependency(draft.gameName, games);
     if (installed) {
       navigate("/battles", {
         state: { hostDraft: draft, hostTitle: title, hostServerKey: serverKey },
@@ -625,7 +643,7 @@ export default function SkirmishPage() {
   }
 
   async function onStart(parts: Participant[] = participants) {
-    if (!target) return;
+    if (!target || dependencyBlock) return;
     const config = await buildConfig(parts);
     if (!config) return;
     // Whether this game counts against a preset is settled now, from the setup
@@ -963,7 +981,9 @@ export default function SkirmishPage() {
                   `${gameName || "Skirmish"} (hosted)`,
                 )
               }
-              disabled={running || !selectedGame || !selectedMap}
+              disabled={
+                running || !selectedGame || !selectedMap || !!dependencyBlock
+              }
             >
               <Swords className="size-4" /> Host
             </Button>
@@ -1034,10 +1054,10 @@ export default function SkirmishPage() {
       {pendingHost && (
         <ResolveContentGate
           title="Set up this battle for hosting"
-          requirements={[
-            exactGameRequirement(pendingHost.draft.gameName),
-            exactMapRequirement(pendingHost.draft.mapName),
-          ]}
+          requirements={launchRequirements({
+            game: pendingHost.draft.gameName,
+            map: pendingHost.draft.mapName,
+          })}
           target={target ?? undefined}
           targetLoading={targetLoading}
           onContinue={() => {
@@ -1124,6 +1144,8 @@ export default function SkirmishPage() {
       )}
 
       {scan.error && <ScanFailed noun="games and maps" reason={scan.error} />}
+
+      {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
 
       {error && (
         <Alert variant="destructive" className="p-3">

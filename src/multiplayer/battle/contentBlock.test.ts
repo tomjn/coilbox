@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { computeMissingRequirements } from "@/content/resolveContent";
 import {
+  battleRequirements,
   type LaunchContent,
   launchBlock,
   startedWithoutYou,
@@ -65,6 +67,25 @@ describe("launchBlock", () => {
     expect(block?.reason).toContain("Comet Catcher Remake 1.8");
   });
 
+  it("blocks a player whose game lacks a dependency archive, naming both", () => {
+    const block = launchBlock(
+      content({
+        dependencyBlock:
+          "Archive not installed: zero-k v1.7.6.4. Zero-K Benchmark v3 depends on it.",
+      }),
+    );
+    expect(block?.short).toBe("Archive missing");
+    expect(block?.reason).toContain("zero-k v1.7.6.4");
+    expect(block?.reason).toContain("Zero-K Benchmark v3");
+  });
+
+  it("names a missing game before a dependency it cannot have read", () => {
+    const block = launchBlock(
+      content({ gameMissing: true, dependencyBlock: "Archive not installed." }),
+    );
+    expect(block?.short).toBe("Game missing");
+  });
+
   it("blocks with no engine selected", () => {
     const block = launchBlock(content({ hasTarget: false }));
     expect(block?.short).toBe("No engine");
@@ -109,6 +130,31 @@ describe("launchBlock", () => {
   it("falls back to a generic noun when the host named nothing", () => {
     const block = launchBlock(content({ gameMissing: true, gameName: "" }));
     expect(block?.reason).toContain("the game");
+  });
+});
+
+describe("battleRequirements and a dependency archive", () => {
+  const battle = { modname: "Zero-K Benchmark v3", map: "Tabula" };
+  const installed = (missingDependencies?: string[]) => ({
+    games: [{ name: battle.modname, missingDependencies }],
+    maps: [battle.map],
+    engineVersions: [],
+  });
+
+  it("reports an archive the battle's game lacks", () => {
+    const missing = computeMissingRequirements(
+      battleRequirements(battle),
+      installed(["zero-k v1.7.6.4"]),
+    );
+    expect(missing.map((r) => [r.kind, r.label, r.gameName])).toEqual([
+      ["dependency", "zero-k v1.7.6.4", battle.modname],
+    ]);
+  });
+
+  it("reports nothing for a game that lacks nothing", () => {
+    expect(
+      computeMissingRequirements(battleRequirements(battle), installed([])),
+    ).toEqual([]);
   });
 });
 
