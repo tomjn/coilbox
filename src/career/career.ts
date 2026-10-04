@@ -4,8 +4,8 @@ import type { AchievementResult } from "../content/achievements";
 import { aiRecordFor } from "../content/aiRecord";
 import type { StatRecord } from "../content/bindings";
 import type { InstalledGame } from "../play/installedGames";
-import { MAX_ASCENSION, unlockedLoadouts } from "../runlite/meta";
-import type { RogueliteMeta } from "../runlite/model";
+import { MAX_ASCENSION, unlockedLoadouts, unlocksFor } from "../runlite/meta";
+import type { RogueliteMeta, RunStats } from "../runlite/model";
 import { createGameResolver, type GameId } from "./games";
 
 export interface CampaignRow {
@@ -50,11 +50,14 @@ export interface CareerGame {
   campaigns: CampaignRow[];
   conquest: ConquestSummary | null;
   ai: AiSummary | null;
+  /** The game's own Warpath runs, with what it offers at setup. */
+  warpath: WarpathSummary | null;
 }
 
 export interface Career {
   games: CareerGame[];
-  warpath: WarpathSummary | null;
+  /** Warpath runs from before records were kept per game, or with no game. */
+  legacyWarpath: WarpathSummary | null;
   isEmpty: boolean;
 }
 
@@ -172,8 +175,8 @@ export function careerTotals(career: Career): CareerTotals {
     aiWins: 0,
     conquestsFinished: 0,
     conquestsWon: 0,
-    warpathRuns: career.warpath?.runs ?? 0,
-    warpathWins: career.warpath?.wins ?? 0,
+    warpathRuns: career.legacyWarpath?.runs ?? 0,
+    warpathWins: career.legacyWarpath?.wins ?? 0,
     campaignsFinished: 0,
     campaignsStarted: 0,
   };
@@ -182,6 +185,8 @@ export function careerTotals(career: Career): CareerTotals {
     totals.aiWins += game.ai?.wins ?? 0;
     totals.conquestsFinished += game.conquest?.finished ?? 0;
     totals.conquestsWon += game.conquest?.won ?? 0;
+    totals.warpathRuns += game.warpath?.runs ?? 0;
+    totals.warpathWins += game.warpath?.wins ?? 0;
     totals.campaignsStarted += game.campaigns.length;
     totals.campaignsFinished += game.campaigns.filter((c) => c.finished).length;
   }
@@ -209,27 +214,42 @@ export function achievementDigest(
   return { shown, earned: earned.length, total: results.length };
 }
 
-/** Warpath's totals and unlocks, or null when the player has none yet. */
-export function warpathSummary(meta: RogueliteMeta): WarpathSummary | null {
-  const loadouts = unlockedLoadouts(meta)
-    .filter((l) => l.id !== "standard")
-    .map((l) => l.label);
-  if (
-    meta.stats.runs === 0 &&
-    meta.ascensionTier === 0 &&
-    loadouts.length === 0 &&
-    meta.eventPools.length === 0
-  ) {
-    return null;
-  }
+/**
+ * A Warpath summary from one record's stats and what it offers, or null when
+ * the record has no runs.
+ */
+function warpathSummary(
+  stats: RunStats,
+  unlocks: {
+    loadouts: readonly string[];
+    eventPools: readonly string[];
+    ascensionTier: number;
+  },
+): WarpathSummary | null {
+  if (stats.runs === 0) return null;
   return {
-    runs: meta.stats.runs,
-    wins: meta.stats.wins,
-    deepest: meta.stats.deepest,
-    ascensionTier: meta.ascensionTier,
+    runs: stats.runs,
+    wins: stats.wins,
+    deepest: stats.deepest,
+    ascensionTier: unlocks.ascensionTier,
     maxAscension: MAX_ASCENSION,
-    loadouts,
-    eventPools: meta.eventPools,
+    loadouts: unlockedLoadouts(unlocks)
+      .filter((l) => l.id !== "standard")
+      .map((l) => l.label),
+    eventPools: [...unlocks.eventPools],
+  };
+}
+
+/** Add a second summary of the same game to the first. */
+function mergeWarpath(a: WarpathSummary, b: WarpathSummary): WarpathSummary {
+  return {
+    ...a,
+    runs: a.runs + b.runs,
+    wins: a.wins + b.wins,
+    deepest: Math.max(a.deepest, b.deepest),
+    ascensionTier: Math.max(a.ascensionTier, b.ascensionTier),
+    loadouts: [...new Set([...a.loadouts, ...b.loadouts])],
+    eventPools: [...new Set([...a.eventPools, ...b.eventPools])],
   };
 }
 
@@ -240,9 +260,11 @@ export function warpathSummary(meta: RogueliteMeta): WarpathSummary | null {
  * and contributes nothing. That is different from a store that answered with
  * nothing, which is why the caller reports the two apart.
  *
- * Warpath is the one store with no game. Its record of loadouts, event pools,
- * ascension tier and stats is one document for the whole install, so it is
- * returned once and not split across games.
+ * Warpath keeps one record per game, keyed by shortname like Conquest's. A
+ * game's summary shows its own runs and wins, and the tier and unlocks it
+ * offers, which include what the legacy record unlocked. The legacy record
+ * (runs from before records were kept per game, or with no game) is returned
+ * once, as `legacyWarpath`.
  *
  * Pure: the hooks that read the stores live in `useCareer`.
  */
@@ -262,6 +284,7 @@ export function buildCareer(input: CareerInput): Career {
           campaigns: [],
           conquest: null,
           ai: null,
+          warpath: null,
         },
       };
       drafts.set(id.key, draft);
@@ -332,6 +355,20 @@ export function buildCareer(input: CareerInput): Career {
     }
   }
 
+  let legacyWarpath: WarpathSummary | null = null;
+  if (input.warpath) {
+    const meta = input.warpath;
+    for (const [shortname, record] of Object.entries(meta.games)) {
+      const summary = warpathSummary(record.stats, unlocksFor(meta, shortname));
+      if (!summary) continue;
+      const game = entry(resolver.byShortname(shortname));
+      game.warpath = game.warpath
+        ? mergeWarpath(game.warpath, summary)
+        : summary;
+    }
+    legacyWarpath = warpathSummary(meta.legacy.stats, meta.legacy);
+  }
+
   // Conquest summaries made only to hold a zero (a game with an unlock record
   // of nothing) are not progress.
   const games = [...drafts.values()]
@@ -340,6 +377,7 @@ export function buildCareer(input: CareerInput): Career {
       (g) =>
         g.campaigns.length > 0 ||
         g.ai !== null ||
+        g.warpath !== null ||
         (g.conquest !== null &&
           (g.conquest.finished > 0 ||
             g.conquest.threatLevel > 0 ||
@@ -347,6 +385,9 @@ export function buildCareer(input: CareerInput): Career {
     )
     .sort((a, b) => a.title.localeCompare(b.title));
 
-  const warpath = input.warpath ? warpathSummary(input.warpath) : null;
-  return { games, warpath, isEmpty: games.length === 0 && warpath === null };
+  return {
+    games,
+    legacyWarpath,
+    isEmpty: games.length === 0 && legacyWarpath === null,
+  };
 }

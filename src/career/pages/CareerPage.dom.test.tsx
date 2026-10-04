@@ -67,7 +67,7 @@ const allReady: Record<SourceId, SourceStatus> = {
 
 const FULL: Career = {
   isEmpty: false,
-  warpath: {
+  legacyWarpath: {
     runs: 2,
     wins: 1,
     deepest: 8,
@@ -99,11 +99,20 @@ const FULL: Career = {
         inProgress: 0,
       },
       ai: { games: 14, wins: 1, losses: 1, undecided: 12, topAi: null },
+      warpath: {
+        runs: 3,
+        wins: 2,
+        deepest: 6,
+        ascensionTier: 2,
+        maxAscension: 5,
+        loadouts: ["Armoured vanguard", "Air superiority"],
+        eventPools: ["anomalies"],
+      },
     },
   ],
 };
 
-const EMPTY: Career = { isEmpty: true, warpath: null, games: [] };
+const EMPTY: Career = { isEmpty: true, legacyWarpath: null, games: [] };
 
 function show(
   data: Pick<CareerData, "career" | "sources"> & Partial<CareerData>,
@@ -171,9 +180,54 @@ describe("CareerPage", () => {
     expect(card.textContent).toContain("2 won of 3 finished");
     expect(card.textContent).toContain("highest threat level unlocked: 2 of 3");
     expect(card.textContent).toContain("14 games · 1W · 1L · 12 undecided");
-    const warpath = screen.getByRole("region", { name: /Warpath/ });
-    expect(warpath.textContent).toContain("2 runs · 1 win");
-    expect(warpath.textContent).toContain("ascension tier 1 of 5");
+    // Warpath sits in the game's card, with that game's own numbers.
+    expect(within(card).getByText("Warpath")).toBeTruthy();
+    expect(card.textContent).toContain("3 runs · 2 wins");
+    expect(card.textContent).toContain("deepest column 6");
+    expect(card.textContent).toContain("ascension tier 2 of 5");
+    expect(card.textContent).toContain(
+      "Unlocked loadouts: Armoured vanguard, Air superiority",
+    );
+    expect(card.textContent).toContain("event pools: anomalies");
+  });
+
+  it("shows the earlier runs once, below the game cards, and says what they are", () => {
+    show({ career: FULL, sources: allReady });
+    const earlier = screen.getByRole("region", {
+      name: /Earlier Warpath runs/,
+    });
+    expect(earlier.textContent).toContain("before records were kept per game");
+    expect(earlier.textContent).toContain("2 runs · 1 win");
+    expect(earlier.textContent).toContain("ascension tier 1 of 5");
+    // The game's own numbers are not in it.
+    expect(earlier.textContent).not.toContain("3 runs");
+    const order = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((h) => h.textContent);
+    expect(order.at(-1)).toContain("Earlier Warpath runs");
+  });
+
+  it("shows only the earlier runs when no game has a record", () => {
+    show({ career: { ...FULL, games: [] }, sources: allReady });
+    const earlier = screen.getByRole("region", {
+      name: /Earlier Warpath runs/,
+    });
+    expect(earlier.textContent).toContain("2 runs · 1 win");
+    expect(href("Open Warpath")).toBe("/warpath");
+  });
+
+  it("shows no earlier block when there are none", () => {
+    show({ career: { ...FULL, legacyWarpath: null }, sources: allReady });
+    expect(screen.queryByText(/Earlier Warpath runs/)).toBeNull();
+    const card = screen.getByRole("region", { name: /Balanced Annihilation/ });
+    expect(card.textContent).toContain("3 runs · 2 wins");
+  });
+
+  it("shows a game that has only Warpath runs", () => {
+    const game = { ...FULL.games[0], campaigns: [], conquest: null, ai: null };
+    show({ career: { ...FULL, games: [game] }, sources: allReady });
+    const card = screen.getByRole("region", { name: /Balanced Annihilation/ });
+    expect(card.textContent).toContain("3 runs · 2 wins");
   });
 
   it("links each section to the screen that owns it", () => {
@@ -185,9 +239,9 @@ describe("CareerPage", () => {
   });
 
   it("shows only the sections a game has progress in", () => {
-    const game = { ...FULL.games[0], campaigns: [], ai: null };
+    const game = { ...FULL.games[0], campaigns: [], ai: null, warpath: null };
     show({
-      career: { ...FULL, games: [game], warpath: null },
+      career: { ...FULL, games: [game], legacyWarpath: null },
       sources: allReady,
     });
     expect(screen.queryByText("Campaigns")).toBeNull();
@@ -208,7 +262,9 @@ describe("CareerPage", () => {
     expect(alert.textContent).toContain("database is locked");
     expect(screen.getByText("Campaigns")).toBeTruthy();
     expect(screen.getByText("Conquest")).toBeTruthy();
-    expect(screen.getByRole("region", { name: /Warpath/ })).toBeTruthy();
+    expect(
+      screen.getByRole("region", { name: /Earlier Warpath runs/ }),
+    ).toBeTruthy();
   });
 
   it("says when the installed games could not be read, without calling any not installed", () => {
@@ -239,6 +295,7 @@ describe("CareerPage", () => {
     show({ career: FULL, sources: allReady });
     expect(screen.queryByText("Conquest")).toBeNull();
     expect(screen.queryByRole("region", { name: /Warpath/ })).toBeNull();
+    expect(screen.queryByText("Warpath")).toBeNull();
     expect(
       screen.queryByRole("link", { name: "Open Player stats" }),
     ).toBeNull();
@@ -288,7 +345,7 @@ describe("CareerPage", () => {
       if (img) fireEvent.error(img);
       expect(icon(card).dataset.state).toBe("placeholder");
       expect(card.textContent).toContain("2 won of 3 finished");
-      expect(screen.getByRole("region", { name: /Warpath/ })).toBeTruthy();
+      expect(card.textContent).toContain("3 runs · 2 wins");
     });
 
     it("skips a logo too wide to read as an icon and uses the next art", () => {
@@ -310,7 +367,7 @@ describe("CareerPage", () => {
       );
     });
 
-    it("puts no icon on the all-games Warpath card", () => {
+    it("puts no icon on the earlier Warpath runs card", () => {
       show({ career: FULL, sources: allReady });
       const warpath = screen.getByRole("region", { name: /Warpath/ });
       expect(within(warpath).queryByTestId("game-icon")).toBeNull();
@@ -346,8 +403,9 @@ describe("CareerPage", () => {
       expect(overview.textContent).toContain("1 won");
       expect(overview.textContent).toContain("2");
       expect(overview.textContent).toContain("of 3 finished");
-      expect(overview.textContent).toContain("2 runs");
-      expect(overview.textContent).toContain("1 win");
+      // Warpath: the earlier runs (2, 1 win) plus the game's own (3, 2 wins).
+      expect(overview.textContent).toContain("5 runs");
+      expect(overview.textContent).toContain("3 wins");
       expect(overview.textContent).toContain("of 1 started");
       const order = screen
         .getAllByRole("heading", { level: 2 })
