@@ -600,6 +600,10 @@ export interface StatAi {
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;
+  /** The team's `Advantage` fraction (0.25 is +25%). Absent when the script has none. */
+  advantage?: number;
+  /** The team's `IncomeMultiplier`. Absent when the script has none. */
+  incomeMultiplier?: number;
   /** Set only for a decided game. */
   won?: boolean;
 }

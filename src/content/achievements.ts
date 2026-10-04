@@ -16,9 +16,9 @@ import type { PlayerGameFact } from "./stats";
  * that pushed progress to the target, recomputed from the records each time. There
  * is no writable achievements store - the stats table is the single source.
  *
- * Note: opponents that are AI bots are not recorded in the stats table (only
- * human `[playerN]` sections are ingested), so "wins vs distinct AIs" is not
- * derivable yet and is deliberately absent from this catalog. See the follow-up.
+ * Note: AI opponents are recorded in `record.ais` (#1148), but `playerGameFacts`
+ * carries human seats only, so no achievement here counts wins against AIs. The
+ * record against AI lives in `aiRecord.ts`.
  */
 
 /** Grouping for the achievements UI. */

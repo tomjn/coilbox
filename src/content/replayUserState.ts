@@ -109,3 +109,22 @@ export function refightFilenames(
   }
   return set;
 }
+
+/**
+ * Filenames of replays from a scripted mode (campaign, Conquest, Warpath). Their
+ * AIs carry handicaps and mission scripts, so the record against AI leaves them
+ * out. Best-effort, like `refightFilenames`: a replay whose tagging failed counts
+ * as a skirmish.
+ */
+export function scriptedModeFilenames(
+  state: Record<string, ReplayUserState>,
+): Set<string> {
+  const set = new Set<string>();
+  for (const [filename, s] of Object.entries(state)) {
+    const mode = s.provenance?.mode;
+    if (mode === "campaign" || mode === "conquest" || mode === "warpath") {
+      set.add(filename);
+    }
+  }
+  return set;
+}
