@@ -126,6 +126,7 @@ import {
   useSkirmishPresets,
 } from "../presets";
 import { reconcileParticipantAis } from "../reconcileAi";
+import { useAiBonusSuggestions } from "../useAiBonusSuggestions";
 import { useSkirmishDebrief } from "../useSkirmishDebrief";
 import { DebriefDrawer } from "./components/DebriefDrawer";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
@@ -189,6 +190,7 @@ export default function SkirmishPage() {
     draft.participants.length > 0 ? draft.participants : initialParticipants(),
   );
   const [gameName, setGameName] = useState(() => draft.gameName);
+  const bonusSuggestions = useAiBonusSuggestions(participants, gameName);
   const [mapName, setMapName] = useState(() => draft.mapName);
   const [startPosType, setStartPosType] = useState(() => draft.startPosType);
   // Ally start boxes for choose-in-game, on the same 0..200 grid the battle room
@@ -1198,6 +1200,7 @@ export default function SkirmishPage() {
             onSetAllAiBonus={(percent) =>
               setParticipants((ps) => setAllAiBonus(ps, percent))
             }
+            bonusSuggestions={bonusSuggestions}
           />
           <GameOptionsPanel
             selectedGame={selectedGame}
