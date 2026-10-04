@@ -342,6 +342,23 @@ export function ParticipantsTable({
                             )}
                           </SelectContent>
                         </Select>
+                        {/* A bonus belongs to the team, which takes it from its
+                            first row, so a row sharing a team has none of its
+                            own. It sits under the AI picker, not in its own
+                            column, which would push Remove off the card. */}
+                        {!sharer && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <span>Bonus</span>
+                            <BonusButton
+                              name={p.name}
+                              confirmed={p.handicap ?? 0}
+                              onSend={(v) => onSetAiBonus(p.id, v)}
+                              help={BONUS_HELP}
+                              actionLabel="Set"
+                              disabled={disabled}
+                            />
+                          </div>
+                        )}
                         {aiInvalid(p) && (
                           <span className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
                             <AlertTriangle className="size-3.5 shrink-0" />
@@ -431,30 +448,16 @@ export function ParticipantsTable({
 
                 <TableCell className="py-2 pl-1 pr-2 text-right">
                   {p.kind === "you" ? null : (
-                    <div className="flex items-center justify-end gap-1">
-                      {/* A bonus belongs to the team, which takes it from its
-                          first row, so a row sharing a team has none of its own. */}
-                      {!sharer && (
-                        <BonusButton
-                          name={p.name}
-                          confirmed={p.handicap ?? 0}
-                          onSend={(v) => onSetAiBonus(p.id, v)}
-                          help={BONUS_HELP}
-                          actionLabel="Set"
-                          disabled={disabled}
-                        />
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        aria-label={`Remove ${p.name}`}
-                        disabled={disabled}
-                        onClick={() => onRemove(p.id)}
-                      >
-                        <X className="size-4" />
-                      </Button>
-                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      aria-label={`Remove ${p.name}`}
+                      disabled={disabled}
+                      onClick={() => onRemove(p.id)}
+                    >
+                      <X className="size-4" />
+                    </Button>
                   )}
                 </TableCell>
               </TableRow>
