@@ -198,7 +198,9 @@ function useLobbyName(): string | null {
  */
 function useHasResume(): boolean {
   const { candidates, loading } = useResume();
-  return !loading && candidates.length > 0;
+  // The start card a distribution names is not something the player left, so it
+  // does not earn "Welcome back" on a fresh install (issue #3378).
+  return !loading && candidates.some((c) => c.kind !== "start");
 }
 
 /**
