@@ -71,7 +71,7 @@ describe("draftToHostSeed", () => {
     });
     expect(seed.bots).toHaveLength(1);
     expect(seed.bots[0]).toEqual({
-      name: "AI 1",
+      name: "AI1",
       aiDll: "BARb",
       side: 0, // Armada
       colorHex: "#0000ff",
@@ -81,6 +81,22 @@ describe("draftToHostSeed", () => {
     });
     expect(seed.openSlots).toBe(0);
     expect(seed.unresolvedAiCount).toBe(0);
+  });
+
+  it("names bots without whitespace, which the ADDBOT line cannot carry", () => {
+    const seed = draftToHostSeed({
+      draft: mkDraft({
+        participants: [
+          you(),
+          ai({ name: "Big Bot" }),
+          ai({ id: "ai2", name: "BigBot" }),
+          ai({ id: "ai3", name: "  " }),
+        ],
+      }),
+      sides: SIDES,
+      ais: AIS,
+    });
+    expect(seed.bots.map((b) => b.name)).toEqual(["BigBot", "BigBot1", "AI"]);
   });
 
   it("carries mod options and start-pos type as script tags", () => {

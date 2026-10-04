@@ -23,6 +23,8 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { identifierFieldProps } from "@/lib/identifierField";
+import { useSkirmishAis } from "@/play/config";
+import type { SkirmishDraft } from "@/play/drafts";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { MapPickerGrid } from "@/play/pages/components/MapPickerGrid";
@@ -39,7 +41,6 @@ import {
 import {
   hostingRoute,
   hostingRouteSummary,
-  NAT_TYPE_DIRECT,
   recordHostingRoute,
 } from "./hostingRoute";
 import { ReachablePorts } from "./ReachablePorts";
@@ -49,12 +50,15 @@ import {
   roomPorts,
 } from "./reachability";
 import {
+  DEFAULT_ROOM_MAX_PLAYERS,
   DEFAULT_ROOM_PORT,
   playerNameProblem,
   roomPasswordProblem,
   roomPortProblem,
   startButtonLabel,
 } from "./room";
+import { draftToRoomSeed, roomSeedSummary } from "./roomSeed";
+import { roomBattleArgs } from "./startRoomArgs";
 
 /** Everything the page needs to start a room and open the host's battle in it. */
 export interface StartRoomArgs {
@@ -75,12 +79,43 @@ export interface StartRoomArgs {
   publicAddress: string | null;
   /** The battle to open once the host's client has connected. */
   battle: OpenBattleArgs;
+  /** The skirmish setup to apply to the battle once the room is up, from "Host
+   *  as battle". Absent for a room started from nothing. */
+  draft?: SkirmishDraft;
+}
+
+/**
+ * What the setup being hosted brings with it: how many bots, how many seats are
+ * left for people, and any bot the game has no AI for. Its own component so the
+ * game's AI list is only read for a room opened from a setup.
+ */
+function SeedNote({
+  draft,
+  enginePath,
+  dataDir,
+  archive,
+}: {
+  draft: SkirmishDraft;
+  enginePath?: string;
+  dataDir?: string;
+  archive?: string;
+}) {
+  // The game's own AI list, so the note can say which bots the game cannot run,
+  // as the battle room will find out for itself. Until it has loaded every bot
+  // is shown as the setup had it.
+  const { ais, loaded } = useSkirmishAis(enginePath, dataDir, archive);
+  return (
+    <p className="text-xs text-muted-foreground">
+      {roomSeedSummary(draftToRoomSeed({ draft, ais: loaded ? ais : null }))}
+    </p>
+  );
 }
 
 export function HostRoomForm({
   blocked,
   leaves = null,
   defaultName,
+  draft,
   onStart,
 }: {
   /** Why hosting is unavailable, or null when it is available. Coilbox is in
@@ -92,13 +127,19 @@ export function HostRoomForm({
   leaves?: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
+  /** A skirmish setup to open the room with: its game and map are picked here,
+   *  and its options and bots are applied once the room is up. */
+  draft?: SkirmishDraft;
   /** Starts the room and opens the battle in it, resolving with the room's
    *  connection key. Rejects with what to tell the host when either half
    *  fails. */
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
-  const content = useHostContent();
+  const content = useHostContent(
+    draft?.gameName || undefined,
+    draft?.mapName || undefined,
+  );
   const { thumbs } = useUnitsyncThumbnails(
     content.target?.enginePath,
     content.target?.dataDir,
@@ -119,7 +160,7 @@ export function HostRoomForm({
   // Held as typed rather than as a number, so the field can be emptied and a bad
   // value can be shown back to the host instead of being corrected under them.
   const [port, setPort] = useState(String(DEFAULT_ROOM_PORT));
-  const [maxPlayers, setMaxPlayers] = useState(8);
+  const [maxPlayers, setMaxPlayers] = useState(DEFAULT_ROOM_MAX_PLAYERS);
   // On by default: the point of hosting on a LAN is that the people on it find
   // the room without being read an address across the sofa.
   const [advertise, setAdvertise] = useState(true);
@@ -178,48 +219,19 @@ export function HostRoomForm({
         // they are directly reachable. Handing it to the room is what makes
         // that true of the game as well as the room (issue #2130).
         publicAddress: ownPublicAddress(reachability),
-        battle: {
-          battleType: 0,
-          natType: NAT_TYPE_DIRECT,
-          key: password.trim() || "*",
-          // The engine's game port, not the room's. The two are separate ports
-          // and the engine binds its own, exactly as it does on a real server.
-          //
-          // The port the router opened deliberately does not go here, unlike a
-          // battle on a lobby server. This one field is read by everybody in the
-          // room, and a room's joiners are on both sides of the router: the
-          // people on this network reach the engine at the port it binds, and
-          // only somebody outside would want the router's. Naming the router's
-          // would break the case the room exists for to fix the case it does
-          // not.
-          //
-          // Worth knowing before anybody revisits that trade, because it looks
-          // like a coin flip and is not. Making the two port numbers agree buys
-          // nothing at all. A room announces one address as well as one port,
-          // and for a room on a LAN that address is this machine on this
-          // network, so a joiner from outside is sent somewhere they cannot
-          // dial whichever port they are handed. A machine behind a router that
-          // could hand back a different external port holds a private address
-          // by definition, so the port is never the only thing in the way and
-          // never the first. Serving both sides means choosing the address per
-          // joiner as well, which the room cannot do today because its accept
-          // loop drops the peer's socket address (issue #2055).
-          port: DEFAULT_HOST_PORT,
-          // Never true here, and written as the same expression the lobby form
-          // uses rather than a bare false, because the reason it is never true
-          // is that a room has no lobby server to have a relay. Hard-coding it
-          // would hide that behind a constant.
-          relay: route === "relay",
+        battle: roomBattleArgs({
+          password,
           maxPlayers,
-          modhash: content.modhash,
-          rank: 0,
-          maphash: content.maphash,
-          engine: "spring",
+          title,
+          host: trimmedName,
+          route,
           version,
-          map: content.mapName,
-          title: title.trim() || `${trimmedName}'s room`,
-          modname: content.gameName,
-        },
+          gameName: content.gameName,
+          mapName: content.mapName,
+          modhash: content.modhash,
+          maphash: content.maphash,
+        }),
+        draft,
       });
       // Against the room's own connection, whose key only exists once the room
       // is up. A room that fails to start is taken down, so it leaves no battle
@@ -498,6 +510,18 @@ export function HostRoomForm({
             </div>
           )}
         </div>
+      )}
+
+      {draft && (
+        <SeedNote
+          draft={draft}
+          enginePath={content.target?.enginePath}
+          dataDir={content.target?.dataDir}
+          archive={
+            content.games.find((g) => g.name === content.gameName)
+              ?.primaryArchive.name
+          }
+        />
       )}
 
       {error && (

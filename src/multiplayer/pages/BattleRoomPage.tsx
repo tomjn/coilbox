@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import { useBrandingEntry } from "@/content/branding";
 import { useHostedRoom } from "@/direct/hostedRoom";
 import { PendingJoinsPanel, usePendingJoins } from "@/direct/PendingJoins";
+import { RoomInvitePanel } from "@/direct/RoomInvitePanel";
 import { RoomMovedPanel } from "@/direct/RoomMoved";
 import { closeEndsTheRoom, hostedRoomKey } from "@/direct/room";
 import { stopHostedRoom } from "@/direct/stopRoom";
@@ -492,6 +493,10 @@ function BattleRoomPage() {
           because it is a fact about the room the host is running rather than
           about something they just pressed (issue #2122). */}
       <RoomMovedPanel />
+
+      {/* The links to hand out, from the moment the room is up. Only in the
+          battle inside our own room, which is the one `endsTheRoom` names. */}
+      {endsTheRoom && hostedRoom && <RoomInvitePanel room={hostedRoom} />}
 
       {/* The same news for everybody who is not running the battle, which the
           strip above never reaches (issue #2073). Below it because a host who

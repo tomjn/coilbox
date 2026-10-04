@@ -12,6 +12,16 @@ import type { DirectRoomStatus } from "./bindings";
  *  binds itself and this never touches. */
 export const DEFAULT_ROOM_PORT = 8200;
 
+/** How many people a room seats unless the host picks another number. The host
+ *  counts as one. Bots do not take a seat. */
+export const DEFAULT_ROOM_MAX_PLAYERS = 8;
+
+/** The `hostServerKey` a skirmish setup sends to the Battles page to say "host
+ *  this as a room on this computer". A room has no connection key until the host
+ *  has chosen a name and a port, so no real key can be named ahead of time. A
+ *  real key is `name@host:port`, so this cannot collide with one. */
+export const NEW_ROOM_TARGET = "new-room";
+
 /** The address the host's own client dials. A room binds `0.0.0.0` so the LAN can
  *  reach it, but the host is always on the same machine as the room. */
 export const LOOPBACK_HOST = "127.0.0.1";
