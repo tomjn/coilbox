@@ -19,6 +19,10 @@ export interface ChallengeBest {
   mode: ChallengeMode;
   won: boolean;
   measure: number;
+  /** Hull remaining and salvage banked on a warpath win. Absent on a win stored
+   * before they were kept, which is read as it was and loses to any win with them. */
+  hull?: number;
+  salvage?: number;
   /** The run it came from. */
   runId: string;
 }
@@ -58,6 +62,9 @@ export function describeBest(best: ChallengeBest): string {
     return best.won
       ? `won in ${plural(best.measure, "turn")}`
       : `lost after ${plural(best.measure, "turn")}`;
+  }
+  if (best.won && best.hull !== undefined && best.salvage !== undefined) {
+    return `won with ${best.hull} hull and ${best.salvage} salvage`;
   }
   return best.won
     ? `won, reaching depth ${best.measure}`

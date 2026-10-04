@@ -763,14 +763,14 @@ const PALETTE_SITES: PaletteSite[] = [
     what: "the enemy-incursion line",
   },
   {
-    file: "../../../runlite/pages/RunPage.tsx",
+    file: "../../../runlite/pages/components/RunEndScreen.tsx",
     className: "text-yellow-300",
     on: "card",
     bar: 3,
     what: "the trophy on the end screen",
   },
   {
-    file: "../../../runlite/pages/RunPage.tsx",
+    file: "../../../runlite/pages/components/RunEndScreen.tsx",
     className: "text-emerald-400",
     on: "card",
     bar: 3,
@@ -935,6 +935,7 @@ describe("no importer outside the two dark routes", () => {
     "runlite/pages/components/EncounterOverlay.tsx",
     "runlite/pages/components/NodeOverlays.tsx",
     "runlite/pages/components/RunContentNotice.tsx",
+    "runlite/pages/components/RunEndScreen.tsx",
     "runlite/pages/components/RunHud.tsx",
   ];
 

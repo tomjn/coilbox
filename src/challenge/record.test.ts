@@ -15,11 +15,12 @@ const run = (
   runId: string,
   won: boolean,
   measure: number,
+  extra: { hull?: number; salvage?: number } = {},
 ): ChallengeRunResult => ({
   mode,
   identity: `${mode}-1`,
   runId,
-  score: { won, measure },
+  score: { won, measure, ...extra },
 });
 
 function play(...results: ChallengeRunResult[]) {
@@ -84,6 +85,52 @@ describe("a challenge record", () => {
     expect(record.best?.runId).toBe("r1");
   });
 
+  describe("warpath wins", () => {
+    const won = (id: string, hull: number, salvage: number) =>
+      run("warpath", id, true, 7, { hull, salvage });
+
+    it("replaces a win with one that has more hull", () => {
+      const { record, change } = play(won("r1", 40, 500), won("r2", 60, 0));
+      expect(change).toEqual({ kind: "better" });
+      expect(record.best).toEqual({
+        mode: "warpath",
+        won: true,
+        measure: 7,
+        hull: 60,
+        salvage: 0,
+        runId: "r2",
+      });
+    });
+
+    it("replaces a win with one that has equal hull and more salvage", () => {
+      const { record } = play(won("r1", 40, 100), won("r2", 40, 120));
+      expect(record.best?.runId).toBe("r2");
+    });
+
+    it("keeps the first of two wins equal on hull and salvage", () => {
+      const { record, change } = play(won("r1", 40, 100), won("r2", 40, 100));
+      expect(change).toEqual({ kind: "kept" });
+      expect(record.best?.runId).toBe("r1");
+    });
+
+    it("keeps a win over a later loss", () => {
+      const { record } = play(won("r1", 10, 0), run("warpath", "r2", false, 9));
+      expect(record.best?.runId).toBe("r1");
+    });
+
+    it("replaces a win stored without hull and salvage with any new win", () => {
+      const stored: ResultRecord<ChallengeBest> = {
+        attempts: 1,
+        wins: 1,
+        best: { mode: "warpath", won: true, measure: 7, runId: "old" },
+        seen: ["old"],
+      };
+      const merged = mergeResult(stored, won("r2", 1, 0), challengeRanking);
+      expect(merged.change).toEqual({ kind: "better" });
+      expect(merged.record.best?.runId).toBe("r2");
+    });
+  });
+
   it("counts the same run once", () => {
     const first = play(run("conquest", "r1", true, 20));
     const again = mergeResult(
@@ -123,6 +170,27 @@ describe("wording", () => {
     ).toBe("lost at depth 4");
   });
 
+  it("describes a warpath win with its hull and salvage", () => {
+    expect(describeBest(best({ mode: "warpath", hull: 7, salvage: 120 }))).toBe(
+      "won with 7 hull and 120 salvage",
+    );
+  });
+
+  it("describes a warpath win stored before hull and salvage as it was", () => {
+    expect(describeBest(best({ mode: "warpath", measure: 7 }))).toBe(
+      "won, reaching depth 7",
+    );
+  });
+
+  it("loads and summarises a record stored before hull and salvage", () => {
+    const stored: ResultRecord<ChallengeBest> = JSON.parse(
+      '{"attempts":2,"wins":1,"best":{"mode":"warpath","won":true,"measure":7,"runId":"old"},"seen":["a","old"]}',
+    );
+    expect(recordSummary(stored)).toBe(
+      "Your best: won, reaching depth 7. 2 attempts.",
+    );
+  });
+
   it("summarises a record with its attempts", () => {
     const one = play(run("conquest", "r1", true, 14)).record;
     expect(recordSummary(one)).toBe("Your best: won in 14 turns. 1 attempt.");
@@ -140,6 +208,20 @@ describe("share text", () => {
   const code = "cbz1.AAAA";
   it("is the bare code when no result is included", () => {
     expect(shareText(code, undefined)).toBe(code);
+  });
+  it("words a new warpath win by hull and salvage", () => {
+    expect(
+      shareText(code, {
+        mode: "warpath",
+        won: true,
+        measure: 7,
+        hull: 7,
+        salvage: 120,
+        runId: "r",
+      }),
+    ).toBe(
+      `${code}\n\nMy best result so far (my claim, not checked by coilbox): won with 7 hull and 120 salvage`,
+    );
   });
   it("puts the result on a line under the code", () => {
     expect(
