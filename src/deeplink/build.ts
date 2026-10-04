@@ -10,13 +10,16 @@
  * together whenever the grammar moves.
  */
 
+import { normaliseServerAddress } from "../lobby-servers/address";
 import {
+  battleIdFrom,
   DEEP_LINK_SCHEME,
   type DeepLinkAction,
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
   MAX_URL_LENGTH,
   OPEN_SCREENS,
+  validBattlePassword,
 } from "./parse";
 
 export type BuildDeepLinkResult =
@@ -78,19 +81,16 @@ function buildRoom(
 function buildJoin(
   action: Extract<DeepLinkAction, { kind: "join" }>,
 ): BuildDeepLinkResult {
-  if (!validField(action.server)) {
-    return invalid("This battle has no server to join.");
+  // The same checks the parser makes, so a link that would be refused on
+  // arrival is never handed out.
+  const address = normaliseServerAddress(action.server);
+  if (!address) return invalid("This battle has no server to join.");
+  const battle = battleIdFrom(action.battle);
+  if (!battle) return invalid("This battle has no id to join.");
+  if (action.password !== undefined && !validBattlePassword(action.password)) {
+    return invalid("This battle's password cannot go in a link.");
   }
-  if (!validField(action.battle)) {
-    return invalid("This battle has no id to join.");
-  }
-  if (action.password !== undefined && !validField(action.password)) {
-    return invalid("This battle's password is too long for a link.");
-  }
-  const params = new URLSearchParams({
-    server: action.server,
-    battle: action.battle,
-  });
+  const params = new URLSearchParams({ server: address.address, battle });
   if (action.password) params.set("password", action.password);
   return { ok: true, url: `${DEEP_LINK_SCHEME}://join?${params.toString()}` };
 }

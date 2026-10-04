@@ -64,7 +64,7 @@ describe("readImport: the four things somebody can hand it", () => {
   });
 
   it("hands a join link to the deep-link handler", () => {
-    const url = "coilbox://join?server=lobby.example.com&battle=42";
+    const url = "coilbox://join?server=lobby.example.com%3A8200&battle=42";
     expect(readImport(url)).toEqual({ outcome: "link", url });
   });
 
