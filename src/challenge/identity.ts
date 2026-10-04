@@ -41,6 +41,9 @@ export function conquestIdentity(s: ConquestChallengeSettings): string {
     ...(readThreatLevel(s.threatLevel) > 0
       ? [readThreatLevel(s.threatLevel)]
       : []),
+    // Only when set, after the level, which is a number where this is a string,
+    // so the two cannot be read as one another.
+    ...(s.startPosition === "centre" ? ["centre"] : []),
   ]);
 }
 

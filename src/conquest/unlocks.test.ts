@@ -7,6 +7,8 @@ import {
   finishedConquest,
   foldFinishedConquest,
   levelChoices,
+  startPositionRequirement,
+  startPositionUnlocked,
   unlockedLevel,
 } from "./unlocks";
 
@@ -156,5 +158,29 @@ describe("finishedConquest", () => {
     expect(
       finishedConquest(authored, { ...active, status: "won" })?.level,
     ).toBe(null);
+  });
+});
+
+describe("start position unlock (issue #3432)", () => {
+  it("is locked for a game with no record and names what unlocks it", () => {
+    expect(startPositionUnlocked({}, "tg")).toBe(false);
+    expect(startPositionRequirement()).toBe("Win a conquest");
+  });
+
+  it("opens with the first win, the same as threat level 1", () => {
+    const won = foldFinishedConquest(
+      {},
+      { runId: "a:1", game: "tg", won: true, level: 0 },
+    );
+    expect(startPositionUnlocked(won, "TG")).toBe(true);
+    expect(startPositionUnlocked(won, "other")).toBe(false);
+  });
+
+  it("stays locked after a loss", () => {
+    const lost = foldFinishedConquest(
+      {},
+      { runId: "a:1", game: "tg", won: false, level: 0 },
+    );
+    expect(startPositionUnlocked(lost, "tg")).toBe(false);
   });
 });

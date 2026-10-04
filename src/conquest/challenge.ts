@@ -18,6 +18,7 @@ import {
 } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 import type { FactionPreset } from "./names";
+import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel } from "./threat";
 
 /**
@@ -47,6 +48,13 @@ export interface ConquestChallengeSettings {
    * two players with one code face the same thing.
    */
   threatLevel?: number;
+  /**
+   * Where the player starts (see `./startPosition`). Absent is the western edge,
+   * so a code shared before this field rebuilds the galaxy it always did. Like
+   * the threat level, a code plays at its own start whatever the importer has
+   * unlocked.
+   */
+  startPosition?: StartPosition;
   /**
    * The map each system uses, by node id (issue #1393). The one part of a
    * galaxy the seed cannot reproduce, because the generator draws maps from the
@@ -117,6 +125,7 @@ export function challengeSettingsFromGalaxy(
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
     threatLevel: readThreatLevel(g.threatLevel) || undefined,
+    startPosition: readStartPosition(g.startPosition),
     nodeMaps: nodeMapsFrom(galaxy.nodes),
     nodeNames: Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.name])),
     factions: galaxy.factions.map(({ name, color, side }) => ({
@@ -184,6 +193,7 @@ export function parseConquestChallengeSettings(
         : undefined,
     fogOfWar: v.fogOfWar === true ? true : undefined,
     threatLevel: readThreatLevel(v.threatLevel) || undefined,
+    startPosition: readStartPosition(v.startPosition),
     nodeMaps: parseNodeMaps(v.nodeMaps),
     nodeNames: parseNodeMaps(v.nodeNames),
     factions: parseChallengeFactions(v.factions),
@@ -269,6 +279,7 @@ export function optionsFromChallenge(
     startingSystems: settings.startingSystems,
     fogOfWar: settings.fogOfWar,
     threatLevel: settings.threatLevel,
+    startPosition: settings.startPosition,
     id,
     title: settings.title,
   };

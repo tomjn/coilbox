@@ -538,3 +538,58 @@ describe("restoreChallengeMap", () => {
     expect(restoreChallengeMap(substituted, "node-999")).toBe(substituted);
   });
 });
+
+describe("start position (issue #3432)", () => {
+  const spread = (g: ReturnType<typeof generateGalaxy>) => {
+    const cx = g.nodes.reduce((a, n) => a + n.pos[0], 0) / g.nodes.length;
+    const cy = g.nodes.reduce((a, n) => a + n.pos[1], 0) / g.nodes.length;
+    const dist = (n: { pos: number[] }) =>
+      Math.hypot(n.pos[0] - cx, n.pos[1] - cy);
+    const player = g.nodes.find(
+      (n) => n.kind === "capital" && n.owner === "player",
+    );
+    if (!player) throw new Error("no player capital");
+    return { player: dist(player), nearest: Math.min(...g.nodes.map(dist)) };
+  };
+
+  it("puts the player capital at the middle of the galaxy when asked", () => {
+    const g = generateGalaxy({ ...base, startPosition: "centre" }, "t0");
+    const { player, nearest } = spread(g);
+    expect(player).toBe(nearest);
+    expect(g.generated?.startPosition).toBe("centre");
+  });
+
+  it("leaves the player on the western edge by default, with nothing recorded", () => {
+    const g = generateGalaxy(base, "t0");
+    const west = Math.min(...g.nodes.map((n) => n.pos[0]));
+    const player = g.nodes.find(
+      (n) => n.kind === "capital" && n.owner === "player",
+    );
+    expect(player?.pos[0]).toBe(west);
+    expect(g.generated?.startPosition).toBeUndefined();
+    expect(generateGalaxy({ ...base, startPosition: undefined }, "t0")).toEqual(
+      g,
+    );
+  });
+
+  it("still gives every enemy a capital and the same number of starting systems", () => {
+    const west = generateGalaxy({ ...base, startingSystems: 2 }, "t0");
+    const centre = generateGalaxy(
+      { ...base, startingSystems: 2, startPosition: "centre" },
+      "t0",
+    );
+    const owned = (g: typeof west, id: string) =>
+      g.nodes.filter((n) => n.owner === id).length;
+    expect(owned(centre, "player")).toBeLessThanOrEqual(2);
+    expect(centre.nodes.filter((n) => n.kind === "capital")).toHaveLength(
+      west.nodes.filter((n) => n.kind === "capital").length,
+    );
+  });
+
+  it("survives a round trip through the saved document", () => {
+    const g = generateGalaxy({ ...base, startPosition: "centre" }, "t0");
+    expect(parseGalaxyJson(JSON.stringify(g))?.generated?.startPosition).toBe(
+      "centre",
+    );
+  });
+});
