@@ -17,12 +17,14 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { copyDeepLink } from "@/deeplink/copyLink";
+import type { DirectRoomStatus } from "@/direct/bindings";
 import {
   battleRouteLabel,
   joinedBattleRouteLabel,
   useChosenHostingRoute,
 } from "@/direct/hostingRoute";
 import { inviteLink, inviteLinkProblem } from "@/direct/invite";
+import { ShareRoomButton } from "@/direct/ShareRoomButton";
 import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
@@ -71,6 +73,7 @@ export function BattleRoomHeader({
   onToggleLock,
   serverKey,
   directRoom,
+  sharedRoom = null,
 }: {
   battle: Battle;
   myStatus: MemberStatus | undefined;
@@ -107,6 +110,9 @@ export function BattleRoomHeader({
   /** Whether that connection is a room somebody is hosting rather than a
    * server, which decides what kind of link there is to give (issue #1617). */
   directRoom: boolean;
+  /** The room on this computer whose join addresses the Share button hands out,
+   * or null when this battle is not in a room of our own (issue #3460). */
+  sharedRoom?: DirectRoomStatus | null;
 }) {
   const ready = myStatus?.battleStatus.ready ?? false;
   // The route the battle hosted on this room's connection took. Read here
@@ -349,6 +355,7 @@ export function BattleRoomHeader({
           </span>
         )}
         <ButtonGroup>
+          {sharedRoom && <ShareRoomButton room={sharedRoom} />}
           {selfHost ? (
             <Popover open={confirmClose} onOpenChange={setConfirmClose}>
               <PopoverTrigger asChild>

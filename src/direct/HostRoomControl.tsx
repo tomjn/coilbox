@@ -1,20 +1,13 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { useEffect, useRef, useState } from "react";
-import { buildRoomLink } from "@/deeplink/build";
+import { useEffect, useRef } from "react";
 import { nextDrawerKey } from "@/general/drawerKey";
 import type { SkirmishDraft } from "@/play/drafts";
-import {
-  type DirectLocalAddress,
-  type DirectRoomStatus,
-  directLocalAddresses,
-} from "./bindings";
-import { CopyButton } from "./CopyButton";
+import type { DirectRoomStatus } from "./bindings";
 import { HostRoomForm, type StartRoomArgs } from "./HostRoomForm";
 import { useRoomMovedFrom } from "./hostedRoom";
 import { QuickRoom } from "./QuickRoom";
-import { type DirectReachability, directPortStatus } from "./reachability";
 import { announcementNote, gameAddressNote, roomSummary } from "./room";
-import { addressText, shareAddresses, shareHeadline } from "./share";
+import { ShareRoomButton } from "./ShareRoomButton";
 
 export type { StartRoomArgs } from "./HostRoomForm";
 
@@ -112,6 +105,10 @@ function RunningRoom({
         <span className="text-sm text-muted-foreground">
           {roomSummary(room)}
         </span>
+        {/* Where to find the room's addresses, here as in the battle room: the
+            host leaves this page when the room starts and comes back to it
+            wanting the same link. */}
+        <ShareRoomButton room={room} className="h-8 px-3" />
         <Button
           variant="secondary"
           className="h-8 px-3"
@@ -128,7 +125,6 @@ function RunningRoom({
       <span className="text-right text-xs text-muted-foreground">
         {announcementNote(room.advertise, heardOnNetwork)}
       </span>
-      <RoomAddresses port={room.port} announced={room.ip} />
       <GameAddress ip={room.ip} />
       {error && (
         <p role="alert" className="text-xs text-destructive">
@@ -160,107 +156,6 @@ function GameAddress({ ip }: { ip: string }) {
     <span role="status" className="text-right text-xs text-muted-foreground">
       {gameAddressNote(ip, movedFrom)}
     </span>
-  );
-}
-
-/**
- * The addresses a joiner types in, while the room is up (issue #1611).
- *
- * This used to be the public address alone, and so rendered nothing at all for
- * every room on a LAN and every room behind a router that refuses UPnP and
- * NAT-PMP, which left the host with no answer to "what do I put in?". The
- * addresses were always there: the room binds `0.0.0.0` and answers on all of
- * them.
- *
- * It is on this line rather than in the drawer because starting a room takes the
- * host straight to their battle room, so the drawer they asked for it in is long
- * gone by the time somebody wants to join.
- *
- * Read once on mount rather than polled. Ports do not open and close by
- * themselves, an interface does not usually appear while a room is up, and this
- * component only exists while one is.
- *
- * `announced` is the exception, and comes down as a prop because it does move:
- * it is the address the room is putting in its battle, re-read on the poll that
- * feeds `GameAddress` below (issue #2116). It is what decides whether the
- * outside row can deliver a game as well as a room (issue #2127).
- */
-export function RoomAddresses({
-  port,
-  announced,
-}: {
-  port: number;
-  announced: string;
-}) {
-  const [addresses, setAddresses] = useState<DirectLocalAddress[] | null>(null);
-  const [report, setReport] = useState<DirectReachability | null>(null);
-  useEffect(() => {
-    let live = true;
-    directLocalAddresses({})
-      .then((r) => {
-        if (live) setAddresses(r.addresses);
-      })
-      .catch(() => {});
-    directPortStatus({})
-      .then((r) => {
-        if (live) setReport(r.reachability);
-      })
-      .catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, []);
-
-  // Nothing until the machine has answered. A moment with no addresses beats a
-  // moment showing only loopback, which is the one address that is never the
-  // answer.
-  if (!addresses) return null;
-  const shared = shareAddresses(addresses, port, report, announced);
-  return (
-    <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-      <span>{shareHeadline(shared)}</span>
-      <ul className="flex flex-col items-end gap-1">
-        {shared.map((address) => {
-          // A link says the same thing as the address beside it, so it is an
-          // extra button rather than a replacement: somebody reading it out over
-          // voice chat still needs the numbers (issue #1612).
-          const link = buildRoomLink(address.address, address.port);
-          return (
-            <li
-              key={`${address.scope}-${address.address}`}
-              className="flex flex-col items-end gap-0.5"
-            >
-              <div className="flex items-center gap-2">
-                <span>{address.label}</span>
-                <code className="select-all rounded bg-muted px-1.5 py-0.5 font-mono text-foreground">
-                  {addressText(address)}
-                </code>
-                <CopyButton
-                  value={addressText(address)}
-                  label={`Copy ${addressText(address)}, ${address.who}`}
-                >
-                  Copy
-                </CopyButton>
-                {link && (
-                  <CopyButton
-                    value={link}
-                    label={`Copy a link that joins at ${addressText(address)}, ${address.who}`}
-                  >
-                    Copy link
-                  </CopyButton>
-                )}
-              </div>
-              {/* Under the row rather than beside it, because it is a sentence
-                  and the row is a heading, an address and two buttons already
-                  (issue #2127). */}
-              {address.caveat && (
-                <span className="max-w-sm text-right">{address.caveat}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
   );
 }
 
