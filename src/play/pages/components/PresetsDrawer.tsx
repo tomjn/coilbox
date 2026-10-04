@@ -11,6 +11,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useState } from "react";
 import type { ConfigOption } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
+import type { ResultRecord } from "../../../records/bestResult";
 import type { ModProject } from "../../../workshop/project";
 import type { SkirmishDraft } from "../../drafts";
 import { PresetLibraryToolbar } from "../../PresetLibraryToolbar";
@@ -49,6 +50,9 @@ export function PresetsDrawer({
   onLoad,
   onSave,
   onDelete,
+  records,
+  replayExists,
+  onClearRecord,
   onExportPreset,
   onCopyPresetLink,
   onImport,
@@ -79,6 +83,12 @@ export function PresetsDrawer({
   onLoad: (preset: SkirmishPreset, selection?: PresetSelection) => void;
   onSave: (name: string) => SkirmishPreset;
   onDelete: (id: string) => void;
+  /** Best results by `presetRecordKey`, shown on each row. */
+  records?: Record<string, ResultRecord>;
+  /** Whether a result's replay is still on disk, so its row can link to it. */
+  replayExists?: (filename: string) => boolean;
+  /** Forget one preset's record. */
+  onClearRecord?: (preset: SkirmishPreset) => void;
   onExportPreset: (preset: SkirmishPreset) => void;
   /** Copy this preset as a `coilbox://import?code=` link (issue #498), an
    * addition alongside the file-export share action above, not a replacement. */
@@ -263,6 +273,9 @@ export function PresetsDrawer({
                   thumbs={thumbs}
                   disabled={disabled}
                   onOpen={setViewing}
+                  records={records}
+                  replayExists={replayExists}
+                  onClearRecord={onClearRecord}
                   empty="No presets yet. Save your current setup above, or import a shared one."
                 />
               </div>
