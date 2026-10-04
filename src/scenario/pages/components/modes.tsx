@@ -745,9 +745,11 @@ const layoutsMode: EditorMode = {
     const { records } = useBlueprintLibrary();
     const { target } = usePreferredTarget();
     const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-    // Null only while the scan is still running, the same rule the library's
-    // own import follows: a scan that failed answers with no games.
-    const installed = scan.data?.games ?? (scan.loading ? null : []);
+    // Null while the scan is running and when it failed, because neither has
+    // answered what is installed. A mission is checked against its own game,
+    // so a null list changes nothing a person sees here.
+    const installed =
+      scan.data?.games ?? (scan.loading || scan.error ? null : []);
     const { units } = useGameUnits(scenario.setup.gameName);
     const known = useMemo(
       () => (units.length > 0 ? knownUnits(units) : undefined),
