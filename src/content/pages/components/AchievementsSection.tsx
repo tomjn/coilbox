@@ -30,7 +30,7 @@ function earnedAt(ms: number | undefined): string | null {
 export function AchievementRow({ a }: { a: AchievementResult }) {
   const date = earnedAt(a.earnedAtMs);
   return (
-    <li className="flex items-center gap-3 py-2">
+    <li className="flex items-start gap-3 py-2">
       <span
         className={
           a.earned ? "shrink-0 text-primary" : "shrink-0 text-muted-foreground"
@@ -43,29 +43,25 @@ export function AchievementRow({ a }: { a: AchievementResult }) {
         )}
       </span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-baseline gap-x-2">
           <span
-            className={`truncate text-sm font-medium ${
+            className={`break-words text-sm font-medium ${
               a.earned ? "" : "text-muted-foreground"
             }`}
           >
             {a.name}
           </span>
           {date && (
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {date}
-            </span>
+            <span className="text-xs text-muted-foreground">{date}</span>
           )}
         </div>
-        <p
-          className="truncate text-xs text-muted-foreground"
-          title={a.description}
-        >
-          {a.description}
-        </p>
+        <p className="text-xs text-muted-foreground">{a.description}</p>
       </div>
       {/* Cap the bar at the target so an over-achieved count still reads 100%. */}
-      <TallyBar games={a.target} wins={Math.min(a.current, a.target)} />
+      {/* One line tall, so the bar sits level with the first line of the name. */}
+      <div className="flex h-5 shrink-0 items-center gap-3">
+        <TallyBar games={a.target} wins={Math.min(a.current, a.target)} />
+      </div>
     </li>
   );
 }
