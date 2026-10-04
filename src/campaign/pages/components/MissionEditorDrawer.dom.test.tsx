@@ -229,7 +229,7 @@ describe("a text box", () => {
     fireEvent.blur(type("Subtitle", "Sector 9"));
 
     await waitFor(() => expect(saved.at(-1)?.subtitle).toBe("Sector 9"));
-    expect(screen.getByText(/^Saved /)).toBeTruthy();
+    await screen.findByText(/^Saved /);
   });
 
   it("says the change is unsaved until then", () => {
@@ -898,6 +898,8 @@ describe("a refused save", () => {
 
     await waitFor(() => expect(tries).toHaveLength(2));
     expect(tries.at(-1)?.subtitle).toBe("Sector 9");
-    expect(screen.getByText(/^Saved /)).toBeTruthy();
+    // The retry is handed to onSave synchronously, but the indicator only says
+    // "Saved" after that promise settles and React has rendered.
+    await screen.findByText(/^Saved /);
   });
 });
