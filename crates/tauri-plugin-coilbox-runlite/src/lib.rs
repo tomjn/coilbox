@@ -62,15 +62,31 @@ fn write_doc(path: PathBuf, json: String, what: &str) -> CliResult {
     }
 }
 
+/// Read the document at `path`, or `default` when there is no such file.
+///
+/// Only a missing file means "nothing saved yet". Any other failure, such as a
+/// permission error or bytes that are not UTF-8, is returned as an error so the
+/// caller reports a failed load and writes nothing. Falling back to the default
+/// there would replace a player's record with an empty one the next time the
+/// app saves.
+fn load_doc(path: PathBuf, default: &str, what: &str) -> CliResult {
+    match std::fs::read_to_string(path) {
+        Ok(json) => CliResult::ok(json!({ "json": json })),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            CliResult::ok(json!({ "json": default }))
+        }
+        Err(e) => CliResult::err(format!("could not read {what}: {e}")),
+    }
+}
+
 /// `runlite_state_load` — the opaque `run.json`, or an empty default (no active
 /// run) when it doesn't exist yet.
 #[tauri::command]
 async fn runlite_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
-    let json = run_path(&app)
-        .ok()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .unwrap_or_else(|| DEFAULT_STATE.to_string());
-    CliResult::ok(json!({ "json": json }))
+    match run_path(&app) {
+        Ok(path) => load_doc(path, DEFAULT_STATE, "runlite state"),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 /// `runlite_state_save` — persist the opaque active-run document.
@@ -86,11 +102,10 @@ async fn runlite_state_save<R: Runtime>(app: AppHandle<R>, json: String) -> CliR
 /// doesn't exist yet.
 #[tauri::command]
 async fn runlite_meta_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
-    let json = meta_path(&app)
-        .ok()
-        .and_then(|p| std::fs::read_to_string(p).ok())
-        .unwrap_or_else(|| DEFAULT_META.to_string());
-    CliResult::ok(json!({ "json": json }))
+    match meta_path(&app) {
+        Ok(path) => load_doc(path, DEFAULT_META, "runlite meta"),
+        Err(e) => CliResult::err(e),
+    }
 }
 
 /// `runlite_meta_save` — persist the opaque meta-progression document.
@@ -134,5 +149,64 @@ mod tests {
         assert!(parsed["loadouts"].is_array());
         assert_eq!(parsed["ascensionTier"], 0);
         assert_eq!(parsed["stats"]["runs"], 0);
+    }
+
+    fn loaded_json(result: &CliResult) -> &str {
+        result.data.as_ref().unwrap()["json"].as_str().unwrap()
+    }
+
+    #[test]
+    fn a_missing_file_loads_as_the_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = load_doc(dir.path().join("meta.json"), DEFAULT_META, "runlite meta");
+        assert!(result.success, "got: {:?}", result.error);
+        assert_eq!(loaded_json(&result), DEFAULT_META);
+    }
+
+    #[test]
+    fn a_file_that_exists_loads_as_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meta.json");
+        std::fs::write(&path, r#"{"schemaVersion":1}"#).unwrap();
+        let result = load_doc(path, DEFAULT_META, "runlite meta");
+        assert!(result.success, "got: {:?}", result.error);
+        assert_eq!(loaded_json(&result), r#"{"schemaVersion":1}"#);
+    }
+
+    #[test]
+    fn a_file_that_is_not_utf8_is_an_error_not_the_default() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("meta.json");
+        std::fs::write(&path, [0xff, 0xfe, 0x00, 0x80]).unwrap();
+        let result = load_doc(path.clone(), DEFAULT_META, "runlite meta");
+        assert!(!result.success, "an unreadable record is not an empty one");
+        assert!(result.data.is_none());
+        assert!(
+            result
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("runlite meta"),
+            "got: {:?}",
+            result.error
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), [0xff, 0xfe, 0x00, 0x80]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_with_no_read_permission_is_an_error_not_the_default() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("run.json");
+        std::fs::write(&path, DEFAULT_STATE).unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        // Root reads anything, so the case cannot be set up there.
+        if std::fs::read(&path).is_ok() {
+            return;
+        }
+        let result = load_doc(path, DEFAULT_STATE, "runlite state");
+        assert!(!result.success, "an unreadable record is not an empty one");
+        assert!(result.data.is_none());
     }
 }
