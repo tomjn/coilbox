@@ -57,6 +57,7 @@ import {
   useCustomServers,
   useLobbyAccounts,
 } from "../config";
+import { onDrawerRequest, takeDrawerRequest } from "../drawerRequest";
 import { PasswordRecoveryForm } from "../PasswordRecoveryForm";
 import { RegisterForm } from "../RegisterForm";
 import { AutojoinChannels } from "./components/AutojoinChannels";
@@ -254,6 +255,42 @@ export default function LobbyServersSettings() {
         allowSelfSigned: false,
       },
     });
+
+  // An invite link to a server with no login, or to one coilbox has no entry
+  // for, sends the player here with a drawer to open (issue #3382). Both are
+  // drafts like any other: the link filled the form in, and only the player
+  // pressing Add saves anything.
+  useEffect(() => {
+    const open = () => {
+      const request = takeDrawerRequest();
+      if (!request) return;
+      if (request.kind === "login") {
+        setAccountDrawer({
+          mode: "add",
+          draft: {
+            id: crypto.randomUUID(),
+            serverId: request.serverId,
+            username: "",
+            hasSecret: false,
+          },
+        });
+      } else {
+        setServerDrawer({
+          mode: "add",
+          draft: {
+            id: crypto.randomUUID(),
+            name: "",
+            host: request.host,
+            port: request.port,
+            tls: false,
+            allowSelfSigned: false,
+          },
+        });
+      }
+    };
+    open();
+    return onDrawerRequest(open);
+  }, []);
 
   const commitCustomServer = (s: LobbyServer) => {
     writeServers((prev) => [...prev, s]);
