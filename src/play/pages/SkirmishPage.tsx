@@ -89,6 +89,8 @@ import {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setAiBonus,
+  setAllAiBonus,
   setParticipantTeam,
   toBattleConfig,
   useLastAi,
@@ -124,6 +126,7 @@ import {
   useSkirmishPresets,
 } from "../presets";
 import { reconcileParticipantAis } from "../reconcileAi";
+import { useAiBonusSuggestions } from "../useAiBonusSuggestions";
 import { useSkirmishDebrief } from "../useSkirmishDebrief";
 import { DebriefDrawer } from "./components/DebriefDrawer";
 import { GameOptionsPanel } from "./components/GameOptionsPanel";
@@ -187,6 +190,7 @@ export default function SkirmishPage() {
     draft.participants.length > 0 ? draft.participants : initialParticipants(),
   );
   const [gameName, setGameName] = useState(() => draft.gameName);
+  const bonusSuggestions = useAiBonusSuggestions(participants, gameName);
   const [mapName, setMapName] = useState(() => draft.mapName);
   const [startPosType, setStartPosType] = useState(() => draft.startPosType);
   // Ally start boxes for choose-in-game, on the same 0..200 grid the battle room
@@ -676,9 +680,9 @@ export default function SkirmishPage() {
     onStart();
   };
 
-  // "Rematch with a tweak" (#370, keeping #354's richer per-AI control
-  // separate): nudge every AI's handicap by a fixed delta, persist it onto the
-  // visible setup, and relaunch. The tweaked array is threaded through
+  // "Rematch with a tweak" (#370): nudge every AI's handicap by a fixed delta,
+  // persist it onto the visible setup (where each AI's bonus control shows it),
+  // and relaunch. The tweaked array is threaded through
   // explicitly rather than read back from `participants` — `setParticipants`
   // hasn't committed by the time `onStart` would otherwise read it.
   const onRematchWithTweak = (deltaPercent: number) => {
@@ -1190,6 +1194,13 @@ export default function SkirmishPage() {
             }
             onRemove={removeParticipant}
             onAddAi={addAi}
+            onSetAiBonus={(id, percent) =>
+              setParticipants((ps) => setAiBonus(ps, id, percent))
+            }
+            onSetAllAiBonus={(percent) =>
+              setParticipants((ps) => setAllAiBonus(ps, percent))
+            }
+            bonusSuggestions={bonusSuggestions}
           />
           <GameOptionsPanel
             selectedGame={selectedGame}

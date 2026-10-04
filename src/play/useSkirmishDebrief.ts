@@ -9,6 +9,7 @@ import {
   describeOutcome,
 } from "./debrief";
 import { resultFromDemoInfo } from "./detect";
+import { ingestFinishedReplay } from "./ingestFinishedReplay";
 import { describeChange } from "./presetRecord";
 import { tagFreshReplay } from "./tagReplayProvenance";
 
@@ -135,6 +136,9 @@ export function useSkirmishDebrief() {
             durationSec,
           }),
         });
+        // After the drawer has its data, and not awaited, so a slow or failed
+        // ingest cannot hold the debrief.
+        void ingestFinishedReplay(target, replay);
       } finally {
         setChecking(false);
       }

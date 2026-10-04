@@ -3,6 +3,7 @@ import {
   type LobbyServer,
   serverProtocol,
 } from "../lobby-servers/config";
+import { serverForKey } from "../lobby-servers/sameServer";
 import type { LobbyState } from "./bindings";
 import type { Connections } from "./connections";
 
@@ -21,9 +22,7 @@ export function protocolForKey(
   servers: LobbyServer[],
 ): LobbyProtocol {
   if (serverKey == null) return "tasserver";
-  const server = servers.find((s) =>
-    serverKey.endsWith(`@${s.host}:${s.port}`),
-  );
+  const server = serverForKey(serverKey, servers);
   return server ? serverProtocol(server) : "tasserver";
 }
 

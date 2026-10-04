@@ -89,6 +89,9 @@ vi.mock("./components/MapCard", () => ({
 vi.mock("./components/ParticipantsTable", () => ({
   ParticipantsTable: () => null,
 }));
+vi.mock("../useAiBonusSuggestions", () => ({
+  useAiBonusSuggestions: () => ({ rows: {}, all: null }),
+}));
 vi.mock("./components/GameOptionsPanel", () => ({
   GameOptionsPanel: () => null,
 }));

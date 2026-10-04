@@ -8,8 +8,8 @@
  * that show it beside the failure.
  */
 
-import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ScanResult } from "./bindings";
 
 const { unitsyncScan } = vi.hoisted(() => ({ unitsyncScan: vi.fn() }));
@@ -32,6 +32,8 @@ const answered: ScanResult = {
   games: [],
   errors: [],
 };
+
+afterEach(cleanup);
 
 let n = 0;
 let dir = "";
@@ -101,5 +103,155 @@ describe("useUnitsyncScan on a scan that answered", () => {
       found = await result.current.run(true);
     });
     expect(found).toEqual(answered);
+  });
+});
+
+describe("useUnitsyncScan on a rescan that fails after an answer (issue #3431)", () => {
+  const earlier: ScanResult = {
+    maps: [],
+    games: [],
+    errors: ["earlier"],
+  };
+
+  async function answeredHook() {
+    const hook = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() => expect(hook.result.current.data).toEqual(earlier));
+    return hook;
+  }
+
+  it("drops the earlier data when the rescan's Init fails", async () => {
+    unitsyncScan.mockResolvedValueOnce(earlier).mockResolvedValueOnce(failed);
+    const { result } = await answeredHook();
+    await act(async () => {
+      await result.current.run(true);
+    });
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe("no space left on device");
+    expect(result.current.unvouched).toEqual(failed);
+  });
+
+  it("drops the earlier data when the rescan throws", async () => {
+    unitsyncScan
+      .mockResolvedValueOnce(earlier)
+      .mockRejectedValueOnce(new Error("worker crashed"));
+    const { result } = await answeredHook();
+    await act(async () => {
+      await result.current.run(true);
+    });
+    expect(result.current.data).toBeNull();
+    expect(result.current.error).toBe("worker crashed");
+  });
+
+  it("keeps the earlier data when the rescan is cancelled", async () => {
+    unitsyncScan
+      .mockResolvedValueOnce(earlier)
+      .mockRejectedValueOnce(new Error("scan cancelled"));
+    const { result } = await answeredHook();
+    await act(async () => {
+      await result.current.run(true);
+    });
+    expect(result.current.data).toEqual(earlier);
+    expect(result.current.cancelled).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
+
+  it("does not serve the earlier answer to a page opened after a failed Init rescan", async () => {
+    unitsyncScan
+      .mockResolvedValueOnce(earlier)
+      .mockResolvedValueOnce(failed)
+      .mockResolvedValueOnce(answered);
+    const first = await answeredHook();
+    await act(async () => {
+      await first.result.current.run(true);
+    });
+    first.unmount();
+
+    const second = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() => expect(second.result.current.data).toEqual(answered));
+    expect(unitsyncScan).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not serve the earlier answer to a page opened after a thrown rescan", async () => {
+    unitsyncScan
+      .mockResolvedValueOnce(earlier)
+      .mockRejectedValueOnce(new Error("worker crashed"));
+    const first = await answeredHook();
+    await act(async () => {
+      await first.result.current.run(true);
+    });
+    first.unmount();
+
+    const second = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() =>
+      expect(second.result.current.error).toBe("worker crashed"),
+    );
+    expect(second.result.current.data).toBeNull();
+    expect(unitsyncScan).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the earlier answer in the cache after a cancelled rescan", async () => {
+    unitsyncScan
+      .mockResolvedValueOnce(earlier)
+      .mockRejectedValueOnce(new Error("scan cancelled"));
+    const first = await answeredHook();
+    await act(async () => {
+      await first.result.current.run(true);
+    });
+    first.unmount();
+
+    const second = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() => expect(second.result.current.data).toEqual(earlier));
+    expect(unitsyncScan).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("useUnitsyncScan.runWithReason (issue #3440)", () => {
+  async function outcomeOf(force = true) {
+    const { result } = renderHook(() => useUnitsyncScan("/engine", dir));
+    let outcome: Awaited<ReturnType<typeof result.current.runWithReason>>;
+    await act(async () => {
+      outcome = await result.current.runWithReason(force);
+    });
+    // biome-ignore lint/style/noNonNullAssertion: assigned inside act above
+    return outcome!;
+  }
+
+  it("resolves the engine's reason when Init failed", async () => {
+    unitsyncScan.mockResolvedValue(failed);
+    expect(await outcomeOf()).toEqual({
+      data: null,
+      error: "no space left on device",
+    });
+  });
+
+  it("resolves the reason when the scan threw", async () => {
+    unitsyncScan.mockRejectedValue(new Error("worker crashed"));
+    expect(await outcomeOf()).toEqual({
+      data: null,
+      error: "worker crashed",
+    });
+  });
+
+  it("resolves no error when the scan was cancelled", async () => {
+    unitsyncScan.mockRejectedValue(new Error("scan cancelled"));
+    expect(await outcomeOf()).toEqual({ data: null, error: null });
+  });
+
+  it("resolves the data and no error when the scan answered", async () => {
+    unitsyncScan.mockResolvedValue(answered);
+    expect(await outcomeOf()).toEqual({ data: answered, error: null });
+  });
+
+  it("resolves the cached answer and no error without a forced scan", async () => {
+    unitsyncScan.mockResolvedValue(answered);
+    const { result } = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() => expect(result.current.data).toEqual(answered));
+    let outcome: Awaited<ReturnType<typeof result.current.runWithReason>>;
+    await act(async () => {
+      outcome = await result.current.runWithReason(false);
+    });
+    // biome-ignore lint/style/noNonNullAssertion: assigned inside act above
+    expect(outcome!).toEqual({ data: answered, error: null });
+    expect(unitsyncScan).toHaveBeenCalledTimes(1);
   });
 });

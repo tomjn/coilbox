@@ -32,7 +32,9 @@ export function bracketedHost(host: string): string {
  * by the first colon but can by the last one, since a port has no colon in it.
  */
 export function addressOfKey(serverKey: string): string {
-  const address = serverKey.slice(serverKey.indexOf("@") + 1);
+  // A name can hold an `@` (an email address typed as one) and a host cannot,
+  // so the address is what follows the last one.
+  const address = serverKey.slice(serverKey.lastIndexOf("@") + 1);
   const colon = address.lastIndexOf(":");
   if (colon < 0) return address;
   return `${bracketedHost(address.slice(0, colon))}${address.slice(colon)}`;

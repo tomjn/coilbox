@@ -2,6 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
 import { bracketedHost } from "./hostForms";
+import { hostIdentity } from "./sameServer";
 
 /**
  * The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`.
@@ -517,13 +518,13 @@ export function dedupeByHost(
     { account: LobbyAccount; server: LobbyServer }
   >();
   for (const target of targets) {
-    const host = target.server.host.toLowerCase();
+    const host = hostIdentity(target.server.host);
     const current = bestForHost.get(host);
     if (!current || rank(target.account) > rank(current.account)) {
       bestForHost.set(host, target);
     }
   }
   return targets.filter(
-    (target) => bestForHost.get(target.server.host.toLowerCase()) === target,
+    (target) => bestForHost.get(hostIdentity(target.server.host)) === target,
   );
 }

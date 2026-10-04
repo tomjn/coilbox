@@ -1,5 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { AlertTriangle, Dices, X } from "lucide-react";
+import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,6 +24,11 @@ import type { Side, SkirmishAi } from "@/content/bindings";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { cn } from "@/lib/utils";
+import { BonusButton } from "@/multiplayer/battle/BonusButton";
+import type {
+  BonusSuggestion,
+  BonusSuggestions,
+} from "@/play/aiBonusSuggestion";
 import {
   aiPips,
   type GameAiConfig,
@@ -54,6 +60,56 @@ const aiValue = (a: { kind: string; shortName: string }) =>
 const aiLabel = (a: { name?: string; shortName: string }) =>
   (a.name ?? a.shortName).replace(/\s*\(game-specific AI\)\s*$/i, "");
 
+const BONUS_HELP =
+  "Extra resource income for the AI. 0 means no bonus. Applies when the game starts.";
+
+const percentText = (n: number) => (n === 0 ? "no bonus" : `+${n}%`);
+
+/**
+ * A bonus to try, with the game it came from and a button to take it. Never
+ * applied by itself.
+ */
+function BonusSuggestionNote({
+  suggestion,
+  aiName,
+  disabled,
+  onApply,
+}: {
+  suggestion: BonusSuggestion;
+  aiName: string;
+  disabled?: boolean;
+  onApply: (percent: number) => void;
+}) {
+  const at = `${
+    suggestion.from === 0
+      ? "with no bonus"
+      : `at ${percentText(suggestion.from)}`
+  }${suggestion.otherVersion ? " on another version" : ""}`;
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+      <span>
+        You {suggestion.result === "win" ? "won" : "lost"} your last game
+        against {aiName} {at}. Try {percentText(suggestion.percent)}?
+      </span>
+      <Link
+        to={`/play/replays/${encodeURIComponent(suggestion.filename)}`}
+        className="underline underline-offset-2"
+      >
+        See that game
+      </Link>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-6 px-2 text-[11px]"
+        disabled={disabled}
+        onClick={() => onApply(suggestion.percent)}
+      >
+        Use {percentText(suggestion.percent)}
+      </Button>
+    </div>
+  );
+}
+
 export function ParticipantsTable({
   participants,
   sides,
@@ -67,6 +123,9 @@ export function ParticipantsTable({
   onSetTeam,
   onRemove,
   onAddAi,
+  onSetAiBonus,
+  onSetAllAiBonus,
+  bonusSuggestions,
 }: {
   participants: Participant[];
   sides: Side[];
@@ -86,6 +145,12 @@ export function ParticipantsTable({
   onSetTeam: (id: string, team: number) => void;
   onRemove: (id: string) => void;
   onAddAi: () => void;
+  /** Set one AI's resource bonus, 0 to 100 percent (0 clears it). */
+  onSetAiBonus: (id: string, percent: number) => void;
+  /** Set the same resource bonus on every AI. */
+  onSetAllAiBonus: (percent: number) => void;
+  /** Bonuses to try from your recent results. Absent while none are known. */
+  bonusSuggestions?: BonusSuggestions;
 }) {
   // Effective (compacted) team index per participant, plus each team's leader —
   // the row whose ally/colour/side the engine team takes when rows share a slot.
@@ -96,6 +161,13 @@ export function ParticipantsTable({
     return (idx !== undefined && byId.get(leaderIdByTeam[idx])) || p;
   };
   const activeCount = teamIndexById.size;
+  // The shared bonus when every AI has the same one, else nothing to show.
+  const aiRows = participants.filter((p) => p.kind === "ai");
+  const sharedBonus = aiRows.every(
+    (p) => (p.handicap ?? 0) === (aiRows[0]?.handicap ?? 0),
+  )
+    ? (aiRows[0]?.handicap ?? 0)
+    : 0;
   // Display order groups rows by effective team so a reassignment (and the
   // compaction it triggers) reads at a glance; a spectating "you" sinks to the
   // bottom. Display-only — the model keeps its row order (participants[0] is
@@ -325,6 +397,31 @@ export function ParticipantsTable({
                             )}
                           </SelectContent>
                         </Select>
+                        {/* A bonus belongs to the team, which takes it from its
+                            first row, so a row sharing a team has none of its
+                            own. It sits under the AI picker, not in its own
+                            column, which would push Remove off the card. */}
+                        {!sharer && (
+                          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground">
+                            <span>Bonus</span>
+                            <BonusButton
+                              name={p.name}
+                              confirmed={p.handicap ?? 0}
+                              onSend={(v) => onSetAiBonus(p.id, v)}
+                              help={BONUS_HELP}
+                              actionLabel="Set"
+                              disabled={disabled}
+                            />
+                          </div>
+                        )}
+                        {bonusSuggestions?.rows[p.id] && p.ai && (
+                          <BonusSuggestionNote
+                            suggestion={bonusSuggestions.rows[p.id]}
+                            aiName={aiLabel(p.ai)}
+                            disabled={disabled}
+                            onApply={(v) => onSetAiBonus(p.id, v)}
+                          />
+                        )}
                         {aiInvalid(p) && (
                           <span className="mt-1 flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400">
                             <AlertTriangle className="size-3.5 shrink-0" />
@@ -443,10 +540,34 @@ export function ParticipantsTable({
         </div>
       )}
 
-      <div className="border-t border-border/40 p-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border/40 p-3">
         <Button variant="ghost" size="sm" disabled={disabled} onClick={onAddAi}>
           + Add AI opponent
         </Button>
+        {aiRows.length > 1 && (
+          // One place for everything that acts on every AI's bonus at once.
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>Bonus for every AI</span>
+            <BonusButton
+              name="every AI"
+              confirmed={sharedBonus}
+              onSend={onSetAllAiBonus}
+              help={BONUS_HELP}
+              actionLabel="Set all"
+              disabled={disabled}
+            />
+          </div>
+        )}
+        {bonusSuggestions?.all && aiRows[0]?.ai && (
+          <div className="basis-full">
+            <BonusSuggestionNote
+              suggestion={bonusSuggestions.all}
+              aiName={aiLabel(aiRows[0].ai)}
+              disabled={disabled}
+              onApply={onSetAllAiBonus}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
