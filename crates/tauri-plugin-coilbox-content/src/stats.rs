@@ -185,13 +185,29 @@ pub fn load(path: &Path) -> Result<StatsStore, String> {
 }
 
 /// Write the whole stats store to `path`, creating the parent dir if needed.
+/// The file is replaced in one step, so a reader sees the old store or the new
+/// one and a crash part way leaves the old one.
 pub fn save(path: &Path, store: &StatsStore) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .map_err(|e| format!("could not create stats store dir: {e}"))?;
     }
     let json = serde_json::to_string(store).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| format!("could not write stats store: {e}"))
+    coilbox_gamebackup::write_atomic(path, json.as_bytes())
+        .map_err(|e| format!("could not write stats store: {e}"))
+}
+
+/// Run `f` as the only pass over the stats store in this process.
+///
+/// A pass loads the store, changes it and saves it, so two passes that overlap
+/// lose the first one's update. Every pass that saves holds this around all
+/// three steps.
+pub(crate) fn with_store_lock<T>(f: impl FnOnce() -> T) -> T {
+    static STORE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    // A pass that panicked leaves the file whole, because saves are atomic, so
+    // the next pass can carry on.
+    let _held = STORE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+    f()
 }
 
 /// Build a record from a decoded demo + its file entry. `totals` is the match's
@@ -348,14 +364,16 @@ pub(crate) async fn content_stats_ingest<R: Runtime>(
     };
     let dry_run = dry_run.unwrap_or(false);
     let res = tauri::async_runtime::spawn_blocking(move || {
-        let mut store = load(&sp)?;
-        let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
-        let engine_dir = PathBuf::from(&engine_path);
-        let summary = ingest(&root_paths, &engine_dir, &mut store);
-        if !dry_run {
-            save(&sp, &store)?;
-        }
-        Ok::<_, String>((summary, store))
+        with_store_lock(|| {
+            let mut store = load(&sp)?;
+            let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
+            let engine_dir = PathBuf::from(&engine_path);
+            let summary = ingest(&root_paths, &engine_dir, &mut store);
+            if !dry_run {
+                save(&sp, &store)?;
+            }
+            Ok::<_, String>((summary, store))
+        })
     })
     .await;
     match res {
@@ -649,6 +667,84 @@ mod tests {
             back.records[0].team_totals[1].totals["unitsProduced"],
             700.0
         );
+    }
+
+    /// A pass that loads, adds a record and saves, slow enough between load and
+    /// save for another pass to get in.
+    fn add_record_in_a_pass(path: &Path, name: &str) {
+        with_store_lock(|| {
+            let mut store = load(path).unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            store.records.push(record_from(
+                &entry(name, 1, 2),
+                demo_info("M", true, vec![]),
+                totals(3),
+            ));
+            save(path, &store).unwrap();
+        });
+    }
+
+    #[test]
+    fn overlapping_passes_keep_every_record() {
+        let dir = std::env::temp_dir().join("coilbox_stats_lock_test");
+        let p = dir.join("stats.json");
+        let _ = std::fs::remove_dir_all(&dir);
+        let names: Vec<String> = (0..6).map(|i| format!("r{i}.sdfz")).collect();
+        let handles: Vec<_> = names
+            .iter()
+            .cloned()
+            .map(|name| {
+                let p = p.clone();
+                std::thread::spawn(move || add_record_in_a_pass(&p, &name))
+            })
+            .collect();
+        for h in handles {
+            h.join().unwrap();
+        }
+        assert_eq!(load(&p).unwrap().records.len(), names.len());
+    }
+
+    /// A save writes a new file and renames it over the store. Where it cannot
+    /// make that file, the store on disk is the old one, never a truncated one.
+    /// A directory that refuses new files shows it: writing in place would still
+    /// succeed there and replace the contents.
+    #[cfg(unix)]
+    #[test]
+    fn a_save_that_cannot_finish_leaves_the_old_store() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join("coilbox_stats_atomic_test");
+        let p = dir.join("stats.json");
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut one = StatsStore::default();
+        one.records.push(record_from(
+            &entry("a.sdfz", 1, 2),
+            demo_info("M", true, vec![]),
+            totals(3),
+        ));
+        save(&p, &one).unwrap();
+
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let result = save(&p, &StatsStore::default());
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+
+        assert!(
+            result.is_err(),
+            "the save could not make its temporary file"
+        );
+        assert_eq!(load(&p).unwrap().records.len(), 1);
+    }
+
+    #[test]
+    fn saving_leaves_no_temporary_file_behind() {
+        let dir = std::env::temp_dir().join("coilbox_stats_tmp_test");
+        let p = dir.join("stats.json");
+        let _ = std::fs::remove_dir_all(&dir);
+        save(&p, &StatsStore::default()).unwrap();
+        let names: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(names, vec![std::ffi::OsString::from("stats.json")]);
     }
 
     #[test]
