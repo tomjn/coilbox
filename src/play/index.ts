@@ -1,5 +1,6 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Clapperboard, FileText, Save, Swords } from "lucide-react";
+import { RECORDS_GROUP } from "../recordsGroup";
 import InGameBadge from "./InGameBadge";
 import { PlayProvider } from "./PlayProvider";
 import EngineLogSection from "./pages/EngineLogSection";
@@ -32,13 +33,6 @@ const playPlugin: FramePlugin = {
           icon: Swords,
         },
         {
-          id: "play.replays",
-          label: "Replays",
-          to: "/play/replays",
-          order: 4,
-          icon: Clapperboard,
-        },
-        {
           id: "play.savegames",
           label: "Save Games",
           to: "/play/savegames",
@@ -46,6 +40,19 @@ const playPlugin: FramePlugin = {
           // from sibling plugins), so keep this clearly above them.
           order: 10,
           icon: Save,
+        },
+      ],
+    },
+    {
+      ...RECORDS_GROUP,
+      items: [
+        {
+          id: "play.replays",
+          label: "Replays",
+          to: "/play/replays",
+          // Last in Records: the raw material behind Career and Player stats.
+          order: 2,
+          icon: Clapperboard,
         },
       ],
     },
@@ -60,6 +67,9 @@ const playPlugin: FramePlugin = {
       path: "play/replays",
       lazy: () => import("../content/pages/ReplaysPage"),
       crumb: "Replays",
+      // Replays lives in Records now, so the trail reads "Replays" like Career
+      // and Player stats, not "Play / Replays". The URL is unchanged.
+      crumbSpan: 2,
     },
     {
       path: "play/replays/:name",

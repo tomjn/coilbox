@@ -1,9 +1,10 @@
 import type { FramePlugin } from "@picoframe/plugin-sdk";
 import { Award } from "lucide-react";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
+import { RECORDS_GROUP } from "../recordsGroup";
 
 /**
- * The Career plugin's frontend half: one page under **Play** that shows how far
+ * The Career plugin's frontend half: one page under **Records** that shows how far
  * the player has got in each game, across campaigns, Conquest, Warpath and
  * skirmishes against AI. It reads those stores and keeps none of its own, so it
  * has no backend crate and no ACL entry.
@@ -16,16 +17,14 @@ const careerPlugin: FramePlugin = {
   version: "0.0.0",
   nav: [
     {
-      id: "play",
-      label: "Play",
-      order: 5,
+      ...RECORDS_GROUP,
       items: [
         {
           id: "career.overview",
           label: "Career",
           to: "/career",
-          // After Warpath (3), before Replays (4).
-          order: 3.5,
+          // First in Records: the summary, above Player stats and Replays.
+          order: 0,
           icon: Award,
           useVisible: () => !isProfileHidden("career.overview"),
         },

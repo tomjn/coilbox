@@ -17,16 +17,16 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Play          | Scenarios     | `#/scenarios`        | `scenario.list`    | no¹      |
 | Play          | Conquest      | `#/conquest`         | `conquest.list`    | **yes**  |
 | Play          | Warpath       | `#/warpath`          | `runlite.list`     | **yes**  |
-| Play          | Career        | `#/career`           | `career.overview`  | **yes**  |
-| Play          | Replays       | `#/play/replays`     | `play.replays`     | no       |
 | Play          | Save Games    | `#/play/savegames`   | `play.savegames`   | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
 | Multiplayer   | Chat          | `#/chat`             | `multiplayer.chat` | no²      |
 | Multiplayer   | Battles       | `#/battles`          | `multiplayer.battles` | **yes** |
 | Multiplayer   | Matchmaking   | `#/matchmaking`      | `multiplayer.matchmaking` | no²|
 | Multiplayer   | Battle Room   | `#/battle`           | `multiplayer.battle`  | no²   |
-| Multiplayer   | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
 | Multiplayer   | Server admin  | `#/admin`            | `multiplayer.admin`   | **yes**² |
+| Records⁵      | Career        | `#/career`           | `career.overview`  | **yes**  |
+| Records⁵      | Player stats  | `#/stats`            | `multiplayer.stats`   | **yes** |
+| Records⁵      | Replays       | `#/play/replays`     | `play.replays`     | no       |
 | Library       | Maps          | `#/library/maps`     | `library.maps`     | no       |
 | Library       | Games         | `#/library/games`    | `library.games`    | **yes**  |
 | Library       | Blueprints    | `#/library/blueprints` | `library.blueprints` | no    |
@@ -40,6 +40,8 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Settings⁴     | All settings  | `#/settings`         | `settings.all`     | no       |
 
 ¹ **Campaigns** only appears in the sidebar once at least one campaign exists (bundled or created locally), and **Scenarios** once at least one scenario names a game and a map. Until then the item is hidden automatically.
+
+⁵ **Records** is the sidebar group for records of games already played, between Multiplayer and Library. Career, Player stats and Replays used to sit under Play and Multiplayer. Their nav ids and links did not change, so a profile `hide` entry or a saved link keeps working. The name Records is provisional (issue #3455). The group has no id of its own to hide: `hide` takes item ids only, and the sidebar drops a group when none of its items is visible.
 
 ⁴ **Settings** items appear on the welcome page only, not in the sidebar. The sidebar's way in is the footer gear, which also carries the settings badge. Four Settings rows above a row already saying Settings was two answers to one question.
 

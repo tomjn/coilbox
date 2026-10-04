@@ -71,7 +71,10 @@ function SectionHeading({
       {link && (
         <Link
           to={link.to}
-          className="ml-auto text-xs font-normal text-primary hover:underline"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "ml-auto",
+          )}
         >
           {link.label}
         </Link>
@@ -88,10 +91,15 @@ function CampaignsSection({ rows }: { rows: CampaignRow[] }) {
       </SectionHeading>
       <ul className="divide-y divide-border/40">
         {rows.map((row) => (
-          <li key={row.id} className="flex items-baseline gap-3 py-1.5 text-sm">
+          <li
+            key={row.id}
+            className="relative flex items-baseline gap-3 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-accent/50"
+          >
+            {/* The link's ::after covers the row, so the whole row is the
+                target and the link's name stays the campaign title. */}
             <Link
               to={`/campaign/${encodeURIComponent(row.id)}`}
-              className="min-w-0 flex-1 truncate text-primary hover:underline"
+              className="min-w-0 flex-1 truncate font-medium after:absolute after:inset-0 after:rounded-md focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary"
             >
               {row.title}
             </Link>
@@ -202,7 +210,10 @@ function WarpathCard({ warpath }: { warpath: WarpathSummary }) {
         </Badge>
         <Link
           to="/warpath"
-          className="ml-auto text-xs font-normal text-primary hover:underline"
+          className={cn(
+            buttonVariants({ variant: "outline", size: "sm" }),
+            "ml-auto",
+          )}
         >
           Open Warpath
         </Link>
