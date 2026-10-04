@@ -1,6 +1,6 @@
 import { Button, useDrawer, useHideSidebar } from "@picoframe/frame";
 import { ArrowLeft, Check, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
 import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
@@ -29,18 +29,12 @@ import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
 import { useGameCatalog } from "../../play/useGameCatalog";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
-import { awardMeta, justFinished } from "../meta";
-import {
-  isBattleNode,
-  type RogueliteRun,
-  type RunNode,
-  type RunNodeType,
-  type RunStatus,
-} from "../model";
+import { isBattleNode, type RunNode, type RunNodeType } from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
 import { runGameNotice } from "../runContent";
 import { useRun, useRunMeta } from "../runs";
+import { useAwardFinishedRun } from "../useAwardFinishedRun";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
   EventOverlay,
@@ -80,12 +74,6 @@ export default function RunPage() {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // The node id to celebrate with a win burst (cleared after the burst plays).
   const [burstId, setBurstId] = useState<string | null>(null);
-  // A run awards meta-progression when this page watches it finish, and only
-  // then. The status last seen, and the finish waiting for the meta to load.
-  const lastStatusRef = useRef<{ id: string; status: RunStatus } | null>(null);
-  const pendingAwardRef = useRef<{ run: RogueliteRun; id: string } | null>(
-    null,
-  );
   const drawer = useDrawer();
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
@@ -188,27 +176,13 @@ export default function RunPage() {
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
-  // When this page sees a run reach won/lost, fold it into its game's
-  // meta-progression once. A run that is already over when the page opens is
-  // never awarded here: it was counted when it ended, by this version or by
-  // the totals from before records were kept per game, and nothing records
-  // which. The meta is only written when the award changed it, and never when
-  // it failed to load, so a bad read cannot overwrite the file.
-  useEffect(() => {
-    if (run && runId) {
-      const last = lastStatusRef.current;
-      const before = last?.id === runId ? last.status : undefined;
-      lastStatusRef.current = { id: runId, status: run.progress.status };
-      if (justFinished(before, run.progress.status)) {
-        pendingAwardRef.current = { run, id: runId };
-      }
-    }
-    const pending = pendingAwardRef.current;
-    if (!pending || metaLoading || metaError) return;
-    pendingAwardRef.current = null;
-    const next = awardMeta(meta, pending.run, pending.id);
-    if (next !== meta) saveMeta(next);
-  }, [run, runId, meta, metaLoading, metaError, saveMeta]);
+  // Awards meta-progression when this page sees the run finish (see the hook).
+  useAwardFinishedRun(run, runId, {
+    meta,
+    loading: metaLoading,
+    error: metaError,
+    save: saveMeta,
+  });
 
   // A finished run counts toward its challenge's best result, once.
   useRecordChallengeRun(run && runId ? warpathRunResult(runId, run) : null);

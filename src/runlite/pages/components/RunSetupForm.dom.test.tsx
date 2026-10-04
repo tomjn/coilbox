@@ -6,12 +6,21 @@
  */
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { emptyMeta, emptyRecord, type RogueliteMeta } from "../../model";
 
-const hoisted = vi.hoisted(() => ({ meta: null as unknown }));
+const hoisted = vi.hoisted(() => ({
+  meta: null as unknown,
+  maps: [] as { name: string; width: number; height: number }[],
+}));
 
-const GAMES = [
+const GAMES: {
+  name: string;
+  info: { shortname: string };
+  primaryArchive: { name: string };
+  missingDependencies?: string[];
+}[] = [
   {
     name: "Balanced Annihilation V15.9.8",
     info: { shortname: "BA" },
@@ -36,7 +45,7 @@ vi.mock("../../../play/config", () => ({
 }));
 vi.mock("../../../content/config", () => ({
   useUnitsyncScan: () => ({
-    data: { games: GAMES, maps: [] },
+    data: { games: GAMES, maps: hoisted.maps },
     loading: false,
   }),
   useUnitsyncGameHeaders: () => ({ headers: new Map() }),
@@ -167,5 +176,50 @@ describe("RunSetupForm unlocks", () => {
     pick("Zero-K v1.14.10.1");
     // ZK has no unlocks, so the field is gone and the default applies.
     expect(screen.queryByText("Loadout")).toBeNull();
+  });
+});
+
+describe("RunSetupForm and a missing dependency archive", () => {
+  const BA = "Balanced Annihilation V15.9.8";
+  beforeEach(() => {
+    hoisted.maps = [{ name: "Comet Catcher Remake", width: 16, height: 16 }];
+  });
+  // The banner links to the game downloads, so it needs a router.
+  const show = (meta: RogueliteMeta) => {
+    hoisted.meta = meta;
+    return render(
+      <MemoryRouter>
+        <RunSetupForm onStarted={() => {}} />
+      </MemoryRouter>,
+    );
+  };
+  afterEach(() => {
+    delete GAMES[0].missingDependencies;
+    hoisted.maps = [];
+  });
+
+  it("names the missing archive and still lets the player begin", () => {
+    GAMES[0].missingDependencies = ["base-content"];
+    show(emptyMeta);
+    expect(
+      screen.getByText(/Archive not installed: base-content\. Balanced/),
+    ).toBeTruthy();
+    // Beginning a run is not a launch, so the form is not blocked.
+    const begin = screen.getByRole("button", { name: /Begin warpath/ });
+    expect((begin as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("says nothing for a game with nothing missing", () => {
+    show(emptyMeta);
+    expect(screen.queryByText(/Archive not installed/)).toBeNull();
+  });
+
+  it("follows the selected game", () => {
+    GAMES[0].missingDependencies = ["base-content"];
+    show(emptyMeta);
+    pick("Zero-K v1.14.10.1");
+    expect(screen.queryByText(/Archive not installed/)).toBeNull();
+    pick(BA);
+    expect(screen.getByText(/Archive not installed/)).toBeTruthy();
   });
 });
