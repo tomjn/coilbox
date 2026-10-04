@@ -29,7 +29,7 @@ import { BrowserToolbar } from "./components/BrowserToolbar";
 import { KeyBindingEditor } from "./components/KeyBindingEditor";
 import { KeyboardMap } from "./components/KeyboardMap";
 import { applyContainerText, KeymapsPanel } from "./components/KeymapsPanel";
-import { EmptyState, ErrorBanner } from "./components/states";
+import { EmptyState, ErrorBanner, ScanFailed } from "./components/states";
 
 /**
  * The keymap editor: `uikeys.txt` on a keyboard.
@@ -172,6 +172,7 @@ export default function KeybindsSection() {
         </div>
       </div>
 
+      {scan.error ? <ScanFailed noun="games" reason={scan.error} /> : null}
       {file.error ? <ErrorBanner message={file.error} /> : null}
       {saveError ? <ErrorBanner message={saveError} /> : null}
 
