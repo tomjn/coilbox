@@ -11,6 +11,9 @@ import {
   BracketFrame,
   HUD_ACCENT_INK,
 } from "../../../conquest/pages/components/hudChrome";
+import { useUnitsyncUnitDataset } from "../../../content/config";
+import { usePreferredTarget } from "../../../play/config";
+import { unitsMissingFrom } from "../../gameChoice";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
 
@@ -41,6 +44,29 @@ export function EncounterOverlay({
   onCelebrate?: () => void;
 }) {
   const enc = useRunEncounter(run, node, onResolved, runId);
+  const { target } = usePreferredTarget();
+  // Before offering a move to another version, check that the units the run
+  // has unlocked exist there (issue #3465).
+  const offered =
+    enc.gameOffer && enc.gameOffer.kind !== "choose"
+      ? enc.gameOffer.newer
+      : undefined;
+  const { dataset: offeredDataset } = useUnitsyncUnitDataset(
+    target?.enginePath,
+    target?.dataDir,
+    offered?.primaryArchive.name,
+  );
+  const offerNote = offered
+    ? offeredDataset
+      ? moveNote(
+          offered.name,
+          unitsMissingFrom(
+            run,
+            offeredDataset.units.map((u) => u.name),
+          ),
+        )
+      : `Checking that your units exist in ${offered.name}…`
+    : undefined;
   const spec = node.battle;
   const kindLabel =
     node.type === "boss"
@@ -77,6 +103,9 @@ export function EncounterOverlay({
         {enc.phase === "briefing" && spec && (
           <div className="flex flex-col gap-3">
             <dl className="flex flex-col gap-1.5 text-sm">
+              {enc.installedGame && (
+                <Row label="Game" value={enc.installedGame.name} />
+              )}
               <Row
                 label="Battlefield"
                 value={spec.mapName}
@@ -106,6 +135,14 @@ export function EncounterOverlay({
               mapDownload={spec.mapDownload}
               game={run.settings.game}
               onRecheck={enc.recheck}
+              gameOffer={enc.gameOffer}
+              gameOfferNoun="warpath"
+              gameOfferNote={offerNote}
+              choosing={enc.choosing}
+              onChooseGame={(name) => enc.answerGameOffer({ pinnedName: name })}
+              onDeclineUpgrade={(name) =>
+                enc.answerGameOffer({ declinedUpdate: name })
+              }
             />
           </div>
         )}
@@ -151,6 +188,16 @@ export function EncounterOverlay({
       </BracketFrame>
     </div>
   );
+}
+
+/** What to tell the player about moving the run's units to another game. */
+function moveNote(gameName: string, missing: string[]): string {
+  if (missing.length === 0) {
+    return `Your start unit and unlocked units are all in ${gameName}.`;
+  }
+  const shown = missing.slice(0, 8).join(", ");
+  const more = missing.length > 8 ? ` and ${missing.length - 8} more` : "";
+  return `${gameName} does not have these units from your run: ${shown}${more}. They will not be available if you move.`;
 }
 
 function Row({

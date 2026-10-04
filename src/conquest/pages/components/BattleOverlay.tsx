@@ -15,6 +15,7 @@ import { UnitPicker } from "../../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../../play/config";
 import { resolveGameByShortname } from "../../../play/installedGames";
 import { factionSides } from "../../galaxy3d/factionShape";
+import { conquestGameRef } from "../../gameChoice";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
@@ -66,10 +67,8 @@ export function BattleOverlay({
   // Faction emblems for the briefing rows (chosen faction + opposition), by side.
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const installedGame = resolveGameByShortname(
-    galaxy.game,
-    scan.data?.games ?? [],
-  );
+  const gameRef = conquestGameRef(galaxy, state);
+  const installedGame = resolveGameByShortname(gameRef, scan.data?.games ?? []);
   const factionLogos = useFactionLogos({
     game: installedGame ?? undefined,
     enginePath: target?.enginePath,
@@ -275,6 +274,16 @@ function Briefing({
   return (
     <div className="flex flex-col gap-3">
       <dl className="flex flex-col gap-1.5 text-sm">
+        {run.installedGame && (
+          <div className="flex justify-between gap-2">
+            <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Game
+            </dt>
+            <dd className="min-w-0 text-right">
+              <span className="block truncate">{run.installedGame.name}</span>
+            </dd>
+          </div>
+        )}
         <div className="flex justify-between gap-2">
           <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
             Battlefield
@@ -353,8 +362,15 @@ function Briefing({
         onStart={run.start}
         mapName={node.battle.mapName}
         mapDownload={node.battle.mapDownload}
-        game={galaxy.game}
+        game={conquestGameRef(galaxy, state)}
         onRecheck={run.recheck}
+        gameOffer={run.gameOffer}
+        gameOfferNoun="conquest"
+        choosing={run.choosing}
+        onChooseGame={(name) => run.answerGameOffer({ pinnedName: name })}
+        onDeclineUpgrade={(name) =>
+          run.answerGameOffer({ declinedUpdate: name })
+        }
       />
     </div>
   );
