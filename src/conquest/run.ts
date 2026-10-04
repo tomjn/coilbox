@@ -3,9 +3,10 @@ import type { SkirmishAi } from "../content/bindings";
 import type { ReplayProvenance } from "../content/replayUserState";
 import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
-import type { InstalledGame } from "../play/installedGames";
+import type { GameChoice, InstalledGame } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { useConquestState } from "./conquests";
+import { conquestGameRef, withGameChoice } from "./gameChoice";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
 import { advanceAfterBattle } from "./rules";
 import { synthesizeBattle } from "./synthesize";
@@ -75,6 +76,15 @@ export function useConquestBattleRun(
     [saveFor, galaxy.id],
   );
 
+  // The player's answer about which game the run uses is saved on its state.
+  const onGameChoice = useCallback(
+    async (choice: GameChoice) => {
+      if (!state) return;
+      await saveFor(galaxy.id, withGameChoice(state, choice));
+    },
+    [saveFor, galaxy.id, state],
+  );
+
   const provenance: ReplayProvenance = {
     mode: "conquest",
     galaxyId: galaxy.id,
@@ -83,7 +93,9 @@ export function useConquestBattleRun(
 
   return useBattleRun<ConquestState>({
     launchMode: "conquest",
-    gameRef: galaxy.game,
+    gameRef: conquestGameRef(galaxy, state),
+    declinedGameUpdate: state?.declinedGameUpdate,
+    onGameChoice,
     mapName: node?.battle.mapName ?? "",
     canStartExtra: !!state && !!node && state.status === "active",
     hasDomainState: !!state && !!node,

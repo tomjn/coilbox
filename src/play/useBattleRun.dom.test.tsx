@@ -184,6 +184,7 @@ function baseOpts<TResolved>(
     mapName: "DeltaSiegeDry",
     canStartExtra: true,
     hasDomainState: true,
+    onGameChoice: async () => {},
     snapshot: conquestSnapshot as UseBattleRunOptions<TResolved>["snapshot"],
     provenance: { mode: "conquest" },
     ...overrides,
@@ -454,5 +455,161 @@ describe("Warpath's own seams: the tech-ceiling/perk snapshot and its resolver",
     expect(persist).toHaveBeenCalledWith({ progress: { status: "wiped" } });
     expect(result.current.phase).toBe("defeat");
     expect(result.current.resolved).toEqual({ progress: { status: "wiped" } });
+  });
+});
+
+/** An installed game as the scan lists it. */
+function scanGame(name: string, shortname: string, version: string) {
+  return {
+    name,
+    primaryArchive: { name: `${name}.sdz` },
+    dependencyArchives: [],
+    info: { shortname, version },
+  };
+}
+
+function scanWith(games: ReturnType<typeof scanGame>[]) {
+  scanOverride.current = {
+    data: {
+      games,
+      maps: [{ name: "DeltaSiegeDry", archives: [], info: {} }],
+      errors: [],
+    },
+    loading: false,
+    run: vi.fn(),
+  };
+}
+
+describe("which game a battle launches (issue #3465)", () => {
+  const zk = scanGame("Zero-K v1.14.10.1", "ZK", "v1.14.10.1");
+  const benchmark = scanGame("Zero-K Benchmark v3", "ZK", "v3");
+  const persist = vi.fn(async () => {});
+  const resolveOutcome = vi.fn((outcome: "victory" | "defeat") => outcome);
+
+  it("launches the game a run pinned, not the benchmark that shares its shortname", async () => {
+    scanWith([benchmark, zk]);
+    launch.mockResolvedValue({ exitCode: null, signal: null });
+    contentListReplays.mockResolvedValue({ replays: [] });
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK", pinnedName: "Zero-K v1.14.10.1" },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(true);
+    expect(result.current.gameOffer).toBeNull();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(toBattleConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ gameType: "Zero-K v1.14.10.1" }),
+    );
+  });
+
+  it("does not launch a run that names no game while several could be meant", () => {
+    scanWith([benchmark, zk]);
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK" },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(false);
+    expect(result.current.missing).toBeNull();
+    expect(result.current.gameOffer).toMatchObject({ kind: "choose" });
+  });
+
+  it("stores the answer without launching, and the run then launches that game", async () => {
+    scanWith([benchmark, zk]);
+    const onGameChoice = vi.fn(async () => {});
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK" },
+          onGameChoice,
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    await act(async () => {
+      await result.current.answerGameOffer({ pinnedName: zk.name });
+    });
+    expect(onGameChoice).toHaveBeenCalledTimes(1);
+    expect(onGameChoice).toHaveBeenCalledWith({ pinnedName: zk.name });
+    expect(launch).not.toHaveBeenCalled();
+  });
+
+  it("pins a run that names no game when exactly one game is installed", () => {
+    scanWith([zk]);
+    const onGameChoice = vi.fn(async () => {});
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK" },
+          onGameChoice,
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(true);
+    expect(onGameChoice).toHaveBeenCalledWith({ pinnedName: zk.name });
+  });
+
+  it("names a missing pinned game, not a benchmark standing in for it", () => {
+    scanWith([benchmark]);
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK", pinnedName: "Zero-K v1.14.10.1" },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(false);
+    expect(result.current.missing).toEqual({
+      kind: "game",
+      name: "Zero-K v1.14.10.1",
+    });
+  });
+
+  it("holds the launch while a newer version is on offer, until it is answered", () => {
+    const newer = scanGame("Zero-K v1.15.0.0", "ZK", "v1.15.0.0");
+    scanWith([zk, newer]);
+    const pinned = {
+      shortname: "ZK",
+      pinnedName: "Zero-K v1.14.10.1",
+    };
+    const open = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: pinned,
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(open.result.current.canStart).toBe(false);
+    expect(open.result.current.gameOffer).toMatchObject({ kind: "upgrade" });
+    const declined = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: pinned,
+          declinedGameUpdate: newer.name,
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(declined.result.current.canStart).toBe(true);
+    expect(declined.result.current.gameOffer).toBeNull();
   });
 });

@@ -6,10 +6,11 @@ import type { ReplayProvenance } from "../content/replayUserState";
 import { usePreferredTarget } from "../play/config";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
-import type { InstalledGame } from "../play/installedGames";
+import type { GameChoice, InstalledGame } from "../play/installedGames";
 import { resolveGameByShortname } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { disabledUnitsFor, perkTotals } from "./build";
+import { withGameChoice } from "./gameChoice";
 import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
 import { synthesizeEncounter } from "./synthesize";
@@ -105,6 +106,13 @@ export function useRunEncounter(
     [onResolved],
   );
 
+  // The player's answer about which game the run uses is saved on the run.
+  const onGameChoice = useCallback(
+    (choice: GameChoice) =>
+      Promise.resolve(onResolved(withGameChoice(run, choice))),
+    [run, onResolved],
+  );
+
   const provenance: ReplayProvenance = {
     mode: "warpath",
     runId,
@@ -114,6 +122,8 @@ export function useRunEncounter(
   return useBattleRun<RogueliteRun>({
     launchMode: "runlite",
     gameRef: run.settings.game,
+    declinedGameUpdate: run.declinedGameUpdate,
+    onGameChoice,
     mapName: node?.battle?.mapName ?? "",
     canStartExtra: !!node && !!node.battle && run.progress.status === "active",
     hasDomainState: !!node,

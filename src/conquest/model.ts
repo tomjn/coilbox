@@ -243,6 +243,14 @@ export interface ConquestState {
    * once. */
   incursions: Incursion[];
   status: "active" | "won" | "lost";
+  /**
+   * The full name of the game this run launches, set when the player answers a
+   * question about it (issue #3465). Beats the galaxy's own `game.pinnedName`.
+   * Kept on the run, not the galaxy, so a bundled galaxy stays read-only.
+   */
+  pinnedGame?: string;
+  /** The newer version of the game the player declined to move to. */
+  declinedGameUpdate?: string;
   /** Most recent battles, oldest first (capped, see {@link HISTORY_CAP}). */
   history: BattleRecord[];
   /** Captures made by the most recent enemy round, for the map recap. */

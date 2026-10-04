@@ -139,3 +139,18 @@ export function decideLaunchGame<T extends InstalledGame>(
   }
   return { kind: "choose", candidates };
 }
+
+/** A question the player answers before a battle can launch, about which
+ * installed game the run uses (issue #3465). */
+export type GameOffer<T extends InstalledGame = InstalledGame> = Extract<
+  LaunchGameDecision<T>,
+  { kind: "choose" | "continue" | "upgrade" }
+>;
+
+/** What the player answered, for the caller to store on the run. */
+export interface GameChoice {
+  /** The full name of the game the run now uses. */
+  pinnedName?: string;
+  /** The newer version the player said no to, so it is not offered again. */
+  declinedUpdate?: string;
+}
