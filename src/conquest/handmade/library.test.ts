@@ -440,7 +440,10 @@ describe("a map with a scenario location", () => {
     expect(result).toEqual({
       ok: false,
       errors: [
-        expect.objectContaining({ code: "scenario-missing", name: "Ironcoast" }),
+        expect.objectContaining({
+          code: "scenario-missing",
+          name: "Ironcoast",
+        }),
       ],
     });
     expect(fetchFile).not.toHaveBeenCalled();
@@ -452,7 +455,10 @@ describe("a map with a scenario location", () => {
     expect(result).toEqual({
       ok: false,
       errors: [
-        expect.objectContaining({ code: "scenario-invalid", name: "Ironcoast" }),
+        expect.objectContaining({
+          code: "scenario-invalid",
+          name: "Ironcoast",
+        }),
       ],
     });
   });

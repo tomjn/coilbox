@@ -114,8 +114,11 @@ function sampleMap(): GalaxyDoc {
 }
 
 const map = sampleMap();
-const source = handmadeRunSource(map);
-if (!source) throw new Error("the sample has no Warpath markings");
+const source = (() => {
+  const found = handmadeRunSource(map);
+  if (!found) throw new Error("the sample has no Warpath markings");
+  return found;
+})();
 
 /** A run on the sample that has walked to Eastcliff, one step short of
  * Ironcoast, and is already settled on its game. */
