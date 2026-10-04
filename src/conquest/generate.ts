@@ -140,6 +140,18 @@ type Pt3 = [number, number, number];
 const dist3 = (a: Pt3, b: Pt3) =>
   Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
+/**
+ * The same distance from operations IEEE 754 pins exactly. `Math.hypot` is
+ * implementation-approximated, which the galaxy fixtures already tolerate, and
+ * a generator added after them has no reason to inherit it.
+ */
+const exactDist3 = (a: Pt3, b: Pt3) => {
+  const dx = a[0] - b[0];
+  const dy = a[1] - b[1];
+  const dz = a[2] - b[2];
+  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+};
+
 /** Lift a flat scatter into source stars, which is what the generator consumes. */
 const flatSource = (pts: Pt[]): SourceStar[] =>
   pts.map((p) => ({ pos: [p[0], p[1], 0] }));
@@ -231,7 +243,7 @@ function scatterRing(rng: Rng, count: number, radius: number): Pt[] {
 }
 
 /** Resolve a (possibly `random`) layout to a concrete one, seed-deterministic. */
-function resolveLayout(
+export function resolveLayout(
   layout: GenerateOptions["layout"],
   rng: Rng,
 ): GalaxyLayout {
@@ -325,7 +337,7 @@ function buildLinks(pts: Pt[]): [number, number][] {
  * components. Shared by both linkers, since an unreachable system is
  * unplayable however the lanes were chosen.
  */
-function repairConnectivity(
+export function repairConnectivity(
   count: number,
   links: [number, number][],
   distOf: (a: number, b: number) => number,
@@ -432,9 +444,9 @@ function centroid(pts: Pt[]): Pt {
 }
 
 /** The index of the point nearest `target`, the earliest on a tie. */
-function nearestTo(pts: Pt[], target: Pt): number {
+function nearestTo(pts: Pt[], target: Pt, distOf = dist): number {
   return pts.reduce(
-    (best, p, i) => (dist(p, target) < dist(pts[best], target) ? i : best),
+    (best, p, i) => (distOf(p, target) < distOf(pts[best], target) ? i : best),
     0,
   );
 }
@@ -474,12 +486,6 @@ export function generateGalaxy(
   now: string = new Date().toISOString(),
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
-  const enemyCount = Math.min(3, Math.max(1, Math.round(opts.factionCount)));
-  const threatLevel = readThreatLevel(opts.threatLevel);
-  const names = resolveConquestNames(opts.names);
-  // limitToNamed caps the galaxy to the named-star pool (no fallback names);
-  // the 8-node floor still applies, so pools smaller than 8 fill the few extra
-  // names via the numeral fallback.
   // Real-star galaxies take their size and their names from the catalogue, so
   // neither the node-count knob nor the naming-pool cap applies to them.
   const realStars = opts.layout === "realstars";
@@ -490,30 +496,73 @@ export function generateGalaxy(
   if (realStars) {
     source = realStarSource(radiusLy);
   } else {
-    const requested = Math.round(opts.nodeCount);
-    const capped =
-      names.limitToNamed && names.starNames.length > 0
-        ? Math.min(requested, names.starNames.length)
-        : requested;
-    source = flatSource(
-      scatterFor(
-        layout,
-        rng,
-        Math.min(MAX_NODE_COUNT, Math.max(8, capped)),
-        100,
-      ),
-    );
+    source = flatSource(scatterFor(layout, rng, generatedNodeCount(opts), 100));
   }
-  const nodeCount = source.length;
 
   const pts = source.map((s) => [s.pos[0], s.pos[1]] as Pt);
   const links = realStars
     ? buildRangeLinks(source, JUMP_RANGE_LY)
     : buildLinks(pts);
+  return assembleGalaxy(opts, rng, { source, links, realStars, radiusLy }, now);
+}
+
+/** How many nodes a procedural layout builds for these options. */
+export function generatedNodeCount(
+  opts: Pick<GenerateOptions, "nodeCount" | "names">,
+): number {
+  // limitToNamed caps the galaxy to the named-star pool (no fallback names);
+  // the 8-node floor still applies, so pools smaller than 8 fill the few extra
+  // names via the numeral fallback.
+  const names = resolveConquestNames(opts.names);
+  const requested = Math.round(opts.nodeCount);
+  const capped =
+    names.limitToNamed && names.starNames.length > 0
+      ? Math.min(requested, names.starNames.length)
+      : requested;
+  return Math.min(MAX_NODE_COUNT, Math.max(8, capped));
+}
+
+/** Where the nodes are and which pairs are joined, before any of it is owned. */
+export interface GalaxyGraph {
+  source: SourceStar[];
+  links: [number, number][];
+  realStars?: boolean;
+  /** Real-star mode only, for the description and the reroll knobs. */
+  radiusLy?: number;
+  /** Measure with `Math.sqrt` alone instead of `Math.hypot`. The galaxy
+   * layouts leave it off, since their fixtures pin the `Math.hypot` results. */
+  exactDistance?: boolean;
+}
+
+/**
+ * Everything after the layout: capitals, factions, starting territory,
+ * difficulty and battle maps, drawn from the same `rng` the layout used. Split
+ * out so another generator can bring its own nodes and links and get the same
+ * strategic setup.
+ */
+export function assembleGalaxy(
+  opts: GenerateOptions,
+  rng: Rng,
+  graph: GalaxyGraph,
+  now: string,
+): GalaxyDoc {
+  const { source, links } = graph;
+  const realStars = graph.realStars === true;
+  const radiusLy = graph.radiusLy ?? DEFAULT_RADIUS_LY;
+  const enemyCount = Math.min(3, Math.max(1, Math.round(opts.factionCount)));
+  const threatLevel = readThreatLevel(opts.threatLevel);
+  const names = resolveConquestNames(opts.names);
+  const nodeCount = source.length;
+  const pts = source.map((s) => [s.pos[0], s.pos[1]] as Pt);
+  const measure = graph.exactDistance ? exactDist3 : dist3;
+  const planar = graph.exactDistance
+    ? (a: Pt, b: Pt) => exactDist3([a[0], a[1], 0], [b[0], b[1], 0])
+    : dist;
 
   // Distances are measured in 3D throughout. Procedural sources are flat, so
   // this is identical to the old planar maths for them.
-  const distAt = (a: number, b: number) => dist3(source[a].pos, source[b].pos);
+  const distAt = (a: number, b: number) =>
+    measure(source[a].pos, source[b].pos);
 
   // Player capital: Sol when the source names a home, else the westernmost
   // node. Enemy capitals: farthest-point sampling so multiple factions start
@@ -526,7 +575,7 @@ export function generateGalaxy(
     home >= 0
       ? home
       : startPosition === "centre"
-        ? nearestTo(pts, centroid(pts))
+        ? nearestTo(pts, centroid(pts), planar)
         : pts.reduce((best, p, i) => (p[0] < pts[best][0] ? i : best), 0);
   const capitals = [playerCapital];
   for (let f = 0; f < enemyCount; f++) {
