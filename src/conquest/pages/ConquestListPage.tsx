@@ -690,6 +690,8 @@ function GenerateGalaxyForm({
       </Link>
       ).
     </>
+  ) : scan.data?.initFailure ? (
+    `The content scan failed, so installed games are not listed: ${scan.data.initFailure}`
   ) : scan.data &&
     (scan.data.games.length === 0 || gameChoices.length === 0) ? (
     <>

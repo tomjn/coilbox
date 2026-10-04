@@ -52,6 +52,7 @@ import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
+import { answeredScan } from "../scanSettled";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
@@ -801,13 +802,14 @@ export default function ReplayDetailPage() {
   // literal string compare (issue #494). Feeds the missing-content notice
   // near the top of the page (#495).
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
+  const answered = answeredScan(scan.data);
   const missingGame =
-    info && scan.data && !scan.loading
-      ? !scan.data.games.some((g) => gameNamesMatch(g.name, info.gameType))
+    info && answered && !scan.loading
+      ? !answered.games.some((g) => gameNamesMatch(g.name, info.gameType))
       : false;
   const missingMap =
-    info?.mapName && scan.data && !scan.loading
-      ? !scan.data.maps.some((m) => m.name === info.mapName)
+    info?.mapName && answered && !scan.loading
+      ? !answered.maps.some((m) => m.name === info.mapName)
       : false;
 
   // After a remix, pull the new copy into the list, then open its detail page —
