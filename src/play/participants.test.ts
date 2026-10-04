@@ -14,6 +14,8 @@ import {
   resolveRandomSides,
   rgbToHex,
   sanitizeColors,
+  setAiBonus,
+  setAllAiBonus,
   setParticipantTeam,
   showsFactionColumn,
   toBattleConfig,
@@ -551,5 +553,86 @@ describe("aiByline", () => {
   it("returns undefined when neither field is present or usable", () => {
     expect(aiByline({})).toBeUndefined();
     expect(aiByline({ version: "  ", description: "" })).toBeUndefined();
+  });
+});
+
+describe("AI bonus", () => {
+  const roster = (): Participant[] => [
+    you(PALETTE[0]),
+    ai("a", PALETTE[1]),
+    ai("b", PALETTE[2]),
+  ];
+
+  it("sets one AI's bonus and leaves every other row alone", () => {
+    const next = setAiBonus(roster(), "a", 40);
+    expect(next.map((p) => p.handicap)).toEqual([undefined, 40, undefined]);
+  });
+
+  it("never gives the human a bonus", () => {
+    expect(setAiBonus(roster(), "you", 40)[0].handicap).toBeUndefined();
+    expect(setAllAiBonus(roster(), 40)[0].handicap).toBeUndefined();
+  });
+
+  it("sets the same bonus on every AI at once", () => {
+    const next = setAllAiBonus(roster(), 25);
+    expect(next.map((p) => p.handicap)).toEqual([undefined, 25, 25]);
+  });
+
+  it("treats 0 as not set, so the field is cleared rather than stored", () => {
+    const boosted = setAllAiBonus(roster(), 25);
+    const cleared = setAiBonus(boosted, "a", 0);
+    expect(cleared[1].handicap).toBeUndefined();
+    expect("handicap" in cleared[1] && cleared[1].handicap === 0).toBe(false);
+    expect(setAllAiBonus(boosted, 0).map((p) => p.handicap)).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
+  });
+
+  it("keeps a bonus in 0 to 100 whole percent", () => {
+    expect(setAiBonus(roster(), "a", 250)[1].handicap).toBe(100);
+    expect(setAiBonus(roster(), "a", -5)[1].handicap).toBeUndefined();
+    expect(setAiBonus(roster(), "a", 12.6)[1].handicap).toBe(13);
+  });
+
+  describe("what reaches the start script input", () => {
+    const base = {
+      mapName: "All That Glitters v2.2.3",
+      gameType: "SplinterFaction 0.1.75",
+      startPosType: 0,
+      modOptions: {},
+      optionSchema: [],
+      mapOptionSchema: [],
+    };
+    const aiRef = { kind: "native" as const, shortName: "X" };
+    const teamOf = (participants: Participant[]) =>
+      toBattleConfig({ ...base, participants }).teams[1];
+
+    it("writes the bonus as a fraction in the AI's team advantage", () => {
+      const team = teamOf([
+        you(PALETTE[0]),
+        { ...ai("a", PALETTE[1]), ai: aiRef, handicap: 40 },
+      ]);
+      expect(team.advantage).toBeCloseTo(0.4, 5);
+    });
+
+    it("writes no advantage for an AI with no bonus", () => {
+      const team = teamOf([
+        you(PALETTE[0]),
+        { ...ai("a", PALETTE[1]), ai: aiRef },
+      ]);
+      expect("advantage" in team).toBe(false);
+    });
+
+    it("writes no advantage once a bonus is set back to 0", () => {
+      const set = setAiBonus(
+        [you(PALETTE[0]), { ...ai("a", PALETTE[1]), ai: aiRef }],
+        "a",
+        40,
+      );
+      const team = teamOf(setAiBonus(set, "a", 0));
+      expect("advantage" in team).toBe(false);
+    });
   });
 });

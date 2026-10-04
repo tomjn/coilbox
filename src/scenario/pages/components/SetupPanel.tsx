@@ -59,6 +59,8 @@ import {
   type Participant,
   RANDOM_SIDE,
   rgbToHex,
+  setAiBonus,
+  setAllAiBonus,
   setParticipantTeam,
   useLastAi,
   usePreferredTarget,
@@ -474,6 +476,12 @@ export function SetupPanel({
                 edit(setParticipantTeam(rows, id, team), options)
               }
               onRemove={askRemove}
+              onSetAiBonus={(id, percent) =>
+                edit(setAiBonus(rows, id, percent), options)
+              }
+              onSetAllAiBonus={(percent) =>
+                edit(setAllAiBonus(rows, percent), options)
+              }
               onAddAi={() =>
                 edit(
                   [

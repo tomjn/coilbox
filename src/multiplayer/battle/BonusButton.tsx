@@ -32,11 +32,19 @@ export function BonusButton({
   name,
   confirmed,
   onSend,
+  help = "The autohost applies this and rejects the request if you aren't its boss or host.",
+  actionLabel = "Send",
+  disabled,
 }: {
   name: string;
   /** The player's last server-confirmed bonus, 0-100. */
   confirmed: number;
   onSend: (value: number) => void;
+  /** The sentence after "Current: n%". The default describes the autohost. */
+  help?: string;
+  /** The confirm button's text. */
+  actionLabel?: string;
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(confirmed);
@@ -53,6 +61,7 @@ export function BonusButton({
       <PopoverTrigger asChild>
         <button
           type="button"
+          disabled={disabled}
           aria-label={
             hasBonus
               ? `Edit resource bonus for ${name}, currently ${confirmed}%`
@@ -62,7 +71,7 @@ export function BonusButton({
             hasBonus ? `${confirmed}% resource bonus` : "Set a resource bonus"
           }
           className={cn(
-            "inline-flex h-7 shrink-0 items-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground",
+            "inline-flex h-7 shrink-0 items-center gap-0.5 rounded px-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50",
             hasBonus && "text-amber-600 dark:text-amber-400",
           )}
         >
@@ -76,8 +85,7 @@ export function BonusButton({
         <div className="flex flex-col gap-3">
           <p className="text-sm font-medium">Resource bonus: {name}</p>
           <p className="text-xs text-muted-foreground">
-            Current: {confirmed}%. The autohost applies this and rejects the
-            request if you aren't its boss or host.
+            Current: {confirmed}%. {help}
           </p>
           <div className="flex items-center gap-3">
             <Slider
@@ -104,7 +112,7 @@ export function BonusButton({
                 setOpen(false);
               }}
             >
-              Send
+              {actionLabel}
             </Button>
           </div>
         </div>
