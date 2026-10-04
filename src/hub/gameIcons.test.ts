@@ -27,7 +27,11 @@ describe("hubIconUrl", () => {
 
   it("accepts an absolute address under the hub's asset base, which is what the live hub sends", () => {
     expect(
-      hubIconUrl("https://assets.example/coilbox-assets/games/SF/logo.png", HUB, CDN),
+      hubIconUrl(
+        "https://assets.example/coilbox-assets/games/SF/logo.png",
+        HUB,
+        CDN,
+      ),
     ).toBe("https://assets.example/coilbox-assets/games/SF/logo.png");
   });
 
@@ -40,24 +44,36 @@ describe("hubIconUrl", () => {
   });
 
   it("refuses the hub's name as a prefix of a longer host", () => {
-    expect(hubIconUrl("https://hub.example.evil.test/x.png", HUB, CDN)).toBeNull();
+    expect(
+      hubIconUrl("https://hub.example.evil.test/x.png", HUB, CDN),
+    ).toBeNull();
   });
 
   it("refuses the hub's name used as a username", () => {
-    expect(hubIconUrl("https://hub.example@evil.test/x.png", HUB, CDN)).toBeNull();
+    expect(
+      hubIconUrl("https://hub.example@evil.test/x.png", HUB, CDN),
+    ).toBeNull();
   });
 
   it("refuses credentials in the address, even on the hub's host", () => {
-    expect(hubIconUrl("https://user:pw@hub.example/x.png", HUB, CDN)).toBeNull();
+    expect(
+      hubIconUrl("https://user:pw@hub.example/x.png", HUB, CDN),
+    ).toBeNull();
   });
 
   it("refuses another path on the asset host", () => {
-    expect(hubIconUrl("https://assets.example/other/x.png", HUB, CDN)).toBeNull();
+    expect(
+      hubIconUrl("https://assets.example/other/x.png", HUB, CDN),
+    ).toBeNull();
   });
 
   it("refuses a path that climbs out of the asset base", () => {
     expect(
-      hubIconUrl("https://assets.example/coilbox-assets/../other/x.png", HUB, CDN),
+      hubIconUrl(
+        "https://assets.example/coilbox-assets/../other/x.png",
+        HUB,
+        CDN,
+      ),
     ).toBeNull();
   });
 
@@ -107,15 +123,24 @@ const INSTALLED = [
   installed("Balanced Annihilation V15.9.8", "ba", "V15.9.8"),
   installed("Splinter Faction 0.1.86", "sf", "0.1.86"),
 ];
-const GAMES = [hubGame("BA", "/ba.png"), hubGame("SF", "/sf.png"), hubGame("ZK", null)];
+const GAMES = [
+  hubGame("BA", "/ba.png"),
+  hubGame("SF", "/sf.png"),
+  hubGame("ZK", null),
+];
 
 describe("matchHubGame", () => {
   it("matches an installed game by its shortname, ignoring case", () => {
-    expect(matchHubGame(GAMES, "Balanced Annihilation V15.9.8", INSTALLED)?.shortname).toBe("BA");
+    expect(
+      matchHubGame(GAMES, "Balanced Annihilation V15.9.8", INSTALLED)
+        ?.shortname,
+    ).toBe("BA");
   });
 
   it("matches a career title with no version", () => {
-    expect(matchHubGame(GAMES, "Splinter Faction", INSTALLED)?.shortname).toBe("SF");
+    expect(matchHubGame(GAMES, "Splinter Faction", INSTALLED)?.shortname).toBe(
+      "SF",
+    );
   });
 
   it("matches a game that is not installed when its name is the shortname", () => {
