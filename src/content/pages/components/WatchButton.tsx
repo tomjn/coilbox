@@ -20,7 +20,8 @@ const isBlocked = (watch: ReplayWatch) =>
  * when Watch is pressed and not before. A replay never runs on another engine: when the recorded one
  * cannot be had, Watch is disabled and says which version is needed. Only a
  * header that names no version falls back to an installed engine. Also disabled
- * while any game/replay is already running.
+ * while any game/replay is already running, and when the replay's game depends on
+ * an archive that is not installed, which would stop the engine (issue #3489).
  *
  * `watch` is the page's decision from `replayEngineDecision`.
  */
@@ -28,10 +29,13 @@ export function WatchButton({
   replayPath,
   engineVersion,
   watch,
+  dependencyBlock,
 }: {
   replayPath: string;
   engineVersion: string;
   watch: ReplayWatch;
+  /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
+  dependencyBlock?: string | null;
 }) {
   const { resolved } = useReplayTarget(engineVersion);
   const { ensureContent } = useLaunchContent();
@@ -41,7 +45,7 @@ export function WatchButton({
   const [error, setError] = useState<string | null>(null);
 
   async function onWatch() {
-    if (isBlocked(watch)) return;
+    if (isBlocked(watch) || dependencyBlock) return;
     setPending(true);
     setError(null);
     try {
@@ -81,8 +85,9 @@ export function WatchButton({
     }
   }
 
-  const title =
-    watch.kind === "none"
+  const title = dependencyBlock
+    ? dependencyBlock
+    : watch.kind === "none"
       ? "Install an engine to watch replays."
       : watch.kind === "unavailable"
         ? `This replay needs engine ${watch.version}, which is not installed and cannot be downloaded here.`
@@ -96,7 +101,7 @@ export function WatchButton({
     <div className="flex flex-col items-end gap-1">
       <Button
         onClick={onWatch}
-        disabled={isBlocked(watch) || running || pending}
+        disabled={isBlocked(watch) || !!dependencyBlock || running || pending}
         title={title}
         className="gap-1.5"
       >
