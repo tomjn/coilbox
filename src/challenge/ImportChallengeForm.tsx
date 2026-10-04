@@ -14,6 +14,8 @@ import {
   challengeDecodeErrorMessage,
 } from "./code";
 import { ImportedCodeRecord } from "./ImportedCodeRecord";
+import { ImportHoldDrawer } from "./ImportHoldDrawer";
+import { ImportHold } from "./importHold";
 import { codeFromPaste } from "./record";
 
 /**
@@ -51,10 +53,13 @@ export function ImportChallengeForm<TSettings, TDoc>({
   buildRequirement: (settings: TSettings) => ContentRequirement;
   /** Resolve the installed game, generate, save, and return the new id plus
    * the saved doc (for the substituted-map count below). Throws to report a
-   * missing install or a generation failure back through the drawer. */
+   * missing install or a generation failure back through the drawer. Throws an
+   * `ImportHold` to stop before saving and ask the player (issue #3488), and
+   * is called again with `accepted` once they choose to create it anyway. */
   finish: (
     settings: TSettings,
     target: PlayTarget,
+    accepted: boolean,
   ) => Promise<{ id: string; doc: TDoc }>;
   countSubstitutedMaps: (doc: TDoc) => number;
   onImported: (id: string) => void;
@@ -62,9 +67,30 @@ export function ImportChallengeForm<TSettings, TDoc>({
   const { target, loading: targetLoading } = usePreferredTarget();
   const [pending, setPending] = useState<TSettings | null>(null);
 
-  const runFinish = async (settings: TSettings) => {
+  const [held, setHeld] = useState<{
+    settings: TSettings;
+    hold: ImportHold;
+  } | null>(null);
+  const [holdBusy, setHoldBusy] = useState(false);
+  const [holdError, setHoldError] = useState<string | null>(null);
+
+  /** Returns false when `finish` stopped to ask the player, true once imported. */
+  const runFinish = async (
+    settings: TSettings,
+    accepted = false,
+  ): Promise<boolean> => {
     if (!target) throw new Error("Install an engine first.");
-    const { id, doc } = await finish(settings, target);
+    let saved: { id: string; doc: TDoc };
+    try {
+      saved = await finish(settings, target, accepted);
+    } catch (e) {
+      if (e instanceof ImportHold) {
+        setHeld({ settings, hold: e });
+        return false;
+      }
+      throw e;
+    }
+    const { id, doc } = saved;
     // Say so when this install could not supply every map the challenge names
     // (issue #1393). This is the one moment somebody is watching, and a
     // stand-in they never heard about is exactly the surprise the naming
@@ -77,6 +103,22 @@ export function ImportChallengeForm<TSettings, TDoc>({
       });
     }
     onImported(id);
+    return true;
+  };
+
+  // The drawer's two ways on. Either may stop again with a new hold, or fail,
+  // and the drawer stays open for both.
+  const resumeHeld = async (accepted: boolean) => {
+    if (!held) return;
+    setHoldBusy(true);
+    setHoldError(null);
+    try {
+      if (await runFinish(held.settings, accepted)) setHeld(null);
+    } catch (e) {
+      setHoldError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setHoldBusy(false);
+    }
   };
 
   // Decode the code, then either finish straight away (game already
@@ -131,6 +173,16 @@ export function ImportChallengeForm<TSettings, TDoc>({
           targetLoading={targetLoading}
           onContinue={() => runFinish(pending).then(() => setPending(null))}
           onCancel={() => setPending(null)}
+        />
+      )}
+      {held && (
+        <ImportHoldDrawer
+          hold={held.hold}
+          busy={holdBusy}
+          error={holdError}
+          onRetry={() => void resumeHeld(false)}
+          onAccept={() => void resumeHeld(true)}
+          onCancel={() => setHeld(null)}
         />
       )}
     </>
