@@ -8,7 +8,6 @@ import {
   Plus,
   Star,
   Swords,
-  UserCheck,
   UserPlus,
   UserX,
   X,
@@ -17,6 +16,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
   type ChatMsg,
+  type LobbyState,
   mpAcceptFriendRequest,
   mpDeclineFriendRequest,
   mpFriendRequest,
@@ -29,6 +29,7 @@ import {
   removeFavourite,
   useFavourites,
 } from "../friends";
+import { mergeFriends } from "../friendsAcrossServers";
 import { isIgnored, useIgnored } from "../ignore";
 import { protocolForKey } from "../protocol";
 import {
@@ -44,8 +45,9 @@ import {
   convId,
   isBattleChannel,
 } from "./conversation";
+import { FriendRow } from "./FriendRow";
 import { PartySection } from "./PartySection";
-import { PRESENCE_META, userPresence } from "./presence";
+import { userPresence } from "./presence";
 import { Section } from "./Section";
 import { UserPicker } from "./UserPicker";
 
@@ -375,39 +377,17 @@ function ConnectionGroup({
               const id = `dm:${peer}`;
               const msgs = state?.dms?.[peer] ?? [];
               const presence = state ? userPresence(state, peer) : "offline";
-              const meta = PRESENCE_META[presence];
               const isServerFriend = serverFriendSet.has(peer);
               return (
-                <li key={id} className="group relative">
-                  <button
-                    type="button"
-                    className={cn(rowClass(id), "pr-16")}
-                    onClick={() => onSelect(serverKey, { kind: "dm", peer })}
-                  >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        meta.dotClass,
-                      )}
-                      title={meta.label}
-                    />
-                    <span
-                      className={cn(
-                        "truncate",
-                        presence === "offline" && "text-muted-foreground",
-                      )}
-                    >
-                      {peer}
-                    </span>
-                    {isServerFriend && (
-                      <UserCheck
-                        className="size-3.5 shrink-0 text-sky-500"
-                        aria-label="Server friend"
-                      />
-                    )}
-                    <Badge n={unreadBadge(id, msgs)} />
-                  </button>
+                <FriendRow
+                  key={id}
+                  name={peer}
+                  status={presence}
+                  serverFriend={isServerFriend}
+                  active={id === activeId}
+                  trailing={<Badge n={unreadBadge(id, msgs)} />}
+                  onOpen={() => onSelect(serverKey, { kind: "dm", peer })}
+                >
                   {isServerFriend ? (
                     <FriendAction
                       icon={<UserX className="size-4" />}
@@ -426,7 +406,7 @@ function ConnectionGroup({
                     active={isFavourite(favourites, serverKey, peer)}
                     onToggle={() => toggleFavourite(peer)}
                   />
-                </li>
+                </FriendRow>
               );
             })}
           </ul>
@@ -487,6 +467,57 @@ function ConnectionGroup({
 }
 
 /**
+ * Friends from every server in one list, with the server named on each row.
+ * Only shown when the friends span two or more servers, since with one server
+ * the connection's own Friends section already says the same thing. A friend on
+ * a server that is not connected is listed as unknown and cannot be opened.
+ */
+function AllFriendsSection({
+  active,
+  onSelect,
+}: {
+  active: ActiveConversation | null;
+  onSelect: (serverKey: string, d: ConversationDescriptor) => void;
+}) {
+  const { connections } = useMultiplayer();
+  const servers = useProtocolServers();
+  const [favourites] = useFavourites();
+  const states: Record<string, LobbyState | null> = {};
+  for (const [key, c] of Object.entries(connections)) {
+    if (c.live) states[key] = c.mirror.state;
+  }
+  const entries = mergeFriends(favourites, states);
+  if (new Set(entries.map((e) => e.serverKey)).size < 2) return null;
+  return (
+    <Section title="All friends">
+      <ul className="flex flex-col gap-0.5 px-2">
+        {entries.map((e) => (
+          <FriendRow
+            key={`${e.serverKey}:${e.name}`}
+            name={e.name}
+            status={e.status}
+            battle={e.battle}
+            serverLabel={serverNameFor(e.serverKey, servers)}
+            serverTitle={
+              e.status === "unknown"
+                ? `Not connected as ${usernameFromKey(e.serverKey)} on ${serverNameFor(e.serverKey, servers)}`
+                : `${usernameFromKey(e.serverKey)} on ${serverNameFor(e.serverKey, servers)}`
+            }
+            serverFriend={e.serverFriend}
+            disabled={e.status === "unknown"}
+            active={
+              active?.serverKey === e.serverKey &&
+              convId(active.desc) === `dm:${e.name}`
+            }
+            onOpen={() => onSelect(e.serverKey, { kind: "dm", peer: e.name })}
+          />
+        ))}
+      </ul>
+    </Section>
+  );
+}
+
+/**
  * The left rail: collapsible Channels and Direct messages sections with unread
  * badges. New DMs are started either from the "+" picker here (search online
  * users) or by selecting a user from a channel's member list.
@@ -513,6 +544,7 @@ export function ConversationSidebar({
   return (
     <nav className="flex w-60 shrink-0 flex-col border-r border-border">
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        <AllFriendsSection active={active} onSelect={onSelect} />
         {liveKeys.map((serverKey) => (
           <ConnectionGroup
             key={serverKey}
