@@ -162,6 +162,10 @@ export interface MapInventory {
   names: ReadonlySet<string>;
   /** True once both readings have landed. */
   known: boolean;
+  /** The scan ran but its unitsync `Init` failed, so `names` is empty because
+   *  the engine could not start and not because nothing is installed (issue
+   *  #3398). */
+  scanFailed?: boolean;
 }
 
 /**
@@ -186,7 +190,10 @@ export function suggestedMapInstalled(
 /** Whether the player has no maps at all, which is a definite answer or false. */
 export function noMapsInstalled(inventory: MapInventory): boolean {
   return (
-    inventory.known && inventory.files.size === 0 && inventory.names.size === 0
+    inventory.known &&
+    !inventory.scanFailed &&
+    inventory.files.size === 0 &&
+    inventory.names.size === 0
   );
 }
 
@@ -696,6 +703,7 @@ export function useMapInventory(): MapInventory {
       names: new Set((scan.data?.maps ?? []).map((m) => m.name.toLowerCase())),
       known:
         (files !== null || (!rootsLoading && paths.length === 0)) && scanKnown,
+      scanFailed: !!scan.data?.initFailure,
     }),
     [files, rootsLoading, paths.length, scan.data, scanKnown],
   );

@@ -254,6 +254,14 @@ describe("the maps the player already has", () => {
       noMapsInstalled({ files: new Set(), names: new Set(["x"]), known: true }),
     ).toBe(false);
   });
+
+  it("will not say the player has nothing when the scan failed to start", () => {
+    // A scan whose unitsync Init failed has no names because the engine could
+    // not start. Nothing in a content root does not make that an empty install,
+    // and "no maps" takes the top of the home page for the get-started card
+    // (issue #3398).
+    expect(noMapsInstalled({ ...NOTHING, scanFailed: true })).toBe(false);
+  });
 });
 
 describe("the catalog this ships with", () => {
