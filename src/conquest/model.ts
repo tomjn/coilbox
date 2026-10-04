@@ -2,6 +2,7 @@ import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import { expandRevealed } from "./fog";
+import { type PlacedModel, parsePlacedModels } from "./placedModels";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel } from "./threat";
@@ -180,6 +181,8 @@ export interface GalaxyDoc {
   };
   linkKinds?: [string, string, LinkKind][];
   blockedBorders?: [string, string][];
+  /** Scenery stood on the terrain. Drawn only when the document has one. */
+  models?: PlacedModel[];
   createdAt: string;
   updatedAt: string;
   /** Set when this galaxy was created by importing a challenge code/file (see
@@ -637,6 +640,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
         ? { graceTurns, fogOfWar }
         : undefined,
     theme: parseTheme(d.theme),
+    models: parsePlacedModels(d.models),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
     importedChallenge: d.importedChallenge === true ? true : undefined,
