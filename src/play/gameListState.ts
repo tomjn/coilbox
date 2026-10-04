@@ -29,6 +29,7 @@ export function gameListState({
   scanned,
   hasGames,
   scanErrors,
+  initFailure,
 }: {
   /** Whether an engine was resolved to scan with. */
   hasTarget: boolean;
@@ -38,9 +39,22 @@ export function gameListState({
   hasGames: boolean;
   /** Diagnostics unitsync drained during the scan. */
   scanErrors: readonly string[];
+  /** The reason unitsync's `Init` failed, when it did. The worker also lists it
+   *  in `scanErrors`, but a result carrying only this is no less unreadable
+   *  (issue #3398). */
+  initFailure?: string | null;
 }): GameListState {
   if (!hasTarget) return "no-engine";
   if (!scanned) return "scanning";
   if (hasGames) return "ready";
-  return scanErrors.length > 0 ? "unreadable" : "empty";
+  return scanErrors.length > 0 || initFailure ? "unreadable" : "empty";
+}
+
+/**
+ * Whether the player is being told to go and get a game, which only a state
+ * with nothing wrong with the reading can say. A scan that could not read the
+ * games has not shown there are none to get.
+ */
+export function needsGame(state: GameListState): boolean {
+  return state === "no-engine" || state === "empty";
 }

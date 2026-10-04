@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gameListState } from "./gameListState";
+import { gameListState, needsGame } from "./gameListState";
 
 /** The common case: a scan that ran and found something. */
 const base = {
@@ -58,5 +58,36 @@ describe("gameListState", () => {
         scanErrors: ["a problem"],
       }),
     ).toBe("no-engine");
+  });
+});
+
+describe("gameListState with an Init failure but no diagnostics", () => {
+  it("is unreadable, not empty (issue #3398)", () => {
+    expect(
+      gameListState({
+        ...base,
+        hasGames: false,
+        initFailure: "no space left",
+      }),
+    ).toBe("unreadable");
+  });
+
+  it("is ready when games were listed whatever the failure says", () => {
+    expect(gameListState({ ...base, initFailure: "partial" })).toBe("ready");
+  });
+});
+
+describe("needsGame", () => {
+  it("is true only when there is no engine or a clean scan found no games", () => {
+    expect(needsGame("no-engine")).toBe(true);
+    expect(needsGame("empty")).toBe(true);
+  });
+
+  it("is false for a scan that could not read the games", () => {
+    // "Needs a game" tells somebody to go and get one, and that is the wrong
+    // instruction for a player whose engine failed to start (issue #3398).
+    expect(needsGame("unreadable")).toBe(false);
+    expect(needsGame("scanning")).toBe(false);
+    expect(needsGame("ready")).toBe(false);
   });
 });

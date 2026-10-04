@@ -15,9 +15,10 @@ import {
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
 import { shareInFlight } from "../content/inFlight";
+import { scanInitFailure } from "../content/scanSettled";
 import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import { withoutGeneratedGames } from "../lib/generatedGames";
-import { type GameListState, gameListState } from "./gameListState";
+import { type GameListState, gameListState, needsGame } from "./gameListState";
 
 export type { Participant, Rgb } from "./participants";
 // The pure participant model lives in ./participants (no hooks, no frame
@@ -215,11 +216,11 @@ export function usePlayReadiness(): {
     scanned: scanResolved,
     hasGames,
     scanErrors,
+    initFailure: scanInitFailure(scan),
   });
-  const needsGame = !target || (scanResolved && !hasGames);
   const loading = targetLoading || (!!target && !scanResolved);
   return {
-    ready: !needsGame,
+    ready: !needsGame(state),
     loading,
     target,
     hasGames,

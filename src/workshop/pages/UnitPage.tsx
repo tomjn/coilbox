@@ -119,7 +119,11 @@ import {
   useUnitsyncUnitDataset,
 } from "@/content/config";
 import { isEditInPlaceEligible } from "@/content/format";
-import { EmptyState, SkeletonList } from "@/content/pages/components/states";
+import {
+  EmptyState,
+  GameMissingState,
+  SkeletonList,
+} from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { buildTechForest } from "@/content/techForest";
 import { useLegoProjects } from "@/lego/projects";
@@ -2633,7 +2637,8 @@ export default function UnitPage() {
           />
         </div>
       ) : !game ? (
-        <EmptyState
+        <GameMissingState
+          initFailure={scan.data?.initFailure ?? null}
           label={
             scan.loading
               ? "Scanning for installed games…"

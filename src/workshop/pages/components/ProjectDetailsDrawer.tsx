@@ -25,6 +25,7 @@ import { useState } from "react";
 import { Field } from "@/components/Field";
 import { Textarea } from "@/components/ui/textarea";
 import type { GameItem } from "@/content/bindings";
+import { ScanFailed } from "@/content/pages/components/states";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
 import { defaultProjectName, type ModProject } from "../../project";
@@ -46,6 +47,7 @@ export function ProjectDetailsDrawer({
   games,
   headers = NO_ART,
   scanning,
+  scanFailure = null,
   existing,
   onSubmit,
 }: {
@@ -60,6 +62,9 @@ export function ProjectDetailsDrawer({
   headers?: Map<string, string>;
   /** Whether the content scan is still running, so the menu says so. */
   scanning: boolean;
+  /** Why the scan could not list games (its unitsync `Init` failed), so the
+   *  empty list is not read as "no games installed" (issue #3398). */
+  scanFailure?: string | null;
   /** The projects already saved, so a nameless one gets a name nothing else
    *  has. */
   existing: readonly { name: string }[];
@@ -82,6 +87,7 @@ export function ProjectDetailsDrawer({
         games={games}
         headers={headers}
         scanning={scanning}
+        scanFailure={scanFailure}
         existing={existing}
         onSubmit={onSubmit}
       />
@@ -101,6 +107,7 @@ function ProjectDetailsForm({
   games,
   headers,
   scanning,
+  scanFailure,
   existing,
   onSubmit,
 }: {
@@ -108,6 +115,7 @@ function ProjectDetailsForm({
   games: readonly GameItem[];
   headers: Map<string, string>;
   scanning: boolean;
+  scanFailure: string | null;
   existing: readonly { name: string }[];
   onSubmit: (details: ProjectDetails) => void;
 }) {
@@ -171,9 +179,13 @@ function ProjectDetailsForm({
       )}
 
       {noGames && !project ? (
-        <p className="text-muted-foreground text-xs">
-          No games are installed. Add one from the Library.
-        </p>
+        scanFailure ? (
+          <ScanFailed noun="games" reason={scanFailure} />
+        ) : (
+          <p className="text-muted-foreground text-xs">
+            No games are installed. Add one from the Library.
+          </p>
+        )
       ) : null}
 
       <Field

@@ -4,7 +4,10 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { MapDownloadHint } from "../../../campaign/model";
 import { invalidateMapPreview, invalidateScans } from "../../../content/config";
-import { ErrorBanner } from "../../../content/pages/components/states";
+import {
+  ErrorBanner,
+  ScanFailed,
+} from "../../../content/pages/components/states";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
@@ -199,6 +202,7 @@ export function BattleLaunchGate({
   error,
   noEngine,
   missing,
+  scanFailure = null,
   canStart,
   running,
   scanLoading,
@@ -212,6 +216,9 @@ export function BattleLaunchGate({
   error?: string | null;
   noEngine: boolean;
   missing: BattleRequirement | null;
+  /** Why the content scan could not say what is installed (its unitsync `Init`
+   *  failed), so there is no missing game or map to name (issue #3398). */
+  scanFailure?: string | null;
   canStart: boolean;
   running: boolean;
   scanLoading: boolean;
@@ -234,6 +241,8 @@ export function BattleLaunchGate({
           </Link>
           ).
         </p>
+      ) : scanFailure ? (
+        <ScanFailed noun="games or maps" reason={scanFailure} />
       ) : missing ? (
         <MissingContentGate
           missing={missing}
