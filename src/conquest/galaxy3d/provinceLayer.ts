@@ -4,6 +4,7 @@ import { NEUTRAL } from "../model";
 import type { MapItemState } from "./cityLayer";
 import {
   BORDER_TOLERANCE_FRACTION,
+  type BorderPiece,
   drapeFill,
   drapeLine,
   isStrongBorder,
@@ -42,6 +43,12 @@ const CAPITAL_RADIUS = 1.3;
 export interface ProvinceLayer {
   /** The provinces, searchable by map point. */
   index: ProvinceIndex;
+  /**
+   * Every border piece the layer draws, each knowing the province on either
+   * side. `cueLayer.ts` reads the shared edge of two provinces from this, so
+   * a line it draws along a border lies on the one drawn here.
+   */
+  borders: readonly BorderPiece[];
   /** Whether this layer draws the node, which is to say it has an outline. */
   has: (nodeId: string) => boolean;
   /** The same, by node index. */
@@ -257,6 +264,10 @@ export function buildProvinceLayer(
   /* -------------------------------- style -------------------------------- */
 
   const WHITE = new THREE.Color(0xffffff);
+  // The gold of the galaxy's contested lanes and the amber of its incursion
+  // warning, so the same colours mean the same things on every map.
+  const ATTACK_COLOR = new THREE.Color(0xffcf8a);
+  const THREAT_COLOR = new THREE.Color(0xffb020);
   const styleOne = (i: number) => {
     const mat = fillMats.get(i);
     if (!mat) return;
@@ -268,9 +279,14 @@ export function buildProvinceLayer(
       hovered: i === hovered,
       selected: i === selected,
     });
-    mat.color
-      .copy(ownerColor(style.tint === "owner" ? owner : undefined))
-      .lerp(WHITE, style.lighten);
+    mat.color.copy(ownerColor(style.tint === "owner" ? owner : undefined));
+    if (style.accent) {
+      mat.color.lerp(
+        style.accent === "threat" ? THREAT_COLOR : ATTACK_COLOR,
+        style.accentMix,
+      );
+    }
+    mat.color.lerp(WHITE, style.lighten);
     mat.opacity = style.opacity;
     const label = labels[i];
     if (label) label.visible = style.showMarkers;
@@ -328,6 +344,7 @@ export function buildProvinceLayer(
 
   return {
     index,
+    borders: pieces,
     has: (nodeId) => provinceOf(nodeId) >= 0,
     isProvince: (nodeIndex) => index.has(nodeIndex),
     pick: (ray) => {
