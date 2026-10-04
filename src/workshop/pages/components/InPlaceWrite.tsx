@@ -62,7 +62,11 @@ import {
   writeSources,
 } from "../../inPlace";
 import type { InPlaceDone } from "../../inPlaceProject";
-import { settledSummary, settleTypedValuesInPlace } from "../../loadsAs";
+import {
+  gameNotFoundNote,
+  settledSummary,
+  settleTypedValuesInPlace,
+} from "../../loadsAs";
 import { isMutatorOnly, mutatorOnlyChanges } from "../../mutatorOnly";
 import type { ModProject } from "../../project";
 import { isDeathMount } from "../../weaponLibrary";
@@ -147,7 +151,10 @@ export function InPlaceWrite({
               })
             : ({
                 ok: false,
-                message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+                message: gameNotFoundNote(
+                  project.gameName,
+                  scan.data?.initFailure ?? null,
+                ),
               } as const);
         setTypedNote(
           settled.ok ? settledSummary(settled.settled) : settled.message,

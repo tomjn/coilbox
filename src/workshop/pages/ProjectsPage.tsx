@@ -385,6 +385,7 @@ export default function ProjectsPage() {
           games={games}
           headers={gameHeaders}
           scanning={scan.loading}
+          scanFailure={scan.data?.initFailure}
           existing={projects}
           onSubmit={saveDetails}
         />

@@ -151,6 +151,20 @@ export function settledSummary(settled: SettledTypedValues): string | null {
 }
 
 /**
+ * The note for a project whose game the scan did not list, so there is nothing
+ * to load. A scan whose unitsync `Init` failed lists nothing whatever is
+ * installed, so it says that instead of "not installed" (issue #3398).
+ */
+export function gameNotFoundNote(
+  gameName: string,
+  initFailure: string | null,
+): string {
+  return initFailure
+    ? `The content scan failed, so ${gameName} could not be found to check typed values (${initFailure}). They are written as typed and the game may load some of them as something else.`
+    : `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`;
+}
+
+/**
  * Ask for `written`, or say why not. A failure is not a stop: the typed
  * values are what every route wrote before this, so the caller carries on
  * with them and shows the reason.
