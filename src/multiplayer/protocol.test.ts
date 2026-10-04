@@ -92,6 +92,114 @@ describe("protocolForKey", () => {
   });
 });
 
+describe("protocolForKey with the server written another way (issue #3437)", () => {
+  // [saved host, host the connection key was built with]
+  const SPELLINGS = [
+    ["IPv6 saved bare, key bracketed", "::1", "[::1]"],
+    ["IPv6 saved bracketed, key bare", "[::1]", "::1"],
+    ["IPv6 long form", "2001:0db8:0:0:0:0:0:1", "2001:db8::1"],
+    ["host name case", "Lobby.Example.com", "lobby.example.com"],
+    ["host name case, other way", "lobby.example.com", "LOBBY.Example.com"],
+    [
+      "trailing dot on the saved host",
+      "lobby.example.com.",
+      "lobby.example.com",
+    ],
+    ["trailing dot on the key", "lobby.example.com", "lobby.example.com."],
+    ["IPv4 in hex", "0x7f.0.0.1", "127.0.0.1"],
+    ["IPv4 as one number", "127.0.0.1", "2130706433"],
+  ] as const;
+
+  for (const [label, saved, keyed] of SPELLINGS) {
+    it(`finds the server: ${label}`, () => {
+      const server: LobbyServer = {
+        id: "mine",
+        name: "Mine",
+        host: saved,
+        port: 443,
+        tls: true,
+        allowSelfSigned: false,
+        protocol: "tachyon",
+      };
+      expect(protocolForKey(`me@${keyed}:443`, [server])).toBe("tachyon");
+    });
+  }
+
+  it("does not match another port or another host", () => {
+    const server: LobbyServer = {
+      id: "mine",
+      name: "Mine",
+      host: "::1",
+      port: 443,
+      tls: true,
+      allowSelfSigned: false,
+      protocol: "tachyon",
+    };
+    expect(protocolForKey("me@[::1]:8200", [server])).toBe("tasserver");
+    expect(protocolForKey("me@[::2]:443", [server])).toBe("tasserver");
+  });
+
+  it("matches a host the normaliser refuses by its exact text", () => {
+    for (const host of ["fe80::1%eth0", "my_lobby.example", "bücher.example"]) {
+      const server: LobbyServer = {
+        id: "mine",
+        name: "Mine",
+        host,
+        port: 443,
+        tls: true,
+        allowSelfSigned: false,
+        protocol: "tachyon",
+      };
+      expect(protocolForKey(`me@${host}:443`, [server]), host).toBe("tachyon");
+    }
+  });
+
+  it("does not read two zone ids as one server", () => {
+    const server: LobbyServer = {
+      id: "mine",
+      name: "Mine",
+      host: "fe80::1%eth0",
+      port: 443,
+      tls: true,
+      allowSelfSigned: false,
+      protocol: "tachyon",
+    };
+    expect(protocolForKey("me@fe80::1%eth1:443", [server])).toBe("tasserver");
+  });
+
+  it("takes the entry spelled exactly as the key before one that only matches normalised", () => {
+    const other: LobbyServer = {
+      id: "other",
+      name: "Other",
+      host: "[::1]",
+      port: 443,
+      tls: true,
+      allowSelfSigned: false,
+      protocol: "tachyon",
+    };
+    const mine: LobbyServer = {
+      ...other,
+      id: "mine",
+      host: "::1",
+      protocol: "tasserver",
+    };
+    expect(protocolForKey("me@::1:443", [other, mine])).toBe("tasserver");
+  });
+
+  it("splits a key whose username has an @ in it at the last one", () => {
+    const server: LobbyServer = {
+      id: "mine",
+      name: "Mine",
+      host: "::1",
+      port: 443,
+      tls: true,
+      allowSelfSigned: false,
+      protocol: "tachyon",
+    };
+    expect(protocolForKey("me@home@[::1]:443", [server])).toBe("tachyon");
+  });
+});
+
 describe("liveTachyonKeys", () => {
   const t1 = `p@${tachyon.host}:${tachyon.port}`;
   const t2 = "q@lobby.example:443";
