@@ -180,7 +180,7 @@ export interface RunNode {
 export type RunMapRef =
   | {
       source: "generated";
-      /** Which generator made it, `territories` for one. */
+      /** Which generator made it: `territories` or `cities`. */
       style: string;
       /** The map's own seed, which need not be the run's. */
       seed: number;

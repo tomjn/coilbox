@@ -1,3 +1,4 @@
+import { generateCities } from "../conquest/cities";
 import type { GalaxyDoc, GameRef } from "../conquest/model";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
 import { generateTerritories } from "../conquest/territories";
@@ -246,7 +247,16 @@ export interface RunMapSource {
 /** Finds a hand-made map by id. Null when this install does not have it. */
 export type HandmadeMapLookup = (id: string) => RunMapSource | null;
 
-const TERRITORY_LAYOUTS = ["scatter", "spiral", "clusters", "ring", "random"];
+const MAP_LAYOUTS = ["scatter", "spiral", "clusters", "ring", "random"];
+
+/** The generators a map can be built again with, by the style it records. */
+const MAP_GENERATORS: Record<
+  string,
+  typeof generateTerritories | typeof generateCities
+> = {
+  territories: generateTerritories,
+  cities: generateCities,
+};
 
 /**
  * Get the map a run was made on. A generated map is built again from its
@@ -260,13 +270,14 @@ export function resolveRunMap(
   handmade?: HandmadeMapLookup,
 ): RunMapSource | null {
   if (ref.source === "handmade") return handmade?.(ref.id) ?? null;
-  if (ref.style !== "territories") return null;
-  const layout = TERRITORY_LAYOUTS.includes(ref.layout ?? "")
+  if (!Object.hasOwn(MAP_GENERATORS, ref.style)) return null;
+  const generate = MAP_GENERATORS[ref.style];
+  const layout = MAP_LAYOUTS.includes(ref.layout ?? "")
     ? (ref.layout as "scatter" | "spiral" | "clusters" | "ring" | "random")
     : undefined;
   try {
     return {
-      map: generateTerritories(
+      map: generate(
         {
           seed: ref.seed,
           game,

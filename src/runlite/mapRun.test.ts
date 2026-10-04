@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { runIdentity, warpathIdentity } from "../challenge/identity";
+import { generateCities } from "../conquest/cities";
 import type { GalaxyDoc, GalaxyNode } from "../conquest/model";
 import { mulberry32 } from "../conquest/rng";
 import { generateTerritories } from "../conquest/territories";
@@ -92,8 +93,13 @@ function mapDoc(ids: string[], links: [string, string][]): GalaxyDoc {
   };
 }
 
-function territories(seed: number, nodeCount = 24): GalaxyDoc {
-  return generateTerritories(
+function generated(
+  style: "territories" | "cities",
+  seed: number,
+  nodeCount = 24,
+): GalaxyDoc {
+  const generate = style === "cities" ? generateCities : generateTerritories;
+  return generate(
     {
       seed,
       game: { shortname: "ba" },
@@ -105,6 +111,9 @@ function territories(seed: number, nodeCount = 24): GalaxyDoc {
     NOW,
   );
 }
+
+const territories = (seed: number, nodeCount?: number) =>
+  generated("territories", seed, nodeCount);
 
 function opts(
   map: GalaxyDoc,
@@ -263,14 +272,17 @@ describe("pickEnds", () => {
   });
 });
 
-describe("generateMapRun on generated Territories maps", () => {
-  const cases = [1, 2, 3, 7, 42, 99, 1234, 20260718].map((seed) => ({
-    seed,
-    map: territories(seed, 16 + (seed % 3) * 12),
-  }));
+describe("generateMapRun on generated maps", () => {
+  const cases = (["territories", "cities"] as const).flatMap((style) =>
+    [1, 2, 3, 7, 42, 99, 1234, 20260718].map((seed) => ({
+      style,
+      seed,
+      map: generated(style, seed, 16 + (seed % 3) * 12),
+    })),
+  );
 
-  for (const { seed, map } of cases) {
-    describe(`seed ${seed}, ${map.nodes.length} provinces`, () => {
+  for (const { style, seed, map } of cases) {
+    describe(`${style}, seed ${seed}, ${map.nodes.length} locations`, () => {
       const run = generateMapRun(opts(map, { seed }));
       const byId = new Map(run.nodes.map((n) => [n.id, n]));
       const typeOf = (id: string) => byId.get(id)?.type;
@@ -515,6 +527,13 @@ describe("resolveRunMap", () => {
     expect(
       resolveRunMap(
         { source: "generated", style: "moonscape", seed: 1, nodeCount: 12 },
+        game,
+      ),
+    ).toBeNull();
+    // A style that names something every object has is still no generator.
+    expect(
+      resolveRunMap(
+        { source: "generated", style: "constructor", seed: 1, nodeCount: 12 },
         game,
       ),
     ).toBeNull();
