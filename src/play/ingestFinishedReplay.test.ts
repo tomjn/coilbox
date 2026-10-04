@@ -19,7 +19,12 @@ import {
 const target = { dataDir: "/data", enginePath: "/engine" };
 
 function replay(path: string): ReplayFile {
-  return { filename: path.split("/").pop() ?? path, path, sizeBytes: 1, modifiedMs: 1 };
+  return {
+    filename: path.split("/").pop() ?? path,
+    path,
+    sizeBytes: 1,
+    modifiedMs: 1,
+  };
 }
 
 function summary(over: Partial<Record<string, number>> = {}) {
