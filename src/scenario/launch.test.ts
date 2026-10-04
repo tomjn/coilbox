@@ -35,6 +35,7 @@ import {
   launchScenario,
   MISSION_MODOPTION,
   missionIssueMessage,
+  scenarioLaunchBlock,
   scenarioLaunchBlocker,
   scenarioRoute,
 } from "./launch";
@@ -908,5 +909,118 @@ describe("scenarioLaunchBlocker", () => {
 
   it("stops a second launch while a game is running", () => {
     expect(blocker({ running: true })).toContain("already running");
+  });
+});
+
+describe("scenarioLaunchBlocker and the map", () => {
+  const blocker = (
+    overrides: Partial<Parameters<typeof scenarioLaunchBlocker>[0]> = {},
+  ) =>
+    scenarioLaunchBlocker({
+      scenario: build(),
+      hasEngine: true,
+      games: [LOOSE],
+      maps: [{ name: "Comet Catcher Redux" }],
+      running: false,
+      reader: "player",
+      ...overrides,
+    });
+
+  it("stops a scenario whose map is not installed", () => {
+    expect(blocker({ maps: [{ name: "Other" }] })).toContain(
+      "Comet Catcher Redux is not installed",
+    );
+  });
+
+  it("lets a scenario whose game and map are installed start", () => {
+    expect(blocker()).toBeNull();
+  });
+
+  it("waits rather than blocking while the scan has not answered the maps", () => {
+    expect(blocker({ maps: null })).toBeNull();
+  });
+});
+
+describe("scenarioLaunchBlock", () => {
+  const block = (
+    overrides: Partial<Parameters<typeof scenarioLaunchBlock>[0]> = {},
+  ) =>
+    scenarioLaunchBlock({
+      scenario: build(),
+      hasEngine: true,
+      games: [LOOSE],
+      maps: [{ name: "Comet Catcher Redux" }],
+      running: false,
+      reader: "player",
+      ...overrides,
+    });
+
+  it("has nothing to say when the scenario can start", () => {
+    expect(block()).toBeNull();
+  });
+
+  it("offers to download a game that is not installed", () => {
+    expect(block({ games: [] })).toMatchObject({
+      kind: "download",
+      needs: { game: "Splinter Faction test" },
+    });
+  });
+
+  it("offers to download a map that is not installed", () => {
+    expect(block({ maps: [] })).toMatchObject({
+      kind: "download",
+      needs: { map: "Comet Catcher Redux" },
+    });
+  });
+
+  it("offers both when the game and the map are missing", () => {
+    expect(block({ games: [], maps: [] })).toMatchObject({
+      kind: "download",
+      needs: { game: "Splinter Faction test", map: "Comet Catcher Redux" },
+    });
+  });
+
+  it("does not name a map to fetch when the scan has not read the maps", () => {
+    const said = block({ games: [], maps: null });
+
+    expect(said).toMatchObject({ kind: "download" });
+    expect(said && said.kind === "download" && said.needs.map).toBeUndefined();
+  });
+
+  it("offers to download an engine when none is installed", () => {
+    expect(block({ hasEngine: false, games: null, maps: null })).toMatchObject({
+      kind: "download",
+      needs: { engine: true },
+    });
+  });
+
+  it("leaves a game already running as text", () => {
+    expect(block({ running: true })).toMatchObject({
+      kind: "text",
+      reason: "A game is already running.",
+    });
+  });
+
+  it("leaves a scenario with no setup as text", () => {
+    const scenario = build({
+      setup: {
+        gameName: "",
+        mapName: "",
+        startPosType: 0,
+        modOptionValues: {},
+        participants: [you],
+      },
+    });
+
+    expect(block({ scenario })).toMatchObject({ kind: "text" });
+  });
+
+  it("leaves a failed content scan as text, whatever else is missing", () => {
+    expect(
+      block({ scanError: "Init failed", games: null, maps: null }),
+    ).toEqual({
+      kind: "text",
+      reason: "The content scan failed: Init failed",
+    });
   });
 });
