@@ -11,12 +11,14 @@
 
 import type { GameItem } from "../content/bindings";
 import { primeScan } from "../content/config";
+import { sameGameFamily } from "../content/resolveContent";
 import type { BattleConfig } from "../play/bindings";
 import {
   gameOptionSchema,
   mapOptionSchema,
   type PlayTarget,
 } from "../play/config";
+import { scenarioMediaWrite } from "./bindings";
 import { launchScenario, type ScenarioLaunchResult } from "./launch";
 import type { Difficulty, Scenario } from "./model";
 
@@ -65,4 +67,41 @@ export async function launchScenarioForPlayer(
     },
     launch,
   });
+}
+
+/**
+ * A scenario set on the installed game a Conquest or Warpath run uses, or null
+ * when it was made for a different game.
+ *
+ * A scenario names one build of its game, and a run plays whichever build it
+ * settled on, which need not be that one. Any build of the same game plays the
+ * scenario, so the run's build takes the place of the name in the setup. A
+ * different game is never substituted: its units are not the scenario's.
+ */
+export function scenarioOnGame(
+  scenario: Scenario,
+  gameName: string,
+): Scenario | null {
+  if (!sameGameFamily(scenario.setup.gameName, gameName)) return null;
+  if (scenario.setup.gameName === gameName) return scenario;
+  return { ...scenario, setup: { ...scenario.setup, gameName } };
+}
+
+/**
+ * Put the dialogue clips a scenario file carried into the media store, which
+ * is the one place the compile step copies them from. A clip that will not
+ * write is skipped: it costs a line its picture or its voice, which is never a
+ * reason to refuse the launch.
+ */
+export async function storeScenarioMedia(
+  scenarioId: string,
+  media: Record<string, string>,
+): Promise<void> {
+  for (const [file, dataUri] of Object.entries(media)) {
+    try {
+      await scenarioMediaWrite({ scenarioId, file, dataUri });
+    } catch {
+      console.warn("skipping unwritable dialogue clip", file);
+    }
+  }
 }

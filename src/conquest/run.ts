@@ -7,6 +7,7 @@ import type { GameChoice, InstalledGame } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { useConquestState } from "./conquests";
 import { conquestGameRef, withGameChoice } from "./gameChoice";
+import { scenarioToPlay, withScenarioWon } from "./handmade/conquest";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "./model";
 import { advanceAfterBattle } from "./rules";
 import { synthesizeBattle } from "./synthesize";
@@ -24,6 +25,12 @@ export type { BattleRequirement, BattleRunPhase } from "../play/useBattleRun";
  * `play/useBattleRun`, shared with warpath's `useRunEncounter`. Only the
  * conquest-specific pieces (the disabled-unit-only snapshot, and advancing
  * through `advanceAfterBattle`) live here.
+ *
+ * A location on a hand-made map can name a scenario. The player's first attack
+ * there plays it in place of the skirmish, through the launch a campaign
+ * mission uses, and a win is recorded so it is not played twice. A defence of
+ * that location, and any attack after the win, is a skirmish on the scenario's
+ * map. See `scenarioToPlay`.
  */
 export function useConquestBattleRun(
   galaxy: GalaxyDoc,
@@ -32,6 +39,8 @@ export function useConquestBattleRun(
   mode: "attack" | "defend",
 ) {
   const { saveFor } = useConquestState();
+  const scenario =
+    state && node ? scenarioToPlay(state, node, mode) : undefined;
 
   // The node battle as a launchable skirmish snapshot: the synthesized roster
   // plus the node's disabled-unit restrictions, so "Save as preset" and the
@@ -66,9 +75,14 @@ export function useConquestBattleRun(
       if (!state || !node) {
         throw new Error("resolveOutcome called before state/node were ready");
       }
-      return advanceAfterBattle(galaxy, state, node.id, mode, outcome);
+      const next = advanceAfterBattle(galaxy, state, node.id, mode, outcome);
+      // Only a win retires the scenario. After a defeat it is still there to
+      // be tried again.
+      return scenario && outcome === "victory"
+        ? withScenarioWon(next, node.id)
+        : next;
     },
-    [galaxy, state, node, mode],
+    [galaxy, state, node, mode, scenario],
   );
 
   const persist = useCallback(
@@ -91,7 +105,7 @@ export function useConquestBattleRun(
     nodeId: node?.id,
   };
 
-  return useBattleRun<ConquestState>({
+  const battle = useBattleRun<ConquestState>({
     launchMode: "conquest",
     gameRef: conquestGameRef(galaxy, state),
     declinedGameUpdate: state?.declinedGameUpdate,
@@ -103,5 +117,11 @@ export function useConquestBattleRun(
     resolveOutcome,
     persist,
     provenance,
+    scenario,
   });
+  return {
+    ...battle,
+    /** The scenario this fight plays, or undefined for a skirmish. */
+    scenario: scenario?.doc,
+  };
 }
