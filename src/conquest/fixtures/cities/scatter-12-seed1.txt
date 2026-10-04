@@ -1,0 +1,41 @@
+id generated-1
+title TG Conquest
+description A generated map of 12 cities.
+terrain image=generated:cities heightmap=generated:cities size=1024x1024 heightScale=64 projection=flat
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"scatter","skin":"galaxy"}
+faction player name="Radiant Hegemony" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Gilded Covenant" color=#ff3524 aggression=0.33466684292070564 side=
+faction enemy-2 name="Hollow Enclave" color=#ffb300 aggression=0.4361850486602634 side=
+node node-0 name="Mizar" pos=798.8,517.1 owner=enemy-1 kind=normal difficulty=5 map="Map 9"
+node node-1 name="Aldebaran" pos=460.2,233.2 owner=neutral kind=normal difficulty=5 map="Map 10"
+node node-2 name="Alcor" pos=165.1,612.3 owner=player kind=capital difficulty=1 map="Map 1"
+node node-3 name="Adhara" pos=400.8,588.8 owner=player kind=normal difficulty=2 map="Map 2"
+node node-4 name="Suhail" pos=595.6,246.6 owner=enemy-1 kind=normal difficulty=5 map="Map 11"
+node node-5 name="Hamal" pos=622.8,807.1 owner=enemy-2 kind=capital difficulty=5 map="Map 9"
+node node-6 name="Sirius" pos=500.1,640.6 owner=enemy-2 kind=normal difficulty=4 map="Map 8"
+node node-7 name="Denebola" pos=814.7,378.4 owner=enemy-1 kind=capital difficulty=5 map="Map 10"
+node node-8 name="Sargas" pos=560.9,459.1 owner=enemy-1 kind=normal difficulty=4 map="Map 7"
+node node-9 name="Bellatrix" pos=258.5,461.3 owner=player kind=normal difficulty=2 map="Map 3"
+node node-10 name="Alkaid" pos=390.7,751.4 owner=player kind=normal difficulty=2 map="Map 2"
+node node-11 name="Merak" pos=339.3,269.7 owner=neutral kind=normal difficulty=4 map="Map 8"
+link node-3 node-6 node-3 node-6 road
+link node-1 node-11 node-1 node-11 road
+link node-1 node-4 node-1 node-4 road
+link node-0 node-7 node-0 node-7 road
+link node-6 node-10 node-6 node-10 road
+link node-3 node-10 node-3 node-10 road
+link node-2 node-9 node-2 node-9 road
+link node-3 node-9 node-3 node-9 road
+link node-6 node-8 node-6 node-8 road
+link node-3 node-8 node-3 node-8 road
+link node-5 node-6 node-5 node-6 crossing
+link node-9 node-11 node-9 node-11 crossing
+link node-4 node-8 node-4 node-8 crossing
+link node-2 node-3 node-2 node-3 road
+link node-5 node-10 node-5 node-10 crossing
+link node-0 node-8 node-0 node-8 road
+link node-1 node-8 node-1 node-8 crossing
+link node-4 node-7 node-4 node-7 crossing
+link node-2 node-10 node-2 node-10 road
+link node-7 node-8 node-7 node-8 road
+link node-0 node-6 node-0 node-6 road
