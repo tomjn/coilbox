@@ -30,6 +30,17 @@ export function occupancy(
   return Object.hasOwn(b.members, b.host) ? m : m + 1;
 }
 
+/**
+ * Whether a battle has started. The server says so on the lobby, which is what
+ * Tachyon does, or the host is in-game, which is all TASServer gives us.
+ */
+export function isBattleRunning(
+  b: Pick<Battle, "inProgress" | "host">,
+  users: Record<string, { status: { ingame: boolean } }> | undefined,
+): boolean {
+  return b.inProgress || (users?.[b.host]?.status.ingame ?? false);
+}
+
 /** The affordance a non-joined battle row offers: join an open battle, or walk
  * into the room of a running one, where the match can be watched. */
 export interface BattleRowAction {

@@ -28,6 +28,7 @@ export function FriendRow({
   active,
   disabled,
   trailing,
+  battleAction,
   onOpen,
   children,
 }: {
@@ -45,6 +46,9 @@ export function FriendRow({
   disabled?: boolean;
   /** Content after the name inside the button, such as an unread badge. */
   trailing?: ReactNode;
+  /** Join or Watch for the friend's battle, shown under the name. It sits beside
+   * the row's button, not inside it, because a button cannot nest in a button. */
+  battleAction?: ReactNode;
   onOpen: () => void;
   children?: ReactNode;
 }) {
@@ -95,6 +99,7 @@ export function FriendRow({
         )}
         {trailing}
       </button>
+      {battleAction && <div className="px-2 pb-1.5 pl-6">{battleAction}</div>}
       {children}
     </li>
   );
