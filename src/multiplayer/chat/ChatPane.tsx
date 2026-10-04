@@ -104,6 +104,14 @@ type MenuOption =
 /** Messages within this window from one sender are visually grouped. */
 const GROUP_WINDOW_MS = 5 * 60_000;
 
+/** A message bubble's widest size: 85% of the pane, or 80 characters of text,
+ * whichever is narrower. `ch` is the width of "0" in the bubble's own font, so
+ * the cap follows the font size and the UI zoom. The 1.5rem is the bubble's
+ * `px-3` padding on both sides, which `max-width` counts, so the text itself
+ * gets the 80 characters. 80 is a judgement inside the 45 to 90 characters per
+ * line that is commonly advised for body text, not a measurement. */
+const BUBBLE_MAX_WIDTH = "max-w-[min(85%,calc(80ch_+_1.5rem))]";
+
 /** join/leave/system render as centered notices and never group. */
 const isNotice = (k: ChatMsg["kind"]) =>
   k === "join" || k === "leave" || k === "system";
@@ -591,9 +599,16 @@ export function ChatPane({
                           )}
                           <div
                             className={cn(
+                              BUBBLE_MAX_WIDTH,
                               own
-                                ? "max-w-[85%] rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
-                                : "max-w-[85%] rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
+                                ? "rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
+                                : "rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
+                              // Bot output (SPADS command lists / stats tables)
+                              // relies on monospace alignment, human chat reads
+                              // better proportional. On the bubble rather than
+                              // the text inside it, so the width cap counts
+                              // columns of the font the lines are drawn in.
+                              bot && "font-mono",
                               // Mention: accent ring so a flagged message stands
                               // out in the log.
                               highlighted && "ring-2 ring-amber-400/60",
@@ -607,15 +622,7 @@ export function ChatPane({
                                 : undefined
                             }
                           >
-                            <span
-                              className={cn(
-                                "whitespace-pre-wrap [overflow-wrap:anywhere]",
-                                // Bot output (SPADS command lists / stats tables)
-                                // relies on monospace alignment, human chat reads
-                                // better proportional.
-                                bot && "font-mono",
-                              )}
-                            >
+                            <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">
                               <FormattedText
                                 text={m.text}
                                 highlight={nameHighlightFor(bot)}
