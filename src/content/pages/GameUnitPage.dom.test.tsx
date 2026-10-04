@@ -346,6 +346,46 @@ describe("GameUnitPage", () => {
     expect(screen.getByText(/150/)).toBeTruthy();
   });
 
+  describe("a morph into a separate unit (issue #3463)", () => {
+    const WEASEL_GAME: UnitFixture[] = [
+      {
+        name: "weasel",
+        fullName: "Weasel",
+        morphTargets: [{ into: "goliath" }, { into: "instigator" }],
+      },
+      { name: "goliath", fullName: "Goliath" },
+      { name: "instigator", fullName: "Instigator" },
+      { name: "factory", buildOptions: ["weasel", "goliath", "instigator"] },
+    ];
+
+    it("says the Weasel upgrades into the Goliath and the Instigator, with links", async () => {
+      renderUnit("weasel", WEASEL_GAME);
+      const heading = await screen.findByRole("heading", {
+        name: "Upgrades into",
+      });
+      // biome-ignore lint/style/noNonNullAssertion: the heading's own section is always its parent
+      const section = within(heading.closest("section")!);
+      expect(section.getByRole("link", { name: /Goliath/ })).toBeTruthy();
+      expect(section.getByRole("link", { name: /Instigator/ })).toBeTruthy();
+      expect(
+        screen.queryByRole("heading", { name: "Upgrade path" }),
+      ).toBeNull();
+    });
+
+    it("says on the Goliath's page what can become it", async () => {
+      renderUnit("goliath", WEASEL_GAME);
+      const heading = await screen.findByRole("heading", {
+        name: "Can be upgraded from",
+      });
+      // biome-ignore lint/style/noNonNullAssertion: the heading's own section is always its parent
+      const section = within(heading.closest("section")!);
+      expect(section.getByRole("link", { name: /Weasel/ })).toBeTruthy();
+      expect(
+        screen.queryByRole("heading", { name: "Upgrades into" }),
+      ).toBeNull();
+    });
+  });
+
   it("tells apart a unit's morph stages even when the game names them all the same", async () => {
     // SplinterFaction's real commander (issue #2063): every tech level reads
     // "Federation of Kala Command Unit", so the def key and the build pic on
