@@ -116,3 +116,34 @@ export function limitHold(
       return null;
   }
 }
+
+/**
+ * What the setup screen says before a run starts when its side gives no limit,
+ * or null when it does or the unit data is still loading. The player decides
+ * whether to begin.
+ */
+export function setupLimitWarning(input: {
+  gameName: string;
+  sideName: string;
+  startUnit?: string;
+  status: UnitsyncInfoStatus;
+  units?: UnitDatasetEntry[];
+}): string | null {
+  const { gameName, sideName, startUnit, status, units } = input;
+  const tail =
+    "so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.";
+  if (status === "error" || (status === "ready" && !units)) {
+    return "Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.";
+  }
+  if (status !== "ready" && status !== "unsyncable") return null;
+  if (!startUnit)
+    return `${sideName} has no start unit in ${gameName}, ${tail}`;
+  const reason = noLimitReason(startUnit, buildEdgeMap(units ?? []));
+  if (reason === "start-unit-not-in-data") {
+    return `The start unit for ${sideName}, ${startUnit}, is not one of the units in ${gameName}, ${tail}`;
+  }
+  if (reason === "reaches-nothing") {
+    return `Nothing can be built from ${startUnit}, the start unit for ${sideName}, ${tail}`;
+  }
+  return null;
+}

@@ -7,6 +7,7 @@ import {
   limitReadiness,
   noLimitMessage,
   noLimitReason,
+  setupLimitWarning,
   unitLimitFor,
 } from "./unitLimit";
 
@@ -304,6 +305,77 @@ describe("limitHold", () => {
       limitHold({
         kind: "ready",
         limit: { kind: "none", reason: "no-start-unit" },
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("setupLimitWarning", () => {
+  const side = { gameName: "Zero-K v1.14.8.0", sideName: "Robots" };
+  const tail =
+    "so coilbox cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.";
+
+  it("warns about Zero-K's placeholder start unit", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: "update_your_damn_engine",
+        status: "ready",
+        units: CLAW,
+      }),
+    ).toBe(
+      `The start unit for Robots, update_your_damn_engine, is not one of the units in Zero-K v1.14.8.0, ${tail}`,
+    );
+  });
+
+  it("warns about a side with no start unit", () => {
+    expect(setupLimitWarning({ ...side, status: "ready", units: CLAW })).toBe(
+      `Robots has no start unit in Zero-K v1.14.8.0, ${tail}`,
+    );
+  });
+
+  it("warns about a start unit that builds nothing", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: "claw_light_drone",
+        status: "ready",
+        units: CLAW,
+      }),
+    ).toBe(
+      `Nothing can be built from claw_light_drone, the start unit for Robots, ${tail}`,
+    );
+  });
+
+  it("warns when the unit data could not be read", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: "claw_commander",
+        status: "error",
+      }),
+    ).toBe(
+      "Coilbox could not read this game's unit data, so it cannot limit your units. Rewards will offer perks only and every unit will be available from the first battle.",
+    );
+  });
+
+  it("says nothing while the unit data loads", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: "claw_commander",
+        status: "loading",
+      }),
+    ).toBeNull();
+  });
+
+  it("says nothing for a start unit that reaches a roster", () => {
+    expect(
+      setupLimitWarning({
+        ...side,
+        startUnit: "claw_commander",
+        status: "ready",
+        units: CLAW,
       }),
     ).toBeNull();
   });

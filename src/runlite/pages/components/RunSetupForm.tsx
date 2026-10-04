@@ -31,6 +31,7 @@ import {
 import { loadoutById, unlockedLoadouts } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
+import { setupLimitWarning } from "../../unitLimit";
 
 /**
  * The run-setup form, shown in a drawer (see RunListPage). Assembles a
@@ -119,11 +120,11 @@ export function RunSetupForm({
     target?.dataDir,
     archive,
   );
-  const { dataset, loading: datasetLoading } = useUnitsyncUnitDataset(
-    target?.enginePath,
-    target?.dataDir,
-    archive,
-  );
+  const {
+    dataset,
+    status: datasetStatus,
+    loading: datasetLoading,
+  } = useUnitsyncUnitDataset(target?.enginePath, target?.dataDir, archive);
   const gameLoading = !!archive && (infoLoading || datasetLoading);
   const { ais } = useSkirmishAis(target?.enginePath, target?.dataDir, archive);
 
@@ -156,6 +157,18 @@ export function RunSetupForm({
     }
     return { startUnit: side.startUnit.toLowerCase(), edges, names };
   }, [dataset, side?.startUnit]);
+
+  // Said before the run starts, so the player knows when no unit limit applies.
+  const limitWarning =
+    game && !gameLoading
+      ? setupLimitWarning({
+          gameName: game.name,
+          sideName: sideName || "this game",
+          startUnit: side?.startUnit,
+          status: datasetStatus,
+          units: dataset?.units,
+        })
+      : null;
 
   // Excluded maps never enter the pool, so a generated run cannot put the player
   // on one (see `content/mapEligibility`).
@@ -348,11 +361,8 @@ export function RunSetupForm({
           </>
         )}
       </Button>
-      {!build && game && (
-        <p className="text-xs text-muted-foreground">
-          Unit data unavailable for this game — rewards will offer perks only
-          and the full arsenal is allowed.
-        </p>
+      {limitWarning && (
+        <p className="text-xs text-muted-foreground">{limitWarning}</p>
       )}
     </div>
   );
