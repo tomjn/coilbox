@@ -41,6 +41,86 @@ describe("buildDeepLink", () => {
         "coilbox://room?address=192.168.1.45&port=8200",
       );
     });
+
+    // Issue #3409. Every address the app can hand to `buildRoomLink` is one a
+    // player was shown or typed: a host's own IPv4 addresses and the router's
+    // public one, and for a joiner whatever they dialled (`direct/invite.ts`).
+    // The link has to come back through the parser as the room it was built
+    // for, in the form the dialog shows.
+    describe("round trip", () => {
+      const roundTrip = (address: string, port: number) => {
+        const link = buildRoomLink(address, port);
+        expect(link, address).not.toBeNull();
+        return parseDeepLink(link ?? "");
+      };
+
+      it("keeps a host's own IPv4 address", () => {
+        for (const address of ["192.168.1.45", "10.0.0.2", "100.64.3.9"]) {
+          expect(roundTrip(address, 8200)).toEqual({
+            kind: "room",
+            address,
+            port: 8200,
+          });
+        }
+      });
+
+      it("keeps the loopback address and the router's public address", () => {
+        expect(roundTrip("127.0.0.1", 8200)).toMatchObject({
+          address: "127.0.0.1",
+        });
+        expect(roundTrip("203.0.113.7", 41234)).toMatchObject({
+          address: "203.0.113.7",
+          port: 41234,
+        });
+      });
+
+      it("keeps a hostname a joiner dialled, written the way a join link writes it", () => {
+        for (const [typed, written] of [
+          ["tomlaptop.local", "tomlaptop.local"],
+          ["tomlaptop", "tomlaptop"],
+          ["Tom-Laptop.LOCAL", "tom-laptop.local"],
+          ["example.com.", "example.com"],
+          ["xn--bcher-kva.example", "xn--bcher-kva.example"],
+        ]) {
+          expect(roundTrip(typed, 8200), typed).toEqual({
+            kind: "room",
+            address: written,
+            port: 8200,
+          });
+        }
+      });
+
+      it("writes an odd IPv4 spelling the way the dialog shows it", () => {
+        expect(roundTrip("0x7f.1", 8200)).toMatchObject({
+          address: "127.0.0.1",
+        });
+      });
+
+      it("carries IPv6 in brackets, with or without them on the way in", () => {
+        expect(roundTrip("::1", 8200)).toMatchObject({ address: "[::1]" });
+        expect(roundTrip("[::1]", 8200)).toMatchObject({ address: "[::1]" });
+      });
+
+      it("keeps every port in range", () => {
+        for (const port of [1, 8200, 65535]) {
+          expect(roundTrip("192.168.1.45", port)).toMatchObject({ port });
+        }
+      });
+
+      it("hands back nothing for an address the parser would refuse", () => {
+        for (const address of [
+          "known@evil.example",
+          "my_pc.local",
+          "bücher.local",
+          "lobby.еxample.com",
+          "evil.example/path",
+          "evil.example:9000",
+          "two words",
+        ]) {
+          expect(buildRoomLink(address, 8200), address).toBeNull();
+        }
+      });
+    });
   });
 
   describe("join", () => {
