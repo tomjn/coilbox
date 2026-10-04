@@ -293,7 +293,7 @@ export const RAIL_DIM_CLASS = "text-muted-foreground";
  * gains or loses a line.
  */
 export const RAIL_CARD_CLASS =
-  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-2.5 text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
+  "group flex w-full flex-col gap-0.5 rounded-lg border border-border bg-card p-2.5 text-left text-card-foreground transition-colors hover:border-ring hover:shadow-sm sm:max-w-64 sm:grow sm:basis-40 " +
   CARD_FOCUS_CLASS;
 
 /**
