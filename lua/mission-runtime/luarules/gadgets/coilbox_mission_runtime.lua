@@ -96,6 +96,13 @@ if not UNIT_CONDITIONS then
 	return false
 end
 
+local PLAYER_ACTIONS, playerActionsError =
+	includeTable("luarules/mission_runtime/coilbox_player_actions.lua")
+if not PLAYER_ACTIONS then
+	log("error", playerActionsError)
+	return false
+end
+
 local ZONES, zonesError = includeTable("luarules/mission_runtime/coilbox_zones.lua")
 if not ZONES then
 	log("error", zonesError)
@@ -376,6 +383,9 @@ if gadgetHandler:IsSyncedCode() then
 	-- every machine runs them.
 	local triggers
 	local unitHooks
+	-- The hooks its player conditions want fed: an order a player gave, and what
+	-- a player's client says they have selected.
+	local playerHooks
 	-- The scenario's groups, once registered.
 	local groups
 	-- What ends the mission, and what stops anything else ending it.
@@ -592,6 +602,7 @@ if gadgetHandler:IsSyncedCode() then
 			log = log,
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
+		playerHooks = PLAYER_ACTIONS.register(triggers, published)
 		-- The zone geometry is published as well as read, so anything else that has
 		-- to work out where a zone is reads the same corners the conditions do.
 		published.zones = ZONES.register(triggers, published)
@@ -810,6 +821,46 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	-- What a player did, for the two conditions that wait on it.
+	--
+	-- Both callins are defined only when a trigger asks, for the reason the two
+	-- above are: UnitCommand runs for every order every unit accepts, and
+	-- RecvLuaMsg for every message any gadget or widget in the game sends.
+
+	if PLAYER_ACTIONS.uses(MISSION, "command_given") then
+		--- A unit accepted an order. The engine calls this in synced code on every
+		-- machine, after AllowCommand, with the player the order came from.
+		function gadget:UnitCommand(unitID, unitDefID, unitTeam, cmdID, _, _, _, playerID, _, fromLua)
+			if playerHooks.command(unitTeam, cmdID, playerID, fromLua) then
+				raise("command_given", {
+					unitID = unitID,
+					unitDefID = unitDefID,
+					team = unitTeam,
+					cmdID = cmdID,
+					player = playerID,
+				})
+			end
+		end
+	end
+
+	if PLAYER_ACTIONS.uses(MISSION, "unit_selected") then
+		--- A client's unsynced half said what its player has selected. A message
+		-- the server relayed, so it arrives here on every machine alike, and comes
+		-- back out of a replay the same way.
+		--
+		-- True for a report, so it stops there, and nothing for anything else:
+		-- another gadget's messages are not ours to swallow.
+		function gadget:RecvLuaMsg(message, playerID)
+			local ours, changed = playerHooks.selection(playerID, message)
+			if changed then
+				raise("selection_changed", { player = playerID })
+			end
+			if ours then
+				return true
+			end
+		end
+	end
+
 	--- Undo the start the game would have given a team the scenario spawns for
 	-- itself.
 	--
@@ -988,6 +1039,58 @@ else
 			return
 		end
 		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
+	end
+
+	-- What this player has selected, reported to the synced half for the
+	-- `unit_selected` condition. Defined only when a trigger asks, so a mission
+	-- that does not costs nothing per drawn frame.
+	local WATCH = PLAYER_ACTIONS.watch(MISSION)
+
+	if WATCH then
+		local previous = {}
+		local lastSent = nil
+
+		local function defNameOf(unitID)
+			local defID = Spring.GetUnitDefID(unitID)
+			local def = defID and UnitDefs[defID]
+			return def and def.name
+		end
+
+		--- Whether the selection is the one last looked at. The engine has no
+		-- callin for a selection changing, so this is the comparison its own
+		-- widget handler makes to invent one.
+		local function unchanged(selected)
+			if #selected ~= #previous then
+				return false
+			end
+			for index = 1, #selected do
+				if selected[index] ~= previous[index] then
+					return false
+				end
+			end
+			return true
+		end
+
+		--- Send a report when what it would say has changed.
+		--
+		-- A spectator sends none, which covers somebody watching a replay as well:
+		-- the reports the players sent are in the replay already.
+		function gadget:Update()
+			if Spring.GetSpectatingState() then
+				return
+			end
+			local selected = Spring.GetSelectedUnits()
+			if unchanged(selected) then
+				return
+			end
+			previous = selected
+
+			local message = PLAYER_ACTIONS.encode(WATCH, selected, defNameOf, published.units)
+			if message ~= lastSent then
+				lastSent = message
+				Spring.SendLuaRulesMsg(message)
+			end
+		end
 	end
 
 	--- Returns nothing: a true return would stop the message reaching the gadgets

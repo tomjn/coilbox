@@ -74,8 +74,20 @@
 -- answers the question the right way up, which is the exact opposite of the
 -- mission that was written. So a scenario using any of them asks for 7.
 
+-- 8 adds two conditions, the first that read what a player did rather than what
+-- the world looks like (issue #3551):
+--
+--   * unit_selected holds while a player has a unit selected: any unit, one of
+--     a type, or one the scenario placed
+--   * command_given holds once a player has given an order since the trigger
+--     was armed: any order, one command, or building one unit type
+--
+-- A runtime behind 8 has no implementation for either, so each reports itself
+-- once and never holds, and a lesson waiting on one waits for ever. So a
+-- scenario using either asks for 8.
+
 return {
-	version = 7,
+	version = 8,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -87,6 +99,8 @@ return {
 		"unit_health_below",
 		"unit_built",
 		"unit_captured",
+		"unit_selected",
+		"command_given",
 		"time_elapsed",
 		"var",
 		"zone_held_for",
