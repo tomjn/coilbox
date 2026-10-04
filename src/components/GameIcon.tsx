@@ -1,12 +1,17 @@
 import { Gamepad2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useBrandingCatalog, useBrandingImage } from "@/content/branding";
+import {
+  useBrandingCatalog,
+  useBrandingImage,
+  useCachedImage,
+} from "@/content/branding";
 import {
   useScanTargetSelection,
   useUnitsyncGameHeaders,
   useUnitsyncScan,
 } from "@/content/config";
 import { gameIconArt } from "@/content/gameIcon";
+import { useHubGameLogoUrl } from "@/hub/gameIcons";
 import { cn } from "@/lib/utils";
 
 interface IconSrc {
@@ -19,14 +24,15 @@ interface IconSrc {
 const MAX_LOGO_ASPECT = 1.5;
 
 /**
- * The pictures for the game a name refers to, best first, from art coilbox
- * already holds: the branding catalog's logo, then its banner, then the game's
- * own loading-screen art. Empty while none has resolved, and when none exists.
+ * The pictures for the game a name refers to, best first: the trusted hub's
+ * logo, then the branding catalog's logo, then its banner, then the game's own
+ * loading-screen art. Empty while none has resolved, and when none exists.
  *
- * Nothing here waits on the network. Catalog art arrives through the cached
- * image path, which serves a file already on disk and gives up quietly when it
- * cannot fetch one. To read the hub's `logo` instead, this is the one place to
- * change.
+ * Nothing here waits on the network. The hub's game list is read once per
+ * session and fails silently, and every picture arrives through the cached image
+ * path, which serves a file already on disk and gives up quietly when it cannot
+ * fetch one. Until the hub's logo is in, or if it never arrives, the local art
+ * below it is what shows.
  */
 function useGameIconCandidates(name: string): IconSrc[] {
   const { selected } = useScanTargetSelection();
@@ -40,10 +46,13 @@ function useGameIconCandidates(name: string): IconSrc[] {
     () => gameIconArt(name, data?.games ?? null, entries),
     [name, data, entries],
   );
+  const hubLogoUrl = useHubGameLogoUrl(name, data?.games ?? null);
+  const hubLogo = useCachedImage(hubLogoUrl ? [hubLogoUrl] : undefined);
   const logo = useBrandingImage(art.logo);
   const banner = useBrandingImage(art.banner, true);
   const header = art.headerGame ? headers.get(art.headerGame) : undefined;
   const found: IconSrc[] = [];
+  if (hubLogo) found.push({ src: hubLogo, fit: "contain" });
   if (logo) found.push({ src: logo, fit: "contain" });
   if (banner) found.push({ src: banner, fit: "cover" });
   if (header) found.push({ src: header, fit: "cover" });
