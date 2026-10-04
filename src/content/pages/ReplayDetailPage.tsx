@@ -985,8 +985,11 @@ export default function ReplayDetailPage() {
             !resolved.matched &&
             engine.watch.kind === "fallback" && (
               <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
-                Recorded on {info.engineVersion || "an unknown engine"};
-                watching with {resolved.target.engineVersion} — may not sync.
+                Recorded on {info.engineVersion || "an unknown engine"}.
+                Watching with{" "}
+                {resolved.target.syncVersion ||
+                  `the engine in a folder named ${resolved.target.engineVersion}, which has not had its version checked yet`}{" "}
+                — may not sync.
               </p>
             )}
         </div>
