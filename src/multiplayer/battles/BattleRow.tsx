@@ -1,5 +1,5 @@
 import { Button } from "@picoframe/frame";
-import { Link as LinkIcon, Lock, LogOut, Users } from "lucide-react";
+import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
 import { memo, useState } from "react";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
@@ -33,6 +33,7 @@ function BattleRowInner({
   canJoin,
   linkable = true,
   inProgress = false,
+  friendsHere,
   onJoin,
   onLeave,
   enginePath,
@@ -53,6 +54,9 @@ function BattleRowInner({
   /** The battle is already running (host in-game): the row says how long ago
    * the match started, and joining is never blocked by a full roster. */
   inProgress?: boolean;
+  /** The friends in this battle, as their names, or undefined for none. A
+   * string so the memo holds while other battles change. */
+  friendsHere?: string;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
   enginePath?: string;
@@ -111,6 +115,15 @@ function BattleRowInner({
         {/* Tachyon's lobby list names no founder, so there is no host to name. */}
         {battle.host && ` · host ${battle.host}`}
       </p>
+      {friendsHere && (
+        <p
+          className="flex items-center gap-1 truncate text-xs text-sky-600 dark:text-sky-400"
+          title={`Friends here: ${friendsHere}`}
+        >
+          <UserCheck className="size-3 shrink-0" aria-hidden />
+          <span className="truncate">Friends here: {friendsHere}</span>
+        </p>
+      )}
     </div>
   );
 

@@ -53,6 +53,7 @@ import {
   type CreateLobbyArgs,
   CreateLobbyPopover,
 } from "../battles/CreateLobbyPopover";
+import { friendsInBattles } from "../battles/friendsInBattles";
 import { HostBattleButton } from "../battles/HostBattleButton";
 import type { OpenBattleArgs } from "../battles/HostBattleForm";
 import {
@@ -70,6 +71,7 @@ import {
   mpSnapshot,
   mpZerokOpenBattle,
 } from "../bindings";
+import { favouritesFor, useFavourites } from "../friends";
 import { protocolForKey, relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import {
@@ -241,6 +243,20 @@ function ServerBattles({
   // pinned separately so its Leave button is always reachable even inside a
   // collapsed group.
   const users = mirror.state?.users;
+  // Battles with a friend in them: the server's friends and the local stars.
+  const [favourites] = useFavourites();
+  const serverFriends = mirror.state?.friends;
+  const friendsHere = useMemo(
+    () =>
+      friendsInBattles(
+        all,
+        new Set([
+          ...favouritesFor(favourites, serverKey),
+          ...(serverFriends ?? []),
+        ]),
+      ),
+    [all, favourites, serverKey, serverFriends],
+  );
   const inProgressIds = useMemo(() => {
     const ids = new Set<number>();
     for (const b of all) {
@@ -370,6 +386,7 @@ function ServerBattles({
       joinedBattle={joinedBattle}
       joinedId={joinedId}
       inProgressIds={inProgressIds}
+      friendsHere={friendsHere}
       canJoin={canJoin}
       linkable={ready}
       onJoin={onJoin}

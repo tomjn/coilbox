@@ -28,6 +28,7 @@ export function BattleList({
   joinedBattle,
   joinedId,
   inProgressIds,
+  friendsHere,
   canJoin,
   linkable,
   onJoin,
@@ -43,6 +44,8 @@ export function BattleList({
   joinedBattle: Battle | undefined;
   joinedId: number | null;
   inProgressIds: Set<number>;
+  /** The friends in each battle, as a names string by battle id. */
+  friendsHere: ReadonlyMap<number, string>;
   canJoin: boolean;
   /** Whether the invite link is worth handing out: connected to the server,
    * full stop. Unlike `canJoin`, it doesn't gate on being busy or already in a
@@ -124,7 +127,12 @@ export function BattleList({
     <div className="flex min-h-0 flex-1 flex-col overflow-auto">
       {joinedBattle && (
         <ul className="flex flex-col gap-2 p-4 pb-0">
-          <BattleRow battle={joinedBattle} joined {...rowProps} />
+          <BattleRow
+            battle={joinedBattle}
+            joined
+            friendsHere={friendsHere.get(joinedBattle.id)}
+            {...rowProps}
+          />
         </ul>
       )}
       <BattleGroup
@@ -133,6 +141,7 @@ export function BattleList({
         collapsed={collapsed.open}
         onToggle={() => setCollapsed((c) => ({ ...c, open: !c.open }))}
         rowProps={rowProps}
+        friendsHere={friendsHere}
       />
       <BattleGroup
         label="Passworded"
@@ -142,6 +151,7 @@ export function BattleList({
           setCollapsed((c) => ({ ...c, passworded: !c.passworded }))
         }
         rowProps={rowProps}
+        friendsHere={friendsHere}
       />
       <BattleGroup
         label="In progress"
@@ -149,6 +159,7 @@ export function BattleList({
         collapsed={collapsed.running}
         onToggle={() => setCollapsed((c) => ({ ...c, running: !c.running }))}
         rowProps={rowProps}
+        friendsHere={friendsHere}
         inProgress
       />
     </div>
@@ -162,6 +173,7 @@ function BattleGroup({
   collapsed,
   onToggle,
   rowProps,
+  friendsHere,
   inProgress = false,
 }: {
   label: string;
@@ -169,6 +181,7 @@ function BattleGroup({
   collapsed: boolean;
   onToggle: () => void;
   rowProps: RowProps;
+  friendsHere: ReadonlyMap<number, string>;
   /** Every battle in this group is running (host in-game); rows offer "Watch
    * live" (spectator join) instead of "Join". */
   inProgress?: boolean;
@@ -199,6 +212,7 @@ function BattleGroup({
               battle={b}
               joined={false}
               inProgress={inProgress}
+              friendsHere={friendsHere.get(b.id)}
               {...rowProps}
             />
           ))}
