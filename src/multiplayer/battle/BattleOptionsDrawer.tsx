@@ -6,21 +6,28 @@ import { UnitRestrictions } from "@/campaign/pages/components/UnitRestrictions";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ConfigOption } from "@/content/bindings";
-import { ModOptionGroups } from "@/play/pages/components/GameOptionsPanel";
+import {
+  GroupReset,
+  ModOptionGroups,
+} from "@/play/pages/components/GameOptionsPanel";
 import { START_POS_OPTIONS } from "@/startbox/mode";
 import type { Battle } from "../bindings";
 import { BattleTweakDecodeSection } from "./BattleTweakDecodeSection";
 import {
   changedCount,
   displayedValue,
+  type OptionEdit,
   type OptionScope,
   type PendingMap,
   rawOptionEntries,
+  resetEdits,
   STARTPOSTYPE_KEY,
   scriptTagKey,
 } from "./battleOptions";
+import { DeliveryProgressPanel } from "./DeliveryProgressPanel";
 import { disabledFromTags } from "./restrictTags";
 import { useBattleOptions } from "./useBattleOptions";
+import type { TweakDelivery } from "./useTweakDelivery";
 
 /**
  * Options that belong to the map rather than to the game that declared them.
@@ -56,6 +63,9 @@ export function BattleOptionsDrawer({
   gameMissing,
   mapMissing,
   sendOption,
+  sendOptions,
+  sendOptionsPaced = false,
+  delivery,
   canEditRestrictions,
   restrictionsUnavailable,
   startPositionsUnavailable,
@@ -68,6 +78,13 @@ export function BattleOptionsDrawer({
   gameMissing: boolean;
   mapMissing: boolean;
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /** Send many edits at once, for a reset. Batches or paces them, never one
+   *  `sendOption` per option, which an autohost's flood protection refuses. */
+  sendOptions: (edits: OptionEdit[]) => void;
+  /** Whether `sendOptions` runs one edit at a time (an autohost battle). */
+  sendOptionsPaced?: boolean;
+  /** The paced run `sendOptions` starts on an autohost battle, to report on. */
+  delivery?: TweakDelivery;
   /** Whether the local user may edit unit restrictions (founder only). */
   canEditRestrictions: boolean;
   /**
@@ -84,10 +101,16 @@ export function BattleOptionsDrawer({
    *  slots are written as script tags or asked of the autohost (issue #1279). */
 }) {
   const [open, setOpen] = useState(false);
-  const { pending, setOption } = useBattleOptions(
+  const { pending, setOption, setOptions } = useBattleOptions(
     battle.scriptTags,
     sendOption,
+    sendOptions,
+    sendOptionsPaced,
   );
+  // Set once this drawer starts a reset, so the progress of a preset load that
+  // shares the same run is not shown here as if it were ours.
+  const [resetStarted, setResetStarted] = useState(false);
+  const resetRunning = delivery?.running ?? false;
 
   // startpostype isn't a scoped mod/map option — resolve it directly, preferring
   // an in-flight pending edit over the confirmed tag.
@@ -118,6 +141,21 @@ export function BattleOptionsDrawer({
     changedCount(mapOptionsSchema, battle.scriptTags, "map", pending) +
     changedCount(mapFromGame, battle.scriptTags, "mod", pending);
   const changed = gameChanged + mapChanged;
+
+  // A reset goes through `useBattleOptions`, which cancels any edit still
+  // waiting to be sent for the same option and then hands the lot to the room.
+  const gameParts = [{ scope: "mod" as const, options: gameOptions }];
+  const mapParts = [
+    { scope: "map" as const, options: mapOptionsSchema },
+    { scope: "mod" as const, options: mapFromGame },
+  ];
+  const reset = (parts: { scope: OptionScope; options: ConfigOption[] }[]) => {
+    if (resetRunning) return;
+    const edits = resetEdits(parts, battle.scriptTags, pending);
+    if (edits.length === 0) return;
+    setResetStarted(true);
+    setOptions(edits);
+  };
 
   return (
     <>
@@ -156,6 +194,15 @@ export function BattleOptionsDrawer({
               <p className="border-b border-border/60 px-5 py-2 text-xs text-muted-foreground">
                 Read-only. Only the host can change battle options.
               </p>
+            )}
+
+            {resetStarted && delivery?.progress && (
+              <div className="border-b border-border/60 px-5 py-3">
+                <DeliveryProgressPanel
+                  progress={delivery.progress}
+                  retryHint="Reset again to send the ones that did not land. Options already at their default are skipped."
+                />
+              </div>
             )}
 
             <Tabs
@@ -204,6 +251,13 @@ export function BattleOptionsDrawer({
                 value="game"
                 className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4"
               >
+                <TabReset
+                  count={gameChanged}
+                  label="Game options"
+                  canEdit={canEdit}
+                  busy={resetRunning}
+                  onConfirm={() => reset(gameParts)}
+                />
                 <OptionSection
                   title="Mod options"
                   scope="mod"
@@ -213,6 +267,7 @@ export function BattleOptionsDrawer({
                   pending={pending}
                   canEdit={canEdit}
                   setOption={setOption}
+                  onReset={resetRunning ? undefined : reset}
                 />
                 <BattleTweakDecodeSection
                   gameName={battle.modname}
@@ -225,6 +280,13 @@ export function BattleOptionsDrawer({
                 value="map"
                 className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-4"
               >
+                <TabReset
+                  count={mapChanged}
+                  label="Map options"
+                  canEdit={canEdit}
+                  busy={resetRunning}
+                  onConfirm={() => reset(mapParts)}
+                />
                 <OptionSection
                   title="Map options"
                   scope="map"
@@ -234,6 +296,7 @@ export function BattleOptionsDrawer({
                   pending={pending}
                   canEdit={canEdit}
                   setOption={setOption}
+                  onReset={resetRunning ? undefined : reset}
                 />
                 {mapFromGame.length > 0 && (
                   <OptionSection
@@ -245,6 +308,7 @@ export function BattleOptionsDrawer({
                     pending={pending}
                     canEdit={canEdit}
                     setOption={setOption}
+                    onReset={resetRunning ? undefined : reset}
                   />
                 )}
               </TabsContent>
@@ -280,6 +344,37 @@ function ChangedCount({ count }: { count: number }) {
 }
 
 /**
+ * The reset for everything a tab holds, with the count it resets. Only for
+ * somebody who can change the options, and only while something is changed.
+ */
+function TabReset({
+  count,
+  label,
+  canEdit,
+  busy,
+  onConfirm,
+}: {
+  count: number;
+  label: string;
+  canEdit: boolean;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  if (!canEdit || count === 0) return null;
+  return (
+    <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+      <span>{count} changed</span>
+      <GroupReset
+        count={count}
+        label={`all ${label}`}
+        busy={busy}
+        onConfirm={onConfirm}
+      />
+    </div>
+  );
+}
+
+/**
  * One scope's block: typed editors from the schema, or a raw read-only fallback
  * when the schema is unavailable (content not installed) but options are set.
  */
@@ -292,6 +387,7 @@ function OptionSection({
   pending,
   canEdit,
   setOption,
+  onReset,
 }: {
   title: string;
   scope: OptionScope;
@@ -301,6 +397,9 @@ function OptionSection({
   pending: PendingMap;
   canEdit: boolean;
   setOption: (tagKey: string, spadsName: string, value: string) => void;
+  /** Reset the changed options among the parts it is given. Absent while a
+   *  reset is already being sent. */
+  onReset?: (parts: { scope: OptionScope; options: ConfigOption[] }[]) => void;
 }) {
   const raw = rawOptionEntries(battle.scriptTags, scope);
 
@@ -324,6 +423,11 @@ function OptionSection({
           // back to the engine's built-in value rather than to the game's.
           onChange={(o, v) =>
             setOption(scriptTagKey(scope, o.key), o.key, v ?? o.default ?? "")
+          }
+          onResetGroup={
+            canEdit && onReset
+              ? (options) => onReset([{ scope, options }])
+              : undefined
           }
         />
       ) : missing && raw.length > 0 ? (

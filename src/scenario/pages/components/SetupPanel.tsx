@@ -496,6 +496,7 @@ export function SetupPanel({
               onOptionChange={(key, value) =>
                 edit(rows, withOption(options, key, value))
               }
+              onOptionValuesChange={(next) => edit(rows, next)}
             />
           </div>
 

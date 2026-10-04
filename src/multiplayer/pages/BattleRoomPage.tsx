@@ -733,6 +733,9 @@ function BattleRoomPage() {
             gameMissing={room.gameMissing}
             mapMissing={room.mapMissing}
             sendOption={room.sendOption}
+            sendOptions={room.sendOptions}
+            sendOptionsPaced={!room.isFounder}
+            delivery={room.presetDelivery}
             canEditRestrictions={room.canEditRestrictions}
             restrictionsUnavailable={room.restrictionsUnavailable}
             startPositionsUnavailable={room.startPositionsUnavailable}

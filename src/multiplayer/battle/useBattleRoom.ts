@@ -55,6 +55,7 @@ import {
   battleOptionTags,
   canEditBattleOptions,
   missingOptionTags,
+  type OptionEdit,
   staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
@@ -137,6 +138,12 @@ export interface BattleRoomView {
   canEditOptions: boolean;
   /** Dispatch one option edit: founder → SETSCRIPTTAGS, autohost → `!bSet`. */
   sendOption: (tagKey: string, spadsName: string, value: string) => void;
+  /**
+   * Dispatch many option edits at once (a reset). Founder: one script-tag
+   * write. Autohost: the paced, confirmed run a preset load uses, reported in
+   * `presetDelivery`, because one `!bSet` per option trips SPADS' flood ban.
+   */
+  sendOptions: (edits: OptionEdit[]) => void;
   /** Apply a whole preset's option tags at once. Founder: batch-set and prune
    * omitted. Autohost: `!bSet` per value, paced the same way as a workshop
    * project's tweak slots. */
@@ -1032,6 +1039,24 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     [activeKey, isFounder, autohostSend, setErr, clearErr],
   );
 
+  // Many option edits at once, for a reset. The founder's script-tag write takes
+  // any number of tags as one command (the Rust side packs them into lines). An
+  // autohost has to be sent them one `!bSet` at a time, and four commands inside
+  // four seconds is a two minute ignore from SPADS, so they go through the paced
+  // run a preset load uses rather than through `sendOption` in a loop.
+  const sendOptions = useCallback(
+    (edits: OptionEdit[]) => {
+      if (!activeKey || edits.length === 0) return;
+      const tags = Object.fromEntries(edits.map((e) => [e.tagKey, e.value]));
+      if (isFounder) {
+        mpSetScriptTags({ serverKey: activeKey, tags }).then(clearErr, setErr);
+      } else {
+        void presetDelivery.start(optionTagSlots(tags));
+      }
+    },
+    [activeKey, isFounder, clearErr, setErr, presetDelivery.start],
+  );
+
   // Apply a whole set of option tags at once (loading a hosting preset). Founder:
   // batch-set the preset's tags and remove any option tags currently set that the
   // preset omits, so a load reflects exactly the saved options (same diff shape as
@@ -1305,6 +1330,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     mapOptionsSchema,
     canEditOptions,
     sendOption,
+    sendOptions,
     applyOptionTags,
     presetDelivery,
     canEditRestrictions: isFounder && !restrictionsRefused,

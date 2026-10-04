@@ -9,6 +9,7 @@ import {
   optionValue,
   rawOptionEntries,
   reconcilePending,
+  resetEdits,
   scriptTagKey,
   staleMapOptionTags,
   tweakSetEntries,
@@ -376,5 +377,96 @@ describe("filterOptionTags", () => {
     expect(filterOptionTags({ "game/hostip": "1.2.3.4" }, sel())).toEqual({
       "game/hostip": "1.2.3.4",
     });
+  });
+});
+
+describe("resetEdits", () => {
+  const a = opt({ key: "a", default: "1" });
+  const b = opt({ key: "b", default: "5" });
+  const flag = opt({ key: "flag", type: "bool", default: "1" });
+  const note = opt({ key: "note", type: "string", default: undefined });
+  const mapFog = opt({ key: "fog", type: "bool", default: "0" });
+
+  it("gives nothing when nothing is changed", () => {
+    expect(
+      resetEdits([{ scope: "mod", options: [a, b] }], {
+        "game/modoptions/a": "1",
+      }),
+    ).toEqual([]);
+  });
+
+  it("gives a write of the declared default for each changed option only", () => {
+    expect(
+      resetEdits([{ scope: "mod", options: [a, b, flag] }], {
+        "game/modoptions/a": "2",
+        "game/modoptions/b": "5",
+        "game/modoptions/flag": "0",
+      }),
+    ).toEqual([
+      { tagKey: "game/modoptions/a", spadsName: "a", value: "1" },
+      { tagKey: "game/modoptions/flag", spadsName: "flag", value: "1" },
+    ]);
+  });
+
+  it("writes the empty value for an option with no declared default", () => {
+    expect(
+      resetEdits([{ scope: "mod", options: [note] }], {
+        "game/modoptions/note": "hello",
+      }),
+    ).toEqual([
+      { tagKey: "game/modoptions/note", spadsName: "note", value: "" },
+    ]);
+  });
+
+  it("covers only the options of the scope it is given", () => {
+    const tags = {
+      "game/modoptions/a": "2",
+      "game/modoptions/b": "6",
+    };
+    expect(resetEdits([{ scope: "mod", options: [a] }], tags)).toHaveLength(1);
+    expect(resetEdits([{ scope: "mod", options: [a, b] }], tags)).toHaveLength(
+      2,
+    );
+  });
+
+  it("covers both scopes of a tab and keeps each under its own tag prefix", () => {
+    expect(
+      resetEdits(
+        [
+          { scope: "map", options: [mapFog] },
+          { scope: "mod", options: [a] },
+        ],
+        { "game/mapoptions/fog": "1", "game/modoptions/a": "2" },
+      ).map((e) => e.tagKey),
+    ).toEqual(["game/mapoptions/fog", "game/modoptions/a"]);
+  });
+
+  it("counts an edit in flight as the value to reset", () => {
+    expect(
+      resetEdits(
+        [{ scope: "mod", options: [a] }],
+        { "game/modoptions/a": "1" },
+        { "game/modoptions/a": { target: "2", prev: "1" } },
+      ),
+    ).toEqual([{ tagKey: "game/modoptions/a", spadsName: "a", value: "1" }]);
+  });
+
+  it("skips an option whose edit in flight already puts it at the default", () => {
+    expect(
+      resetEdits(
+        [{ scope: "mod", options: [a] }],
+        { "game/modoptions/a": "2" },
+        { "game/modoptions/a": { target: "1", prev: "2" } },
+      ),
+    ).toEqual([]);
+  });
+
+  it("leaves a section out", () => {
+    const s = opt({ key: "s", type: "section" });
+    expect(
+      resetEdits([{ scope: "mod", options: [s] }], {
+        "game/modoptions/s": "x",
+      }),
+    ).toEqual([]);
   });
 });

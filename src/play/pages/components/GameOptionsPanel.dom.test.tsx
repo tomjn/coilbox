@@ -191,3 +191,122 @@ describe("the changed mark (issue #3388)", () => {
     expect(screen.getAllByText("changed")).toHaveLength(2);
   });
 });
+
+describe("resetting options (issue #3387)", () => {
+  const flag: ConfigOption = {
+    key: "fixedallies",
+    name: "Fixed allies",
+    type: "bool",
+    default: "1",
+  };
+  const options: ConfigOption[] = [
+    { key: "eco", name: "Economy", type: "section" },
+    { ...maxUnits, section: "eco" },
+    { ...flag, section: "eco" },
+    { key: "top", name: "Top level", type: "number", default: "3" },
+  ];
+
+  const confirm = () =>
+    fireEvent.click(
+      screen
+        .getAllByRole("button", { name: "Reset" })
+        .find((b) => b.closest("[data-slot=popover-content]")) as HTMLElement,
+    );
+
+  it("resets one changed row by reporting no override", () => {
+    const onChange = vi.fn();
+    render(
+      <ModOptionField option={maxUnits} value="6000" onChange={onChange} />,
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Reset Max units to its default" }),
+    );
+
+    expect(onChange).toHaveBeenCalledWith(undefined);
+  });
+
+  it("offers no row reset on an unchanged row", () => {
+    render(<ModOptionField option={maxUnits} onChange={() => {}} />);
+
+    expect(screen.queryByRole("button", { name: /Reset/ })).toBeNull();
+  });
+
+  it("offers no row reset when the field cannot be edited", () => {
+    render(
+      <ModOptionField
+        option={maxUnits}
+        value="6000"
+        disabled
+        onChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /Reset/ })).toBeNull();
+  });
+
+  it("has no group reset while nothing is changed", () => {
+    render(
+      <GameOptionsPanel
+        options={options}
+        optionValues={{}}
+        onOptionChange={() => {}}
+        onOptionValuesChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Reset/ })).toBeNull();
+  });
+
+  it("resets a section after a confirm that shows the count, and only that section", () => {
+    const onValues = vi.fn();
+    render(
+      <GameOptionsPanel
+        options={options}
+        optionValues={{ maxunits: "6000", fixedallies: "0", top: "9" }}
+        onOptionChange={() => {}}
+        onOptionValuesChange={onValues}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset Economy" }));
+    expect(screen.getByText("Reset 2 options to their defaults?")).toBeTruthy();
+    expect(onValues).not.toHaveBeenCalled();
+
+    confirm();
+
+    expect(onValues).toHaveBeenCalledWith({ top: "9" });
+  });
+
+  it("resets every changed option from the panel header", () => {
+    const onValues = vi.fn();
+    render(
+      <GameOptionsPanel
+        options={options}
+        optionValues={{ maxunits: "6000", top: "9", elsewhere: "x" }}
+        onOptionChange={() => {}}
+        onOptionValuesChange={onValues}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset Game options" }));
+    expect(screen.getByText("Reset 2 options to their defaults?")).toBeTruthy();
+    confirm();
+
+    expect(onValues).toHaveBeenCalledWith({ elsewhere: "x" });
+  });
+
+  it("offers no group reset when the panel is disabled", () => {
+    render(
+      <GameOptionsPanel
+        options={options}
+        optionValues={{ maxunits: "6000" }}
+        onOptionChange={() => {}}
+        onOptionValuesChange={() => {}}
+        disabled
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^Reset/ })).toBeNull();
+  });
+});
