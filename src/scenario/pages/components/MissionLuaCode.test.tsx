@@ -35,6 +35,14 @@ afterEach(() => {
   cleanup();
 });
 
+/**
+ * The first render of a 5000 line document mounts every row before the
+ * container is measured, which takes 0.5s alone and 0.9s in a full run. With 16
+ * copies of this file running at once on 8 cores, the same two tests took up to
+ * 29.4s against the 5s default, so the limit is about twice that. Issue #3469.
+ */
+const SLOW_RENDER_TIMEOUT_MS = 60_000;
+
 function lines(n: number): string[] {
   return Array.from({ length: n }, (_, i) => `local line${i} = ${i}`);
 }
@@ -138,7 +146,7 @@ describe("virtualization", () => {
     } finally {
       globalThis.ResizeObserver = original;
     }
-  });
+  }, SLOW_RENDER_TIMEOUT_MS);
 
   it("scrolls a match not currently on screen into the middle of the view", () => {
     const original = globalThis.ResizeObserver;
@@ -165,5 +173,5 @@ describe("virtualization", () => {
     } finally {
       globalThis.ResizeObserver = original;
     }
-  });
+  }, SLOW_RENDER_TIMEOUT_MS);
 });
