@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const readiness = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
   runsError: null as string | null,
+  unreadableCount: 0,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -36,6 +37,7 @@ vi.mock("../runs", () => ({
     runs: {},
     loading: false,
     error: readiness.runsError,
+    unreadableCount: readiness.unreadableCount,
     deleteRun: vi.fn(),
   }),
 }));
@@ -49,6 +51,7 @@ import RunListPage from "./RunListPage";
 afterEach(() => {
   cleanup();
   readiness.runsError = null;
+  readiness.unreadableCount = 0;
 });
 
 describe("RunListPage with a failed scan", () => {
@@ -89,5 +92,46 @@ describe("RunListPage with a run file that could not be read", () => {
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/No warpath in progress/)).toBeNull();
+  });
+});
+
+describe("RunListPage with runs kept in the file that could not be read", () => {
+  function renderReady() {
+    readiness.current = {
+      hasGames: true,
+      state: "ready",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+  }
+
+  it("says how many, and that they are kept and unchanged", () => {
+    readiness.unreadableCount = 2;
+    renderReady();
+    expect(
+      screen.getByText(
+        "2 warpath runs could not be read. They are kept in the file and have not been changed.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("uses the singular for one", () => {
+    readiness.unreadableCount = 1;
+    renderReady();
+    expect(
+      screen.getByText(
+        "1 warpath run could not be read. It is kept in the file and has not been changed.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows nothing when there are none", () => {
+    renderReady();
+    expect(screen.queryByText(/could not be read/)).toBeNull();
   });
 });

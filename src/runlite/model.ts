@@ -251,6 +251,10 @@ export interface RogueliteRun {
 export interface RunStateFile {
   schemaVersion: 1;
   runs: Record<string, RogueliteRun>;
+  /** Entries that failed validation, as the raw JSON values they had in the
+   *  file, under the key they had. They are not runs for play, and a write puts
+   *  them back unchanged so a save never drops them. */
+  unreadable: Record<string, unknown>;
 }
 
 /** The version of the meta document this code writes. */
@@ -298,7 +302,11 @@ export interface RunStats {
   deepest: number;
 }
 
-export const emptyStateFile: RunStateFile = { schemaVersion: 1, runs: {} };
+export const emptyStateFile: RunStateFile = {
+  schemaVersion: 1,
+  runs: {},
+  unreadable: {},
+};
 
 export const emptyRecord: UnlockRecord = {
   loadouts: [],
@@ -726,14 +734,14 @@ export const RUN_STATE_SCHEMA_VERSION = 1;
  * An empty string is an empty file, as is the plugin's default for a file that
  * does not exist. Anything else that cannot be read as a whole throws, because
  * reading it as empty would let the next save replace every run: text that is
- * not JSON, JSON of the wrong shape, a file made by a newer version, and a file
- * where any one run fails {@link parseRunJson}. A single unreadable run fails the
- * load rather than being skipped, since a save writes back only the runs that
- * were read and would delete it.
+ * not JSON, JSON of the wrong shape, and a file made by a newer version.
+ *
+ * A single entry that fails {@link parseRunJson} does not fail the load. It is
+ * kept as its raw JSON value in `unreadable`, under its key, so the other runs
+ * stay playable and a save writes it back as it was.
  */
 export function parseRunStateFile(json: string): RunStateFile {
-  const empty: RunStateFile = { schemaVersion: 1, runs: {} };
-  if (json.trim() === "") return empty;
+  if (json.trim() === "") return emptyStateFile;
   let data: unknown;
   try {
     data = JSON.parse(json);
@@ -753,6 +761,7 @@ export function parseRunStateFile(json: string): RunStateFile {
   }
 
   const runs: Record<string, RogueliteRun> = {};
+  const unreadable: Record<string, unknown> = {};
 
   // Current shape: a keyed map of runs.
   if (data.runs !== undefined) {
@@ -760,30 +769,34 @@ export function parseRunStateFile(json: string): RunStateFile {
       throw new Error("run.json has a runs entry that is not an object");
     }
     for (const [id, raw] of Object.entries(data.runs)) {
-      if (!id) continue;
-      const parsed = parseRunJson(JSON.stringify(raw));
-      if (!parsed)
-        throw new Error(`run.json has a run that cannot be read (${id})`);
-      runs[id] = reconcileRun(parsed);
+      const parsed = id ? parseRunJson(JSON.stringify(raw)) : null;
+      if (parsed) runs[id] = reconcileRun(parsed);
+      else unreadable[id] = raw;
     }
   } else if (data.run === undefined) {
     throw new Error("run.json has no runs");
   }
 
   // Legacy migration: a single `run` from before multi-run storage. A stable id
-  // (seed + creation time) keeps the key identical across reloads.
+  // (seed + creation time) keeps the key identical across reloads. One that
+  // cannot be read is kept raw under a key of its own and written into `runs`.
   if (
     Object.keys(runs).length === 0 &&
     data.run !== undefined &&
     data.run !== null
   ) {
     const parsed = parseRunJson(JSON.stringify(data.run));
-    if (!parsed) throw new Error("run.json has a run that cannot be read");
-    runs[`run-${parsed.settings.seed}-${parsed.createdAt}`] =
-      reconcileRun(parsed);
+    if (parsed) {
+      runs[`run-${parsed.settings.seed}-${parsed.createdAt}`] =
+        reconcileRun(parsed);
+    } else {
+      let key = "legacy-run";
+      while (key in unreadable) key += "-";
+      unreadable[key] = data.run;
+    }
   }
 
-  return { schemaVersion: 1, runs };
+  return { schemaVersion: 1, runs, unreadable };
 }
 
 function parseRecord(data: unknown): UnlockRecord {

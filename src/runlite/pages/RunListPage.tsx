@@ -43,7 +43,13 @@ import { RunSetupForm } from "./components/RunSetupForm";
 export default function RunListPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const { runs, loading: runsLoading, error: runsError, deleteRun } = useRuns();
+  const {
+    runs,
+    loading: runsLoading,
+    error: runsError,
+    unreadableCount,
+    deleteRun,
+  } = useRuns();
   // A run that ended while its page was closed is counted when the list shows it.
   useAwardFinishedRuns(runs, runsLoading);
 
@@ -162,6 +168,15 @@ export default function RunListPage() {
         />
       )}
       {abandonError && <ErrorBanner message={abandonError} />}
+      {!runsLoading && unreadableCount > 0 && (
+        <ErrorBanner
+          message={
+            unreadableCount === 1
+              ? "1 warpath run could not be read. It is kept in the file and has not been changed."
+              : `${unreadableCount} warpath runs could not be read. They are kept in the file and have not been changed.`
+          }
+        />
+      )}
 
       {state === "scanning" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
