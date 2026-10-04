@@ -1,4 +1,4 @@
-import type { GalaxyDoc, GalaxyNode, LinkKind } from "../model";
+import type { GalaxyDoc, GalaxyNode } from "../model";
 import type { WorldPos } from "./layout";
 import type { TerrainSurface } from "./terrain";
 
@@ -21,21 +21,6 @@ export type MapPoint = [number, number];
 /** A key for an undirected pair of node ids, the same whichever way round. */
 export function pairKey(a: string, b: string): string {
   return a < b ? `${a}\n${b}` : `${b}\n${a}`;
-}
-
-/**
- * The stated kind of the link between two nodes, or `undefined` when the
- * document states none. The pair matches either way round.
- */
-export function linkKindOf(
-  galaxy: Pick<GalaxyDoc, "linkKinds">,
-  a: string,
-  b: string,
-): LinkKind | undefined {
-  for (const [x, y, kind] of galaxy.linkKinds ?? []) {
-    if ((x === a && y === b) || (x === b && y === a)) return kind;
-  }
-  return undefined;
 }
 
 /** A link that draws as a road, with its ends in the order the link has. */

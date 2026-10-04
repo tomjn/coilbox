@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  linkKindOf,
   pairKey,
   ROAD_LIFT,
   roadLinks,
@@ -82,15 +81,8 @@ describe("roadLinks", () => {
   });
 });
 
-describe("linkKindOf and pairKey", () => {
+describe("pairKey", () => {
   it("matches a pair either way round", () => {
-    const doc = {
-      linkKinds: [["a", "b", "road"]] as [string, string, "road"][],
-    };
-    expect(linkKindOf(doc, "a", "b")).toBe("road");
-    expect(linkKindOf(doc, "b", "a")).toBe("road");
-    expect(linkKindOf(doc, "a", "c")).toBeUndefined();
-    expect(linkKindOf({}, "a", "b")).toBeUndefined();
     expect(pairKey("a", "b")).toBe(pairKey("b", "a"));
     expect(pairKey("a", "b")).not.toBe(pairKey("a", "c"));
   });
