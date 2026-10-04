@@ -92,7 +92,11 @@ vi.mock("../config", () => {
       status: "ready",
     }),
     useUnitsyncUnitBuildpics: () => null,
-    useUnitsyncUnitModel: () => ({ model: null, loading: false, failed: false }),
+    useUnitsyncUnitModel: () => ({
+      model: null,
+      loading: false,
+      failed: false,
+    }),
     useUnitsyncArchiveTree: () => ({ tree: null, loading: false }),
     useUnitsyncArchiveFile: () => ({ data: null, loading: false }),
     useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
@@ -106,7 +110,9 @@ vi.mock("../config", () => {
 
 // Everything below is stubbed because it bears on neither the name lookup nor
 // the notice. Each is a child component or a hook that needs a Tauri context.
-vi.mock("./components/BuildTreeDrawer", () => ({ BuildTreeDrawer: () => null }));
+vi.mock("./components/BuildTreeDrawer", () => ({
+  BuildTreeDrawer: () => null,
+}));
 vi.mock("./components/GameHeader", () => ({ GameHeader: () => null }));
 vi.mock("./components/StartModeActions", () => ({
   StartModeActions: () => null,
