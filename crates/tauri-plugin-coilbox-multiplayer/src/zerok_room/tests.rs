@@ -700,3 +700,59 @@ fn a_vote_is_typed_the_way_the_official_client_types_it() {
     // A Zero-K poll offers two answers, so there is no third to type.
     assert_eq!(vote_text(VoteChoice::Abstain), None);
 }
+
+/// Upstream assigns what it is handed, so an edit to one option has to carry
+/// the others or it clears them (#3418).
+#[test]
+fn editing_one_option_sends_the_rooms_other_options_with_it() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetModOptions {"Options":{"MaxUnits":"2000","Commanders":"1"}}"#,
+    );
+    feed(
+        &mut state,
+        r#"SetMapOptions {"Options":{"WaterLevel":"-50"}}"#,
+    );
+    let mut edit = BTreeMap::new();
+    edit.insert("game/modoptions/maxunits".to_string(), "500".to_string());
+
+    let actions = option_actions(&state, &edit);
+
+    assert_eq!(
+        replies(&state, &actions),
+        vec![r#"SetModOptions {"Options":{"commanders":"1","maxunits":"500"}}"#],
+        "the other mod option is kept and the map options are not sent"
+    );
+}
+
+#[test]
+fn an_edit_with_a_differently_cased_key_replaces_the_option_it_names() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetMapOptions {"Options":{"WaterLevel":"-50","Gravity":"100"}}"#,
+    );
+    let mut edit = BTreeMap::new();
+    edit.insert("Game/MapOptions/WaterLevel".to_string(), "0".to_string());
+
+    let actions = option_actions(&state, &edit);
+
+    assert_eq!(
+        replies(&state, &actions),
+        vec![r#"SetMapOptions {"Options":{"gravity":"100","waterlevel":"0"}}"#]
+    );
+}
+
+#[test]
+fn tags_outside_both_namespaces_send_nothing() {
+    let mut state = in_room();
+    feed(
+        &mut state,
+        r#"SetModOptions {"Options":{"MaxUnits":"2000"}}"#,
+    );
+    let mut edit = BTreeMap::new();
+    edit.insert("game/restrict/unit0".to_string(), "armcom".to_string());
+
+    assert!(option_actions(&state, &edit).is_empty());
+}

@@ -639,6 +639,52 @@ pub(crate) fn build(
     })
 }
 
+/// The option commands for a set of script tags, as the whole of each namespace.
+///
+/// `SetModOptions` and `SetMapOptions` assign the dictionary they are handed, so
+/// tags that name one option would clear the rest. Each namespace the tags touch
+/// is the room's current options with those tags laid over them. A namespace the
+/// tags do not touch sends nothing, so a push of only unit restrictions leaves
+/// the room's options alone.
+pub(crate) fn option_actions(
+    state: &LobbyState,
+    tags: &BTreeMap<String, String>,
+) -> Vec<RoomAction> {
+    let current = state
+        .current_battle
+        .and_then(|id| state.battles.get(&id))
+        .map(|battle| &battle.script_tags);
+    let namespace = |prefix: &str| -> BTreeMap<String, String> {
+        let named = |source: &BTreeMap<String, String>| -> Vec<(String, String)> {
+            source
+                .iter()
+                .filter_map(|(key, value)| {
+                    let key = key.to_lowercase();
+                    Some((key.strip_prefix(prefix)?.to_owned(), value.clone()))
+                })
+                .collect()
+        };
+        let edits = named(tags);
+        if edits.is_empty() {
+            return BTreeMap::new();
+        }
+        let mut whole: BTreeMap<String, String> =
+            current.map(named).into_iter().flatten().collect();
+        whole.extend(edits);
+        whole
+    };
+
+    let mod_options = namespace("game/modoptions/");
+    let map_options = namespace("game/mapoptions/");
+    [
+        (!mod_options.is_empty()).then_some(RoomAction::ModOptions(mod_options)),
+        (!map_options.is_empty()).then_some(RoomAction::MapOptions(map_options)),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
 /// The battle mode a room opens in, by the name the frontend picks it by.
 ///
 /// A mode upstream cannot place is answered with "Incorrect battle type" and
