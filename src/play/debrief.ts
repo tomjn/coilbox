@@ -43,8 +43,8 @@ export function describeOutcome(reason: DebriefReason): {
 }
 
 /** The handicap nudges offered by "Rematch with a tweak" — a single quick
- * adjustment applied to every AI opponent. Deliberately simple: #354 is the
- * separate, richer per-AI difficulty control. */
+ * adjustment applied to every AI opponent. Each delta is a whole percent, the
+ * unit of the bonus control in the participants table. */
 export const HANDICAP_TWEAKS: readonly {
   value: string;
   label: string;
