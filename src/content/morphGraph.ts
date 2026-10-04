@@ -40,27 +40,51 @@ export function morphEdgeMap(units: UnitDatasetEntry[]): Map<string, string[]> {
 }
 
 /**
- * Every group of units joined by morph edges, one per connected component.
+ * Every group of units joined by folding morph edges, one per connected
+ * component (issue #3463).
  *
- * The walk is undirected. A branch means two stages share a parent and nothing
- * morphs one into the other, and they still belong together.
+ * A morph edge folds its target into its source only when the target is a
+ * later form of the source and not a unit in its own right. That is when
+ * nothing in the dataset has the target in its build options and exactly one
+ * unit morphs into it. Every other morph edge is a relationship between two
+ * separate units, and neither is hidden inside the other. A commander's upgrade
+ * levels still fold, because nothing builds them and each has one parent.
  *
- * The base is the stage nothing else in the group morphs into, which is what a
- * ladder's bottom rung looks like. Two of those means a game where two units
- * morph into one, and the first by name wins. None of them means a cycle, where
- * every stage has a parent, and the first by name wins there too. A rule that
- * always answers beats an exception, because the alternative is a group with no
- * name in a game nobody has looked at yet.
+ * The walk is undirected over folding edges. A branch means two stages share a
+ * parent and nothing morphs one into the other, and they still belong together.
  *
- * Units with no morph edge at all are not groups. A group of one is a unit, and
- * a caller that has to check `length > 1` everywhere will forget somewhere.
+ * Each stage has at most one folding edge into it, so a group has one stage
+ * nothing else in it morphs into, which is what a ladder's bottom rung looks
+ * like, and that is the base. A cycle has no such stage, where every stage has
+ * a parent, and the first by name wins. A rule that always answers beats an
+ * exception, because the alternative is a group with no name in a game nobody
+ * has looked at yet.
+ *
+ * Units with no folding edge at all are not groups. A group of one is a unit,
+ * and a caller that has to check `length > 1` everywhere will forget somewhere.
  */
 export function morphGroups(units: UnitDatasetEntry[]): MorphGroup[] {
   const edges = morphEdgeMap(units);
+
+  // Built means some unit in the dataset lists it in `buildOptions`, which is
+  // what `buildEdgeMap` (`buildTree.ts`) holds. Read from `units` directly so
+  // this file stays free of imports the hub does not have.
+  const built = new Set<string>();
+  for (const u of units) {
+    for (const option of u.buildOptions ?? []) built.add(option.toLowerCase());
+  }
+  const parents = new Map<string, number>();
+  for (const [from, targets] of edges) {
+    for (const to of targets) {
+      if (to !== from) parents.set(to, (parents.get(to) ?? 0) + 1);
+    }
+  }
+
   const incoming = new Map<string, number>();
   const undirected = new Map<string, Set<string>>();
   for (const [from, targets] of edges) {
     for (const to of targets) {
+      if (to === from || built.has(to) || parents.get(to) !== 1) continue;
       incoming.set(to, (incoming.get(to) ?? 0) + 1);
       if (!undirected.has(from)) undirected.set(from, new Set());
       if (!undirected.has(to)) undirected.set(to, new Set());

@@ -6,8 +6,9 @@ import { foldMorphs, groupOf, morphEdgeMap, morphGroups } from "./morphGraph";
 function unit(
   name: string,
   morphTargets: { into: string }[] = [],
+  buildOptions: string[] = [],
 ): UnitDatasetEntry {
-  return { name, morphTargets };
+  return { name, morphTargets, buildOptions };
 }
 
 describe("morphEdgeMap", () => {
@@ -64,6 +65,81 @@ describe("morphGroups", () => {
     expect(morphGroups([unit("armsolar"), unit("armwin")])).toEqual([]);
   });
 
+  it("does not fold a target a factory builds (issue #3463)", () => {
+    const units = [
+      unit("weasel", [{ into: "goliath" }, { into: "instigator" }]),
+      unit("goliath"),
+      unit("instigator"),
+      unit("tier2factory", [], ["goliath", "instigator"]),
+    ];
+    expect(morphGroups(units)).toEqual([]);
+  });
+
+  it("does not fold a target that two units morph into", () => {
+    const units = [
+      unit("a", [{ into: "shared" }]),
+      unit("b", [{ into: "shared" }]),
+      unit("shared"),
+    ];
+    expect(morphGroups(units)).toEqual([]);
+  });
+
+  it("does not fold a built target even when it has one parent", () => {
+    const units = [
+      unit("a", [{ into: "b" }]),
+      unit("b"),
+      unit("lab", [], ["b"]),
+    ];
+    expect(morphGroups(units)).toEqual([]);
+  });
+
+  it("still folds a commander ladder nothing builds", () => {
+    const units = [
+      unit("com", [{ into: "com1" }], ["lab"]),
+      unit("com1", [{ into: "com2" }], ["lab", "fac"]),
+      unit("com2", [], ["lab", "fac", "air"]),
+      unit("lab"),
+      unit("fac"),
+      unit("air"),
+    ];
+    expect(morphGroups(units)).toEqual([
+      { base: "com", stages: ["com", "com1", "com2"] },
+    ]);
+  });
+
+  it("stops a chain at a stage whose own target is built", () => {
+    const units = [
+      unit("a", [{ into: "b" }]),
+      unit("b", [{ into: "c" }]),
+      unit("c"),
+      unit("factory", [], ["c"]),
+    ];
+    expect(morphGroups(units)).toEqual([{ base: "a", stages: ["a", "b"] }]);
+  });
+
+  it("folds a cycle nothing builds, naming the first by name", () => {
+    const units = [
+      unit("walkmode", [{ into: "siegemode" }]),
+      unit("siegemode", [{ into: "walkmode" }]),
+    ];
+    expect(morphGroups(units)).toEqual([
+      { base: "siegemode", stages: ["siegemode", "walkmode"] },
+    ]);
+  });
+
+  it("does not fold a cycle whose members are built", () => {
+    const units = [
+      unit("a", [{ into: "b" }]),
+      unit("b", [{ into: "a" }]),
+      unit("lab", [], ["a", "b"]),
+    ];
+    expect(morphGroups(units)).toEqual([]);
+  });
+
+  it("does not make a group of a unit that morphs into itself", () => {
+    expect(morphGroups([unit("a", [{ into: "a" }])])).toEqual([]);
+  });
+
   it("does not group two ladders that never meet", () => {
     const units = [
       unit("a1", [{ into: "a2" }]),
@@ -104,5 +180,17 @@ describe("foldMorphs", () => {
     // itself is not a node.
     expect(edges.get("armcom")?.sort()).toEqual(["armlab", "armsolar"]);
     expect(edges.has("armcom1")).toBe(false);
+  });
+
+  it("keeps a built morph target as a node of its own", () => {
+    const units = [
+      unit("weasel", [{ into: "goliath" }]),
+      unit("goliath", [], ["gun"]),
+      unit("factory", [], ["weasel", "goliath"]),
+      unit("gun"),
+    ];
+    const edges = foldMorphs(units, buildEdgeMap(units));
+    expect(edges.get("factory")).toEqual(["goliath", "weasel"]);
+    expect(edges.get("goliath")).toEqual(["gun"]);
   });
 });

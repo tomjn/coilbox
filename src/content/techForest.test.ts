@@ -97,6 +97,18 @@ describe("buildTechForest", () => {
     expect(forest.morphBase.get("armsolar")).toBe("armsolar");
   });
 
+  it("lists a built morph target under its own id (issue #3463)", () => {
+    const units = [
+      { name: "armcom", buildOptions: ["lab"] },
+      { name: "lab", buildOptions: ["weasel", "goliath"] },
+      { name: "weasel", morphTargets: [{ into: "goliath" }] },
+      { name: "goliath" },
+    ];
+    const forest = buildTechForest(units, ["armcom"]);
+    expect(forest.morphBase.get("goliath")).toBe("goliath");
+    expect(forest.morphBase.get("weasel")).toBe("weasel");
+  });
+
   it("gives an upgraded stage the faction its base has", () => {
     const units = [
       { name: "armcom", morphTargets: [{ into: "armcom1" }] },
