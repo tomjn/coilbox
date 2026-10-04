@@ -4,6 +4,10 @@ import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
 import { useConquestUnlocks } from "../conquest/useUnlocks";
 import {
+  type AchievementResult,
+  evaluateAchievements,
+} from "../content/achievements";
+import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
@@ -14,7 +18,7 @@ import {
   scriptedModeFilenames,
   useReplayUserState,
 } from "../content/replayUserState";
-import { allPlayers } from "../content/stats";
+import { allPlayers, playerGameFacts } from "../content/stats";
 import { useRunMeta } from "../runlite/runs";
 import { buildCareer, type Career, type CareerInput } from "./career";
 
@@ -31,6 +35,10 @@ export interface SourceStatus {
 
 export interface CareerData {
   career: Career;
+  /** Who "you" is: the Player stats pick, else the most-played name. Null with no records. */
+  player: string | null;
+  /** Every achievement for `player`, or null with no replay records to judge. */
+  achievements: AchievementResult[] | null;
   sources: Record<SourceId, SourceStatus>;
 }
 
@@ -168,8 +176,20 @@ export function useCareer(): CareerData {
     meta.meta,
   ]);
 
+  // Achievements are the player's record across every game, so they are not
+  // split by game. Null until the replay records answer, and when there are none.
+  const achievements = useMemo(
+    () =>
+      aiReady && player
+        ? evaluateAchievements(playerGameFacts(stats.records, player, refights))
+        : null,
+    [aiReady, player, stats.records, refights],
+  );
+
   return {
     career,
+    player: aiReady && player ? player : null,
+    achievements,
     sources: {
       campaigns: campaignsStatus,
       conquest: conquestStatus,

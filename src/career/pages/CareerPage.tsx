@@ -1,23 +1,33 @@
 import { buttonVariants, cn } from "@picoframe/frame";
-import { Award, Bot, Milestone, Orbit, Rocket } from "lucide-react";
+import { Award, Bot, Milestone, Orbit, Rocket, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { MAX_THREAT_LEVEL } from "../../conquest/threat";
+import type { AchievementResult } from "../../content/achievements";
+import { AchievementRow } from "../../content/pages/components/AchievementsSection";
+import { StatCard } from "../../content/pages/components/StatWidgets";
 import {
   EmptyState,
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
 import { isProfileHidden } from "../../profile/hidden";
-import type {
-  AiSummary,
-  CampaignRow,
-  CareerGame,
-  ConquestSummary,
-  WarpathSummary,
+import {
+  type AiSummary,
+  achievementDigest,
+  type CampaignRow,
+  type CareerGame,
+  type ConquestSummary,
+  careerTotals,
+  type WarpathSummary,
 } from "../career";
-import { type SourceId, type SourceStatus, useCareer } from "../useCareer";
+import {
+  type CareerData,
+  type SourceId,
+  type SourceStatus,
+  useCareer,
+} from "../useCareer";
 
 /** What each source is called in a notice, and what its failure costs. */
 const SOURCE_NOTICE: Record<SourceId, { name: string; effect: string }> = {
@@ -26,7 +36,7 @@ const SOURCE_NOTICE: Record<SourceId, { name: string; effect: string }> = {
   warpath: { name: "Warpath records", effect: "Warpath is not shown." },
   ai: {
     name: "Replay records",
-    effect: "The record against AI is not shown.",
+    effect: "The record against AI and achievements are not shown.",
   },
   games: {
     name: "The installed games",
@@ -226,6 +236,180 @@ function WarpathCard({ warpath }: { warpath: WarpathSummary }) {
   );
 }
 
+/** Most earned achievements the summary draws, newest first. */
+const SHOWN_ACHIEVEMENTS = 6;
+
+function AchievementsSummary({
+  status,
+  achievements,
+  statsLink,
+}: {
+  status: SourceStatus;
+  achievements: AchievementResult[] | null;
+  statsLink: boolean;
+}) {
+  // A failure is already named by the notice at the top of the page.
+  if (status.state === "error") return null;
+  const digest = achievements
+    ? achievementDigest(achievements, SHOWN_ACHIEVEMENTS)
+    : null;
+  const left = digest ? digest.total - digest.shown.length : 0;
+  const notEarned = digest ? digest.total - digest.earned : 0;
+  const moreEarned = digest ? digest.earned - digest.shown.length : 0;
+  return (
+    <section
+      aria-labelledby="career-achievements"
+      className="rounded-lg border border-border/60 bg-card p-4"
+    >
+      <h3
+        id="career-achievements"
+        className="mb-1 flex items-center gap-2 text-sm font-medium"
+      >
+        <Trophy className="size-4 text-muted-foreground" />
+        Achievements
+        {digest && (
+          <span className="ml-auto text-xs font-normal tabular-nums text-muted-foreground">
+            {digest.earned} of {digest.total} earned
+          </span>
+        )}
+      </h3>
+      {status.state === "loading" && !digest && (
+        <p className="text-sm text-muted-foreground">Reading replay records…</p>
+      )}
+      {status.state === "ready" && !digest && (
+        <p className="text-sm text-muted-foreground">
+          No replay records yet, so there are no achievements to show.
+        </p>
+      )}
+      {digest && digest.shown.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          None earned yet. {digest.total} to go.
+        </p>
+      )}
+      {digest && digest.shown.length > 0 && (
+        <ul className="grid gap-x-6 sm:grid-cols-2">
+          {digest.shown.map((a) => (
+            <AchievementRow key={a.id} a={a} />
+          ))}
+        </ul>
+      )}
+      {digest && left > 0 && digest.shown.length > 0 && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          {moreEarned > 0 ? `${moreEarned} more earned, ` : ""}
+          {notEarned} not yet earned.
+          {statsLink && (
+            <>
+              {" "}
+              <Link to="/stats" className="text-primary hover:underline">
+                See them all on Player stats
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+    </section>
+  );
+}
+
+/**
+ * The headline across every game: totals from what the page already loaded,
+ * the player's achievements, and the way to their own stats page. Achievements
+ * are one record for the player across all games (see `playerGameFacts`), so
+ * they sit here and not in a game card.
+ */
+function Overview({
+  data,
+  hideConquest,
+  hideWarpath,
+  hideStats,
+}: {
+  data: CareerData;
+  hideConquest: boolean;
+  hideWarpath: boolean;
+  hideStats: boolean;
+}) {
+  const { career, sources } = data;
+  const totals = careerTotals(career);
+  const cards: {
+    key: string;
+    icon: ReactNode;
+    label: string;
+    value: string;
+    sub: string;
+  }[] = [];
+  if (totals.aiGames > 0) {
+    cards.push({
+      key: "ai",
+      icon: <Bot className="size-3.5" />,
+      label: "Games against AI",
+      value: plural(totals.aiGames, "game"),
+      sub: `${totals.aiWins} won`,
+    });
+  }
+  if (!hideConquest && totals.conquestsFinished > 0) {
+    cards.push({
+      key: "conquest",
+      icon: <Orbit className="size-3.5" />,
+      label: "Conquests won",
+      value: String(totals.conquestsWon),
+      sub: `of ${totals.conquestsFinished} finished`,
+    });
+  }
+  if (!hideWarpath && career.warpath) {
+    cards.push({
+      key: "warpath",
+      icon: <Rocket className="size-3.5" />,
+      label: "Warpath",
+      value: plural(totals.warpathRuns, "run"),
+      sub: `${plural(totals.warpathWins, "win")}`,
+    });
+  }
+  if (totals.campaignsStarted > 0) {
+    cards.push({
+      key: "campaigns",
+      icon: <Milestone className="size-3.5" />,
+      label: "Campaigns finished",
+      value: String(totals.campaignsFinished),
+      sub: `of ${totals.campaignsStarted} started`,
+    });
+  }
+  const statsTo = data.player
+    ? `/stats/${encodeURIComponent(data.player)}`
+    : "/stats";
+  return (
+    <section aria-labelledby="career-overview" className="flex flex-col gap-3">
+      <div className="flex items-center gap-2">
+        <h2 id="career-overview" className="text-base font-semibold">
+          Overview
+        </h2>
+        {!hideStats && (
+          <Link
+            to={statsTo}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "ml-auto",
+            )}
+          >
+            Your player stats
+          </Link>
+        )}
+      </div>
+      {cards.length > 0 && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] gap-3">
+          {cards.map(({ key, ...card }) => (
+            <StatCard key={key} {...card} />
+          ))}
+        </div>
+      )}
+      <AchievementsSummary
+        status={sources.ai}
+        achievements={data.achievements}
+        statsLink={!hideStats}
+      />
+    </section>
+  );
+}
+
 /** One line per source that has no answer, in the order the sections run. */
 function SourceNotices({
   sources,
@@ -297,13 +481,14 @@ function StartPoints({
  * Career: how far the player has got in each game, across campaigns, Conquest,
  * Warpath and skirmishes against AI. It reads the stores those screens own and
  * keeps none of its own, and nothing on it can be edited. Each part links to the
- * screen that owns it. Achievements stay on Player stats.
+ * screen that owns it. A summary at the top holds the totals and achievements.
  *
  * Each source loads and fails on its own: a failure is a line at the top and the
  * rest still draws.
  */
 export default function CareerPage() {
-  const { career, sources } = useCareer();
+  const data = useCareer();
+  const { career, sources } = data;
 
   const hideConquest = isProfileHidden("conquest.list");
   const hideWarpath = isProfileHidden("runlite.list");
@@ -314,6 +499,9 @@ export default function CareerPage() {
   );
   const warpath = hideWarpath ? null : career.warpath;
   const empty = games.length === 0 && warpath === null;
+  // Achievements come from replays of any kind, so they can exist with no game
+  // card to show.
+  const showOverview = !empty || data.achievements !== null;
 
   const states = (["campaigns", "conquest", "warpath", "ai"] as const).map(
     (id) => sources[id].state,
@@ -337,8 +525,17 @@ export default function CareerPage() {
       <SourceNotices sources={sources} />
 
       {empty && reading && <SkeletonList />}
-      {empty && answered && (
+      {!showOverview && empty && answered && (
         <StartPoints hideConquest={hideConquest} hideWarpath={hideWarpath} />
+      )}
+
+      {showOverview && (
+        <Overview
+          data={data}
+          hideConquest={hideConquest}
+          hideWarpath={hideWarpath}
+          hideStats={hideStats}
+        />
       )}
 
       {games.map((game) => (

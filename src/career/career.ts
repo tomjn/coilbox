@@ -1,5 +1,6 @@
 import type { GameRef } from "../conquest/model";
 import type { ConquestUnlocks } from "../conquest/unlocks";
+import type { AchievementResult } from "../content/achievements";
 import { aiRecordFor } from "../content/aiRecord";
 import type { StatRecord } from "../content/bindings";
 import type { InstalledGame } from "../play/installedGames";
@@ -147,6 +148,65 @@ export function campaignRows(
     });
   }
   return rows;
+}
+
+/** The headline numbers across every game, from what the page already holds. */
+export interface CareerTotals {
+  aiGames: number;
+  aiWins: number;
+  conquestsFinished: number;
+  conquestsWon: number;
+  warpathRuns: number;
+  warpathWins: number;
+  campaignsFinished: number;
+  campaignsStarted: number;
+}
+
+/**
+ * Add up the career. A part with no answer, or none to show, adds nothing:
+ * the caller decides which totals to display.
+ */
+export function careerTotals(career: Career): CareerTotals {
+  const totals: CareerTotals = {
+    aiGames: 0,
+    aiWins: 0,
+    conquestsFinished: 0,
+    conquestsWon: 0,
+    warpathRuns: career.warpath?.runs ?? 0,
+    warpathWins: career.warpath?.wins ?? 0,
+    campaignsFinished: 0,
+    campaignsStarted: 0,
+  };
+  for (const game of career.games) {
+    totals.aiGames += game.ai?.games ?? 0;
+    totals.aiWins += game.ai?.wins ?? 0;
+    totals.conquestsFinished += game.conquest?.finished ?? 0;
+    totals.conquestsWon += game.conquest?.won ?? 0;
+    totals.campaignsStarted += game.campaigns.length;
+    totals.campaignsFinished += game.campaigns.filter((c) => c.finished).length;
+  }
+  return totals;
+}
+
+/** The achievements to show in a short summary. */
+export interface AchievementDigest {
+  /** The most recently earned, newest first, capped at `limit`. */
+  shown: AchievementResult[];
+  /** Earned in all, including those not shown. */
+  earned: number;
+  total: number;
+}
+
+/** Earned achievements, newest first, cut to `limit`, with the counts. */
+export function achievementDigest(
+  results: readonly AchievementResult[],
+  limit: number,
+): AchievementDigest {
+  const earned = results.filter((r) => r.earned);
+  const shown = [...earned]
+    .sort((a, b) => (b.earnedAtMs ?? 0) - (a.earnedAtMs ?? 0))
+    .slice(0, limit);
+  return { shown, earned: earned.length, total: results.length };
 }
 
 /** Warpath's totals and unlocks, or null when the player has none yet. */
