@@ -74,6 +74,132 @@ describe("parseDeepLink", () => {
         parseDeepLink("coilbox://room?address=evil.com%2Fpath&port=8200").kind,
       ).toBe("invalid");
     });
+
+    // A room link is written by whoever sent it (issue #3409), so its address
+    // goes through the same normaliser a join link's does, and the dialog shows
+    // that form, never the text of the link.
+    describe("a hostile link", () => {
+      const room = (address: string, port = "8200") =>
+        parseDeepLink(
+          `coilbox://room?address=${encodeURIComponent(address)}&port=${encodeURIComponent(port)}`,
+        );
+
+      it("rejects an address that names two hosts", () => {
+        for (const raw of [
+          "known@evil.example",
+          "known:pw@evil.example",
+          "evil.example#known.example",
+          "evil.example?x=1",
+          "evil.example\\known.example",
+          "evil.example:9000",
+          "lobby.еxample.com",
+          "lobbу.example.com",
+          "evil.example\u{202e}",
+          "evil.example\u{200b}",
+          "evil%2eexample",
+          "evil.example\nknown.example",
+          "..",
+          ".",
+          "-evil.example",
+          "[evil.example]",
+          "[::1",
+          "[::1]x",
+          "my_pc.local",
+        ]) {
+          expect(room(raw).kind, JSON.stringify(raw)).toBe("invalid");
+        }
+      });
+
+      it("writes the address in the one form a join link's is written in", () => {
+        expect(room("Tom-Laptop.LOCAL")).toMatchObject({
+          address: "tom-laptop.local",
+        });
+        expect(room("example.com.")).toMatchObject({ address: "example.com" });
+        expect(room("xn--bcher-kva.example")).toMatchObject({
+          address: "xn--bcher-kva.example",
+        });
+      });
+
+      it("writes every spelling of an IPv4 address as four decimal numbers", () => {
+        for (const [raw, written] of [
+          ["192.168.1.45", "192.168.1.45"],
+          ["0xc0.0xa8.0x01.0x2d", "192.168.1.45"],
+          ["0300.0250.01.055", "192.168.1.45"],
+          ["3232235821", "192.168.1.45"],
+          ["192.168.301", "192.168.1.45"],
+          ["127.1", "127.0.0.1"],
+          ["2130706433", "127.0.0.1"],
+          ["0x7f.1", "127.0.0.1"],
+        ]) {
+          expect(room(raw), raw).toMatchObject({ address: written });
+        }
+      });
+
+      it("takes IPv6 in brackets, and without them because the port is its own field", () => {
+        expect(room("[::1]")).toMatchObject({ address: "[::1]", port: 8200 });
+        expect(room("[2001:DB8:0:0:0:0:0:1]")).toMatchObject({
+          address: "[2001:db8::1]",
+        });
+        expect(room("::1")).toMatchObject({ address: "[::1]", port: 8200 });
+        expect(room("2001:DB8::1")).toMatchObject({
+          address: "[2001:db8::1]",
+        });
+      });
+
+      it("rejects an IPv6 address that is not one", () => {
+        for (const raw of ["[::1::2]", "1:2:3:4:5:6:7:8:9", ":::", "[:::]"]) {
+          expect(room(raw).kind, raw).toBe("invalid");
+        }
+      });
+
+      it("rejects a port that is not a number in range", () => {
+        for (const raw of [
+          "0",
+          "65536",
+          "99999999999999999999",
+          "-1",
+          "+1",
+          "8200abc",
+          "abc",
+          "0x10",
+          "1e3",
+          "8200.0",
+          "82 00",
+          "８２００",
+        ]) {
+          expect(room("192.168.1.45", raw).kind, raw).toBe("invalid");
+        }
+      });
+
+      it("writes a port one way", () => {
+        expect(room("192.168.1.45", "08200")).toMatchObject({ port: 8200 });
+        expect(room("192.168.1.45", "65535")).toMatchObject({ port: 65535 });
+        expect(room("192.168.1.45", "1")).toMatchObject({ port: 1 });
+      });
+
+      it("reads the first address when a link repeats the field", () => {
+        expect(
+          parseDeepLink(
+            "coilbox://room?address=192.168.1.45&address=evil.example&port=8200",
+          ),
+        ).toMatchObject({ address: "192.168.1.45" });
+      });
+
+      it("carries nothing a link adds beyond the two fields", () => {
+        expect(
+          parseDeepLink(
+            "coilbox://room?address=192.168.1.45&port=8200&password=x&name=Official",
+          ),
+        ).toEqual({ kind: "room", address: "192.168.1.45", port: 8200 });
+      });
+
+      it("says why in plain words", () => {
+        expect(room("known@evil.example")).toEqual({
+          kind: "invalid",
+          reason: "This room link's address is not an address.",
+        });
+      });
+    });
   });
 
   describe("join", () => {
@@ -285,6 +411,82 @@ describe("parseDeepLink", () => {
 
     it("rejects an open with no screen", () => {
       expect(parseDeepLink("coilbox://open").kind).toBe("invalid");
+    });
+
+    // Issue #3409. The screen is a name on a list, and a name that an object
+    // inherits is not on it.
+    it("rejects a screen name every object has", () => {
+      for (const raw of [
+        "constructor",
+        "toString",
+        "hasOwnProperty",
+        "__proto__",
+        "valueOf",
+      ]) {
+        expect(parseDeepLink(`coilbox://open?screen=${raw}`).kind, raw).toBe(
+          "invalid",
+        );
+        expect(
+          parseDeepLink(`coilbox://open?screen=${raw}&id=x`).kind,
+          raw,
+        ).toBe("invalid");
+      }
+    });
+
+    it("rejects a screen spelled in capitals rather than guessing", () => {
+      expect(parseDeepLink("coilbox://open?screen=Conquest").kind).toBe(
+        "invalid",
+      );
+    });
+
+    it("rejects an id that is a way up a path rather than a name", () => {
+      for (const raw of [".", ".."]) {
+        expect(
+          parseDeepLink(`coilbox://open?screen=map&id=${raw}`).kind,
+          raw,
+        ).toBe("invalid");
+      }
+    });
+
+    it("rejects an id with characters that are not shown or that reorder what is", () => {
+      for (const raw of [
+        "line\nbreak",
+        "tab\there",
+        "nul\u0000",
+        "\u{202e}Catcher Comet",
+        "zero\u{200b}width",
+        "b\u{feff}om",
+      ]) {
+        expect(
+          parseDeepLink(
+            `coilbox://open?screen=map&id=${encodeURIComponent(raw)}`,
+          ).kind,
+          JSON.stringify(raw),
+        ).toBe("invalid");
+      }
+    });
+
+    it("keeps a name in any script, because maps are named in all of them", () => {
+      expect(
+        parseDeepLink(
+          `coilbox://open?screen=map&id=${encodeURIComponent("Ünïcode Карта 地図")}`,
+        ),
+      ).toMatchObject({ id: "Ünïcode Карта 地図" });
+    });
+
+    it("rejects an id longer than a field may be", () => {
+      expect(
+        parseDeepLink(
+          `coilbox://open?screen=map&id=${"x".repeat(MAX_FIELD_LENGTH + 1)}`,
+        ).kind,
+      ).toBe("invalid");
+    });
+
+    it("carries no id for a screen that takes none", () => {
+      expect(parseDeepLink("coilbox://open?screen=chat&id=anything")).toEqual({
+        kind: "open",
+        screen: "chat",
+      });
     });
   });
 });

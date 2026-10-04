@@ -10,7 +10,10 @@
  * together whenever the grammar moves.
  */
 
-import { normaliseServerAddress } from "../lobby-servers/address";
+import {
+  normaliseHostPort,
+  normaliseServerAddress,
+} from "../lobby-servers/address";
 import {
   battleIdFrom,
   DEEP_LINK_SCHEME,
@@ -20,6 +23,7 @@ import {
   MAX_URL_LENGTH,
   OPEN_SCREENS,
   validBattlePassword,
+  validOpenId,
 } from "./parse";
 
 export type BuildDeepLinkResult =
@@ -61,9 +65,9 @@ export function buildDeepLink(action: DeepLinkAction): BuildDeepLinkResult {
 function buildRoom(
   action: Extract<DeepLinkAction, { kind: "room" }>,
 ): BuildDeepLinkResult {
-  if (!validField(action.address)) {
-    return invalid("This room has no address to join at.");
-  }
+  // The same checks the parser makes, so a link that would be refused on
+  // arrival is never handed out (issue #3409). The address is written in the
+  // form the dialog will show.
   if (
     !Number.isInteger(action.port) ||
     action.port < 1 ||
@@ -71,9 +75,11 @@ function buildRoom(
   ) {
     return invalid("This room has no port to join on.");
   }
+  const address = normaliseHostPort(action.address.trim(), action.port);
+  if (!address) return invalid("This room has no address to join at.");
   const params = new URLSearchParams({
-    address: action.address.trim(),
-    port: String(action.port),
+    address: address.host,
+    port: String(address.port),
   });
   return { ok: true, url: `${DEEP_LINK_SCHEME}://room?${params.toString()}` };
 }
@@ -140,8 +146,11 @@ function buildOpen(
   if (action.id !== undefined && !validField(action.id)) {
     return invalid("This id is invalid for a link.");
   }
+  if (action.id !== undefined && !validOpenId(action.id.trim())) {
+    return invalid("This id is invalid for a link.");
+  }
   const params = new URLSearchParams({ screen: action.screen });
-  if (action.id) params.set("id", action.id.trim());
+  if (spec.needsId && action.id) params.set("id", action.id.trim());
   return { ok: true, url: `${DEEP_LINK_SCHEME}://open?${params.toString()}` };
 }
 
