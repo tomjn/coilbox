@@ -12,6 +12,7 @@ import {
   isProvince,
   isStrongBorder,
   type MapPoint,
+  pickProvince,
   pointInRing,
   provinceBorders,
   provinceIndexFor,
@@ -180,6 +181,50 @@ describe("rayToMap", () => {
       hilly.groundHeightAt(hit[0], hit[1]),
       3,
     );
+  });
+});
+
+describe("pickProvince", () => {
+  // A small province inside a large one, and bare land to the east.
+  const index = createProvinceIndex([
+    { outline: [square(0, 0, 60)] },
+    { outline: [square(20, 20, 10)] },
+  ]);
+  /** A ray straight down onto a map point. */
+  const down = (mapX: number, mapY: number, hidden?: (i: number) => boolean) =>
+    pickProvince(
+      index,
+      flat,
+      [(mapX - 50) * 2, 100, (mapY - 50) * 2],
+      [0, -1, 0],
+      hidden,
+    );
+
+  it("picks the province under the ray, the smaller where two overlap", () => {
+    expect(down(5, 5)).toBe(0);
+    expect(down(25, 25)).toBe(1);
+  });
+
+  it("picks nothing on bare land or off the sheet", () => {
+    expect(down(80, 80)).toBe(-1);
+    expect(down(150, 5)).toBe(-1);
+  });
+
+  it("never picks a hidden province", () => {
+    expect(down(5, 5, (i) => i === 0)).toBe(-1);
+    expect(down(5, 5, (i) => i === 1)).toBe(0);
+  });
+
+  it("does not fall through a hidden province to the one around it", () => {
+    expect(down(25, 25, (i) => i === 1)).toBe(-1);
+  });
+
+  it("finds a province on a hillside the ray reaches first", () => {
+    const whole = createProvinceIndex([{ outline: [square(0, 0, 100)] }]);
+    expect(pickProvince(whole, hilly, [-80, 30, 0], [110, -30, 0])).toBe(0);
+    expect(
+      pickProvince(whole, hilly, [-80, 30, 0], [110, -30, 0], () => true),
+    ).toBe(-1);
   });
 });
 

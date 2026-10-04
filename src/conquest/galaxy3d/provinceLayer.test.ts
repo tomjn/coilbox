@@ -130,6 +130,15 @@ describe("buildProvinceLayer", () => {
     expect(layer?.pick(rayAt(50, 80))).toBe(-1);
   });
 
+  it("does not pick a hidden province, and picks it again once revealed", () => {
+    const { layer } = build();
+    layer?.setProvinceState("west", { hidden: true });
+    expect(layer?.pick(rayAt(3, 47))).toBe(-1);
+    expect(layer?.pick(rayAt(97, 2))).toBe(2);
+    layer?.setProvinceState("west", undefined);
+    expect(layer?.pick(rayAt(3, 47))).toBe(0);
+  });
+
   it("highlights the hovered and the selected province as a whole", () => {
     const { layer, fill } = build();
     const plain = fill("west").opacity;

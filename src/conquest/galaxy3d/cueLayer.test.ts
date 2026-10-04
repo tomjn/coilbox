@@ -401,6 +401,106 @@ describe("buildCueLayer on a conquest", () => {
   });
 });
 
+describe("buildCueLayer under fog of war", () => {
+  // The player sees their own provinces, their city and east.
+  const fogged = () => {
+    const built = build();
+    built.input.visible = new Set(["west", "mid", "port", "east"]);
+    built.layer.apply();
+    return built;
+  };
+  const fill = (scene: THREE.Scene, id: string) =>
+    (scene.getObjectByName(`province-fill:${id}`) as THREE.Mesh)
+      .material as THREE.MeshBasicMaterial;
+
+  it("tells each hidden province and city it is hidden, and nothing else", () => {
+    const { locationStates } = fogged();
+    for (const id of ["isle", "wall", "fort"]) {
+      expect(locationStates.get(id)).toEqual({
+        attackable: false,
+        emphasised: false,
+        threatened: false,
+        hidden: true,
+      });
+    }
+    expect(locationStates.get("east")?.hidden).toBe(false);
+  });
+
+  it("takes the owner colour off a hidden province and keeps its shape", () => {
+    const { scene } = fogged();
+    // Isle and wall are blue. Hidden, they take the neutral grey.
+    expect(fill(scene, "isle").color.getHex()).toBe(0x6b7280);
+    expect(fill(scene, "wall").color.getHex()).toBe(0x6b7280);
+    expect(fill(scene, "isle").opacity).toBeGreaterThan(0);
+    expect(scene.getObjectByName("province-fill:isle")?.visible).toBe(true);
+  });
+
+  it("does not draw a frontier or crossing between two hidden provinces", () => {
+    const built = build();
+    built.input.owners.wall = "red";
+    built.layer.apply();
+    expect(built.paintOf(built.line("frontier", "wall", "east"))[1]).toBe(1);
+    built.input.visible = new Set(["west", "mid", "port"]);
+    built.layer.apply();
+    expect(built.paintOf(built.line("frontier", "wall", "east"))[1]).toBe(0);
+  });
+
+  it("draws a crossing into the fog plain, and no frontier onto hidden land", () => {
+    const { line, paintOf } = fogged();
+    const [color, opacity] = paintOf(line("crossing", "west", "isle"));
+    expect(color).toBe(0xe2dccb);
+    expect(opacity).toBeGreaterThan(0);
+    const built = build();
+    built.input.visible = new Set(["west", "mid", "port"]);
+    built.layer.apply();
+    expect(built.paintOf(built.line("frontier", "mid", "east"))[1]).toBe(0);
+  });
+
+  it("keeps a blocked border with one visible side and drops one with none", () => {
+    const { line, paintOf } = fogged();
+    expect(paintOf(line("blocked", "mid", "wall"))[1]).toBeGreaterThan(0.9);
+    const built = build();
+    built.input.visible = new Set(["west", "port"]);
+    built.layer.apply();
+    expect(built.paintOf(built.line("blocked", "mid", "wall"))[1]).toBe(0);
+  });
+
+  it("marks a road between two hidden cities hidden", () => {
+    const built = build();
+    built.input.visible = new Set(["west", "mid"]);
+    built.layer.apply();
+    expect(built.roadStates.get("port fort")).toMatchObject({ hidden: true });
+  });
+
+  it("restores colour, cues and lines when the fog lifts, with no rebuild", () => {
+    const built = fogged();
+    const mesh = built.mesh;
+    built.input.visible = new Set([
+      "west",
+      "mid",
+      "port",
+      "east",
+      "isle",
+      "wall",
+      "fort",
+    ]);
+    built.layer.apply();
+    expect(fill(built.scene, "wall").color.getHex()).toBe(0x0000ff);
+    expect(built.locationStates.get("isle")).toMatchObject({
+      attackable: true,
+      hidden: false,
+    });
+    expect(built.paintOf(built.line("crossing", "west", "isle"))).toEqual([
+      GOLD,
+      1,
+    ]);
+    expect(built.scene.getObjectByName("map-cues")).toBe(mesh);
+    built.input.visible = undefined;
+    built.layer.apply();
+    expect(built.locationStates.get("wall")).toBeUndefined();
+  });
+});
+
 describe("buildCueLayer on a Warpath run", () => {
   // The player came from west and stands on mid.
   const run = () => {

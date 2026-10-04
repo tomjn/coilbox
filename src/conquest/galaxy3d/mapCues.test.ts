@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { FOG_RANGE, withinJumps } from "../fog";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../model";
 import { NEUTRAL } from "../model";
 import { attackableNodes } from "../rules";
@@ -75,7 +76,7 @@ const link = (cues: ReturnType<typeof mapCues>, a: string, b: string) => {
 
 const where = (
   cues: ReturnType<typeof mapCues>,
-  key: "attackable" | "emphasised" | "threatened",
+  key: "attackable" | "emphasised" | "threatened" | "hidden",
 ) =>
   [...cues.locations]
     .filter(([, cue]) => cue[key])
@@ -121,7 +122,7 @@ describe("mapCues on a conquest", () => {
   it("does not mark a province behind a blocked border", () => {
     const cues = conquest();
     expect(cues.locations.get("wall")?.attackable).toBe(false);
-    expect(cues.blocked).toEqual([{ a: "home", b: "wall" }]);
+    expect(cues.blocked).toEqual([{ a: "home", b: "wall", hidden: false }]);
   });
 
   it("marks nothing attackable when no set is given", () => {
@@ -177,6 +178,94 @@ describe("mapCues on a conquest", () => {
     expect(where(conquest({ selectedId: "isle" }), "emphasised")).toEqual([
       "home",
     ]);
+  });
+});
+
+describe("mapCues under fog of war", () => {
+  // What fog.ts reveals for this map: everything within two links of the
+  // player's home, north and port. That leaves wall hidden.
+  const visible = withinJumps(galaxy, ["home", "north", "port"], FOG_RANGE);
+
+  it("hides nothing when there is no fog", () => {
+    expect(where(conquest(), "hidden")).toEqual([]);
+    expect(conquest().links.some((l) => l.hidden)).toBe(false);
+  });
+
+  it("hides exactly the locations the fog rule does not reveal", () => {
+    expect(where(conquest({ visible }), "hidden")).toEqual(["wall"]);
+  });
+
+  it("gives a hidden location no other state", () => {
+    const cues = conquest({
+      visible: new Set(["home", "north", "port"]),
+      attackable: new Set(["east", "isle", "fort"]),
+      incursionNodeId: "east",
+      selectedId: "home",
+    });
+    for (const id of ["east", "isle", "fort", "far", "wall"]) {
+      expect(cues.locations.get(id)).toEqual({
+        attackable: false,
+        emphasised: false,
+        threatened: false,
+        hidden: true,
+      });
+    }
+    // Neighbours the player can see are still emphasised.
+    expect(where(cues, "emphasised")).toEqual(["north", "port"]);
+  });
+
+  it("draws a link with one hidden end plain, whoever holds that end", () => {
+    const cues = conquest({
+      visible: new Set(["home", "north", "port"]),
+      selectedId: "home",
+    });
+    for (const [a, b] of [
+      ["home", "east"],
+      ["home", "isle"],
+      ["port", "fort"],
+    ]) {
+      expect(link(cues, a, b)).toMatchObject({
+        tone: "plain",
+        emphasised: false,
+        hidden: false,
+      });
+    }
+    expect(link(cues, "home", "north").tone).toBe("owned");
+  });
+
+  it("does not draw a link or a blocked border between two hidden locations", () => {
+    const cues = conquest({ visible: new Set(["home", "north", "port"]) });
+    expect(link(cues, "east", "far").hidden).toBe(true);
+    expect(link(cues, "far", "wall").hidden).toBe(true);
+    // Home is visible, so its blocked border onto wall still draws.
+    expect(cues.blocked).toEqual([{ a: "home", b: "wall", hidden: false }]);
+    const dark = conquest({ visible: new Set(["north"]) });
+    expect(dark.blocked).toEqual([{ a: "home", b: "wall", hidden: true }]);
+  });
+
+  it("restores every cue when a location is revealed", () => {
+    const fogged = conquest({ visible: new Set(["home", "north", "port"]) });
+    expect(fogged.locations.get("east")?.attackable).toBe(false);
+    const revealed = conquest({ visible });
+    expect(revealed.locations.get("east")).toMatchObject({
+      attackable: true,
+      hidden: false,
+    });
+    expect(link(revealed, "home", "east").tone).toBe("contested");
+    expect(link(revealed, "east", "far").hidden).toBe(false);
+  });
+
+  it("offers no step into a hidden location on a run", () => {
+    const cues = mapCues({
+      galaxy,
+      owners,
+      playerFactionId: "red",
+      run: {},
+      visible: new Set(["home", "north", "port", "isle"]),
+    });
+    expect(link(cues, "home", "east").tone).toBe("plain");
+    expect(link(cues, "home", "isle").tone).toBe("choice");
+    expect(where(cues, "attackable")).toEqual(["isle"]);
   });
 });
 
