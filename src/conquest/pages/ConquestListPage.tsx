@@ -32,6 +32,7 @@ import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
+  ScanFailed,
   SkeletonList,
 } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
@@ -87,7 +88,8 @@ export default function ConquestListPage() {
   // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Shared
   // with the sidebar nav badge (issue #419) via `usePlayReadiness`, so the two
   // never disagree.
-  const { target, state, scanErrors, refresh } = usePlayReadiness();
+  const { target, state, scanErrors, scanFailure, refresh } =
+    usePlayReadiness();
   // The games the galaxies on this machine are made for, with the download of
   // each one a download can be named for (issue #3368). Needs an engine: the
   // check cannot read what is installed without one.
@@ -260,6 +262,9 @@ export default function ConquestListPage() {
               )}
             </div>
           </div>
+          {state === "unreadable" && scanFailure && (
+            <ScanFailed noun="games" reason={scanFailure} />
+          )}
           {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
       ) : loading ? (
@@ -626,10 +631,15 @@ function GenerateGalaxyForm({
     String(Math.floor(Math.random() * 100000)),
   );
 
-  const { run: runScan, data: scanData, loading: scanLoading } = scan;
+  const {
+    run: runScan,
+    data: scanData,
+    loading: scanLoading,
+    error: scanError,
+  } = scan;
   useEffect(() => {
-    if (!scanData && !scanLoading) runScan();
-  }, [scanData, scanLoading, runScan]);
+    if (!scanData && !scanLoading && !scanError) runScan();
+  }, [scanData, scanLoading, scanError, runScan]);
 
   // Excluded maps never enter the pool, so a generated galaxy cannot put the
   // player on one (see `content/mapEligibility`).
@@ -690,8 +700,8 @@ function GenerateGalaxyForm({
       </Link>
       ).
     </>
-  ) : scan.data?.initFailure ? (
-    `The content scan failed, so installed games are not listed: ${scan.data.initFailure}`
+  ) : scan.error ? (
+    `The content scan failed, so installed games are not listed: ${scan.error}`
   ) : scan.data &&
     (scan.data.games.length === 0 || gameChoices.length === 0) ? (
     <>
@@ -911,10 +921,15 @@ function ImportChallengeForm({
   const gameCatalog = useGameCatalog();
   const { eligible } = useMapEligibility();
 
-  const { run: runScan, data: scanData, loading: scanLoading } = scan;
+  const {
+    run: runScan,
+    data: scanData,
+    loading: scanLoading,
+    error: scanError,
+  } = scan;
   useEffect(() => {
-    if (!scanData && !scanLoading) runScan();
-  }, [scanData, scanLoading, runScan]);
+    if (!scanData && !scanLoading && !scanError) runScan();
+  }, [scanData, scanLoading, scanError, runScan]);
 
   const finish = async (settings: ConquestChallengeSettings) => {
     const matcher = getGameMatcher();
@@ -923,6 +938,11 @@ function ImportChallengeForm({
     );
     const installedGame = resolveGameByShortname(settings.game, games);
     if (!installedGame) {
+      if (scanError) {
+        throw new Error(
+          `The content scan failed, so installed games are not listed: ${scanError}`,
+        );
+      }
       throw new Error(
         `This challenge needs "${settings.game.shortname}", which isn't installed. Install it from Content → Games, then try again.`,
       );

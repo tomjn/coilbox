@@ -116,8 +116,9 @@ export default function RunPage() {
     ? runGameNotice({
         hasTarget: !!target,
         targetLoading,
-        scanned: !!scan.data,
+        scanned: !!scan.data || scan.error !== null,
         scanErrors: scan.data?.errors ?? [],
+        scanFailure: scan.error,
         gameInstalled: !!game,
         download: resolveGameDownload(run.settings.game, gameCatalog),
       })
