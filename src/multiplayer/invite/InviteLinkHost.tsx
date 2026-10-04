@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router";
 import { SlideDrawer } from "@/components/SlideDrawer";
+import { BATTLE_PASSWORD_REFUSAL, battleKeyFor } from "../../deeplink/parse";
 import {
   allServers,
   useCustomServers,
@@ -21,6 +22,7 @@ import {
   roomLeaveIsStale,
 } from "../battles/oneBattle";
 import type { Connections } from "../connections";
+import { protocolForKey } from "../protocol";
 import { serverNameFor, useMultiplayer, useProtocolServers } from "../store";
 import {
   type InviteConnection,
@@ -197,6 +199,24 @@ export function InviteLinkHost() {
       navigate(battleRowHref(serverKey, battle.id));
       return;
     }
+    // The password rule is the saved server entry's, never the link's, so a
+    // link cannot claim a protocol to get a looser one (issue #3524).
+    const key =
+      link.password === undefined
+        ? undefined
+        : battleKeyFor(
+            protocolForKey(serverKey, protocolServers),
+            link.password,
+          );
+    if (key === null) {
+      void notify({
+        title: "This battle's password cannot be sent",
+        body: `${BATTLE_PASSWORD_REFUSAL} Enter it on the battle's row to join.`,
+        level: "error",
+      });
+      navigate(battleRowHref(serverKey, battle.id));
+      return;
+    }
     // Only the battle the player was told about is left. One joined since the
     // press was never agreed to, so that join is left for the battle list,
     // which asks.
@@ -212,7 +232,7 @@ export function InviteLinkHost() {
     void joinBattle({
       serverKey,
       battle,
-      key: link.password,
+      key: key || undefined,
       leaveOther: async () => {
         if (other) await leaveBattle(other);
       },

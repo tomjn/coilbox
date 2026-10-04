@@ -79,9 +79,13 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import { unlockedLevel } from "../unlocks";
+import { startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
+import {
+  type StartChoice,
+  StartPositionSelect,
+} from "./components/StartPositionSelect";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
 /**
@@ -656,6 +660,10 @@ function GenerateGalaxyForm({
   const { unlocks } = useConquestUnlocks();
   const ceiling = unlockedLevel(unlocks, effectiveShort);
   const threat = Math.min(threatChoice, ceiling);
+  const [startChoice, setStartChoice] = useState<StartChoice>("edge");
+  const startUnlocked = startPositionUnlocked(unlocks, effectiveShort);
+  const startPosition =
+    startChoice === "centre" && startUnlocked ? "centre" : undefined;
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
   );
@@ -694,6 +702,7 @@ function GenerateGalaxyForm({
         starting === STARTING_DEFAULT ? undefined : Number(starting),
       fogOfWar: fog,
       threatLevel: threat,
+      startPosition: realStars ? undefined : startPosition,
       names,
       id,
       title: `${effectiveShort} Conquest`,
@@ -712,6 +721,7 @@ function GenerateGalaxyForm({
       starting,
       fog,
       threat,
+      startPosition,
       names,
     ],
   );
@@ -858,6 +868,13 @@ function GenerateGalaxyForm({
             ceiling={ceiling}
             onChange={setThreatChoice}
           />
+          {!realStars && (
+            <StartPositionSelect
+              value={startPosition ?? "edge"}
+              unlocked={startUnlocked}
+              onChange={setStartChoice}
+            />
+          )}
           {!realStars && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Map style</span>

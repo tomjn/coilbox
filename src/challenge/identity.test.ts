@@ -95,6 +95,25 @@ describe("conquest challenge identity", () => {
     expect(new Set(ids).size).toBe(4);
   });
 
+  it("makes a centre start a different challenge, and leaves the default's identity alone", () => {
+    const west = conquestIdentity(conquestSettings());
+    const centre = conquestIdentity(
+      conquestSettings({ startPosition: "centre" }),
+    );
+    expect(centre).not.toBe(west);
+    expect(west).toBe(
+      '["conquest","TG",4242,20,2,"spiral",null,"theatre",2,true]',
+    );
+    // A level and a start position together are told apart from either alone.
+    const both = conquestIdentity(
+      conquestSettings({ threatLevel: 1, startPosition: "centre" }),
+    );
+    expect(new Set([west, centre, both]).size).toBe(3);
+    expect(conquestIdentity(conquestSettings({ threatLevel: 1 }))).not.toBe(
+      both,
+    );
+  });
+
   it("is the same for a galaxy at a level and for an import of its code", () => {
     const galaxy = generateGalaxy({ ...galaxyOpts, threatLevel: 2 }, "t0");
     const decoded = decodeConquestChallenge(

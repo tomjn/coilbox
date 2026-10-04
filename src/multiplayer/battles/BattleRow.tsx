@@ -3,6 +3,7 @@ import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
+import type { LobbyProtocol } from "../../lobby-servers/config";
 import { startedAgo, useNow } from "../battle/runningMatch";
 import type { Battle } from "../bindings";
 import { BattleRowMapThumb } from "./BattleRowMapThumb";
@@ -42,6 +43,7 @@ function BattleRowInner({
   directRoom = false,
   leaves = null,
   focused = false,
+  protocol,
 }: {
   battle: Battle;
   joined: boolean;
@@ -75,6 +77,9 @@ function BattleRowInner({
   /** A notification sent the player here for this battle, so the row is
    * scrolled into view and outlined. */
   focused?: boolean;
+  /** The protocol of this connection's saved server entry, which decides what
+   * a battle password may hold (issue #3524). */
+  protocol?: LobbyProtocol;
 }) {
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
@@ -206,6 +211,7 @@ function BattleRowInner({
           needsPassword={battle.passworded}
           notice={leaves}
           triggerLabel={battle.passworded ? "Join" : action.label}
+          protocol={protocol}
         />
       ) : (
         <Button
