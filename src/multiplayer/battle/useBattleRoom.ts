@@ -7,11 +7,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
-import {
-  exactGameRequirement,
-  exactMapRequirement,
-  resolveVerdict,
-} from "@/content/resolveContent";
+import { resolveVerdict } from "@/content/resolveContent";
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import { notify } from "@/notify/notify";
 import {
@@ -75,6 +71,7 @@ import {
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
+import { battleRequirements } from "./contentBlock";
 import { type EngineMatch, engineMatch } from "./engineMatch";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";
@@ -544,9 +541,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   // drawer uses for imports (issue #2458). This room only adds its own extra
   // blockers on top (players not ready, host not present).
   const contentVerdict = resolveVerdict({
-    requirements: battle
-      ? [exactGameRequirement(battle.modname), exactMapRequirement(battle.map)]
-      : [],
+    requirements: battleRequirements(battle),
     installed: {
       games: games.map((g) => ({ name: g.name })),
       maps: maps.map((m) => m.name),
