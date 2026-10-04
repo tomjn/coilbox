@@ -33,6 +33,7 @@ import {
   getProfileSource,
 } from "./profile";
 import { describeScenarioFailure } from "./scenarioFailure";
+import { resolveStart, type StartCampaign } from "./start";
 
 /** The campaign's own `name`, or a placeholder when the JSON can't be read. */
 function campaignName(json: string): string {
@@ -119,11 +120,17 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         ? state?.roots.find((r) => r.id === writeRootId)?.path
         : undefined;
 
+      // Every campaign that did load, which is what `start` may name.
+      const campaigns: StartCampaign[] = [];
       const campaignFailures = await campaignList({})
         .then((r) => {
           const out: CampaignFailure[] = [];
           for (const item of r.items) {
-            if (parseCampaignJson(item.json) !== null) continue;
+            const campaign = parseCampaignJson(item.json);
+            if (campaign !== null) {
+              campaigns.push({ campaign, source: item.source });
+              continue;
+            }
             out.push({
               source: item.source,
               name: campaignName(item.json),
@@ -197,6 +204,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         linkIcons,
         validIconNames: linkIconNames(),
         home: homeHealth(profile.home),
+        start: resolveStart(profile.start, campaigns),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);
