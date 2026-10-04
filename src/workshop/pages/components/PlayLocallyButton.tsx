@@ -101,7 +101,15 @@ async function findGeneratedGame(target: {
   enginePath: string;
   dataDir: string;
 }) {
-  const rescanned = await primeScan(target.enginePath, target.dataDir, true);
+  const rescanned = await primeScan(
+    target.enginePath,
+    target.dataDir,
+    true,
+  ).catch((error) => {
+    throw new Error(
+      `The content scan failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
   return rescanned.games.find((g) =>
     isWorkshopMutatorArchive(g.primaryArchive.name),
   );
@@ -206,8 +214,8 @@ export function PlayLocallyButton({
   const blocker =
     !targetLoading && !target
       ? "No engine is installed. Add one from Content before playing locally."
-      : scan.error || scan.data?.initFailure
-        ? `The content scan failed: ${scan.error ?? scan.data?.initFailure}`
+      : scan.error
+        ? `The content scan failed: ${scan.error}`
         : scan.data && !game
           ? `${project.gameName} is not installed here.`
           : scan.data && maps.length === 0
@@ -454,7 +462,12 @@ export function PlayLocallyButton({
               onClick={() => setMapPickerOpen(true)}
               disabled={busy || maps.length === 0}
             >
-              {map?.name ?? (waiting ? "Reading maps" : "No map installed")}
+              {map?.name ??
+                (waiting
+                  ? "Reading maps"
+                  : scan.error
+                    ? "Maps could not be read"
+                    : "No map installed")}
             </Button>
           </div>
           <MapPickerDrawer

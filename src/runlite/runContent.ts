@@ -16,6 +16,9 @@ export interface RunGameReadings {
   scanned: boolean;
   /** Diagnostics unitsync reported during the scan. */
   scanErrors: readonly string[];
+  /** Why the scan failed outright (unitsync's `Init`), or null. Such a scan has
+   *  no result, so it counts as `scanned` and its games are unknown. */
+  scanFailure?: string | null;
   /** The scan lists a game the run's shortname resolves to. */
   gameInstalled: boolean;
   /** What a download can be named for the run's game, or null. */
@@ -28,7 +31,7 @@ export type RunGameNotice =
   /** No engine, so nothing can read what is installed. Offer an engine. */
   | { kind: "no-engine" }
   /** The scan could not read the games, so "missing" would be a guess. */
-  | { kind: "unreadable" }
+  | { kind: "unreadable"; reason: string | null }
   /** The game is missing and this download fetches it. */
   | { kind: "download"; download: GameDownload }
   /** The game is missing and coilbox knows no download for it. */
@@ -38,7 +41,9 @@ export function runGameNotice(r: RunGameReadings): RunGameNotice {
   if (r.targetLoading) return { kind: "none" };
   if (!r.hasTarget) return { kind: "no-engine" };
   if (!r.scanned || r.gameInstalled) return { kind: "none" };
-  if (r.scanErrors.length > 0) return { kind: "unreadable" };
+  if (r.scanFailure || r.scanErrors.length > 0) {
+    return { kind: "unreadable", reason: r.scanFailure ?? null };
+  }
   return r.download
     ? { kind: "download", download: r.download }
     : { kind: "unavailable" };

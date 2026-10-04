@@ -12,6 +12,7 @@ import type { DemoInfo } from "./bindings";
 
 const state = vi.hoisted(() => ({
   data: null as unknown,
+  error: null as string | null,
 }));
 
 vi.mock("@/play/config", () => ({
@@ -24,7 +25,7 @@ vi.mock("./config", () => ({
   useUnitsyncScan: () => ({
     data: state.data,
     loading: false,
-    error: null,
+    error: state.error,
     cancelled: false,
   }),
   useUnitsyncGameInfo: () => ({ info: null, loading: false }),
@@ -36,7 +37,8 @@ const info = { gameType: "Some Game 1.0", mapName: "Some Map" } as DemoInfo;
 
 describe("the refight setup when the scan did not answer", () => {
   it("does not call the game or map missing, and carries the reason", () => {
-    state.data = { games: [], maps: [], initFailure: "no space left" };
+    state.data = null;
+    state.error = "no space left";
     const { result } = renderHook(() => useRefightSetup(info));
     expect(result.current.missingGame).toBe(false);
     expect(result.current.missingMap).toBe(false);
@@ -45,6 +47,7 @@ describe("the refight setup when the scan did not answer", () => {
 
   it("still calls them missing when the scan answered with empty lists", () => {
     state.data = { games: [], maps: [] };
+    state.error = null;
     const { result } = renderHook(() => useRefightSetup(info));
     expect(result.current.missingGame).toBe(true);
     expect(result.current.missingMap).toBe(true);

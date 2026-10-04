@@ -33,7 +33,7 @@ const MAPS: MapItem[] = [
   map("No Description Map"),
 ];
 
-function renderDrawer(maps: MapItem[] = MAPS) {
+function renderDrawer(maps: MapItem[] = MAPS, scanError?: string | null) {
   return render(
     <MapPickerDrawer
       open
@@ -42,6 +42,7 @@ function renderDrawer(maps: MapItem[] = MAPS) {
       thumbs={new Map<string, MapThumbData>()}
       selectedName=""
       onSelect={() => {}}
+      scanError={scanError}
     />,
   );
 }
@@ -89,5 +90,18 @@ describe("MapPickerDrawer search", () => {
       target: { value: "nonexistent" },
     });
     expect(screen.getByText(/No maps match/)).toBeTruthy();
+  });
+});
+
+describe("MapPickerDrawer when the content scan failed", () => {
+  it("gives the reason instead of saying no maps are installed", () => {
+    renderDrawer([], "no space left on device");
+    expect(screen.getByText(/no space left on device/)).toBeTruthy();
+    expect(screen.queryByText(/No maps installed/)).toBeNull();
+  });
+
+  it("still says so when the scan answered with no maps", () => {
+    renderDrawer([]);
+    expect(screen.getByText(/No maps installed/)).toBeTruthy();
   });
 });

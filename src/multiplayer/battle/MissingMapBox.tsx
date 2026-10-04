@@ -51,6 +51,7 @@ export function MissingMapBox({
     args: { mapName, writePath },
   });
   const [rescanning, setRescanning] = useState(false);
+  const [rescanFailure, setRescanFailure] = useState<string | null>(null);
 
   const downloading = mapDl.busy;
   const progress = mapDl.progress;
@@ -67,8 +68,11 @@ export function MissingMapBox({
 
   async function rescan() {
     setRescanning(true);
+    setRescanFailure(null);
     try {
-      return await onRescan();
+      const found = await onRescan();
+      setRescanFailure(found.failure ?? null);
+      return found;
     } finally {
       setRescanning(false);
     }
@@ -79,7 +83,8 @@ export function MissingMapBox({
   // be on disk, and never repeat a download that has already finished once.
   async function downloadIfStillMissing() {
     const found = await rescan();
-    if (found.map || mapDl.completed) return;
+    // No answer is not "missing": a scan that failed says nothing about the disk.
+    if (found.failure || found.map || mapDl.completed) return;
     await downloadMap();
   }
 
@@ -162,8 +167,10 @@ export function MissingMapBox({
             </Button>
           </div>
         )}
-        {mapDl.error && (
-          <span className="text-xs text-destructive">{mapDl.error}</span>
+        {(rescanFailure ?? mapDl.error) && (
+          <span className="text-xs text-destructive">
+            {rescanFailure ?? mapDl.error}
+          </span>
         )}
       </div>
     </>

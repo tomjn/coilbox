@@ -95,6 +95,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const scannedGames = scan.data?.games;
+  const scanError = scan.error;
   const installedGames = useMemo(
     () => (scannedGames ? installedGameNames(scannedGames) : null),
     [scannedGames],
@@ -184,6 +185,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         gameFilter: profile.gameFilter,
         roots,
         installedGames,
+        scanError,
         writeRootPath,
         campaignFailures,
         scenarioFailures,
@@ -203,7 +205,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [writeRootId, installedGames]);
+  }, [writeRootId, installedGames, scanError]);
 
   return { checks, loading };
 }

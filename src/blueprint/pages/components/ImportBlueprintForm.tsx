@@ -115,14 +115,17 @@ export function ImportBlueprintForm({
   const { records } = useBlueprintLibrary();
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  // Null only while the scan is still running. A scan that failed answers with
-  // no games, which reads as "you have not got that game" and is the truth as
-  // far as coilbox can see it, with the failure itself said out loud below.
-  const installed = scan.data?.games ?? (scan.loading ? null : []);
+  // Null while the scan is still running, and also when it failed, which has
+  // not answered either way. `unreadable` tells the two apart so a failure is
+  // neither "still reading" nor "you have not got that game". The failure
+  // itself is said out loud below.
+  const unreadable = !!scan.error;
+  const installed =
+    scan.data?.games ?? (scan.loading || unreadable ? null : []);
 
   const game = useMemo(
-    () => arrivingGame(payload?.game, installed),
-    [payload, installed],
+    () => arrivingGame(payload?.game, installed, unreadable),
+    [payload, installed, unreadable],
   );
   const { units, archive } = useGameUnits(gameToCheckAgainst(game));
   const sides = useGameSides(archive);
@@ -181,10 +184,11 @@ export function ImportBlueprintForm({
             payload: keeping,
             taken: records.map((record) => record.layout.name),
             installed,
+            unreadable,
             known: units.length > 0 ? known : undefined,
           })
         : null,
-    [keeping, records, installed, units, known],
+    [keeping, records, installed, unreadable, units, known],
   );
 
   const decode = async (text: string) => {

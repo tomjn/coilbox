@@ -99,7 +99,11 @@ export function useScenarios() {
   const { target, loading: targetLoading } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
-  const { data: scan } = useUnitsyncScan(enginePath, dataDir);
+  const {
+    data: scan,
+    error: scanError,
+    cancelled: scanCancelled,
+  } = useUnitsyncScan(enginePath, dataDir);
 
   useEffect(() => {
     const listener = (loaded: LoadedScenario[]) => setScenarios(loaded);
@@ -155,6 +159,14 @@ export function useScenarios() {
       setGamesDone(true);
       return;
     }
+    // A scan that failed or was cancelled has answered and will not answer
+    // again, so no game ships a mission we can read. Settle on an empty games
+    // half rather than waiting for data that never comes.
+    if (!scan && (scanError || scanCancelled)) {
+      gamesRead = true;
+      setGamesDone(true);
+      return;
+    }
     if (!scan) return;
     let cancelled = false;
     gameScenarios(scan.games)
@@ -174,7 +186,7 @@ export function useScenarios() {
     return () => {
       cancelled = true;
     };
-  }, [scan, targetLoading, enginePath, dataDir]);
+  }, [scan, scanError, scanCancelled, targetLoading, enginePath, dataDir]);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -189,7 +201,14 @@ export function useScenarios() {
   // settle before a game's missions have been read, which shows a player whose
   // only scenarios come from a game an empty list first and the real one a
   // moment later.
-  return { scenarios, loading: loading || !gamesDone, error, refresh };
+  return {
+    scenarios,
+    loading: loading || !gamesDone,
+    error,
+    /** Why the content scan failed, or null. Game missions are not listed then. */
+    scanError,
+    refresh,
+  };
 }
 
 /**

@@ -12,7 +12,11 @@ import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
 import { useUnitsyncScan } from "../../content/config";
-import { Diagnostics, EmptyState } from "../../content/pages/components/states";
+import {
+  Diagnostics,
+  EmptyState,
+  ScanFailed,
+} from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
@@ -41,7 +45,7 @@ export default function RunListPage() {
 
   // Shared with the sidebar nav badge (issue #419) via `usePlayReadiness`, so
   // the two never disagree on whether a game is installed.
-  const { hasGames, state, scanErrors } = usePlayReadiness();
+  const { hasGames, state, scanErrors, scanFailure } = usePlayReadiness();
   const runEntries = Object.entries(runs);
 
   // The single most recently updated run still in progress (issue #374's
@@ -159,6 +163,7 @@ export default function RunListPage() {
         />
       ) : state === "unreadable" ? (
         <div className="flex flex-col gap-3">
+          {scanFailure && <ScanFailed noun="games" reason={scanFailure} />}
           <EmptyState
             label={
               <>

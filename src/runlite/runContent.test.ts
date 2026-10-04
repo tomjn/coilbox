@@ -40,7 +40,16 @@ describe("runGameNotice", () => {
   it("does not call the game missing when the scan could not read games", () => {
     expect(runGameNotice({ ...base, scanErrors: ["Init failed"] })).toEqual({
       kind: "unreadable",
+      reason: null,
     });
+  });
+
+  // The scan hook answers `data: null` and an `error` when Init failed, so the
+  // page passes the reason and counts the scan as answered (issue #3423).
+  it("is unreadable, with the reason, when the scan itself failed", () => {
+    expect(
+      runGameNotice({ ...base, scanFailure: "no space left on device" }),
+    ).toEqual({ kind: "unreadable", reason: "no space left on device" });
   });
 
   it("offers the download for a missing game that has one", () => {

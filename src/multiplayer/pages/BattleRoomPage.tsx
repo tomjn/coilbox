@@ -97,6 +97,7 @@ function BattleRoomPage() {
     engineMissing: engine.verdict === "mismatch" ? engine.hostLabel : null,
     engineUnreadable: room.engineUnreadable,
     unreadable: room.contentUnreadable,
+    unreadableReason: room.contentUnreadableReason,
     contentKnown: room.contentKnown,
     mapMissing: room.mapMissing,
     gameMissing: room.gameMissing,
@@ -631,6 +632,7 @@ function BattleRoomPage() {
                 enginePath={room.enginePath}
                 dataDir={room.dataDir}
                 archive={room.localGame?.primaryArchive.name}
+                scanFailure={room.contentUnreadableReason}
                 canEditRestrictions={room.canEditRestrictions}
                 modOptionsSchema={room.modOptionsSchema}
                 // Through the same route every other option takes, so a

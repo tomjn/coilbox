@@ -8,7 +8,6 @@ import {
   gameNamesMatch,
   resolveReplayShortGameId,
 } from "./resolveContent";
-import { scanInitFailure } from "./scanSettled";
 
 /**
  * Resolve what a "refight this setup" (#368) needs from the currently
@@ -36,9 +35,9 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
   const scan = useUnitsyncScan(enginePath, dataDir);
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
-  // A scan whose `Init` failed has empty lists that are not a report of an
-  // empty machine, so nothing is called missing off them (issue #3398).
-  const scanFailure = scanInitFailure(scan);
+  // A scan whose `Init` failed has no data and carries the reason in error, so
+  // nothing is called missing off it (issues #3398, #3423).
+  const scanFailure = scan.error;
 
   const shortGameId = useMemo(
     () =>

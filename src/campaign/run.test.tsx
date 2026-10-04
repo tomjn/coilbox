@@ -85,6 +85,7 @@ vi.mock("../play/PlayProvider", () => ({
   usePlay: () => ({ running: false, launch: vi.fn() }),
 }));
 
+import { primeScan } from "../content/config";
 import { newScenario } from "../scenario/create";
 import type { Difficulty, Scenario } from "../scenario/model";
 import type { Campaign, CampaignMission, ProgressFile } from "./model";
@@ -246,5 +247,29 @@ describe("a campaign mission's difficulty", () => {
       await result.current.start();
     });
     expect(launchScenario.mock.calls[0][0].difficulty).toBe("hard");
+  });
+});
+
+describe("a launch whose rescan fails", () => {
+  it("shows the failure as the mission's error instead of throwing", async () => {
+    vi.mocked(primeScan).mockRejectedValueOnce(
+      new Error("no space left on device"),
+    );
+    launchScenario.mockImplementation(
+      async (input: { rescan: () => Promise<unknown> }) => {
+        await input.rescan();
+        return { ok: true, config: { myPlayerName: "Player" }, exitCode: null };
+      },
+    );
+    const { campaign, mission } = campaignWith(flat());
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    await act(async () => {
+      await result.current.start();
+    });
+
+    expect(result.current.error).toBe(
+      "The content scan failed: no space left on device",
+    );
   });
 });

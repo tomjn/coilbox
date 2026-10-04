@@ -59,7 +59,15 @@ export async function applyTweakMutatorRoute({
     project,
     written: settled.ok ? settled.settled.written : undefined,
   });
-  const rescanned = await primeScan(target.enginePath, target.dataDir, true);
+  const rescanned = await primeScan(
+    target.enginePath,
+    target.dataDir,
+    true,
+  ).catch((error) => {
+    throw new Error(
+      `The content scan failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
   const found = rescanned.games.find((g) =>
     isWorkshopMutatorArchive(g.primaryArchive.name),
   );

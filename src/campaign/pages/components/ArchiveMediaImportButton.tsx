@@ -266,6 +266,11 @@ export function ArchiveMediaImportButton({
             <Skeleton className="h-4 w-2/3" />
             <Skeleton className="h-24 w-full" />
           </div>
+        ) : scan.error ? (
+          <p className="text-xs text-destructive">
+            The scan of your games failed, so this game&apos;s files can&apos;t
+            be browsed. Use the file picker instead. unitsync said: {scan.error}
+          </p>
         ) : !game ? (
           <p className="text-xs text-muted-foreground">
             &quot;{gameName}&quot; isn&apos;t installed under the current play

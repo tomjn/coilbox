@@ -68,6 +68,7 @@ export function RunContentNotice({
             Content &gt; Games
           </Link>{" "}
           to see what it did find, or pick another engine in Settings.
+          {notice.reason && <> unitsync said: {notice.reason}</>}
         </p>
       ) : (
         <p>

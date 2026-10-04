@@ -23,6 +23,7 @@ export function MapPickerDrawer({
   selectedName,
   onSelect,
   mapsLoading,
+  scanError,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +34,7 @@ export function MapPickerDrawer({
   /** The map list is still being scanned, so an empty grid means "not loaded
    * yet" rather than "no maps installed". */
   mapsLoading?: boolean;
+  scanError?: string | null;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -59,6 +61,7 @@ export function MapPickerDrawer({
               onOpenChange(false);
             }}
             mapsLoading={mapsLoading}
+            scanError={scanError}
           />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

@@ -120,19 +120,24 @@ vi.mock("../../loadsAs", async () => {
     await vi.importActual<typeof import("../../loadsAs")>("../../loadsAs");
   return { ...actual, settleTypedValues, settleTypedValuesTweaks };
 });
+// Set to a reason to stand in a scan whose Init failed: the hook then returns
+// no data and the engine's reason as the error (issue #3423).
+let mockScanError: string | null = null;
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({
-    data: {
-      games: [
-        {
-          name: "Balanced Annihilation V15.9.8",
-          primaryArchive: { name: "ba.sdz" },
+    data: mockScanError
+      ? null
+      : {
+          games: [
+            {
+              name: "Balanced Annihilation V15.9.8",
+              primaryArchive: { name: "ba.sdz" },
+            },
+          ],
+          maps: [],
         },
-      ],
-      maps: [],
-    },
     loading: false,
-    error: null,
+    error: mockScanError,
   }),
 }));
 vi.mock("@/play/config", () => ({
@@ -176,6 +181,7 @@ function draw(
 
 afterEach(() => {
   cleanup();
+  mockScanError = null;
   save.mockClear();
   save.mockResolvedValue("/home/tom/faster-commanders-v1.sdz");
   open.mockClear();
@@ -256,6 +262,22 @@ describe("PackagePanel", () => {
     await vi.waitFor(() =>
       expect(screen.getByText(/faster-commanders-v1\.sdz/)).toBeTruthy(),
     );
+  });
+
+  it("says the scan failed, not that the game is missing, when Init failed", async () => {
+    mockScanError = "no space left on device";
+    mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /save as \.sdz/i }));
+
+    await vi.waitFor(() =>
+      expect(workshopPackageMutator).toHaveBeenCalledTimes(1),
+    );
+    await vi.waitFor(() =>
+      expect(screen.getByText(/The content scan failed/)).toBeTruthy(),
+    );
+    expect(screen.getByText(/no space left on device/)).toBeTruthy();
+    expect(screen.queryByText(/is not installed here/)).toBeNull();
   });
 
   it("writes nothing when the save dialog is cancelled", async () => {
@@ -560,6 +582,24 @@ describe("PackagePanel", () => {
       expect(
         screen.getByText(/could not load the game to check typed values/),
       ).toBeTruthy();
+    });
+
+    it("says the scan failed, not that the game is missing, when Init failed", async () => {
+      mockScanError = "no space left on device";
+      mockCompiled = compiled([{ path: "modinfo.lua", contents: "return {}" }]);
+      draw();
+      openTweakMode();
+      fireEvent.click(
+        screen.getByRole("button", { name: /pack for tweak slots/i }),
+      );
+      await vi.waitFor(() =>
+        expect(workshopPackTweakSlots).toHaveBeenCalledTimes(1),
+      );
+      await vi.waitFor(() =>
+        expect(screen.getByText(/The content scan failed/)).toBeTruthy(),
+      );
+      expect(screen.getByText(/no space left on device/)).toBeTruthy();
+      expect(screen.queryByText(/is not installed here/)).toBeNull();
     });
 
     it("refuses to pack when preflight finds a blocker, before packing runs", async () => {
