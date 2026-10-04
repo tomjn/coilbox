@@ -17,10 +17,16 @@ import {
   mapSkinFor,
   regenerateGalaxy,
 } from "./mapStyle";
-import { MAP_SKINS, type MapSkin, parseGalaxyJson } from "./model";
+import {
+  type GalaxyDoc,
+  MAP_SKINS,
+  type MapSkin,
+  parseGalaxyJson,
+} from "./model";
 import { TERRAIN_PIXELS } from "./terrainGen";
 import {
   GENERATED_TERRITORIES_IMAGE,
+  generatedTerrain,
   generateTerritories,
 } from "./territories";
 
@@ -157,10 +163,18 @@ describe("a challenge code on a land style", () => {
       expect(rebuilt.nodes.map(({ battle: _b, ...node }) => node)).toEqual(
         doc.nodes.map(({ battle: _b, ...node }) => node),
       );
-      // Their land is the sender's land, pixel for pixel.
-      expect(generatedTerrainPixels(rebuilt)).toEqual(
-        generatedTerrainPixels(doc),
-      );
+      // Their land is the sender's land, pixel for pixel. Compared as bytes,
+      // because a deep comparison of a megabyte of pixels is slow.
+      const bytes = (doc: GalaxyDoc) => {
+        const terrain = generatedTerrain(doc);
+        if (!terrain) throw new Error("expected generated land");
+        return Buffer.concat([
+          Buffer.from(terrain.land),
+          Buffer.from(terrain.heightmap),
+          Buffer.from(terrain.image),
+        ]);
+      };
+      expect(bytes(rebuilt).equals(bytes(doc))).toBe(true);
       expect(galaxyIdentity(rebuilt)).toBe(galaxyIdentity(doc));
     });
   }
