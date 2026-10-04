@@ -26,7 +26,7 @@ crates/coilbox-zerok-protocol/upstream/**/*.cs -text
 # them into CRLF and failed every comparison (issue #3556).
 src/conquest/fixtures/** text eol=lf
 src/runlite/fixtures/** text eol=lf
-src/workshop/fixtures/** text eol=lf
+crates/tauri-plugin-coilbox-workshop/tests/fixtures/saved-project.json text eol=lf
 
 # Unit files copied from real games, trailing whitespace and missing final
 # newline included. The patcher's tests check that every byte outside an edit
