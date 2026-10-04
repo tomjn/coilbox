@@ -251,6 +251,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `multiplayer.stats`  | Multiplayer > Player stats |
 | `conquest.list`      | Play > Conquest       |
 | `runlite.list`       | Play > Warpath        |
+| `career.overview`    | Play > Career         |
 | `campaign.builder`   | Campaign Builder > Builder |
 
 ```json

@@ -17,6 +17,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 | Play          | Scenarios     | `#/scenarios`        | `scenario.list`    | no¹      |
 | Play          | Conquest      | `#/conquest`         | `conquest.list`    | **yes**  |
 | Play          | Warpath       | `#/warpath`          | `runlite.list`     | **yes**  |
+| Play          | Career        | `#/career`           | `career.overview`  | **yes**  |
 | Play          | Replays       | `#/play/replays`     | `play.replays`     | no       |
 | Play          | Save Games    | `#/play/savegames`   | `play.savegames`   | no       |
 | Multiplayer   | Login         | `#/lobby`            | `multiplayer.lobby`| no²      |
@@ -46,7 +47,7 @@ These appear in the sidebar for every user (unless hidden). The **nav id** colum
 
 ² **Multiplayer** items appear contextually, not via the profile. **Login** shows only while logged out. **Chat** appears after the first connect, then stays for the session. **Matchmaking** shows only while connected to a Tachyon server, because TASServer has no matchmaking. **Battle Room** shows only while you're in a battle. **Battles** is not contextual, it stays visible even logged out, because a direct room can be hosted from that page with no server and no login (issue #1580). It is profile-hideable instead. **Server admin** shows only while a connected account is a moderator or admin on an uberserver lobby (never on Teiserver or Zero-K), and is also on the profile's `hide` list, so a distribution can turn it off outright.
 
-> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
+> Want a nav item hideable that isn't yet? It's a one-line change per item in the plugin. Ask and the list can grow. Today `campaign.builder`, `career.overview`, `conquest.list`, `library.games`, `downloads.browse`, `downloads.games`, `hub.browse`, `multiplayer.admin`, `multiplayer.battles`, `multiplayer.stats` and `runlite.list` are wired for hiding (the authoritative set is `HIDEABLE_NAV_IDS` in `src/profile/hidden.tsx`). `content.setupPacks` is also on the same `hide` list. It no longer names a nav item. It hides the Coilbox hub screen's "Share a pack" button instead.
 
 > **Old paths**: `#/content/replays(/:name)` and `#/content/stats(/:name)` redirect to `#/play/replays(/:name)` and `#/stats(/:name)` respectively, so existing bookmarks and links keep working (#467). `#/content/setup-packs` redirects to `#/downloads/maps`, since the Setup packs page is gone and sharing a pack now happens from the Coilbox hub screen instead.
 >
