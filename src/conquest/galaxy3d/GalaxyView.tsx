@@ -11,6 +11,7 @@ import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
 import { buildCueLayer } from "./cueLayer";
+import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
@@ -720,6 +721,19 @@ export function GalaxyView({
         )
       : undefined;
 
+    // The start and the goal of a run across a land map. See endMarkerLayer.ts.
+    const endMarkers =
+      surface && identities
+        ? buildEndMarkerLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            identities,
+            ownerColor,
+          )
+        : undefined;
+
     // Crossings, blocked borders and the player's frontier, and the state of
     // every location and road on a terrain map. See cueLayer.ts.
     const cues =
@@ -889,7 +903,9 @@ export function GalaxyView({
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
-        cities.fitToCamera(camera.position.distanceTo(controls.target));
+        const distance = camera.position.distanceTo(controls.target);
+        cities.fitToCamera(distance);
+        endMarkers?.fitToCamera(distance);
       }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
