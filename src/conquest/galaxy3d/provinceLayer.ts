@@ -9,10 +9,10 @@ import {
   drapeLine,
   isStrongBorder,
   type ProvinceIndex,
+  pickProvince,
   provinceBorders,
   provinceIndexFor,
   provinceStyle,
-  rayToMap,
   ribbonPositions,
 } from "./provinces";
 import type { TerrainSurface } from "./terrain";
@@ -55,8 +55,8 @@ export interface ProvinceLayer {
   isProvince: (nodeIndex: number) => boolean;
   /**
    * Node index of the province under a ray, or -1 when the ray lands on
-   * ground that belongs to no province, or misses the sheet. A hidden
-   * province is still returned: the caller decides what may be selected.
+   * ground that belongs to no province, or misses the sheet. A province
+   * in the `hidden` state is never picked.
    */
   pick: (ray: THREE.Ray) => number;
   /** Restyle every fill and border for the current owners and states. */
@@ -347,14 +347,14 @@ export function buildProvinceLayer(
     borders: pieces,
     has: (nodeId) => provinceOf(nodeId) >= 0,
     isProvince: (nodeIndex) => index.has(nodeIndex),
-    pick: (ray) => {
-      const hit = rayToMap(
+    pick: (ray) =>
+      pickProvince(
+        index,
         surface,
         [ray.origin.x, ray.origin.y, ray.origin.z],
         [ray.direction.x, ray.direction.y, ray.direction.z],
-      );
-      return hit ? index.at(hit[0], hit[1]) : -1;
-    },
+        (i) => !!stateOf(i).hidden,
+      ),
     apply,
     select,
     hover,

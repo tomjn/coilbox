@@ -23,8 +23,8 @@ import type { TerrainSurface } from "./terrain";
  * - On every change it works the cues out with `mapCues` and hands each
  *   location and road its state, so the province and city layers restyle.
  *
- * Geometry is built once. A change of owner, selection or incursion only
- * rewrites vertex colours. Widths, dashes and colours are design values
+ * Geometry is built once. A change of owner, selection, incursion or fog
+ * only rewrites vertex colours. Widths, dashes and colours are design values
  * chosen without seeing them on screen.
  */
 
@@ -245,16 +245,26 @@ export function buildCueLayer(
     }
   };
 
-  const styleLines = (linkOf: Map<string, LinkCue>) => {
+  const styleLines = (
+    linkOf: Map<string, LinkCue>,
+    blockedHidden: Set<string>,
+  ) => {
     for (const line of lines) {
+      const key = pairKey(line.a, line.b);
       if (line.type === "blocked") {
-        paint(line, BLOCKED_COLOR, BLOCKED_OPACITY);
+        paint(
+          line,
+          BLOCKED_COLOR,
+          blockedHidden.has(key) ? 0 : BLOCKED_OPACITY,
+        );
         continue;
       }
-      const link = linkOf.get(pairKey(line.a, line.b));
+      const link = linkOf.get(key);
       const tone = link?.tone ?? "plain";
       let opacity = 1;
-      if (tone === "taken") scratch.copy(TAKEN_COLOR);
+      // Fog: a line between two hidden locations is not drawn.
+      if (link?.hidden) opacity = 0;
+      else if (tone === "taken") scratch.copy(TAKEN_COLOR);
       else if (tone === "contested" || tone === "choice") {
         scratch.copy(ATTACK_COLOR);
       } else if (line.type === "frontier") {
@@ -282,11 +292,18 @@ export function buildCueLayer(
 
   const apply = () => {
     const cues = mapCues({ galaxy, ...source() });
-    styleLines(new Map(cues.links.map((l) => [pairKey(l.a, l.b), l])));
+    styleLines(
+      new Map(cues.links.map((l) => [pairKey(l.a, l.b), l])),
+      new Set(
+        cues.blocked.filter((b) => b.hidden).map((b) => pairKey(b.a, b.b)),
+      ),
+    );
 
     for (const [id, cue] of cues.locations) {
       const state: MapItemState | undefined =
-        cue.attackable || cue.emphasised || cue.threatened ? cue : undefined;
+        cue.attackable || cue.emphasised || cue.threatened || cue.hidden
+          ? cue
+          : undefined;
       if (cities.has(id)) cities.setLocationState(id, state);
       else provinces?.setProvinceState(id, state);
     }
@@ -294,11 +311,12 @@ export function buildCueLayer(
       if (link.kind !== "road") continue;
       const attackable = link.tone === "contested" || link.tone === "choice";
       const travelled = link.tone === "taken";
+      const { emphasised, hidden } = link;
       cities.setRoadState(
         link.a,
         link.b,
-        attackable || travelled || link.emphasised
-          ? { attackable, travelled, emphasised: link.emphasised }
+        attackable || travelled || emphasised || hidden
+          ? { attackable, travelled, emphasised, hidden }
           : undefined,
       );
     }

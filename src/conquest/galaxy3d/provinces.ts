@@ -215,6 +215,25 @@ export function rayToMap(
   return onSheet(tBottom);
 }
 
+/**
+ * Node index of the province a ray picks, or -1. The ray is walked down to
+ * the ground and the province there is looked up. A province `isHidden` says
+ * is hidden by fog is never returned, and nothing under it is either: a
+ * click on hidden land picks nothing.
+ */
+export function pickProvince(
+  index: Pick<ProvinceIndex, "at">,
+  surface: TerrainSurface,
+  origin: readonly [number, number, number],
+  direction: readonly [number, number, number],
+  isHidden: (nodeIndex: number) => boolean = () => false,
+): number {
+  const hit = rayToMap(surface, origin, direction);
+  if (!hit) return -1;
+  const node = index.at(hit[0], hit[1]);
+  return node >= 0 && isHidden(node) ? -1 : node;
+}
+
 /* -------------------------------- fills --------------------------------- */
 
 /** A convex polygon as flat `[x0, y0, x1, y1, ...]` map coordinates. */
