@@ -16,6 +16,7 @@ import { usePreferredTarget } from "../../../play/config";
 import { resolveGameByShortname } from "../../../play/installedGames";
 import { factionSides } from "../../galaxy3d/factionShape";
 import { conquestGameRef } from "../../gameChoice";
+import { drawsAsGalaxy, locationNoun } from "../../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 import { difficultyHandicap, difficultyTable } from "../../rules";
 import { useConquestBattleRun } from "../../run";
@@ -231,6 +232,7 @@ export function BattleOverlay({
             node={node}
             resolved={run.resolved}
             autoDetected={run.autoDetected}
+            place={drawsAsGalaxy(galaxy) ? "galaxy" : "map"}
             onContinue={onClose}
           />
         )}
@@ -340,10 +342,11 @@ function Briefing({
         )}
         {mode === "defend" && (
           <p className={`text-xs ${HUD_ACCENT_INK.amber}`}>
-            Lose this defence and the system falls
+            Lose this defence and the {locationNoun(galaxy.theme?.skin).one}{" "}
+            falls
             {node.kind === "capital" &&
             state.owners[node.id] === state.playerFactionId
-              ? " — it is your homeworld"
+              ? ` — it is your ${drawsAsGalaxy(galaxy) ? "homeworld" : "capital"}`
               : ""}
             .
           </p>
@@ -382,6 +385,7 @@ function Outcome({
   node,
   resolved,
   autoDetected,
+  place,
   onContinue,
 }: {
   phase: "victory" | "defeat";
@@ -389,6 +393,8 @@ function Outcome({
   node: GalaxyNode;
   resolved: ConquestState | null;
   autoDetected: boolean;
+  /** What the strategic map is called: a galaxy for stars, a map otherwise. */
+  place: "galaxy" | "map";
   onContinue: () => void;
 }) {
   const won = phase === "victory";
@@ -410,7 +416,7 @@ function Outcome({
       <p className="text-sm text-muted-foreground">{consequence}</p>
       {resolved?.status === "won" && (
         <p className="text-sm text-emerald-300">
-          Every enemy capital has fallen — the galaxy is yours.
+          Every enemy capital has fallen — the {place} is yours.
         </p>
       )}
       {resolved?.status === "lost" && (
@@ -421,7 +427,8 @@ function Outcome({
       {resolved?.status === "active" && hasIncursion && (
         <p className="flex items-center gap-1.5 text-sm text-amber-300">
           <ShieldAlert className="size-4" aria-hidden />
-          Enemy incursion detected — check the galaxy map.
+          Enemy incursion detected — check the{" "}
+          {place === "galaxy" ? "galaxy map" : "map"}.
         </p>
       )}
       {autoDetected && (
@@ -429,7 +436,7 @@ function Outcome({
           Result detected from the replay.
         </p>
       )}
-      <Button onClick={onContinue}>Return to the galaxy</Button>
+      <Button onClick={onContinue}>Return to the {place}</Button>
     </div>
   );
 }

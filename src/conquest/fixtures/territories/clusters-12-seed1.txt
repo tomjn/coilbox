@@ -2,7 +2,7 @@ id generated-1
 title TG Conquest
 description A generated map of 12 provinces.
 terrain image=generated:territories heightmap=generated:territories size=1024x1024 heightScale=64 projection=flat
-generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"clusters","skin":"galaxy"}
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"clusters","skin":"territories"}
 faction player name="Silent Imperium" color=#2f7dff aggression=0 side=
 faction enemy-1 name="Sovereign Enclave" color=#ff3524 aggression=0.4983307706192136 side=
 faction enemy-2 name="Eternal Vanguard" color=#ffb300 aggression=0.4908016594592482 side=

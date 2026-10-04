@@ -105,7 +105,7 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 | `#/campaign/:id/:missionId`               | A mission briefing/result                      |
 | `#/campaign-builder/:id`                  | Editing a campaign (advanced)                  |
 | `#/scenario-builder/:id`                  | Editing a scenario (advanced)                  |
-| `#/conquest/:id`                          | A galactic conquest run in progress            |
+| `#/conquest/:id`                          | A conquest in progress                         |
 | `#/warpath/:runId`                        | A Warpath run's node map                       |
 | `#/lego/open`                             | Opens an archive member in the unit builder (advanced) |
 | `#/lego/:id`                              | Editing a unit in the builder (advanced)       |

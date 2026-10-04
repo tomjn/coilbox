@@ -19,7 +19,7 @@ export function provenanceLink(
         to: p.nodeId
           ? `/conquest/${encodeURIComponent(p.galaxyId)}?node=${encodeURIComponent(p.nodeId)}`
           : `/conquest/${encodeURIComponent(p.galaxyId)}`,
-        label: "Back to conquest galaxy",
+        label: "Back to conquest map",
       };
     case "warpath":
       if (!p.runId) return null;

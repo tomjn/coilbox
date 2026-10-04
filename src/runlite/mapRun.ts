@@ -7,12 +7,14 @@ import {
   bakeNode,
   chooseNodeType,
   type GenerateRunOpts,
+  generateRun,
   planUnlocks,
 } from "./generate";
 import type {
   EncounterSpec,
   RogueliteRun,
   RunEdge,
+  RunLength,
   RunMapRef,
   RunNode,
   RunNodeType,
@@ -409,4 +411,45 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
     startId,
     opts.mapRef ?? runMapRefFor(map),
   );
+}
+
+/**
+ * How many locations the generated map has for each run length. The map
+ * decides how long a land run is, so these are the sizes whose routes come out
+ * nearest the column runs of 6, 9 and 13. Measured over seeds 1 to 40 with the
+ * layout left to the seed, the median route was 7, 8 and 12 locations long on
+ * Cities maps of 18, 28 and 56, and 7, 9 and 13 on Territories maps of 12, 18
+ * and 40.
+ */
+export const LAND_RUN_SIZES: Record<
+  "cities" | "territories",
+  Record<RunLength, number>
+> = {
+  cities: { quick: 18, standard: 28, long: 56 },
+  territories: { quick: 12, standard: 18, long: 40 },
+};
+
+/**
+ * Generate the run a setup asks for, in whichever style it chose. Galaxy and
+ * Theatre are the column run. Cities and Territories generate a map from the
+ * run's own seed, at the size its length calls for, and cross it. The map goes
+ * through {@link resolveRunMap}, the same way an opened run or an imported
+ * challenge finds it again, so the map generated here is the one they rebuild.
+ */
+export function generateStyledRun(opts: GenerateRunOpts): RogueliteRun {
+  if (opts.skin !== "cities" && opts.skin !== "territories") {
+    return generateRun(opts);
+  }
+  const mapRef: RunMapRef = {
+    source: "generated",
+    style: opts.skin,
+    seed: opts.seed,
+    nodeCount: LAND_RUN_SIZES[opts.skin][opts.length],
+    layout: "random",
+  };
+  const source = resolveRunMap(mapRef, opts.game);
+  if (!source) {
+    throw new MapRouteError("The map for this warpath could not be generated.");
+  }
+  return generateMapRun({ ...opts, ...source, mapRef });
 }

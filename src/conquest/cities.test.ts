@@ -45,8 +45,21 @@ const SEEDS = [2, 7, 42];
 
 /** A document with everything the Cities style adds or moves taken out. */
 function strategic(doc: GalaxyDoc) {
-  const { description: _d, terrain: _t, linkKinds: _k, ...rest } = doc;
-  return { ...rest, nodes: doc.nodes.map(({ pos: _p, ...node }) => node) };
+  const {
+    description: _d,
+    terrain: _t,
+    linkKinds: _k,
+    theme: _theme,
+    generated,
+    ...rest
+  } = doc;
+  // The style is how the map is drawn, which is the one thing that differs.
+  const { skin: _skin, ...knobs } = generated ?? {};
+  return {
+    ...rest,
+    generated: knobs,
+    nodes: doc.nodes.map(({ pos: _p, ...node }) => node),
+  };
 }
 
 /** Does any land touch the edge of the terrain? */

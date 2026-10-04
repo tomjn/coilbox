@@ -73,7 +73,7 @@ import {
   substitutedMapCount,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
-import { type GenerateOptions, generateGalaxy } from "../generate";
+import type { GenerateOptions } from "../generate";
 import { readHandmadeRun } from "../handmade/conquest";
 import {
   type HandmadeImportResult,
@@ -85,7 +85,13 @@ import {
   refreshHandmadeMaps,
   useHandmadeMaps,
 } from "../handmade/useHandmadeMaps";
-import type { ConquestState, GalaxyDoc } from "../model";
+import { generateMap, locationNoun, MAP_STYLE_OPTIONS } from "../mapStyle";
+import {
+  type ConquestState,
+  type GalaxyDoc,
+  isLandSkin,
+  type MapSkin,
+} from "../model";
 import { mergeConquestNames } from "../names";
 import {
   DEFAULT_RADIUS_LY,
@@ -93,6 +99,8 @@ import {
   systemCountWithin,
 } from "../realstars";
 import { maxUnlockedNodeCount } from "../size";
+import type { GeneratedTerrain } from "../terrainGen";
+import { generatedTerrain } from "../territories";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
@@ -104,9 +112,9 @@ import {
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
 /**
- * The Conquest hub: in-progress runs first, then galaxies ready to start
- * (bundled and generated), plus the "Generate a galaxy" drawer — the
- * procedural fallback for games that ship no authored galaxy. Faction/side
+ * The Conquest hub: in-progress runs first, then maps ready to start
+ * (bundled and generated), plus the "Generate a map" drawer, the
+ * procedural fallback for games that ship no authored map. Faction/side
  * choice happens on the galaxy page itself, over a live preview of the map.
  */
 export default function ConquestListPage() {
@@ -210,7 +218,7 @@ export default function ConquestListPage() {
 
   const openGenerate = (initialGameName?: string) =>
     drawer.open({
-      title: "Generate a galaxy",
+      title: "Generate a map",
       width: "30rem",
       content: (
         <GenerateGalaxyForm
@@ -288,7 +296,7 @@ export default function ConquestListPage() {
     <div className="flex flex-col gap-4 p-4">
       <PageHeader
         title="Conquest"
-        description="Wage a campaign across a galaxy of star systems. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
+        description="Wage a campaign across a map of territory you take one battle at a time. Win skirmishes to capture territory, defend against counterattacks, and take every enemy capital."
         actions={
           !needsGame && (
             <>
@@ -300,8 +308,7 @@ export default function ConquestListPage() {
                 challenge
               </Button>
               <Button onClick={() => openGenerate()}>
-                <Dices className="mr-1.5 size-4" aria-hidden /> Generate a
-                galaxy
+                <Dices className="mr-1.5 size-4" aria-hidden /> Generate a map
               </Button>
             </>
           )
@@ -338,8 +345,8 @@ export default function ConquestListPage() {
                 {state === "unreadable"
                   ? "The scan finished but the engine reported problems and listed no games, so this is not a sign that you own none. Try another engine, or open Content > Games to see what it did find."
                   : target
-                    ? "Conquest generates a galaxy for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
-                    : "Install an engine and at least one game, then return here to generate a galaxy for it."}
+                    ? "Conquest generates a map for any installed game with skirmish AIs. Download a game to get started, and it will appear here automatically."
+                    : "Install an engine and at least one game, then return here to generate a map for it."}
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
@@ -387,7 +394,7 @@ export default function ConquestListPage() {
       ) : loading || handmade.loading ? (
         <SkeletonList />
       ) : nothingListed ? (
-        <EmptyState label="No galaxies yet. Generate one for any installed game, or import a galaxy file." />
+        <EmptyState label="No conquest maps yet. Generate one for any installed game, or import a map or a challenge." />
       ) : (
         <>
           {runIds.length + lostRuns.length > 0 && (
@@ -482,7 +489,7 @@ export default function ConquestListPage() {
                     <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
                       <span className="text-sm font-medium">{m.title}</span>
                       <p className="text-sm text-muted-foreground">
-                        This map has the id "{m.id}", which a galaxy in the list
+                        This map has the id "{m.id}", which a map in the list
                         above already uses, so the map is not listed. Change the
                         id in its map.json and import it again.
                       </p>
@@ -788,7 +795,7 @@ function GalaxyCard({
         <ChallengeShare
           identity={galaxyIdentity(galaxy)}
           code={challengeCode ?? ""}
-          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical galaxy, so results are directly comparable."
+          helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical map, so results are directly comparable."
           onExportFile={exportChallengeFile}
         />
       ),
@@ -853,8 +860,9 @@ function GalaxyCard({
             {resume && <ContinueBadge />}
           </div>
           <p className="line-clamp-1 text-xs text-muted-foreground">
-            {galaxy.game.shortname} · {galaxy.nodes.length} systems ·{" "}
-            {galaxy.factions.length} factions
+            {galaxy.game.shortname} · {galaxy.nodes.length}{" "}
+            {locationNoun(galaxy.theme?.skin).many} · {galaxy.factions.length}{" "}
+            factions
           </p>
           <span
             className={`text-xs ${
@@ -928,6 +936,19 @@ const LAYOUT_OPTIONS = [
   { value: "ring", label: "Ring" },
   { value: "realstars", label: "Real stars (the solar neighbourhood)" },
 ];
+// Real stars are a galaxy and nothing else, and a disc and arms are a galaxy's
+// words, so every other style gets the same shapes under plainer names.
+const PLAIN_LAYOUT_OPTIONS = [
+  { value: "random", label: "Surprise me" },
+  { value: "scatter", label: "Scattered" },
+  { value: "spiral", label: "Spiral" },
+  { value: "clusters", label: "Clusters" },
+  { value: "ring", label: "Ring" },
+];
+/** How long the form waits after the last change before it builds a land
+ * preview. A choice, not a measurement: long enough that typing a seed builds
+ * one map and not one per digit. */
+const LAND_PREVIEW_DELAY_MS = 300;
 // Real-star galaxies are sized by radius, not by node count: every system
 // inside the radius is on the map. Counts come from the catalogue so they
 // cannot drift from the data.
@@ -935,22 +956,34 @@ const RADIUS_OPTIONS = RADIUS_CHOICES.map((ly) => ({
   value: String(ly),
   label: `${ly} light years (${systemCountWithin(ly)} systems)`,
 }));
-const STYLE_OPTIONS = [
-  { value: "galaxy", label: "Galaxy (starfield)" },
-  { value: "theatre", label: "Theatre map (flat chart)" },
-];
 /** Sentinel for "let the generator decide" (the classic full-frontier start for
- * procedural galaxies, capital-only for real stars). An empty string cannot be
+ * procedural maps, capital-only for real stars). An empty string cannot be
  * used: Radix Select reads it as no selection and falls back to the
  * placeholder, leaving the row looking blank. */
 const STARTING_DEFAULT = "auto";
-const STARTING_OPTIONS = [
-  { value: STARTING_DEFAULT, label: "Full frontier (default)" },
-  { value: "1", label: "Capital only" },
-  { value: "2", label: "Capital + 1 system" },
-  { value: "3", label: "Capital + 2 systems" },
-  { value: "4", label: "Capital + 3 systems" },
-];
+/** The starting territory choices, counted in the style's own locations. */
+function startingOptions(
+  noun: { one: string; many: string },
+  realStars: boolean,
+) {
+  return [
+    {
+      value: STARTING_DEFAULT,
+      label: realStars ? "Capital only (default)" : "Full frontier (default)",
+    },
+    { value: "1", label: "Capital only" },
+    { value: "2", label: `Capital + 1 ${noun.one}` },
+    { value: "3", label: `Capital + 2 ${noun.many}` },
+    { value: "4", label: `Capital + 3 ${noun.many}` },
+  ];
+}
+
+/** A land preview, and the options it was built from, as text. */
+interface LandPreview {
+  key: string;
+  doc: GalaxyDoc;
+  terrain: GeneratedTerrain | null;
+}
 
 /** What makes two installed archives the same game in the wizard: the modinfo
  * shortname and the name without its version. */
@@ -1048,7 +1081,15 @@ function GenerateGalaxyForm({
   const [layout, setLayout] = useState("random");
   const [radius, setRadius] = useState(String(DEFAULT_RADIUS_LY));
   const realStars = layout === "realstars";
-  const [style, setStyle] = useState("galaxy");
+  const [style, setStyleChoice] = useState<MapSkin>("galaxy");
+  // Real stars belong to the Galaxy style alone, so leaving it for another
+  // style puts the shape back on the default.
+  const setStyle = (next: string) => {
+    setStyleChoice(next as MapSkin);
+    if (next !== "galaxy" && layout === "realstars") setLayout("random");
+  };
+  const land = isLandSkin(style);
+  const noun = locationNoun(style);
   const [starting, setStarting] = useState(STARTING_DEFAULT);
   const [fog, setFog] = useState(false);
   const [threatChoice, setThreatChoice] = useState(0);
@@ -1087,7 +1128,7 @@ function GenerateGalaxyForm({
   );
 
   // One options builder shared by the live preview and the create action, so
-  // the galaxy the user saw is exactly the galaxy that gets saved.
+  // the map the user saw is exactly the map that gets saved.
   const genOptions = useCallback(
     (id: string): GenerateOptions => ({
       seed: Number(seed) || 1,
@@ -1097,7 +1138,7 @@ function GenerateGalaxyForm({
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
       radiusLy: Number(radius),
-      skin: style === "theatre" && !realStars ? "theatre" : "galaxy",
+      skin: style,
       startingSystems:
         starting === STARTING_DEFAULT ? undefined : Number(starting),
       fogOfWar: fog,
@@ -1126,14 +1167,44 @@ function GenerateGalaxyForm({
     ],
   );
 
-  const preview = useMemo(() => {
-    if (!selected || maps.length === 0) return null;
+  const canPreview = Boolean(selected) && maps.length > 0;
+  // A galaxy or a theatre builds in a few milliseconds, so its preview is
+  // built as the form renders.
+  const pointPreview = useMemo(() => {
+    if (land || !canPreview) return null;
     try {
-      return generateGalaxy(genOptions("preview"));
+      return generateMap(genOptions("preview"));
     } catch {
       return null;
     }
-  }, [genOptions, selected, maps]);
+  }, [genOptions, land, canPreview]);
+  // Land is slower to build, so it waits until the form has been still for a
+  // moment. The last preview stays up, dimmed, until the new one replaces it.
+  // Keyed on the options as text, so a preview is rebuilt when a value
+  // changes and never because an equal object was made again.
+  const [landPreview, setLandPreview] = useState<LandPreview | null>(null);
+  const landKey = useMemo(
+    () => (land && canPreview ? JSON.stringify(genOptions("preview")) : null),
+    [genOptions, land, canPreview],
+  );
+  useEffect(() => {
+    if (landKey === null) return;
+    const timer = setTimeout(() => {
+      try {
+        const doc = generateMap(JSON.parse(landKey) as GenerateOptions);
+        setLandPreview({
+          key: landKey,
+          doc,
+          terrain: generatedTerrain(doc),
+        });
+      } catch {
+        setLandPreview(null);
+      }
+    }, LAND_PREVIEW_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [landKey]);
+  const preview = land ? (landPreview?.doc ?? null) : pointPreview;
+  const previewStale = land && landPreview?.key !== landKey;
   const blocked: ReactNode = !target ? (
     <>
       Install an engine first (
@@ -1165,7 +1236,7 @@ function GenerateGalaxyForm({
     </>
   ) : null;
 
-  // Creating a galaxy is not a launch, so this does not stop the form. The
+  // Creating a map is not a launch, so this does not stop the form. The
   // player is told here, because every battle of it would stop on it (issue
   // #3489).
   const dependency = selected
@@ -1181,7 +1252,7 @@ function GenerateGalaxyForm({
     setError(null);
     try {
       const id = `generated-${crypto.randomUUID()}`;
-      const doc = generateGalaxy(genOptions(id));
+      const doc = generateMap(genOptions(id));
       await conquestSave({ id, json: JSON.stringify(doc) });
       await refreshGalaxies();
       onCreated(id);
@@ -1224,16 +1295,26 @@ function GenerateGalaxyForm({
             <BrandingScreenshots shots={brandingEntry.screenshots} />
           ) : null}
           <div className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium">Map style</span>
+            <OptionSelect
+              value={style}
+              onValueChange={setStyle}
+              options={MAP_STYLE_OPTIONS}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">Shape</span>
             <OptionSelect
               value={layout}
               onValueChange={setLayout}
-              options={LAYOUT_OPTIONS}
+              options={
+                style === "galaxy" ? LAYOUT_OPTIONS : PLAIN_LAYOUT_OPTIONS
+              }
             />
           </div>
           <div className="flex flex-col gap-1.5 text-sm">
             <span className="font-medium">
-              {realStars ? "Radius from Sol" : "Galaxy size"}
+              {realStars ? "Radius from Sol" : "Map size"}
             </span>
             {realStars ? (
               <OptionSelect
@@ -1245,7 +1326,7 @@ function GenerateGalaxyForm({
               <OptionSelect
                 value={String(nodeCount)}
                 onValueChange={setSize}
-                options={sizeOptions(ceiling)}
+                options={sizeOptions(ceiling, noun.many)}
               />
             )}
             {realStars && (
@@ -1275,39 +1356,20 @@ function GenerateGalaxyForm({
               onChange={setStartChoice}
             />
           )}
-          {!realStars && (
-            <div className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Map style</span>
-              <OptionSelect
-                value={style}
-                onValueChange={setStyle}
-                options={STYLE_OPTIONS}
-              />
-            </div>
-          )}
           <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Starting systems</span>
+            <span className="font-medium">Starting territory</span>
             <OptionSelect
               value={starting}
               onValueChange={setStarting}
-              options={
-                realStars
-                  ? [
-                      {
-                        value: STARTING_DEFAULT,
-                        label: "Capital only (default)",
-                      },
-                      ...STARTING_OPTIONS.slice(1),
-                    ]
-                  : STARTING_OPTIONS
-              }
+              options={startingOptions(noun, realStars)}
             />
           </div>
           <div className="flex items-center justify-between gap-3 text-sm">
             <label htmlFor="conquest-fog" className="flex flex-col gap-0.5">
               <span className="font-medium">Fog of war</span>
               <span className="text-xs text-muted-foreground">
-                Hide systems more than two jumps from your territory.
+                Hide {noun.many} more than two{" "}
+                {style === "galaxy" ? "jumps" : "moves"} from your territory.
               </span>
             </label>
             <Switch id="conquest-fog" checked={fog} onCheckedChange={setFog} />
@@ -1319,7 +1381,7 @@ function GenerateGalaxyForm({
                 value={seed}
                 onChange={(e) => setSeed(e.target.value.replace(/\D/g, ""))}
                 inputMode="numeric"
-                aria-label="Galaxy seed"
+                aria-label="Map seed"
               />
               <Button
                 variant="outline"
@@ -1334,16 +1396,28 @@ function GenerateGalaxyForm({
             <span className="text-xs text-muted-foreground">
               {realStars
                 ? "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
-                : "The same seed always builds the same galaxy."}
+                : "The same seed always builds the same map."}
             </span>
           </div>
-          {preview && !realStars && (
+          {!realStars && (preview || (land && canPreview)) && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Preview</span>
-              <GalaxyPreview2D galaxy={preview} />
-              {preview.nodes.length < nodeCount && (
+              {preview ? (
+                <div className={previewStale ? "opacity-50" : undefined}>
+                  <GalaxyPreview2D
+                    galaxy={preview}
+                    terrain={land ? landPreview?.terrain : undefined}
+                  />
+                </div>
+              ) : null}
+              {land && (previewStale || !preview) && (
+                <span className="text-xs text-muted-foreground" role="status">
+                  Building the preview…
+                </span>
+              )}
+              {preview && !previewStale && preview.nodes.length < nodeCount && (
                 <span className="text-xs text-muted-foreground">
-                  Capped at {preview.nodes.length} named systems.
+                  Capped at {preview.nodes.length} named {noun.many}.
                 </span>
               )}
             </div>
@@ -1351,7 +1425,7 @@ function GenerateGalaxyForm({
           {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
           {error && <ErrorBanner message={error} />}
           <Button onClick={create} disabled={busy || !selected}>
-            {busy ? "Generating…" : "Create galaxy"}
+            {busy ? "Generating…" : "Create map"}
           </Button>
         </>
       )}
@@ -1361,7 +1435,7 @@ function GenerateGalaxyForm({
 
 /**
  * Paste a challenge code, resolve it against the recipient's own install, and
- * generate the identical galaxy locally (issue #376). `installedGame` is
+ * generate the identical map locally (issue #376). `installedGame` is
  * resolved from the decoded settings, not from the wizard's own game picker,
  * because a challenge names its own game. Wraps the shared
  * `ImportChallengeForm` (issue #2441) with conquest's own decode and finish.
@@ -1440,8 +1514,8 @@ function ImportChallengeForm({
 
   return (
     <SharedImportChallengeForm
-      helpText="Paste a challenge code shared by another player to generate the identical galaxy on your own install."
-      substitutedNoun="systems"
+      helpText="Paste a challenge code shared by another player to generate the identical map on your own install."
+      substitutedNoun="locations"
       initialCode={initialCode}
       decode={decodeConquestChallenge}
       identityOf={conquestIdentity}

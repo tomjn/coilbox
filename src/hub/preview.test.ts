@@ -244,6 +244,108 @@ describe("readPreview", () => {
     expect(systems.some((s) => s.faction === null)).toBe(true);
   });
 
+  it("draws a galaxy and a theatre as points, with no land", () => {
+    for (const skin of [undefined, "galaxy", "theatre"]) {
+      const preview = readPreview(
+        container("challenge", {
+          mode: "conquest",
+          settings: { ...CONQUEST, skin },
+        }),
+      );
+      if (preview?.kind !== "challenge" || !preview.galaxy) {
+        throw new Error("expected a galaxy");
+      }
+      expect(preview.galaxy.skin).toBe(skin ?? "galaxy");
+      expect(preview.galaxy.land).toBeUndefined();
+    }
+  });
+
+  it("draws a Territories challenge as provinces on its own land (issue #3507)", () => {
+    const preview = readPreview(
+      container("challenge", {
+        mode: "conquest",
+        settings: { ...CONQUEST, skin: "territories" },
+      }),
+    );
+    expect(preview).toMatchObject({
+      stats: [{ label: "Provinces", value: "20" }, {}, {}],
+    });
+    if (preview?.kind !== "challenge" || !preview.galaxy?.land) {
+      throw new Error("expected a land map");
+    }
+    const { skin, systems, lanes, land } = preview.galaxy;
+    expect(skin).toBe("territories");
+    expect(systems).toHaveLength(20);
+    // One outline for each province, every point inside the unit square.
+    expect(land.outlines.map((o) => o.system)).toEqual(
+      systems.map((_, i) => i),
+    );
+    for (const { ring } of land.outlines) {
+      expect(ring.length).toBeGreaterThanOrEqual(3);
+      for (const [x, y] of ring) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(1);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(1);
+      }
+    }
+    // Every link is a border or a crossing, and the map has sea as well as land.
+    expect(land.laneKinds).toHaveLength(lanes.length);
+    expect(
+      land.laneKinds.every((k) => k === "border" || k === "crossing"),
+    ).toBe(true);
+    const cells = land.runs.reduce((n, [, from, to]) => n + to - from + 1, 0);
+    expect(cells).toBeGreaterThan(0);
+    expect(cells).toBeLessThan(land.grid * land.grid);
+  });
+
+  it("draws a Cities challenge as cities on land, each one standing on it", () => {
+    const preview = readPreview(
+      container("challenge", {
+        mode: "conquest",
+        settings: { ...CONQUEST, skin: "cities" },
+      }),
+    );
+    expect(preview).toMatchObject({
+      stats: [{ label: "Cities", value: "20" }, {}, {}],
+    });
+    if (preview?.kind !== "challenge" || !preview.galaxy?.land) {
+      throw new Error("expected a land map");
+    }
+    const { systems, land } = preview.galaxy;
+    expect(land.outlines).toEqual([]);
+    expect(land.laneKinds.every((k) => k === "road" || k === "crossing")).toBe(
+      true,
+    );
+    // The generator puts land under every city, so each one is on or beside a
+    // land cell of the coarser grid.
+    const isLand = (row: number, col: number) =>
+      land.runs.some(([r, from, to]) => r === row && col >= from && col <= to);
+    for (const s of systems) {
+      const col = Math.min(land.grid - 1, Math.floor(s.x * land.grid));
+      const row = Math.min(land.grid - 1, Math.floor(s.y * land.grid));
+      const near = [-1, 0, 1].some((dr) =>
+        [-1, 0, 1].some((dc) => isLand(row + dr, col + dc)),
+      );
+      expect(near).toBe(true);
+    }
+  });
+
+  it("draws a land style of real stars as the galaxy it falls back to", () => {
+    const preview = readPreview(
+      container("challenge", {
+        mode: "conquest",
+        settings: { ...CONQUEST, skin: "cities", layout: "realstars" },
+      }),
+    );
+    expect(preview).toMatchObject({ stats: [{ label: "Systems" }, {}, {}] });
+    if (preview?.kind !== "challenge" || !preview.galaxy) {
+      throw new Error("expected a galaxy");
+    }
+    expect(preview.galaxy.skin).toBe("galaxy");
+    expect(preview.galaxy.land).toBeUndefined();
+  });
+
   it("draws the same galaxy every time, because the seed decides it", () => {
     const once = readPreview(
       container("challenge", { mode: "conquest", settings: CONQUEST }),

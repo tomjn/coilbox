@@ -17,7 +17,7 @@
  * The counterpart on the website is `components/ItemPreview.tsx` and
  * `lib/gallery/*` in tomjn/coilbox-hub, which had to vendor coilbox's galaxy
  * and run generators and mirror their validation to do this. Here all four are
- * the originals: `parseConquestChallengeSettings` and `generateGalaxy`,
+ * the originals: `parseConquestChallengeSettings` and `generateMap`,
  * `parseWarpathChallengeSettings` and `generateRun`, are the same functions the
  * app generates a real galaxy or run with, so a preview cannot drift from it.
  */
@@ -33,8 +33,15 @@ import {
   optionsFromChallenge,
   parseConquestChallengeSettings,
 } from "@/conquest/challenge";
-import { generateGalaxy } from "@/conquest/generate";
-import { type GalaxyDoc, NEUTRAL, type NodePos } from "@/conquest/model";
+import { generateMap, locationNoun, mapSkinFor } from "@/conquest/mapStyle";
+import {
+  type GalaxyDoc,
+  type LinkKind,
+  type MapSkin,
+  NEUTRAL,
+  type NodePos,
+} from "@/conquest/model";
+import { generatedTerrain } from "@/conquest/territories";
 import type { Container } from "@/container/container";
 import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
 import {
@@ -83,11 +90,28 @@ export interface GalaxySystem {
 }
 
 export interface GalaxyShape {
+  /** The map style, which decides how the shape is drawn and what its
+   * locations are called. */
+  skin: MapSkin;
   systems: GalaxySystem[];
   /** Jump lanes, as index pairs into {@link GalaxyShape.systems}. */
   lanes: [number, number][];
   /** Player first, then enemies. */
   factionColors: string[];
+  /** Present for a map drawn on land: Cities and Territories. */
+  land?: LandShape;
+}
+
+/** The land under a Cities or Territories map, in the same unit square. */
+export interface LandShape {
+  /** The land is given on a grid this many cells across and down. */
+  grid: number;
+  /** Runs of land cells along a row: the row, then the first and last column. */
+  runs: [number, number, number][];
+  /** A province's outline rings, by the index of its system. A city has none. */
+  outlines: { system: number; ring: [number, number][] }[];
+  /** What joins each lane's two ends, in the order of the lanes. */
+  laneKinds: (LinkKind | undefined)[];
 }
 
 /** One stop on a rebuilt warpath run, positioned in a unit square. */
@@ -318,7 +342,10 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
       galaxy: rebuildGalaxy(parsed),
       run: null,
       stats: [
-        { label: "Systems", value: String(parsed.nodeCount) },
+        {
+          label: capitalise(locationNoun(mapSkinFor(parsed)).many),
+          value: String(parsed.nodeCount),
+        },
         // `factionCount` is the enemy count. The app's own wizard calls it
         // "enemy factions", and the drawing has the player as a colour too.
         { label: "Enemies", value: String(parsed.factionCount) },
@@ -348,7 +375,7 @@ function challengePreview(payload: Record<string, unknown>): HubPreview | null {
 }
 
 /**
- * Rebuild the galaxy the challenge would generate.
+ * Rebuild the map the challenge would generate, in the style it names.
  *
  * Positions, lanes, capitals and starting territory are all settled before the
  * generator first touches installed content, so passing it no maps and no
@@ -360,7 +387,7 @@ function rebuildGalaxy(
   settings: Parameters<typeof optionsFromChallenge>[0],
 ): GalaxyShape | null {
   try {
-    const galaxy = generateGalaxy(
+    const galaxy = generateMap(
       optionsFromChallenge(settings, { maps: [] }, "hub-preview"),
     );
     return galaxy.nodes.length > 0 ? shapeOf(galaxy) : null;
@@ -475,12 +502,92 @@ function normalise(points: [number, number][]): [number, number][] {
   ]);
 }
 
+const capitalise = (word: string) =>
+  word.charAt(0).toUpperCase() + word.slice(1);
+
+/** How finely a card draws the land: cells across and down the map. */
+const LAND_GRID = 64;
+
+/**
+ * The land of a generated Cities or Territories map, from the generator's own
+ * land mask, so a card's coast is the coast the map is played on. The mask is
+ * read down to {@link LAND_GRID} cells a side, a cell being land when at least
+ * half of its pixels are. Null for a map with no generated land. Generated
+ * land is square, so the grid and the unit square cover the same area.
+ */
+function landOf(galaxy: GalaxyDoc): LandShape | null {
+  const terrain = generatedTerrain(galaxy);
+  const box = galaxy.terrain;
+  if (!terrain || !box) return null;
+  const index = new Map(galaxy.nodes.map((node, i) => [node.id, i]));
+  const kinds = new Map<string, LinkKind>();
+  for (const [a, b, kind] of galaxy.linkKinds ?? []) {
+    kinds.set(`${a}|${b}`, kind);
+    kinds.set(`${b}|${a}`, kind);
+  }
+
+  const runs: [number, number, number][] = [];
+  const cellW = terrain.width / LAND_GRID;
+  const cellH = terrain.height / LAND_GRID;
+  for (let row = 0; row < LAND_GRID; row++) {
+    let start = -1;
+    for (let col = 0; col <= LAND_GRID; col++) {
+      let isLand = false;
+      if (col < LAND_GRID) {
+        const x0 = Math.floor(col * cellW);
+        const x1 = Math.max(x0 + 1, Math.floor((col + 1) * cellW));
+        const y0 = Math.floor(row * cellH);
+        const y1 = Math.max(y0 + 1, Math.floor((row + 1) * cellH));
+        let count = 0;
+        for (let y = y0; y < y1; y++) {
+          for (let x = x0; x < x1; x++)
+            count += terrain.land[y * terrain.width + x];
+        }
+        isLand = count * 2 >= (x1 - x0) * (y1 - y0);
+      }
+      if (isLand && start < 0) start = col;
+      if (!isLand && start >= 0) {
+        runs.push([row, start, col - 1]);
+        start = -1;
+      }
+    }
+  }
+
+  const span = Math.max(box.width, box.height);
+  return {
+    grid: LAND_GRID,
+    runs,
+    outlines: galaxy.nodes.flatMap((node, system) =>
+      (node.outline ?? []).map((ring) => ({
+        system,
+        ring: ring.map(([x, y]): [number, number] => [x / span, y / span]),
+      })),
+    ),
+    laneKinds: galaxy.links.flatMap(([a, b]) =>
+      index.has(a) && index.has(b) ? [kinds.get(`${a}|${b}`)] : [],
+    ),
+  };
+}
+
 function shapeOf(galaxy: GalaxyDoc): GalaxyShape {
   const index = new Map(galaxy.nodes.map((node, i) => [node.id, i]));
   const factionIndex = new Map(galaxy.factions.map((f, i) => [f.id, i]));
-  const positions = normalise(galaxy.nodes.map((node) => plane(node.pos)));
+  const land = landOf(galaxy);
+  // A land map keeps its place on the land, so it is fitted by the map's own
+  // box. Anything else is fitted by where its systems are.
+  const box = galaxy.terrain;
+  const span = box ? Math.max(box.width, box.height) : 1;
+  const positions =
+    land && box
+      ? galaxy.nodes.map((node): [number, number] => [
+          node.pos[0] / span,
+          node.pos[1] / span,
+        ])
+      : normalise(galaxy.nodes.map((node) => plane(node.pos)));
 
   return {
+    skin: galaxy.theme?.skin ?? "galaxy",
+    ...(land ? { land } : {}),
     systems: galaxy.nodes.map((node, i) => ({
       id: node.id,
       x: positions[i][0],

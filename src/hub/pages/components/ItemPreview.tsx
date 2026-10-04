@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { LayoutPlan } from "@/blueprint/LayoutPlan";
+import { locationNoun } from "@/conquest/mapStyle";
 import type { RunNodeType } from "@/runlite/model";
 import { useHeldUnitPictures } from "../../assets/useUnitPictures";
 import type {
@@ -156,6 +157,11 @@ const UNCLAIMED = "#6b7280";
 /** One galaxy is drawn per page, so a fixed filter id is safe. */
 const GLOW = "hub-preview-system-glow";
 
+/** The sea and the land of a land map, from the generator's own palette
+ * (`SEA_DEEP` and the grass of `LAND_RAMP` in `conquest/terrainGen.ts`). */
+const SEA = "#183a60";
+const LAND = "#769852";
+
 /**
  * The galaxy itself.
  *
@@ -167,6 +173,12 @@ const GLOW = "hub-preview-system-glow";
  *
  * The `viewBox` is the unit square the shape was fitted to, scaled up and inset
  * so a system at the edge is not clipped by its own glow.
+ *
+ * A Cities or Territories map is drawn as land instead (issue #3507): the
+ * generator's own coast over sea, province outlines tinted by who holds them,
+ * roads as lines and sea crossings as dashes. A border between two provinces
+ * is not drawn as a lane, because the outlines touching already says it, and a
+ * province is marked only where it is a capital.
  *
  * Exported so `BrowseCardArt.tsx` can draw the same galaxy at card size
  * (issue #2598): one renderer, sized by `className` rather than duplicated.
@@ -188,13 +200,88 @@ export function Galaxy({
   const colorOf = (faction: number | null) =>
     faction === null ? UNCLAIMED : (shape.factionColors[faction] ?? UNCLAIMED);
   const held = shape.systems.filter((s) => s.faction !== null).length;
+  const { land } = shape;
+  const noun = locationNoun(shape.skin).many;
+
+  if (land) {
+    // The land fills the box edge to edge, so nothing is inset.
+    const cell = 100 / land.grid;
+    const provinces = new Set(land.outlines.map((o) => o.system));
+    return (
+      <svg
+        viewBox="0 0 100 100"
+        className={className}
+        role="img"
+        aria-label={`${shape.systems.length} ${noun} on a map of land and sea, ${held} of them held at the start`}
+      >
+        <rect width={100} height={100} rx={2} fill={SEA} />
+        <path
+          data-part="land"
+          fill={LAND}
+          d={land.runs
+            .map(
+              ([row, from, to]) =>
+                `M${from * cell} ${row * cell}h${(to - from + 1) * cell}v${cell}h${-(to - from + 1) * cell}z`,
+            )
+            .join("")}
+        />
+        {land.outlines.map(({ system, ring }, i) => (
+          <polygon
+            // biome-ignore lint/suspicious/noArrayIndexKey: the outlines are a fixed list, never reordered
+            key={i}
+            points={ring.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
+            fill={
+              shape.systems[system].faction === null
+                ? "none"
+                : colorOf(shape.systems[system].faction)
+            }
+            fillOpacity={0.55}
+            stroke="#0f172a"
+            strokeOpacity={0.6}
+            strokeWidth={0.3}
+            strokeLinejoin="round"
+          />
+        ))}
+        {shape.lanes.map(([a, b], i) =>
+          land.laneKinds[i] === "border" ? null : (
+            <line
+              key={`${a}-${b}`}
+              x1={shape.systems[a].x * 100}
+              y1={shape.systems[a].y * 100}
+              x2={shape.systems[b].x * 100}
+              y2={shape.systems[b].y * 100}
+              stroke="#e2e8f0"
+              strokeOpacity={0.8}
+              strokeWidth={0.4}
+              strokeDasharray={
+                land.laneKinds[i] === "crossing" ? "1.2 1.2" : undefined
+              }
+            />
+          ),
+        )}
+        {shape.systems.map((system, i) =>
+          provinces.has(i) && !system.capital ? null : (
+            <circle
+              key={system.id}
+              cx={system.x * 100}
+              cy={system.y * 100}
+              r={system.capital ? 2.1 : 1.2}
+              fill={colorOf(system.faction)}
+              stroke="#0f172a"
+              strokeWidth={0.3}
+            />
+          ),
+        )}
+      </svg>
+    );
+  }
 
   return (
     <svg
       viewBox="0 0 100 100"
       className={className}
       role="img"
-      aria-label={`${shape.systems.length} systems joined by ${shape.lanes.length} jump lanes, ${held} of them held at the start`}
+      aria-label={`${shape.systems.length} ${noun} joined by ${shape.lanes.length} jump lanes, ${held} of them held at the start`}
     >
       <defs>
         {/* Each node is a star, so it glows. The blurred copies go under the

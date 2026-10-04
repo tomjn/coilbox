@@ -11,7 +11,7 @@ describe("provenanceLink", () => {
     };
     expect(provenanceLink(p)).toEqual({
       to: "/conquest/g1?node=n1",
-      label: "Back to conquest galaxy",
+      label: "Back to conquest map",
     });
   });
 
@@ -19,7 +19,7 @@ describe("provenanceLink", () => {
     const p: ReplayProvenance = { mode: "conquest", galaxyId: "g1" };
     expect(provenanceLink(p)).toEqual({
       to: "/conquest/g1",
-      label: "Back to conquest galaxy",
+      label: "Back to conquest map",
     });
   });
 
