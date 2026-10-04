@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "./model";
 import {
+  linkKind,
   newConquestState,
   parseConquestStateFile,
   parseGalaxyJson,
@@ -154,6 +155,236 @@ describe("parseGalaxyJson", () => {
       "p",
       "e",
     ]);
+  });
+});
+
+/** A land map: three provinces in a row and a city reached by road. */
+function landMap(overrides: Partial<GalaxyDoc> = {}): GalaxyDoc {
+  const base = galaxy();
+  const square = (x: number): [number, number][][] => [
+    [
+      [x, 0],
+      [x + 10, 0],
+      [x + 10, 10],
+      [x, 10],
+    ],
+  ];
+  return {
+    ...base,
+    nodes: [
+      { ...base.nodes[0], pos: [5, 5], outline: square(0) },
+      { ...base.nodes[1], pos: [15, 5], outline: square(10) },
+      {
+        ...base.nodes[2],
+        pos: [25, 5],
+        outline: [...square(20), ...square(40)],
+      },
+      {
+        id: "d",
+        name: "D",
+        pos: [35, 5],
+        owner: "neutral",
+        difficulty: 1,
+        battle: { mapName: "MapD" },
+      },
+    ],
+    links: [
+      ["a", "b"],
+      ["b", "c"],
+      ["c", "d"],
+    ],
+    terrain: {
+      image: "data:image/png;base64,AAAA",
+      heightmap: "generated:territories",
+      width: 50,
+      height: 10,
+      heightScale: 8,
+      projection: "flat",
+    },
+    linkKinds: [
+      ["a", "b", "border"],
+      ["c", "d", "road"],
+    ],
+    blockedBorders: [["a", "c"]],
+    ...overrides,
+  };
+}
+
+/** Parse a raw document and return the reason it was refused, if it was. */
+function refusal(raw: unknown): string | undefined {
+  let reason: string | undefined;
+  const parsed = parseGalaxyJson(JSON.stringify(raw), (r) => {
+    reason = r;
+  });
+  expect(parsed).toBeNull();
+  return reason;
+}
+
+describe("parseGalaxyJson map fields", () => {
+  it("round-trips outlines, terrain, link kinds and blocked borders", () => {
+    const doc = landMap();
+    expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);
+  });
+
+  it("round-trips them through the export wrapper", () => {
+    const doc = landMap();
+    const wrapped = JSON.stringify(wrapGalaxyForExport(doc));
+    expect(parseGalaxyJson(wrapped)).toEqual(doc);
+  });
+
+  it("leaves a document with none of them as it was", () => {
+    const parsed = parseGalaxyJson(JSON.stringify(galaxy()));
+    expect(parsed?.terrain).toBeUndefined();
+    expect(parsed?.linkKinds).toBeUndefined();
+    expect(parsed?.blockedBorders).toBeUndefined();
+    expect(parsed?.nodes.every((n) => n.outline === undefined)).toBe(true);
+  });
+
+  it("refuses a location that cannot be reached and names it", () => {
+    const doc = landMap({ linkKinds: [["a", "b", "border"]] });
+    doc.links = [
+      ["a", "b"],
+      ["b", "c"],
+    ];
+    expect(refusal(doc)).toBe(
+      'location "d" (D) cannot be reached from the rest of the map',
+    );
+  });
+
+  it("names the stray location when it is the first one listed", () => {
+    const doc = galaxy({ links: [["b", "c"]] });
+    expect(refusal(doc)).toBe(
+      'location "a" (A) cannot be reached from the rest of the map',
+    );
+  });
+
+  it("refuses a projection other than flat", () => {
+    const doc = landMap();
+    const raw = { ...doc, terrain: { ...doc.terrain, projection: "globe" } };
+    expect(refusal(raw)).toBe(
+      'terrain projection "globe" is not supported, only "flat" is',
+    );
+  });
+
+  it("refuses terrain without an image or a size above 0", () => {
+    const doc = landMap();
+    expect(refusal({ ...doc, terrain: { ...doc.terrain, image: "" } })).toBe(
+      "terrain has no image",
+    );
+    for (const bad of [{ width: 0 }, { height: -1 }, { width: "50" }]) {
+      expect(refusal({ ...doc, terrain: { ...doc.terrain, ...bad } })).toBe(
+        "terrain width and height must be numbers above 0",
+      );
+    }
+    expect(refusal({ ...doc, terrain: "map.png" })).toBe(
+      "terrain is not an object",
+    );
+  });
+
+  it("takes any non-empty string as a terrain image", () => {
+    const doc = landMap();
+    const terrain = {
+      image: "generated:cities",
+      width: 50,
+      height: 10,
+    };
+    const parsed = parseGalaxyJson(JSON.stringify({ ...doc, terrain }));
+    expect(parsed?.terrain).toEqual(terrain);
+  });
+
+  it("refuses an outline polygon with fewer than 3 points", () => {
+    const doc = landMap();
+    doc.nodes[1].outline = [
+      [
+        [0, 0],
+        [1, 1],
+      ],
+    ];
+    expect(refusal(doc)).toBe(
+      'location "b" has an outline that is not a list of polygons of 3 or more [x, y] points',
+    );
+  });
+
+  it("refuses an outline that is not polygons of points", () => {
+    for (const outline of [
+      [],
+      "square",
+      [
+        [
+          [0, 0],
+          [1, "1"],
+          [2, 2],
+        ],
+      ],
+    ]) {
+      const raw = JSON.parse(JSON.stringify(landMap()));
+      raw.nodes[0].outline = outline;
+      expect(refusal(raw)).toContain('location "a" has an outline');
+    }
+  });
+
+  it("refuses a link kind for a pair that is not a link", () => {
+    expect(refusal(landMap({ linkKinds: [["a", "c", "crossing"]] }))).toBe(
+      "linkKinds names a and c, which are not linked in links",
+    );
+    expect(refusal(landMap({ linkKinds: [["a", "zz", "road"]] }))).toBe(
+      "linkKinds names a and zz, which are not linked in links",
+    );
+  });
+
+  it("refuses a link kind it does not know", () => {
+    const raw = { ...landMap(), linkKinds: [["a", "b", "tunnel"]] };
+    expect(refusal(raw)).toBe(
+      'linkKinds gives a and b the kind "tunnel", which is not border, crossing or road',
+    );
+  });
+
+  it("refuses a blocked border that is also a link", () => {
+    expect(refusal(landMap({ blockedBorders: [["b", "a"]] }))).toBe(
+      "blockedBorders names b and a, which are also linked in links",
+    );
+  });
+
+  it("refuses a blocked border naming an unknown location", () => {
+    expect(refusal(landMap({ blockedBorders: [["a", "zz"]] }))).toBe(
+      "blockedBorders names zz, which is not a location",
+    );
+  });
+
+  it("refuses link kinds and blocked borders of the wrong shape", () => {
+    const doc = landMap();
+    expect(refusal({ ...doc, linkKinds: "border" })).toBe(
+      "linkKinds is not a list",
+    );
+    expect(refusal({ ...doc, linkKinds: [["a"]] })).toBe(
+      "linkKinds has an entry that is not [id, id, kind]",
+    );
+    expect(refusal({ ...doc, blockedBorders: {} })).toBe(
+      "blockedBorders is not a list",
+    );
+    expect(refusal({ ...doc, blockedBorders: [["a", "a"]] })).toBe(
+      "blockedBorders has an entry that is not two different ids",
+    );
+  });
+
+  it("still refuses a faction with two capitals", () => {
+    const doc = landMap();
+    doc.nodes[3] = { ...doc.nodes[3], owner: "e", kind: "capital" };
+    expect(parseGalaxyJson(JSON.stringify(doc))).toBeNull();
+  });
+});
+
+describe("linkKind", () => {
+  it("finds a link's kind in either order", () => {
+    const doc = landMap();
+    expect(linkKind(doc, "a", "b")).toBe("border");
+    expect(linkKind(doc, "b", "a")).toBe("border");
+    expect(linkKind(doc, "d", "c")).toBe("road");
+  });
+
+  it("is undefined for a link with no stated kind and for a plain galaxy", () => {
+    expect(linkKind(landMap(), "b", "c")).toBeUndefined();
+    expect(linkKind(galaxy(), "a", "b")).toBeUndefined();
   });
 });
 
