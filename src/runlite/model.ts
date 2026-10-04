@@ -236,6 +236,10 @@ export interface RogueliteRun {
    * `./challenge.ts`) rather than generated locally — shown on the hub list so
    * a shared-seed run's provenance stays visible. */
   importedChallenge?: boolean;
+  /** The newer version of the run's game the player declined to move to, so it
+   * is not offered again (issue #3465). Kept on the run, not its settings,
+   * which a shared challenge code carries. */
+  declinedGameUpdate?: string;
 }
 
 /**
@@ -626,6 +630,11 @@ export function parseRunJson(json: string): RogueliteRun | null {
     createdAt: typeof data.createdAt === "string" ? data.createdAt : now(),
     updatedAt: typeof data.updatedAt === "string" ? data.updatedAt : now(),
     importedChallenge: data.importedChallenge === true ? true : undefined,
+    declinedGameUpdate:
+      typeof data.declinedGameUpdate === "string" &&
+      data.declinedGameUpdate !== ""
+        ? data.declinedGameUpdate
+        : undefined,
   };
 }
 

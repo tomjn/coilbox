@@ -13,7 +13,9 @@ import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
 import type { SkirmishDraft } from "../../../play/drafts";
 import { resolveGameDownload } from "../../../play/gameOffer";
+import type { GameOffer } from "../../../play/installedGames";
 import { DownloadGameButton } from "../../../play/pages/components/DownloadGameButton";
+import { GameChoiceOffer } from "../../../play/pages/components/GameChoiceOffer";
 import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { BattleRequirement } from "../../../play/useBattleRun";
 import { useGameCatalog } from "../../../play/useGameCatalog";
@@ -212,6 +214,12 @@ export function BattleLaunchGate({
   mapDownload,
   game,
   onRecheck,
+  gameOffer = null,
+  gameOfferNoun,
+  gameOfferNote,
+  choosing = false,
+  onChooseGame,
+  onDeclineUpgrade,
 }: {
   error?: string | null;
   noEngine: boolean;
@@ -229,6 +237,14 @@ export function BattleLaunchGate({
   /** The game the battle is for. Given, a missing game downloads in place. */
   game?: GameRef;
   onRecheck: () => void | Promise<void>;
+  /** A question about which installed game the run uses, answered before the
+   *  battle can launch (issue #3465). */
+  gameOffer?: GameOffer | null;
+  gameOfferNoun?: "warpath" | "conquest";
+  gameOfferNote?: ReactNode;
+  choosing?: boolean;
+  onChooseGame?: (name: string) => void;
+  onDeclineUpgrade?: (declinedName: string) => void;
 }) {
   return (
     <>
@@ -250,6 +266,15 @@ export function BattleLaunchGate({
           mapDownload={mapDownload}
           game={game}
           onRecheck={onRecheck}
+        />
+      ) : gameOffer && onChooseGame && onDeclineUpgrade && gameOfferNoun ? (
+        <GameChoiceOffer
+          offer={gameOffer}
+          noun={gameOfferNoun}
+          busy={choosing}
+          note={gameOfferNote}
+          onChoose={onChooseGame}
+          onDecline={onDeclineUpgrade}
         />
       ) : canStart ? (
         <Button onClick={onStart} className="w-full">

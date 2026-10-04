@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { GameRef } from "../conquest/model";
 import { contentListReplays, type SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
@@ -22,8 +22,8 @@ import {
 import type { SkirmishDraft } from "./drafts";
 import type { GameAiConfig } from "./gameAi";
 import { mergeGameAi } from "./gameAi";
-import type { InstalledGame } from "./installedGames";
-import { resolveGameByShortname } from "./installedGames";
+import type { GameChoice, GameOffer, InstalledGame } from "./installedGames";
+import { decideLaunchGame } from "./installedGames";
 import { usePlay } from "./PlayProvider";
 
 /* -------------------------------------------------------------------------- *
@@ -49,8 +49,9 @@ export type BattleRunPhase =
   | "victory"
   | "defeat";
 
-/** What the battle needs installed before it can launch. The game resolves by
- * shortname (newest installed version), and the map is an exact-name match. */
+/** What the battle needs installed before it can launch. The game is the one
+ * the run pinned, or the one `decideLaunchGame` settles on, and the map is an
+ * exact-name match. */
 export interface BattleRequirement {
   kind: "game" | "map";
   name: string;
@@ -64,6 +65,10 @@ export interface UseBattleRunOptions<TResolved> {
   launchMode: "conquest" | "runlite";
   /** The game to resolve against the installed list. */
   gameRef: GameRef;
+  /** The newer version of the game the player already declined, if any. */
+  declinedGameUpdate?: string;
+  /** Store the player's answer about the game on the run or galaxy. */
+  onGameChoice: (choice: GameChoice) => Promise<void>;
   /** The current node's map name, or `""` when there's no node yet. */
   mapName: string;
   /**
@@ -112,6 +117,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   const {
     launchMode,
     gameRef,
+    declinedGameUpdate,
+    onGameChoice,
     mapName,
     canStartExtra,
     hasDomainState,
@@ -145,18 +152,58 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   const scanFailure = scan.error;
   const scanReady = !!scan.data || scanFailure !== null;
 
-  const installedGame = resolveGameByShortname(gameRef, games);
+  const decision = decideLaunchGame(gameRef, games, declinedGameUpdate);
+  // Only a game the run is already on, or the sole candidate of a run that
+  // names none, launches. Every other answer waits for the player.
+  const installedGame = decision.kind === "ready" ? decision.game : undefined;
+  const gameOffer: GameOffer<(typeof games)[number]> | null =
+    decision.kind === "choose" ||
+    decision.kind === "continue" ||
+    decision.kind === "upgrade"
+      ? decision
+      : null;
   // A scan whose `Init` failed has empty lists that are not a report of an
   // empty machine, so it names nothing missing and cannot start a battle
   // (issue #3398).
   const missing: BattleRequirement | null =
     !scanReady || scanFailure
       ? null
-      : !installedGame
-        ? { kind: "game", name: gameRef.pinnedName ?? gameRef.shortname }
-        : !maps.some((m) => m.name === mapName)
-          ? { kind: "map", name: mapName }
-          : null;
+      : decision.kind === "missing"
+        ? { kind: "game", name: decision.name }
+        : gameOffer
+          ? null
+          : !maps.some((m) => m.name === mapName)
+            ? { kind: "map", name: mapName }
+            : null;
+
+  // A run that named no game and has exactly one candidate is pinned to it, so
+  // later battles do not depend on what else gets installed. Done as soon as
+  // the briefing shows, not at launch, so the launch closure sees the saved run.
+  const pin = decision.kind === "ready" ? decision.pin : undefined;
+  const pinned = useRef<string | null>(null);
+  useEffect(() => {
+    if (!pin || !hasDomainState || !scanReady || pinned.current === pin) return;
+    pinned.current = pin;
+    onGameChoice({ pinnedName: pin }).catch((e) =>
+      console.warn("could not pin the run's game", e),
+    );
+  }, [pin, hasDomainState, scanReady, onGameChoice]);
+
+  const [choosing, setChoosing] = useState(false);
+  const answerGameOffer = useCallback(
+    async (choice: GameChoice) => {
+      setChoosing(true);
+      setError(null);
+      try {
+        await onGameChoice(choice);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setChoosing(false);
+      }
+    },
+    [onGameChoice],
+  );
 
   const { ais } = useSkirmishAis(
     target?.enginePath,
@@ -175,6 +222,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     scanReady &&
     !scanFailure &&
     !missing &&
+    !gameOffer &&
     !running &&
     !scan.loading &&
     ais.length > 0 &&
@@ -331,6 +379,11 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     autoDetected,
     resolved,
     installedGame,
+    /** The question to answer before launching, or null when there is none. */
+    gameOffer,
+    /** True while an answer to {@link gameOffer} is being saved. */
+    choosing,
+    answerGameOffer,
     ais,
     start,
     snapshot,

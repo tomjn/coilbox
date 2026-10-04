@@ -36,6 +36,10 @@ import {
   ScanFailed,
   SkeletonList,
 } from "../../content/pages/components/states";
+import {
+  normalizeGameIdentity,
+  stripVersionSuffix,
+} from "../../content/resolveContent";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
@@ -47,6 +51,7 @@ import {
 } from "../../play/config";
 import { challengeGameRequirement, offerableGames } from "../../play/gameOffer";
 import {
+  candidateGames,
   compareGameVersions,
   resolveGameByShortname,
 } from "../../play/installedGames";
@@ -543,8 +548,17 @@ const STARTING_OPTIONS = [
   { value: "4", label: "Capital + 3 systems" },
 ];
 
+/** What makes two installed archives the same game in the wizard: the modinfo
+ * shortname and the name without its version. */
+function gameChoiceKey(g: {
+  name: string;
+  info: Record<string, string>;
+}): string {
+  return `${(g.info.shortname ?? g.name).trim().toLowerCase()}|${normalizeGameIdentity(stripVersionSuffix(g.name))}`;
+}
+
 /**
- * The procedural wizard: pick a game (one entry per modinfo shortname, newest
+ * The procedural wizard: pick a game (one entry per game, newest
  * installed version, narrowed by the profile's game filter — auto-selected
  * when only one qualifies), size, enemy count and seed, then save the
  * generated document so the run is stable across sessions and content changes.
@@ -568,8 +582,10 @@ function GenerateGalaxyForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // One wizard entry per shortname: the newest installed version represents
-  // the game (battles always resolve "latest installed" at launch anyway).
+  // One wizard entry per game: the newest installed version represents it. A
+  // game is its shortname and its name without the version, so an archive that
+  // only shares the shortname (Zero-K Benchmark v3 beside Zero-K) is its own
+  // entry (issue #3465). The entry's full name is saved on the galaxy.
   const gameChoices = useMemo(() => {
     const matcher = getGameMatcher();
     // Never coilbox's own generated games: a campaign fought in the unit
@@ -580,13 +596,14 @@ function GenerateGalaxyForm({
       if (matcher && !matcher(g.name)) continue;
       const short = (g.info.shortname ?? g.name).trim();
       if (!short) continue;
-      const existing = byShort.get(short.toLowerCase());
+      const key = gameChoiceKey(g);
+      const existing = byShort.get(key);
       if (
         !existing ||
         compareGameVersions(g.info.version ?? "", existing.info.version ?? "") >
           0
       ) {
-        byShort.set(short.toLowerCase(), g);
+        byShort.set(key, g);
       }
     }
     return [...byShort.values()].sort((a, b) => a.name.localeCompare(b.name));
@@ -597,9 +614,7 @@ function GenerateGalaxyForm({
   // first game, so the create button is never a silent dead-end. The user
   // can still switch games via the select.
   const selected =
-    gameChoices.find(
-      (g) => (g.info.shortname ?? g.name).trim().toLowerCase() === gameShort,
-    ) ??
+    gameChoices.find((g) => gameChoiceKey(g) === gameShort) ??
     (initialGameName
       ? gameChoices.find((g) => g.name === initialGameName)
       : undefined) ??
@@ -665,7 +680,7 @@ function GenerateGalaxyForm({
   const genOptions = useCallback(
     (id: string): GenerateOptions => ({
       seed: Number(seed) || 1,
-      game: { shortname: effectiveShort },
+      game: { shortname: effectiveShort, pinnedName: selected?.name },
       maps,
       nodeCount: Number(size),
       factionCount: Number(factions),
@@ -683,6 +698,7 @@ function GenerateGalaxyForm({
     [
       seed,
       effectiveShort,
+      selected?.name,
       maps,
       size,
       factions,
@@ -762,11 +778,11 @@ function GenerateGalaxyForm({
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Game</span>
               <OptionSelect
-                value={effectiveShort.toLowerCase()}
+                value={selected ? gameChoiceKey(selected) : ""}
                 onValueChange={setGameShort}
                 placeholder={scan.loading ? "Scanning…" : "Pick a game"}
                 options={gameChoices.map((g) => ({
-                  value: (g.info.shortname ?? g.name).trim().toLowerCase(),
+                  value: gameChoiceKey(g),
                   label: g.name,
                 }))}
               />
@@ -954,7 +970,11 @@ function ImportChallengeForm({
     const games = (scanData?.games ?? []).filter(
       (g) => !matcher || matcher(g.name),
     );
-    const installedGame = resolveGameByShortname(settings.game, games);
+    // Names and branding only. Which game each battle launches is decided at
+    // launch (`decideLaunchGame`), so an ambiguous code is not guessed here.
+    const installedGame =
+      resolveGameByShortname(settings.game, games) ??
+      candidateGames(settings.game, games)[0];
     if (!installedGame) {
       if (scanError) {
         throw new Error(

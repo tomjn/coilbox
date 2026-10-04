@@ -214,3 +214,24 @@ describe("parseRunMeta", () => {
     expect(meta.stats.wins).toBe(4);
   });
 });
+
+describe("a run's game choice (issue #3465)", () => {
+  it("round-trips the full game name and a declined update", () => {
+    const run = baseRun();
+    run.settings.game = { shortname: "ZK", pinnedName: "Zero-K v1.14.10.1" };
+    run.declinedGameUpdate = "Zero-K v1.15.0.0";
+    const parsed = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, runs: { a: run } }),
+    ).runs.a;
+    expect(parsed.settings.game).toEqual(run.settings.game);
+    expect(parsed.declinedGameUpdate).toBe("Zero-K v1.15.0.0");
+    expect(reconcileRun(parsed).declinedGameUpdate).toBe("Zero-K v1.15.0.0");
+  });
+
+  it("reads a run saved before the fields existed as unpinned, and writes nothing", () => {
+    const run = baseRun();
+    const parsed = parseRunJson(JSON.stringify(run));
+    expect(parsed?.settings.game.pinnedName).toBeUndefined();
+    expect(parsed?.declinedGameUpdate).toBeUndefined();
+  });
+});
