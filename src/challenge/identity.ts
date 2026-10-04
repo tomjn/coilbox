@@ -68,6 +68,21 @@ export function warpathIdentity(s: RunSettings): string {
     s.factionId,
     s.side ?? null,
     s.skin,
+    // Only a run across a land map adds to the list, so the identity of every
+    // other run is what it was before maps existed.
+    ...(s.map
+      ? [
+          s.map.source === "generated"
+            ? [
+                "generated",
+                s.map.style,
+                s.map.seed,
+                s.map.nodeCount,
+                s.map.layout ?? null,
+              ]
+            : ["handmade", s.map.id],
+        ]
+      : []),
   ]);
 }
 
