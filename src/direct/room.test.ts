@@ -55,6 +55,18 @@ describe("hostBlockedReason", () => {
     expect(reason).toContain("192.168.1.45:8200");
   });
 
+
+  // A room's name is whatever the host typed, so the key can hold an `@` or a
+  // `:` before the one that separates it from the address (issue #3442).
+  it.each([
+    ["me@home@192.168.1.45:8200", "192.168.1.45:8200"],
+    ["a:b@192.168.1.45:8200", "192.168.1.45:8200"],
+    ["a:b@::1:8200", "[::1]:8200"],
+    ["me@home@::1:8200", "[::1]:8200"],
+  ])("names the address of the room keyed %s", (key, address) => {
+    expect(hostBlockedReason(key)).toContain(`at ${address}. Leave it first`);
+  });
+
   it("no longer says coilbox holds one lobby connection", () => {
     const reason = String(hostBlockedReason("Tom@192.168.1.45:8200"));
     expect(reason).not.toContain("one lobby connection");
