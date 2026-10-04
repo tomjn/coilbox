@@ -299,6 +299,38 @@ export function setParticipantTeam(
   });
 }
 
+/**
+ * A bonus as stored on a participant: whole percent, 0 to 100, with 0 as
+ * undefined so an unset bonus writes no `Advantage` (see `toBattleConfig`).
+ */
+function bonusValue(percent: number): number | undefined {
+  const whole = Math.max(0, Math.min(100, Math.round(percent)));
+  return whole === 0 ? undefined : whole;
+}
+
+/** Set one AI's resource bonus. The human row never takes one. */
+export function setAiBonus(
+  participants: Participant[],
+  id: string,
+  percent: number,
+): Participant[] {
+  return participants.map((p) =>
+    p.id === id && p.kind === "ai"
+      ? { ...p, handicap: bonusValue(percent) }
+      : p,
+  );
+}
+
+/** Set the same resource bonus on every AI. The human row never takes one. */
+export function setAllAiBonus(
+  participants: Participant[],
+  percent: number,
+): Participant[] {
+  return participants.map((p) =>
+    p.kind === "ai" ? { ...p, handicap: bonusValue(percent) } : p,
+  );
+}
+
 /** `#rrggbb` -> RGB in 0..1. */
 export function hexToRgb(hex: string): Rgb {
   const n = Number.parseInt(hex.replace("#", ""), 16);
