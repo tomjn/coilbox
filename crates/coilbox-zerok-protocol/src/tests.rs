@@ -276,6 +276,36 @@ fn a_command_goes_out_as_its_name_then_its_json() {
 }
 
 #[test]
+fn a_battle_password_with_a_space_a_quote_or_non_ascii_survives_the_wire() {
+    // The password is a JSON field, so unlike a TASServer join line it needs no
+    // rule against a space. It must come back exactly as it went in.
+    let password = "my pass \"quoted\" caf\u{e9} \u{2603}";
+    for command_line in [
+        line::to_line(&JoinBattle {
+            battle_id: 42,
+            password: Some(password.into()),
+        })
+        .expect("JoinBattle serialises"),
+        line::to_line(&OpenBattle {
+            header: Some(BattleHeader {
+                password: Some(password.into()),
+                ..BattleHeader::default()
+            }),
+        })
+        .expect("OpenBattle serialises"),
+    ] {
+        assert!(line::is_wire_safe(&command_line));
+        let (name, body) = line::split_line(&command_line).expect("it is a line");
+        let found = match ZerokMessage::decode(name, body) {
+            ZerokMessage::JoinBattle(join) => join.password,
+            ZerokMessage::OpenBattle(open) => open.header.and_then(|h| h.password),
+            other => panic!("decoded as {other:?}"),
+        };
+        assert_eq!(found.as_deref(), Some(password));
+    }
+}
+
+#[test]
 fn a_built_line_never_carries_a_break() {
     // A name or a body with a newline in it would read as two messages.
     let line = line::to_line(&Say {
