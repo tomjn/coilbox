@@ -135,7 +135,9 @@ function RemixForm({
     setTarget(newest.name);
   }, [candidates, target]);
 
-  const engineVersion = resolved?.target.engineVersion;
+  // Only a version the engine reported. Its folder name is not one, so an
+  // engine that has not been checked offers no stamp (issue #3452).
+  const engineVersion = resolved?.target.syncVersion;
 
   async function rewrite() {
     if (!target) return;
