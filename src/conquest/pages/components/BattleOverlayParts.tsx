@@ -220,6 +220,7 @@ export function BattleLaunchGate({
   choosing = false,
   onChooseGame,
   onDeclineUpgrade,
+  hold,
 }: {
   error?: string | null;
   noEngine: boolean;
@@ -245,6 +246,9 @@ export function BattleLaunchGate({
   choosing?: boolean;
   onChooseGame?: (name: string) => void;
   onDeclineUpgrade?: (declinedName: string) => void;
+  /** Something the battle waits on that is not the content scan, such as a
+   *  warpath's unit data (issue #3473). Shown on the disabled launch button. */
+  hold?: { label: string; busy: boolean };
 }) {
   return (
     <>
@@ -282,14 +286,16 @@ export function BattleLaunchGate({
         </Button>
       ) : (
         <Button disabled className="w-full">
-          <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+          {(hold?.busy ?? true) && (
+            <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden />
+          )}
           {running
             ? "A game is already running"
             : scanLoading
               ? "Scanning content…"
               : !aisAvailable
                 ? "No skirmish AI available"
-                : "Preparing…"}
+                : (hold?.label ?? "Preparing…")}
         </Button>
       )}
     </>

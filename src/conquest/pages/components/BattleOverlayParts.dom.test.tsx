@@ -45,3 +45,41 @@ describe("BattleLaunchGate when the scan failed", () => {
     expect(screen.getByText("Preparing…")).toBeTruthy();
   });
 });
+
+describe("BattleLaunchGate while the run's unit limit is not known", () => {
+  it("says the unit data is loading instead of preparing", () => {
+    render(
+      <MemoryRouter>
+        <BattleLaunchGate
+          {...base}
+          hold={{ label: "Loading unit data…", busy: true }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Loading unit data…")).toBeTruthy();
+    expect(screen.queryByText("Preparing…")).toBeNull();
+    expect(screen.queryByText("Launch battle")).toBeNull();
+  });
+
+  it("has no launch button when the unit data failed to load", () => {
+    render(
+      <MemoryRouter>
+        <BattleLaunchGate
+          {...base}
+          hold={{ label: "Cannot launch without unit data", busy: false }}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Cannot launch without unit data")).toBeTruthy();
+    expect(screen.queryByText("Launch battle")).toBeNull();
+  });
+
+  it("offers the launch button once the limit is known", () => {
+    render(
+      <MemoryRouter>
+        <BattleLaunchGate {...base} canStart />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Launch battle")).toBeTruthy();
+  });
+});
