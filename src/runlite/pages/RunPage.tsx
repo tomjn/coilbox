@@ -3,7 +3,11 @@ import { ArrowLeft, Check, Trophy, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useFactionLogo } from "@/factions/logos";
+import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
+import { runIdentity } from "../../challenge/identity";
+import { warpathRunResult } from "../../challenge/result";
 import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
+import { useRecordChallengeRun } from "../../challenge/useChallengeRecords";
 import {
   BracketFrame,
   HUD_ACCENT_INK,
@@ -187,6 +191,9 @@ export default function RunPage() {
     saveMeta(awardMeta(meta, run));
   }, [run, meta, saveMeta]);
 
+  // A finished run counts toward its challenge's best result, once.
+  useRecordChallengeRun(run && runId ? warpathRunResult(runId, run) : null);
+
   if (loading) return <SkeletonList />;
   if (!run) {
     return (
@@ -293,6 +300,10 @@ export default function RunPage() {
               Imported challenge
             </span>
           )}
+          <ChallengeRecordLine
+            identity={runIdentity(run)}
+            className={`${MAP_BAND_CLASS} px-2 py-1 ${MAP_DIM_INK_CLASS}`}
+          />
         </div>
         <div className="flex items-stretch gap-3">
           {selectedId && !active ? (

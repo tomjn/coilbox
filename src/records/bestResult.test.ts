@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { type GameResult, mergeResult, type ResultRecord } from "./bestResult";
+import {
+  type GameResult,
+  mergeResult,
+  type Ranking,
+  type ResultRecord,
+} from "./bestResult";
 
 const win = (
   replayFilename: string,
@@ -112,5 +117,69 @@ describe("mergeResult", () => {
     const again = mergeResult(first.record, win("a.sdfz", 100));
     expect(again.change).toEqual({ kind: "duplicate" });
     expect(again.record.wins).toBe(0);
+  });
+});
+
+describe("mergeResult with a ranking passed in", () => {
+  // A score where a loss can be the best, which the default ranking never allows.
+  interface Run {
+    id: string;
+    won: boolean;
+    score: number;
+  }
+  interface Best {
+    id: string;
+    won: boolean;
+    score: number;
+  }
+  const ranking: Ranking<Run, Best, { kind: "best" | "kept" }> = {
+    id: (r) => r.id,
+    isWin: (r) => r.won,
+    judge: (r, best) =>
+      !best ||
+      (r.won && !best.won) ||
+      (r.won === best.won && r.score > best.score)
+        ? {
+            best: { id: r.id, won: r.won, score: r.score },
+            change: { kind: "best" },
+          }
+        : { best, change: { kind: "kept" } },
+  };
+
+  it("lets a loss be the best, and a win replace it", () => {
+    const a = mergeResult(
+      undefined,
+      { id: "a", won: false, score: 3 },
+      ranking,
+    );
+    expect(a.record).toEqual({
+      attempts: 1,
+      wins: 0,
+      best: { id: "a", won: false, score: 3 },
+      seen: ["a"],
+    });
+    const b = mergeResult(a.record, { id: "b", won: true, score: 1 }, ranking);
+    expect(b.change).toEqual({ kind: "best" });
+    expect(b.record.best?.id).toBe("b");
+    expect(b.record.wins).toBe(1);
+  });
+
+  it("keeps the best when a result does not beat it", () => {
+    const a = mergeResult(undefined, { id: "a", won: true, score: 9 }, ranking);
+    const b = mergeResult(a.record, { id: "b", won: true, score: 2 }, ranking);
+    expect(b.change).toEqual({ kind: "kept" });
+    expect(b.record.best?.id).toBe("a");
+    expect(b.record.attempts).toBe(2);
+  });
+
+  it("merges the same id once", () => {
+    const a = mergeResult(undefined, { id: "a", won: true, score: 9 }, ranking);
+    const again = mergeResult(
+      a.record,
+      { id: "a", won: true, score: 9 },
+      ranking,
+    );
+    expect(again.change).toEqual({ kind: "duplicate" });
+    expect(again.record).toBe(a.record);
   });
 });
