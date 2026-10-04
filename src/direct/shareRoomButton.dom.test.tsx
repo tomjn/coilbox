@@ -17,6 +17,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -255,7 +256,9 @@ describe("the keyboard", () => {
         key: "Escape",
       });
     });
+    // Radix hands focus back once the popover has unmounted, which is a tick
+    // after the key press.
+    await waitFor(() => expect(document.activeElement).toBe(button));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(document.activeElement).toBe(button);
   });
 });
