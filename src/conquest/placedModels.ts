@@ -46,7 +46,7 @@ const finite = (v: unknown): v is number =>
   typeof v === "number" && Number.isFinite(v);
 
 /** File endings a `file` reference may have. */
-const FILE_EXTS = [".gltf", ".glb"];
+export const MODEL_FILE_EXTS = [".gltf", ".glb"];
 
 /**
  * A `file` reference stays inside the map folder: a relative path with
@@ -60,7 +60,7 @@ function isMapFolderFile(name: string): boolean {
     return false;
   }
   const lower = name.toLowerCase();
-  return FILE_EXTS.some((ext) => lower.endsWith(ext));
+  return MODEL_FILE_EXTS.some((ext) => lower.endsWith(ext));
 }
 
 function parseModelRef(value: unknown): ModelRef | undefined {

@@ -1,5 +1,9 @@
 import { useMemo } from "react";
 import { GalaxyView } from "../conquest/galaxy3d/GalaxyView";
+import {
+  type PlacedModelGame,
+  usePlacedModelSources,
+} from "../conquest/galaxy3d/usePlacedModelSources";
 import { useKnownSpaceMaps } from "../content/mapAppearanceCache";
 import {
   useEffectsEnabled,
@@ -15,6 +19,8 @@ import {
   runToGalaxyDoc,
 } from "./galaxyAdapter";
 import type { RogueliteRun } from "./model";
+
+const NO_MODEL_GAME: PlacedModelGame = {};
 
 /**
  * The run map. Rather than a bespoke renderer, it adapts the run into a
@@ -35,6 +41,7 @@ export function RunMapView({
   onSelect,
   focusId,
   burstNodeId,
+  modelGame,
   className,
 }: {
   run: RogueliteRun;
@@ -44,6 +51,8 @@ export function RunMapView({
   focusId?: string | null;
   /** Fire a one-shot win burst on this node (e.g. a battle just won). */
   burstNodeId?: string | null;
+  /** The installed game a land map's placed models are read out of. */
+  modelGame?: PlacedModelGame;
   className?: string;
 }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
@@ -85,6 +94,7 @@ export function RunMapView({
     [doc.nodes],
   );
   const spaceMaps = useKnownSpaceMaps(nodeMaps);
+  const modelSources = usePlacedModelSources(doc, modelGame ?? NO_MODEL_GAME);
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
@@ -104,6 +114,7 @@ export function RunMapView({
       onSelect={onSelect}
       focusNodeId={focusId ?? null}
       spaceMaps={spaceMaps}
+      modelSources={modelSources}
       display={{ reduceMotion, effects, performanceMode }}
       className={className}
     />
