@@ -105,12 +105,16 @@ export function useConquestBattleRun(
     nodeId: node?.id,
   };
 
+  // A scenario is set on its own map whatever the location's battle says: a
+  // map swapped in for an excluded one applies to the skirmish only.
+  const mapName = scenario?.doc.setup.mapName ?? node?.battle.mapName ?? "";
+
   const battle = useBattleRun<ConquestState>({
     launchMode: "conquest",
     gameRef: conquestGameRef(galaxy, state),
     declinedGameUpdate: state?.declinedGameUpdate,
     onGameChoice,
-    mapName: node?.battle.mapName ?? "",
+    mapName,
     canStartExtra: !!state && !!node && state.status === "active",
     hasDomainState: !!state && !!node,
     snapshot,
@@ -123,5 +127,7 @@ export function useConquestBattleRun(
     ...battle,
     /** The scenario this fight plays, or undefined for a skirmish. */
     scenario: scenario?.doc,
+    /** The map the fight is on. */
+    mapName,
   };
 }

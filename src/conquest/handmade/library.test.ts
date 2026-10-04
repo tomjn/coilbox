@@ -27,7 +27,7 @@ const manifest = readFileSync(`${SAMPLE}map.json`, "utf8");
 const FILES = [
   "cairn.gltf",
   "heightmap.png",
-  "highmoor-siege.json",
+  "ironcoast-siege.json",
   "map.json",
   "picture.png",
   "provinces.png",
@@ -424,23 +424,23 @@ describe("a map with a scenario location", () => {
     const result = await loadHandmadeMap("sample-two-shores");
     if (!result.ok) throw new Error(JSON.stringify(result.errors));
     expect(fetchFile).toHaveBeenCalledWith(
-      "coilbox://localhost/conquestmap/sample-two-shores/highmoor-siege.json",
+      "coilbox://localhost/conquestmap/sample-two-shores/ironcoast-siege.json",
     );
-    const highmoor = result.doc.nodes.find((n) => n.id === "highmoor");
-    expect(highmoor?.scenario?.doc.name).toBe("Siege");
+    const ironcoast = result.doc.nodes.find((n) => n.id === "ironcoast");
+    expect(ironcoast?.scenario?.doc.name).toBe("Siege");
   });
 
   it("names the location when the folder has no such file", async () => {
     hoisted.list.mockResolvedValue({
       items: [
-        item({ files: FILES.filter((f) => f !== "highmoor-siege.json") }),
+        item({ files: FILES.filter((f) => f !== "ironcoast-siege.json") }),
       ],
     });
     const result = await loadHandmadeMap("sample-two-shores");
     expect(result).toEqual({
       ok: false,
       errors: [
-        expect.objectContaining({ code: "scenario-missing", name: "Highmoor" }),
+        expect.objectContaining({ code: "scenario-missing", name: "Ironcoast" }),
       ],
     });
     expect(fetchFile).not.toHaveBeenCalled();
@@ -452,7 +452,7 @@ describe("a map with a scenario location", () => {
     expect(result).toEqual({
       ok: false,
       errors: [
-        expect.objectContaining({ code: "scenario-invalid", name: "Highmoor" }),
+        expect.objectContaining({ code: "scenario-invalid", name: "Ironcoast" }),
       ],
     });
   });

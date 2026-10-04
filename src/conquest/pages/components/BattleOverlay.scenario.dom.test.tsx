@@ -52,6 +52,7 @@ vi.mock("../../run", () => ({
     installedGame: { name: "Test Game 2.0" },
     ais: [],
     scenario: h.scenario,
+    mapName: "Comet Catcher Redux",
     snapshot: () => null,
     lastSnapshot: null,
   }),
@@ -60,8 +61,8 @@ vi.mock("../../run", () => ({
 import { BattleOverlay } from "./BattleOverlay";
 
 const node: GalaxyNode = {
-  id: "highmoor",
-  name: "Highmoor",
+  id: "ironcoast",
+  name: "Ironcoast",
   pos: [0, 0],
   owner: "neutral",
   difficulty: 3,
@@ -76,7 +77,7 @@ const galaxy = {
 } as unknown as GalaxyDoc;
 const state = {
   playerFactionId: "west",
-  owners: { highmoor: "neutral" },
+  owners: { ironcoast: "neutral" },
   incursions: [],
   status: "active",
 } as unknown as ConquestState;
@@ -115,7 +116,7 @@ describe("the briefing for a scenario location", () => {
     expect(screen.getByText("Siege")).toBeTruthy();
     expect(
       screen.getByText(
-        "This location is a scenario, not a skirmish. The player must hold the keep before the clock runs out. Win it to take Highmoor.",
+        "This location is a scenario, not a skirmish. The player must hold the keep before the clock runs out. Win it to take Ironcoast.",
       ),
     ).toBeTruthy();
     expect(screen.getByText("Comet Catcher Redux")).toBeTruthy();
@@ -137,7 +138,7 @@ describe("the briefing for a scenario location", () => {
     show();
     expect(
       screen.getByText(
-        "This location is a scenario, not a skirmish. Win it to take Highmoor.",
+        "This location is a scenario, not a skirmish. Win it to take Ironcoast.",
       ),
     ).toBeTruthy();
   });

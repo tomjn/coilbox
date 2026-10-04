@@ -43,14 +43,15 @@
       "warpath": { "kind": "shop" }
     },
     { "color": "#8a6fc2", "name": "Southreach" },
-    { "color": "#b55f9a", "name": "Ironcoast", "difficulty": 3 },
     {
-      "color": "#5c7fd0",
-      "name": "Highmoor",
+      "color": "#b55f9a",
+      "name": "Ironcoast",
       "difficulty": 3,
-      "blurb": "A keep on the moor. Taking it is a scenario, not a skirmish.",
-      "scenario": "highmoor-siege.json"
+      "blurb": "The keep that guards the landing. Taking it is a scenario, not a skirmish.",
+      "scenario": "ironcoast-siege.json",
+      "warpath": { "kind": "battle" }
     },
+    { "color": "#5c7fd0", "name": "Highmoor", "difficulty": 3 },
     {
       "color": "#c97b3c",
       "name": "Redfield",

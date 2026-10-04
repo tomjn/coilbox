@@ -290,11 +290,13 @@ function Briefing({
             Battlefield
           </dt>
           <dd className="min-w-0 text-right">
-            <span className="block truncate">{node.battle.mapName}</span>
-            <SubstitutedMapNote
-              original={node.battle.mapSubstitutedFrom}
-              onRestore={() => onRestoreMap(node.id)}
-            />
+            <span className="block truncate">{run.mapName}</span>
+            {!run.scenario && (
+              <SubstitutedMapNote
+                original={node.battle.mapSubstitutedFrom}
+                onRestore={() => onRestoreMap(node.id)}
+              />
+            )}
           </dd>
         </div>
         {run.scenario ? (
@@ -383,8 +385,8 @@ function Briefing({
         scanLoading={run.scanLoading}
         aisAvailable={run.ais.length > 0 || !!run.scenario}
         onStart={run.start}
-        mapName={node.battle.mapName}
-        mapDownload={node.battle.mapDownload}
+        mapName={run.mapName}
+        mapDownload={run.scenario ? undefined : node.battle.mapDownload}
         game={conquestGameRef(galaxy, state)}
         onRecheck={run.recheck}
         gameOffer={run.gameOffer}

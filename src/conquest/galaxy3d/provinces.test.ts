@@ -435,8 +435,8 @@ describe("provinceBorders on the sample hand-made map", () => {
     picture: { width: image.width, height: image.height },
     urlFor: (name) => `asset://map/${name}`,
     scenarios: {
-      "highmoor-siege.json": readFileSync(
-        `${SAMPLE}highmoor-siege.json`,
+      "ironcoast-siege.json": readFileSync(
+        `${SAMPLE}ironcoast-siege.json`,
         "utf8",
       ),
     },

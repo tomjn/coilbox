@@ -103,8 +103,8 @@ function sampleMap(): GalaxyDoc {
     picture: { width: provinces.width, height: provinces.height },
     urlFor: (name) => `asset://map/${name}`,
     scenarios: {
-      "highmoor-siege.json": readFileSync(
-        `${SAMPLE}highmoor-siege.json`,
+      "ironcoast-siege.json": readFileSync(
+        `${SAMPLE}ironcoast-siege.json`,
         "utf8",
       ),
     },
@@ -114,8 +114,8 @@ function sampleMap(): GalaxyDoc {
 }
 
 const galaxy = sampleMap();
-const highmoor = galaxy.nodes.find((n) => n.id === "highmoor");
-if (!highmoor) throw new Error("the sample has no Highmoor");
+const ironcoast = galaxy.nodes.find((n) => n.id === "ironcoast");
+if (!ironcoast) throw new Error("the sample has no Ironcoast");
 
 /** A new conquest on the sample, already settled on `pinnedGame`, so the only
  * save a test sees is the one a battle makes. */
@@ -148,7 +148,7 @@ function mount(
   state: ConquestState = freshState(),
   mode: "attack" | "defend" = "attack",
 ) {
-  return renderHook(() => useConquestBattleRun(galaxy, state, highmoor, mode));
+  return renderHook(() => useConquestBattleRun(galaxy, state, ironcoast, mode));
 }
 
 beforeEach(() => {
@@ -195,7 +195,7 @@ describe("attacking a scenario location", () => {
     expect(input.scenario.setup.gameName).toBe("Test Game 2.0");
     // The runtime the scenario needs travels with it, for the launch to check.
     expect(input.scenario.runtimeVersion).toBe(
-      highmoor.scenario?.doc.runtimeVersion,
+      ironcoast.scenario?.doc.runtimeVersion,
     );
     // No skirmish was started beside it.
     expect(engineLaunch).not.toHaveBeenCalled();
@@ -214,10 +214,10 @@ describe("attacking a scenario location", () => {
       ConquestState,
     ];
     expect(mapId).toBe(galaxy.id);
-    expect(saved.owners.highmoor).toBe("west");
-    expect(saved.handmade?.scenariosWon).toEqual(["highmoor"]);
+    expect(saved.owners.ironcoast).toBe("west");
+    expect(saved.handmade?.scenariosWon).toEqual(["ironcoast"]);
     expect(saved.history.at(-1)).toMatchObject({
-      nodeId: "highmoor",
+      nodeId: "ironcoast",
       mode: "attack",
       outcome: "victory",
     });
@@ -232,7 +232,7 @@ describe("attacking a scenario location", () => {
       string,
       ConquestState,
     ];
-    expect(saved.owners.highmoor).not.toBe("west");
+    expect(saved.owners.ironcoast).not.toBe("west");
     expect(saved.handmade?.scenariosWon).toBeUndefined();
     expect(saved.history.at(-1)).toMatchObject({ outcome: "defeat" });
   });
@@ -254,8 +254,8 @@ describe("attacking a scenario location", () => {
       string,
       ConquestState,
     ];
-    expect(saved.owners.highmoor).toBe("west");
-    expect(saved.handmade?.scenariosWon).toEqual(["highmoor"]);
+    expect(saved.owners.ironcoast).toBe("west");
+    expect(saved.handmade?.scenariosWon).toEqual(["ironcoast"]);
   });
 
   it("shows a refusal and saves nothing when the scenario will not launch", async () => {
@@ -296,6 +296,21 @@ describe("attacking a scenario location", () => {
     expect(saveFor).not.toHaveBeenCalled();
   });
 
+  it("checks for the scenario's map, not one swapped in for the skirmish", () => {
+    const swapped = {
+      ...ironcoast,
+      battle: { ...ironcoast.battle, mapName: "MapA" },
+    };
+    const { result } = renderHook(() =>
+      useConquestBattleRun(galaxy, freshState(), swapped, "attack"),
+    );
+    expect(result.current.mapName).toBe("Comet Catcher Redux");
+    const defending = renderHook(() =>
+      useConquestBattleRun(galaxy, freshState(), swapped, "defend"),
+    );
+    expect(defending.result.current.mapName).toBe("MapA");
+  });
+
   it("puts the clips the file carried in the media store first", async () => {
     const withClip: GalaxyDoc = {
       ...galaxy,
@@ -311,7 +326,7 @@ describe("attacking a scenario location", () => {
           : n,
       ),
     };
-    const node = withClip.nodes.find((n) => n.id === "highmoor");
+    const node = withClip.nodes.find((n) => n.id === "ironcoast");
     const { result } = renderHook(() =>
       useConquestBattleRun(withClip, freshState(), node, "attack"),
     );
@@ -331,8 +346,10 @@ describe("the other fights at a scenario location", () => {
   it("defends it as a skirmish on the scenario's map", async () => {
     const state: ConquestState = {
       ...freshState(),
-      owners: { ...freshState().owners, highmoor: "west" },
-      incursions: [{ nodeId: "highmoor", factionId: "east", expiresOnTurn: 3 }],
+      owners: { ...freshState().owners, ironcoast: "west" },
+      incursions: [
+        { nodeId: "ironcoast", factionId: "east", expiresOnTurn: 3 },
+      ],
     };
     const { result } = mount(state, "defend");
     expect(result.current.scenario).toBeUndefined();
@@ -348,7 +365,7 @@ describe("the other fights at a scenario location", () => {
       ...state,
       handmade: state.handmade && {
         ...state.handmade,
-        scenariosWon: ["highmoor"],
+        scenariosWon: ["ironcoast"],
       },
     };
     const { result } = mount(won, "attack");

@@ -18,7 +18,7 @@ import { type HandmadeMapInput, readHandmadeMap } from "./read";
 const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
-const SCENARIO_FILE = "highmoor-siege.json";
+const SCENARIO_FILE = "ironcoast-siege.json";
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const scenarioText = readFileSync(`${SAMPLE}${SCENARIO_FILE}`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
@@ -70,15 +70,15 @@ describe("the sample map's scenario location", () => {
   });
 
   it("carries the scenario, and fights on the scenario's map", () => {
-    const highmoor = readDoc().nodes.find((n) => n.id === "highmoor");
-    expect(highmoor?.scenario?.file).toBe(SCENARIO_FILE);
-    expect(highmoor?.scenario?.doc).toEqual(siege);
-    expect(highmoor?.scenario?.media).toEqual({});
-    expect(highmoor?.battle).toEqual({ mapName: siege.setup.mapName });
+    const ironcoast = readDoc().nodes.find((n) => n.id === "ironcoast");
+    expect(ironcoast?.scenario?.file).toBe(SCENARIO_FILE);
+    expect(ironcoast?.scenario?.doc).toEqual(siege);
+    expect(ironcoast?.scenario?.media).toEqual({});
+    expect(ironcoast?.battle).toEqual({ mapName: siege.setup.mapName });
   });
 
   it("leaves every other location without one", () => {
-    const others = readDoc().nodes.filter((n) => n.id !== "highmoor");
+    const others = readDoc().nodes.filter((n) => n.id !== "ironcoast");
     expect(others.every((n) => n.scenario === undefined)).toBe(true);
   });
 
@@ -88,7 +88,7 @@ describe("the sample map's scenario location", () => {
       { seed: 1, fogOfWar: false, threatLevel: 0 },
       [{ name: "Some Map", width: 8, height: 8 }],
     );
-    expect(run.battles.highmoor).toBeUndefined();
+    expect(run.battles.ironcoast).toBeUndefined();
     expect(JSON.stringify(run)).not.toContain("Siege");
   });
 
@@ -96,7 +96,7 @@ describe("the sample map's scenario location", () => {
     const doc = readDoc(
       sample({ scenarios: { [SCENARIO_FILE]: JSON.stringify(siege) } }),
     );
-    expect(doc.nodes.find((n) => n.id === "highmoor")?.scenario?.doc).toEqual(
+    expect(doc.nodes.find((n) => n.id === "ironcoast")?.scenario?.doc).toEqual(
       siege,
     );
   });
@@ -131,11 +131,11 @@ describe("a scenario location the author got wrong", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
       code: "scenario-missing",
-      id: "highmoor",
-      name: "Highmoor",
+      id: "ironcoast",
+      name: "Ironcoast",
       file: SCENARIO_FILE,
     });
-    expect(errors[0].message).toContain('"Highmoor"');
+    expect(errors[0].message).toContain('"Ironcoast"');
     expect(errors[0].message).toContain(SCENARIO_FILE);
   });
 
@@ -155,17 +155,17 @@ describe("a scenario location the author got wrong", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
       code: "scenario-invalid",
-      id: "highmoor",
+      id: "ironcoast",
       file: SCENARIO_FILE,
     });
-    expect(errors[0].message).toContain('"Highmoor"');
+    expect(errors[0].message).toContain('"Ironcoast"');
   });
 
   it("names the location when the file could not be read", () => {
     const errors = errorsOf(sample({ scenarios: {} }));
     expect(errors).toHaveLength(1);
     expect(errors[0].code).toBe("scenario-invalid");
-    expect(errors[0].message).toContain('"Highmoor"');
+    expect(errors[0].message).toContain('"Ironcoast"');
     expect(errors[0].message).toContain("could not be read");
   });
 
@@ -190,10 +190,10 @@ describe("a scenario location the author got wrong", () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
       code: "scenario-wrong-game",
-      id: "highmoor",
+      id: "ironcoast",
       game: "Test Game",
     });
-    expect(errors[0].message).toContain('"Highmoor"');
+    expect(errors[0].message).toContain('"Ironcoast"');
     expect(errors[0].message).toContain('"TG"');
   });
 
@@ -224,16 +224,16 @@ describe("a scenario location the author got wrong", () => {
     const errors = errorsOf(
       sample({
         manifest: manifestWith((m) => {
-          const highmoor = m.provinces.find((p) => p.name === "Highmoor");
-          if (highmoor) highmoor.battle = { mapName: "MapA" };
+          const ironcoast = m.provinces.find((p) => p.name === "Ironcoast");
+          if (ironcoast) ironcoast.battle = { mapName: "MapA" };
         }),
       }),
     );
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
       code: "scenario-and-battle",
-      id: "highmoor",
-      name: "Highmoor",
+      id: "ironcoast",
+      name: "Ironcoast",
     });
   });
 
@@ -257,37 +257,37 @@ describe("a scenario location the author got wrong", () => {
 });
 
 describe("which fight at a scenario location plays the scenario", () => {
-  const highmoor = readDoc().nodes.find((n) => n.id === "highmoor");
-  if (!highmoor) throw new Error("the sample has no Highmoor");
+  const ironcoast = readDoc().nodes.find((n) => n.id === "ironcoast");
+  if (!ironcoast) throw new Error("the sample has no Ironcoast");
   const fresh = {
     handmade: { mapId: "sample-two-shores", title: "Two Shores", battles: {} },
   } as unknown as ConquestState;
 
   it("plays it on the first attack", () => {
-    expect(scenarioToPlay(fresh, highmoor, "attack")?.doc.id).toBe("siege");
+    expect(scenarioToPlay(fresh, ironcoast, "attack")?.doc.id).toBe("siege");
   });
 
   it("never plays it on a defence", () => {
-    expect(scenarioToPlay(fresh, highmoor, "defend")).toBeUndefined();
+    expect(scenarioToPlay(fresh, ironcoast, "defend")).toBeUndefined();
   });
 
   it("does not play it again once it is won", () => {
-    const won = withScenarioWon(fresh, "highmoor");
-    expect(won.handmade?.scenariosWon).toEqual(["highmoor"]);
-    expect(scenarioToPlay(won, highmoor, "attack")).toBeUndefined();
-    expect(withScenarioWon(won, "highmoor")).toBe(won);
+    const won = withScenarioWon(fresh, "ironcoast");
+    expect(won.handmade?.scenariosWon).toEqual(["ironcoast"]);
+    expect(scenarioToPlay(won, ironcoast, "attack")).toBeUndefined();
+    expect(withScenarioWon(won, "ironcoast")).toBe(won);
   });
 
   it("keeps the record through a save and a load", () => {
     const saved = JSON.parse(
-      JSON.stringify(withScenarioWon(fresh, "highmoor")),
+      JSON.stringify(withScenarioWon(fresh, "ironcoast")),
     ) as ConquestState;
-    expect(readHandmadeRun(saved)?.scenariosWon).toEqual(["highmoor"]);
+    expect(readHandmadeRun(saved)?.scenariosWon).toEqual(["ironcoast"]);
     expect(readHandmadeRun(fresh)?.scenariosWon).toBeUndefined();
   });
 
   it("plays nothing at a location with no scenario", () => {
-    const { scenario: _scenario, ...plain } = highmoor;
+    const { scenario: _scenario, ...plain } = ironcoast;
     expect(scenarioToPlay(fresh, plain, "attack")).toBeUndefined();
   });
 });
