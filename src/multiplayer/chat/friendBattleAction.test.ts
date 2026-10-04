@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { friendBattleAction } from "./friendBattleAction";
 
-const open = {
+const open: {
+  id: number;
+  passworded: boolean;
+  locked: boolean;
+  host: string;
+  members: Record<string, unknown>;
+  playerCount: number | null;
+  maxPlayers: number;
+} = {
   id: 7,
   passworded: false,
   locked: false,
@@ -11,7 +19,11 @@ const open = {
   maxPlayers: 8,
 };
 
-const ready = { ready: true, busy: false, joinedId: null };
+const ready: { ready: boolean; busy: boolean; joinedId: number | null } = {
+  ready: true,
+  busy: false,
+  joinedId: null,
+};
 
 function act(
   over: {

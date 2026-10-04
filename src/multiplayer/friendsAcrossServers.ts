@@ -19,7 +19,8 @@ export interface FriendEntry {
   serverFriend: boolean;
 }
 
-function battleOf(
+/** The battle a user sits in, as host or member, or null. */
+export function battleOf(
   state: LobbyState,
   name: string,
 ): { id: number; title: string } | null {

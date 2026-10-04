@@ -29,7 +29,7 @@ import {
   removeFavourite,
   useFavourites,
 } from "../friends";
-import { mergeFriends } from "../friendsAcrossServers";
+import { battleOf, mergeFriends } from "../friendsAcrossServers";
 import { isIgnored, useIgnored } from "../ignore";
 import { protocolForKey } from "../protocol";
 import {
@@ -45,6 +45,7 @@ import {
   convId,
   isBattleChannel,
 } from "./conversation";
+import { FriendBattleButton } from "./FriendBattleButton";
 import { FriendRow } from "./FriendRow";
 import { PartySection } from "./PartySection";
 import { userPresence } from "./presence";
@@ -378,11 +379,22 @@ function ConnectionGroup({
               const msgs = state?.dms?.[peer] ?? [];
               const presence = state ? userPresence(state, peer) : "offline";
               const isServerFriend = serverFriendSet.has(peer);
+              const friendBattle = state ? battleOf(state, peer) : null;
               return (
                 <FriendRow
                   key={id}
                   name={peer}
                   status={presence}
+                  battle={friendBattle}
+                  battleAction={
+                    friendBattle && (
+                      <FriendBattleButton
+                        serverKey={serverKey}
+                        status={presence}
+                        battleId={friendBattle.id}
+                      />
+                    )
+                  }
                   serverFriend={isServerFriend}
                   active={id === activeId}
                   trailing={<Badge n={unreadBadge(id, msgs)} />}
@@ -505,6 +517,15 @@ function AllFriendsSection({
             }
             serverFriend={e.serverFriend}
             disabled={e.status === "unknown"}
+            battleAction={
+              e.battle && (
+                <FriendBattleButton
+                  serverKey={e.serverKey}
+                  status={e.status}
+                  battleId={e.battle.id}
+                />
+              )
+            }
             active={
               active?.serverKey === e.serverKey &&
               convId(active.desc) === `dm:${e.name}`
