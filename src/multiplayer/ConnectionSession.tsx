@@ -5,6 +5,14 @@ import {
 } from "../lobby-servers/config";
 import { notify } from "../notify/notify";
 import { sendAdminCommand } from "./admin/adminRequest";
+import { occupancy } from "./battles/battleFilters";
+import {
+  battleRowHref,
+  describeSearch,
+  newMatches,
+  type SavedBattleSearch,
+  type ToldBattles,
+} from "./battles/savedSearch";
 import {
   mpFriendList,
   mpFriendRequestList,
@@ -40,6 +48,10 @@ export interface ConnectionSessionProps {
   ignored: NameLists;
   setIgnored: (next: NameLists) => void;
   favourites: NameLists;
+  /** The saved battle searches, the same list on every connection. */
+  savedSearches: SavedBattleSearch[];
+  /** What the server is called, so a notification says where the battle is. */
+  serverName: string;
   requestJoinChannel: (
     channel: string,
     key: string | undefined,
@@ -74,6 +86,8 @@ export function ConnectionSession({
   ignored,
   setIgnored,
   favourites,
+  savedSearches,
+  serverName,
   requestJoinChannel,
   update,
   onSeenChange,
@@ -311,6 +325,36 @@ export function ConnectionSession({
         void notify({ title: `${name} went offline` });
     }
   }, [activeKey, mirror.phase, mirror.state, favourites]);
+
+  // Notify when a battle starts matching a saved search. The lobby sends no
+  // event for it, so this runs over the battle list on each snapshot, the way
+  // the friend roster above does. `mirror.state` is replaced at most once per
+  // SNAPSHOT_BATCH_MS per connection, and the work is one pass over the
+  // battles per saved search, so it runs on every change with no throttle.
+  // `newMatches` records what it has seen, so the first ready snapshot only
+  // baselines and the login flood never notifies.
+  const toldBattlesRef = useRef<ToldBattles | null>(null);
+  useEffect(() => {
+    const st = mirror.state;
+    if (activeKey == null || mirror.phase !== "ready" || !st) {
+      toldBattlesRef.current = null;
+      return;
+    }
+    const { matches, told } = newMatches(
+      savedSearches,
+      Object.values(st.battles),
+      st.currentBattle,
+      toldBattlesRef.current ?? new Map(),
+    );
+    toldBattlesRef.current = told;
+    for (const { search, battle } of matches) {
+      void notify({
+        title: `A battle matches "${describeSearch(search)}"`,
+        body: `${battle.title} on ${serverName}: ${battle.map}, ${occupancy(battle)}/${battle.maxPlayers} players`,
+        to: battleRowHref(activeKey, battle.id),
+      });
+    }
+  }, [activeKey, mirror.phase, mirror.state, savedSearches, serverName]);
 
   // Away status (issue #333): see useAwayStatus for the design. The provider
   // owns the in-game and manual away choices, because one person at one

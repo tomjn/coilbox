@@ -5,6 +5,7 @@ import {
 } from "@tauri-apps/plugin-notification";
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { SavedSearchSettings } from "../multiplayer/battles/SavedSearchSettings";
 import { NOTIFY_OS_ENABLED_KEY, NOTIFY_OS_SOUND_KEY } from "./NotifyProvider";
 import { notify } from "./notify";
 import { setPermGranted } from "./prefs";
@@ -88,6 +89,8 @@ export default function NotificationsSettings() {
           </>
         )}
       </div>
+
+      <SavedSearchSettings />
 
       <div>
         <Button
