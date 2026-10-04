@@ -170,6 +170,13 @@ export interface RunNode {
    * map (see `./mapRun.ts`). Absent on a Galaxy or Theatre run, whose nodes are
    * laid out in columns. */
   location?: string;
+  /**
+   * The scenario file this fight plays in place of the skirmish in `battle`,
+   * when the location on a hand-made map names one. Only the file name is
+   * saved. The scenario itself is read from the map folder when the run is
+   * opened, and `battle` is what is fought if it cannot be read then.
+   */
+  scenario?: string;
 }
 
 /**
@@ -524,6 +531,9 @@ function parseNode(value: unknown): RunNode | null {
     shop: parseShop(value.shop),
     ...(typeof value.location === "string" && value.location !== ""
       ? { location: value.location }
+      : {}),
+    ...(typeof value.scenario === "string" && value.scenario !== ""
+      ? { scenario: value.scenario }
       : {}),
   };
 }

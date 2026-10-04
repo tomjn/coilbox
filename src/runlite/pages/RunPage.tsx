@@ -32,6 +32,7 @@ import { useGameCatalog } from "../../play/useGameCatalog";
 import { runLocations } from "../galaxyAdapter";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import { useRunHandmadeMap } from "../handmadeMap";
+import { runNodeScenario } from "../mapRun";
 import { isBattleNode, type RunNode, type RunNodeType } from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
@@ -420,6 +421,7 @@ export default function RunPage() {
             run={run}
             runId={runId}
             node={active}
+            scenario={runNodeScenario(handmadeDoc, active)}
             onResolved={applyAndSave}
             onRestoreMap={restoreMap}
             onClose={closeOverlay}
