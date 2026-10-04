@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { LobbyState } from "./bindings";
-import { mergeFriends } from "./friendsAcrossServers";
+import { battleOf, mergeFriends } from "./friendsAcrossServers";
 
 const A = "me@alpha:8200";
 const B = "me@beta:8200";
@@ -185,5 +185,87 @@ describe("mergeFriends", () => {
       { [A]: state({ users: { bob: {}, Amy: {} } }) },
     );
     expect(rows.map((r) => r.name)).toEqual(["Amy", "bob"]);
+  });
+});
+
+describe("battleOf on a lobby list with no member names", () => {
+  // Tachyon's lobby list names no host and no members, only a uuid and counts.
+  function tachyonState(
+    users: Record<string, { currentLobby?: string | null }>,
+    lobbies: Record<string, string | null>,
+  ): LobbyState {
+    return {
+      users: Object.fromEntries(
+        Object.entries(users).map(([name, u]) => [
+          name,
+          { name, status: { ingame: false, away: false }, ...u },
+        ]),
+      ),
+      battles: Object.fromEntries(
+        Object.entries(lobbies).map(([id, tachyonId]) => [
+          id,
+          {
+            id: Number(id),
+            title: `Lobby ${id}`,
+            host: "",
+            members: {},
+            tachyonId,
+          },
+        ]),
+      ),
+      friends: [],
+    } as unknown as LobbyState;
+  }
+
+  it("finds the lobby a user's currentLobby names", () => {
+    const s = tachyonState(
+      { amy: { currentLobby: "uuid-b" } },
+      { "1": "uuid-a", "2": "uuid-b" },
+    );
+    expect(battleOf(s, "amy")).toEqual({ id: 2, title: "Lobby 2" });
+  });
+
+  it("finds nothing for a user whose currentLobby is null or absent", () => {
+    const s = tachyonState(
+      { amy: { currentLobby: null }, bob: {} },
+      { "1": "uuid-a" },
+    );
+    expect(battleOf(s, "amy")).toBeNull();
+    expect(battleOf(s, "bob")).toBeNull();
+  });
+
+  it("finds nothing when the named lobby is not in the list", () => {
+    const s = tachyonState(
+      { amy: { currentLobby: "uuid-gone" } },
+      { "1": "uuid-a" },
+    );
+    expect(battleOf(s, "amy")).toBeNull();
+  });
+
+  it("finds nothing for a name that is not a known user", () => {
+    expect(battleOf(tachyonState({}, { "1": "uuid-a" }), "amy")).toBeNull();
+  });
+
+  it("still prefers the member list where there is one", () => {
+    const s = {
+      users: { amy: { name: "amy", currentLobby: "uuid-b" } },
+      battles: {
+        "1": {
+          id: 1,
+          title: "One",
+          host: "hostie",
+          members: { amy: {} },
+          tachyonId: null,
+        },
+        "2": {
+          id: 2,
+          title: "Two",
+          host: "",
+          members: {},
+          tachyonId: "uuid-b",
+        },
+      },
+    } as unknown as LobbyState;
+    expect(battleOf(s, "amy")).toEqual({ id: 1, title: "One" });
   });
 });

@@ -63,6 +63,7 @@ fn put(state: &mut LobbyState, record: &types::User) -> Vec<Delta> {
         agent: record.lobby_version.clone().unwrap_or_default(),
         status,
         rating: rating_of(record),
+        current_lobby: None,
     };
 
     let mut deltas = Vec::new();
