@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
 import {
+  changedOptions,
   defaultLabel,
   effectiveOptions,
   groupOptions,
   isChanged,
+  resetOptionValues,
   sparseOptions,
   withOption,
 } from "./modOptions";
@@ -292,5 +294,60 @@ describe("defaultLabel", () => {
     expect(defaultLabel(opt("a", { type: "string", default: undefined }))).toBe(
       "empty",
     );
+  });
+});
+
+describe("changedOptions", () => {
+  const read = (values: Record<string, string>) => (o: ConfigOption) =>
+    values[o.key];
+
+  it("is empty when nothing differs from its default", () => {
+    const options = [opt("a"), opt("b")];
+    expect(changedOptions(options, read({}))).toEqual([]);
+    expect(changedOptions(options, read({ a: "1", b: "1.0" }))).toEqual([]);
+  });
+
+  it("picks out the changed ones from a mix", () => {
+    const options = [opt("a"), opt("b"), opt("c")];
+    expect(
+      changedOptions(options, read({ a: "2", b: "1", c: "3" })).map(
+        (o) => o.key,
+      ),
+    ).toEqual(["a", "c"]);
+  });
+
+  it("never counts a section", () => {
+    expect(changedOptions([section("s", "S")], read({ s: "x" }))).toEqual([]);
+  });
+});
+
+describe("resetOptionValues", () => {
+  it("returns the same values when nothing is changed", () => {
+    const values = { a: "1", z: "9" };
+    expect(resetOptionValues([opt("a")], values)).toEqual(values);
+  });
+
+  it("drops the override of each changed option and keeps the rest", () => {
+    const options = [opt("a"), opt("b"), opt("c")];
+    expect(resetOptionValues(options, { a: "2", b: "1.0", c: "3" })).toEqual({
+      b: "1.0",
+    });
+  });
+
+  it("resets an option with no declared default to empty by dropping it", () => {
+    const options = [opt("name", { type: "string", default: undefined })];
+    expect(resetOptionValues(options, { name: "hello" })).toEqual({});
+  });
+
+  it("only touches the options it is given", () => {
+    expect(resetOptionValues([opt("a")], { a: "2", b: "2" })).toEqual({
+      b: "2",
+    });
+  });
+
+  it("keeps a value for a key the schema does not declare", () => {
+    expect(
+      resetOptionValues([opt("a")], { a: "2", coilbox_mission: "m" }),
+    ).toEqual({ coilbox_mission: "m" });
   });
 });
