@@ -491,4 +491,13 @@ describe("sameGameFamily", () => {
       ),
     ).toBe(false);
   });
+
+  it("keeps Zero-K Benchmark v3 apart from Zero-K v1.14.10.1 (issue #3465)", () => {
+    expect(stripVersionSuffix("Zero-K Benchmark v3")).toBe("Zero-K Benchmark");
+    expect(stripVersionSuffix("Zero-K v1.14.10.1")).toBe("Zero-K");
+    expect(sameGameFamily("Zero-K Benchmark v3", "Zero-K v1.14.10.1")).toBe(
+      false,
+    );
+    expect(sameGameFamily("Zero-K v1.14.8.0", "Zero-K v1.14.10.1")).toBe(true);
+  });
 });

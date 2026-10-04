@@ -1,4 +1,9 @@
 import type { GameRef } from "../conquest/model";
+import {
+  normalizeGameIdentity,
+  sameGameFamily,
+  stripVersionSuffix,
+} from "../content/resolveContent";
 
 /**
  * Compare two game version strings segment-wise (numeric segments compare as
@@ -29,12 +34,39 @@ export interface InstalledGame {
   info: Record<string, string>;
 }
 
+const shortnameOf = (g: InstalledGame) =>
+  (g.info.shortname ?? "").trim().toLowerCase();
+
+const newestFirst = <T extends InstalledGame>(a: T, b: T) =>
+  compareGameVersions(b.info.version ?? "", a.info.version ?? "");
+
 /**
- * Resolve a {@link GameRef} against the installed games. An exact `pinnedName`
- * match wins, otherwise the newest installed version of the shortname
- * (case-insensitive, by {@link compareGameVersions} on modinfo `version`).
- * Returns `undefined` when nothing matches, and the caller shows an install
- * gate.
+ * The installed games a {@link GameRef} can mean, newest version first. A game
+ * must share the ref's shortname. When the ref pins a name, it must also be the
+ * same game as that name (`sameGameFamily`), so another archive that happens to
+ * share the shortname, such as "Zero-K Benchmark v3" beside "Zero-K v1.14.10.1",
+ * is never a version of it (issue #3465).
+ */
+export function candidateGames<T extends InstalledGame>(
+  game: GameRef,
+  installed: T[],
+): T[] {
+  const want = game.shortname.trim().toLowerCase();
+  const pinned = game.pinnedName;
+  return installed
+    .filter(
+      (g) =>
+        shortnameOf(g) === want && (!pinned || sameGameFamily(g.name, pinned)),
+    )
+    .sort(newestFirst);
+}
+
+/**
+ * Resolve a {@link GameRef} against the installed games, for display and for
+ * reading a game's data. An exact `pinnedName` match wins, then the newest
+ * installed version of the same game. A ref with no pinned name does not say
+ * which game it means, so when the candidates are different games this returns
+ * `undefined` rather than guess. Launching goes through {@link decideLaunchGame}.
  */
 export function resolveGameByShortname<T extends InstalledGame>(
   game: GameRef,
@@ -44,16 +76,62 @@ export function resolveGameByShortname<T extends InstalledGame>(
     const pinned = installed.find((g) => g.name === game.pinnedName);
     if (pinned) return pinned;
   }
-  const want = game.shortname.trim().toLowerCase();
-  let best: T | undefined;
-  for (const g of installed) {
-    if ((g.info.shortname ?? "").trim().toLowerCase() !== want) continue;
-    if (
-      !best ||
-      compareGameVersions(g.info.version ?? "", best.info.version ?? "") > 0
-    ) {
-      best = g;
-    }
+  const candidates = candidateGames(game, installed);
+  if (!game.pinnedName) {
+    const families = new Set(
+      candidates.map((g) => normalizeGameIdentity(stripVersionSuffix(g.name))),
+    );
+    if (families.size > 1) return undefined;
   }
-  return best;
+  return candidates[0];
+}
+
+/** What a battle does about the game its run or galaxy names. */
+export type LaunchGameDecision<T extends InstalledGame> =
+  /** Launch `game`. `pin` is set when the run named no game and exactly one
+   *  was installed, so the caller stores that name. */
+  | { kind: "ready"; game: T; pin?: string }
+  /** The run names no game and several could be meant. Ask, newest first. */
+  | { kind: "choose"; candidates: T[] }
+  /** The pinned game is gone but another version of it is installed. */
+  | { kind: "continue"; pinnedName: string; newer: T }
+  /** The pinned game is installed and a newer version of it has appeared. */
+  | { kind: "upgrade"; current: T; newer: T }
+  /** Nothing installed matches. `name` is what the gate says is missing. */
+  | { kind: "missing"; name: string };
+
+/**
+ * Which installed game a battle launches, without ever changing the game a run
+ * uses unasked (issue #3465). Only a pinned name that is installed, or the sole
+ * candidate of an unpinned run, launches straight away. `declinedUpdate` is the
+ * newer version the player already said no to.
+ */
+export function decideLaunchGame<T extends InstalledGame>(
+  game: GameRef,
+  installed: T[],
+  declinedUpdate?: string,
+): LaunchGameDecision<T> {
+  const candidates = candidateGames(game, installed);
+  if (game.pinnedName) {
+    const current = installed.find((g) => g.name === game.pinnedName);
+    if (current) {
+      const newer = candidates.find(
+        (g) =>
+          g.name !== current.name &&
+          compareGameVersions(g.info.version ?? "", current.info.version ?? "") >
+            0,
+      );
+      return newer && newer.name !== declinedUpdate
+        ? { kind: "upgrade", current, newer }
+        : { kind: "ready", game: current };
+    }
+    return candidates.length > 0
+      ? { kind: "continue", pinnedName: game.pinnedName, newer: candidates[0] }
+      : { kind: "missing", name: game.pinnedName };
+  }
+  if (candidates.length === 0) return { kind: "missing", name: game.shortname };
+  if (candidates.length === 1) {
+    return { kind: "ready", game: candidates[0], pin: candidates[0].name };
+  }
+  return { kind: "choose", candidates };
 }
