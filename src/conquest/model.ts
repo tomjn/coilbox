@@ -212,6 +212,17 @@ export interface GalaxyDoc {
   blockedBorders?: [string, string][];
   /** Scenery stood on the terrain. Drawn only when the document has one. */
   models?: PlacedModel[];
+  /**
+   * Present when the document was read from a hand-made map folder (see
+   * `./handmade`). Such a document is rebuilt from the folder on every load and
+   * is never saved, so {@link parseGalaxyJson} does not read this.
+   */
+  handmade?: {
+    /** The id of the map in the hand-made map library. */
+    mapId: string;
+    /** Threat level 0..3 the conquest was started at. Absent reads as 0. */
+    threatLevel?: number;
+  };
   createdAt: string;
   updatedAt: string;
   /** Set when this galaxy was created by importing a challenge code/file (see
@@ -305,7 +316,30 @@ export interface ConquestState {
   history: BattleRecord[];
   /** Captures made by the most recent enemy round, for the map recap. */
   lastRound?: TurnEvent[];
+  /** Set when the conquest is played on a hand-made map. */
+  handmade?: HandmadeRun;
   updatedAt: string;
+}
+
+/**
+ * What a conquest on a hand-made map saves besides its progress. The map
+ * itself is not saved: it is read from its folder again on every load, so an
+ * updated map takes effect and its image addresses are always current.
+ */
+export interface HandmadeRun {
+  /** The id of the map in the hand-made map library. */
+  mapId: string;
+  /** The map's title when the conquest started, to name it if the map goes. */
+  title: string;
+  fogOfWar?: boolean;
+  /** Threat level 0..3 (see `./threat`). Absent reads as 0. */
+  threatLevel?: number;
+  /**
+   * nodeId -> battle map, for each location whose battle the author left for
+   * coilbox to pick. Kept so a location stays on the map it was given when
+   * the installed maps change.
+   */
+  battles: Record<string, string>;
 }
 
 export const HISTORY_CAP = 200;
@@ -917,8 +951,9 @@ export function newConquestState(
 /**
  * Heal a saved run state against a (possibly updated) galaxy document: drop
  * ownership entries for nodes that no longer exist, seed newly added nodes
- * from their authored owner, drop a dangling incursion, and fall back to the
- * doc's default faction if the chosen one vanished. Run on every load.
+ * from their authored owner, drop a dangling incursion and a recap line for a
+ * node that is gone, and fall back to the doc's default faction if the chosen
+ * one vanished. Run on every load.
  */
 export function reconcileState(
   galaxy: GalaxyDoc,
@@ -954,6 +989,8 @@ export function reconcileState(
     const prev = (state.revealed ?? []).filter((id) => nodeIds.has(id));
     revealed = expandRevealed(galaxy, owners, playerFactionId, prev);
   }
+  // The recap names each capture's node, so one that is gone has no line.
+  const lastRound = state.lastRound?.filter((e) => owners[e.nodeId]);
   const { incursion: _legacy, ...rest } = legacy;
-  return { ...rest, owners, playerFactionId, revealed, incursions };
+  return { ...rest, owners, playerFactionId, revealed, incursions, lastRound };
 }

@@ -341,6 +341,43 @@ describe("importing a hand-made map", () => {
     });
     expect(hoisted.discard).toHaveBeenCalledWith({ token: "tok-1" });
   });
+
+  it("takes the map out again when the installed copy cannot be read", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    // The installed folder lost a file between the install and the read.
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result).toEqual({
+      status: "invalid",
+      errors: [expect.objectContaining({ code: "file-missing" })],
+    });
+    expect(hoisted.remove).toHaveBeenCalledWith({ id: "sample-two-shores" });
+  });
+
+  it("says the map is still installed when it cannot be taken out", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    hoisted.remove.mockRejectedValue(new Error("folder is in use"));
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result.status).toBe("refused");
+    if (result.status !== "refused") return;
+    expect(result.message).toContain(
+      'The map was installed as "sample-two-shores"',
+    );
+    expect(result.message).toContain("folder is in use");
+  });
 });
 
 describe("removing a hand-made map", () => {
