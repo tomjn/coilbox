@@ -43,3 +43,62 @@ export const conquestStateSave = defineCommand<
   { json: string },
   Record<string, never>
 >("coilbox-conquest", "conquest_state_save");
+
+/** One hand-made map folder: its manifest text and the files beside it. */
+export interface HandmadeMapItem {
+  /** The directory name. For an imported map this is the manifest's id. */
+  folder: string;
+  /** `bundled` maps ship read-only in the portable `.coilbox/galaxies` folder. */
+  source: "imported" | "bundled";
+  /** The text of `map.json`, unparsed. */
+  manifest: string;
+  /** Paths of the folder's files relative to it, with `/` separators. */
+  files: string[];
+}
+
+/** Every hand-made map folder: imported ones, then read-only bundled ones. */
+export const conquestMapList = defineCommand<
+  Record<string, never>,
+  { items: HandmadeMapItem[] }
+>("coilbox-conquest", "conquest_map_list");
+
+/** A zip unpacked into staging, waiting to be read and then committed. */
+export interface StagedHandmadeMap {
+  token: string;
+  /** The manifest's id, or empty when the manifest is not JSON. */
+  id: string;
+  manifest: string;
+  files: string[];
+  /** How many zip entries were left out: hidden files and unknown types. */
+  skipped: number;
+}
+
+/**
+ * Unpack the zip at `path` into staging. Throws with a sentence for the player
+ * when the zip is refused. Nothing is installed until {@link conquestMapCommit}.
+ */
+export const conquestMapStage = defineCommand<
+  { path: string },
+  StagedHandmadeMap
+>("coilbox-conquest", "conquest_map_stage");
+
+/**
+ * Install a staged map. `exists` means a map with that id is installed and
+ * `replace` was not set. The staged copy is kept in that case.
+ */
+export const conquestMapCommit = defineCommand<
+  { token: string; replace: boolean },
+  { status: "imported" | "exists"; id: string }
+>("coilbox-conquest", "conquest_map_commit");
+
+/** Throw away a staged map. */
+export const conquestMapDiscard = defineCommand<
+  { token: string },
+  Record<string, never>
+>("coilbox-conquest", "conquest_map_discard");
+
+/** Remove an imported map. Throws for a bundled one. */
+export const conquestMapRemove = defineCommand<
+  { id: string },
+  Record<string, never>
+>("coilbox-conquest", "conquest_map_remove");

@@ -17,6 +17,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 picoframe-core = "0.0.4"
 coilbox-portable = { path = "../coilbox-portable" }
+# A hand-made map is imported from a zip file.
+zip = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
