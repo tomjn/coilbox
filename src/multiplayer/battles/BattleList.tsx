@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
 
+const NO_FRIENDS: ReadonlyMap<number, string> = new Map();
+
 type RowProps = {
   canJoin: boolean;
   linkable: boolean;
@@ -28,7 +30,7 @@ export function BattleList({
   joinedBattle,
   joinedId,
   inProgressIds,
-  friendsHere,
+  friendsHere = NO_FRIENDS,
   canJoin,
   linkable,
   onJoin,
@@ -46,7 +48,7 @@ export function BattleList({
   joinedId: number | null;
   inProgressIds: Set<number>;
   /** The friends in each battle, as a names string by battle id. */
-  friendsHere: ReadonlyMap<number, string>;
+  friendsHere?: ReadonlyMap<number, string>;
   canJoin: boolean;
   /** Whether the invite link is worth handing out: connected to the server,
    * full stop. Unlike `canJoin`, it doesn't gate on being busy or already in a
