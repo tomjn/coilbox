@@ -103,6 +103,7 @@ export function EncounterOverlay({
               onStart={enc.start}
               mapName={spec.mapName}
               mapDownload={spec.mapDownload}
+              game={run.settings.game}
               onRecheck={enc.recheck}
             />
           </div>
