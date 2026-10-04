@@ -18,6 +18,18 @@ export function scanInitFailure(scan: ScanReading): string | null {
 }
 
 /**
+ * The scan's result when it can vouch for what is installed, else null. A scan
+ * whose `Init` failed has a result, but its empty lists are not a report of an
+ * empty machine, so a caller about to say "not installed" reads this instead of
+ * `data` (issue #3392).
+ */
+export function answeredScan<T extends { initFailure?: string }>(
+  data: T | null | undefined,
+): T | null {
+  return data && !data.initFailure ? data : null;
+}
+
+/**
  * Whether the unitsync scan has gone as far as it is ever going to.
  *
  * Not the same question as "did it find anything". A scan that errored, or that

@@ -193,7 +193,9 @@ describe("resolveVerdict", () => {
       }),
     );
     expect(verdict.unreadable).toBe(true);
-    expect(verdict.unreadableReason).toBe("Init: not enough free space on drive");
+    expect(verdict.unreadableReason).toBe(
+      "Init: not enough free space on drive",
+    );
     expect(verdict.loading).toBe(false);
     expect(verdict.missing).toEqual([]);
     expect(verdict.resolved).toBe(false);

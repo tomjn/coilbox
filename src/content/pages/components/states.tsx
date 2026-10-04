@@ -33,13 +33,7 @@ export function ErrorBanner({ message }: { message: string }) {
  * lists it came back with are empty because the engine could not start, so
  * "no games yet" would be a claim the scan never made.
  */
-export function ScanFailed({
-  noun,
-  reason,
-}: {
-  noun: string;
-  reason: string;
-}) {
+export function ScanFailed({ noun, reason }: { noun: string; reason: string }) {
   return (
     <Alert variant="destructive">
       <AlertCircle />
