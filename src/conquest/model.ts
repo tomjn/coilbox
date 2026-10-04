@@ -1,6 +1,7 @@
 import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
+import type { MapRunKind } from "../runlite/mapRun";
 import { expandRevealed } from "./fog";
 import { type PlacedModel, parsePlacedModels } from "./placedModels";
 import { MAX_NODE_COUNT } from "./size";
@@ -222,6 +223,18 @@ export interface GalaxyDoc {
     mapId: string;
     /** Threat level 0..3 the conquest was started at. Absent reads as 0. */
     threatLevel?: number;
+  };
+  /**
+   * The Warpath markings of a hand-made map whose author gave it a start and a
+   * goal: both ends, and the kind of each location the author chose one for,
+   * by location id. Only the hand-made map reader sets this and only Warpath
+   * reads it. Conquest never looks at it, and {@link parseGalaxyJson} does not
+   * read it, for the reason given on `handmade`.
+   */
+  warpath?: {
+    startId: string;
+    goalId: string;
+    kinds: Record<string, MapRunKind>;
   };
   createdAt: string;
   updatedAt: string;
