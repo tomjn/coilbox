@@ -1,5 +1,10 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { decodePng } from "../handmade/png.testhelper";
+import { readHandmadeMap } from "../handmade/read";
 import {
+  BORDER_TOLERANCE_FRACTION,
   type BorderPiece,
   createProvinceIndex,
   drapeFill,
@@ -371,6 +376,67 @@ describe("provinceBorders", () => {
     const inner = pieces.filter((p) => p.province === 1);
     expect(inner.reduce((s, p) => s + pieceLength(p), 0)).toBeCloseTo(40);
     expect(inner.every((p) => p.neighbour === 0)).toBe(true);
+  });
+});
+
+describe("provinceBorders on the sample hand-made map", () => {
+  const SAMPLE = fileURLToPath(
+    new URL("../../../docs/examples/handmade-map/", import.meta.url),
+  );
+  const image = decodePng(readFileSync(`${SAMPLE}provinces.png`));
+  const result = readHandmadeMap({
+    manifest: readFileSync(`${SAMPLE}map.json`, "utf8"),
+    provinces: image,
+    picture: { width: image.width, height: image.height },
+    urlFor: (name) => `asset://map/${name}`,
+  });
+  if (!result.ok) throw new Error("the sample map did not read");
+  const doc = result.doc;
+  const index = createProvinceIndex(doc.nodes);
+  const longSide = Math.max(doc.terrain?.width ?? 0, doc.terrain?.height ?? 0);
+  const pieces = provinceBorders(index, longSide * BORDER_TOLERANCE_FRACTION);
+  const length = (list: BorderPiece[]) =>
+    list.reduce((s, p) => s + pieceLength(p), 0);
+
+  it("finds exactly the provinces the tracer says touch", () => {
+    const found = new Set(
+      pieces
+        .filter((p) => p.neighbour >= 0)
+        .map((p) =>
+          [doc.nodes[p.province].id, doc.nodes[p.neighbour].id]
+            .sort()
+            .join(" "),
+        ),
+    );
+    // A blocked border is still two provinces touching.
+    const touching = [
+      ...(doc.linkKinds ?? [])
+        .filter(([, , kind]) => kind === "border")
+        .map(([a, b]) => [a, b]),
+      ...(doc.blockedBorders ?? []),
+    ].map((pair) => [...pair].sort().join(" "));
+    expect([...found].sort()).toEqual(touching.sort());
+  });
+
+  it("draws every shared border once", () => {
+    let perimeter = 0;
+    for (const i of index.nodes) {
+      for (const ring of index.ringsOf(i)) {
+        ring.forEach((p, k) => {
+          const q = ring[(k + 1) % ring.length];
+          perimeter += Math.hypot(q[0] - p[0], q[1] - p[1]);
+        });
+      }
+    }
+    const shared = length(pieces.filter((p) => p.neighbour >= 0));
+    expect(shared).toBeGreaterThan(0);
+    // Both neighbours' outlines run along a shared border, and one draws it.
+    // The walk places the end of a shared stretch to within one step, at
+    // each end of each of the 13 shared borders.
+    const step = longSide * BORDER_TOLERANCE_FRACTION * 2;
+    expect(Math.abs(perimeter - shared - length(pieces))).toBeLessThan(
+      13 * 2 * step,
+    );
   });
 });
 
