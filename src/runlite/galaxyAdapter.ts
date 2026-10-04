@@ -4,7 +4,7 @@ import type {
   NodeIdentity,
 } from "../conquest/galaxy3d/GalaxyView";
 import { hashString } from "../conquest/galaxy3d/layout";
-import type { Faction, GalaxyDoc } from "../conquest/model";
+import { type Faction, type GalaxyDoc, NEUTRAL } from "../conquest/model";
 import { isBattleNode, type RogueliteRun, type RunNodeType } from "./model";
 import { successors } from "./progress";
 
@@ -79,12 +79,16 @@ export const PLAYER_FACTION = "you";
 /** A muted faction for already-crossed nodes, so they read as spent. */
 const DONE_FACTION = "done";
 
+/** The faction of a location the player passed through on a land map. It has
+ * the player's colour, and is a faction of its own so that only the location
+ * the player stands on lights the lanes ahead. */
+const TAKEN_FACTION = "taken";
+
 const typeFaction = (type: RunNodeType) => `type-${type}`;
 
-/** Build the GalaxyDoc for a run (memoise on run identity — a new object
- * rebuilds the scene; owners/selection/focus update live without a rebuild). */
-export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
-  const factions: Faction[] = [
+/** The factions a run's nodes are drawn as: you, cleared, and one per type. */
+function runFactions(): Faction[] {
+  return [
     { id: PLAYER_FACTION, name: "You", color: TYPE_COLOR.start },
     { id: DONE_FACTION, name: "Cleared", color: "#5a6577" },
     ...RUN_TYPES.map((t) => ({
@@ -93,6 +97,12 @@ export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
       color: TYPE_COLOR[t],
     })),
   ];
+}
+
+/** Build the GalaxyDoc for a run (memoise on run identity — a new object
+ * rebuilds the scene; owners/selection/focus update live without a rebuild). */
+export function runToGalaxyDoc(run: RogueliteRun): GalaxyDoc {
+  const factions = runFactions();
 
   // Centre each column vertically so columns line up around the lane, instead
   // of all starting at row 0 (which skews the connecting lanes and makes them
@@ -182,14 +192,19 @@ const linkKey = (a: string, b: string) => `${a} ${b}`;
  * a pair is only highlighted if a real edge joins it.
  */
 export function runPathLinks(run: RogueliteRun): Set<string> {
+  return new Set(runPathSteps(run).map(([a, b]) => linkKey(a, b)));
+}
+
+/** The steps behind {@link runPathLinks}, as pairs of run node ids. */
+function runPathSteps(run: RogueliteRun): [string, string][] {
   const edges = new Set(run.edges.map(([a, b]) => linkKey(a, b)));
   const visited = run.nodes
     .filter((n) => run.progress.visited.includes(n.id))
     .sort((a, b) => a.col - b.col);
-  const out = new Set<string>();
+  const out: [string, string][] = [];
   for (let i = 0; i + 1 < visited.length; i++) {
-    const key = linkKey(visited[i].id, visited[i + 1].id);
-    if (edges.has(key)) out.add(key);
+    const step: [string, string] = [visited[i].id, visited[i + 1].id];
+    if (edges.has(linkKey(...step))) out.push(step);
   }
   return out;
 }
@@ -337,4 +352,181 @@ export function runEmphasis(run: RogueliteRun): Map<string, NodeEmphasis> {
     if (entry.opacity !== undefined || entry.flash) emphasis.set(n.id, entry);
   }
   return emphasis;
+}
+
+// ---------------------------------------------------------------------------
+// A run across a land map (see `./mapRun.ts`). The map document goes to the
+// view as it is, with the run's state laid over it. No position is invented:
+// every location is drawn where the map has it. The functions above still do
+// the work, and these move their answers from run node ids to location ids.
+// ---------------------------------------------------------------------------
+
+/**
+ * Which map location each run node stands for, by run node id. Null when the
+ * run was not made on this map: a node with no location, a location the map
+ * does not have, or a step between two locations the map does not join. The
+ * caller falls back to the column layout, which every run can be drawn in.
+ */
+export function runLocations(
+  run: RogueliteRun,
+  map: GalaxyDoc,
+): Map<string, string> | null {
+  const known = new Set(map.nodes.map((n) => n.id));
+  const out = new Map<string, string>();
+  for (const n of run.nodes) {
+    if (!n.location || !known.has(n.location)) return null;
+    out.set(n.id, n.location);
+  }
+  if (new Set(out.values()).size !== out.size) return null;
+  const joined = new Set(
+    map.links.flatMap(([a, b]) => [linkKey(a, b), linkKey(b, a)]),
+  );
+  for (const [a, b] of run.edges) {
+    if (!joined.has(linkKey(out.get(a) ?? "", out.get(b) ?? ""))) return null;
+  }
+  return out;
+}
+
+/**
+ * The map document for the view, with the run laid over it. Each location on a
+ * route takes its run node's type colour, tier and battle map. The rest is
+ * scenery and is neutral.
+ *
+ * The view lights a lane as a way forward when its first end is the player's,
+ * so each step of the run is written from the earlier location to the later.
+ * A link from a route location to scenery is written scenery first, which
+ * never lights. A link between two route locations that is not a step joins
+ * two of the same rank, and is left out: it cannot be travelled in this run,
+ * and it would light as a choice whichever way round it was written.
+ */
+export function mapRunToGalaxyDoc(
+  run: RogueliteRun,
+  map: GalaxyDoc,
+  locations: Map<string, string>,
+): GalaxyDoc {
+  const nodeAt = new Map(
+    run.nodes.map((n) => [locations.get(n.id) ?? n.id, n]),
+  );
+  const steps = new Set(
+    run.edges.map(([a, b]) =>
+      linkKey(locations.get(a) ?? a, locations.get(b) ?? b),
+    ),
+  );
+  const sideways = (a: string, b: string) =>
+    nodeAt.has(a) &&
+    nodeAt.has(b) &&
+    !steps.has(linkKey(a, b)) &&
+    !steps.has(linkKey(b, a));
+
+  return {
+    ...map,
+    title: "Warpath",
+    game: run.settings.game,
+    playerFactionId: PLAYER_FACTION,
+    playableFactionIds: undefined,
+    rules: undefined,
+    factions: [
+      ...runFactions(),
+      { id: TAKEN_FACTION, name: "Taken", color: TYPE_COLOR.start },
+    ],
+    nodes: map.nodes.map((place) => {
+      const n = nodeAt.get(place.id);
+      if (!n) {
+        return {
+          ...place,
+          owner: NEUTRAL,
+          kind: undefined,
+          battle: { mapName: "" },
+        };
+      }
+      return {
+        ...place,
+        owner: typeFaction(n.type),
+        kind:
+          n.type === "boss" || n.type === "start"
+            ? ("capital" as const)
+            : undefined,
+        difficulty: Math.max(1, Math.min(5, n.battle?.techTier ?? 2)),
+        battle: { mapName: n.battle?.mapName ?? "" },
+      };
+    }),
+    links: map.links
+      .filter(([a, b]) => !sideways(a, b))
+      .map(([a, b]): [string, string] =>
+        steps.has(linkKey(b, a)) || (nodeAt.has(a) && !nodeAt.has(b))
+          ? [b, a]
+          : [a, b],
+      ),
+    linkKinds: map.linkKinds?.filter(([a, b]) => !sideways(a, b)),
+  };
+}
+
+/** Move a set of answers keyed by run node id onto location ids. */
+function byLocation<T>(
+  answers: Iterable<[string, T]>,
+  locations: Map<string, string>,
+): [string, T][] {
+  return [...answers].map(([id, value]) => [locations.get(id) ?? id, value]);
+}
+
+/** Live ownership on a land map. The location the player stands on is theirs,
+ * the ones they passed through are taken, the rest of the route keeps its type
+ * colour whether it is still ahead or was gone around, and scenery is neutral. */
+export function mapRunOwners(
+  run: RogueliteRun,
+  map: GalaxyDoc,
+  locations: Map<string, string>,
+): Record<string, string> {
+  const owners: Record<string, string> = {};
+  for (const place of map.nodes) owners[place.id] = NEUTRAL;
+  for (const [id, owner] of byLocation(
+    Object.entries(runOwners(run)),
+    locations,
+  )) {
+    owners[id] = owner === DONE_FACTION ? TAKEN_FACTION : owner;
+  }
+  return owners;
+}
+
+/** Emphasis on a land map. Scenery is pushed right back. A location the player
+ * went around stays as clear as the road ahead, so it reads as still held by
+ * the enemy and not as scenery. */
+export function mapRunEmphasis(
+  run: RogueliteRun,
+  map: GalaxyDoc,
+  locations: Map<string, string>,
+): Map<string, NodeEmphasis> {
+  const out = new Map<string, NodeEmphasis>();
+  const onRoute = new Set(locations.values());
+  for (const place of map.nodes) {
+    if (!onRoute.has(place.id)) {
+      out.set(place.id, { opacity: RUN_DIM.unreachable });
+    }
+  }
+  for (const [id, entry] of byLocation(runEmphasis(run), locations)) {
+    out.set(
+      id,
+      entry.opacity === RUN_DIM.unreachable
+        ? { ...entry, opacity: RUN_DIM.future }
+        : entry,
+    );
+  }
+  return out;
+}
+
+/** The start and goal markers and the danger tints, by location id. */
+export function mapRunIdentities(
+  run: RogueliteRun,
+  locations: Map<string, string>,
+): Map<string, NodeIdentity> {
+  return new Map(byLocation(runIdentities(run), locations));
+}
+
+/** The path taken, as link keys between location ids. */
+export function mapRunPathLinks(
+  run: RogueliteRun,
+  locations: Map<string, string>,
+): Set<string> {
+  const at = (id: string) => locations.get(id) ?? id;
+  return new Set(runPathSteps(run).map(([a, b]) => linkKey(at(a), at(b))));
 }
