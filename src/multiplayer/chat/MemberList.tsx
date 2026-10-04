@@ -1,10 +1,37 @@
-import { Button, cn } from "@picoframe/frame";
+import { Button, cn, useSetting } from "@picoframe/frame";
 import { UserCheck, UserX } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react";
 import type { User } from "../bindings";
 import { NoteButton } from "../NoteButton";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
+import { MemberListResizer } from "./MemberListResizer";
+import { clampWidth, DEFAULT_WIDTH } from "./memberListWidth";
 import { PRESENCE_META, type Presence } from "./presence";
+
+/** The setting that holds the list's width, one for every channel. */
+export const MEMBER_LIST_WIDTH_KEY = "multiplayer.memberListWidth";
+
+/** The width of the element holding `ref`'s parent, kept current as it resizes. 0 until measured. */
+function useParentWidth(ref: RefObject<HTMLElement | null>): number {
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const parent = ref.current?.parentElement;
+    if (!parent) return;
+    const measure = () => setWidth(parent.clientWidth);
+    const observer = new ResizeObserver(measure);
+    observer.observe(parent);
+    measure();
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
 
 /**
  * A reusable member panel: the users in the active conversation, with a coarse
@@ -53,8 +80,38 @@ export function MemberList({
   // colour-less members (e.g. the host) still line up, while plain channel/DM
   // lists (no colours at all) stay flush without a leading gap.
   const showSwatches = colorFor ? members.some((u) => colorFor(u.name)) : false;
+
+  // The stored width is clamped each time it is drawn and never rewritten for
+  // it, so a width chosen in a big window returns when the window does. A drag
+  // in progress is held here and only stored when it ends.
+  const [stored, setStored] = useSetting<number>(
+    MEMBER_LIST_WIDTH_KEY,
+    DEFAULT_WIDTH,
+  );
+  const [dragging, setDragging] = useState<number | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
+  const available = useParentWidth(asideRef);
+  const width = clampWidth(dragging ?? stored, available);
+  const listId = useId();
+
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-l border-border">
+    <aside
+      ref={asideRef}
+      id={listId}
+      style={{ width }}
+      className="relative flex shrink-0 flex-col border-l border-border"
+    >
+      <MemberListResizer
+        width={width}
+        available={available}
+        controls={listId}
+        onChange={(next, final) => {
+          if (final) {
+            setDragging(null);
+            setStored(next);
+          } else setDragging(next);
+        }}
+      />
       <div className="border-b border-border px-4 py-3 text-sm font-semibold">
         Members ({members.length})
       </div>
@@ -80,7 +137,10 @@ export function MemberList({
                   <span aria-hidden className="size-2.5 shrink-0" />
                 ))}
               <CountryFlag country={u.country} />
-              <span className="truncate" title={note || undefined}>
+              <span
+                className="truncate"
+                title={note ? `${u.name} - ${note}` : u.name}
+              >
                 {u.name}
               </span>
               <RankBadge rank={u.status.rank} />
