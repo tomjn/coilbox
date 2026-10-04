@@ -127,6 +127,81 @@ describe("suggestAiBonus", () => {
     expect(ask([other])).toBeNull();
   });
 
+  describe("across versions of one game", () => {
+    const NEW = "Beyond All Reason test-2";
+
+    it("uses the last game on an earlier version and says so", () => {
+      const old = game({
+        won: true,
+        gameType: GAME,
+        ai: { advantage: 0.2 },
+      });
+      expect(ask([old], { gameName: NEW })).toEqual({
+        percent: 20 + harder,
+        from: 20,
+        result: "win",
+        filename: old.filename,
+        otherVersion: true,
+      });
+    });
+
+    it("uses the newest game when it was played on two versions", () => {
+      const older = game({
+        won: false,
+        gameType: GAME,
+        startTimeMs: 1,
+        ai: { advantage: 0.5 },
+      });
+      const newer = game({
+        won: true,
+        gameType: NEW,
+        startTimeMs: 99,
+        ai: { advantage: 0.1 },
+      });
+      const found = ask([older, newer], { gameName: NEW });
+      expect(found).toMatchObject({ from: 10, filename: newer.filename });
+      expect(found?.otherVersion).toBeUndefined();
+    });
+
+    it("uses the older version's game when it is the newer one", () => {
+      const older = game({ gameType: NEW, startTimeMs: 1 });
+      const newer = game({
+        won: false,
+        gameType: GAME,
+        startTimeMs: 99,
+        ai: { advantage: 0.3 },
+      });
+      expect(ask([older, newer], { gameName: NEW })).toMatchObject({
+        result: "loss",
+        filename: newer.filename,
+        otherVersion: true,
+      });
+    });
+
+    it("matches whatever the version looks like", () => {
+      const old = game({ gameType: "Balanced Annihilation V15.9.8" });
+      expect(
+        ask([old], { gameName: "Balanced Annihilation V16.0.1" }),
+      ).toMatchObject({ filename: old.filename, otherVersion: true });
+    });
+
+    it("does not match another game whose name starts the same", () => {
+      const other = game({ gameType: "Balanced Annihilation Reloaded V1.0" });
+      expect(
+        ask([other], { gameName: "Balanced Annihilation V15.9.8" }),
+      ).toBeNull();
+      const base = game({ gameType: "Balanced Annihilation V15.9.8" });
+      expect(
+        ask([base], { gameName: "Balanced Annihilation Reloaded V1.0" }),
+      ).toBeNull();
+    });
+
+    it("leaves the same version unmarked", () => {
+      const same = game({ ai: { advantage: 0.1 } });
+      expect(ask([same])).not.toHaveProperty("otherVersion");
+    });
+  });
+
   it("does not count a game with a human opponent as well", () => {
     const mixed = game({
       extraPlayers: [

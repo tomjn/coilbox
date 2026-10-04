@@ -227,6 +227,20 @@ describe("suggested bonus", () => {
     filename: "a game.sdfz",
   };
 
+  it("says when the game was played on another version", () => {
+    renderTable([you, bot("Bot A")], {
+      bonusSuggestions: {
+        rows: { "Bot A": { ...suggestion, otherVersion: true } },
+        all: null,
+      },
+    });
+    expect(
+      screen.getByText(
+        "You won your last game against BARb at +10% on another version. Try +20%?",
+      ),
+    ).toBeTruthy();
+  });
+
   it("shows where it came from, links the replay and applies on click", () => {
     const { onSetAiBonus } = renderTable([you, bot("Bot A")], {
       bonusSuggestions: { rows: { "Bot A": suggestion }, all: null },

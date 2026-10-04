@@ -1,5 +1,6 @@
 import { aiGameFor } from "@/content/aiRecord";
 import type { StatRecord } from "@/content/bindings";
+import { sameGameFamily } from "@/content/resolveContent";
 import { isGenuineMatch } from "@/content/stats";
 import { HANDICAP_TWEAKS } from "./debrief";
 import { effectiveTeams, type Participant } from "./participants";
@@ -13,8 +14,9 @@ import { effectiveTeams, type Participant } from "./participants";
  * "easier" step. Clamp to 0..100.
  *
  * Matching: the AI by `shortName`, ignoring case and version, and the game by
- * the exact `gameType` string the replay recorded, which is how `aiRecord.ts`
- * groups a game.
+ * its name with the version removed (`sameGameFamily`), so a result from an
+ * earlier version still counts. The record holds only the `gameType` name, not
+ * the modinfo shortname. `aiRecord.ts` still groups by the exact name.
  */
 
 export interface BonusSuggestion {
@@ -25,6 +27,9 @@ export interface BonusSuggestion {
   result: "win" | "loss";
   /** The replay the suggestion came from. */
   filename: string;
+  /** Set when that game was recorded on a different version of the game than
+   * the one selected now. */
+  otherVersion?: boolean;
 }
 
 /** Smallest positive step: the gentlest way "Rematch with a tweak" goes harder. */
@@ -128,7 +133,7 @@ export function suggestAiBonus({
   const candidates = records
     .filter(
       (r) =>
-        r.gameType === gameName &&
+        sameGameFamily(r.gameType, gameName) &&
         isGenuineMatch(r, refights) &&
         !scripted.has(r.filename),
     )
@@ -154,7 +159,13 @@ export function suggestAiBonus({
     const step = played.result === "win" ? HARDER_STEP : EASIER_STEP;
     const percent = Math.max(0, Math.min(100, from + step));
     if (percent === currentBonus) return null;
-    return { percent, from, result: played.result, filename: record.filename };
+    return {
+      percent,
+      from,
+      result: played.result,
+      filename: record.filename,
+      ...(record.gameType === gameName ? {} : { otherVersion: true }),
+    };
   }
   return null;
 }
