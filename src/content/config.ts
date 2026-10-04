@@ -261,6 +261,20 @@ const scanCache = new Map<string, ScanResult>();
 const scanErrorCache = new Map<string, string>();
 
 /**
+ * A scan whose unitsync `Init` failed. The worker prints a result for it, with
+ * empty lists and the engine's reason, so the scan did not throw. That result
+ * does not say what is installed, so `primeScan` throws this instead of handing
+ * it out as an answer, and carries the result for the two list pages that show
+ * it beside the failure (issue #3423). The message is the engine's reason.
+ */
+export class ScanInitFailure extends Error {
+  constructor(readonly result: ScanResult) {
+    super(result.initFailure);
+    this.name = "ScanInitFailure";
+  }
+}
+
+/**
  * In-flight scans keyed like the scan cache. A page opened while the launch
  * warm-up (or another page) is mid-scan joins that running op — and its
  * cancellable `opId` — instead of kicking off a second worker scan of the same
@@ -310,6 +324,10 @@ export async function primeScan(
   const promise = (async () => {
     try {
       const res = await unitsyncScan({ enginePath, dataDir, opId });
+      // Cached nowhere, not even as a failure: an `Init` that fails does so
+      // fast, so the next open can afford to ask again, and by then the disk
+      // may have room.
+      if (res.initFailure) throw new ScanInitFailure(res);
       scanCache.set(key, res);
       // The one place every game modinfo this machine reads goes through, so it
       // is where the shortnames are picked up. They outlive the build they came
@@ -321,7 +339,8 @@ export async function primeScan(
       const msg = e instanceof Error ? e.message : String(e);
       // A user cancellation isn't a target failure — don't poison the error
       // cache, or the next open would resurface "cancelled" as a scan error.
-      if (!/cancelled/i.test(msg)) scanErrorCache.set(key, msg);
+      if (!(e instanceof ScanInitFailure) && !/cancelled/i.test(msg))
+        scanErrorCache.set(key, msg);
       throw e;
     } finally {
       inFlightScans.delete(key);
@@ -377,23 +396,29 @@ export function useScanEpoch(enginePath?: string, dataDir?: string): number {
 /** Run / read a cached unitsync scan for the given target. */
 export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [data, setData] = useState<ScanResult | null>(null);
+  // The result of a scan whose `Init` failed. Not an answer, so it is not
+  // `data`; only a page that shows the partial list beside the failure reads it.
+  const [unvouched, setUnvouched] = useState<ScanResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
 
   const run = useCallback(
     // Resolves with what the scan found, or null when it found nothing to
-    // report, so a caller that has to act on the answer need not wait a render.
+    // report (it threw, or its `Init` failed), so a caller that has to act on
+    // the answer need not wait a render.
     async (force = false): Promise<ScanResult | null> => {
       if (!enginePath || !dataDir) return null;
       const key = `${dataDir}::${enginePath}`;
       if (!force && scanCache.has(key)) {
         const cached = scanCache.get(key) ?? null;
         setData(cached);
+        setUnvouched(null);
         return cached;
       }
       setLoading(true);
       setError(null);
+      setUnvouched(null);
       setCancelled(false);
       try {
         const found = await primeScan(enginePath, dataDir, force);
@@ -401,6 +426,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
         return found;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (e instanceof ScanInitFailure) setUnvouched(e.result);
         // A cancel lands in a stable "cancelled" state rather than an error.
         if (/cancelled/i.test(msg)) setCancelled(true);
         else setError(msg);
@@ -421,12 +447,13 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setData(null);
+      setUnvouched(null);
       return;
     }
     run(false);
   }, [enginePath, dataDir, run]);
 
-  return { data, loading, error, cancelled, run, cancel };
+  return { data, unvouched, loading, error, cancelled, run, cancel };
 }
 
 /**
