@@ -334,6 +334,9 @@ describe("a broken map folder", () => {
     expect(error.name).toBe("Stonebridge");
     expect(error.color).toBeUndefined();
     expect(error.message).toContain('The location "Stonebridge"');
+    expect(error.message).toContain("No road or crossing joins it.");
+    expect(error.message).toContain("Add a road or a crossing to it");
+    expect(error.message).not.toMatch(/paint|touch/i);
   });
 
   it("says when the province image and the map picture are different sizes", () => {
