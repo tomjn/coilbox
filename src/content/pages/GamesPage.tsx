@@ -20,6 +20,7 @@ import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
+  ScanFailed,
   SkeletonList,
 } from "./components/states";
 
@@ -141,6 +142,8 @@ export default function GamesPage() {
         <SkeletonList />
       ) : cancelled && games.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load games." />
+      ) : games.length === 0 && data?.initFailure ? (
+        <ScanFailed noun="games" reason={data.initFailure} />
       ) : games.length === 0 ? (
         suggestions.length > 0 ? (
           <SuggestionsList

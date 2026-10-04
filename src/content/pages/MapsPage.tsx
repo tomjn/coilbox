@@ -21,6 +21,7 @@ import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
+  ScanFailed,
   SkeletonList,
 } from "./components/states";
 
@@ -149,6 +150,8 @@ export default function MapsPage() {
         <SkeletonList />
       ) : cancelled && maps.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load maps." />
+      ) : maps.length === 0 && data?.initFailure ? (
+        <ScanFailed noun="maps" reason={data.initFailure} />
       ) : maps.length === 0 ? (
         suggestions.length > 0 ? (
           <SuggestionsList
