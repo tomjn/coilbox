@@ -2,8 +2,9 @@
 /**
  * Draws the three images of the sample hand-made map in
  * `docs/examples/handmade-map/`: the map picture, the province image and the
- * heightmap. The art is made here, from the numbers below, so it belongs to
- * this repo and a change to it shows up as a change to this file.
+ * heightmap. It also writes `cairn.gltf`, the one model the sample places.
+ * The art is made here, from the numbers below, so it belongs to this repo
+ * and a change to it shows up as a change to this file.
  *
  * The map is two land masses with sea between them. Each land mass is split
  * into provinces by nearest seed point. `map.json` in the same folder is
@@ -188,3 +189,86 @@ for (const [name, pixels, channels] of [
   writeFileSync(join(OUT, name), bytes);
   console.log(`${name}: ${bytes.length} bytes`);
 }
+
+/**
+ * The sample's placed model: a stone cairn, which is a four sided pyramid 40
+ * map units across and 60 tall with its origin under the middle of its base.
+ * glTF has y up. The buffer is inside the file, so the model is one file.
+ */
+function cairnGltf() {
+  const positions = [
+    [-20, 0, -20],
+    [20, 0, -20],
+    [20, 0, 20],
+    [-20, 0, 20],
+    [0, 60, 0],
+  ];
+  // Four sides, then the base as two triangles. Each is anticlockwise seen
+  // from outside.
+  const indices = [3, 2, 4, 2, 1, 4, 1, 0, 4, 0, 3, 4, 0, 1, 2, 0, 2, 3];
+  const indexBytes = indices.length * 2;
+  const buffer = Buffer.alloc(indexBytes + positions.length * 12);
+  indices.forEach((index, i) => {
+    buffer.writeUInt16LE(index, i * 2);
+  });
+  positions.flat().forEach((value, i) => {
+    buffer.writeFloatLE(value, indexBytes + i * 4);
+  });
+  const gltf = {
+    asset: { version: "2.0", generator: "coilbox sample map script" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ name: "cairn", mesh: 0 }],
+    meshes: [
+      {
+        primitives: [{ attributes: { POSITION: 1 }, indices: 0, material: 0 }],
+      },
+    ],
+    materials: [
+      {
+        name: "stone",
+        pbrMetallicRoughness: {
+          baseColorFactor: [0.62, 0.6, 0.56, 1],
+          metallicFactor: 0,
+          roughnessFactor: 1,
+        },
+      },
+    ],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5123,
+        count: indices.length,
+        type: "SCALAR",
+      },
+      {
+        bufferView: 1,
+        componentType: 5126,
+        count: positions.length,
+        type: "VEC3",
+        min: [-20, 0, -20],
+        max: [20, 60, 20],
+      },
+    ],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: indexBytes, target: 34963 },
+      {
+        buffer: 0,
+        byteOffset: indexBytes,
+        byteLength: positions.length * 12,
+        target: 34962,
+      },
+    ],
+    buffers: [
+      {
+        byteLength: buffer.length,
+        uri: `data:application/octet-stream;base64,${buffer.toString("base64")}`,
+      },
+    ],
+  };
+  return Buffer.from(`${JSON.stringify(gltf, null, 2)}\n`);
+}
+
+const cairn = cairnGltf();
+writeFileSync(join(OUT, "cairn.gltf"), cairn);
+console.log(`cairn.gltf: ${cairn.length} bytes`);

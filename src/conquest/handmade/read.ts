@@ -88,6 +88,17 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       ? undefined
       : url("heightmap", manifest.files.heightmap);
 
+  manifest.models.forEach((placed, i) => {
+    if (!("file" in placed.model)) return;
+    const { file } = placed.model;
+    if (input.urlFor(file) !== undefined) return;
+    errors.push({
+      code: "file-missing",
+      file,
+      message: `${MANIFEST_FILE}: models[${i}] names the model file "${file}", but the folder has no file with that name.`,
+    });
+  });
+
   const key = input.cache ? traceCacheKey(input.manifest, image) : "";
   let traced: TracedMap | undefined = input.cache?.get(key);
   if (!traced) {
@@ -242,6 +253,7 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       },
       linkKinds,
       blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
+      models: manifest.models.length > 0 ? manifest.models : undefined,
       theme: { skin: "theatre" },
       createdAt: now,
       updatedAt: now,

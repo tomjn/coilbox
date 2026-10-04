@@ -10,6 +10,7 @@ export {
   type HandmadeMapList,
   type HandmadeMapSource,
   type HandmadeMapSummary,
+  handmadeMapFileUrls,
   importHandmadeMap,
   listHandmadeMaps,
   loadHandmadeMap,

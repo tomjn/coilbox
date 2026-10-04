@@ -13,7 +13,13 @@ import { pointInRing } from "./trace";
 const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
-const FILES = ["map.json", "picture.png", "provinces.png", "heightmap.png"];
+const FILES = [
+  "map.json",
+  "picture.png",
+  "provinces.png",
+  "heightmap.png",
+  "cairn.gltf",
+];
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
@@ -209,12 +215,51 @@ describe("the sample map", () => {
     expect(parseGalaxyJson(JSON.stringify(doc))).toBeNull();
   });
 
+  it("places the manifest's models on the document", () => {
+    expect(doc.models).toEqual([
+      { model: { file: "cairn.gltf" }, pos: [440, 600], rotation: 30 },
+    ]);
+  });
+
+  it("takes a game model and a file in a folder inside the map folder", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models = [
+            { model: { game: "armcom" }, pos: [100, 100], scale: 2 },
+            { model: { file: "models/Gate.GLB" }, pos: [0, 960], height: 5 },
+          ];
+        }),
+        urlFor: (name) =>
+          [...FILES, "models/Gate.GLB"].includes(name)
+            ? `asset://map/${name}`
+            : undefined,
+      }),
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.doc.models).toEqual([
+      { model: { game: "armcom" }, pos: [100, 100], scale: 2 },
+      { model: { file: "models/Gate.GLB" }, pos: [0, 960], height: 5 },
+    ]);
+  });
+
+  it("leaves models off a document whose manifest lists none", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models = [];
+        }),
+      }),
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.doc.models).toBeUndefined();
+  });
+
   it("ignores keys it does not know, including the reserved ones", () => {
     const result = readHandmadeMap(
       sample({
         manifest: manifestWith((m) => {
           m.warpath = { start: "westhaven", goal: "farwatch" };
-          m.models = [{ file: "tower.gltf" }];
           m.provinces[0].scenario = "intro.json";
           m.provinces[0].warpath = { kind: "shop" };
           (m as unknown as Record<string, unknown>).somethingNew = 1;
@@ -433,6 +478,98 @@ describe("a broken map folder", () => {
     );
     expect(errors).toHaveLength(1);
     expect(only(errors, "file-missing")[0].file).toBe("europe.png");
+  });
+
+  it("names a model file the folder does not hold", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models?.push({ model: { file: "tower.glb" }, pos: [10, 10] });
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "file-missing");
+    expect(error.file).toBe("tower.glb");
+    expect(error.message).toContain(
+      'models[1] names the model file "tower.glb"',
+    );
+  });
+
+  it("names a model file that is not glTF", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models = [{ model: { file: "tower.obj" }, pos: [10, 10] }];
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "manifest-field");
+    expect(error.path).toBe('models[0] ("tower.obj").model.file');
+    expect(error.message).toContain("must end in .gltf or .glb");
+  });
+
+  it("names a model placed outside the map", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models?.push({ model: { game: "armcom" }, pos: [1700, 20] });
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "manifest-field");
+    expect(error.path).toBe('models[1] ("armcom").pos');
+    expect(error.message).toContain("outside the map (1600 by 960)");
+  });
+
+  it("lists every malformed model entry and does not drop one unsaid", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).models = [
+            "cairn.gltf",
+            { pos: [10, 10] },
+            { model: { file: "cairn.gltf", game: "armcom" }, pos: [10, 10] },
+            { model: { game: " " }, pos: [10, 10] },
+            { model: { file: "../cairn.gltf" }, pos: [10, 10] },
+            { model: { file: "cairn.gltf" } },
+            {
+              model: { file: "cairn.gltf" },
+              pos: [10, 10],
+              height: "high",
+              rotation: null,
+              scale: 0,
+            },
+          ];
+        }),
+      }),
+    );
+    expect(only(errors, "manifest-field").map((e) => e.path)).toEqual([
+      "models[0]",
+      "models[1].model",
+      'models[2] ("cairn.gltf").model',
+      "models[3].model.game",
+      'models[4] ("../cairn.gltf").model.file',
+      'models[5] ("cairn.gltf").pos',
+      'models[6] ("cairn.gltf").height',
+      'models[6] ("cairn.gltf").rotation',
+      'models[6] ("cairn.gltf").scale',
+    ]);
+    expect(errors).toHaveLength(9);
+  });
+
+  it("says when models is not a list", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).models = {};
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    expect(only(errors, "manifest-field")[0].path).toBe("models");
   });
 
   it("names a crossing to a location that does not exist", () => {
