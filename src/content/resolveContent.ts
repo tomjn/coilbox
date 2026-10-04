@@ -211,7 +211,8 @@ export interface ResolveReadings {
    * not landed. */
   enginesLoading: boolean;
   /** These requirements name an engine, and the release catalogs that say
-   * whether it can be fetched have not landed. */
+   * whether it can be fetched have not landed. Only waited for while one of
+   * those engines is missing. */
   engineCatalogPending: boolean;
 }
 
@@ -262,10 +263,16 @@ export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
     !r.scan.loading &&
     r.scan.data === null &&
     (r.scan.error !== null || r.scan.cancelled);
+  // The catalogs say whether a missing engine can be fetched, so they are only
+  // worth waiting for while an engine is missing. An engine already on disk
+  // needs no answer from the network before a launch goes ahead (issue #3364).
+  const catalogNeeded =
+    r.engineCatalogPending &&
+    r.requirements.some(
+      (q) => q.kind === "engine" && !q.isInstalled(r.installed),
+    );
   const loading =
-    (!installKnown && !installUnreadable) ||
-    r.enginesLoading ||
-    r.engineCatalogPending;
+    (!installKnown && !installUnreadable) || r.enginesLoading || catalogNeeded;
   if (loading) {
     return {
       loading: true,
