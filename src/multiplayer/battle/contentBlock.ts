@@ -12,6 +12,21 @@
  * sync pill, and the launch itself.
  */
 
+import {
+  type ContentRequirement,
+  exactGameRequirement,
+  exactMapRequirement,
+} from "@/content/resolveContent";
+
+/** The game and map a battle needs installed, named as the host named them. */
+export function battleRequirements(
+  battle: { modname: string; map: string } | undefined,
+): ContentRequirement[] {
+  return battle
+    ? [exactGameRequirement(battle.modname), exactMapRequirement(battle.map)]
+    : [];
+}
+
 export interface LaunchContent {
   /** An engine and data dir are resolved, and that resolution has settled. */
   hasTarget: boolean;
