@@ -108,6 +108,8 @@ export interface NodeStar {
   spectral: string[];
 }
 
+export type LinkKind = "border" | "crossing" | "road";
+
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
@@ -180,6 +182,16 @@ export interface GalaxyDoc {
     fogOfWar?: boolean;
   };
   theme?: GalaxyTheme;
+  terrain?: {
+    image: string; // URL the webview can load (data:, blob:, asset or http)
+    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
+    width: number; // map units
+    height: number; // map units
+    heightScale?: number; // map units of height for a white heightmap pixel
+    projection?: "flat";
+  };
+  linkKinds?: [string, string, LinkKind][];
+  blockedBorders?: [string, string][];
   createdAt: string;
   updatedAt: string;
   /** Set when this galaxy was created by importing a challenge code/file (see
