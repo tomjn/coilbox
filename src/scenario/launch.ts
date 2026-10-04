@@ -56,6 +56,7 @@ import {
   coilboxTooOld,
   gameNotInstalled,
   gameOwnMissionRoute,
+  mapNotInstalled,
   missionDriftedFromDocument,
   missionProblems,
   olderRuntimeRoute,
@@ -185,34 +186,92 @@ export function missionIssueMessage(
  * is compiled. Null when it can be tried.
  *
  * This is the button's own reason for being disabled, so it is the things the
- * author has to go and fix elsewhere: no engine, no setup, a game they have not
- * installed, a game already running. Everything wrong *inside* the scenario is
+ * author has to go and fix elsewhere: no engine, no setup, a game or map they have
+ * not installed, a game already running. Everything wrong *inside* the scenario is
  * {@link launchScenario}'s answer, because it takes compiling to find out.
  *
- * `games` is null until the content scan has answered, which is not a blocker:
+ * `games` and `maps` are null until the content scan has answered, which is not a blocker:
  * a scenario is not stopped from being tested because a read is in flight.
  */
 export function scenarioLaunchBlocker(opts: {
   scenario: Scenario;
   hasEngine: boolean;
   games: GameItem[] | null;
+  maps?: { name: string }[] | null;
   running: boolean;
   reader: ScenarioReader;
 }): string | null {
-  const { scenario, hasEngine, games, running, reader } = opts;
+  return scenarioLaunchBlock(opts)?.reason ?? null;
+}
+
+/** What a download can put right for a blocked scenario. */
+export interface ScenarioMissingContent {
+  /** No engine is installed. */
+  engine?: true;
+  /** The scenario's game, when it is not installed. */
+  game?: string;
+  /** The scenario's map, when it is not installed. */
+  map?: string;
+}
+
+/**
+ * A reason a scenario cannot start, sorted by whether a download can fix it.
+ * `download` names what to fetch. `text` is a reason only the player can act
+ * on, so the row says it and offers nothing.
+ */
+export type ScenarioLaunchBlock =
+  | { kind: "download"; reason: string; needs: ScenarioMissingContent }
+  | { kind: "text"; reason: string };
+
+export function scenarioLaunchBlock(opts: {
+  scenario: Scenario;
+  hasEngine: boolean;
+  games: GameItem[] | null;
+  maps?: { name: string }[] | null;
+  running: boolean;
+  reader: ScenarioReader;
+  /** A content scan that failed. Nothing is known about what is installed. */
+  scanError?: string | null;
+}): ScenarioLaunchBlock | null {
+  const { scenario, hasEngine, games, maps, running, reader, scanError } = opts;
   const { gameName, mapName } = scenario.setup;
+  const text = (reason: string): ScenarioLaunchBlock => ({
+    kind: "text",
+    reason,
+  });
+  if (scanError) return text(`The content scan failed: ${scanError}`);
   if (!hasEngine) {
-    return reader === "player"
-      ? "No engine is installed. Add one from Content before playing a scenario."
-      : "No engine is installed. Add one from Content before testing a scenario.";
+    return {
+      kind: "download",
+      reason:
+        reader === "player"
+          ? "No engine is installed. Add one from Content before playing a scenario."
+          : "No engine is installed. Add one from Content before testing a scenario.",
+      needs: { engine: true },
+    };
   }
   if (!gameName || !mapName) {
-    return "This scenario has no game and map yet. Set it up from a preset first.";
+    return text(
+      "This scenario has no game and map yet. Set it up from a preset first.",
+    );
   }
-  if (games && !games.some((g) => g.name === gameName)) {
-    return gameNotInstalled(reader, gameName);
+  // A scan that has not answered is not a reason to stop, and it names nothing
+  // to fetch either.
+  const gameMissing = !!games && !games.some((g) => g.name === gameName);
+  const mapMissing = !!maps && !maps.some((m) => m.name === mapName);
+  if (gameMissing || mapMissing) {
+    return {
+      kind: "download",
+      reason: gameMissing
+        ? gameNotInstalled(reader, gameName)
+        : mapNotInstalled(reader, mapName),
+      needs: {
+        ...(gameMissing ? { game: gameName } : {}),
+        ...(mapMissing ? { map: mapName } : {}),
+      },
+    };
   }
-  if (running) return "A game is already running.";
+  if (running) return text("A game is already running.");
   return null;
 }
 
