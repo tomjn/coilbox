@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
+import type { AchievementResult } from "../content/achievements";
 import type { StatAi, StatPlayer, StatRecord } from "../content/bindings";
 import { emptyMeta } from "../runlite/model";
-import { buildCareer, type CareerInput } from "./career";
+import {
+  achievementDigest,
+  buildCareer,
+  type Career,
+  type CareerGame,
+  type CareerInput,
+  careerTotals,
+} from "./career";
 import { createGameResolver, stripVersion } from "./games";
 
 const installed = (name: string, shortname: string, version: string) => ({
@@ -381,5 +389,118 @@ describe("buildCareer", () => {
       },
     });
     expect(career.isEmpty).toBe(true);
+  });
+});
+
+describe("careerTotals", () => {
+  const game = (over: Partial<CareerGame>): CareerGame => ({
+    key: "g",
+    title: "G",
+    installed: true,
+    campaigns: [],
+    conquest: null,
+    ai: null,
+    ...over,
+  });
+  const row = (id: string, finished: boolean) => ({
+    id,
+    title: id,
+    missions: 3,
+    completed: finished ? 3 : 1,
+    finished,
+    nextMission: undefined,
+  });
+
+  it("adds each game's results together and counts finished campaigns", () => {
+    const career: Career = {
+      isEmpty: false,
+      warpath: {
+        runs: 5,
+        wins: 2,
+        deepest: 4,
+        ascensionTier: 0,
+        maxAscension: 5,
+        loadouts: [],
+        eventPools: [],
+      },
+      games: [
+        game({
+          campaigns: [row("a", true), row("b", false)],
+          conquest: {
+            finished: 3,
+            won: 2,
+            lost: 1,
+            threatLevel: 1,
+            inProgress: 0,
+          },
+          ai: { games: 10, wins: 6, losses: 3, undecided: 1, topAi: null },
+        }),
+        game({
+          key: "h",
+          campaigns: [row("c", true)],
+          ai: { games: 4, wins: 1, losses: 3, undecided: 0, topAi: null },
+        }),
+      ],
+    };
+    expect(careerTotals(career)).toEqual({
+      aiGames: 14,
+      aiWins: 7,
+      conquestsFinished: 3,
+      conquestsWon: 2,
+      warpathRuns: 5,
+      warpathWins: 2,
+      campaignsFinished: 2,
+      campaignsStarted: 3,
+    });
+  });
+
+  it("is all zeros for a career with nothing in it", () => {
+    expect(careerTotals({ isEmpty: true, warpath: null, games: [] })).toEqual({
+      aiGames: 0,
+      aiWins: 0,
+      conquestsFinished: 0,
+      conquestsWon: 0,
+      warpathRuns: 0,
+      warpathWins: 0,
+      campaignsFinished: 0,
+      campaignsStarted: 0,
+    });
+  });
+});
+
+describe("achievementDigest", () => {
+  const result = (
+    id: string,
+    earned: boolean,
+    earnedAtMs?: number,
+  ): AchievementResult => ({
+    id,
+    name: id,
+    description: id,
+    category: "Milestones",
+    target: 1,
+    current: earned ? 1 : 0,
+    earned,
+    earnedAtMs,
+  });
+
+  it("shows the most recently earned first, up to the limit, and counts them all", () => {
+    const digest = achievementDigest(
+      [
+        result("old", true, 100),
+        result("locked", false),
+        result("new", true, 300),
+        result("mid", true, 200),
+      ],
+      2,
+    );
+    expect(digest.shown.map((r) => r.id)).toEqual(["new", "mid"]);
+    expect(digest.earned).toBe(3);
+    expect(digest.total).toBe(4);
+  });
+
+  it("shows nothing when nothing is earned", () => {
+    const digest = achievementDigest([result("a", false)], 6);
+    expect(digest).toEqual({ shown: [], earned: 0, total: 1 });
   });
 });
