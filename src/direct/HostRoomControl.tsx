@@ -1,7 +1,8 @@
 import { Button, useDrawer } from "@picoframe/frame";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildRoomLink } from "@/deeplink/build";
 import { nextDrawerKey } from "@/general/drawerKey";
+import type { SkirmishDraft } from "@/play/drafts";
 import {
   type DirectLocalAddress,
   type DirectRoomStatus,
@@ -10,6 +11,7 @@ import {
 import { CopyButton } from "./CopyButton";
 import { HostRoomForm, type StartRoomArgs } from "./HostRoomForm";
 import { useRoomMovedFrom } from "./hostedRoom";
+import { QuickRoom } from "./QuickRoom";
 import { type DirectReachability, directPortStatus } from "./reachability";
 import { announcementNote, gameAddressNote, roomSummary } from "./room";
 import { addressText, shareAddresses, shareHeadline } from "./share";
@@ -36,6 +38,7 @@ export function HostRoomControl({
   blocked,
   leaves = null,
   defaultName,
+  draft,
   busy,
   error,
   onStart,
@@ -55,6 +58,9 @@ export function HostRoomControl({
   leaves?: string | null;
   /** The name to offer as the host's, usually their last lobby login. */
   defaultName?: string;
+  /** A skirmish setup from "Host as battle" to open the form with, which also
+   *  opens the form on arrival. */
+  draft?: SkirmishDraft;
   busy: boolean;
   /** Why the last attempt to stop the room failed, or null. A failed start is
    *  said in the drawer, by the form that asked for it. */
@@ -78,6 +84,7 @@ export function HostRoomControl({
       blocked={blocked}
       leaves={leaves}
       defaultName={defaultName}
+      draft={draft}
       onStart={onStart}
     />
   );
@@ -178,7 +185,7 @@ function GameAddress({ ip }: { ip: string }) {
  * feeds `GameAddress` below (issue #2116). It is what decides whether the
  * outside row can deliver a game as well as a room (issue #2127).
  */
-function RoomAddresses({
+export function RoomAddresses({
   port,
   announced,
 }: {
@@ -257,48 +264,82 @@ function RoomAddresses({
   );
 }
 
-/** Opens the form in the frame's drawer. Keyed per opening so a second visit gets
- *  a new form rather than the one the last visit left behind. */
+/** Opens the form in the frame's drawer, or starts a room against the computer
+ *  in one step. Keyed per opening so a second visit gets a new form rather than
+ *  the one the last visit left behind. */
 function HostRoomDrawerButton({
   blocked,
   leaves,
   defaultName,
+  draft,
   onStart,
 }: {
   blocked: string | null;
   leaves: string | null;
   defaultName?: string;
+  draft?: SkirmishDraft;
   onStart: (args: StartRoomArgs) => Promise<string | undefined>;
 }) {
   const drawer = useDrawer();
+  const openForm = () =>
+    drawer.open({
+      title: "Host on LAN",
+      // No description. The page this button sits on has already said a room
+      // needs no server and no account, and repeating it costs a line the
+      // form needs to stand up in one short laptop window.
+      // Wide enough for the same reason.
+      width: "30rem",
+      content: (
+        <HostRoomForm
+          key={nextDrawerKey()}
+          blocked={blocked}
+          leaves={leaves}
+          defaultName={defaultName}
+          draft={draft}
+          onStart={onStart}
+        />
+      ),
+    });
+  // A setup sent here from the Singleplayer page opens the form on arrival, once.
+  // Held in a ref so the drawer is not opened again by a re-render, and so a
+  // form already closed stays closed.
+  const openOnArrival = useRef(openForm);
+  openOnArrival.current = openForm;
+  const arrived = useRef(false);
+  useEffect(() => {
+    if (!draft || arrived.current) return;
+    arrived.current = true;
+    openOnArrival.current();
+  }, [draft]);
   return (
     // Deliberately not disabled while blocked: a button that does nothing and
     // says nothing is the failure this milestone is about. The drawer opens and
     // says why hosting is unavailable.
-    <Button
-      variant="secondary"
-      className="h-8 px-3"
-      onClick={() =>
-        drawer.open({
-          title: "Host on LAN",
-          // No description. The page this button sits on has already said a room
-          // needs no server and no account, and repeating it costs a line the
-          // form needs to stand up in one short laptop window.
-          // Wide enough for the same reason.
-          width: "30rem",
-          content: (
-            <HostRoomForm
-              key={nextDrawerKey()}
-              blocked={blocked}
-              leaves={leaves}
-              defaultName={defaultName}
-              onStart={onStart}
-            />
-          ),
-        })
-      }
-    >
-      Host on LAN
-    </Button>
+    <div className="flex items-center gap-2">
+      <Button
+        variant="secondary"
+        className="h-8 px-3"
+        onClick={() =>
+          drawer.open({
+            title: "Host against the computer",
+            width: "30rem",
+            content: (
+              <QuickRoom
+                key={nextDrawerKey()}
+                blocked={blocked}
+                leaves={leaves}
+                defaultName={defaultName}
+                onStart={onStart}
+              />
+            ),
+          })
+        }
+      >
+        Host vs computer
+      </Button>
+      <Button variant="secondary" className="h-8 px-3" onClick={openForm}>
+        Host on LAN
+      </Button>
+    </div>
   );
 }
