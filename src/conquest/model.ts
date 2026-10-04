@@ -106,6 +106,8 @@ export interface NodeStar {
   spectral: string[];
 }
 
+export type LinkKind = "border" | "crossing" | "road";
+
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
@@ -114,6 +116,8 @@ export interface GalaxyNode {
   pos: NodePos;
   /** Real stellar data, when this node came from the star catalogue. */
   star?: NodeStar;
+  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
+  outline?: [number, number][][];
   /** Initial owner: a faction id or {@link NEUTRAL}. */
   owner: string;
   /**
