@@ -65,6 +65,7 @@ export default defineConfig({
           { text: "The unit builder", link: "/lego-builder" },
           { text: "Lego parts pack", link: "/lego-parts-pack" },
           { text: "The mission runtime", link: "/mission-runtime" },
+          { text: "Teaching your game", link: "/teaching-your-game" },
           { text: "Lobby moderation", link: "/lobby-moderation" },
           { text: "Server admin", link: "/server-admin" },
           { text: "Tachyon protocol", link: "/tachyon-protocol" },

@@ -415,6 +415,8 @@ If `start` names a campaign that is not bundled, or a mission the campaign does 
 
 Leave `start` out and nothing changes.
 
+[Teaching your game](teaching-your-game.md) covers writing the missions and bundling the campaign that `start` names.
+
 ### `home` (object)
 
 Rearranges Coilbox's own home page: which layout it uses, what it paints behind the page, and which zones it shows in what order.
