@@ -55,6 +55,7 @@ import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { answeredScan } from "../scanSettled";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
+import { useReplaysRoot } from "../useReplaysRoot";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
@@ -845,11 +846,12 @@ export default function ReplayDetailPage() {
   const filename = name ? decodeURIComponent(name) : "";
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
+  const replaysRoot = useReplaysRoot(selected?.rootPath);
   const {
     replays,
     loading: listLoading,
     refresh,
-  } = useReplays(selected?.rootPath);
+  } = useReplays(replaysRoot);
   const replay = replays.find((r) => r.filename === filename);
   const { info, loading, error } = useDemoInfo(
     selected?.enginePath,
@@ -1079,7 +1081,9 @@ export default function ReplayDetailPage() {
               />
             ) : (
               <p className="text-sm text-muted-foreground">
-                No map recorded for this replay.
+                {info.mapName
+                  ? "Install an engine to preview this map."
+                  : "No map recorded for this replay."}
               </p>
             )}
           </section>
