@@ -19,8 +19,8 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("the Career nav item", () => {
-  it("sits under Play and links to the page", () => {
-    expect(careerPlugin.nav?.[0].id).toBe("play");
+  it("sits under Records and links to the page", () => {
+    expect(careerPlugin.nav?.[0].id).toBe("records");
     expect(item?.to).toBe("/career");
     expect(item?.label).toBe("Career");
   });
