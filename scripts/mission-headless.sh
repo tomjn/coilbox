@@ -20,7 +20,7 @@
 # that the whole thing loads at all.
 #
 # Usage: scripts/mission-headless.sh [mission ...]
-# Default: gate, ambush, garrison, siege, outbreak, drill.
+# Default: gate, ambush, garrison, siege, outbreak, drill, briefing.
 #
 # outbreak is the difficulty fixture. It is run at whatever
 # COILBOX_HARNESS_DIFFICULTY says, which is nothing by default, so the default
@@ -78,7 +78,7 @@ MAP_ARCHIVE="${COILBOX_HARNESS_MAP:-}"
 [ -n "$MAP_ARCHIVE" ] || MAP_ARCHIVE="$(pick "$DATA_DIR/maps" '\.sd[7z]$' 'map')"
 
 MISSIONS=("$@")
-[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak drill)
+[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak drill briefing)
 
 DIFFICULTY="${COILBOX_HARNESS_DIFFICULTY:-}"
 
@@ -250,6 +250,24 @@ run_mission() { # a fixture mission id, or "gate" for a game with no mission
   elif [ "$loaded" -eq 0 ]; then
     echo "  fail the runtime gadget did not load"
     failed=$((failed + 1))
+  fi
+
+  # The briefing pauses the game, and the engine says so itself, with the frame
+  # it happened on. Both lines on one frame is the claim: two held lines were
+  # dismissed and three triggers fired between them, and no game frame ran. The
+  # probe cannot always see this for itself, because without LuaUI the runtime
+  # dismisses the lines and the pause can be over between two of its looks.
+  if [ "$id" = briefing ]; then
+    local paused_at resumed_at
+    paused_at=$(grep -m 1 ' paused the game' "$log" | sed -E 's/.*\[f=(-?[0-9]+)\].*/\1/' || true)
+    resumed_at=$(grep -m 1 ' unpaused the game' "$log" | sed -E 's/.*\[f=(-?[0-9]+)\].*/\1/' || true)
+    if [ -n "$paused_at" ] && [ "$paused_at" = "$resumed_at" ]; then
+      echo "  ok the engine paused and unpaused on frame $((10#$paused_at)), with both dismissals in between"
+      passed=$((passed + 1))
+    else
+      echo "  fail the engine paused on frame '${paused_at}' and unpaused on frame '${resumed_at}'"
+      failed=$((failed + 1))
+    fi
   fi
 
   # Anything the runtime called an error is a failure whether or not a check

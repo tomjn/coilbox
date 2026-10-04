@@ -151,6 +151,12 @@ if not DIALOGUE then
 	return false
 end
 
+local PAUSE, pauseError = includeTable("luarules/mission_runtime/coilbox_pause.lua")
+if not PAUSE then
+	log("error", pauseError)
+	return false
+end
+
 local VIEW, viewError = includeTable("luarules/mission_runtime/coilbox_view.lua")
 if not VIEW then
 	log("error", viewError)
@@ -248,6 +254,9 @@ local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 local SOUND_MESSAGE = "coilbox_mission_sound"
 local CAMERA_MESSAGE = "coilbox_mission_camera"
 local MARKER_MESSAGE = "coilbox_mission_marker"
+-- And the one that asks this client to pause the game or start it again, which
+-- synced Lua cannot do for itself.
+local PAUSE_MESSAGE = "coilbox_mission_pause"
 
 -- The global the widget registers on the widget handler to hear a line. A
 -- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
@@ -694,8 +703,15 @@ if gadgetHandler:IsSyncedCode() then
 		-- rather than things that happen in the game, so synced Lua decides only
 		-- that they happened and the unsynced half takes it from there.
 		published.dialogue = DIALOGUE.register(triggers, published, {
-			say = function(lineId)
-				SendToUnsynced(DIALOGUE_MESSAGE, lineId)
+			-- A held line is noted before it goes out, so the dismissal that
+			-- answers it finds a line the mission is holding. Nothing rides along
+			-- for a line that is not held, which is the message every runtime
+			-- before this one sent.
+			say = function(lineId, hold)
+				if hold then
+					playerHooks.held(lineId)
+				end
+				SendToUnsynced(DIALOGUE_MESSAGE, lineId, hold or nil)
 			end,
 			sound = function(name)
 				SendToUnsynced(SOUND_MESSAGE, name)
@@ -711,6 +727,13 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 			mark = function(x, z, text, team)
 				SendToUnsynced(MARKER_MESSAGE, x, z, text, team)
+			end,
+		})
+		-- Stopping the clock is the server's to do and a client's to ask for, so
+		-- this goes to the unsynced half as well.
+		published.pause = PAUSE.register(triggers, {
+			pause = function(paused)
+				SendToUnsynced(PAUSE_MESSAGE, paused)
 			end,
 		})
 		published.triggers = triggers
@@ -843,20 +866,41 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
-	if PLAYER_ACTIONS.uses(MISSION, "unit_selected") then
-		--- A client's unsynced half said what its player has selected. A message
-		-- the server relayed, so it arrives here on every machine alike, and comes
-		-- back out of a replay the same way.
+	local HEARS_SELECTION = PLAYER_ACTIONS.uses(MISSION, "unit_selected")
+	local HEARS_DISMISSAL = PLAYER_ACTIONS.uses(MISSION, "dialogue_dismissed")
+
+	if HEARS_SELECTION or HEARS_DISMISSAL then
+		--- A client said what its player has selected, or that its player clicked
+		-- a held line of dialogue away. A message the server relayed, so it
+		-- arrives here on every machine alike, and comes back out of a replay the
+		-- same way. The engine hands it over when it arrives rather than on a game
+		-- frame, so it is heard while the game is paused too.
 		--
-		-- True for a report, so it stops there, and nothing for anything else:
-		-- another gadget's messages are not ours to swallow.
+		-- True for a message of ours, so it stops there, and nothing for anything
+		-- else: another gadget's messages are not ours to swallow.
 		function gadget:RecvLuaMsg(message, playerID)
-			local ours, changed = playerHooks.selection(playerID, message)
-			if changed then
-				raise("selection_changed", { player = playerID })
+			if HEARS_SELECTION then
+				local ours, changed = playerHooks.selection(playerID, message)
+				if changed then
+					raise("selection_changed", { player = playerID })
+				end
+				if ours then
+					return true
+				end
 			end
-			if ours then
-				return true
+			if HEARS_DISMISSAL then
+				local ours, lineId = playerHooks.dismissal(playerID, message)
+				if lineId then
+					raise("dialogue_dismissed", { line = lineId, player = playerID })
+					-- And the polled triggers, because a dismissal is often what a
+					-- paused lesson is waiting on and no frame is coming to ask them.
+					if not suppressing and not gameOver.isOver() then
+						triggers:poll()
+					end
+				end
+				if ours then
+					return true
+				end
 			end
 		end
 	end
@@ -1041,6 +1085,34 @@ else
 		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
 	end
 
+	--- Whether a player who can pause is at this client. A spectator may not, and
+	-- in a replay the engine reads any pause request as a toggle of the playback,
+	-- so a mission played back must never send one.
+	local function mayPause()
+		return not Spring.IsReplay() and not Spring.GetSpectatingState()
+	end
+
+	--- Pause the game or start it again, the way the pause key does.
+	--
+	-- The state wanted is always named and never toggled, and it is sent whatever
+	-- the game looks like from here: this client only learns the game is paused
+	-- when the server says so, so a pause and an unpause a moment apart would
+	-- otherwise cancel wrongly.
+	local function setPaused(paused)
+		if mayPause() then
+			Spring.SendCommands(paused and "pause 1" or "pause 0")
+		end
+	end
+
+	--- Dismiss a held line on the player's behalf, when there is no panel for
+	-- them to dismiss it on. A lesson waiting on the dismissal would otherwise
+	-- wait for ever in a game with no LuaUI, or with the widget switched off.
+	local function dismissUnseen(lineId)
+		if not Spring.GetSpectatingState() then
+			Spring.SendLuaRulesMsg(PLAYER_ACTIONS.DISMISSED_MESSAGE .. lineId)
+		end
+	end
+
 	-- What this player has selected, reported to the synced half for the
 	-- `unit_selected` condition. Defined only when a trigger asks, so a mission
 	-- that does not costs nothing per drawn frame.
@@ -1108,8 +1180,14 @@ else
 			-- The panel is a widget, so the line goes on to LuaUI, which draws it
 			-- and plays its clip in step with the text. A game with no LuaUI, or a
 			-- player who has switched the widget off, gets no dialogue: there is
-			-- nowhere for it to appear.
-			Script.LuaUI[DIALOGUE_GLOBAL](first)
+			-- nowhere for it to appear. `second` is whether the line is held.
+			if second and not Script.LuaUI(DIALOGUE_GLOBAL) then
+				dismissUnseen(first)
+			else
+				Script.LuaUI[DIALOGUE_GLOBAL](first, second)
+			end
+		elseif message == PAUSE_MESSAGE then
+			setPaused(first)
 		elseif message == SOUND_MESSAGE then
 			-- Played here rather than in the widget, because a sound is not part of
 			-- the conversation and has nothing to queue behind.

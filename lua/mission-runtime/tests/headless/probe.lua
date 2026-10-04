@@ -161,6 +161,85 @@ if not gadgetHandler:IsSyncedCode() then
 			table.concat(aimedAt.marker, ","))
 	end
 
+	-- Briefing: the pause and the dismissal (issue #3552).
+	--
+	-- A paused game sends no game frames, so the synced half of this probe stops
+	-- with it and this half has to carry the plan through the pause. It watches
+	-- for the pause in Update, which the engine calls every draw frame whatever
+	-- the game is doing.
+	--
+	-- Who dismisses the two held lines depends on the run. With LuaUI the mission
+	-- widget has them, and this half stands in for the player's two clicks by
+	-- sending what the widget sends when a held line is clicked away. The
+	-- widget's own click handling needs a mouse, which a headless run has not
+	-- got. With no LuaUI the runtime dismisses each line itself, the way it does
+	-- for a player with no panel, and the whole exchange can be over between two
+	-- calls to Update. So this half checks nothing then, and the claim is made
+	-- by scripts/mission-headless.sh from the engine's own log, which names the
+	-- frame of the pause and of the unpause.
+	--
+	-- 0 is waiting for the pause, 1 has dismissed the first line, 2 the second,
+	-- and 3 has seen the game start again.
+	local briefingStage = 0
+	local briefingFrame, briefingTimer
+
+	-- How long the run may sit paused before the probe gives up and unpauses it
+	-- itself, in seconds of wall time. A probe that waited for ever would be a
+	-- hung harness rather than a failed one. A dismissal is a trip to the local
+	-- server and back, so this is long.
+	local BRIEFING_PATIENCE = 20
+
+	if MISSION_ID == "briefing" then
+		local DISMISSED_MESSAGE = "coilbox_mission_dismissed:"
+
+		local function objective(id)
+			local value = Spring.GetGameRulesParam("coilbox_mission_objective_" .. id)
+			return value
+		end
+
+		function gadget:Update()
+			if briefingStage == 3 then
+				return
+			end
+			local _, _, paused = Spring.GetGameSpeed()
+
+			if briefingStage == 0 then
+				if not paused then
+					return
+				end
+				briefingStage = 1
+				briefingFrame = Spring.GetGameFrame()
+				briefingTimer = Spring.GetTimer()
+				if proving then
+					check("pause_game pauses the game, asked for by the runtime's own unsynced half", true)
+					check("and nothing has dismissed the held line yet", objective("read") == 0, objective("read"))
+					Spring.SendLuaRulesMsg(DISMISSED_MESSAGE .. "welcome")
+				else
+					say("skip this run has no LuaUI, so the runtime dismisses the held lines itself and no click is stood in for")
+				end
+			elseif briefingStage == 1 and objective("read") == 1 then
+				briefingStage = 2
+				if proving then
+					check("a dismissal reaches synced code while the game is paused, and fires a polled trigger",
+						paused == true, tostring(paused))
+					check("with no game frame run since the pause",
+						Spring.GetGameFrame() == briefingFrame,
+						tostring(Spring.GetGameFrame()) .. " from " .. tostring(briefingFrame))
+					Spring.SendLuaRulesMsg(DISMISSED_MESSAGE .. "orders")
+				end
+			elseif briefingStage == 2 and not paused then
+				briefingStage = 3
+				if proving then
+					check("unpause_game starts the game again, from a trigger a dismissal woke", true)
+				end
+			elseif Spring.DiffTimers(Spring.GetTimer(), briefingTimer) > BRIEFING_PATIENCE then
+				say("fail the briefing sat paused at stage " .. briefingStage .. ", so the probe unpaused it")
+				briefingStage = 3
+				Spring.SendCommands("pause 0")
+			end
+		end
+	end
+
 	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
 			-- Last of all, because a widget the handler threw out over an error in
@@ -171,6 +250,10 @@ if not gadgetHandler:IsSyncedCode() then
 			end
 			if MISSION_ID == "ambush" then
 				checkAimed()
+			end
+			if MISSION_ID == "briefing" and proving then
+				check("the briefing was paused, dismissed twice and started again",
+					briefingStage == 3, "stopped at stage " .. briefingStage)
 			end
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
@@ -1247,6 +1330,36 @@ plans.drill = {
 		{ frame = 340, run = function()
 			check("ten seconds in, the negated command_given has not held, because orders were given",
 				objectiveIs("prompt") == ACTIVE, objectiveIs("prompt"))
+		end },
+	},
+}
+
+-- Briefing: a pause, two held lines and the dismissals that move the lesson on
+-- (issue #3552).
+--
+-- The unsynced half of this probe does the driving, because the game is paused
+-- for the middle of the run and this half gets no frames then. What is checked
+-- here is the two ends: nothing has moved before the mission pauses, and the
+-- game came back with both objectives done.
+--
+-- The mission pauses on the polled beat at frame 30. The run is at twenty times
+-- speed, so the pause lands some frames after that, and the last step is set
+-- far enough out that it cannot run before the pause has.
+plans.briefing = {
+	deadline = 930,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			check("before the lesson opens, neither line has been dismissed",
+				objectiveIs("read") == ACTIVE and objectiveIs("ready") == ACTIVE)
+			check("the triggers waiting on a dismissal are armed",
+				armed("read") == true and armed("ready") == true)
+		end },
+		{ frame = 900, run = function()
+			check("the game is running again with the first held line dismissed",
+				objectiveIs("read") == COMPLETE, objectiveIs("read"))
+			check("and the second, whose trigger unpaused it",
+				objectiveIs("ready") == COMPLETE, objectiveIs("ready"))
 		end },
 	},
 }
