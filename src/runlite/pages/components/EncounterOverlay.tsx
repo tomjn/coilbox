@@ -16,6 +16,8 @@ import { usePreferredTarget } from "../../../play/config";
 import { unitsMissingFrom } from "../../gameChoice";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
+import { limitHold } from "../../unitLimit";
+import { UnitLimitNote } from "./UnitLimitNote";
 
 /**
  * Battle briefing for a battle/elite/boss node, rendered as an overlay on the
@@ -67,6 +69,7 @@ export function EncounterOverlay({
         )
       : `Checking that your units exist in ${offered.name}…`
     : undefined;
+  const hold = limitHold(enc.limit);
   const spec = node.battle;
   const kindLabel =
     node.type === "boss"
@@ -118,11 +121,21 @@ export function EncounterOverlay({
               />
               <Row label="Tech tier" value={`${spec.techTier}`} />
             </dl>
+            <UnitLimitNote
+              limit={enc.limit}
+              startUnit={run.startUnit}
+              gameName={
+                enc.installedGame?.name ??
+                run.settings.game.pinnedName ??
+                run.settings.game.shortname
+              }
+            />
             <p className="text-xs text-muted-foreground">
               Defeat costs health, not the warpath — you retreat and press on.
             </p>
             <BattleLaunchGate
-              error={enc.error}
+              error={enc.error ?? hold?.error}
+              hold={hold ?? undefined}
               noEngine={enc.noEngine}
               missing={enc.missing}
               scanFailure={enc.scanFailure}
@@ -144,6 +157,15 @@ export function EncounterOverlay({
                 enc.answerGameOffer({ declinedUpdate: name })
               }
             />
+            {enc.limit.kind === "failed" && (
+              <Button
+                variant="outline"
+                onClick={enc.reloadUnitData}
+                className="w-full"
+              >
+                Try reading the unit data again
+              </Button>
+            )}
           </div>
         )}
 
