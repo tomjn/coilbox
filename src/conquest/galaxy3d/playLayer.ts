@@ -16,6 +16,7 @@ import type {
 } from "./GalaxyView";
 import type { WorldPos } from "./layout";
 import { hashString, trimLane } from "./layout";
+import type { TerrainSurface } from "./terrain";
 import {
   accretionTexture,
   anomalyTexture,
@@ -198,6 +199,8 @@ export function buildPlayLayer(
   prevFactionRef: { current: string | undefined },
   burstRef: { current: string | null | undefined },
   applyBurstRef: { current: (() => void) | null },
+  /** Set for a terrain map only. */
+  surface?: TerrainSurface,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
   // edge (each end trimmed back from the node centre and drawn at that
@@ -1567,6 +1570,15 @@ export function buildPlayLayer(
   galaxy.nodes.forEach((n, i) => {
     const p = positions.get(n.id);
     if (!p) {
+      starSprites.push(undefined);
+      starMats.push(undefined);
+      spikeSprites.push(undefined);
+      coronaSprites.push(undefined);
+      discMats.push(undefined);
+      return;
+    }
+    // A point location on a terrain map is drawn by cityLayer.ts.
+    if (surface && !n.outline) {
       starSprites.push(undefined);
       starMats.push(undefined);
       spikeSprites.push(undefined);
