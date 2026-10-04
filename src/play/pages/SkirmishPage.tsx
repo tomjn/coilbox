@@ -2,7 +2,7 @@ import { Button } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { Bookmark, Play, Swords } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Dialog,
@@ -120,6 +120,7 @@ import {
   MapOverlayImage,
   useMapOverlayLayer,
 } from "./components/MapOverlay";
+import { NoEngineNotice } from "./components/NoEngineNotice";
 import { ParticipantsTable } from "./components/ParticipantsTable";
 import { PresetsDrawer } from "./components/PresetsDrawer";
 
@@ -141,7 +142,11 @@ function restrictionSummary(r: BattleRestrictions): string {
  * launch the engine. Uses the preferred engine silently (no picker). */
 export default function SkirmishPage() {
   const navigate = useNavigate();
-  const { target, loading: targetLoading } = usePreferredTarget();
+  const {
+    target,
+    loading: targetLoading,
+    refresh: refreshTarget,
+  } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
   const { running, launch } = usePlay();
@@ -1042,17 +1047,8 @@ export default function SkirmishPage() {
         disabled={!canStart}
       />
 
-      {!target && !scan.loading && (
-        <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
-          No engine found. Add a content folder with an engine in{" "}
-          <Link
-            className="font-medium underline underline-offset-4"
-            to="/settings/content-folders"
-          >
-            Settings → Content folders
-          </Link>{" "}
-          first.
-        </p>
+      {!target && (
+        <NoEngineNotice targetLoading={targetLoading} refresh={refreshTarget} />
       )}
 
       {error && (
