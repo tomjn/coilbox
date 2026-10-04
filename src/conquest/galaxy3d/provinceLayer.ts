@@ -1,13 +1,13 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import { NEUTRAL } from "../model";
+import type { MapItemState } from "./cityLayer";
 import {
   BORDER_TOLERANCE_FRACTION,
   drapeFill,
   drapeLine,
   isStrongBorder,
   type ProvinceIndex,
-  type ProvinceVisualState,
   provinceBorders,
   provinceIndexFor,
   provinceStyle,
@@ -22,8 +22,8 @@ import type { TerrainSurface } from "./terrain";
  * capital marker. The maths is in `provinces.ts`.
  *
  * Geometry is built once. Everything that changes afterwards (owner, hover,
- * selection, and the states set through {@link ProvinceLayer.setState}) is a
- * material colour, an opacity, a visibility flag or the strong border's index
+ * selection, and the states set through
+ * {@link ProvinceLayer.setProvinceState}) is a material colour, an opacity, a visibility flag or the strong border's index
  * list, so nothing here rebuilds a fill.
  */
 
@@ -42,28 +42,28 @@ const CAPITAL_RADIUS = 1.3;
 export interface ProvinceLayer {
   /** The provinces, searchable by map point. */
   index: ProvinceIndex;
-  /** True when the node at this index is drawn as a province. */
-  isProvince(nodeIndex: number): boolean;
+  /** Whether this layer draws the node, which is to say it has an outline. */
+  has: (nodeId: string) => boolean;
+  /** The same, by node index. */
+  isProvince: (nodeIndex: number) => boolean;
   /**
    * Node index of the province under a ray, or -1 when the ray lands on
    * ground that belongs to no province, or misses the sheet. A hidden
    * province is still returned: the caller decides what may be selected.
    */
-  pick(ray: THREE.Ray): number;
-  /** Re-read every province's owner and restyle fills and borders. */
-  applyOwners(): void;
-  /** The hovered node index, or -1. Ignores nodes that are not provinces. */
-  setHovered(nodeIndex: number): void;
-  /** The selected node index, or -1. Ignores nodes that are not provinces. */
-  setSelected(nodeIndex: number): void;
+  pick: (ray: THREE.Ray) => number;
+  /** Restyle every fill and border for the current owners and states. */
+  apply: () => void;
+  /** Mark one province selected, or none. Point locations count as none. */
+  select: (nodeId: string | null) => void;
+  /** Mark one province hovered, or none. Point locations count as none. */
+  hover: (nodeId: string | null) => void;
   /**
-   * Merge a visual state into a province, by node id, and restyle it. Pass
-   * `false` or `undefined` for a field to clear it. Unknown ids and point
-   * locations are ignored.
+   * Set or clear a province's state, the same shape `cityLayer.ts` takes for
+   * a location. Geometry is not rebuilt. Call {@link apply} once after a
+   * batch of changes.
    */
-  setState(nodeId: string, state: ProvinceVisualState): void;
-  /** The state last set for a node id. */
-  getState(nodeId: string): ProvinceVisualState;
+  setProvinceState: (nodeId: string, state: MapItemState | undefined) => void;
 }
 
 /** A five point star lying flat, pointing to map north (world -Z). */
@@ -89,8 +89,9 @@ function starGeometry(radius: number): THREE.BufferGeometry {
  * Build the province layer into `scene`. Returns `undefined`, and adds
  * nothing, when the map has no provinces: see {@link provinceIndexFor}.
  *
- * `labels` are the name labels by node index. The layer only hides and shows
- * them for the `hidden` state. Their colour stays with `owners.ts`.
+ * `labels` are the name labels by node index. The layer puts a province's
+ * label on its anchor and hides it for the `hidden` state. Its colour stays
+ * with `owners.ts`.
  */
 export function buildProvinceLayer(
   scene: THREE.Scene,
@@ -106,8 +107,8 @@ export function buildProvinceLayer(
 
   const ownerOf = (i: number): string =>
     ownersRef.current[galaxy.nodes[i].id] ?? galaxy.nodes[i].owner;
-  const states = new Map<number, ProvinceVisualState>();
-  const stateOf = (i: number): ProvinceVisualState => states.get(i) ?? {};
+  const states = new Map<number, MapItemState>();
+  const stateOf = (i: number): MapItemState => states.get(i) ?? {};
   let hovered = -1;
   let selected = -1;
 
@@ -146,6 +147,9 @@ export function buildProvinceLayer(
     disposables.push(geo, mat);
     scene.add(mesh);
     fillMats.set(i, mat);
+    // A province's name sits on its anchor, on the ground.
+    const [anchorX, anchorY] = galaxy.nodes[i].pos;
+    labels[i]?.position.set(...surface.mapToWorld(anchorX, anchorY));
 
     if (galaxy.nodes[i].kind !== "capital") continue;
     if (!capitalGeo || !capitalMat) {
@@ -292,21 +296,27 @@ export function buildProvinceLayer(
     strong.show(entries);
   };
 
-  const applyOwners = () => {
+  const apply = () => {
     for (const i of index.nodes) styleOne(i);
     styleBorders();
   };
 
-  const setHovered = (nodeIndex: number) => {
-    const next = index.has(nodeIndex) ? nodeIndex : -1;
+  const nodeIndexById = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
+  /** A node id as a province's node index, or -1. */
+  const provinceOf = (nodeId: string | null): number => {
+    const i = nodeId === null ? undefined : nodeIndexById.get(nodeId);
+    return i !== undefined && index.has(i) ? i : -1;
+  };
+  const hover = (nodeId: string | null) => {
+    const next = provinceOf(nodeId);
     if (next === hovered) return;
     const previous = hovered;
     hovered = next;
     styleOne(previous);
     styleOne(next);
   };
-  const setSelected = (nodeIndex: number) => {
-    const next = index.has(nodeIndex) ? nodeIndex : -1;
+  const select = (nodeId: string | null) => {
+    const next = provinceOf(nodeId);
     if (next === selected) return;
     const previous = selected;
     selected = next;
@@ -314,22 +324,11 @@ export function buildProvinceLayer(
     styleOne(next);
   };
 
-  const nodeIndexById = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
-  const setState = (nodeId: string, state: ProvinceVisualState) => {
-    const i = nodeIndexById.get(nodeId);
-    if (i === undefined || !index.has(i)) return;
-    const before = stateOf(i);
-    const after = { ...before, ...state };
-    states.set(i, after);
-    styleOne(i);
-    // Only fog changes which borders are strong.
-    if (!!before.hidden !== !!after.hidden) styleBorders();
-  };
-
-  applyOwners();
+  apply();
 
   return {
     index,
+    has: (nodeId) => provinceOf(nodeId) >= 0,
     isProvince: (nodeIndex) => index.has(nodeIndex),
     pick: (ray) => {
       const hit = rayToMap(
@@ -339,13 +338,14 @@ export function buildProvinceLayer(
       );
       return hit ? index.at(hit[0], hit[1]) : -1;
     },
-    applyOwners,
-    setHovered,
-    setSelected,
-    setState,
-    getState: (nodeId) => {
-      const i = nodeIndexById.get(nodeId);
-      return i === undefined ? {} : { ...stateOf(i) };
+    apply,
+    select,
+    hover,
+    setProvinceState: (nodeId, state) => {
+      const i = provinceOf(nodeId);
+      if (i < 0) return;
+      if (state) states.set(i, state);
+      else states.delete(i);
     },
   };
 }

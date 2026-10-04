@@ -9,6 +9,7 @@ import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
+import { buildCityLayer } from "./cityLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
@@ -607,7 +608,6 @@ export function GalaxyView({
       galaxy,
       skin,
       positions,
-      surface,
       playerFactionId,
       reduceMotion,
       effects,
@@ -624,6 +624,7 @@ export function GalaxyView({
       prevFactionRef,
       burstRef,
       applyBurstRef,
+      surface,
     );
 
     /* ------------------------------- labels -------------------------------- */
@@ -638,11 +639,8 @@ export function GalaxyView({
         .getHexString()}`;
 
     const labelObjects: CSS2DObject[] = [];
-    // By node index, for the province layer. `labelObjects` skips a node with
-    // no position, so its indices are not node indices.
-    const labelByNode: (CSS2DObject | undefined)[] = [];
     if (!performanceMode) {
-      galaxy.nodes.forEach((n, i) => {
+      galaxy.nodes.forEach((n) => {
         const p = positions.get(n.id);
         if (!p) return;
         const el = document.createElement("div");
@@ -654,17 +652,14 @@ export function GalaxyView({
           "text-shadow:0 1px 4px rgba(0,0,0,0.95);transform:translateY(14px);";
         const label = new CSS2DObject(el);
         label.position.set(p[0], p[1] - 3.6, p[2]);
-        labelByNode[i] = label;
         labelObjects.push(label);
         scene.add(label);
       });
     }
 
-    /* ------------------------------ provinces ------------------------------ */
-
     // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
     // galaxy or theatre map, and on a terrain map of point locations only.
-    const provinceLayer = surface
+    const provinces = surface
       ? buildProvinceLayer(
           scene,
           disposables,
@@ -672,16 +667,25 @@ export function GalaxyView({
           surface,
           ownerColor,
           ownersRef,
-          labelByNode,
+          labelObjects,
         )
       : undefined;
-    // A province's name sits on its anchor, not hung below a marker.
-    galaxy.nodes.forEach((n, i) => {
-      const p = positions.get(n.id);
-      if (p && provinceLayer?.isProvince(i)) {
-        labelByNode[i]?.position.set(p[0], p[1], p[2]);
-      }
-    });
+
+    // A terrain map's point locations and roads. See cityLayer.ts.
+    const cities = surface
+      ? buildCityLayer(
+          scene,
+          disposables,
+          galaxy,
+          surface,
+          ownerColor,
+          ownersRef,
+          laneDim,
+          dimOf,
+          labelObjects,
+          cores,
+        )
+      : undefined;
 
     /* ------------------------ renderer + camera ---------------------------- */
 
@@ -821,6 +825,9 @@ export function GalaxyView({
 
     const render = () => {
       if (!renderer || !labelRenderer) return;
+      if (cities && controls) {
+        cities.fitToCamera(camera.position.distanceTo(controls.target));
+      }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     };
@@ -846,7 +853,8 @@ export function GalaxyView({
       laneDim,
       ownerColor,
       dimOf,
-      trimmedSeg,
+      // A terrain map has no lanes. Its roads are drawn by cityLayer.ts.
+      surface ? () => null : trimmedSeg,
       setLanePair,
       layoutChevrons,
       lanes,
@@ -860,9 +868,13 @@ export function GalaxyView({
       discMats,
       ringGeoFor,
       () => selection.getIndex(),
-      provinceLayer,
     );
-    applyOwnersRef.current = owners.apply;
+    const applyOwners = () => {
+      owners.apply();
+      cities?.apply();
+      provinces?.apply();
+    };
+    applyOwnersRef.current = applyOwners;
 
     // Selection enlarges the node's own ownership ring and pulses its
     // colour, in the animation loop below, no second ring. See selection.ts.
@@ -879,10 +891,10 @@ export function GalaxyView({
       ownersRef,
       owners.styleRing,
     );
-    // A selected province is highlighted as a whole area by its own layer.
     const applySelection = () => {
       selection.apply();
-      provinceLayer?.setSelected(selection.getIndex());
+      cities?.select(selectedRef.current ?? null);
+      provinces?.select(selectedRef.current ?? null);
     };
     applySelectionRef.current = applySelection;
 
@@ -909,7 +921,7 @@ export function GalaxyView({
     );
     applyVisibilityRef.current = visibility.apply;
 
-    owners.apply();
+    applyOwners();
     applySelection();
     visibility.apply();
 
@@ -933,8 +945,8 @@ export function GalaxyView({
       // A province is picked by its whole area, so its anchor's hit target
       // is ignored and the ground under the pointer decides. A point location
       // standing inside a province keeps its own hit target and wins.
-      if (provinceLayer && (idx < 0 || provinceLayer.isProvince(idx))) {
-        idx = provinceLayer.pick(raycaster.ray);
+      if (provinces && (idx < 0 || provinces.isProvince(idx))) {
+        idx = provinces.pick(raycaster.ray);
       }
       // Fogged systems aren't selectable.
       if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
@@ -967,12 +979,13 @@ export function GalaxyView({
       if (hovered >= 0) setHoverStyle(hovered, false);
       hovered = idx;
       if (hovered >= 0) setHoverStyle(hovered, true);
-      provinceLayer?.setHovered(hovered);
       // Lane colours are baked into the merged geometry, so lifting the hovered
       // node's lanes means rebuilding them. That is the same work an ownership
       // change already does, and it only runs when the hovered node changes.
       hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
-      owners.apply();
+      cities?.hover(hoveredNodeId);
+      provinces?.hover(hoveredNodeId);
+      applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
@@ -1206,6 +1219,7 @@ export function GalaxyView({
               dimOf(galaxy.nodes[vp.i].id);
           }
           selection.tick(now);
+          cities?.tick(now);
         }
         winBurst.tick(now);
 

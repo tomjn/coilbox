@@ -1,5 +1,6 @@
 import { ShapeUtils, Vector2 } from "three";
 import type { GalaxyDoc, GalaxyNode } from "../model";
+import type { MapItemState } from "./cityLayer";
 import { type TerrainSurface, terrainSpecOf } from "./terrain";
 
 /**
@@ -502,24 +503,7 @@ export function ribbonPositions(
 
 /* -------------------------------- style --------------------------------- */
 
-/**
- * Per-province state set from outside the layer, through
- * `ProvinceLayer.setState`. All absent means a plain province.
- */
-export interface ProvinceVisualState {
-  /** The player can attack this province this turn. */
-  attackable?: boolean;
-  /** Picked out, for example as a neighbour of the selected province. */
-  emphasised?: boolean;
-  /**
-   * Hidden by fog of war. The shape stays, drawn in a flat neutral tint, and
-   * the owner colour, the name and the capital marker go. It cannot be
-   * hovered or selected.
-   */
-  hidden?: boolean;
-}
-
-export interface ProvinceStyleInput extends ProvinceVisualState {
+export interface ProvinceStyleInput extends MapItemState {
   /** No faction owns it. */
   neutral: boolean;
   hovered: boolean;
@@ -538,8 +522,10 @@ export interface ProvinceStyle {
 }
 
 /**
- * How a province is drawn for a given state. The numbers are design values
- * chosen without seeing them on screen.
+ * How a province is drawn for a given state. A hidden province keeps its
+ * shape in a flat neutral tint and loses its owner colour, its name, its
+ * capital marker, and any hover or selection highlight. The numbers are
+ * design values chosen without seeing them on screen.
  */
 export function provinceStyle(input: ProvinceStyleInput): ProvinceStyle {
   if (input.hidden) {

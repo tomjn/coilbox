@@ -109,12 +109,12 @@ describe("buildProvinceLayer", () => {
     // Red and blue meet, so their border is the strong one.
     expect(strongCount()).toBeGreaterThan(0);
     ownersRef.current = { east: "red" };
-    layer?.applyOwners();
+    layer?.apply();
     expect(fill("east").color.getHex()).toBe(0xff0000);
     // One owner either side now: no strong border left.
     expect(strongCount()).toBe(0);
     ownersRef.current = { east: NEUTRAL };
-    layer?.applyOwners();
+    layer?.apply();
     expect(fill("east").color.getHex()).toBe(0x808080);
     expect(strongCount()).toBeGreaterThan(0);
   });
@@ -133,24 +133,24 @@ describe("buildProvinceLayer", () => {
   it("highlights the hovered and the selected province as a whole", () => {
     const { layer, fill } = build();
     const plain = fill("west").opacity;
-    layer?.setHovered(0);
+    layer?.hover("west");
     const hovered = fill("west").opacity;
     expect(hovered).toBeGreaterThan(plain);
-    layer?.setHovered(-1);
+    layer?.hover(null);
     expect(fill("west").opacity).toBe(plain);
-    layer?.setSelected(0);
+    layer?.select("west");
     expect(fill("west").opacity).toBeGreaterThan(hovered);
     // A point location is not this layer's to highlight.
-    layer?.setSelected(1);
+    layer?.select("city");
     expect(fill("west").opacity).toBe(plain);
   });
 
   it("keeps a highlight through an owner change", () => {
     const { layer, ownersRef, fill } = build();
-    layer?.setSelected(2);
+    layer?.select("east");
     const selected = fill("east").opacity;
     ownersRef.current = { east: "red" };
-    layer?.applyOwners();
+    layer?.apply();
     expect(fill("east").opacity).toBe(selected);
   });
 
@@ -158,14 +158,17 @@ describe("buildProvinceLayer", () => {
     const { scene, layer, labels, fill, strongCount } = build();
     const star = scene.getObjectByName("province-capital:west");
     expect(star?.visible).toBe(true);
-    layer?.setState("west", { hidden: true });
+    layer?.setProvinceState("west", { hidden: true });
+    // Nothing changes until the batch is applied.
+    expect(fill("west").color.getHex()).toBe(0xff0000);
+    layer?.apply();
     expect(fill("west").color.getHex()).toBe(0x808080);
     expect(labels[0].visible).toBe(false);
     expect(star?.visible).toBe(false);
     expect(strongCount()).toBe(0);
-    expect(layer?.getState("west")).toEqual({ hidden: true });
     // Revealing it puts everything back.
-    layer?.setState("west", { hidden: false });
+    layer?.setProvinceState("west", undefined);
+    layer?.apply();
     expect(fill("west").color.getHex()).toBe(0xff0000);
     expect(labels[0].visible).toBe(true);
     expect(star?.visible).toBe(true);
@@ -175,11 +178,33 @@ describe("buildProvinceLayer", () => {
   it("restyles for the attackable and emphasised states", () => {
     const { layer, fill } = build();
     const plain = fill("east").opacity;
-    layer?.setState("east", { attackable: true });
+    layer?.setProvinceState("east", { attackable: true });
+    layer?.apply();
     expect(fill("east").opacity).toBeGreaterThan(plain);
-    layer?.setState("east", { attackable: false, emphasised: true });
+    layer?.setProvinceState("east", { emphasised: true });
+    layer?.apply();
     expect(fill("east").opacity).toBeGreaterThan(plain);
-    layer?.setState("east", { emphasised: false });
+    layer?.setProvinceState("east", undefined);
+    layer?.apply();
     expect(fill("east").opacity).toBe(plain);
+  });
+
+  it("ignores a state for a node that is not a province", () => {
+    const { layer } = build();
+    expect(layer?.has("west")).toBe(true);
+    expect(layer?.has("city")).toBe(false);
+    expect(() => {
+      layer?.setProvinceState("city", { hidden: true });
+      layer?.setProvinceState("nowhere", { hidden: true });
+      layer?.apply();
+    }).not.toThrow();
+  });
+
+  it("puts a province's name on its anchor", () => {
+    const { labels } = build();
+    // Map (25, 25) on a 100 unit map 200 world units across.
+    expect(labels[0].position.toArray()).toEqual([-50, 0, -50]);
+    // A point location's label is left where it was.
+    expect(labels[1].position.toArray()).toEqual([0, 0, 0]);
   });
 });

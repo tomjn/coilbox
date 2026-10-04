@@ -16,7 +16,6 @@ import type {
 } from "./GalaxyView";
 import type { WorldPos } from "./layout";
 import { hashString, trimLane } from "./layout";
-import { isProvince } from "./provinces";
 import type { TerrainSurface } from "./terrain";
 import {
   accretionTexture,
@@ -180,7 +179,6 @@ export function buildPlayLayer(
   galaxy: GalaxyDoc,
   skin: "galaxy" | "theatre",
   positions: Map<string, WorldPos>,
-  surface: TerrainSurface | undefined,
   playerFactionId: string,
   reduceMotion: boolean,
   effects: boolean,
@@ -201,6 +199,8 @@ export function buildPlayLayer(
   prevFactionRef: { current: string | undefined },
   burstRef: { current: string | null | undefined },
   applyBurstRef: { current: (() => void) | null },
+  /** Set for a terrain map only. */
+  surface?: TerrainSurface,
 ) {
   // Lanes: thick translucent capsule quads connecting ring edge to ring
   // edge (each end trimmed back from the node centre and drawn at that
@@ -1577,14 +1577,14 @@ export function buildPlayLayer(
       discMats.push(undefined);
       return;
     }
-    // A province is drawn as an area by `provinceLayer.ts`, so it gets no
-    // point marker. An outline only counts on a terrain map.
-    if (surface && isProvince(n)) {
-      discMats.push(undefined);
+    // Nothing on a terrain map takes a marker here: cityLayer.ts draws a
+    // point location and provinceLayer.ts draws a node with an outline.
+    if (surface) {
       starSprites.push(undefined);
       starMats.push(undefined);
       spikeSprites.push(undefined);
       coronaSprites.push(undefined);
+      discMats.push(undefined);
       return;
     }
     if (skin === "theatre") {
