@@ -1,15 +1,17 @@
 import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   ChevronRight,
   Dices,
   Download,
+  Map as MapIcon,
+  MapPlus,
   Orbit,
   Share2,
   Trash2,
 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -72,6 +74,17 @@ import {
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import { type GenerateOptions, generateGalaxy } from "../generate";
+import { readHandmadeRun } from "../handmade/conquest";
+import {
+  type HandmadeImportResult,
+  type HandmadeMapSummary,
+  importHandmadeMap,
+  removeHandmadeMap,
+} from "../handmade/library";
+import {
+  refreshHandmadeMaps,
+  useHandmadeMaps,
+} from "../handmade/useHandmadeMaps";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { mergeConquestNames } from "../names";
 import {
@@ -83,6 +96,7 @@ import { maxUnlockedNodeCount } from "../size";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
+import { MapErrorList } from "./components/MapErrorList";
 import {
   type StartChoice,
   StartPositionSelect,
@@ -140,17 +154,52 @@ export default function ConquestListPage() {
   const runs = galaxies.filter((g) => file.conquests[g.galaxy.id]);
   const unstarted = galaxies.filter((g) => !file.conquests[g.galaxy.id]);
 
+  // Hand-made maps (issue #3509). A map is listed beside the galaxies, and a
+  // conquest on one is saved under the map's id like any other. A galaxy with
+  // the same id is opened first, so a map it hides is said to be hidden.
+  const handmade = useHandmadeMaps();
+  const galaxyIds = new Set(galaxies.map((g) => g.galaxy.id));
+  const maps = handmade.maps.filter((m) => !galaxyIds.has(m.id));
+  const hiddenMaps = handmade.maps.filter((m) => galaxyIds.has(m.id));
+  const mapRuns = maps.filter((m) => file.conquests[m.id]);
+  const mapsUnstarted = maps.filter((m) => !file.conquests[m.id]);
+  // A conquest whose map is gone is still a save, and is shown as one. Only
+  // once the list has answered, or every conquest would look lost.
+  const lostRuns =
+    loading || handmade.loading || handmade.error
+      ? []
+      : Object.entries(file.conquests).flatMap(([id, state]) => {
+          const run = readHandmadeRun(state);
+          const gone =
+            run && !galaxyIds.has(id) && !maps.some((m) => m.id === id);
+          return gone ? [{ id, title: run.title, state }] : [];
+        });
+  const [mapError, setMapError] = useState<string | null>(null);
+  const removeMap = async (map: HandmadeMapSummary) => {
+    setMapError(null);
+    try {
+      await removeHandmadeMap(map.id);
+      await refreshHandmadeMaps();
+    } catch (e) {
+      setMapError(
+        `"${map.title}" was not removed. ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
+  const nothingListed =
+    galaxies.length === 0 &&
+    handmade.maps.length === 0 &&
+    handmade.unreadable.length === 0 &&
+    lostRuns.length === 0;
+
   // The single most recently updated run still in progress (issue #374's
   // "continue playing" affordance). Badged below, not a separate button,
   // since each run's card already links straight to it.
-  const resumeGalaxyId = useMemo(
-    () =>
-      mostRecentOpen(
-        runs,
-        (g) => file.conquests[g.galaxy.id]?.status === "active",
-        (g) => Date.parse(file.conquests[g.galaxy.id]?.updatedAt ?? ""),
-      )?.galaxy.id,
-    [runs, file],
+  const runIds = [...runs.map((g) => g.galaxy.id), ...mapRuns.map((m) => m.id)];
+  const resumeGalaxyId = mostRecentOpen(
+    runIds,
+    (id) => file.conquests[id]?.status === "active",
+    (id) => Date.parse(file.conquests[id]?.updatedAt ?? ""),
   );
 
   // A confirmed `coilbox://import` deep link (issue #388) lands here with the
@@ -194,6 +243,31 @@ export default function ConquestListPage() {
       ),
     });
 
+  // Pick a zip, then run the import in a drawer that shows how it went.
+  const importMap = async () => {
+    const zipPath = await open({
+      title: "Import map",
+      multiple: false,
+      filters: [{ name: "Hand-made map", extensions: ["zip"] }],
+    });
+    if (typeof zipPath !== "string") return;
+    drawer.open({
+      title: "Import map",
+      width: "26rem",
+      content: (
+        <ImportMapForm
+          key={nextDrawerKey()}
+          zipPath={zipPath}
+          onClose={() => drawer.close()}
+          onOpenMap={(id) => {
+            drawer.close();
+            navigate(`/conquest/${encodeURIComponent(id)}`);
+          }}
+        />
+      ),
+    });
+  };
+
   // Open the import drawer with the deep link's code prefilled, so the same
   // decode plus content-resolution flow runs as a manual paste.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once when the deep-link code arrives, not on every drawer identity change
@@ -218,6 +292,9 @@ export default function ConquestListPage() {
         actions={
           !needsGame && (
             <>
+              <Button variant="outline" onClick={importMap}>
+                <MapPlus className="mr-1.5 size-4" aria-hidden /> Import map
+              </Button>
               <Button variant="outline" onClick={() => openImportChallenge()}>
                 <Download className="mr-1.5 size-4" aria-hidden /> Import
                 challenge
@@ -238,6 +315,12 @@ export default function ConquestListPage() {
         />
       )}
       {abandonError && <ErrorBanner message={abandonError} />}
+      {handmade.error && (
+        <ErrorBanner
+          message={`The hand-made maps could not be listed. ${handmade.error}`}
+        />
+      )}
+      {mapError && <ErrorBanner message={mapError} />}
 
       {needsGame ? (
         <div className="flex flex-col gap-3">
@@ -301,13 +384,13 @@ export default function ConquestListPage() {
           )}
           {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
-      ) : loading ? (
+      ) : loading || handmade.loading ? (
         <SkeletonList />
-      ) : galaxies.length === 0 ? (
+      ) : nothingListed ? (
         <EmptyState label="No galaxies yet. Generate one for any installed game, or import a galaxy file." />
       ) : (
         <>
-          {runs.length > 0 && (
+          {runIds.length + lostRuns.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-muted-foreground">
                 In progress
@@ -324,10 +407,29 @@ export default function ConquestListPage() {
                     />
                   </li>
                 ))}
+                {mapRuns.map((map) => (
+                  <li key={map.id}>
+                    <HandmadeMapCard
+                      map={map}
+                      state={file.conquests[map.id]}
+                      resume={map.id === resumeGalaxyId}
+                      onAbandon={() => abandon(map.id)}
+                    />
+                  </li>
+                ))}
+                {lostRuns.map(({ id, title, state }) => (
+                  <li key={id}>
+                    <LostMapCard
+                      title={title}
+                      state={state}
+                      onAbandon={() => abandon(id)}
+                    />
+                  </li>
+                ))}
               </ul>
             </section>
           )}
-          {unstarted.length > 0 && (
+          {unstarted.length + mapsUnstarted.length > 0 && (
             <section className="flex flex-col gap-2">
               <h2 className="text-sm font-medium text-muted-foreground">
                 Ready to start
@@ -340,6 +442,51 @@ export default function ConquestListPage() {
                       bundled={source === "bundled"}
                       state={undefined}
                     />
+                  </li>
+                ))}
+                {mapsUnstarted.map((map) => (
+                  <li key={map.id}>
+                    <HandmadeMapCard
+                      map={map}
+                      state={undefined}
+                      onRemove={
+                        map.source === "imported"
+                          ? () => removeMap(map)
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {handmade.unreadable.length + hiddenMaps.length > 0 && (
+            <section className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                Maps that could not be listed
+              </h2>
+              <ul className="flex flex-col gap-2">
+                {handmade.unreadable.map((u) => (
+                  <li key={`${u.source}/${u.folder}`}>
+                    <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
+                      <span className="text-sm font-medium">
+                        {u.source === "bundled" ? "Bundled map" : "Map"} folder
+                        "{u.folder}"
+                      </span>
+                      <MapErrorList errors={u.errors} />
+                    </Card>
+                  </li>
+                ))}
+                {hiddenMaps.map((m) => (
+                  <li key={m.id}>
+                    <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
+                      <span className="text-sm font-medium">{m.title}</span>
+                      <p className="text-sm text-muted-foreground">
+                        This map has the id "{m.id}", which a galaxy in the list
+                        above already uses, so the map is not listed. Change the
+                        id in its map.json and import it again.
+                      </p>
+                    </Card>
                   </li>
                 ))}
               </ul>
@@ -359,6 +506,246 @@ function territoryPercent(galaxy: GalaxyDoc, state: ConquestState): number {
     (n) => state.owners[n.id] === state.playerFactionId,
   ).length;
   return Math.round((held / total) * 100);
+}
+
+/** Share of a conquest's locations the player holds, from the save alone. */
+function heldPercent(state: ConquestState): number {
+  const owners = Object.values(state.owners);
+  if (owners.length === 0) return 0;
+  const held = owners.filter((o) => o === state.playerFactionId).length;
+  return Math.round((held / owners.length) * 100);
+}
+
+function statusClass(state: ConquestState | undefined): string {
+  return state?.status === "won"
+    ? "text-emerald-400"
+    : state?.status === "lost"
+      ? "text-red-400"
+      : "text-muted-foreground";
+}
+
+/**
+ * A hand-made map in the list: its picture, title and description, and the
+ * conquest on it when there is one. The list is drawn from each map's
+ * manifest alone. The map itself is read when it is opened.
+ */
+function HandmadeMapCard({
+  map,
+  state,
+  resume,
+  onAbandon,
+  onRemove,
+}: {
+  map: HandmadeMapSummary;
+  state: ConquestState | undefined;
+  resume?: boolean;
+  /** Present for a conquest in progress: clears it, keeping the map. */
+  onAbandon?: () => void;
+  /** Present for an imported map with no conquest on it. */
+  onRemove?: () => void;
+}) {
+  const statusLabel =
+    state?.status === "won"
+      ? "Victory"
+      : state?.status === "lost"
+        ? "Defeat"
+        : state
+          ? `Turn ${state.turn} · ${heldPercent(state)}% held`
+          : "Not started";
+  return (
+    <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none transition-colors hover:border-border hover:bg-accent/50">
+      <Link
+        to={`/conquest/${encodeURIComponent(map.id)}`}
+        className="flex min-w-0 flex-1 items-center gap-3"
+      >
+        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+          {map.pictureUrl ? (
+            <img
+              src={map.pictureUrl}
+              alt=""
+              className="size-full object-cover"
+            />
+          ) : (
+            <MapIcon className="size-5 text-muted-foreground" aria-hidden />
+          )}
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="truncate text-sm font-medium">{map.title}</span>
+            {map.source === "bundled" && (
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                Bundled
+              </span>
+            )}
+            {resume && <ContinueBadge />}
+          </div>
+          <p className="line-clamp-1 text-xs text-muted-foreground">
+            {map.game.shortname} · Hand-made map
+            {map.description ? ` · ${map.description}` : ""}
+          </p>
+          <span className={`text-xs ${statusClass(state)}`}>{statusLabel}</span>
+        </div>
+        <ChevronRight
+          className="size-4 shrink-0 text-muted-foreground"
+          aria-hidden
+        />
+      </Link>
+      {state && onAbandon ? (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Abandon ${map.title}`}
+          title="Abandon this campaign"
+          onClick={onAbandon}
+        >
+          <Trash2 className="size-4 text-muted-foreground" aria-hidden />
+        </Button>
+      ) : (
+        onRemove && (
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={`Remove ${map.title}`}
+            title="Remove this map"
+            onClick={onRemove}
+          >
+            <Trash2 className="size-4 text-muted-foreground" aria-hidden />
+          </Button>
+        )
+      )}
+    </Card>
+  );
+}
+
+/** A saved conquest whose hand-made map is no longer installed. */
+function LostMapCard({
+  title,
+  state,
+  onAbandon,
+}: {
+  title: string;
+  state: ConquestState;
+  onAbandon: () => void;
+}) {
+  return (
+    <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
+        <MapIcon className="size-5 text-muted-foreground" aria-hidden />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="truncate text-sm font-medium">{title}</span>
+        <p className="text-xs text-muted-foreground">
+          The map this conquest is played on is no longer installed. Your
+          progress is saved (turn {state.turn}). Import the map again to carry
+          on.
+        </p>
+      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={`Abandon ${title}`}
+        title="Abandon this campaign"
+        onClick={onAbandon}
+      >
+        <Trash2 className="size-4 text-muted-foreground" aria-hidden />
+      </Button>
+    </Card>
+  );
+}
+
+/**
+ * Import a hand-made map from a zip and say how it went. The import starts as
+ * the drawer opens. A map that is already installed is replaced only after the
+ * player agrees, and a map the reader refuses lists every reason.
+ */
+function ImportMapForm({
+  zipPath,
+  onClose,
+  onOpenMap,
+}: {
+  zipPath: string;
+  onClose: () => void;
+  onOpenMap: (id: string) => void;
+}) {
+  /** Null while an import is running. */
+  const [result, setResult] = useState<HandmadeImportResult | null>(null);
+  const run = useCallback(
+    async (replace: boolean) => {
+      setResult(null);
+      const next = await importHandmadeMap(zipPath, { replace });
+      // The list changes on an install, and on a failed read after one.
+      if (next.status !== "exists") {
+        await refreshHandmadeMaps().catch(() => {});
+      }
+      setResult(next);
+    },
+    [zipPath],
+  );
+  // Once per drawer, so a second effect run cannot import the zip twice.
+  const started = useRef(false);
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    run(false);
+  }, [run]);
+
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      {result === null && (
+        <p className="text-sm text-muted-foreground">Importing the map…</p>
+      )}
+      {result?.status === "imported" && (
+        <>
+          <p className="text-sm">
+            "{result.doc.title}" is imported and listed on the Conquest page.
+          </p>
+          {result.skipped > 0 && (
+            <p className="text-sm text-muted-foreground">
+              {result.skipped} file{result.skipped === 1 ? "" : "s"} in the zip{" "}
+              {result.skipped === 1 ? "was" : "were"} left out, because a map
+              does not use {result.skipped === 1 ? "it" : "them"}.
+            </p>
+          )}
+          <div className="flex gap-2">
+            <Button onClick={() => onOpenMap(result.id)}>Open the map</Button>
+            <Button variant="outline" onClick={onClose}>
+              Done
+            </Button>
+          </div>
+        </>
+      )}
+      {result?.status === "exists" && (
+        <>
+          <p className="text-sm">
+            A map called "{result.title}" is already installed. Replace it with
+            the one in this zip?
+          </p>
+          <p className="text-sm text-muted-foreground">
+            A conquest in progress on it is kept and carries on with the new
+            map.
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={() => run(true)}>Replace the map</Button>
+            <Button variant="outline" onClick={onClose}>
+              Keep the installed map
+            </Button>
+          </div>
+        </>
+      )}
+      {result?.status === "invalid" && (
+        <>
+          <p className="text-sm">
+            The map was not imported. Fix the following in the map folder, zip
+            it again and import the new zip.
+          </p>
+          <MapErrorList errors={result.errors} />
+        </>
+      )}
+      {result?.status === "refused" && (
+        <ErrorBanner message={`The map was not imported. ${result.message}`} />
+      )}
+    </div>
+  );
 }
 
 function GalaxyCard({

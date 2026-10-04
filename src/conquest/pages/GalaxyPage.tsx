@@ -1,4 +1,4 @@
-import { Button, useHideSidebar } from "@picoframe/frame";
+import { Button, Input, useHideSidebar } from "@picoframe/frame";
 import {
   ArrowLeft,
   Dices,
@@ -7,8 +7,10 @@ import {
   ShieldAlert,
   Swords,
 } from "lucide-react";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
+import { Switch } from "@/components/ui/switch";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
@@ -51,12 +53,21 @@ import {
   restoreChallengeMap,
   substituteExcludedMaps,
 } from "../generate";
+import {
+  blankLocations,
+  type HandmadeConquestOptions,
+  handmadeConquestDoc,
+  newHandmadeConquest,
+  pickBlankBattles,
+  readHandmadeRun,
+} from "../handmade/conquest";
+import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
-import { finishedConquest } from "../unlocks";
-import { useAwardFinishedConquest } from "../useUnlocks";
+import { finishedConquest, unlockedLevel } from "../unlocks";
+import { useAwardFinishedConquest, useConquestUnlocks } from "../useUnlocks";
 import { BattleOverlay } from "./components/BattleOverlay";
 import {
   BracketFrame,
@@ -65,7 +76,9 @@ import {
   MAP_DIM_INK_CLASS,
   MAP_INK_CLASS,
 } from "./components/hudChrome";
+import { MapErrorList } from "./components/MapErrorList";
 import { FactionDot, SidePicker } from "./components/RunSetup";
+import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
 /**
  * The strategic map page: the full-bleed 3D galaxy with HTML overlays — a
@@ -100,20 +113,285 @@ export default function GalaxyPage() {
     );
   }
   if (!loaded || !galaxy) {
-    return (
-      <div className="flex flex-col gap-4 p-4">
-        {error && <ErrorBanner message={error} />}
-        <EmptyState label="Galaxy not found." />
-        <Link to="/conquest" className="text-sm text-primary hover:underline">
-          Back to Conquest
-        </Link>
-      </div>
-    );
+    // Not a stored galaxy, so it may be a hand-made map.
+    if (id) return <HandmadeGalaxy id={id} listError={error} />;
+    return <NotOpened error={error} label="Galaxy not found." />;
   }
   return <GalaxyScreen key={galaxy.id} galaxy={galaxy} />;
 }
 
-function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
+/** The page in place of a map that cannot be shown, with the way back. */
+function NotOpened({
+  error,
+  label,
+  children,
+}: {
+  error?: string | null;
+  label: string;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-4 p-4">
+      {error && <ErrorBanner message={error} />}
+      <EmptyState label={label} />
+      {children}
+      <Link to="/conquest" className="text-sm text-primary hover:underline">
+        Back to Conquest
+      </Link>
+    </div>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div className="p-4">
+      <SkeletonList />
+    </div>
+  );
+}
+
+/** A seed for a new conquest. It drives the enemy turns. */
+const randomSeed = () => Math.floor(Math.random() * 2 ** 31);
+
+/** What a hand-made map adds to the screen while a conquest is set up. */
+interface HandmadeSetup {
+  /** The fog, threat level and seed fields for the setup panel. */
+  fields: ReactNode;
+  /** The conquest to save when the player starts. */
+  newState: (
+    playerFactionId: string,
+    playerSide: string | undefined,
+  ) => ConquestState;
+  /** Called when a finished conquest is started again. */
+  onRestart: () => void;
+}
+
+/**
+ * A conquest on a hand-made map. The map is read from its folder on every
+ * visit and the conquest's own choices are put back on it, so nothing about
+ * the map is saved with the conquest (see `../handmade/conquest`).
+ */
+function HandmadeGalaxy({
+  id,
+  listError,
+}: {
+  id: string;
+  listError: string | null;
+}) {
+  const { loading, result, failure } = useHandmadeMap(id);
+  const listed = useHandmadeMaps();
+  const { file, loading: stateLoading, saveFor } = useConquestState();
+  const saved = file.conquests[id];
+  const run = useMemo(() => (saved ? readHandmadeRun(saved) : null), [saved]);
+
+  const { target } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const {
+    run: runScan,
+    data: scanData,
+    loading: scanLoading,
+    error: scanError,
+  } = scan;
+  useEffect(() => {
+    if (!scanData && !scanLoading && !scanError) runScan();
+  }, [scanData, scanLoading, scanError, runScan]);
+  const { eligible, isExcluded } = useMapEligibility();
+  const maps = useMemo(
+    () => eligible(scanData?.maps ?? []),
+    [scanData, eligible],
+  );
+
+  const [options, setOptions] = useState<HandmadeConquestOptions>(() => ({
+    seed: randomSeed(),
+    fogOfWar: false,
+    threatLevel: 0,
+  }));
+  const map = result?.ok ? result.doc : undefined;
+  const { unlocks } = useConquestUnlocks();
+  const ceiling = map ? unlockedLevel(unlocks, map.game.shortname) : 0;
+  const threatLevel = Math.min(options.threatLevel, ceiling);
+
+  // A saved conquest keeps the battles it was given. Only a blank location it
+  // has no map for, one added to the map since, draws one now.
+  const seed = saved?.seed ?? options.seed;
+  const battles = useMemo(
+    () => (map ? pickBlankBattles(map, maps, seed, run?.battles) : {}),
+    [map, maps, seed, run],
+  );
+  const fogOfWar = saved ? run?.fogOfWar : options.fogOfWar;
+  const level = saved ? run?.threatLevel : threatLevel;
+  const allMaps = scanData?.maps;
+  const galaxy = useMemo(() => {
+    if (!map) return undefined;
+    return substituteExcludedMaps(
+      handmadeConquestDoc(map, { fogOfWar, threatLevel: level, battles }),
+      allMaps ?? [],
+      isExcluded,
+    );
+  }, [map, fogOfWar, level, battles, allMaps, isExcluded]);
+
+  // Save a battle drawn on this visit, so the location keeps it.
+  const drawn = run
+    ? Object.keys(battles)
+        .filter((nodeId) => !run.battles[nodeId])
+        .join("\0")
+    : "";
+  useEffect(() => {
+    if (!saved || !run || drawn === "") return;
+    // A refused save changes nothing: the battles still apply on this visit.
+    saveFor(id, { ...saved, handmade: { ...run, battles } }).catch(() => {});
+  }, [id, saved, run, battles, drawn, saveFor]);
+
+  if (loading || stateLoading || listed.loading) return <PageLoading />;
+  if (failure) {
+    return (
+      <NotOpened
+        error={`The map folders could not be read. ${failure}`}
+        label="This map could not be opened."
+      />
+    );
+  }
+  if (!map) {
+    const known = listed.maps.some((m) => m.id === id);
+    if (!run && !known) {
+      return <NotOpened error={listError} label="Galaxy not found." />;
+    }
+    return (
+      <NotOpened
+        label={
+          known
+            ? "This map could not be read."
+            : `The map "${run?.title ?? id}" is no longer installed.`
+        }
+      >
+        {known && result && !result.ok && (
+          <MapErrorList errors={result.errors} />
+        )}
+        {run && (
+          <p className="text-sm text-muted-foreground">
+            Your conquest on it is saved and nothing has been changed.{" "}
+            {known
+              ? "It carries on once the map can be read again."
+              : "Import the map again from the Conquest page to carry on."}
+          </p>
+        )}
+      </NotOpened>
+    );
+  }
+  const blank = blankLocations(map, battles);
+  if (blank.length > 0) {
+    // Until the scan answers there are no maps to pick from yet.
+    if (target && !scanData && !scanError) return <PageLoading />;
+    return (
+      <NotOpened
+        error={
+          scanError
+            ? `The content scan failed, so installed maps are not listed: ${scanError}`
+            : null
+        }
+        label={`This map leaves ${blank.length} of its battles for coilbox to choose, and there are no maps installed to choose from. Install at least one map in Content > Maps, then open it again.`}
+      />
+    );
+  }
+  if (!galaxy) return <PageLoading />;
+
+  return (
+    <GalaxyScreen
+      key={galaxy.id}
+      galaxy={galaxy}
+      handmade={{
+        fields: (
+          <HandmadeOptionFields
+            options={{ ...options, threatLevel }}
+            ceiling={ceiling}
+            onChange={setOptions}
+          />
+        ),
+        newState: (playerFactionId, playerSide) =>
+          newHandmadeConquest(
+            map,
+            { ...options, threatLevel, playerFactionId, playerSide },
+            maps,
+          ),
+        onRestart: () => setOptions((o) => ({ ...o, seed: randomSeed() })),
+      }}
+    />
+  );
+}
+
+/**
+ * The choices a hand-made map still leaves: fog of war, threat level and a
+ * seed. Size, shape and style are the map's own, so they are not offered.
+ */
+function HandmadeOptionFields({
+  options,
+  ceiling,
+  onChange,
+}: {
+  options: HandmadeConquestOptions;
+  /** The highest threat level the player has unlocked for the map's game. */
+  ceiling: number;
+  onChange: (next: HandmadeConquestOptions) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <label htmlFor="handmade-fog" className="flex flex-col gap-0.5">
+          <span className="font-medium">Fog of war</span>
+          <span className="text-xs text-muted-foreground">
+            Hide locations more than two jumps from your territory.
+          </span>
+        </label>
+        <Switch
+          id="handmade-fog"
+          checked={options.fogOfWar}
+          onCheckedChange={(fogOfWar) => onChange({ ...options, fogOfWar })}
+        />
+      </div>
+      <ThreatLevelSelect
+        value={options.threatLevel}
+        ceiling={ceiling}
+        onChange={(threatLevel) => onChange({ ...options, threatLevel })}
+      />
+      <div className="flex flex-col gap-1.5 text-sm">
+        <span className="font-medium">Seed</span>
+        <div className="flex gap-2">
+          <Input
+            value={String(options.seed)}
+            onChange={(e) =>
+              onChange({
+                ...options,
+                seed: Number(e.target.value.replace(/\D/g, "")) || 0,
+              })
+            }
+            inputMode="numeric"
+            aria-label="Conquest seed"
+          />
+          <Button
+            variant="outline"
+            onClick={() => onChange({ ...options, seed: randomSeed() })}
+          >
+            <Dices className="size-4" aria-hidden />
+            <span className="sr-only">Reroll seed</span>
+          </Button>
+        </div>
+        <span className="text-xs text-muted-foreground">
+          The map never changes. The seed sets how your enemies move and which
+          battlefield each location the map leaves open is fought on.
+        </span>
+      </div>
+    </>
+  );
+}
+
+function GalaxyScreen({
+  galaxy,
+  handmade,
+}: {
+  galaxy: GalaxyDoc;
+  /** Present while the galaxy is a hand-made map. */
+  handmade?: HandmadeSetup;
+}) {
   const {
     loading,
     error: stateError,
@@ -490,14 +768,17 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
           galaxy={galaxy}
           faction={setupFaction}
           onFaction={setSetupFaction}
+          options={handmade?.fields}
           onStart={async (playerSide) => {
             await saveFor(
               galaxy.id,
-              newConquestState(galaxy, {
-                playerFactionId: setupFaction,
-                playerSide,
-                seed: Math.floor(Math.random() * 2 ** 31),
-              }),
+              handmade
+                ? handmade.newState(setupFaction, playerSide)
+                : newConquestState(galaxy, {
+                    playerFactionId: setupFaction,
+                    playerSide,
+                    seed: randomSeed(),
+                  }),
             );
           }}
         />
@@ -508,7 +789,10 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         <EndScreen
           galaxy={galaxy}
           state={state}
-          onRestart={() => saveFor(galaxy.id, undefined)}
+          onRestart={() => {
+            handmade?.onRestart();
+            return saveFor(galaxy.id, undefined);
+          }}
         />
       )}
 
@@ -806,11 +1090,14 @@ export function RunSetupPanel({
   galaxy,
   faction,
   onFaction,
+  options,
   onStart,
 }: {
   galaxy: GalaxyDoc;
   faction: string;
   onFaction: (id: string) => void;
+  /** More fields for the panel, shown above its buttons. */
+  options?: ReactNode;
   onStart: (playerSide: string | undefined) => Promise<void>;
 }) {
   const { target } = usePreferredTarget();
@@ -988,6 +1275,7 @@ export function RunSetupPanel({
           onChange={setSide}
         />
       )}
+      {options}
       {canRegenerate && (
         <Button
           variant="outline"
