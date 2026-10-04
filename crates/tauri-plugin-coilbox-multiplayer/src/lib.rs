@@ -2996,11 +2996,10 @@ fn mp_set_script_tags(
     server_key: String,
     tags: BTreeMap<String, String>,
 ) -> CliResult {
-    // Zero-K splits this in two and takes each whole. `SetModOptions` and
-    // `SetMapOptions` assign the dictionary they are handed, so a key left out
-    // is a key removed, which is why the caller's tags are read as the whole of
-    // each namespace rather than as a patch over it. It has nothing for a start
-    // position type or a unit restriction, so those go nowhere.
+    // Zero-K splits this in two. `SetModOptions` and `SetMapOptions` assign the
+    // dictionary they are handed, so the caller's tags are laid over the room's
+    // current options before they go. It has nothing for a start position type
+    // or a unit restriction, so those go nowhere.
     if is_zerok(registry.inner(), &server_key) {
         return zerok_option_actions(registry.inner(), &server_key, &tags);
     }
@@ -3013,34 +3012,25 @@ fn mp_set_script_tags(
 
 /// Send a tag map to a Zero-K connection as its two option commands.
 ///
-/// Only the namespaces Zero-K has a command for, and only when the caller named
-/// something in them, so a push that carried nothing but unit restrictions sends
-/// nothing rather than clearing the room's options.
+/// Each namespace goes out as the room's current options with the caller's tags
+/// laid over them (see [`zerok_room::option_actions`]), so editing one option
+/// does not clear the rest. A push that carried nothing but unit restrictions
+/// sends nothing.
 fn zerok_option_actions(
     registry: &Registry,
     server_key: &str,
     tags: &BTreeMap<String, String>,
 ) -> CliResult {
-    let under = |prefix: &str| -> BTreeMap<String, String> {
-        tags.iter()
-            .filter_map(|(key, value)| {
-                let key = key.to_lowercase();
-                let name = key.strip_prefix(prefix)?.to_owned();
-                Some((name, value.clone()))
-            })
-            .collect()
+    let actions = {
+        let map = lock_or_recover(registry);
+        let Some(conn) = map.get(server_key) else {
+            return CliResult::err("connection is closed");
+        };
+        let state = lock_or_recover(&conn.state);
+        zerok_room::option_actions(&state, tags)
     };
-
-    let mod_options = under("game/modoptions/");
-    let map_options = under("game/mapoptions/");
     let mut last = CliResult::ok(json!({ "sent": true }));
-    for action in [
-        (!mod_options.is_empty()).then_some(zerok_room::RoomAction::ModOptions(mod_options)),
-        (!map_options.is_empty()).then_some(zerok_room::RoomAction::MapOptions(map_options)),
-    ]
-    .into_iter()
-    .flatten()
-    {
+    for action in actions {
         last = zerok_room_action(registry, server_key, action)
             .unwrap_or_else(|| CliResult::err("connection is closed"));
         if !last.success {
