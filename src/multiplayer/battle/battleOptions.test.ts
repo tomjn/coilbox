@@ -44,6 +44,30 @@ describe("battleOptions", () => {
     ).toBe(0);
   });
 
+  it("does not count a default the server spelled differently", () => {
+    expect(
+      changedCount([opt()], { "game/modoptions/maxunits": "1000.0" }, "mod"),
+    ).toBe(0);
+    const flag = opt({ key: "fixedallies", type: "bool", default: "1" });
+    expect(
+      changedCount([flag], { "game/modoptions/fixedallies": "true" }, "mod"),
+    ).toBe(0);
+  });
+
+  it("counts an edit in flight over the confirmed value", () => {
+    const tags = { "game/modoptions/maxunits": "1000" };
+    const pending = {
+      "game/modoptions/maxunits": { target: "2000", prev: "1000" },
+    };
+    expect(changedCount([opt()], tags, "mod", pending)).toBe(1);
+  });
+
+  it("does not count a server value for an option the game does not declare", () => {
+    expect(
+      changedCount([opt()], { "game/modoptions/unknown": "9" }, "mod"),
+    ).toBe(0);
+  });
+
   it("extracts raw entries for a scope", () => {
     const tags = {
       "game/modoptions/a": "1",

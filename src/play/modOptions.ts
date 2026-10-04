@@ -80,9 +80,67 @@ export function withOption(
   return rest;
 }
 
-/** Whether the user has overridden an option away from its default. */
+/** A bool as the engine and lobby servers spell it, or undefined for anything else. */
+function parseBool(v: string): boolean | undefined {
+  const t = v.trim().toLowerCase();
+  if (t === "1" || t === "true") return true;
+  if (t === "0" || t === "false" || t === "") return false;
+  return undefined;
+}
+
+/** A number as written, or undefined for an empty or non-numeric string. */
+function parseNumber(v: string): number | undefined {
+  if (v.trim() === "") return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Whether two spellings of an option's value are the same value, by the
+ * option's declared type. A lobby server sends everything as a string, and
+ * "1.0" is the default of a "1" number and "true" the default of a "1" bool.
+ * Anything that does not parse as its type falls back to exact comparison.
+ */
+function sameOptionValue(o: ConfigOption, a: string, b: string): boolean {
+  if (o.type === "bool") {
+    const pa = parseBool(a);
+    const pb = parseBool(b);
+    if (pa !== undefined && pb !== undefined) return pa === pb;
+  }
+  if (o.type === "number") {
+    const pa = parseNumber(a);
+    const pb = parseNumber(b);
+    if (pa !== undefined && pb !== undefined) return pa === pb;
+  }
+  return a === b;
+}
+
+/**
+ * Whether an option's value differs from the default its game or map declares.
+ * This is the one answer to "was this changed", for the marks on the option
+ * panels, their counts, and `sparseOptions`.
+ *
+ * `undefined` means nobody set a value, which is the default. An option with no
+ * declared default is taken to default to the empty value, which is what its
+ * control shows and what `effectiveOptions` leaves out, so any other value is a
+ * change. A section is never changed.
+ */
 export const isChanged = (o: ConfigOption, value?: string) =>
-  o.type !== "section" && value !== undefined && value !== (o.default ?? "");
+  o.type !== "section" &&
+  value !== undefined &&
+  !sameOptionValue(o, value, o.default ?? "");
+
+/**
+ * An option's declared default as a reader would say it: On or Off for a bool,
+ * the item's name for a list, "empty" for an empty one, otherwise as written.
+ */
+export function defaultLabel(o: ConfigOption): string {
+  const d = o.default ?? "";
+  if (o.type === "bool") return parseBool(d) ? "On" : "Off";
+  if (o.type === "list")
+    return o.listItems?.find((it) => it.key === d)?.name ?? (d || "empty");
+  return d === "" ? "empty" : d;
+}
 
 /**
  * The `[modoptions]` block to write: the caller's values, with the game's
