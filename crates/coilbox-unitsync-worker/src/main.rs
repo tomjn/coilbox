@@ -52,6 +52,7 @@ mod unitscriptfile;
 use coilbox_unitsync_worker::Mode;
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
+use std::collections::HashSet;
 use std::path::Path;
 
 const LIST_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -1722,7 +1723,7 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
     }
 
     let tg = std::time::Instant::now();
-    let games = collect_games(&us);
+    let games = collect_games(&us, &maps);
     if timings {
         eprintln!(
             "[unitsync-timing] games={} in {}ms",
@@ -1956,9 +1957,11 @@ fn collect_maps(us: &Unitsync) -> Vec<MapItem> {
     maps
 }
 
-fn collect_games(us: &Unitsync) -> Vec<GameItem> {
+fn collect_games(us: &Unitsync, maps: &[MapItem]) -> Vec<GameItem> {
     let count = us.mod_count();
-    let mut games = Vec::with_capacity(count.max(0) as usize);
+    // One pass reads every game, a second works out each game's missing
+    // dependencies once the whole installed set is known.
+    let mut read = Vec::with_capacity(count.max(0) as usize);
     for i in 0..count {
         let primary_name = us.mod_archive(i).unwrap_or_default();
         let info = us.mod_info(i);
@@ -1969,28 +1972,56 @@ fn collect_games(us: &Unitsync) -> Vec<GameItem> {
             .unwrap_or_else(|| primary_name.clone());
 
         let primary_archive = archive(us, primary_name.clone());
-        // The archive list includes the game's own archive — but under its
+        // The archive list includes the game's own archive, but under its
         // display name (the mod name) rather than its filename, so exclude both
         // forms so a game never lists itself as a dependency.
-        let dependency_archives = us
+        let reported: Vec<String> = us
             .mod_archives(i)
             .into_iter()
             .filter(|a| a != &primary_name && a != &name)
-            .map(|a| archive(us, a))
             .collect();
 
         // Drain after the accessors above, so any queued diagnostics attach to
         // this game.
         let warnings = drain_attributed(us);
-        games.push(GameItem {
-            name: name.clone(),
-            primary_archive,
-            dependency_archives,
-            info,
-            warnings,
-        });
+        read.push((name, primary_archive, reported, info, warnings));
     }
-    games
+
+    let installed: HashSet<String> = read
+        .iter()
+        .map(|(name, ..)| name.clone())
+        .chain(maps.iter().map(|m| m.name.clone()))
+        .collect();
+
+    read.into_iter()
+        .map(
+            |(name, primary_archive, reported, info, warnings)| GameItem {
+                missing_dependencies: missing_dependencies(&reported, &installed),
+                dependency_archives: reported.into_iter().map(|a| archive(us, a)).collect(),
+                name,
+                primary_archive,
+                info,
+                warnings,
+            },
+        )
+        .collect()
+}
+
+/// The dependencies in `reported` that no installed archive satisfies.
+///
+/// unitsync does not fail on a missing dependency. Its archive list names each
+/// resolved dependency by the archive's own versioned name, and each one it
+/// could not resolve by the lower-cased name that was asked for. A name with an
+/// upper-case letter was therefore resolved. A name without one is missing
+/// unless it is exactly the name of an installed game or map. The engine matches
+/// display names exactly and compares case only on the archive file name it
+/// falls back to, so a case-only difference is a miss here as well.
+fn missing_dependencies(reported: &[String], installed: &HashSet<String>) -> Vec<String> {
+    reported
+        .iter()
+        .filter(|name| **name == name.to_lowercase() && !installed.contains(*name))
+        .cloned()
+        .collect()
 }
 
 fn emit_error(msg: String) {
@@ -2010,6 +2041,75 @@ fn print_json(out: &ScanOutput) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn installed(list: &[&str]) -> HashSet<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn a_game_whose_dependencies_all_resolve_misses_nothing() {
+        let reported = names(&["Spring content v1", "Spring Bitmaps"]);
+        assert!(missing_dependencies(&reported, &installed(&[])).is_empty());
+    }
+
+    #[test]
+    fn a_dependency_unitsync_could_not_resolve_is_missing() {
+        // The engine reports what it could not resolve as the lower-cased name
+        // that was asked for.
+        let reported = names(&["Spring content v1", "zero-k v1.7.6.4"]);
+        assert_eq!(
+            missing_dependencies(&reported, &installed(&["Zero-K Benchmark v3"])),
+            names(&["zero-k v1.7.6.4"])
+        );
+    }
+
+    #[test]
+    fn a_name_that_differs_only_in_case_is_not_the_installed_archive() {
+        // The engine matches a dependency's display name exactly. Only the
+        // archive file name it falls back to is compared without case.
+        let reported = names(&["zero-k v1.7.6.4"]);
+        assert_eq!(
+            missing_dependencies(&reported, &installed(&["Zero-K v1.7.6.4"])),
+            names(&["zero-k v1.7.6.4"])
+        );
+    }
+
+    #[test]
+    fn an_installed_archive_with_a_lower_case_name_is_found() {
+        let reported = names(&["evolution rts 1"]);
+        assert!(missing_dependencies(&reported, &installed(&["evolution rts 1"])).is_empty());
+    }
+
+    #[test]
+    fn a_dependency_satisfied_by_another_archive_file_is_not_missing() {
+        // Asked for by shortname or file name, the engine reports the archive it
+        // resolved to under that archive's own versioned name.
+        let reported = names(&["Zero-K v1.14.8.0"]);
+        assert!(missing_dependencies(&reported, &installed(&["Zero-K v1.14.8.0"])).is_empty());
+    }
+
+    #[test]
+    fn a_game_reports_its_missing_dependencies_to_the_frontend() {
+        let item = GameItem {
+            name: "Zero-K Benchmark v3".into(),
+            primary_archive: Archive {
+                name: "benchmark.sdz".into(),
+                path: None,
+                checksum: None,
+                size: None,
+            },
+            dependency_archives: Vec::new(),
+            missing_dependencies: names(&["zero-k v1.7.6.4"]),
+            info: Default::default(),
+            warnings: Vec::new(),
+        };
+        let json = serde_json::to_value(&item).unwrap();
+        assert_eq!(json["missingDependencies"][0], "zero-k v1.7.6.4");
+    }
 
     #[test]
     fn a_failed_init_is_reported_with_the_engines_own_reason() {

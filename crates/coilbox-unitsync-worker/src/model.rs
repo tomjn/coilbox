@@ -566,6 +566,10 @@ pub struct GameItem {
     pub primary_archive: Archive,
     /// Archives the game depends on (its primary archive excluded).
     pub dependency_archives: Vec<Archive>,
+    /// Dependencies no installed archive satisfies, as the engine names them.
+    /// Always present, empty when everything resolves, so a missing key means an
+    /// older worker rather than a healthy game.
+    pub missing_dependencies: Vec<String>,
     /// modinfo metadata (name, shortname, version, description, ...).
     pub info: BTreeMap<String, String>,
     /// Non-fatal unitsync diagnostics attributed to this game during the scan.
