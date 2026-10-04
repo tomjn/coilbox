@@ -148,6 +148,23 @@ describe("splitHostPort", () => {
     });
   });
 
+  // A bracketed address is the one IPv6 spelling with a port in it that can be
+  // read (issue #3420), and it is what a room's key and a room link write.
+  it("splits a bracketed IPv6 address from its port, keeping the brackets", () => {
+    expect(splitHostPort("[::1]:8200")).toEqual({
+      address: "[::1]",
+      port: "8200",
+    });
+    expect(splitHostPort("[2001:db8::1]:8300")).toEqual({
+      address: "[2001:db8::1]",
+      port: "8300",
+    });
+  });
+
+  it("leaves a bracketed IPv6 address with no port whole", () => {
+    expect(splitHostPort("[::1]")).toEqual({ address: "[::1]", port: null });
+  });
+
   it("does not treat a trailing word as a port", () => {
     expect(splitHostPort("tomlaptop:lobby")).toEqual({
       address: "tomlaptop:lobby",

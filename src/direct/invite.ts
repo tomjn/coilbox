@@ -34,6 +34,9 @@ export function inviteLink(
   if (!address) return null;
   if (!room) return buildJoinLink(address, battleId);
   const dialled = splitHostPort(address);
-  if (!dialled.port || dialled.address === LOOPBACK_HOST) return null;
+  if (!dialled.port || LOOPBACK.includes(dialled.address)) return null;
   return buildRoomLink(dialled.address, Number(dialled.port));
 }
+
+/** The IPv4 and IPv6 loopback, as `splitHostPort` returns them. */
+const LOOPBACK = [LOOPBACK_HOST, "[::1]"];

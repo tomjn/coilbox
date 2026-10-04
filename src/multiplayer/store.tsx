@@ -28,6 +28,7 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
+import { bracketedHost, dialHost } from "../lobby-servers/hostForms";
 import { notify } from "../notify/notify";
 import type { ClientFlags } from "./awayStatus";
 import {
@@ -1440,7 +1441,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           beginConnecting(serverKey, direct, focus);
           await mpConnectZerok({
             serverKey,
-            host: server.host,
+            host: dialHost(server.host),
             port: server.port,
             username,
             password: cred.secret,
@@ -1454,7 +1455,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           beginConnecting(serverKey, direct, focus);
           await mpConnectTachyon({
             serverKey,
-            host: server.host,
+            // The Rust side builds a URL from this, and a URL has IPv6 in brackets.
+            host: bracketedHost(server.host),
             port: server.port,
             tls: server.tls,
             serverId: server.id,
@@ -1480,7 +1482,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           beginConnecting(serverKey, direct, focus);
           await mpConnect({
             serverKey,
-            host: server.host,
+            host: dialHost(server.host),
             port: server.port,
             tlsMode: tlsModeFor(server),
             allowSelfSigned: server.allowSelfSigned,
@@ -1831,7 +1833,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
             serverProtocol(server) === "zerok"
               ? mpRegisterZerok({
                   serverKey,
-                  host: server.host,
+                  host: dialHost(server.host),
                   port: server.port,
                   username,
                   password,
@@ -1841,7 +1843,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
                 })
               : mpRegister({
                   serverKey,
-                  host: server.host,
+                  host: dialHost(server.host),
                   port: server.port,
                   tlsMode: tlsModeFor(server),
                   allowSelfSigned: server.allowSelfSigned,
@@ -1915,7 +1917,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           };
           mpRecoverPassword({
             serverKey,
-            host: server.host,
+            host: dialHost(server.host),
             port: server.port,
             tlsMode: tlsModeFor(server),
             allowSelfSigned: server.allowSelfSigned,

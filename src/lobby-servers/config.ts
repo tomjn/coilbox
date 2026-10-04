@@ -1,6 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import type { ProfileLobby } from "../profile/profile";
 import { getProfile } from "../profile/profile";
+import { bracketedHost } from "./hostForms";
 
 /**
  * The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`.
@@ -100,8 +101,8 @@ export function tachyonBaseUrl(server: {
 }): string {
   const authority =
     server.port === (server.tls ? 443 : 80)
-      ? server.host
-      : `${server.host}:${server.port}`;
+      ? bracketedHost(server.host)
+      : `${bracketedHost(server.host)}:${server.port}`;
   return `${server.tls ? "https" : "http"}://${authority}`;
 }
 

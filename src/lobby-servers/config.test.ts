@@ -194,6 +194,17 @@ describe("tachyonBaseUrl", () => {
     ).toBe("https://teiserver.example:8443");
   });
 
+  it("writes an IPv6 host in brackets, saved with them or without", () => {
+    for (const host of ["2001:db8::1", "[2001:db8::1]"]) {
+      expect(tachyonBaseUrl({ host, port: 8443, tls: true })).toBe(
+        "https://[2001:db8::1]:8443",
+      );
+      expect(tachyonBaseUrl({ host, port: 443, tls: true })).toBe(
+        "https://[2001:db8::1]",
+      );
+    }
+  });
+
   it("uses http for a server without TLS", () => {
     expect(tachyonBaseUrl({ host: "localhost", port: 4000, tls: false })).toBe(
       "http://localhost:4000",
