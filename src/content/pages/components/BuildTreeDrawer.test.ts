@@ -79,6 +79,29 @@ describe("BuildTreeDrawer's morph fold", () => {
     expect(html).toContain("armcom (1 upgrade)");
   });
 
+  it("draws a built morph target as a node of its own (issue #3463)", () => {
+    const units = [
+      unit("armcom", ["lab"]),
+      unit("lab", ["weasel", "goliath"]),
+      unit("weasel", [], ["goliath"]),
+      unit("goliath"),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(BuildTreeDrawer, {
+        enginePath: "",
+        dataDir: "",
+        gameArchive: "",
+        sides: [{ name: "Arm", startUnit: "armcom" }],
+        units,
+        initialSide: "Arm",
+      }),
+    );
+    expect(html).toContain('data-node-id="weasel"');
+    expect(html).toContain('data-node-id="goliath"');
+    expect(html).not.toContain("upgrade)");
+    expect(html).not.toContain("upgrades)");
+  });
+
   it("still draws the tree when the side's start unit is a non-base stage", () => {
     // The engine can report any stage as a faction's spawn unit, not just the
     // one morphGroups picked as the base. The folded edge map only has the

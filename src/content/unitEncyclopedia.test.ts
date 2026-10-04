@@ -41,6 +41,55 @@ describe("encyclopediaSections", () => {
     expect(sections[0].cells[0].stages).toEqual(["armcom1", "armcom2"]);
   });
 
+  it("lists a built morph target as a cell of its own (issue #3463)", () => {
+    const units = [
+      unit("armcom", { buildOptions: ["lab"] }),
+      unit("lab", { buildOptions: ["weasel", "goliath", "instigator"] }),
+      unit("weasel", {
+        morphTargets: [{ into: "goliath" }, { into: "instigator" }],
+      }),
+      unit("goliath", { fullName: "Goliath" }),
+      unit("instigator"),
+    ];
+    const cells = encyclopediaSections(units, ARMADA, "").flatMap(
+      (s) => s.cells,
+    );
+    expect(cells.map((c) => c.id).sort()).toEqual([
+      "armcom",
+      "goliath",
+      "instigator",
+      "lab",
+      "weasel",
+    ]);
+    expect(cells.find((c) => c.id === "weasel")?.upgrades).toBe(0);
+  });
+
+  it("counts only folded stages as upgrades", () => {
+    const units = [
+      unit("armcom", { morphTargets: [{ into: "armcom1" }] }),
+      unit("armcom1", { morphTargets: [{ into: "goliath" }] }),
+      unit("goliath"),
+      unit("lab", { buildOptions: ["goliath"] }),
+    ];
+    const cells = encyclopediaSections(units, ARMADA, "").flatMap(
+      (s) => s.cells,
+    );
+    expect(cells.find((c) => c.id === "armcom")?.upgrades).toBe(1);
+    expect(cells.some((c) => c.id === "goliath")).toBe(true);
+  });
+
+  it("finds a built morph target by name instead of through its source", () => {
+    const units = [
+      unit("weasel", { morphTargets: [{ into: "goliath" }] }),
+      unit("goliath", { fullName: "Goliath" }),
+      unit("lab", { buildOptions: ["goliath"] }),
+    ];
+    const cells = encyclopediaSections(units, [], "goliath").flatMap(
+      (s) => s.cells,
+    );
+    expect(cells.map((c) => c.id)).toEqual(["goliath"]);
+  });
+
   it("gives a unit that morphs nowhere no upgrades", () => {
     const units = [
       unit("armcom", { buildOptions: ["armsolar"] }),
