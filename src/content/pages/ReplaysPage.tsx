@@ -294,10 +294,7 @@ export default function ReplaysPage() {
           {/* Some engines record into their own folder, so a player clearing an
               old engine in Finder loses those games. This puts them all in one
               place first (issue #971). */}
-          <GatherReplaysButton
-            rootPath={replaysRoot}
-            onGathered={refresh}
-          />
+          <GatherReplaysButton rootPath={replaysRoot} onGathered={refresh} />
         </div>
 
         {!busy && replays.length > 0 && (

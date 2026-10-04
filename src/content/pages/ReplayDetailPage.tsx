@@ -847,11 +847,7 @@ export default function ReplayDetailPage() {
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
   const replaysRoot = useReplaysRoot(selected?.rootPath);
-  const {
-    replays,
-    loading: listLoading,
-    refresh,
-  } = useReplays(replaysRoot);
+  const { replays, loading: listLoading, refresh } = useReplays(replaysRoot);
   const replay = replays.find((r) => r.filename === filename);
   const { info, loading, error } = useDemoInfo(
     selected?.enginePath,
