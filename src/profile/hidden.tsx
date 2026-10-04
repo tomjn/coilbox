@@ -23,7 +23,7 @@ import { canonicalProfileId } from "./renamedIds";
  *
  * KEEP IN SYNC with the `isProfileHidden(...)` call sites (see `content/index.ts`,
  * `downloads/index.ts`, `multiplayer/index.tsx`, `conquest/index.ts`,
- * `runlite/index.ts`, `campaign/index.ts`, `hub/index.tsx` and
+ * `runlite/index.ts`, `career/index.ts`, `campaign/index.ts`, `hub/index.tsx` and
  * `hub/pages/BrowsePage.tsx`): add an id here whenever a nav item opts into
  * hiding.
  *
@@ -42,6 +42,7 @@ export const HIDEABLE_NAV_IDS: string[] = [
   "multiplayer.admin",
   "conquest.list",
   "runlite.list",
+  "career.overview",
   "campaign.builder",
 ];
 

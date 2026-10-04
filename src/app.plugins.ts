@@ -3,6 +3,7 @@ import { type FramePlugin, framePlugin } from "@picoframe/frame";
 import accountPlugin from "./account";
 import animationPlugin from "./animation";
 import campaignPlugin from "./campaign";
+import careerPlugin from "./career";
 import conquestPlugin from "./conquest";
 import contentPlugin from "./content";
 import deepLinkPlugin from "./deeplink";
@@ -42,6 +43,7 @@ export const plugins: FramePlugin[] = [
   scenarioPlugin,
   conquestPlugin,
   runlitePlugin,
+  careerPlugin,
   lobbyServersPlugin,
   accountPlugin,
   multiplayerPlugin,
