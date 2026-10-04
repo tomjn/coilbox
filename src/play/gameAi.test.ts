@@ -10,8 +10,8 @@ import {
   mergeGameAi,
   minigamePips,
   neutralPick,
-  PIP_SCALE,
   orderedAis,
+  PIP_SCALE,
   rankedAis,
   standardAi,
 } from "./gameAi";
