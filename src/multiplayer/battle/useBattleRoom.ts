@@ -58,7 +58,6 @@ import {
   staleMapOptionTags,
 } from "./battleOptions";
 import { battleRoomHref } from "./battleRoomKey";
-import { battleRequirements } from "./contentBlock";
 import {
   battleStartable,
   clampBonus,
@@ -72,6 +71,7 @@ import {
   startPosTypeOf,
   usedColorsFromBattle,
 } from "./config";
+import { battleRequirements } from "./contentBlock";
 import { type EngineMatch, engineMatch } from "./engineMatch";
 import { leaveBattle } from "./leaveBattle";
 import { diffRestrictTags } from "./restrictTags";

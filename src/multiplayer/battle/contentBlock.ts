@@ -12,18 +12,22 @@
  * sync pill, and the launch itself.
  */
 
-import {
-  type ContentRequirement,
-  exactGameRequirement,
-  exactMapRequirement,
-} from "@/content/resolveContent";
+import type { ContentRequirement } from "@/content/resolveContent";
+import { launchRequirements } from "@/play/launchContent";
 
-/** The game and map a battle needs installed, named as the host named them. */
+/**
+ * The game and map a battle needs installed, named as the host named them.
+ *
+ * Built by the shared `launchRequirements`, so the room and the other launch
+ * paths cannot disagree about what counts as needing a game or a map. The
+ * engine is left out on purpose: the room compares it by the version the binary
+ * reported (`engineMatch`), and the shared check also accepts a folder name.
+ */
 export function battleRequirements(
   battle: { modname: string; map: string } | undefined,
 ): ContentRequirement[] {
   return battle
-    ? [exactGameRequirement(battle.modname), exactMapRequirement(battle.map)]
+    ? launchRequirements({ game: battle.modname, map: battle.map })
     : [];
 }
 
