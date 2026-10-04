@@ -26,6 +26,7 @@ import {
   runPathLinks,
   runToGalaxyDoc,
 } from "./galaxyAdapter";
+import type { RunHandmadeMap } from "./handmadeMap";
 import { resolveRunMap } from "./mapRun";
 import type { RogueliteRun } from "./model";
 
@@ -48,7 +49,9 @@ const NO_MODEL_GAME: PlacedModelGame = {};
  * the map document goes to the view with the run's state laid over it. The
  * view speaks in location ids there, so the ids going in and the selection
  * coming out are translated. A run whose map cannot be had falls back to the
- * column layout.
+ * column layout. A hand-made map is read by the page and handed in as
+ * `handmadeMap`, and nothing is drawn until that read has answered, so the
+ * column layout never shows for a moment in place of the map.
  */
 export function RunMapView({
   run,
@@ -57,6 +60,7 @@ export function RunMapView({
   focusId,
   burstNodeId,
   modelGame,
+  handmadeMap,
   className,
 }: {
   run: RogueliteRun;
@@ -68,6 +72,8 @@ export function RunMapView({
   burstNodeId?: string | null;
   /** The installed game a land map's placed models are read out of. */
   modelGame?: PlacedModelGame;
+  /** The hand-made map the run was made on, from `useRunHandmadeMap`. */
+  handmadeMap?: RunHandmadeMap;
   className?: string;
 }) {
   // The map a land run crosses, built again from the run's settings, and which
@@ -75,10 +81,21 @@ export function RunMapView({
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the map settings and the graph, both stable across moves
   const land = useMemo(() => {
     const ref = run.settings.map;
-    const map = ref ? resolveRunMap(ref, run.settings.game)?.map : undefined;
+    const handmade = handmadeMap?.map;
+    const map = ref
+      ? resolveRunMap(ref, run.settings.game, (id) =>
+          handmade && handmade.id === id ? { map: handmade } : null,
+        )?.map
+      : undefined;
     const locations = map ? runLocations(run, map) : null;
     return map && locations ? { map, locations } : null;
-  }, [run.settings.map, run.settings.game, run.nodes, run.edges]);
+  }, [
+    run.settings.map,
+    run.settings.game,
+    run.nodes,
+    run.edges,
+    handmadeMap?.map,
+  ]);
   const terrainPixels = useMemo((): TerrainPixels | undefined => {
     const terrain = land ? generatedTerrain(land.map) : null;
     if (!terrain) return undefined;
@@ -159,6 +176,8 @@ export function RunMapView({
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
+
+  if (handmadeMap?.loading) return <div className={className} />;
 
   return (
     <GalaxyView
