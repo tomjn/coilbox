@@ -348,7 +348,7 @@ describe("CareerPage", () => {
       expect(card.textContent).toContain("3 runs · 2 wins");
     });
 
-    it("skips a logo too wide to read as an icon and uses the next art", () => {
+    it("keeps a logo too wide to fit a square and clips it to the square", () => {
       hoisted.image = "coilbox://logo/wordmark.webp";
       hoisted.headers = new Map([
         ["Balanced Annihilation V15.9.8", "coilbox://header/ba.jpg"],
@@ -359,12 +359,28 @@ describe("CareerPage", () => {
       });
       const img = icon(card).querySelector("img") as HTMLImageElement;
       expect(img.getAttribute("src")).toBe("coilbox://logo/wordmark.webp");
+      expect(img.className).toContain("object-contain");
       Object.defineProperty(img, "naturalWidth", { value: 500 });
       Object.defineProperty(img, "naturalHeight", { value: 92 });
       fireEvent.load(img);
-      expect(icon(card).querySelector("img")?.getAttribute("src")).toBe(
-        "coilbox://header/ba.jpg",
-      );
+      const after = icon(card).querySelector("img") as HTMLImageElement;
+      expect(after.getAttribute("src")).toBe("coilbox://logo/wordmark.webp");
+      expect(after.className).toContain("object-cover");
+      expect(after.className).not.toContain("object-contain");
+    });
+
+    it("fits a near-square logo inside the square", () => {
+      hoisted.image = "coilbox://logo/square.webp";
+      show({ career: FULL, sources: allReady });
+      const card = screen.getByRole("region", {
+        name: "Balanced Annihilation",
+      });
+      const img = icon(card).querySelector("img") as HTMLImageElement;
+      Object.defineProperty(img, "naturalWidth", { value: 120 });
+      Object.defineProperty(img, "naturalHeight", { value: 100 });
+      fireEvent.load(img);
+      const after = icon(card).querySelector("img") as HTMLImageElement;
+      expect(after.className).toContain("object-contain");
     });
 
     it("puts no icon on the earlier Warpath runs card", () => {
