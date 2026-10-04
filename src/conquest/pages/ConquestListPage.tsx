@@ -44,9 +44,16 @@ import {
   useSkirmishAis,
 } from "../../play/config";
 import {
+  gameRequirement,
+  offerableGames,
+  resolveGameDownload,
+} from "../../play/gameOffer";
+import {
   compareGameVersions,
   resolveGameByShortname,
 } from "../../play/installedGames";
+import { DownloadGameButton } from "../../play/pages/components/DownloadGameButton";
+import { useGameCatalog } from "../../play/useGameCatalog";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { conquestDelete, conquestSave } from "../bindings";
 import {
@@ -58,11 +65,6 @@ import {
   substitutedMapCount,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
-import {
-  gameRequirement,
-  offerableGames,
-  resolveGameDownload,
-} from "../gameOffer";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { mergeConquestNames } from "../names";
@@ -71,8 +73,6 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import { useGameCatalog } from "../useGameCatalog";
-import { DownloadGameButton } from "./components/DownloadGameButton";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 
 /**

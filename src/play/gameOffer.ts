@@ -1,9 +1,9 @@
+import type { GameRef } from "../conquest/model";
 import { resolveBranding, type SuggestedGame } from "../content/branding";
 import type { ContentRequirement } from "../content/resolveContent";
 import { type GameRepo, resolveGithubRepo } from "../downloads/gameRepos";
-import { resolveGameByShortname } from "../play/installedGames";
 import { getGameMatcher } from "../profile/profile";
-import type { GameRef } from "./model";
+import { resolveGameByShortname } from "./installedGames";
 
 /**
  * Turning the game a galaxy names into something the download queue can fetch

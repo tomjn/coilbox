@@ -9,13 +9,13 @@ import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../../play/config";
 import type { SkirmishDraft } from "../../../play/drafts";
+import { resolveGameDownload } from "../../../play/gameOffer";
+import { DownloadGameButton } from "../../../play/pages/components/DownloadGameButton";
 import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { BattleRequirement } from "../../../play/useBattleRun";
-import { resolveGameDownload } from "../../gameOffer";
+import { useGameCatalog } from "../../../play/useGameCatalog";
 import type { GameRef } from "../../model";
-import { useGameCatalog } from "../../useGameCatalog";
 import { BackToMapButton } from "./BackToMapButton";
-import { DownloadGameButton } from "./DownloadGameButton";
 import { HUD_CARD_CLASS } from "./hudChrome";
 
 /**
