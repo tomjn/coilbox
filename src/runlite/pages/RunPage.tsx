@@ -33,8 +33,8 @@ import { isBattleNode, type RunNode, type RunNodeType } from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
 import { runGameNotice } from "../runContent";
-import { useRun, useRunMeta } from "../runs";
-import { useAwardFinishedRun } from "../useAwardFinishedRun";
+import { useRun } from "../runs";
+import { useAwardFinishedRuns } from "../useAwardFinishedRuns";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
   EventOverlay,
@@ -57,12 +57,6 @@ export default function RunPage() {
   useHideSidebar();
   const { runId } = useParams();
   const { run: savedRun, loading, save } = useRun(runId);
-  const {
-    meta,
-    loading: metaLoading,
-    error: metaError,
-    save: saveMeta,
-  } = useRunMeta();
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the inspect panel opens straight to it (mirrors conquest's
   // `?node=` on GalaxyPage). A stale id (the node no longer exists in this run)
@@ -176,13 +170,13 @@ export default function RunPage() {
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
-  // Awards meta-progression when this page sees the run finish (see the hook).
-  useAwardFinishedRun(run, runId, {
-    meta,
-    loading: metaLoading,
-    error: metaError,
-    save: saveMeta,
-  });
+  // Counts this run towards meta-progression if it is finished and nobody has
+  // counted it yet, including one that ended while this page was closed.
+  const savedRuns = useMemo(
+    () => (runId && savedRun ? { [runId]: savedRun } : {}),
+    [runId, savedRun],
+  );
+  useAwardFinishedRuns(savedRuns, loading);
 
   // A finished run counts toward its challenge's best result, once.
   useRecordChallengeRun(run && runId ? warpathRunResult(runId, run) : null);

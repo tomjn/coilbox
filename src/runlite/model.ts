@@ -285,6 +285,10 @@ export interface RogueliteMeta {
   schemaVersion: number;
   legacy: UnlockRecord;
   games: Record<string, UnlockRecord>;
+  /** True once the runs already finished on disk have been added to `seen`.
+   * Until then nothing is awarded. Never set by `migrateMeta`, which cannot see
+   * the runs. */
+  seenSeeded?: boolean;
 }
 
 export interface RunStats {
@@ -798,16 +802,26 @@ export function migrateMeta(data: unknown): RogueliteMeta {
     schemaVersion: Math.max(version, META_SCHEMA_VERSION),
     legacy: parseRecord(data.legacy),
     games,
+    ...(data.seenSeeded === true ? { seenSeeded: true } : {}),
   };
 }
 
-/** Parse the raw JSON of the meta document, falling back to an empty meta. */
+/**
+ * Parse the raw JSON of the meta document. An empty string is an empty meta, as
+ * is the plugin's default for a file that does not exist. Text that is not JSON,
+ * or JSON that is not an object, throws: the file is damaged, and reading it as
+ * empty would let the next save replace the player's unlocks.
+ */
 export function parseRunMeta(json: string): RogueliteMeta {
+  if (json.trim() === "") return emptyMeta;
   let data: unknown;
   try {
     data = JSON.parse(json);
   } catch {
-    return emptyMeta;
+    throw new Error("meta.json is not valid JSON");
+  }
+  if (!isRecord(data) || Array.isArray(data)) {
+    throw new Error("meta.json is not a JSON object");
   }
   return migrateMeta(data);
 }

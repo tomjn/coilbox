@@ -203,11 +203,31 @@ describe("parseRunMeta", () => {
     stats: { runs: 1, wins: 1, deepest: 8 },
   };
 
-  it("falls back to empty meta on garbage", () => {
-    const meta = parseRunMeta("not json");
+  it("fails on text that is not JSON, so the file is never replaced", () => {
+    expect(() => parseRunMeta("not json")).toThrow();
+    expect(() => parseRunMeta('{"schemaVersion":2,')).toThrow();
+  });
+
+  it("fails on valid JSON that is not an object", () => {
+    for (const text of ["[]", "null", "42", '"text"', "true"]) {
+      expect(() => parseRunMeta(text)).toThrow();
+    }
+  });
+
+  it("reads an empty string as an empty meta", () => {
+    for (const text of ["", "  \n"]) {
+      const meta = parseRunMeta(text);
+      expect(meta.legacy.stats.runs).toBe(0);
+      expect(meta.games).toEqual({});
+    }
+  });
+
+  it("reads the plugin's default document as an empty meta", () => {
+    const meta = parseRunMeta(
+      '{"schemaVersion":1,"loadouts":[],"eventPools":[],"ascensionTier":0,"stats":{"runs":0,"wins":0,"deepest":0}}',
+    );
     expect(meta.legacy.ascensionTier).toBe(0);
     expect(meta.legacy.stats.runs).toBe(0);
-    expect(meta.legacy.loadouts).toEqual([]);
     expect(meta.games).toEqual({});
   });
 

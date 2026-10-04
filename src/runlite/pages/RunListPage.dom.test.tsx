@@ -33,6 +33,9 @@ vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
 vi.mock("../runs", () => ({
   useRuns: () => ({ runs: {}, deleteRun: vi.fn() }),
 }));
+vi.mock("../useAwardFinishedRuns", () => ({
+  useAwardFinishedRuns: vi.fn(),
+}));
 vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
 
 import RunListPage from "./RunListPage";
