@@ -36,8 +36,11 @@ import {
   type RunSummary,
   rankCandidates,
   skirmishCandidate,
+  startCandidate,
+  startCopy,
   updateCandidate,
   warpathCandidate,
+  withStart,
 } from "./continue";
 
 const NOW = Date.parse("2026-08-07T12:00:00.000Z");
@@ -538,6 +541,124 @@ const emptySources: ResumeSources = {
   update: null,
   installedVersion: null,
 };
+
+describe("startCandidate", () => {
+  const { campaign: coreWar } = campaign("c1", "Core War");
+  const named = (missionAt: number) =>
+    ({
+      status: "ok",
+      campaign: coreWar,
+      mission: coreWar.missions[missionAt],
+    }) as const;
+  const completed = (ids: string[]): ProgressFile => ({
+    schemaVersion: 1,
+    campaigns: {
+      c1: { completedMissionIds: ids, updatedAt: minutesAgo(5) },
+    },
+  });
+
+  it("is nothing for a profile with no start key", () => {
+    expect(startCandidate({ status: "none" }, noProgress, NOW)).toBeUndefined();
+  });
+
+  it("is nothing when the profile names something that is not bundled", () => {
+    // The health panel says why. The home page just draws what it always drew.
+    expect(
+      startCandidate({ status: "problem", issue: "nope" }, noProgress, NOW),
+    ).toBeUndefined();
+  });
+
+  it("offers the mission on a fresh install", () => {
+    const c = startCandidate(named(0), noProgress, NOW);
+    expect(c?.kind).toBe("start");
+    expect(c?.title).toBe("Core War");
+    expect(c?.detail).toBe("Landfall");
+    expect(c?.to).toBe("/campaign/c1/m1");
+    expect(c?.start?.mission.id).toBe("m1");
+  });
+
+  it("stays while the mission has been tried and not finished", () => {
+    const progress: ProgressFile = {
+      schemaVersion: 1,
+      campaigns: {
+        c1: {
+          completedMissionIds: [],
+          lastPlayedMissionId: "m1",
+          updatedAt: minutesAgo(5),
+        },
+      },
+    };
+    expect(startCandidate(named(0), progress, NOW)).toBeDefined();
+  });
+
+  it("goes once the mission is finished", () => {
+    expect(startCandidate(named(0), completed(["m1"]), NOW)).toBeUndefined();
+  });
+
+  it("waits on the named mission, not on the campaign's first", () => {
+    expect(startCandidate(named(1), completed(["m1"]), NOW)).toBeDefined();
+    expect(
+      startCandidate(named(1), completed(["m1", "m2"]), NOW),
+    ).toBeUndefined();
+  });
+});
+
+describe("withStart", () => {
+  const start: ResumeCandidate = {
+    ...waiting("start", NOW),
+    kind: "start",
+    to: "/campaign/c1/m1",
+  };
+
+  it("hands the ranked list back untouched when there is no start card", () => {
+    // What keeps a profile with no `start` key, and plain coilbox, exactly as
+    // they were: the same array, not an equal one.
+    const ranked = [waiting("a", NOW), waiting("b", NOW - 1)];
+    expect(withStart(ranked, undefined)).toBe(ranked);
+  });
+
+  it("puts the start card ahead of everything, however recent", () => {
+    const ranked = [closing("battle", NOW, "soon"), waiting("a", NOW)];
+    expect(ids(withStart(ranked, start))).toEqual(["start", "battle", "a"]);
+  });
+
+  it("drops a campaign card for the same mission", () => {
+    const same = { ...waiting("campaign:c1", NOW), to: "/campaign/c1/m1" };
+    const other = { ...waiting("campaign:c2", NOW), to: "/campaign/c2/m1" };
+    expect(ids(withStart([same, other], start))).toEqual([
+      "start",
+      "campaign:c2",
+    ]);
+  });
+});
+
+describe("startCopy", () => {
+  it("keeps the card's own words when nothing is missing", () => {
+    expect(startCopy([])).toEqual({ action: "Start mission", detail: null });
+  });
+
+  it("names the one thing to download", () => {
+    expect(startCopy([{ kind: "map", name: "Red Comet" }])).toEqual({
+      action: "Download and start",
+      detail: "Download Red Comet first",
+    });
+  });
+
+  it("names the game and the map together", () => {
+    expect(
+      startCopy([
+        { kind: "game", name: "Ironhold 1.2" },
+        { kind: "map", name: "Red Comet" },
+      ]).detail,
+    ).toBe("Download Ironhold 1.2 and Red Comet first");
+  });
+
+  it("says the engine in words, since a campaign does not name one", () => {
+    expect(startCopy([{ kind: "engine", name: "" }]).detail).toBe(
+      "Download the engine first",
+    );
+  });
+});
 
 describe("collectCandidates", () => {
   it("finds nothing on a fresh install, with every source absent", () => {

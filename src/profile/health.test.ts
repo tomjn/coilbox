@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Campaign } from "../campaign/model";
 import { deriveHealthChecks, type HealthInputs } from "./health";
 
 function base(): HealthInputs {
@@ -23,6 +24,7 @@ function base(): HealthInputs {
     linkIcons: [],
     validIconNames: ["discord", "globe", "docs"],
     home: null,
+    start: { status: "none" },
   };
 }
 
@@ -368,6 +370,45 @@ describe("deriveHealthChecks", () => {
         "home",
       );
       expect(c.hint).toContain('Layout "stacked", 4 zone(s), pinned');
+    });
+  });
+
+  describe("start", () => {
+    it("adds no row for a profile with no start key", () => {
+      expect(maybeById(base(), "start")).toBeUndefined();
+    });
+
+    it("confirms the mission the home page will offer", () => {
+      const mission = { id: "m1", title: "Landfall" };
+      const campaign = { id: "c1", title: "Basic Training" };
+      const c = byId(
+        {
+          ...base(),
+          start: {
+            status: "ok",
+            campaign: campaign as Campaign,
+            mission: mission as Campaign["missions"][number],
+          },
+        },
+        "start",
+      );
+      expect(c.status).toBe("ok");
+      expect(c.label).toBe("Start: 'Landfall' in campaign 'Basic Training'");
+    });
+
+    it("warns, with the reason, when it names nothing playable", () => {
+      const c = byId(
+        {
+          ...base(),
+          start: {
+            status: "problem",
+            issue: "start campaign 'nope' is not bundled",
+          },
+        },
+        "start",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("start campaign 'nope' is not bundled");
     });
   });
 });

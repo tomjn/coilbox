@@ -107,6 +107,8 @@ To ship **audio or video** (which can't be embedded), reference the files by rel
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete in the builder) but otherwise play exactly like local ones, and their progress is tracked the same way.
 
+A profile can name a bundled campaign as where a new player starts, which puts a card for it on the home page. See [`start`](distribution-profile.md#start-object).
+
 One exception: a bundled campaign whose missions carry a [scenario](scenarios.md) brings the scenario but not its dialogue portraits and voice clips, so those lines play silent. Import the campaign rather than bundling it until [issue #877](https://github.com/tomjn/coilbox/issues/877) is done.
 
 ## Win/loss detection

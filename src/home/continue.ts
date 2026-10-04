@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import {
   CircleArrowUp,
+  Flag,
   Gamepad2,
   Milestone,
   Orbit,
@@ -8,7 +9,12 @@ import {
   Swords,
 } from "lucide-react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
-import type { Campaign, ProgressFile } from "../campaign/model";
+import type { MissionNeed } from "../campaign/missionNeeds";
+import type {
+  Campaign,
+  CampaignMission,
+  ProgressFile,
+} from "../campaign/model";
 import { resumeMissionId } from "../campaign/progress";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
 import type { ConquestStateFile, GalaxyDoc } from "../conquest/model";
@@ -20,6 +26,8 @@ import type { StoredSkirmishDraft } from "../play/drafts";
 import { useSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
 import { useSkirmishPresets } from "../play/presets";
+import { getProfile } from "../profile/profile";
+import { resolveStart, type StartResolution } from "../profile/start";
 import type { RunStatus } from "../runlite/model";
 import { useRuns } from "../runlite/runs";
 import { useAvailableUpdate } from "../updater/UpdaterProvider";
@@ -31,7 +39,8 @@ export type ResumeKind =
   | "conquest"
   | "campaign"
   | "skirmish"
-  | "update";
+  | "update"
+  | "start";
 
 /**
  * One thing the player could pick up again.
@@ -62,6 +71,12 @@ export interface ResumeCandidate {
    * that will be.
    */
   expiresAt?: number | "soon";
+  /**
+   * The mission a `start` candidate opens, and the campaign it belongs to. Only
+   * that kind carries it. The hero reads the campaign's art from it and checks
+   * whether the mission's game and map are installed.
+   */
+  start?: { campaign: Campaign; mission: CampaignMission };
 }
 
 /** What a card calls a kind of thing, and what its action offers to do. */
@@ -96,6 +111,9 @@ export const RESUME_KIND_COPY: Record<ResumeKind, ResumeKindCopy> = {
   // than installing from the card: an update is a restart, so it is not
   // something to set off with one click from the welcome screen.
   update: { label: "Coilbox update", action: "Update Coilbox" },
+  // The one card here that is not a thing you left. A distribution's profile
+  // names it as where a new player begins (issue #3378).
+  start: { label: "Start here", action: "Start mission" },
 };
 
 /**
@@ -114,6 +132,7 @@ export const RESUME_KIND_ICON: Record<ResumeKind, LucideIcon> = {
   campaign: Milestone,
   skirmish: Swords,
   update: CircleArrowUp,
+  start: Flag,
 };
 
 /** Whether the window is still open at `now`. `"soon"` has not closed yet. */
@@ -414,6 +433,76 @@ export function updateCandidate(
   };
 }
 
+/**
+ * The mission a distribution's profile names as where a new player starts
+ * (issue #3378), until the player has finished it.
+ *
+ * Finished is the campaign progress file's answer, the same list the campaign
+ * pages read, so there is no flag of this card's own to fall out of step. A
+ * profile with no `start` key, or one naming a campaign that is not bundled,
+ * resolves to no candidate and the page is the page it always was.
+ */
+export function startCandidate(
+  start: StartResolution,
+  progress: ProgressFile,
+  now: number,
+): ResumeCandidate | undefined {
+  if (start.status !== "ok") return undefined;
+  const { campaign, mission } = start;
+  const done = progress.campaigns[campaign.id]?.completedMissionIds ?? [];
+  if (done.includes(mission.id)) return undefined;
+  return {
+    id: `start:${campaign.id}:${mission.id}`,
+    kind: "start",
+    title: campaign.title,
+    detail: mission.title,
+    to: `/campaign/${encodeURIComponent(campaign.id)}/${encodeURIComponent(mission.id)}`,
+    touchedAt: now,
+    start: { campaign, mission },
+  };
+}
+
+/**
+ * What the start card says when the mission cannot be played yet.
+ *
+ * `needs` is the briefing page's own list of what is not installed. Empty means
+ * the card keeps its usual words, so `detail` is null and the mission's title
+ * stays. Otherwise the card names what has to be downloaded, in the order the
+ * briefing page will download it.
+ */
+export function startCopy(needs: readonly MissionNeed[]): {
+  action: string;
+  detail: string | null;
+} {
+  if (needs.length === 0)
+    return { action: RESUME_KIND_COPY.start.action, detail: null };
+  const names = needs.map((n) => (n.kind === "engine" ? "the engine" : n.name));
+  const last = names.pop();
+  const list = names.length ? `${names.join(", ")} and ${last}` : last;
+  return {
+    action: "Download and start",
+    detail: `Download ${list} first`,
+  };
+}
+
+/**
+ * Put the start card ahead of everything already ranked.
+ *
+ * It is not ranked with the rest because it is not competing on recency: the
+ * distribution said this comes first until it is finished. A campaign candidate
+ * for the same mission is dropped, since a player who tried the mission and lost
+ * would otherwise be offered it twice, once in the hero and once in the rail.
+ *
+ * With no start card the ranked list comes back untouched.
+ */
+export function withStart(
+  ranked: ResumeCandidate[],
+  start: ResumeCandidate | undefined,
+): ResumeCandidate[] {
+  if (!start) return ranked;
+  return [start, ...ranked.filter((c) => c.to !== start.to)];
+}
+
 export interface ResumeSources {
   runs: Record<string, RunSummary>;
   campaigns: readonly { campaign: Campaign }[];
@@ -499,7 +588,7 @@ export function useResume(): {
   const { update, version } = useAvailableUpdate();
 
   const now = Date.now();
-  const candidates = rankCandidates(
+  const ranked = rankCandidates(
     collectCandidates(
       {
         runs: runs.runs,
@@ -516,6 +605,14 @@ export function useResume(): {
       now,
     ),
     now,
+  );
+  const candidates = withStart(
+    ranked,
+    startCandidate(
+      resolveStart(getProfile().start, campaigns.campaigns),
+      progress.progress,
+      now,
+    ),
   );
 
   const loading =

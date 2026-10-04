@@ -474,6 +474,16 @@ describe("Greeting zone", () => {
     expect(render().tagline).toBe("Pick up where you left off.");
   });
 
+  it("does not count a distribution's start card as something left off", () => {
+    // A fresh install of a distribution that names a start mission has a card
+    // in the hero and nothing the player ever did (issue #3378).
+    resume.mockReturnValue({
+      candidates: [{ id: "start:c1:m1", kind: "start" }],
+      loading: false,
+    });
+    expect(render().tagline).toBe("Choose a tool to get started.");
+  });
+
   it("waits for the sources before promising a resume", () => {
     // The hero and the rail both wait for `loading`, so a greeting that did not
     // would promise "Pick up where you left off." over a page with nothing on it
