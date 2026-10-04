@@ -22,6 +22,7 @@ export interface ChallengeScore {
 
 /** A finished run that counts, ready to merge into a challenge's record. */
 export interface ChallengeRunResult {
+  mode: ChallengeMode;
   identity: string;
   /** What stops one finished run being merged twice. */
   runId: string;
@@ -62,6 +63,7 @@ export function conquestRunResult(
   const identity = galaxyIdentity(galaxy);
   if (!identity || conquestSubstituted(galaxy) > 0) return null;
   return {
+    mode: "conquest",
     identity,
     runId: `${galaxy.id}:${state.seed}`,
     score: { won: state.status === "won", measure: state.turn },
@@ -79,6 +81,7 @@ export function warpathRunResult(
   if (run.progress.status === "active") return null;
   if (warpathSubstituted(run) > 0) return null;
   return {
+    mode: "warpath",
     identity: runIdentity(run),
     runId,
     score: {

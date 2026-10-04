@@ -105,6 +105,7 @@ describe("warpath: a win beats a loss, then further beats nearer", () => {
 describe("conquestRunResult", () => {
   it("reads turns and the outcome from a finished run", () => {
     expect(conquestRunResult(galaxy, ended("won", 14))).toEqual({
+      mode: "conquest",
       identity: galaxyIdentity(galaxy),
       runId: `${galaxy.id}:11`,
       score: { won: true, measure: 14 },
@@ -152,6 +153,7 @@ describe("warpathRunResult", () => {
   it("reads the deepest column and the outcome", () => {
     const result = warpathRunResult("run-1", warpathEnded("lost", 3));
     expect(result).toEqual({
+      mode: "warpath",
       identity: runIdentity(run),
       runId: "run-1",
       score: { won: false, measure: 3 },
