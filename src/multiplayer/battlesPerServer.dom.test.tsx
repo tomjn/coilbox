@@ -26,6 +26,11 @@ const wire = vi.hoisted(() => ({
   /** Keys whose battle Rust says goes through the relay. */
   relayedOn: new Set<string>(),
   launches: [] as { relayed: boolean }[],
+  /** What the scan hook's `runWithReason` resolves, for the rescan tests. */
+  scanOutcome: { data: null, error: null } as {
+    data: { games: { name: string }[]; maps: { name: string }[] } | null;
+    error: string | null;
+  },
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
@@ -97,6 +102,7 @@ vi.mock("@/content/config", () => ({
     data: { games: [], maps: [] },
     loading: false,
     run: async () => {},
+    runWithReason: async () => wire.scanOutcome,
   }),
   useUnitsyncGameInfo: () => ({ info: null }),
   useUnitsyncMapInfo: () => ({ info: null, status: "idle", loadedMap: null }),
@@ -307,6 +313,7 @@ describe("the battle room with two connections", () => {
     wire.hostConfigFor.length = 0;
     wire.launches.length = 0;
     wire.relayedOn.clear();
+    wire.scanOutcome = { data: null, error: null };
   });
 
   afterEach(() => {
@@ -395,5 +402,44 @@ describe("the battle room with two connections", () => {
 
     expect(wire.hostConfigFor).toEqual([KEY_B]);
     expect(wire.launches).toEqual([{ relayed: false }]);
+  });
+
+  // The rescan used to say only that it could not read the install (issue
+  // #3440), so a full disk and a crashed worker looked the same.
+  it("carries the engine's reason in a failed rescan's message", async () => {
+    wire.scanOutcome = { data: null, error: "no space left on device" };
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    let found: Awaited<ReturnType<typeof room.rescan>> | undefined;
+    await act(async () => {
+      found = await room.rescan();
+    });
+    expect(found?.failure).toBe(
+      "The rescan could not read what is installed (no space left on device).",
+    );
+  });
+
+  it("keeps the generic message when the rescan has no reason, as after a cancel", async () => {
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    let found: Awaited<ReturnType<typeof room.rescan>> | undefined;
+    await act(async () => {
+      found = await room.rescan();
+    });
+    expect(found?.failure).toBe("The rescan could not read what is installed.");
+  });
+
+  it("reports what the rescan found when it answered", async () => {
+    wire.scanOutcome = {
+      data: {
+        games: [{ name: "Beyond All Reason test-1234" }],
+        maps: [],
+      },
+      error: null,
+    };
+    await openRoom(`/battle?server=${encodeURIComponent(KEY_B)}`);
+    let found: Awaited<ReturnType<typeof room.rescan>> | undefined;
+    await act(async () => {
+      found = await room.rescan();
+    });
+    expect(found).toEqual({ game: true, map: false });
   });
 });
