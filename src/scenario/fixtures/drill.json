@@ -1,0 +1,306 @@
+{
+  "id": "drill",
+  "name": "Drill",
+  "description": "A first lesson: select the builder, move it, then tell it to build.",
+  "runtimeVersion": 8,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Recruit",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "rivals",
+        "kind": "ai",
+        "name": "Rivals",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {},
+  "zones": [],
+  "actors": [
+    {
+      "id": "engineer",
+      "unitDef": "armck",
+      "team": "player",
+      "pos": {
+        "x": 1000,
+        "z": 1000
+      },
+      "facing": 0
+    },
+    {
+      "id": "scout",
+      "unitDef": "armpw",
+      "team": "player",
+      "pos": {
+        "x": 1100,
+        "z": 1000
+      },
+      "facing": 0
+    }
+  ],
+  "groups": [],
+  "blueprints": [],
+  "bases": [],
+  "restrictions": {},
+  "vars": {
+    "orders": 0
+  },
+  "triggers": [
+    {
+      "id": "pick-anything",
+      "name": "The player selects any unit",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_selected",
+            "params": {}
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "pick"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pick-engineer",
+      "name": "The player selects the engineer",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_selected",
+            "params": {
+              "team": "player",
+              "actor": "engineer"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "engineer"
+          }
+        },
+        {
+          "type": "enable_trigger",
+          "params": {
+            "trigger": "order-move"
+          }
+        }
+      ]
+    },
+    {
+      "id": "order-move",
+      "name": "The player gives a move order",
+      "enabled": false,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "command_given",
+            "params": {
+              "team": "player",
+              "command": "move"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "move"
+          }
+        },
+        {
+          "type": "enable_trigger",
+          "params": {
+            "trigger": "order-again"
+          }
+        }
+      ]
+    },
+    {
+      "id": "order-again",
+      "name": "And then a second one",
+      "enabled": false,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "command_given",
+            "params": {
+              "team": "player",
+              "command": "move"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "again"
+          }
+        }
+      ]
+    },
+    {
+      "id": "order-solar",
+      "name": "The player orders a solar collector",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "unit_selected",
+            "params": {
+              "unitDef": "armck"
+            }
+          },
+          {
+            "type": "command_given",
+            "params": {
+              "unitDef": "armsolar"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "solar"
+          }
+        }
+      ]
+    },
+    {
+      "id": "count-builds",
+      "name": "Every build order is counted",
+      "enabled": true,
+      "repeat": true,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "command_given",
+            "params": {
+              "command": "build"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "add_var",
+          "params": {
+            "name": "orders",
+            "value": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "idle-hands",
+      "name": "Ten seconds in with no order given",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 10
+            }
+          },
+          {
+            "type": "command_given",
+            "params": {},
+            "negate": true
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "fail_objective",
+          "params": {
+            "objective": "prompt"
+          }
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "pick",
+      "kind": "primary",
+      "text": "Select a unit.",
+      "hidden": false
+    },
+    {
+      "id": "engineer",
+      "kind": "primary",
+      "text": "Select the engineer.",
+      "hidden": false
+    },
+    {
+      "id": "move",
+      "kind": "primary",
+      "text": "Give a move order.",
+      "hidden": false
+    },
+    {
+      "id": "again",
+      "kind": "primary",
+      "text": "Give another move order.",
+      "hidden": false
+    },
+    {
+      "id": "solar",
+      "kind": "primary",
+      "text": "With a builder selected, order a solar collector.",
+      "hidden": false
+    },
+    {
+      "id": "prompt",
+      "kind": "secondary",
+      "text": "Give an order within ten seconds.",
+      "hidden": false
+    }
+  ],
+  "dialogue": [],
+  "createdAt": "2026-10-04T00:00:00.000Z",
+  "updatedAt": "2026-10-04T00:00:00.000Z"
+}

@@ -16,16 +16,25 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { launchScenario, playInfolog, scanState, primeScan } = vi.hoisted(
-  () => ({
-    launchScenario: vi.fn(),
-    playInfolog: vi.fn(),
-    // Set by the tests where the scan failed: the hook answers `data: null`
-    // with the engine's reason.
-    scanState: { error: null as string | null },
-    primeScan: vi.fn(async () => ({ games: [] as unknown[] })),
-  }),
-);
+const {
+  launchScenario,
+  playInfolog,
+  scanState,
+  primeScan,
+  contentListReplays,
+  detectBattleResult,
+  recordWin,
+} = vi.hoisted(() => ({
+  launchScenario: vi.fn(),
+  playInfolog: vi.fn(),
+  contentListReplays: vi.fn(),
+  detectBattleResult: vi.fn(),
+  recordWin: vi.fn(),
+  // Set by the tests where the scan failed: the hook answers `data: null`
+  // with the engine's reason.
+  scanState: { error: null as string | null },
+  primeScan: vi.fn(async () => ({ games: [] as unknown[] })),
+}));
 
 // The launch itself is `launch.test.ts`'s. What is under test is what the drawer
 // does once one has come back, so it is stubbed down to the callback it makes
@@ -36,6 +45,12 @@ vi.mock("../../launch", () => ({
   missionIssueSummary: () => "",
 }));
 vi.mock("@/play/bindings", () => ({ playInfolog }));
+// How the run ended is `detect.test.ts`'s. Stubbed to the verdict it hands back.
+vi.mock("@/content/bindings", () => ({ contentListReplays }));
+vi.mock("@/play/detect", () => ({ detectBattleResult }));
+vi.mock("../../wins", () => ({
+  useScenarioWins: () => ({ wins: {}, recordWin }),
+}));
 vi.mock("@/play/config", () => ({
   usePreferredTarget: () => ({
     target: {
@@ -127,6 +142,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   scanState.error = null;
   clean();
+  contentListReplays.mockResolvedValue({ replays: [{ path: "/old.sdfz" }] });
+  detectBattleResult.mockResolvedValue({ outcome: "ambiguous", replay: null });
 });
 afterEach(cleanup);
 
@@ -268,6 +285,66 @@ describe("choosing a difficulty before the launch", () => {
     await vi.waitFor(() =>
       expect(launchScenario.mock.calls[0][0].difficulty).toBeUndefined(),
     );
+  });
+});
+
+/**
+ * Issue #3549. A scenario played on its own keeps a record of being won, which
+ * is what tells a distribution's start card for it to go away.
+ */
+describe("recording a win when a player plays a scenario", () => {
+  it("records a win the replay shows", async () => {
+    detectBattleResult.mockResolvedValue({ outcome: "victory", replay: null });
+    const scenario = newScenario("Demo");
+    render(<ScenarioTestDrawer scenario={scenario} mode="play" />);
+    screen.getByRole("button", { name: "Play" }).click();
+
+    expect(await screen.findByText(/You won/)).toBeTruthy();
+    expect(recordWin).toHaveBeenCalledWith(scenario.id);
+    // Told from the replays that were already there before the launch.
+    expect(detectBattleResult.mock.calls[0][0].beforePaths).toEqual(
+      new Set(["/old.sdfz"]),
+    );
+  });
+
+  it("records nothing for a defeat", async () => {
+    detectBattleResult.mockResolvedValue({ outcome: "defeat", replay: null });
+    await press("play");
+
+    await screen.findByText(/The game has closed/);
+    await vi.waitFor(() => expect(detectBattleResult).toHaveBeenCalled());
+    expect(recordWin).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "I won" })).toBeNull();
+  });
+
+  it("asks the player when the replay does not say, and takes their word", async () => {
+    const scenario = newScenario("Demo");
+    render(<ScenarioTestDrawer scenario={scenario} mode="play" />);
+    screen.getByRole("button", { name: "Play" }).click();
+
+    fireEvent.click(await screen.findByRole("button", { name: "I won" }));
+    expect(recordWin).toHaveBeenCalledWith(scenario.id);
+    expect(screen.getByText(/You won/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "I won" })).toBeNull();
+  });
+
+  it("still asks when the replays could not be listed before the launch", async () => {
+    contentListReplays.mockRejectedValue(new Error("unreadable"));
+    await press("play");
+
+    expect(await screen.findByRole("button", { name: "I won" })).toBeTruthy();
+    expect(detectBattleResult).not.toHaveBeenCalled();
+  });
+
+  it("records nothing for an author's test run", async () => {
+    withLog([]);
+    detectBattleResult.mockResolvedValue({ outcome: "victory", replay: null });
+    await press("test");
+
+    await screen.findByText(/Test again to play a change/);
+    expect(contentListReplays).not.toHaveBeenCalled();
+    expect(detectBattleResult).not.toHaveBeenCalled();
+    expect(recordWin).not.toHaveBeenCalled();
   });
 });
 

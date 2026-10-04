@@ -164,6 +164,45 @@ describe("trigger parameter labels", () => {
     expect(screen.getByLabelText("Var comparison, op")).toBeTruthy();
   });
 
+  /**
+   * Issue #3551. Both conditions are edited through the same fields as every
+   * other one: a team, a unit picked from the game, a placed unit from the
+   * scenario's own actors, and the command from a fixed list.
+   */
+  it("offers a team, a unit type and a placed unit for a selection, and a command for an order", () => {
+    const scenario = newScenario("Test");
+    const row = (step: TriggerStep) => (
+      <StepRow
+        step={step}
+        at={{ triggerId: "trigger-1", list: "conditions", index: 0 }}
+        scenario={scenario}
+        extensions={NO_EXTENSIONS}
+        unsupported={undefined}
+        units={[]}
+        unitsLoading={false}
+        issues={[]}
+        picking={null}
+        onPick={noop}
+        onNegate={null}
+        onParam={noop}
+        onMove={null}
+        onRemove={noop}
+      />
+    );
+
+    render(row({ type: "unit_selected", params: {} }));
+    expect(screen.getByText("team")).toBeTruthy();
+    expect(screen.getByText("unit type")).toBeTruthy();
+    expect(
+      screen.getByLabelText("Unit selected placed unit, actor"),
+    ).toBeTruthy();
+    cleanup();
+
+    render(row({ type: "command_given", params: { command: "move" } }));
+    expect(screen.getByLabelText("Command given command")).toBeTruthy();
+    expect(screen.getByText("unit to build")).toBeTruthy();
+  });
+
   it("names the point picker's group rather than either of its two parts (issue #2299)", () => {
     const scenario = newScenario("Test");
     const step: TriggerStep = {

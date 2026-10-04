@@ -21,6 +21,13 @@ crates/tauri-plugin-coilbox-downloads/tests/fixtures/*.txt -text
 # nobody can resolve.
 crates/coilbox-zerok-protocol/upstream/**/*.cs -text
 
+# The golden fixtures are compared as strings against what the generators
+# print, which always use LF. A Windows checkout with `core.autocrlf` turned
+# them into CRLF and failed every comparison (issue #3556).
+src/conquest/fixtures/** text eol=lf
+src/runlite/fixtures/** text eol=lf
+crates/tauri-plugin-coilbox-workshop/tests/fixtures/saved-project.json text eol=lf
+
 # Unit files copied from real games, trailing whitespace and missing final
 # newline included. The patcher's tests check that every byte outside an edit
 # survives, so the fixtures have to keep the bytes the games have.

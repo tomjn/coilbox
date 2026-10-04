@@ -101,7 +101,10 @@ export interface HealthInputs {
   validIconNames: string[];
   /** The resolved `home` key, or null when the profile has none. */
   home: HomeHealth | null;
-  /** What the profile's `start` key resolved to against the bundled campaigns. */
+  /**
+   * What the profile's `start` key resolved to against the bundled campaigns
+   * and scenarios.
+   */
   start: StartResolution;
 }
 
@@ -273,8 +276,8 @@ export function checkHome(home: HomeHealth | null): HealthCheck | null {
 /**
  * Report what a profile's `start` key resolved to (issue #3378).
  *
- * A `start` naming a campaign or mission that is not bundled draws no card on
- * the home page, which on the author's screen looks the same as a card the
+ * A `start` naming a campaign, mission or scenario that is not bundled draws no
+ * card on the home page, which on the author's screen looks the same as a card the
  * player has already finished. This row is where the difference shows.
  *
  * `null` when the profile has no `start` key, in the shape of {@link checkHideIds}.
@@ -286,6 +289,13 @@ export function checkStart(start: StartResolution): HealthCheck | null {
       id: "start",
       status: "ok",
       label: `Start: '${start.mission.title}' in campaign '${start.campaign.title}'`,
+    };
+  }
+  if (start.status === "scenario") {
+    return {
+      id: "start",
+      status: "ok",
+      label: `Start: scenario '${start.scenario.name}'`,
     };
   }
   return {

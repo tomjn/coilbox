@@ -33,7 +33,7 @@ import {
   getProfileSource,
 } from "./profile";
 import { describeScenarioFailure } from "./scenarioFailure";
-import { resolveStart, type StartCampaign } from "./start";
+import { resolveStart, type StartCampaign, type StartScenario } from "./start";
 
 /** The campaign's own `name`, or a placeholder when the JSON can't be read. */
 function campaignName(json: string): string {
@@ -144,11 +144,17 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
       // The same check over bundled scenarios (issue #962). A scenario a package
       // shipped that coilbox skipped is invisible otherwise: it does not appear
       // in the list, and the only trace is a console warning nobody reads.
+      // Every scenario that did load is what `start` may name instead.
+      const scenarios: StartScenario[] = [];
       const scenarioFailures = await scenarioList({})
         .then((r) => {
           const out: ScenarioFailure[] = [];
           for (const item of r.items) {
-            if (parseStoredScenario(item.json) !== null) continue;
+            const scenario = parseStoredScenario(item.json);
+            if (scenario !== null) {
+              scenarios.push({ scenario, source: item.source });
+              continue;
+            }
             out.push({
               source: item.source,
               ...describeScenarioFailure(item.json),
@@ -204,7 +210,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         linkIcons,
         validIconNames: linkIconNames(),
         home: homeHealth(profile.home),
-        start: resolveStart(profile.start, campaigns),
+        start: resolveStart(profile.start, campaigns, scenarios),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);

@@ -38,7 +38,9 @@ Engine.__index = Engine
 --
 -- `spec.test(params, ctx)` returns whether the condition holds now. `ctx` is the
 -- table handed to M.new, with `frame` set to the current game frame and `event`
--- set to `{ name =, payload = }` when this pass came from an event.
+-- set to `{ name =, payload = }` when this pass came from an event. `armedAt` is
+-- the stamp of the moment the trigger being tested was last armed or last fired,
+-- for a condition about something happening rather than something being so.
 --
 -- `spec.events` is the list of event names the condition reacts to. A condition
 -- with no events is an aggregate and lands on the polled tick instead. That
@@ -129,12 +131,26 @@ function Engine:setEnabled(id, enabled)
 		-- Re-arming clears whatever the trigger was waiting on. A mission that
 		-- switches a trigger back on means now, not once an old cooldown runs out.
 		record.readyFrame = self.frameNumber
+		record.armedAt = self:stamp()
 	end
 end
 
 function Engine:isEnabled(id)
 	local record = self.byId[id]
 	return record ~= nil and record.enabled
+end
+
+--- A number for this moment, higher than every one handed out before it.
+--
+-- A condition about something the player did, such as giving an order, has to
+-- tell an order given before its trigger was armed from one given after, or a
+-- lesson's second "now give a move order" is answered by the first. Game frames
+-- cannot say: the order that fires one trigger and the arming of the next happen
+-- on the same frame. So arming takes a stamp, whatever records the deed takes
+-- one, and the later of the two is the higher.
+function Engine:stamp()
+	self.stamps = self.stamps + 1
+	return self.stamps
 end
 
 local function registerBuiltins(engine)
@@ -179,6 +195,7 @@ function M.new(mission, ctx)
 		queue = {},
 		reported = {},
 		frameNumber = 0,
+		stamps = 0,
 		running = false,
 	}, Engine)
 
@@ -202,6 +219,9 @@ function M.new(mission, ctx)
 			repeats = trigger["repeat"] == true,
 			cooldown = math.floor((tonumber(trigger.cooldown) or 0) * self.ctx.gameSpeed),
 			readyFrame = 0,
+			-- Before every stamp, so a trigger armed from the start counts whatever
+			-- the player does from the first frame.
+			armedAt = 0,
 		}
 		self.triggers[#self.triggers + 1] = record
 		self.byId[record.id] = record
@@ -347,6 +367,8 @@ end
 function Engine:fire(record)
 	if record.repeats then
 		record.readyFrame = self.frameNumber + record.cooldown
+		-- What set it off this time is spent, so the next firing wants a new one.
+		record.armedAt = self:stamp()
 	else
 		record.enabled = false
 	end
@@ -377,12 +399,14 @@ function Engine:pass(event)
 	self.ctx.event = event
 
 	for _, record in ipairs(records) do
+		self.ctx.armedAt = record.armedAt
 		if record.enabled and self.frameNumber >= record.readyFrame and self:holds(record) then
 			self:fire(record)
 		end
 	end
 
 	self.ctx.event = nil
+	self.ctx.armedAt = nil
 end
 
 --- Run a pass, then whatever passes its actions asked for.
@@ -418,8 +442,9 @@ function Engine:run(event)
 end
 
 --- Something happened that triggers may care about. The runtime raises
--- `unit_created`, `unit_finished`, `unit_destroyed` and `unit_captured`; a
--- condition may declare any name, and whatever raises it must use the same one.
+-- `unit_created`, `unit_finished`, `unit_destroyed`, `unit_captured`,
+-- `command_given` and `selection_changed`; a condition may declare any name, and
+-- whatever raises it must use the same one.
 function Engine:event(name, payload)
 	self:run({ name = name, payload = payload })
 end
