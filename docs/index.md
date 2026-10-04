@@ -117,5 +117,6 @@ Download and run the installer / AppImage from the [latest release](https://gith
 - [Campaigns](/campaigns), [Galactic conquest](/conquest) and [Roguelite run](/roguelite-run) — the singleplayer game modes.
 - [Scenarios](/scenarios) and [the mission runtime](/mission-runtime): authoring in-engine missions, and what a game does to play them.
 - [Teaching your game](/teaching-your-game): how a distribution offers a new player a first lesson.
+- [Hand-made maps](/hand-made-maps): how to make a Conquest map of land from images and a text file.
 - [Server admin](/server-admin): the moderation and admin tools for an uberserver lobby.
 - [Routes](/routes) — the app's screen map.
