@@ -85,6 +85,15 @@ describe("requiredRuntimeVersion", () => {
     expect(typeRuntimeVersion("release_group")).toBe(3);
   });
 
+  /**
+   * Issue #3551. A runtime behind 8 has neither condition, so a lesson waiting
+   * for the player to select a unit or give an order would wait for ever.
+   */
+  it("is raised by the two conditions that read what a player did", () => {
+    expect(requiredRuntimeVersion(withTrigger(["unit_selected"], []))).toBe(8);
+    expect(requiredRuntimeVersion(withTrigger(["command_given"], []))).toBe(8);
+  });
+
   it("takes the highest version any type used needs", () => {
     const since = (type: string) =>
       ({ zone_held_for: 2, map_marker: 3 })[type] ?? 1;

@@ -156,9 +156,9 @@ describe("generateTerritories", () => {
       });
 
       it("survives a save and a load", () => {
-        const loaded = parseGalaxyJson(JSON.stringify(doc));
-        expect(loaded?.nodes).toHaveLength(nodeCount);
-        expect(loaded?.links).toHaveLength(doc.links.length);
+        // The whole document, so the generator and the validator cannot drift
+        // apart: terrain, outlines and link kinds all have to come back.
+        expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);
       });
 
       it("is the same document from the same seed", () => {

@@ -107,17 +107,29 @@ export interface NodeStar {
   spectral: string[];
 }
 
+/**
+ * What joins two neighbours: a shared `border`, a `crossing` over a gap such as
+ * a sea route or a pass, or a `road` between point locations.
+ */
 export type LinkKind = "border" | "crossing" | "road";
 
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
   name: string;
-  /** Authored layout position on the strategic plane (any units). */
+  /**
+   * Authored layout position on the strategic plane (any units). On a document
+   * with `terrain`, x and y are in map units (see {@link GalaxyDoc.terrain}).
+   */
   pos: NodePos;
   /** Real stellar data, when this node came from the star catalogue. */
   star?: NodeStar;
-  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
+  /**
+   * One or more closed polygons in map units. Each polygon is a ring of [x, y]
+   * points with the last point not repeated, no holes. Absent means a point
+   * location such as a city. `pos` stays as the anchor for the label and
+   * marker.
+   */
   outline?: [number, number][][];
   /** Initial owner: a faction id or {@link NEUTRAL}. */
   owner: string;
@@ -171,15 +183,32 @@ export interface GalaxyDoc {
     fogOfWar?: boolean;
   };
   theme?: GalaxyTheme;
+  /**
+   * The land a map is drawn on. When present, `pos` x and y and every outline
+   * point are in map units: origin at the top left of the map image, x to the
+   * right, y down, within 0..width and 0..height.
+   */
   terrain?: {
-    image: string; // URL the webview can load (data:, blob:, asset or http)
-    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
-    width: number; // map units
-    height: number; // map units
-    heightScale?: number; // map units of height for a white heightmap pixel
+    /**
+     * URL the webview can load (data:, blob:, asset or http), or a marker a
+     * generator understands. Turning a file name in a map folder into a URL is
+     * the loader's job, not the model's.
+     */
+    image: string;
+    /** Same, greyscale: black is 0 and white is `heightScale`. */
+    heightmap?: string;
+    /** Map units. */
+    width: number;
+    /** Map units. */
+    height: number;
+    /** Map units of height for a white heightmap pixel. */
+    heightScale?: number;
+    /** Any other value is refused, so a globe can be added without a format change. */
     projection?: "flat";
   };
+  /** Undirected. Every pair must also be in `links`. A link with no entry has no stated kind. */
   linkKinds?: [string, string, LinkKind][];
+  /** Pairs of locations that touch but are not neighbours. A pair here must not be in `links`. */
   blockedBorders?: [string, string][];
   /** Scenery stood on the terrain. Drawn only when the document has one. */
   models?: PlacedModel[];
@@ -467,6 +496,99 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
   };
 }
 
+/** Order-insensitive key for a pair of node ids. */
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}\0${b}` : `${b}\0${a}`;
+}
+
+function isPositive(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0;
+}
+
+/** An outline as written, or `null` when it is not polygons of 3 or more points. */
+function parseOutline(value: unknown): [number, number][][] | null {
+  if (!Array.isArray(value) || value.length === 0) return null;
+  const outline: [number, number][][] = [];
+  for (const ring of value) {
+    if (!Array.isArray(ring) || ring.length < 3) return null;
+    const points: [number, number][] = [];
+    for (const p of ring) {
+      if (
+        !Array.isArray(p) ||
+        !Number.isFinite(p[0]) ||
+        !Number.isFinite(p[1]) ||
+        typeof p[0] !== "number" ||
+        typeof p[1] !== "number"
+      ) {
+        return null;
+      }
+      points.push([p[0], p[1]]);
+    }
+    outline.push(points);
+  }
+  return outline;
+}
+
+/** The terrain block, or the reason it is refused. */
+function parseTerrain(
+  value: unknown,
+): NonNullable<GalaxyDoc["terrain"]> | string {
+  if (typeof value !== "object" || value === null) {
+    return "terrain is not an object";
+  }
+  const t = value as Record<string, unknown>;
+  if (t.projection !== undefined && t.projection !== "flat") {
+    return `terrain projection ${JSON.stringify(t.projection)} is not supported, only "flat" is`;
+  }
+  if (typeof t.image !== "string" || t.image === "") {
+    return "terrain has no image";
+  }
+  if (!isPositive(t.width) || !isPositive(t.height)) {
+    return "terrain width and height must be numbers above 0";
+  }
+  return {
+    image: t.image,
+    heightmap:
+      typeof t.heightmap === "string" && t.heightmap !== ""
+        ? t.heightmap
+        : undefined,
+    width: t.width,
+    height: t.height,
+    heightScale: isPositive(t.heightScale) ? t.heightScale : undefined,
+    projection: t.projection === "flat" ? "flat" : undefined,
+  };
+}
+
+/**
+ * The first location cut off from the rest of the map, or `undefined` when
+ * every location can be reached. Names one from the smaller side of the split,
+ * so one stray city is named instead of the continent it is missing from.
+ */
+function findUnreachable(
+  nodes: GalaxyNode[],
+  links: [string, string][],
+): GalaxyNode | undefined {
+  const adjacent = new Map<string, string[]>(nodes.map((n) => [n.id, []]));
+  for (const [a, b] of links) {
+    adjacent.get(a)?.push(b);
+    adjacent.get(b)?.push(a);
+  }
+  const seen = new Set([nodes[0].id]);
+  const queue = [nodes[0].id];
+  for (const id of queue) {
+    for (const next of adjacent.get(id) ?? []) {
+      if (!seen.has(next)) {
+        seen.add(next);
+        queue.push(next);
+      }
+    }
+  }
+  if (seen.size === nodes.length) return undefined;
+  return seen.size * 2 < nodes.length
+    ? nodes[0]
+    : nodes.find((n) => !seen.has(n.id));
+}
+
 /**
  * Parse the raw JSON of a stored or imported galaxy into a validated
  * {@link GalaxyDoc}, or `null` if the shape doesn't match. This is the single
@@ -478,8 +600,23 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
  * exactly one capital it owns. Malformed optionals are dropped; unknown node
  * owners normalize to {@link NEUTRAL}; links referencing unknown nodes,
  * self-links and duplicates are dropped.
+ *
+ * The map fields are refused instead of dropped, because a map that lost its
+ * terrain or a border would load as a different map: a location that cannot be
+ * reached from the others, a `projection` other than `flat`, a malformed
+ * `terrain` or `outline`, a `linkKinds` entry that is not a link, and a
+ * `blockedBorders` pair that is a link or names an unknown location. Each of
+ * those passes its reason to `onRefusal`.
  */
-export function parseGalaxyJson(json: string): GalaxyDoc | null {
+export function parseGalaxyJson(
+  json: string,
+  onRefusal?: (reason: string) => void,
+): GalaxyDoc | null {
+  const refuse = (reason: string): null => {
+    onRefusal?.(reason);
+    return null;
+  };
+
   let data: unknown;
   try {
     data = JSON.parse(json);
@@ -548,6 +685,13 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     }
     const battle = parseBattle(n.battle);
     if (!battle) return null;
+    const outline =
+      n.outline === undefined ? undefined : parseOutline(n.outline);
+    if (outline === null) {
+      return refuse(
+        `location ${JSON.stringify(n.id)} has an outline that is not a list of polygons of 3 or more [x, y] points`,
+      );
+    }
     // A third component is optional: pre-3D galaxies stay flat.
     const z =
       typeof pos[2] === "number" && Number.isFinite(pos[2]) ? pos[2] : 0;
@@ -560,6 +704,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
       name: n.name,
       pos: z === 0 ? [pos[0], pos[1]] : [pos[0], pos[1], z],
       star: spectral.length > 0 ? { spectral } : undefined,
+      outline,
       owner:
         typeof n.owner === "string" && factionIds.has(n.owner)
           ? n.owner
@@ -593,10 +738,81 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
       const [a, b] = raw;
       if (typeof a !== "string" || typeof b !== "string") continue;
       if (a === b || !nodeIds.has(a) || !nodeIds.has(b)) continue;
-      const key = a < b ? `${a}\0${b}` : `${b}\0${a}`;
+      const key = pairKey(a, b);
       if (seenLinks.has(key)) continue;
       seenLinks.add(key);
       links.push([a, b]);
+    }
+  }
+
+  const stranded = findUnreachable(nodes, links);
+  if (stranded) {
+    return refuse(
+      `location ${JSON.stringify(stranded.id)} (${stranded.name}) cannot be reached from the rest of the map`,
+    );
+  }
+
+  let terrain: GalaxyDoc["terrain"];
+  if (d.terrain !== undefined) {
+    const parsed = parseTerrain(d.terrain);
+    if (typeof parsed === "string") return refuse(parsed);
+    terrain = parsed;
+  }
+
+  const linkKinds: [string, string, LinkKind][] = [];
+  if (d.linkKinds !== undefined) {
+    if (!Array.isArray(d.linkKinds)) return refuse("linkKinds is not a list");
+    const seenKinds = new Set<string>();
+    for (const raw of d.linkKinds) {
+      const [a, b, kind] = Array.isArray(raw) ? raw : [];
+      if (typeof a !== "string" || typeof b !== "string") {
+        return refuse("linkKinds has an entry that is not [id, id, kind]");
+      }
+      if (kind !== "border" && kind !== "crossing" && kind !== "road") {
+        return refuse(
+          `linkKinds gives ${a} and ${b} the kind ${JSON.stringify(kind)}, which is not border, crossing or road`,
+        );
+      }
+      const key = pairKey(a, b);
+      if (!seenLinks.has(key)) {
+        return refuse(
+          `linkKinds names ${a} and ${b}, which are not linked in links`,
+        );
+      }
+      if (seenKinds.has(key)) continue;
+      seenKinds.add(key);
+      linkKinds.push([a, b, kind]);
+    }
+  }
+
+  const blockedBorders: [string, string][] = [];
+  if (d.blockedBorders !== undefined) {
+    if (!Array.isArray(d.blockedBorders)) {
+      return refuse("blockedBorders is not a list");
+    }
+    const seenBlocked = new Set<string>();
+    for (const raw of d.blockedBorders) {
+      const [a, b] = Array.isArray(raw) ? raw : [];
+      if (typeof a !== "string" || typeof b !== "string" || a === b) {
+        return refuse(
+          "blockedBorders has an entry that is not two different ids",
+        );
+      }
+      const unknown = [a, b].find((id) => !nodeIds.has(id));
+      if (unknown !== undefined) {
+        return refuse(
+          `blockedBorders names ${unknown}, which is not a location`,
+        );
+      }
+      const key = pairKey(a, b);
+      if (seenLinks.has(key)) {
+        return refuse(
+          `blockedBorders names ${a} and ${b}, which are also linked in links`,
+        );
+      }
+      if (seenBlocked.has(key)) continue;
+      seenBlocked.add(key);
+      blockedBorders.push([a, b]);
     }
   }
 
@@ -640,6 +856,9 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
         ? { graceTurns, fogOfWar }
         : undefined,
     theme: parseTheme(d.theme),
+    terrain,
+    linkKinds: linkKinds.length > 0 ? linkKinds : undefined,
+    blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
     models: parsePlacedModels(d.models),
     createdAt: typeof d.createdAt === "string" ? d.createdAt : "",
     updatedAt: typeof d.updatedAt === "string" ? d.updatedAt : "",
@@ -648,6 +867,7 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
   };
 }
 
+/** The stated kind of the link between two locations, in either order. */
 export function linkKind(
   doc: GalaxyDoc,
   a: string,
