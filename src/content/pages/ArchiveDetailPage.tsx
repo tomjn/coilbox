@@ -35,7 +35,7 @@ import { DetailLoading, NotFound } from "./components/states";
  */
 export default function ArchiveDetailPage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const navigate = useNavigate();
   const drawer = useDrawer();
   const { selected } = useScanTargetSelection();
