@@ -24,9 +24,8 @@ import {
   substitutedMapCount,
   type WarpathChallengeSettings,
 } from "../../challenge";
-import type { GenBuildGraph } from "../../generate";
 import { useRuns } from "../../runs";
-import { setupLimitWarning } from "../../unitLimit";
+import { buildGraphFor, setupLimitWarning } from "../../unitLimit";
 
 /**
  * What the chosen game says about the side's start unit. `failure` is set when
@@ -144,19 +143,9 @@ export function ImportChallengeForm({
             acceptLabel: "Create run with no unit limit",
           });
     }
-    let build: GenBuildGraph | undefined;
-    if (read.startUnit && read.units) {
-      const edges = new Map<string, string[]>();
-      const names = new Map<string, string>();
-      for (const u of read.units) {
-        edges.set(
-          u.name.toLowerCase(),
-          (u.buildOptions ?? []).map((o) => o.toLowerCase()),
-        );
-        names.set(u.name.toLowerCase(), u.fullName ?? u.name);
-      }
-      build = { startUnit: read.startUnit.toLowerCase(), edges, names };
-    }
+    const build = read.units
+      ? buildGraphFor(read.startUnit, read.units)
+      : undefined;
 
     const id = `run-${crypto.randomUUID()}`;
     const run = runFromChallenge(settings, { maps, build, enemyAiKey });

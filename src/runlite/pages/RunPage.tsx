@@ -15,7 +15,7 @@ import {
   MAP_BAND_CLASS,
   MAP_DIM_INK_CLASS,
 } from "../../conquest/pages/components/hudChrome";
-import { buildEdgeMap, reachableFrom } from "../../content/buildTree";
+import { buildEdgeMap } from "../../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../../content/config";
 import { useMapEligibility } from "../../content/mapEligibility";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
@@ -34,6 +34,7 @@ import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
 import { runGameNotice } from "../runContent";
 import { useRun } from "../runs";
+import { reachableFromAll, startSetFor } from "../unitLimit";
 import { useAwardFinishedRuns } from "../useAwardFinishedRuns";
 import { EncounterOverlay } from "./components/EncounterOverlay";
 import {
@@ -129,19 +130,30 @@ export default function RunPage() {
     },
     run?.settings.side,
   );
+  // The units the run starts from: its start unit, or the set coilbox derives
+  // from the unit data when the start unit is a placeholder.
+  const startSet = useMemo(
+    () =>
+      run?.startUnit && dataset
+        ? startSetFor(run.startUnit, dataset.units)
+        : undefined,
+    [run?.startUnit, dataset],
+  );
   const arsenalTotal = useMemo(() => {
     if (!run?.startUnit || !dataset) return undefined;
-    return reachableFrom(run.startUnit, buildEdgeMap(dataset.units)).size;
-  }, [run?.startUnit, dataset]);
+    const roots = startSet?.derived ? startSet.roots : [run.startUnit];
+    return reachableFromAll(roots, buildEdgeMap(dataset.units)).size;
+  }, [run?.startUnit, dataset, startSet]);
 
   // The run's faction arsenal only: the dataset carries every side's units, but
   // a warpath is single-faction, so scope the read-only tree to what the run's
   // commander can reach. This drops the other faction from "Other units".
   const arsenalUnits = useMemo(() => {
     if (!run?.startUnit || !dataset) return [];
-    const reachable = reachableFrom(run.startUnit, buildEdgeMap(dataset.units));
+    const roots = startSet?.derived ? startSet.roots : [run.startUnit];
+    const reachable = reachableFromAll(roots, buildEdgeMap(dataset.units));
     return dataset.units.filter((u) => reachable.has(u.name.toLowerCase()));
-  }, [run?.startUnit, dataset]);
+  }, [run?.startUnit, dataset, startSet]);
 
   // Read-only lit-tree of the run's unlocked arsenal, opened from the HUD's
   // Arsenal tile. The unlocked-unit set lights up against the faction's full
@@ -157,7 +169,17 @@ export default function RunPage() {
             content: (
               <UnitPicker
                 units={arsenalUnits}
-                factions={run.startUnit ? [{ startUnit: run.startUnit }] : []}
+                factions={
+                  run.startUnit
+                    ? [
+                        {
+                          startUnit: startSet?.derived
+                            ? startSet.roots[0]
+                            : run.startUnit,
+                        },
+                      ]
+                    : []
+                }
                 selected={run.progress.unlockedUnits}
                 selectedLabel="unlocked"
                 enginePath={target?.enginePath}
