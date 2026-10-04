@@ -843,7 +843,7 @@ function DeleteReplayButton({
 /** One replay: decoded metadata, players, and a preview of the map it was on. */
 export default function ReplayDetailPage() {
   const { name } = useParams();
-  const filename = name ? decodeURIComponent(name) : "";
+  const filename = name ?? "";
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();
   const replaysRoot = useReplaysRoot(selected?.rootPath);
