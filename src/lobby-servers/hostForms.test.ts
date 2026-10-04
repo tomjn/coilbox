@@ -27,7 +27,7 @@ describe("bracketedHost", () => {
 });
 
 describe("addressOfKey", () => {
-  it("is the host and port after the first @", () => {
+  it("is the host and port after the last @", () => {
     expect(addressOfKey("me@192.168.1.45:8200")).toBe("192.168.1.45:8200");
     expect(addressOfKey("me@lobby.example.com:8200")).toBe(
       "lobby.example.com:8200",
@@ -38,6 +38,13 @@ describe("addressOfKey", () => {
     expect(addressOfKey("me@::1:8200")).toBe("[::1]:8200");
     expect(addressOfKey("me@2001:db8::1:8200")).toBe("[2001:db8::1]:8200");
     expect(addressOfKey("me@[2001:db8::1]:8200")).toBe("[2001:db8::1]:8200");
+  });
+
+  it("is not thrown by an @ in the username", () => {
+    expect(addressOfKey("me@home.example@lobby.example.com:8200")).toBe(
+      "lobby.example.com:8200",
+    );
+    expect(addressOfKey("a@b@::1:8200")).toBe("[::1]:8200");
   });
 
   it("keeps a zone id, which the normaliser then refuses", () => {
