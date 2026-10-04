@@ -14,6 +14,7 @@ import {
   type ResolveReadings,
   resolveReplayShortGameId,
   resolveVerdict,
+  sameGameFamily,
   stripVersionSuffix,
 } from "./resolveContent";
 import type { ScanReading } from "./scanSettled";
@@ -431,5 +432,34 @@ describe("resolveReplayShortGameId / gameMatchesShortId (issue #503)", () => {
       }),
     ).toBe("byar");
     expect(installedGameShortId({ name: "Zero-K v1.10.6" })).toBe("zerok");
+  });
+});
+
+describe("sameGameFamily", () => {
+  it("matches one game at two versions, however the version is written", () => {
+    expect(
+      sameGameFamily(
+        "Balanced Annihilation V15.9.8",
+        "Balanced Annihilation V16.0.1",
+      ),
+    ).toBe(true);
+    expect(
+      sameGameFamily(
+        "Beyond All Reason test-30018-d71d659",
+        "Beyond All Reason test-30050",
+      ),
+    ).toBe(true);
+    expect(
+      sameGameFamily("SplinterFaction 0.178", "SplinterFaction v0.179"),
+    ).toBe(true);
+  });
+
+  it("does not match a game whose name only starts the same", () => {
+    expect(
+      sameGameFamily(
+        "Balanced Annihilation V15.9.8",
+        "Balanced Annihilation Reloaded V1.0",
+      ),
+    ).toBe(false);
   });
 });
