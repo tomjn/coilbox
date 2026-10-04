@@ -10,6 +10,7 @@ import {
   mergeGameAi,
   minigamePips,
   neutralPick,
+  PIP_SCALE,
   orderedAis,
   rankedAis,
   standardAi,
@@ -158,6 +159,75 @@ describe("aiPips", () => {
     expect(aiPips(ai("HouseBot"), [ai("SimpleAI"), ai("HouseBot")])).toBe(
       undefined,
     );
+  });
+});
+
+/** The Lua AIs Metal Factions 2.58 declares in its `LuaAI.lua`, in its order. */
+const mfai = [
+  "MFAI : easy",
+  "MFAI : normal",
+  "MFAI : brutal",
+  "MFAI : normal (air)",
+  "MFAI : normal (assault)",
+  "MFAI : normal (skirmisher)",
+  "MFAI : normal (amphibious)",
+  "MFAI : normal (raider)",
+  "MFAI : normal (navy)",
+  "MFAI : brutal (air)",
+  "MFAI : brutal (assault)",
+  "MFAI : brutal (skirmisher)",
+  "MFAI : brutal (amphibious)",
+  "MFAI : brutal (raider)",
+  "MFAI : brutal (navy)",
+].map((n) => ai(n));
+
+describe("a Brutal AI by name", () => {
+  it("reads the top of the scale for every Metal Factions brutal AI", () => {
+    for (const a of mfai.filter((m) => m.shortName.includes("brutal"))) {
+      expect(aiPips(a, mfai)).toBe(PIP_SCALE);
+    }
+  });
+
+  it("ignores letter case", () => {
+    expect(aiPips(ai("MFAI : BRUTAL"), [])).toBe(PIP_SCALE);
+    expect(aiPips(ai("Brutal"), [])).toBe(PIP_SCALE);
+  });
+
+  it("reads the display name when the short name has no such word", () => {
+    const a: SkirmishAi = { shortName: "MF1", name: "Brutal bot", kind: "lua" };
+    expect(aiPips(a, [])).toBe(PIP_SCALE);
+  });
+
+  it("matches the whole word only", () => {
+    expect(aiPips(ai("Brutality"), [])).toBeUndefined();
+    expect(aiPips(ai("Brutalized"), [])).toBeUndefined();
+    expect(aiPips(ai("Unbrutal"), [])).toBeUndefined();
+  });
+
+  it("lets the game's own ranking win", () => {
+    const config: GameAiConfig = {
+      ranking: ["Hard", "Brutal Bot", "Gentle"],
+    };
+    const list = [ai("Gentle"), ai("Brutal Bot"), ai("Hard")];
+    expect(aiPips(ai("Brutal Bot"), list, config)).toBe(3);
+  });
+
+  it("keeps its place in the list", () => {
+    expect(names(orderedAis(mfai))).toEqual(names(mfai));
+  });
+
+  it("is not in the pool generated battles draw from", () => {
+    const list = [...mfai, ai("SimpleAI")];
+    expect(names(rankedAis(list))).toEqual(["SimpleAI"]);
+    expect(names(battlePool(list))).toEqual(["SimpleAI"]);
+    expect(aiForDifficulty(5, list)?.shortName).toBe("SimpleAI");
+    expect(standardAi(list)?.shortName).toBe("SimpleAI");
+  });
+
+  it("leaves the other Metal Factions levels to the name reading", () => {
+    expect(aiPips(ai("MFAI : easy"), mfai)).toBeUndefined();
+    expect(minigamePips("MFAI : easy")).toBe(2);
+    expect(minigamePips("MFAI : normal (air)")).toBe(3);
   });
 });
 
