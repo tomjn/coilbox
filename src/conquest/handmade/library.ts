@@ -35,6 +35,9 @@ export interface HandmadeMapSummary {
   game: MapManifest["game"];
   source: HandmadeMapSource;
   pictureUrl?: string;
+  /** Whether the author marked a Warpath start and goal. Without them the map
+   * is for Conquest only. */
+  warpath: boolean;
 }
 
 /** A map folder whose manifest cannot be listed, with the reader's reasons. */
@@ -136,6 +139,7 @@ async function listFolders(): Promise<{
         game: manifest.game,
         source,
         pictureUrl: installedUrls(item)(manifest.files.picture),
+        warpath: manifest.warpath !== undefined,
       },
     });
   }
