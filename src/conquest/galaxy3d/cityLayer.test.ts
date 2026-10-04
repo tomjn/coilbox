@@ -302,4 +302,30 @@ describe("buildCityLayer", () => {
     expect(groups[2].scale.x).toBeGreaterThan(plain);
     expect(roadColor(1)[3]).toBeGreaterThan(opacity);
   });
+
+  it("gives a location under incursion the warning colour, over the attack one", () => {
+    const { layer, groups } = build();
+    const wall = (
+      (groups[2].children[0] as THREE.Mesh)
+        .material as THREE.MeshBasicMaterial[]
+    )[0];
+    layer.setLocationState("east", { attackable: true });
+    layer.apply();
+    const attack = hex(wall.color);
+    layer.setLocationState("east", { attackable: true, threatened: true });
+    layer.apply();
+    expect(hex(wall.color)).toBe("#ffb020");
+    expect(hex(wall.color)).not.toBe(attack);
+  });
+
+  it("draws a road already travelled in the path green", () => {
+    const { layer, roadColor } = build();
+    layer.setRoadState("west", "mid", { travelled: true });
+    layer.apply();
+    const [r, g, b] = roadColor(0);
+    const green = new THREE.Color(0x46e08a);
+    expect(r).toBeCloseTo(green.r);
+    expect(g).toBeCloseTo(green.g);
+    expect(b).toBeCloseTo(green.b);
+  });
 });

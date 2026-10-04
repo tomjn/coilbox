@@ -517,6 +517,13 @@ export interface ProvinceStyle {
   opacity: number;
   /** How far the fill colour moves toward white, 0 to 1. */
   lighten: number;
+  /**
+   * A second colour mixed into the fill before it is lightened: the attack
+   * gold for a province the player can attack, the warning amber for one
+   * under incursion. `accentMix` is how far the fill moves toward it, 0 to 1.
+   */
+  accent?: "attack" | "threat";
+  accentMix: number;
   /** Whether the name label and the capital marker show. */
   showMarkers: boolean;
 }
@@ -529,13 +536,30 @@ export interface ProvinceStyle {
  */
 export function provinceStyle(input: ProvinceStyleInput): ProvinceStyle {
   if (input.hidden) {
-    return { tint: "neutral", opacity: 0.3, lighten: 0, showMarkers: false };
+    return {
+      tint: "neutral",
+      opacity: 0.3,
+      lighten: 0,
+      accentMix: 0,
+      showMarkers: false,
+    };
   }
   let opacity = input.neutral ? 0.22 : 0.42;
   let lighten = 0;
+  // The player's own province is the one under incursion, and one they can
+  // attack is never theirs, so the two accents do not meet in play. The
+  // warning wins if they ever do.
+  let accent: ProvinceStyle["accent"];
+  let accentMix = 0;
   if (input.attackable) {
     opacity += 0.1;
-    lighten += 0.15;
+    accent = "attack";
+    accentMix = 0.45;
+  }
+  if (input.threatened) {
+    opacity += 0.15;
+    accent = "threat";
+    accentMix = 0.6;
   }
   if (input.emphasised) {
     opacity += 0.1;
@@ -553,6 +577,8 @@ export function provinceStyle(input: ProvinceStyleInput): ProvinceStyle {
     tint: input.neutral ? "neutral" : "owner",
     opacity: Math.min(0.85, opacity),
     lighten: Math.min(0.6, lighten),
+    accent,
+    accentMix,
     showMarkers: true,
   };
 }

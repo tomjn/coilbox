@@ -10,6 +10,7 @@ import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
+import { buildCueLayer } from "./cueLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
@@ -106,6 +107,12 @@ interface GalaxyViewProps {
   playerFactionId: string;
   selectedId?: string | null;
   incursion?: Incursion;
+  /**
+   * The locations the player can attack this turn, from `attackableNodes`.
+   * Read on a terrain map only, where each one is picked out. A run with
+   * {@link laneFlow} works its open choices out from `owners` instead.
+   */
+  attackableIds?: Set<string>;
   onSelect?: (nodeId: string | null) => void;
   /**
    * Fog of war: the node ids the player can see. `undefined` means no fog —
@@ -410,6 +417,7 @@ export function GalaxyView({
   playerFactionId,
   selectedId,
   incursion,
+  attackableIds,
   onSelect,
   visibleIds,
   emphasis,
@@ -432,6 +440,7 @@ export function GalaxyView({
   const ownersRef = useRef(owners);
   const selectedRef = useRef<string | null | undefined>(selectedId);
   const incursionRef = useRef(incursion);
+  const attackableRef = useRef<Set<string> | undefined>(attackableIds);
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
@@ -687,6 +696,30 @@ export function GalaxyView({
         )
       : undefined;
 
+    // Crossings, blocked borders and the player's frontier, and the state of
+    // every location and road on a terrain map. See cueLayer.ts.
+    const cues =
+      surface && cities
+        ? buildCueLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            ownerColor,
+            laneDim,
+            cities,
+            provinces,
+            () => ({
+              owners: ownersRef.current,
+              playerFactionId,
+              selectedId: selectedRef.current,
+              attackable: attackableRef.current,
+              incursionNodeId: incursionRef.current?.nodeId,
+              run: laneFlow ? { pathLinks: pathLinksRef.current } : undefined,
+            }),
+          )
+        : undefined;
+
     /* ------------------------ renderer + camera ---------------------------- */
 
     renderer = new THREE.WebGLRenderer({
@@ -871,8 +904,8 @@ export function GalaxyView({
     );
     const applyOwners = () => {
       owners.apply();
-      cities?.apply();
-      provinces?.apply();
+      // On a terrain map this restyles the cities and the provinces too.
+      cues?.apply();
     };
     applyOwnersRef.current = applyOwners;
 
@@ -895,6 +928,8 @@ export function GalaxyView({
       selection.apply();
       cities?.select(selectedRef.current ?? null);
       provinces?.select(selectedRef.current ?? null);
+      // The selected location's neighbours and the incursion are cues.
+      cues?.apply();
     };
     applySelectionRef.current = applySelection;
 
@@ -1312,10 +1347,11 @@ export function GalaxyView({
     visibleRef.current = visibleIds;
     emphasisRef.current = emphasis;
     pathLinksRef.current = pathLinks;
+    attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, emphasis, pathLinks, reduceMotion]);
+  }, [owners, visibleIds, emphasis, pathLinks, attackableIds, reduceMotion]);
 
   useEffect(() => {
     selectedRef.current = selectedId;

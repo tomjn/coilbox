@@ -189,6 +189,35 @@ describe("buildProvinceLayer", () => {
     expect(fill("east").opacity).toBe(plain);
   });
 
+  it("tints an attackable province gold and one under incursion amber", () => {
+    const { layer, fill } = build();
+    const plain = fill("east").color.getHex();
+    expect(plain).toBe(0x0000ff);
+    layer?.setProvinceState("east", { attackable: true });
+    layer?.apply();
+    const attack = fill("east").color.clone();
+    // Blue moves toward the gold: red and green come up.
+    expect(attack.r).toBeGreaterThan(0);
+    expect(attack.g).toBeGreaterThan(0);
+    layer?.setProvinceState("east", { threatened: true });
+    layer?.apply();
+    expect(fill("east").color.getHex()).not.toBe(attack.getHex());
+    expect(fill("east").color.getHex()).not.toBe(plain);
+    layer?.setProvinceState("east", undefined);
+    layer?.apply();
+    expect(fill("east").color.getHex()).toBe(plain);
+  });
+
+  it("hands out the border pieces it draws", () => {
+    const { layer } = build();
+    const shared = layer?.borders.filter((p) => p.neighbour >= 0) ?? [];
+    expect(shared.length).toBeGreaterThan(0);
+    for (const p of shared) {
+      expect([p.province, p.neighbour].sort()).toEqual([0, 2]);
+      expect(p.a[0]).toBe(50);
+    }
+  });
+
   it("ignores a state for a node that is not a province", () => {
     const { layer } = build();
     expect(layer?.has("west")).toBe(true);
