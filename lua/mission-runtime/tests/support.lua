@@ -99,6 +99,7 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_gameover.lua"),
 		["luarules/mission_runtime/coilbox_dialogue.lua"] = module(
 			"luarules/mission_runtime/coilbox_dialogue.lua"),
+		["luarules/mission_runtime/coilbox_pause.lua"] = module("luarules/mission_runtime/coilbox_pause.lua"),
 		["luarules/mission_runtime/coilbox_view.lua"] = module("luarules/mission_runtime/coilbox_view.lua"),
 		["luarules/mission_runtime/coilbox_reveal.lua"] = module("luarules/mission_runtime/coilbox_reveal.lua"),
 		["luarules/mission_runtime/coilbox_restrictions.lua"] = module(
@@ -142,6 +143,8 @@ end
 -- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
 -- is every ally team the game has. `options.aiTeams` is the set of engine teams
 -- an AI plays, and `options.spectating` makes this client a spectator.
+-- `options.replay` makes it a client watching a replay, and `options.noLuaUI`
+-- leaves LuaUI without the global a line of dialogue is handed to.
 --
 -- `options.allowTransfer(unitID, newTeam, given)` is the game's own
 -- `AllowUnitTransfer`, and a test that says nothing about it has a game that
@@ -210,6 +213,8 @@ function M.newEngine(modOptions, files, options)
 		selected = {},
 		-- Every Spring.SendLuaRulesMsg call the unsynced half made.
 		luaRulesMsgs = {},
+		-- Every console command sent through Spring.SendCommands.
+		commands = {},
 	}
 
 	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
@@ -655,6 +660,15 @@ function M.newEngine(modOptions, files, options)
 			GetSpectatingState = function()
 				return options.spectating == true
 			end,
+			IsReplay = function()
+				return options.replay == true
+			end,
+			-- Every console command the runtime sent, one string each.
+			SendCommands = function(...)
+				for _, command in ipairs({ ... }) do
+					table.insert(engine.commands, command)
+				end
+			end,
 			-- Recorded rather than delivered. The server relays a Lua message to
 			-- every client's synced half, and a test that wants that hands the
 			-- recorded string to a synced engine's RecvLuaMsg itself.
@@ -761,13 +775,17 @@ function M.newEngine(modOptions, files, options)
 		end,
 		-- Calling into another Lua handle. The engine answers any name with a
 		-- callable and does nothing at all when the other handle has no such
-		-- global, so the stub records the call and never refuses one.
+		-- global, so the stub records the call and never refuses one. Called
+		-- with a name, it answers whether the other handle has that global.
 		Script = {
 			LuaUI = setmetatable({}, {
 				__index = function(_, name)
 					return function(...)
 						table.insert(engine.luaUI, { name, ... })
 					end
+				end,
+				__call = function()
+					return options.noLuaUI ~= true
 				end,
 			}),
 		},

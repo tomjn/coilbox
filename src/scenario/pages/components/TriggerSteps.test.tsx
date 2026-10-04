@@ -316,3 +316,28 @@ describe("a trigger step's point parameter the validator has flagged", () => {
     expect(field.getAttribute("aria-describedby")).toBe(message.id);
   });
 });
+
+/**
+ * Issue #3552. A dialogue step can keep its line on screen until the player
+ * clicks it away, and the two pause actions take no parameters at all.
+ */
+describe("the steps a lesson pauses and waits with", () => {
+  it("offers a dialogue step a switch that holds the line", () => {
+    render(<StepHarness type="dialogue" params={{ line: "welcome" }} />);
+
+    const hold = screen.getByRole("switch", { name: /wait for the player/ });
+    expect(hold.getAttribute("aria-checked")).toBe("false");
+
+    fireEvent.click(hold);
+
+    expect(stored()).toEqual({ line: "welcome", hold: true });
+  });
+
+  it("draws a pause step with nothing to fill in", () => {
+    render(<StepHarness type="pause_game" params={{}} />);
+
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+});

@@ -1,5 +1,5 @@
 import { generateCities } from "../conquest/cities";
-import type { GalaxyDoc, GameRef } from "../conquest/model";
+import type { GalaxyDoc, GameRef, NodeBattleSpec } from "../conquest/model";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
 import { generateTerritories } from "../conquest/territories";
 import {
@@ -11,6 +11,7 @@ import {
   planUnlocks,
 } from "./generate";
 import type {
+  EncounterSpec,
   RogueliteRun,
   RunEdge,
   RunLength,
@@ -216,6 +217,12 @@ export interface GenerateMapRunOpts extends GenerateRunOpts {
    * A location not listed gets its kind from the seed. The start and the goal
    * are always the start and the boss. */
   kinds?: Record<string, MapRunKind>;
+  /** The battle the author set for a location, by location id. It is used when
+   * the location turns out to be a fight: its map and whatever else it gives
+   * replace the generated encounter's, and what it leaves out stays as
+   * generated. `disabledUnits` is not carried, because the run's arsenal
+   * decides which units can be built. */
+  battles?: Record<string, NodeBattleSpec>;
 }
 
 /**
@@ -244,6 +251,7 @@ export interface RunMapSource {
   startId?: string;
   goalId?: string;
   kinds?: Record<string, MapRunKind>;
+  battles?: Record<string, NodeBattleSpec>;
 }
 
 /** Finds a hand-made map by id. Null when this install does not have it. */
@@ -295,6 +303,23 @@ export function resolveRunMap(
   } catch {
     return null;
   }
+}
+
+/** The parts of an author's battle an encounter takes, left out where the
+ * author gave none. */
+function authoredEncounter(battle: NodeBattleSpec): Partial<EncounterSpec> {
+  // The download hint always goes with the map name, so the generated map's
+  // hint never stays on the author's map.
+  const out: Partial<EncounterSpec> = {
+    mapName: battle.mapName,
+    mapDownload: battle.mapDownload,
+  };
+  if (battle.enemyAiCount !== undefined) out.enemyAiCount = battle.enemyAiCount;
+  if (battle.enemyAiKey !== undefined) out.enemyAiKey = battle.enemyAiKey;
+  if (battle.startPosType !== undefined) out.startPosType = battle.startPosType;
+  if (battle.handicap !== undefined) out.handicap = battle.handicap;
+  if (battle.modOptionValues) out.modOptionValues = battle.modOptionValues;
+  return out;
 }
 
 /**
@@ -369,6 +394,11 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
 
     const node: RunNode = { id, type, col, row, location: id };
     bakeNode(rng, opts, planner, usedUnlocks, node, cols);
+    // After the draw, so a run takes the same draws with or without it.
+    const authored = opts.battles?.[id];
+    if (node.battle && authored) {
+      node.battle = { ...node.battle, ...authoredEncounter(authored) };
+    }
     return node;
   });
 

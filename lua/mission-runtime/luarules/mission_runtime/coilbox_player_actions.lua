@@ -1,10 +1,12 @@
 -- Coilbox mission runtime: the trigger conditions that read what a player did.
 --
--- Two conditions that leave nothing in the world for the others to find:
--- `unit_selected`, which holds while a player has a unit selected, and
--- `command_given`, which holds once a player has given an order. They are what a
--- lesson's "select your builder" and "tell it to build a solar panel" are made
--- of.
+-- Three conditions that leave nothing in the world for the others to find:
+-- `unit_selected`, which holds while a player has a unit selected,
+-- `command_given`, which holds once a player has given an order, and
+-- `dialogue_dismissed`, which holds once a player has clicked away a line of
+-- dialogue the mission held on screen. They are what a lesson's "select your
+-- builder", "tell it to build a solar panel" and "read this, then carry on" are
+-- made of.
 --
 -- An order is synced. The engine hands every one a unit accepts to synced Lua
 -- through UnitCommand, with the player who gave it, so the gadget feeds
@@ -18,6 +20,13 @@
 -- player's mouse from desyncing a game with two players in it, and what makes a
 -- replay fire the trigger again without anyone selecting anything.
 --
+-- A dismissal is the same kind of thing and takes the same road. The click
+-- lands in the mission widget, the widget says which line it was in a Lua
+-- message, and `hooks.dismissal` reads it in synced code. A Lua message is
+-- relayed and read whether or not the game is paused, which a game frame is not,
+-- so this is also the one thing that still reaches the triggers in a lesson the
+-- mission has paused.
+--
 -- Read-only. It calls the engine to look a unit up, and changes nothing.
 
 local M = {}
@@ -25,6 +34,9 @@ local M = {}
 -- What a selection message starts with. Every Lua message any gadget or widget
 -- sends reaches RecvLuaMsg, so the prefix is how this one is told from the rest.
 M.SELECTION_MESSAGE = "coilbox_mission_selection:"
+
+-- What a dismissal message starts with. The rest of it is the id of the line.
+M.DISMISSED_MESSAGE = "coilbox_mission_dismissed:"
 
 -- The condition's own word for a build order of any kind. Every other command is
 -- named the way the engine's CMD table names it.
@@ -252,7 +264,53 @@ function M.register(engine, state)
 		end,
 	})
 
+	-- Dialogue id -> whether the mission has said the line held and nobody has
+	-- dismissed it yet, and dialogue id -> the stamp of its last dismissal.
+	local held = {}
+	local dismissed = {}
+
+	-- Holds once a player has dismissed the line since the trigger was armed, or
+	-- since it last fired, for the reason `command_given` is: a lesson that says
+	-- the same line twice wants the second reading, not the first.
+	engine:addCondition("dialogue_dismissed", {
+		events = { "dialogue_dismissed" },
+		test = function(params, ctx)
+			return (dismissed[params.line] or 0) > (ctx.armedAt or 0)
+		end,
+	})
+
 	local hooks = {}
+
+	--- The mission said a line and is holding it on screen.
+	function hooks.held(lineId)
+		held[lineId] = true
+	end
+
+	--- A Lua message arrived. Returns whether it was a dismissal, and the id of
+	-- the line when it dismissed one.
+	--
+	-- Taken on no more trust than a selection report. A spectator's is dropped,
+	-- and so is one for a line the mission is not holding, which covers a line it
+	-- never said, a second player dismissing what the first already has, and a
+	-- client trying to skip ahead.
+	function hooks.dismissal(playerID, message)
+		if type(message) ~= "string" or message:sub(1, #M.DISMISSED_MESSAGE) ~= M.DISMISSED_MESSAGE then
+			return false, nil
+		end
+
+		local lineId = message:sub(#M.DISMISSED_MESSAGE + 1)
+		if not held[lineId] then
+			return true, nil
+		end
+		local _, _, spectator = Spring.GetPlayerInfo(playerID, false)
+		if spectator then
+			return true, nil
+		end
+
+		held[lineId] = nil
+		dismissed[lineId] = engine:stamp()
+		return true, lineId
+	end
 
 	--- A unit accepted an order. Returns whether a player gave it, which is
 	-- whether there is anything for a trigger to hear about.
