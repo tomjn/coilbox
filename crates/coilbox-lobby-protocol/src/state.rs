@@ -22,6 +22,11 @@ pub struct User {
     /// What the server says about how good they are, empty where it says
     /// nothing. See [`Rating`].
     pub rating: Rating,
+    /// The Tachyon lobby this person is in, by the lobby's uuid, or `None` when
+    /// the server has not said or they are in none. Matches
+    /// [`Battle::tachyon_id`], which is how a friend is found in the lobby list
+    /// when the list carries no member names. Always `None` off Tachyon.
+    pub current_lobby: Option<String>,
 }
 
 /// A player's skill, in whatever categories the server that sent it keeps.

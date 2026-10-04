@@ -403,6 +403,7 @@ pub fn reduce_at(state: &mut LobbyState, msg: ServerMessage, now_ms: u64) -> Vec
                     // TASServer has no rating anywhere in the protocol, so
                     // nobody on one is ever rated (issue #2002).
                     rating: Rating::default(),
+                    current_lobby: None,
                 },
             );
             vec![Delta::UserAdded { name: username }]
