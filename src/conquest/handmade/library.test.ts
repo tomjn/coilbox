@@ -27,6 +27,7 @@ const manifest = readFileSync(`${SAMPLE}map.json`, "utf8");
 const FILES = [
   "cairn.gltf",
   "heightmap.png",
+  "highmoor-siege.json",
   "map.json",
   "picture.png",
   "provinces.png",
@@ -46,6 +47,19 @@ vi.mock("./decode", () => ({
     return { width, height };
   },
 }));
+
+// The webview reads a scenario file over the same protocol. Here the file
+// named last in the URL is read from the sample folder.
+const fetchFile = vi.fn(async (url: string) => {
+  const file = decodeURIComponent(url.split("/").at(-1) ?? "");
+  try {
+    const text = readFileSync(`${SAMPLE}${file}`, "utf8");
+    return { ok: true, text: async () => text };
+  } catch {
+    return { ok: false, text: async () => "" };
+  }
+});
+vi.stubGlobal("fetch", fetchFile);
 
 const {
   handmadeMapFileUrls,
@@ -75,6 +89,7 @@ const staged = (change: object = {}) => ({
 });
 
 beforeEach(() => {
+  fetchFile.mockClear();
   for (const mock of Object.values(hoisted)) mock.mockReset();
   hoisted.list.mockResolvedValue({ items: [item()] });
   hoisted.discard.mockResolvedValue({});
@@ -389,5 +404,56 @@ describe("removing a hand-made map", () => {
     await expect(removeHandmadeMap("shipped")).rejects.toThrow(
       "cannot be removed",
     );
+  });
+});
+
+describe("a map with a scenario location", () => {
+  it("reads the scenario file from the folder", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(fetchFile).toHaveBeenCalledWith(
+      "coilbox://localhost/conquestmap/sample-two-shores/highmoor-siege.json",
+    );
+    const highmoor = result.doc.nodes.find((n) => n.id === "highmoor");
+    expect(highmoor?.scenario?.doc.name).toBe("Siege");
+  });
+
+  it("names the location when the folder has no such file", async () => {
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({ files: FILES.filter((f) => f !== "highmoor-siege.json") }),
+      ],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({ code: "scenario-missing", name: "Highmoor" }),
+      ],
+    });
+    expect(fetchFile).not.toHaveBeenCalled();
+  });
+
+  it("names the location when the file cannot be fetched", async () => {
+    fetchFile.mockRejectedValueOnce(new Error("no such host"));
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({ code: "scenario-invalid", name: "Highmoor" }),
+      ],
+    });
+  });
+
+  it("does not install a zip whose scenario file is damaged", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    fetchFile.mockResolvedValueOnce({ ok: true, text: async () => "{ nope" });
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result).toEqual({
+      status: "invalid",
+      errors: [expect.objectContaining({ code: "scenario-invalid" })],
+    });
+    expect(hoisted.commit).not.toHaveBeenCalled();
+    expect(hoisted.discard).toHaveBeenCalledWith({ token: "tok-1" });
   });
 });

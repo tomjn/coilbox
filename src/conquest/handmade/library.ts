@@ -193,19 +193,49 @@ async function readFolder(
       return undefined;
     }
   };
-  const [provinces, picture] = await Promise.all([
+  const scenarioFiles = new Set(
+    [...manifest.provinces, ...manifest.locations].flatMap((l) =>
+      l.scenario === undefined ? [] : [l.scenario],
+    ),
+  );
+  const [provinces, picture, ...scenarioTexts] = await Promise.all([
     decode(manifest.files.provinces, () => decodeRgba(provincesUrl)),
     decode(manifest.files.picture, () => imageSize(pictureUrl)),
+    ...[...scenarioFiles].map(
+      async (file): Promise<[string, string | undefined]> => [
+        file,
+        await fileText(urlFor(file)),
+      ],
+    ),
   ]);
   if (!provinces || !picture) return { ok: false, errors: unreadable };
+
+  // A scenario file that is missing or would not read is left out, and the
+  // reader says which location it belongs to.
+  const scenarios: Record<string, string> = {};
+  for (const [file, text] of scenarioTexts) {
+    if (text !== undefined) scenarios[file] = text;
+  }
 
   return readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
     urlFor,
+    scenarios,
     cache: traces,
   });
+}
+
+/** The text of a file in a map folder, or undefined when it cannot be read. */
+async function fileText(url: string | undefined): Promise<string | undefined> {
+  if (url === undefined) return undefined;
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.text() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

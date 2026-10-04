@@ -39,7 +39,13 @@
     { "color": "#4f9da6", "name": "Eastcliff", "difficulty": 2 },
     { "color": "#8a6fc2", "name": "Southreach" },
     { "color": "#b55f9a", "name": "Ironcoast", "difficulty": 3 },
-    { "color": "#5c7fd0", "name": "Highmoor", "difficulty": 3 },
+    {
+      "color": "#5c7fd0",
+      "name": "Highmoor",
+      "difficulty": 3,
+      "blurb": "A keep on the moor. Taking it is a scenario, not a skirmish.",
+      "scenario": "highmoor-siege.json"
+    },
     {
       "color": "#c97b3c",
       "name": "Redfield",

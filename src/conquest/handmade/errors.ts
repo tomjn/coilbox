@@ -15,6 +15,34 @@ export type HandmadeMapError =
   | { code: "duplicate-id"; id: string; message: string }
   /** The manifest names a file the folder does not hold. */
   | { code: "file-missing"; file: string; message: string }
+  /** A location has both a scenario and a battle. */
+  | { code: "scenario-and-battle"; id: string; name: string; message: string }
+  /** A location's scenario file is not in the folder. */
+  | {
+      code: "scenario-missing";
+      id: string;
+      name: string;
+      file: string;
+      message: string;
+    }
+  /** A location's scenario file is not a scenario coilbox can play. */
+  | {
+      code: "scenario-invalid";
+      id: string;
+      name: string;
+      file: string;
+      message: string;
+    }
+  /** A location's scenario is for a different game than the map. */
+  | {
+      code: "scenario-wrong-game";
+      id: string;
+      name: string;
+      file: string;
+      /** The game the scenario names. */
+      game: string;
+      message: string;
+    }
   /** An image is in the folder but cannot be decoded. */
   | { code: "image-unreadable"; file: string; message: string }
   /** The province image and the map picture are different sizes. */

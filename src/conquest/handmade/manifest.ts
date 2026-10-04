@@ -79,8 +79,11 @@ export interface ManifestLocation {
    */
   warpath?: { kind?: string };
   /**
-   * Reserved for a scenario played here in place of a skirmish (issue #3515):
-   * the name of a scenario file in the folder. The reader ignores it today.
+   * A scenario played here in place of a skirmish: the name of a `.json` file
+   * in the folder, as exported from the scenario builder. The scenario must be
+   * for the same game as the map. A location has a `scenario` or a `battle`,
+   * never both. The player plays it once, when they first attack the location.
+   * Any later fight here is a skirmish on the scenario's map.
    */
   scenario?: string;
 }
@@ -469,6 +472,29 @@ export function parseManifest(text: string): {
       );
       owner = NEUTRAL;
     }
+    let scenario: string | undefined;
+    if (raw.scenario !== undefined) {
+      const file = raw.scenario;
+      if (
+        typeof file !== "string" ||
+        !isFolderFile(file) ||
+        !file.toLowerCase().endsWith(".json")
+      ) {
+        field(
+          `${label}.scenario`,
+          "must be the name of a .json scenario file inside the map folder.",
+        );
+      } else if (raw.battle !== undefined) {
+        errors.push({
+          code: "scenario-and-battle",
+          id: locId,
+          name,
+          message: `${MANIFEST_FILE}: "${name}" has a scenario and a battle. A location plays one or the other, so remove one of them.`,
+        });
+      } else {
+        scenario = file;
+      }
+    }
     const capital = optBool(raw, "capital", `${label}.capital`);
     if (capital && owner === NEUTRAL) {
       field(`${label}.capital`, "is true, so the location needs an owner.");
@@ -488,6 +514,7 @@ export function parseManifest(text: string): {
       ),
       battle: readBattle(raw.battle, `${label}.battle`, field),
       blurb: optText(raw, "blurb", `${label}.blurb`),
+      scenario,
     };
   };
   const readPoint = (value: unknown, path: string) => {

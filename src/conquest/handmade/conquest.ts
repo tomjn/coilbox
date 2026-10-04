@@ -3,7 +3,9 @@ import {
   type ConquestState,
   DEFAULT_AGGRESSION,
   type GalaxyDoc,
+  type GalaxyNode,
   type HandmadeRun,
+  type NodeScenario,
   newConquestState,
 } from "../model";
 import { mulberry32 } from "../rng";
@@ -165,5 +167,48 @@ export function readHandmadeRun(state: ConquestState): HandmadeRun | null {
     fogOfWar: r.fogOfWar === true ? true : undefined,
     threatLevel: threatLevel > 0 ? threatLevel : undefined,
     battles,
+    scenariosWon:
+      Array.isArray(r.scenariosWon) && r.scenariosWon.length > 0
+        ? r.scenariosWon.filter((id): id is string => typeof id === "string")
+        : undefined,
+  };
+}
+
+/**
+ * The scenario a fight at `node` plays, or undefined when it is a skirmish.
+ * Only an attack plays one, and only until the player has won it: a defence,
+ * and any attack after that win, is a skirmish on the scenario's map.
+ */
+export function scenarioToPlay(
+  state: Pick<ConquestState, "handmade">,
+  node: GalaxyNode,
+  mode: "attack" | "defend",
+): NodeScenario | undefined {
+  if (mode !== "attack" || !node.scenario) return undefined;
+  const won = readScenariosWon(state);
+  return won.includes(node.id) ? undefined : node.scenario;
+}
+
+function readScenariosWon(state: Pick<ConquestState, "handmade">): string[] {
+  const won: unknown = state.handmade?.scenariosWon;
+  return Array.isArray(won)
+    ? won.filter((id): id is string => typeof id === "string")
+    : [];
+}
+
+/**
+ * Record that the scenario at `nodeId` was won, so it is not played again.
+ * A state that is not on a hand-made map comes back unchanged.
+ */
+export function withScenarioWon(
+  state: ConquestState,
+  nodeId: string,
+): ConquestState {
+  if (!state.handmade) return state;
+  const won = readScenariosWon(state);
+  if (won.includes(nodeId)) return state;
+  return {
+    ...state,
+    handmade: { ...state.handmade, scenariosWon: [...won, nodeId] },
   };
 }

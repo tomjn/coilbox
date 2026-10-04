@@ -19,7 +19,9 @@ const FILES = [
   "provinces.png",
   "heightmap.png",
   "cairn.gltf",
+  "highmoor-siege.json",
 ];
+const scenarioText = readFileSync(`${SAMPLE}highmoor-siege.json`, "utf8");
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
@@ -32,6 +34,7 @@ function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
     picture: { width: picture.width, height: picture.height },
     urlFor: (name) =>
       FILES.includes(name) ? `asset://map/${name}` : undefined,
+    scenarios: { "highmoor-siege.json": scenarioText },
     ...change,
   };
 }
@@ -260,7 +263,6 @@ describe("the sample map", () => {
       sample({
         manifest: manifestWith((m) => {
           m.warpath = { start: "westhaven", goal: "farwatch" };
-          m.provinces[0].scenario = "intro.json";
           m.provinces[0].warpath = { kind: "shop" };
           (m as unknown as Record<string, unknown>).somethingNew = 1;
         }),

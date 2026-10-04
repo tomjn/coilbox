@@ -26,6 +26,7 @@ const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
+const scenarioText = readFileSync(`${SAMPLE}highmoor-siege.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 
 /** The sample map as the reader gives it, after `edit` and a repaint. */
@@ -54,6 +55,7 @@ function readSample(
     provinces: image,
     picture: { width: image.width, height: image.height },
     urlFor: (name) => `coilbox://${folder}/${name}`,
+    scenarios: { "highmoor-siege.json": scenarioText },
   });
   if (!result.ok) {
     throw new Error(result.errors.map((e) => e.message).join("\n"));
