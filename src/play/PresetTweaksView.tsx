@@ -6,7 +6,11 @@ import type { ConfigOption } from "@/content/bindings";
 import { deliverySlots } from "@/multiplayer/battle/tweakDelivery";
 import { notify } from "@/notify/notify";
 import { deliveryRoutes } from "@/workshop/deliveryRoutes";
-import { settledSummary, settleTypedValuesTweaks } from "@/workshop/loadsAs";
+import {
+  gameNotFoundNote,
+  settledSummary,
+  settleTypedValuesTweaks,
+} from "@/workshop/loadsAs";
 import { type ModProject, useModProjects } from "@/workshop/project";
 import { tweakSlotFit, workshopPackTweakSlots } from "@/workshop/tweakPack";
 
@@ -68,6 +72,7 @@ export function PresetTweaksView({
   enginePath,
   dataDir,
   archive,
+  scanFailure = null,
 }: {
   /** The game the setup or room is on. A project is written against one game. */
   gameName: string;
@@ -96,6 +101,9 @@ export function PresetTweaksView({
   dataDir?: string;
   /** The game's primary archive, as unitsync names it. */
   archive?: string;
+  /** The engine's reason when the content scan failed, so the note says that
+   *  instead of claiming the game is not installed. */
+  scanFailure?: string | null;
 }) {
   const [packing, setPacking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,7 +145,7 @@ export function PresetTweaksView({
             })
           : ({
               ok: false,
-              message: `${gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+              message: gameNotFoundNote(gameName, scanFailure),
             } as const);
       const pack = await workshopPackTweakSlots({
         project,

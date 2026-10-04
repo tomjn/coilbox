@@ -47,8 +47,14 @@ import type { ModProject } from "../../project";
 // settling typed values (issue #3093), which has its own coverage in
 // `loads_as.rs`. The game is never "installed" here, so the write goes ahead
 // with every field written as typed.
+// Set to a reason to stand in a scan whose Init failed (issue #3423).
+let mockScanError: string | null = null;
 vi.mock("@/content/config", () => ({
-  useUnitsyncScan: () => ({ data: undefined, loading: false, error: null }),
+  useUnitsyncScan: () => ({
+    data: undefined,
+    loading: false,
+    error: mockScanError,
+  }),
 }));
 vi.mock("@/play/config", () => ({
   usePreferredTarget: () => ({ target: undefined, loading: false }),
@@ -97,6 +103,7 @@ const withCopy: ModProject = {
 
 afterEach(() => {
   cleanup();
+  mockScanError = null;
   status = { backups: 0, created: 0 };
   writeResponse = null;
   calls.length = 0;
@@ -221,6 +228,27 @@ describe("the edit-in-place actions", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
     expect(onWritten).not.toHaveBeenCalled();
+  });
+
+  it("says the scan failed, not that the game is missing, when Init failed", async () => {
+    mockScanError = "no space left on device";
+    writeResponse = {
+      written: ["units/armcom.lua"],
+      changed: 1,
+      unchanged: 0,
+      refused: [],
+      notCarried: [],
+      carried: [],
+      copies: [],
+      equipped: [],
+    };
+    renderWrite();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Write changes into the game" }),
+    );
+    expect(await screen.findByText(/The content scan failed/)).toBeTruthy();
+    expect(screen.getByText(/no space left on device/)).toBeTruthy();
+    expect(screen.queryByText(/is not installed here/)).toBeNull();
   });
 
   it("reports what it wrote, offers undo, and asks the caller to refresh", async () => {
