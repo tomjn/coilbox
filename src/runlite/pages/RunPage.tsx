@@ -30,12 +30,7 @@ import { resolveGameByShortname } from "../../play/installedGames";
 import { useGameCatalog } from "../../play/useGameCatalog";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import { awardMeta } from "../meta";
-import {
-  isBattleNode,
-  type RogueliteRun,
-  type RunNode,
-  type RunNodeType,
-} from "../model";
+import { isBattleNode, type RunNode, type RunNodeType } from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
 import { runGameNotice } from "../runContent";
