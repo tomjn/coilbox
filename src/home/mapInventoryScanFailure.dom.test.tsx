@@ -4,8 +4,8 @@
  * engine's reason in `error`. The map inventory must not read that as a player
  * with no maps, because the home page then promotes a download.
  */
-import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   data: null as unknown,
@@ -46,6 +46,9 @@ vi.mock("../play/config", () => ({
 }));
 
 const { useMapInventory, noMapsInstalled } = await import("./suggestedMap");
+
+// Unmount before the DOM is torn down, so no render is left scheduled.
+afterEach(cleanup);
 
 describe("the map inventory when the scan did not answer", () => {
   it("is not an empty install", async () => {
