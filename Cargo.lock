@@ -6378,6 +6378,7 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "tempfile",
+ "zip 8.6.0",
 ]
 
 [[package]]

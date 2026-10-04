@@ -16,6 +16,11 @@
 //!   - `coilbox://localhost/scenario/<id>/<file>` → `<data_dir>/scenario/media/<id>/<file>`
 //!     (a scenario's dialogue portraits and voice clips, so the editor can show a
 //!     portrait and play a clip without holding the whole file base64 in JS)
+//!   - `coilbox://localhost/conquestmap/<id>/<file>` → `<data_dir>/conquest/maps/<id>/<file>`
+//!     (an imported hand-made map's images. A bundled one is under `portable`)
+//!   - `coilbox://localhost/conquestmapstaging/<token>/<file>` →
+//!     `<data_dir>/conquest/map-staging/<token>/<file>` (a zip being imported,
+//!     so the webview can read the map before it is installed)
 //!   - `coilbox://localhost/legopack/<file>`      → `.coilbox/legoparts/<file>` if
 //!     present, else `<resource_dir>/legoparts/<file>` (the unit builder's base
 //!     parts pack, portable-first so a distribution can ship its own)
@@ -158,6 +163,22 @@ fn resolve_path(
                 return None;
             }
             let base = data_dir()?.join(root).join("media").join(id);
+            Some(file.iter().fold(base, |p, s| p.join(s)))
+        }
+        // A hand-made map folder, installed or still being imported. Both are
+        // `<root>/<id>/<file...>` under `<data_dir>/conquest/`, guarded the same
+        // way as the media roots above.
+        "conquestmap" | "conquestmapstaging" => {
+            let (id, file) = rest.split_first()?;
+            if !coilbox_portable::valid_id(id) || file.is_empty() {
+                return None;
+            }
+            let folder = if root == "conquestmap" {
+                "maps"
+            } else {
+                "map-staging"
+            };
+            let base = data_dir()?.join("conquest").join(folder).join(id);
             Some(file.iter().fold(base, |p, s| p.join(s)))
         }
         "legopack" => {
@@ -519,6 +540,28 @@ mod tests {
             resolve_path(&s, None, || None, || None, || None, |_| None),
             None
         );
+    }
+
+    #[test]
+    fn resolve_conquest_map_roots_serve_one_folder_per_map() {
+        assert_eq!(
+            under_data(&segs(&["conquestmap", "two-shores", "picture.png"])),
+            Some(PathBuf::from("/data/conquest/maps/two-shores/picture.png"))
+        );
+        assert_eq!(
+            under_data(&segs(&["conquestmap", "two-shores", "models", "a.glb"])),
+            Some(PathBuf::from("/data/conquest/maps/two-shores/models/a.glb"))
+        );
+        assert_eq!(
+            under_data(&segs(&["conquestmapstaging", "abc-1", "picture.png"])),
+            Some(PathBuf::from(
+                "/data/conquest/map-staging/abc-1/picture.png"
+            ))
+        );
+        // missing file segment
+        assert_eq!(under_data(&segs(&["conquestmap", "two-shores"])), None);
+        // bad id
+        assert_eq!(under_data(&segs(&["conquestmap", "../x", "a.png"])), None);
     }
 
     #[test]

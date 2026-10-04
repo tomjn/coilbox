@@ -311,6 +311,7 @@ async fn run_loop(mut socket: TachyonSocket, ctx: TachyonConnContext) {
                 let deltas = {
                     let mut state = lock_or_recover(&state);
                     let mut deltas = tachyon_users::reduce(&mut state, &message);
+                    deltas.extend(tachyon_users::lobbies(&mut state, &frame));
                     // A name that has just arrived may be the name of a thread
                     // filed under a user id, so this follows the user fold.
                     deltas.extend(tachyon_messaging::rename_threads(&mut state));

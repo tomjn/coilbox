@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Campaign } from "../campaign/model";
+import type { Scenario } from "../scenario/model";
 import { deriveHealthChecks, type HealthInputs } from "./health";
 
 function base(): HealthInputs {
@@ -394,6 +395,21 @@ describe("deriveHealthChecks", () => {
       );
       expect(c.status).toBe("ok");
       expect(c.label).toBe("Start: 'Landfall' in campaign 'Basic Training'");
+    });
+
+    it("confirms the scenario the home page will offer", () => {
+      const c = byId(
+        {
+          ...base(),
+          start: {
+            status: "scenario",
+            scenario: { id: "s1", name: "First Steps" } as Scenario,
+          },
+        },
+        "start",
+      );
+      expect(c.status).toBe("ok");
+      expect(c.label).toBe("Start: scenario 'First Steps'");
     });
 
     it("warns, with the reason, when it names nothing playable", () => {

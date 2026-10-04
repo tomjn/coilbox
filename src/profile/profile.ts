@@ -264,7 +264,9 @@ export interface Profile {
    * Where a new player starts: a campaign this distribution bundles, and
    * optionally one mission in it (see `./start`). The home page's continue card
    * offers it until the player finishes that mission, or the campaign's first
-   * mission when only a campaign is named. Omitted leaves the home page as it is.
+   * mission when only a campaign is named. It can name a scenario bundled on its
+   * own instead, offered until the player wins it. Omitted leaves the home page
+   * as it is.
    */
   start?: StartConfig;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */

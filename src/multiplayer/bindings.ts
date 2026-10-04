@@ -62,6 +62,11 @@ export interface User {
   agent: string;
   status: ClientStatus;
   rating: Rating;
+  /**
+   * The Tachyon lobby this person is in, by uuid, matching a battle's
+   * `tachyonId`. Null when the server has not said or they are in none.
+   */
+  currentLobby: string | null;
 }
 
 export type ChatKind =

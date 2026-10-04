@@ -29,6 +29,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { contentListReplays } from "@/content/bindings";
 import { primeScan, useUnitsyncScan } from "@/content/config";
 import { useGameUnits } from "@/content/useGameUnits";
 import { playInfolog } from "@/play/bindings";
@@ -38,6 +39,7 @@ import {
   usePreferredTarget,
 } from "@/play/config";
 import { classifyLine } from "@/play/crash";
+import { type DetectedResult, detectBattleResult } from "@/play/detect";
 import { usePlay } from "@/play/PlayProvider";
 import { MUTATOR_FOLDER } from "../../../lib/generatedGames";
 import {
@@ -61,6 +63,7 @@ import {
   type MissionIssue,
   missionIssueLabels,
 } from "../../validate";
+import { useScenarioWins } from "../../wins";
 import {
   engineRunProblems,
   missionRunLogMissing,
@@ -203,6 +206,12 @@ export function ScenarioTestDrawer({
   // fills in behind it. Null until the read answers, and `{ log: null }` once it
   // has answered with nothing this run can use.
   const [runLog, setRunLog] = useState<{ log: RunLog | null } | null>(null);
+  // How a player's run ended, read from the replay it wrote (issue #3549). Null
+  // until that read answers, and for an author's test, which is not a result
+  // anybody is keeping. A win is recorded so a distribution's start card for
+  // this scenario knows to go away.
+  const [outcome, setOutcome] = useState<DetectedResult | null>(null);
+  const { recordWin } = useScenarioWins();
 
   const busy =
     phase.state === "writing" ||
@@ -238,11 +247,24 @@ export function ScenarioTestDrawer({
     if (!target) return;
     setPhase({ state: "writing" });
     setRunLog(null);
+    setOutcome(null);
     // When the engine actually started, which is the only thing that tells this
     // run's log from the one before it. Set again inside `launch` because
     // compiling the mission and rescanning both happen before the engine does,
     // and a log written in between is not this run's.
     let startedAtMs = Date.now();
+    // The replays that exist before the engine runs, so the one this run writes
+    // can be told from them. The campaign mission run does the same. A failure
+    // leaves the result to the player to report and never blocks the launch.
+    let beforePaths: Set<string> | null = null;
+    if (!testing) {
+      try {
+        const { replays } = await contentListReplays({ root: target.dataDir });
+        beforePaths = new Set(replays.map((r) => r.path));
+      } catch {
+        beforePaths = null;
+      }
+    }
     try {
       // A bundled scenario's dialogue clips have never been written into the
       // media store, and that store is where the compile step copies them from,
@@ -299,7 +321,22 @@ export function ScenarioTestDrawer({
       // spawned nothing exits with code 0, and that is the run this is for.
       // A read that fails is not reported as its own error: the run is the news
       // and it has already been shown.
-      if (!testing) return;
+      if (!testing) {
+        // A launch cancelled before the game started has no result to read.
+        if (result.exitCode === null) return;
+        const detected = beforePaths
+          ? (
+              await detectBattleResult({
+                target,
+                beforePaths,
+                playerName: result.config.myPlayerName,
+              })
+            ).outcome
+          : "ambiguous";
+        if (detected === "victory") recordWin(scenario.id);
+        setOutcome(detected);
+        return;
+      }
       try {
         const { log } = await playInfolog({
           dataDir: target.dataDir,
@@ -432,8 +469,28 @@ export function ScenarioTestDrawer({
               ? `The engine exited with code ${phase.result.exitCode}. Its infolog says why.`
               : testing
                 ? "The game has closed. Test again to play a change."
-                : "The game has closed. Play it again from here."}
+                : outcome === "victory"
+                  ? "You won. Play it again from here."
+                  : "The game has closed. Play it again from here."}
           </p>
+          {/* The replay did not say who won, so the player is asked, as a
+              campaign mission asks. Only after a clean exit: an engine that
+              died has no result to report. */}
+          {outcome === "ambiguous" && phase.result.exitCode === 0 ? (
+            <div className="flex items-center gap-3">
+              <p>Coilbox could not tell how that ended.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  recordWin(scenario.id);
+                  setOutcome("victory");
+                }}
+              >
+                I won
+              </Button>
+            </div>
+          ) : null}
           {/* Where the mission was written is the author's problem to debug, so
               a player is not shown paths they have no use for. */}
           {testing ? (
