@@ -702,6 +702,7 @@ export function GalaxyView({
           ownerColor,
           ownersRef,
           labelObjects,
+          dimOf,
         )
       : undefined;
 

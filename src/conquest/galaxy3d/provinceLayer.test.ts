@@ -45,7 +45,7 @@ const colors: Record<string, number> = { red: 0xff0000, blue: 0x0000ff };
 const ownerColor = (owner: string | undefined) =>
   new THREE.Color(owner && owner in colors ? colors[owner] : 0x808080);
 
-function build(galaxy: GalaxyDoc = doc(nodes)) {
+function build(galaxy: GalaxyDoc = doc(nodes), dims?: Record<string, number>) {
   const scene = new THREE.Scene();
   const ownersRef = { current: {} as Record<string, string> };
   const labels = galaxy.nodes.map(() => new THREE.Object3D());
@@ -57,6 +57,7 @@ function build(galaxy: GalaxyDoc = doc(nodes)) {
     ownerColor,
     ownersRef,
     labels,
+    dims && ((id) => dims[id] ?? 1),
   );
   const fill = (id: string) =>
     (scene.getObjectByName(`province-fill:${id}`) as THREE.Mesh)
@@ -225,6 +226,18 @@ describe("buildProvinceLayer", () => {
       expect([p.province, p.neighbour].sort()).toEqual([0, 2]);
       expect(p.a[0]).toBe(50);
     }
+  });
+
+  it("fades a province by its emphasis, and follows a change of it", () => {
+    const plain = build().fill("east").opacity;
+    const dims: Record<string, number> = { east: 0.25 };
+    const { layer, fill } = build(doc(nodes), dims);
+    expect(fill("east").opacity).toBeCloseTo(plain * 0.25);
+    // West is not listed, so it is at full strength.
+    expect(fill("west").opacity).toBe(build().fill("west").opacity);
+    dims.east = 1;
+    layer?.apply();
+    expect(fill("east").opacity).toBe(plain);
   });
 
   it("ignores a state for a node that is not a province", () => {
