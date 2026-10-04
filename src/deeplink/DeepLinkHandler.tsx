@@ -16,6 +16,8 @@ import {
   useTrustedHubUrl,
 } from "../hub/config";
 import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
+import { inviteLinkFrom } from "../multiplayer/invite/inviteOffer";
+import { offerInvite } from "../multiplayer/invite/inviteStore";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
@@ -147,26 +149,26 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // A battle on a lobby server (issue #3382). What to offer depends on
+      // which servers and logins this player has, so the question is asked by
+      // `InviteLinkHost`, which can see them. Handing the link over connects
+      // nothing. A link that arrives while one is still being asked about is
+      // refused, so the button somebody has read keeps meaning what it said.
       if (result.kind === "join") {
-        setPending({
-          title: "Join a battle",
-          lines: [
-            `Join battle "${result.battle}" on ${result.server}?`,
-            "You will connect and join only after you confirm.",
-          ],
-          warnings: [],
-          confirmLabel: "Join battle",
-          run: () =>
-            navigate("/battles", {
-              state: {
-                deeplinkJoin: {
-                  server: result.server,
-                  battle: result.battle,
-                  ...(result.password ? { password: result.password } : {}),
-                },
-              },
-            }),
-        });
+        const link = inviteLinkFrom(result);
+        if (!link) {
+          notify({
+            title: "Ignored a coilbox link",
+            body: "This join link is not one coilbox can read.",
+            level: "error",
+          });
+        } else if (!offerInvite(link)) {
+          notify({
+            title: "Ignored a coilbox link",
+            body: "Another invite is still open. Answer or close it, then open this link again.",
+            level: "error",
+          });
+        }
         return;
       }
 

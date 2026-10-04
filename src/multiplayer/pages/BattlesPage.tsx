@@ -42,7 +42,6 @@ import { stopHostedRoom } from "../../direct/stopRoom";
 import { useLanRooms } from "../../direct/useLanRooms";
 import { VpnWarning } from "../../direct/VpnWarning";
 import { useLastLogin } from "../../lobby-servers/config";
-import { notify } from "../../notify/notify";
 import { getGameMatcher } from "../../profile/profile";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
@@ -93,8 +92,6 @@ import {
  */
 type PendingEntry = { serverKey: string; seeded: boolean } | null;
 
-type DeeplinkJoin = { server: string; battle: string; password?: string };
-
 /**
  * One connection's battles, with in-place join and that server's own way to
  * open a battle (issue #2844). Battles come from the connection's mirror
@@ -113,8 +110,6 @@ function ServerBattles({
   hostDraft,
   hostMap,
   hostTitle,
-  deeplinkJoin,
-  deeplinkHandled,
   pageControls,
   lanSection,
   focusId,
@@ -132,9 +127,6 @@ function ServerBattles({
   /** Only the focused connection is handed a map jump. */
   hostMap?: string;
   hostTitle?: string;
-  /** Only the focused connection is handed a deep link to join. */
-  deeplinkJoin?: DeeplinkJoin;
-  deeplinkHandled: MutableRefObject<boolean>;
   /** The page's own header controls, drawn beside this server's in `page`. */
   pageControls?: ReactNode;
   /** The rooms on this network, drawn above the list in `page`. */
@@ -212,34 +204,6 @@ function ServerBattles({
       }),
     [serverKey, awaitLanding, giveUp, leaveOther],
   );
-
-  // Carry out a deep-link join once the connection is ready. Fires at most once
-  // per arrival (the ref guard), and reports rather than acts when it cannot.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: onJoin changes with the one-battle rule, re-adding it would loop the join
-  useEffect(() => {
-    if (!deeplinkJoin || deeplinkHandled.current) return;
-    if (!ready) {
-      deeplinkHandled.current = true;
-      notify({
-        title: "Connect first to join",
-        body: `Log in to ${deeplinkJoin.server}, then open the link again.`,
-        level: "error",
-      });
-      return;
-    }
-    const target = all.find((b) => String(b.id) === deeplinkJoin.battle);
-    if (!target) {
-      deeplinkHandled.current = true;
-      notify({
-        title: "Battle not found",
-        body: `Battle "${deeplinkJoin.battle}" is not open on this server.`,
-        level: "error",
-      });
-      return;
-    }
-    deeplinkHandled.current = true;
-    void onJoin(target, deeplinkJoin.password);
-  }, [deeplinkJoin, ready, all]);
 
   // A battle is "in progress" when the server says so on the lobby, which is what
   // Tachyon does, or when its host is in-game, which is all TASServer gives us.
@@ -580,31 +544,10 @@ function BattlesPage() {
   const hostDraft = hostState?.hostDraft;
   const hostTargetKey = hostState?.hostServerKey ?? activeKey;
 
-  // A confirmed coilbox://join deep link (issue #388) navigates here with the
-  // target server and battle id. Join only when already connected to a server
-  // and the battle is open. Cross-server auto-connect is out of scope, so an
-  // unconnected or missing target is reported rather than acted on silently.
-  // The focused connection's list carries it out.
-  const deeplinkJoin = (
-    location.state as {
-      deeplinkJoin?: DeeplinkJoin;
-    } | null
-  )?.deeplinkJoin;
-  const deeplinkJoinHandledRef = useRef(false);
-  useEffect(() => {
-    if (!deeplinkJoin || deeplinkJoinHandledRef.current || activeKey) return;
-    deeplinkJoinHandledRef.current = true;
-    notify({
-      title: "Connect first to join",
-      body: `Log in to ${deeplinkJoin.server}, then open the link again.`,
-      level: "error",
-    });
-  }, [deeplinkJoin, activeKey]);
-
   // A confirmed coilbox://room deep link (issue #1612) navigates here with the
-  // address and port of a room somebody is hosting themselves. Unlike the join
-  // above it needs no connection and no battle list, because a room is one
-  // machine and one battle, so it opens the join form filled in rather than
+  // address and port of a room somebody is hosting themselves. It needs no
+  // connection and no battle list, because a room is one machine and one
+  // battle, so it opens the join form filled in rather than
   // acting: the person still has to put their name in and press Join, and a room
   // that has stopped since the link was written is reported there.
   const deeplinkRoom =
@@ -850,8 +793,6 @@ function BattlesPage() {
         hostDraft={hostDraft}
         hostMap={hostMap}
         hostTitle={hostState?.hostTitle}
-        deeplinkJoin={deeplinkJoin}
-        deeplinkHandled={deeplinkJoinHandledRef}
         pageControls={
           <>
             {hostControl}
@@ -910,8 +851,6 @@ function BattlesPage() {
               hostDraft={hosting ? hostDraft : undefined}
               hostMap={focused ? hostMap : undefined}
               hostTitle={hosting ? hostState?.hostTitle : undefined}
-              deeplinkJoin={focused ? deeplinkJoin : undefined}
-              deeplinkHandled={deeplinkJoinHandledRef}
               focusId={focus?.serverKey === key ? focus.id : undefined}
             />
           );
