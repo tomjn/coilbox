@@ -175,6 +175,11 @@ if not gadgetHandler:IsSyncedCode() then
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == "coilbox_harness_select" then
+			-- What a player's click or drag does to the selection. Nothing here
+			-- tells the runtime: its own unsynced half has to notice, and carry
+			-- it to the synced half, which is the claim (issue #3551).
+			Spring.SelectUnitArray({ ... })
 		elseif message == CAMERA_MESSAGE then
 			local _, _, _, team = ...
 			aimedAt.camera[#aimedAt.camera + 1] = team
@@ -1153,6 +1158,95 @@ plans.outbreak = {
 			local wave = state().groups.units("second-wave")
 			check("spawn_group puts a hard-only group on the map only on hard",
 				#wave == (state().difficulty == "hard" and 4 or 0), #wave)
+		end },
+	},
+}
+
+-- Drill: the two conditions that read what a player did (issue #3551).
+--
+-- The claims only a real engine can settle are the two routes. That a selection
+-- made on the client reaches synced code at all: the runtime's unsynced half has
+-- to see it in Update, the engine has to carry its Lua message through the
+-- server, and RecvLuaMsg has to be handed it. And that an order a player gives
+-- arrives at UnitCommand with a player on it and fromLua false, while an order
+-- the game itself gives does not.
+--
+-- The steps are spaced wider than the others' because a selection makes two
+-- trips, one out of the client and one back from the server, where an order
+-- makes one.
+local drillSite = {}
+
+local function objectiveIs(id)
+	return rules("coilbox_mission_objective_" .. id)
+end
+
+plans.drill = {
+	deadline = 345,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			check("with nothing selected, neither selection objective has moved",
+				objectiveIs("pick") == ACTIVE and objectiveIs("engineer") == ACTIVE)
+			SendToUnsynced("coilbox_harness_select", state().units.scout)
+		end },
+		{ frame = 45, run = function()
+			check("a selection made on the client reaches the synced half and completes unit_selected",
+				objectiveIs("pick") == COMPLETE, objectiveIs("pick"))
+			check("and a condition naming another placed unit does not hold",
+				objectiveIs("engineer") == ACTIVE, objectiveIs("engineer"))
+			-- A move order before the trigger that waits on one is armed, down the
+			-- player's own path, and one from the game itself.
+			local x, _, z = Spring.GetUnitPosition(state().units.scout)
+			SendToUnsynced("coilbox_harness_player_order", state().units.scout, CMD.MOVE,
+				x + 100, Spring.GetGroundHeight(x + 100, z), z)
+		end },
+		{ frame = 70, run = function()
+			SendToUnsynced("coilbox_harness_select", state().units.scout, state().units.engineer)
+		end },
+		{ frame = 110, run = function()
+			check("selecting the placed unit a condition names completes it",
+				objectiveIs("engineer") == COMPLETE, objectiveIs("engineer"))
+			check("which arms the trigger waiting on a move order", armed("order-move") == true)
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			Spring.GiveOrderToUnit(state().units.engineer, CMD.MOVE,
+				{ x + 50, Spring.GetGroundHeight(x + 50, z), z }, 0)
+		end },
+		{ frame = 130, run = function()
+			check("neither the move given before it was armed nor one synced Lua gave answers command_given",
+				objectiveIs("move") == ACTIVE, objectiveIs("move"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			SendToUnsynced("coilbox_harness_player_order", state().units.engineer, CMD.MOVE,
+				x + 50, Spring.GetGroundHeight(x + 50, z), z)
+		end },
+		{ frame = 160, run = function()
+			check("a move order the player gives reaches UnitCommand and completes command_given",
+				objectiveIs("move") == COMPLETE, objectiveIs("move"))
+			check("and the order that answered one trigger does not answer the one it armed",
+				armed("order-again") == true and objectiveIs("again") == ACTIVE, objectiveIs("again"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			SendToUnsynced("coilbox_harness_player_order", state().units.engineer, CMD.MOVE,
+				x + 60, Spring.GetGroundHeight(x + 60, z), z)
+		end },
+		{ frame = 190, run = function()
+			check("a second move order does", objectiveIs("again") == COMPLETE, objectiveIs("again"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			drillSite.x, drillSite.y, drillSite.z = buildSite("armsolar", x, z, 200)
+			check("there is somewhere near the engineer a solar collector may be built",
+				drillSite.x ~= nil)
+			if drillSite.x then
+				SendToUnsynced("coilbox_harness_player_order", state().units.engineer,
+					-UnitDefNames["armsolar"].id, drillSite.x, drillSite.y, drillSite.z, 0)
+			end
+		end },
+		{ frame = 220, run = function()
+			check("a build order for the type a condition names, with a builder selected, completes both",
+				objectiveIs("solar") == COMPLETE, objectiveIs("solar"))
+			check("and the repeating trigger counted that one build order once",
+				rules("coilbox_mission_var_orders") == 1, rules("coilbox_mission_var_orders"))
+		end },
+		{ frame = 340, run = function()
+			check("ten seconds in, the negated command_given has not held, because orders were given",
+				objectiveIs("prompt") == ACTIVE, objectiveIs("prompt"))
 		end },
 	},
 }

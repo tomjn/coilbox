@@ -92,6 +92,29 @@ export function isUnitDefParam(name: string): boolean {
 /** Comparisons a `var` condition can make. */
 export const VAR_OPS = ["eq", "ne", "lt", "lte", "gt", "gte"] as const;
 
+/**
+ * The orders a `command_given` condition can name. Each is the engine's own
+ * name for the command, lower case, which the runtime looks up in the engine's
+ * `CMD` table. `build` is the exception: a build order has no one command id,
+ * so the runtime reads it as "any build order".
+ */
+export const GIVEN_COMMANDS = [
+  "move",
+  "attack",
+  "fight",
+  "patrol",
+  "guard",
+  "stop",
+  "wait",
+  "repair",
+  "reclaim",
+  "resurrect",
+  "capture",
+  "load_units",
+  "unload_units",
+  "build",
+] as const;
+
 /** Conditions the runtime implements at runtime version 1. */
 export const CONDITION_TYPES: Record<string, TypeSpec> = {
   units_in_zone: {
@@ -125,6 +148,30 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     actor: { kind: "actorId" },
     /** The capturing team. Absent means any. */
     team: { kind: "teamId", optional: true, label: "capturing team" },
+  },
+  /**
+   * Holds while a player has a unit selected. With no unit type and no placed
+   * unit it is any unit at all, and with both it is that placed unit.
+   *
+   * A selection lives on the player's own client, so the runtime carries it to
+   * the synced half in a message the server relays (issue #3551).
+   */
+  unit_selected: {
+    /** Whose selection. Absent means any player's. */
+    team: { kind: "teamId", optional: true },
+    unitDef: { kind: "string", optional: true, label: "unit type" },
+    actor: { kind: "actorId", optional: true, label: "placed unit" },
+  },
+  /**
+   * Holds once a player has given an order since the trigger was armed, or
+   * since it last fired. With no command it is any order. A unit type asks for
+   * an order to build that type, whatever the command says.
+   */
+  command_given: {
+    /** Whose order. Absent means any player's. */
+    team: { kind: "teamId", optional: true },
+    command: { kind: "enum", values: GIVEN_COMMANDS, optional: true },
+    unitDef: { kind: "string", optional: true, label: "unit to build" },
   },
   time_elapsed: {
     seconds: { kind: "number" },
@@ -290,6 +337,10 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   unit_built: "Holds once a team has finished building enough of a unit type.",
   unit_captured:
     "True once an actor changes hands, whether captured or gifted away.",
+  unit_selected:
+    "Holds while a player has a unit selected: any unit, one of a type, or one you placed.",
+  command_given:
+    "Holds once a player has given an order after this trigger was armed: any order, one command, or building a unit type.",
   time_elapsed:
     "True once a set number of seconds has passed since the mission began.",
   var: "Compares a variable to a number, or to another variable.",
@@ -356,6 +407,8 @@ export const TYPE_GROUPS: Record<string, string> = {
   unit_health_below: "Units",
   unit_built: "Units",
   unit_captured: "Units",
+  unit_selected: "Player",
+  command_given: "Player",
   var: "Variables",
   time_elapsed: "Time",
   zone_held_for: "Time",
@@ -387,7 +440,12 @@ export const TYPE_GROUPS: Record<string, string> = {
 };
 
 /** The bands `AddStep` offers for the conditions list, in the order shown. */
-export const CONDITION_GROUP_ORDER = ["Units", "Variables", "Time"] as const;
+export const CONDITION_GROUP_ORDER = [
+  "Units",
+  "Player",
+  "Variables",
+  "Time",
+] as const;
 
 /** The bands `AddStep` offers for the actions list, in the order shown. */
 export const ACTION_GROUP_ORDER = [
@@ -427,6 +485,10 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   give_resources: 7,
   set_income: 7,
   give_storage: 7,
+  /** Issue #3551. A runtime behind 8 has no implementation for either, so a
+   *  lesson waiting on one waits for ever. */
+  unit_selected: 8,
+  command_given: 8,
 };
 
 /**

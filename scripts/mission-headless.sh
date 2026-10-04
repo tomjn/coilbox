@@ -20,7 +20,7 @@
 # that the whole thing loads at all.
 #
 # Usage: scripts/mission-headless.sh [mission ...]
-# Default: gate, ambush, garrison, siege, outbreak.
+# Default: gate, ambush, garrison, siege, outbreak, drill.
 #
 # outbreak is the difficulty fixture. It is run at whatever
 # COILBOX_HARNESS_DIFFICULTY says, which is nothing by default, so the default
@@ -78,7 +78,7 @@ MAP_ARCHIVE="${COILBOX_HARNESS_MAP:-}"
 [ -n "$MAP_ARCHIVE" ] || MAP_ARCHIVE="$(pick "$DATA_DIR/maps" '\.sd[7z]$' 'map')"
 
 MISSIONS=("$@")
-[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak)
+[ ${#MISSIONS[@]} -gt 0 ] || MISSIONS=(gate ambush garrison siege outbreak drill)
 
 DIFFICULTY="${COILBOX_HARNESS_DIFFICULTY:-}"
 
