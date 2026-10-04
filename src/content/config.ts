@@ -397,6 +397,12 @@ export function useScanEpoch(enginePath?: string, dataDir?: string): number {
   );
 }
 
+/** What one run of the scan hook found, and why when it found nothing. */
+export interface ScanOutcome {
+  data: ScanResult | null;
+  error: string | null;
+}
+
 /** Run / read a cached unitsync scan for the given target. */
 export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [data, setData] = useState<ScanResult | null>(null);
@@ -407,18 +413,18 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   const [error, setError] = useState<string | null>(null);
   const [cancelled, setCancelled] = useState(false);
 
-  const run = useCallback(
-    // Resolves with what the scan found, or null when it found nothing to
-    // report (it threw, or its `Init` failed), so a caller that has to act on
-    // the answer need not wait a render.
-    async (force = false): Promise<ScanResult | null> => {
-      if (!enginePath || !dataDir) return null;
+  // The one scan path. Resolves with what the scan found and, when it found
+  // nothing, the reason, so a caller that has to act on the answer need not
+  // wait a render for `error`. A cancel has no reason: nothing went wrong.
+  const runWithReason = useCallback(
+    async (force = false): Promise<ScanOutcome> => {
+      if (!enginePath || !dataDir) return { data: null, error: null };
       const key = `${dataDir}::${enginePath}`;
       if (!force && scanCache.has(key)) {
         const cached = scanCache.get(key) ?? null;
         setData(cached);
         setUnvouched(null);
-        return cached;
+        return { data: cached, error: null };
       }
       setLoading(true);
       setError(null);
@@ -427,7 +433,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
       try {
         const found = await primeScan(enginePath, dataDir, force);
         setData(found);
-        return found;
+        return { data: found, error: null };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (e instanceof ScanInitFailure) setUnvouched(e.result);
@@ -435,17 +441,27 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
         // and keeps the answer before it: nothing was learned. Any other
         // failure drops that answer, since the reason to rescan is that
         // something changed and the old lists no longer describe the install.
-        if (/cancelled/i.test(msg)) setCancelled(true);
-        else {
-          setData(null);
-          setError(msg);
+        if (/cancelled/i.test(msg)) {
+          setCancelled(true);
+          return { data: null, error: null };
         }
-        return null;
+        setData(null);
+        setError(msg);
+        return { data: null, error: msg };
       } finally {
         setLoading(false);
       }
     },
     [enginePath, dataDir],
+  );
+
+  // Resolves with what the scan found, or null when it found nothing to
+  // report (it threw, or its `Init` failed). Callers that show why use
+  // `runWithReason`.
+  const run = useCallback(
+    async (force = false): Promise<ScanResult | null> =>
+      (await runWithReason(force)).data,
+    [runWithReason],
   );
 
   const cancel = useCallback(() => {
@@ -463,7 +479,16 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
     run(false);
   }, [enginePath, dataDir, run]);
 
-  return { data, unvouched, loading, error, cancelled, run, cancel };
+  return {
+    data,
+    unvouched,
+    loading,
+    error,
+    cancelled,
+    run,
+    runWithReason,
+    cancel,
+  };
 }
 
 /**

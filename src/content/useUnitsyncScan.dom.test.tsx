@@ -204,3 +204,54 @@ describe("useUnitsyncScan on a rescan that fails after an answer (issue #3431)",
     expect(unitsyncScan).toHaveBeenCalledTimes(2);
   });
 });
+
+describe("useUnitsyncScan.runWithReason (issue #3440)", () => {
+  async function outcomeOf(force = true) {
+    const { result } = renderHook(() => useUnitsyncScan("/engine", dir));
+    let outcome: Awaited<ReturnType<typeof result.current.runWithReason>>;
+    await act(async () => {
+      outcome = await result.current.runWithReason(force);
+    });
+    // biome-ignore lint/style/noNonNullAssertion: assigned inside act above
+    return outcome!;
+  }
+
+  it("resolves the engine's reason when Init failed", async () => {
+    unitsyncScan.mockResolvedValue(failed);
+    expect(await outcomeOf()).toEqual({
+      data: null,
+      error: "no space left on device",
+    });
+  });
+
+  it("resolves the reason when the scan threw", async () => {
+    unitsyncScan.mockRejectedValue(new Error("worker crashed"));
+    expect(await outcomeOf()).toEqual({
+      data: null,
+      error: "worker crashed",
+    });
+  });
+
+  it("resolves no error when the scan was cancelled", async () => {
+    unitsyncScan.mockRejectedValue(new Error("scan cancelled"));
+    expect(await outcomeOf()).toEqual({ data: null, error: null });
+  });
+
+  it("resolves the data and no error when the scan answered", async () => {
+    unitsyncScan.mockResolvedValue(answered);
+    expect(await outcomeOf()).toEqual({ data: answered, error: null });
+  });
+
+  it("resolves the cached answer and no error without a forced scan", async () => {
+    unitsyncScan.mockResolvedValue(answered);
+    const { result } = renderHook(() => useUnitsyncScan("/engine", dir));
+    await waitFor(() => expect(result.current.data).toEqual(answered));
+    let outcome: Awaited<ReturnType<typeof result.current.runWithReason>>;
+    await act(async () => {
+      outcome = await result.current.runWithReason(false);
+    });
+    // biome-ignore lint/style/noNonNullAssertion: assigned inside act above
+    expect(outcome!).toEqual({ data: answered, error: null });
+    expect(unitsyncScan).toHaveBeenCalledTimes(1);
+  });
+});

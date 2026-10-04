@@ -1292,14 +1292,20 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     if (enginePath && dataDir && battle?.map) {
       invalidateMapPreview(enginePath, dataDir, battle.map);
     }
-    const found = await scan.run(true).catch((e) => {
-      setErr(e);
-      return null;
-    });
+    // `runWithReason` never throws. `data` is null when the scan did not
+    // answer, and `error` says why unless it was cancelled.
+    const { data: found, error } = await scan.runWithReason(true);
     if (found) clearErr();
     setContentNonce((n) => n + 1);
-    // `scan.run` never throws. It resolves null when the scan did not answer.
-    if (!found) return { game: false, map: false, failure: RESCAN_FAILURE };
+    if (!found) {
+      return {
+        game: false,
+        map: false,
+        failure: error
+          ? `The rescan could not read what is installed (${error}).`
+          : RESCAN_FAILURE,
+      };
+    }
     // The same exact-name match `contentVerdict` makes above.
     return {
       game: found.games.some((g) => g.name === battle?.modname),
@@ -1310,8 +1316,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     dataDir,
     battle?.map,
     battle?.modname,
-    scan.run,
-    setErr,
+    scan.runWithReason,
     clearErr,
   ]);
 

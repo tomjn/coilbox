@@ -1,3 +1,4 @@
+import { addressOfKey } from "../lobby-servers/hostForms";
 import type { Battle } from "../multiplayer/bindings";
 import type { DirectLanRoom } from "./bindings";
 
@@ -130,8 +131,7 @@ export function joinBlockedReason(
     return "Stop your own room first. Coilbox can be in one room at a time.";
   }
   if (roomKey) {
-    const address = roomKey.slice(roomKey.indexOf("@") + 1);
-    return `You are in a room already, at ${address}. Leave it first: coilbox can be in one room at a time.`;
+    return `You are in a room already, at ${addressOfKey(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
   }
   return null;
 }
