@@ -10,10 +10,16 @@
  * blank the engine cannot use.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
-import { ModOptionField } from "./GameOptionsPanel";
+import { GameOptionsPanel, ModOptionField } from "./GameOptionsPanel";
 
 afterEach(cleanup);
 
@@ -103,5 +109,85 @@ describe("ModOptionField", () => {
     );
 
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("the changed mark (issue #3388)", () => {
+  const flag: ConfigOption = {
+    key: "fixedallies",
+    name: "Fixed allies",
+    type: "bool",
+    default: "1",
+  };
+  const mode: ConfigOption = {
+    key: "mode",
+    name: "Mode",
+    type: "list",
+    default: "e",
+    listItems: [
+      { key: "e", name: "Easy" },
+      { key: "h", name: "Hard" },
+    ],
+  };
+
+  it("marks a number that differs and says what the default is", () => {
+    render(
+      <ModOptionField option={maxUnits} value="6000" onChange={() => {}} />,
+    );
+
+    expect(screen.getByText("changed")).toBeTruthy();
+    expect(screen.getByText("Default: 5000")).toBeTruthy();
+  });
+
+  it("marks nothing for an option nobody set", () => {
+    render(<ModOptionField option={maxUnits} onChange={() => {}} />);
+
+    expect(screen.queryByText("changed")).toBeNull();
+    expect(screen.queryByText(/^Default:/)).toBeNull();
+  });
+
+  it("marks nothing for a default in another spelling", () => {
+    render(
+      <ModOptionField option={maxUnits} value="5000.0" onChange={() => {}} />,
+    );
+
+    expect(screen.queryByText("changed")).toBeNull();
+  });
+
+  it("marks a bool and says On or Off", () => {
+    render(<ModOptionField option={flag} value="0" onChange={() => {}} />);
+
+    expect(screen.getByText("changed")).toBeTruthy();
+    expect(screen.getByText("Default: On")).toBeTruthy();
+  });
+
+  it("marks a list and names the default item", () => {
+    render(<ModOptionField option={mode} value="h" onChange={() => {}} />);
+
+    expect(screen.getByText("changed")).toBeTruthy();
+    expect(screen.getByText("Default: Easy")).toBeTruthy();
+  });
+
+  it("counts changes in a section header and opens the section", () => {
+    const options: ConfigOption[] = [
+      { key: "eco", name: "Economy", type: "section" },
+      { ...maxUnits, section: "eco" },
+      { ...flag, section: "eco" },
+      { key: "quiet", name: "Quiet", type: "section" },
+      { ...mode, section: "quiet" },
+    ];
+    render(
+      <GameOptionsPanel
+        options={options}
+        optionValues={{ maxunits: "6000", fixedallies: "0" }}
+        onOptionChange={() => {}}
+      />,
+    );
+
+    const eco = screen.getByText("Economy").closest("button");
+    expect(within(eco as HTMLElement).getByText("2 changed")).toBeTruthy();
+    const quiet = screen.getByText("Quiet").closest("button");
+    expect(within(quiet as HTMLElement).queryByText(/changed/)).toBeNull();
+    expect(screen.getAllByText("changed")).toHaveLength(2);
   });
 });

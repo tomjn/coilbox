@@ -89,10 +89,6 @@ export function BattleOptionsDrawer({
     sendOption,
   );
 
-  const changed =
-    changedCount(modOptionsSchema, battle.scriptTags, "mod") +
-    changedCount(mapOptionsSchema, battle.scriptTags, "map");
-
   // startpostype isn't a scoped mod/map option — resolve it directly, preferring
   // an in-flight pending edit over the confirmed tag.
   const startPos =
@@ -109,6 +105,19 @@ export function BattleOptionsDrawer({
       (isAboutTheMap(o) ? aboutMap : rest).push(o);
     return [aboutMap, rest];
   }, [modOptionsSchema]);
+
+  // Counted per tab, so a change on a tab nobody has opened is not missed. The
+  // map tab also holds the mod options that are about the map.
+  const gameChanged = changedCount(
+    gameOptions,
+    battle.scriptTags,
+    "mod",
+    pending,
+  );
+  const mapChanged =
+    changedCount(mapOptionsSchema, battle.scriptTags, "map", pending) +
+    changedCount(mapFromGame, battle.scriptTags, "mod", pending);
+  const changed = gameChanged + mapChanged;
 
   return (
     <>
@@ -155,8 +164,14 @@ export function BattleOptionsDrawer({
             >
               <TabsList className="mx-5 mt-3 self-start">
                 <TabsTrigger value="battle">Battle</TabsTrigger>
-                <TabsTrigger value="game">Game</TabsTrigger>
-                <TabsTrigger value="map">Map</TabsTrigger>
+                <TabsTrigger value="game">
+                  Game
+                  <ChangedCount count={gameChanged} />
+                </TabsTrigger>
+                <TabsTrigger value="map">
+                  Map
+                  <ChangedCount count={mapChanged} />
+                </TabsTrigger>
                 <TabsTrigger value="units">Units</TabsTrigger>
               </TabsList>
 
@@ -251,6 +266,16 @@ export function BattleOptionsDrawer({
         </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </>
+  );
+}
+
+/** How many options a tab holds that differ from their default, said in words. */
+function ChangedCount({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <span className="rounded-full bg-primary/15 px-1.5 text-[10px] font-medium text-primary">
+      {count} changed
+    </span>
   );
 }
 

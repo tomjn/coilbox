@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
 import {
+  defaultLabel,
   effectiveOptions,
   groupOptions,
+  isChanged,
   sparseOptions,
   withOption,
 } from "./modOptions";
@@ -196,5 +198,99 @@ describe("sparseOptions", () => {
         tweakdefs: "",
       }),
     ).toEqual({});
+  });
+});
+
+describe("isChanged", () => {
+  const num = opt("maxunits", { default: "1000" });
+  const flag = opt("fixedallies", { type: "bool", default: "1" });
+
+  it("is false when nobody set a value", () => {
+    expect(isChanged(num)).toBe(false);
+  });
+
+  it("is true for a number that differs", () => {
+    expect(isChanged(num, "2000")).toBe(true);
+  });
+
+  it("treats a number in another spelling as the default", () => {
+    expect(isChanged(num, "1000.0")).toBe(false);
+    expect(isChanged(num, "1e3")).toBe(false);
+    expect(isChanged(num, " 1000 ")).toBe(false);
+    expect(isChanged(opt("a", { default: "1.0" }), "1")).toBe(false);
+  });
+
+  it("does not read an empty number as zero", () => {
+    expect(isChanged(opt("a", { default: "0" }), "")).toBe(true);
+  });
+
+  it("treats a bool in either spelling as the default", () => {
+    expect(isChanged(flag, "1")).toBe(false);
+    expect(isChanged(flag, "true")).toBe(false);
+    expect(isChanged(flag, "TRUE")).toBe(false);
+    expect(isChanged(flag, "0")).toBe(true);
+    expect(isChanged(flag, "false")).toBe(true);
+    expect(isChanged(opt("b", { type: "bool", default: "0" }), "false")).toBe(
+      false,
+    );
+  });
+
+  it("compares a list by item key, exactly", () => {
+    const list = opt("mode", { type: "list", default: "easy" });
+    expect(isChanged(list, "easy")).toBe(false);
+    expect(isChanged(list, "hard")).toBe(true);
+    expect(isChanged(list, "Easy")).toBe(true);
+  });
+
+  it("compares a string exactly", () => {
+    const str = opt("motd", { type: "string", default: "hello" });
+    expect(isChanged(str, "hello")).toBe(false);
+    expect(isChanged(str, "hello ")).toBe(true);
+  });
+
+  it("takes a missing default as empty, so any value is a change", () => {
+    const str = opt("note", { type: "string", default: undefined });
+    expect(isChanged(str, "")).toBe(false);
+    expect(isChanged(str, "hi")).toBe(true);
+    expect(isChanged(opt("b", { type: "bool", default: undefined }), "0")).toBe(
+      false,
+    );
+  });
+
+  it("is never true for a section", () => {
+    expect(isChanged(section("s", "S"), "x")).toBe(false);
+  });
+});
+
+describe("defaultLabel", () => {
+  it("says on or off for a bool", () => {
+    expect(defaultLabel(opt("a", { type: "bool", default: "1" }))).toBe("On");
+    expect(defaultLabel(opt("a", { type: "bool", default: "0" }))).toBe("Off");
+  });
+
+  it("names the list item rather than its key", () => {
+    const list = opt("mode", {
+      type: "list",
+      default: "e",
+      listItems: [{ key: "e", name: "Easy" }],
+    } as Partial<ConfigOption>);
+    expect(defaultLabel(list)).toBe("Easy");
+  });
+
+  it("falls back to the key for a list item it cannot find", () => {
+    expect(defaultLabel(opt("mode", { type: "list", default: "x" }))).toBe("x");
+  });
+
+  it("gives a number or string as written", () => {
+    expect(defaultLabel(opt("a", { default: "1000" }))).toBe("1000");
+  });
+
+  it("says empty for an empty or missing default", () => {
+    expect(defaultLabel(opt("a", { type: "string", default: "" }))).toBe(
+      "empty",
+    );
+    expect(defaultLabel(opt("a", { type: "string", default: undefined }))).toBe(
+      "empty",
+    );
   });
 });
