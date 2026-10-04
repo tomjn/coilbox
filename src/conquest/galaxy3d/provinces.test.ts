@@ -494,6 +494,20 @@ describe("provinceStyle", () => {
     );
   });
 
+  it("gives an attackable province and one under incursion their own accent", () => {
+    expect(provinceStyle(plain).accent).toBeUndefined();
+    expect(provinceStyle({ ...plain, attackable: true }).accent).toBe("attack");
+    const threatened = provinceStyle({ ...plain, threatened: true });
+    expect(threatened.accent).toBe("threat");
+    expect(threatened.opacity).toBeGreaterThan(provinceStyle(plain).opacity);
+    expect(
+      provinceStyle({ ...plain, attackable: true, threatened: true }).accent,
+    ).toBe("threat");
+    expect(
+      provinceStyle({ ...plain, hidden: true, attackable: true }).accent,
+    ).toBeUndefined();
+  });
+
   it("strips a hidden province of colour, markers, hover and selection", () => {
     const hidden = provinceStyle({ ...plain, hidden: true });
     expect(hidden.tint).toBe("neutral");

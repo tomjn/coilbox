@@ -603,6 +603,7 @@ function GalaxyScreen({
         playerFactionId={playerFactionId}
         selectedId={selectedId}
         incursion={primaryIncursion}
+        attackableIds={attackable}
         onSelect={(id) => {
           setSelectedId(id);
           setFactionFocus(null);
