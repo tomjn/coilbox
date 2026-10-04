@@ -1,4 +1,5 @@
 import type { LobbyServer } from "../lobby-servers/config";
+import { addressOfKey } from "../lobby-servers/hostForms";
 import type { DirectRoomStatus } from "./bindings";
 
 /**
@@ -68,11 +69,6 @@ export function hostedRoomKey(
   return room ? `${room.host}@${LOOPBACK_HOST}:${room.port}` : null;
 }
 
-/** The `host:port` half of a room's key, which is what names it. */
-function roomAddress(roomKey: string): string {
-  return roomKey.slice(roomKey.indexOf("@") + 1);
-}
-
 /**
  * Why this client cannot host a room right now, or null when it can. Pure.
  *
@@ -91,7 +87,7 @@ export function hostBlockedReason(
   roomKey: string | null,
 ): string | null {
   if (!roomKey) return null;
-  return `You are in a room already, at ${roomAddress(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
+  return `You are in a room already, at ${addressOfKey(roomKey)}. Leave it first: coilbox can be in one room at a time.`;
 }
 
 /**
