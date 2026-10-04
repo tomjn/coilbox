@@ -26,10 +26,12 @@ import { ImportChallengeForm as SharedImportChallengeForm } from "../../challeng
 import { conquestIdentity, galaxyIdentity } from "../../challenge/identity";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
+import { dependencyBlockReason } from "../../content/gameDependencies";
 import { useMapEligibility } from "../../content/mapEligibility";
 import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../content/pages/components/BrandingScreenshots";
 import {
+  DependencyBlocked,
   Diagnostics,
   EmptyState,
   ErrorBanner,
@@ -55,6 +57,7 @@ import {
   compareGameVersions,
   resolveGameByShortname,
 } from "../../play/installedGames";
+import { missingLaunchDependency } from "../../play/launchContent";
 import { DownloadGameButton } from "../../play/pages/components/DownloadGameButton";
 import { useGameCatalog } from "../../play/useGameCatalog";
 import { getGameMatcher, getProfile } from "../../profile/profile";
@@ -752,6 +755,16 @@ function GenerateGalaxyForm({
     </>
   ) : null;
 
+  // Creating a galaxy is not a launch, so this does not stop the form. The
+  // player is told here, because every battle of it would stop on it (issue
+  // #3489).
+  const dependency = selected
+    ? missingLaunchDependency(selected.name, scan.data?.games ?? [])
+    : null;
+  const dependencyBlock = dependency?.gameName
+    ? dependencyBlockReason(dependency.label, dependency.gameName)
+    : null;
+
   const create = async () => {
     if (!selected) return;
     setBusy(true);
@@ -918,6 +931,7 @@ function GenerateGalaxyForm({
               )}
             </div>
           )}
+          {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
           {error && <ErrorBanner message={error} />}
           <Button onClick={create} disabled={busy || !selected}>
             {busy ? "Generating…" : "Create galaxy"}
