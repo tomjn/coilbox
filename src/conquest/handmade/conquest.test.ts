@@ -169,7 +169,12 @@ describe("starting a conquest on a hand-made map", () => {
     });
     expect(parseGalaxyJson(JSON.stringify(doc))).not.toBeNull();
     expect(doc.generated).toBeUndefined();
-    expect(doc.handmade).toEqual({ mapId: "sample-two-shores" });
+    expect(doc.handmade).toEqual({
+      mapId: "sample-two-shores",
+      fingerprint: map.handmade?.fingerprint,
+      battles: state.handmade?.battles,
+    });
+    expect(doc.handmade?.fingerprint).toMatch(/^[0-9a-f]{16}$/);
   });
 
   it("turns fog of war on only when asked", () => {
