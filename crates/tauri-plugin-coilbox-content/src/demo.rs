@@ -1421,7 +1421,8 @@ fn build_demo_info(
     // `[aiN]` seats a bot on a team, exactly as `[playerN]` seats a person, so the
     // same team lookup resolves its ally team, side, colour and result. The keys
     // are the ones `tauri-plugin-coilbox-play`'s `script.rs` writes (`Name`,
-    // `ShortName`, `Version`, `Team`, `Host`), lowercased by the TDF parser.
+    // `ShortName`, `Version`, `Team`, `Host`), lowercased by the TDF parser. The
+    // bot's bonus is on its team: `Advantage` and `IncomeMultiplier`.
     let mut ais: Vec<AiInfo> = Vec::new();
     for (name, a) in &game.children {
         if index_suffix(name, "ai").is_none() {
@@ -1445,6 +1446,12 @@ fn build_demo_info(
                 .filter(|s| !s.is_empty())
                 .map(str::to_string),
             rgb_color: team_sec.and_then(|t| t.get("rgbcolor")).and_then(parse_rgb),
+            advantage: team_sec
+                .and_then(|t| t.get("advantage"))
+                .and_then(|v| v.trim().parse().ok()),
+            income_multiplier: team_sec
+                .and_then(|t| t.get("incomemultiplier"))
+                .and_then(|v| v.trim().parse().ok()),
             won: winners_known
                 .then(|| ally_team.map(|a| winning.contains(&(a as u32))))
                 .flatten(),
@@ -1854,11 +1861,11 @@ mod tests {
         mapname=All That Glitters v2.2.3;\n\
         gametype=SplinterFaction 0.1.77;\n\
         [allyteam1]\n{\nnumallies=0;\n}\n\
-        [team2]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.9 0.1 0.1;\nside=Cortex;\n}\n\
+        [team2]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.9 0.1 0.1;\nside=Cortex;\nincomemultiplier=1.5;\n}\n\
         [player0]\n{\nteam=0;\nspectator=0;\nname=You;\n}\n\
         [ai1]\n{\nteam=2;\nhost=0;\nname=AI 2;\nshortname=BARb;\n}\n\
         [ai0]\n{\nteam=1;\nhost=0;\nversion=<game>;\nname=AI 1;\nshortname=SurvivalAI;\n}\n\
-        [team1]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.31 0.55 1;\nside=Federation of Kala;\n}\n\
+        [team1]\n{\nallyteam=1;\nteamleader=0;\nrgbcolor=0.31 0.55 1;\nside=Federation of Kala;\nadvantage=0.25;\n}\n\
         [team0]\n{\nallyteam=0;\nteamleader=0;\nrgbcolor=0.99 0.12 0.87;\nside=Federation of Kala;\n}\n\
         [allyteam0]\n{\nnumallies=0;\n}\n}\n";
 
@@ -2184,6 +2191,9 @@ mod tests {
         assert_eq!(first.ally_team, Some(1));
         assert_eq!(first.side.as_deref(), Some("Federation of Kala"));
         assert_eq!(first.rgb_color, Some([0.31, 0.55, 1.0]));
+        // The bonus is on the team, so each bot carries its own team's.
+        assert_eq!(first.advantage, Some(0.25));
+        assert_eq!(first.income_multiplier, None);
 
         let second = &info.ais[1];
         assert_eq!(second.short_name, "BARb");
@@ -2192,6 +2202,8 @@ mod tests {
         // The engine omits `version` for a bot that has none, so it is absent
         // rather than an empty string.
         assert_eq!(second.version, None);
+        assert_eq!(second.advantage, None);
+        assert_eq!(second.income_multiplier, Some(1.5));
     }
 
     /// A bot's win is its ally team's win, exactly as a player's is.

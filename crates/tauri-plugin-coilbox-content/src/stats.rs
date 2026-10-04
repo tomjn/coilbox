@@ -46,7 +46,8 @@ use crate::model::DemoInfo;
 /// 3: records carry what the match measured: per-team end-of-match totals
 /// (`teamTotals`), per-player `apm`, and `statsKnown` for whether there was
 /// anything to measure at all.
-pub const STATS_SCHEMA_VERSION: u32 = 3;
+/// 4: a record's AIs carry their team's bonus (`advantage`, `incomeMultiplier`).
+pub const STATS_SCHEMA_VERSION: u32 = 4;
 
 /// One player (or spectator) as recorded in a game, flattened from the demo's
 /// start-script. `side` is the faction; `won` is set only for a decided game where
@@ -84,6 +85,12 @@ pub struct StatAi {
     pub ally_team: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub side: Option<String>,
+    /// The team's `Advantage` fraction (0.25 for +25%), when the script has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub advantage: Option<f32>,
+    /// The team's `IncomeMultiplier`, when the script has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub income_multiplier: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub won: Option<bool>,
 }
@@ -216,6 +223,8 @@ fn record_from(
             version: a.version,
             ally_team: a.ally_team,
             side: a.side,
+            advantage: a.advantage,
+            income_multiplier: a.income_multiplier,
             won: a.won,
         })
         .collect();
@@ -569,6 +578,8 @@ mod tests {
             host: Some(0),
             side: Some("Cortex".into()),
             rgb_color: None,
+            advantage: Some(0.25),
+            income_multiplier: Some(1.5),
             won: Some(false),
         }];
         let rec = record_from(&entry("a.sdfz", 10, 20), info, None);
@@ -579,6 +590,8 @@ mod tests {
         assert_eq!(rec.ais[0].version.as_deref(), Some("stable"));
         assert_eq!(rec.ais[0].side.as_deref(), Some("Cortex"));
         assert_eq!(rec.ais[0].won, Some(false));
+        assert_eq!(rec.ais[0].advantage, Some(0.25));
+        assert_eq!(rec.ais[0].income_multiplier, Some(1.5));
     }
 
     /// A store written before AIs were recorded has no `ais` key at all. It must

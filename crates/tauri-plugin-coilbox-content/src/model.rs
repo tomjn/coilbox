@@ -237,6 +237,14 @@ pub struct AiInfo {
     /// Normalized team colour `[r, g, b]` (0..1), when present.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rgb_color: Option<[f32; 3]>,
+    /// The team's `Advantage` (a resource bonus fraction, 0.25 for +25%), as
+    /// the script wrote it. `None` when the script carries none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub advantage: Option<f32>,
+    /// The team's `IncomeMultiplier`, as the script wrote it. `None` when the
+    /// script carries none.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub income_multiplier: Option<f32>,
     /// True/false when the winner is known, and `None` when it couldn't be
     /// determined.
     #[serde(skip_serializing_if = "Option::is_none")]
