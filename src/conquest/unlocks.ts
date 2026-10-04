@@ -8,9 +8,10 @@ import { MAX_THREAT_LEVEL, readThreatLevel } from "./threat";
  * unlock only adds a choice at setup, and nothing the setup offers today is ever
  * locked.
  *
- * The one unlock is the threat level (`./threat`). It goes up one level at a
- * time, and only by winning a conquest played at the current highest level. A
- * loss unlocks nothing.
+ * The threat level (`./threat`) goes up one level at a time, and only by
+ * winning a conquest played at the current highest level. A loss unlocks
+ * nothing. The centre start (`./startPosition`) opens with the first of those
+ * wins.
  *
  * Warpath's document is not reused. It holds loadouts, event pools and an
  * ascension tier that mean nothing here, and its page owns the only code that
@@ -110,6 +111,23 @@ export function foldFinishedConquest(
       seen: [...prev.seen, finished.runId],
     },
   };
+}
+
+/**
+ * Whether a game's player may start at the centre of the galaxy (issue #3432).
+ * It opens with the first win, which is the threshold threat level 1 already
+ * uses, so it reads the same record and stores nothing of its own.
+ */
+export function startPositionUnlocked(
+  unlocks: ConquestUnlocks,
+  game: string,
+): boolean {
+  return unlockedLevel(unlocks, game) >= 1;
+}
+
+/** What the setup says unlocks the centre start. The words threat level 1 uses. */
+export function startPositionRequirement(): string {
+  return levelChoices(0).locked?.requirement ?? "";
 }
 
 /** What the setup offers at a given unlocked level. */

@@ -5,7 +5,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { BATTLE_PASSWORD_REFUSAL, validBattlePassword } from "@/deeplink/parse";
+import { BATTLE_PASSWORD_REFUSAL, battleKeyFor } from "@/deeplink/parse";
+import type { LobbyProtocol } from "@/lobby-servers/config";
 import { leaveAndLabel } from "./oneBattle";
 
 /**
@@ -26,6 +27,7 @@ export function JoinBattlePopover({
   needsPassword = true,
   notice = null,
   triggerLabel = "Join",
+  protocol = "tasserver",
 }: {
   title: string;
   disabled: boolean;
@@ -37,6 +39,9 @@ export function JoinBattlePopover({
   /** What joining leaves behind, from the one-battle rule, or null. */
   notice?: string | null;
   triggerLabel?: string;
+  /** The protocol of the server the battle is on, from its saved entry. It
+   * decides what a password may hold (issue #3524). */
+  protocol?: LobbyProtocol;
 }) {
   const [key, setKey] = useState("");
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -61,13 +66,15 @@ export function JoinBattlePopover({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
-            // The join line is split on spaces and has no escape, so a password
-            // with one would reach the server as two words (issue #3410).
-            if (needsPassword && key !== "" && !validBattlePassword(key)) {
+            // The TASServer join line is split on spaces and has no escape, so
+            // a password with one would reach the server as two words (issue
+            // #3410). Zero-K sends it as JSON and takes any password.
+            const sent = needsPassword ? battleKeyFor(protocol, key) : key;
+            if (sent === null) {
               setRefusal(BATTLE_PASSWORD_REFUSAL);
               return;
             }
-            onSubmit(key);
+            onSubmit(sent);
             onOpenChange(false);
           }}
         >

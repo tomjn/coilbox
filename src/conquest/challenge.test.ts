@@ -85,6 +85,43 @@ describe("conquest challenge codec", () => {
     expect(decode(1)).toBe(5);
   });
 
+  it("carries a centre start through a code, and rebuilds the same galaxy", () => {
+    const galaxy = generateGalaxy({ ...base, startPosition: "centre" }, "t0");
+    const decoded = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    expect(decoded.settings.startPosition).toBe("centre");
+    const rebuilt = galaxyFromChallenge(
+      decoded.settings,
+      { maps, names: undefined },
+      galaxy.id,
+      "t0",
+    );
+    expect(rebuilt.nodes.map((n) => [n.pos, n.owner])).toEqual(
+      galaxy.nodes.map((n) => [n.pos, n.owner]),
+    );
+    expect(rebuilt.generated?.startPosition).toBe("centre");
+  });
+
+  it("writes nothing into a default start code, so the code is the one it was", () => {
+    expect(
+      encodeConquestChallenge(
+        generateGalaxy({ ...base, startPosition: undefined }, "t0"),
+      ),
+    ).toBe(encodeConquestChallenge(generateGalaxy(base, "t0")));
+  });
+
+  it("reads a start position a code makes up as the default", () => {
+    const settings = challengeSettingsFromGalaxy(generateGalaxy(base, "t0"));
+    for (const startPosition of ["west", 1, "CENTRE", null]) {
+      const code = encodeChallenge("conquest", { ...settings, startPosition });
+      const out = decodeConquestChallenge(code);
+      if (!out.ok) throw new Error("expected a successful decode");
+      expect(out.settings.startPosition, String(startPosition)).toBeUndefined();
+    }
+  });
+
   it("writes no level into a level 0 code, so the code is the one it was", () => {
     const galaxy = generateGalaxy({ ...base, threatLevel: 0 }, "t0");
     expect(encodeConquestChallenge(galaxy)).toBe(

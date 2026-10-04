@@ -380,6 +380,7 @@ function ServerBattles({
       directRoom={directRoom}
       leaves={rule.notice("join")}
       focusId={focusId}
+      protocol={protocol}
     />
   );
 

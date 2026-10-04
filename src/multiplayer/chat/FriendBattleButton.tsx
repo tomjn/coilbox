@@ -8,7 +8,8 @@ import { JoinBattlePopover } from "../battles/JoinBattlePopover";
 import { joinBattle } from "../battles/joinBattle";
 import { useOneBattleRule } from "../battles/oneBattle";
 import type { FriendStatus } from "../friendsAcrossServers";
-import { useConnection, useMultiplayer } from "../store";
+import { protocolForKey } from "../protocol";
+import { useConnection, useMultiplayer, useProtocolServers } from "../store";
 import { friendBattleAction } from "./friendBattleAction";
 
 /**
@@ -35,6 +36,7 @@ export function FriendBattleButton({
   const connection = useConnection(serverKey);
   const { busy, clearJoinError } = useMultiplayer();
   const rule = useOneBattleRule(serverKey);
+  const protocol = protocolForKey(serverKey, useProtocolServers());
   const navigate = useNavigate();
   const [waiting, setWaiting] = useState(false);
   const [open, setOpen] = useState(false);
@@ -102,6 +104,7 @@ export function FriendBattleButton({
         needsPassword={action.asksPassword}
         notice={leaves}
         triggerLabel={action.label}
+        protocol={protocol}
       />
     );
   }

@@ -3,6 +3,7 @@ import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import { expandRevealed } from "./fog";
 import { MAX_NODE_COUNT } from "./size";
+import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel } from "./threat";
 
 /**
@@ -193,6 +194,8 @@ export interface GalaxyDoc {
     fogOfWar?: boolean;
     /** Threat level 0..3 (see `./threat`). Absent reads as 0. */
     threatLevel?: number;
+    /** Where the player starts (see `./startPosition`). Absent is the western edge. */
+    startPosition?: StartPosition;
     /** Real-star mode only: the catalogue radius in light years. */
     radiusLy?: number;
   };
@@ -402,6 +405,7 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
         : undefined,
     fogOfWar: g.fogOfWar === true ? true : undefined,
     threatLevel: readThreatLevel(g.threatLevel) || undefined,
+    startPosition: readStartPosition(g.startPosition),
   };
 }
 

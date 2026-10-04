@@ -28,6 +28,8 @@ import { offerInvite, resetInviteStore } from "./inviteStore";
 
 const BAR = "server4.beyondallreason.info:8201";
 const ALICE_KEY = `alice@${BAR}`;
+const ZK = "zero-k.info:8200";
+const ZK_KEY = `zed@${ZK}`;
 const CAROL_KEY = "carol@lobby.techa-rts.com:8200";
 
 const mp = {
@@ -235,6 +237,37 @@ describe("an invite link to a server with a saved login", () => {
     expect(document.body.textContent).not.toContain("sesame");
     press("Connect as alice and join");
     expect(document.body.textContent).not.toContain("sesame");
+  });
+});
+
+// Issue #3524. The rule for a password comes from the saved server entry and
+// never from the link, so a link cannot pick the looser one.
+describe("a link password with a space", () => {
+  function joinWith(serverKey: string, server: string, password: string) {
+    connectAs(connection(serverKey, { battles: { "42": battle(42, true) } }));
+    draw();
+    open(server, "42", password);
+    press("Join battle");
+  }
+
+  it("is sent to a Zero-K server, trimmed as the host form trims it", () => {
+    joinWith(ZK_KEY, ZK, "  my pass ");
+    expect(joinBattle).toHaveBeenCalledTimes(1);
+    expect(joinBattle.mock.calls[0][0]).toMatchObject({
+      serverKey: ZK_KEY,
+      key: "my pass",
+    });
+  });
+
+  it("is refused on a TASServer style server and sent nowhere", () => {
+    joinWith(ALICE_KEY, BAR, "my pass");
+    expect(joinBattle).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "error" }),
+    );
+    expect(where).toBe(
+      `/battles?server=${encodeURIComponent(ALICE_KEY)}&battle=42`,
+    );
   });
 });
 

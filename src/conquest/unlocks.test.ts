@@ -9,6 +9,8 @@ import {
   foldFinishedConquest,
   levelChoices,
   sizeOptions,
+  startPositionRequirement,
+  startPositionUnlocked,
   unlockedLevel,
 } from "./unlocks";
 
@@ -202,5 +204,29 @@ describe("size choices (issue #3433)", () => {
     expect(maxUnlockedNodeCount(2)).toBe(120);
     expect(maxUnlockedNodeCount(3)).toBe(160);
     expect(maxUnlockedNodeCount(99)).toBe(160);
+  });
+});
+
+describe("start position unlock (issue #3432)", () => {
+  it("is locked for a game with no record and names what unlocks it", () => {
+    expect(startPositionUnlocked({}, "tg")).toBe(false);
+    expect(startPositionRequirement()).toBe("Win a conquest");
+  });
+
+  it("opens with the first win, the same as threat level 1", () => {
+    const won = foldFinishedConquest(
+      {},
+      { runId: "a:1", game: "tg", won: true, level: 0 },
+    );
+    expect(startPositionUnlocked(won, "TG")).toBe(true);
+    expect(startPositionUnlocked(won, "other")).toBe(false);
+  });
+
+  it("stays locked after a loss", () => {
+    const lost = foldFinishedConquest(
+      {},
+      { runId: "a:1", game: "tg", won: false, level: 0 },
+    );
+    expect(startPositionUnlocked(lost, "tg")).toBe(false);
   });
 });

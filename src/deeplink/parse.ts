@@ -31,6 +31,7 @@ import {
   normaliseHostPort,
   normaliseServerAddress,
 } from "../lobby-servers/address";
+import type { LobbyProtocol } from "../lobby-servers/config";
 
 /** The scheme every coilbox deep link must use. */
 export const DEEP_LINK_SCHEME = "coilbox";
@@ -139,10 +140,20 @@ export function battleIdFrom(raw: string): string | null {
 }
 
 /**
- * Whether a battle password can go in a link. Pure. It is sent as one word of
- * `JOINBATTLE <id> <password> <scriptPassword>`, so a space would make it two
- * and a line break would make it a second command. Printable ASCII is all it
- * may hold.
+ * Whether a battle password can go in a link. Pure. A link does not know which
+ * protocol its server speaks, and it must not be the one to say, so this only
+ * checks size. The rule for the server's protocol is applied by
+ * {@link battleKeyFor} when the join is made, against the saved server entry.
+ */
+export function validLinkBattlePassword(raw: string): boolean {
+  return raw.length > 0 && raw.length <= MAX_FIELD_LENGTH;
+}
+
+/**
+ * Whether a battle password can go in a TASServer join line. Pure. It is sent
+ * as one word of `JOINBATTLE <id> <password> <scriptPassword>`, so a space would
+ * make it two and a line break would make it a second command. Printable ASCII
+ * is all it may hold.
  */
 export function validBattlePassword(raw: string): boolean {
   return raw.length <= MAX_FIELD_LENGTH && /^[\x21-\x7e]+$/.test(raw);
@@ -155,12 +166,36 @@ export const BATTLE_PASSWORD_REFUSAL =
 /**
  * Why a typed battle or room password cannot be sent, or null when it can.
  * Pure. A form trims the password before it sends it, so the edges are not
- * checked, and no password at all is an open battle.
+ * checked, and no password at all is an open battle. A Zero-K password is a
+ * JSON string, so it has no character to refuse (issue #3524).
  */
-export function battlePasswordProblem(typed: string): string | null {
+export function battlePasswordProblem(
+  typed: string,
+  protocol: LobbyProtocol = "tasserver",
+): string | null {
+  if (protocol === "zerok") return null;
   const password = typed.trim();
   if (password === "" || validBattlePassword(password)) return null;
   return BATTLE_PASSWORD_REFUSAL;
+}
+
+/**
+ * The password to send when joining a battle on a server speaking `protocol`,
+ * or null when that protocol cannot carry it. Pure. An empty string is no
+ * password.
+ *
+ * Zero-K takes any string and its host form trims the outer spaces, so a join
+ * trims them too and both sides agree (issue #3524). Every other protocol keeps
+ * the TASServer rule, untrimmed, as it always has been. The protocol has to come
+ * from the saved server entry, never from a link.
+ */
+export function battleKeyFor(
+  protocol: LobbyProtocol,
+  raw: string,
+): string | null {
+  if (protocol === "zerok") return raw.trim();
+  if (raw === "") return "";
+  return validBattlePassword(raw) ? raw : null;
 }
 
 /**
@@ -180,10 +215,10 @@ function parseJoin(params: URLSearchParams): DeepLinkParseResult {
   }
   const id = battleIdFrom(battle);
   if (!id) return invalid("This join link's battle is not a battle number.");
-  // Not trimmed, unlike the others. A password with a space in it is refused
-  // rather than turned into a different password.
+  // Not trimmed, unlike the others. Whether a space is allowed depends on the
+  // protocol of the server it is sent to, which is judged when the join is made.
   const password = params.get("password") ?? "";
-  if (password !== "" && !validBattlePassword(password)) {
+  if (password !== "" && !validLinkBattlePassword(password)) {
     return invalid("This join link's password is not a battle password.");
   }
   return {

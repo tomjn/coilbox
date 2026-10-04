@@ -1,4 +1,4 @@
-import { battleIdFrom, validBattlePassword } from "../../deeplink/parse";
+import { battleIdFrom, validLinkBattlePassword } from "../../deeplink/parse";
 import {
   normaliseHostPort,
   normaliseServerAddress,
@@ -95,7 +95,10 @@ export function inviteLinkFrom(action: {
   const address = normaliseServerAddress(action.server);
   const battle = battleIdFrom(action.battle);
   if (!address || !battle) return null;
-  if (action.password !== undefined && !validBattlePassword(action.password)) {
+  if (
+    action.password !== undefined &&
+    !validLinkBattlePassword(action.password)
+  ) {
     return null;
   }
   return {

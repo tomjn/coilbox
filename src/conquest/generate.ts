@@ -17,6 +17,7 @@ import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 import { MAX_NODE_COUNT } from "./size";
+import { readStartPosition, type StartPosition } from "./startPosition";
 import { readThreatLevel, threatAggression } from "./threat";
 
 /**
@@ -122,6 +123,9 @@ export interface GenerateOptions {
   fogOfWar?: boolean;
   /** Threat level 0..3 (see `./threat`). Omitted or 0 is the galaxy as it always was. */
   threatLevel?: number;
+  /** Where the player starts (see `./startPosition`). Omitted is the western
+   * edge, the galaxy as it always was. Ignored for real stars, which start at Sol. */
+  startPosition?: StartPosition;
   /** Naming pools / faction presets from a profile and/or the branding catalog. */
   names?: ConquestNames;
   /** Document id; defaults to `generated-<seed>`. */
@@ -418,6 +422,23 @@ function buildRangeLinks(
   });
 }
 
+/** The mean of a set of points. */
+function centroid(pts: Pt[]): Pt {
+  const n = Math.max(1, pts.length);
+  return [
+    pts.reduce((a, p) => a + p[0], 0) / n,
+    pts.reduce((a, p) => a + p[1], 0) / n,
+  ];
+}
+
+/** The index of the point nearest `target`, the earliest on a tie. */
+function nearestTo(pts: Pt[], target: Pt): number {
+  return pts.reduce(
+    (best, p, i) => (dist(p, target) < dist(pts[best], target) ? i : best),
+    0,
+  );
+}
+
 /** BFS hop distances from a start node over an adjacency list. */
 function hopDistances(count: number, links: [number, number][], start: number) {
   const adj: number[][] = Array.from({ length: count }, () => []);
@@ -498,10 +519,15 @@ export function generateGalaxy(
   // node. Enemy capitals: farthest-point sampling so multiple factions start
   // spread apart.
   const home = source.findIndex((s) => s.home);
+  const startPosition = realStars
+    ? undefined
+    : readStartPosition(opts.startPosition);
   const playerCapital =
     home >= 0
       ? home
-      : pts.reduce((best, p, i) => (p[0] < pts[best][0] ? i : best), 0);
+      : startPosition === "centre"
+        ? nearestTo(pts, centroid(pts))
+        : pts.reduce((best, p, i) => (p[0] < pts[best][0] ? i : best), 0);
   const capitals = [playerCapital];
   for (let f = 0; f < enemyCount; f++) {
     let far = -1;
@@ -637,6 +663,7 @@ export function generateGalaxy(
       startingSystems: startCount,
       fogOfWar: opts.fogOfWar ? true : undefined,
       threatLevel: threatLevel > 0 ? threatLevel : undefined,
+      startPosition,
     },
   };
 }
