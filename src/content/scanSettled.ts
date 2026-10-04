@@ -1,9 +1,20 @@
 /** A unitsync scan reading, as much of it as anything outside the hook needs. */
 export interface ScanReading {
   loading: boolean;
-  data: unknown;
+  data: { initFailure?: string } | null | undefined;
   error: string | null;
   cancelled: boolean;
+}
+
+/**
+ * Why a scan that ran could not say what is installed, or null when it could.
+ *
+ * The worker prints a result even when unitsync's `Init` failed, with empty
+ * lists and the engine's reason in `initFailure`. Such a result is not a report
+ * of an empty machine (issue #3392).
+ */
+export function scanInitFailure(scan: ScanReading): string | null {
+  return scan.data?.initFailure ?? null;
 }
 
 /**

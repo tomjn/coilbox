@@ -16,7 +16,7 @@
  * `useResolveContent.ts`.
  */
 
-import type { ScanReading } from "./scanSettled";
+import { type ScanReading, scanInitFailure } from "./scanSettled";
 
 export type ContentRequirementKind = "game" | "map" | "engine";
 
@@ -256,13 +256,16 @@ export interface ResolveVerdict {
 export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
   const installKnown =
     !r.targetLoading && (!r.hasTarget || r.scan.data !== null);
+  // A scan whose Init failed came back with a result, but not an answer: the
+  // lists in it are empty because unitsync could not start (issue #3392).
+  const initFailure = scanInitFailure(r.scan);
   // A scan that has stopped without data is not going to run again by itself.
   const installUnreadable =
     !r.targetLoading &&
     r.hasTarget &&
     !r.scan.loading &&
-    r.scan.data === null &&
-    (r.scan.error !== null || r.scan.cancelled);
+    ((r.scan.data === null && (r.scan.error !== null || r.scan.cancelled)) ||
+      initFailure !== null);
   // The catalogs say whether a missing engine can be fetched, so they are only
   // worth waiting for while an engine is missing. An engine already on disk
   // needs no answer from the network before a launch goes ahead (issue #3364).
@@ -286,7 +289,7 @@ export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
     return {
       loading: false,
       unreadable: true,
-      unreadableReason: r.scan.error,
+      unreadableReason: r.scan.error ?? initFailure,
       missing: [],
       resolved: false,
     };
