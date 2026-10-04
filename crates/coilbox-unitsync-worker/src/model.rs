@@ -1525,6 +1525,11 @@ pub struct ScanOutput {
     pub games: Vec<GameItem>,
     /// Non-fatal diagnostics drained from unitsync during the scan.
     pub errors: Vec<String>,
+    /// Why the scan could not say what is installed: set when `Init` returned 0,
+    /// absent otherwise. The lists above are empty or partial in that case and
+    /// must not be read as "nothing installed" (issue #3392).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub init_failure: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sync_version: Option<String>,
 }
