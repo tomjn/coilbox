@@ -25,12 +25,14 @@ import type { ConquestStateFile } from "../conquest/model";
 import { defaultSkirmishDraft, type StoredSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
 import type { RunStatus } from "../runlite/model";
+import type { Scenario } from "../scenario/model";
 import {
   battleCandidate,
   campaignCandidate,
   collectCandidates,
   conquestCandidate,
   type LobbySnapshot,
+  namesStartScenario,
   type ResumeCandidate,
   type ResumeSources,
   type RunSummary,
@@ -600,6 +602,67 @@ describe("startCandidate", () => {
     expect(
       startCandidate(named(1), completed(["m1", "m2"]), NOW),
     ).toBeUndefined();
+  });
+});
+
+describe("startCandidate, for a scenario", () => {
+  const scenario = {
+    id: "s1",
+    name: "First Steps",
+    setup: { gameName: "Ironhold 1.2", mapName: "Red Comet" },
+  } as Scenario;
+  const named = { status: "scenario", scenario } as const;
+
+  it("offers the scenario on a fresh install", () => {
+    const c = startCandidate(named, noProgress, NOW);
+    expect(c?.kind).toBe("start");
+    expect(c?.title).toBe("First Steps");
+    expect(c?.detail).toBe("Ironhold 1.2 · Red Comet");
+    // The Scenarios page, with this scenario's play drawer open.
+    expect(c?.to).toBe("/scenarios?scenario=s1");
+    expect(c?.startScenario).toBe(scenario);
+    expect(c?.start).toBeUndefined();
+  });
+
+  it("stays while some other scenario has been won", () => {
+    expect(
+      startCandidate(named, noProgress, NOW, { other: minutesAgo(5) }),
+    ).toBeDefined();
+  });
+
+  it("goes once the scenario is won", () => {
+    expect(
+      startCandidate(named, noProgress, NOW, { s1: minutesAgo(5) }),
+    ).toBeUndefined();
+  });
+
+  it("leaves a campaign start alone, whatever has been won", () => {
+    // The unchanged case: the wins record is not read for a campaign mission.
+    const { campaign: coreWar } = campaign("c1", "Core War");
+    const mission = {
+      status: "ok",
+      campaign: coreWar,
+      mission: coreWar.missions[0],
+    } as const;
+    expect(
+      startCandidate(mission, noProgress, NOW, { c1: "x", m1: "x" }),
+    ).toEqual(startCandidate(mission, noProgress, NOW));
+  });
+});
+
+describe("namesStartScenario", () => {
+  it("is false with no start, and with a campaign start", () => {
+    // Neither reads the scenario list, so the home page loads what it did.
+    expect(namesStartScenario(undefined)).toBe(false);
+    expect(namesStartScenario(null)).toBe(false);
+    expect(namesStartScenario({ campaign: "c1", mission: "m1" })).toBe(false);
+    expect(namesStartScenario("s1")).toBe(false);
+  });
+
+  it("is true once a scenario is named, even a badly written one", () => {
+    // A bad id still has to reach the resolver to be reported.
+    expect(namesStartScenario({ scenario: "s1" })).toBe(true);
+    expect(namesStartScenario({ scenario: 3 })).toBe(true);
   });
 });
 

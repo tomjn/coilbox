@@ -96,6 +96,51 @@ pub(crate) fn names_in(msg: &TachyonMessage) -> Vec<(&str, &str)> {
         .collect()
 }
 
+/// Fold the `currentLobby` of each user record in a raw frame into `users`.
+///
+/// Read from the raw frame because the vendored schema gives `currentLobby` to
+/// `privateUser` only, so the typed `user` and `user/updated` shapes drop it.
+/// Teiserver does not send it on those today, so this does nothing for other
+/// people until it does. A string files the person in that lobby, `null` takes
+/// them out, and a record that does not mention it leaves the stored value
+/// alone. Runs after [`reduce`], which is what creates or removes the record,
+/// so a person who is offline or unnamed has none to update.
+pub(crate) fn lobbies(state: &mut LobbyState, raw: &str) -> Vec<Delta> {
+    let Ok(frame) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return vec![];
+    };
+    let data = &frame["data"];
+    let records: Vec<&serde_json::Value> = match frame["commandId"].as_str() {
+        Some("user/self") => vec![&data["user"]],
+        Some("user/updated") => data["users"].as_array().into_iter().flatten().collect(),
+        Some("user/info") if frame["status"] == "success" => vec![data],
+        _ => vec![],
+    };
+
+    let mut deltas = Vec::new();
+    for record in records {
+        let (Some(user_id), Some(lobby)) = (record["userId"].as_str(), record.get("currentLobby"))
+        else {
+            continue;
+        };
+        let lobby = match lobby {
+            serde_json::Value::Null => None,
+            serde_json::Value::String(id) => Some(id.clone()),
+            _ => continue,
+        };
+        let Some(user) = state.users.values_mut().find(|u| u.user_id == user_id) else {
+            continue;
+        };
+        if user.current_lobby != lobby {
+            user.current_lobby = lobby;
+            deltas.push(Delta::UserStatusChanged {
+                name: user.name.clone(),
+            });
+        }
+    }
+    deltas
+}
+
 /// The user ids `user/self` named that we have no record for, in the order the
 /// event listed them, capped at what one subscription may ask for.
 ///
@@ -349,7 +394,9 @@ mod tests {
 
     /// Fold a frame into the state the way the connection does.
     fn feed(state: &mut LobbyState, frame: &str) -> Vec<Delta> {
-        reduce(state, &parse_frame(frame))
+        let mut deltas = reduce(state, &parse_frame(frame));
+        deltas.extend(lobbies(state, frame));
+        deltas
     }
 
     #[test]
@@ -734,5 +781,177 @@ mod tests {
             ids_to_subscribe(&state, &event.data.user).len(),
             SUBSCRIBE_LIMIT
         );
+    }
+
+    #[test]
+    fn an_update_naming_a_lobby_puts_the_user_in_it() {
+        let mut state = LobbyState::new();
+        let deltas = feed(
+            &mut state,
+            &updated_frame(json!([
+                { "userId": "2", "username": "bob", "status": "lobby", "currentLobby": "uuid-1" },
+            ])),
+        );
+
+        assert_eq!(
+            user_named(&state, "bob").current_lobby.as_deref(),
+            Some("uuid-1")
+        );
+        assert_eq!(
+            deltas,
+            vec![
+                Delta::UserAdded { name: "bob".into() },
+                Delta::UserStatusChanged { name: "bob".into() },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_null_lobby_takes_the_user_out_of_it() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &updated_frame(json!([
+                { "userId": "2", "username": "bob", "status": "lobby", "currentLobby": "uuid-1" },
+            ])),
+        );
+
+        let deltas = feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "currentLobby": null }])),
+        );
+
+        assert_eq!(user_named(&state, "bob").current_lobby, None);
+        assert_eq!(
+            deltas,
+            vec![Delta::UserStatusChanged { name: "bob".into() }]
+        );
+    }
+
+    #[test]
+    fn an_update_that_does_not_mention_a_lobby_keeps_the_one_we_have() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &updated_frame(json!([
+                { "userId": "2", "username": "bob", "status": "lobby", "currentLobby": "uuid-1" },
+            ])),
+        );
+
+        feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "countryCode": "DE" }])),
+        );
+
+        assert_eq!(
+            user_named(&state, "bob").current_lobby.as_deref(),
+            Some("uuid-1")
+        );
+    }
+
+    #[test]
+    fn a_lobby_changing_is_a_delta_and_the_same_lobby_again_is_not() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &updated_frame(json!([
+                { "userId": "2", "username": "bob", "status": "lobby", "currentLobby": "uuid-1" },
+            ])),
+        );
+
+        let same = feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "currentLobby": "uuid-1" }])),
+        );
+        let moved = feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "currentLobby": "uuid-2" }])),
+        );
+
+        assert_eq!(same, vec![]);
+        assert_eq!(moved, vec![Delta::UserStatusChanged { name: "bob".into() }]);
+    }
+
+    #[test]
+    fn going_offline_leaves_no_lobby_behind() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &updated_frame(json!([
+                { "userId": "2", "username": "bob", "status": "lobby", "currentLobby": "uuid-1" },
+            ])),
+        );
+        feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "status": "offline" }])),
+        );
+        feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "2", "username": "bob", "status": "menu" }])),
+        );
+
+        assert_eq!(user_named(&state, "bob").current_lobby, None);
+    }
+
+    #[test]
+    fn a_lobby_for_someone_we_cannot_name_is_dropped() {
+        let mut state = LobbyState::new();
+        let deltas = feed(
+            &mut state,
+            &updated_frame(json!([{ "userId": "9", "currentLobby": "uuid-1" }])),
+        );
+
+        assert!(state.users.is_empty());
+        assert_eq!(deltas, vec![]);
+    }
+
+    #[test]
+    fn our_own_record_carries_the_lobby_we_are_in() {
+        let mut state = LobbyState::new();
+        feed(
+            &mut state,
+            &self_frame(json!({ "currentLobby": "uuid-me" })),
+        );
+        assert_eq!(
+            user_named(&state, "alice").current_lobby.as_deref(),
+            Some("uuid-me")
+        );
+
+        feed(&mut state, &self_frame(json!({ "currentLobby": null })));
+        assert_eq!(user_named(&state, "alice").current_lobby, None);
+    }
+
+    #[test]
+    fn user_info_carries_the_lobby_when_the_server_sends_one() {
+        let mut state = LobbyState::new();
+        let frame = json!({
+            "type": "response",
+            "messageId": "9",
+            "commandId": "user/info",
+            "status": "success",
+            "data": {
+                "userId": "3",
+                "username": "dave",
+                "displayName": "Dave",
+                "clanBaseData": null,
+                "status": "lobby",
+                "currentLobby": "uuid-3",
+            },
+        })
+        .to_string();
+
+        feed(&mut state, &frame);
+
+        assert_eq!(
+            user_named(&state, "dave").current_lobby.as_deref(),
+            Some("uuid-3")
+        );
+    }
+
+    #[test]
+    fn a_frame_that_is_not_a_user_record_changes_no_lobby() {
+        let mut state = LobbyState::new();
+        assert_eq!(lobbies(&mut state, r#"{"not":"a tachyon frame"}"#), vec![]);
+        assert_eq!(lobbies(&mut state, "not json"), vec![]);
     }
 }

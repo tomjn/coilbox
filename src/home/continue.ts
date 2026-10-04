@@ -8,6 +8,7 @@ import {
   Rocket,
   Swords,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import type { MissionNeed } from "../campaign/missionNeeds";
 import type {
@@ -27,9 +28,16 @@ import { useSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
 import { useSkirmishPresets } from "../play/presets";
 import { getProfile } from "../profile/profile";
-import { resolveStart, type StartResolution } from "../profile/start";
+import {
+  resolveStart,
+  type StartResolution,
+  type StartScenario,
+} from "../profile/start";
 import type { RunStatus } from "../runlite/model";
 import { useRuns } from "../runlite/runs";
+import type { Scenario } from "../scenario/model";
+import { scenarioRoute, storedScenarios } from "../scenario/scenarios";
+import { type ScenarioWins, useScenarioWins } from "../scenario/wins";
 import { useAvailableUpdate } from "../updater/UpdaterProvider";
 
 /** Which part of Coilbox a resume candidate came from. */
@@ -77,6 +85,12 @@ export interface ResumeCandidate {
    * whether the mission's game and map are installed.
    */
   start?: { campaign: Campaign; mission: CampaignMission };
+  /**
+   * The scenario a `start` candidate opens, when the profile names one bundled
+   * on its own instead of a campaign mission (issue #3549). The hero checks
+   * whether its game and map are installed.
+   */
+  startScenario?: Scenario;
 }
 
 /** What a card calls a kind of thing, and what its action offers to do. */
@@ -441,12 +455,31 @@ export function updateCandidate(
  * pages read, so there is no flag of this card's own to fall out of step. A
  * profile with no `start` key, or one naming a campaign that is not bundled,
  * resolves to no candidate and the page is the page it always was.
+ *
+ * A scenario bundled on its own has no campaign progress to read, so its card
+ * goes when the scenario's id is in `wins`, the record the Scenarios page writes
+ * when the player wins one (issue #3549).
  */
 export function startCandidate(
   start: StartResolution,
   progress: ProgressFile,
   now: number,
+  wins: ScenarioWins = {},
 ): ResumeCandidate | undefined {
+  if (start.status === "scenario") {
+    const { scenario } = start;
+    if (wins[scenario.id]) return undefined;
+    return {
+      id: `start:scenario:${scenario.id}`,
+      kind: "start",
+      title: scenario.name,
+      // The Scenarios page's own second line for the same scenario.
+      detail: `${scenario.setup.gameName} · ${scenario.setup.mapName}`,
+      to: scenarioRoute(scenario.id),
+      touchedAt: now,
+      startScenario: scenario,
+    };
+  }
   if (start.status !== "ok") return undefined;
   const { campaign, mission } = start;
   const done = progress.campaigns[campaign.id]?.completedMissionIds ?? [];
@@ -501,6 +534,53 @@ export function withStart(
 ): ResumeCandidate[] {
   if (!start) return ranked;
   return [start, ...ranked.filter((c) => c.to !== start.to)];
+}
+
+/**
+ * Whether a profile's `start` names a scenario, which is the only case the
+ * scenario list is read for. False for no `start` and for a campaign `start`,
+ * so both leave the home page reading exactly what it read before.
+ */
+export function namesStartScenario(start: unknown): boolean {
+  if (typeof start !== "object" || start === null) return false;
+  return (start as { scenario?: unknown }).scenario !== undefined;
+}
+
+/**
+ * The scenarios `start` may name, read only for a profile whose `start` names
+ * one.
+ *
+ * Every other profile, and plain coilbox, gets the same empty list on every
+ * render with nothing read and nothing to wait for. The read is the stored and
+ * bundled documents alone, so the home page does not start a content scan to
+ * draw one card.
+ */
+const NO_SCENARIOS: readonly StartScenario[] = [];
+function useStartScenarios(): {
+  scenarios: readonly StartScenario[];
+  loading: boolean;
+} {
+  const wanted = namesStartScenario(getProfile().start);
+  const [scenarios, setScenarios] = useState<readonly StartScenario[] | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!wanted) return;
+    let cancelled = false;
+    storedScenarios()
+      .then((loaded) => {
+        if (!cancelled) setScenarios(loaded);
+      })
+      // An unreadable list resolves `start` to a problem, which draws no card.
+      .catch(() => {
+        if (!cancelled) setScenarios(NO_SCENARIOS);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted]);
+  if (!wanted) return { scenarios: NO_SCENARIOS, loading: false };
+  return { scenarios: scenarios ?? NO_SCENARIOS, loading: scenarios === null };
 }
 
 export interface ResumeSources {
@@ -586,6 +666,8 @@ export function useResume(): {
   // sits open is new information rather than a late answer. Same reasoning as
   // the lobby.
   const { update, version } = useAvailableUpdate();
+  const startScenarios = useStartScenarios();
+  const { wins } = useScenarioWins();
 
   const now = Date.now();
   const ranked = rankCandidates(
@@ -609,9 +691,14 @@ export function useResume(): {
   const candidates = withStart(
     ranked,
     startCandidate(
-      resolveStart(getProfile().start, campaigns.campaigns),
+      resolveStart(
+        getProfile().start,
+        campaigns.campaigns,
+        startScenarios.scenarios,
+      ),
       progress.progress,
       now,
+      wins,
     ),
   );
 
@@ -620,7 +707,8 @@ export function useResume(): {
     campaigns.loading ||
     progress.loading ||
     galaxies.loading ||
-    conquests.loading;
+    conquests.loading ||
+    startScenarios.loading;
 
   return { candidates, loading };
 }

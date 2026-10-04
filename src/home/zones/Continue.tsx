@@ -2,11 +2,12 @@ import { buttonVariants, cn } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
-import { missionNeeds } from "../../campaign/missionNeeds";
+import { type MissionNeed, missionNeeds } from "../../campaign/missionNeeds";
 import { useCampaignImage } from "../../campaign/panorama";
 import { useUnitsyncScan } from "../../content/config";
 import { mediaKind } from "../../lib/assetUrl";
 import { usePreferredTarget } from "../../play/config";
+import type { Scenario } from "../../scenario/model";
 import { CARD_FOCUS_CLASS, GROUP_HEADING_CLASS } from "../cardShell";
 import {
   RESUME_KIND_COPY,
@@ -115,6 +116,9 @@ import {
  * is this card rather than a zone of its own because it wants this card's slot,
  * its size and its place beside the rail, and a second zone would have had to
  * be told all three. See {@link StartHero} for the two things it adds.
+ *
+ * The profile can name a scenario bundled on its own instead (issue #3549),
+ * which {@link StartScenarioHero} draws.
  */
 export default function Continue({ className }: { className?: string }) {
   const { candidates, loading } = useResume();
@@ -122,6 +126,14 @@ export default function Continue({ className }: { className?: string }) {
   if (loading || !top) return null;
   if (top.start)
     return <StartHero top={top} start={top.start} className={className} />;
+  if (top.startScenario)
+    return (
+      <StartScenarioHero
+        top={top}
+        scenario={top.startScenario}
+        className={className}
+      />
+    );
 
   const { label, action } = RESUME_KIND_COPY[top.kind];
   return heroCard({
@@ -170,19 +182,10 @@ function StartHero({
   className?: string;
 }) {
   const { campaign, mission } = start;
-  const { target, loading: targetLoading } = usePreferredTarget();
-  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const gameName = mission.snapshot?.gameName ?? "";
-  const mapName = mission.snapshot?.mapName ?? "";
-  const needs = missionNeeds({
-    unfinished: !gameName || !mapName,
-    noEngine: !targetLoading && !target,
-    scanReady: !!scan.data,
-    gameName,
-    mapName,
-    games: scan.data?.games ?? [],
-    maps: scan.data?.maps ?? [],
-  });
+  const needs = useStartNeeds(
+    mission.snapshot?.gameName ?? "",
+    mission.snapshot?.mapName ?? "",
+  );
   const copy = startCopy(needs);
   const src = useCampaignImage(
     campaign.id,
@@ -206,6 +209,58 @@ function StartHero({
     ) : (
       <KindIcon kind="start" />
     ),
+    className,
+  });
+}
+
+/**
+ * What is not installed of the engine, the game and the map a start card
+ * needs, by the briefing page's own {@link missionNeeds}.
+ */
+function useStartNeeds(gameName: string, mapName: string): MissionNeed[] {
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  return missionNeeds({
+    unfinished: !gameName || !mapName,
+    noEngine: !targetLoading && !target,
+    scanReady: !!scan.data,
+    gameName,
+    mapName,
+    games: scan.data?.games ?? [],
+    maps: scan.data?.maps ?? [],
+  });
+}
+
+/**
+ * The hero for a start scenario, one a distribution bundles on its own with no
+ * campaign around it (issue #3549).
+ *
+ * It makes the same install check {@link StartHero} does and says the same
+ * words. A scenario has no picture of its own, so it draws the kind's icon.
+ *
+ * Where it goes depends on that check. With everything installed it opens the
+ * scenario's play drawer on the Scenarios page. With something missing it opens
+ * the Scenarios page without the drawer, because the download button is on the
+ * scenario's row there and the drawer would cover it with a Play button that
+ * cannot be pressed.
+ */
+function StartScenarioHero({
+  top,
+  scenario,
+  className,
+}: {
+  top: ResumeCandidate;
+  scenario: Scenario;
+  className?: string;
+}) {
+  const needs = useStartNeeds(scenario.setup.gameName, scenario.setup.mapName);
+  const copy = startCopy(needs);
+  return heroCard({
+    top: needs.length > 0 ? { ...top, to: "/scenarios" } : top,
+    label: RESUME_KIND_COPY.start.label,
+    action: copy.action,
+    detail: copy.detail ?? top.detail,
+    art: <KindIcon kind="start" />,
     className,
   });
 }
