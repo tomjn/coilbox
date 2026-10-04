@@ -1,5 +1,6 @@
 import { Bot } from "lucide-react";
 import { useMemo } from "react";
+import { GameIcon } from "@/components/GameIcon";
 import { type AiRecordRow, aiRecordFor } from "../../aiRecord";
 import type { StatRecord } from "../../bindings";
 import { TallyBar } from "./StatWidgets";
@@ -19,6 +20,7 @@ function AiRow({ row }: { row: AiRecordRow }) {
   const decided = row.wins + row.losses;
   return (
     <li className="flex items-center gap-3 py-1.5">
+      <GameIcon name={row.game} />
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="truncate text-sm" title={row.ai}>

@@ -1,8 +1,16 @@
 // @vitest-environment happy-dom
 
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StatAi, StatRecord } from "../../bindings";
+
+// The game icon reads the scan and the cached art, which need the app frame.
+vi.mock("@/components/GameIcon", () => ({
+  GameIcon: ({ name }: { name: string }) => (
+    <span data-testid="game-icon" data-name={name} />
+  ),
+}));
+
 import { AiRecordSection } from "./AiRecordSection";
 
 let seq = 0;
@@ -39,6 +47,21 @@ const none: ReadonlySet<string> = new Set();
 afterEach(cleanup);
 
 describe("AiRecordSection", () => {
+  it("puts the game's icon on each row, keyed by the row's game name", () => {
+    render(
+      <AiRecordSection
+        records={[skirmish({}, true)]}
+        playerName="me"
+        refights={none}
+        scripted={none}
+      />,
+    );
+    const row = screen.getAllByRole("listitem")[0];
+    const icon = within(row).getByTestId("game-icon");
+    expect(row.textContent).toContain(icon.getAttribute("data-name"));
+    expect(icon.getAttribute("data-name")).not.toBe("");
+  });
+
   it("shows a row per AI and bonus, with the bonus and the result", () => {
     const records = [
       skirmish({}, true),
