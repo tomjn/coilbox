@@ -164,7 +164,9 @@ describe("replayEngineDecision", () => {
     const folder = "105.1.1-2511-gdef5678";
 
     it("asks to check it, and enables Watch, when its folder is named for the recorded version", () => {
-      const d = replayEngineDecision(readings({ engines: [unverified(folder)] }));
+      const d = replayEngineDecision(
+        readings({ engines: [unverified(folder)] }),
+      );
       expect(d.notice).toEqual({ kind: "unchecked", version: RECORDED });
       expect(d.watch).toEqual({ kind: "verify" });
     });
