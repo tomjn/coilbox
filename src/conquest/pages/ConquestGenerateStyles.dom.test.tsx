@@ -232,7 +232,7 @@ describe("Conquest generate form: order and wording", () => {
       "Preview",
     ]);
     expect(optionLabels(selectOffering("territories"))).toEqual([
-      "Galaxy (stars in space)",
+      "Galaxy (starfield)",
       "Theatre (flat chart)",
       "Cities (roads across generated land)",
       "Territories (provinces on generated land)",

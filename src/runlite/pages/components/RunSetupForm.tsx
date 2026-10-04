@@ -7,6 +7,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
+import { locationNoun, MAP_STYLE_OPTIONS } from "../../../conquest/mapStyle";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
   useUnitsyncGameHeaders,
@@ -28,12 +29,8 @@ import { missingLaunchDependency } from "../../../play/launchContent";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
 import { aiKey } from "../../../play/participants";
 import { getGameMatcher, getProfile } from "../../../profile/profile";
-import {
-  type GenBuildGraph,
-  type GenerateRunOpts,
-  type GenRunMap,
-  generateRun,
-} from "../../generate";
+import type { GenBuildGraph, GenerateRunOpts, GenRunMap } from "../../generate";
+import { generateStyledRun, LAND_RUN_SIZES } from "../../mapRun";
 import { loadoutById, unlockedLoadouts, unlocksFor } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
@@ -46,7 +43,8 @@ import {
 /**
  * The run-setup form, shown in a drawer (see RunListPage). Assembles a
  * {@link GenerateRunOpts} from the installed game's maps, sides and build graph,
- * bakes a self-contained run and saves it, then calls `onStarted`.
+ * bakes a self-contained run and saves it, then calls `onStarted`. A Cities or
+ * Territories run also generates the land map it crosses.
  */
 /** Remembers the last game picked across runs (and the module-level default). */
 const LAST_GAME_KEY = "runlite:lastGame";
@@ -233,7 +231,7 @@ export function RunSetupForm({
     };
     const id = `run-${crypto.randomUUID()}`;
     try {
-      await saveRun(id, generateRun(opts));
+      await saveRun(id, generateStyledRun(opts));
     } catch (e) {
       setStartError(
         `The warpath was not started. ${e instanceof Error ? e.message : String(e)}`,
@@ -242,6 +240,10 @@ export function RunSetupForm({
     }
     onStarted(id);
   };
+
+  // Set for the two styles that cross a generated land map.
+  const landSizes =
+    skin === "cities" || skin === "territories" ? LAND_RUN_SIZES[skin] : null;
 
   const toggleItem =
     "rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -342,6 +344,12 @@ export function RunSetupForm({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
+        {landSizes && (
+          <span className="text-xs text-muted-foreground">
+            The map decides how long this warpath is. This length crosses a map
+            of {landSizes[length]} {locationNoun(skin).many}.
+          </span>
+        )}
       </Field>
 
       <Field label={`Difficulty — level ${difficulty}`}>
@@ -360,10 +368,7 @@ export function RunSetupForm({
           <OptionSelect
             value={skin}
             onValueChange={(v) => setSkin(v as RunSkin)}
-            options={[
-              { value: "galaxy", label: "Galaxy (starfield)" },
-              { value: "theatre", label: "Theatre (flat chart)" },
-            ]}
+            options={MAP_STYLE_OPTIONS}
           />
         </Field>
         {ascensionTier > 0 && (

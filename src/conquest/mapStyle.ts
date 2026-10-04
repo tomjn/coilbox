@@ -14,7 +14,7 @@ import { generatedTerrain, generateTerritories } from "./territories";
 
 /** The style choices, in the order both setup forms offer them. */
 export const MAP_STYLE_OPTIONS: { value: MapSkin; label: string }[] = [
-  { value: "galaxy", label: "Galaxy (stars in space)" },
+  { value: "galaxy", label: "Galaxy (starfield)" },
   { value: "theatre", label: "Theatre (flat chart)" },
   { value: "cities", label: "Cities (roads across generated land)" },
   { value: "territories", label: "Territories (provinces on generated land)" },
