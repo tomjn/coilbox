@@ -1145,10 +1145,10 @@ export default function SkirmishPage() {
         </p>
       )}
 
-      {/* 22rem to the side, the width the battle room's aside is fixed at, so the
+      {/* The sidebar width the battle room's aside uses (`--battle-sidebar-width`), so the
           map and the start-box editor under it are the same size in both places.
           It still stacks below md, which the battle room's flex row never does. */}
-      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">
+      <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,var(--battle-sidebar-width))]">
         <div className="flex flex-col gap-5">
           {aiNotice && (
             <Alert className="p-3">
