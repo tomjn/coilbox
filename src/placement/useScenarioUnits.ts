@@ -17,7 +17,6 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "@/content/config";
-import { answeredScan } from "@/content/scanSettled";
 import { useReduceMotion } from "@/general/display";
 import type { MapScene3D } from "@/lib/mapScene";
 import { scenarioPlacements } from "@/lib/scenarioEditing/placements";
@@ -333,9 +332,8 @@ export function useScenarioUnits(
       : null;
   }, [flat, grid, worldWidth, worldHeight, minHeight, maxHeight]);
 
-  // A scan whose `Init` failed lists no games, which does not make the game
-  // missing (issue #3398).
-  const gameMissing = !!gameName && !!answeredScan(scan.data) && !game;
+  // A scan that failed has no data, so it cannot make the game missing.
+  const gameMissing = !!gameName && !!scan.data && !game;
   const unitDefs: StageState = !archive
     ? scan.loading
       ? "loading"

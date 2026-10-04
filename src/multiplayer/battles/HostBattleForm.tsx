@@ -13,6 +13,7 @@ import {
   useUnitsyncGameHeaders,
   useUnitsyncThumbnails,
 } from "@/content/config";
+import { ScanFailed } from "@/content/pages/components/states";
 import type { PlayTarget } from "@/play/config";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
@@ -354,6 +355,7 @@ export function HostBattleForm({
         onBack={() => setPickingGame(false)}
         backLabel="Back to the battle form"
         gamesLoading={content.scanning}
+        scanError={content.scanError}
       />
     );
   }
@@ -382,6 +384,7 @@ export function HostBattleForm({
             setPickingMap(false);
           }}
           mapsLoading={content.scanning}
+          scanError={content.scanError}
         />
       </div>
     );
@@ -402,6 +405,10 @@ export function HostBattleForm({
         </p>
       ) : (
         <>
+          {content.scanError && (
+            <ScanFailed noun="games or maps" reason={content.scanError} />
+          )}
+
           {/* biome-ignore lint/a11y/noLabelWithoutControl: wraps the control (implicit label association) */}
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-medium">Title</span>

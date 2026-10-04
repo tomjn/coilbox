@@ -68,6 +68,29 @@ describe("arrivingGame", () => {
   });
 });
 
+describe("a scan that failed", () => {
+  it("is neither still reading nor a missing game", () => {
+    expect(arrivingGame({ name: "Zero-K 1.2.3" }, null, true)).toEqual({
+      state: "unreadable",
+      wanted: "Zero-K 1.2.3",
+    });
+  });
+
+  it("says the games could not be read, and claims nothing is missing or still loading", () => {
+    const arrival = blueprintArrival({
+      payload: payload({ game: { name: "Zero-K 1.2.3" } }),
+      taken: [],
+      installed: null,
+      unreadable: true,
+    });
+    const text = arrival.notes.map((note) => note.text).join(" ");
+    expect(text).toContain("could not be read");
+    expect(text).not.toContain("not installed");
+    expect(text).not.toContain("still reading");
+    expect(gameToCheckAgainst(arrival.game)).toBe("");
+  });
+});
+
 describe("gameToCheckAgainst", () => {
   it("is the installed build for a layout that names one", () => {
     expect(

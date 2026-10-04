@@ -48,6 +48,7 @@ export function ApplySkirmishPresetDrawer({
   enginePath,
   dataDir,
   archive,
+  scanFailure,
   disabled,
   canEditRestrictions,
   modOptionsSchema,
@@ -71,6 +72,9 @@ export function ApplySkirmishPresetDrawer({
   /** The room's game's primary archive, as unitsync names it, for checking a
    *  slot-bound project's typed values before packing (issue #3122). */
   archive?: string;
+  /** Why the content scan could not answer, so a typed-value note says the scan
+   *  failed rather than that the game is not installed. */
+  scanFailure?: string | null;
   disabled?: boolean;
   /** Whether unit restrictions can be written here at all. They are
    *  `game/restrict/*` script tags with no autohost path, so on a bot-hosted
@@ -169,6 +173,7 @@ export function ApplySkirmishPresetDrawer({
               enginePath={enginePath}
               dataDir={dataDir}
               archive={archive}
+              scanFailure={scanFailure}
               disabled={disabled}
               onApply={(slots) => {
                 onApplyTweaks(slots);

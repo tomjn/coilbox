@@ -28,6 +28,7 @@ import {
 } from "@/content/config";
 import { isSdd } from "@/content/format";
 import { SddBadge } from "@/content/pages/components/SddBadge";
+import { ScanFailed } from "@/content/pages/components/states";
 import { UnitIcon } from "@/content/pages/components/UnitIcon";
 import { usePreferredTarget } from "@/play/config";
 import {
@@ -306,6 +307,7 @@ export function GameModelDrawer({
             <GameList
               games={games}
               loading={scan.loading}
+              error={scan.error}
               onPick={(picked) => setGame(picked)}
             />
           ) : stage.state !== "idle" ? (
@@ -405,13 +407,16 @@ function sortedGames(games: GameItem[]): GameItem[] {
   });
 }
 
-function GameList({
+export function GameList({
   games,
   loading,
+  error,
   onPick,
 }: {
   games: GameItem[];
   loading: boolean;
+  /** Why the scan could not list games, or null. */
+  error: string | null;
   onPick: (game: GameItem) => void;
 }) {
   if (loading) {
@@ -419,6 +424,13 @@ function GameList({
       <p className="px-5 py-4 text-xs text-muted-foreground">
         Looking for installed games.
       </p>
+    );
+  }
+  if (error) {
+    return (
+      <div className="px-5 py-4">
+        <ScanFailed noun="games" reason={error} />
+      </div>
     );
   }
   if (games.length === 0) {

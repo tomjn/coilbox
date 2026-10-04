@@ -94,6 +94,10 @@ let mockWeaponDefs: Record<string, Record<string, unknown>> = {};
  *  (issue #3054). Absent in most tests, as for a game it could not. */
 let mockBeforePost: UnitDefsResult["beforePost"];
 
+// Set to a reason to stand in a scan whose Init failed: the hook then returns
+// no data and the engine's reason as the error (issue #3423).
+let mockScanError: string | null = null;
+
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
   // Only exercised through the edit-in-place route, which has its own
@@ -102,9 +106,11 @@ vi.mock("@/content/config", () => ({
   invalidateGameInfo: () => {},
   invalidateUnitDataset: () => {},
   useUnitsyncScan: () => ({
-    data: { games: [GAME, GAME_2, PACKED_GAME], maps: [] },
+    data: mockScanError
+      ? null
+      : { games: [GAME, GAME_2, PACKED_GAME], maps: [] },
     loading: false,
-    error: null,
+    error: mockScanError,
     run: () => {},
   }),
   useUnitsyncUnitDataset: () => ({
@@ -536,6 +542,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  mockScanError = null;
   mockStatus = "ready";
   mockDataset = [];
   mockSides = [];
@@ -814,6 +821,13 @@ describe("UnitPage", () => {
     expect(
       screen.getByText(/A Game Nobody Has is not installed here/),
     ).toBeTruthy();
+  });
+
+  it("says the scan failed once, and not that no games are installed", () => {
+    mockScanError = "no space left on device";
+    show();
+    expect(screen.getAllByText(/no space left on device/)).toHaveLength(1);
+    expect(screen.queryByText(/No games are installed/)).toBeNull();
   });
 
   it("says it is still reading while the defs load", () => {

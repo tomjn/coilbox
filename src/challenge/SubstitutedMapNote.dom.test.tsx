@@ -26,6 +26,7 @@ import { SubstitutedMapNote } from "./SubstitutedMapNote";
 
 const scan = vi.hoisted(() => ({
   data: null as { maps: { name: string }[] } | null,
+  error: null as string | null,
 }));
 const excluded = vi.hoisted(() => ({ names: [] as string[] }));
 const downloadMapAnySource = vi.hoisted(() => vi.fn(async () => {}));
@@ -42,7 +43,7 @@ vi.mock("../content/config", () => ({
   useUnitsyncScan: () => ({
     data: scan.data,
     loading: false,
-    error: null,
+    error: scan.error,
     cancelled: false,
     run: vi.fn(),
     cancel: vi.fn(),
@@ -100,6 +101,7 @@ const noteText = () => document.body.textContent ?? "";
 
 beforeEach(() => {
   scan.data = null;
+  scan.error = null;
   excluded.names = [];
   (
     globalThis as unknown as { window: Record<string, unknown> }
@@ -155,6 +157,16 @@ describe("the substituted map note", () => {
       "Stands in for Nowhere Atoll, which is not available here.",
     );
     expect(screen.queryByRole("button")).toBeNull();
+  });
+});
+
+describe("the substituted map note when the content scan failed", () => {
+  it("offers no download and does not claim the map is not installed", () => {
+    scan.error = "no space left on device";
+    renderNote("Nowhere Atoll");
+
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(noteText()).not.toMatch(/not installed|Download/);
   });
 });
 

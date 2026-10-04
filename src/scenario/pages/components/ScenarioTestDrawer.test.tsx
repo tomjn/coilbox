@@ -16,10 +16,16 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { launchScenario, playInfolog } = vi.hoisted(() => ({
-  launchScenario: vi.fn(),
-  playInfolog: vi.fn(),
-}));
+const { launchScenario, playInfolog, scanState, primeScan } = vi.hoisted(
+  () => ({
+    launchScenario: vi.fn(),
+    playInfolog: vi.fn(),
+    // Set by the tests where the scan failed: the hook answers `data: null`
+    // with the engine's reason.
+    scanState: { error: null as string | null },
+    primeScan: vi.fn(async () => ({ games: [] as unknown[] })),
+  }),
+);
 
 // The launch itself is `launch.test.ts`'s. What is under test is what the drawer
 // does once one has come back, so it is stubbed down to the callback it makes
@@ -43,8 +49,12 @@ vi.mock("@/play/config", () => ({
   mapOptionSchema: async () => ({}),
 }));
 vi.mock("@/content/config", () => ({
-  useUnitsyncScan: () => ({ data: { games: [] }, error: null }),
-  primeScan: async () => ({ games: [] }),
+  useUnitsyncScan: () => ({
+    data: scanState.error ? null : { games: [] },
+    error: scanState.error,
+    loading: false,
+  }),
+  primeScan,
 }));
 vi.mock("@/content/useGameUnits", () => ({
   useGameUnits: () => ({ units: [], archive: null }),
@@ -115,6 +125,7 @@ async function press(mode: "test" | "play") {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  scanState.error = null;
   clean();
 });
 afterEach(cleanup);
@@ -257,5 +268,41 @@ describe("choosing a difficulty before the launch", () => {
     await vi.waitFor(() =>
       expect(launchScenario.mock.calls[0][0].difficulty).toBeUndefined(),
     );
+  });
+});
+
+/** Issue #3423: a scan whose unitsync Init failed has no games, not no game. */
+describe("a scan that failed", () => {
+  it("gives the reason, claims nothing is missing, and keeps the launch off", () => {
+    scanState.error = "no space left on device";
+    render(<ScenarioTestDrawer scenario={newScenario("Demo")} mode="test" />);
+
+    expect(
+      screen.getByText("The content scan failed: no space left on device"),
+    ).toBeTruthy();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Test in game",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(document.body.textContent).not.toMatch(
+      /not installed|No game is installed|Download|Reading your installed games/,
+    );
+  });
+
+  it("shows a rescan that throws during a launch as the failure", async () => {
+    primeScan.mockRejectedValueOnce(new Error("no space left on device"));
+    launchScenario.mockImplementation(
+      async (input: { rescan: () => Promise<unknown> }) => {
+        await input.rescan();
+        return { ok: true };
+      },
+    );
+    render(<ScenarioTestDrawer scenario={newScenario("Demo")} mode="test" />);
+    screen.getByRole("button", { name: "Test in game" }).click();
+
+    expect(await screen.findByText(/no space left on device/)).toBeTruthy();
   });
 });

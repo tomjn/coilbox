@@ -173,7 +173,11 @@ export function ExportPackForm() {
           items={games.map((g) => ({ id: g.name, label: g.name }))}
           selected={selectedGames}
           onToggle={toggleGame}
-          emptyMessage="No games installed for this engine."
+          emptyMessage={
+            scan.error
+              ? `The scan failed, so no games are listed. unitsync said: ${scan.error}`
+              : "No games installed for this engine."
+          }
         />
       </div>
 
@@ -183,7 +187,11 @@ export function ExportPackForm() {
           items={maps.map((m) => ({ id: m.name, label: m.name }))}
           selected={selectedMaps}
           onToggle={toggleMap}
-          emptyMessage="No maps installed for this engine."
+          emptyMessage={
+            scan.error
+              ? `The scan failed, so no maps are listed. unitsync said: ${scan.error}`
+              : "No maps installed for this engine."
+          }
         />
       </div>
 

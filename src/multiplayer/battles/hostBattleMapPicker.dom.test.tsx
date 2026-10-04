@@ -37,7 +37,7 @@ const MAPS = [
   { name: "DeltaSiegeDry", archives: [], info: {} },
 ];
 
-function stubContent() {
+function stubContent(overrides: Record<string, unknown> = {}) {
   useHostContent.mockReturnValue({
     targets: [],
     target: {
@@ -62,6 +62,7 @@ function stubContent() {
     gameFailed: false,
     mapFailed: false,
     ready: true,
+    ...overrides,
   });
 }
 
@@ -135,5 +136,36 @@ describe("choosing a map from minimaps", () => {
     expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe(
       "Friday night pubs",
     );
+  });
+});
+
+describe("a failed content scan", () => {
+  const REASON = "no space left on device";
+
+  function failedScan() {
+    stubContent({
+      games: [],
+      maps: [],
+      gameName: "",
+      mapName: "",
+      checksumsReady: false,
+      ready: false,
+      scanError: REASON,
+    });
+  }
+
+  it("says why on the form, since Host is disabled", () => {
+    failedScan();
+    form();
+    expect(screen.getByText(/scan failed/i)).toBeTruthy();
+    expect(screen.getByText(new RegExp(REASON))).toBeTruthy();
+  });
+
+  it("does not say 'No maps installed' in the map picker", () => {
+    failedScan();
+    form();
+    fireEvent.click(screen.getByRole("button", { name: "Select a map" }));
+    expect(screen.queryByText(/No maps installed/)).toBeNull();
+    expect(screen.getByText(new RegExp(REASON))).toBeTruthy();
   });
 });

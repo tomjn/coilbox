@@ -13,6 +13,7 @@ import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
+import { ScanFailed } from "../../content/pages/components/states";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
 import type { MissionNeed } from "../missionNeeds";
@@ -353,6 +354,7 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
           disabled={run.running}
         />
       )}
+      {run.scanError && <ScanFailed noun="games" reason={run.scanError} />}
       <div className="flex items-center gap-3">
         <Button onClick={run.start} disabled={!run.canStart}>
           <Play className="size-4 fill-current" />{" "}

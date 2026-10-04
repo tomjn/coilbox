@@ -55,6 +55,11 @@ export function ImportChallengeForm({
       (g) => (g.info.shortname ?? g.name).trim().toLowerCase() === want,
     );
     if (!installedGame) {
+      if (scan.error) {
+        throw new Error(
+          `The content scan failed, so this challenge's game could not be looked for: ${scan.error}`,
+        );
+      }
       throw new Error(
         `This challenge needs "${settings.game.shortname}", which isn't installed. Install it from Content → Games, then try again.`,
       );

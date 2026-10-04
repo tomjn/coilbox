@@ -38,8 +38,15 @@ vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
   useDrawer: () => ({ open: () => {}, close: () => {}, isOpen: false }),
 }));
+const scan = vi.hoisted(() => ({
+  current: {
+    data: { games: [] } as unknown,
+    loading: false,
+    error: null as string | null,
+  },
+}));
 vi.mock("@/content/config", () => ({
-  useUnitsyncScan: () => ({ data: { games: [] }, loading: false }),
+  useUnitsyncScan: () => scan.current,
   useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
 }));
 vi.mock("@/play/config", () => ({ usePreferredTarget: () => ({}) }));
@@ -89,6 +96,27 @@ describe("BlueprintsPage", () => {
     const link = cardLink(markup());
     expect(link).toContain('href="/library/blueprints/b1"');
     expect(link).not.toContain("<button");
+  });
+
+  it("says the game is not installed when the scan answered", () => {
+    expect(markup()).toContain("That game is not installed here.");
+  });
+
+  /** A scan whose unitsync Init failed has not said what is installed (issue
+   *  #3423), so a card must not say its game is missing. */
+  it("shows the failure and does not say a game is missing when the scan failed", () => {
+    scan.current = {
+      data: null,
+      loading: false,
+      error: "no space left on device",
+    };
+    try {
+      const html = markup();
+      expect(html).toContain("no space left on device");
+      expect(html).not.toContain("not installed here");
+    } finally {
+      scan.current = { data: { games: [] }, loading: false, error: null };
+    }
   });
 
   /** Where a copy came from, for every way in rather than only a pack file

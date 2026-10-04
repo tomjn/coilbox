@@ -469,7 +469,7 @@ export default function ReferencePage() {
   if (!game)
     return (
       <GameMissingState
-        initFailure={data.initFailure ?? null}
+        initFailure={null}
         label={`${gameName} is not installed here, so there are no units to show.`}
       />
     );
