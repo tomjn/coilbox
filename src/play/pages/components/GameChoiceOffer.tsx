@@ -27,11 +27,7 @@ export function GameChoiceOffer({
   onDecline: (declinedName: string) => void;
 }) {
   return (
-    <div
-      className="flex flex-col gap-2 text-sm"
-      role="group"
-      aria-label="Which game to play"
-    >
+    <div className="flex flex-col gap-2 text-sm">
       {offer.kind === "choose" && (
         <>
           <p>
