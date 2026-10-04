@@ -6,6 +6,17 @@ export {
 } from "./cache";
 export type { HandmadeMapError, HandmadeMapErrorCode } from "./errors";
 export {
+  type HandmadeImportResult,
+  type HandmadeMapList,
+  type HandmadeMapSource,
+  type HandmadeMapSummary,
+  importHandmadeMap,
+  listHandmadeMaps,
+  loadHandmadeMap,
+  removeHandmadeMap,
+  type UnreadableHandmadeMap,
+} from "./library";
+export {
   MANIFEST_FILE,
   MANIFEST_FORMAT_VERSION,
   type ManifestBattle,
