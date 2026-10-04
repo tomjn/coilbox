@@ -65,9 +65,13 @@ export type ReplayWatch =
   /** It is not installed but can be downloaded. Watch opens the download first
    *  and runs on the engine it installs. */
   | { kind: "download" }
-  /** It cannot be had. Watch runs on another installed engine, which may not
-   *  sync, and the page says so. */
+  /** The header names no engine version, so there is nothing to match. Watch
+   *  runs on another installed engine, which may not sync, and the page says
+   *  so. */
   | { kind: "fallback" }
+  /** The recorded engine is not installed and cannot be downloaded here. Watch
+   *  is disabled, because a replay must not run on any other engine. */
+  | { kind: "unavailable"; version: string }
   /** Still reading. Watch waits. */
   | { kind: "wait" }
   /** No engine can run it. */
@@ -110,6 +114,6 @@ export function replayEngineDecision(r: ReplayEngineReadings): {
       version: recorded,
       reason: r.resolve.noWriteRoot ? "no-write-root" : "no-build",
     },
-    watch: fallback,
+    watch: { kind: "unavailable", version: recorded },
   };
 }
