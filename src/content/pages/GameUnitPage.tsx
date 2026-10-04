@@ -12,7 +12,7 @@ import {
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
 } from "../config";
-import { groupOf, morphGroups } from "../morphGraph";
+import { groupOf, morphEdgeMap, morphGroups } from "../morphGraph";
 import { encyclopediaSections, unitLabel } from "../unitEncyclopedia";
 import { unitIconSrc } from "../unitIcon";
 import { countPieces, countTriangles, modelFormatLabel } from "../unitModel";
@@ -103,6 +103,23 @@ export default function GameUnitPage() {
   const stageChain =
     morphGroupList.find((g) => g.base === morphBase)?.stages ?? [];
 
+  // Morphs that cross to another unit. A target a factory builds, or one that
+  // several units morph into, is a unit of its own and not a stage (#3463), so
+  // it is not in `stageChain` and the relationship is shown here instead.
+  const morphEdges = morphEdgeMap(dataset?.units ?? []);
+  const groupBase = groupOf(morphGroupList);
+  const groupKey = (unitId: string) => groupBase.get(unitId) ?? unitId;
+  const upgradesInto = (morphEdges.get(id) ?? []).filter(
+    (to) => groupKey(to) !== groupKey(id),
+  );
+  const upgradesFrom = [...morphEdges]
+    .filter(
+      ([from, targets]) =>
+        targets.includes(id) && groupKey(from) !== groupKey(id),
+    )
+    .map(([from]) => from)
+    .sort();
+
   // Computed unconditionally, ahead of every early return below, so
   // `useUnitsyncUnitBuildpics` is called on every render in the same order,
   // the same reasoning `GameUnitsPage` documents for its own call.
@@ -121,7 +138,16 @@ export default function GameUnitPage() {
   // rather than after the gates below: they all have to exist before this
   // call, not just before the JSX that draws them.
   const buildpicIds = unit
-    ? [...new Set([id, ...builds, ...builtBy, ...stageChain])]
+    ? [
+        ...new Set([
+          id,
+          ...builds,
+          ...builtBy,
+          ...stageChain,
+          ...upgradesInto,
+          ...upgradesFrom,
+        ]),
+      ]
     : [];
   const buildpics = useUnitsyncUnitBuildpics(
     selected?.enginePath,
@@ -398,6 +424,40 @@ export default function GameUnitPage() {
                   to={unitPath(builderId)}
                   label={label(builderId)}
                   src={unitIconSrc(buildpics?.units[builderId])}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {upgradesInto.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Upgrades into</h2>
+          <ul className="flex flex-wrap gap-3">
+            {upgradesInto.map((targetId) => (
+              <li key={targetId}>
+                <UnitPictureCard
+                  to={unitPath(targetId)}
+                  label={label(targetId)}
+                  src={unitIconSrc(buildpics?.units[targetId])}
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {upgradesFrom.length > 0 && (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-sm font-medium">Can be upgraded from</h2>
+          <ul className="flex flex-wrap gap-3">
+            {upgradesFrom.map((sourceId) => (
+              <li key={sourceId}>
+                <UnitPictureCard
+                  to={unitPath(sourceId)}
+                  label={label(sourceId)}
+                  src={unitIconSrc(buildpics?.units[sourceId])}
                 />
               </li>
             ))}

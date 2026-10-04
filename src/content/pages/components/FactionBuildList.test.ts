@@ -78,6 +78,33 @@ describe("FactionBuildList's Sides card count", () => {
     expect(html).toContain("2 units");
   });
 
+  it("counts a built morph target as a unit of its own (issue #3463)", () => {
+    // The Goliath is built by the factory and the Weasel can morph into it, so
+    // it is not folded into the Weasel. All four are reachable and counted.
+    const units = [
+      unit("armcom", ["lab"]),
+      unit("lab", ["weasel", "goliath"]),
+      unit("weasel", [], ["goliath"]),
+      unit("goliath"),
+    ];
+    const html = renderToStaticMarkup(
+      createElement(
+        MemoryRouter,
+        null,
+        createElement(FactionBuildList, {
+          enginePath: "",
+          dataDir: "",
+          gameArchive: "",
+          gameName: "Test Game",
+          sides: [{ name: "Arm", startUnit: "armcom" }],
+          units,
+          buildpics: null,
+        }),
+      ),
+    );
+    expect(html).toContain("4 units");
+  });
+
   it("still counts correctly when the side's start unit is a non-base stage", () => {
     // The engine can report the upgraded stage as the spawn unit rather than
     // the base morphGroups picked. The folded edge map only has the base as a
