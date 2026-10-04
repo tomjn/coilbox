@@ -13,6 +13,8 @@ import {
   type ChallengeDecodeResult,
   challengeDecodeErrorMessage,
 } from "./code";
+import { ImportedCodeRecord } from "./ImportedCodeRecord";
+import { codeFromPaste } from "./record";
 
 /**
  * Paste a challenge code, resolve it against the recipient's own install, and
@@ -31,12 +33,16 @@ export function ImportChallengeForm<TSettings, TDoc>({
   substitutedNoun,
   initialCode,
   decode,
+  identityOf,
   buildRequirement,
   finish,
   countSubstitutedMaps,
   onImported,
 }: {
   helpText: string;
+  /** The challenge's identity (see `./identity.ts`), to show your own best
+   * result for the code pasted in the box. */
+  identityOf: (settings: TSettings) => string;
   substitutedNoun: string;
   /** A confirmed `coilbox://` import code to prefill and run once (issue #388). */
   initialCode?: string;
@@ -76,7 +82,9 @@ export function ImportChallengeForm<TSettings, TDoc>({
   // Decode the code, then either finish straight away (game already
   // installed, no pointless prompt) or hand off to the resolve gate, which
   // offers the download and calls `runFinish` once it clears (#387).
-  const importChallenge = async (code: string) => {
+  const importChallenge = async (pasted: string) => {
+    // A shared code may carry a line of text under it, which is not part of it.
+    const code = codeFromPaste(pasted);
     const result = decode(code);
     if (!result.ok) {
       throw new Error(challengeDecodeErrorMessage(result.error));
@@ -107,6 +115,13 @@ export function ImportChallengeForm<TSettings, TDoc>({
         initialCode={initialCode}
         onImport={importChallenge}
         onPickFile={pickChallengeFile}
+        preview={(code) => (
+          <ImportedCodeRecord
+            code={code}
+            decode={decode}
+            identityOf={identityOf}
+          />
+        )}
       />
       {pending && (
         <ResolveContentGate
