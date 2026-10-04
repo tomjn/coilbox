@@ -47,7 +47,8 @@ export function DebriefDrawer({
 
   if (!debrief) return null;
 
-  const { outcome, headline, durationSec, replayFilename } = debrief;
+  const { outcome, headline, durationSec, replayFilename, presetLine } =
+    debrief;
   const Icon =
     outcome === "victory"
       ? Trophy
@@ -93,6 +94,7 @@ export function DebriefDrawer({
                     ? formatDuration(durationSec)
                     : "unknown"}
                 </p>
+                {presetLine && <p className="text-sm">{presetLine}</p>}
               </div>
             </div>
 

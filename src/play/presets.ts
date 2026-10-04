@@ -140,16 +140,20 @@ function canonical(value: unknown): unknown {
  * Absent restrictions normalize to `null` so a draft with none matches another
  * with none.
  */
-function draftKey(draft: SkirmishDraft): string {
+export function draftKey(draft: SkirmishDraft): string {
   const participants = draft.participants.map(({ id: _id, ...rest }) => rest);
+  const boxes = draft.startRects ?? {};
   return JSON.stringify(
     canonical({
       participants,
       gameName: draft.gameName,
       mapName: draft.mapName,
       startPosType: draft.startPosType,
-      startRects: draft.startRects ?? null,
+      // The setup screen holds no boxes as `{}`, so an empty set and none at all
+      // are one setup.
+      startRects: Object.keys(boxes).length > 0 ? boxes : null,
       modOptionValues: draft.modOptionValues,
+      mapOptionValues: draft.mapOptionValues ?? null,
       restrictions: draft.restrictions ?? null,
     }),
   );
