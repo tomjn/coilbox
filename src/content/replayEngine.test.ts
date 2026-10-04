@@ -66,7 +66,7 @@ describe("replayEngineDecision", () => {
     expect(d.watch).toEqual({ kind: "download" });
   });
 
-  it("names the engine and falls back to another when no download exists", () => {
+  it("names the engine and disables Watch when no download exists, even with another engine installed", () => {
     const d = replayEngineDecision(
       readings({
         installedVersions: ["104.0.1-1828-g1234567"],
@@ -78,7 +78,7 @@ describe("replayEngineDecision", () => {
       version: RECORDED,
       reason: "no-build",
     });
-    expect(d.watch).toEqual({ kind: "fallback" });
+    expect(d.watch).toEqual({ kind: "unavailable", version: RECORDED });
   });
 
   it("disables Watch when no download exists and no engine is installed", () => {
@@ -90,7 +90,7 @@ describe("replayEngineDecision", () => {
       version: RECORDED,
       reason: "no-build",
     });
-    expect(d.watch).toEqual({ kind: "none" });
+    expect(d.watch).toEqual({ kind: "unavailable", version: RECORDED });
   });
 
   it("blames the download folder when there is none to write to", () => {

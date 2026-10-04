@@ -7,13 +7,19 @@ import { usePlay } from "../../../play/PlayProvider";
 import { type ReplayWatch, replayEngineRequirement } from "../../replayEngine";
 import { useReplayUserState } from "../../replayUserState";
 
+const isBlocked = (watch: ReplayWatch) =>
+  watch.kind === "wait" ||
+  watch.kind === "none" ||
+  watch.kind === "unavailable";
+
 /**
  * Launch the engine to watch a replay, on the engine the replay was recorded on
  * when it is installed. When it is not installed but can be downloaded, the
  * shared launch check offers it first and the replay starts on what it installs
- * (issue #3370). Only when the recorded engine cannot be had does it fall back
- * to another installed engine, which may not sync. Disabled with a reason when
- * no engine can run it, and while any game/replay is already running.
+ * (issue #3370). A replay never runs on another engine: when the recorded one
+ * cannot be had, Watch is disabled and says which version is needed. Only a
+ * header that names no version falls back to an installed engine. Also disabled
+ * while any game/replay is already running.
  *
  * `watch` is the page's decision from `replayEngineDecision`.
  */
@@ -34,7 +40,7 @@ export function WatchButton({
   const [error, setError] = useState<string | null>(null);
 
   async function onWatch() {
-    if (watch.kind === "wait" || watch.kind === "none") return;
+    if (isBlocked(watch)) return;
     setPending(true);
     setError(null);
     try {
@@ -73,19 +79,19 @@ export function WatchButton({
   const title =
     watch.kind === "none"
       ? "Install an engine to watch replays."
-      : watch.kind === "wait"
-        ? "Checking for the engine this replay needs."
-        : running && !pending
-          ? "A game is already running."
-          : undefined;
+      : watch.kind === "unavailable"
+        ? `This replay needs engine ${watch.version}, which is not installed and cannot be downloaded here.`
+        : watch.kind === "wait"
+          ? "Checking for the engine this replay needs."
+          : running && !pending
+            ? "A game is already running."
+            : undefined;
 
   return (
     <div className="flex flex-col items-end gap-1">
       <Button
         onClick={onWatch}
-        disabled={
-          watch.kind === "wait" || watch.kind === "none" || running || pending
-        }
+        disabled={isBlocked(watch) || running || pending}
         title={title}
         className="gap-1.5"
       >
