@@ -1796,7 +1796,7 @@ fn advertising(advertised: relay_host::Advertised, battle: &BattleToOpen) -> Vec
 /// is not the port anybody dials, so it stays out of the wire lines and goes to
 /// the relay agent instead, as `--engine-port`.
 ///
-/// ## Why a relayed open waits for the lobby and a direct one does not
+/// ## Why both routes wait for the lobby
 ///
 /// Queueing two lines is not opening a battle. The lobby can still refuse, and
 /// on the relay route a refusal leaves a sidecar holding an allocation for a
@@ -1805,8 +1805,9 @@ fn advertising(advertised: relay_host::Advertised, battle: &BattleToOpen) -> Vec
 /// out but ending it by hand (issue #2058).
 ///
 /// So the relay route waits to hear which happened and stops the agent unless
-/// the answer is a battle. A direct host has nothing running to stop, so
-/// nothing there changes.
+/// the answer is a battle. A direct host has nothing running to stop, but it
+/// waits too, so that a refusal reaches the form as an error instead of the
+/// form closing over a battle that does not exist (issue #3534).
 ///
 /// The lobby refusing the address, `RELAYEDHOSTFAILED`, is the same wait and the
 /// same stop, with one thing more to do: the lobby usually opens the battle
@@ -1877,8 +1878,8 @@ async fn open_battle(
     .await
 }
 
-/// Queue the lines that advertise a battle, and on the relay route wait to hear
-/// whether the lobby opened one.
+/// Queue the lines that advertise a battle, and wait to hear whether the lobby
+/// opened one. The relay route also stops its agent when it did not.
 ///
 /// Split from [`open_battle`] because this is the half that can be driven
 /// without a sidecar and without a TURN server: hand it a `hosted` whose control
@@ -1894,10 +1895,11 @@ async fn advertise(
     hosted: Option<relay_host::RelayHost>,
     patience: Duration,
 ) -> CliResult {
-    // Not a relayed battle, so there is no allocation riding on the answer and
-    // no reason to make the host wait for one. This is every host today.
+    // Not a relayed battle, so there is no allocation to take down. The host
+    // still waits for the answer, because a lobby that turns the battle down
+    // leaves nothing to join and the form has to say so (issue #3534).
     let Some(host) = hosted else {
-        return enqueue_all(registry, server_key, lines);
+        return advertise_direct(registry, server_key, lines, patience).await;
     };
 
     // Taken before a line is queued and marked seen in the same breath, so an
@@ -1988,6 +1990,49 @@ async fn advertise(
             let _ = host.agent.stop();
             CliResult::err(why.to_string())
         }
+    }
+}
+
+/// The direct half of [`advertise`]: queue the lines and wait for the lobby to
+/// say a battle exists, with nothing to stop if it does not.
+///
+/// uberserver turns a battle down from several places. Most answer with
+/// `OPENBATTLEFAILED`, which is the reason that comes back. Hosting without TLS
+/// is answered with a bare `SERVERMSG` and nothing else, so for that one the
+/// only evidence is that no battle was announced. The silence is reported as
+/// that, and the host is pointed at the lobby's own words rather than this code
+/// reading a sentence it does not own.
+///
+/// A connection that is not a TASServer one has no slot that is ever answered,
+/// so it keeps the old behaviour of queueing and returning.
+async fn advertise_direct(
+    registry: &Registry,
+    server_key: &str,
+    lines: Vec<String>,
+    patience: Duration,
+) -> CliResult {
+    let answers = {
+        let map = lock_or_recover(registry);
+        map.get(server_key)
+            .filter(|conn| conn.protocol == ConnProtocol::TasServer)
+            .map(|conn| conn.opened.clone())
+    };
+    let Some(mut answers) = answers else {
+        return enqueue_all(registry, server_key, lines);
+    };
+    // Marked seen before anything is queued, for the reason `advertise` gives.
+    answers.borrow_and_update();
+
+    let sent = enqueue_all(registry, server_key, lines);
+    if !sent.success {
+        return sent;
+    }
+    match relay_host::confirmed(&mut answers, patience).await {
+        Ok(_) => sent,
+        Err(why @ relay_host::NoBattle::Silent(_)) => CliResult::err(format!(
+            "{why}. The lobby may have said why in a server message"
+        )),
+        Err(why) => CliResult::err(why.to_string()),
     }
 }
 
@@ -5283,7 +5328,10 @@ mod tests {
     /// this: one line, the port it was given, and no address.
     #[tokio::test]
     async fn hosting_without_a_relay_still_sends_one_ordinary_line() {
-        let (registry, mut sent, _answers) = a_connection("COMPFLAGS u sp");
+        let (registry, mut sent, answers) = a_connection("COMPFLAGS u sp");
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Opened(9));
+        });
 
         let opened = open_battle(&registry, "alice@bar:8200", 8452, a_battle_to_open(), None).await;
 
@@ -5293,6 +5341,95 @@ mod tests {
             Ok(Outbound::Line(line)) if line.starts_with("OPENBATTLE 0 0 * 8452 8")
         ));
         assert!(sent.try_recv().is_err(), "one line and no more");
+    }
+
+    /// Issue #3534. A direct host used to be told "sent" the moment the line was
+    /// queued, so a lobby that refused the battle left the form closed over a
+    /// battle that did not exist. The lobby's reason has to come back as the
+    /// error.
+    #[tokio::test]
+    async fn a_direct_battle_the_lobby_refuses_is_an_error_with_its_reason() {
+        let (registry, _sent, answers) = a_connection("COMPFLAGS u sp");
+
+        tokio::spawn(async move {
+            let _ = answers.send(relay_host::OpenAnswer::Refused(
+                "Invalid game hash 0".to_string(),
+            ));
+        });
+        let refused = advertise(
+            &registry,
+            "alice@bar:8200",
+            advertising(relay_host::Advertised::direct(8452), &a_battle_to_open()),
+            None,
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(!refused.success, "the lobby refused, so nothing opened");
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("Invalid game hash 0"),
+            "got: {:?}",
+            refused.error
+        );
+    }
+
+    /// Issue #3534, over a real socket. uberserver turns a battle down on a
+    /// connection without TLS with a bare `SERVERMSG` and nothing else, so the
+    /// only evidence is that no battle was announced. The host is told that, and
+    /// told to look at the server messages, without the sentence being matched.
+    #[tokio::test]
+    async fn a_direct_battle_a_lobby_answers_only_with_a_message_is_not_reported_as_opened() {
+        let addr = lobby_answering_an_open(|_| {
+            "SERVERMSG A TLS connection is required to host battles. Please upgrade your client."
+                .to_string()
+        })
+        .await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let refused = advertise(
+            &registry,
+            &key,
+            advertising(relay_host::Advertised::direct(8452), &a_battle_to_open()),
+            None,
+            Duration::from_millis(300),
+        )
+        .await;
+
+        assert!(!refused.success, "no battle was announced");
+        assert!(
+            refused
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("server message"),
+            "the host is pointed at the lobby's own words, got: {:?}",
+            refused.error
+        );
+    }
+
+    /// Issue #3534, over a real socket: a lobby that does open the battle still
+    /// gives a direct host a success, and as soon as it answers.
+    #[tokio::test]
+    async fn a_direct_battle_the_lobby_opens_over_a_socket_is_a_success() {
+        let addr = lobby_answering_an_open(|id| format!("OPENBATTLE {id}")).await;
+        let registry = Registry::default();
+        let (key, _logs) = logged_in(&registry, addr).await;
+
+        let opened = advertise(
+            &registry,
+            &key,
+            advertising(relay_host::Advertised::direct(8452), &a_battle_to_open()),
+            None,
+            HOSTING_PATIENCE,
+        )
+        .await;
+
+        assert!(opened.success, "got: {:?}", opened.error);
     }
 
     /// A password the line cannot carry is refused before anything else happens,
