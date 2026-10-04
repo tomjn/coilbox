@@ -23,7 +23,7 @@ import {
   memorySettingsStorage,
   readStoredSetting,
 } from "../lib/storedSetting";
-import type { SkirmishDraft } from "./drafts";
+import { type SkirmishDraft, useSkirmishDraft } from "./drafts";
 import {
   PRESET_KIND_VERSION,
   PRESETS_KEY,
@@ -392,6 +392,60 @@ describe("useSkirmishPresets", () => {
     const drop = savePreset("Drop", draftWith(["rl0", "rl1"]));
     removePreset(drop.id);
     expect(stored().map((p) => p.name)).toEqual(["Keep"]);
+  });
+});
+
+describe("an AI's bonus in presets and drafts", () => {
+  beforeEach(() => {
+    storage = memorySettingsStorage();
+    installSettingsStorage(storage);
+  });
+
+  const boosted = (ids: [string, string], bonus = 30): SkirmishDraft => {
+    const draft = draftWith(ids);
+    return {
+      ...draft,
+      participants: draft.participants.map((p) =>
+        p.kind === "ai" ? { ...p, handicap: bonus } : p,
+      ),
+    };
+  };
+  const aiBonus = (d: { participants: SkirmishDraft["participants"] }) =>
+    d.participants.find((p) => p.kind === "ai")?.handicap;
+
+  it("keeps the bonus in a saved preset", () => {
+    const { savePreset } = useSkirmishPresets();
+    savePreset("Boosted", boosted(["rl0", "rl1"]));
+    const [saved] = readStoredSetting<SkirmishPreset[]>(PRESETS_KEY, []);
+    expect(aiBonus(saved)).toBe(30);
+  });
+
+  it("keeps the bonus through a shared or exported preset", () => {
+    const code = encodeContainerCode(
+      "preset",
+      PRESET_KIND_VERSION,
+      presetPayload(asPreset(boosted(["rl0", "rl1"])), []),
+    );
+    const parsed = parsePresetJson(code);
+    expect(parsed && aiBonus(parsed)).toBe(30);
+  });
+
+  it("keeps the bonus in the working draft", () => {
+    const [, setDraft] = useSkirmishDraft();
+    setDraft(boosted(["rl0", "rl1"]));
+    const [draft] = useSkirmishDraft();
+    expect(aiBonus(draft)).toBe(30);
+  });
+
+  it("tells a boosted preset from the same battle without a bonus", () => {
+    const saved = asPreset(draftWith(["rl0", "rl1"]));
+    expect(presetMatchesDraft([saved], boosted(["rl0", "rl1"]))).toBe(false);
+    expect(
+      presetMatchesDraft(
+        [asPreset(boosted(["rl0", "rl1"]))],
+        boosted(["rl4", "rl5"]),
+      ),
+    ).toBe(true);
   });
 });
 

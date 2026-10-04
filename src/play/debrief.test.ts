@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bumpAiHandicap, describeOutcome } from "./debrief";
+import { bumpAiHandicap, describeOutcome, HANDICAP_TWEAKS } from "./debrief";
 import type { Participant } from "./participants";
 
 describe("describeOutcome", () => {
@@ -77,5 +77,14 @@ describe("bumpAiHandicap", () => {
   it("clamps at 100", () => {
     const result = bumpAiHandicap([ai({ handicap: 95 })], 25);
     expect(result[0].handicap).toBe(100);
+  });
+});
+
+describe("HANDICAP_TWEAKS", () => {
+  it("steps in whole percents, the unit of the bonus control (0 to 100, step 1)", () => {
+    for (const { delta } of HANDICAP_TWEAKS) {
+      expect(Number.isInteger(delta)).toBe(true);
+      expect(Math.abs(delta)).toBeLessThanOrEqual(100);
+    }
   });
 });
