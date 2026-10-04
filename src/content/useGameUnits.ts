@@ -16,6 +16,7 @@ import { usePreferredTarget } from "@/play/config";
 import { compareGameVersions } from "@/play/installedGames";
 import type { UnitDatasetEntry } from "./bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "./config";
+import { answeredScan } from "./scanSettled";
 
 export interface GameUnits {
   /** Every unit the game has, unsorted. Empty until it has been read. */
@@ -95,7 +96,7 @@ export function useGameUnits(gameName: string, shortname?: string): GameUnits {
   return {
     units: dataset?.units ?? [],
     loading: scan.loading || status === "loading",
-    gameMissing: !!gameName && !!scan.data && !game,
+    gameMissing: !!gameName && !!answeredScan(scan.data) && !game,
     archive: game?.primaryArchive.name,
     resolved: game?.name,
   };

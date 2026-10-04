@@ -1698,10 +1698,13 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
     let us = unsafe { Unitsync::load(Path::new(lib))? };
 
     let mut errors = Vec::new();
-    if us.init(false, 0) == 0 {
+    let init_ok = us.init(false, 0) != 0;
+    if !init_ok {
         errors.push("unitsync Init returned 0 (failure); results may be empty".into());
     }
-    errors.extend(us.drain_errors());
+    let diagnostics = us.drain_errors();
+    let init_failure = init_failure(init_ok, &diagnostics);
+    errors.extend(diagnostics);
     if timings {
         eprintln!("[unitsync-timing] init={}ms", t0.elapsed().as_millis());
     }
@@ -1734,8 +1737,22 @@ fn scan(lib: &str) -> Result<ScanOutput, String> {
         maps,
         games,
         errors,
+        init_failure,
         sync_version,
     })
+}
+
+/// Why a scan whose `Init` failed cannot say what is installed, or `None` when
+/// `Init` succeeded. The engine's own diagnostics say why (a full disk reads as
+/// a full disk), so they are the reason when there are any.
+fn init_failure(init_ok: bool, diagnostics: &[String]) -> Option<String> {
+    if init_ok {
+        return None;
+    }
+    if diagnostics.is_empty() {
+        return Some("unitsync Init returned 0 (failure)".into());
+    }
+    Some(diagnostics.join("; "))
 }
 
 /// Load one map's archive set and read its options (+ attributed diagnostics).
@@ -1993,6 +2010,38 @@ fn print_json(out: &ScanOutput) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failed_init_is_reported_with_the_engines_own_reason() {
+        let diagnostics = vec!["Init: not enough free space on drive".to_string()];
+        assert_eq!(
+            init_failure(false, &diagnostics).as_deref(),
+            Some("Init: not enough free space on drive")
+        );
+    }
+
+    #[test]
+    fn a_failed_init_with_no_diagnostics_still_says_it_failed() {
+        assert!(init_failure(false, &[]).is_some());
+    }
+
+    #[test]
+    fn a_successful_init_reports_no_failure_whatever_the_diagnostics() {
+        let diagnostics = vec!["a missing dependency archive".to_string()];
+        assert_eq!(init_failure(true, &diagnostics), None);
+    }
+
+    #[test]
+    fn the_failure_reaches_the_json_the_frontend_reads() {
+        let failed = ScanOutput {
+            init_failure: Some("disk full".into()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&failed).unwrap();
+        assert_eq!(json["initFailure"], "disk full");
+        let ok = serde_json::to_value(ScanOutput::default()).unwrap();
+        assert!(ok.get("initFailure").is_none());
+    }
 
     #[test]
     fn the_chosen_root_leads_the_datadir_list() {

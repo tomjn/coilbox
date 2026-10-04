@@ -28,6 +28,23 @@ export function ErrorBanner({ message }: { message: string }) {
   );
 }
 
+/**
+ * The empty state for a scan whose unitsync `Init` failed (issue #3392). The
+ * lists it came back with are empty because the engine could not start, so
+ * "no games yet" would be a claim the scan never made.
+ */
+export function ScanFailed({ noun, reason }: { noun: string; reason: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle />
+      <AlertTitle>The scan failed, so no {noun} are listed</AlertTitle>
+      <AlertDescription className="break-words">
+        Anything already installed is still on disk. unitsync said: {reason}
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 /** What unitsync said, one line each, wherever the lines are being shown. */
 function DiagnosticsLines({ errors }: { errors: string[] }) {
   return (

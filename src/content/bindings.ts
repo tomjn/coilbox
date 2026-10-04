@@ -2195,6 +2195,12 @@ export interface ScanResult {
   games: GameItem[];
   /** Non-fatal diagnostics drained from unitsync during the scan. */
   errors: string[];
+  /**
+   * Set when unitsync's `Init` failed (a full disk, say): the lists above are
+   * then empty or partial, and say nothing about what is installed. The engine's
+   * reason for the failure.
+   */
+  initFailure?: string;
   syncVersion?: string;
 }
 
