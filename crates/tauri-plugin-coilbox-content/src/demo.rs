@@ -394,8 +394,10 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
 // ---- decoding --------------------------------------------------------------
 
 /// Decode one replay: native header + start-script + trailer, with `demotool`
-/// as a fallback for a trailer the decoder refuses.
-pub fn demo_info(engine_dir: &Path, demo: &Path) -> Result<DemoInfo, String> {
+/// as a fallback for a trailer the decoder refuses. `engine_dir` is only where
+/// that fallback looks, so `None` (no engine installed) still answers with the
+/// header and script and leaves a winner the trailer cannot give unknown.
+pub fn demo_info(engine_dir: Option<&Path>, demo: &Path) -> Result<DemoInfo, String> {
     Ok(decode(engine_dir, demo)?.0)
 }
 
@@ -411,10 +413,13 @@ pub fn demo_info_for_stats(
     engine_dir: &Path,
     demo: &Path,
 ) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
-    decode(engine_dir, demo)
+    decode(Some(engine_dir), demo)
 }
 
-fn decode(engine_dir: &Path, demo: &Path) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
+fn decode(
+    engine_dir: Option<&Path>,
+    demo: &Path,
+) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
     // A replay of a game nobody ended has no winners to read, and neither the
@@ -430,7 +435,7 @@ fn decode(engine_dir: &Path, demo: &Path) -> Result<(DemoInfo, Option<Vec<TeamTo
         // player statistics, since parsing them out of its text output is a
         // second decoder for a case that has never been seen.
         Some(t) => Some(t.winning_ally_teams.clone()),
-        None if raw.game_over => demotool_winners(engine_dir, demo),
+        None if raw.game_over => engine_dir.and_then(|dir| demotool_winners(dir, demo)),
         None => None,
     };
     // Measured or not is the decoder's own answer, not a second guess at it:
@@ -1709,12 +1714,18 @@ pub(crate) async fn content_list_replays(root: String) -> CliResult {
 /// `content_demo_info`, decode one replay: native header + start-script (map,
 /// game, players, sides, ally-teams) plus the trailer's winner, with `demotool`
 /// as a fallback for a trailer format the decoder refuses. `enginePath` is an
-/// `Engine.path` (where `demotool` lives). `replayPath` is an absolute demo path.
+/// `Engine.path` (where `demotool` lives), and is omitted when no engine is
+/// installed. `replayPath` is an absolute demo path.
 #[tauri::command]
-pub(crate) async fn content_demo_info(engine_path: String, replay_path: String) -> CliResult {
-    let engine = PathBuf::from(&engine_path);
+pub(crate) async fn content_demo_info(
+    engine_path: Option<String>,
+    replay_path: String,
+) -> CliResult {
+    let engine = engine_path.filter(|p| !p.is_empty()).map(PathBuf::from);
     let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo_info(&engine, &demo_path)).await {
+    match tauri::async_runtime::spawn_blocking(move || demo_info(engine.as_deref(), &demo_path))
+        .await
+    {
         Ok(Ok(info)) => CliResult::ok(json!({ "info": info })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo info task failed: {e}")),
@@ -2859,7 +2870,7 @@ mod tests {
                 panic!("{}: {err}", path.display());
             });
             let total: usize = t.teams.iter().map(|s| s.samples.len()).sum();
-            let info = demo_info(Path::new("/no/such/engine"), &path).unwrap();
+            let info = demo_info(Some(Path::new("/no/such/engine")), &path).unwrap();
             eprintln!(
                 "{}: winners={:?} teams={} samples={total} statistics={}",
                 path.file_name().unwrap().to_string_lossy(),
@@ -2918,7 +2929,7 @@ mod tests {
     fn real_demo() {
         let demo = std::env::var("COILBOX_REAL_DEMO").expect("set COILBOX_REAL_DEMO");
         let engine = std::env::var("COILBOX_ENGINE_DIR").expect("set COILBOX_ENGINE_DIR");
-        let info = demo_info(Path::new(&engine), Path::new(&demo)).unwrap();
+        let info = demo_info(Some(Path::new(&engine)), Path::new(&demo)).unwrap();
         eprintln!(
             "engine={} map={} game={} dur={}s players={} allyteams={} winnersKnown={} winners={:?}",
             info.engine_version,
@@ -3304,7 +3315,7 @@ mod tests {
         };
         let demo = write_tmp("trailer-only.sdfz", &f.gzipped());
 
-        let info = demo_info(&engine, &demo).unwrap();
+        let info = demo_info(Some(&engine), &demo).unwrap();
         assert!(info.winners_known);
         assert_eq!(info.winning_ally_teams, vec![1]);
         assert!(
@@ -3345,12 +3356,51 @@ mod tests {
             "the fixture must actually be a refusal case"
         );
 
-        let info = demo_info(&engine, &demo).unwrap();
+        let info = demo_info(Some(&engine), &demo).unwrap();
         assert!(marker.exists(), "a refused trailer must ask demotool");
         assert!(info.winners_known);
         assert_eq!(info.winning_ally_teams, vec![2]);
 
         let _ = std::fs::remove_dir_all(&engine);
+    }
+
+    /// A machine with no engine installed still reads a replay's engine
+    /// version, game and map (#3403). Only a winner `demotool` would have
+    /// supplied is absent, and it reads as unknown, not as a result.
+    #[test]
+    fn demo_info_reads_header_and_script_with_no_engine() {
+        let f = DemoFixture {
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let demo = write_tmp("no-engine.sdfz", &f.gzipped());
+        let info = demo_info(None, &demo).unwrap();
+        assert_eq!(info.engine_version, "105.1.2 TEST");
+        assert_eq!(info.game_type, "Beyond All Reason test-30018");
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
+        assert_eq!(
+            info.winning_ally_teams,
+            vec![1],
+            "the trailer needs no engine"
+        );
+    }
+
+    /// With no engine, a refused trailer has no `demotool` to fall back to, so
+    /// the winner is unknown while the header and script still read.
+    #[test]
+    fn demo_info_with_no_engine_and_a_refused_trailer_has_no_winner() {
+        let f = DemoFixture {
+            version: 6,
+            winning_ally_teams: vec![1],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        };
+        let demo = write_tmp("no-engine-refused.sdfz", &f.gzipped());
+        assert!(read_trailer(&demo).is_err());
+        let info = demo_info(None, &demo).unwrap();
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
+        assert!(!info.winners_known);
     }
 
     /// An aborted recording (no game over recorded in the header) has no
@@ -3361,7 +3411,7 @@ mod tests {
         let engine = std::env::temp_dir().join("coilbox_demo_info_aborted_test");
         let demo = write_tmp("aborted.sdfz", &DemoFixture::default().gzipped());
 
-        let info = demo_info(&engine, &demo).unwrap();
+        let info = demo_info(Some(&engine), &demo).unwrap();
         assert!(!info.winners_known);
         assert!(info.winning_ally_teams.is_empty());
         assert!(
@@ -3390,7 +3440,7 @@ mod tests {
             ..Default::default()
         };
         let demo = write_tmp("apm.sdfz", &f.gzipped());
-        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+        let info = demo_info(None, &demo).unwrap();
 
         let alice = info.players.iter().find(|p| p.name == "Alice").unwrap();
         assert_eq!(alice.stats.unwrap().num_commands, 163);
@@ -3424,7 +3474,7 @@ mod tests {
             ..Default::default()
         };
         let demo = write_tmp("uninitialised.sdfz", &f.gzipped());
-        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+        let info = demo_info(None, &demo).unwrap();
 
         assert!(info.winners_known, "the winner is still readable");
         assert!(
@@ -3459,7 +3509,7 @@ mod tests {
             ..Default::default()
         };
         let demo = write_tmp("player_ids.sdfz", &f.gzipped());
-        let info = demo_info(std::env::temp_dir().join("no_such_engine").as_path(), &demo).unwrap();
+        let info = demo_info(None, &demo).unwrap();
         let commands = |name: &str| {
             info.players
                 .iter()

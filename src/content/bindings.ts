@@ -532,10 +532,11 @@ export const contentListReplays = defineCommand<
 
 /**
  * Decode one replay. `enginePath` is an `Engine.path` (the engine folder holding
- * `demotool`); `replayPath` is a `ReplayFile.path`.
+ * `demotool`) and is left out when no engine is installed, which still reads the
+ * header and script; `replayPath` is a `ReplayFile.path`.
  */
 export const contentDemoInfo = defineCommand<
-  { enginePath: string; replayPath: string },
+  { enginePath?: string; replayPath: string },
   { info: DemoInfo }
 >("coilbox-content", "content_demo_info");
 

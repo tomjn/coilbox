@@ -37,6 +37,7 @@ import {
   replayOrigin,
 } from "../replayFilterVisibility";
 import { useReplayUserState } from "../replayUserState";
+import { useReplaysRoot } from "../useReplaysRoot";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { GatherReplaysButton } from "./components/GatherReplaysButton";
@@ -138,9 +139,8 @@ export function OriginBadge({ origin }: { origin: ReplayOrigin }) {
 export default function ReplaysPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { replays, loading, error, refresh, ready } = useReplays(
-    selected?.rootPath,
-  );
+  const replaysRoot = useReplaysRoot(selected?.rootPath);
+  const { replays, loading, error, refresh, ready } = useReplays(replaysRoot);
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
     selected?.enginePath,
     selected?.rootPath,
@@ -269,7 +269,7 @@ export default function ReplaysPage() {
   // Busy only while actually loading or before the first load completes for the
   // selected target — NOT when a load finished and simply found no replays (that
   // must fall through to the empty state, not spin a skeleton forever).
-  const busy = loading || (!!selected && !ready);
+  const busy = loading || (!!replaysRoot && !ready);
 
   return (
     <TooltipProvider>
@@ -294,10 +294,7 @@ export default function ReplaysPage() {
           {/* Some engines record into their own folder, so a player clearing an
               old engine in Finder loses those games. This puts them all in one
               place first (issue #971). */}
-          <GatherReplaysButton
-            rootPath={selected?.rootPath}
-            onGathered={refresh}
-          />
+          <GatherReplaysButton rootPath={replaysRoot} onGathered={refresh} />
         </div>
 
         {!busy && replays.length > 0 && (
@@ -385,7 +382,7 @@ export default function ReplaysPage() {
 
         {error && <ErrorBanner message={error} />}
 
-        {targets.length === 0 ? null : busy ? (
+        {busy ? (
           <SkeletonList />
         ) : replays.length === 0 ? (
           <EmptyState label="No replays found. Watch a game, or place .sdfz files in your demos folder." />

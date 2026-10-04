@@ -1964,13 +1964,16 @@ export function useSaves(rootPath?: string) {
   return { saves, loading, error, refresh, ready: loadedFor === rootPath };
 }
 
-/** Session cache of decoded demos, keyed by `enginePath::replayPath`. */
+/** Session cache of decoded demos, keyed by `enginePath::replayPath` (the engine
+ * part is empty when no engine is installed). */
 const demoInfoCache = new Map<string, DemoInfo>();
 
 /**
  * Lazily decode one replay (native header, start-script and trailer, with
  * demotool asked only as a fallback for a trailer format the decoder
- * refuses). Cached for the session, decoding re-reads the file.
+ * refuses). Cached for the session, decoding re-reads the file. `enginePath`
+ * is optional: with no engine installed the header and script still decode, and
+ * only a winner the trailer cannot give is left unknown.
  */
 export function useDemoInfo(enginePath?: string, replayPath?: string) {
   const [info, setInfo] = useState<DemoInfo | null>(null);
@@ -1978,11 +1981,11 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enginePath || !replayPath) {
+    if (!replayPath) {
       setInfo(null);
       return;
     }
-    const key = `${enginePath}::${replayPath}`;
+    const key = `${enginePath ?? ""}::${replayPath}`;
     const cached = demoInfoCache.get(key);
     if (cached) {
       setInfo(cached);
