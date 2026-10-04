@@ -53,6 +53,8 @@ import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
+import { finishedConquest } from "../unlocks";
+import { useAwardFinishedConquest } from "../useUnlocks";
 import { BattleOverlay } from "./components/BattleOverlay";
 import {
   BracketFrame,
@@ -115,6 +117,8 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   // A finished run counts toward its challenge's best result, once.
   const challengeId = galaxyIdentity(galaxy);
   useRecordChallengeRun(state ? conquestRunResult(galaxy, state) : null);
+  // ...and toward the threat levels it unlocks, once.
+  useAwardFinishedConquest(state ? finishedConquest(galaxy, state) : null);
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the selection panel opens straight to it. A stale id (the
   // node no longer exists) just finds nothing and the panel stays closed.

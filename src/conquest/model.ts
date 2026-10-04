@@ -2,6 +2,7 @@ import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import { expandRevealed } from "./fog";
+import { readThreatLevel } from "./threat";
 
 /**
  * Galactic-conquest schema — the single source of truth for the shape of a
@@ -189,6 +190,8 @@ export interface GalaxyDoc {
     skin?: "galaxy" | "theatre";
     startingSystems?: number;
     fogOfWar?: boolean;
+    /** Threat level 0..3 (see `./threat`). Absent reads as 0. */
+    threatLevel?: number;
     /** Real-star mode only: the catalogue radius in light years. */
     radiusLy?: number;
   };
@@ -389,6 +392,7 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
         ? clamp(Math.round(g.startingSystems), 1, 4)
         : undefined,
     fogOfWar: g.fogOfWar === true ? true : undefined,
+    threatLevel: readThreatLevel(g.threatLevel) || undefined,
   };
 }
 

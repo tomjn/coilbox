@@ -71,7 +71,10 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
+import { unlockedLevel } from "../unlocks";
+import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
+import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
 /**
  * The Conquest hub: in-progress runs first, then galaxies ready to start
@@ -629,6 +632,12 @@ function GenerateGalaxyForm({
   const [style, setStyle] = useState("galaxy");
   const [starting, setStarting] = useState(STARTING_DEFAULT);
   const [fog, setFog] = useState(false);
+  const [threatChoice, setThreatChoice] = useState(0);
+  // Unlocks are per game, so a level chosen for one game never carries to a
+  // game that has not unlocked it.
+  const { unlocks } = useConquestUnlocks();
+  const ceiling = unlockedLevel(unlocks, effectiveShort);
+  const threat = Math.min(threatChoice, ceiling);
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
   );
@@ -666,6 +675,7 @@ function GenerateGalaxyForm({
       startingSystems:
         starting === STARTING_DEFAULT ? undefined : Number(starting),
       fogOfWar: fog,
+      threatLevel: threat,
       names,
       id,
       title: `${effectiveShort} Conquest`,
@@ -682,6 +692,7 @@ function GenerateGalaxyForm({
       style,
       starting,
       fog,
+      threat,
       names,
     ],
   );
@@ -813,6 +824,11 @@ function GenerateGalaxyForm({
               options={FACTION_OPTIONS}
             />
           </div>
+          <ThreatLevelSelect
+            value={threat}
+            ceiling={ceiling}
+            onChange={setThreatChoice}
+          />
           {!realStars && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Map style</span>
