@@ -48,11 +48,13 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import type { ReplayEngineNotice } from "../replayEngine";
 import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { answeredScan } from "../scanSettled";
+import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
@@ -506,10 +508,77 @@ function MapDownload({
 }
 
 /**
- * Missing-content affordance for the replay's game and/or map, surfaced near
+ * The engine the replay was recorded on, for the missing-content notice (issue
+ * #3370). A replay only plays back on that version. When no build of it can be
+ * downloaded the version is named, so the player knows which engine to find.
+ */
+function EngineDownload({
+  notice,
+  engine,
+}: {
+  notice: Extract<ReplayEngineNotice, { kind: "download" | "unavailable" }>;
+  engine: ReplayEngine;
+}) {
+  const { requirement, resolve } = engine;
+  const status = resolve.statusFor(requirement);
+  const item = resolve.itemFor(requirement);
+  const error = resolve.errorFor(requirement);
+  const busy = status === "active" || status === "queued";
+
+  if (notice.kind === "unavailable") {
+    return (
+      <p className="text-xs text-muted-foreground">
+        {notice.reason === "no-write-root" ? (
+          <>
+            Engine {notice.version} is not installed. Set a download folder in{" "}
+            <Link
+              className="underline underline-offset-4"
+              to="/settings/downloads"
+            >
+              Downloads settings
+            </Link>{" "}
+            to download it.
+          </>
+        ) : (
+          <>
+            Engine {notice.version} is not installed, and no download was found
+            for it on this platform. Install it yourself in Settings, Engines.
+          </>
+        )}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <Button
+          onClick={() => resolve.download(requirement)}
+          disabled={busy}
+          className="gap-1.5"
+        >
+          {busy ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Download className="size-4" />
+          )}
+          {status === "queued" ? "Queued…" : "Download engine"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Recorded on {notice.version}. A replay only plays on that version.
+        </span>
+      </div>
+      <QueueProgress item={item} className="max-w-xs" />
+      {error && <p className="text-xs text-destructive">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * Missing-content affordance for the replay's game, map and engine, surfaced near
  * the top of the page next to the game/map identity (#495) instead of at the
  * bottom, so it's the first thing a user sees when something needs
- * downloading. Renders nothing once both are installed, the common case,
+ * downloading. Renders nothing once all are installed, the common case,
  * especially after the #494 version-tolerant match fix.
  */
 function MissingContentNotice({
@@ -517,21 +586,30 @@ function MissingContentNotice({
   mapName,
   missingGame,
   missingMap,
+  engine,
   onMapDownloaded,
 }: {
   gameType: string;
   mapName: string;
   missingGame: boolean;
   missingMap: boolean;
+  engine: ReplayEngine;
   onMapDownloaded: () => void;
 }) {
-  if (!missingGame && !missingMap) return null;
-  const label =
-    missingGame && missingMap
-      ? "Game and map not installed"
-      : missingGame
-        ? "Game not installed"
-        : "Map not installed";
+  const engineNotice =
+    engine.notice.kind === "download" || engine.notice.kind === "unavailable"
+      ? engine.notice
+      : null;
+  if (!missingGame && !missingMap && !engineNotice) return null;
+  const missing = [
+    missingGame && "Game",
+    missingMap && "Map",
+    engineNotice && "Engine",
+  ].filter((m): m is string => !!m);
+  const label = `${missing
+    .map((m, i) => (i === 0 ? m : m.toLowerCase()))
+    .join(", ")
+    .replace(/, ([^,]*)$/, " and $1")} not installed`;
   return (
     <section className="flex flex-col gap-2 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
       <div className="flex items-center gap-1.5 text-sm font-medium text-amber-700 dark:text-amber-400">
@@ -541,6 +619,7 @@ function MissingContentNotice({
       {missingMap && mapName && (
         <MapDownload mapName={mapName} onDownloaded={onMapDownloaded} />
       )}
+      {engineNotice && <EngineDownload notice={engineNotice} engine={engine} />}
     </section>
   );
 }
@@ -778,6 +857,7 @@ export default function ReplayDetailPage() {
   );
   // Drives the engine-mismatch "may not sync" hint under the header.
   const { resolved } = useReplayTarget(info?.engineVersion ?? "");
+  const engine = useReplayEngine(info?.engineVersion ?? "");
   const userState = useReplayUserState();
   const provenance = userState.get(filename).provenance;
   const origin = provenance?.mode ?? "other";
@@ -902,12 +982,15 @@ export default function ReplayDetailPage() {
               <ArrowLeft className="size-3.5" /> {link.label}
             </Link>
           )}
-          {info && resolved && !resolved.matched && (
-            <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
-              Recorded on {info.engineVersion || "an unknown engine"}; watching
-              with {resolved.target.engineVersion} — may not sync.
-            </p>
-          )}
+          {info &&
+            resolved &&
+            !resolved.matched &&
+            engine.watch.kind === "fallback" && (
+              <p className="max-w-md text-xs text-amber-600 dark:text-amber-400">
+                Recorded on {info.engineVersion || "an unknown engine"};
+                watching with {resolved.target.engineVersion} — may not sync.
+              </p>
+            )}
         </div>
         {replay && info && (
           // Destructive + secondary actions first, and the primary CTA (Watch)
@@ -935,6 +1018,7 @@ export default function ReplayDetailPage() {
             <WatchButton
               replayPath={replay.path}
               engineVersion={info.engineVersion}
+              watch={engine.watch}
             />
           </div>
         )}
@@ -951,6 +1035,7 @@ export default function ReplayDetailPage() {
             mapName={info.mapName}
             missingGame={missingGame}
             missingMap={missingMap}
+            engine={engine}
             onMapDownloaded={onMapDownloaded}
           />
 

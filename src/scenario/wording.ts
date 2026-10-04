@@ -38,6 +38,16 @@ export function gameNotInstalled(
     : `${missing} Install it from Content, or set the scenario up on a game you have.`;
 }
 
+/** The scenario's map is not installed. */
+export function mapNotInstalled(
+  reader: ScenarioReader,
+  mapName: string,
+): string {
+  return reader === "player"
+    ? `${mapName} is not installed. Install it from Content to play this scenario.`
+    : `${mapName} is not installed. Install it from Content, or set the scenario up on a map you have.`;
+}
+
 /**
  * What a player is told about every route that is not the game's own. Which of
  * the three it is, and why, is the author's business: a player needs to know

@@ -15,6 +15,7 @@ import {
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
 import { shareInFlight } from "../content/inFlight";
+import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import { withoutGeneratedGames } from "../lib/generatedGames";
 import { type GameListState, gameListState } from "./gameListState";
 
@@ -249,7 +250,14 @@ export function useReplayTarget(demoVersion: string): {
   resolved: ReplayTarget | null;
   loading: boolean;
 } {
-  const { state, loading } = useContentState();
+  const { state, loading, refresh } = useContentState();
+  // This hook holds its own read of the installed engines, so an engine that
+  // finishes downloading is invisible to it until it looks again (issue #3370).
+  useDownloadComplete((done) => {
+    if (done.kind === "engineRecoil" || done.kind === "engineSpring") {
+      void refresh();
+    }
+  });
   const roots = state?.roots ?? [];
   const engines = roots.flatMap((r) =>
     r.engines.map((e) => ({ id: e.id, version: e.syncVersion ?? e.version })),

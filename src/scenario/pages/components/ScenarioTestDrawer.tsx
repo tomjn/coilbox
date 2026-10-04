@@ -220,6 +220,7 @@ export function ScenarioTestDrawer({
         scenario,
         hasEngine: targetLoading || !!target,
         games: scan.data?.games ?? null,
+        maps: scan.data?.maps ?? null,
         running: play.running && !busy,
         reader,
       });
