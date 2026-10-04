@@ -34,7 +34,6 @@ import {
   ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
-import type { ContentRequirement } from "../../content/resolveContent";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
@@ -59,6 +58,11 @@ import {
   substitutedMapCount,
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
+import {
+  gameRequirement,
+  offerableGames,
+  resolveGameDownload,
+} from "../gameOffer";
 import { type GenerateOptions, generateGalaxy } from "../generate";
 import type { ConquestState, GalaxyDoc } from "../model";
 import { mergeConquestNames } from "../names";
@@ -67,32 +71,9 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
+import { useGameCatalog } from "../useGameCatalog";
+import { DownloadGameButton } from "./components/DownloadGameButton";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
-
-/** Best-effort shortname/version match, mirroring `resolveGameByShortname`
- * (issue #387: the content-resolution step for a decoded challenge). */
-function shortnameGameRequirement(
-  game: ConquestChallengeSettings["game"],
-): ContentRequirement {
-  return {
-    kind: "game",
-    label: game.pinnedName ?? game.shortname,
-    downloadKey: game.shortname,
-    isInstalled: (installed) => {
-      const matcher = getGameMatcher();
-      const games = installed.games.filter((g) => !matcher || matcher(g.name));
-      return (
-        resolveGameByShortname(
-          game,
-          games.map((g) => ({
-            name: g.name,
-            info: { shortname: g.shortname ?? "", version: g.version ?? "" },
-          })),
-        ) !== undefined
-      );
-    },
-  };
-}
 
 /**
  * The Conquest hub: in-progress runs first, then galaxies ready to start
@@ -110,7 +91,21 @@ export default function ConquestListPage() {
   // rapid installs (BAR et al.) live in packages/pool, not games/*.sd7. Shared
   // with the sidebar nav badge (issue #419) via `usePlayReadiness`, so the two
   // never disagree.
-  const { target, state, scanErrors } = usePlayReadiness();
+  const { target, state, scanErrors, refresh } = usePlayReadiness();
+  // The games the galaxies on this machine are made for, with the download of
+  // each one a download can be named for (issue #3368). Needs an engine: the
+  // check cannot read what is installed without one.
+  const gameCatalog = useGameCatalog();
+  const gameOffers = useMemo(
+    () =>
+      target
+        ? offerableGames(
+            galaxies.map((g) => g.galaxy.game),
+            gameCatalog,
+          )
+        : [],
+    [target, galaxies, gameCatalog],
+  );
   // "scanning" is deliberately absent: a scan that has not answered yet leaves
   // the list up rather than flashing an empty state that is about to be wrong.
   const needsGame =
@@ -232,7 +227,16 @@ export default function ConquestListPage() {
                     : "Install an engine and at least one game, then return here to generate a galaxy for it."}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap justify-center gap-2">
+              {state !== "unreadable" &&
+                gameOffers.map(({ game, download }) => (
+                  <DownloadGameButton
+                    key={`${game.shortname}|${game.pinnedName ?? ""}`}
+                    game={game}
+                    download={download}
+                    onReady={refresh}
+                  />
+                ))}
               {(!target || state === "unreadable") && (
                 <Link
                   to="/settings/engines"
@@ -892,11 +896,10 @@ function GenerateGalaxyForm({
  * `ImportChallengeForm` (issue #2441) with conquest's own decode and finish.
  * Warpath's counterpart is `ImportChallengeForm.tsx`.
  *
- * SEAM FOR #387 (resolve missing content on import): the "game not installed"
- * branch below is exactly where a content-resolution/download flow belongs. It
- * currently just reports the gap. `optionsFromChallenge` (see `../challenge.ts`)
- * is the pure settings -> generator-options step #387's resolution result would
- * feed into unchanged.
+ * A game that is not installed is offered for download by the shared form's
+ * content gate before `finish` runs (issues #387 and #3368). The gate fetches the
+ * name `resolveGameDownload` gives it. The "not installed" error in `finish`
+ * only fires if the gate was passed without the game arriving.
  */
 function ImportChallengeForm({
   onImported,
@@ -909,6 +912,7 @@ function ImportChallengeForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
+  const gameCatalog = useGameCatalog();
   const { eligible } = useMapEligibility();
 
   const { run: runScan, data: scanData, loading: scanLoading } = scan;
@@ -955,7 +959,12 @@ function ImportChallengeForm({
       substitutedNoun="systems"
       initialCode={initialCode}
       decode={decodeConquestChallenge}
-      buildRequirement={(settings) => shortnameGameRequirement(settings.game)}
+      buildRequirement={(settings) =>
+        gameRequirement(
+          settings.game,
+          resolveGameDownload(settings.game, gameCatalog) ?? undefined,
+        )
+      }
       finish={finish}
       countSubstitutedMaps={substitutedMapCount}
       onImported={onImported}

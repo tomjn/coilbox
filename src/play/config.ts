@@ -1,5 +1,5 @@
 import { useSetting } from "@picoframe/frame";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   type ConfigOption,
   type SkirmishAi,
@@ -193,9 +193,16 @@ export function usePlayReadiness(): {
   state: GameListState;
   /** Diagnostics unitsync reported during the scan, for the same screens. */
   scanErrors: string[];
+  /** Scan again, for a screen that has just installed a game. This hook holds
+   * its own read, so it does not see a download made elsewhere until told to. */
+  refresh: () => Promise<void>;
 } {
   const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const { run } = scan;
+  const refresh = useCallback(async () => {
+    await run(true);
+  }, [run]);
   const scanResolved = scan.data != null;
   // Coilbox's own generated games do not count. A player whose only game is the
   // one the unit builder wrote has nothing to play, and every empty state that
@@ -210,7 +217,15 @@ export function usePlayReadiness(): {
   });
   const needsGame = !target || (scanResolved && !hasGames);
   const loading = targetLoading || (!!target && !scanResolved);
-  return { ready: !needsGame, loading, target, hasGames, state, scanErrors };
+  return {
+    ready: !needsGame,
+    loading,
+    target,
+    hasGames,
+    state,
+    scanErrors,
+    refresh,
+  };
 }
 
 /** A resolved replay launch target plus whether its engine exactly matches the
