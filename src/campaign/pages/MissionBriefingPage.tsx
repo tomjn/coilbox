@@ -1,8 +1,6 @@
 import { Button, buttonVariants, cn, useHideSidebar } from "@picoframe/frame";
 import {
   ArrowLeft,
-  ChevronRight,
-  Download,
   Loader2,
   Play,
   RotateCcw,
@@ -15,13 +13,11 @@ import { Link, useParams } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { invalidateMapPreview, invalidateScans } from "../../content/config";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
-import { useWriteRootPath } from "../../downloads/config";
-import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
-import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { usePreferredTarget } from "../../play/config";
 import { useCampaigns } from "../campaigns";
+import type { MissionNeed } from "../missionNeeds";
 import type { Campaign, CampaignMission } from "../model";
-import { type MissionRequirement, useMissionRun } from "../run";
+import { useMissionRun } from "../run";
 import { BriefingProse } from "./components/Briefing";
 import { CampaignImage } from "./components/CampaignImage";
 import {
@@ -29,6 +25,7 @@ import {
   MissionMapSideGraphic,
 } from "./components/MissionMapPreview";
 import { MissionMediaPlayer } from "./components/MissionMediaFields";
+import { MissionNeedsPanel } from "./components/MissionNeedsPanel";
 import { MissionUnfinishedGate } from "./components/MissionUnfinishedGate";
 import {
   MissionUnitBackground,
@@ -110,7 +107,7 @@ function MissionStage({
   // there is nothing to read a map or a unit out of when the mission's game or
   // map is missing, and nothing at all when it never named one.
   const live3d =
-    !run.missing &&
+    run.needs.length === 0 &&
     !run.unfinished &&
     !!(mission.panoramaMap || (mission.panoramaUnit && !unit.unavailable));
 
@@ -187,12 +184,8 @@ function MissionStage({
               campaignId={campaign.id}
               reason={run.unfinished}
             />
-          ) : run.missing ? (
-            <MissionRequiredGate
-              mission={mission}
-              missing={run.missing}
-              run={run}
-            />
+          ) : run.needs.length > 0 ? (
+            <MissionRequiredGate mission={mission} run={run} />
           ) : (
             <>
               {run.phase === "briefing" && (
@@ -348,21 +341,6 @@ function Briefing({
 
 /** The Start button plus the reasons it might be unavailable. */
 function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
-  if (run.noEngine) {
-    return (
-      <p className="rounded-md border border-border/50 bg-background/60 p-3 text-sm text-muted-foreground">
-        No engine found. Add a content folder with an engine in{" "}
-        <Link
-          className="font-medium underline underline-offset-4"
-          to="/settings/content-folders"
-        >
-          Settings → Content folders
-        </Link>{" "}
-        first.
-      </p>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
       {/* Only for a mission that actually plays differently at each level
@@ -390,103 +368,40 @@ function StartArea({ run }: { run: ReturnType<typeof useMissionRun> }) {
 }
 
 /**
- * The hard gate shown in place of the briefing when the mission's game or map is
- * not installed. A missing map can be downloaded and installed inline (best-effort
- * by name, or the mission's `mapDownload` override); once the rescan clears the
- * requirement the briefing takes over. A missing game just links to Downloads.
+ * The hard gate shown in place of the briefing when the engine, the mission's
+ * game or its map is not installed. Each downloads in place (the map by name or
+ * the mission's `mapDownload` override), and once the rescan clears what was
+ * short the briefing takes over.
  */
 function MissionRequiredGate({
   mission,
-  missing,
   run,
 }: {
   mission: CampaignMission;
-  missing: MissionRequirement;
   run: ReturnType<typeof useMissionRun>;
 }) {
   const { target } = usePreferredTarget();
-  const writePath = useWriteRootPath();
-  const mapDl = useQueuedDownload({
-    kind: "map",
-    label: `Map: ${mission.snapshot.mapName}`,
-    args: {
-      springName: mission.mapDownload?.springName ?? mission.snapshot.mapName,
-      searchUrl: mission.mapDownload?.searchUrl,
-      writePath,
-    },
-  });
 
-  const isMap = missing.kind === "map";
-  const downloadsLink = isMap ? "/downloads/maps" : "/downloads/games";
-  const downloading = mapDl.busy;
-  const error = mapDl.error;
-
-  const download = async () => {
-    const settled = await mapDl.start();
-    if (settled?.status !== "done") return;
-    // Drop the stale scan + map-preview caches so the rescan sees the new map.
+  const installed = async (need: MissionNeed) => {
+    // A new engine changes which engine is preferred, and the install is read
+    // through it, so reading the engines again is what brings the rescan.
+    if (need.kind === "engine") {
+      await run.refreshTarget();
+      return;
+    }
+    // Drop the stale scan + map-preview caches so the rescan sees the new content.
     invalidateScans();
-    if (target?.enginePath && target?.dataDir)
-      invalidateMapPreview(
-        target.enginePath,
-        target.dataDir,
-        mission.snapshot.mapName,
-      );
+    if (need.kind === "map" && target?.enginePath && target?.dataDir)
+      invalidateMapPreview(target.enginePath, target.dataDir, need.name);
     await run.recheck();
   };
 
   return (
-    <PhaseCard>
-      <div className="flex items-center gap-2">
-        <Download className="size-5 text-muted-foreground" />
-        <h2 className="text-lg font-semibold">
-          {isMap ? "Map required" : "Game required"}
-        </h2>
-      </div>
-      <p className="text-sm text-muted-foreground">
-        This mission needs{" "}
-        <span className="font-medium text-foreground">{missing.name}</span>{" "}
-        installed before you can play it.
-      </p>
-
-      {error && (
-        <Alert variant="destructive" className="p-3">
-          <AlertDescription className="text-destructive">
-            {error}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {isMap ? (
-        <div className="flex flex-col gap-2">
-          <Button onClick={download} disabled={downloading}>
-            {downloading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Download className="size-4" />
-            )}
-            {mapDl.status === "queued"
-              ? "Waiting for a slot…"
-              : downloading
-                ? "Downloading…"
-                : "Download & Install"}
-          </Button>
-          {downloading && <QueueProgress item={mapDl} />}
-          {/* Best-effort by name can miss maps whose springname differs; the manual
-              Downloads page is the fallback (and the only option for games). */}
-          <Link
-            to={downloadsLink}
-            className="inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:underline"
-          >
-            Find it in Downloads <ChevronRight className="size-3.5" />
-          </Link>
-        </div>
-      ) : (
-        <Link to={downloadsLink} className={cn(buttonVariants(), "w-fit")}>
-          <Download className="size-4" /> Get it in Downloads
-        </Link>
-      )}
-    </PhaseCard>
+    <MissionNeedsPanel
+      mission={mission}
+      needs={run.needs}
+      onInstalled={installed}
+    />
   );
 }
 
