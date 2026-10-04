@@ -4,7 +4,13 @@ import {
   restoreChallengeMap as restoreChallengeMapShared,
   substituteExcludedMaps as substituteExcludedMapsShared,
 } from "./mapSubstitution";
-import type { Faction, GalaxyDoc, GalaxyNode, NodeBattleSpec } from "./model";
+import type {
+  Faction,
+  GalaxyDoc,
+  GalaxyNode,
+  GameRef,
+  NodeBattleSpec,
+} from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
@@ -91,7 +97,9 @@ function mapTier(byArea: GenMap[], difficulty: number): GenMap[] {
 
 export interface GenerateOptions {
   seed: number;
-  game: { shortname: string };
+  /** `pinnedName` is the full name of the game the player chose, so every
+   *  battle launches that game (issue #3465). */
+  game: GameRef;
   maps: GenMap[];
   /** Total nodes, clamped to 8..80. */
   nodeCount: number;
@@ -601,7 +609,9 @@ export function generateGalaxy(
     description: realStars
       ? `The ${nodeCount} real star systems within ${radiusLy} light years of Sol.`
       : `A procedurally generated conquest of ${nodeCount} systems.`,
-    game: { shortname: opts.game.shortname },
+    game: opts.game.pinnedName
+      ? { shortname: opts.game.shortname, pinnedName: opts.game.pinnedName }
+      : { shortname: opts.game.shortname },
     playerFactionId: factions[0].id,
     playableFactionIds: factions.map((f) => f.id),
     factions,
@@ -831,7 +841,7 @@ export function regenerateGalaxy(
   const doc = generateGalaxy(
     {
       seed,
-      game: { shortname: galaxy.game.shortname },
+      game: galaxy.game,
       maps: env.maps,
       nodeCount: g.nodeCount,
       factionCount: g.factionCount,

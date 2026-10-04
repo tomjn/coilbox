@@ -308,6 +308,25 @@ describe("generateGalaxy", () => {
   });
 });
 
+describe("the game a galaxy is saved with (issue #3465)", () => {
+  const game = { shortname: "ZK", pinnedName: "Zero-K v1.14.10.1" };
+
+  it("stores the full name of the chosen game", () => {
+    expect(generateGalaxy({ ...base, game }, "t0").game).toEqual(game);
+  });
+
+  it("leaves a galaxy with no chosen game unpinned", () => {
+    const doc = generateGalaxy({ ...base, game: { shortname: "ZK" } }, "t0");
+    expect(doc.game).toEqual({ shortname: "ZK" });
+    expect("pinnedName" in doc.game).toBe(false);
+  });
+
+  it("keeps the chosen game when the galaxy is rerolled", () => {
+    const doc = generateGalaxy({ ...base, game }, "t0");
+    expect(regenerateGalaxy(doc, { maps }, 999, "t1")?.game).toEqual(game);
+  });
+});
+
 describe("regenerateGalaxy", () => {
   it("rerolls in place: same id/title/createdAt/knobs, new positions", () => {
     const doc = generateGalaxy({ ...base, id: "keep-id", title: "Keep" }, "t0");

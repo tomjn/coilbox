@@ -10,6 +10,10 @@ import { useMapEligibility } from "../../../content/mapEligibility";
 import type { PlayTarget } from "../../../play/config";
 import { usePreferredTarget } from "../../../play/config";
 import { challengeGameRequirement } from "../../../play/gameOffer";
+import {
+  candidateGames,
+  resolveGameByShortname,
+} from "../../../play/installedGames";
 import { useGameCatalog } from "../../../play/useGameCatalog";
 import { getGameMatcher } from "../../../profile/profile";
 import {
@@ -50,10 +54,9 @@ export function ImportChallengeForm({
     const games = (scan.data?.games ?? []).filter(
       (g) => !matcher || matcher(g.name),
     );
-    const want = settings.game.shortname.trim().toLowerCase();
-    const installedGame = games.find(
-      (g) => (g.info.shortname ?? g.name).trim().toLowerCase() === want,
-    );
+    const installedGame =
+      resolveGameByShortname(settings.game, games) ??
+      candidateGames(settings.game, games)[0];
     if (!installedGame) {
       if (scan.error) {
         throw new Error(

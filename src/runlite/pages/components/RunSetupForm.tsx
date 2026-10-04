@@ -183,7 +183,12 @@ export function RunSetupForm({
       length,
       difficulty,
       ascension,
-      game: { shortname: game.info.shortname ?? game.name },
+      // The archive the player picked, by its full name, so every battle
+      // launches it and not another archive sharing the shortname (#3465).
+      game: {
+        shortname: game.info.shortname ?? game.name,
+        pinnedName: game.name,
+      },
       factionId: "player",
       side: sideName || undefined,
       skin,

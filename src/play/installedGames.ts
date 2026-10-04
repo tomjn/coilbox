@@ -34,8 +34,10 @@ export interface InstalledGame {
   info: Record<string, string>;
 }
 
+// A game with no modinfo shortname is referred to by its name, as the setup
+// forms write it.
 const shortnameOf = (g: InstalledGame) =>
-  (g.info.shortname ?? "").trim().toLowerCase();
+  (g.info.shortname ?? g.name).trim().toLowerCase();
 
 const newestFirst = <T extends InstalledGame>(a: T, b: T) =>
   compareGameVersions(b.info.version ?? "", a.info.version ?? "");
@@ -118,8 +120,10 @@ export function decideLaunchGame<T extends InstalledGame>(
       const newer = candidates.find(
         (g) =>
           g.name !== current.name &&
-          compareGameVersions(g.info.version ?? "", current.info.version ?? "") >
-            0,
+          compareGameVersions(
+            g.info.version ?? "",
+            current.info.version ?? "",
+          ) > 0,
       );
       return newer && newer.name !== declinedUpdate
         ? { kind: "upgrade", current, newer }

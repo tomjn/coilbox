@@ -3,7 +3,7 @@ import { resolveBranding, type SuggestedGame } from "../content/branding";
 import type { ContentRequirement } from "../content/resolveContent";
 import { type GameRepo, resolveGithubRepo } from "../downloads/gameRepos";
 import { getGameMatcher } from "../profile/profile";
-import { resolveGameByShortname } from "./installedGames";
+import { candidateGames } from "./installedGames";
 
 /**
  * Turning the game a galaxy names into something the download queue can fetch
@@ -120,8 +120,8 @@ export function challengeGameRequirement(
 
 /**
  * The requirement the launch check takes for a galaxy's game. It is met by any
- * installed version of the shortname, which is how a battle later resolves the
- * game (`resolveGameByShortname`), and downloads by `download`. Without a
+ * installed version of the game, which a battle later offers to continue on
+ * (`decideLaunchGame`), and downloads by `download`. Without a
  * `download` nothing can fetch it, and the requirement says so.
  */
 export function gameRequirement(
@@ -138,13 +138,13 @@ export function gameRequirement(
       const matcher = getGameMatcher();
       const games = installed.games.filter((g) => !matcher || matcher(g.name));
       return (
-        resolveGameByShortname(
+        candidateGames(
           game,
           games.map((g) => ({
             name: g.name,
             info: { shortname: g.shortname ?? "", version: g.version ?? "" },
           })),
-        ) !== undefined
+        ).length > 0
       );
     },
   };
