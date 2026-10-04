@@ -151,6 +151,27 @@ describe("applying a project onto tweak slots", () => {
     );
   });
 
+  it("says the scan failed, not that the game is missing, when it is given the reason", async () => {
+    const { onApply } = draw({
+      archive: undefined,
+      scanFailure: "no space left on device",
+    });
+    fireEvent.click(screen.getByText(project.name));
+
+    await vi.waitFor(() => expect(onApply).toHaveBeenCalled());
+
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("no space left on device"),
+      }),
+    );
+    expect(notify).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.stringContaining("is not installed here"),
+      }),
+    );
+  });
+
   it("packs as typed and says why when the settle itself fails", async () => {
     settleTypedValuesTweaks.mockResolvedValueOnce({
       ok: false,

@@ -78,6 +78,7 @@ export function MusicSource() {
               placeholder="Pick a game"
               ariaLabel="Game to take music from"
               gamesLoading={content.scanning}
+              scanError={content.scanError}
             />
           </div>
           <span className="block text-xs text-muted-foreground">

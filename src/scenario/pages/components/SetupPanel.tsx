@@ -48,6 +48,7 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { mergeMapTiers } from "@/content/mapTiers";
+import { ScanFailed } from "@/content/pages/components/states";
 import { useGameUnits } from "@/content/useGameUnits";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
@@ -437,12 +438,13 @@ export function SetupPanel({
           />
         )}
 
-        {setup.gameName && !selectedGame && !scan.loading && (
-          <MissingNote what={setup.gameName} />
-        )}
-        {setup.mapName && !selectedMap && !scan.loading && (
-          <MissingNote what={setup.mapName} />
-        )}
+        <SetupMissing
+          scan={scan}
+          gameName={setup.gameName}
+          mapName={setup.mapName}
+          hasGame={!!selectedGame}
+          hasMap={!!selectedMap}
+        />
 
         {/* Where the mission lives, which is a fact about the game named here
             rather than about the document, so it sits with the setup. */}
@@ -531,6 +533,34 @@ export function SetupPanel({
         </div>
       </div>
     </EditorPanel>
+  );
+}
+
+/**
+ * What the setup names that this machine does not have. A scan that failed has
+ * not said what is installed, so it shows the failure and claims nothing.
+ */
+export function SetupMissing({
+  scan,
+  gameName,
+  mapName,
+  hasGame,
+  hasMap,
+}: {
+  scan: { loading: boolean; error: string | null };
+  gameName: string | undefined;
+  mapName: string | undefined;
+  hasGame: boolean;
+  hasMap: boolean;
+}) {
+  if (scan.error) {
+    return <ScanFailed noun="games or maps" reason={scan.error} />;
+  }
+  return (
+    <>
+      {gameName && !hasGame && !scan.loading && <MissingNote what={gameName} />}
+      {mapName && !hasMap && !scan.loading && <MissingNote what={mapName} />}
+    </>
   );
 }
 

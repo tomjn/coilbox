@@ -231,6 +231,33 @@ describe("deriveHealthChecks", () => {
     });
   });
 
+  describe("when the scan failed", () => {
+    const failed = {
+      ...base(),
+      installedGames: null,
+      scanError: "no space left on device",
+    };
+
+    it("says the games scan failed and why, not that it has not run", () => {
+      const c = byId(failed, "content");
+      expect(c.status).toBe("unknown");
+      expect(c.label).not.toContain("not scanned yet");
+      expect(c.label).not.toContain("No games");
+      expect(c.hint).toContain("no space left on device");
+      expect(c.hint).not.toContain("let the scan finish");
+    });
+
+    it("says why the filter was not checked, without claiming it matches nothing", () => {
+      const c = byId(
+        { ...failed, gameFilter: { names: ["Splinter Faction 1.3"] } },
+        "gameFilter",
+      );
+      expect(c.status).toBe("unknown");
+      expect(c.hint).toContain("no space left on device");
+      expect(c.hint).not.toContain("let the scan finish");
+    });
+  });
+
   it("returns unknown for a check whose input is absent", () => {
     const c = byId({ ...base(), writeRootPath: undefined }, "writeRoot");
     expect(c.status).toBe("unknown");

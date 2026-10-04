@@ -17,6 +17,7 @@ import {
   gameMatchesShortId,
   resolveReplayShortGameId,
 } from "../../resolveContent";
+import { ScanFailed } from "./states";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -171,6 +172,8 @@ function RemixForm({
           <p className="text-xs text-muted-foreground">
             Scanning installed games…
           </p>
+        ) : scan.error ? (
+          <ScanFailed noun="games" reason={scan.error} />
         ) : games.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             No installed games found to target.

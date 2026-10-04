@@ -5,7 +5,6 @@ import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
-import { scanInitFailure } from "../content/scanSettled";
 import { getProfile } from "../profile/profile";
 import {
   applyRestrictions,
@@ -141,13 +140,15 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
 
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
-  const scanReady = !!scan.data;
+  // The scan hook answers `data: null` with the reason in `error` when unitsync's
+  // `Init` failed, and an errored scan has answered (issue #3423).
+  const scanFailure = scan.error;
+  const scanReady = !!scan.data || scanFailure !== null;
 
   const installedGame = resolveGameByShortname(gameRef, games);
   // A scan whose `Init` failed has empty lists that are not a report of an
   // empty machine, so it names nothing missing and cannot start a battle
   // (issue #3398).
-  const scanFailure = scanInitFailure(scan);
   const missing: BattleRequirement | null =
     !scanReady || scanFailure
       ? null

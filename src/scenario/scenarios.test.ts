@@ -25,6 +25,9 @@ const gameScenariosMock = vi.fn();
  *  stand in for the scan resolving after the first render the way it does
  *  for real. */
 let scanData: { games: GameItem[] } | null = null;
+/** The scan's own failure reason, as the hook reports it when unitsync's
+ *  Init failed. Data stays null alongside it. */
+let scanError: string | null = null;
 
 /** What `usePreferredTarget` currently reports. Null stands in for a machine
  *  with no engine installed, where the scan never runs at all. */
@@ -41,7 +44,12 @@ vi.mock("./gameScenarios", () => ({
   gameScenarios: (...args: unknown[]) => gameScenariosMock(...args),
 }));
 vi.mock("../content/config", () => ({
-  useUnitsyncScan: () => ({ data: scanData, loading: false, error: null }),
+  useUnitsyncScan: () => ({
+    data: scanData,
+    loading: false,
+    error: scanError,
+    cancelled: false,
+  }),
 }));
 vi.mock("../play/config", () => ({
   usePreferredTarget: () => ({
@@ -58,6 +66,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   scanData = null;
+  scanError = null;
   targetData = { enginePath: "/engine", dataDir: "/data" };
   listScenariosMock.mockResolvedValue([]);
   gameScenariosMock.mockResolvedValue([]);
@@ -111,6 +120,17 @@ describe("useScenarios", () => {
     // half here would hold the page loading for good.
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(gameScenariosMock).not.toHaveBeenCalled();
+  });
+
+  it("settles when the scan failed, with the failure exposed and no game missions read", async () => {
+    scanError = "no space left on device";
+    const { useScenarios } = await import("./scenarios");
+    const { result } = renderHook(() => useScenarios());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(gameScenariosMock).not.toHaveBeenCalled();
+    expect(result.current.scenarios).toEqual([]);
+    expect(result.current.scanError).toBe("no space left on device");
   });
 
   /**

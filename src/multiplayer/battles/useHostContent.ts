@@ -122,6 +122,8 @@ export function useHostContent(
     games,
     maps,
     scanning: scan.loading,
+    /** Why the scan could not say what is installed, or null (issue #3423). */
+    scanError: scan.error,
     /** Nothing to host with, and not merely nothing scanned yet. */
     noEngine: !target && !scan.loading,
     gameName,

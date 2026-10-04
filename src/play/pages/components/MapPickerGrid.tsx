@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { MapItem } from "@/content/bindings";
 import type { MapThumbData } from "@/content/config";
 import { mapSizeLabel } from "@/content/pages/components/MapThumb";
+import { ScanFailed } from "@/content/pages/components/states";
 
 /** Unique id for a map: its name plus its own archive (distinguishes variants). */
 const mapId = (m: MapItem) => `${m.name}::${m.archives[0]?.name ?? ""}`;
@@ -23,6 +24,7 @@ export function MapPickerGrid({
   selectedName,
   onSelect,
   mapsLoading,
+  scanError,
 }: {
   maps: MapItem[];
   thumbs: Map<string, MapThumbData>;
@@ -31,6 +33,9 @@ export function MapPickerGrid({
   /** The map list is still being scanned, so an empty grid means "not loaded
    * yet" rather than "no maps installed". */
   mapsLoading?: boolean;
+  /** The content scan failed with this reason, so an empty grid is not a
+   *  claim that nothing is installed. */
+  scanError?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -126,7 +131,13 @@ export function MapPickerGrid({
               </button>
             );
           })}
+          {filtered.length === 0 && scanError && (
+            <div className="col-span-3">
+              <ScanFailed noun="maps" reason={scanError} />
+            </div>
+          )}
           {filtered.length === 0 &&
+            !scanError &&
             (mapsLoading ? (
               <div className="col-span-3 flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
                 <Loader2 className="size-4 animate-spin" aria-hidden />

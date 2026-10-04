@@ -37,6 +37,10 @@ import {
   useBattleRun,
 } from "./useBattleRun";
 
+const scanOverride = vi.hoisted(() => ({
+  current: null as Record<string, unknown> | null,
+}));
+
 const {
   applyRestrictions,
   contentDemoInfo,
@@ -68,22 +72,23 @@ vi.mock("../content/replayUserState", () => ({
   useReplayUserState: () => ({ setProvenance }),
 }));
 vi.mock("../content/config", () => ({
-  useUnitsyncScan: () => ({
-    data: {
-      games: [
-        {
-          name: "Balanced Annihilation",
-          primaryArchive: { name: "ba.sdz" },
-          dependencyArchives: [],
-          info: { shortname: "ba", version: "1.0" },
-        },
-      ],
-      maps: [{ name: "DeltaSiegeDry", archives: [], info: {} }],
-      errors: [],
+  useUnitsyncScan: () =>
+    scanOverride.current ?? {
+      data: {
+        games: [
+          {
+            name: "Balanced Annihilation",
+            primaryArchive: { name: "ba.sdz" },
+            dependencyArchives: [],
+            info: { shortname: "ba", version: "1.0" },
+          },
+        ],
+        maps: [{ name: "DeltaSiegeDry", archives: [], info: {} }],
+        errors: [],
+      },
+      loading: false,
+      run: vi.fn(),
     },
-    loading: false,
-    run: vi.fn(),
-  }),
 }));
 vi.mock("../profile/profile", () => ({ getProfile: () => ({}) }));
 vi.mock("./config", () => ({
@@ -195,6 +200,7 @@ beforeEach(() => {
   gameOptionSchema.mockClear();
   mapOptionSchema.mockClear();
   setProvenance.mockClear();
+  scanOverride.current = null;
 });
 
 afterEach(() => {
@@ -297,6 +303,35 @@ describe("launching and detecting the outcome from the replay", () => {
     expect(result.current.phase).toBe("victory");
     expect(result.current.resolved).toBe("victory");
     expect(result.current.autoDetected).toBe(false);
+  });
+});
+
+describe("a scan whose Init failed (issue #3423)", () => {
+  // The scan hook answers `data: null` with the engine's reason in `error`.
+  // That is an answer, so the gate must name the failure and claim nothing is
+  // missing, and must not read as still preparing.
+  it("reports the failure, names nothing missing and cannot start", () => {
+    scanOverride.current = {
+      data: null,
+      error: "no space left on device",
+      loading: false,
+      cancelled: false,
+      unvouched: null,
+      run: vi.fn(),
+      cancel: vi.fn(),
+    };
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          persist: vi.fn(async () => {}),
+          resolveOutcome: vi.fn((o: "victory" | "defeat") => o),
+        }),
+      ),
+    );
+    expect(result.current.scanFailure).toBe("no space left on device");
+    expect(result.current.missing).toBeNull();
+    expect(result.current.canStart).toBe(false);
+    expect(result.current.scanLoading).toBe(false);
   });
 });
 

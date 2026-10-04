@@ -78,7 +78,8 @@ export function MissingContentCard({
   // be on disk, and never repeat a download that has already finished once.
   async function downloadIfStillMissing() {
     const found = await rescan();
-    if (found?.game || completedFor(identity)) return;
+    // No answer is not "missing": a scan that failed says nothing about the disk.
+    if (!found || found.failure || found.game || completedFor(identity)) return;
     downloadGame();
   }
 
@@ -91,6 +92,9 @@ export function MissingContentCard({
         if (done.identity !== identity) return;
         setRescanning(true);
         onRescan()
+          .then((found) => {
+            if (found.failure) setError(found.failure);
+          })
           .catch((e) => setError(errMessage(e)))
           .finally(() => setRescanning(false));
       }),
@@ -101,7 +105,9 @@ export function MissingContentCard({
     setRescanning(true);
     setError(null);
     try {
-      return await onRescan();
+      const found = await onRescan();
+      if (found.failure) setError(found.failure);
+      return found;
     } catch (e) {
       setError(errMessage(e));
       return null;

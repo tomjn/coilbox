@@ -10,6 +10,7 @@ import {
 } from "../../config";
 import { BuildTreeDrawer } from "./BuildTreeDrawer";
 import { FactionBuildList } from "./FactionBuildList";
+import { ScanFailed } from "./states";
 
 /**
  * Embeds a game's build tree into a page — the engine behind the `@widget/build-tree`
@@ -32,10 +33,11 @@ export function BuildTreeEmbed({
   mode: "graph" | "buttons";
 }) {
   const { selected } = useScanTargetSelection();
-  const { data, loading: scanLoading } = useUnitsyncScan(
-    selected?.enginePath,
-    selected?.rootPath,
-  );
+  const {
+    data,
+    error: scanError,
+    loading: scanLoading,
+  } = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
   const game = useMemo(() => pickGame(data?.games ?? [], arg), [data, arg]);
   const { info: gameInfo, loading: infoLoading } = useUnitsyncGameInfo(
     selected?.enginePath,
@@ -69,6 +71,12 @@ export function BuildTreeEmbed({
 
   if (!selected)
     return <Notice>No engine selected to read the build tree.</Notice>;
+  if (scanError)
+    return (
+      <div className="my-3">
+        <ScanFailed noun="games" reason={scanError} />
+      </div>
+    );
   if (!data || scanLoading) return <EmbedSkeleton />;
   if (!game) {
     return (

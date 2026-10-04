@@ -305,7 +305,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   value={game?.name ?? ""}
                   games={games}
                   headers={gameHeaders}
-                  placeholder={waiting ? "Reading games" : "No game installed"}
+                  placeholder={
+                    waiting
+                      ? "Reading games"
+                      : scan.error
+                        ? "Scan failed"
+                        : "No game installed"
+                  }
                   disabled={busy || games.length === 0}
                   onClick={() => setPickingGame(true)}
                 />
@@ -317,7 +323,13 @@ export function TestDrawer({ open, onOpenChange, project, pack, raw }: Props) {
                   value={map?.name ?? ""}
                   onValueChange={setMapName}
                   options={maps.map((m) => ({ value: m.name, label: m.name }))}
-                  placeholder={waiting ? "Reading maps" : "No map installed"}
+                  placeholder={
+                    waiting
+                      ? "Reading maps"
+                      : scan.error
+                        ? "Scan failed"
+                        : "No map installed"
+                  }
                   disabled={busy || maps.length === 0}
                 />
               </div>

@@ -17,6 +17,7 @@ export function GameSelectCard({
   games,
   headers,
   gamesLoading,
+  scanError,
   onSelectGame,
   disabled,
 }: {
@@ -26,6 +27,8 @@ export function GameSelectCard({
   headers: Map<string, string>;
   /** The game list is still being scanned, so no games are available yet. */
   gamesLoading?: boolean;
+  /** The content scan failed with this reason, so the picker says so. */
+  scanError?: string | null;
   onSelectGame: (name: string) => void;
   disabled?: boolean;
 }) {
@@ -75,6 +78,7 @@ export function GameSelectCard({
         headers={headers}
         selectedName={game?.name ?? ""}
         onSelect={onSelectGame}
+        scanError={scanError}
       />
     </GameCardShell>
   );

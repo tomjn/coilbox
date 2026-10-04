@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { answeredScan, type ScanReading, scanSettled } from "./scanSettled";
+import { type ScanReading, scanSettled } from "./scanSettled";
 
 const RUNNING: ScanReading = {
   loading: true,
@@ -41,21 +41,5 @@ describe("whether the unitsync scan has answered", () => {
     expect(withScan(DONE)).toBe(true);
     expect(withScan(FAILED)).toBe(true);
     expect(withScan(CANCELLED)).toBe(true);
-  });
-});
-
-describe("whether a scan result can vouch for what is installed", () => {
-  it("passes a clean result through", () => {
-    const data = {};
-    expect(answeredScan(data)).toBe(data);
-  });
-
-  it("returns nothing for a result whose Init failed (issue #3392)", () => {
-    expect(answeredScan({ initFailure: "disk full" })).toBeNull();
-  });
-
-  it("returns nothing when there is no result", () => {
-    expect(answeredScan(null)).toBeNull();
-    expect(answeredScan(undefined)).toBeNull();
   });
 });
