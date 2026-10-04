@@ -155,7 +155,7 @@ export function DiagnosticsButton({
 }
 
 /**
- * Small amber glyph for a list item that has unitsync warnings. The warning
+ * Small amber glyph for a list item that has warnings. The warning
  * text is surfaced on hover; the detail page shows the full banner.
  */
 export function WarningIcon({ warnings }: { warnings: string[] }) {
@@ -166,7 +166,7 @@ export function WarningIcon({ warnings }: { warnings: string[] }) {
     >
       <TriangleAlert
         className="size-3.5"
-        aria-label={`${warnings.length} unitsync warning${
+        aria-label={`${warnings.length} warning${
           warnings.length === 1 ? "" : "s"
         }`}
       />
@@ -197,6 +197,28 @@ export function WarningBanner({
             </li>
           ))}
         </ul>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+/** Amber banner for a game with dependency archives that are not installed. */
+export function MissingDependencyBanner({ notes }: { notes: string[] }) {
+  return (
+    <Alert variant="warning">
+      <TriangleAlert />
+      <AlertTitle>A dependency of this game is missing</AlertTitle>
+      <AlertDescription>
+        <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
+          {notes.map((n) => (
+            <li key={n} className="break-words">
+              {n}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-2 text-xs text-muted-foreground">
+          A battle on this game stops in the engine until it is installed.
+        </p>
       </AlertDescription>
     </Alert>
   );

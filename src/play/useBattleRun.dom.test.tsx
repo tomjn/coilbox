@@ -459,11 +459,17 @@ describe("Warpath's own seams: the tech-ceiling/perk snapshot and its resolver",
 });
 
 /** An installed game as the scan lists it. */
-function scanGame(name: string, shortname: string, version: string) {
+function scanGame(
+  name: string,
+  shortname: string,
+  version: string,
+  missingDependencies?: string[],
+) {
   return {
     name,
     primaryArchive: { name: `${name}.sdz` },
     dependencyArchives: [],
+    ...(missingDependencies ? { missingDependencies } : {}),
     info: { shortname, version },
   };
 }
@@ -579,6 +585,59 @@ describe("which game a battle launches (issue #3465)", () => {
       kind: "game",
       name: "Zero-K v1.14.10.1",
     });
+  });
+
+  it("names the archive a game depends on that is not installed, and cannot start", () => {
+    const broken = scanGame("Zero-K Benchmark v3", "ZK", "v3", [
+      "zero-k v1.7.6.4",
+    ]);
+    scanWith([broken]);
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK", pinnedName: broken.name },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(false);
+    expect(result.current.missing).toEqual({
+      kind: "dependency",
+      name: "zero-k v1.7.6.4",
+      gameName: "Zero-K Benchmark v3",
+    });
+  });
+
+  it("starts a game whose dependencies all resolve", () => {
+    scanWith([scanGame(zk.name, "ZK", "v1.14.10.1", [])]);
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK", pinnedName: zk.name },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(true);
+    expect(result.current.missing).toBeNull();
+  });
+
+  it("reads a scan from an older worker, with no missingDependencies, as none known", () => {
+    scanWith([zk]);
+    expect("missingDependencies" in zk).toBe(false);
+    const { result } = renderHook(() =>
+      useBattleRun(
+        baseOpts<"victory" | "defeat">({
+          gameRef: { shortname: "ZK", pinnedName: zk.name },
+          persist,
+          resolveOutcome,
+        }),
+      ),
+    );
+    expect(result.current.canStart).toBe(true);
+    expect(result.current.missing).toBeNull();
   });
 
   it("holds the launch while a newer version is on offer, until it is answered", () => {

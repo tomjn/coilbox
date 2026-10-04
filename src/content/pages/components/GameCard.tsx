@@ -5,6 +5,7 @@ import { generatedGameNote } from "@/lib/generatedGames";
 import type { GameItem } from "../../bindings";
 import { useBrandingEntry, useBrandingImage } from "../../branding";
 import { isSdd } from "../../format";
+import { missingDependencyNotes } from "../../gameDependencies";
 import { GameCardShell } from "./GameCardShell";
 
 /**
@@ -43,7 +44,7 @@ export function GameCard({
       version={game.info.version}
       sdd={isSdd(game.primaryArchive)}
       generated={generatedGameNote(game.primaryArchive.name)}
-      warnings={game.warnings}
+      warnings={[...(game.warnings ?? []), ...missingDependencyNotes(game)]}
       loading={loading}
       action={
         <Button
