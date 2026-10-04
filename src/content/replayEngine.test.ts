@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InstalledEngine } from "../play/engineConfirmation";
 import {
   type ReplayEngineReadings,
+  replayDependencyBlock,
   replayEngineDecision,
   replayEngineRequirement,
 } from "./replayEngine";
@@ -240,5 +241,35 @@ describe("replayEngineDecision", () => {
     );
     expect(d.notice).toEqual({ kind: "none" });
     expect(d.watch).toEqual({ kind: "fallback" });
+  });
+});
+
+describe("replayDependencyBlock", () => {
+  const games = [
+    {
+      name: "SplinterFaction 0.1.86",
+      missingDependencies: ["springcontent.sdz"],
+    },
+    { name: "Zero-K v1.14.8.0", missingDependencies: [] },
+  ];
+
+  it("names the archive a replay's game depends on and lacks", () => {
+    expect(replayDependencyBlock("SplinterFaction 0.1.86", games)).toBe(
+      "Archive not installed: springcontent.sdz. SplinterFaction 0.1.86 depends on it.",
+    );
+  });
+
+  it("matches the game the way the replay page does", () => {
+    expect(replayDependencyBlock("splinterfaction 0.1.86", games)).toBe(
+      "Archive not installed: springcontent.sdz. SplinterFaction 0.1.86 depends on it.",
+    );
+  });
+
+  it("says nothing for a game with everything installed", () => {
+    expect(replayDependencyBlock("Zero-K v1.14.8.0", games)).toBeNull();
+  });
+
+  it("says nothing for a game that is not installed, which the page reports itself", () => {
+    expect(replayDependencyBlock("Balanced Annihilation V9", games)).toBeNull();
   });
 });

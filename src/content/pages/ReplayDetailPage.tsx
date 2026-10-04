@@ -48,7 +48,10 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
-import type { ReplayEngineNotice } from "../replayEngine";
+import {
+  type ReplayEngineNotice,
+  replayDependencyBlock,
+} from "../replayEngine";
 import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
@@ -58,7 +61,12 @@ import { useReplaysRoot } from "../useReplaysRoot";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
-import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
+import {
+  DependencyBlocked,
+  DetailLoading,
+  ErrorBanner,
+  NotFound,
+} from "./components/states";
 import { UncheckedEngineNotice } from "./components/UncheckedEngineNotice";
 import { WatchButton } from "./components/WatchButton";
 import { OriginBadge } from "./ReplaysPage";
@@ -885,6 +893,12 @@ export default function ReplayDetailPage() {
     info && answered && !scan.loading
       ? !answered.games.some((g) => gameNamesMatch(g.name, info.gameType))
       : false;
+  // A replay of a game that lacks a dependency archive would stop in the
+  // engine, so Watch stops first and names the archive (issue #3489).
+  const dependencyBlock =
+    info && answered && !scan.loading
+      ? replayDependencyBlock(info.gameType, answered.games)
+      : null;
   const missingMap =
     info?.mapName && answered && !scan.loading
       ? !answered.maps.some((m) => m.name === info.mapName)
@@ -1020,6 +1034,7 @@ export default function ReplayDetailPage() {
               replayPath={replay.path}
               engineVersion={info.engineVersion}
               watch={engine.watch}
+              dependencyBlock={dependencyBlock}
             />
           </div>
         )}
@@ -1034,6 +1049,7 @@ export default function ReplayDetailPage() {
           {engine.notice.kind === "unchecked" && (
             <UncheckedEngineNotice version={engine.notice.version} />
           )}
+          {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
           <MissingContentNotice
             gameType={info.gameType}
             mapName={info.mapName}

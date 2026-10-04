@@ -18,8 +18,14 @@ import {
   concludeEngine,
   type InstalledEngine,
 } from "../play/engineConfirmation";
+import { missingLaunchDependency } from "../play/launchContent";
 import { compareEngineVersions } from "./engineVersion";
-import type { ContentRequirement } from "./resolveContent";
+import { dependencyBlockReason } from "./gameDependencies";
+import {
+  type ContentRequirement,
+  gameNamesMatch,
+  type InstalledContentSnapshot,
+} from "./resolveContent";
 
 /**
  * The engine a replay was recorded on, as something the shared launch check and
@@ -141,4 +147,22 @@ export function replayEngineDecision(r: ReplayEngineReadings): {
     },
     watch: { kind: "unavailable", version: recorded },
   };
+}
+
+/**
+ * Why Watch cannot start, when the replay's game is installed but depends on an
+ * archive that is not (issue #3489), or null. The same sentence the other launch
+ * paths give. The game is matched the way the replay page matches it, so a
+ * version-string difference does not hide it.
+ */
+export function replayDependencyBlock(
+  gameType: string,
+  games: InstalledContentSnapshot["games"],
+): string | null {
+  const game = games.find((g) => gameNamesMatch(g.name, gameType));
+  if (!game) return null;
+  const dependency = missingLaunchDependency(game.name, games);
+  return dependency?.gameName
+    ? dependencyBlockReason(dependency.label, dependency.gameName)
+    : null;
 }
