@@ -1,6 +1,11 @@
 import { parseMapDownload } from "../../campaign/model";
 import type { NodeBattleSpec } from "../model";
 import { MAX_DIFFICULTY, MIN_DIFFICULTY, NEUTRAL } from "../model";
+import {
+  MODEL_FILE_EXTS,
+  type PlacedModel,
+  parsePlacedModels,
+} from "../placedModels";
 import type { HandmadeMapError } from "./errors";
 
 /**
@@ -141,8 +146,11 @@ export interface MapManifest {
    * reader ignores it today.
    */
   warpath?: { start?: string; goal?: string };
-  /** Reserved for placed models (issue #3504). The reader ignores it today. */
-  models?: unknown[];
+  /**
+   * Models stood on the terrain as scenery. An entry names a model the game
+   * has, or a `.gltf` or `.glb` file inside the folder.
+   */
+  models?: PlacedModel[];
 }
 
 /**
@@ -160,6 +168,7 @@ export interface ResolvedManifest
     | "warpath"
     | "models"
   > {
+  models: PlacedModel[];
   provinces: (ManifestProvince & { id: string })[];
   locations: (ManifestPointLocation & { id: string })[];
   crossings: [string, string][];
@@ -555,6 +564,67 @@ export function parseManifest(text: string): {
   } else if (d.locations !== undefined) {
     field("locations", "must be a list of point locations.");
   }
+  // Placed models. An entry has the shape the map document keeps, so the
+  // checks here only say what `parsePlacedModels` would drop without a word.
+  const models: PlacedModel[] = [];
+  if (Array.isArray(d.models)) {
+    d.models.forEach((raw, i) => {
+      const path = `models[${i}]`;
+      if (!isObj(raw)) {
+        field(
+          path,
+          'must be an object such as { "model": { "file": "tower.glb" }, "pos": [120, 340] }.',
+        );
+        return;
+      }
+      const before = errors.length;
+      const ref = isObj(raw.model) ? raw.model : {};
+      const named = [ref.file, ref.game].find(
+        (v) => typeof v === "string" && v.trim() !== "",
+      );
+      const label = named === undefined ? path : `${path} ("${named}")`;
+      const { file, game: gameModel } = ref;
+      if ((file === undefined) === (gameModel === undefined)) {
+        field(
+          `${label}.model`,
+          'must name one model: { "file": "tower.glb" } for a file in the map folder, or { "game": "armcom" } for a model the game has.',
+        );
+      } else if (gameModel !== undefined) {
+        if (typeof gameModel !== "string" || gameModel.trim() === "") {
+          field(`${label}.model.game`, "must be text and cannot be empty.");
+        }
+      } else if (typeof file !== "string" || !isFolderFile(file)) {
+        field(
+          `${label}.model.file`,
+          "must be the name of a file inside the map folder.",
+        );
+      } else if (
+        !MODEL_FILE_EXTS.some((ext) => file.toLowerCase().endsWith(ext))
+      ) {
+        field(
+          `${label}.model.file`,
+          `is "${file}", which is not a glTF model. The name must end in ${MODEL_FILE_EXTS.join(" or ")}.`,
+        );
+      }
+      readPoint(raw.pos, `${label}.pos`);
+      optNumber(raw, "height", `${label}.height`, () => true, "a number");
+      optNumber(raw, "rotation", `${label}.rotation`, () => true, "a number");
+      optNumber(
+        raw,
+        "scale",
+        `${label}.scale`,
+        (n) => n > 0,
+        "a number above 0",
+      );
+      if (errors.length > before) return;
+      const [entry] = parsePlacedModels([raw]) ?? [];
+      if (entry) models.push(entry);
+      else field(label, "is not a model the map can place.");
+    });
+  } else if (d.models !== undefined) {
+    field("models", "must be a list of models.");
+  }
+
   if (provinces.length + locations.length === 0 && Array.isArray(d.provinces)) {
     field("provinces", "is empty, and the map needs at least one location.");
   }
@@ -670,6 +740,7 @@ export function parseManifest(text: string): {
       crossings,
       blockedBorders,
       roads,
+      models,
     },
     errors,
   };

@@ -71,6 +71,24 @@ function installedUrls(item: HandmadeMapItem): UrlFor {
   );
 }
 
+/**
+ * The resolver for the other files of the map folder that `imageUrl` points
+ * into, where `imageUrl` is the terrain picture of a document the reader made.
+ * A placed model's `file` goes through it. It answers `undefined` for a name
+ * the folder does not hold, and the whole call answers `undefined` when no
+ * installed map has that picture.
+ */
+export async function handmadeMapFileUrls(
+  imageUrl: string,
+): Promise<UrlFor | undefined> {
+  const { items } = await conquestMapList({});
+  for (const item of items) {
+    const urlFor = installedUrls(item);
+    if (item.files.some((file) => urlFor(file) === imageUrl)) return urlFor;
+  }
+  return undefined;
+}
+
 interface Listed {
   item: HandmadeMapItem;
   summary: HandmadeMapSummary;
