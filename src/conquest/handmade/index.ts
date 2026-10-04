@@ -4,6 +4,15 @@ export {
   type TraceCache,
   traceCacheKey,
 } from "./cache";
+export {
+  blankLocations,
+  type HandmadeConquestOptions,
+  handmadeConquestDoc,
+  handmadeRun,
+  newHandmadeConquest,
+  pickBlankBattles,
+  readHandmadeRun,
+} from "./conquest";
 export type { HandmadeMapError, HandmadeMapErrorCode } from "./errors";
 export {
   type HandmadeImportResult,
