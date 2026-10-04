@@ -8,9 +8,9 @@
  * has to look exactly as it always has: no heading at all.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LobbyState } from "../bindings";
 import { ConversationSidebar } from "./ConversationSidebar";
 
@@ -26,7 +26,13 @@ vi.mock("@picoframe/frame", () => ({
   ],
 }));
 
+vi.mock("../../notify/notify", () => ({ notify: async () => {} }));
+
 vi.mock("../bindings", () => ({
+  mpJoinBattle: (args: unknown) => {
+    wire.joins.push(args);
+    return Promise.resolve();
+  },
   mpAcceptFriendRequest: async () => ({}),
   mpDeclineFriendRequest: async () => ({}),
   mpFriendRequest: async () => ({}),
@@ -38,15 +44,25 @@ const KEY_A = "AF@bar.example:8200";
 const KEY_B = "Zeta@techa.example:8200";
 
 const wire = vi.hoisted(() => ({
+  joins: [] as unknown[],
   favourites: {} as Record<string, string[]>,
   connections: {} as Record<
     string,
-    { serverKey: string; live: boolean; mirror: { state: unknown } }
+    {
+      serverKey: string;
+      live: boolean;
+      mirror: { phase: string; state: unknown };
+    }
   >,
 }));
 
 vi.mock("../store", () => ({
-  useMultiplayer: () => ({ connections: wire.connections, unreadFor: () => 0 }),
+  useMultiplayer: () => ({
+    connections: wire.connections,
+    unreadFor: () => 0,
+    busy: false,
+    clearJoinError: () => {},
+  }),
   useConnection: (serverKey: string | null) =>
     serverKey ? (wire.connections[serverKey] ?? null) : null,
   useProtocolServers: () => [],
@@ -77,7 +93,10 @@ function connectionFor(
   return {
     serverKey,
     live,
-    mirror: { state: { ...emptyState(serverKey.split("@")[0]), ...patch } },
+    mirror: {
+      phase: "ready",
+      state: { ...emptyState(serverKey.split("@")[0]), ...patch },
+    },
   };
 }
 
@@ -97,6 +116,7 @@ afterEach(() => {
   cleanup();
   wire.connections = {};
   wire.favourites = {};
+  wire.joins = [];
 });
 
 describe("ConversationSidebar: grouped by connection", () => {
@@ -209,5 +229,146 @@ describe("ConversationSidebar: friends across servers (#3380)", () => {
 
     expect(screen.getByText("bar.example:8200")).toBeTruthy();
     expect(screen.getByText("techa.example:8200")).toBeTruthy();
+  });
+});
+
+describe("ConversationSidebar: join or watch a friend's battle (#3381)", () => {
+  const online = { status: { ingame: false, away: false } };
+  const ingame = { status: { ingame: true, away: false } };
+
+  function friendInBattle(
+    battle: Record<string, unknown> = {},
+    host: typeof online = online,
+  ) {
+    wire.favourites = { [KEY_A]: ["amy"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A, true, {
+        users: {
+          amy: { name: "amy", ...host },
+          hostie: { name: "hostie", ...host },
+        } as unknown as LobbyState["users"],
+        battles: {
+          "4": {
+            id: 4,
+            title: "Skirmish",
+            host: "hostie",
+            members: { amy: {} },
+            passworded: false,
+            locked: false,
+            maxPlayers: 8,
+            playerCount: null,
+            inProgress: false,
+            ...battle,
+          },
+        } as unknown as LobbyState["battles"],
+      }),
+    };
+  }
+
+  beforeEach(() => {
+    wire.joins = [];
+  });
+
+  it("joins the battle through the battle list's join when Join is pressed", () => {
+    friendInBattle();
+    renderSidebar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Join Skirmish" }));
+    return vi.waitFor(() =>
+      expect(wire.joins).toMatchObject([{ serverKey: KEY_A, id: 4 }]),
+    );
+  });
+
+  it("offers Watch for a running game", () => {
+    friendInBattle({}, ingame);
+    renderSidebar();
+
+    expect(screen.getByRole("button", { name: "Watch Skirmish" })).toBeTruthy();
+  });
+
+  it("says Locked and cannot be pressed for a locked battle", () => {
+    friendInBattle({ locked: true });
+    renderSidebar();
+
+    const button = screen.getByRole("button", {
+      name: "Locked Skirmish",
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  it("says Full and cannot be pressed for a full battle", () => {
+    friendInBattle({ maxPlayers: 2 });
+    renderSidebar();
+
+    const button = screen.getByRole("button", {
+      name: "Full Skirmish",
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
+  it("asks for the password instead of joining at once", async () => {
+    friendInBattle({ passworded: true });
+    renderSidebar();
+
+    fireEvent.click(screen.getByRole("button", { name: "Join" }));
+    expect(await screen.findByPlaceholderText("Battle password")).toBeTruthy();
+    expect(wire.joins).toEqual([]);
+  });
+
+  it("offers nothing for a friend who is in no battle", () => {
+    wire.favourites = { [KEY_A]: ["amy"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A, true, {
+        users: {
+          amy: { name: "amy", ...online },
+        } as unknown as LobbyState["users"],
+      }),
+    };
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: /^(Join|Watch)/ })).toBeNull();
+  });
+
+  it("offers nothing on a row for a server that is not connected", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["bob"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B, false),
+    };
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: /^(Join|Watch)/ })).toBeNull();
+  });
+
+  it("puts the button on the all-servers row as well", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["bob"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A, true, {
+        users: {
+          amy: { name: "amy", ...online },
+          hostie: { name: "hostie", ...online },
+        } as unknown as LobbyState["users"],
+        battles: {
+          "4": {
+            id: 4,
+            title: "Skirmish",
+            host: "hostie",
+            members: { amy: {} },
+            passworded: false,
+            locked: false,
+            maxPlayers: 8,
+            playerCount: null,
+            inProgress: false,
+          },
+        } as unknown as LobbyState["battles"],
+      }),
+      [KEY_B]: connectionFor(KEY_B, false),
+    };
+    renderSidebar();
+
+    // One in the server's own Friends section, one in All friends.
+    expect(
+      screen.getAllByRole("button", { name: "Join Skirmish" }).length,
+    ).toBe(2);
   });
 });

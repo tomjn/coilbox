@@ -48,17 +48,19 @@ import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
 import { BattleFilterPopover } from "../battles/BattleFilterPopover";
 import { BattleList } from "../battles/BattleList";
-import { filterSortBattles } from "../battles/battleFilters";
+import { filterSortBattles, isBattleRunning } from "../battles/battleFilters";
 import {
   type CreateLobbyArgs,
   CreateLobbyPopover,
 } from "../battles/CreateLobbyPopover";
+import { friendsInBattles } from "../battles/friendsInBattles";
 import { HostBattleButton } from "../battles/HostBattleButton";
 import type { OpenBattleArgs } from "../battles/HostBattleForm";
 import {
   HostZerokBattlePopover,
   type ZerokOpenBattleArgs,
 } from "../battles/HostZerokBattlePopover";
+import { joinBattle } from "../battles/joinBattle";
 import { useOneBattleRule, useRoomBattleRule } from "../battles/oneBattle";
 import { SaveSearchPopover } from "../battles/SaveSearchPopover";
 import { useBattleFilters } from "../battles/useBattleFilters";
@@ -70,6 +72,7 @@ import {
   mpSnapshot,
   mpZerokOpenBattle,
 } from "../bindings";
+import { favouritesFor, useFavourites } from "../friends";
 import { protocolForKey, relayHostingAvailable } from "../protocol";
 import { newScriptPassword } from "../scriptPassword";
 import {
@@ -198,30 +201,15 @@ function ServerBattles({
   // another server, if joining would (issue #2844), so the leave goes first.
   const { leaveOther } = rule;
   const onJoin = useCallback(
-    async (b: Battle, key?: string) => {
-      try {
-        await leaveOther();
-      } catch (e) {
-        void notify({
-          title: "You are still in your other battle",
-          body: `Coilbox could not leave it: ${e instanceof Error ? e.message : String(e)}.`,
-          level: "error",
-        });
-        return;
-      }
-      awaitLanding(false);
-      try {
-        await mpJoinBattle({
-          serverKey,
-          id: b.id,
-          key,
-          scriptPassword: newScriptPassword(),
-        });
-      } catch {
-        // Wire-level failures surface via lastJoinError or a disconnect.
-        giveUp();
-      }
-    },
+    (b: Battle, key?: string) =>
+      joinBattle({
+        serverKey,
+        battle: b,
+        key,
+        leaveOther,
+        awaitLanding: () => awaitLanding(false),
+        giveUp,
+      }),
     [serverKey, awaitLanding, giveUp, leaveOther],
   );
 
@@ -259,10 +247,24 @@ function ServerBattles({
   // pinned separately so its Leave button is always reachable even inside a
   // collapsed group.
   const users = mirror.state?.users;
+  // Battles with a friend in them: the server's friends and the local stars.
+  const [favourites] = useFavourites();
+  const serverFriends = mirror.state?.friends;
+  const friendsHere = useMemo(
+    () =>
+      friendsInBattles(
+        all,
+        new Set([
+          ...favouritesFor(favourites, serverKey),
+          ...(serverFriends ?? []),
+        ]),
+      ),
+    [all, favourites, serverKey, serverFriends],
+  );
   const inProgressIds = useMemo(() => {
     const ids = new Set<number>();
     for (const b of all) {
-      if (b.inProgress || users?.[b.host]?.status.ingame) ids.add(b.id);
+      if (isBattleRunning(b, users)) ids.add(b.id);
     }
     return ids;
   }, [all, users]);
@@ -388,6 +390,7 @@ function ServerBattles({
       joinedBattle={joinedBattle}
       joinedId={joinedId}
       inProgressIds={inProgressIds}
+      friendsHere={friendsHere}
       canJoin={canJoin}
       linkable={ready}
       onJoin={onJoin}
