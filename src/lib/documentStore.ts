@@ -33,6 +33,23 @@ export interface DocumentStore<T> {
   /** Synchronous read of the last known value, for non-React callers, or
    *  `null` before anything has loaded this session. */
   getCached(): T | null;
+  /** The document a write must build on. Throws {@link DocumentNotLoadedError}
+   *  when no load has succeeded this session, because a write built on the
+   *  empty `initial` would replace the real document with almost nothing. */
+  getForWrite(): T;
+}
+
+/** A save was refused because the document it would replace has not loaded.
+ *  `message` says why in words a player can read. */
+export class DocumentNotLoadedError extends Error {
+  constructor(failure: string | null) {
+    super(
+      failure
+        ? `Your saved data could not be read, so nothing was saved and the file has not been changed. ${failure}`
+        : "Your saved data is still loading, so nothing was saved. Try again in a moment.",
+    );
+    this.name = "DocumentNotLoadedError";
+  }
 }
 
 /**
@@ -44,16 +61,28 @@ export function createDocumentStore<T>(
   initial: T,
 ): DocumentStore<T> {
   let cache: T | null = null;
+  // Why the last load failed, while no load has succeeded since.
+  let failure: string | null = null;
   const listeners = new Set<(value: T) => void>();
 
   function publish(value: T): T {
     cache = value;
+    failure = null;
     for (const listener of listeners) listener(value);
     return value;
   }
 
+  function describe(e: unknown): string {
+    return e instanceof Error ? e.message : String(e);
+  }
+
   async function refresh(): Promise<T> {
-    return publish(await fetch());
+    try {
+      return publish(await fetch());
+    } catch (e) {
+      failure = describe(e);
+      throw e;
+    }
   }
 
   function useStore() {
@@ -84,7 +113,8 @@ export function createDocumentStore<T>(
           }
         })
         .catch((e) => {
-          if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+          failure = describe(e);
+          if (!cancelled) setError(describe(e));
         })
         .finally(() => {
           if (!cancelled) setLoading(false);
@@ -99,7 +129,7 @@ export function createDocumentStore<T>(
       try {
         await refresh();
       } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
+        setError(describe(e));
       }
     }, []);
 
@@ -110,5 +140,10 @@ export function createDocumentStore<T>(
     return cache;
   }
 
-  return { useStore, refresh, publish, getCached };
+  function getForWrite(): T {
+    if (cache === null) throw new DocumentNotLoadedError(failure);
+    return cache;
+  }
+
+  return { useStore, refresh, publish, getCached, getForWrite };
 }
