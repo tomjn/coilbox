@@ -71,6 +71,24 @@ function installedUrls(item: HandmadeMapItem): UrlFor {
   );
 }
 
+/**
+ * The resolver for the other files of the map folder that `imageUrl` points
+ * into, where `imageUrl` is the terrain picture of a document the reader made.
+ * A placed model's `file` goes through it. It answers `undefined` for a name
+ * the folder does not hold, and the whole call answers `undefined` when no
+ * installed map has that picture.
+ */
+export async function handmadeMapFileUrls(
+  imageUrl: string,
+): Promise<UrlFor | undefined> {
+  const { items } = await conquestMapList({});
+  for (const item of items) {
+    const urlFor = installedUrls(item);
+    if (item.files.some((file) => urlFor(file) === imageUrl)) return urlFor;
+  }
+  return undefined;
+}
+
 interface Listed {
   item: HandmadeMapItem;
   summary: HandmadeMapSummary;
@@ -258,7 +276,19 @@ export async function importHandmadeMap(
     // The document read above points at the staging folder, which is gone
     // now. Read the installed copy. The trace is cached, so this is cheap.
     const installed = await loadHandmadeMap(id);
-    if (!installed.ok) return { status: "invalid", errors: installed.errors };
+    if (!installed.ok) {
+      // The map is installed but cannot be read back. Take it out again, so
+      // "invalid" still means nothing was installed.
+      try {
+        await conquestMapRemove({ id });
+      } catch (e) {
+        return {
+          status: "refused",
+          message: `The map was installed as "${id}" but could not be read back, and taking it out again failed. Remove it from the Conquest page. ${messageOf(e)}`,
+        };
+      }
+      return { status: "invalid", errors: installed.errors };
+    }
     return {
       status: "imported",
       id,

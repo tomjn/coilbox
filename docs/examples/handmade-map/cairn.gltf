@@ -1,0 +1,92 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "coilbox sample map script"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "cairn",
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1
+          },
+          "indices": 0,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "stone",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.62,
+          0.6,
+          0.56,
+          1
+        ],
+        "metallicFactor": 0,
+        "roughnessFactor": 1
+      }
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5123,
+      "count": 18,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC3",
+      "min": [
+        -20,
+        0,
+        -20
+      ],
+      "max": [
+        20,
+        60,
+        20
+      ]
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 36,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 36,
+      "byteLength": 60,
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 96,
+      "uri": "data:application/octet-stream;base64,AwACAAQAAgABAAQAAQAAAAQAAAADAAQAAAABAAIAAAACAAMAAACgwQAAAAAAAKDBAACgQQAAAAAAAKDBAACgQQAAAAAAAKBBAACgwQAAAAAAAKBBAAAAAAAAcEIAAAAA"
+    }
+  ]
+}

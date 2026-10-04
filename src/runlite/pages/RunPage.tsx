@@ -285,6 +285,12 @@ export default function RunPage() {
         onSelect={onSelect}
         focusId={focusId}
         burstNodeId={burstId}
+        modelGame={{
+          enginePath: target?.enginePath,
+          dataDir: target?.dataDir,
+          gameArchive: game?.primaryArchive.name,
+          pending: Boolean(target) && !scan.data && !scan.error,
+        }}
         className="absolute inset-0"
       />
 

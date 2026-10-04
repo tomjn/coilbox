@@ -71,9 +71,11 @@ export function finishedConquest(
     runId: `${galaxy.id}:${state.seed}`,
     game: gameKey(galaxy.game.shortname),
     won: state.status === "won",
-    level: galaxy.generated
-      ? readThreatLevel(galaxy.generated.threatLevel)
-      : null,
+    // A hand-made map offers the levels too, so a conquest on one counts.
+    level:
+      galaxy.generated || galaxy.handmade
+        ? readThreatLevel((galaxy.generated ?? galaxy.handmade)?.threatLevel)
+        : null,
   };
 }
 

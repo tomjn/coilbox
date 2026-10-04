@@ -24,7 +24,13 @@ const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
 const manifest = readFileSync(`${SAMPLE}map.json`, "utf8");
-const FILES = ["heightmap.png", "map.json", "picture.png", "provinces.png"];
+const FILES = [
+  "cairn.gltf",
+  "heightmap.png",
+  "map.json",
+  "picture.png",
+  "provinces.png",
+];
 
 // The webview decodes through a canvas. Here the file named last in the URL is
 // decoded from the sample folder, and "broken.png" stands for a damaged image.
@@ -42,6 +48,7 @@ vi.mock("./decode", () => ({
 }));
 
 const {
+  handmadeMapFileUrls,
   importHandmadeMap,
   listHandmadeMaps,
   loadHandmadeMap,
@@ -208,6 +215,39 @@ describe("loading a hand-made map", () => {
   });
 });
 
+describe("the files of a map folder", () => {
+  it("resolves a file the folder holds and no other", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    const fileUrl = await handmadeMapFileUrls(result.doc.terrain?.image ?? "");
+    expect(fileUrl?.("cairn.gltf")).toBe(
+      "coilbox://localhost/conquestmap/sample-two-shores/cairn.gltf",
+    );
+    expect(fileUrl?.("tower.glb")).toBeUndefined();
+  });
+
+  it("resolves inside a bundled map's folder beside the app", async () => {
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({ folder: "other", files: ["map.json", "picture.png"] }),
+        item({ source: "bundled", folder: "Two Shores" }),
+      ],
+    });
+    const fileUrl = await handmadeMapFileUrls(
+      "coilbox://localhost/portable/galaxies/Two%20Shores/picture.png",
+    );
+    expect(fileUrl?.("cairn.gltf")).toBe(
+      "coilbox://localhost/portable/galaxies/Two%20Shores/cairn.gltf",
+    );
+  });
+
+  it("has no resolver for a picture no installed map holds", async () => {
+    expect(
+      await handmadeMapFileUrls("coilbox://localhost/conquestmap/gone/a.png"),
+    ).toBeUndefined();
+  });
+});
+
 describe("importing a hand-made map", () => {
   it("installs a map the reader accepts", async () => {
     hoisted.stage.mockResolvedValue(staged({ skipped: 2 }));
@@ -300,6 +340,43 @@ describe("importing a hand-made map", () => {
       message: "Could not install the map.",
     });
     expect(hoisted.discard).toHaveBeenCalledWith({ token: "tok-1" });
+  });
+
+  it("takes the map out again when the installed copy cannot be read", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    // The installed folder lost a file between the install and the read.
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result).toEqual({
+      status: "invalid",
+      errors: [expect.objectContaining({ code: "file-missing" })],
+    });
+    expect(hoisted.remove).toHaveBeenCalledWith({ id: "sample-two-shores" });
+  });
+
+  it("says the map is still installed when it cannot be taken out", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    hoisted.remove.mockRejectedValue(new Error("folder is in use"));
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result.status).toBe("refused");
+    if (result.status !== "refused") return;
+    expect(result.message).toContain(
+      'The map was installed as "sample-two-shores"',
+    );
+    expect(result.message).toContain("folder is in use");
   });
 });
 

@@ -65,5 +65,8 @@
   ],
   "crossings": [["eastcliff", "ironcoast"]],
   "blockedBorders": [["northmarch", "midvale"]],
-  "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]]
+  "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]],
+  "models": [
+    { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 }
+  ]
 }

@@ -112,6 +112,15 @@ vi.mock("../conquests", () => ({
   useGalaxies: () => ({ galaxies: [], loading: false, error: null }),
   useConquestState: () => ({ file: { conquests: {} }, saveFor: vi.fn() }),
 }));
+vi.mock("../handmade/useHandmadeMaps", () => ({
+  refreshHandmadeMaps: vi.fn(),
+  useHandmadeMaps: () => ({
+    maps: [],
+    unreadable: [],
+    loading: false,
+    error: null,
+  }),
+}));
 vi.mock("../bindings", () => ({
   conquestDelete: vi.fn(),
   conquestSave: vi.fn(async (args: { id: string; json: string }) => {

@@ -396,7 +396,8 @@ const PLACEHOLDER_RUN_MAPS: GenRunMap[] = [{ name: "" }];
  */
 function rebuildRun(settings: Record<string, unknown>): RunShape | null {
   const parsed = parseWarpathChallengeSettings(settings);
-  if (!parsed) return null;
+  // A run across a land map is not columns, so there is no shape to draw here.
+  if (!parsed || parsed.map) return null;
   try {
     const run = generateRun(
       optionsFromWarpathChallenge(parsed, { maps: PLACEHOLDER_RUN_MAPS }),

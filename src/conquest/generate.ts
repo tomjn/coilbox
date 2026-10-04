@@ -98,6 +98,29 @@ function mapTier(byArea: GenMap[], difficulty: number): GenMap[] {
   return byArea.slice(start, end);
 }
 
+/**
+ * Hands out a battle map for a difficulty: maps by area, bucketed into
+ * difficulty tiers (bigger -> harder), cycling within a tier so a small pool
+ * still varies. Each tier starts at a place the `rng` picks, so the same seed
+ * and the same pool give the same maps in the same order. Returns "" when the
+ * pool is empty.
+ */
+export function tierMapPicker(
+  maps: GenMap[],
+  rng: Rng,
+): (difficulty: number) => string {
+  const byArea = mapsByArea(maps);
+  const tierCursor = new Map<number, number>();
+  return (d) => {
+    const tier = mapTier(byArea, d);
+    const poolAll = tier.length > 0 ? tier : byArea;
+    if (poolAll.length === 0) return "";
+    const cursor = tierCursor.get(d) ?? Math.floor(rng() * poolAll.length);
+    tierCursor.set(d, cursor + 1);
+    return poolAll[cursor % poolAll.length].name;
+  };
+}
+
 export interface GenerateOptions {
   seed: number;
   /** `pinnedName` is the full name of the game the player chose, so every
@@ -658,19 +681,7 @@ export function assembleGalaxy(
     return Math.max(1, Math.min(MAX_DIFFICULTY, Math.ceil(t * MAX_DIFFICULTY)));
   });
 
-  // Maps by area, bucketed into difficulty tiers (bigger -> harder), cycling
-  // within a tier so a small pool still varies.
-  const byArea = mapsByArea(opts.maps);
-  const tierFor = (d: number) => mapTier(byArea, d);
-  const tierCursor = new Map<number, number>();
-  const mapFor = (d: number): string => {
-    const tier = tierFor(d);
-    const poolAll = tier.length > 0 ? tier : byArea;
-    if (poolAll.length === 0) return "";
-    const cursor = tierCursor.get(d) ?? Math.floor(rng() * poolAll.length);
-    tierCursor.set(d, cursor + 1);
-    return poolAll[cursor % poolAll.length].name;
-  };
+  const mapFor = tierMapPicker(opts.maps, rng);
 
   const nodes: GalaxyNode[] = source.map((s, i) => ({
     id: `node-${i}`,
