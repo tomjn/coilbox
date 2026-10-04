@@ -46,12 +46,12 @@ describe("whether the unitsync scan has answered", () => {
 
 describe("whether a scan result can vouch for what is installed", () => {
   it("passes a clean result through", () => {
-    const data = { games: [] };
+    const data = {};
     expect(answeredScan(data)).toBe(data);
   });
 
   it("returns nothing for a result whose Init failed (issue #3392)", () => {
-    expect(answeredScan({ games: [], initFailure: "disk full" })).toBeNull();
+    expect(answeredScan({ initFailure: "disk full" })).toBeNull();
   });
 
   it("returns nothing when there is no result", () => {
