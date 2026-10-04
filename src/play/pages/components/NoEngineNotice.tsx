@@ -22,9 +22,12 @@ const boxClass =
 export function NoEngineNotice({
   targetLoading,
   refresh,
+  playing = "a skirmish",
 }: {
   targetLoading: boolean;
   refresh: () => Promise<void>;
+  /** What the engine is for, finishing "to play ...". */
+  playing?: string;
 }) {
   const writeRoot = useWriteRoot();
   const { ensureContent } = useLaunchContent();
@@ -73,8 +76,8 @@ export function NoEngineNotice({
     return (
       <div className={`${boxClass} flex flex-col items-start gap-2`}>
         <p>
-          No engine is installed. Download engine {offer.version} to play a
-          skirmish.
+          No engine is installed. Download engine {offer.version} to play{" "}
+          {playing}.
         </p>
         <Button
           size="sm"

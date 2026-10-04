@@ -1,9 +1,9 @@
+import type { GameRef } from "../conquest/model";
 import { resolveBranding, type SuggestedGame } from "../content/branding";
 import type { ContentRequirement } from "../content/resolveContent";
 import { type GameRepo, resolveGithubRepo } from "../downloads/gameRepos";
-import { resolveGameByShortname } from "../play/installedGames";
 import { getGameMatcher } from "../profile/profile";
-import type { GameRef } from "./model";
+import { resolveGameByShortname } from "./installedGames";
 
 /**
  * Turning the game a galaxy names into something the download queue can fetch
@@ -107,9 +107,22 @@ export function offerableGames(
 }
 
 /**
+ * The requirement a challenge import takes for its game, for Conquest and
+ * Warpath alike (issue #3401). A game with no resolvable download is marked as
+ * such, so the import drawer says so instead of offering a download that fails.
+ */
+export function challengeGameRequirement(
+  game: GameRef,
+  catalog: GameCatalog,
+): ContentRequirement {
+  return gameRequirement(game, resolveGameDownload(game, catalog) ?? undefined);
+}
+
+/**
  * The requirement the launch check takes for a galaxy's game. It is met by any
  * installed version of the shortname, which is how a battle later resolves the
- * game (`resolveGameByShortname`), and downloads by `download`.
+ * game (`resolveGameByShortname`), and downloads by `download`. Without a
+ * `download` nothing can fetch it, and the requirement says so.
  */
 export function gameRequirement(
   game: GameRef,
@@ -118,7 +131,9 @@ export function gameRequirement(
   return {
     kind: "game",
     label: download?.label ?? game.pinnedName ?? game.shortname,
-    downloadKey: download?.downloadKey ?? game.shortname,
+    ...(download
+      ? { downloadKey: download.downloadKey }
+      : { noDownload: true }),
     isInstalled: (installed) => {
       const matcher = getGameMatcher();
       const games = installed.games.filter((g) => !matcher || matcher(g.name));

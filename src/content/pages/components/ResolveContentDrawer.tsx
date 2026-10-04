@@ -45,7 +45,7 @@ function RequirementRow({
           <span className="flex shrink-0 items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="size-4" /> Installed
           </span>
-        ) : (
+        ) : req.noDownload ? null : (
           <Button
             variant="outline"
             size="sm"
@@ -66,12 +66,22 @@ function RequirementRow({
           </Button>
         )}
       </div>
+      {req.noDownload && !done && (
+        <p className="text-xs text-muted-foreground">
+          Coilbox has no download for this {kindLabel.toLowerCase()}. Add it in{" "}
+          <Link className="underline underline-offset-4" to="/library/games">
+            Content &gt; Games
+          </Link>
+          , then try again.
+        </p>
+      )}
       {active && <QueueProgress item={item} />}
       {/* Only ever says why the download is off when it knows why. A write root
           still being read is neither answer, and saying either would be a guess
           the reader acts on (issue #1104). */}
       {!resolve.canDownload(req) &&
         !done &&
+        !req.noDownload &&
         (resolve.noWriteRoot || req.kind === "engine") && (
           <p className="text-xs text-muted-foreground">
             {req.kind === "engine" && !resolve.noWriteRoot
@@ -139,6 +149,7 @@ export function ResolveContentGate({
   const firedRef = useRef(false);
 
   const canProceed = resolve.resolved && !resolve.loading;
+  const nothingToDownload = resolve.missing.every((r) => r.noDownload);
   // Whether the full drawer has been on screen, which is what ends `quiet`.
   const [opened, setOpened] = useState(false);
   const hasSomethingToSay =
@@ -245,7 +256,9 @@ export function ResolveContentGate({
                   <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" />
                   <p className="text-xs text-muted-foreground">
                     {description ??
-                      "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready."}
+                      (nothingToDownload
+                        ? "Some content this needs isn't installed, and coilbox cannot download it. Nothing is imported until it is installed."
+                        : "Some content this needs isn't installed. Download it below, or cancel — nothing is imported until everything's ready.")}
                   </p>
                 </div>
 
@@ -259,17 +272,19 @@ export function ResolveContentGate({
                   ))}
                 </ul>
 
-                <p className="text-xs text-muted-foreground">
-                  Best-effort by name — a download may not be an exact match.
-                  See{" "}
-                  <Link
-                    className="underline underline-offset-4"
-                    to="/settings/downloads"
-                  >
-                    Downloads settings
-                  </Link>{" "}
-                  for the destination folder.
-                </p>
+                {!nothingToDownload && (
+                  <p className="text-xs text-muted-foreground">
+                    Best-effort by name — a download may not be an exact match.
+                    See{" "}
+                    <Link
+                      className="underline underline-offset-4"
+                      to="/settings/downloads"
+                    >
+                      Downloads settings
+                    </Link>{" "}
+                    for the destination folder.
+                  </p>
+                )}
               </>
             )}
 
