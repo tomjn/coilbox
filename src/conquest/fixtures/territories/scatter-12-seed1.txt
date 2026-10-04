@@ -1,0 +1,42 @@
+id generated-1
+title TG Conquest
+description A generated map of 12 provinces.
+terrain image=generated:territories heightmap=generated:territories size=1024x1024 heightScale=64 projection=flat
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"scatter","skin":"galaxy"}
+faction player name="Scarlet Syndicate" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Ashen Coalition" color=#ff3524 aggression=0.4584396980702877 side=
+faction enemy-2 name="Eternal Covenant" color=#ffb300 aggression=0.3504683293867856 side=
+node node-0 name="Adhara" pos=457,615 owner=player kind=normal difficulty=2 map="Map 3" outline=480,530 522,530 530,708 502,734 502,742 424,738 384,596
+node node-1 name="Betelgeuse" pos=381,285 owner=enemy-2 kind=capital difficulty=5 map="Map 11" outline=446,260 404,338 274,278 302,254 338,250 362,238 394,246 412,240 434,244 444,250
+node node-2 name="Menkar" pos=747,657 owner=enemy-1 kind=capital difficulty=5 map="Map 9" outline=786,470 802,506 796,530 786,536 782,552 762,584 762,602 770,612 778,612 774,626 794,642 800,660 768,708 730,746 712,744 674,554
+node node-3 name="Sadr" pos=359,789 owner=player kind=normal difficulty=2 map="Map 2" outline=420,740 384,882 360,874 350,854 332,842 326,832 314,794 322,746
+node node-4 name="Phecda" pos=671,487 owner=enemy-1 kind=normal difficulty=5 map="Map 10" outline=586,388 610,398 636,420 672,420 702,442 722,436 738,448 756,444 786,470 674,554 566,492 572,406
+node node-5 name="Altair" pos=603,593 owner=enemy-1 kind=normal difficulty=4 map="Map 8" outline=566,492 674,554 712,744 682,728 658,704 632,704 624,680 616,672 606,680 590,680 586,670 572,670 538,706 530,708 522,530
+node node-6 name="Algol" pos=289,633 owner=player kind=capital difficulty=1 map="Map 0" outline=266,540 384,596 424,738 420,740 322,746 324,728 298,718 264,714 250,706 244,700 238,674 214,660 206,632 200,626 200,586 210,570 224,564 232,552
+node node-7 name="Gacrux" pos=455,787 owner=player kind=normal difficulty=2 map="Map 3" outline=424,738 502,742 506,778 480,840 460,858 442,864 410,888 394,888 384,882 420,740
+node node-8 name="Nunki" pos=341,373 owner=enemy-2 kind=normal difficulty=4 map="Map 7" outline=274,278 404,338 412,360 372,440 334,460 330,460 322,444 302,438 282,402 268,398 272,382 278,378 280,354 254,344 242,316 242,294 260,280
+node node-9 name="Castor" pos=397,523 owner=player kind=normal difficulty=2 map="Map 2" outline=372,440 480,530 384,596 266,540 290,532 330,532 362,480 358,472 346,470 334,460
+node node-10 name="Pollux" pos=483,455 owner=neutral kind=normal difficulty=4 map="Map 8" outline=412,360 572,406 566,492 522,530 480,530 372,440
+node node-11 name="Shaula" pos=471,325 owner=enemy-2 kind=normal difficulty=5 map="Map 11" outline=446,260 448,268 442,276 454,272 488,276 506,286 522,304 530,322 532,348 520,380 558,380 586,388 572,406 412,360 404,338
+link node-0 node-5 node-0 node-5 border
+link node-0 node-6 node-0 node-6 border
+link node-0 node-7 node-0 node-7 border
+link node-0 node-9 node-0 node-9 border
+link node-0 node-10 node-0 node-10 border
+link node-1 node-8 node-1 node-8 border
+link node-1 node-11 node-1 node-11 border
+link node-2 node-4 node-2 node-4 border
+link node-2 node-5 node-2 node-5 border
+link node-3 node-6 node-3 node-6 border
+link node-3 node-7 node-3 node-7 border
+link node-4 node-5 node-4 node-5 border
+link node-4 node-10 node-4 node-10 border
+link node-4 node-11 node-4 node-11 border
+link node-5 node-10 node-5 node-10 border
+link node-6 node-7 node-6 node-7 border
+link node-6 node-9 node-6 node-9 border
+link node-8 node-9 node-8 node-9 border
+link node-8 node-10 node-8 node-10 border
+link node-8 node-11 node-8 node-11 border
+link node-9 node-10 node-9 node-10 border
+link node-10 node-11 node-10 node-11 border
