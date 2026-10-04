@@ -59,6 +59,7 @@ import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { DetailLoading, ErrorBanner, NotFound } from "./components/states";
+import { UncheckedEngineNotice } from "./components/UncheckedEngineNotice";
 import { WatchButton } from "./components/WatchButton";
 import { OriginBadge } from "./ReplaysPage";
 
@@ -1027,6 +1028,9 @@ export default function ReplayDetailPage() {
         <DetailLoading backTo="/play/replays" />
       ) : info ? (
         <>
+          {engine.notice.kind === "unchecked" && (
+            <UncheckedEngineNotice version={engine.notice.version} />
+          )}
           <MissingContentNotice
             gameType={info.gameType}
             mapName={info.mapName}

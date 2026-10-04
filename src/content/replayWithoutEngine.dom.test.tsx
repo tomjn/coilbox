@@ -64,7 +64,7 @@ describe("useDemoInfo with no engine", () => {
     await waitFor(() => expect(result.current.info).not.toBeNull());
     const decision = replayEngineDecision({
       recorded: result.current.info?.engineVersion ?? "",
-      installedVersions: [],
+      engines: [],
       resolve: { loading: false, canDownload: true, noWriteRoot: false },
     });
     expect(decision.notice).toEqual({
