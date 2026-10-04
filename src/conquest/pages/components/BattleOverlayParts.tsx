@@ -159,9 +159,19 @@ function MissingContentGate({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm text-muted-foreground">
-        {missing.kind === "map" ? "Map" : "Game"} not installed:{" "}
-        <span className="text-foreground">{missing.name}</span>
+        {missing.kind === "map"
+          ? "Map"
+          : missing.kind === "dependency"
+            ? "Archive"
+            : "Game"}{" "}
+        not installed: <span className="text-foreground">{missing.name}</span>
       </p>
+      {missing.kind === "dependency" && missing.gameName && (
+        <p className="text-sm text-muted-foreground">
+          <span className="text-foreground">{missing.gameName}</span> depends on
+          it.
+        </p>
+      )}
       {mapDl.error && <ErrorBanner message={mapDl.error} />}
       {missing.kind === "map" ? (
         <>
@@ -175,7 +185,7 @@ function MissingContentGate({
           </Button>
           <QueueProgress item={mapDl} />
         </>
-      ) : game && gameDownload ? (
+      ) : game && gameDownload && missing.kind === "game" ? (
         <DownloadGameButton
           game={game}
           download={gameDownload}

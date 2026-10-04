@@ -1080,6 +1080,12 @@ export interface GameItem {
   primaryArchive: Archive;
   /** Archives the game depends on (its primary archive excluded). */
   dependencyArchives: Archive[];
+  /**
+   * Dependencies no installed archive satisfies, as the engine names them
+   * (lower-cased). Empty when everything resolves. Absent in a scan from a
+   * worker that predates the field, which reads as none known.
+   */
+  missingDependencies?: string[];
   /** modinfo metadata (name, shortname, version, description, ...). */
   info: Record<string, string>;
   /** Non-fatal unitsync diagnostics attributed to this game during the scan. */

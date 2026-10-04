@@ -53,8 +53,10 @@ export type BattleRunPhase =
  * the run pinned, or the one `decideLaunchGame` settles on, and the map is an
  * exact-name match. */
 export interface BattleRequirement {
-  kind: "game" | "map";
+  kind: "game" | "map" | "dependency";
   name: string;
+  /** For a `dependency`, the installed game that needs it. */
+  gameName?: string;
 }
 
 /** The player participant's display name in synthesized battles. */
@@ -172,9 +174,15 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
         ? { kind: "game", name: decision.name }
         : gameOffer
           ? null
-          : !maps.some((m) => m.name === mapName)
-            ? { kind: "map", name: mapName }
-            : null;
+          : installedGame?.missingDependencies?.length
+            ? {
+                kind: "dependency",
+                name: installedGame.missingDependencies[0],
+                gameName: installedGame.name,
+              }
+            : !maps.some((m) => m.name === mapName)
+              ? { kind: "map", name: mapName }
+              : null;
 
   // A run that named no game and has exactly one candidate is pinned to it, so
   // later battles do not depend on what else gets installed. Done as soon as

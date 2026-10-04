@@ -32,6 +32,8 @@ export function compareGameVersions(a: string, b: string): number {
 export interface InstalledGame {
   name: string;
   info: Record<string, string>;
+  /** Dependencies no installed archive satisfies. Absent reads as none known. */
+  missingDependencies?: string[];
 }
 
 // A game with no modinfo shortname is referred to by its name, as the setup
