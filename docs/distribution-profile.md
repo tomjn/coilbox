@@ -386,7 +386,7 @@ Leaving `onboarding` out of a [`home.zones`](#home-object) list hides the cards 
 
 ### `start` (object)
 
-Names a campaign you bundle as where a new player starts. The home page shows a "Start here" card for it in the place the [`continue`](#the-zones) card takes, on a fresh install where there is nothing to resume yet.
+Names a campaign or a scenario you bundle as where a new player starts. The home page shows a "Start here" card for it in the place the [`continue`](#the-zones) card takes, on a fresh install where there is nothing to resume yet.
 
 ```json
 { "version": 1, "start": { "campaign": "b2f6c1d0-7e3a-4c55-9a41-0d8f5e2a6c17" } }
@@ -396,8 +396,9 @@ Names a campaign you bundle as where a new player starts. The home page shows a 
 | ---------- | ---------------------------------------------------------------------------------------------------- |
 | `campaign` | The `id` of a campaign in `.coilbox/campaigns/`. Required.                                           |
 | `mission`  | The `id` of one mission in that campaign. Leave it out to start on the campaign's first mission.     |
+| `scenario` | The `id` of a scenario in `.coilbox/scenarios/`. Use it in place of `campaign`, never beside it.     |
 
-Both are the `id` values inside the campaign's exported `.json`, not its title or file name. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) for how the campaign gets into the package.
+Give `campaign` or `scenario`, not both. `campaign` and `mission` are the `id` values inside the campaign's exported `.json`, not its title or file name. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) for how the campaign gets into the package.
 
 What the card does:
 
@@ -407,11 +408,28 @@ What the card does:
 - While it is there it comes first, ahead of anything the player could resume. Those move to the `resume` cards beside it.
 - If the engine, the game or the map the mission needs is not installed, the card says what has to be downloaded first. The briefing it opens does the download and holds the mission back until it is done.
 
-Only a campaign mission can be named. A scenario on its own, outside a campaign, cannot.
+#### Starting on a scenario
+
+A scenario you bundle on its own, with no campaign around it, can be the starting point too.
+
+```json
+{ "version": 1, "start": { "scenario": "0c9d4a7e-52b1-4f3a-9e68-7a1d2c3b4e5f" } }
+```
+
+`scenario` is the `id` inside the scenario's exported `.json`. See [Ship a scenario in a distribution](scenarios.md#ship-a-scenario-in-a-distribution) for how the scenario gets into the package.
+
+What the card does for a scenario:
+
+- It shows the scenario's name, with its game and map under it.
+- It opens the Scenarios page with that scenario ready to play.
+- It stays until the player wins the scenario. Coilbox reads the result from the replay when the game closes. If the replay does not say who won, coilbox asks the player and records a win when they press **I won**.
+- If the engine, the game or the map is not installed, the card says what has to be downloaded first. It then opens the Scenarios page, where the scenario's row has the download button.
+
+A win only counts when the player plays the scenario from the Scenarios page. A `start` that names both a `campaign` and a `scenario` shows no card.
 
 The card is part of the `continue` zone, so it needs that zone on the page. A [`home.zones`](#home-object) list that leaves `continue` out, or a [`welcome`](#welcome-object) that replaces the page, shows no card. A welcome can link to the mission itself with `#/campaign/<campaign id>/<mission id>`.
 
-If `start` names a campaign that is not bundled, or a mission the campaign does not have, the home page shows no card and is otherwise unchanged. The health checklist in Settings > Distribution profile has a `start` row that says which it was. A campaign that exists only as a local campaign on your own machine counts as not bundled, because your players will not have it.
+If `start` names a campaign or scenario that is not bundled, or a mission the campaign does not have, the home page shows no card and is otherwise unchanged. The health checklist in Settings > Distribution profile has a `start` row that says which it was. A campaign or scenario that exists only on your own machine counts as not bundled, because your players will not have it.
 
 Leave `start` out and nothing changes.
 
