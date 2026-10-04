@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_FIELD_LENGTH } from "../../deeplink/parse";
 import type { LobbyAccount, LobbyServer } from "../../lobby-servers/config";
 import {
   type InviteConnection,
@@ -93,17 +94,27 @@ describe("inviteLinkFrom", () => {
     }
   });
 
-  it("refuses a password that is not one word of a lobby command", () => {
-    for (const password of ["two words", "a\nb", "a\tb", ""]) {
+  it("refuses an empty password and one longer than a field may be", () => {
+    for (const password of ["", "x".repeat(MAX_FIELD_LENGTH + 1)]) {
       expect(
         inviteLinkFrom({
           server: "lobby.example.com:8200",
           battle: "42",
           password,
         }),
-        JSON.stringify(password),
+        JSON.stringify(password.slice(0, 20)),
       ).toBeNull();
     }
+  });
+
+  it("keeps a password the TASServer rule would refuse, for the join to judge", () => {
+    expect(
+      inviteLinkFrom({
+        server: "lobby.example.com:8200",
+        battle: "42",
+        password: "two words",
+      }),
+    ).toMatchObject({ password: "two words" });
   });
 
   it("refuses a server that is not a host and a port", () => {

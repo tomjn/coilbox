@@ -22,7 +22,7 @@ import {
   MAX_FIELD_LENGTH,
   MAX_URL_LENGTH,
   OPEN_SCREENS,
-  validBattlePassword,
+  validLinkBattlePassword,
   validOpenId,
 } from "./parse";
 
@@ -93,7 +93,10 @@ function buildJoin(
   if (!address) return invalid("This battle has no server to join.");
   const battle = battleIdFrom(action.battle);
   if (!battle) return invalid("This battle has no id to join.");
-  if (action.password !== undefined && !validBattlePassword(action.password)) {
+  if (
+    action.password !== undefined &&
+    !validLinkBattlePassword(action.password)
+  ) {
     return invalid("This battle's password cannot go in a link.");
   }
   const params = new URLSearchParams({ server: address.address, battle });

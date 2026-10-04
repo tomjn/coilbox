@@ -25,7 +25,7 @@ vi.mock("@/components/ui/popover", () => ({
 
 afterEach(cleanup);
 
-function draw() {
+function draw(protocol?: "tasserver" | "zerok" | "tachyon") {
   const onSubmit = vi.fn();
   const onOpenChange = vi.fn();
   render(
@@ -35,6 +35,7 @@ function draw() {
       onSubmit={onSubmit}
       open={true}
       onOpenChange={onOpenChange}
+      protocol={protocol}
     />,
   );
   return { onSubmit, onOpenChange };
@@ -71,5 +72,34 @@ describe("the battle password field", () => {
     typeAndSubmit("s3cret!");
     expect(onSubmit).toHaveBeenCalledWith("s3cret!");
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
+
+describe("the battle password field on a Zero-K server (issue #3524)", () => {
+  it("hands a password with a space up, which the server takes as JSON", () => {
+    const { onSubmit, onOpenChange } = draw("zerok");
+    typeAndSubmit("my pass");
+    expect(onSubmit).toHaveBeenCalledWith("my pass");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("hands up a non-ASCII password", () => {
+    const { onSubmit } = draw("zerok");
+    typeAndSubmit("pässword");
+    expect(onSubmit).toHaveBeenCalledWith("pässword");
+  });
+
+  it("trims the outer spaces, as the host form does", () => {
+    const { onSubmit } = draw("zerok");
+    typeAndSubmit("  my pass  ");
+    expect(onSubmit).toHaveBeenCalledWith("my pass");
+  });
+
+  it("still refuses a space on a TASServer style server", () => {
+    const { onSubmit } = draw("tasserver");
+    typeAndSubmit("my pass");
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toContain("space");
   });
 });
