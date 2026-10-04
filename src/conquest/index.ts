@@ -3,6 +3,7 @@ import { Orbit } from "lucide-react";
 import { NeedsGameNavBadge } from "../play/navBadges";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
 import { getCachedGalaxy } from "./conquests";
+import { getCachedHandmadeMap } from "./handmade/useHandmadeMaps";
 
 /**
  * The Galactic Conquest plugin's frontend half — a single-player strategy
@@ -65,7 +66,10 @@ const conquestPlugin: FramePlugin = {
         () => import("./pages/GalaxyPage"),
       ),
       crumb: (c) =>
-        (c.params.id && getCachedGalaxy(c.params.id)?.galaxy.title) || "Galaxy",
+        (c.params.id &&
+          (getCachedGalaxy(c.params.id)?.galaxy.title ??
+            getCachedHandmadeMap(c.params.id)?.title)) ||
+        "Galaxy",
     },
   ],
 };
