@@ -248,7 +248,7 @@ export interface ReplayTarget {
  * The target to watch a replay with, for a demo's recorded engine version.
  *
  * A demo replays cleanly only under its recording engine version, so an engine
- * whose label (`syncVersion ?? version`) matches `demoVersion` wins
+ * whose reported version (`syncVersion`) matches `demoVersion` wins
  * (`compareEngineVersions` keys off the dotted release + commit count and ignores
  * the trailing branch label like `BAR105`). With no exact match it falls back to
  * the preferred engine — surfaced as `matched: false` so the UI can warn. Returns
@@ -286,8 +286,11 @@ export function useReplayTarget(demoVersion: string): {
   // Exact version match wins.
   for (const r of roots) {
     for (const e of r.engines) {
+      // Only a version the engine reported counts. A folder name is not one
+      // (issue #3452), so an engine that has not reported never matches.
       if (
-        compareEngineVersions(demoVersion, e.syncVersion ?? e.version) === 0
+        e.syncVersion &&
+        compareEngineVersions(demoVersion, e.syncVersion) === 0
       ) {
         return {
           resolved: { target: build(r.path, e), matched: true },
