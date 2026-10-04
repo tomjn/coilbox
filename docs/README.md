@@ -15,7 +15,7 @@ Guides for running Coilbox in **portable mode** and shipping it alongside a game
 ## Content
 
 - **[Campaigns](campaigns.md)** — authoring a linear sequence of skirmish missions in the Campaign Builder, mission media and unit restrictions, export/import, and bundling campaigns into a distribution.
-- **[Galactic Conquest](conquest.md)** — the single-player conquest map: generating a galaxy (size, layout, starting territory, fog of war, theatre skin), how a run plays, supplying your game's system/faction names via the profile or branding catalog, and bundling a galaxy.
+- **[Galactic Conquest](conquest.md)** — the single-player conquest map: generating a map (style, size, layout, starting territory, fog of war), how a run plays, supplying your game's system/faction names via the profile or branding catalog, and bundling a galaxy.
 - **[Scenarios](scenarios.md)**: authoring in-engine missions in the Scenario Builder, what triggers can do, testing one, and how a scenario relates to a mission and a campaign.
 - **[The mission runtime](mission-runtime.md)**: the adoption contract a game follows to play scenarios itself, what coilbox installs, how versions are negotiated, and how the runtime is tested.
 - **[Teaching your game](teaching-your-game.md)**: a guide for distribution authors, from writing missions to a new player being offered the first lesson.
