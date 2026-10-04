@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { contentListReplays } from "../content/bindings";
-import { primeScan, useUnitsyncScan } from "../content/config";
+import { useUnitsyncScan } from "../content/config";
 import { dependencyBlockReason } from "../content/gameDependencies";
 import { useReplayUserState } from "../content/replayUserState";
 import type { BattleConfig } from "../play/bindings";
@@ -17,8 +17,8 @@ import {
 } from "../play/detect";
 import { missingLaunchDependency } from "../play/launchContent";
 import { usePlay } from "../play/PlayProvider";
-import { launchScenario } from "../scenario/launch";
 import { type Difficulty, usesDifficulty } from "../scenario/model";
+import { launchScenarioForPlayer } from "../scenario/playerLaunch";
 import { useCampaignProgress } from "./campaigns";
 import { missionNeeds } from "./missionNeeds";
 import type { Campaign, CampaignMission } from "./model";
@@ -97,10 +97,10 @@ export function missionUnfinishedReason(
  * can't be found or its winner can't be read, the player is asked directly via
  * the manual Victory/Defeat prompt instead.
  *
- * A mission carrying a scenario goes through `launchScenario` instead of
- * building the config here, so there is one compile-write-validate path and the
- * campaign gets its refusals for free. Everything after the engine exits is the
- * same either way.
+ * A mission carrying a scenario goes through `launchScenarioForPlayer`, the
+ * player's wrapper over `launchScenario`, instead of building the config here,
+ * so there is one compile-write-validate path and the campaign gets its
+ * refusals for free. Everything after the engine exits is the same either way.
  */
 export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const {
@@ -231,12 +231,6 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         executable: target.executable,
         dataDir: target.dataDir,
       });
-    // Read once for both branches. A scenario mission runs as a mutator over
-    // this game, so the mutator's options are this game's options.
-    const optionSchema = await gameOptionSchema(
-      target,
-      game.primaryArchive.name,
-    );
     try {
       let exitCode: number | null;
       // The start script the engine was actually given. Detection reads the
@@ -254,20 +248,10 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
         // is ever launched: compiled, written where the game will look for it,
         // and read back before the engine is started. A refusal means nothing
         // ran, so it is shown and no result is looked for.
-        const result = await launchScenario({
+        const result = await launchScenarioForPlayer({
           scenario: mission.scenario,
-          // Whoever is playing a campaign is a player, whether or not they also
-          // wrote it: a refusal here is read on the briefing screen.
-          reader: "player",
-          dataDir: target.dataDir,
+          target,
           games,
-          optionSchema,
-          // A scenario mission is set on its own map, which is the snapshot's
-          // for every mission built from one but is the scenario's to say.
-          mapOptionSchema: await mapOptionSchema(
-            target,
-            mission.scenario.setup.mapName,
-          ),
           disabledUnits: mission.disabledUnits,
           // The run's level, by the one route a scenario's difficulty ever
           // reaches the engine: `launchScenario` writes the `coilbox_difficulty`
@@ -275,19 +259,6 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           // a run nobody has chosen a level for, so both produce the start
           // script they always did.
           difficulty: variesByDifficulty ? difficulty : undefined,
-          // A rescan whose unitsync `Init` failed throws the engine's reason.
-          // It is worded as a scan failure here so the briefing's error does
-          // not read as a bare engine message.
-          rescan: async () => {
-            try {
-              return (await primeScan(target.enginePath, target.dataDir, true))
-                .games;
-            } catch (e) {
-              throw new Error(
-                `The content scan failed: ${e instanceof Error ? e.message : String(e)}`,
-              );
-            }
-          },
           launch: startEngine,
         });
         if (!result.ok) {
@@ -307,7 +278,10 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           gameType: game.name,
           startPosType: snapshot.startPosType,
           modOptions: snapshot.modOptionValues,
-          optionSchema,
+          optionSchema: await gameOptionSchema(
+            target,
+            game.primaryArchive.name,
+          ),
           mapOptionSchema: await mapOptionSchema(target, map.name),
           disabledUnits: mission.disabledUnits,
         });
