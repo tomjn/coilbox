@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { DirectLocalAddress } from "./bindings";
 import type { DirectReachability } from "./reachability";
-import { addressText, shareAddresses, shareHeadline } from "./share";
+import {
+  addressText,
+  shareAddresses,
+  shareHeadline,
+  shareNotices,
+} from "./share";
+
+const NO_ADDRESS =
+  "This room has no address another computer can reach, because this machine is on no network.";
 
 const on = (address: string, iface: string): DirectLocalAddress => ({
   address,
@@ -87,23 +95,21 @@ describe("shareAddresses", () => {
       null,
       "192.168.1.45",
     );
-    expect(found.map((a) => a.address)).toEqual([
-      "192.168.1.45",
-      "10.8.0.2",
-      "127.0.0.1",
-    ]);
+    expect(found.map((a) => a.address)).toEqual(["192.168.1.45", "10.8.0.2"]);
   });
 
-  it("always ends with this machine, whatever else was found", () => {
+  // A second coilbox on the same computer is not something a host shares a room
+  // with, so the loopback address is not offered. Joining it by typing it still
+  // works, which is the join form's business and not this list's.
+  it("never offers the loopback address, whether or not it was found", () => {
     const found = shareAddresses(
       [on("192.168.1.45", "en0"), loopback],
       8200,
       null,
       "192.168.1.45",
     );
-    const last = found[found.length - 1];
-    expect(last.scope).toBe("machine");
-    expect(addressText(last)).toBe("127.0.0.1:8200");
+    expect(found.map((a) => a.address)).not.toContain("127.0.0.1");
+    expect(found.map((a) => a.label)).not.toContain("Same machine");
   });
 
   // The room's own port is not the one to read out when the router handed back
@@ -221,10 +227,9 @@ describe("shareAddresses", () => {
     expect(outside?.caveat).toContain("172.17.0.1");
   });
 
-  it("says so rather than pretending, on a machine with no network at all", () => {
-    const found = shareAddresses([loopback], 8200, null, "127.0.0.1");
-    expect(found).toHaveLength(1);
-    expect(found[0].who).toContain("on no network");
+  it("offers nothing on a machine with no network at all", () => {
+    expect(shareAddresses([loopback], 8200, null, "127.0.0.1")).toEqual([]);
+    expect(shareAddresses([], 8200, null, "127.0.0.1")).toEqual([]);
   });
 });
 
@@ -246,7 +251,7 @@ describe("shareHeadline", () => {
       null,
       "192.168.1.45",
     );
-    expect(shareHeadline(found)).toBe("Give joiners this address:");
+    expect(shareHeadline(found)).toBe("Give joiners this address.");
   });
 
   // A machine whose one address is a public one is on a network, and it is the
@@ -259,12 +264,49 @@ describe("shareHeadline", () => {
       direct("209.35.91.246"),
       "209.35.91.246",
     );
-    expect(shareHeadline(found)).toBe("Give joiners this address:");
+    expect(shareHeadline(found)).toBe("Give joiners this address.");
   });
 
-  it("does not offer an address nobody else can reach", () => {
+  it("says there is no address another computer can reach when there is none", () => {
     expect(
       shareHeadline(shareAddresses([loopback], 8200, null, "127.0.0.1")),
-    ).toContain("nobody else can reach");
+    ).toBe(NO_ADDRESS);
+  });
+});
+
+describe("shareNotices", () => {
+  const lan = shareAddresses(
+    [on("192.168.1.45", "en0"), loopback],
+    8200,
+    null,
+    "192.168.1.45",
+  );
+
+  it("has nothing to say about an ordinary announced room", () => {
+    expect(shareNotices(lan, true)).toEqual([]);
+  });
+
+  it("says a room that is not announced needs the address given out", () => {
+    expect(shareNotices(lan, false)).toEqual([
+      "Not announced on this network, so give joiners your address.",
+    ]);
+  });
+
+  it("says so when the machine is on no network, and only that", () => {
+    const none = shareAddresses([loopback], 8200, null, "127.0.0.1");
+    expect(shareNotices(none, true)).toEqual([NO_ADDRESS]);
+    expect(shareNotices(none, false)).toEqual([NO_ADDRESS]);
+  });
+
+  it("names the row whose address gets a joiner into the room but not the game", () => {
+    const found = shareAddresses(
+      [on("192.168.1.45", "en0"), loopback],
+      8200,
+      mapped("203.0.113.9", 8200),
+      "192.168.1.45",
+    );
+    const notices = shareNotices(found, true);
+    expect(notices).toHaveLength(1);
+    expect(notices[0]).toMatch(/^From outside: They can join this room/);
   });
 });

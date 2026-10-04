@@ -4,6 +4,7 @@ import {
   isOnPublicAddress,
   joinAddress,
 } from "./reachability";
+import { announcementNote } from "./room";
 
 /**
  * What a host reads out so somebody else can join their room (issue #1611).
@@ -20,12 +21,12 @@ import {
  */
 
 /** Who an address is for. */
-export type AddressScope = "network" | "internet" | "machine";
+export type AddressScope = "network" | "internet";
 
 /** One address, ready to be read out, copied, or turned into a link. */
 export interface ShareAddress {
   scope: AddressScope;
-  /** The heading beside it: "On this network", "On en0", "Same machine". */
+  /** The heading beside it: "On this network", or "On en0". */
   label: string;
   /** The address to type in, as `address:port`. */
   address: string;
@@ -53,8 +54,10 @@ export function addressText(address: ShareAddress): string {
  *
  * The order is who is most likely to be asking: the local network first, since
  * that is what this milestone is for, then the internet when port mapping
- * worked, then this machine, which is only ever a second coilbox running beside
- * this one. A host whose own address is the public one has no local row to come
+ * worked. This machine's own loopback address is not offered, because the only
+ * thing it reaches is a second coilbox on the same computer, which is not
+ * somebody a host shares a room with (typing it into the join form still works).
+ * A host whose own address is the public one has no local row to come
  * first, so the internet leads instead, which is the same rule read on a machine
  * where the internet is the only network there is.
  *
@@ -115,16 +118,6 @@ export function shareAddresses(
     }
   }
 
-  shared.push({
-    scope: "machine",
-    label: "Same machine",
-    address: "127.0.0.1",
-    port,
-    who:
-      local.length === 0
-        ? "for another coilbox on this machine, which is the only thing that can reach this room while this machine is on no network"
-        : "for another coilbox on this machine",
-  });
   return shared;
 }
 
@@ -170,17 +163,44 @@ function outsideAddress(
   };
 }
 
+/** What a host reads when there is nothing to hand out. Every row is an address
+ *  somebody else can use, so an empty list is a machine on no network. */
+export const NO_ADDRESS =
+  "This room has no address another computer can reach, because this machine is on no network.";
+
 /** The one line above the addresses, which changes with what there is to say.
  *  Pure. */
 export function shareHeadline(addresses: ShareAddress[]): string {
-  // Anything but loopback. A machine whose only address is a public one is on
-  // the largest network there is, and asking for a "network" row would read
-  // that as no network at all.
-  if (!addresses.some((a) => a.scope !== "machine")) {
-    return "This machine is on no network, so nobody else can reach this room.";
-  }
+  if (addresses.length === 0) return NO_ADDRESS;
   if (addresses.filter((a) => a.scope === "network").length > 1) {
-    return "Give joiners the address for the network they are on:";
+    return "Give joiners the address for the network they are on.";
   }
-  return "Give joiners this address:";
+  return "Give joiners this address.";
+}
+
+/**
+ * What a host has to read before they hand an address out, one sentence each. Pure.
+ *
+ * Everything here used to sit beside the rows in the band under the header, and
+ * now sits behind the Share button, so the button shows a marker when this is
+ * not empty and the popover puts it first. Three sources: the machine being on
+ * no network, a row that gets a joiner into the room but not into the game (see
+ * {@link ShareAddress.caveat}), and a room that is not announcing itself, which
+ * the Battles page says in the same words.
+ *
+ * `advertise` is whether the room announces itself on the network at all. Whether
+ * the announcement has been heard is not asked, because the battle room does not
+ * listen for it.
+ */
+export function shareNotices(
+  addresses: ShareAddress[],
+  advertise: boolean,
+): string[] {
+  if (addresses.length === 0) return [NO_ADDRESS];
+  const notices: string[] = [];
+  for (const a of addresses) {
+    if (a.caveat) notices.push(`${a.label}: ${a.caveat}`);
+  }
+  if (!advertise) notices.push(announcementNote(false, false));
+  return notices;
 }
