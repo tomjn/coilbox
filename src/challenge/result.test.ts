@@ -102,6 +102,43 @@ describe("warpath: a win beats a loss, then further beats nearer", () => {
   });
 });
 
+describe("warpath wins: more hull is better, then more salvage", () => {
+  const won = (hull: number, salvage: number): ChallengeScore => ({
+    won: true,
+    measure: 7,
+    hull,
+    salvage,
+  });
+  it("more hull beats less, whatever the salvage", () => {
+    expect(betterScore("warpath", won(60, 0), won(50, 900))).toBe(true);
+    expect(betterScore("warpath", won(50, 900), won(60, 0))).toBe(false);
+  });
+  it("equal hull falls to salvage", () => {
+    expect(betterScore("warpath", won(50, 120), won(50, 100))).toBe(true);
+    expect(betterScore("warpath", won(50, 100), won(50, 120))).toBe(false);
+  });
+  it("equal hull and salvage is a tie", () => {
+    expect(betterScore("warpath", won(50, 100), won(50, 100))).toBe(false);
+  });
+  it("a win still beats any loss, and losses still compare on depth", () => {
+    expect(betterScore("warpath", won(1, 0), loss(7))).toBe(true);
+    expect(betterScore("warpath", loss(7), won(1, 0))).toBe(false);
+    expect(betterScore("warpath", loss(5), loss(3))).toBe(true);
+    expect(betterScore("warpath", loss(3), loss(5))).toBe(false);
+  });
+  it("any win with hull and salvage beats a win stored without them", () => {
+    expect(betterScore("warpath", won(1, 0), win(7))).toBe(true);
+    expect(betterScore("warpath", win(7), won(1, 0))).toBe(false);
+    expect(betterScore("warpath", win(7), win(7))).toBe(false);
+  });
+  it("does not change how conquest compares wins", () => {
+    const quick = { ...won(1, 0), measure: 10 };
+    const slow = { ...won(99, 999), measure: 20 };
+    expect(betterScore("conquest", quick, slow)).toBe(true);
+    expect(betterScore("conquest", slow, quick)).toBe(false);
+  });
+});
+
 describe("conquestRunResult", () => {
   it("reads turns and the outcome from a finished run", () => {
     expect(conquestRunResult(galaxy, ended("won", 14))).toEqual({
@@ -161,6 +198,27 @@ describe("warpathRunResult", () => {
     expect(warpathRunResult("run-1", warpathEnded("won", 7))?.score.won).toBe(
       true,
     );
+  });
+  it("reads hull remaining and salvage banked from a win", () => {
+    const finished = warpathEnded("won", 7);
+    const result = warpathRunResult("run-1", {
+      ...finished,
+      progress: { ...finished.progress, hull: 63, salvage: 240 },
+    });
+    expect(result?.score).toEqual({
+      won: true,
+      measure: 7,
+      hull: 63,
+      salvage: 240,
+    });
+  });
+  it("leaves hull and salvage off a loss", () => {
+    const finished = warpathEnded("lost", 3);
+    const result = warpathRunResult("run-1", {
+      ...finished,
+      progress: { ...finished.progress, hull: 0, salvage: 80 },
+    });
+    expect(result?.score).toEqual({ won: false, measure: 3 });
   });
   it("is null while the run is still active", () => {
     expect(warpathRunResult("run-1", warpathEnded("active", 2))).toBeNull();
