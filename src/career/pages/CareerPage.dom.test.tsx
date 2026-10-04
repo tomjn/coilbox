@@ -3,6 +3,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AchievementResult } from "../../content/achievements";
 import type { Career } from "../career";
 import type { CareerData, SourceId, SourceStatus } from "../useCareer";
 
@@ -68,8 +69,10 @@ const FULL: Career = {
 
 const EMPTY: Career = { isEmpty: true, warpath: null, games: [] };
 
-function show(data: CareerData) {
-  hoisted.data = data;
+function show(
+  data: Pick<CareerData, "career" | "sources"> & Partial<CareerData>,
+) {
+  hoisted.data = { player: null, achievements: null, ...data };
   return render(
     <MemoryRouter>
       <CareerPage />
@@ -202,5 +205,147 @@ describe("CareerPage", () => {
       screen.queryByRole("link", { name: "Open Player stats" }),
     ).toBeNull();
     expect(screen.getByText("Against AI")).toBeTruthy();
+  });
+  describe("overview", () => {
+    const result = (
+      id: string,
+      earned: boolean,
+      earnedAtMs?: number,
+    ): AchievementResult => ({
+      id,
+      name: `Name ${id}`,
+      description: `Do ${id}`,
+      category: "Milestones",
+      target: 10,
+      current: earned ? 10 : 2,
+      earned,
+      earnedAtMs,
+    });
+    const some = [
+      result("a", true, 100),
+      result("b", true, 200),
+      result("c", false),
+      result("d", false),
+    ];
+
+    it("shows the totals across games above the game cards", () => {
+      show({ career: FULL, sources: allReady });
+      const overview = screen.getByRole("region", { name: "Overview" });
+      expect(overview.textContent).toContain("14 games");
+      expect(overview.textContent).toContain("1 won");
+      expect(overview.textContent).toContain("2");
+      expect(overview.textContent).toContain("of 3 finished");
+      expect(overview.textContent).toContain("2 runs");
+      expect(overview.textContent).toContain("1 win");
+      expect(overview.textContent).toContain("of 1 started");
+      const order = screen
+        .getAllByRole("heading", { level: 2 })
+        .map((h) => h.textContent);
+      expect(order[0]).toBe("Overview");
+      expect(order[1]).toContain("Balanced Annihilation");
+    });
+
+    it("lists earned achievements, newest first, and counts the rest", () => {
+      show({ career: FULL, sources: allReady, achievements: some });
+      const box = screen.getByRole("region", { name: /Achievements/ });
+      expect(box.textContent).toContain("2 of 4 earned");
+      const names = within(box)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent);
+      expect(names).toHaveLength(2);
+      expect(names[0]).toContain("Name b");
+      expect(names[1]).toContain("Name a");
+      expect(box.textContent).not.toContain("Name c");
+      expect(within(box).queryAllByLabelText("Not yet earned")).toHaveLength(0);
+      expect(box.textContent).toContain("2 not yet earned");
+      expect(within(box).getByRole("link").getAttribute("href")).toBe("/stats");
+    });
+
+    it("says so when none are earned, without a list", () => {
+      show({
+        career: FULL,
+        sources: allReady,
+        achievements: [result("c", false), result("d", false)],
+      });
+      const box = screen.getByRole("region", { name: /Achievements/ });
+      expect(box.textContent).toContain("None earned yet. 2 to go.");
+      expect(within(box).queryAllByRole("listitem")).toHaveLength(0);
+    });
+
+    it("says in one line that there are no replay records", () => {
+      show({ career: FULL, sources: allReady });
+      const box = screen.getByRole("region", { name: /Achievements/ });
+      expect(box.textContent).toContain("No replay records yet");
+      expect(within(box).queryAllByRole("listitem")).toHaveLength(0);
+    });
+
+    it("says it is reading while replay records load, and keeps the rest", () => {
+      show({
+        career: FULL,
+        sources: { ...allReady, ai: { state: "loading" } },
+      });
+      const box = screen.getByRole("region", { name: /Achievements/ });
+      expect(box.textContent).toContain("Reading replay records");
+      expect(screen.getByText("Campaigns")).toBeTruthy();
+    });
+
+    it("leaves the achievements out when replay records fail, and keeps the rest", () => {
+      show({
+        career: { ...FULL, games: [{ ...FULL.games[0], ai: null }] },
+        sources: { ...allReady, ai: { state: "error", message: "locked" } },
+      });
+      expect(screen.queryByRole("region", { name: /Achievements/ })).toBeNull();
+      expect(screen.getByRole("alert").textContent).toContain(
+        "achievements are not shown",
+      );
+      expect(screen.getByRole("region", { name: "Overview" })).toBeTruthy();
+      expect(screen.getByText("Campaigns")).toBeTruthy();
+    });
+
+    it("links your player stats to your dossier when the player is known", () => {
+      show({ career: FULL, sources: allReady, player: "Tom & Co" });
+      expect(href("Your player stats")).toBe("/stats/Tom%20%26%20Co");
+    });
+
+    it("links your player stats to the stats page when the player is not known", () => {
+      show({ career: FULL, sources: allReady });
+      expect(href("Your player stats")).toBe("/stats");
+    });
+
+    it("hides both stats links under a profile that hides Player stats, and still shows achievements", () => {
+      hoisted.hide = ["multiplayer.stats"];
+      show({
+        career: FULL,
+        sources: allReady,
+        player: "me",
+        achievements: some,
+      });
+      expect(
+        screen.queryByRole("link", { name: "Your player stats" }),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("link", { name: /See them all on Player stats/ }),
+      ).toBeNull();
+      expect(screen.getByText("Name a")).toBeTruthy();
+    });
+
+    it("leaves Conquest and Warpath totals out where the profile hides them", () => {
+      hoisted.hide = ["conquest.list", "runlite.list"];
+      show({ career: FULL, sources: allReady });
+      const overview = screen.getByRole("region", { name: "Overview" });
+      expect(overview.textContent).not.toContain("Conquests won");
+      expect(overview.textContent).not.toContain("Warpath");
+    });
+
+    it("shows achievements even when no game card is left to show", () => {
+      show({
+        career: EMPTY,
+        sources: allReady,
+        player: "me",
+        achievements: some,
+      });
+      expect(screen.queryByText(/Nothing to show yet/)).toBeNull();
+      expect(screen.getByText("Name a")).toBeTruthy();
+    });
   });
 });

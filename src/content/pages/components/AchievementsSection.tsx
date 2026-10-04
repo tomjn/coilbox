@@ -23,8 +23,11 @@ function earnedAt(ms: number | undefined): string | null {
   return new Date(ms).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-/** One achievement: earned/locked glyph, name, description, and a progress bar. */
-function AchievementRow({ a }: { a: AchievementResult }) {
+/**
+ * One achievement: earned/locked glyph, name, description, and a progress bar.
+ * Shared with the Career page, so both draw an achievement the same way.
+ */
+export function AchievementRow({ a }: { a: AchievementResult }) {
   const date = earnedAt(a.earnedAtMs);
   return (
     <li className="flex items-center gap-3 py-2">
