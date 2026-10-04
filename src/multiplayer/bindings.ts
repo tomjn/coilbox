@@ -1386,12 +1386,13 @@ export const mpSetBattleStatus = defineCommand<
  * only then a battle. It rejects with the reason if any of that fails, and
  * nothing is advertised when it does.
  *
- * That means this call takes as long as opening a TURN allocation and then
- * hearing back from the lobby when `relay` is set, rather than returning as
- * soon as a line is queued. It waits for the answer because a battle the lobby
- * refuses leaves a relay agent holding an allocation for nothing, and the agent
- * has to be told (issue #2058). A refusal comes back here as well as arriving
- * as an `openBattleFailed` delta.
+ * That means this call hears back from the lobby, and when `relay` is set also
+ * waits for a TURN allocation, rather than returning as soon as a line is
+ * queued. It waits for the answer because a battle the lobby refuses leaves a
+ * relay agent holding an allocation for nothing, and the agent has to be told
+ * (issue #2058). A direct host waits too, so the form can show a refusal
+ * (issue #3534). A refusal comes back here as well as arriving as an
+ * `openBattleFailed` delta.
  */
 export const mpOpenBattle = defineCommand<
   {
