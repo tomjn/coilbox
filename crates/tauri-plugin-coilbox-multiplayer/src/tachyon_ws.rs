@@ -319,9 +319,15 @@ impl Endpoint {
         let uri: Uri = url
             .parse()
             .map_err(|e| WsConnectError::BadUrl(format!("{url}: {e}")))?;
-        let host = uri
+        let raw_host = uri
             .host()
-            .ok_or_else(|| WsConnectError::BadUrl(format!("{url} has no host")))?
+            .ok_or_else(|| WsConnectError::BadUrl(format!("{url} has no host")))?;
+        // `Uri::host` keeps the brackets of an IPv6 literal. Sockets and TLS names
+        // want the bare address, while `uri` stays intact for the Host header.
+        let host = raw_host
+            .strip_prefix('[')
+            .and_then(|h| h.strip_suffix(']'))
+            .unwrap_or(raw_host)
             .to_string();
 
         let tls = match uri.scheme_str() {
@@ -350,8 +356,7 @@ impl Endpoint {
     }
 }
 
-/// Whether a host names this machine. `[::1]` arrives from the URL with its
-/// brackets already stripped.
+/// Whether a host names this machine. Expects an IPv6 address without brackets.
 fn is_loopback(host: &str) -> bool {
     host == "localhost" || host == "::1" || host.starts_with("127.")
 }
@@ -445,6 +450,46 @@ impl RateLimiter {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ipv6_loopback_parses_to_a_bare_host_and_is_allowed_over_ws() {
+        let target = Endpoint::parse("ws://[::1]:4000/").unwrap();
+        assert_eq!(target.host, "::1");
+        assert_eq!(target.port, 4000);
+        assert!(!target.tls);
+        assert_eq!(target.uri.to_string(), "ws://[::1]:4000/");
+    }
+
+    #[test]
+    fn ipv6_address_over_wss_parses_to_a_bare_host() {
+        let target = Endpoint::parse("wss://[2001:db8::1]/").unwrap();
+        assert_eq!(target.host, "2001:db8::1");
+        assert_eq!(target.port, 443);
+        assert!(target.tls);
+        assert_eq!(target.uri.authority().unwrap().as_str(), "[2001:db8::1]");
+        assert!(rustls::pki_types::ServerName::try_from(target.host.clone()).is_ok());
+    }
+
+    #[test]
+    fn ipv6_non_loopback_is_still_refused_over_ws() {
+        assert!(Endpoint::parse("ws://[2001:db8::1]:4000/").is_err());
+    }
+
+    #[test]
+    fn bare_host_parts_are_unchanged_for_names_and_ipv4() {
+        assert_eq!(
+            Endpoint::parse("ws://localhost:1/").unwrap().host,
+            "localhost"
+        );
+        assert_eq!(
+            Endpoint::parse("wss://example.com/").unwrap().host,
+            "example.com"
+        );
+        assert_eq!(
+            Endpoint::parse("ws://127.0.0.1:1/").unwrap().host,
+            "127.0.0.1"
+        );
+    }
     use std::io::Write as _;
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
