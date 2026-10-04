@@ -214,6 +214,8 @@ export interface BattleRoomView {
    * checked on its own by the launch block and the caller.
    */
   contentUnreadable: boolean;
+  /** Why the scan could not be read, when it said. Null otherwise. */
+  contentUnreadableReason: string | null;
   sync: SyncState;
   /**
    * The reason the last battle action (kick, force, ready, start, leave, …)
@@ -367,10 +369,18 @@ export interface BattleRoomView {
   rescan: () => Promise<ContentPresence>;
 }
 
+const RESCAN_FAILURE = "The rescan could not read what is installed.";
+
 /** Whether the battle's game and map are installed, as one scan saw it. */
 export interface ContentPresence {
   game: boolean;
   map: boolean;
+  /**
+   * Set when the rescan did not answer (unitsync failed or was cancelled), so
+   * `game` and `map` being false say nothing about what is on disk. A caller
+   * must not download off them (issue #3423).
+   */
+  failure?: string;
 }
 
 /**
@@ -566,6 +576,9 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const contentKnown =
     !!target && !contentVerdict.loading && !contentVerdict.unreadable;
   const contentUnreadable = !!target && contentVerdict.unreadable;
+  const contentUnreadableReason = contentUnreadable
+    ? contentVerdict.unreadableReason
+    : null;
   const mapMissing =
     contentKnown && contentVerdict.missing.some((r) => r.kind === "map");
   const gameMissing =
@@ -1285,10 +1298,12 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     });
     if (found) clearErr();
     setContentNonce((n) => n + 1);
+    // `scan.run` never throws. It resolves null when the scan did not answer.
+    if (!found) return { game: false, map: false, failure: RESCAN_FAILURE };
     // The same exact-name match `contentVerdict` makes above.
     return {
-      game: !!found?.games.some((g) => g.name === battle?.modname),
-      map: !!found?.maps.some((m) => m.name === battle?.map),
+      game: found.games.some((g) => g.name === battle?.modname),
+      map: found.maps.some((m) => m.name === battle?.map),
     };
   }, [
     enginePath,
@@ -1349,6 +1364,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     gameMissing,
     contentKnown,
     contentUnreadable,
+    contentUnreadableReason,
     sync,
     actionError,
     hostIngame,

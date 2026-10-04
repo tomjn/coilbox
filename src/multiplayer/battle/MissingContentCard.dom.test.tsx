@@ -198,4 +198,28 @@ describe("the missing-game card", () => {
 
     await waitFor(() => expect(downloadGameAnySource).toHaveBeenCalledTimes(1));
   });
+
+  it("does not download on join when the rescan did not answer, and says why", async () => {
+    autoDownload.enabled = true;
+    const onRescan = vi.fn(async () => ({
+      game: false,
+      map: false,
+      failure: "The rescan could not read what is installed.",
+    }));
+    render(
+      <DownloadQueueProvider>
+        <MissingContentCard
+          battleId={6}
+          gameName="Metal Factions v2.58"
+          onRescan={onRescan}
+        />
+      </DownloadQueueProvider>,
+    );
+
+    await waitFor(() => expect(onRescan).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByText(/could not read what is installed/)).toBeTruthy(),
+    );
+    expect(downloadGameAnySource).not.toHaveBeenCalled();
+  });
 });

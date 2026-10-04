@@ -703,9 +703,9 @@ export function useMapInventory(): MapInventory {
       names: new Set((scan.data?.maps ?? []).map((m) => m.name.toLowerCase())),
       known:
         (files !== null || (!rootsLoading && paths.length === 0)) && scanKnown,
-      scanFailed: !!scan.data?.initFailure,
+      scanFailed: !!scan.error,
     }),
-    [files, rootsLoading, paths.length, scan.data, scanKnown],
+    [files, rootsLoading, paths.length, scan.data, scan.error, scanKnown],
   );
 }
 

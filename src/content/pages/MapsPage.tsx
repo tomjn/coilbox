@@ -45,10 +45,8 @@ const mapArea = (m: { width?: number; height?: number }) =>
 export default function MapsPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { data, loading, error, cancelled, run, cancel } = useUnitsyncScan(
-    selected?.enginePath,
-    selected?.rootPath,
-  );
+  const { data, unvouched, loading, error, cancelled, run, cancel } =
+    useUnitsyncScan(selected?.enginePath, selected?.rootPath);
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
     selected?.enginePath,
     selected?.rootPath,
@@ -63,12 +61,16 @@ export default function MapsPage() {
   // Proportions come from the thumbnail pass, which reads them while it already
   // has the archive open, so the size label and the area sorts fill in alongside
   // the minimaps rather than holding up the list.
+  // A failed Init leaves data null and the engine's reason in error. The raw
+  // result stays in unvouched, which this page still lists from.
+  const result = data ?? unvouched;
+  const scanFailure = unvouched ? error : null;
   const maps = useMemo(() => {
     const unique = Array.from(
-      new Map((data?.maps ?? []).map((m) => [m.name, m])).values(),
+      new Map((result?.maps ?? []).map((m) => [m.name, m])).values(),
     );
     return mergeMapTiers(unique, thumbs, meta);
-  }, [data, thumbs, meta]);
+  }, [result, thumbs, meta]);
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no maps.
@@ -143,15 +145,15 @@ export default function MapsPage() {
         />
       )}
 
-      {error && <ErrorBanner message={error} />}
-      {data?.errors?.length ? <Diagnostics errors={data.errors} /> : null}
+      {error && !scanFailure && <ErrorBanner message={error} />}
+      {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
 
       {targets.length === 0 ? null : busy ? (
         <SkeletonList />
       ) : cancelled && maps.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load maps." />
-      ) : maps.length === 0 && data?.initFailure ? (
-        <ScanFailed noun="maps" reason={data.initFailure} />
+      ) : maps.length === 0 && scanFailure ? (
+        <ScanFailed noun="maps" reason={scanFailure} />
       ) : maps.length === 0 ? (
         suggestions.length > 0 ? (
           <SuggestionsList

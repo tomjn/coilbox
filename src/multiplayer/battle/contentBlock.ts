@@ -57,6 +57,8 @@ export interface LaunchContent {
    * a player chasing a download for content they may already have.
    */
   unreadable: boolean;
+  /** Why the scan could not be read, when it said (the engine's own words). */
+  unreadableReason?: string | null;
   /**
    * The content scan has settled, so a missing verdict is a fact rather than a
    * list that has not loaded yet. A false verdict mid-scan reads as "you do not
@@ -109,8 +111,7 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
   if (c.unreadable) {
     return {
       short: "Can't check content",
-      reason:
-        "Coilbox could not read what is installed, so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.",
+      reason: `Coilbox could not read what is installed${c.unreadableReason ? ` (${c.unreadableReason})` : ""}, so it cannot tell whether you have this battle's game or map. Pick another engine in Settings, Engines to fix this.`,
     };
   }
   if (!c.contentKnown) return null;

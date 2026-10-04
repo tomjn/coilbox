@@ -133,4 +133,29 @@ describe("the missing-map box", () => {
     await waitFor(() => expect(onRescan).toHaveBeenCalledTimes(1));
     expect(downloadMapAnySource).not.toHaveBeenCalled();
   });
+
+  it("does not download on join when the rescan did not answer, and says why", async () => {
+    autoDownload.enabled = true;
+    const onRescan = vi.fn(async () => ({
+      game: false,
+      map: false,
+      failure: "The rescan could not read what is installed.",
+    }));
+    render(
+      <DownloadQueueProvider>
+        <MissingMapBox
+          battleId={4}
+          mapName="Altair_Crossing_V4.1"
+          onRescan={onRescan}
+          picture={[]}
+        />
+      </DownloadQueueProvider>,
+    );
+
+    await waitFor(() => expect(onRescan).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(screen.getByText(/could not read what is installed/)).toBeTruthy(),
+    );
+    expect(downloadMapAnySource).not.toHaveBeenCalled();
+  });
 });

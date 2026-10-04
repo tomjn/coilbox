@@ -496,6 +496,7 @@ export function BlueprintOnMap({
           setSpot(null);
         }}
         mapsLoading={scan.loading && maps.length === 0}
+        scanError={scan.error}
       />
     </>
   );
