@@ -5,7 +5,7 @@ The Lua that plays a coilbox scenario inside the engine. It is coilbox-authored 
 ## Layout
 
 - `luarules/gadgets/coilbox_mission_runtime.lua`, the gadget. It gates on the modoption, loads the compiled mission, and hands it to the rest of the runtime.
-- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_difficulty.lua` is the difficulty ladder and the one comparison every other module gates on. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_player_actions.lua` the two that read what a player did, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups and what it orders them to do, `coilbox_economy.lua` its teams' banks, income and storage, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, `coilbox_gameover.lua` how it ends, `coilbox_call.lua` the one action that reaches the game's own Lua, and `coilbox_extensions.lua` the condition and action types a game declares for itself. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
+- `luarules/mission_runtime/`, the runtime's own modules. `coilbox_start.lua` turns a compiled mission into the team setup and the list of units to place. `coilbox_triggers.lua` is the trigger engine. `coilbox_difficulty.lua` is the difficulty ladder and the one comparison every other module gates on. `coilbox_unit_conditions.lua` registers the conditions that read units, `coilbox_player_actions.lua` the three that read what a player did, `coilbox_zones.lua` the conditions that read zones, `coilbox_vars.lua` the mission's variables, `coilbox_groups.lua` its groups and what it orders them to do, `coilbox_economy.lua` its teams' banks, income and storage, `coilbox_objectives.lua` its objectives, `coilbox_dialogue.lua` what it says, `coilbox_view.lua` where it points the player, `coilbox_pause.lua` the two actions that pause the game, `coilbox_reveal.lua` what it shows them, `coilbox_restrictions.lua` what its teams may build and do, `coilbox_gameover.lua` how it ends, `coilbox_call.lua` the one action that reaches the game's own Lua, and `coilbox_extensions.lua` the condition and action types a game declares for itself. The first two are pure, with no engine calls and no state, so the gadget reads the engine, asks them what the mission wants, and carries the answer out. `coilbox_dialogue.lua` and `coilbox_view.lua` are pure as well, because saying a line, moving a camera and dropping a marker are all deciding that the mission asked and nothing more.
 - `luaui/widgets/coilbox_mission_ui.lua`, the widget: the objectives panel, the dialogue panel, the debrief and the name over a named actor. `luaui/mission_ui/coilbox_panel_model.lua` is everything it decides before it draws, pure and tested outside the engine.
 - `missions/runtime.lua`, the version marker and capability table. Coilbox reads it out of an installed game to decide what the editor may offer.
 - `missions/extensions.lua` is *not* here, and never installed. It is the game's own file, declaring the game's own trigger types, and both the runtime and the editor read it out of whatever game has one. See [Game extensions](#game-extensions).
@@ -159,7 +159,7 @@ The zones are published as well as read, so anything else that has to work out w
 
 ## What the player did
 
-Two conditions read the player rather than the world, and `coilbox_player_actions.lua` owns both.
+Three conditions read the player rather than the world, and `coilbox_player_actions.lua` owns them. The third, `dialogue_dismissed`, is described under [Pausing and held lines](#pausing-and-held-lines).
 
 - `command_given` holds once a player has given an order since the trigger was armed, or since it last fired. `command` is an engine command name looked up in `CMD`, or `build` for any build order. `unitDef` asks for an order to build that type. With neither it is any order. `team` narrows it to one participant.
 - `unit_selected` holds while a player has a unit selected. `unitDef` asks for a unit of that type, `actor` for one placed unit, and with neither it is any unit the player owns. `team` narrows it to one participant.
@@ -175,6 +175,38 @@ The message is whatever a client chose to send, so the synced half trusts none o
 A report raises `selection_changed`, so a trigger waiting only on a selection fires as the report arrives. A selection the player already had when the trigger was armed sends no report, so the question is asked again on the polled tick while anybody has anything selected.
 
 All three call-ins, `UnitCommand`, `RecvLuaMsg` and the unsynced `Update`, are defined only when a trigger in the mission uses the condition that needs them.
+
+## Pausing and held lines
+
+Runtime 9 lets a lesson stop the game and wait for the player to read. `coilbox_pause.lua` owns `pause_game` and `unpause_game`. The `hold` flag on a `dialogue` action is in `coilbox_dialogue.lua`, and the `dialogue_dismissed` condition is in `coilbox_player_actions.lua`.
+
+Synced Lua cannot pause. The engine's synced Lua API has `Spring.SetNoPause` and nothing that sets the pause itself. A game pauses when a client sends `NETMSG_PAUSE` and the server accepts it, which is what the `pause` console command does (`PauseActionExecutor` in `UnsyncedGameCommands.cpp`). So the synced half sends its unsynced half a message, and the unsynced half calls `Spring.SendCommands("pause 1")` or `"pause 0"`. The state is always named, never toggled, because a client only learns the game is paused when the server's broadcast comes back.
+
+The server takes a pause from the host whatever `nopause` says, and from another player only when the game is pausable. It refuses a spectator (`GameServer.cpp`, `case NETMSG_PAUSE`). During replay playback it reads any pause request as a toggle of the playback itself. So the unsynced half sends nothing when `Spring.IsReplay()` or `Spring.GetSpectatingState()` is true.
+
+Both actions are single player only. With more than one player who is not a spectator, the synced half reports once and sends nothing. The count is read in synced code, so every machine decides the same way.
+
+A paused server sends no `NETMSG_NEWFRAME`, so no client runs `SimFrame` and no gadget or widget gets `GameFrame`. `Update` still runs on every draw frame, and a Lua message is still relayed and handed to `RecvLuaMsg` as it arrives (`GameServer.cpp` and `NetCommands.cpp`, `case NETMSG_LUAMSG`). That is the road a dismissal takes:
+
+1. The widget's `MousePress` lands on a held line. It takes the line off the panel and calls `Spring.SendLuaRulesMsg("coilbox_mission_dismissed:<line id>")`.
+2. The server relays the message to every client, and writes it into the replay.
+3. The synced half reads it in `RecvLuaMsg`. It drops a spectator's message and one for a line the mission is not holding.
+4. It raises `dialogue_dismissed`, which wakes the triggers that subscribe to it, then calls `triggers:poll()` so a polled trigger waiting on the dismissal is asked too. No frame is coming to ask it.
+
+`dialogue_dismissed` holds once the line has been dismissed since the trigger was armed, by the same stamps `command_given` uses.
+
+While the game is paused nothing else drives the trigger engine. Samplers registered with `addTick` do not run, cooldowns do not expire, and `time_elapsed` does not move. A selection report and an order still arrive, and still wake the triggers subscribed to their events.
+
+The widget runs its dialogue queue on game frames, so it would never show a line said into a paused game. Its `Update` covers the gap. While the game is paused, a waiting line takes an empty panel, and a timed line with a held line stuck behind it counts down on wall time. A timed line with nothing held behind it stays frozen through a pause, as before.
+
+A spectator's widget shows a held line as a timed one, which covers a replay viewer. If LuaUI has no `CoilboxMissionDialogue` global, because the game has no LuaUI or the widget is off, the unsynced half sends the dismissal itself so the lesson does not wait for ever.
+
+`RecvLuaMsg` is defined only when a trigger uses `unit_selected` or `dialogue_dismissed`.
+
+```lua
+GG.CoilboxMission.pause.set(true)    -- ask for a pause, false to unpause
+GG.CoilboxMission.dialogue.say("warn", true)    -- say a line and hold it
+```
 
 ## Revealing an area
 
@@ -388,7 +420,7 @@ GG.CoilboxMission.dialogue.sound("alarm.wav")
 
 ## The panels
 
-The objectives panel, the dialogue panel and the debrief are one LuaUI widget, `coilbox_mission_ui`. It reads the mission's state out of game rules params, reads the mission itself out of the archive the same way the gadget does, and never talks back: nothing on one player's screen may reach the game.
+The objectives panel, the dialogue panel and the debrief are one LuaUI widget, `coilbox_mission_ui`. It reads the mission's state out of game rules params, reads the mission itself out of the archive the same way the gadget does, and talks back in one case only, when the player dismisses a held line (see [Pausing and held lines](#pausing-and-held-lines)). Apart from that, nothing on one player's screen may reach the game.
 
 - The objectives panel lists what the mission is asking for: primaries first, then secondaries, each in the order the scenario lists them. A hidden objective is left out while it is active, and settling one is what reveals it.
 - The dialogue panel shows one line at a time, with its speaker, its portrait and its clip. Lines queue rather than interrupt, because a trigger with two lines in it is an author writing an exchange. A line holds the panel for as long as its text takes to read, three seconds at least and twelve at most, and the backlog behind it is capped at six.
@@ -496,6 +528,7 @@ What it has settled:
 - The restrictions. The siege mission denies two unit defs and withholds one command. A factory and a builder both drop a build order for a denied def rather than keeping it, and both build the order behind it. A withheld command given as the player's never reaches the unit, and the same command from the runtime does.
 - The build menu those restrictions paint, read back off a real builder and a real factory. The icon for a denied def is greyed and the one beside it is not, on a builder the player made, on a builder the scenario placed itself, and on a factory belonging to a team no human is playing.
 - `unlock_unit`, the other end of the same mechanism. The garrison mission denies a def from the start and its `unlock` trigger frees it for the player part way through. One builder given one order at one site is refused before that trigger fires and builds after it, its icon is greyed before and not after, the other twenty nine icons in the menu are in the order they were in, and the team the unlock did not name still has its own icon greyed.
+- A pause and the dismissals that end it. The briefing mission pauses on frame 30 and holds two lines. The engine's own log names the frame of the pause and of the unpause, and the harness passes only when they are the same frame. In between, two dismissals crossed the server and three triggers fired, one of them polled. On a machine with no LuaUI the runtime's unsynced half sends both dismissals, which is its fallback for a player with no panel. With LuaUI the probe sends them in place of the widget's click. Not covered: the click itself, the "Click to continue" line being drawn, two players, a spectator and a replay.
 - The two conditions that read the player, on one client. The drill mission's probe selects a unit with `Spring.SelectUnitArray` and gives orders from unsynced code, which is the path a click takes. The selection reaches the synced half through the runtime's own `Update` and `RecvLuaMsg`, a player's order arrives at `UnitCommand` and completes `command_given`, and an order synced Lua gave does not. Two players at once, a spectator and a replay are not in that run.
 - The widget, as far as a run with no screen can take it. A real game's own widget handler finds `coilbox_mission_ui.lua` in the vendored `luaui/widgets/`, and it initialises: the panel model and the compiled mission both come out of the archive, and it registers `CoilboxMissionDialogue`. `Script.LuaUI` is how the probe reads that, because the global a widget registers is the one thing about it a gadget can see, and it is what the runtime's own dialogue call reaches. The widget is still registered when the mission ends, having run every frame in between: the panels' text goes through `gl.Text` for real, the backdrops stay off because a headless engine answers `gl.GetVBO` with nothing and the widget carries on without them, and a widget that raised in any callin would have been thrown out with its global. A game with no mission is left with no widget, because the widget takes itself back off.
 
