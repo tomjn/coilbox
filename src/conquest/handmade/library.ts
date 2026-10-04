@@ -258,7 +258,19 @@ export async function importHandmadeMap(
     // The document read above points at the staging folder, which is gone
     // now. Read the installed copy. The trace is cached, so this is cheap.
     const installed = await loadHandmadeMap(id);
-    if (!installed.ok) return { status: "invalid", errors: installed.errors };
+    if (!installed.ok) {
+      // The map is installed but cannot be read back. Take it out again, so
+      // "invalid" still means nothing was installed.
+      try {
+        await conquestMapRemove({ id });
+      } catch (e) {
+        return {
+          status: "refused",
+          message: `The map was installed as "${id}" but could not be read back, and taking it out again failed. Remove it from the Conquest page. ${messageOf(e)}`,
+        };
+      }
+      return { status: "invalid", errors: installed.errors };
+    }
     return {
       status: "imported",
       id,
