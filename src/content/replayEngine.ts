@@ -6,8 +6,18 @@
  * decision is tested without React. The version comparison is
  * `compareEngineVersions`, the one `useReplayTarget` already picks an engine
  * with, so "installed" here and "the engine Watch launches" cannot disagree.
+ *
+ * Whether the engine is installed is `concludeEngine`'s answer, the one the
+ * launch check gives, so this page and Watch apply one rule: only a version the
+ * engine binary reported counts, and a folder name is not a version (issue
+ * #3452). This page never starts an engine to find out. It says an unchecked
+ * engine has not been checked, and Watch checks it.
  */
 
+import {
+  concludeEngine,
+  type InstalledEngine,
+} from "../play/engineConfirmation";
 import { compareEngineVersions } from "./engineVersion";
 import type { ContentRequirement } from "./resolveContent";
 
@@ -32,8 +42,8 @@ export function replayEngineRequirement(version: string): ContentRequirement {
 export interface ReplayEngineReadings {
   /** The engine version in the replay header. Blank when it names none. */
   recorded: string;
-  /** The version each installed engine reports. */
-  installedVersions: string[];
+  /** Every installed engine, with the version it reported once it has. */
+  engines: InstalledEngine[];
   /** What the download resolver says about the recorded engine. */
   resolve: {
     /** The engine catalogs have not answered. */
@@ -49,6 +59,9 @@ export type ReplayEngineNotice =
   | { kind: "none" }
   /** Still reading. Say nothing yet. */
   | { kind: "pending" }
+  /** No engine has reported the version, but one sits in a folder named for it.
+   *  It may be the engine, so this is neither "installed" nor "download". */
+  | { kind: "unchecked"; version: string }
   /** Not installed, and it can be downloaded. */
   | { kind: "download"; version: string }
   /** Not installed and cannot be downloaded. Names the version so the player
@@ -62,6 +75,9 @@ export type ReplayEngineNotice =
 export type ReplayWatch =
   /** The recorded engine is installed. Watch runs on it. */
   | { kind: "recorded" }
+  /** An engine in a folder named for it has not been checked. Watch checks it,
+   *  then runs on it, or opens the download if it is another build. */
+  | { kind: "verify" }
   /** It is not installed but can be downloaded. Watch opens the download first
    *  and runs on the engine it installs. */
   | { kind: "download" }
@@ -81,7 +97,7 @@ export function replayEngineDecision(r: ReplayEngineReadings): {
   notice: ReplayEngineNotice;
   watch: ReplayWatch;
 } {
-  const hasAnyEngine = r.installedVersions.length > 0;
+  const hasAnyEngine = r.engines.length > 0;
   const fallback: ReplayWatch = hasAnyEngine
     ? { kind: "fallback" }
     : { kind: "none" };
@@ -90,13 +106,22 @@ export function replayEngineDecision(r: ReplayEngineReadings): {
   // A header with no version gives nothing to match or to download.
   if (recorded === "") return { notice: { kind: "none" }, watch: fallback };
 
-  const installed = replayEngineRequirement(recorded).isInstalled({
-    games: [],
-    maps: [],
-    engineVersions: r.installedVersions,
-  });
-  if (installed) {
+  // What the launch check would conclude, with no verification run yet.
+  const conclusion = concludeEngine(
+    [replayEngineRequirement(recorded)],
+    r.engines,
+    [],
+  );
+  if (conclusion.kind === "installed") {
     return { notice: { kind: "none" }, watch: { kind: "recorded" } };
+  }
+  // Ahead of the catalogs and the download offer: a folder that may already
+  // hold the engine must not send the player to download it.
+  if (conclusion.kind === "verify" || conclusion.kind === "unconfirmed") {
+    return {
+      notice: { kind: "unchecked", version: recorded },
+      watch: { kind: "verify" },
+    };
   }
 
   if (r.resolve.loading) {

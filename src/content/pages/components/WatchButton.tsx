@@ -16,7 +16,8 @@ const isBlocked = (watch: ReplayWatch) =>
  * Launch the engine to watch a replay, on the engine the replay was recorded on
  * when it is installed. When it is not installed but can be downloaded, the
  * shared launch check offers it first and the replay starts on what it installs
- * (issue #3370). A replay never runs on another engine: when the recorded one
+ * (issue #3370). An engine that has not reported its version is checked first,
+ * when Watch is pressed and not before. A replay never runs on another engine: when the recorded one
  * cannot be had, Watch is disabled and says which version is needed. Only a
  * header that names no version falls back to an installed engine. Also disabled
  * while any game/replay is already running.
@@ -45,14 +46,11 @@ export function WatchButton({
     setError(null);
     try {
       let target = resolved?.target;
-      // An engine that matched on its folder name alone has not said what it is.
-      // The shared check asks it, and offers the download if it is another build
-      // (issue #3405).
-      const unverified = !!resolved && !resolved.target.syncVersion;
-      if (
-        watch.kind === "download" ||
-        (watch.kind === "recorded" && unverified)
-      ) {
+      // `verify` is an engine in a folder named for the recorded version that has
+      // not said what it is. The shared check asks it, and offers the download if
+      // it is another build (issues #3405, #3452). This is the only place the
+      // replay page starts an engine to ask.
+      if (watch.kind === "download" || watch.kind === "verify") {
         const check = await ensureContent({
           requirements: [replayEngineRequirement(engineVersion)],
           title: "Download the engine this replay needs",
