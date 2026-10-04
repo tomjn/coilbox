@@ -127,51 +127,59 @@ describe("virtualization", () => {
     expect(screen.getAllByTestId("mission-lua-line-text")).toHaveLength(500);
   });
 
-  it("renders far fewer rows than lines once the container is measured", () => {
-    const original = globalThis.ResizeObserver;
-    globalThis.ResizeObserver =
-      FixedSizeResizeObserver as unknown as typeof ResizeObserver;
-    try {
-      render(
-        <MissionLuaCode
-          lines={lines(5000)}
-          tokens={null}
-          matches={[]}
-          activeMatch={null}
-        />,
-      );
-      const rows = screen.getAllByTestId("mission-lua-line-text");
-      expect(rows.length).toBeGreaterThan(0);
-      expect(rows.length).toBeLessThan(100);
-    } finally {
-      globalThis.ResizeObserver = original;
-    }
-  }, SLOW_RENDER_TIMEOUT_MS);
+  it(
+    "renders far fewer rows than lines once the container is measured",
+    () => {
+      const original = globalThis.ResizeObserver;
+      globalThis.ResizeObserver =
+        FixedSizeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        render(
+          <MissionLuaCode
+            lines={lines(5000)}
+            tokens={null}
+            matches={[]}
+            activeMatch={null}
+          />,
+        );
+        const rows = screen.getAllByTestId("mission-lua-line-text");
+        expect(rows.length).toBeGreaterThan(0);
+        expect(rows.length).toBeLessThan(100);
+      } finally {
+        globalThis.ResizeObserver = original;
+      }
+    },
+    SLOW_RENDER_TIMEOUT_MS,
+  );
 
-  it("scrolls a match not currently on screen into the middle of the view", () => {
-    const original = globalThis.ResizeObserver;
-    globalThis.ResizeObserver =
-      FixedSizeResizeObserver as unknown as typeof ResizeObserver;
-    try {
-      const ref = createRef<MissionLuaCodeHandle>();
-      render(
-        <MissionLuaCode
-          ref={ref}
-          lines={lines(5000)}
-          tokens={null}
-          matches={[]}
-          activeMatch={null}
-        />,
-      );
-      expect(screen.queryByText("local line3000 = 3000")).toBeNull();
+  it(
+    "scrolls a match not currently on screen into the middle of the view",
+    () => {
+      const original = globalThis.ResizeObserver;
+      globalThis.ResizeObserver =
+        FixedSizeResizeObserver as unknown as typeof ResizeObserver;
+      try {
+        const ref = createRef<MissionLuaCodeHandle>();
+        render(
+          <MissionLuaCode
+            ref={ref}
+            lines={lines(5000)}
+            tokens={null}
+            matches={[]}
+            activeMatch={null}
+          />,
+        );
+        expect(screen.queryByText("local line3000 = 3000")).toBeNull();
 
-      act(() => {
-        ref.current?.scrollToLine(3000);
-      });
+        act(() => {
+          ref.current?.scrollToLine(3000);
+        });
 
-      expect(screen.getByText("local line3000 = 3000")).toBeTruthy();
-    } finally {
-      globalThis.ResizeObserver = original;
-    }
-  }, SLOW_RENDER_TIMEOUT_MS);
+        expect(screen.getByText("local line3000 = 3000")).toBeTruthy();
+      } finally {
+        globalThis.ResizeObserver = original;
+      }
+    },
+    SLOW_RENDER_TIMEOUT_MS,
+  );
 });
