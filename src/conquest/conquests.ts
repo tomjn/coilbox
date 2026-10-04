@@ -21,11 +21,14 @@ async function fetchGalaxies(): Promise<LoadedGalaxy[]> {
   const { items } = await conquestList({});
   const loaded: LoadedGalaxy[] = [];
   for (const item of items) {
-    const galaxy = parseGalaxyJson(item.json);
+    let reason: string | undefined;
+    const galaxy = parseGalaxyJson(item.json, (r) => {
+      reason = r;
+    });
     if (galaxy) {
       loaded.push({ galaxy, source: item.source });
     } else {
-      console.warn("skipping invalid galaxy document", item.source);
+      console.warn("skipping invalid galaxy document", item.source, reason);
     }
   }
   return loaded;
