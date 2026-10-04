@@ -40,6 +40,12 @@ export function offerInvite(link: InviteLink): boolean {
   return true;
 }
 
+/** Whether a link is in front of the player now, so another kind of prompt can
+ * wait its turn too. */
+export function invitePromptOpen(): boolean {
+  return state.prompt !== null;
+}
+
 /** Take the link away unanswered, which is a cancel. */
 export function closeInvitePrompt(): void {
   if (state.prompt) set({ ...state, prompt: null });

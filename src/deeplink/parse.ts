@@ -27,7 +27,10 @@
  * joiner would otherwise be reading out over voice chat.
  */
 
-import { normaliseServerAddress } from "../lobby-servers/address";
+import {
+  normaliseHostPort,
+  normaliseServerAddress,
+} from "../lobby-servers/address";
 
 /** The scheme every coilbox deep link must use. */
 export const DEEP_LINK_SCHEME = "coilbox";
@@ -179,27 +182,24 @@ function parseJoin(params: URLSearchParams): DeepLinkParseResult {
 /**
  * A room on somebody's machine, as an address and a port (issue #1612).
  *
- * The address is only checked for the shapes that could not possibly be one, the
- * same test a typed address gets in `direct/lan.ts`: whether a machine is
- * actually there is the connection's answer, and refusing here would refuse
- * hostnames that resolve perfectly well. The port is checked properly, because a
- * link with a port outside the range is a link that could never have worked.
+ * The address goes through the same normaliser a `join` link's server does
+ * (issue #3409), so what the dialog shows and what is dialled is one form, and
+ * anything that could read as one host and dial another is refused: userinfo,
+ * a path, an escape and every non-ASCII character. Whether a machine is
+ * actually there is still the connection's answer. The port is its own field, so
+ * an IPv6 address needs no brackets here, and comes back in them.
  */
 function parseRoom(params: URLSearchParams): DeepLinkParseResult {
   const address = field(params, "address");
   const port = field(params, "port");
   if (!address) return invalid("This room link has no address.");
   if (!port) return invalid("This room link has no port.");
-  if (/\s/.test(address) || address.includes("/")) {
-    return invalid("This room link's address is not an address.");
-  }
-  if (!/^\d+$/.test(port))
-    return invalid("This room link's port is not a port.");
-  const number = Number(port);
-  if (number < 1 || number > 65535) {
+  if (!/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
     return invalid("This room link's port is not a port.");
   }
-  return { kind: "room", address, port: number };
+  const normal = normaliseHostPort(address, Number(port));
+  if (!normal) return invalid("This room link's address is not an address.");
+  return { kind: "room", address: normal.host, port: normal.port };
 }
 
 function parseImport(params: URLSearchParams): DeepLinkParseResult {
@@ -233,18 +233,29 @@ function parseImport(params: URLSearchParams): DeepLinkParseResult {
   return invalid("This import link has no payload.");
 }
 
+/**
+ * Whether an `open` link's id can be a name that is shown and looked up. Pure.
+ * Maps, games and replays are named in every script, so only what cannot be a
+ * name is refused: `.` and `..`, which are a way up a path, and control and
+ * format characters, which are not shown or reorder the text around them.
+ */
+export function validOpenId(id: string): boolean {
+  return id !== "." && id !== ".." && !/[\p{Cc}\p{Cf}]/u.test(id);
+}
+
 function parseOpen(params: URLSearchParams): DeepLinkParseResult {
   const screen = field(params, "screen");
   if (!screen) return invalid("This open link has no screen.");
-  if (!(screen in OPEN_SCREENS)) {
+  // An own name only: `in` also finds `constructor` and `toString`.
+  if (!Object.hasOwn(OPEN_SCREENS, screen)) {
     return invalid(`Unknown screen "${screen}".`);
   }
   const key = screen as OpenScreen;
+  if (!OPEN_SCREENS[key].needsId) return { kind: "open", screen: key };
   const id = field(params, "id");
-  if (OPEN_SCREENS[key].needsId && !id) {
-    return invalid(`Opening "${screen}" needs an id.`);
-  }
-  return { kind: "open", screen: key, ...(id ? { id } : {}) };
+  if (!id) return invalid(`Opening "${screen}" needs an id.`);
+  if (!validOpenId(id)) return invalid(`This open link's id is not a name.`);
+  return { kind: "open", screen: key, id };
 }
 
 /** Resolve an `open` action to its concrete in-app route, filling `:id`. */

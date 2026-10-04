@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseDeepLink } from "@/deeplink/parse";
 import { inviteLink } from "./invite";
 
 describe("inviteLink", () => {
@@ -12,6 +13,31 @@ describe("inviteLink", () => {
     expect(inviteLink("192.168.1.45:8300", true, "1")).toBe(
       "coilbox://room?address=192.168.1.45&port=8300",
     );
+  });
+
+  // Issue #3409. A joiner passes on the address they dialled, spelled however
+  // they typed it, and the link has to come back through the parser as that room.
+  it("gives a link the parser reads back as the room dialled, for every spelling a joiner can type", () => {
+    for (const [dialled, address, port] of [
+      ["192.168.1.45:8200", "192.168.1.45", 8200],
+      ["tomlaptop.local:8200", "tomlaptop.local", 8200],
+      ["TomLaptop.LOCAL:8300", "tomlaptop.local", 8300],
+      ["example.com.:8200", "example.com", 8200],
+      ["0x7f.1:8200", "127.0.0.1", 8200],
+    ] as const) {
+      const link = inviteLink(dialled, true, "1");
+      expect(link, dialled).not.toBeNull();
+      expect(parseDeepLink(link ?? ""), dialled).toEqual({
+        kind: "room",
+        address,
+        port,
+      });
+    }
+  });
+
+  it("gives nothing for a room address a link could not carry", () => {
+    expect(inviteLink("known@evil.example:8200", true, "1")).toBeNull();
+    expect(inviteLink("my_pc.local:8200", true, "1")).toBeNull();
   });
 
   it("gives nothing for a room reached over loopback", () => {
