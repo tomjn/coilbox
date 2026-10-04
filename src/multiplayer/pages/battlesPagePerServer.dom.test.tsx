@@ -106,6 +106,9 @@ vi.mock("../../direct/bindings", () => ({}));
 vi.mock("../battles/BattleFilterPopover", () => ({
   BattleFilterPopover: () => null,
 }));
+vi.mock("../battles/SaveSearchPopover", () => ({
+  SaveSearchPopover: () => null,
+}));
 vi.mock("../battles/BattleRowMapThumb", () => ({
   BattleRowMapThumb: () => null,
 }));

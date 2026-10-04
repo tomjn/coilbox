@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
-import { memo, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
 import { startedAgo, useNow } from "../battle/runningMatch";
@@ -41,6 +41,7 @@ function BattleRowInner({
   serverAddress,
   directRoom = false,
   leaves = null,
+  focused = false,
 }: {
   battle: Battle;
   joined: boolean;
@@ -71,6 +72,9 @@ function BattleRowInner({
   /** What joining this battle leaves behind under the one-battle rule (issue
    * #2844), or null. When set, joining asks first. */
   leaves?: string | null;
+  /** A notification sent the player here for this battle, so the row is
+   * scrolled into view and outlined. */
+  focused?: boolean;
 }) {
   const players = occupancy(battle);
   const restricted = battle.passworded || battle.locked;
@@ -79,6 +83,10 @@ function BattleRowInner({
   const action = battleRowAction(battle, { canJoin, inProgress });
   const disabled = joined || action.disabled;
   const [pwOpen, setPwOpen] = useState(false);
+  const rowRef = useRef<HTMLLIElement>(null);
+  useEffect(() => {
+    if (focused) rowRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [focused]);
   // Built rather than assumed: a connection that has no link worth giving out
   // shows no button, instead of one that copies something nobody can act on.
   const invite = inviteLink(serverAddress, directRoom, String(battle.id));
@@ -129,9 +137,11 @@ function BattleRowInner({
 
   return (
     <li
+      ref={rowRef}
+      aria-current={focused ? "true" : undefined}
       className={`flex items-center gap-4 rounded-md border p-3 ${
-        joined ? "border-primary bg-primary/5" : "border-border"
-      }`}
+        joined || focused ? "border-primary bg-primary/5" : "border-border"
+      } ${focused ? "ring-2 ring-primary" : ""}`}
     >
       <BattleRowMapThumb
         battle={battle}

@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import type { SkirmishDraft } from "@/play/drafts";
 import { useScanTargetSelection } from "../../content/config";
 import {
@@ -62,6 +62,7 @@ import {
 } from "../battles/HostZerokBattlePopover";
 import { joinBattle } from "../battles/joinBattle";
 import { useOneBattleRule, useRoomBattleRule } from "../battles/oneBattle";
+import { SaveSearchPopover } from "../battles/SaveSearchPopover";
 import { useBattleFilters } from "../battles/useBattleFilters";
 import {
   type Battle,
@@ -116,6 +117,7 @@ function ServerBattles({
   deeplinkHandled,
   pageControls,
   lanSection,
+  focusId,
 }: {
   serverKey: string;
   layout: "page" | "section";
@@ -137,6 +139,8 @@ function ServerBattles({
   pageControls?: ReactNode;
   /** The rooms on this network, drawn above the list in `page`. */
   lanSection?: ReactNode;
+  /** The battle a notification sent the player to, on this connection. */
+  focusId?: number;
 }) {
   const { busy, clearJoinError } = useMultiplayer();
   const connection = useConnection(serverKey);
@@ -402,6 +406,7 @@ function ServerBattles({
       serverAddress={serverAddressFromKey(serverKey)}
       directRoom={directRoom}
       leaves={rule.notice("join")}
+      focusId={focusId}
     />
   );
 
@@ -510,6 +515,16 @@ function BattlesPage() {
   // hard-scoped to that game (matched on modname) — the bundled build only ever
   // shows its own game's battles. No profile => no scoping.
   const gameMatch = useMemo(() => getGameMatcher(), []);
+  // A notification for a saved search names the battle by server and id. Its
+  // row is shown even when a filter would hide it, since being sent to a row
+  // that is not there would read as a broken link.
+  const [params] = useSearchParams();
+  const focusServer = params.get("server");
+  const focusBattleId = Number(params.get("battle") ?? Number.NaN);
+  const focus =
+    focusServer != null && Number.isInteger(focusBattleId)
+      ? { serverKey: focusServer, id: focusBattleId }
+      : null;
   const lists = useMemo(
     () =>
       Object.fromEntries(
@@ -520,10 +535,22 @@ function BattlesPage() {
           const scoped = gameMatch
             ? all.filter((b) => gameMatch(b.modname))
             : all;
-          return [key, { scoped, shown: filterSortBattles(scoped, filters) }];
+          const shown = filterSortBattles(scoped, filters);
+          const target =
+            focus?.serverKey === key
+              ? scoped.find((b) => b.id === focus.id)
+              : undefined;
+          return [
+            key,
+            {
+              scoped,
+              shown:
+                target && !shown.includes(target) ? [...shown, target] : shown,
+            },
+          ];
         }),
       ),
-    [liveKeys, connections, gameMatch, filters],
+    [liveKeys, connections, gameMatch, filters, focus?.serverKey, focus?.id],
   );
   const roomBattles = Object.values(
     (roomKey != null ? connections[roomKey] : undefined)?.mirror.state
@@ -802,7 +829,10 @@ function BattlesPage() {
   }
 
   const filterControl = (
-    <BattleFilterPopover filters={filters} setFilters={setFilters} />
+    <>
+      <SaveSearchPopover />
+      <BattleFilterPopover filters={filters} setFilters={setFilters} />
+    </>
   );
 
   // One connection is the page it always was, with its own way to open a
@@ -829,6 +859,7 @@ function BattlesPage() {
           </>
         }
         lanSection={lanSection}
+        focusId={focus?.serverKey === key ? focus.id : undefined}
       />
     );
   }
@@ -881,6 +912,7 @@ function BattlesPage() {
               hostTitle={hosting ? hostState?.hostTitle : undefined}
               deeplinkJoin={focused ? deeplinkJoin : undefined}
               deeplinkHandled={deeplinkJoinHandledRef}
+              focusId={focus?.serverKey === key ? focus.id : undefined}
             />
           );
         })}

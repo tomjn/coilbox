@@ -19,6 +19,7 @@ import {
   playLaunchReplay,
   playLaunchSave,
 } from "./bindings";
+import { LaunchContentProvider } from "./LaunchContentProvider";
 import { CrashDrawer } from "./pages/components/CrashDrawer";
 import { type CrashContext, useCrashTriage } from "./useCrashTriage";
 
@@ -310,7 +311,9 @@ export function PlayProvider({ children }: { children: ReactNode }) {
         cancel,
       }}
     >
-      {children}
+      {/* The content check every launch path runs before it calls `launch`
+          (issue #3364). Mounted here so it is wherever `usePlay` is. */}
+      <LaunchContentProvider>{children}</LaunchContentProvider>
       <CrashDrawer
         open={crashOpen}
         onOpenChange={setCrashOpen}

@@ -34,6 +34,7 @@ import {
   forgetBattleMovedUnless,
   recordBattleMoved,
 } from "./battle/battleMoved";
+import { useSavedBattleSearches } from "./battles/savedSearch";
 import {
   type ChatMsg,
   type Delta,
@@ -801,6 +802,7 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
 
   const [ignored, setIgnored] = useIgnored();
   const [favourites] = useFavourites();
+  const { searches: savedSearches } = useSavedBattleSearches();
 
   // --- Auto-rejoin on unexpected server drop (issue #192) --------------------
   // Distinct from the reload-reattach path below: this handles a genuine server-
@@ -2433,6 +2435,8 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           ignored={ignored}
           setIgnored={setIgnored}
           favourites={favourites}
+          savedSearches={savedSearches}
+          serverName={serverNameFor(entry.serverKey, protocolServers)}
           requestJoinChannel={requestJoinChannel}
           update={updateConnection}
           onSeenChange={forceSeenTick}

@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
 
@@ -38,6 +38,7 @@ export function BattleList({
   serverAddress,
   directRoom,
   leaves = null,
+  focusId,
 }: {
   battles: Battle[];
   totalCount: number;
@@ -65,6 +66,9 @@ export function BattleList({
   /** What joining a battle here leaves behind under the one-battle rule
    * (issue #2844), or null. */
   leaves?: string | null;
+  /** The battle a notification sent the player to. Its group is opened and its
+   * row scrolled into view. */
+  focusId?: number;
 }) {
   // Passworded and running battles are both things you cannot simply drop into,
   // so they start collapsed and keep the joinable list short.
@@ -108,6 +112,20 @@ export function BattleList({
   const open = waiting.filter((b) => !b.passworded);
   const passworded = waiting.filter((b) => b.passworded);
 
+  const focusGroup =
+    focusId === undefined
+      ? null
+      : running.some((b) => b.id === focusId)
+        ? "running"
+        : passworded.some((b) => b.id === focusId)
+          ? "passworded"
+          : open.some((b) => b.id === focusId)
+            ? "open"
+            : null;
+  useEffect(() => {
+    if (focusGroup) setCollapsed((c) => ({ ...c, [focusGroup]: false }));
+  }, [focusGroup]);
+
   if (totalCount === 0) {
     return (
       <p className="p-6 text-center text-sm text-muted-foreground">
@@ -142,6 +160,7 @@ export function BattleList({
         onToggle={() => setCollapsed((c) => ({ ...c, open: !c.open }))}
         rowProps={rowProps}
         friendsHere={friendsHere}
+        focusId={focusId}
       />
       <BattleGroup
         label="Passworded"
@@ -152,6 +171,7 @@ export function BattleList({
         }
         rowProps={rowProps}
         friendsHere={friendsHere}
+        focusId={focusId}
       />
       <BattleGroup
         label="In progress"
@@ -160,6 +180,7 @@ export function BattleList({
         onToggle={() => setCollapsed((c) => ({ ...c, running: !c.running }))}
         rowProps={rowProps}
         friendsHere={friendsHere}
+        focusId={focusId}
         inProgress
       />
     </div>
@@ -174,6 +195,7 @@ function BattleGroup({
   onToggle,
   rowProps,
   friendsHere,
+  focusId,
   inProgress = false,
 }: {
   label: string;
@@ -182,6 +204,7 @@ function BattleGroup({
   onToggle: () => void;
   rowProps: RowProps;
   friendsHere: ReadonlyMap<number, string>;
+  focusId?: number;
   /** Every battle in this group is running (host in-game); rows offer "Watch
    * live" (spectator join) instead of "Join". */
   inProgress?: boolean;
@@ -213,6 +236,7 @@ function BattleGroup({
               joined={false}
               inProgress={inProgress}
               friendsHere={friendsHere.get(b.id)}
+              focused={b.id === focusId}
               {...rowProps}
             />
           ))}

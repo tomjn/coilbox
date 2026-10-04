@@ -109,6 +109,7 @@ export function ResolveContentGate({
   targetLoading,
   title,
   description,
+  quiet,
   onContinue,
   onCancel,
 }: {
@@ -120,6 +121,13 @@ export function ResolveContentGate({
   targetLoading?: boolean;
   title: string;
   description?: string;
+  /**
+   * Draw nothing until there is something to say. A launch asks on every Play
+   * press and nearly always hears "all installed", so the checking spinner
+   * would flash a drawer over a game that is about to start (issue #3364).
+   * Once the drawer has opened it behaves as usual, spinner included.
+   */
+  quiet?: boolean;
   /** Runs once every requirement is satisfied. May throw — the error is shown
    * inline and the drawer stays open so the user can retry or cancel. */
   onContinue: () => void | Promise<void>;
@@ -131,6 +139,13 @@ export function ResolveContentGate({
   const firedRef = useRef(false);
 
   const canProceed = resolve.resolved && !resolve.loading;
+  // Whether the full drawer has been on screen, which is what ends `quiet`.
+  const [opened, setOpened] = useState(false);
+  const hasSomethingToSay =
+    !!error || resolve.unreadable || resolve.missing.length > 0;
+  useEffect(() => {
+    if (hasSomethingToSay) setOpened(true);
+  }, [hasSomethingToSay]);
 
   /** Run the caller's completion step once. Used both by the auto-fire effect
    * below and by "Try again" after a failed attempt (content itself is
@@ -161,6 +176,7 @@ export function ResolveContentGate({
     !error &&
     (canProceed || (resolve.loading && resolve.missing.length === 0))
   ) {
+    if (quiet && !opened) return null;
     return (
       <DialogPrimitive.Root open onOpenChange={(o) => !o && onCancel()}>
         <DialogPrimitive.Portal>
