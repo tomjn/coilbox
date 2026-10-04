@@ -24,6 +24,7 @@ import { contentListReplays } from "../../bindings";
 import { demoInfoToSkirmishDraft } from "../../demoToSkirmish";
 import { useRefightSetup } from "../../refight";
 import { useReplayUserState } from "../../replayUserState";
+import { ScanFailed } from "./states";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -85,6 +86,7 @@ function RefightForm({
     selectedGameName,
     setSelectedGameName,
     installedGame,
+    scanFailure,
     missingGame,
     missingMap,
     sides,
@@ -118,6 +120,15 @@ function RefightForm({
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="size-4 animate-spin" /> Checking installed content…
+      </div>
+    );
+  }
+
+  if (scanFailure) {
+    return (
+      <div className="flex flex-col gap-1">
+        <h3 className="text-sm font-medium">Refight this setup</h3>
+        <ScanFailed noun="games or maps" reason={scanFailure} />
       </div>
     );
   }
