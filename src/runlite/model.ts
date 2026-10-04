@@ -285,6 +285,10 @@ export interface RogueliteMeta {
   schemaVersion: number;
   legacy: UnlockRecord;
   games: Record<string, UnlockRecord>;
+  /** True once the runs already finished on disk have been added to `seen`.
+   * Until then nothing is awarded. Never set by `migrateMeta`, which cannot see
+   * the runs. */
+  seenSeeded?: boolean;
 }
 
 export interface RunStats {
@@ -798,6 +802,7 @@ export function migrateMeta(data: unknown): RogueliteMeta {
     schemaVersion: Math.max(version, META_SCHEMA_VERSION),
     legacy: parseRecord(data.legacy),
     games,
+    ...(data.seenSeeded === true ? { seenSeeded: true } : {}),
   };
 }
 

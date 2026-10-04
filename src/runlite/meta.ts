@@ -3,7 +3,6 @@ import {
   META_SCHEMA_VERSION,
   type RogueliteMeta,
   type RogueliteRun,
-  type RunStatus,
   type UnlockRecord,
 } from "./model";
 import { deepestColumn } from "./progress";
@@ -95,18 +94,56 @@ export function loadoutById(id: string | undefined): Loadout {
   return LOADOUTS.find((l) => l.id === id) ?? LOADOUTS[0];
 }
 
+/** True when any record has counted this run id. */
+function isCounted(meta: RogueliteMeta, runId: string): boolean {
+  return (
+    meta.legacy.seen.includes(runId) ||
+    Object.values(meta.games).some((g) => g.seen.includes(runId))
+  );
+}
+
 /**
- * True on the render where a run moves from active to finished, which is the
- * only moment to award it. A page that opens on a run already finished has not
- * seen it finish: that run was counted by the version that ended it, or by the
- * legacy totals before records were kept per game, and counting it again would
- * count it twice.
+ * Mark the runs that were already finished when the meta was first read as
+ * counted, once. Runs finished before records kept a `seen` list may have been
+ * counted once, repeatedly or never, and nothing says which, so they are not
+ * counted again. The ids go in the legacy record, and `awardMeta` looks in every
+ * record. Returns the same object when already seeded, or when the document is
+ * from a newer version and must not be rewritten.
  */
-export function justFinished(
-  before: RunStatus | undefined,
-  now: RunStatus,
-): boolean {
-  return before === "active" && now !== "active";
+export function seedSeen(
+  meta: RogueliteMeta,
+  finishedIds: ReadonlySet<string>,
+): RogueliteMeta {
+  if (meta.seenSeeded || meta.schemaVersion > META_SCHEMA_VERSION) return meta;
+  const legacySeen = [...meta.legacy.seen];
+  for (const id of finishedIds) {
+    if (!isCounted(meta, id) && !legacySeen.includes(id)) legacySeen.push(id);
+  }
+  return {
+    ...meta,
+    legacy: { ...meta.legacy, seen: legacySeen },
+    seenSeeded: true,
+  };
+}
+
+/**
+ * The one rule for counting finished runs, shared by every place that shows
+ * runs. Before the meta is seeded nothing is awarded. After that, a finished
+ * run no record has counted is awarded into its game's record. `baseline` is
+ * the ids of the runs that were already finished when the runs were first read
+ * this session, so a run that ends later is never mistaken for one of them.
+ */
+export function awardFinishedRuns(
+  meta: RogueliteMeta,
+  runs: Readonly<Record<string, RogueliteRun>>,
+  baseline: ReadonlySet<string>,
+): RogueliteMeta {
+  let next = seedSeen(meta, baseline);
+  if (!next.seenSeeded) return next;
+  for (const [id, run] of Object.entries(runs)) {
+    if (run.progress.status !== "active") next = awardMeta(next, run, id);
+  }
+  return next;
 }
 
 /**
@@ -132,7 +169,7 @@ export function awardMeta(
   const prev: UnlockRecord = key
     ? (meta.games[key] ?? emptyRecord)
     : meta.legacy;
-  if (prev.seen.includes(runId)) return meta;
+  if (isCounted(meta, runId)) return meta;
 
   const won = run.progress.status === "won";
   const runs = prev.stats.runs + 1;
@@ -167,6 +204,7 @@ export function awardMeta(
     seen: [...prev.seen, runId],
   };
   return {
+    ...meta,
     schemaVersion: META_SCHEMA_VERSION,
     legacy: key ? meta.legacy : next,
     games: key ? { ...meta.games, [key]: next } : meta.games,

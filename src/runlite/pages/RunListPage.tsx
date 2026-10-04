@@ -29,6 +29,7 @@ import {
 } from "../challenge";
 import type { RogueliteRun } from "../model";
 import { useRuns } from "../runs";
+import { useAwardFinishedRuns } from "../useAwardFinishedRuns";
 import { ImportChallengeForm } from "./components/ImportChallengeForm";
 import { RunSetupForm } from "./components/RunSetupForm";
 
@@ -41,7 +42,9 @@ import { RunSetupForm } from "./components/RunSetupForm";
 export default function RunListPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const { runs, deleteRun } = useRuns();
+  const { runs, loading: runsLoading, deleteRun } = useRuns();
+  // A run that ended while its page was closed is counted when the list shows it.
+  useAwardFinishedRuns(runs, runsLoading);
 
   // Shared with the sidebar nav badge (issue #419) via `usePlayReadiness`, so
   // the two never disagree on whether a game is installed.

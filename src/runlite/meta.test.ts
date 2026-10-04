@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  awardFinishedRuns,
   awardMeta,
-  justFinished,
   loadoutById,
+  seedSeen,
   unlockedLoadouts,
   unlocksFor,
 } from "./meta";
@@ -243,14 +244,88 @@ describe("what a game offers, with a legacy record", () => {
   });
 });
 
-describe("justFinished", () => {
-  it("is true only when a run moves from active to finished", () => {
-    expect(justFinished("active", "won")).toBe(true);
-    expect(justFinished("active", "lost")).toBe(true);
-    expect(justFinished("active", "active")).toBe(false);
-    expect(justFinished("won", "won")).toBe(false);
-    // First sight of a run that is already over: counted before, not now.
-    expect(justFinished(undefined, "won")).toBe(false);
+describe("seedSeen", () => {
+  it("adds the finished ids to the legacy record and sets the flag", () => {
+    const seeded = seedSeen(emptyMeta, new Set(["a", "b"]));
+    expect(seeded.seenSeeded).toBe(true);
+    expect(seeded.legacy.seen).toEqual(["a", "b"]);
+    expect(seeded.legacy.stats.runs).toBe(0);
+  });
+
+  it("does nothing once seeded", () => {
+    const seeded = seedSeen(emptyMeta, new Set(["a"]));
+    expect(seedSeen(seeded, new Set(["a", "b"]))).toBe(seeded);
+  });
+
+  it("never rewrites a document from a newer version", () => {
+    const newer: RogueliteMeta = { ...emptyMeta, schemaVersion: 99 };
+    expect(seedSeen(newer, new Set(["a"]))).toBe(newer);
+  });
+});
+
+describe("awardFinishedRuns", () => {
+  const none = new Set<string>();
+  const seeded = (ids: string[] = []) => seedSeen(emptyMeta, new Set(ids));
+
+  it("seeds from the baseline and then awards a run that ended later", () => {
+    const meta = awardFinishedRuns(
+      emptyMeta,
+      { old: run("won"), fresh: run("won") },
+      new Set(["old"]),
+    );
+    expect(meta.seenSeeded).toBe(true);
+    expect(meta.games.ba.seen).toEqual(["fresh"]);
+    expect(meta.games.ba.stats.runs).toBe(1);
+    expect(meta.legacy.seen).toEqual(["old"]);
+  });
+
+  it("never awards a run in the baseline", () => {
+    const meta = awardFinishedRuns(
+      emptyMeta,
+      { old: run("won"), older: run("lost") },
+      new Set(["old", "older"]),
+    );
+    expect(meta.games).toEqual({});
+    expect(meta.legacy.stats.runs).toBe(0);
+  });
+
+  it("awards a finished run once, however often it is seen", () => {
+    const once = awardFinishedRuns(seeded(), { r1: run("won") }, none);
+    const twice = awardFinishedRuns(once, { r1: run("won") }, none);
+    expect(twice).toBe(once);
+    expect(once.games.ba.stats.runs).toBe(1);
+  });
+
+  it("does not count a run that is still active", () => {
+    const active = run("won");
+    active.progress.status = "active";
+    const meta = seeded();
+    expect(awardFinishedRuns(meta, { r1: active }, none)).toBe(meta);
+  });
+
+  it("puts a run with no game in the legacy record", () => {
+    const meta = awardFinishedRuns(
+      seeded(),
+      { r1: run("won", 0, 4, "") },
+      none,
+    );
+    expect(meta.legacy.stats.runs).toBe(1);
+    expect(meta.legacy.seen).toEqual(["r1"]);
+    expect(meta.games).toEqual({});
+  });
+
+  it("does not count a run any record has counted", () => {
+    const meta = seeded(["r1"]);
+    expect(awardFinishedRuns(meta, { r1: run("won") }, none)).toBe(meta);
+  });
+
+  it("writes nothing for a newer document", () => {
+    const newer: RogueliteMeta = {
+      ...emptyMeta,
+      schemaVersion: 99,
+      seenSeeded: true,
+    };
+    expect(awardFinishedRuns(newer, { r1: run("won") }, none)).toBe(newer);
   });
 });
 

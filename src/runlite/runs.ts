@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback } from "react";
 import { createDocumentStore } from "../lib/documentStore";
 import {
   runliteMetaLoad,
@@ -6,6 +6,7 @@ import {
   runliteStateLoad,
   runliteStateSave,
 } from "./bindings";
+import { awardFinishedRuns } from "./meta";
 import {
   emptyMeta,
   parseRunMeta,
@@ -21,8 +22,20 @@ import {
 async function fetchRuns(): Promise<Record<string, RogueliteRun>> {
   const { json } = await runliteStateLoad({});
   const { runs: parsed } = parseRunStateFile(json);
+  // The runs as the disk had them the first time this session read it, taken
+  // before any battle can end. They seed the meta's `seen` list, and a run that
+  // finishes later is not one of them.
+  if (finishedOnFirstLoad === null) {
+    finishedOnFirstLoad = new Set(
+      Object.entries(parsed)
+        .filter(([, run]) => run.progress.status !== "active")
+        .map(([id]) => id),
+    );
+  }
   return parsed;
 }
+
+let finishedOnFirstLoad: ReadonlySet<string> | null = null;
 
 const store = createDocumentStore<Record<string, RogueliteRun>>(fetchRuns, {});
 
@@ -81,40 +94,56 @@ export function useRun(id: string | undefined) {
   return { run, loading, error, refresh, save };
 }
 
+async function fetchMeta(): Promise<RogueliteMeta> {
+  const { json } = await runliteMetaLoad({});
+  return parseRunMeta(json);
+}
+
+/** One copy of the meta for the whole session, so every mounted consumer sees
+ *  a write made by any other. */
+const metaStore = createDocumentStore<RogueliteMeta>(fetchMeta, emptyMeta);
+
+// Disk writes go one after another, and each writes the latest meta at the
+// moment its turn comes, so a slow write can never land after a newer one.
+let metaWrites: Promise<void> = Promise.resolve();
+
+/** Make `next` the meta everywhere at once, then write the latest meta. */
+function commitMeta(next: RogueliteMeta): Promise<void> {
+  metaStore.publish(next);
+  const write = metaWrites
+    .catch(() => {})
+    .then(async () => {
+      const latest = metaStore.getCached();
+      if (latest) await runliteMetaSave({ json: JSON.stringify(latest) });
+    });
+  metaWrites = write;
+  return write;
+}
+
+/**
+ * Count every finished run in `runs` that no record has counted. Every place
+ * that shows runs calls this, so there is one rule. It reads the meta from the
+ * session store at the moment it runs and publishes the result before
+ * returning, so two callers cannot work from different copies, and the second
+ * finds the first's `seen` ids and counts nothing. Does nothing until both the
+ * meta and the runs have loaded.
+ */
+export function observeFinishedRuns(
+  runs: Readonly<Record<string, RogueliteRun>>,
+): void {
+  const meta = metaStore.getCached();
+  if (!meta || finishedOnFirstLoad === null) return;
+  const next = awardFinishedRuns(meta, runs, finishedOnFirstLoad);
+  if (next === meta) return;
+  commitMeta(next).catch((e) => console.error("Warpath meta save failed", e));
+}
+
 /**
  * Load / save persistent meta-progression (between-run unlocks). Small and
  * read-mostly; written only when a run ends.
  */
 export function useRunMeta() {
-  const [meta, setMeta] = useState<RogueliteMeta>(emptyMeta);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const metaRef = useRef<RogueliteMeta>(emptyMeta);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { json } = await runliteMetaLoad({});
-      const parsed = parseRunMeta(json);
-      metaRef.current = parsed;
-      setMeta(parsed);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const save = useCallback(async (next: RogueliteMeta) => {
-    metaRef.current = next;
-    setMeta(next);
-    await runliteMetaSave({ json: JSON.stringify(next) });
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
+  const { data: meta, loading, error, refresh } = metaStore.useStore();
+  const save = useCallback((next: RogueliteMeta) => commitMeta(next), []);
   return { meta, loading, error, refresh, save };
 }
