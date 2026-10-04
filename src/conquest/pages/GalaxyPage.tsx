@@ -61,6 +61,7 @@ import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
 import {
   drawsAsGalaxy,
   generatedTerrainPixels,
+  locationNoun,
   regenerateGalaxy,
 } from "../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
@@ -1080,11 +1081,14 @@ function SelectionPanel({
       ) : isPlayers ? (
         <p className="text-xs text-muted-foreground">
           Under your control
-          {node.kind === "capital" ? " — your homeworld." : "."}
+          {node.kind === "capital"
+            ? ` — your ${drawsAsGalaxy(galaxy) ? "homeworld" : "capital"}.`
+            : "."}
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Out of reach — capture an adjacent system first.
+          Out of reach — capture an adjacent{" "}
+          {locationNoun(galaxy.theme?.skin).one} first.
         </p>
       )}
     </BracketFrame>
