@@ -106,6 +106,8 @@ export interface NodeStar {
   spectral: string[];
 }
 
+export type LinkKind = "border" | "crossing" | "road";
+
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
@@ -114,6 +116,8 @@ export interface GalaxyNode {
   pos: NodePos;
   /** Real stellar data, when this node came from the star catalogue. */
   star?: NodeStar;
+  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
+  outline?: [number, number][][];
   /** Initial owner: a faction id or {@link NEUTRAL}. */
   owner: string;
   /**
@@ -166,6 +170,16 @@ export interface GalaxyDoc {
     fogOfWar?: boolean;
   };
   theme?: GalaxyTheme;
+  terrain?: {
+    image: string; // URL the webview can load (data:, blob:, asset or http)
+    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
+    width: number; // map units
+    height: number; // map units
+    heightScale?: number; // map units of height for a white heightmap pixel
+    projection?: "flat";
+  };
+  linkKinds?: [string, string, LinkKind][];
+  blockedBorders?: [string, string][];
   createdAt: string;
   updatedAt: string;
   /** Set when this galaxy was created by importing a challenge code/file (see

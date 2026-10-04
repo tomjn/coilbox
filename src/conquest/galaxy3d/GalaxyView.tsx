@@ -10,10 +10,20 @@ import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { createFocus } from "./focus";
-import { hashString, layoutNodes, playBounds, playExtentFor } from "./layout";
+import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { buildPlayLayer } from "./playLayer";
 import { createSelection } from "./selection";
+import {
+  cameraFloorAt,
+  clampPanToSheet,
+  layoutStrategicMap,
+  TERRAIN_MAX_SEGMENTS,
+  terrainCameraLimits,
+  terrainSpecOf,
+} from "./terrain";
+import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
+import { buildTerrainMesh } from "./terrainMesh";
 import { createVisibility } from "./visibility";
 
 /**
@@ -152,6 +162,13 @@ interface GalaxyViewProps {
    * dead-centre behind it. Applied at build/re-frame time.
    */
   focusBiasX?: number;
+  /**
+   * Terrain as pixels, for a map whose picture or heights were made at runtime
+   * and have no URL. Each part given replaces the matching URL in
+   * `galaxy.terrain`. Ignored when the document has no terrain. Keep it stable
+   * between renders, because a new object rebuilds the scene.
+   */
+  terrainPixels?: TerrainPixels;
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
@@ -391,6 +408,7 @@ export function GalaxyView({
   depthMood = false,
   focusNodeId,
   focusBiasX = 0,
+  terrainPixels,
   display,
   className,
 }: GalaxyViewProps) {
@@ -431,9 +449,19 @@ export function GalaxyView({
   const effects = display?.effects ?? true;
   const performanceMode = display?.performanceMode ?? false;
 
+  // A terrain's heights are read before the scene builds, because every
+  // marker is placed at ground height during the build.
+  const terrainSpec = terrainSpecOf(galaxy);
+  const terrainColor = terrainPixels?.color;
+  const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
+    terrainSpec,
+    terrainPixels?.height,
+  );
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+    if (!terrainReady) return;
 
     // Unlike MapPreview3D there is no async asset load here — the whole scene
     // builds synchronously — so no `cancelled` flag is needed.
@@ -447,16 +475,13 @@ export function GalaxyView({
     const scene = new THREE.Scene();
     const uTime = { value: 0 };
 
-    const skin = galaxy.theme?.skin ?? "galaxy";
-    // Bigger galaxies get a proportionally bigger plane (constant density);
-    // the backdrop, nebulae and camera framing all scale with it.
-    const extent = playExtentFor(galaxy.nodes.length);
-    const positions = layoutNodes(galaxy.nodes, extent);
-    // A theatre map is a flat chart: drop the galactic Y jitter.
-    if (skin === "theatre") {
-      for (const p of positions.values()) p[1] = 0;
-    }
-    const bounds = playBounds(positions.values());
+    // `surface` is set for a terrain map only. A galaxy or theatre map has
+    // none and takes the same layout it always has.
+    const { skin, extent, positions, bounds, surface } = layoutStrategicMap(
+      galaxy,
+      terrainHeights,
+      performanceMode ? TERRAIN_MAX_SEGMENTS / 2 : TERRAIN_MAX_SEGMENTS,
+    );
     const nodeIds = galaxy.nodes.map((n) => n.id);
     const factionColor = new Map(
       galaxy.factions.map((f) => [f.id, new THREE.Color(f.color)]),
@@ -488,19 +513,30 @@ export function GalaxyView({
 
     /* ------------------------- decorative backdrop ------------------------- */
 
-    buildBackdrop(
-      scene,
-      disposables,
-      uTime,
-      galaxy,
-      skin,
-      extent,
-      performanceMode,
-      effects,
-      laneFlow,
-      depthMood,
-      renderRef,
-    );
+    // A terrain map draws its sheet and nothing else: no starfield, no nebula.
+    if (surface && terrainSpec) {
+      buildTerrainMesh(
+        scene,
+        disposables,
+        surface,
+        terrainColor ?? terrainSpec.image,
+        renderRef,
+      );
+    } else {
+      buildBackdrop(
+        scene,
+        disposables,
+        uTime,
+        galaxy,
+        skin,
+        extent,
+        performanceMode,
+        effects,
+        laneFlow,
+        depthMood,
+        renderRef,
+      );
+    }
 
     /* ----------------------------- play layer ------------------------------ */
 
@@ -635,12 +671,18 @@ export function GalaxyView({
       // overlay panel (the camera looks down +Z with world +X → screen right,
       // so moving the target right pushes the content left on screen).
       focus.x += extent * focusBiasX;
+      // On a terrain the view pivots on the ground, not on sea level.
+      if (surface) focus.y = surface.groundHeightAtWorld(focus.x, focus.z);
     }
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
     // Start high above the plane (~27° from vertical), pulled back to frame the
     // player's region.
-    camera.position.set(focus.x, extent * 1.05, focus.z + extent * 0.55);
+    camera.position.set(
+      focus.x,
+      focus.y + extent * 1.05,
+      focus.z + extent * 0.55,
+    );
 
     controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(focus);
@@ -659,6 +701,9 @@ export function GalaxyView({
     controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
     controls.minDistance = 25;
     controls.maxDistance = 220;
+    // A terrain map may be viewed straight down, where it reads as a 2D map,
+    // and zooms out far enough to show the whole sheet.
+    if (surface) Object.assign(controls, terrainCameraLimits(surface, 50));
     controls.zoomToCursor = true;
     controls.enableDamping = !reduceMotion;
 
@@ -705,6 +750,18 @@ export function GalaxyView({
     const clampTarget = () => {
       if (!controls) return;
       const t = controls.target;
+      if (surface) {
+        // A terrain pans to the sheet's edge and no further. The target rides
+        // the ground and carries the camera with it, and the camera is held
+        // above whatever ground lies beneath it, so a tilt or a zoom never
+        // passes through a hill.
+        [t.x, t.z] = clampPanToSheet(surface, t.x, t.z);
+        const ground = surface.groundHeightAtWorld(t.x, t.z);
+        const p = camera.position;
+        p.y = Math.max(p.y + ground - t.y, cameraFloorAt(surface, p.x, p.z));
+        t.y = ground;
+        return;
+      }
       t.x = Math.min(bounds.maxX + MARGIN, Math.max(bounds.minX - MARGIN, t.x));
       t.z = Math.min(bounds.maxZ + MARGIN, Math.max(bounds.minZ - MARGIN, t.z));
       t.y = 0;
@@ -1161,6 +1218,10 @@ export function GalaxyView({
     identities,
     depthMood,
     focusBiasX,
+    terrainSpec,
+    terrainReady,
+    terrainHeights,
+    terrainColor,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
