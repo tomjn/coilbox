@@ -53,7 +53,6 @@ import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
-import { answeredScan } from "../scanSettled";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { MatchStatsSection } from "./components/MatchStatsSection";
@@ -880,7 +879,7 @@ export default function ReplayDetailPage() {
   // literal string compare (issue #494). Feeds the missing-content notice
   // near the top of the page (#495).
   const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
-  const answered = answeredScan(scan.data);
+  const answered = scan.data;
   const missingGame =
     info && answered && !scan.loading
       ? !answered.games.some((g) => gameNamesMatch(g.name, info.gameType))
