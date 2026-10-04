@@ -2,6 +2,7 @@ import { buttonVariants, cn } from "@picoframe/frame";
 import { Award, Bot, Milestone, Orbit, Rocket, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { GameIcon } from "@/components/GameIcon";
 import { Badge } from "@/components/ui/badge";
 import { MAX_THREAT_LEVEL } from "../../conquest/threat";
 import type { AchievementResult } from "../../content/achievements";
@@ -176,8 +177,9 @@ function GameCard({
     >
       <h2
         id={`career-${game.key}`}
-        className="flex items-center gap-2 text-base font-semibold"
+        className="flex items-center gap-3 text-base font-semibold"
       >
+        <GameIcon name={game.title} />
         {game.title}
         {game.installed === false && (
           <Badge variant="outline" className="font-normal">
