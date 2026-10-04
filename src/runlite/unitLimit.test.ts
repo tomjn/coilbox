@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UnitDatasetEntry } from "../content/bindings";
 import { buildBuildGraph, buildEdgeMap } from "../content/buildTree";
+import { morphEdgeMap } from "../content/morphGraph";
 import type { RogueliteRun } from "./model";
 import {
   limitHold,
@@ -110,62 +111,200 @@ describe("noLimitReason", () => {
 
 describe("unitLimitFor", () => {
   const edges = buildEdgeMap(CLAW);
+  const morphs = morphEdgeMap(CLAW);
 
   it("limits a run to what it has unlocked, from a start unit that reaches a roster", () => {
     const limit = unitLimitFor(
       run(["claw_commander", "claw_light_plant"], "claw_commander"),
       edges,
+      morphs,
     );
     expect(limit.kind).toBe("limited");
     if (limit.kind !== "limited") return;
     expect(limit.disabled.sort()).toEqual([
+      "claw_avenger",
       "claw_knife",
       "claw_tombstone",
       "claw_totem",
+      "claw_totem_laser",
     ]);
   });
 
   it("gives no limit for a placeholder start unit, and says why", () => {
-    expect(unitLimitFor(run([], "update_your_damn_engine"), edges)).toEqual({
+    expect(
+      unitLimitFor(run([], "update_your_damn_engine"), edges, morphs),
+    ).toEqual({
       kind: "none",
       reason: "start-unit-not-in-data",
     });
   });
 
   it("gives no limit for a start unit that reaches nothing, and says why", () => {
-    expect(unitLimitFor(run([], "claw_light_drone"), edges)).toEqual({
+    expect(unitLimitFor(run([], "claw_light_drone"), edges, morphs)).toEqual({
       kind: "none",
       reason: "reaches-nothing",
     });
   });
 
-  it("does not disable a form the start unit morphs into, since no reward offers it", () => {
+  it("leaves a form the start unit morphs into alone, since its source is unlocked", () => {
     // `claw_u1commander` builds what `claw_commander` does but nothing builds
-    // it, so the run can never unlock it. Disabling it would lock the player
-    // out of their commander's upgrade for good.
+    // it, so no reward can offer it. It stays available because the unit that
+    // morphs into it is unlocked.
     const limit = unitLimitFor(
       run(["claw_commander"], "claw_commander"),
       edges,
+      morphs,
     );
     if (limit.kind !== "limited") throw new Error("expected a limit");
     expect(limit.disabled).not.toContain("claw_u1commander");
-    expect(limit.disabled).not.toContain("claw_totem_laser");
+  });
+
+  it("disables a form that only a locked unit morphs into, and nothing else new", () => {
+    const limit = unitLimitFor(
+      run(["claw_commander"], "claw_commander"),
+      edges,
+      morphs,
+    );
+    if (limit.kind !== "limited") throw new Error("expected a limit");
+    expect(limit.disabled.sort()).toEqual([
+      "claw_avenger",
+      "claw_knife",
+      "claw_light_plant",
+      "claw_tombstone",
+      "claw_totem",
+      "claw_totem_laser",
+    ]);
+  });
+
+  it("frees a form once the unit that morphs into it is unlocked", () => {
+    const limit = unitLimitFor(
+      run(["claw_commander", "claw_tombstone"], "claw_commander"),
+      edges,
+      morphs,
+    );
+    if (limit.kind !== "limited") throw new Error("expected a limit");
+    expect(limit.disabled).not.toContain("claw_avenger");
+    expect(limit.disabled).toContain("claw_totem_laser");
+  });
+
+  it("frees a form that two units morph into when either is unlocked", () => {
+    const two = [...CLAW, unit("claw_totem_hybrid", [], ["claw_avenger"])];
+    const twoEdges = buildEdgeMap([
+      ...two.slice(0, 1),
+      unit(
+        "claw_commander",
+        [...CLAW_BUILDS, "claw_totem_hybrid"],
+        ["claw_u1commander"],
+      ),
+      ...two.slice(1),
+    ]);
+    const twoMorphs = morphEdgeMap(two);
+    const limit = unitLimitFor(
+      run(["claw_commander", "claw_totem_hybrid"], "claw_commander"),
+      twoEdges,
+      twoMorphs,
+    );
+    if (limit.kind !== "limited") throw new Error("expected a limit");
     expect(limit.disabled).not.toContain("claw_avenger");
   });
 
-  it("leaves an unlocked unit that only a morph reaches alone", () => {
-    const limit = unitLimitFor(
-      run(["claw_commander", "claw_u1commander"], "claw_commander"),
-      edges,
+  it("keeps a chain of forms, and what a form builds, open from an unlocked unit", () => {
+    // `fedcommander_up1` builds a unit the base commander does not. A reward
+    // cannot offer that unit, so it opens up with the form that builds it.
+    const fed = [
+      unit("fedcommander", ["fed_solar"], ["fedcommander_up1"]),
+      unit(
+        "fedcommander_up1",
+        ["fed_solar", "fed_beam_tower"],
+        ["fedcommander_up2"],
+      ),
+      unit("fedcommander_up2", ["fed_solar", "fed_beam_tower"]),
+      unit("fed_solar"),
+      unit("fed_beam_tower"),
+    ];
+    const fedLimit = (unlocked: string[]) =>
+      unitLimitFor(
+        run(unlocked, "fedcommander"),
+        buildEdgeMap(fed),
+        morphEdgeMap(fed),
+      );
+    const open = fedLimit(["fedcommander", "fed_solar"]);
+    if (open.kind !== "limited") throw new Error("expected a limit");
+    expect(open.disabled).toEqual([]);
+  });
+
+  it("locks a whole chain of forms behind a locked unit", () => {
+    const chain = [...CLAW, unit("claw_totem_laser2")].map((u) =>
+      u.name === "claw_totem_laser"
+        ? unit("claw_totem_laser", [], ["claw_totem_laser2"])
+        : u,
     );
-    if (limit.kind !== "limited") throw new Error("expected a limit");
-    expect(limit.disabled).not.toContain("claw_u1commander");
+    const chainEdges = buildEdgeMap(chain);
+    const chainMorphs = morphEdgeMap(chain);
+    const locked = unitLimitFor(
+      run(["claw_commander"], "claw_commander"),
+      chainEdges,
+      chainMorphs,
+    );
+    if (locked.kind !== "limited") throw new Error("expected a limit");
+    expect(locked.disabled).toContain("claw_totem_laser");
+    expect(locked.disabled).toContain("claw_totem_laser2");
+    const open = unitLimitFor(
+      run(["claw_commander", "claw_totem"], "claw_commander"),
+      chainEdges,
+      chainMorphs,
+    );
+    if (open.kind !== "limited") throw new Error("expected a limit");
+    expect(open.disabled).not.toContain("claw_totem_laser");
+    expect(open.disabled).not.toContain("claw_totem_laser2");
+  });
+
+  it("disables nothing once every unit the start unit builds is unlocked", () => {
+    const limit = unitLimitFor(
+      run(
+        [
+          "claw_commander",
+          "claw_light_plant",
+          "claw_knife",
+          "claw_totem",
+          "claw_tombstone",
+        ],
+        "claw_commander",
+      ),
+      edges,
+      morphs,
+    );
+    expect(limit).toEqual({ kind: "limited", disabled: [] });
+  });
+
+  it("never disables a unit the start unit builds because of a morph", () => {
+    // The morph rule only adds forms nothing builds, so it cannot take away
+    // anything the start unit builds directly.
+    const withMorph = unitLimitFor(
+      run(["claw_commander"], "claw_commander"),
+      edges,
+      morphs,
+    );
+    const withoutMorph = unitLimitFor(
+      run(["claw_commander"], "claw_commander"),
+      edges,
+      new Map(),
+    );
+    if (withMorph.kind !== "limited" || withoutMorph.kind !== "limited") {
+      throw new Error("expected a limit");
+    }
+    for (const built of CLAW_BUILDS) {
+      expect(withMorph.disabled.includes(built)).toBe(
+        withoutMorph.disabled.includes(built),
+      );
+    }
   });
 
   it("never disables a unit that no route reaches", () => {
     const limit = unitLimitFor(
       run(["claw_commander"], "claw_commander"),
       edges,
+      morphs,
     );
     if (limit.kind !== "limited") throw new Error("expected a limit");
     expect(limit.disabled).not.toContain("claw_light_drone");
@@ -173,11 +312,14 @@ describe("unitLimitFor", () => {
 
   it("covers every unit the unlock rewards can offer", () => {
     // Rewards are drawn from the build graph, so a reward the run offers is
-    // always one the limit understands.
+    // always one the limit understands. Forms nothing builds are locked as
+    // well, and open up with the unit that morphs into them.
     const offered = buildBuildGraph("claw_commander", edges).order;
-    const limit = unitLimitFor(run([], "claw_commander"), edges);
+    const limit = unitLimitFor(run([], "claw_commander"), edges, morphs);
     if (limit.kind !== "limited") throw new Error("expected a limit");
-    expect(limit.disabled.sort()).toEqual([...offered].sort());
+    // The start unit counts as available, so its own form is never locked.
+    const forms = ["claw_totem_laser", "claw_avenger"];
+    expect(limit.disabled.sort()).toEqual([...offered, ...forms].sort());
   });
 });
 

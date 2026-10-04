@@ -50,17 +50,25 @@ function run(
 
 describe("disabledUnitsFor", () => {
   it("disables the reachable arsenal minus the unlocked set", () => {
-    const disabled = disabledUnitsFor(run(["com", "mex", "vplant"]), EDGES);
+    const disabled = disabledUnitsFor(
+      run(["com", "mex", "vplant"]),
+      EDGES,
+      new Map(),
+    );
     expect(disabled.sort()).toEqual(["con", "radar", "tank"]);
   });
 
   it("disables nothing when everything reachable is unlocked", () => {
     const all = ["com", "mex", "vplant", "tank", "con", "radar"];
-    expect(disabledUnitsFor(run(all), EDGES)).toEqual([]);
+    expect(disabledUnitsFor(run(all), EDGES, new Map())).toEqual([]);
   });
 
   it("is case-insensitive on the unlocked set", () => {
-    const disabled = disabledUnitsFor(run(["COM", "MEX", "VPLANT"]), EDGES);
+    const disabled = disabledUnitsFor(
+      run(["COM", "MEX", "VPLANT"]),
+      EDGES,
+      new Map(),
+    );
     expect(disabled).not.toContain("com");
     expect(disabled.sort()).toEqual(["con", "radar", "tank"]);
   });
@@ -68,7 +76,7 @@ describe("disabledUnitsFor", () => {
   it("disables nothing when there is no start unit (full arsenal)", () => {
     const r = run([]);
     r.startUnit = undefined;
-    expect(disabledUnitsFor(r, EDGES)).toEqual([]);
+    expect(disabledUnitsFor(r, EDGES, new Map())).toEqual([]);
   });
 });
 

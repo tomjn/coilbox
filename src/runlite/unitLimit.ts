@@ -1,6 +1,7 @@
 import type { UnitDatasetEntry } from "../content/bindings";
 import { buildEdgeMap, reachableFrom } from "../content/buildTree";
 import type { UnitsyncInfoStatus } from "../content/config";
+import { morphEdgeMap } from "../content/morphGraph";
 import { disabledUnitsFor } from "./build";
 import type { RogueliteRun } from "./model";
 
@@ -10,11 +11,11 @@ import type { RogueliteRun } from "./model";
  *
  * The limit covers the units reachable from the start unit through build
  * options. That is the same graph the unlock rewards are drawn from, so every
- * unit a reward can offer is a unit the limit understands. Morph edges are left
- * out on purpose. A morph form such as `claw_u1commander` is not something a
- * reward can unlock, so disabling it would lock the player out of their
- * commander's upgrade for good. A unit no route reaches is never disabled,
- * which is harmless: nothing the player owns can build it.
+ * unit a reward can offer is a unit the limit understands. Units reached only
+ * by morphing are limited too (issue #3487), but no reward offers them, so they
+ * open up with the unit that morphs into them rather than needing an unlock of
+ * their own. See `disabledUnitsFor`. A unit no route reaches is never
+ * disabled, which is harmless: nothing the player owns can build it.
  */
 
 /** Why coilbox cannot work out a limit for a start unit. */
@@ -51,11 +52,12 @@ export function noLimitReason(
 export function unitLimitFor(
   run: RogueliteRun,
   edges: Map<string, string[]>,
+  morphEdges: Map<string, string[]>,
 ): UnitLimit {
   const reason = noLimitReason(run.startUnit, edges);
   return reason
     ? { kind: "none", reason }
-    : { kind: "limited", disabled: disabledUnitsFor(run, edges) };
+    : { kind: "limited", disabled: disabledUnitsFor(run, edges, morphEdges) };
 }
 
 /**
@@ -77,7 +79,11 @@ export function limitReadiness(
   if (data.status === "error" || !data.units) return { kind: "failed" };
   return {
     kind: "ready",
-    limit: unitLimitFor(run, buildEdgeMap(data.units)),
+    limit: unitLimitFor(
+      run,
+      buildEdgeMap(data.units),
+      morphEdgeMap(data.units),
+    ),
   };
 }
 

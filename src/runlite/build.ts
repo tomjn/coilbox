@@ -14,10 +14,17 @@ import type { Perk, RogueliteRun } from "./model";
  * escalates as you unlock, it is never player-exclusive (that's what per-team
  * perks are for). With no start unit (dataset unavailable) nothing is disabled:
  * the full arsenal is allowed rather than everything banned.
+ *
+ * Units the start unit only reaches by morphing, or that a morph form builds,
+ * are not in that set and no reward can offer them (issue #3487). They are
+ * disabled too, and open up with the unit that gets the player there: a form is
+ * available once an available unit morphs into it or builds it. A commander's
+ * upgrade follows the commander, and `claw_avenger` follows `claw_tombstone`.
  */
 export function disabledUnitsFor(
   run: RogueliteRun,
   edges: Map<string, string[]>,
+  morphEdges: Map<string, string[]>,
 ): string[] {
   if (!run.startUnit) return [];
   const reachable = reachableFrom(run.startUnit, edges);
@@ -27,6 +34,38 @@ export function disabledUnitsFor(
   const disabled: string[] = [];
   for (const unit of reachable) {
     if (!unlocked.has(unit)) disabled.push(unit);
+  }
+
+  // Forms: what morphing, and building from a form, reaches beyond the build
+  // graph from the start unit.
+  const forms = new Set<string>();
+  const queue = [...reachable];
+  while (queue.length > 0) {
+    // biome-ignore lint/style/noNonNullAssertion: queue is non-empty in the loop
+    const unit = queue.shift()!;
+    const next = [...(morphEdges.get(unit) ?? []), ...(edges.get(unit) ?? [])];
+    for (const to of next) {
+      if (!reachable.has(to) && !forms.has(to) && edges.has(to)) {
+        forms.add(to);
+        queue.push(to);
+      }
+    }
+  }
+  const available = new Set([...unlocked, run.startUnit.toLowerCase()]);
+  const open = [...available];
+  while (open.length > 0) {
+    // biome-ignore lint/style/noNonNullAssertion: open is non-empty in the loop
+    const unit = open.shift()!;
+    const next = [...(morphEdges.get(unit) ?? []), ...(edges.get(unit) ?? [])];
+    for (const to of next) {
+      if (forms.has(to) && !available.has(to)) {
+        available.add(to);
+        open.push(to);
+      }
+    }
+  }
+  for (const form of forms) {
+    if (!available.has(form)) disabled.push(form);
   }
   return disabled;
 }
