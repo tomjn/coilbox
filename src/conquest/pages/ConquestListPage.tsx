@@ -98,6 +98,17 @@ import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 export default function ConquestListPage() {
   const { galaxies, loading, error } = useGalaxies();
   const { file, saveFor } = useConquestState();
+  const [abandonError, setAbandonError] = useState<string | null>(null);
+  const abandon = async (galaxyId: string) => {
+    setAbandonError(null);
+    try {
+      await saveFor(galaxyId, undefined);
+    } catch (e) {
+      setAbandonError(
+        `The conquest was not abandoned. ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
   const drawer = useDrawer();
   const navigate = useNavigate();
 
@@ -221,6 +232,7 @@ export default function ConquestListPage() {
       />
 
       {error && <ErrorBanner message={error} />}
+      {abandonError && <ErrorBanner message={abandonError} />}
 
       {needsGame ? (
         <div className="flex flex-col gap-3">
@@ -303,7 +315,7 @@ export default function ConquestListPage() {
                       bundled={source === "bundled"}
                       state={file.conquests[galaxy.id]}
                       resume={galaxy.id === resumeGalaxyId}
-                      onAbandon={() => saveFor(galaxy.id, undefined)}
+                      onAbandon={() => abandon(galaxy.id)}
                     />
                   </li>
                 ))}

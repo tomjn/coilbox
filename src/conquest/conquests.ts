@@ -96,7 +96,7 @@ async function saveConquestState(
   galaxyId: string,
   state: ConquestState | undefined,
 ): Promise<void> {
-  const conquests = { ...(stateStore.getCached() ?? emptyStateFile).conquests };
+  const conquests = { ...stateStore.getForWrite().conquests };
   if (state) {
     conquests[galaxyId] = state;
   } else {

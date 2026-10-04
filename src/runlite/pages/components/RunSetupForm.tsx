@@ -211,8 +211,12 @@ export function RunSetupForm({
   const enemyAiKey = enemyAi ? aiKey(enemyAi) : undefined;
   const canGenerate = !!game && genMaps.length > 0 && !gameLoading;
 
+  // Why the last Begin did not start a run, so the player is told where they
+  // pressed rather than sent to a run that was never saved.
+  const [startError, setStartError] = useState<string | null>(null);
   const startRun = async () => {
     if (!game) return;
+    setStartError(null);
     const opts: GenerateRunOpts = {
       seed: Math.floor(Math.random() * 1e9),
       length,
@@ -233,7 +237,14 @@ export function RunSetupForm({
       loadoutBranch: loadoutById(loadoutId).branchIndex,
     };
     const id = `run-${crypto.randomUUID()}`;
-    await saveRun(id, generateRun(opts));
+    try {
+      await saveRun(id, generateRun(opts));
+    } catch (e) {
+      setStartError(
+        `The warpath was not started. ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return;
+    }
     onStarted(id);
   };
 
@@ -375,6 +386,8 @@ export function RunSetupForm({
       </div>
 
       {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
+
+      {startError && <ErrorBanner message={startError} />}
 
       <Button onClick={startRun} disabled={!canGenerate} className="w-full">
         {gameLoading ? (

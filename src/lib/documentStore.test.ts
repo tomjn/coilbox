@@ -8,7 +8,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { createDocumentStore } from "./documentStore";
+import { createDocumentStore, DocumentNotLoadedError } from "./documentStore";
 
 describe("createDocumentStore", () => {
   it("starts loading and serves the fetched value once it resolves", async () => {
@@ -100,5 +100,70 @@ describe("createDocumentStore", () => {
       await store.refresh();
     });
     expect(store.getCached()).toEqual(["a"]);
+  });
+
+  describe("getForWrite", () => {
+    it("refuses while the first load is still running, and says so", async () => {
+      const store = createDocumentStore<string[]>(
+        () => new Promise(() => {}),
+        [],
+      );
+      renderHook(() => store.useStore());
+      expect(() => store.getForWrite()).toThrow(DocumentNotLoadedError);
+      expect(() => store.getForWrite()).toThrow(/still loading/);
+    });
+
+    it("refuses after a failed load and gives the reason", async () => {
+      const store = createDocumentStore<string[]>(async () => {
+        throw new Error("disk unreadable");
+      }, []);
+      renderHook(() => store.useStore());
+      await act(async () => {});
+      expect(() => store.getForWrite()).toThrow(DocumentNotLoadedError);
+      expect(() => store.getForWrite()).toThrow(/disk unreadable/);
+    });
+
+    it("refuses after a failed refresh with nothing loaded", async () => {
+      const store = createDocumentStore<string[]>(async () => {
+        throw new Error("bad json");
+      }, []);
+      await act(async () => {
+        await store.refresh().catch(() => {});
+      });
+      expect(() => store.getForWrite()).toThrow(/bad json/);
+    });
+
+    it("answers the loaded document after a later load succeeds", async () => {
+      let broken = true;
+      const store = createDocumentStore<string[]>(async () => {
+        if (broken) throw new Error("disk unreadable");
+        return ["a"];
+      }, []);
+      renderHook(() => store.useStore());
+      await act(async () => {});
+      expect(() => store.getForWrite()).toThrow();
+
+      broken = false;
+      await act(async () => {
+        await store.refresh();
+      });
+      expect(store.getForWrite()).toEqual(["a"]);
+    });
+
+    it("keeps answering the last good document when a later refresh fails", async () => {
+      let broken = false;
+      const store = createDocumentStore<string[]>(async () => {
+        if (broken) throw new Error("disk unreadable");
+        return ["a"];
+      }, []);
+      await act(async () => {
+        await store.refresh();
+      });
+      broken = true;
+      await act(async () => {
+        await store.refresh().catch(() => {});
+      });
+      expect(store.getForWrite()).toEqual(["a"]);
+    });
   });
 });

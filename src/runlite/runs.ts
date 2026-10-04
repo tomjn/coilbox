@@ -60,12 +60,12 @@ export function useRuns() {
   /** Add or replace a run under `id`, preserving every other run. Builds on
    *  the latest cache, so two quick saves don't clobber each other. */
   const saveRun = useCallback(async (id: string, run: RogueliteRun) => {
-    await persist({ ...(store.getCached() ?? {}), [id]: run });
+    await persist({ ...store.getForWrite(), [id]: run });
   }, []);
 
   /** Remove a run (abandon), preserving every other run. */
   const deleteRun = useCallback(async (id: string) => {
-    const next = { ...(store.getCached() ?? {}) };
+    const next = { ...store.getForWrite() };
     delete next[id];
     await persist(next);
   }, []);
@@ -107,8 +107,15 @@ const metaStore = createDocumentStore<RogueliteMeta>(fetchMeta, emptyMeta);
 // moment its turn comes, so a slow write can never land after a newer one.
 let metaWrites: Promise<void> = Promise.resolve();
 
-/** Make `next` the meta everywhere at once, then write the latest meta. */
+/** Make `next` the meta everywhere at once, then write the latest meta. Rejects
+ *  without writing when the meta has not loaded, so a failed read is never
+ *  replaced by a record built from nothing. */
 function commitMeta(next: RogueliteMeta): Promise<void> {
+  try {
+    metaStore.getForWrite();
+  } catch (e) {
+    return Promise.reject(e);
+  }
   metaStore.publish(next);
   const write = metaWrites
     .catch(() => {})

@@ -7,7 +7,7 @@ import {
   ShieldAlert,
   Swords,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
@@ -113,8 +113,24 @@ export default function GalaxyPage() {
 }
 
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
-  const { loading, stateFor, saveFor } = useConquestState();
+  const { loading, stateFor, saveFor: writeState } = useConquestState();
   const state = stateFor(galaxy);
+  // A save the store refuses (the saved runs did not load) changes nothing, so
+  // the player is told here instead of the press doing nothing.
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const saveFor = useCallback(
+    async (galaxyId: string, next: ConquestState | undefined) => {
+      setSaveError(null);
+      try {
+        await writeState(galaxyId, next);
+      } catch (e) {
+        setSaveError(
+          `Nothing was changed. ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    },
+    [writeState],
+  );
   // A finished run counts toward its challenge's best result, once.
   const challengeId = galaxyIdentity(galaxy);
   useRecordChallengeRun(state ? conquestRunResult(galaxy, state) : null);
@@ -277,6 +293,11 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
       className="relative h-full overflow-hidden bg-[#05070f]"
       style={backdrop}
     >
+      {saveError && (
+        <div className="pointer-events-auto absolute left-1/2 top-4 z-50 w-[28rem] max-w-[90%] -translate-x-1/2">
+          <ErrorBanner message={saveError} />
+        </div>
+      )}
       <GalaxyView
         galaxy={themedGalaxy}
         owners={owners}

@@ -1,7 +1,7 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, Loader2, Play, Rocket, Share2, Trash2 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { challengeExport } from "@/challenge/bindings";
 import { ChallengeShare } from "@/challenge/ChallengeShare";
@@ -15,6 +15,7 @@ import { useUnitsyncScan } from "../../content/config";
 import {
   Diagnostics,
   EmptyState,
+  ErrorBanner,
   ScanFailed,
 } from "../../content/pages/components/states";
 import { useGamePresetParam } from "../../content/useGamePresetParam";
@@ -50,6 +51,17 @@ export default function RunListPage() {
   // the two never disagree on whether a game is installed.
   const { hasGames, state, scanErrors, scanFailure } = usePlayReadiness();
   const runEntries = Object.entries(runs);
+  const [abandonError, setAbandonError] = useState<string | null>(null);
+  const abandon = async (id: string) => {
+    setAbandonError(null);
+    try {
+      await deleteRun(id);
+    } catch (e) {
+      setAbandonError(
+        `The warpath was not abandoned. ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+  };
 
   // The single most recently updated run still in progress (issue #374's
   // "continue playing" affordance). Badged, not a separate button, since
@@ -167,6 +179,7 @@ export default function RunListPage() {
       ) : state === "unreadable" ? (
         <div className="flex flex-col gap-3">
           {scanFailure && <ScanFailed noun="games" reason={scanFailure} />}
+          {abandonError && <ErrorBanner message={abandonError} />}
           <EmptyState
             label={
               <>
@@ -213,7 +226,7 @@ export default function RunListPage() {
                 run={run}
                 resume={id === resumeRunId}
                 onResume={() => navigate(`/warpath/${encodeURIComponent(id)}`)}
-                onAbandon={() => deleteRun(id)}
+                onAbandon={() => abandon(id)}
               />
             </li>
           ))}
