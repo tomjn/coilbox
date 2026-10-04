@@ -223,7 +223,6 @@ describe("joinBlockedReason", () => {
     );
   });
 
-
   // A room's name is whatever the host typed, so the key can hold an `@` or a
   // `:` before the one that separates it from the address (issue #3442).
   it.each([
@@ -232,7 +231,9 @@ describe("joinBlockedReason", () => {
     ["a:b@::1:8200", "[::1]:8200"],
     ["me@home@::1:8200", "[::1]:8200"],
   ])("names the address of the room keyed %s", (key, address) => {
-    expect(joinBlockedReason(key, false)).toContain(`at ${address}. Leave it first`);
+    expect(joinBlockedReason(key, false)).toContain(
+      `at ${address}. Leave it first`,
+    );
   });
 
   // Hosting is checked first, because a host's own client is connected to their
