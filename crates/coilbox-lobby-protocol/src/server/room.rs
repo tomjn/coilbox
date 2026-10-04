@@ -959,6 +959,10 @@ impl RoomState {
     /// before this join, so the newcomer is never counted as their own
     /// competition for a seat.
     ///
+    /// The exception is a room set up as the host against bots, which is a
+    /// player on one ally and a bot on another. The joiner is there to help, so
+    /// they take the host's ally on a team of their own (issue #3413).
+    ///
     /// A bot occupies a seat as surely as a player does, so both feed the same
     /// used sets: a two-player game with a bot already on team 2 must not seat
     /// the second joiner on top of it.
@@ -979,10 +983,22 @@ impl RoomState {
             used_allies.insert(bot.battle_status.ally);
         }
         let first_free = |used: &BTreeSet<u8>| (0..=15u8).find(|i| !used.contains(i)).unwrap_or(15);
+        let host_ally = existing
+            .get(&self.config.host)
+            .filter(|m| m.battle_status.mode)
+            .map(|m| m.battle_status.ally);
+        let bot_against_host = host_ally.is_some_and(|ally| {
+            self.battle
+                .iter()
+                .flat_map(|b| b.bots.values())
+                .any(|bot| bot.battle_status.ally != ally)
+        });
         BattleStatus {
             mode: true,
             team_id: first_free(&used_teams),
-            ally: first_free(&used_allies),
+            ally: host_ally
+                .filter(|_| bot_against_host)
+                .unwrap_or_else(|| first_free(&used_allies)),
             ..default_battle_status()
         }
     }
@@ -1721,6 +1737,63 @@ mod tests {
         assert_eq!(
             due(&out, BOB).last(),
             Some(&format!("CLIENTBATTLESTATUS bob {} 0", bob_seat.to_int()).as_str())
+        );
+    }
+
+    fn player_seat(team_id: u8, ally: u8) -> BattleStatus {
+        BattleStatus {
+            mode: true,
+            team_id,
+            ally,
+            ..default_battle_status()
+        }
+    }
+
+    /// A room hosted from "me against the bots" has the host on one ally and bots
+    /// on another. A friend who joins is there to help, so they take the host's
+    /// ally on a team of their own (issue #3413).
+    #[test]
+    fn a_joiner_is_seated_with_the_host_when_bots_are_on_another_ally() {
+        let mut room = started(false);
+        send(
+            &mut room,
+            ALICE,
+            &command::my_battle_status(player_seat(0, 0), 0),
+        );
+        for (i, name) in ["Barb1", "Barb2"].into_iter().enumerate() {
+            let seat = player_seat(1 + i as u8, 1);
+            send(&mut room, ALICE, &command::add_bot(name, seat, 255, "BARb"));
+        }
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let seat = player_seat(3, 0);
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", seat.to_int()).as_str())
+        );
+    }
+
+    /// With no bot against the host there is no setup to side with, so each joiner
+    /// is an opponent as before.
+    #[test]
+    fn a_joiner_still_takes_the_next_ally_when_no_bot_is_against_the_host() {
+        let mut room = started(false);
+        send(
+            &mut room,
+            ALICE,
+            &command::my_battle_status(player_seat(0, 0), 0),
+        );
+        send(
+            &mut room,
+            ALICE,
+            &command::add_bot("Barb", player_seat(1, 0), 255, "BARb"),
+        );
+
+        let out = send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        let seat = player_seat(2, 1);
+        assert_eq!(
+            due(&out, BOB).last(),
+            Some(&format!("CLIENTBATTLESTATUS bob {} 0", seat.to_int()).as_str())
         );
     }
 
