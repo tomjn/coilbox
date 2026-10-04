@@ -17,6 +17,7 @@ import { unitsMissingFrom } from "../../gameChoice";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
 import { limitHold } from "../../unitLimit";
+import { UnitLimitNote } from "./UnitLimitNote";
 
 /**
  * Battle briefing for a battle/elite/boss node, rendered as an overlay on the
@@ -120,6 +121,15 @@ export function EncounterOverlay({
               />
               <Row label="Tech tier" value={`${spec.techTier}`} />
             </dl>
+            <UnitLimitNote
+              limit={enc.limit}
+              startUnit={run.startUnit}
+              gameName={
+                enc.installedGame?.name ??
+                run.settings.game.pinnedName ??
+                run.settings.game.shortname
+              }
+            />
             <p className="text-xs text-muted-foreground">
               Defeat costs health, not the warpath — you retreat and press on.
             </p>
