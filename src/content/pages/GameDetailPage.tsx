@@ -21,6 +21,7 @@ import {
   useUnitsyncUnitDataset,
 } from "../config";
 import { isDeletableArchive, isSdd } from "../format";
+import { missingDependencyNotes } from "../gameDependencies";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, factionRecordsFor, guessPrimaryPlayer } from "../stats";
 import { usePlayGame } from "../usePlayGame";
@@ -40,6 +41,7 @@ import { TallyBar } from "./components/StatWidgets";
 import {
   DetailError,
   DetailLoading,
+  MissingDependencyBanner,
   NotFound,
   WarningBanner,
 } from "./components/states";
@@ -242,6 +244,9 @@ export default function GameDetailPage() {
         <BrandingScreenshots shots={brand.screenshots} />
       ) : null}
 
+      {missingDependencyNotes(game).length > 0 && (
+        <MissingDependencyBanner notes={missingDependencyNotes(game)} />
+      )}
       {game.warnings?.length ? (
         <WarningBanner warnings={game.warnings} noun="game" />
       ) : null}
