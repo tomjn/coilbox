@@ -10,7 +10,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
-import type { ContentRequirement } from "../../resolveContent";
+import type { ContentRequirement, EngineReading } from "../../resolveContent";
 import { useResolveContent } from "../../useResolveContent";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -120,6 +120,7 @@ export function ResolveContentGate({
   title,
   description,
   quiet,
+  engineReading,
   onContinue,
   onCancel,
 }: {
@@ -138,12 +139,20 @@ export function ResolveContentGate({
    * Once the drawer has opened it behaves as usual, spinner included.
    */
   quiet?: boolean;
+  /** The caller's own confirmed reading of the installed engines, for a launch
+   * that names an engine version. See `useResolveContent`. */
+  engineReading?: EngineReading;
   /** Runs once every requirement is satisfied. May throw — the error is shown
    * inline and the drawer stays open so the user can retry or cancel. */
   onContinue: () => void | Promise<void>;
   onCancel: () => void;
 }) {
-  const resolve = useResolveContent(requirements, target, targetLoading);
+  const resolve = useResolveContent(
+    requirements,
+    target,
+    targetLoading,
+    engineReading,
+  );
   const [continuing, setContinuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const firedRef = useRef(false);
@@ -237,9 +246,9 @@ export function ResolveContentGate({
                     checked whether you already have what this needs.
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    The engine set as preferred could not be read. Pick another
-                    in Settings → Engines and try this again, or continue
-                    without the check and find out when you play.
+                    {engineReading?.unconfirmed
+                      ? "An engine that may be the one this needs would not report its version. Check it in Settings → Engines and try this again, or continue without the check and find out when you play."
+                      : "The engine set as preferred could not be read. Pick another in Settings → Engines and try this again, or continue without the check and find out when you play."}
                   </p>
                   {resolve.unreadableReason && (
                     <p className="break-words font-mono text-xs text-muted-foreground">

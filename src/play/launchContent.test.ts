@@ -16,11 +16,14 @@ const installed = (
   ...over,
 });
 
-const target = (engineVersion: string): PlayTarget => ({
+/** An engine that reported `engineVersion`, unless `verified` is false, when
+ *  `engineVersion` is only its folder's name. */
+const target = (engineVersion: string, verified = true): PlayTarget => ({
   enginePath: `/content/engine/${engineVersion}`,
   executable: `/content/engine/${engineVersion}/spring`,
   dataDir: "/content",
   engineVersion,
+  ...(verified ? { syncVersion: engineVersion } : {}),
 });
 
 describe("launchRequirements", () => {
@@ -123,6 +126,15 @@ describe("launchTargets", () => {
   it("has nothing to run while the named version is not installed, and reads the install with what there is", () => {
     const reqs = launchRequirements({ engineVersion: "2025.06.12" });
     expect(launchTargets(reqs, [preferred, older], preferred)).toEqual({
+      scan: preferred,
+      run: null,
+    });
+  });
+
+  it("never reads a folder name as a version (issue #3405)", () => {
+    const reqs = launchRequirements({ engineVersion: "2024.11.30" });
+    const folderOnly = target("2024.11.30", false);
+    expect(launchTargets(reqs, [preferred, folderOnly], preferred)).toEqual({
       scan: preferred,
       run: null,
     });

@@ -45,7 +45,14 @@ export function WatchButton({
     setError(null);
     try {
       let target = resolved?.target;
-      if (watch.kind === "download") {
+      // An engine that matched on its folder name alone has not said what it is.
+      // The shared check asks it, and offers the download if it is another build
+      // (issue #3405).
+      const unverified = !!resolved && !resolved.target.syncVersion;
+      if (
+        watch.kind === "download" ||
+        (watch.kind === "recorded" && unverified)
+      ) {
         const check = await ensureContent({
           requirements: [replayEngineRequirement(engineVersion)],
           title: "Download the engine this replay needs",
