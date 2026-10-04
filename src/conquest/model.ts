@@ -270,6 +270,47 @@ export interface ConquestStateFile {
   conquests: Record<string, ConquestState>;
 }
 
+/** The version of the run-state file this build reads and writes. */
+export const CONQUEST_STATE_SCHEMA_VERSION = 1;
+
+/**
+ * Parse the raw JSON of the run-state file. An empty string is an empty file, as
+ * is the plugin's default for a file that does not exist. Anything else that
+ * cannot be read as a whole throws, because reading it as empty would let the
+ * next save replace every conquest: text that is not JSON, JSON of the wrong
+ * shape, and a file made by a newer version. The saved runs inside are passed
+ * through untouched, so a save writes back exactly what was read.
+ */
+export function parseConquestStateFile(json: string): ConquestStateFile {
+  if (json.trim() === "") return { schemaVersion: 1, conquests: {} };
+  let data: unknown;
+  try {
+    data = JSON.parse(json);
+  } catch {
+    throw new Error("state.json is not valid JSON");
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) {
+    throw new Error("state.json is not a JSON object");
+  }
+  const file = data as { schemaVersion?: unknown; conquests?: unknown };
+  if (
+    typeof file.schemaVersion === "number" &&
+    file.schemaVersion > CONQUEST_STATE_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      `state.json was made by a newer version of coilbox (file version ${file.schemaVersion}, this version reads ${CONQUEST_STATE_SCHEMA_VERSION})`,
+    );
+  }
+  if (
+    typeof file.conquests !== "object" ||
+    file.conquests === null ||
+    Array.isArray(file.conquests)
+  ) {
+    throw new Error("state.json has no conquests object");
+  }
+  return data as ConquestStateFile;
+}
+
 /** The on-disk / shared shape produced by export and consumed by import. */
 export interface GalaxyExportFile {
   format: "coilbox-galaxy";

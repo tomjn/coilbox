@@ -166,16 +166,6 @@ describe("parseRunStateFile", () => {
     expect(file.runs.beta.progress.hull).toBe(100);
   });
 
-  it("skips runs that fail validation", () => {
-    const file = parseRunStateFile(
-      JSON.stringify({
-        schemaVersion: 1,
-        runs: { good: baseRun(), bad: { type: "roguelite-run" } },
-      }),
-    );
-    expect(Object.keys(file.runs)).toEqual(["good"]);
-  });
-
   it("migrates a legacy single-run document into a one-entry map", () => {
     const file = parseRunStateFile(
       JSON.stringify({ schemaVersion: 1, run: baseRun() }),
@@ -185,11 +175,73 @@ describe("parseRunStateFile", () => {
     expect(file.runs[ids[0]].settings.seed).toBe(42);
   });
 
-  it("returns an empty map for a null legacy run and for garbage", () => {
+  it("returns an empty map for a null legacy run", () => {
     expect(
       parseRunStateFile(JSON.stringify({ schemaVersion: 1, run: null })).runs,
     ).toEqual({});
-    expect(parseRunStateFile("not json").runs).toEqual({});
+  });
+
+  it("reads an empty string and the plugin default as no runs", () => {
+    for (const text of ["", "  \n", '{"schemaVersion":1,"runs":{}}']) {
+      expect(parseRunStateFile(text).runs).toEqual({});
+    }
+  });
+
+  it("fails on text that is not JSON", () => {
+    expect(() => parseRunStateFile("not json")).toThrow(/not valid JSON/);
+    expect(() => parseRunStateFile('{"runs":{"a":')).toThrow(/not valid JSON/);
+  });
+
+  it("fails on JSON that is not an object with runs", () => {
+    for (const text of ["[]", "null", "42", '"text"', "true"]) {
+      expect(() => parseRunStateFile(text)).toThrow(/not a JSON object/);
+    }
+    expect(() => parseRunStateFile("{}")).toThrow(/no runs/);
+    expect(() => parseRunStateFile('{"runs":[]}')).toThrow(/not an object/);
+    expect(() => parseRunStateFile('{"runs":"x"}')).toThrow(/not an object/);
+  });
+
+  it("fails on a file made by a newer version", () => {
+    expect(() =>
+      parseRunStateFile(
+        JSON.stringify({ schemaVersion: 2, runs: { a: baseRun() } }),
+      ),
+    ).toThrow(/newer version of coilbox/);
+  });
+
+  it("skips a run that fails validation from play but keeps it raw in the file", () => {
+    const bad = { type: "roguelite-run", extra: [1, { deep: true }] };
+    const file = parseRunStateFile(
+      JSON.stringify({
+        schemaVersion: 1,
+        runs: { good: baseRun(), other: baseRun(), bad },
+      }),
+    );
+    expect(Object.keys(file.runs).sort()).toEqual(["good", "other"]);
+    expect(file.unreadable).toEqual({ bad });
+  });
+
+  it("keeps an entry with an empty key raw instead of dropping it", () => {
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, runs: { "": { x: 1 } } }),
+    );
+    expect(file.runs).toEqual({});
+    expect(file.unreadable).toEqual({ "": { x: 1 } });
+  });
+
+  it("has nothing unreadable in a clean file", () => {
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, runs: { a: baseRun() } }),
+    );
+    expect(file.unreadable).toEqual({});
+  });
+
+  it("keeps a legacy run that cannot be read raw", () => {
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, run: { odd: true } }),
+    );
+    expect(file.runs).toEqual({});
+    expect(Object.values(file.unreadable)).toEqual([{ odd: true }]);
   });
 });
 

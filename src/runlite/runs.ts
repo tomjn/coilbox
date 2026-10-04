@@ -21,7 +21,8 @@ import {
  *  other. */
 async function fetchRuns(): Promise<Record<string, RogueliteRun>> {
   const { json } = await runliteStateLoad({});
-  const { runs: parsed } = parseRunStateFile(json);
+  const { runs: parsed, unreadable: damaged } = parseRunStateFile(json);
+  unreadable = damaged;
   // The runs as the disk had them the first time this session read it, taken
   // before any battle can end. They seed the meta's `seen` list, and a run that
   // finishes later is not one of them.
@@ -37,6 +38,11 @@ async function fetchRuns(): Promise<Record<string, RogueliteRun>> {
 
 let finishedOnFirstLoad: ReadonlySet<string> | null = null;
 
+/** The entries of `run.json` that were not readable as runs, as the disk had
+ *  them. Every write puts them back, and none of them is a run for play, so they
+ *  are not in the store, not awarded, and not in the baseline above. */
+let unreadable: Readonly<Record<string, unknown>> = {};
+
 const store = createDocumentStore<Record<string, RogueliteRun>>(fetchRuns, {});
 
 /** Synchronous best-effort read of a loaded run from the session cache, for
@@ -50,7 +56,10 @@ export function getCachedRun(id: string): RogueliteRun | undefined {
 async function persist(next: Record<string, RogueliteRun>): Promise<void> {
   store.publish(next);
   await runliteStateSave({
-    json: JSON.stringify({ schemaVersion: 1, runs: next }),
+    json: JSON.stringify({
+      schemaVersion: 1,
+      runs: { ...unreadable, ...next },
+    }),
   });
 }
 
@@ -60,6 +69,11 @@ export function useRuns() {
   /** Add or replace a run under `id`, preserving every other run. Builds on
    *  the latest cache, so two quick saves don't clobber each other. */
   const saveRun = useCallback(async (id: string, run: RogueliteRun) => {
+    if (id in unreadable) {
+      throw new Error(
+        "That run id is taken by a run that could not be read, so nothing was saved.",
+      );
+    }
     await persist({ ...store.getForWrite(), [id]: run });
   }, []);
 
@@ -70,7 +84,15 @@ export function useRuns() {
     await persist(next);
   }, []);
 
-  return { runs, loading, error, refresh, saveRun, deleteRun };
+  return {
+    runs,
+    loading,
+    error,
+    refresh,
+    saveRun,
+    deleteRun,
+    unreadableCount: Object.keys(unreadable).length,
+  };
 }
 
 /**

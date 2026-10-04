@@ -10,6 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const readiness = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
+  runsError: null as string | null,
+  unreadableCount: 0,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -31,7 +33,13 @@ vi.mock("../../deeplink/useImportParam", () => ({
 }));
 vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
 vi.mock("../runs", () => ({
-  useRuns: () => ({ runs: {}, deleteRun: vi.fn() }),
+  useRuns: () => ({
+    runs: {},
+    loading: false,
+    error: readiness.runsError,
+    unreadableCount: readiness.unreadableCount,
+    deleteRun: vi.fn(),
+  }),
 }));
 vi.mock("../useAwardFinishedRuns", () => ({
   useAwardFinishedRuns: vi.fn(),
@@ -40,7 +48,11 @@ vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
 
 import RunListPage from "./RunListPage";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  readiness.runsError = null;
+  readiness.unreadableCount = 0;
+});
 
 describe("RunListPage with a failed scan", () => {
   it("shows the reason and no scanning spinner", () => {
@@ -57,5 +69,69 @@ describe("RunListPage with a failed scan", () => {
     );
     expect(screen.getByText(/no space left on device/)).toBeTruthy();
     expect(screen.queryByText(/Scanning installed games/)).toBeNull();
+  });
+});
+
+describe("RunListPage with a run file that could not be read", () => {
+  it("says so, that nothing was changed, and gives the reason", () => {
+    readiness.current = {
+      hasGames: true,
+      state: "ready",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    readiness.runsError = "run.json is not valid JSON";
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText(
+        "Your warpath runs could not be read. Nothing has been changed. run.json is not valid JSON",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/No warpath in progress/)).toBeNull();
+  });
+});
+
+describe("RunListPage with runs kept in the file that could not be read", () => {
+  function renderReady() {
+    readiness.current = {
+      hasGames: true,
+      state: "ready",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+  }
+
+  it("says how many, and that they are kept and unchanged", () => {
+    readiness.unreadableCount = 2;
+    renderReady();
+    expect(
+      screen.getByText(
+        "2 warpath runs could not be read. They are kept in the file and have not been changed.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("uses the singular for one", () => {
+    readiness.unreadableCount = 1;
+    renderReady();
+    expect(
+      screen.getByText(
+        "1 warpath run could not be read. It is kept in the file and has not been changed.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows nothing when there are none", () => {
+    renderReady();
+    expect(screen.queryByText(/could not be read/)).toBeNull();
   });
 });

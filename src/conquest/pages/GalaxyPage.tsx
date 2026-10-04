@@ -113,7 +113,12 @@ export default function GalaxyPage() {
 }
 
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
-  const { loading, stateFor, saveFor: writeState } = useConquestState();
+  const {
+    loading,
+    error: stateError,
+    stateFor,
+    saveFor: writeState,
+  } = useConquestState();
   const state = stateFor(galaxy);
   // A save the store refuses (the saved runs did not load) changes nothing, so
   // the player is told here instead of the press doing nothing.
@@ -293,9 +298,15 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
       className="relative h-full overflow-hidden bg-[#05070f]"
       style={backdrop}
     >
-      {saveError && (
+      {(stateError || saveError) && (
         <div className="pointer-events-auto absolute left-1/2 top-4 z-50 w-[28rem] max-w-[90%] -translate-x-1/2">
-          <ErrorBanner message={saveError} />
+          {stateError ? (
+            <ErrorBanner
+              message={`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
+            />
+          ) : (
+            <ErrorBanner message={saveError ?? ""} />
+          )}
         </div>
       )}
       <GalaxyView

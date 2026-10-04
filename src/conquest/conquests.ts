@@ -5,6 +5,7 @@ import {
   type ConquestState,
   type ConquestStateFile,
   type GalaxyDoc,
+  parseConquestStateFile,
   parseGalaxyJson,
   reconcileState,
 } from "./model";
@@ -61,14 +62,11 @@ export function getCachedGalaxy(id: string): LoadedGalaxy | undefined {
 /** The empty state document, matching the plugin's default. */
 const emptyStateFile: ConquestStateFile = { schemaVersion: 1, conquests: {} };
 
-/** Read + parse the run-state file from disk (empty on parse failure). */
+/** Read + parse the run-state file from disk. A file that cannot be read
+ *  throws, so the store reports a failed load and refuses to save over it. */
 async function fetchStateFile(): Promise<ConquestStateFile> {
   const { json } = await conquestStateLoad({});
-  try {
-    return JSON.parse(json) as ConquestStateFile;
-  } catch {
-    return emptyStateFile;
-  }
+  return parseConquestStateFile(json);
 }
 
 /**
