@@ -36,7 +36,10 @@ const machine = vi.hoisted(() => {
   interface Snapshot {
     games: string[];
     maps: string[];
+    /** Engines that reported their version. The folder is named for it. */
     engines: string[];
+    /** Folder names of engines that have not reported a version yet. */
+    unverified: string[];
     writePath: string | undefined;
     scanError: string | null;
   }
@@ -45,6 +48,7 @@ const machine = vi.hoisted(() => {
     games: [],
     maps: [],
     engines: [],
+    unverified: [],
     writePath: "/content",
     scanError: null,
   };
@@ -70,14 +74,27 @@ const downloads = vi.hoisted(() => ({
   recoilCatalog: [] as { version: string; assetUrl: string }[],
 }));
 
+/** `contentVerifyEngine`, which runs an engine binary. Never a real one here. */
+const verify = vi.hoisted(() => vi.fn());
+vi.mock("@/content/bindings", () => ({ contentVerifyEngine: verify }));
+
 const useMachine = () => useSyncExternalStore(machine.subscribe, machine.read);
 
+/** An engine that reported `engineVersion`. */
 const targetFor = (engineVersion: string): PlayTarget => ({
-  enginePath: `/content/engine/${engineVersion}`,
-  executable: `/content/engine/${engineVersion}/spring`,
-  dataDir: "/content",
-  engineVersion,
+  ...folderOnly(engineVersion),
+  syncVersion: engineVersion,
 });
+
+/** An engine that has not reported: its folder name is all there is. */
+function folderOnly(folder: string): PlayTarget {
+  return {
+    enginePath: `/content/engine/${folder}`,
+    executable: `/content/engine/${folder}/spring`,
+    dataDir: "/content",
+    engineVersion: folder,
+  };
+}
 
 vi.mock("@/downloads/bindings", () => ({
   dlCancel: vi.fn(async () => ({})),
@@ -143,14 +160,21 @@ vi.mock("./config", async () => {
   const { useState } = await import("react");
   return {
     usePreferredTarget: () => {
-      const [engines, setEngines] = useState(() => machine.read().engines);
-      const targets = engines.map(targetFor);
+      const read = () => ({
+        engines: machine.read().engines,
+        unverified: machine.read().unverified,
+      });
+      const [seen, setSeen] = useState(read);
+      const targets = [
+        ...seen.engines.map(targetFor),
+        ...seen.unverified.map(folderOnly),
+      ];
       return {
         target: targets[0] ?? null,
         targets,
         loading: false,
         error: null,
-        refresh: async () => setEngines(machine.read().engines),
+        refresh: async () => setSeen(read()),
       };
     },
   };
@@ -190,6 +214,7 @@ beforeEach(() => {
     games: ["Beyond All Reason test-1"],
     maps: ["Comet Catcher Redux"],
     engines: ["2025.04.01"],
+    unverified: [],
     writePath: "/content",
     scanError: null,
   });
@@ -363,6 +388,102 @@ describe("ensureContent", () => {
         target: targetFor("2025.04.01"),
       }),
     );
+  });
+
+  describe("an engine that has not reported its version (issue #3405)", () => {
+    const WANT = "2026.03.01";
+    const named = () => launchRequirements({ engineVersion: WANT });
+    const reports = (version: string | null) =>
+      verify.mockImplementation(async () => ({
+        engine: { syncVersion: version ?? undefined },
+      }));
+
+    it("asks the engine in the folder named for the version, then launches on it", async () => {
+      machine.set({ unverified: [WANT] });
+      reports(WANT);
+      const outcome = check({ requirements: named() });
+
+      await waitFor(() =>
+        expect(outcome.result).toEqual({
+          ready: true,
+          target: targetFor(WANT),
+        }),
+      );
+      expect(verify).toHaveBeenCalledTimes(1);
+      expect(verify).toHaveBeenCalledWith({
+        path: folderOnly(WANT).executable,
+      });
+      expect(screen.queryByRole("dialog")).toBeNull();
+    });
+
+    it("offers the download when that engine reports another version", async () => {
+      machine.set({ unverified: [WANT] });
+      reports("2025.06.20");
+      const outcome = check({ requirements: named() });
+
+      await screen.findByText(WANT);
+      expect(screen.getByRole("button", { name: "Download" })).toBeTruthy();
+      expect(outcome.result).toBeNull();
+      expect(verify).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not guess when the engine will not start, and lets the player go on", async () => {
+      machine.set({ unverified: [WANT] });
+      verify.mockRejectedValue(new Error("failed to launch engine"));
+      const outcome = check({ requirements: named() });
+
+      await screen.findByText(/Could not confirm that engine 2026\.03\.01/);
+      expect(screen.getByText(/failed to launch engine/)).toBeTruthy();
+      // Not claimed missing, so no download is offered.
+      expect(screen.queryByRole("button", { name: "Download" })).toBeNull();
+      expect(outcome.result).toBeNull();
+
+      fireEvent.click(screen.getByRole("button", { name: "Continue anyway" }));
+      await waitFor(() =>
+        expect(outcome.result).toEqual({
+          ready: true,
+          target: folderOnly(WANT),
+        }),
+      );
+    });
+
+    it("asks only the folder named for the version", async () => {
+      machine.set({ unverified: ["2024.11.30", WANT, "my-engine"] });
+      reports(WANT);
+      const outcome = check({ requirements: named() });
+
+      await waitFor(() => expect(outcome.result?.ready).toBe(true));
+      expect(verify).toHaveBeenCalledTimes(1);
+      expect(verify).toHaveBeenCalledWith({
+        path: folderOnly(WANT).executable,
+      });
+    });
+
+    it("asks nothing when a verified engine already reports the version", async () => {
+      machine.set({
+        engines: ["2025.04.01", WANT],
+        unverified: [`${WANT}-b`],
+      });
+      const outcome = check({ requirements: named() });
+
+      await waitFor(() =>
+        expect(outcome.result).toEqual({
+          ready: true,
+          target: targetFor(WANT),
+        }),
+      );
+      expect(verify).not.toHaveBeenCalled();
+    });
+
+    it("asks nothing when the launch names no engine version", async () => {
+      machine.set({ unverified: [WANT] });
+      const outcome = check({
+        requirements: launchRequirements({ map: "Comet Catcher Redux" }),
+      });
+
+      await waitFor(() => expect(outcome.result?.ready).toBe(true));
+      expect(verify).not.toHaveBeenCalled();
+    });
   });
 
   it("ends the first check as cancelled when a second launch asks", async () => {

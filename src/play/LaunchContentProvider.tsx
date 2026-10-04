@@ -13,6 +13,7 @@ import type { ContentRequirement } from "@/content/resolveContent";
 import { useDownloadComplete } from "@/downloads/DownloadQueueProvider";
 import { type PlayTarget, usePreferredTarget } from "./config";
 import { type LaunchContentResult, launchTargets } from "./launchContent";
+import { useEngineConfirmation } from "./useEngineConfirmation";
 
 /** One launch asking whether it has what it needs. */
 export interface LaunchContentRequest {
@@ -74,12 +75,34 @@ function LaunchContentGate({
   request: LaunchContentRequest;
   onSettle: (result: LaunchContentResult) => void;
 }) {
-  const { target: preferred, targets, loading, refresh } = usePreferredTarget();
-  const { scan, run } = launchTargets(
+  const {
+    target: preferred,
+    targets: read,
+    loading,
+    refresh,
+  } = usePreferredTarget();
+  // A launch that names an engine version asks an engine for its version when
+  // only its folder name says it might be that one. One that names none never
+  // does (issue #3405).
+  const confirmation = useEngineConfirmation(
+    request.requirements,
+    read,
+    loading,
+  );
+  const { targets } = confirmation;
+  const { scan, run: confirmed } = launchTargets(
     request.requirements,
     targets,
     request.target ?? preferred,
   );
+  // "Continue anyway" past an engine that would not say its version runs that
+  // engine, because the player chose to find out when they play.
+  const { conclusion } = confirmation;
+  const unconfirmed =
+    conclusion?.kind === "unconfirmed"
+      ? (targets.find((t) => t.executable === conclusion.executable) ?? null)
+      : null;
+  const run = confirmed ?? unconfirmed;
   const namesEngine = request.requirements.some((r) => r.kind === "engine");
   const [proceed, setProceed] = useState(false);
   // An engine arrived since the engines were last read.
@@ -119,7 +142,8 @@ function LaunchContentGate({
       description="This cannot start until the content below is installed. Download it and the game starts when it is ready."
       requirements={request.requirements}
       target={scan ?? undefined}
-      targetLoading={loading}
+      targetLoading={loading || confirmation.confirming}
+      engineReading={confirmation.reading}
       onContinue={async () => {
         // Read the engines again whenever this render cannot name one to run.
         // The check can learn an engine is installed before this read does.
