@@ -1,6 +1,6 @@
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { Loader2 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Dialog,
@@ -17,7 +17,10 @@ import {
 } from "../hub/config";
 import { hubItemIdForContainer, withHubItem } from "../hub/importRecord";
 import { inviteLinkFrom } from "../multiplayer/invite/inviteOffer";
-import { offerInvite } from "../multiplayer/invite/inviteStore";
+import {
+  invitePromptOpen,
+  offerInvite,
+} from "../multiplayer/invite/inviteStore";
 import { notify } from "../notify/notify";
 import { describeOpen, type ImportPlan, prepareImport } from "./actions";
 import { setDeepLinkHandler } from "./bus";
@@ -68,13 +71,33 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * gallery, its API, its home page, still takes the fetch flow above.
  */
 
+/** What a link that arrives while another is open is told. Written the way the
+ * invite store's refusal of a second join link is. */
+const BUSY =
+  "Another link is still open. Answer or close it, then open this link again.";
+
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const trustedHubUrl = useTrustedHubUrl();
-  const [pending, setPending] = useState<Pending | null>(null);
+  const [pending, setPendingState] = useState<Pending | null>(null);
   // Set while a fetch-URL import is downloading, so the user sees progress and
   // cannot fire a second fetch. Holds the host being contacted.
-  const [fetching, setFetching] = useState<string | null>(null);
+  const [fetching, setFetchingState] = useState<string | null>(null);
+  // What is open right now, kept where a link that arrives in the same moment
+  // can read it. State is only current after the next render, and a second link
+  // must not slip in before it.
+  const open = useRef<{ pending: boolean; fetching: boolean }>({
+    pending: false,
+    fetching: false,
+  });
+  const setPending = useCallback((next: Pending | null) => {
+    open.current.pending = next !== null;
+    setPendingState(next);
+  }, []);
+  const setFetching = useCallback((host: string | null) => {
+    open.current.fetching = host !== null;
+    setFetchingState(host);
+  }, []);
 
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.
@@ -121,7 +144,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         ),
       );
     },
-    [buildImportPending],
+    [buildImportPending, setFetching, setPending],
   );
 
   // Build a pending confirmation from a raw link, or surface a rejection as a
@@ -133,6 +156,19 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         notify({
           title: "Ignored a coilbox link",
           body: result.reason,
+          level: "error",
+        });
+        return;
+      }
+
+      // One prompt at a time, across every kind (issue #3409). The button a
+      // player has read keeps doing what the words above it said, so a link that
+      // arrives while another is being asked about, or while an import is being
+      // fetched for the player to answer next, is refused rather than swapped in.
+      if (open.current.pending || open.current.fetching || invitePromptOpen()) {
+        notify({
+          title: "Ignored a coilbox link",
+          body: BUSY,
           level: "error",
         });
         return;
@@ -247,7 +283,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
       setPending(buildImportPending(plan.plan));
     },
-    [navigate, runFetch, buildImportPending, trustedHubUrl],
+    [navigate, runFetch, buildImportPending, setPending, trustedHubUrl],
   );
 
   useEffect(() => {
