@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Check, Copy, Download, Link as LinkIcon } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { buildImportCodeLink } from "@/deeplink/build";
 import { copyDeepLink } from "@/deeplink/copyLink";
@@ -32,9 +32,16 @@ export function ChallengeCodeView({
   code,
   helpText,
   onExportFile,
+  copyText,
+  extra,
 }: {
   code: string;
   helpText: string;
+  /** What "Copy code" puts on the clipboard, when that is more than the code.
+   * The box, the link and the hub still carry the bare code. */
+  copyText?: string;
+  /** Options shown under the code, such as what else to copy beside it. */
+  extra?: ReactNode;
   /** Save the challenge as a file. Resolves once the dialog is dismissed
    * (including a no-op resolve when the user cancels it). */
   onExportFile?: () => Promise<void>;
@@ -52,7 +59,7 @@ export function ChallengeCodeView({
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(copyText ?? code);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -83,6 +90,7 @@ export function ChallengeCodeView({
         className="font-mono text-xs"
         onFocus={(e) => e.currentTarget.select()}
       />
+      {extra}
       {fileError && <ErrorBanner message={fileError} />}
       <div className="flex gap-2">
         <Button className="flex-1" onClick={copy}>

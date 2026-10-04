@@ -21,8 +21,9 @@ import { useFactionLogo } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { challengeExport } from "../../challenge/bindings";
-import { ChallengeCodeView } from "../../challenge/ChallengeCodeView";
+import { ChallengeShare } from "../../challenge/ChallengeShare";
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../challenge/ImportChallengeForm";
+import { conquestIdentity, galaxyIdentity } from "../../challenge/identity";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import { useMapEligibility } from "../../content/mapEligibility";
@@ -364,7 +365,8 @@ function GalaxyCard({
       title: "Share challenge",
       width: "26rem",
       content: (
-        <ChallengeCodeView
+        <ChallengeShare
+          identity={galaxyIdentity(galaxy)}
           code={challengeCode ?? ""}
           helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical galaxy, so results are directly comparable."
           onExportFile={exportChallengeFile}
@@ -975,6 +977,7 @@ function ImportChallengeForm({
       substitutedNoun="systems"
       initialCode={initialCode}
       decode={decodeConquestChallenge}
+      identityOf={conquestIdentity}
       buildRequirement={(settings) =>
         challengeGameRequirement(settings.game, gameCatalog)
       }

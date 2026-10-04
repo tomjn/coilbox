@@ -12,7 +12,11 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { FactionLogo } from "@/factions/FactionLogo";
 import type { FactionLogoSrc } from "@/factions/fallback";
 import { useFactionLogos } from "@/factions/logos";
+import { ChallengeRecordLine } from "../../challenge/ChallengeRecordLine";
+import { galaxyIdentity } from "../../challenge/identity";
+import { conquestRunResult } from "../../challenge/result";
 import { SubstitutedMapNote } from "../../challenge/SubstitutedMapNote";
+import { useRecordChallengeRun } from "../../challenge/useChallengeRecords";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncGameInfo, useUnitsyncScan } from "../../content/config";
 import { useKnownSpaceMaps } from "../../content/mapAppearanceCache";
@@ -108,6 +112,9 @@ export default function GalaxyPage() {
 function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
   const { loading, stateFor, saveFor } = useConquestState();
   const state = stateFor(galaxy);
+  // A finished run counts toward its challenge's best result, once.
+  const challengeId = galaxyIdentity(galaxy);
+  useRecordChallengeRun(state ? conquestRunResult(galaxy, state) : null);
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the selection panel opens straight to it. A stale id (the
   // node no longer exists) just finds nothing and the panel stays closed.
@@ -325,6 +332,12 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
                 {state.turn}
               </span>
             </BracketFrame>
+          )}
+          {challengeId && (
+            <ChallengeRecordLine
+              identity={challengeId}
+              className={`pointer-events-auto px-2 py-1 ${MAP_BAND_CLASS} ${MAP_DIM_INK_CLASS}`}
+            />
           )}
           {/* One clickable card per faction — click flies the camera to their
               territory (capital, or nearest system they still hold). */}

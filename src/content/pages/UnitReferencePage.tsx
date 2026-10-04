@@ -31,7 +31,7 @@ import { DetailError, DetailLoading, NotFound } from "./components/states";
  */
 export default function UnitReferencePage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,

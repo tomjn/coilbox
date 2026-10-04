@@ -4,7 +4,8 @@ import { Download, Loader2, Play, Rocket, Share2, Trash2 } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router";
 import { challengeExport } from "@/challenge/bindings";
-import { ChallengeCodeView } from "@/challenge/ChallengeCodeView";
+import { ChallengeShare } from "@/challenge/ChallengeShare";
+import { runIdentity } from "@/challenge/identity";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -249,7 +250,8 @@ function RunCard({
       title: "Share challenge",
       width: "26rem",
       content: (
-        <ChallengeCodeView
+        <ChallengeShare
+          identity={runIdentity(run)}
           code={encodeWarpathChallenge(run)}
           helpText="Anyone who pastes this code into Import challenge (needs the same game installed) plays the identical warpath, so results are directly comparable."
           onExportFile={exportChallengeFile}

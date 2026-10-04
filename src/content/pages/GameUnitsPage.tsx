@@ -33,7 +33,7 @@ import { UnitIcon } from "./components/UnitIcon";
  */
 export default function GameUnitsPage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const [searchParams] = useSearchParams();
   const factionParam = searchParams.get("faction");
   const { selected } = useScanTargetSelection();

@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Download, FolderOpen } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { ErrorBanner } from "../content/pages/components/states";
 
@@ -29,8 +29,11 @@ export function ChallengeCodeInput({
   initialCode,
   onImport,
   onPickFile,
+  preview,
 }: {
   helpText: string;
+  /** Something to show under the box about what is pasted in it so far. */
+  preview?: (code: string) => ReactNode;
   placeholder?: string;
   submitLabel?: string;
   busyLabel?: string;
@@ -96,6 +99,7 @@ export function ChallengeCodeInput({
         rows={6}
         className="font-mono text-xs"
       />
+      {preview?.(code)}
       {error && <ErrorBanner message={error} />}
       <Button onClick={() => submit()} disabled={busy || !code.trim()}>
         <Download className="mr-1.5 size-4" aria-hidden />

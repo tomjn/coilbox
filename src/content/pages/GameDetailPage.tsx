@@ -53,7 +53,7 @@ const HEADLINE_KEYS = new Set(["name", "shortname", "version", "description"]);
  */
 export default function GameDetailPage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const playGame = usePlayGame();
   const navigate = useNavigate();
   const { selected } = useScanTargetSelection();

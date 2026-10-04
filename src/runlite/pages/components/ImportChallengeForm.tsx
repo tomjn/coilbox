@@ -1,4 +1,5 @@
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../../challenge/ImportChallengeForm";
+import { warpathIdentity } from "../../../challenge/identity";
 import {
   unitsyncGameInfo,
   unitsyncSkirmishAis,
@@ -124,6 +125,7 @@ export function ImportChallengeForm({
       substitutedNoun="encounters"
       initialCode={initialCode}
       decode={decodeWarpathChallenge}
+      identityOf={warpathIdentity}
       buildRequirement={(settings) =>
         challengeGameRequirement(settings.game, gameCatalog)
       }

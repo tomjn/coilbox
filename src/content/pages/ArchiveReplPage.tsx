@@ -11,7 +11,7 @@ import { DetailLoading, NotFound } from "./components/states";
  */
 export default function ArchiveReplPage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const { selected } = useScanTargetSelection();
   const { archives, data, loading } = useArchives(
     selected?.enginePath,
