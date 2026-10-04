@@ -60,6 +60,8 @@ export function createOwners(
   laneFlow: boolean,
   ownersRef: { current: Record<string, string> },
   pathLinksRef: { current: Set<string> | undefined },
+  /** Links that are no step of a run, as `"a b"`. Never lit as a choice. */
+  closedLinksRef: { current: Set<string> | undefined },
   isVisible: (id: string) => boolean,
   laneDim: (a: string, b: string) => number,
   ownerColor: (owner: string | undefined) => THREE.Color,
@@ -161,8 +163,13 @@ export function createOwners(
         // allegiance. `trimmedSeg(a, b)` runs source -> target, so the pulse
         // flows outward.
         if (pathLinksRef.current?.has(`${a} ${b}`)) pathSegs.push(seg);
-        else if (aPlayer && !bPlayer) routeSegs.push(seg);
-        else pushBase(seg, a, b);
+        else if (
+          aPlayer &&
+          !bPlayer &&
+          !closedLinksRef.current?.has(`${a} ${b}`)
+        ) {
+          routeSegs.push(seg);
+        } else pushBase(seg, a, b);
         continue;
       }
       if (aPlayer !== bPlayer) {

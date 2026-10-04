@@ -108,6 +108,11 @@ export function buildProvinceLayer(
   ownerColor: (owner: string | undefined) => THREE.Color,
   ownersRef: { current: Record<string, string> },
   labels: (THREE.Object3D | undefined)[],
+  /**
+   * A node's graded emphasis, 0 to 1, as the city layer takes it. A run
+   * pushes its scenery back with this. Left out, every province is at 1.
+   */
+  dimOf: (nodeId: string) => number = () => 1,
 ): ProvinceLayer | undefined {
   const index = provinceIndexFor(galaxy);
   if (!index) return undefined;
@@ -287,7 +292,7 @@ export function buildProvinceLayer(
       );
     }
     mat.color.lerp(WHITE, style.lighten);
-    mat.opacity = style.opacity;
+    mat.opacity = style.opacity * dimOf(galaxy.nodes[i].id);
     const label = labels[i];
     if (label) label.visible = style.showMarkers;
     const star = capitals.get(i);

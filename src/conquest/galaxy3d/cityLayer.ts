@@ -33,13 +33,13 @@ import {
  */
 
 /** The block's radius in world units, the theatre disc's own. */
-const MARKER_RADIUS = 1.35;
+export const MARKER_RADIUS = 1.35;
 /** How far the block stands above the ground at its anchor. */
 const MARKER_HEIGHT = 1.2;
 /** How far the block reaches below its anchor, so a slope never shows under it. */
 const MARKER_FOOT = 1.5;
 /** A capital's block is this much bigger, as the theatre disc is. */
-const CAPITAL_SCALE = 1.25;
+export const CAPITAL_SCALE = 1.25;
 /** The capital's upper tier, as a share of the block's radius, and its height. */
 const TIER_RADIUS = 0.55;
 const TIER_HEIGHT = 0.9;

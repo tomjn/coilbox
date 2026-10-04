@@ -13,10 +13,12 @@ import {
   useReduceMotion,
 } from "../general/display";
 import {
+  mapRunClosedLinks,
   mapRunEmphasis,
   mapRunIdentities,
   mapRunOwners,
   mapRunPathLinks,
+  mapRunScenery,
   mapRunToGalaxyDoc,
   PLAYER_FACTION,
   runEmphasis,
@@ -148,6 +150,18 @@ export function RunMapView({
     [land, run.nodes, run.edges, run.progress.visited],
   );
 
+  // A land map's links between two locations of one rank, which are drawn and
+  // never offered as a step, and its scenery, which the pointer ignores.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the map and the graph, both stable across moves
+  const closedLinks = useMemo(
+    () => (land ? mapRunClosedLinks(run, land.map, land.locations) : undefined),
+    [land, run.edges],
+  );
+  const inertIds = useMemo(
+    () => (land ? mapRunScenery(land.map, land.locations) : undefined),
+    [land],
+  );
+
   // On a land map the view knows locations, and the page knows run nodes.
   const nodeIdAt = useMemo(
     () => new Map([...(land?.locations ?? [])].map(([id, at]) => [at, id])),
@@ -188,6 +202,8 @@ export function RunMapView({
       depthMood={!land}
       laneFlow
       pathLinks={pathLinks}
+      closedLinks={closedLinks}
+      inertIds={inertIds}
       burstNodeId={toView(burstNodeId)}
       playerFactionId={PLAYER_FACTION}
       selectedId={toView(selectedId)}

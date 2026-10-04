@@ -89,9 +89,14 @@ export interface MapCueInput {
   visible?: ReadonlySet<string>;
   /**
    * Set on a Warpath run, where links are steps in one direction.
-   * `pathLinks` holds the steps already made as `"from to"`.
+   * `pathLinks` holds the steps already made as `"from to"`. `closedLinks`
+   * holds the links that are no step of the run, as `"a b"` in the order the
+   * document writes them. A closed link is never a choice.
    */
-  run?: { pathLinks?: ReadonlySet<string> };
+  run?: {
+    pathLinks?: ReadonlySet<string>;
+    closedLinks?: ReadonlySet<string>;
+  };
 }
 
 /**
@@ -152,7 +157,7 @@ export function mapCues(input: MapCueInput): MapCues {
       // The same order the galaxy's lanes use: a step already made first,
       // then a step out of the player's location, and no faction colours.
       if (run.pathLinks?.has(`${a} ${b}`)) tone = "taken";
-      else if (aPlayer && !bPlayer) {
+      else if (aPlayer && !bPlayer && !run.closedLinks?.has(`${a} ${b}`)) {
         tone = "choice";
         cueB.attackable = true;
       }

@@ -313,6 +313,13 @@ describe("mapCues on a Warpath run", () => {
     expect(where(cues, "attackable")).toEqual([]);
   });
 
+  it("never offers a closed link, and still draws it", () => {
+    const cues = run({ run: { closedLinks: new Set(["home east"]) } });
+    expect(link(cues, "home", "east").tone).toBe("plain");
+    expect(link(cues, "home", "isle").tone).toBe("choice");
+    expect(where(cues, "attackable")).toEqual(["isle", "port"]);
+  });
+
   it("has no contested or owned links, and ignores the conquest set", () => {
     const cues = run({ attackable: new Set(["far"]) });
     expect(cues.links.map((l) => l.tone)).not.toContain("contested");
