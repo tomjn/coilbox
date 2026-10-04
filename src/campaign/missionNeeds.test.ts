@@ -4,7 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { type NeedsFacts, missionNeeds, needNotice } from "./missionNeeds";
+import { missionNeeds, type NeedsFacts, needNotice } from "./missionNeeds";
 
 const installed: NeedsFacts = {
   unfinished: false,
@@ -79,9 +79,9 @@ describe("missionNeeds", () => {
   it("is playable after the download: the same facts with the game now scanned", () => {
     const before = { ...installed, games: [] };
     expect(missionNeeds(before)).toHaveLength(1);
-    expect(
-      missionNeeds({ ...before, games: [{ name: "BA 9.1" }] }),
-    ).toEqual([]);
+    expect(missionNeeds({ ...before, games: [{ name: "BA 9.1" }] })).toEqual(
+      [],
+    );
   });
 
   it("moves from the engine to the game once an engine exists", () => {
