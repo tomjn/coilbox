@@ -13,6 +13,7 @@ import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { buildPlayLayer } from "./playLayer";
+import { buildProvinceLayer } from "./provinceLayer";
 import { createSelection } from "./selection";
 import {
   cameraFloorAt,
@@ -583,6 +584,7 @@ export function GalaxyView({
       galaxy,
       skin,
       positions,
+      surface,
       playerFactionId,
       reduceMotion,
       effects,
@@ -613,8 +615,11 @@ export function GalaxyView({
         .getHexString()}`;
 
     const labelObjects: CSS2DObject[] = [];
+    // By node index, for the province layer. `labelObjects` skips a node with
+    // no position, so its indices are not node indices.
+    const labelByNode: (CSS2DObject | undefined)[] = [];
     if (!performanceMode) {
-      galaxy.nodes.forEach((n) => {
+      galaxy.nodes.forEach((n, i) => {
         const p = positions.get(n.id);
         if (!p) return;
         const el = document.createElement("div");
@@ -626,10 +631,34 @@ export function GalaxyView({
           "text-shadow:0 1px 4px rgba(0,0,0,0.95);transform:translateY(14px);";
         const label = new CSS2DObject(el);
         label.position.set(p[0], p[1] - 3.6, p[2]);
+        labelByNode[i] = label;
         labelObjects.push(label);
         scene.add(label);
       });
     }
+
+    /* ------------------------------ provinces ------------------------------ */
+
+    // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
+    // galaxy or theatre map, and on a terrain map of point locations only.
+    const provinceLayer = surface
+      ? buildProvinceLayer(
+          scene,
+          disposables,
+          galaxy,
+          surface,
+          ownerColor,
+          ownersRef,
+          labelByNode,
+        )
+      : undefined;
+    // A province's name sits on its anchor, not hung below a marker.
+    galaxy.nodes.forEach((n, i) => {
+      const p = positions.get(n.id);
+      if (p && provinceLayer?.isProvince(i)) {
+        labelByNode[i]?.position.set(p[0], p[1], p[2]);
+      }
+    });
 
     /* ------------------------ renderer + camera ---------------------------- */
 
@@ -808,6 +837,7 @@ export function GalaxyView({
       discMats,
       ringGeoFor,
       () => selection.getIndex(),
+      provinceLayer,
     );
     applyOwnersRef.current = owners.apply;
 
@@ -826,7 +856,12 @@ export function GalaxyView({
       ownersRef,
       owners.styleRing,
     );
-    applySelectionRef.current = selection.apply;
+    // A selected province is highlighted as a whole area by its own layer.
+    const applySelection = () => {
+      selection.apply();
+      provinceLayer?.setSelected(selection.getIndex());
+    };
+    applySelectionRef.current = applySelection;
 
     // Fog of war + graded emphasis: dim/hide styling for every node, plus the
     // lazily-built "done" check marker and ambient combat flash. See
@@ -852,7 +887,7 @@ export function GalaxyView({
     applyVisibilityRef.current = visibility.apply;
 
     owners.apply();
-    selection.apply();
+    applySelection();
     visibility.apply();
 
     /* ------------------------------ picking -------------------------------- */
@@ -871,7 +906,13 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      const idx = hit?.instanceId ?? -1;
+      let idx = hit?.instanceId ?? -1;
+      // A province is picked by its whole area, so its anchor's hit target
+      // is ignored and the ground under the pointer decides. A point location
+      // standing inside a province keeps its own hit target and wins.
+      if (provinceLayer && (idx < 0 || provinceLayer.isProvince(idx))) {
+        idx = provinceLayer.pick(raycaster.ray);
+      }
       // Fogged systems aren't selectable.
       if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
       return idx;
@@ -903,6 +944,7 @@ export function GalaxyView({
       if (hovered >= 0) setHoverStyle(hovered, false);
       hovered = idx;
       if (hovered >= 0) setHoverStyle(hovered, true);
+      provinceLayer?.setHovered(hovered);
       // Lane colours are baked into the merged geometry, so lifting the hovered
       // node's lanes means rebuilding them. That is the same work an ownership
       // change already does, and it only runs when the hovered node changes.

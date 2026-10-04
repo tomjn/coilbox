@@ -84,6 +84,9 @@ export function createOwners(
   /** The currently selected node's index, or -1. Selection owns this value.
    * `apply` only reads it to skip restyling the selected ring. */
   getSelectedIndex: () => number,
+  /** Province fills and borders, restyled on the same call as the rings.
+   * Absent on a map with no provinces. */
+  provinces?: { applyOwners(): void },
 ): Owners {
   /** Reset a ring to its plain ownership style (shape, colour, opacity). */
   const styleRing = (i: number) => {
@@ -208,6 +211,7 @@ export function createOwners(
       });
       setLanePair(frontier, dashes, dashColors);
     }
+    provinces?.applyOwners();
   };
 
   return { apply, styleRing };
