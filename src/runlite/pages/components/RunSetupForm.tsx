@@ -14,11 +14,14 @@ import {
   useUnitsyncScan,
   useUnitsyncUnitDataset,
 } from "../../../content/config";
+import { dependencyBlockReason } from "../../../content/gameDependencies";
 import { useMapEligibility } from "../../../content/mapEligibility";
 import { BrandingLinks } from "../../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../../content/pages/components/BrandingScreenshots";
+import { DependencyBlocked } from "../../../content/pages/components/states";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { aiForDifficulty, mergeGameAi } from "../../../play/gameAi";
+import { missingLaunchDependency } from "../../../play/launchContent";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
 import { aiKey } from "../../../play/participants";
 import { getGameMatcher, getProfile } from "../../../profile/profile";
@@ -119,6 +122,14 @@ export function RunSetupForm({
     : "standard";
   const ascensionTier = unlocks.ascensionTier;
   const archive = game?.primaryArchive.name;
+  // Starting a run is not a launch, so this does not stop the form. The player
+  // is told here, because every battle of the run would stop on it (issue #3489).
+  const dependency = game
+    ? missingLaunchDependency(game.name, scanned ?? [])
+    : null;
+  const dependencyBlock = dependency?.gameName
+    ? dependencyBlockReason(dependency.label, dependency.gameName)
+    : null;
   // Reuse the same branding catalog art shown on game detail (issue #372), so
   // the warpath setup feels like part of the game's world.
   const brandingEntries = useBrandingCatalog();
@@ -353,6 +364,8 @@ export function RunSetupForm({
           </Field>
         )}
       </div>
+
+      {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
 
       <Button onClick={startRun} disabled={!canGenerate} className="w-full">
         {gameLoading ? (
