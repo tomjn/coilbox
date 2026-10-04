@@ -6,9 +6,14 @@ import {
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
-import { refightFilenames, useReplayUserState } from "../replayUserState";
+import {
+  refightFilenames,
+  scriptedModeFilenames,
+  useReplayUserState,
+} from "../replayUserState";
 import { allPlayers, profileFor } from "../stats";
 import { AchievementsSection } from "./components/AchievementsSection";
+import { AiRecordSection } from "./components/AiRecordSection";
 import { PlayerPicker } from "./components/PlayerPicker";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -33,6 +38,11 @@ export default function StatsPage() {
   const { state: replayUserState } = useReplayUserState();
   const refights = useMemo(
     () => refightFilenames(replayUserState),
+    [replayUserState],
+  );
+
+  const scripted = useMemo(
+    () => scriptedModeFilenames(replayUserState),
     [replayUserState],
   );
 
@@ -187,6 +197,13 @@ export default function StatsPage() {
               )}
             </section>
           </div>
+
+          <AiRecordSection
+            records={records}
+            playerName={activeName}
+            refights={refights}
+            scripted={scripted}
+          />
 
           <AchievementsSection
             records={records}
