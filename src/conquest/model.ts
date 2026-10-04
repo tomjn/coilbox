@@ -127,7 +127,11 @@ export interface GalaxyNode {
   /** Selection-panel flavour text. */
   blurb?: string;
   battle: NodeBattleSpec;
+  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
+  outline?: [number, number][][];
 }
+
+export type LinkKind = "border" | "crossing" | "road";
 
 /** Author-controlled presentation of the strategic map. */
 export interface GalaxyTheme {
@@ -166,6 +170,16 @@ export interface GalaxyDoc {
     fogOfWar?: boolean;
   };
   theme?: GalaxyTheme;
+  terrain?: {
+    image: string; // URL the webview can load (data:, blob:, asset or http)
+    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
+    width: number; // map units
+    height: number; // map units
+    heightScale?: number; // map units of height for a white heightmap pixel
+    projection?: "flat";
+  };
+  linkKinds?: [string, string, LinkKind][];
+  blockedBorders?: [string, string][];
   createdAt: string;
   updatedAt: string;
   /** Set when this galaxy was created by importing a challenge code/file (see
@@ -628,6 +642,16 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     importedChallenge: d.importedChallenge === true ? true : undefined,
     generated: parseGenerated(d.generated),
   };
+}
+
+export function linkKind(
+  doc: GalaxyDoc,
+  a: string,
+  b: string,
+): LinkKind | undefined {
+  return doc.linkKinds?.find(
+    ([x, y]) => (x === a && y === b) || (x === b && y === a),
+  )?.[2];
 }
 
 /** Wrap a galaxy in the export/share file shape. */
