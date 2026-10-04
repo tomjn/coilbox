@@ -91,6 +91,19 @@ export function stripVersionSuffix(name: string): string {
 }
 
 /**
+ * Whether two game names are the same game at any version: equal once each has
+ * its version stripped and is normalised. For a stat record, which carries only
+ * `gameType` and no shortname. "Balanced Annihilation V15.9.8" matches
+ * "Balanced Annihilation V16.0.1" but not "Balanced Annihilation Reloaded V1.0".
+ */
+export function sameGameFamily(a: string, b: string): boolean {
+  return (
+    normalizeGameIdentity(stripVersionSuffix(a)) ===
+    normalizeGameIdentity(stripVersionSuffix(b))
+  );
+}
+
+/**
  * The short game id an installed game is matched by (issue #503). It's the
  * real modinfo `shortname` when present, otherwise the normalised,
  * version-stripped family name of its display name.

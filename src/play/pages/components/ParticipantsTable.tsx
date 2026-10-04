@@ -80,10 +80,11 @@ function BonusSuggestionNote({
   disabled?: boolean;
   onApply: (percent: number) => void;
 }) {
-  const at =
+  const at = `${
     suggestion.from === 0
       ? "with no bonus"
-      : `at ${percentText(suggestion.from)}`;
+      : `at ${percentText(suggestion.from)}`
+  }${suggestion.otherVersion ? " on another version" : ""}`;
   return (
     <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
       <span>

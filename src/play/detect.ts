@@ -6,6 +6,7 @@ import {
 } from "../content/bindings";
 import { sleep } from "../lib/helpers";
 import type { PlayTarget } from "./config";
+import { ingestFinishedReplay } from "./ingestFinishedReplay";
 
 /**
  * Automatic win/loss detection from a run's replay. Most of this is pure,
@@ -102,6 +103,8 @@ export async function detectBattleResult(opts: {
       enginePath: target.enginePath,
       replayPath: replay.path,
     });
+    // Not awaited: the strategic modes apply the result without waiting on it.
+    void ingestFinishedReplay(target, replay);
     return { outcome: resultFromDemoInfo(info, playerName), replay };
   } catch {
     return { outcome: "ambiguous", replay: null };
