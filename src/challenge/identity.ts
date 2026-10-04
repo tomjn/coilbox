@@ -3,6 +3,7 @@ import {
   challengeSettingsFromGalaxy,
 } from "../conquest/challenge";
 import type { GalaxyDoc } from "../conquest/model";
+import { readThreatLevel } from "../conquest/threat";
 import type { RogueliteRun, RunSettings } from "../runlite/model";
 
 /**
@@ -35,6 +36,11 @@ export function conquestIdentity(s: ConquestChallengeSettings): string {
     s.skin,
     s.startingSystems ?? null,
     s.fogOfWar === true,
+    // Only above 0, so every identity from before levels existed is unchanged
+    // and a record keeps its challenge.
+    ...(readThreatLevel(s.threatLevel) > 0
+      ? [readThreatLevel(s.threatLevel)]
+      : []),
   ]);
 }
 
