@@ -19,6 +19,7 @@ import {
 } from "./placedModelLoaders";
 import { buildPlacedModels } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
+import { buildProvinceLayer } from "./provinceLayer";
 import { createSelection } from "./selection";
 import {
   cameraFloorAt,
@@ -656,6 +657,20 @@ export function GalaxyView({
       });
     }
 
+    // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
+    // galaxy or theatre map, and on a terrain map of point locations only.
+    const provinces = surface
+      ? buildProvinceLayer(
+          scene,
+          disposables,
+          galaxy,
+          surface,
+          ownerColor,
+          ownersRef,
+          labelObjects,
+        )
+      : undefined;
+
     // A terrain map's point locations and roads. See cityLayer.ts.
     const cities = surface
       ? buildCityLayer(
@@ -857,6 +872,7 @@ export function GalaxyView({
     const applyOwners = () => {
       owners.apply();
       cities?.apply();
+      provinces?.apply();
     };
     applyOwnersRef.current = applyOwners;
 
@@ -878,6 +894,7 @@ export function GalaxyView({
     const applySelection = () => {
       selection.apply();
       cities?.select(selectedRef.current ?? null);
+      provinces?.select(selectedRef.current ?? null);
     };
     applySelectionRef.current = applySelection;
 
@@ -924,7 +941,13 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      const idx = hit?.instanceId ?? -1;
+      let idx = hit?.instanceId ?? -1;
+      // A province is picked by its whole area, so its anchor's hit target
+      // is ignored and the ground under the pointer decides. A point location
+      // standing inside a province keeps its own hit target and wins.
+      if (provinces && (idx < 0 || provinces.isProvince(idx))) {
+        idx = provinces.pick(raycaster.ray);
+      }
       // Fogged systems aren't selectable.
       if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
       return idx;
@@ -961,6 +984,7 @@ export function GalaxyView({
       // change already does, and it only runs when the hovered node changes.
       hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
       cities?.hover(hoveredNodeId);
+      provinces?.hover(hoveredNodeId);
       applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
