@@ -80,7 +80,7 @@ function ExclusionBadge({
  */
 export default function PlayerDossierPage() {
   const { name } = useParams();
-  const playerName = name ? decodeURIComponent(name) : "";
+  const playerName = name ?? "";
   const { state } = useContentState();
   const { selected } = useScanTargetSelection();
   const roots = useMemo(() => (state?.roots ?? []).map((r) => r.path), [state]);

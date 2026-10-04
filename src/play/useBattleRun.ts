@@ -5,6 +5,7 @@ import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
+import { scanInitFailure } from "../content/scanSettled";
 import { getProfile } from "../profile/profile";
 import {
   applyRestrictions,
@@ -143,13 +144,18 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   const scanReady = !!scan.data;
 
   const installedGame = resolveGameByShortname(gameRef, games);
-  const missing: BattleRequirement | null = !scanReady
-    ? null
-    : !installedGame
-      ? { kind: "game", name: gameRef.pinnedName ?? gameRef.shortname }
-      : !maps.some((m) => m.name === mapName)
-        ? { kind: "map", name: mapName }
-        : null;
+  // A scan whose `Init` failed has empty lists that are not a report of an
+  // empty machine, so it names nothing missing and cannot start a battle
+  // (issue #3398).
+  const scanFailure = scanInitFailure(scan);
+  const missing: BattleRequirement | null =
+    !scanReady || scanFailure
+      ? null
+      : !installedGame
+        ? { kind: "game", name: gameRef.pinnedName ?? gameRef.shortname }
+        : !maps.some((m) => m.name === mapName)
+          ? { kind: "map", name: mapName }
+          : null;
 
   const { ais } = useSkirmishAis(
     target?.enginePath,
@@ -166,6 +172,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
   const canStart =
     !!target &&
     scanReady &&
+    !scanFailure &&
     !missing &&
     !running &&
     !scan.loading &&
@@ -314,6 +321,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     error,
     canStart,
     missing,
+    /** Why the scan could not say what is installed, or null when it could. */
+    scanFailure,
     noEngine,
     scanLoading,
     running,

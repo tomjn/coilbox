@@ -114,7 +114,7 @@ interface Fetched {
 
 export default function ItemPage() {
   const { id: rawId } = useParams();
-  const id = rawId ? decodeURIComponent(rawId) : "";
+  const id = rawId ?? "";
   const hubUrl = useHubUrl();
   const navigate = useNavigate();
   const presenceOf = useHubItemPresence();

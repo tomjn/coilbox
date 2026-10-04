@@ -8,6 +8,7 @@ import {
   gameNamesMatch,
   resolveReplayShortGameId,
 } from "./resolveContent";
+import { scanInitFailure } from "./scanSettled";
 
 /**
  * Resolve what a "refight this setup" (#368) needs from the currently
@@ -35,6 +36,9 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
   const scan = useUnitsyncScan(enginePath, dataDir);
   const games = scan.data?.games ?? [];
   const maps = scan.data?.maps ?? [];
+  // A scan whose `Init` failed has empty lists that are not a report of an
+  // empty machine, so nothing is called missing off them (issue #3398).
+  const scanFailure = scanInitFailure(scan);
 
   const shortGameId = useMemo(
     () =>
@@ -95,8 +99,11 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
     setSelectedGameName,
     installedGame,
     installedMap,
-    missingGame: !!info && !scan.loading && gameCandidates.length === 0,
-    missingMap: !!info && !scan.loading && !installedMap,
+    /** Why the scan could not say what is installed, or null when it could. */
+    scanFailure,
+    missingGame:
+      !!info && !scan.loading && !scanFailure && gameCandidates.length === 0,
+    missingMap: !!info && !scan.loading && !scanFailure && !installedMap,
     sides: gameInfo.info?.sides ?? [],
     /** The target game's declared options, so a draft made from the replay can
      * tell what the match changed from what the game itself chose (#1838). */

@@ -345,6 +345,7 @@ function Briefing({
         error={run.error}
         noEngine={run.noEngine}
         missing={run.missing}
+        scanFailure={run.scanFailure}
         canStart={run.canStart}
         running={run.running}
         scanLoading={run.scanLoading}

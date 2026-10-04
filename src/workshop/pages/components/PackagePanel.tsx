@@ -58,6 +58,7 @@ import {
 import { useCompiledProject } from "../../compile";
 import { tweakSlotsUncheckedNote } from "../../deliveryRoutes";
 import {
+  gameNotFoundNote,
   settledSummary,
   settleTypedValues,
   settleTypedValuesTweaks,
@@ -177,9 +178,12 @@ function TweakSlotExportSection({
   project,
   routeOptions,
   game,
+  scanFailure,
 }: {
   project: ModProject;
   routeOptions: ConfigOption[] | undefined;
+  /** Why the scan could not list the game, or `null` when it could. */
+  scanFailure: string | null;
   /** Where to load the game to check typed values (issue #3092), or `null`
    *  when it is not installed here. */
   game: { enginePath: string; dataDir: string; archive: string } | null;
@@ -210,7 +214,7 @@ function TweakSlotExportSection({
         ? await settleTypedValuesTweaks({ ...game, project, route: "numbered" })
         : ({
             ok: false,
-            message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+            message: gameNotFoundNote(project.gameName, scanFailure),
           } as const);
       setPhase({ state: "packing" });
       const pack = await workshopPackTweakSlots({
@@ -432,7 +436,10 @@ export function PackagePanel({
             })
           : ({
               ok: false,
-              message: `${project.gameName} is not installed here, so typed values are written as typed and the game may load some of them as something else.`,
+              message: gameNotFoundNote(
+                project.gameName,
+                scan.data?.initFailure ?? null,
+              ),
             } as const);
 
       setPhase({ state: "packaging" });
@@ -564,6 +571,7 @@ export function PackagePanel({
             <TweakSlotExportSection
               project={scopedProject}
               routeOptions={routeOptions}
+              scanFailure={scan.data?.initFailure ?? null}
               game={
                 target && game
                   ? {

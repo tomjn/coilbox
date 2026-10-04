@@ -239,6 +239,22 @@ export function EmptyState({ label }: { label: ReactNode }) {
   );
 }
 
+/**
+ * What a page draws for a game it cannot find in the scan. A scan whose
+ * `Init` failed has no games because the engine could not start, so that is
+ * said in place of "not installed" (issue #3398).
+ */
+export function GameMissingState({
+  initFailure,
+  label,
+}: {
+  initFailure: string | null;
+  label: ReactNode;
+}) {
+  if (initFailure) return <ScanFailed noun="games" reason={initFailure} />;
+  return <EmptyState label={label} />;
+}
+
 /** Detail-page loading state (the scan for this target is still resolving). */
 export function DetailLoading({ backTo }: { backTo: string }) {
   return (

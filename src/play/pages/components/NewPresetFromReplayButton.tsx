@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/popover";
 import { useDemoInfo, useReplays } from "@/content/config";
 import { demoInfoToSkirmishDraft } from "@/content/demoToSkirmish";
+import { ScanFailed } from "@/content/pages/components/states";
 import { useRefightSetup } from "@/content/refight";
 import { aiByline, type Participant, usePreferredTarget } from "../../config";
 import type { SkirmishDraft } from "../../drafts";
@@ -71,6 +72,7 @@ function ReplayPickerForm({
     gameCandidates,
     selectedGameName,
     setSelectedGameName,
+    scanFailure,
     missingGame,
     missingMap,
     sides,
@@ -113,7 +115,8 @@ function ReplayPickerForm({
   // The preset stores only what the match changed, so it waits for the game's
   // option list as well as for the replay and the content scan (#1838).
   const ready = !!replayPath && !infoLoading && !scanLoading && !optionsLoading;
-  const canSave = !!draft && !!name.trim() && !missingGame && !missingMap;
+  const canSave =
+    !!draft && !!name.trim() && !scanFailure && !missingGame && !missingMap;
 
   const save = () => {
     if (canSave && draft) onSaved(name.trim(), draft);
@@ -152,6 +155,10 @@ function ReplayPickerForm({
         </div>
       )}
 
+      {ready && scanFailure && (
+        <ScanFailed noun="games or maps" reason={scanFailure} />
+      )}
+
       {ready && (missingGame || missingMap) && (
         <p className="text-xs text-destructive">
           {missingGame ? "This replay's game isn't installed. " : ""}
@@ -164,7 +171,7 @@ function ReplayPickerForm({
         </p>
       )}
 
-      {ready && info && !missingGame && !missingMap && (
+      {ready && info && !scanFailure && !missingGame && !missingMap && (
         <>
           {gameCandidates.length > 1 && (
             <div className="flex flex-col gap-1.5">

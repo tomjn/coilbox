@@ -96,6 +96,7 @@ export function EncounterOverlay({
               error={enc.error}
               noEngine={enc.noEngine}
               missing={enc.missing}
+              scanFailure={enc.scanFailure}
               canStart={enc.canStart}
               running={enc.running}
               scanLoading={enc.scanLoading}

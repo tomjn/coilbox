@@ -34,6 +34,7 @@ import {
   DetailError,
   DetailLoading,
   EmptyState,
+  GameMissingState,
 } from "@/content/pages/components/states";
 import { buildTechForest } from "@/content/techForest";
 import {
@@ -467,7 +468,8 @@ export default function ReferencePage() {
   if (!data || loading) return <DetailLoading backTo="/workshop" />;
   if (!game)
     return (
-      <EmptyState
+      <GameMissingState
+        initFailure={data.initFailure ?? null}
         label={`${gameName} is not installed here, so there are no units to show.`}
       />
     );

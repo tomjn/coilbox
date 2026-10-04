@@ -67,7 +67,7 @@ const HEADLINE_KEYS = new Set(["name", "description"]);
 /** A single map: a minimap preview, its metadata, and the archives it's from. */
 export default function MapDetailPage() {
   const { name } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
+  const decoded = name ?? "";
   const navigate = useNavigate();
   const playMap = usePlayMap();
   const advanced = useAdvancedMode();

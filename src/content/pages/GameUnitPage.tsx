@@ -36,8 +36,8 @@ import { useUnitRenders } from "./components/useUnitRenders";
  */
 export default function GameUnitPage() {
   const { name, unit: unitParam } = useParams();
-  const decoded = name ? decodeURIComponent(name) : "";
-  const id = unitParam ? decodeURIComponent(unitParam).toLowerCase() : "";
+  const decoded = name ?? "";
+  const id = unitParam ? unitParam.toLowerCase() : "";
 
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
