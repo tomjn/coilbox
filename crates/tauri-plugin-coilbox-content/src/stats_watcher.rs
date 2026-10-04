@@ -376,17 +376,20 @@ fn is_new_demo_dir(path: &Path, roots: &[PathBuf]) -> bool {
 /// missing, ingest touching nothing new) leaves the watcher running silently.
 /// Scan-on-open remains the fallback of record.
 fn run_ingest<R: Runtime>(app: &AppHandle<R>, target: &IngestTarget) {
-    let Ok(mut store) = stats::load(&target.stats_path) else {
-        return;
-    };
-    let summary = stats::ingest(&target.roots, &target.engine_dir, &mut store);
-    if summary.added == 0 && summary.updated == 0 {
-        return;
+    let summary = stats::with_store_lock(|| {
+        let Ok(mut store) = stats::load(&target.stats_path) else {
+            return None;
+        };
+        let summary = stats::ingest(&target.roots, &target.engine_dir, &mut store);
+        if summary.added == 0 && summary.updated == 0 {
+            return None;
+        }
+        stats::save(&target.stats_path, &store).ok()?;
+        Some(summary)
+    });
+    if let Some(summary) = summary {
+        let _ = app.emit(STATS_UPDATED_EVENT, &summary);
     }
-    if stats::save(&target.stats_path, &store).is_err() {
-        return;
-    }
-    let _ = app.emit(STATS_UPDATED_EVENT, &summary);
 }
 
 /// `content_stats_watch_start` (#462): start (or restart) the live filesystem
