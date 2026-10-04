@@ -1,5 +1,5 @@
-import { Input } from "@picoframe/frame";
-import { ChevronDown } from "lucide-react";
+import { Button, Input } from "@picoframe/frame";
+import { ChevronDown, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,13 +9,20 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { ConfigOption, GameItem } from "@/content/bindings";
 import {
+  changedOptions,
   defaultLabel,
   effectiveValue,
   groupOptions,
   isChanged,
   type OptionGroup,
+  resetOptionValues,
 } from "@/play/modOptions";
 
 /** The value in effect for an option, as a control-ready string. */
@@ -43,18 +50,28 @@ export function GameOptionsPanel({
   options,
   optionValues,
   onOptionChange,
+  onOptionValuesChange,
   disabled,
 }: {
   selectedGame?: GameItem | null;
   options: ConfigOption[];
   optionValues: Record<string, string>;
   onOptionChange: (key: string, value: string | undefined) => void;
+  /**
+   * Replace the whole set of values. Lets a reset change many options in one
+   * update, which looping over `onOptionChange` cannot do for a caller that
+   * builds its next state from a stale copy. Without it the panel offers no
+   * reset for a group.
+   */
+  onOptionValuesChange?: (values: Record<string, string>) => void;
   disabled?: boolean;
 }) {
   const groups = groupOptions(options);
-  const changed = options.filter((o) =>
-    isChanged(o, optionValues[o.key]),
-  ).length;
+  const changed = changedOptions(options, (o) => optionValues[o.key]).length;
+  const resetGroup = onOptionValuesChange
+    ? (members: ConfigOption[]) =>
+        onOptionValuesChange(resetOptionValues(members, optionValues))
+    : undefined;
   const summary = [
     selectedGame?.name ?? "No game",
     changed > 0 ? `${changed} options changed` : "default options",
@@ -65,15 +82,24 @@ export function GameOptionsPanel({
       defaultOpen
       className="rounded-lg border border-border/50 bg-card"
     >
-      <CollapsibleTrigger className="group flex w-full items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
-        <span className="flex min-w-0 items-baseline gap-3">
-          <span className="text-sm font-semibold">Game options</span>
-          <span className="truncate text-xs text-muted-foreground">
-            {summary}
+      <div className="flex items-center gap-1 pr-3">
+        <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
+          <span className="flex min-w-0 items-baseline gap-3">
+            <span className="text-sm font-semibold">Game options</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {summary}
+            </span>
           </span>
-        </span>
-        <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        {resetGroup && !disabled && (
+          <GroupReset
+            count={changed}
+            label="Game options"
+            onConfirm={() => resetGroup(options)}
+          />
+        )}
+      </div>
 
       <CollapsibleContent>
         <div className="border-t border-border/40 px-4 pb-4 pt-3">
@@ -94,6 +120,7 @@ export function GameOptionsPanel({
                 readValue={(o) => optionValues[o.key]}
                 disabled={disabled}
                 onChange={(o, v) => onOptionChange(o.key, v)}
+                onResetGroup={resetGroup}
               />
             </>
           )}
@@ -109,6 +136,7 @@ interface GroupProps {
   readValue: (o: ConfigOption) => string | undefined;
   disabled?: boolean;
   onChange: (o: ConfigOption, value: string | undefined) => void;
+  onResetGroup?: (options: ConfigOption[]) => void;
 }
 
 /**
@@ -123,18 +151,23 @@ interface GroupProps {
  *
  * The two surfaces read and write an option differently, one from a plain
  * record and one from the battle's script tags with edits in flight, so the
- * lookup and the write are passed in rather than assumed.
+ * lookup and the write are passed in rather than assumed. So is the reset of a
+ * section: `onResetGroup` is handed every option the section declares, and the
+ * caller works out which of them are changed and how to put them back. Without
+ * it a section offers no reset.
  */
 export function ModOptionGroups({
   options,
   readValue,
   disabled,
   onChange,
+  onResetGroup,
 }: {
   options: ConfigOption[];
   readValue: (o: ConfigOption) => string | undefined;
   disabled?: boolean;
   onChange: (o: ConfigOption, value: string | undefined) => void;
+  onResetGroup?: (options: ConfigOption[]) => void;
 }) {
   const groups = groupOptions(options);
   return (
@@ -155,6 +188,7 @@ export function ModOptionGroups({
             readValue={readValue}
             disabled={disabled}
             onChange={onChange}
+            onResetGroup={onResetGroup}
           />
         ),
       )}
@@ -185,28 +219,35 @@ function OptionGrid({ group, readValue, disabled, onChange }: GroupProps) {
  * so a non-default setting can never hide behind a collapsed header.
  */
 function OptionSection(props: GroupProps) {
-  const { group, readValue } = props;
-  const changed = group.options.filter((o) =>
-    isChanged(o, readValue(o)),
-  ).length;
+  const { group, readValue, disabled, onResetGroup } = props;
+  const changed = changedOptions(group.options, readValue).length;
 
   return (
     <Collapsible
       defaultOpen={changed > 0}
       className="rounded-md border border-border/40"
     >
-      <CollapsibleTrigger className="group flex w-full items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/30">
-        <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
-        <span
-          className="truncate text-xs font-medium"
-          title={group.description ?? group.name}
-        >
-          {group.name}
-        </span>
-        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-          {changed > 0 ? `${changed} changed` : group.options.length}
-        </span>
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-1 pr-2">
+        <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left hover:bg-muted/30">
+          <ChevronDown className="size-3.5 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+          <span
+            className="truncate text-xs font-medium"
+            title={group.description ?? group.name}
+          >
+            {group.name}
+          </span>
+          <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+            {changed > 0 ? `${changed} changed` : group.options.length}
+          </span>
+        </CollapsibleTrigger>
+        {onResetGroup && !disabled && (
+          <GroupReset
+            count={changed}
+            label={group.name ?? "section"}
+            onConfirm={() => onResetGroup(group.options)}
+          />
+        )}
+      </div>
       <CollapsibleContent>
         <div className="border-t border-border/40 px-3 pb-3 pt-2">
           <OptionGrid {...props} />
@@ -254,9 +295,12 @@ function OptionHelp({
 function ChangedMark({
   option,
   value,
+  onReset,
 }: {
   option: ConfigOption;
   value?: string;
+  /** Put this one option back to its default. Absent where it cannot be edited. */
+  onReset?: () => void;
 }) {
   if (!isChanged(option, value)) return null;
   return (
@@ -265,7 +309,75 @@ function ChangedMark({
         changed
       </span>
       <span className="truncate">Default: {defaultLabel(option)}</span>
+      {onReset && (
+        <button
+          type="button"
+          aria-label={`Reset ${option.name} to its default`}
+          title="Reset to default"
+          onClick={onReset}
+          className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <RotateCcw className="size-3" />
+        </button>
+      )}
     </span>
+  );
+}
+
+/**
+ * A "Reset" for a group of options, asking first because it changes many at
+ * once. A popover rather than a dialog, so it stays beside the button it came
+ * from. Shown only while something in the group is changed.
+ */
+export function GroupReset({
+  count,
+  label,
+  onConfirm,
+  busy,
+}: {
+  count: number;
+  /** What is being reset, for the button's accessible name. */
+  label: string;
+  onConfirm: () => void;
+  /** A previous reset is still being sent. */
+  busy?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  if (count === 0) return null;
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 shrink-0 px-2 text-[11px]"
+          disabled={busy}
+          aria-label={`Reset ${label}`}
+        >
+          Reset
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="flex w-64 flex-col gap-3">
+        <p className="text-sm">
+          Reset {count} {count === 1 ? "option" : "options"} to{" "}
+          {count === 1 ? "its default" : "their defaults"}?
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              setOpen(false);
+              onConfirm();
+            }}
+          >
+            Reset
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -287,6 +399,9 @@ export function ModOptionField({
   onChange: OptionChange;
 }) {
   const id = `modopt-${o.key}`;
+  // Reporting `undefined` is how a field says "back to the default", whichever
+  // way its screen stores that. Not offered on a field nobody can edit.
+  const reset = disabled ? undefined : () => onChange(undefined);
 
   if (o.type === "section") return null;
 
@@ -306,7 +421,7 @@ export function ModOptionField({
         <span className="flex min-w-0 flex-col gap-0.5">
           <span>{o.name}</span>
           <OptionHelp option={o} />
-          <ChangedMark option={o} value={value} />
+          <ChangedMark option={o} value={value} onReset={reset} />
         </span>
       </label>
     );
@@ -325,7 +440,7 @@ export function ModOptionField({
           options={o.listItems.map((it) => ({ value: it.key, label: it.name }))}
           onValueChange={onChange}
         />
-        <ChangedMark option={o} value={value} />
+        <ChangedMark option={o} value={value} onReset={reset} />
       </div>
     );
   }
@@ -366,6 +481,7 @@ function TypedOptionField({
 }) {
   const id = `modopt-${o.key}`;
   const isNumber = o.type === "number";
+  const reset = disabled ? undefined : () => onChange(undefined);
   // Held here rather than reported, so clearing the box writes nothing until
   // the edit is finished (and writes nothing at all if it never was).
   const [emptied, setEmptied] = useState(false);
@@ -398,7 +514,7 @@ function TypedOptionField({
           }}
         />
       </Label>
-      <ChangedMark option={o} value={value} />
+      <ChangedMark option={o} value={value} onReset={reset} />
     </div>
   );
 }
