@@ -40,3 +40,19 @@ export function inviteLink(
 
 /** The IPv4 and IPv6 loopback, as `splitHostPort` returns them. */
 const LOOPBACK = [LOOPBACK_HOST, "[::1]"];
+
+/**
+ * Why a connection has no invite link when its address cannot go in one, or
+ * null when there is some other reason or none. Pure.
+ *
+ * Only a zone id (`fe80::1%eth0`) is worth saying. It names a network card on
+ * this machine, so it means nothing to the friend the link is for, and
+ * `address.ts` refuses it. Every other address with no link is one the player
+ * has no way to fix.
+ */
+export function inviteLinkProblem(
+  address: string | null | undefined,
+): string | null {
+  if (!address?.includes("%")) return null;
+  return "This server's address names a network card on this computer, so it would mean nothing to a friend. Save the server under its full IPv6 address, without the % part, to get a link.";
+}

@@ -28,7 +28,11 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../lobby-servers/config";
-import { bracketedHost, dialHost } from "../lobby-servers/hostForms";
+import {
+  addressOfKey,
+  bracketedHost,
+  dialHost,
+} from "../lobby-servers/hostForms";
 import { notify } from "../notify/notify";
 import type { ClientFlags } from "./awayStatus";
 import {
@@ -126,7 +130,7 @@ export function serverKeyFor(server: LobbyServer, username: string): string {
 /** The `host:port` half of a `serverKey`, for a `coilbox://join` link (issue
  * #498) - a link should carry where to connect, not who was connected. */
 export function serverAddressFromKey(serverKey: string): string {
-  return serverKey.slice(serverKey.indexOf("@") + 1);
+  return addressOfKey(serverKey);
 }
 
 /** The `username` half of a `serverKey`, e.g. for a sidebar heading that

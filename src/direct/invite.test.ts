@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDeepLink } from "@/deeplink/parse";
-import { inviteLink } from "./invite";
+import { inviteLink, inviteLinkProblem } from "./invite";
 
 describe("inviteLink", () => {
   it("gives a room's address as a room link, not a join link", () => {
@@ -68,6 +68,13 @@ describe("inviteLink", () => {
 
   it("gives nothing for a room address with no port in it", () => {
     expect(inviteLink("192.168.1.45", true, "1")).toBeNull();
+  });
+
+  it("says why a zone id has no link, and says nothing for any other address", () => {
+    expect(inviteLinkProblem("[fe80::1%eth0]:8200")).toMatch(/network card/);
+    expect(inviteLinkProblem("[2001:db8::1]:8200")).toBeNull();
+    expect(inviteLinkProblem("lobby.example.com:8200")).toBeNull();
+    expect(inviteLinkProblem(null)).toBeNull();
   });
 
   it("gives nothing when there is no connection to name", () => {

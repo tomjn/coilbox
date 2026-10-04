@@ -22,3 +22,18 @@ export function dialHost(host: string): string {
 export function bracketedHost(host: string): string {
   return host.includes(":") && !host.startsWith("[") ? `[${host}]` : host;
 }
+
+/**
+ * The `host:port` half of a connection key (`username@host:port`), with an IPv6
+ * host in brackets whichever way the key was built. Pure.
+ *
+ * A key is built from the host as it was saved or typed, so a bare `::1` gives
+ * `me@::1:8200`, where the port cannot be told from the address's last group
+ * by the first colon but can by the last one, since a port has no colon in it.
+ */
+export function addressOfKey(serverKey: string): string {
+  const address = serverKey.slice(serverKey.indexOf("@") + 1);
+  const colon = address.lastIndexOf(":");
+  if (colon < 0) return address;
+  return `${bracketedHost(address.slice(0, colon))}${address.slice(colon)}`;
+}

@@ -22,7 +22,7 @@ import {
   joinedBattleRouteLabel,
   useChosenHostingRoute,
 } from "@/direct/hostingRoute";
-import { inviteLink } from "@/direct/invite";
+import { inviteLink, inviteLinkProblem } from "@/direct/invite";
 import type { Battle, MemberStatus } from "../bindings";
 import { serverAddressFromKey } from "../store";
 import type { SyncState } from "./config";
@@ -124,9 +124,14 @@ export function BattleRoomHeader({
   const startWarning = startAnywayWarning(unsynced);
   // A room and a server are passed on differently, and a connection with nothing
   // worth handing out shows no button at all.
+  const address = serverKey ? serverAddressFromKey(serverKey) : null;
   const invite = serverKey
-    ? inviteLink(serverAddressFromKey(serverKey), directRoom, String(battle.id))
+    ? inviteLink(address, directRoom, String(battle.id))
     : null;
+  // A server saved under a link-local address with a zone id gets no link, and
+  // says why rather than leaving the player looking for a missing button.
+  const inviteProblem =
+    !invite && !directRoom ? inviteLinkProblem(address) : null;
   // How this battle is connected, for the host who wants to know why the pings
   // in it look the way they do (issue #2022).
   //
@@ -250,6 +255,20 @@ export function BattleRoomHeader({
           >
             <LinkIcon className="size-4" />
           </Button>
+        )}
+        {inviteProblem && (
+          // A disabled button gets no hover, so the reason sits on the wrapper.
+          <span title={inviteProblem} className="shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8 text-muted-foreground"
+              aria-label={`No invite link for this battle. ${inviteProblem}`}
+              disabled
+            >
+              <LinkIcon className="size-4" />
+            </Button>
+          </span>
         )}
         {routeLabel && (
           <TooltipProvider delayDuration={150}>
