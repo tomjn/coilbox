@@ -67,6 +67,22 @@ export interface HostSeed {
 }
 
 /**
+ * A bot's name as the lobby wire carries it. `ADDBOT` splits its fields on
+ * spaces, so a name like "AI 1" shifts every field after it and the room (or
+ * server) reads a bot with a broken status, colour and AI. Whitespace is
+ * removed, an empty name becomes "AI", and a name already in `taken` gets a
+ * number. Adds the result to `taken`. Pure apart from that.
+ */
+export function botWireName(name: string, taken: Set<string>): string {
+  const base = name.replace(/\s+/g, "") || "AI";
+  let out = base;
+  let n = 1;
+  while (taken.has(out)) out = `${base}${n++}`;
+  taken.add(out);
+  return out;
+}
+
+/**
  * The forward bridge from a singleplayer `SkirmishDraft` (a skirmish preset,
  * or the page's current setup) to what hosting it online needs: the option,
  * start-pos-type and unit-restriction script tags to apply once the room is
@@ -142,6 +158,7 @@ export function draftToHostSeed(opts: {
   let openSlots = 0;
   let unresolvedAiCount = 0;
   const substitutions: AiSubstitution[] = [];
+  const takenNames = new Set<string>();
   for (const p of resolved) {
     if (p === you) continue;
     if (p.kind !== "ai") {
@@ -158,7 +175,7 @@ export function draftToHostSeed(opts: {
       substitutions.push({ from: p.ai.shortName, to: outcome.ai.shortName });
     }
     bots.push({
-      name: p.name,
+      name: botWireName(p.name, takenNames),
       aiDll: outcome.ai.shortName,
       side: sideIndex(p.side),
       colorHex: rgbToHex(p.color),

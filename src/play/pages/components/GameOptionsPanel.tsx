@@ -11,6 +11,7 @@ import {
 import { Label } from "@/components/ui/label";
 import type { ConfigOption, GameItem } from "@/content/bindings";
 import {
+  defaultLabel,
   effectiveValue,
   groupOptions,
   isChanged,
@@ -244,6 +245,31 @@ function OptionHelp({
 }
 
 /**
+ * The mark on an option whose value differs from the game's declared default:
+ * the word "changed" and the default it changed from, so it reads without
+ * colour. The pill matches the one on a unit tweak field that has been edited,
+ * so the app has one way of showing a change. Shared by every option row, in
+ * Singleplayer and in the battle room.
+ */
+function ChangedMark({
+  option,
+  value,
+}: {
+  option: ConfigOption;
+  value?: string;
+}) {
+  if (!isChanged(option, value)) return null;
+  return (
+    <span className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
+      <span className="shrink-0 rounded-full bg-primary/15 px-1.5 font-medium text-primary">
+        changed
+      </span>
+      <span className="truncate">Default: {defaultLabel(option)}</span>
+    </span>
+  );
+}
+
+/**
  * Render one mod option as the control its type calls for. A section is a group
  * header rather than a setting, so it renders nothing here: callers that group
  * (see `groupOptions`) never pass one, and those that don't would otherwise show
@@ -280,6 +306,7 @@ export function ModOptionField({
         <span className="flex min-w-0 flex-col gap-0.5">
           <span>{o.name}</span>
           <OptionHelp option={o} />
+          <ChangedMark option={o} value={value} />
         </span>
       </label>
     );
@@ -298,6 +325,7 @@ export function ModOptionField({
           options={o.listItems.map((it) => ({ value: it.key, label: it.name }))}
           onValueChange={onChange}
         />
+        <ChangedMark option={o} value={value} />
       </div>
     );
   }
@@ -343,31 +371,34 @@ function TypedOptionField({
   const [emptied, setEmptied] = useState(false);
 
   return (
-    <Label htmlFor={id} className="block font-normal">
-      <span className="mb-1.5 block text-xs text-muted-foreground">
-        {o.name}
-      </span>
-      <OptionHelp option={o} className="mb-1.5" />
-      <Input
-        id={id}
-        type={isNumber ? "number" : "text"}
-        min={isNumber ? o.numberMin : undefined}
-        max={isNumber ? o.numberMax : undefined}
-        step={isNumber ? o.numberStep : undefined}
-        value={emptied ? "" : effective(o, value)}
-        placeholder={o.default}
-        disabled={disabled}
-        onChange={(e) => {
-          const next = e.target.value;
-          setEmptied(next === "");
-          if (next !== "") onChange(next);
-        }}
-        onBlur={() => {
-          if (!emptied) return;
-          setEmptied(false);
-          if (value !== undefined) onChange(undefined);
-        }}
-      />
-    </Label>
+    <div>
+      <Label htmlFor={id} className="block font-normal">
+        <span className="mb-1.5 block text-xs text-muted-foreground">
+          {o.name}
+        </span>
+        <OptionHelp option={o} className="mb-1.5" />
+        <Input
+          id={id}
+          type={isNumber ? "number" : "text"}
+          min={isNumber ? o.numberMin : undefined}
+          max={isNumber ? o.numberMax : undefined}
+          step={isNumber ? o.numberStep : undefined}
+          value={emptied ? "" : effective(o, value)}
+          placeholder={o.default}
+          disabled={disabled}
+          onChange={(e) => {
+            const next = e.target.value;
+            setEmptied(next === "");
+            if (next !== "") onChange(next);
+          }}
+          onBlur={() => {
+            if (!emptied) return;
+            setEmptied(false);
+            if (value !== undefined) onChange(undefined);
+          }}
+        />
+      </Label>
+      <ChangedMark option={o} value={value} />
+    </div>
   );
 }

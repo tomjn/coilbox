@@ -38,12 +38,18 @@ import {
   exactGameRequirement,
   exactMapRequirement,
 } from "@/content/resolveContent";
+import { hostBlockedReason, NEW_ROOM_TARGET } from "@/direct/room";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { useMyTeamColor } from "@/lib/useMyTeamColor";
-import { AccountPicker } from "@/multiplayer/AccountPicker";
+import { liveRoomKey } from "@/multiplayer/connections";
 import { liveHostableKeys } from "@/multiplayer/protocol";
-import { useMultiplayer, useProtocolServers } from "@/multiplayer/store";
+import {
+  serverNameFor,
+  useMultiplayer,
+  useProtocolServers,
+  usernameFromKey,
+} from "@/multiplayer/store";
 import { notify } from "@/notify/notify";
 import type { StartRect } from "@/startbox/geometry";
 import { isBoxMode, startPosNote } from "@/startbox/mode";
@@ -205,29 +211,24 @@ export default function SkirmishPage() {
   const { presets, savePreset, touchPreset, removePreset } =
     useSkirmishPresets();
 
-  // Whether Host is offered at all (issue #514): hosting needs a live multiplayer
-  // login, so the button is hidden rather than shown disabled when logged out.
-  // Under Tachyon the server allocates a dedicated autohost from its own pool and a
-  // client cannot host at all, so the same button is hidden while connected to one
-  // (see `docs/tachyon-protocol.md`).
-  //
-  // With more than one connection open, hosting is possible as long as any of
-  // them can (issue #2847): `hostableKeys` is every live connection that is
-  // not Tachyon, focused first.
+  // Hosting is always offered, because a room on this computer needs no login at
+  // all. A lobby server is one more place to host it, and only a live connection
+  // that can host counts (issue #514, #2847): `hostableKeys` is every live lobby
+  // login that is not Tachyon, focused first. Under Tachyon the server allocates a
+  // dedicated autohost from its own pool and a client cannot host at all (see
+  // `docs/tachyon-protocol.md`). A room is a connection too once it is up, but
+  // hosting on one that is already open opens nothing, so it is left out.
   const { connections, activeKey } = useMultiplayer();
   const hostServers = useProtocolServers();
-  const liveKeys = useMemo(
-    () => Object.keys(connections).filter((k) => connections[k].live),
-    [connections],
-  );
   const hostableKeys = useMemo(
-    () => liveHostableKeys(connections, hostServers, activeKey),
+    () =>
+      liveHostableKeys(connections, hostServers, activeKey).filter(
+        (key) => !connections[key]?.direct,
+      ),
     [connections, hostServers, activeKey],
   );
-  // Logged out this stays true, so the preset drawer's "Host as battle" keeps
-  // showing the way it does today. Only being live on nothing but Tachyon
-  // connections removes it.
-  const hostingPossible = liveKeys.length === 0 || hostableKeys.length > 0;
+  // Why a room cannot be started now, or null. Coilbox is in one room at a time.
+  const roomBlocked = hostBlockedReason(liveRoomKey(connections));
 
   // The team colour remembered across surfaces (shared with the MP lobby via the
   // same setting key). Empty = never picked.
@@ -549,9 +550,8 @@ export default function SkirmishPage() {
   // different game. Gate on the resolve-content flow (#387) first. Only once
   // both are confirmed installed does this navigate to the Battles hub with
   // the draft to seed (`BattlesPage`/`BattleRoomPage` carry it the rest of the
-  // way). Not connected yet, or not logged in? `/battles` itself already
-  // prompts to connect (same as the content map detail's "Host a battle here"),
-  // so nothing extra is needed here.
+  // way). With no lobby login the draft goes to a room on this computer
+  // (`NEW_ROOM_TARGET`), which needs none.
   const [pendingHost, setPendingHost] = useState<{
     draft: SkirmishDraft;
     title: string;
@@ -581,12 +581,19 @@ export default function SkirmishPage() {
     setPendingHost({ draft, title, serverKey });
   }
 
+  // With no lobby login the only place to host is a room on this computer, so it
+  // is taken without asking. With one or more, the player is asked, because a
+  // room and a server are different things to be hosting on.
   function hostAsBattle(draft: SkirmishDraft, title: string) {
-    if (hostableKeys.length > 1) {
+    if (hostableKeys.length > 0) {
       setHostPick({ draft, title });
       return;
     }
-    proceedHost(draft, title, hostableKeys[0] ?? null);
+    if (roomBlocked) {
+      setError(roomBlocked);
+      return;
+    }
+    proceedHost(draft, title, NEW_ROOM_TARGET);
   }
 
   async function onStart(parts: Participant[] = participants) {
@@ -911,20 +918,18 @@ export default function SkirmishPage() {
               </TooltipTrigger>
               <TooltipContent>Presets</TooltipContent>
             </Tooltip>
-            {hostableKeys.length > 0 && (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  hostAsBattle(
-                    currentDraft(),
-                    `${gameName || "Skirmish"} (hosted)`,
-                  )
-                }
-                disabled={running || !selectedGame || !selectedMap}
-              >
-                <Swords className="size-4" /> Host
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              onClick={() =>
+                hostAsBattle(
+                  currentDraft(),
+                  `${gameName || "Skirmish"} (hosted)`,
+                )
+              }
+              disabled={running || !selectedGame || !selectedMap}
+            >
+              <Swords className="size-4" /> Host
+            </Button>
             <Button onClick={() => onStart()} disabled={!canStart}>
               <Play className="size-4 fill-current" />{" "}
               {running ? "Game running…" : "Start Game"}
@@ -960,9 +965,7 @@ export default function SkirmishPage() {
           setPresetsOpen(false);
           navigate("/hub?kind=preset");
         }}
-        onHostAsBattle={
-          hostingPossible ? (p) => hostAsBattle(p, p.name) : undefined
-        }
+        onHostAsBattle={(p) => hostAsBattle(p, p.name)}
         disabled={running}
       />
 
@@ -1019,17 +1022,45 @@ export default function SkirmishPage() {
         >
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
-              <DialogTitle>Host on which server?</DialogTitle>
+              <DialogTitle>Where do you want to host this?</DialogTitle>
             </DialogHeader>
-            <AccountPicker
-              keys={hostableKeys}
-              value={hostableKeys[0]}
-              onChange={(serverKey) => {
-                const picked = hostPick;
-                setHostPick(null);
-                proceedHost(picked.draft, picked.title, serverKey);
-              }}
-            />
+            <div className="flex flex-col gap-2">
+              {hostableKeys.map((serverKey) => (
+                <Button
+                  key={serverKey}
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => {
+                    const picked = hostPick;
+                    setHostPick(null);
+                    proceedHost(picked.draft, picked.title, serverKey);
+                  }}
+                >
+                  {usernameFromKey(serverKey)} ·{" "}
+                  {serverNameFor(serverKey, hostServers)}
+                </Button>
+              ))}
+              <Button
+                variant="outline"
+                className="justify-start"
+                disabled={roomBlocked !== null}
+                onClick={() => {
+                  const picked = hostPick;
+                  setHostPick(null);
+                  proceedHost(picked.draft, picked.title, NEW_ROOM_TARGET);
+                }}
+              >
+                A room on this computer
+              </Button>
+              {roomBlocked ? (
+                <p className="text-xs text-muted-foreground">{roomBlocked}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  A room needs no server and no account. Friends join with a
+                  link or an address.
+                </p>
+              )}
+            </div>
           </DialogContent>
         </Dialog>
       )}
