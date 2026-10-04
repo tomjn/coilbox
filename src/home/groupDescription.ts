@@ -26,6 +26,7 @@
 const GROUP_DESCRIPTIONS: Readonly<Record<string, string>> = {
   play: "Start a skirmish, run a campaign, or pick up a Warpath run.",
   multiplayer: "Log in to a lobby server, chat, and join battles.",
+  records: "Your career, player stats and replays of games already played.",
   library:
     "Everything installed on this machine: maps, games, blueprints and archives.",
   downloads: "Find and install maps, games and other content.",

@@ -43,8 +43,8 @@ import StorageSection from "./pages/StorageSection";
  * they sit in the Content group further down, alongside Downloads and Import,
  * which other plugins declare into the same group.
  *
- * Replays (now under Singleplayer, `play/index.ts`) and the stats profile (now
- * under Multiplayer as "Player stats", `multiplayer/index.tsx`) moved out of this
+ * Replays (`play/index.ts`) and the stats profile ("Player stats",
+ * `multiplayer/index.tsx`), both now in the Records nav group, moved out of this
  * group in #467; their old `content/replays*`/`content/stats*` paths still route
  * here purely to redirect to the new locations, via `LegacyRedirect`.
  *
