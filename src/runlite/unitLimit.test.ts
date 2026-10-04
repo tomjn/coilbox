@@ -3,6 +3,7 @@ import type { UnitDatasetEntry } from "../content/bindings";
 import { buildBuildGraph, buildEdgeMap } from "../content/buildTree";
 import type { RogueliteRun } from "./model";
 import {
+  limitHold,
   limitReadiness,
   noLimitMessage,
   noLimitReason,
@@ -277,5 +278,33 @@ describe("noLimitMessage", () => {
     ).toBe(
       "Nothing can be built from random_comm, this run's start unit, so coilbox cannot limit your units. Every unit is available.",
     );
+  });
+});
+
+describe("limitHold", () => {
+  it("shows the launch button as busy while the unit data loads", () => {
+    expect(limitHold({ kind: "loading" })).toEqual({
+      label: "Loading unit data…",
+      busy: true,
+      error: undefined,
+    });
+  });
+
+  it("says the battle will not launch when the unit data failed", () => {
+    const hold = limitHold({ kind: "failed" });
+    expect(hold?.busy).toBe(false);
+    expect(hold?.label).toBe("Cannot launch without unit data");
+    expect(hold?.error).toBe(
+      "Coilbox could not read this game's unit data, so it cannot work out your unit limit. The battle will not launch until it can.",
+    );
+  });
+
+  it("holds nothing back once the limit is known", () => {
+    expect(
+      limitHold({
+        kind: "ready",
+        limit: { kind: "none", reason: "no-start-unit" },
+      }),
+    ).toBeNull();
   });
 });

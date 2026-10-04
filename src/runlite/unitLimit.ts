@@ -97,3 +97,22 @@ export function noLimitMessage(
       return `Nothing can be built from ${startUnit}, this run's start unit, ${tail}`;
   }
 }
+
+/** What the launch button shows while the limit is not known, or null once it is. */
+export function limitHold(
+  readiness: LimitReadiness,
+): { label: string; busy: boolean; error?: string } | null {
+  switch (readiness.kind) {
+    case "loading":
+      return { label: "Loading unit data…", busy: true, error: undefined };
+    case "failed":
+      return {
+        label: "Cannot launch without unit data",
+        busy: false,
+        error:
+          "Coilbox could not read this game's unit data, so it cannot work out your unit limit. The battle will not launch until it can.",
+      };
+    case "ready":
+      return null;
+  }
+}

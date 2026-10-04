@@ -1,25 +1,25 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { SkirmishAi } from "../content/bindings";
-import { buildEdgeMap } from "../content/buildTree";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { usePreferredTarget } from "../play/config";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameChoice, InstalledGame } from "../play/installedGames";
-import { resolveGameByShortname } from "../play/installedGames";
+import { decideLaunchGame } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
-import { disabledUnitsFor, perkTotals } from "./build";
+import { perkTotals } from "./build";
 import { withGameChoice } from "./gameChoice";
 import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
 import { synthesizeEncounter } from "./synthesize";
+import { limitReadiness } from "./unitLimit";
 
 export type { BattleRequirement, BattleRunPhase } from "../play/useBattleRun";
 
 /**
  * Drive one run battle node: resolve the launch target and the run's game
- * (newest installed version of its shortname), synthesize the encounter, apply
+ * (see `decideLaunchGame`), synthesize the encounter, apply
  * the run's disabled set (shared tech ceiling) and personal perks, launch,
  * detect the outcome (manual prompt on ambiguity), then fold it through
  * `resolveBattle` and hand the next run back to `onResolved` to persist.
@@ -30,7 +30,8 @@ export type { BattleRequirement, BattleRunPhase } from "../play/useBattleRun";
  * folding the outcome through `resolveBattle`. The tech ceiling needs the
  * resolved target and installed game before the shared hook exists to hand
  * them back, so this re-resolves them (the same cached calls `useBattleRun`
- * makes internally) rather than threading them out through it.
+ * makes internally) rather than threading them out through it. The launch
+ * waits for the unit data the limit needs, and does not go ahead without it.
  */
 export function useRunEncounter(
   run: RogueliteRun,
@@ -42,17 +43,31 @@ export function useRunEncounter(
 ) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const installedGame = resolveGameByShortname(
+  // The game the battle launches, decided the way `useBattleRun` decides it, so
+  // the unit data read here is the data of the game that runs. An unpinned run
+  // with several candidate games has none until the player answers the offer.
+  const decision = decideLaunchGame(
     run.settings.game,
     scan.data?.games ?? [],
+    run.declinedGameUpdate,
   );
+  const launchGame = decision.kind === "ready" ? decision.game : undefined;
 
-  // The unit dataset backs the shared tech ceiling. Without it nothing is
-  // disabled (full arsenal), which is a safe fallback.
-  const { dataset } = useUnitsyncUnitDataset(
+  // The unit dataset backs the shared tech ceiling. A launch waits for it, and
+  // a load that failed stops the launch rather than running with no limit
+  // (issue #3473).
+  const {
+    dataset,
+    status: datasetStatus,
+    reload: reloadUnitData,
+  } = useUnitsyncUnitDataset(
     target?.enginePath,
     target?.dataDir,
-    installedGame?.primaryArchive.name,
+    launchGame?.primaryArchive.name,
+  );
+  const limit = useMemo(
+    () => limitReadiness(run, { status: datasetStatus, units: dataset?.units }),
+    [run, datasetStatus, dataset],
   );
 
   // The encounter as a launchable skirmish snapshot: the synthesized roster plus
@@ -64,7 +79,7 @@ export function useRunEncounter(
       ais: SkirmishAi[],
       aiConfig: GameAiConfig | undefined,
     ): SkirmishDraft | null => {
-      if (!node) return null;
+      if (!node || limit.kind !== "ready") return null;
       const draft = synthesizeEncounter(run, node, {
         playerName: PLAYER_NAME,
         gameName: installedGame.name,
@@ -72,10 +87,8 @@ export function useRunEncounter(
         aiConfig,
       });
       if (!draft) return null;
-      const edges = dataset
-        ? buildEdgeMap(dataset.units)
-        : new Map<string, string[]>();
-      const disabledUnits = disabledUnitsFor(run, edges);
+      const disabledUnits =
+        limit.limit.kind === "limited" ? limit.limit.disabled : [];
       const { advantage, income } = perkTotals(run.progress.perks);
       const restrictions: BattleRestrictions = {};
       if (disabledUnits.length > 0) restrictions.disabledUnits = disabledUnits;
@@ -85,7 +98,7 @@ export function useRunEncounter(
         ? { ...draft, restrictions }
         : draft;
     },
-    [run, node, dataset],
+    [run, node, limit],
   );
 
   // Only ever invoked once `hasDomainState` (below) has gated on `node` being
@@ -119,7 +132,7 @@ export function useRunEncounter(
     nodeId: node?.id,
   };
 
-  return useBattleRun<RogueliteRun>({
+  const battle = useBattleRun<RogueliteRun>({
     launchMode: "runlite",
     gameRef: run.settings.game,
     declinedGameUpdate: run.declinedGameUpdate,
@@ -132,4 +145,12 @@ export function useRunEncounter(
     persist,
     provenance,
   });
+
+  return {
+    ...battle,
+    // The launch waits for the limit to be known.
+    canStart: battle.canStart && limit.kind === "ready",
+    limit,
+    reloadUnitData,
+  };
 }
