@@ -125,13 +125,18 @@ export function orderedAis<T extends { shortName: string }>(
   return [...ranked, ...rest];
 }
 
-/**
- * The difficulty reading for one AI, 1..{@link PIP_SCALE} with the scale's top
- * being hardest, or undefined when no ranking places it. Fixed-width so two
- * games with different numbers of AIs still read against the same scale. A game
- * with one ranked AI reads mid-scale: it is the standard by default.
- */
-export function aiPips(
+/** The word that marks the hardest AI of any game, matched as a whole word. */
+const BRUTAL_PATTERN = /\bbrutal\b/i;
+
+/** An AI whose short name or display name says "brutal", in any letter case. */
+function isBrutalAi(ai: { shortName: string; name?: string }): boolean {
+  return (
+    BRUTAL_PATTERN.test(ai.shortName) || BRUTAL_PATTERN.test(ai.name ?? "")
+  );
+}
+
+/** The reading from the ranking alone, or undefined when it does not place the AI. */
+function rankedPips(
   ai: { shortName: string },
   ais: { shortName: string }[],
   config?: GameAiConfig,
@@ -144,6 +149,26 @@ export function aiPips(
   if (ranked.length === 1) return Math.ceil(PIP_SCALE / 2);
   const span = (rank / (ranked.length - 1)) * (PIP_SCALE - 1);
   return Math.round(PIP_SCALE - span);
+}
+
+/**
+ * The difficulty reading for one AI, 1..{@link PIP_SCALE} with the scale's top
+ * being hardest, or undefined when no ranking places it. Fixed-width so two
+ * games with different numbers of AIs still read against the same scale. A game
+ * with one ranked AI reads mid-scale: it is the standard by default.
+ *
+ * An AI no ranking places but whose name says "brutal" reads the top of the
+ * scale (#3466). A game's own ranking still wins, and the reading is display
+ * only: {@link rankedAis} does not include such an AI, so it is never picked.
+ */
+export function aiPips(
+  ai: { shortName: string; name?: string },
+  ais: { shortName: string }[],
+  config?: GameAiConfig,
+): number | undefined {
+  return (
+    rankedPips(ai, ais, config) ?? (isBrutalAi(ai) ? PIP_SCALE : undefined)
+  );
 }
 
 /**
@@ -193,7 +218,7 @@ export function minigamePips(name: string): number | undefined {
  * does not name.
  */
 export function referencePips(shortName: string): number | undefined {
-  return aiPips(
+  return rankedPips(
     { shortName },
     DEFAULT_AI_RANKING.map((n) => ({ shortName: n })),
   );
