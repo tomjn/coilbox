@@ -20,8 +20,8 @@ vi.mock("@picoframe/frame", () => ({
   ),
   Input: (props: Record<string, unknown>) => <input {...props} />,
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(" "),
-  useSetting: <T,>(_key: string, initial: T): [T, () => void] => [
-    initial,
+  useSetting: <T,>(key: string, initial: T): [T, () => void] => [
+    key === "multiplayer.favourites" ? (wire.favourites as T) : initial,
     () => {},
   ],
 }));
@@ -38,6 +38,7 @@ const KEY_A = "AF@bar.example:8200";
 const KEY_B = "Zeta@techa.example:8200";
 
 const wire = vi.hoisted(() => ({
+  favourites: {} as Record<string, string[]>,
   connections: {} as Record<
     string,
     { serverKey: string; live: boolean; mirror: { state: unknown } }
@@ -68,11 +69,15 @@ function emptyState(username: string): LobbyState {
   } as unknown as LobbyState;
 }
 
-function connectionFor(serverKey: string, live = true) {
+function connectionFor(
+  serverKey: string,
+  live = true,
+  patch: Partial<LobbyState> = {},
+) {
   return {
     serverKey,
     live,
-    mirror: { state: emptyState(serverKey.split("@")[0]) },
+    mirror: { state: { ...emptyState(serverKey.split("@")[0]), ...patch } },
   };
 }
 
@@ -91,6 +96,7 @@ function renderSidebar() {
 afterEach(() => {
   cleanup();
   wire.connections = {};
+  wire.favourites = {};
 });
 
 describe("ConversationSidebar: grouped by connection", () => {
@@ -127,5 +133,81 @@ describe("ConversationSidebar: grouped by connection", () => {
 
     expect(screen.queryByText(/on techa.example/)).toBeNull();
     expect(screen.getAllByText("Channels").length).toBe(1);
+  });
+});
+
+describe("ConversationSidebar: friends across servers (#3380)", () => {
+  const online = { status: { ingame: false, away: false } };
+
+  it("has no all-servers list while friends sit on one server", () => {
+    wire.favourites = { [KEY_A]: ["amy"] };
+    wire.connections = { [KEY_A]: connectionFor(KEY_A) };
+    renderSidebar();
+
+    expect(screen.queryByText("All friends")).toBeNull();
+  });
+
+  it("lists friends from two connected servers with the server on each row, online first", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["bob"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B, true, {
+        users: { bob: online } as unknown as LobbyState["users"],
+      }),
+    };
+    renderSidebar();
+
+    expect(screen.getByText("All friends")).toBeTruthy();
+    const rows = screen
+      .getByText("All friends")
+      .closest("div[data-state], div")
+      ?.parentElement?.querySelectorAll("li");
+    const text = [...(rows ?? [])].map((li) => li.textContent);
+    expect(text).toEqual(["bobtecha.example:8200", "amybar.example:8200"]);
+  });
+
+  it("says which battle a friend is in", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["bob"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B, true, {
+        users: { bob: online } as unknown as LobbyState["users"],
+        battles: {
+          "4": { id: 4, title: "Skirmish", host: "bob", members: {} },
+        } as unknown as LobbyState["battles"],
+      }),
+    };
+    renderSidebar();
+
+    expect(
+      screen.getByText("techa.example:8200 \u00b7 In Skirmish"),
+    ).toBeTruthy();
+  });
+
+  it("shows a friend on a server that is not connected as unknown and does not open it", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["bob"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B, false),
+    };
+    renderSidebar();
+
+    const dot = screen.getByTitle("Unknown, not connected");
+    const button = dot.closest("button");
+    expect(button?.disabled).toBe(true);
+    // amy, on the live server, is offline rather than unknown.
+    expect(screen.getAllByTitle("Offline").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the same name on two servers as two rows", () => {
+    wire.favourites = { [KEY_A]: ["amy"], [KEY_B]: ["amy"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A),
+      [KEY_B]: connectionFor(KEY_B),
+    };
+    renderSidebar();
+
+    expect(screen.getByText("bar.example:8200")).toBeTruthy();
+    expect(screen.getByText("techa.example:8200")).toBeTruthy();
   });
 });
