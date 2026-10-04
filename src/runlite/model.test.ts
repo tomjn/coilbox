@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyMeta,
+  migrateMeta,
   parseRunJson,
   parseRunMeta,
   parseRunStateFile,
@@ -192,26 +194,82 @@ describe("parseRunStateFile", () => {
 });
 
 describe("parseRunMeta", () => {
+  /** The shape the user's own file has: no game anywhere on it. */
+  const OLD = {
+    schemaVersion: 1,
+    loadouts: ["vanguard"],
+    eventPools: [],
+    ascensionTier: 1,
+    stats: { runs: 1, wins: 1, deepest: 8 },
+  };
+
   it("falls back to empty meta on garbage", () => {
     const meta = parseRunMeta("not json");
-    expect(meta.ascensionTier).toBe(0);
-    expect(meta.stats.runs).toBe(0);
-    expect(meta.loadouts).toEqual([]);
+    expect(meta.legacy.ascensionTier).toBe(0);
+    expect(meta.legacy.stats.runs).toBe(0);
+    expect(meta.legacy.loadouts).toEqual([]);
+    expect(meta.games).toEqual({});
   });
 
-  it("reads a stored meta document", () => {
+  it("turns an old document into the legacy record and nothing per game", () => {
+    const meta = parseRunMeta(JSON.stringify(OLD));
+    expect(meta.schemaVersion).toBe(2);
+    expect(meta.games).toEqual({});
+    expect(meta.legacy).toEqual({
+      loadouts: ["vanguard"],
+      eventPools: [],
+      ascensionTier: 1,
+      stats: { runs: 1, wins: 1, deepest: 8 },
+      seen: [],
+    });
+  });
+
+  it("migrating twice changes nothing", () => {
+    const once = migrateMeta(OLD);
+    expect(migrateMeta(once)).toEqual(once);
+    expect(parseRunMeta(JSON.stringify(once))).toEqual(once);
+  });
+
+  it("reads the Rust default for a missing file as empty", () => {
+    // Mirrors `RunliteMeta::default()` in the plugin: the old shape, empty.
     const meta = parseRunMeta(
       JSON.stringify({
         schemaVersion: 1,
-        loadouts: ["air-first"],
+        loadouts: [],
         eventPools: [],
-        ascensionTier: 3,
-        stats: { runs: 10, wins: 4, deepest: 7 },
+        ascensionTier: 0,
+        stats: { runs: 0, wins: 0, deepest: 0 },
       }),
     );
-    expect(meta.loadouts).toEqual(["air-first"]);
-    expect(meta.ascensionTier).toBe(3);
-    expect(meta.stats.wins).toBe(4);
+    expect(meta).toEqual(emptyMeta);
+  });
+
+  it("reads a current document with its per game records", () => {
+    const doc = {
+      schemaVersion: 2,
+      legacy: OLD,
+      games: {
+        ba: {
+          loadouts: ["air"],
+          eventPools: ["anomalies"],
+          ascensionTier: 2,
+          stats: { runs: 3, wins: 2, deepest: 5 },
+          seen: ["a", "b", "c"],
+        },
+      },
+    };
+    const meta = parseRunMeta(JSON.stringify(doc));
+    expect(meta.games.ba.seen).toEqual(["a", "b", "c"]);
+    expect(meta.games.ba.ascensionTier).toBe(2);
+    expect(meta.legacy.stats.wins).toBe(1);
+  });
+
+  it("keeps a newer document's version so it is not written back", () => {
+    const meta = parseRunMeta(
+      JSON.stringify({ schemaVersion: 7, legacy: OLD, games: {} }),
+    );
+    expect(meta.schemaVersion).toBe(7);
+    expect(meta.legacy.loadouts).toEqual(["vanguard"]);
   });
 });
 

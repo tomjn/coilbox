@@ -28,7 +28,7 @@ import {
   type GenRunMap,
   generateRun,
 } from "../../generate";
-import { loadoutById, unlockedLoadouts } from "../../meta";
+import { loadoutById, unlockedLoadouts, unlocksFor } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
 import { setupLimitWarning } from "../../unitLimit";
@@ -84,9 +84,7 @@ export function RunSetupForm({
   const [difficulty, setDifficulty] = useState(2);
   const [ascension, setAscension] = useState(0);
   const [skin, setSkin] = useState<RunSkin>("galaxy");
-  const [loadoutId, setLoadoutId] = useState("standard");
-
-  const loadouts = unlockedLoadouts(meta);
+  const [pickedLoadoutId, setLoadoutId] = useState("standard");
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
     target?.dataDir,
@@ -110,6 +108,16 @@ export function RunSetupForm({
   }, [games, gameName, initialGameName]);
 
   const game = games.find((g) => g.name === gameName) ?? null;
+  // What this game offers: the legacy unlocks plus its own. The key is the one a
+  // run records for the game, so a finished run lands in the record shown here.
+  const gameShortname = game ? (game.info.shortname ?? game.name) : "";
+  const unlocks = unlocksFor(meta, gameShortname);
+  const loadouts = unlockedLoadouts(unlocks);
+  // A choice made for another game falls back when this game does not offer it.
+  const loadoutId = loadouts.some((l) => l.id === pickedLoadoutId)
+    ? pickedLoadoutId
+    : "standard";
+  const ascensionTier = unlocks.ascensionTier;
   const archive = game?.primaryArchive.name;
   // Reuse the same branding catalog art shown on game detail (issue #372), so
   // the warpath setup feels like part of the game's world.
@@ -195,11 +203,11 @@ export function RunSetupForm({
       seed: Math.floor(Math.random() * 1e9),
       length,
       difficulty,
-      ascension,
+      ascension: Math.min(ascension, ascensionTier),
       // The archive the player picked, by its full name, so every battle
       // launches it and not another archive sharing the shortname (#3465).
       game: {
-        shortname: game.info.shortname ?? game.name,
+        shortname: gameShortname,
         pinnedName: game.name,
       },
       factionId: "player",
@@ -332,18 +340,15 @@ export function RunSetupForm({
             ]}
           />
         </Field>
-        {meta.ascensionTier > 0 && (
+        {ascensionTier > 0 && (
           <Field label="Ascension">
             <OptionSelect
-              value={String(ascension)}
+              value={String(Math.min(ascension, ascensionTier))}
               onValueChange={(v) => setAscension(Number(v))}
-              options={Array.from(
-                { length: meta.ascensionTier + 1 },
-                (_, i) => ({
-                  value: String(i),
-                  label: `Tier ${i}`,
-                }),
-              )}
+              options={Array.from({ length: ascensionTier + 1 }, (_, i) => ({
+                value: String(i),
+                label: `Tier ${i}`,
+              }))}
             />
           </Field>
         )}

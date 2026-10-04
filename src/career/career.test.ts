@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AchievementResult } from "../content/achievements";
 import type { StatAi, StatPlayer, StatRecord } from "../content/bindings";
-import { emptyMeta } from "../runlite/model";
+import { emptyMeta, emptyRecord, type RogueliteMeta } from "../runlite/model";
 import {
   achievementDigest,
   buildCareer,
@@ -298,34 +298,127 @@ describe("buildCareer", () => {
       ai: { records: [], player: "", refights: new Set(), scripted: new Set() },
       warpath: emptyMeta,
     });
-    expect(career).toEqual({ games: [], warpath: null, isEmpty: true });
+    expect(career).toEqual({
+      games: [],
+      legacyWarpath: null,
+      isEmpty: true,
+    });
   });
 
   it("is empty when every store is unavailable", () => {
     expect(buildCareer({ ...none, installed: null }).isEmpty).toBe(true);
   });
 
-  it("reports Warpath once, not per game, and only when there is something", () => {
-    const career = buildCareer({
-      ...none,
-      warpath: {
-        ...emptyMeta,
-        loadouts: ["vanguard"],
-        eventPools: ["anomalies"],
-        ascensionTier: 1,
-        stats: { runs: 2, wins: 1, deepest: 8 },
-      },
-    });
-    expect(career.isEmpty).toBe(false);
-    expect(career.games).toEqual([]);
-    expect(career.warpath).toEqual({
-      runs: 2,
-      wins: 1,
-      deepest: 8,
+  describe("Warpath", () => {
+    /** The user's real file, as the legacy record: 1 run, 1 win, column 8. */
+    const legacy: RogueliteMeta["legacy"] = {
+      ...emptyRecord,
+      loadouts: ["vanguard"],
       ascensionTier: 1,
-      maxAscension: 5,
-      loadouts: ["Armoured vanguard"],
+      stats: { runs: 1, wins: 1, deepest: 8 },
+    };
+    const baRecord = {
+      ...emptyRecord,
+      loadouts: ["air"],
       eventPools: ["anomalies"],
+      ascensionTier: 2,
+      stats: { runs: 4, wins: 2, deepest: 6 },
+      seen: ["a", "b", "c", "d"],
+    };
+
+    it("summarises the legacy record on its own, with no game card", () => {
+      const career = buildCareer({
+        ...none,
+        warpath: { ...emptyMeta, legacy },
+      });
+      expect(career.isEmpty).toBe(false);
+      expect(career.games).toEqual([]);
+      expect(career.legacyWarpath).toEqual({
+        runs: 1,
+        wins: 1,
+        deepest: 8,
+        ascensionTier: 1,
+        maxAscension: 5,
+        loadouts: ["Armoured vanguard"],
+        eventPools: [],
+      });
+    });
+
+    it("puts a game's own runs in its card, with what it offers there", () => {
+      const career = buildCareer({
+        ...none,
+        installed: [BA, SF],
+        warpath: { ...emptyMeta, legacy, games: { ba: baRecord } },
+      });
+      expect(career.games.map((g) => g.title)).toEqual([
+        "Balanced Annihilation",
+      ]);
+      // Its own totals, and the union of legacy and its own for the rest.
+      expect(career.games[0].warpath).toEqual({
+        runs: 4,
+        wins: 2,
+        deepest: 6,
+        ascensionTier: 2,
+        maxAscension: 5,
+        loadouts: ["Armoured vanguard", "Air superiority"],
+        eventPools: ["anomalies"],
+      });
+      // The legacy block keeps its own totals, unmixed.
+      expect(career.legacyWarpath?.runs).toBe(1);
+      expect(career.legacyWarpath?.loadouts).toEqual(["Armoured vanguard"]);
+    });
+
+    it("gives each game its own numbers", () => {
+      const career = buildCareer({
+        ...none,
+        installed: [BA, SF],
+        warpath: {
+          ...emptyMeta,
+          games: {
+            ba: baRecord,
+            sf: { ...emptyRecord, stats: { runs: 1, wins: 0, deepest: 2 } },
+          },
+        },
+      });
+      const byTitle = Object.fromEntries(
+        career.games.map((g) => [g.title, g.warpath]),
+      );
+      expect(byTitle["Balanced Annihilation"]?.wins).toBe(2);
+      expect(byTitle.SplinterFaction?.wins).toBe(0);
+      expect(byTitle.SplinterFaction?.loadouts).toEqual([]);
+      expect(career.legacyWarpath).toBeNull();
+    });
+
+    it("shows nothing when there is no legacy record and no game record", () => {
+      const career = buildCareer({ ...none, warpath: emptyMeta });
+      expect(career.legacyWarpath).toBeNull();
+      expect(career.games).toEqual([]);
+      expect(career.isEmpty).toBe(true);
+    });
+
+    it("shows nothing for a game record with no runs", () => {
+      const career = buildCareer({
+        ...none,
+        warpath: { ...emptyMeta, games: { ba: emptyRecord } },
+      });
+      expect(career.isEmpty).toBe(true);
+    });
+
+    it("adds a game's Warpath to a card that has other progress", () => {
+      const career = buildCareer({
+        ...none,
+        installed: [BA],
+        campaigns: {
+          campaigns: [
+            campaign("c", "Ridge", ["Balanced Annihilation V15.9.8"]),
+          ],
+          progress: { campaigns: { c: { completedMissionIds: ["c-m0"] } } },
+        },
+        warpath: { ...emptyMeta, games: { ba: baRecord } },
+      });
+      expect(career.games).toHaveLength(1);
+      expect(career.games[0].campaigns).toHaveLength(1);
+      expect(career.games[0].warpath?.runs).toBe(4);
     });
   });
 
@@ -400,6 +493,7 @@ describe("careerTotals", () => {
     campaigns: [],
     conquest: null,
     ai: null,
+    warpath: null,
     ...over,
   });
   const row = (id: string, finished: boolean) => ({
@@ -414,7 +508,7 @@ describe("careerTotals", () => {
   it("adds each game's results together and counts finished campaigns", () => {
     const career: Career = {
       isEmpty: false,
-      warpath: {
+      legacyWarpath: {
         runs: 5,
         wins: 2,
         deepest: 4,
@@ -434,6 +528,15 @@ describe("careerTotals", () => {
             inProgress: 0,
           },
           ai: { games: 10, wins: 6, losses: 3, undecided: 1, topAi: null },
+          warpath: {
+            runs: 3,
+            wins: 1,
+            deepest: 6,
+            ascensionTier: 1,
+            maxAscension: 5,
+            loadouts: [],
+            eventPools: [],
+          },
         }),
         game({
           key: "h",
@@ -447,15 +550,17 @@ describe("careerTotals", () => {
       aiWins: 7,
       conquestsFinished: 3,
       conquestsWon: 2,
-      warpathRuns: 5,
-      warpathWins: 2,
+      warpathRuns: 8,
+      warpathWins: 3,
       campaignsFinished: 2,
       campaignsStarted: 3,
     });
   });
 
   it("is all zeros for a career with nothing in it", () => {
-    expect(careerTotals({ isEmpty: true, warpath: null, games: [] })).toEqual({
+    expect(
+      careerTotals({ isEmpty: true, legacyWarpath: null, games: [] }),
+    ).toEqual({
       aiGames: 0,
       aiWins: 0,
       conquestsFinished: 0,

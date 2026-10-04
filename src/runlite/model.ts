@@ -253,9 +253,11 @@ export interface RunStateFile {
   runs: Record<string, RogueliteRun>;
 }
 
-/** Persistent between-run unlocks. "Options, not raw power." */
-export interface RogueliteMeta {
-  schemaVersion: 1;
+/** The version of the meta document this code writes. */
+export const META_SCHEMA_VERSION = 2;
+
+/** One record of unlocks and totals. Every game has one, and `legacy` is one. */
+export interface UnlockRecord {
   /** Unlocked starting-loadout ids offered at run setup. */
   loadouts: string[];
   /** Unlocked event-pool ids drawn into the event deck. */
@@ -263,6 +265,26 @@ export interface RogueliteMeta {
   /** Highest ascension difficulty tier the player may pick. */
   ascensionTier: number;
   stats: RunStats;
+  /** Run ids already counted, so reopening a finished run cannot count it
+   * twice. Empty on `legacy` until a run with no game is counted there. */
+  seen: string[];
+}
+
+/**
+ * Persistent between-run unlocks. "Options, not raw power."
+ *
+ * One record per game, keyed by lower case shortname (as Conquest's unlocks
+ * are), plus `legacy`: what was earned before records were kept per game, which
+ * cannot be attributed to a game. What a game offers at setup is the union of
+ * `legacy` and that game's own record (see `unlocksFor` in `./meta`).
+ *
+ * `schemaVersion` is a plain number because a document written by a newer
+ * version is read as it is and never written back.
+ */
+export interface RogueliteMeta {
+  schemaVersion: number;
+  legacy: UnlockRecord;
+  games: Record<string, UnlockRecord>;
 }
 
 export interface RunStats {
@@ -274,12 +296,18 @@ export interface RunStats {
 
 export const emptyStateFile: RunStateFile = { schemaVersion: 1, runs: {} };
 
-export const emptyMeta: RogueliteMeta = {
-  schemaVersion: 1,
+export const emptyRecord: UnlockRecord = {
   loadouts: [],
   eventPools: [],
   ascensionTier: 0,
   stats: { runs: 0, wins: 0, deepest: 0 },
+  seen: [],
+};
+
+export const emptyMeta: RogueliteMeta = {
+  schemaVersion: META_SCHEMA_VERSION,
+  legacy: emptyRecord,
+  games: {},
 };
 
 // ---------------------------------------------------------------------------
@@ -723,6 +751,56 @@ export function parseRunStateFile(json: string): RunStateFile {
   return { schemaVersion: 1, runs };
 }
 
+function parseRecord(data: unknown): UnlockRecord {
+  const d = isRecord(data) ? data : {};
+  const stats = isRecord(d.stats) ? d.stats : {};
+  return {
+    loadouts: stringArray(d.loadouts),
+    eventPools: stringArray(d.eventPools),
+    ascensionTier: clamp(Math.round(num(d.ascensionTier, 0)), 0, 99),
+    stats: {
+      runs: clamp(Math.round(num(stats.runs, 0)), 0, 999999),
+      wins: clamp(Math.round(num(stats.wins, 0)), 0, 999999),
+      deepest: clamp(Math.round(num(stats.deepest, 0)), 0, 999999),
+    },
+    seen: stringArray(d.seen),
+  };
+}
+
+/**
+ * Bring a stored meta document to the current shape. Pure, and safe to run on
+ * its own output.
+ *
+ * A document from before records were kept per game has one set of loadouts,
+ * event pools, ascension tier and stats and no game. It becomes `legacy`, with
+ * no per-game records. A missing file's default (the old shape, empty) becomes
+ * an empty `legacy`. A document from a newer version keeps its version number,
+ * so the caller can tell it must not be written back.
+ */
+export function migrateMeta(data: unknown): RogueliteMeta {
+  if (!isRecord(data)) return emptyMeta;
+  const version =
+    typeof data.schemaVersion === "number" ? data.schemaVersion : 1;
+  if (version < META_SCHEMA_VERSION && !isRecord(data.games)) {
+    return {
+      schemaVersion: META_SCHEMA_VERSION,
+      legacy: parseRecord(data),
+      games: {},
+    };
+  }
+  const games: Record<string, UnlockRecord> = {};
+  if (isRecord(data.games)) {
+    for (const [key, raw] of Object.entries(data.games)) {
+      if (key) games[key] = parseRecord(raw);
+    }
+  }
+  return {
+    schemaVersion: Math.max(version, META_SCHEMA_VERSION),
+    legacy: parseRecord(data.legacy),
+    games,
+  };
+}
+
 /** Parse the raw JSON of the meta document, falling back to an empty meta. */
 export function parseRunMeta(json: string): RogueliteMeta {
   let data: unknown;
@@ -731,17 +809,5 @@ export function parseRunMeta(json: string): RogueliteMeta {
   } catch {
     return emptyMeta;
   }
-  if (!isRecord(data)) return emptyMeta;
-  const stats = isRecord(data.stats) ? data.stats : {};
-  return {
-    schemaVersion: 1,
-    loadouts: stringArray(data.loadouts),
-    eventPools: stringArray(data.eventPools),
-    ascensionTier: clamp(Math.round(num(data.ascensionTier, 0)), 0, 99),
-    stats: {
-      runs: clamp(Math.round(num(stats.runs, 0)), 0, 999999),
-      wins: clamp(Math.round(num(stats.wins, 0)), 0, 999999),
-      deepest: clamp(Math.round(num(stats.deepest, 0)), 0, 999999),
-    },
-  };
+  return migrateMeta(data);
 }

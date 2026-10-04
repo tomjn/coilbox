@@ -29,8 +29,14 @@ import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
 import { useGameCatalog } from "../../play/useGameCatalog";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
-import { awardMeta } from "../meta";
-import { isBattleNode, type RunNode, type RunNodeType } from "../model";
+import { awardMeta, justFinished } from "../meta";
+import {
+  isBattleNode,
+  type RogueliteRun,
+  type RunNode,
+  type RunNodeType,
+  type RunStatus,
+} from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
 import { runGameNotice } from "../runContent";
@@ -57,7 +63,12 @@ export default function RunPage() {
   useHideSidebar();
   const { runId } = useParams();
   const { run: savedRun, loading, save } = useRun(runId);
-  const { meta, save: saveMeta } = useRunMeta();
+  const {
+    meta,
+    loading: metaLoading,
+    error: metaError,
+    save: saveMeta,
+  } = useRunMeta();
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the inspect panel opens straight to it (mirrors conquest's
   // `?node=` on GalaxyPage). A stale id (the node no longer exists in this run)
@@ -69,8 +80,12 @@ export default function RunPage() {
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
   // The node id to celebrate with a win burst (cleared after the burst plays).
   const [burstId, setBurstId] = useState<string | null>(null);
-  // Guard so a finished run awards meta-progression exactly once.
-  const awardedRef = useRef<string | null>(null);
+  // A run awards meta-progression when this page watches it finish, and only
+  // then. The status last seen, and the finish waiting for the meta to load.
+  const lastStatusRef = useRef<{ id: string; status: RunStatus } | null>(null);
+  const pendingAwardRef = useRef<{ run: RogueliteRun; id: string } | null>(
+    null,
+  );
   const drawer = useDrawer();
 
   // The arsenal ceiling size, for the HUD gauge (best-effort).
@@ -173,14 +188,27 @@ export default function RunPage() {
 
   const choices = useMemo(() => (run ? nextChoices(run) : []), [run]);
 
-  // When a run reaches won/lost, fold it into meta-progression once.
+  // When this page sees a run reach won/lost, fold it into its game's
+  // meta-progression once. A run that is already over when the page opens is
+  // never awarded here: it was counted when it ended, by this version or by
+  // the totals from before records were kept per game, and nothing records
+  // which. The meta is only written when the award changed it, and never when
+  // it failed to load, so a bad read cannot overwrite the file.
   useEffect(() => {
-    if (!run || run.progress.status === "active") return;
-    const key = `${run.createdAt}:${run.settings.seed}`;
-    if (awardedRef.current === key) return;
-    awardedRef.current = key;
-    saveMeta(awardMeta(meta, run));
-  }, [run, meta, saveMeta]);
+    if (run && runId) {
+      const last = lastStatusRef.current;
+      const before = last?.id === runId ? last.status : undefined;
+      lastStatusRef.current = { id: runId, status: run.progress.status };
+      if (justFinished(before, run.progress.status)) {
+        pendingAwardRef.current = { run, id: runId };
+      }
+    }
+    const pending = pendingAwardRef.current;
+    if (!pending || metaLoading || metaError) return;
+    pendingAwardRef.current = null;
+    const next = awardMeta(meta, pending.run, pending.id);
+    if (next !== meta) saveMeta(next);
+  }, [run, runId, meta, metaLoading, metaError, saveMeta]);
 
   // A finished run counts toward its challenge's best result, once.
   useRecordChallengeRun(run && runId ? warpathRunResult(runId, run) : null);

@@ -161,14 +161,52 @@ function AiSection({ ai, showLink }: { ai: AiSummary; showLink: boolean }) {
   );
 }
 
+/** What a Warpath summary says: the runs, then what the game offers. */
+function WarpathLines({ warpath }: { warpath: WarpathSummary }) {
+  return (
+    <>
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Rocket className="size-4" />
+        {plural(warpath.runs, "run")} · {plural(warpath.wins, "win")} · deepest
+        column {warpath.deepest} · ascension tier {warpath.ascensionTier} of{" "}
+        {warpath.maxAscension}
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Unlocked loadouts:{" "}
+        {warpath.loadouts.length > 0 ? warpath.loadouts.join(", ") : "none yet"}
+        {" · "}event pools:{" "}
+        {warpath.eventPools.length > 0
+          ? warpath.eventPools.join(", ")
+          : "none yet"}
+      </p>
+    </>
+  );
+}
+
+function WarpathSection({ warpath }: { warpath: WarpathSummary }) {
+  return (
+    <section>
+      <SectionHeading
+        icon={<Rocket className="size-4" />}
+        link={{ to: "/warpath", label: "Open Warpath" }}
+      >
+        Warpath
+      </SectionHeading>
+      <WarpathLines warpath={warpath} />
+    </section>
+  );
+}
+
 function GameCard({
   game,
   hideConquest,
   hideStats,
+  hideWarpath,
 }: {
   game: CareerGame;
   hideConquest: boolean;
   hideStats: boolean;
+  hideWarpath: boolean;
 }) {
   return (
     <section
@@ -191,12 +229,26 @@ function GameCard({
       {game.conquest && !hideConquest && (
         <ConquestSection conquest={game.conquest} />
       )}
+      {game.warpath && !hideWarpath && (
+        <WarpathSection warpath={game.warpath} />
+      )}
       {game.ai && <AiSection ai={game.ai} showLink={!hideStats} />}
     </section>
   );
 }
 
-function WarpathCard({ warpath }: { warpath: WarpathSummary }) {
+/**
+ * Runs from before Warpath kept a record per game, and runs with no game. They
+ * cannot be given to a game, so they are shown once, apart from the game cards.
+ * The link is only here when no game card has one.
+ */
+function LegacyWarpathCard({
+  warpath,
+  showLink,
+}: {
+  warpath: WarpathSummary;
+  showLink: boolean;
+}) {
   return (
     <section
       aria-labelledby="career-warpath"
@@ -206,34 +258,24 @@ function WarpathCard({ warpath }: { warpath: WarpathSummary }) {
         id="career-warpath"
         className="flex items-center gap-2 text-base font-semibold"
       >
-        Warpath
-        <Badge variant="outline" className="font-normal">
-          All games
-        </Badge>
-        <Link
-          to="/warpath"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "ml-auto",
-          )}
-        >
-          Open Warpath
-        </Link>
+        Earlier Warpath runs
+        {showLink && (
+          <Link
+            to="/warpath"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "ml-auto",
+            )}
+          >
+            Open Warpath
+          </Link>
+        )}
       </h2>
-      <p className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Rocket className="size-4" />
-        {plural(warpath.runs, "run")} · {plural(warpath.wins, "win")} · deepest
-        column {warpath.deepest} · ascension tier {warpath.ascensionTier} of{" "}
-        {warpath.maxAscension}
+      <p className="text-xs text-muted-foreground">
+        Runs from before records were kept per game, or with no game recorded.
+        What they unlocked is offered in every game.
       </p>
-      <p className="text-sm text-muted-foreground">
-        Unlocked loadouts:{" "}
-        {warpath.loadouts.length > 0 ? warpath.loadouts.join(", ") : "none yet"}
-        {" · "}event pools:{" "}
-        {warpath.eventPools.length > 0
-          ? warpath.eventPools.join(", ")
-          : "none yet"}
-      </p>
+      <WarpathLines warpath={warpath} />
     </section>
   );
 }
@@ -357,7 +399,10 @@ function Overview({
       sub: `of ${totals.conquestsFinished} finished`,
     });
   }
-  if (!hideWarpath && career.warpath) {
+  if (
+    !hideWarpath &&
+    (career.legacyWarpath || career.games.some((g) => g.warpath))
+  ) {
     cards.push({
       key: "warpath",
       icon: <Rocket className="size-3.5" />,
@@ -497,9 +542,13 @@ export default function CareerPage() {
   const hideStats = isProfileHidden("multiplayer.stats");
 
   const games = career.games.filter(
-    (g) => g.campaigns.length > 0 || g.ai || (g.conquest && !hideConquest),
+    (g) =>
+      g.campaigns.length > 0 ||
+      g.ai ||
+      (g.conquest && !hideConquest) ||
+      (g.warpath && !hideWarpath),
   );
-  const warpath = hideWarpath ? null : career.warpath;
+  const warpath = hideWarpath ? null : career.legacyWarpath;
   const empty = games.length === 0 && warpath === null;
   // Achievements come from replays of any kind, so they can exist with no game
   // card to show.
@@ -546,9 +595,15 @@ export default function CareerPage() {
           game={game}
           hideConquest={hideConquest}
           hideStats={hideStats}
+          hideWarpath={hideWarpath}
         />
       ))}
-      {warpath && <WarpathCard warpath={warpath} />}
+      {warpath && (
+        <LegacyWarpathCard
+          warpath={warpath}
+          showLink={!games.some((g) => g.warpath)}
+        />
+      )}
     </div>
   );
 }
