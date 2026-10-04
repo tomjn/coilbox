@@ -45,6 +45,7 @@ import { isVoidNode, type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
+import type { PlacedModelSources } from "../galaxy3d/placedModelLoaders";
 import {
   regenerateGalaxy,
   restoreChallengeMap,
@@ -248,6 +249,28 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
     };
   }, [galaxy]);
 
+  // Where the map's placed models are read from. Only a document that places
+  // models asks, and the object is stable so the scene is not rebuilt.
+  const hasModels = (galaxy.models?.length ?? 0) > 0;
+  const modelEngine = target?.enginePath;
+  const modelDataDir = target?.dataDir;
+  const modelArchive = installedGame?.primaryArchive.name;
+  // Until the scan answers, a game that is installed looks like one that is
+  // not, so the models wait instead of being reported as missing.
+  const modelsPending = Boolean(target) && !scan.data && !scan.error;
+  const modelSources = useMemo<PlacedModelSources | undefined>(() => {
+    if (!hasModels) return undefined;
+    if (modelsPending) return { pending: true };
+    if (!modelEngine || !modelDataDir || !modelArchive) return undefined;
+    return {
+      game: {
+        enginePath: modelEngine,
+        dataDir: modelDataDir,
+        gameArchive: modelArchive,
+      },
+    };
+  }, [hasModels, modelsPending, modelEngine, modelDataDir, modelArchive]);
+
   const selected = galaxy.nodes.find((n) => n.id === selectedId);
 
   // The battle briefing now lives on the map (no separate screen): opening it
@@ -323,6 +346,7 @@ function GalaxyScreen({ galaxy }: { galaxy: GalaxyDoc }) {
         spaceMaps={spaceMaps}
         focusNodeId={battleNodeId ?? factionFocus}
         focusBiasX={state ? 0 : 0.13}
+        modelSources={modelSources}
         display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
       />
