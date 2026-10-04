@@ -1,0 +1,536 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { linkKind, parseGalaxyJson } from "../model";
+import { memoryTraceCache, type TraceCache, traceCacheKey } from "./cache";
+import type { HandmadeMapError, HandmadeMapErrorCode } from "./errors";
+import type { MapManifest } from "./manifest";
+import { decodePng } from "./png.testhelper";
+import { type HandmadeMapInput, hasBlankBattle, readHandmadeMap } from "./read";
+import { pointInRing } from "./trace";
+
+/** The sample folder, which the broken-folder tests copy and damage. */
+const SAMPLE = fileURLToPath(
+  new URL("../../../docs/examples/handmade-map/", import.meta.url),
+);
+const FILES = ["map.json", "picture.png", "provinces.png", "heightmap.png"];
+const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
+const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
+const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
+
+/** The sample as reader input, with one thing changed. */
+function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
+  return {
+    manifest: manifestText,
+    provinces,
+    picture: { width: picture.width, height: picture.height },
+    urlFor: (name) =>
+      FILES.includes(name) ? `asset://map/${name}` : undefined,
+    ...change,
+  };
+}
+
+/** The sample manifest after `edit`, as text. */
+function manifestWith(edit: (m: MapManifest) => void): string {
+  const m = JSON.parse(manifestText) as MapManifest;
+  edit(m);
+  return JSON.stringify(m);
+}
+
+/** A copy of the province image with a block painted one colour. */
+function paintedOver(
+  x0: number,
+  y0: number,
+  size: number,
+  rgb: [number, number, number],
+) {
+  const data = new Uint8Array(provinces.data);
+  for (let y = y0; y < y0 + size; y++) {
+    for (let x = x0; x < x0 + size; x++) {
+      data.set([...rgb, 255], (y * provinces.width + x) * 4);
+    }
+  }
+  return { ...provinces, data };
+}
+
+function errorsOf(input: HandmadeMapInput): HandmadeMapError[] {
+  const result = readHandmadeMap(input);
+  if (result.ok) throw new Error("expected the read to fail");
+  return result.errors;
+}
+
+function only<C extends HandmadeMapErrorCode>(
+  errors: HandmadeMapError[],
+  code: C,
+): Extract<HandmadeMapError, { code: C }>[] {
+  return errors.filter(
+    (e): e is Extract<HandmadeMapError, { code: C }> => e.code === code,
+  );
+}
+
+function readSample() {
+  const result = readHandmadeMap(sample());
+  if (!result.ok) {
+    throw new Error(result.errors.map((e) => e.message).join("\n"));
+  }
+  return result.doc;
+}
+
+describe("the sample map", () => {
+  const doc = readSample();
+  const node = (id: string) => {
+    const found = doc.nodes.find((n) => n.id === id);
+    if (!found) throw new Error(`no node ${id}`);
+    return found;
+  };
+
+  it("reads into a galaxy document", () => {
+    expect(doc.id).toBe("sample-two-shores");
+    expect(doc.type).toBe("conquest-galaxy");
+    expect(doc.game).toEqual({ shortname: "TG" });
+    expect(doc.nodes.map((n) => n.id)).toEqual([
+      "northmarch",
+      "westhaven",
+      "midvale",
+      "eastcliff",
+      "southreach",
+      "ironcoast",
+      "highmoor",
+      "redfield",
+      "farwatch",
+      "stonebridge",
+    ]);
+    expect(doc.playerFactionId).toBe("west");
+    expect(doc.playableFactionIds).toEqual(["west", "east"]);
+    expect(doc.factions[1]).toEqual({
+      id: "east",
+      name: "Eastern Crown",
+      color: "#3fa374",
+      aggression: 0.4,
+    });
+  });
+
+  it("carries the terrain with URLs from the folder", () => {
+    expect(doc.terrain).toEqual({
+      image: "asset://map/picture.png",
+      heightmap: "asset://map/heightmap.png",
+      width: 1600,
+      height: 960,
+      heightScale: 120,
+      projection: "flat",
+    });
+  });
+
+  it("gives each faction one capital and leaves the rest neutral", () => {
+    const capitals = doc.nodes.filter((n) => n.kind === "capital");
+    expect(capitals.map((n) => [n.id, n.owner])).toEqual([
+      ["westhaven", "west"],
+      ["farwatch", "east"],
+    ]);
+    expect(node("northmarch").owner).toBe("neutral");
+    expect(node("midvale").owner).toBe("west");
+  });
+
+  it("outlines every province in map units, with the anchor inside", () => {
+    for (const n of doc.nodes) {
+      if (n.id === "stonebridge") continue;
+      const rings = n.outline ?? [];
+      expect(rings.length, n.name).toBe(1);
+      for (const [x, y] of rings[0]) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(1600);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(960);
+      }
+      expect(pointInRing(n.pos[0], n.pos[1], rings[0]), n.name).toBe(true);
+    }
+  });
+
+  it("keeps province outlines to a modest number of points", () => {
+    // The curved coasts are several hundred pixel corners as painted. The
+    // largest outline measured on this sample is 16 points.
+    for (const n of doc.nodes) {
+      for (const ring of n.outline ?? []) {
+        expect(ring.length, n.name).toBeLessThanOrEqual(16);
+        expect(ring.length, n.name).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("makes the city a point location at its position", () => {
+    expect(node("stonebridge").outline).toBeUndefined();
+    expect(node("stonebridge").pos).toEqual([400, 640]);
+  });
+
+  it("links neighbours by border, crossing and road, and drops the blocked border", () => {
+    expect(linkKind(doc, "westhaven", "midvale")).toBe("border");
+    expect(linkKind(doc, "ironcoast", "eastcliff")).toBe("crossing");
+    expect(linkKind(doc, "stonebridge", "southreach")).toBe("road");
+    expect(linkKind(doc, "northmarch", "midvale")).toBeUndefined();
+    expect(doc.blockedBorders).toEqual([["northmarch", "midvale"]]);
+    // The two land masses share nothing but the crossing.
+    const west = new Set([
+      "northmarch",
+      "westhaven",
+      "midvale",
+      "eastcliff",
+      "southreach",
+      "stonebridge",
+    ]);
+    const across = doc.links.filter(([a, b]) => west.has(a) !== west.has(b));
+    expect(across).toEqual([["eastcliff", "ironcoast"]]);
+    expect(doc.linkKinds).toHaveLength(doc.links.length);
+  });
+
+  it("marks a battle the author left out as blank, and keeps a given one", () => {
+    expect(hasBlankBattle(node("midvale"))).toBe(true);
+    expect(node("midvale").battle).toEqual({ mapName: "" });
+    expect(hasBlankBattle(node("farwatch"))).toBe(false);
+    expect(node("farwatch").battle).toEqual({
+      mapName: "MapB",
+      enemyAiCount: 2,
+    });
+    expect(node("farwatch").difficulty).toBe(5);
+    expect(node("midvale").difficulty).toBe(1);
+  });
+
+  it("passes the galaxy validator once the blank battles are filled", () => {
+    const filled = {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        hasBlankBattle(n) ? { ...n, battle: { mapName: "MapA" } } : n,
+      ),
+    };
+    const parsed = parseGalaxyJson(JSON.stringify(filled));
+    expect(parsed?.nodes).toHaveLength(doc.nodes.length);
+    expect(parsed?.links).toHaveLength(doc.links.length);
+    // With a battle still blank the validator refuses it, so nothing can
+    // launch a location that has no map.
+    expect(parseGalaxyJson(JSON.stringify(doc))).toBeNull();
+  });
+
+  it("ignores keys it does not know, including the reserved ones", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { start: "westhaven", goal: "farwatch" };
+          m.models = [{ file: "tower.gltf" }];
+          m.provinces[0].scenario = "intro.json";
+          m.provinces[0].warpath = { kind: "shop" };
+          (m as unknown as Record<string, unknown>).somethingNew = 1;
+        }),
+      }),
+    );
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("a broken map folder", () => {
+  it("names a colour that is painted but not listed, and where it is", () => {
+    const errors = errorsOf(
+      sample({ provinces: paintedOver(40, 40, 9, [0x12, 0x34, 0x56]) }),
+    );
+    const [error] = only(errors, "color-not-listed");
+    expect(error.color).toBe("#123456");
+    expect(error.x).toBeGreaterThanOrEqual(40);
+    expect(error.x).toBeLessThan(49);
+    expect(error.y).toBeGreaterThanOrEqual(40);
+    expect(error.y).toBeLessThan(49);
+    expect(error.message).toContain("#123456");
+    expect(error.message).toContain(`pixel ${error.x}, ${error.y}`);
+    expect(errors).toHaveLength(1);
+  });
+
+  it("names a province that is listed but never painted", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces.push({ color: "#ABCDEF", name: "Lost Isle" });
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "province-not-painted");
+    expect(error.name).toBe("Lost Isle");
+    expect(error.color).toBe("#abcdef");
+    expect(error.message).toContain('"Lost Isle" (#abcdef)');
+  });
+
+  it("names every province cut off from the rest of the map", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.crossings = [];
+        }),
+      }),
+    );
+    // Without the crossing the eastern land mass is the smaller part.
+    expect(only(errors, "unreachable").map((e) => e.name)).toEqual([
+      "Ironcoast",
+      "Highmoor",
+      "Redfield",
+      "Farwatch",
+    ]);
+    expect(errors[0].message).toContain('"Ironcoast" (#b55f9a)');
+    expect(errors[0].message).toContain("cannot be reached");
+    expect(errors).toHaveLength(4);
+  });
+
+  it("names a point location with no road to it", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.roads = [];
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "unreachable");
+    expect(error.name).toBe("Stonebridge");
+    expect(error.color).toBeUndefined();
+    expect(error.message).toContain('The location "Stonebridge"');
+  });
+
+  it("says when the province image and the map picture are different sizes", () => {
+    const errors = errorsOf(sample({ picture: { width: 320, height: 192 } }));
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "size-mismatch");
+    expect(error.provinces).toEqual({ width: 160, height: 96 });
+    expect(error.picture).toEqual({ width: 320, height: 192 });
+    expect(error.message).toContain("160 by 96");
+    expect(error.message).toContain("320 by 192");
+  });
+
+  it("names a faction with no capital", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[8].capital = false;
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "capital-count");
+    expect(error.factionName).toBe("Eastern Crown");
+    expect(error.capitals).toEqual([]);
+    expect(error.message).toContain('"Eastern Crown" has no capital');
+  });
+
+  it("names a faction with two capitals, and both of them", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[2].capital = true;
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "capital-count");
+    expect(error.factionName).toBe("Western League");
+    expect(error.capitals).toEqual(["Westhaven", "Midvale"]);
+    expect(error.message).toContain("2 capitals: Westhaven, Midvale");
+  });
+
+  it("reports the manifest and image problems in one pass", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[8].capital = false;
+          m.files.heightmap = "missing.png";
+          m.blockedBorders?.push(["westhaven", "farwatch"]);
+        }),
+        provinces: paintedOver(40, 40, 9, [0x12, 0x34, 0x56]),
+        picture: { width: 10, height: 10 },
+      }),
+    );
+    expect(errors.map((e) => e.code).sort()).toEqual([
+      "blocked-border-not-touching",
+      "capital-count",
+      "color-not-listed",
+      "file-missing",
+      "size-mismatch",
+    ]);
+  });
+
+  it("says when map.json is not JSON", () => {
+    const errors = errorsOf(sample({ manifest: "{ not json" }));
+    expect(errors.map((e) => e.code)).toEqual(["manifest-json"]);
+  });
+
+  it("lists every missing or wrong key at once", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          const raw = m as unknown as Record<string, unknown>;
+          raw.title = undefined;
+          raw.size = { width: 0, height: 960 };
+          raw.files = { picture: "../picture.png", provinces: "provinces.png" };
+          m.provinces[0].color = "red";
+          m.provinces[1].difficulty = 9;
+          m.provinces[2].owner = "north";
+          m.provinces[3].battle = { mapName: "" };
+        }),
+      }),
+    );
+    expect(only(errors, "manifest-field").map((e) => e.path)).toEqual([
+      "title",
+      "size.width",
+      "files.picture",
+      'provinces[0] ("Northmarch").color',
+      'provinces[1] ("Westhaven").difficulty',
+      'provinces[2] ("Midvale").owner',
+      'provinces[3] ("Eastcliff").battle.mapName',
+    ]);
+    expect(errors).toHaveLength(7);
+    expect(errors[5].message).toContain('"north" is not a faction id');
+  });
+
+  it("refuses a manifest written for a newer coilbox", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).formatVersion = 2;
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("Update coilbox");
+  });
+
+  it("names two provinces listed with one colour", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[1].color = m.provinces[0].color;
+        }),
+      }),
+    );
+    const [error] = only(errors, "duplicate-color");
+    expect(error.message).toContain('"Northmarch" and "Westhaven"');
+    expect(error.message).toContain("#c85050");
+  });
+
+  it("names two locations that end up with one id", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.locations?.push({ name: "Midvale", pos: [10, 10] });
+        }),
+      }),
+    );
+    const [error] = only(errors, "duplicate-id");
+    expect(error.id).toBe("midvale");
+    expect(errors).toHaveLength(1);
+  });
+
+  it("names a file the folder does not hold", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.files.picture = "europe.png";
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    expect(only(errors, "file-missing")[0].file).toBe("europe.png");
+  });
+
+  it("names a crossing to a location that does not exist", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.crossings?.push(["eastcliff", "atlantis"]);
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "unknown-location");
+    expect(error.list).toBe("crossings");
+    expect(error.id).toBe("atlantis");
+  });
+
+  it("names a blocked border between provinces that do not touch", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.blockedBorders?.push(["westhaven", "farwatch"]);
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "blocked-border-not-touching");
+    expect(error.message).toContain('"Westhaven" (#d9a441)');
+    expect(error.message).toContain('"Farwatch" (#3fa374)');
+  });
+
+  it("names a pair that is both blocked and joined", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.roads?.push(["midvale", "northmarch"]);
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "link-conflict");
+    expect(error.message).toContain("a blocked border and a road");
+  });
+});
+
+describe("caching", () => {
+  /** A cache that counts how often a trace was stored. */
+  function counting(): TraceCache & { stored: number } {
+    const inner = memoryTraceCache();
+    const cache = {
+      stored: 0,
+      get: inner.get,
+      set: (key: string, value: Parameters<TraceCache["set"]>[1]) => {
+        cache.stored++;
+        inner.set(key, value);
+      },
+    };
+    return cache;
+  }
+
+  it("traces a map once and serves the same document after that", () => {
+    const cache = counting();
+    const first = readHandmadeMap(sample({ cache }));
+    const second = readHandmadeMap(sample({ cache }));
+    expect(cache.stored).toBe(1);
+    expect(second).toEqual(first);
+  });
+
+  it("traces again when the province image changes", () => {
+    const cache = counting();
+    readHandmadeMap(sample({ cache }));
+    // One sea pixel in Eastcliff's colour: a speck, so the map still reads.
+    const result = readHandmadeMap(
+      sample({ cache, provinces: paintedOver(85, 46, 1, [0x4f, 0x9d, 0xa6]) }),
+    );
+    expect(result.ok).toBe(true);
+    expect(cache.stored).toBe(2);
+  });
+
+  it("traces again when the manifest changes", () => {
+    const cache = counting();
+    readHandmadeMap(sample({ cache }));
+    readHandmadeMap(
+      sample({
+        cache,
+        manifest: manifestWith((m) => {
+          m.title = "Two Shores, second edition";
+        }),
+      }),
+    );
+    expect(cache.stored).toBe(2);
+  });
+
+  it("keys on the manifest text and every pixel", () => {
+    const key = traceCacheKey(manifestText, provinces);
+    expect(traceCacheKey(manifestText, provinces)).toBe(key);
+    expect(traceCacheKey(`${manifestText} `, provinces)).not.toBe(key);
+    expect(
+      traceCacheKey(manifestText, paintedOver(0, 0, 1, [1, 2, 3])),
+    ).not.toBe(key);
+  });
+});
