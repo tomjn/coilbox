@@ -583,7 +583,7 @@ function BattleRoomPage() {
           />
         </div>
 
-        <aside className="w-[22rem] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
+        <aside className="w-[var(--battle-sidebar-width)] shrink-0 space-y-4 overflow-y-auto border-l border-border p-4">
           <BattleMapCard
             key={room.contentNonce}
             battle={battle}

@@ -11,6 +11,24 @@
 @import "@fontsource-variable/oxanium";
 @theme {
   --font-display: "Oxanium Variable", ui-sans-serif, system-ui, sans-serif;
+  /* Tailwind stops at 2xl (96rem). 3xl is the first step above a 1920 CSS pixel
+     window, which is a 1080p screen at 100% and a 4K screen at 200%. It is a
+     window width, so it follows the UI zoom and not the monitor's resolution. */
+  --breakpoint-3xl: 128rem;
+}
+
+/* Width of the sidebar beside the battle room and the singleplayer setup screen
+   (`BattleRoomPage`, `SkirmishPage`). Both read it, so the map and the start-box
+   editor stay the same size in both places. Above 3xl it becomes a share of the
+   window, from 22rem up to 48rem, so a very wide window spends its spare room
+   on the map as well as on the other column. */
+:root {
+  --battle-sidebar-width: 22rem;
+}
+@media (width >= theme(--breakpoint-3xl)) {
+  :root {
+    --battle-sidebar-width: clamp(22rem, 20vw, 48rem);
+  }
 }
 
 /* Secondary text has to clear WCAG AA (4.5:1) at 12px, and picoframe's light ramp
