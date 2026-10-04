@@ -5,8 +5,8 @@ import { pairKey } from "./roads";
 /**
  * Which state every location, link and blocked border of a terrain map is in:
  * what the player can attack, where their frontier runs, what the selected
- * location reaches, where an incursion is, and for a Warpath run the path
- * taken and the choices ahead. Pure, so the rules are tested without a scene.
+ * location reaches, where an incursion is, what the fog of war hides, and for
+ * a Warpath run the path taken and the choices ahead. Pure, so the rules are tested without a scene.
  * `cueLayer.ts` hands the result to the province, city and line drawing.
  */
 
@@ -31,6 +31,11 @@ export interface LocationCue {
   emphasised: boolean;
   /** An incursion is under way here. */
   threatened: boolean;
+  /**
+   * Hidden by the fog of war. A hidden location takes none of the other
+   * three, so nothing drawn for it says who holds it or what it borders.
+   */
+  hidden: boolean;
 }
 
 export interface LinkCue {
@@ -43,12 +48,19 @@ export interface LinkCue {
   owner?: string;
   /** One end is the selected location. */
   emphasised: boolean;
+  /**
+   * Both ends are hidden by fog, so the link is not drawn. A link with one
+   * hidden end is drawn `plain`: something lies beyond, and no more is said.
+   */
+  hidden: boolean;
 }
 
 /** Two locations that touch and are not neighbours. */
 export interface BlockedCue {
   a: string;
   b: string;
+  /** Both provinces are hidden by fog, so the border is not drawn. */
+  hidden: boolean;
 }
 
 export interface MapCues {
@@ -70,6 +82,11 @@ export interface MapCueInput {
   /** The locations `attackableNodes` returns. Not read on a run. */
   attackable?: ReadonlySet<string>;
   incursionNodeId?: string;
+  /**
+   * Fog of war: the locations the player can see, as `fog.ts` works them
+   * out. Left out when there is no fog, and then nothing is hidden.
+   */
+  visible?: ReadonlySet<string>;
   /**
    * Set on a Warpath run, where links are steps in one direction.
    * `pathLinks` holds the steps already made as `"from to"`.
@@ -101,12 +118,17 @@ export function mapCues(input: MapCueInput): MapCues {
     (galaxy.linkKinds ?? []).map(([a, b, kind]) => [pairKey(a, b), kind]),
   );
 
+  const isHidden = (id: string): boolean =>
+    !!input.visible && !input.visible.has(id);
+
   const locations = new Map<string, LocationCue>();
   for (const n of galaxy.nodes) {
+    const hidden = isHidden(n.id);
     locations.set(n.id, {
-      attackable: !run && !!input.attackable?.has(n.id),
+      attackable: !hidden && !run && !!input.attackable?.has(n.id),
       emphasised: false,
-      threatened: n.id === input.incursionNodeId,
+      threatened: !hidden && n.id === input.incursionNodeId,
+      hidden,
     });
   }
 
@@ -121,9 +143,12 @@ export function mapCues(input: MapCueInput): MapCues {
     const ownerB = ownerOf(b);
     const aPlayer = ownerA === playerFactionId;
     const bPlayer = ownerB === playerFactionId;
+    const hiddenEnds = (cueA.hidden ? 1 : 0) + (cueB.hidden ? 1 : 0);
     let tone: LinkTone = "plain";
     let owner: string | undefined;
-    if (run) {
+    if (hiddenEnds > 0) {
+      // A tone would give away who holds the hidden end.
+    } else if (run) {
       // The same order the galaxy's lanes use: a step already made first,
       // then a step out of the player's location, and no faction colours.
       if (run.pathLinks?.has(`${a} ${b}`)) tone = "taken";
@@ -138,7 +163,9 @@ export function mapCues(input: MapCueInput): MapCues {
       owner = ownerA;
     }
     const emphasised =
-      selectedId != null && (a === selectedId || b === selectedId);
+      hiddenEnds === 0 &&
+      selectedId != null &&
+      (a === selectedId || b === selectedId);
     if (emphasised) {
       if (a === selectedId) cueB.emphasised = true;
       if (b === selectedId) cueA.emphasised = true;
@@ -154,12 +181,14 @@ export function mapCues(input: MapCueInput): MapCues {
       tone,
       owner,
       emphasised,
+      hidden: hiddenEnds === 2,
     });
   }
 
   const blocked: BlockedCue[] = [];
   for (const [a, b] of galaxy.blockedBorders ?? []) {
-    if (nodes.has(a) && nodes.has(b)) blocked.push({ a, b });
+    if (!nodes.has(a) || !nodes.has(b)) continue;
+    blocked.push({ a, b, hidden: isHidden(a) && isHidden(b) });
   }
 
   return { locations, links, blocked };
