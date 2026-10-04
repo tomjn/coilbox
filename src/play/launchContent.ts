@@ -73,7 +73,10 @@ export function missingLaunchContent(
  * engine instead of turning up after the engine has downloaded.
  *
  * An engine is matched with the requirement's own `isInstalled`, so the engine
- * that satisfies the check is by construction the one that gets run.
+ * that satisfies the check is by construction the one that gets run. Only an
+ * engine that reported its version can match, the battle room's rule (issue
+ * #3405). Callers that name a version confirm an engine in a folder of that name
+ * first, through `concludeEngine`.
  */
 export function launchTargets(
   requirements: readonly ContentRequirement[],
@@ -88,7 +91,8 @@ export function launchTargets(
         r.isInstalled({
           games: [],
           maps: [],
-          engineVersions: [t.engineVersion],
+          // Only a version the engine reported. A folder name is not one.
+          engineVersions: t.syncVersion ? [t.syncVersion] : [],
         }),
       ),
     ) ?? null;

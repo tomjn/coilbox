@@ -147,6 +147,35 @@ describe("resolveVerdict", () => {
     expect(verdict.resolved).toBe(false);
   });
 
+  it("says the check did not happen when a named engine could not be confirmed (issue #3405)", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("2026.03.01")],
+        installed: installed({ engineVersions: [] }),
+        engineUnconfirmed: "Could not confirm engine 2026.03.01",
+      }),
+    );
+    expect(verdict.unreadable).toBe(true);
+    expect(verdict.unreadableReason).toBe(
+      "Could not confirm engine 2026.03.01",
+    );
+    expect(verdict.loading).toBe(false);
+    expect(verdict.missing).toEqual([]);
+    expect(verdict.resolved).toBe(false);
+  });
+
+  it("keeps waiting, not unreadable, while the engine is still being asked", () => {
+    const verdict = resolveVerdict(
+      readings({
+        installed: nothingYet,
+        targetLoading: true,
+        engineUnconfirmed: "Could not confirm engine 2026.03.01",
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+    expect(verdict.unreadable).toBe(false);
+  });
+
   it("offers nothing while the scan is still running", () => {
     const verdict = resolveVerdict(
       readings({

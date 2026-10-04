@@ -16,6 +16,7 @@ import {
 import { useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
+  type EngineReading,
   type InstalledContentSnapshot,
   resolveVerdict,
 } from "./resolveContent";
@@ -72,11 +73,16 @@ export interface ResolveContentState {
  * it, or a caller that reaches here before its engine is known reads as a
  * machine with nothing installed and gets offered downloads for content it
  * already has (issue #1377).
+ *
+ * `engineReading` is a launch's own, confirmed reading of the installed engines.
+ * Without it the installed engines are read by folder name when an engine has
+ * not reported a version yet (issue #3405).
  */
 export function useResolveContent(
   requirements: ContentRequirement[],
   target: { enginePath?: string; dataDir?: string } | undefined,
   targetLoading = false,
+  engineReading?: EngineReading,
 ): ResolveContentState {
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const contentTargets = useContentTargets();
@@ -126,9 +132,11 @@ export function useResolveContent(
         version: g.info.version,
       })),
       maps: (scan.data?.maps ?? []).map((m) => m.name),
-      engineVersions: contentTargets.targets.map((t) => t.engineVersion),
+      engineVersions:
+        engineReading?.versions ??
+        contentTargets.targets.map((t) => t.engineVersion),
     }),
-    [scan.data, contentTargets.targets],
+    [scan.data, contentTargets.targets, engineReading?.versions],
   );
 
   const { loading, unreadable, unreadableReason, missing, resolved } =
@@ -140,6 +148,7 @@ export function useResolveContent(
       scan,
       enginesLoading: contentTargets.loading,
       engineCatalogPending: hasEngineReq && !engineCatalog,
+      engineUnconfirmed: engineReading?.unconfirmed,
     });
 
   const enqueueInputFor = useCallback(
