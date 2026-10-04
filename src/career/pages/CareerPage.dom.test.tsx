@@ -1,6 +1,12 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Career } from "../career";
@@ -9,12 +15,39 @@ import type { CareerData, SourceId, SourceStatus } from "../useCareer";
 const hoisted = vi.hoisted(() => ({
   data: null as unknown,
   hide: [] as string[],
+  /** The headers map the icon reads, by installed game name. */
+  headers: new Map<string, string>(),
+  /** What the cached image path hands back for a logo or banner. */
+  image: undefined as string | undefined,
 }));
 
 // The page reads the stores through this hook, which needs the app frame.
 vi.mock("../useCareer", () => ({ useCareer: () => hoisted.data }));
 vi.mock("../../profile/profile", () => ({
   getProfile: () => ({ hide: hoisted.hide }),
+}));
+
+// The icon reads the scan and the cached art, which need the app frame.
+vi.mock("@/content/config", () => ({
+  useScanTargetSelection: () => ({
+    selected: { enginePath: "/e", rootPath: "/r" },
+  }),
+  useUnitsyncScan: () => ({
+    data: {
+      games: [
+        {
+          name: "Balanced Annihilation V15.9.8",
+          info: { shortname: "ba", version: "V15.9.8" },
+        },
+      ],
+    },
+  }),
+  useUnitsyncGameHeaders: () => ({ headers: hoisted.headers }),
+}));
+vi.mock("@/content/branding", () => ({
+  resolveBranding: () => null,
+  useBrandingCatalog: () => [],
+  useBrandingImage: () => hoisted.image,
 }));
 
 import CareerPage from "./CareerPage";
@@ -82,6 +115,8 @@ const href = (name: string | RegExp) =>
 
 beforeEach(() => {
   hoisted.hide = [];
+  hoisted.headers = new Map();
+  hoisted.image = undefined;
 });
 afterEach(cleanup);
 
@@ -202,5 +237,77 @@ describe("CareerPage", () => {
       screen.queryByRole("link", { name: "Open Player stats" }),
     ).toBeNull();
     expect(screen.getByText("Against AI")).toBeTruthy();
+  });
+
+  describe("game icons", () => {
+    const icon = (card: HTMLElement) =>
+      within(card).getByTestId("game-icon") as HTMLElement;
+
+    it("draws the game's art in its card header with empty alt text", () => {
+      hoisted.headers = new Map([
+        ["Balanced Annihilation V15.9.8", "coilbox://header/ba.jpg"],
+      ]);
+      show({ career: FULL, sources: allReady });
+      const card = screen.getByRole("region", {
+        name: "Balanced Annihilation",
+      });
+      expect(icon(card).dataset.state).toBe("image");
+      const img = icon(card).querySelector("img");
+      expect(img?.getAttribute("src")).toBe("coilbox://header/ba.jpg");
+      expect(img?.getAttribute("alt")).toBe("");
+      expect(icon(card).style.width).toBe("32px");
+      expect(icon(card).style.height).toBe("32px");
+    });
+
+    it("draws a placeholder of the same size for a game with no art", () => {
+      show({ career: FULL, sources: allReady });
+      const card = screen.getByRole("region", {
+        name: "Balanced Annihilation",
+      });
+      expect(icon(card).dataset.state).toBe("placeholder");
+      expect(icon(card).querySelector("img")).toBeNull();
+      expect(icon(card).style.width).toBe("32px");
+    });
+
+    it("falls back to the placeholder and keeps the page when the picture fails", () => {
+      hoisted.headers = new Map([
+        ["Balanced Annihilation V15.9.8", "coilbox://header/missing.jpg"],
+      ]);
+      show({ career: FULL, sources: allReady });
+      const card = screen.getByRole("region", {
+        name: "Balanced Annihilation",
+      });
+      const img = icon(card).querySelector("img");
+      expect(img).not.toBeNull();
+      if (img) fireEvent.error(img);
+      expect(icon(card).dataset.state).toBe("placeholder");
+      expect(card.textContent).toContain("2 won of 3 finished");
+      expect(screen.getByRole("region", { name: /Warpath/ })).toBeTruthy();
+    });
+
+    it("skips a logo too wide to read as an icon and uses the next art", () => {
+      hoisted.image = "coilbox://logo/wordmark.webp";
+      hoisted.headers = new Map([
+        ["Balanced Annihilation V15.9.8", "coilbox://header/ba.jpg"],
+      ]);
+      show({ career: FULL, sources: allReady });
+      const card = screen.getByRole("region", {
+        name: "Balanced Annihilation",
+      });
+      const img = icon(card).querySelector("img") as HTMLImageElement;
+      expect(img.getAttribute("src")).toBe("coilbox://logo/wordmark.webp");
+      Object.defineProperty(img, "naturalWidth", { value: 500 });
+      Object.defineProperty(img, "naturalHeight", { value: 92 });
+      fireEvent.load(img);
+      expect(icon(card).querySelector("img")?.getAttribute("src")).toBe(
+        "coilbox://header/ba.jpg",
+      );
+    });
+
+    it("puts no icon on the all-games Warpath card", () => {
+      show({ career: FULL, sources: allReady });
+      const warpath = screen.getByRole("region", { name: /Warpath/ });
+      expect(within(warpath).queryByTestId("game-icon")).toBeNull();
+    });
   });
 });
