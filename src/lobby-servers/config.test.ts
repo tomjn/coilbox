@@ -474,6 +474,42 @@ describe("dedupeByHost", () => {
     ]);
   });
 
+  const spellings = [
+    ["IPv6 bare and bracketed", "::1", "[::1]"],
+    ["IPv6 long form", "2001:0db8:0:0:0:0:0:1", "2001:db8::1"],
+    ["host name case", "Lobby.Example.com", "lobby.example.com"],
+    ["trailing dot", "lobby.example.com.", "lobby.example.com"],
+    ["IPv4 in hex", "0x7f.0.0.1", "127.0.0.1"],
+  ];
+  for (const [label, first, second] of spellings) {
+    it(`counts two spellings of one host as one host: ${label} (issue #3437)`, () => {
+      const a: LobbyAccount = { id: "a", serverId: "s1", username: "alice" };
+      const b: LobbyAccount = { id: "b", serverId: "s2", username: "bob" };
+      const targets = [
+        { account: a, server: { ...barSsl, id: "s1", host: first } },
+        { account: b, server: { ...barSsl, id: "s2", host: second } },
+      ];
+      expect(dedupeByHost(targets, null).map((t) => t.account.id)).toEqual([
+        "a",
+      ]);
+    });
+  }
+
+  it("keeps hosts the normaliser refuses apart unless their text is the same", () => {
+    const a: LobbyAccount = { id: "a", serverId: "s1", username: "alice" };
+    const b: LobbyAccount = { id: "b", serverId: "s2", username: "bob" };
+    const c: LobbyAccount = { id: "c", serverId: "s3", username: "carol" };
+    const targets = [
+      { account: a, server: { ...barSsl, id: "s1", host: "fe80::1%eth0" } },
+      { account: b, server: { ...barSsl, id: "s2", host: "fe80::1%eth1" } },
+      { account: c, server: { ...barSsl, id: "s3", host: "fe80::1%eth0" } },
+    ];
+    expect(dedupeByHost(targets, null).map((t) => t.account.id)).toEqual([
+      "a",
+      "b",
+    ]);
+  });
+
   it("keeps the more recently used of a clashing pair", () => {
     const older: LobbyAccount = {
       id: "a",

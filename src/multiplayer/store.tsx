@@ -33,6 +33,7 @@ import {
   bracketedHost,
   dialHost,
 } from "../lobby-servers/hostForms";
+import { hostOfKey, serverForKey } from "../lobby-servers/sameServer";
 import { notify } from "../notify/notify";
 import type { ClientFlags } from "./awayStatus";
 import {
@@ -136,7 +137,7 @@ export function serverAddressFromKey(serverKey: string): string {
 /** The `username` half of a `serverKey`, e.g. for a sidebar heading that
  * names which account a grouped connection belongs to (issue #2843). */
 export function usernameFromKey(serverKey: string): string {
-  return serverKey.slice(0, serverKey.indexOf("@"));
+  return serverKey.slice(0, serverKey.lastIndexOf("@"));
 }
 
 /**
@@ -150,22 +151,18 @@ export function serverNameFor(
   serverKey: string,
   servers: LobbyServer[],
 ): string {
-  const server = servers.find((s) =>
-    serverKey.endsWith(`@${s.host}:${s.port}`),
-  );
+  const server = serverForKey(serverKey, servers);
   return server?.name ?? serverAddressFromKey(serverKey);
 }
 
 /**
- * The host half of a `serverKey`, lower-cased, which is what decides whether two
- * keys are the same lobby server. Beyond All Reason's TASServer and Tachyon
+ * The host half of a `serverKey` in its normalised form, which is what decides
+ * whether two keys are the same lobby server, however the host was written. Beyond All Reason's TASServer and Tachyon
  * entries share a host on different ports and are one server behind two
  * protocols (issue #2848).
  */
 export function serverHostFromKey(serverKey: string): string {
-  const address = serverAddressFromKey(serverKey);
-  const colon = address.lastIndexOf(":");
-  return (colon < 0 ? address : address.slice(0, colon)).toLowerCase();
+  return hostOfKey(serverKey);
 }
 
 /** A connection that stands in the way of another, for `connectBlockedReason`. */
@@ -936,11 +933,9 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
   const clearOpenAtQuitRef = useRef((_serverKey: string) => {});
   useEffect(() => {
     clearOpenAtQuitRef.current = (serverKey: string) => {
-      const server = allServers(customCfg.servers).find((s) =>
-        serverKey.endsWith(`@${s.host}:${s.port}`),
-      );
+      const server = serverForKey(serverKey, allServers(customCfg.servers));
       if (!server) return;
-      const username = serverKey.slice(0, serverKey.indexOf("@"));
+      const username = usernameFromKey(serverKey);
       setAccountsCfg({
         accounts: accountsCfg.accounts.map((a) =>
           a.serverId === server.id && a.username === username

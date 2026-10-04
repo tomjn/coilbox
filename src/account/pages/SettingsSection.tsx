@@ -10,6 +10,7 @@ import {
   useLastLogin,
   useLobbyAccounts,
 } from "../../lobby-servers/config";
+import { serverForKey } from "../../lobby-servers/sameServer";
 import { AccountPicker } from "../../multiplayer/AccountPicker";
 import { protocolForKey } from "../../multiplayer/protocol";
 import {
@@ -216,9 +217,7 @@ function accountForKey(
   servers: LobbyServer[],
   accounts: LobbyAccount[],
 ): LobbyAccount | undefined {
-  const server = servers.find((s) =>
-    serverKey.endsWith(`@${s.host}:${s.port}`),
-  );
+  const server = serverForKey(serverKey, servers);
   if (!server) return undefined;
   const username = usernameFromKey(serverKey);
   return accounts.find(
