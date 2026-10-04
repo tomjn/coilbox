@@ -1,6 +1,8 @@
 import type { ReplayFile } from "../content/bindings";
 import type { ReplayProvenance } from "../content/replayUserState";
+import type { PlayTarget } from "./config";
 import { findNewReplay } from "./detect";
+import { ingestFinishedReplay } from "./ingestFinishedReplay";
 
 /**
  * Best-effort provenance tagging for launches that don't otherwise read back
@@ -30,4 +32,24 @@ export async function tagFreshReplay(
     // Best-effort, see the module doc.
     return null;
   }
+}
+
+/**
+ * `tagFreshReplay`, then ingest the replay it found into the stats store
+ * (`ingestFinishedReplay`). For launches with no debrief to wait on:
+ * multiplayer battles and refights. Never throws.
+ */
+export async function tagAndIngestFreshReplay(
+  target: PlayTarget,
+  beforePaths: ReadonlySet<string>,
+  provenance: ReplayProvenance,
+  setProvenance: (filename: string, provenance: ReplayProvenance) => void,
+): Promise<void> {
+  const replay = await tagFreshReplay(
+    target.dataDir,
+    beforePaths,
+    provenance,
+    setProvenance,
+  );
+  await ingestFinishedReplay(target, replay);
 }

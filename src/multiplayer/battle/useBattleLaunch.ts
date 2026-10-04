@@ -5,7 +5,7 @@ import { notify } from "@/notify/notify";
 import type { BattleConfig } from "@/play/bindings";
 import type { PlayTarget } from "@/play/config";
 import { usePlay } from "@/play/PlayProvider";
-import { tagFreshReplay } from "@/play/tagReplayProvenance";
+import { tagAndIngestFreshReplay } from "@/play/tagReplayProvenance";
 import {
   type HostProbeOutcome,
   mpBuildBattleConfig,
@@ -187,8 +187,8 @@ export function useBattleLaunch(
         setError(`Engine exited with code ${res.exitCode}.`);
       }
       if (beforePaths && res.exitCode !== null) {
-        tagFreshReplay(
-          target.dataDir,
+        tagAndIngestFreshReplay(
+          target,
           beforePaths,
           { mode: "multiplayer" },
           setProvenance,

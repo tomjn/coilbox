@@ -18,7 +18,7 @@ import {
 import type { SkirmishDraft } from "@/play/drafts";
 import { usePlay } from "@/play/PlayProvider";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
-import { tagFreshReplay } from "../../../play/tagReplayProvenance";
+import { tagAndIngestFreshReplay } from "../../../play/tagReplayProvenance";
 import type { DemoInfo } from "../../bindings";
 import { contentListReplays } from "../../bindings";
 import { demoInfoToSkirmishDraft } from "../../demoToSkirmish";
@@ -208,8 +208,8 @@ function RefightForm({
         setError(`Engine exited with code ${res.exitCode}.`);
       }
       if (beforePaths && res.exitCode !== null) {
-        tagFreshReplay(
-          target.dataDir,
+        tagAndIngestFreshReplay(
+          target,
           beforePaths,
           { mode: "refight", sourceReplayFilename: filename },
           setProvenance,
