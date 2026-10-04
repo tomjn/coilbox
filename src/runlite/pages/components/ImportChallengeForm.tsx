@@ -1,6 +1,8 @@
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../../challenge/ImportChallengeForm";
 import { warpathIdentity } from "../../../challenge/identity";
+import { ImportHold } from "../../../challenge/importHold";
 import {
+  type UnitDatasetEntry,
   unitsyncGameInfo,
   unitsyncSkirmishAis,
   unitsyncUnitDataset,
@@ -24,6 +26,37 @@ import {
 } from "../../challenge";
 import type { GenBuildGraph } from "../../generate";
 import { useRuns } from "../../runs";
+import { setupLimitWarning } from "../../unitLimit";
+
+/**
+ * What the chosen game says about the side's start unit. `failure` is set when
+ * coilbox could not read the data, which a second read may fix. A side with no
+ * start unit is a property of the game and reads no unit data.
+ */
+async function readUnitData(
+  target: PlayTarget,
+  gameArchive: string,
+  side: string | undefined,
+): Promise<{
+  startUnit?: string;
+  units?: UnitDatasetEntry[];
+  failure?: string;
+}> {
+  const args = {
+    enginePath: target.enginePath,
+    dataDir: target.dataDir,
+    gameArchive,
+  };
+  try {
+    const info = await unitsyncGameInfo(args);
+    const startUnit = info.sides?.find((s) => s.name === side)?.startUnit;
+    if (!startUnit) return {};
+    const dataset = await unitsyncUnitDataset(args);
+    return { startUnit, units: dataset.units };
+  } catch (e) {
+    return { failure: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 /**
  * Paste a challenge code and generate the identical warpath locally, resolved
@@ -49,6 +82,7 @@ export function ImportChallengeForm({
   const finish = async (
     settings: WarpathChallengeSettings,
     target: PlayTarget,
+    accepted: boolean,
   ) => {
     const matcher = getGameMatcher();
     const games = (scan.data?.games ?? []).filter(
@@ -82,38 +116,46 @@ export function ImportChallengeForm({
       ? `${ais[0].kind}:${ais[0].shortName}`
       : undefined;
 
-    // The commander build graph is only needed for unlock rewards, without it
-    // the generator falls back to perk-only rewards (same as a fresh run whose
-    // game has no unit dataset), mirroring `RunSetupForm`'s own resolution.
+    // The commander build graph feeds unlock rewards and the run's unit limit.
+    // Without it the run has no limit and offers perks only, which the player
+    // must hear about before the run exists (issue #3488).
+    const read = await readUnitData(target, archive, settings.side);
+    const warning = setupLimitWarning({
+      gameName: installedGame.name,
+      sideName: settings.side ?? "this game",
+      startUnit: read.startUnit,
+      status: read.failure === undefined ? "ready" : "error",
+      units: read.units ?? [],
+    });
+    if (warning && !accepted) {
+      throw read.failure === undefined
+        ? new ImportHold({
+            message: warning,
+            note: settings.side
+              ? `This challenge code fixes the side to ${settings.side}, so you cannot choose another.`
+              : "This challenge code names no side, so you cannot choose one.",
+            canRetry: false,
+            acceptLabel: "Create run anyway",
+          })
+        : new ImportHold({
+            message: warning,
+            detail: read.failure,
+            canRetry: true,
+            acceptLabel: "Create run with no unit limit",
+          });
+    }
     let build: GenBuildGraph | undefined;
-    try {
-      const info = await unitsyncGameInfo({
-        enginePath: target.enginePath,
-        dataDir: target.dataDir,
-        gameArchive: archive,
-      });
-      const startUnit = info.sides?.find(
-        (s) => s.name === settings.side,
-      )?.startUnit;
-      if (startUnit) {
-        const dataset = await unitsyncUnitDataset({
-          enginePath: target.enginePath,
-          dataDir: target.dataDir,
-          gameArchive: archive,
-        });
-        const edges = new Map<string, string[]>();
-        const names = new Map<string, string>();
-        for (const u of dataset.units) {
-          edges.set(
-            u.name.toLowerCase(),
-            (u.buildOptions ?? []).map((o) => o.toLowerCase()),
-          );
-          names.set(u.name.toLowerCase(), u.fullName ?? u.name);
-        }
-        build = { startUnit: startUnit.toLowerCase(), edges, names };
+    if (read.startUnit && read.units) {
+      const edges = new Map<string, string[]>();
+      const names = new Map<string, string>();
+      for (const u of read.units) {
+        edges.set(
+          u.name.toLowerCase(),
+          (u.buildOptions ?? []).map((o) => o.toLowerCase()),
+        );
+        names.set(u.name.toLowerCase(), u.fullName ?? u.name);
       }
-    } catch {
-      // Build graph is best-effort. The run still generates without it.
+      build = { startUnit: read.startUnit.toLowerCase(), edges, names };
     }
 
     const id = `run-${crypto.randomUUID()}`;
