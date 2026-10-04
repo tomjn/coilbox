@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
- * The Conquest "Generate a galaxy" form for a game that depends on an archive
- * that is not installed (issue #3489). Creating a galaxy is not a launch, so the
+ * The Conquest "Generate a map" form for a game that depends on an archive
+ * that is not installed (issue #3489). Creating a map is not a launch, so the
  * form stays usable, but it says the game cannot launch yet.
  */
 import { cleanup, render, screen } from "@testing-library/react";
@@ -110,18 +110,18 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("Conquest generate form and a missing dependency archive", () => {
-  it("names the missing archive and still lets the player create the galaxy", () => {
+  it("names the missing archive and still lets the player create the map", () => {
     openForm([game(["base-content"])]);
     expect(
       screen.getByText(/Archive not installed: base-content\. Cool Game v1/),
     ).toBeTruthy();
-    const create = screen.getByRole("button", { name: "Create galaxy" });
+    const create = screen.getByRole("button", { name: "Create map" });
     expect((create as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("says nothing when no dependency is missing", () => {
     openForm([game(undefined)]);
-    expect(screen.getByRole("button", { name: "Create galaxy" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Create map" })).toBeTruthy();
     expect(screen.queryByText(/Archive not installed/)).toBeNull();
     expect(screen.queryByText(/missing something it depends on/)).toBeNull();
   });

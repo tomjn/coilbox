@@ -6,9 +6,9 @@ import { levelChoices } from "../../unlocks";
  * is in `../../threat`. */
 const LEVEL_NOTES = [
   "Opponents attack as they always have.",
-  "Opponents pick your systems over neutral ones more often.",
-  "Opponents pick your systems over neutral ones much more often.",
-  "Opponents treat your systems like any other target, so incursions come far more often.",
+  "Opponents pick your territory over neutral ground more often.",
+  "Opponents pick your territory over neutral ground much more often.",
+  "Opponents treat your territory like any other target, so incursions come far more often.",
 ];
 
 /**

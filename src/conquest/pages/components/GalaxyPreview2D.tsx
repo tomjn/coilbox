@@ -1,14 +1,35 @@
-import { useMemo } from "react";
-import type { GalaxyDoc } from "../../model";
+import { useEffect, useMemo, useRef } from "react";
+import type { GalaxyDoc, LinkKind } from "../../model";
 import { NEUTRAL } from "../../model";
+import type { GeneratedTerrain } from "../../terrainGen";
+
+const NEUTRAL_COLOR = "#94a3b8";
+/** Shown under a land map until its picture is drawn, and where it cannot be. */
+const SEA_COLOR = "#183a60";
 
 /**
- * A cheap 2D constellation preview of a galaxy document: authored node
- * positions, lanes and capitals in faction colours, drawn straight in the
- * authored coordinate space. Pure SVG — the wizard regenerates this on every
- * knob change, which would be wasteful with the three.js view.
+ * A cheap 2D preview of a map document, drawn straight in the document's own
+ * coordinate space. Pure SVG for a galaxy or a theatre: node positions, lanes
+ * and capitals in faction colours. The wizard regenerates this on every knob
+ * change, which would be wasteful with the three.js view.
+ *
+ * A document with a terrain is drawn as land. `terrain` is the generator's own
+ * picture of it, the one the strategic map is given, so the coast here is the
+ * coast the player then plays on. Over it go the province outlines, tinted by
+ * owner, and the links that are not a shared border: roads solid, crossings
+ * dashed. A border is not drawn as a line, because the two outlines touching
+ * already says it.
  */
-export function GalaxyPreview2D({ galaxy }: { galaxy: GalaxyDoc }) {
+export function GalaxyPreview2D({
+  galaxy,
+  terrain,
+}: {
+  galaxy: GalaxyDoc;
+  /** The pixels of a generated land map. Without them the land has no picture
+   * and only the outlines, links and markers are drawn. */
+  terrain?: GeneratedTerrain | null;
+}) {
+  const land = galaxy.terrain;
   const view = useMemo(() => {
     const xs = galaxy.nodes.map((n) => n.pos[0]);
     const ys = galaxy.nodes.map((n) => n.pos[1]);
@@ -16,17 +37,39 @@ export function GalaxyPreview2D({ galaxy }: { galaxy: GalaxyDoc }) {
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    const span = Math.max(maxX - minX, maxY - minY, 1);
+    // A land map is framed by its terrain, so the picture and the overlay
+    // share one box. Anything else is framed by its nodes.
+    const span = land
+      ? Math.max(land.width, land.height)
+      : Math.max(maxX - minX, maxY - minY, 1);
     const pad = span * 0.08;
     const byId = new Map(galaxy.nodes.map((n) => [n.id, n]));
     const color = new Map(galaxy.factions.map((f) => [f.id, f.color]));
+    const colorOf = (owner: string) =>
+      owner === NEUTRAL ? NEUTRAL_COLOR : (color.get(owner) ?? NEUTRAL_COLOR);
+    const kinds = new Map<string, LinkKind>();
+    for (const [a, b, kind] of galaxy.linkKinds ?? []) {
+      kinds.set(`${a}:${b}`, kind);
+      kinds.set(`${b}:${a}`, kind);
+    }
     return {
-      box: `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`,
+      box: land
+        ? `0 0 ${land.width} ${land.height}`
+        : `${minX - pad} ${minY - pad} ${maxX - minX + pad * 2} ${maxY - minY + pad * 2}`,
       r: span * 0.014,
+      provinces: galaxy.nodes.flatMap((n) =>
+        (n.outline ?? []).map((ring, i) => ({
+          key: `${n.id}:${i}`,
+          points: ring.map(([x, y]) => `${x},${y}`).join(" "),
+          owned: n.owner !== NEUTRAL,
+          color: colorOf(n.owner),
+        })),
+      ),
       lanes: galaxy.links.flatMap(([a, b]) => {
         const na = byId.get(a);
         const nb = byId.get(b);
-        return na && nb
+        const kind = kinds.get(`${a}:${b}`);
+        return na && nb && kind !== "border"
           ? [
               {
                 key: `${a}:${b}`,
@@ -34,28 +77,63 @@ export function GalaxyPreview2D({ galaxy }: { galaxy: GalaxyDoc }) {
                 y1: na.pos[1],
                 x2: nb.pos[0],
                 y2: nb.pos[1],
+                crossing: kind === "crossing",
               },
             ]
           : [];
       }),
-      stars: galaxy.nodes.map((n) => ({
-        id: n.id,
-        x: n.pos[0],
-        y: n.pos[1],
-        capital: n.kind === "capital",
-        color:
-          n.owner === NEUTRAL ? "#94a3b8" : (color.get(n.owner) ?? "#94a3b8"),
-      })),
+      // A province is its outline. Only its capital gets a marker.
+      stars: galaxy.nodes
+        .filter((n) => !n.outline || n.kind === "capital")
+        .map((n) => ({
+          id: n.id,
+          x: n.pos[0],
+          y: n.pos[1],
+          capital: n.kind === "capital",
+          color: colorOf(n.owner),
+        })),
     };
-  }, [galaxy]);
+  }, [galaxy, land]);
 
-  return (
+  const canvas = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const ctx = terrain ? canvas.current?.getContext("2d") : null;
+    if (!terrain || !ctx) return;
+    ctx.putImageData(
+      new ImageData(
+        new Uint8ClampedArray(terrain.image),
+        terrain.width,
+        terrain.height,
+      ),
+      0,
+      0,
+    );
+  }, [terrain]);
+
+  const lane = land ? "#e2e8f0" : "#334155";
+  const svg = (
     <svg
       viewBox={view.box}
-      className="aspect-square w-full rounded-md border border-border/50 bg-[#05070f]"
+      className={
+        land
+          ? "absolute inset-0 size-full"
+          : "aspect-square w-full rounded-md border border-border/50 bg-[#05070f]"
+      }
       role="img"
-      aria-label="Galaxy layout preview"
+      aria-label={land ? "Map preview" : "Galaxy layout preview"}
     >
+      {view.provinces.map((p) => (
+        <polygon
+          key={p.key}
+          points={p.points}
+          fill={p.owned ? p.color : "none"}
+          fillOpacity={0.45}
+          stroke="#0f172a"
+          strokeOpacity={0.7}
+          strokeWidth={view.r * 0.25}
+          strokeLinejoin="round"
+        />
+      ))}
       {view.lanes.map((l) => (
         <line
           key={l.key}
@@ -63,8 +141,10 @@ export function GalaxyPreview2D({ galaxy }: { galaxy: GalaxyDoc }) {
           y1={l.y1}
           x2={l.x2}
           y2={l.y2}
-          stroke="#334155"
+          stroke={lane}
+          strokeOpacity={land ? 0.8 : 1}
           strokeWidth={view.r * 0.3}
+          strokeDasharray={l.crossing ? `${view.r} ${view.r}` : undefined}
         />
       ))}
       {view.stars.map((s) => (
@@ -74,10 +154,32 @@ export function GalaxyPreview2D({ galaxy }: { galaxy: GalaxyDoc }) {
           cy={s.y}
           r={s.capital ? view.r * 1.9 : view.r}
           fill={s.color}
-          stroke={s.capital ? "#e2e8f0" : "none"}
-          strokeWidth={s.capital ? view.r * 0.35 : 0}
+          stroke={s.capital ? "#e2e8f0" : land ? "#0f172a" : "none"}
+          strokeWidth={s.capital ? view.r * 0.35 : land ? view.r * 0.2 : 0}
         />
       ))}
     </svg>
+  );
+  if (!land) return svg;
+
+  return (
+    <div
+      className="relative w-full overflow-hidden rounded-md border border-border/50"
+      style={{
+        aspectRatio: `${land.width} / ${land.height}`,
+        background: SEA_COLOR,
+      }}
+    >
+      {terrain && (
+        <canvas
+          ref={canvas}
+          width={terrain.width}
+          height={terrain.height}
+          className="absolute inset-0 size-full"
+          aria-hidden
+        />
+      )}
+      {svg}
+    </div>
   );
 }

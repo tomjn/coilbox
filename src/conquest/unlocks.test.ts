@@ -191,6 +191,30 @@ describe("size choices (issue #3433)", () => {
     expect(at3.map((o) => o.value).slice(-2)).toEqual(["120", "160"]);
   });
 
+  it("counts every size in the word it is given, and in systems without one", () => {
+    expect(sizeOptions(MAX_THREAT_LEVEL).map((o) => o.label)).toEqual([
+      "Small (12 systems)",
+      "Medium (18 systems)",
+      "Large (28 systems)",
+      "Sprawling (40 systems)",
+      "Vast (56 systems)",
+      "Immense (80 systems)",
+      "Colossal (120 systems)",
+      "Titanic (160 systems)",
+    ]);
+    const provinces = sizeOptions(MAX_THREAT_LEVEL, "provinces");
+    expect(provinces.map((o) => o.label)).toEqual([
+      "Small (12 provinces)",
+      "Medium (18 provinces)",
+      "Large (28 provinces)",
+      "Sprawling (40 provinces)",
+      "Vast (56 provinces)",
+      "Immense (80 provinces)",
+      "Colossal (120 provinces)",
+      "Titanic (160 provinces)",
+    ]);
+  });
+
   it("never locks a size that was on offer before", () => {
     const open = sizeOptions(0)
       .filter((o) => !o.disabled)
