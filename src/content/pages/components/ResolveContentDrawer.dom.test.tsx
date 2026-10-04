@@ -77,3 +77,23 @@ describe("ResolveContentGate for a game with no download", () => {
     expect(screen.queryByText(/no download/i)).toBeNull();
   });
 });
+
+describe("ResolveContentGate for a missing dependency archive", () => {
+  const dependency = game({
+    kind: "dependency",
+    label: "zero-k v1.7.6.4",
+    gameName: "Zero-K Benchmark v3",
+    noDownload: true,
+  });
+
+  it("names the archive and the game, and links to game downloads", () => {
+    renderGate(dependency);
+    expect(screen.getByText("zero-k v1.7.6.4")).toBeTruthy();
+    expect(screen.getByText("Archive")).toBeTruthy();
+    expect(screen.getByText(/Zero-K Benchmark v3 depends on it/)).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /game downloads/ }).getAttribute("href"),
+    ).toBe("/downloads/games");
+    expect(screen.queryByRole("button", { name: /^Download/ })).toBeNull();
+  });
+});

@@ -7,6 +7,7 @@ import {
   useUnitsyncMapInfo,
   useUnitsyncScan,
 } from "@/content/config";
+import { dependencyBlockReason } from "@/content/gameDependencies";
 import { resolveVerdict } from "@/content/resolveContent";
 import { isBlackHex, pickTeamColorHex } from "@/lib/teamColor";
 import { notify } from "@/notify/notify";
@@ -204,6 +205,8 @@ export interface BattleRoomView {
   engineUnreadable: boolean;
   mapMissing: boolean;
   gameMissing: boolean;
+  /** A dependency archive of the installed game is missing, worded, else null. */
+  dependencyBlock: string | null;
   /** True once local content presence is known (scan settled). */
   contentKnown: boolean;
   /**
@@ -560,7 +563,10 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const contentVerdict = resolveVerdict({
     requirements: battleRequirements(battle),
     installed: {
-      games: games.map((g) => ({ name: g.name })),
+      games: games.map((g) => ({
+        name: g.name,
+        missingDependencies: g.missingDependencies,
+      })),
       maps: maps.map((m) => m.name),
       engineVersions: [],
     },
@@ -583,6 +589,14 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     contentKnown && contentVerdict.missing.some((r) => r.kind === "map");
   const gameMissing =
     contentKnown && contentVerdict.missing.some((r) => r.kind === "game");
+  // The game is here but an archive it depends on is not (issue #3489).
+  const missingDependency = contentKnown
+    ? contentVerdict.missing.find((r) => r.kind === "dependency")
+    : undefined;
+  const dependencyMissing = !!missingDependency;
+  const dependencyBlock = missingDependency?.gameName
+    ? dependencyBlockReason(missingDependency.label, missingDependency.gameName)
+    : null;
 
   const rows = useMemo(
     () => (battle ? membersToRows(battle, me, state?.users) : []),
@@ -610,7 +624,12 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
   const engineUnreadable =
     !!target && !target.syncVersion && unreadableEngines.has(target.executable);
   const sync: SyncState = battle
-    ? deriveSync(battle, { mapMissing, gameMissing, engineMissing })
+    ? deriveSync(battle, {
+        mapMissing,
+        gameMissing,
+        engineMissing,
+        dependencyMissing,
+      })
     : "pending";
 
   // Match state + start gating. The match has "started" once the host (autohost)
@@ -718,7 +737,8 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     // A wrong engine is known without the content scan, which that engine may
     // never finish.
     if (!activeKey || !myStatus || (!contentKnown && !engineMissing)) return;
-    const desired = engineMissing || mapMissing || gameMissing ? 2 : 1;
+    const desired =
+      engineMissing || mapMissing || gameMissing || dependencyMissing ? 2 : 1;
     if (myStatus.battleStatus.sync !== desired) pushStatus({ sync: desired });
   }, [
     activeKey,
@@ -727,6 +747,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     engineMissing,
     mapMissing,
     gameMissing,
+    dependencyMissing,
     pushStatus,
   ]);
 
@@ -1367,6 +1388,7 @@ export function useBattleRoom(serverKey: string | null): BattleRoomView {
     engineUnreadable,
     mapMissing,
     gameMissing,
+    dependencyBlock,
     contentKnown,
     contentUnreadable,
     contentUnreadableReason,

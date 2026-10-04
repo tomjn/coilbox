@@ -20,8 +20,10 @@ import { useCallback, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SkirmishDraft } from "../play/drafts";
 
-const { launchScenario, progressState, saved } = vi.hoisted(() => ({
+const { launchScenario, progressState, saved, scanState } = vi.hoisted(() => ({
   launchScenario: vi.fn(),
+  // Dependency archives the scanned game lacks, set per test.
+  scanState: { missingDependencies: undefined as string[] | undefined },
   // The stored progress document each render starts from, set per test.
   progressState: { file: { schemaVersion: 1, campaigns: {} } as unknown },
   saved: [] as unknown[],
@@ -55,7 +57,13 @@ vi.mock("../content/config", () => ({
   primeScan: vi.fn(async () => ({ games: [] })),
   useUnitsyncScan: () => ({
     data: {
-      games: [{ name: "BA", primaryArchive: { name: "ba.sdz" } }],
+      games: [
+        {
+          name: "BA",
+          primaryArchive: { name: "ba.sdz" },
+          missingDependencies: scanState.missingDependencies,
+        },
+      ],
       maps: [{ name: "Comet" }],
     },
     loading: false,
@@ -188,6 +196,7 @@ beforeEach(() => {
   });
   progressState.file = { schemaVersion: 1, campaigns: {} };
   saved.length = 0;
+  scanState.missingDependencies = undefined;
 });
 
 afterEach(() => {
@@ -271,5 +280,31 @@ describe("a launch whose rescan fails", () => {
     expect(result.current.error).toBe(
       "The content scan failed: no space left on device",
     );
+  });
+});
+
+describe("a mission on a game with a missing dependency archive (issue #3489)", () => {
+  it("cannot start, says which archive and which game, and does not launch", async () => {
+    scanState.missingDependencies = ["zero-k v1.7.6.4"];
+    const { campaign, mission } = campaignWith(flat());
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    expect(result.current.canStart).toBe(false);
+    expect(result.current.dependencyBlock).toBe(
+      "Archive not installed: zero-k v1.7.6.4. BA depends on it.",
+    );
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(launchScenario).not.toHaveBeenCalled();
+  });
+
+  it("starts as before when the game lacks nothing", () => {
+    scanState.missingDependencies = [];
+    const { campaign, mission } = campaignWith(flat());
+    const { result } = renderHook(() => useMissionRun(campaign, mission));
+
+    expect(result.current.canStart).toBe(true);
+    expect(result.current.dependencyBlock).toBeNull();
   });
 });

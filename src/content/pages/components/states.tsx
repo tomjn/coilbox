@@ -45,6 +45,27 @@ export function ScanFailed({ noun, reason }: { noun: string; reason: string }) {
   );
 }
 
+/**
+ * A launch stopped because an installed game depends on an archive that is not
+ * installed (issue #3489). `reason` is `dependencyBlockReason`. There is no
+ * download button, because the engine names the archive in lower case and the
+ * download resolver cannot match that, so the way on is the game downloads page.
+ */
+export function DependencyBlocked({ reason }: { reason: string }) {
+  return (
+    <Alert variant="destructive">
+      <AlertCircle />
+      <AlertTitle>This game is missing something it depends on</AlertTitle>
+      <AlertDescription className="break-words">
+        {reason}{" "}
+        <Link className="underline underline-offset-4" to="/downloads/games">
+          Open game downloads
+        </Link>
+      </AlertDescription>
+    </Alert>
+  );
+}
+
 /** What unitsync said, one line each, wherever the lines are being shown. */
 function DiagnosticsLines({ errors }: { errors: string[] }) {
   return (

@@ -332,6 +332,17 @@ describe("deriveSync", () => {
     );
   });
 
+  it("errors when the game lacks a dependency archive", () => {
+    const battle = mkBattle({ members: { alice: member() } });
+    expect(
+      deriveSync(battle, {
+        mapMissing: false,
+        gameMissing: false,
+        dependencyMissing: true,
+      }),
+    ).toBe("error");
+  });
+
   it("errors when any present player is unsynced (sync=2)", () => {
     const battle = mkBattle({
       members: {

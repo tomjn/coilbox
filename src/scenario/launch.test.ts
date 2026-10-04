@@ -973,6 +973,24 @@ describe("scenarioLaunchBlock", () => {
     });
   });
 
+  it("stops on a dependency archive the game lacks and offers no download", () => {
+    expect(
+      block({
+        games: [{ ...LOOSE, missingDependencies: ["zero-k v1.7.6.4"] }],
+      }),
+    ).toEqual({
+      kind: "text",
+      reason:
+        "Archive not installed: zero-k v1.7.6.4. Splinter Faction test depends on it.",
+    });
+  });
+
+  it("starts a game with an empty dependency list", () => {
+    expect(
+      block({ games: [{ ...LOOSE, missingDependencies: [] }] }),
+    ).toBeNull();
+  });
+
   it("offers both when the game and the map are missing", () => {
     expect(block({ games: [], maps: [] })).toMatchObject({
       kind: "download",

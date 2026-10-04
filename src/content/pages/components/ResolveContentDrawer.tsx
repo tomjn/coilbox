@@ -30,7 +30,13 @@ function RequirementRow({
   const done = status === "done";
   const active = status === "active" || status === "queued";
   const kindLabel =
-    req.kind === "game" ? "Game" : req.kind === "map" ? "Map" : "Engine";
+    req.kind === "game"
+      ? "Game"
+      : req.kind === "map"
+        ? "Map"
+        : req.kind === "dependency"
+          ? "Archive"
+          : "Engine";
 
   return (
     <li className="flex flex-col gap-1.5 rounded-lg border border-border/50 bg-card p-3">
@@ -66,7 +72,17 @@ function RequirementRow({
           </Button>
         )}
       </div>
-      {req.noDownload && !done && (
+      {req.kind === "dependency" && !done && (
+        <p className="text-xs text-muted-foreground">
+          {req.gameName} depends on it, and coilbox cannot download an archive
+          by this name. Find it in{" "}
+          <Link className="underline underline-offset-4" to="/downloads/games">
+            game downloads
+          </Link>
+          , then try again.
+        </p>
+      )}
+      {req.kind !== "dependency" && req.noDownload && !done && (
         <p className="text-xs text-muted-foreground">
           Coilbox has no download for this {kindLabel.toLowerCase()}. Add it in{" "}
           <Link className="underline underline-offset-4" to="/library/games">

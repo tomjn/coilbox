@@ -22,9 +22,9 @@ import {
   type ContentRequirement,
   computeMissingRequirements,
   engineVersionRequirement,
-  exactGameRequirement,
   exactMapRequirement,
   type InstalledContentSnapshot,
+  launchGameRequirement,
 } from "@/content/resolveContent";
 import type { PlayTarget } from "./config";
 
@@ -49,7 +49,7 @@ export function launchRequirements(needs: LaunchNeeds): ContentRequirement[] {
   const out: ContentRequirement[] = [];
   const engine = needs.engineVersion?.trim();
   if (engine) out.push(engineVersionRequirement(engine));
-  if (needs.game) out.push(exactGameRequirement(needs.game));
+  if (needs.game) out.push(launchGameRequirement(needs.game));
   if (needs.map) out.push(exactMapRequirement(needs.map));
   return out;
 }
@@ -62,6 +62,24 @@ export function missingLaunchContent(
   installed: InstalledContentSnapshot,
 ): ContentRequirement[] {
   return computeMissingRequirements(launchRequirements(needs), installed);
+}
+
+/**
+ * The dependency archive an installed game lacks, for a launch path that keeps
+ * its own check of the game and map but must still stop here (issue #3489). It
+ * asks the same question `missingLaunchContent` does, so the rule is one. Null
+ * when the game is not installed, which that path reports as a missing game.
+ */
+export function missingLaunchDependency(
+  game: string,
+  games: InstalledContentSnapshot["games"],
+): ContentRequirement | null {
+  return (
+    missingLaunchContent(
+      { game },
+      { games, maps: [], engineVersions: [] },
+    ).find((r) => r.kind === "dependency") ?? null
+  );
 }
 
 /**

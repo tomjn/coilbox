@@ -100,6 +100,7 @@ function BattleRoomPage() {
     contentKnown: room.contentKnown,
     mapMissing: room.mapMissing,
     gameMissing: room.gameMissing,
+    dependencyBlock: room.dependencyBlock,
     mapName: room.battle?.map ?? "",
     gameName: room.battle?.modname ?? "",
   });
@@ -309,7 +310,8 @@ function BattleRoomPage() {
     !!room.target &&
     !room.contentUnreadable &&
     !room.mapMissing &&
-    !room.gameMissing;
+    !room.gameMissing &&
+    !room.dependencyBlock;
   const { launch: doLaunch } = launch;
   // A launch of ours is on its way or has an engine up. Once it is over and the
   // host is still in-game we have dropped out of a running match, which is what

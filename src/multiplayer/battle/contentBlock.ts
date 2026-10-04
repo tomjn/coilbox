@@ -67,6 +67,11 @@ export interface LaunchContent {
   contentKnown: boolean;
   mapMissing: boolean;
   gameMissing: boolean;
+  /**
+   * The game is installed but a dependency archive it needs is not, worded by
+   * `dependencyBlockReason`, else null or absent (issue #3489).
+   */
+  dependencyBlock?: string | null;
   /** The battle's map name, as the host named it. */
   mapName: string;
   /** The battle's game name, as the host named it. */
@@ -133,6 +138,12 @@ export function launchBlock(c: LaunchContent): LaunchBlock | null {
     return {
       short: "Map missing",
       reason: `You do not have the map this battle uses (${map}), so it cannot start for you. Install it to play.`,
+    };
+  }
+  if (c.dependencyBlock) {
+    return {
+      short: "Archive missing",
+      reason: `${c.dependencyBlock} The battle cannot start for you until it is installed.`,
     };
   }
   return null;
