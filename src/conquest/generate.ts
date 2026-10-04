@@ -10,6 +10,7 @@ import type { ConquestNames } from "./names";
 import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
+import { readThreatLevel, threatAggression } from "./threat";
 
 /**
  * Procedural galaxy generation — the fallback when a game ships no authored
@@ -110,6 +111,8 @@ export interface GenerateOptions {
   startingSystems?: number;
   /** Hide systems more than two jumps from your territory (sets `rules.fogOfWar`). */
   fogOfWar?: boolean;
+  /** Threat level 0..3 (see `./threat`). Omitted or 0 is the galaxy as it always was. */
+  threatLevel?: number;
   /** Naming pools / faction presets from a profile and/or the branding catalog. */
   names?: ConquestNames;
   /** Document id; defaults to `generated-<seed>`. */
@@ -442,6 +445,7 @@ export function generateGalaxy(
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
   const enemyCount = Math.min(3, Math.max(1, Math.round(opts.factionCount)));
+  const threatLevel = readThreatLevel(opts.threatLevel);
   const names = resolveConquestNames(opts.names);
   // limitToNamed caps the galaxy to the named-star pool (no fallback names);
   // the 8-node floor still applies, so pools smaller than 8 fill the few extra
@@ -509,7 +513,10 @@ export function generateGalaxy(
     id: i === 0 ? "player" : `enemy-${i}`,
     name: spec.name,
     color: spec.color,
-    aggression: i === 0 ? 0 : (spec.aggression ?? 0.3 + rng() * 0.2),
+    aggression:
+      i === 0
+        ? 0
+        : threatAggression(spec.aggression ?? 0.3 + rng() * 0.2, threatLevel),
     side: spec.side,
     // No AI is pinned here: the opponent is chosen when the battle is
     // synthesised, from the node's difficulty against whatever the player has
@@ -613,6 +620,7 @@ export function generateGalaxy(
       skin: opts.skin === "theatre" ? "theatre" : "galaxy",
       startingSystems: startCount,
       fogOfWar: opts.fogOfWar ? true : undefined,
+      threatLevel: threatLevel > 0 ? threatLevel : undefined,
     },
   };
 }
@@ -832,6 +840,7 @@ export function regenerateGalaxy(
       skin: g.skin,
       startingSystems: g.startingSystems,
       fogOfWar: g.fogOfWar,
+      threatLevel: g.threatLevel,
       names: env.names,
       id: galaxy.id,
       title: galaxy.title,

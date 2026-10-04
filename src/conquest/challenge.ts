@@ -18,6 +18,7 @@ import {
 } from "./generate";
 import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
 import type { FactionPreset } from "./names";
+import { readThreatLevel } from "./threat";
 
 /**
  * Shareable challenge settings for a generated conquest galaxy — everything
@@ -39,6 +40,13 @@ export interface ConquestChallengeSettings {
   skin: "galaxy" | "theatre";
   startingSystems?: number;
   fogOfWar?: boolean;
+  /**
+   * How hard the opposing factions press (see `./threat`). Absent reads as 0,
+   * so a code shared before levels existed rebuilds the galaxy it always did.
+   * A challenge plays at its own level whatever the importer has unlocked, so
+   * two players with one code face the same thing.
+   */
+  threatLevel?: number;
   /**
    * The map each system uses, by node id (issue #1393). The one part of a
    * galaxy the seed cannot reproduce, because the generator draws maps from the
@@ -108,6 +116,7 @@ export function challengeSettingsFromGalaxy(
     skin: g.skin ?? "galaxy",
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
+    threatLevel: readThreatLevel(g.threatLevel) || undefined,
     nodeMaps: nodeMapsFrom(galaxy.nodes),
     nodeNames: Object.fromEntries(galaxy.nodes.map((n) => [n.id, n.name])),
     factions: galaxy.factions.map(({ name, color, side }) => ({
@@ -174,6 +183,7 @@ export function parseConquestChallengeSettings(
         ? clamp(Math.round(v.startingSystems), 1, 4)
         : undefined,
     fogOfWar: v.fogOfWar === true ? true : undefined,
+    threatLevel: readThreatLevel(v.threatLevel) || undefined,
     nodeMaps: parseNodeMaps(v.nodeMaps),
     nodeNames: parseNodeMaps(v.nodeNames),
     factions: parseChallengeFactions(v.factions),
@@ -258,6 +268,7 @@ export function optionsFromChallenge(
     skin: settings.skin,
     startingSystems: settings.startingSystems,
     fogOfWar: settings.fogOfWar,
+    threatLevel: settings.threatLevel,
     id,
     title: settings.title,
   };

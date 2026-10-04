@@ -84,6 +84,12 @@ vi.mock("../conquests", () => ({
   useConquestState: () => ({ file: { conquests: {} }, saveFor: vi.fn() }),
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
+// The unlocks live in the frame's settings store, which this page is rendered
+// without. Nothing is unlocked, so the generate form offers threat level 0.
+vi.mock("../useUnlocks", () => ({
+  useConquestUnlocks: () => ({ unlocks: {}, award: vi.fn() }),
+  useAwardFinishedConquest: () => {},
+}));
 
 import ConquestListPage from "./ConquestListPage";
 

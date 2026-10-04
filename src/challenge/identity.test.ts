@@ -66,6 +66,50 @@ function conquestSettings(over: Partial<GenerateOptions> = {}) {
 }
 
 describe("conquest challenge identity", () => {
+  // A code made before threat levels existed. Pinned as a literal so a change
+  // to what it decodes to, or to the identity of a challenge somebody already
+  // has a record for, fails here.
+  const CODE_BEFORE_LEVELS =
+    "cbz1.dY-xDsIwDER_BXnOABUTawdGBhDMpnXbiNQuiStRVf13nCLExBafL3fPMzQSe1Q4QCU-3OUFzl6s6JkiHHYOHp7rvO4wBOKWzJClK8XkhVfLgFMQNNcMvdS0hvFzpKRmTqTquU15m4jMtS_2hYMWe3Oa1klUXge4HGFxoF7DZ9qUvxy25FJGNtZi66DBSq3_qzgIOMmYD0mDjxhys3HarB2hxsydFGNmOU9JqTci-9ZIe2puaLdqHMna_3Etyxs";
+
+  it("leaves the identity of a code from before threat levels unchanged", () => {
+    const decoded = decodeConquestChallenge(CODE_BEFORE_LEVELS);
+    if (!decoded.ok) throw new Error("expected the old code to decode");
+    expect(decoded.settings.threatLevel).toBeUndefined();
+    expect(conquestIdentity(decoded.settings)).toBe(
+      '["conquest","TG",4242,20,2,"spiral",null,"theatre",2,true]',
+    );
+  });
+
+  it("reads an explicit level 0 as the same challenge as no level", () => {
+    const old = conquestSettings();
+    expect(conquestIdentity({ ...old, threatLevel: 0 })).toBe(
+      conquestIdentity(old),
+    );
+  });
+
+  it("makes a level above 0 a different challenge, one per level", () => {
+    const ids = [0, 1, 2, 3].map((threatLevel) =>
+      conquestIdentity(conquestSettings({ threatLevel })),
+    );
+    expect(new Set(ids).size).toBe(4);
+  });
+
+  it("is the same for a galaxy at a level and for an import of its code", () => {
+    const galaxy = generateGalaxy({ ...galaxyOpts, threatLevel: 2 }, "t0");
+    const decoded = decodeConquestChallenge(
+      encodeConquestChallenge(galaxy) as string,
+    );
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    const imported = galaxyFromChallenge(
+      decoded.settings,
+      { maps, names: undefined },
+      "imported-2",
+    );
+    expect(galaxyIdentity(imported)).toBe(galaxyIdentity(galaxy));
+    expect(imported.generated?.threatLevel).toBe(2);
+  });
+
   it("is the same when one challenge is encoded twice with different bytes", () => {
     const galaxy = generateGalaxy(galaxyOpts, "t0");
     // Same settings, but the second copy carries different names and title, so

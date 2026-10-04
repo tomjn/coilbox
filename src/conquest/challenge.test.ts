@@ -31,6 +31,45 @@ const base: GenerateOptions = {
 };
 
 describe("conquest challenge codec", () => {
+  it("carries a threat level through a code, and plays it at the code's level", () => {
+    const hard = generateGalaxy({ ...base, threatLevel: 3 }, "t0");
+    const decoded = decodeConquestChallenge(
+      encodeConquestChallenge(hard) as string,
+    );
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    expect(decoded.settings.threatLevel).toBe(3);
+    const rebuilt = galaxyFromChallenge(
+      decoded.settings,
+      { maps, names: undefined },
+      hard.id,
+      "t0",
+    );
+    expect(rebuilt.factions.map((f) => f.aggression)).toEqual(
+      hard.factions.map((f) => f.aggression),
+    );
+    expect(rebuilt.generated?.threatLevel).toBe(3);
+  });
+
+  it("writes no level into a level 0 code, so the code is the one it was", () => {
+    const galaxy = generateGalaxy({ ...base, threatLevel: 0 }, "t0");
+    expect(encodeConquestChallenge(galaxy)).toBe(
+      encodeConquestChallenge(generateGalaxy(base, "t0")),
+    );
+  });
+
+  it("clamps a level a code makes up to the top level and reads junk as 0", () => {
+    const decode = (threatLevel: unknown) => {
+      const settings = challengeSettingsFromGalaxy(generateGalaxy(base, "t0"));
+      const code = encodeChallenge("conquest", { ...settings, threatLevel });
+      const out = decodeConquestChallenge(code);
+      if (!out.ok) throw new Error("expected a successful decode");
+      return out.settings.threatLevel;
+    };
+    expect(decode(99)).toBe(3);
+    expect(decode("2")).toBeUndefined();
+    expect(decode(-4)).toBeUndefined();
+  });
+
   it("encodes a generated galaxy and decodes back to equivalent settings", () => {
     const galaxy = generateGalaxy(base, "t0");
     const code = encodeConquestChallenge(galaxy);
