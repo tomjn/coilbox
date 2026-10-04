@@ -5,7 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { validBattlePassword } from "@/deeplink/parse";
+import { BATTLE_PASSWORD_REFUSAL, validBattlePassword } from "@/deeplink/parse";
 import { leaveAndLabel } from "./oneBattle";
 
 /**
@@ -64,9 +64,7 @@ export function JoinBattlePopover({
             // The join line is split on spaces and has no escape, so a password
             // with one would reach the server as two words (issue #3410).
             if (needsPassword && key !== "" && !validBattlePassword(key)) {
-              setRefusal(
-                "Coilbox cannot send this password. A battle password cannot contain a space, and only letters, numbers and punctuation from the basic keyboard are allowed.",
-              );
+              setRefusal(BATTLE_PASSWORD_REFUSAL);
               return;
             }
             onSubmit(key);

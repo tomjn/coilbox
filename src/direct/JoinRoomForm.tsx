@@ -14,6 +14,7 @@
 
 import { Button, Input, useDrawer } from "@picoframe/frame";
 import { useState } from "react";
+import { battlePasswordProblem } from "@/deeplink/parse";
 import { identifierFieldProps } from "@/lib/identifierField";
 import { leaveAndLabel } from "../multiplayer/battles/oneBattle";
 import { addressProblem, splitHostPort } from "./lan";
@@ -104,6 +105,13 @@ export function JoinRoomForm({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!canJoin) return;
+    // The join line is split on spaces and has no escape, so a password with one
+    // would reach the room as two words (issue #3518).
+    const passwordProblem = battlePasswordProblem(password);
+    if (passwordProblem) {
+      setError(passwordProblem);
+      return;
+    }
     setJoining(true);
     setError(null);
     try {

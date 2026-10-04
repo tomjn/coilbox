@@ -148,6 +148,21 @@ export function validBattlePassword(raw: string): boolean {
   return raw.length <= MAX_FIELD_LENGTH && /^[\x21-\x7e]+$/.test(raw);
 }
 
+/** What a form says when it refuses a password `validBattlePassword` rejects. */
+export const BATTLE_PASSWORD_REFUSAL =
+  "Coilbox cannot send this password. A battle password cannot contain a space, and only letters, numbers and punctuation from the basic keyboard are allowed.";
+
+/**
+ * Why a typed battle or room password cannot be sent, or null when it can.
+ * Pure. A form trims the password before it sends it, so the edges are not
+ * checked, and no password at all is an open battle.
+ */
+export function battlePasswordProblem(typed: string): string | null {
+  const password = typed.trim();
+  if (password === "" || validBattlePassword(password)) return null;
+  return BATTLE_PASSWORD_REFUSAL;
+}
+
 /**
  * A battle on a lobby server (issue #3382). Every field is checked for what it
  * has to be, not only for being there, because the server decides whether a

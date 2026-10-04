@@ -14,6 +14,7 @@ import {
   useUnitsyncThumbnails,
 } from "@/content/config";
 import { ScanFailed } from "@/content/pages/components/states";
+import { battlePasswordProblem } from "@/deeplink/parse";
 import type { PlayTarget } from "@/play/config";
 import { GamePickerButton } from "@/play/pages/components/GamePickerButton";
 import { GamePickerPanel } from "@/play/pages/components/GamePickerPanel";
@@ -266,7 +267,10 @@ export function HostBattleForm({
   }
 
   const noEngine = content.noEngine;
-  const canHost = content.ready;
+  // A password the OPENBATTLE line cannot carry opens a battle every joiner
+  // sees as full (issue #3518).
+  const passwordProblem = battlePasswordProblem(password);
+  const canHost = content.ready && !passwordProblem;
   const route = hostingRoute(reachability, relayAvailable, relayMode);
   // Only when there was a relay to refuse. On a server with none the host's
   // answer changed nothing, and crediting them for an outcome that was never
@@ -511,6 +515,11 @@ export function HostBattleForm({
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Leave blank for an open battle"
             />
+            {passwordProblem && (
+              <span className="text-xs text-destructive">
+                {passwordProblem}
+              </span>
+            )}
           </label>
 
           <ReachablePorts

@@ -519,4 +519,12 @@ describe("roomPasswordProblem", () => {
     expect(roomPasswordProblem("let me in")).toContain("No spaces");
     expect(roomPasswordProblem("let\tme in")).toContain("No spaces");
   });
+
+  // The same rule the join line holds a joiner to (issue #3518): a password a
+  // joiner could not type back is a room nobody can enter.
+  it("refuses a password outside the basic keyboard", () => {
+    expect(roomPasswordProblem("pässword")).toContain(
+      "only letters, numbers and punctuation from the basic keyboard",
+    );
+  });
 });
