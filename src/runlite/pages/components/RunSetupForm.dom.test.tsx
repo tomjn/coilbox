@@ -12,6 +12,8 @@ import { emptyMeta, emptyRecord, type RogueliteMeta } from "../../model";
 
 const hoisted = vi.hoisted(() => ({
   meta: null as unknown,
+  loading: false,
+  error: null as string | null,
   maps: [] as { name: string; width: number; height: number }[],
 }));
 
@@ -34,7 +36,11 @@ const GAMES: {
 ];
 
 vi.mock("../../runs", () => ({
-  useRunMeta: () => ({ meta: hoisted.meta }),
+  useRunMeta: () => ({
+    meta: hoisted.meta,
+    loading: hoisted.loading,
+    error: hoisted.error,
+  }),
   useRuns: () => ({ saveRun: vi.fn() }),
 }));
 vi.mock("../../../play/config", () => ({
@@ -105,6 +111,8 @@ const loadouts = () =>
 
 beforeEach(() => {
   localStorage.clear();
+  hoisted.loading = false;
+  hoisted.error = null;
 });
 afterEach(cleanup);
 
@@ -221,5 +229,42 @@ describe("RunSetupForm and a missing dependency archive", () => {
     expect(screen.queryByText(/Archive not installed/)).toBeNull();
     pick(BA);
     expect(screen.getByText(/Archive not installed/)).toBeTruthy();
+  });
+});
+
+describe("RunSetupForm and a Warpath record that failed to load", () => {
+  const NOTICE = /Warpath records could not be read/;
+  const begin = () =>
+    screen.getByRole("button", { name: /Begin warpath/ }) as HTMLButtonElement;
+
+  it("says the record could not be read and that the file is unchanged", () => {
+    hoisted.error = "meta.json is not valid JSON";
+    show(emptyMeta);
+    expect(screen.getByText(NOTICE)).toBeTruthy();
+    expect(
+      screen.getByText(/only the standard options are offered/i),
+    ).toBeTruthy();
+    expect(screen.getByText(/file has not been changed/i)).toBeTruthy();
+    expect(screen.getByText(/meta\.json is not valid JSON/)).toBeTruthy();
+  });
+
+  it("says nothing while the record is still loading", () => {
+    hoisted.loading = true;
+    hoisted.error = "an old failure";
+    show(emptyMeta);
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+
+  it("says nothing when the record loaded", () => {
+    show(emptyMeta);
+    expect(screen.queryByText(NOTICE)).toBeNull();
+  });
+
+  it("still lets the player begin", () => {
+    hoisted.error = "meta.json is not valid JSON";
+    hoisted.maps = [{ name: "Comet Catcher Remake", width: 16, height: 16 }];
+    show(emptyMeta);
+    expect(begin().disabled).toBe(false);
+    hoisted.maps = [];
   });
 });

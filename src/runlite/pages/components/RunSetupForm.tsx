@@ -18,7 +18,10 @@ import { dependencyBlockReason } from "../../../content/gameDependencies";
 import { useMapEligibility } from "../../../content/mapEligibility";
 import { BrandingLinks } from "../../../content/pages/components/BrandingLinks";
 import { BrandingScreenshots } from "../../../content/pages/components/BrandingScreenshots";
-import { DependencyBlocked } from "../../../content/pages/components/states";
+import {
+  DependencyBlocked,
+  ErrorBanner,
+} from "../../../content/pages/components/states";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { aiForDifficulty, mergeGameAi } from "../../../play/gameAi";
 import { missingLaunchDependency } from "../../../play/launchContent";
@@ -60,7 +63,7 @@ export function RunSetupForm({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { saveRun } = useRuns();
-  const { meta } = useRunMeta();
+  const { meta, loading: metaLoading, error: metaError } = useRunMeta();
 
   // In a distribution profile filtered to a game, only that game is offered.
   const matcher = getGameMatcher();
@@ -291,6 +294,12 @@ export function RunSetupForm({
             </ToggleGroup>
           )}
         </Field>
+      )}
+
+      {!metaLoading && metaError && (
+        <ErrorBanner
+          message={`Warpath records could not be read. Only the standard options are offered. The file has not been changed. ${metaError}`}
+        />
       )}
 
       {loadouts.length > 1 && (
