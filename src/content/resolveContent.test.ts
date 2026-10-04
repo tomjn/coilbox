@@ -268,6 +268,30 @@ describe("resolveVerdict", () => {
     expect(verdict.loading).toBe(true);
     expect(verdict.missing).toEqual([]);
   });
+
+  it("does not wait for the engine catalogs when the engine is installed", () => {
+    // The catalogs only say whether a missing engine can be fetched. A launch
+    // that names an engine already on disk must not sit behind a network read
+    // whose answer it will never use (issue #3364).
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("105.1.1-2200-abcdef BAR")],
+        engineCatalogPending: true,
+      }),
+    );
+    expect(verdict).toMatchObject({ loading: false, resolved: true });
+  });
+
+  it("still waits for the installed engines before skipping the catalogs", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [engineVersionRequirement("105.1.1-2200-abcdef BAR")],
+        enginesLoading: true,
+        engineCatalogPending: true,
+      }),
+    );
+    expect(verdict.loading).toBe(true);
+  });
 });
 
 describe("normalizeGameIdentity / gameNamesMatch", () => {
