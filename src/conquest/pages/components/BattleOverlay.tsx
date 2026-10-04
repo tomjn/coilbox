@@ -352,6 +352,7 @@ function Briefing({
         onStart={run.start}
         mapName={node.battle.mapName}
         mapDownload={node.battle.mapDownload}
+        game={galaxy.game}
         onRecheck={run.recheck}
       />
     </div>

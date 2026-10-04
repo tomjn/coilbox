@@ -11,7 +11,11 @@ import { usePreferredTarget } from "../../../play/config";
 import type { SkirmishDraft } from "../../../play/drafts";
 import { SaveAsPresetButton } from "../../../play/pages/components/SaveAsPresetButton";
 import type { BattleRequirement } from "../../../play/useBattleRun";
+import { resolveGameDownload } from "../../gameOffer";
+import type { GameRef } from "../../model";
+import { useGameCatalog } from "../../useGameCatalog";
 import { BackToMapButton } from "./BackToMapButton";
+import { DownloadGameButton } from "./DownloadGameButton";
 import { HUD_CARD_CLASS } from "./hudChrome";
 
 /**
@@ -108,20 +112,25 @@ export function BattleResultPrompt({
   );
 }
 
-/** Install gate: a missing map downloads inline. A missing game links to the
- * Downloads page instead, since a game is a bigger decision than a map fetch. */
+/** Install gate: a missing map downloads inline. A missing game downloads
+ * through the launch check when `game` is given and a download can be named for
+ * it (issue #3368), and otherwise links to the Downloads page. */
 function MissingContentGate({
   missing,
   mapName,
   mapDownload,
+  game,
   onRecheck,
 }: {
   missing: BattleRequirement;
   mapName: string;
   mapDownload?: MapDownloadHint;
+  game?: GameRef;
   onRecheck: () => void | Promise<void>;
 }) {
   const { target } = usePreferredTarget();
+  const gameCatalog = useGameCatalog();
+  const gameDownload = game ? resolveGameDownload(game, gameCatalog) : null;
   const mapDl = useQueuedDownload({
     kind: "map",
     label: `Map: ${mapName}`,
@@ -161,6 +170,13 @@ function MissingContentGate({
           </Button>
           <QueueProgress item={mapDl} />
         </>
+      ) : game && gameDownload ? (
+        <DownloadGameButton
+          game={game}
+          download={gameDownload}
+          onReady={onRecheck}
+          className="w-full"
+        />
       ) : (
         <Link to="/downloads/games">
           <Button variant="outline" className="w-full">
@@ -190,6 +206,7 @@ export function BattleLaunchGate({
   onStart,
   mapName,
   mapDownload,
+  game,
   onRecheck,
 }: {
   error?: string | null;
@@ -202,6 +219,8 @@ export function BattleLaunchGate({
   onStart: () => void;
   mapName: string;
   mapDownload?: MapDownloadHint;
+  /** The game the battle is for. Given, a missing game downloads in place. */
+  game?: GameRef;
   onRecheck: () => void | Promise<void>;
 }) {
   return (
@@ -220,6 +239,7 @@ export function BattleLaunchGate({
           missing={missing}
           mapName={mapName}
           mapDownload={mapDownload}
+          game={game}
           onRecheck={onRecheck}
         />
       ) : canStart ? (

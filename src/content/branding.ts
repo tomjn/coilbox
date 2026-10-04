@@ -229,7 +229,7 @@ function entryMatches(
  */
 export function resolveBranding(
   entries: CompiledEntry[],
-  game: GameItem,
+  game: Pick<GameItem, "name" | "info">,
 ): CompiledEntry | null {
   for (const e of entries) {
     if (entryMatches(e, game.name, game.info.shortname)) {
