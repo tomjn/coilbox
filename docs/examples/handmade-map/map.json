@@ -1,0 +1,69 @@
+{
+  "formatVersion": 1,
+  "id": "sample-two-shores",
+  "title": "Two Shores",
+  "description": "A small sample map: two land masses, a strait between them, and a faction on each side.",
+  "game": { "shortname": "TG" },
+  "size": { "width": 1600, "height": 960 },
+  "files": {
+    "picture": "picture.png",
+    "provinces": "provinces.png",
+    "heightmap": "heightmap.png"
+  },
+  "heightScale": 120,
+  "factions": [
+    { "id": "west", "name": "Western League", "color": "#d9a441" },
+    {
+      "id": "east",
+      "name": "Eastern Crown",
+      "color": "#3fa374",
+      "aggression": 0.4
+    }
+  ],
+  "playerFaction": "west",
+  "provinces": [
+    {
+      "color": "#c85050",
+      "name": "Northmarch",
+      "difficulty": 2,
+      "blurb": "Hill country north of the ridge."
+    },
+    {
+      "color": "#d9a441",
+      "name": "Westhaven",
+      "owner": "west",
+      "capital": true,
+      "battle": { "mapName": "MapA" }
+    },
+    { "color": "#7ab85a", "name": "Midvale", "owner": "west" },
+    { "color": "#4f9da6", "name": "Eastcliff", "difficulty": 2 },
+    { "color": "#8a6fc2", "name": "Southreach" },
+    { "color": "#b55f9a", "name": "Ironcoast", "difficulty": 3 },
+    { "color": "#5c7fd0", "name": "Highmoor", "difficulty": 3 },
+    {
+      "color": "#c97b3c",
+      "name": "Redfield",
+      "owner": "east",
+      "difficulty": 4
+    },
+    {
+      "color": "#3fa374",
+      "name": "Farwatch",
+      "owner": "east",
+      "capital": true,
+      "difficulty": 5,
+      "battle": { "mapName": "MapB", "enemyAiCount": 2 }
+    }
+  ],
+  "locations": [
+    {
+      "name": "Stonebridge",
+      "pos": [400, 640],
+      "difficulty": 2,
+      "blurb": "A walled town on the road south."
+    }
+  ],
+  "crossings": [["eastcliff", "ironcoast"]],
+  "blockedBorders": [["northmarch", "midvale"]],
+  "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]]
+}
