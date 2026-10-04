@@ -71,6 +71,7 @@ export function GamePickerField({
   ariaLabel,
   disabled,
   gamesLoading,
+  scanError,
 }: {
   value: string;
   onValueChange: (name: string) => void;
@@ -80,6 +81,8 @@ export function GamePickerField({
   ariaLabel?: string;
   disabled?: boolean;
   gamesLoading?: boolean;
+  /** Why the scan could not list games, shown in the drawer in place of "No games". */
+  scanError?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -101,6 +104,7 @@ export function GamePickerField({
         selectedName={value}
         onSelect={onValueChange}
         gamesLoading={gamesLoading}
+        scanError={scanError}
       />
     </>
   );

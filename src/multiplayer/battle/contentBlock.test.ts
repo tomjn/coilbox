@@ -96,6 +96,16 @@ describe("launchBlock", () => {
     expect(block?.reason).toContain("could not read");
   });
 
+  it("carries the reason the install could not be read, when there is one", () => {
+    const block = launchBlock(
+      content({
+        unreadable: true,
+        unreadableReason: "no space left on device",
+      }),
+    );
+    expect(block?.reason).toContain("no space left on device");
+  });
+
   it("falls back to a generic noun when the host named nothing", () => {
     const block = launchBlock(content({ gameMissing: true, gameName: "" }));
     expect(block?.reason).toContain("the game");

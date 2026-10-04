@@ -144,11 +144,14 @@ vi.mock("../../compile", async () => ({
   useCompiledProject: () => mockCompiled,
   workshopCompile,
 }));
+// Set to a reason to stand in a scan whose Init failed: the hook then returns
+// no data and the engine's reason as the error (issue #3423).
+let mockScanError: string | null = null;
 vi.mock("@/content/config", () => ({
   useUnitsyncScan: () => ({
-    data: { games: [GAME], maps: [MAP] },
+    data: mockScanError ? null : { games: [GAME], maps: [MAP] },
     loading: false,
-    error: null,
+    error: mockScanError,
   }),
   useUnitsyncGameInfo: () => ({ info: { options: mockGameInfoOptions } }),
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
@@ -228,6 +231,7 @@ function draw(unit?: { key: string; label: string; inGame: boolean }) {
 
 afterEach(() => {
   cleanup();
+  mockScanError = null;
   primeScan.mockClear();
   launch.mockClear();
   workshopTestMutator.mockClear();
@@ -362,6 +366,35 @@ describe("PlayLocallyButton", () => {
     expect(
       screen.getByText(/1 typed value is written so the game's own Lua/),
     ).toBeTruthy();
+  });
+
+  it("says the scan failed, and no map is missing, when Init failed", () => {
+    mockScanError = "no space left on device";
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+    expect(
+      screen.getByText(/The content scan failed: no space left on device/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/No map installed/)).toBeNull();
+    expect(screen.queryByText(/is not installed here/)).toBeNull();
+  });
+
+  it("says the scan failed when the rescan after writing the test game fails", async () => {
+    mockCompiled = compiled({
+      files: [{ path: "modinfo.lua", contents: "return {}" }],
+    });
+    primeScan.mockRejectedValueOnce(new Error("no space left on device"));
+    draw();
+    fireEvent.click(screen.getByRole("button", { name: /^test$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^play$/i }));
+
+    expect(
+      await screen.findByText(
+        /The content scan failed: no space left on device/,
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/did not pick up/)).toBeNull();
+    expect(launch).not.toHaveBeenCalled();
   });
 
   it("writes the typed values and says why when the game cannot be checked", async () => {

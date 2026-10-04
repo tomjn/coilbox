@@ -2607,7 +2607,7 @@ export default function UnitPage() {
         </Alert>
       )}
 
-      {scan.error && !scan.data && (
+      {scan.error && !scan.data && missing && (
         <Alert variant="destructive">
           <AlertDescription className="break-words">
             {scan.error}
@@ -2638,7 +2638,7 @@ export default function UnitPage() {
         </div>
       ) : !game ? (
         <GameMissingState
-          initFailure={scan.data?.initFailure ?? null}
+          initFailure={scan.error}
           label={
             scan.loading
               ? "Scanning for installed games…"

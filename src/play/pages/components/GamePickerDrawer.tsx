@@ -22,6 +22,7 @@ export function GamePickerDrawer({
   selectedName,
   onSelect,
   gamesLoading,
+  scanError,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -32,6 +33,7 @@ export function GamePickerDrawer({
   selectedName: string;
   onSelect: (name: string) => void;
   gamesLoading?: boolean;
+  scanError?: string | null;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -58,6 +60,7 @@ export function GamePickerDrawer({
               onOpenChange(false);
             }}
             gamesLoading={gamesLoading}
+            scanError={scanError}
           />
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

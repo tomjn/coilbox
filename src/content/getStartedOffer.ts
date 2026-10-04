@@ -18,7 +18,7 @@ import {
 } from "./branding";
 import { useSetupStatus, useUnitsyncScan } from "./config";
 import { getStartedCandidates } from "./pages/components/getStartedCandidates";
-import { answeredScan, scanSettled } from "./scanSettled";
+import { scanSettled } from "./scanSettled";
 import { filterSuggestedGamesByFilter } from "./suggestedGames";
 
 /** The downloads the get-started card is offering, by kind. */
@@ -141,9 +141,10 @@ export function useCollectGetStartedOffer(): GetStartedOfferState {
 
   // unitsync is the truth for both kinds: it sees rapid content, which never
   // lands as a file in `games/`. A scan that failed reports no games and no
-  // maps, which is not a report of an empty install, so only a scan that
-  // resolved counts (matching `usePlayReadiness`).
-  const scanned = scan.loading ? null : answeredScan(scan.data);
+  // maps, which is not a report of an empty install. The hook hands back no
+  // data for it, so only a scan that answered counts (matching
+  // `usePlayReadiness`).
+  const scanned = scan.loading ? null : scan.data;
   // A distribution's gameFilter narrows the suggestions first, so a single-game
   // distribution (e.g. SplinterFaction) never advertises other games' downloads.
   const scopedGames = filterSuggestedGamesByFilter(

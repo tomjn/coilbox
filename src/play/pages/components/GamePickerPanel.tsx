@@ -17,6 +17,7 @@ export function GamePickerPanel({
   onBack,
   backLabel,
   gamesLoading,
+  scanError,
 }: {
   games: readonly GameItem[];
   headers: Map<string, string>;
@@ -26,6 +27,7 @@ export function GamePickerPanel({
   /** What the back button returns to, for its accessible name. */
   backLabel: string;
   gamesLoading?: boolean;
+  scanError?: string | null;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
@@ -50,6 +52,7 @@ export function GamePickerPanel({
           onBack();
         }}
         gamesLoading={gamesLoading}
+        scanError={scanError}
       />
     </div>
   );

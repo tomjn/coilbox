@@ -281,6 +281,7 @@ export function HostRoomForm({
         onBack={() => setPickingGame(false)}
         backLabel="Back to the room form"
         gamesLoading={content.scanning}
+        scanError={content.scanError}
       />
     );
   }
@@ -309,6 +310,7 @@ export function HostRoomForm({
             setPickingMap(false);
           }}
           mapsLoading={content.scanning}
+          scanError={content.scanError}
         />
       </div>
     );

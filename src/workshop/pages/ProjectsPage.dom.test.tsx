@@ -64,14 +64,17 @@ const GAME_2 = {
 // with the `mock` prefix vitest requires for a variable a hoisted `vi.mock`
 // factory is allowed to close over.
 let mockScanGames: (typeof GAME)[] = [GAME, GAME_2];
+// Set to a reason to stand in a scan whose Init failed: the hook then returns
+// no data and the engine's reason as the error (issue #3423).
+let mockScanError: string | null = null;
 
 vi.mock("@/content/config", () => ({
   useScanTargetSelection: () => ({ selected: SELECTED }),
   useUnitsyncGameHeaders: () => ({ headers: new Map(), loading: false }),
   useUnitsyncScan: () => ({
-    data: { games: mockScanGames, maps: [] },
+    data: mockScanError ? null : { games: mockScanGames, maps: [] },
     loading: false,
-    error: null,
+    error: mockScanError,
     run: () => {},
   }),
 }));
@@ -170,6 +173,7 @@ beforeEach(() => {
   installSettingsStorage(storage);
   resetShortnames();
   mockScanGames = [GAME, GAME_2];
+  mockScanError = null;
 });
 
 afterEach(() => {
@@ -235,6 +239,14 @@ describe("ProjectsPage", () => {
       description: "Everything on tracks costs more.",
     });
     expect(screen.getByText(`editor ${made.id}`)).toBeTruthy();
+  });
+
+  it("says the scan failed, not that no games are installed, when Init failed", () => {
+    mockScanError = "no space left on device";
+    show();
+    fireEvent.click(screen.getByRole("button", { name: /New project/ }));
+    expect(screen.getByText(/no space left on device/)).toBeTruthy();
+    expect(screen.queryByText(/No games are installed/)).toBeNull();
   });
 
   it("takes the game's name for a project nobody named", () => {

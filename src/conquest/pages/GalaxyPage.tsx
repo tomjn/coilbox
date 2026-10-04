@@ -767,10 +767,15 @@ function RunSetupPanel({
 }) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
-  const { run: runScan, data: scanData, loading: scanLoading } = scan;
+  const {
+    run: runScan,
+    data: scanData,
+    loading: scanLoading,
+    error: scanError,
+  } = scan;
   useEffect(() => {
-    if (!scanData && !scanLoading) runScan();
-  }, [scanData, scanLoading, runScan]);
+    if (!scanData && !scanLoading && !scanError) runScan();
+  }, [scanData, scanLoading, scanError, runScan]);
   const [side, setSide] = useState("");
   const [busy, setBusy] = useState(false);
   const choices = playableFactions(galaxy);

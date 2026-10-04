@@ -45,6 +45,7 @@ export function PresetsDrawer({
   enginePath,
   dataDir,
   archive,
+  scanFailure,
   onApplyTweaks,
   onApplyMutator,
   onLoad,
@@ -76,6 +77,9 @@ export function PresetsDrawer({
   dataDir?: string;
   /** The current game's primary archive, as unitsync names it. */
   archive?: string;
+  /** Why the content scan could not answer, so a typed-value note says the scan
+   *  failed rather than that the game is not installed. */
+  scanFailure?: string | null;
   /** Write a packed project's slots over whatever the options already say. */
   onApplyTweaks: (slots: Record<string, string>) => void;
   /** Carry a project by mutator archive instead, for a game with no slots. */
@@ -172,6 +176,7 @@ export function PresetsDrawer({
               enginePath={enginePath}
               dataDir={dataDir}
               archive={archive}
+              scanFailure={scanFailure}
               disabled={disabled}
               onApply={(slots) => {
                 onApplyTweaks(slots);

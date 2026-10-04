@@ -42,6 +42,8 @@ export type ArrivingGame =
   | { state: "unnamed" }
   /** The installed games have not been read yet, so this is not an answer. */
   | { state: "unread"; wanted: string }
+  /** The scan failed, so it never will say. Not the same as the game being absent. */
+  | { state: "unreadable"; wanted: string }
   /** The exact build it was exported for is here. */
   | { state: "installed"; here: string }
   /** A different build of the same game is here, matched by modinfo shortname. */
@@ -71,11 +73,14 @@ function claimed(game: GameIdentity): string {
 export function arrivingGame(
   game: GameIdentity | undefined,
   installed: readonly InstalledGameInfo[] | null,
+  unreadable = false,
 ): ArrivingGame {
   if (!game) return { state: "unnamed" };
   const wanted = claimed(game);
   if (!wanted) return { state: "unnamed" };
-  if (!installed) return { state: "unread", wanted };
+  if (!installed) {
+    return { state: unreadable ? "unreadable" : "unread", wanted };
+  }
 
   const exact = installed.find((one) => one.name === wanted);
   if (exact) return { state: "installed", here: exact.name };
@@ -125,6 +130,8 @@ export interface ArrivalInput {
   taken: Iterable<string>;
   /** This machine's games, or null while they are still being read. */
   installed: readonly InstalledGameInfo[] | null;
+  /** The scan failed, so a null `installed` is not "still being read". */
+  unreadable?: boolean;
   /** The units of {@link gameToCheckAgainst}'s game, once they have been read.
    *  Absent means not checked, which is not the same as nothing being wrong. */
   known?: KnownUnits;
@@ -159,10 +166,11 @@ function missionGame(
 
 /** What the person taking this layout needs to know before they take it. */
 export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
-  const { payload, taken, installed, known, into } = input;
+  const { payload, taken, installed, unreadable, known, into } = input;
   const game = arrivingGame(
     payload.game,
     into === undefined ? installed : missionGame(into, installed),
+    unreadable,
   );
   const notes: ArrivalNote[] = [];
 
@@ -181,6 +189,12 @@ export function blueprintArrival(input: ArrivalInput): BlueprintArrival {
       notes.push({
         tone: "note",
         text: `This blueprint is for ${game.wanted}. Coilbox is still reading your games, so it does not know yet whether you have it.`,
+      });
+      break;
+    case "unreadable":
+      notes.push({
+        tone: "note",
+        text: `This blueprint is for ${game.wanted}. Your games could not be read, so it has not been checked against them.`,
       });
       break;
     case "missing":

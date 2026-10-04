@@ -11,22 +11,12 @@ export interface ScanReading {
  *
  * The worker prints a result even when unitsync's `Init` failed, with empty
  * lists and the engine's reason in `initFailure`. Such a result is not a report
- * of an empty machine (issue #3392).
+ * of an empty machine (issue #3392). `useUnitsyncScan` no longer hands such a
+ * result out as `data`, so this only matters to a caller holding a raw result,
+ * such as `resolveVerdict`.
  */
 export function scanInitFailure(scan: ScanReading): string | null {
   return scan.data?.initFailure ?? null;
-}
-
-/**
- * The scan's result when it can vouch for what is installed, else null. A scan
- * whose `Init` failed has a result, but its empty lists are not a report of an
- * empty machine, so a caller about to say "not installed" reads this instead of
- * `data` (issue #3392).
- */
-export function answeredScan<T extends { initFailure?: string }>(
-  data: T | null | undefined,
-): T | null {
-  return data && !data.initFailure ? data : null;
 }
 
 /**

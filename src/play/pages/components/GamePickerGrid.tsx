@@ -5,6 +5,7 @@ import type { GameItem } from "@/content/bindings";
 import { useBrandingEntry, useBrandingImage } from "@/content/branding";
 import { isSdd } from "@/content/format";
 import { GameCardShell } from "@/content/pages/components/GameCardShell";
+import { ScanFailed } from "@/content/pages/components/states";
 import { getGameMatcher } from "@/profile/profile";
 
 /** Unique id for a game: its name plus its own primary archive (matches GamesPage). */
@@ -62,6 +63,7 @@ export function GamePickerGrid({
   selectedName,
   onSelect,
   gamesLoading,
+  scanError,
 }: {
   games: readonly GameItem[];
   /** Batched loading-screen art keyed by game name. A game without any shows
@@ -72,6 +74,9 @@ export function GamePickerGrid({
   /** The game list is still being scanned, so an empty grid means "not loaded
    *  yet" rather than "no games installed". */
   gamesLoading?: boolean;
+  /** The content scan failed with this reason, so an empty grid is not a
+   *  claim that nothing is installed. */
+  scanError?: string | null;
 }) {
   const [query, setQuery] = useState("");
   // A distribution profile can preset a game filter. When it does, the picker
@@ -120,7 +125,12 @@ export function GamePickerGrid({
               onSelect={() => onSelect(g.name)}
             />
           ))}
-          {filtered.length === 0 && (
+          {filtered.length === 0 && scanError && (
+            <div className="col-span-2">
+              <ScanFailed noun="games" reason={scanError} />
+            </div>
+          )}
+          {filtered.length === 0 && !scanError && (
             <p className="col-span-2 py-8 text-center text-sm text-muted-foreground">
               {empty}
             </p>

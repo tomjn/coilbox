@@ -436,10 +436,7 @@ export function PackagePanel({
             })
           : ({
               ok: false,
-              message: gameNotFoundNote(
-                project.gameName,
-                scan.data?.initFailure ?? null,
-              ),
+              message: gameNotFoundNote(project.gameName, scan.error),
             } as const);
 
       setPhase({ state: "packaging" });
@@ -571,7 +568,7 @@ export function PackagePanel({
             <TweakSlotExportSection
               project={scopedProject}
               routeOptions={routeOptions}
-              scanFailure={scan.data?.initFailure ?? null}
+              scanFailure={scan.error}
               game={
                 target && game
                   ? {

@@ -39,9 +39,9 @@ export function gameListState({
   hasGames: boolean;
   /** Diagnostics unitsync drained during the scan. */
   scanErrors: readonly string[];
-  /** The reason unitsync's `Init` failed, when it did. The worker also lists it
-   *  in `scanErrors`, but a result carrying only this is no less unreadable
-   *  (issue #3398). */
+  /** The reason the scan could not read the install, when it could not. Comes
+   *  from the scan hook's `error`, which holds unitsync's `Init` failure with
+   *  `data` null (issue #3423). A scan that errored counts as `scanned`. */
   initFailure?: string | null;
 }): GameListState {
   if (!hasTarget) return "no-engine";

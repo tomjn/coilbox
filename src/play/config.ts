@@ -15,7 +15,6 @@ import {
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
 import { shareInFlight } from "../content/inFlight";
-import { scanInitFailure } from "../content/scanSettled";
 import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import { withoutGeneratedGames } from "../lib/generatedGames";
 import { type GameListState, gameListState, needsGame } from "./gameListState";
@@ -197,6 +196,9 @@ export function usePlayReadiness(): {
   state: GameListState;
   /** Diagnostics unitsync reported during the scan, for the same screens. */
   scanErrors: string[];
+  /** Why the scan could not read the install at all (unitsync's `Init`
+   *  failed), or null. The scan hook answers `data: null` with this in `error`. */
+  scanFailure: string | null;
   /** Scan again, for a screen that has just installed a game. This hook holds
    * its own read, so it does not see a download made elsewhere until told to. */
   refresh: () => Promise<void>;
@@ -207,7 +209,9 @@ export function usePlayReadiness(): {
   const refresh = useCallback(async () => {
     await run(true);
   }, [run]);
-  const scanResolved = scan.data != null;
+  // A scan that errored has answered, so it is settled (issue #3423).
+  const scanFailure = scan.error;
+  const scanResolved = scan.data != null || scanFailure !== null;
   // Coilbox's own generated games do not count. A player whose only game is the
   // one the unit builder wrote has nothing to play, and every empty state that
   // reads this says so.
@@ -218,7 +222,7 @@ export function usePlayReadiness(): {
     scanned: scanResolved,
     hasGames,
     scanErrors,
-    initFailure: scanInitFailure(scan),
+    initFailure: scanFailure,
   });
   const loading = targetLoading || (!!target && !scanResolved);
   return {
@@ -228,6 +232,7 @@ export function usePlayReadiness(): {
     hasGames,
     state,
     scanErrors,
+    scanFailure,
     refresh,
   };
 }

@@ -41,6 +41,7 @@ import { useUnitsyncGameHeaders, useUnitsyncScan } from "@/content/config";
 import {
   EmptyState,
   ErrorBanner,
+  ScanFailed,
   SkeletonList,
 } from "@/content/pages/components/states";
 import { gameForIdentity } from "@/content/useGameUnits";
@@ -157,12 +158,15 @@ export default function BlueprintsPage() {
               headers={gameHeaders}
               taken={names}
               scanning={scan.loading}
+              scanError={scan.error}
             />
           </>
         }
       />
 
       {error && <ErrorBanner message={error} />}
+
+      {scan.error && <ScanFailed noun="games" reason={scan.error} />}
 
       {games.length > 1 && (
         <div className="flex items-center gap-2">
@@ -206,6 +210,7 @@ export default function BlueprintsPage() {
                 record={record}
                 taken={names}
                 installed={
+                  !!scan.error ||
                   !recordGameName(record) ||
                   !!gameForIdentity(
                     installed,
@@ -336,6 +341,7 @@ function NewBlueprintButton({
   headers,
   taken,
   scanning,
+  scanError,
 }: {
   games: GameItem[];
   /** Loading-screen art for the game picker, keyed by game name. */
@@ -344,6 +350,8 @@ function NewBlueprintButton({
    *  offered as "Untitled layout 2" rather than as a twin. */
   taken: string[];
   scanning: boolean;
+  /** Why the scan could not list games, or null. */
+  scanError: string | null;
 }) {
   const navigate = useNavigate();
   const [name, setName] = useState("");
@@ -408,7 +416,12 @@ function NewBlueprintButton({
           </p>
         </div>
 
-        {games.length === 0 && !scanning && (
+        {scanError && (
+          <p className="text-xs text-destructive">
+            Your games could not be read: {scanError}
+          </p>
+        )}
+        {games.length === 0 && !scanning && !scanError && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             No games found. Install one under Content, then come back.
           </p>

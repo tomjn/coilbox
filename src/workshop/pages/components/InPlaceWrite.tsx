@@ -151,10 +151,7 @@ export function InPlaceWrite({
               })
             : ({
                 ok: false,
-                message: gameNotFoundNote(
-                  project.gameName,
-                  scan.data?.initFailure ?? null,
-                ),
+                message: gameNotFoundNote(project.gameName, scan.error),
               } as const);
         setTypedNote(
           settled.ok ? settledSummary(settled.settled) : settled.message,

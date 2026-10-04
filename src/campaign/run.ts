@@ -262,8 +262,19 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
           // a run nobody has chosen a level for, so both produce the start
           // script they always did.
           difficulty: variesByDifficulty ? difficulty : undefined,
-          rescan: async () =>
-            (await primeScan(target.enginePath, target.dataDir, true)).games,
+          // A rescan whose unitsync `Init` failed throws the engine's reason.
+          // It is worded as a scan failure here so the briefing's error does
+          // not read as a bare engine message.
+          rescan: async () => {
+            try {
+              return (await primeScan(target.enginePath, target.dataDir, true))
+                .games;
+            } catch (e) {
+              throw new Error(
+                `The content scan failed: ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
+          },
           launch: startEngine,
         });
         if (!result.ok) {
@@ -415,6 +426,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     /** What the download panel offers: the engine, game and map still short. */
     needs,
     scanLoading,
+    /** The engine's reason when the content scan failed, else null. */
+    scanError: scan.error ?? null,
     running,
     saving,
     autoDetected,

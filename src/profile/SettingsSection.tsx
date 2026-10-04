@@ -172,6 +172,13 @@ function ProfileAuthoring() {
     setError(null);
     setResult(null);
     try {
+      // A failed scan has no games to seed the filter from, and an empty list
+      // would write a profile that says none are installed.
+      if (scan.error) {
+        throw new Error(
+          `The content scan failed, so the profile could not be seeded with the installed games. unitsync said: ${scan.error}`,
+        );
+      }
       const installedGames = installedGameNames(scan.data?.games ?? []);
       const profile = buildScaffoldProfile({
         title: getProfile().title ?? "Coilbox",

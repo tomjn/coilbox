@@ -78,6 +78,9 @@ export interface HealthInputs {
    * (issue #959).
    */
   installedGames: string[] | null;
+  /** The engine's reason when the scan failed, so the checks that need the
+   *  games say that instead of waiting for a scan that has already answered. */
+  scanError?: string | null;
   writeRootPath: string | undefined;
   campaignFailures: CampaignFailure[];
   /** Bundled and local scenarios the reader skipped, and why. */
@@ -373,7 +376,9 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       id: "gameFilter",
       status: "unknown",
       label: "Game filter not checked against anything",
-      hint: "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.",
+      hint: i.scanError
+        ? `The games scan failed, so there is nothing to match the filter against. unitsync said: ${i.scanError}`
+        : "Nothing has scanned the content folders for games yet, so there is nothing to match the filter against. Install an engine, or open Content > Games and let the scan finish, then re-run this.",
     });
   } else {
     const { count, regexError } = countFilterMatches(
@@ -480,8 +485,12 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
       checks.push({
         id: "content",
         status: "unknown",
-        label: `${engines} engine(s) found, games not scanned yet`,
-        hint: `Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
+        label: i.scanError
+          ? `${engines} engine(s) found, games scan failed`
+          : `${engines} engine(s) found, games not scanned yet`,
+        hint: i.scanError
+          ? `The games scan failed, so it is not known what is installed. unitsync said: ${i.scanError} ${scanned}`
+          : `Nothing has scanned for games yet. Open Content > Games and let the scan finish, then re-run this. ${scanned}`,
       });
     } else if (games === 0) {
       checks.push({

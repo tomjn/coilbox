@@ -35,6 +35,7 @@ import {
 } from "@/content/config";
 import { mergeMapTiers } from "@/content/mapTiers";
 import { ResolveContentGate } from "@/content/pages/components/ResolveContentDrawer";
+import { ScanFailed } from "@/content/pages/components/states";
 import {
   exactGameRequirement,
   exactMapRequirement,
@@ -982,6 +983,7 @@ export default function SkirmishPage() {
         enginePath={enginePath}
         dataDir={dataDir}
         archive={gameArchive}
+        scanFailure={scan.error}
         // Over the top of whatever the options already say, which is the point
         // of applying a project after a preset rather than instead of one.
         onApplyTweaks={(slots) =>
@@ -1119,6 +1121,8 @@ export default function SkirmishPage() {
         <NoEngineNotice targetLoading={targetLoading} refresh={refreshTarget} />
       )}
 
+      {scan.error && <ScanFailed noun="games and maps" reason={scan.error} />}
+
       {error && (
         <Alert variant="destructive" className="p-3">
           <AlertDescription className="text-destructive">
@@ -1220,6 +1224,7 @@ export default function SkirmishPage() {
             markerColors={activeColors}
             env={minimap.env}
             mapsLoading={mapsLoading}
+            scanError={scan.error}
             onSelectMap={setMapName}
             disabled={running}
             dimBase={!!overlay.overlayUrl}
@@ -1273,6 +1278,7 @@ export default function SkirmishPage() {
             games={games}
             headers={gameHeaders}
             gamesLoading={gamesLoading}
+            scanError={scan.error}
             onSelectGame={setGameName}
             disabled={running}
           />

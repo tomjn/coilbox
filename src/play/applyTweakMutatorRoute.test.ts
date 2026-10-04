@@ -161,4 +161,17 @@ describe("applyTweakMutatorRoute", () => {
       }),
     ).rejects.toThrow(/did not find it/);
   });
+
+  it("says the scan failed, not that the archive is missing, when the rescan throws", async () => {
+    primeScan.mockRejectedValueOnce(new Error("no space left on device"));
+
+    await expect(
+      applyTweakMutatorRoute({
+        target,
+        gameArchive: "byar.sdd",
+        gameName: "Beyond All Reason",
+        project,
+      }),
+    ).rejects.toThrow("The content scan failed: no space left on device");
+  });
 });

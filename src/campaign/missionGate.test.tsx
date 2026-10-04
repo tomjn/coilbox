@@ -35,6 +35,9 @@ const { scan, engine } = vi.hoisted(() => ({
       dataDir: "/data",
       executable: "/engine/spring",
     } as unknown,
+    // Set by the tests where the scan failed: the hook then answers
+    // `data: null` with the engine's reason.
+    scanError: null as string | null,
   },
 }));
 
@@ -63,7 +66,8 @@ vi.mock("../content/bindings", () => ({
 vi.mock("../content/config", () => ({
   primeScan: vi.fn(async () => ({ games: [] })),
   useUnitsyncScan: () => ({
-    data: engine.target ? scan : null,
+    data: engine.target && !engine.scanError ? scan : null,
+    error: engine.scanError,
     loading: false,
     run: vi.fn(),
   }),
@@ -281,5 +285,30 @@ describe("what the briefing offers to download", () => {
     hook.rerender();
 
     expect(hook.result.current.needs).toEqual([{ kind: "game", name: "XTA" }]);
+  });
+});
+
+describe("a mission when the content scan failed", () => {
+  afterEach(() => {
+    engine.scanError = null;
+  });
+
+  it("cannot be started, and says why instead of asking for a download", () => {
+    engine.scanError = "no space left on device";
+    const mission = missionOn("m1", "BA", "Comet");
+
+    const run = open(campaignOf(mission), mission);
+
+    expect(run.canStart).toBe(false);
+    expect(run.missing).toBeNull();
+    expect(run.needs).toEqual([]);
+    expect(run.scanLoading).toBe(false);
+    expect(run.scanError).toBe("no space left on device");
+  });
+
+  it("has no scan error when the scan answered", () => {
+    const mission = missionOn("m1", "BA", "Comet");
+
+    expect(open(campaignOf(mission), mission).scanError).toBeNull();
   });
 });
