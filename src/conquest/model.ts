@@ -101,6 +101,8 @@ export function posZ(pos: NodePos): number {
 
 /** Describes a node's real star, when it has one. Absent on procedural nodes,
  * whose appearance stays a hash of the node id. */
+export type LinkKind = "border" | "crossing" | "road";
+
 export interface NodeStar {
   /** One spectral type per component, brightest first ("A1.0 V", "DA2"). */
   spectral: string[];
@@ -114,6 +116,8 @@ export interface GalaxyNode {
   pos: NodePos;
   /** Real stellar data, when this node came from the star catalogue. */
   star?: NodeStar;
+  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
+  outline?: [number, number][][];
   /** Initial owner: a faction id or {@link NEUTRAL}. */
   owner: string;
   /**
@@ -160,6 +164,16 @@ export interface GalaxyDoc {
   nodes: GalaxyNode[];
   /** Undirected node-id pairs. */
   links: [string, string][];
+  terrain?: {
+    image: string; // URL the webview can load (data:, blob:, asset or http)
+    heightmap?: string; // same, greyscale, black is 0 and white is heightScale
+    width: number; // map units
+    height: number; // map units
+    heightScale?: number; // map units of height for a white heightmap pixel
+    projection?: "flat";
+  };
+  linkKinds?: [string, string, LinkKind][];
+  blockedBorders?: [string, string][];
   rules?: {
     graceTurns?: number;
     /** Hide systems more than two jumps from your territory (see `../fog`). */
@@ -628,6 +642,17 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     importedChallenge: d.importedChallenge === true ? true : undefined,
     generated: parseGenerated(d.generated),
   };
+}
+
+export function linkKind(
+  doc: GalaxyDoc,
+  a: string,
+  b: string,
+): LinkKind | undefined {
+  for (const [x, y, kind] of doc.linkKinds ?? []) {
+    if ((x === a && y === b) || (x === b && y === a)) return kind;
+  }
+  return undefined;
 }
 
 /** Wrap a galaxy in the export/share file shape. */
