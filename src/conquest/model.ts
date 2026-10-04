@@ -648,6 +648,17 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
   };
 }
 
+export function linkKind(
+  doc: GalaxyDoc,
+  a: string,
+  b: string,
+): LinkKind | undefined {
+  for (const [x, y, kind] of doc.linkKinds ?? []) {
+    if ((x === a && y === b) || (x === b && y === a)) return kind;
+  }
+  return undefined;
+}
+
 /** Wrap a galaxy in the export/share file shape. */
 export function wrapGalaxyForExport(galaxy: GalaxyDoc): GalaxyExportFile {
   return { format: "coilbox-galaxy", formatVersion: 1, galaxy };
