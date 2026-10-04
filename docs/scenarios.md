@@ -184,6 +184,8 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_health_below` | An actor's health is under a fraction of its maximum. |
 | `unit_built` | A team has finished building this many of a unit type. |
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
+| `unit_selected` | A player has a unit selected. Any unit, or one of a unit type, or one actor. Optionally one team's player. |
+| `command_given` | A player has given an order since the trigger was armed. Any order, or one command, or an order to build one unit type. Optionally one team's player. |
 | `time_elapsed` | This many seconds since the mission started. |
 | `var` | A variable compared against a number, or against another variable, with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
 | `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. **Uncontested** asks for control instead of presence. |
@@ -193,6 +195,14 @@ The names below are the ones in the compiled mission. The editor shows them with
 Gaia does not contest. It owns the map's own furniture, critters and the units some maps place, which belongs to no side and fights for none, so a mission that told the player to clear the keep would otherwise be asking them to hunt down a deer. Allies do not contest either. A scenario that ticks the box needs mission runtime 3.
 
 You cannot build this out of `units_in_zone` with `max = 0`. That reads the moment the timer runs out rather than the whole minute leading up to it.
+
+`unit_selected` and `command_given` are the two conditions that read what a player did, and they are what a first lesson is made of. A scenario that uses either needs mission runtime 8.
+
+`unit_selected` holds for as long as the unit stays selected. If the player already has their builder selected when "select your builder" is armed, the trigger fires straight away. It counts units the player owns, and it ignores spectators.
+
+`command_given` counts orders given after the trigger was armed, and after each firing for a trigger that fires every time. So "give a move order" as a lesson's third step is not answered by the move order from its first step. The commands on offer are the engine's own: `move`, `attack`, `fight`, `patrol`, `guard`, `stop`, `wait`, `repair`, `reclaim`, `resurrect`, `capture`, `load_units` and `unload_units`, plus `build` for any build order. Pick a unit type under **unit to build** to ask for one building or one unit out of a factory. Orders the mission gives its own groups do not count, and neither do an AI's.
+
+Both work in a multiplayer mission and in a replay. With no team set, any player's selection or order will do.
 
 ### Actions
 
