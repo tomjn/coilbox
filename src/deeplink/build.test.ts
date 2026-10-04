@@ -149,6 +149,19 @@ describe("buildDeepLink", () => {
       expect(parseDeepLink(built.url)).toEqual(action);
     });
 
+    it("round-trips a join password the TASServer rule would refuse", () => {
+      const action = {
+        kind: "join" as const,
+        server: "lobby.example.com:8200",
+        battle: "42",
+        password: "my pass",
+      };
+      const built = buildDeepLink(action);
+      expect(built.ok).toBe(true);
+      if (!built.ok) return;
+      expect(parseDeepLink(built.url)).toEqual(action);
+    });
+
     it("rejects a join with no server", () => {
       const built = buildDeepLink({
         kind: "join",

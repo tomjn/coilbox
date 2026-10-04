@@ -1,5 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import type { LobbyProtocol } from "../../lobby-servers/config";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
 
@@ -15,6 +16,7 @@ type RowProps = {
   serverAddress?: string;
   directRoom?: boolean;
   leaves?: string | null;
+  protocol?: LobbyProtocol;
 };
 
 /**
@@ -41,6 +43,7 @@ export function BattleList({
   directRoom,
   leaves = null,
   focusId,
+  protocol,
 }: {
   battles: Battle[];
   totalCount: number;
@@ -71,6 +74,8 @@ export function BattleList({
   /** The battle a notification sent the player to. Its group is opened and its
    * row scrolled into view. */
   focusId?: number;
+  /** The protocol of this connection's saved server entry (issue #3524). */
+  protocol?: LobbyProtocol;
 }) {
   // Passworded and running battles are both things you cannot simply drop into,
   // so they start collapsed and keep the joinable list short.
@@ -92,6 +97,7 @@ export function BattleList({
       serverAddress,
       directRoom,
       leaves,
+      protocol,
     }),
     [
       canJoin,
@@ -103,6 +109,7 @@ export function BattleList({
       serverAddress,
       directRoom,
       leaves,
+      protocol,
     ],
   );
 

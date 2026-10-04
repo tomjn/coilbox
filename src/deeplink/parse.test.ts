@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   BATTLE_PASSWORD_REFUSAL,
+  battleKeyFor,
   battlePasswordProblem,
   MAX_CODE_LENGTH,
   MAX_FIELD_LENGTH,
@@ -301,29 +302,26 @@ describe("parseDeepLink", () => {
         });
       });
 
-      it("rejects a password that could not be one word of a lobby command", () => {
-        for (const raw of [
-          "two words",
-          "line\nLOGIN x",
-          "line\rbreak",
-          "tab\there",
-          "nul\u0000",
-          "pässword",
-          "x".repeat(MAX_FIELD_LENGTH + 1),
-        ]) {
+      // The link does not know which protocol its server speaks, and must not
+      // be the one to say. It is checked for size here, and for what the saved
+      // server's protocol allows when the join is made (issue #3524).
+      it("rejects a password longer than a field may be", () => {
+        expect(
+          join(
+            `server=${server}&battle=42&password=${"x".repeat(MAX_FIELD_LENGTH + 1)}`,
+          ).kind,
+        ).toBe("invalid");
+      });
+
+      it("carries a password the TASServer rule would refuse, for the join to judge", () => {
+        for (const raw of ["two words", "pässword", " secret "]) {
           expect(
             join(
               `server=${server}&battle=42&password=${encodeURIComponent(raw)}`,
-            ).kind,
-            JSON.stringify(raw.slice(0, 20)),
-          ).toBe("invalid");
+            ),
+            JSON.stringify(raw),
+          ).toMatchObject({ kind: "join", password: raw });
         }
-      });
-
-      it("does not trim a password into a valid one", () => {
-        expect(
-          join(`server=${server}&battle=42&password=%20secret%20`).kind,
-        ).toBe("invalid");
       });
 
       it("reads an empty password as none", () => {
@@ -515,5 +513,40 @@ describe("battlePasswordProblem", () => {
   it("refuses a space inside the password and a character outside the basic keyboard", () => {
     expect(battlePasswordProblem("let me in")).toBe(BATTLE_PASSWORD_REFUSAL);
     expect(battlePasswordProblem("pässword")).toBe(BATTLE_PASSWORD_REFUSAL);
+  });
+});
+
+describe("battleKeyFor", () => {
+  it("sends nothing for no password on any protocol", () => {
+    for (const protocol of ["tasserver", "zerok", "tachyon"] as const) {
+      expect(battleKeyFor(protocol, "")).toBe("");
+    }
+  });
+
+  it("keeps the TASServer rule for TASServer and Tachyon", () => {
+    for (const protocol of ["tasserver", "tachyon"] as const) {
+      expect(battleKeyFor(protocol, "s3cret!")).toBe("s3cret!");
+      expect(battleKeyFor(protocol, "let me in")).toBeNull();
+      expect(battleKeyFor(protocol, "pässword")).toBeNull();
+      expect(battleKeyFor(protocol, " s3cret ")).toBeNull();
+      expect(battleKeyFor(protocol, "a\nb")).toBeNull();
+    }
+  });
+
+  it("refuses no character for Zero-K and trims the outer spaces as the host form does", () => {
+    expect(battleKeyFor("zerok", "my pass")).toBe("my pass");
+    expect(battleKeyFor("zerok", "pässword")).toBe("pässword");
+    expect(battleKeyFor("zerok", 'say "hi"')).toBe('say "hi"');
+    expect(battleKeyFor("zerok", "  my pass  ")).toBe("my pass");
+    expect(battleKeyFor("zerok", "   ")).toBe("");
+  });
+});
+
+describe("battlePasswordProblem on Zero-K", () => {
+  it("has none for a password the TASServer rule refuses", () => {
+    expect(battlePasswordProblem("let me in", "zerok")).toBeNull();
+    expect(battlePasswordProblem("let me in", "tasserver")).toBe(
+      BATTLE_PASSWORD_REFUSAL,
+    );
   });
 });
