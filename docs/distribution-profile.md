@@ -384,6 +384,37 @@ Without a `welcome`, the cards sit at the top of Coilbox's own home page above t
 
 Leaving `onboarding` out of a [`home.zones`](#home-object) list hides the cards as well, because omitting a zone hides it. See [Leaving out `onboarding`](#leaving-out-onboarding).
 
+### `start` (object)
+
+Names a campaign you bundle as where a new player starts. The home page shows a "Start here" card for it in the place the [`continue`](#the-zones) card takes, on a fresh install where there is nothing to resume yet.
+
+```json
+{ "version": 1, "start": { "campaign": "b2f6c1d0-7e3a-4c55-9a41-0d8f5e2a6c17" } }
+```
+
+| Field      | Meaning                                                                                              |
+| ---------- | ---------------------------------------------------------------------------------------------------- |
+| `campaign` | The `id` of a campaign in `.coilbox/campaigns/`. Required.                                           |
+| `mission`  | The `id` of one mission in that campaign. Leave it out to start on the campaign's first mission.     |
+
+Both are the `id` values inside the campaign's exported `.json`, not its title or file name. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) for how the campaign gets into the package.
+
+What the card does:
+
+- It shows the campaign's title and the mission's title, with the campaign's icon. A campaign with no icon shows its background image instead, and one with neither gets a plain icon.
+- It opens the mission's briefing.
+- It stays until the player wins that mission. A mission they tried and lost keeps the card. After that the `continue` card goes back to offering whatever the player was last doing.
+- While it is there it comes first, ahead of anything the player could resume. Those move to the `resume` cards beside it.
+- If the engine, the game or the map the mission needs is not installed, the card says what has to be downloaded first. The briefing it opens does the download and holds the mission back until it is done.
+
+Only a campaign mission can be named. A scenario on its own, outside a campaign, cannot.
+
+The card is part of the `continue` zone, so it needs that zone on the page. A [`home.zones`](#home-object) list that leaves `continue` out, or a [`welcome`](#welcome-object) that replaces the page, shows no card. A welcome can link to the mission itself with `#/campaign/<campaign id>/<mission id>`.
+
+If `start` names a campaign that is not bundled, or a mission the campaign does not have, the home page shows no card and is otherwise unchanged. The health checklist in Settings > Distribution profile has a `start` row that says which it was. A campaign that exists only as a local campaign on your own machine counts as not bundled, because your players will not have it.
+
+Leave `start` out and nothing changes.
+
 ### `home` (object)
 
 Rearranges Coilbox's own home page: which layout it uses, what it paints behind the page, and which zones it shows in what order.
@@ -427,7 +458,7 @@ Six zones make up the page. Each one is self-contained and draws nothing when it
 | ------------ | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
 | `onboarding` | The "Set up Coilbox" card (content folder and engine) and the get-started download suggestions.                            | Setup is done, the player has a game and at least three maps, the player dismissed the card, or [`onboarding`](#onboarding-string) is `"off"`. |
 | `greeting`   | The page heading and the line under it. Greets by lobby name once logged in.                                              | Never. An app always has a title, though the line under it depends on your other zones. See [What the greeting says depends on the rest of your list](#what-the-greeting-says-depends-on-the-rest-of-your-list). |
-| `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install.                            |
+| `continue`   | One card for the thing you were last doing: a Warpath run, the next campaign mission, a conquest, a battle you can still rejoin, or your last skirmish setup. | There is nothing to resume, which includes every fresh install unless [`start`](#start-object) names a mission. |
 | `resume`     | Up to three runners-up the `continue` card did not take, plus a "log in as" card when you are logged out with a saved login. | There are no runners-up.                                                                   |
 | `cards`      | Every sidebar destination as a card, in the sidebar's own groups. A group's external links share one card at its end.      | The build has no navigation left outside Home.                                             |
 | `suggested`  | One curated map to download that the player does not already have, chosen by date. Sits in the tool grid's Downloads group, or at the top of the page when the player has no maps at all and the `onboarding` zone is offering none. | The player already has every curated map, or the catalog offers none that can be installed and pictured. |

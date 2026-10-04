@@ -1,5 +1,6 @@
 import type { GameFilter, ProfileSource } from "./profile";
 import { canonicalProfileId } from "./renamedIds";
+import type { StartResolution } from "./start";
 
 export type HealthStatus = "ok" | "warn" | "error" | "unknown";
 
@@ -100,6 +101,8 @@ export interface HealthInputs {
   validIconNames: string[];
   /** The resolved `home` key, or null when the profile has none. */
   home: HomeHealth | null;
+  /** What the profile's `start` key resolved to against the bundled campaigns. */
+  start: StartResolution;
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -264,6 +267,32 @@ export function checkHome(home: HomeHealth | null): HealthCheck | null {
     label: `${home.issues.length} problem(s) in \`home\``,
     hint: `Coilbox drew the page anyway: ${home.summary}. Each line below is one thing it ignored or could not read.`,
     detail: home.issues.join("\n"),
+  };
+}
+
+/**
+ * Report what a profile's `start` key resolved to (issue #3378).
+ *
+ * A `start` naming a campaign or mission that is not bundled draws no card on
+ * the home page, which on the author's screen looks the same as a card the
+ * player has already finished. This row is where the difference shows.
+ *
+ * `null` when the profile has no `start` key, in the shape of {@link checkHideIds}.
+ */
+export function checkStart(start: StartResolution): HealthCheck | null {
+  if (start.status === "none") return null;
+  if (start.status === "ok") {
+    return {
+      id: "start",
+      status: "ok",
+      label: `Start: '${start.mission.title}' in campaign '${start.campaign.title}'`,
+    };
+  }
+  return {
+    id: "start",
+    status: "warn",
+    label: "`start` names nothing playable",
+    hint: `The home page shows no start card: ${start.issue}.`,
   };
 }
 
@@ -538,13 +567,14 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     }
   }
 
-  // 9-12. Profile no-op advisories: configured values that silently do nothing.
+  // 9-13. Profile no-op advisories: configured values that silently do nothing.
   // Each returns null (no row) when its part of the profile is empty.
   for (const c of [
     checkHideIds(i.hide, i.hideableNavIds),
     checkHideSettingsIds(i.hideSettings, i.settingsIds),
     checkLinkIcons(i.linkIcons, i.validIconNames),
     checkHome(i.home),
+    checkStart(i.start),
   ]) {
     if (c) checks.push(c);
   }
