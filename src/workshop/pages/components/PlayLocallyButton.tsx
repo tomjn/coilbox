@@ -206,8 +206,8 @@ export function PlayLocallyButton({
   const blocker =
     !targetLoading && !target
       ? "No engine is installed. Add one from Content before playing locally."
-      : scan.error
-        ? `The content scan failed: ${scan.error}`
+      : scan.error || scan.data?.initFailure
+        ? `The content scan failed: ${scan.error ?? scan.data?.initFailure}`
         : scan.data && !game
           ? `${project.gameName} is not installed here.`
           : scan.data && maps.length === 0

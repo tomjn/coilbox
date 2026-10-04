@@ -18,6 +18,7 @@ import { usePlay } from "../play/PlayProvider";
 import { launchScenario } from "../scenario/launch";
 import { type Difficulty, usesDifficulty } from "../scenario/model";
 import { useCampaignProgress } from "./campaigns";
+import { missionNeeds } from "./missionNeeds";
 import type { Campaign, CampaignMission } from "./model";
 import {
   applyDefeat,
@@ -100,7 +101,11 @@ export function missionUnfinishedReason(
  * same either way.
  */
 export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
-  const { target, loading: targetLoading } = usePreferredTarget();
+  const {
+    target,
+    loading: targetLoading,
+    refresh: refreshTarget,
+  } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { running, launch } = usePlay();
   const { progress, save } = useCampaignProgress();
@@ -142,6 +147,17 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
   const difficulty = runDifficulty(progress, campaign.id);
 
   const noEngine = !targetLoading && !target;
+  // Everything the briefing's download panel has to get, engine first. `missing`
+  // above names only the first thing short, which is all the launch needs.
+  const needs = missionNeeds({
+    unfinished: !!unfinished,
+    noEngine,
+    scanReady,
+    gameName: snapshot.gameName,
+    mapName: snapshot.mapName,
+    games,
+    maps,
+  });
   const scanLoading = !!target && !scanReady && scan.loading;
   const canStart =
     !!target &&
@@ -396,6 +412,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     /** Why the mission cannot be played at all, whatever is installed. */
     unfinished,
     noEngine,
+    /** What the download panel offers: the engine, game and map still short. */
+    needs,
     scanLoading,
     running,
     saving,
@@ -410,6 +428,8 @@ export function useMissionRun(campaign: Campaign, mission: CampaignMission) {
     recordVictory,
     recordDefeat,
     reset,
+    /** Read the installed engines again, after one was downloaded. */
+    refreshTarget,
     /** Force a rescan so a just-installed game/map clears `missing` (install gate). */
     recheck: async () => {
       await scan.run(true);

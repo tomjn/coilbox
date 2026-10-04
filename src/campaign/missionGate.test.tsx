@@ -19,13 +19,22 @@
 
 import { renderHook } from "@testing-library/react";
 import { useCallback, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SkirmishDraft } from "../play/drafts";
 
-const { scan } = vi.hoisted(() => ({
+const { scan, engine } = vi.hoisted(() => ({
   scan: {
     games: [{ name: "BA", primaryArchive: { name: "ba.sdz" } }],
     maps: [{ name: "Comet" }],
+  },
+  // The engine the preferred-target read finds, or none. Mutated by the tests
+  // that install one, standing in for the read after a download.
+  engine: {
+    target: {
+      enginePath: "/engine",
+      dataDir: "/data",
+      executable: "/engine/spring",
+    } as unknown,
   },
 }));
 
@@ -53,7 +62,11 @@ vi.mock("../content/bindings", () => ({
 
 vi.mock("../content/config", () => ({
   primeScan: vi.fn(async () => ({ games: [] })),
-  useUnitsyncScan: () => ({ data: scan, loading: false, run: vi.fn() }),
+  useUnitsyncScan: () => ({
+    data: engine.target ? scan : null,
+    loading: false,
+    run: vi.fn(),
+  }),
 }));
 
 vi.mock("../content/replayUserState", () => ({
@@ -65,12 +78,9 @@ vi.mock("../play/config", () => ({
   mapOptionSchema: vi.fn(async () => []),
   toBattleConfig: vi.fn(() => ({ myPlayerName: "Player" })),
   usePreferredTarget: () => ({
-    target: {
-      enginePath: "/engine",
-      dataDir: "/data",
-      executable: "/engine/spring",
-    },
+    target: engine.target,
     loading: false,
+    refresh: vi.fn(),
   }),
 }));
 
@@ -203,5 +213,73 @@ describe("a mission naming installed content", () => {
     expect(run.missing).toBeNull();
     expect(run.unfinished).toBeNull();
     expect(run.canStart).toBe(true);
+  });
+});
+
+describe("what the briefing offers to download", () => {
+  const baseGames = [{ name: "BA", primaryArchive: { name: "ba.sdz" } }];
+  const target = {
+    enginePath: "/engine",
+    dataDir: "/data",
+    executable: "/engine/spring",
+  };
+  afterEach(() => {
+    scan.games = [...baseGames];
+    scan.maps = [{ name: "Comet" }];
+    engine.target = target;
+  });
+
+  it("lists the game and the map together when both are short", () => {
+    const mission = missionOn("m1", "XTA", "Delta");
+
+    expect(open(campaignOf(mission), mission).needs).toEqual([
+      { kind: "game", name: "XTA" },
+      { kind: "map", name: "Delta" },
+    ]);
+  });
+
+  it("lists only the engine on a machine with none", () => {
+    engine.target = null;
+    const mission = missionOn("m1", "XTA", "Delta");
+
+    const run = open(campaignOf(mission), mission);
+
+    expect(run.noEngine).toBe(true);
+    expect(run.needs).toEqual([{ kind: "engine", name: "" }]);
+    expect(run.canStart).toBe(false);
+  });
+
+  it("lists nothing for a mission that was never finished", () => {
+    const mission = missionOn("m1", "BA", "");
+
+    expect(open(campaignOf(mission), mission).needs).toEqual([]);
+  });
+
+  it("becomes playable once the game is installed, with no reload", () => {
+    const mission = missionOn("m1", "XTA", "Comet");
+    const campaign = campaignOf(mission);
+    const hook = renderHook(() => useMissionRun(campaign, mission));
+    expect(hook.result.current.needs).toEqual([{ kind: "game", name: "XTA" }]);
+    expect(hook.result.current.canStart).toBe(false);
+
+    // What the rescan after the download reads.
+    scan.games = [...baseGames, { name: "XTA", primaryArchive: { name: "x" } }];
+    hook.rerender();
+
+    expect(hook.result.current.needs).toEqual([]);
+    expect(hook.result.current.canStart).toBe(true);
+  });
+
+  it("moves from the engine to the game once an engine is installed", () => {
+    engine.target = null;
+    const mission = missionOn("m1", "XTA", "Comet");
+    const campaign = campaignOf(mission);
+    const hook = renderHook(() => useMissionRun(campaign, mission));
+    expect(hook.result.current.needs).toEqual([{ kind: "engine", name: "" }]);
+
+    engine.target = target;
+    hook.rerender();
+
+    expect(hook.result.current.needs).toEqual([{ kind: "game", name: "XTA" }]);
   });
 });

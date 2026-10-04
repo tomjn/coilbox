@@ -178,6 +178,41 @@ describe("resolveVerdict", () => {
     expect(verdict.resolved).toBe(false);
   });
 
+  it("says the install could not be read when the scan's Init failed (issue #3392)", () => {
+    // The worker still prints a result when Init fails, with empty lists. That
+    // is not a report of an empty machine, so nothing is offered to download
+    // and the engine's own reason is what the reader is shown.
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        scan: {
+          ...SCANNED,
+          data: { initFailure: "Init: not enough free space on drive" },
+        },
+      }),
+    );
+    expect(verdict.unreadable).toBe(true);
+    expect(verdict.unreadableReason).toBe(
+      "Init: not enough free space on drive",
+    );
+    expect(verdict.loading).toBe(false);
+    expect(verdict.missing).toEqual([]);
+    expect(verdict.resolved).toBe(false);
+  });
+
+  it("still offers a download when the scan succeeded and the game is absent", () => {
+    const verdict = resolveVerdict(
+      readings({
+        requirements: [exactGameRequirement("Beyond All Reason")],
+        installed: nothingYet,
+        scan: { ...SCANNED, data: {} },
+      }),
+    );
+    expect(verdict.unreadable).toBe(false);
+    expect(verdict.missing.map((r) => r.label)).toEqual(["Beyond All Reason"]);
+  });
+
   it("says the install could not be read when the scan was cancelled", () => {
     const verdict = resolveVerdict(
       readings({
