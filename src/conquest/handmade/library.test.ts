@@ -74,7 +74,17 @@ const staged = (change: object = {}) => ({
   ...change,
 });
 
+// The webview fetches a model file by URL. Here the file named last in the URL
+// is read from the sample folder, unless a test has put other text there.
+let modelText: Record<string, string> = {};
+vi.stubGlobal("fetch", async (url: string) => {
+  const file = decodeURIComponent(url.split("/").at(-1) ?? "");
+  const text = modelText[file] ?? readFileSync(`${SAMPLE}${file}`, "utf8");
+  return { ok: true, text: async () => text };
+});
+
 beforeEach(() => {
+  modelText = {};
   for (const mock of Object.values(hoisted)) mock.mockReset();
   hoisted.list.mockResolvedValue({ items: [item()] });
   hoisted.discard.mockResolvedValue({});
@@ -218,6 +228,67 @@ describe("loading a hand-made map", () => {
           file: "broken.png",
         }),
       ],
+    });
+  });
+
+  describe("a .gltf model that names other files", () => {
+    // Put the sample's cairn.gltf in the folder with these uris added.
+    const withModel = (
+      gltf: object,
+      files: string[] = FILES,
+      file = "cairn.gltf",
+    ) => {
+      modelText[file] = JSON.stringify(gltf);
+      hoisted.list.mockResolvedValue({ items: [item({ files })] });
+    };
+
+    it("names the .bin the folder does not hold", async () => {
+      withModel({ buffers: [{ uri: "cairn.bin", byteLength: 4 }] });
+      const result = await loadHandmadeMap("sample-two-shores");
+      expect(result).toEqual({
+        ok: false,
+        errors: [
+          expect.objectContaining({
+            code: "file-missing",
+            file: "cairn.bin",
+            message: expect.stringContaining("models[0]"),
+          }),
+        ],
+      });
+      if (result.ok) return;
+      expect(result.errors[0].message).toContain("cairn.gltf");
+      expect(result.errors[0].message).toContain("cairn.bin");
+    });
+
+    it("names a texture the folder does not hold, in a percent-encoded folder path", async () => {
+      withModel({ images: [{ uri: "my%20textures/stone.png" }] });
+      const result = await loadHandmadeMap("sample-two-shores");
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors[0].message).toContain("my textures/stone.png");
+    });
+
+    it("accepts files the folder holds and data uris", async () => {
+      withModel(
+        {
+          buffers: [
+            { uri: "cairn.bin" },
+            { uri: "data:application/octet-stream;base64,AAAA" },
+          ],
+          images: [{ uri: "picture.png" }, { bufferView: 0 }],
+        },
+        [...FILES, "cairn.bin"],
+      );
+      const result = await loadHandmadeMap("sample-two-shores");
+      expect(result.ok).toBe(true);
+    });
+
+    it("refuses a uri that leaves the map folder", async () => {
+      withModel({ buffers: [{ uri: "../outside.bin" }] });
+      const result = await loadHandmadeMap("sample-two-shores");
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.errors[0].message).toContain("../outside.bin");
     });
   });
 
