@@ -43,11 +43,7 @@ import {
   usePreferredTarget,
   useSkirmishAis,
 } from "../../play/config";
-import {
-  gameRequirement,
-  offerableGames,
-  resolveGameDownload,
-} from "../../play/gameOffer";
+import { challengeGameRequirement, offerableGames } from "../../play/gameOffer";
 import {
   compareGameVersions,
   resolveGameByShortname,
@@ -960,10 +956,7 @@ function ImportChallengeForm({
       initialCode={initialCode}
       decode={decodeConquestChallenge}
       buildRequirement={(settings) =>
-        gameRequirement(
-          settings.game,
-          resolveGameDownload(settings.game, gameCatalog) ?? undefined,
-        )
+        challengeGameRequirement(settings.game, gameCatalog)
       }
       finish={finish}
       countSubstitutedMaps={substitutedMapCount}

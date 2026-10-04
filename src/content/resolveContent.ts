@@ -42,6 +42,9 @@ export interface ContentRequirement {
   kind: ContentRequirementKind;
   label: string;
   downloadKey?: string;
+  /** True when coilbox knows no download for this, so the gate shows a plain
+   *  message instead of a Download button that would fail (issue #3401). */
+  noDownload?: boolean;
   isInstalled: (installed: InstalledContentSnapshot) => boolean;
 }
 

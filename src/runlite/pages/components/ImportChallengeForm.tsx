@@ -6,9 +6,10 @@ import {
 } from "../../../content/bindings";
 import { useUnitsyncScan } from "../../../content/config";
 import { useMapEligibility } from "../../../content/mapEligibility";
-import type { ContentRequirement } from "../../../content/resolveContent";
 import type { PlayTarget } from "../../../play/config";
 import { usePreferredTarget } from "../../../play/config";
+import { challengeGameRequirement } from "../../../play/gameOffer";
+import { useGameCatalog } from "../../../play/useGameCatalog";
 import { getGameMatcher } from "../../../profile/profile";
 import {
   decodeWarpathChallenge,
@@ -18,25 +19,6 @@ import {
 } from "../../challenge";
 import type { GenBuildGraph } from "../../generate";
 import { useRuns } from "../../runs";
-
-/** Best-effort shortname match, filtered by the distribution profile's game
- * filter — the same rule `importChallenge` used before #387. */
-function shortnameGameRequirement(shortname: string): ContentRequirement {
-  const want = shortname.trim().toLowerCase();
-  return {
-    kind: "game",
-    label: shortname,
-    downloadKey: shortname,
-    isInstalled: (installed) => {
-      const matcher = getGameMatcher();
-      return installed.games.some(
-        (g) =>
-          (!matcher || matcher(g.name)) &&
-          (g.shortname ?? g.name).trim().toLowerCase() === want,
-      );
-    },
-  };
-}
 
 /**
  * Paste a challenge code and generate the identical warpath locally, resolved
@@ -57,6 +39,7 @@ export function ImportChallengeForm({
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { eligible } = useMapEligibility();
   const { saveRun } = useRuns();
+  const gameCatalog = useGameCatalog();
 
   const finish = async (
     settings: WarpathChallengeSettings,
@@ -137,7 +120,7 @@ export function ImportChallengeForm({
       initialCode={initialCode}
       decode={decodeWarpathChallenge}
       buildRequirement={(settings) =>
-        shortnameGameRequirement(settings.game.shortname)
+        challengeGameRequirement(settings.game, gameCatalog)
       }
       finish={finish}
       countSubstitutedMaps={substitutedMapCount}
