@@ -3,6 +3,7 @@ import {
   type LobbyServer,
   profileOfficialServer,
 } from "../lobby-servers/config";
+import { keyIsOnServer } from "../lobby-servers/sameServer";
 import { notify } from "../notify/notify";
 import { sendAdminCommand } from "./admin/adminRequest";
 import { occupancy } from "./battles/battleFilters";
@@ -169,8 +170,7 @@ export function ConnectionSession({
       if (joinedChannels[activeKey] === undefined) {
         const official = profileOfficialServer();
         const isOfficialServer =
-          official != null &&
-          activeKey.endsWith(`@${official.host}:${official.port}`);
+          official != null && keyIsOnServer(activeKey, official);
         const seed = firstConnectChannels(
           protocol,
           isOfficialServer ? profileDefaultChannels() : [],
