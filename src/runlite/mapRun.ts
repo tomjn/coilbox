@@ -1,3 +1,4 @@
+import { handmadeMapRefFor } from "../challenge/mapRef";
 import { generateCities } from "../conquest/cities";
 import type { GalaxyDoc, GameRef, NodeBattleSpec } from "../conquest/model";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
@@ -242,7 +243,7 @@ export function runMapRefFor(map: GalaxyDoc): RunMapRef {
       ...(g.layout ? { layout: g.layout } : {}),
     };
   }
-  return { source: "handmade", id: map.id };
+  return handmadeMapRefFor(map);
 }
 
 /** A map to cross, with the Warpath markings a hand-made one carries. */

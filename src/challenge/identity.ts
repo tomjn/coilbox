@@ -80,7 +80,13 @@ export function warpathIdentity(s: RunSettings): string {
                 s.map.nodeCount,
                 s.map.layout ?? null,
               ]
-            : ["handmade", s.map.id],
+            : [
+                "handmade",
+                s.map.id,
+                // Only when the run carries one, so a run made before
+                // fingerprints keeps the identity it had.
+                ...(s.map.fingerprint ? [s.map.fingerprint] : []),
+              ],
         ]
       : []),
   ]);
