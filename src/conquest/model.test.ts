@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "./model";
 import {
   newConquestState,
+  parseConquestStateFile,
   parseGalaxyJson,
   reconcileState,
   wrapGalaxyForExport,
@@ -215,5 +216,40 @@ describe("reconcileState", () => {
     expect(healed.incursions).toEqual([
       { nodeId: "a", factionId: "e", expiresOnTurn: 2 },
     ]);
+  });
+});
+
+describe("parseConquestStateFile", () => {
+  it("reads an empty string and the plugin default as no conquests", () => {
+    for (const text of ["", "  \n", '{"schemaVersion":1,"conquests":{}}']) {
+      expect(parseConquestStateFile(text).conquests).toEqual({});
+    }
+  });
+
+  it("fails on text that is not JSON", () => {
+    expect(() => parseConquestStateFile("not json")).toThrow(/not valid JSON/);
+  });
+
+  it("fails on JSON of the wrong shape", () => {
+    for (const text of ["[]", "null", "42", '"text"', "true"]) {
+      expect(() => parseConquestStateFile(text)).toThrow(/not a JSON object/);
+    }
+    for (const text of ["{}", '{"conquests":[]}', '{"conquests":null}']) {
+      expect(() => parseConquestStateFile(text)).toThrow(/no conquests object/);
+    }
+  });
+
+  it("fails on a file made by a newer version", () => {
+    expect(() =>
+      parseConquestStateFile('{"schemaVersion":2,"conquests":{}}'),
+    ).toThrow(/newer version of coilbox/);
+  });
+
+  it("passes the saved runs through untouched", () => {
+    const text = JSON.stringify({
+      schemaVersion: 1,
+      conquests: { g1: { seed: 1, extra: true } },
+    });
+    expect(parseConquestStateFile(text)).toEqual(JSON.parse(text));
   });
 });

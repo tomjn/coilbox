@@ -715,41 +715,72 @@ export function reconcileRun(run: RogueliteRun): RogueliteRun {
   };
 }
 
+/** The version of the run file this build reads and writes. */
+export const RUN_STATE_SCHEMA_VERSION = 1;
+
 /**
- * Parse the run-state document into a map of healed runs keyed by id, skipping
- * any that fail {@link parseRunJson} validation. Migrates the legacy single-run
- * shape (`{ run: <run> }`, at most one) into a one-entry map so an in-flight run
- * saved before multi-run support isn't lost. Always returns a usable file, even
- * from garbage input.
+ * Parse the run-state document into a map of healed runs keyed by id. Migrates
+ * the legacy single-run shape (`{ run: <run> }`, at most one) into a one-entry
+ * map so an in-flight run saved before multi-run support isn't lost.
+ *
+ * An empty string is an empty file, as is the plugin's default for a file that
+ * does not exist. Anything else that cannot be read as a whole throws, because
+ * reading it as empty would let the next save replace every run: text that is
+ * not JSON, JSON of the wrong shape, a file made by a newer version, and a file
+ * where any one run fails {@link parseRunJson}. A single unreadable run fails the
+ * load rather than being skipped, since a save writes back only the runs that
+ * were read and would delete it.
  */
 export function parseRunStateFile(json: string): RunStateFile {
+  const empty: RunStateFile = { schemaVersion: 1, runs: {} };
+  if (json.trim() === "") return empty;
   let data: unknown;
   try {
     data = JSON.parse(json);
   } catch {
-    return { schemaVersion: 1, runs: {} };
+    throw new Error("run.json is not valid JSON");
   }
-  if (!isRecord(data)) return { schemaVersion: 1, runs: {} };
+  if (!isRecord(data) || Array.isArray(data)) {
+    throw new Error("run.json is not a JSON object");
+  }
+  if (
+    typeof data.schemaVersion === "number" &&
+    data.schemaVersion > RUN_STATE_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      `run.json was made by a newer version of coilbox (file version ${data.schemaVersion}, this version reads ${RUN_STATE_SCHEMA_VERSION})`,
+    );
+  }
 
   const runs: Record<string, RogueliteRun> = {};
 
   // Current shape: a keyed map of runs.
-  if (isRecord(data.runs)) {
+  if (data.runs !== undefined) {
+    if (!isRecord(data.runs) || Array.isArray(data.runs)) {
+      throw new Error("run.json has a runs entry that is not an object");
+    }
     for (const [id, raw] of Object.entries(data.runs)) {
       if (!id) continue;
       const parsed = parseRunJson(JSON.stringify(raw));
-      if (parsed) runs[id] = reconcileRun(parsed);
+      if (!parsed)
+        throw new Error(`run.json has a run that cannot be read (${id})`);
+      runs[id] = reconcileRun(parsed);
     }
+  } else if (data.run === undefined) {
+    throw new Error("run.json has no runs");
   }
 
   // Legacy migration: a single `run` from before multi-run storage. A stable id
   // (seed + creation time) keeps the key identical across reloads.
-  if (Object.keys(runs).length === 0 && isRecord(data.run)) {
+  if (
+    Object.keys(runs).length === 0 &&
+    data.run !== undefined &&
+    data.run !== null
+  ) {
     const parsed = parseRunJson(JSON.stringify(data.run));
-    if (parsed) {
-      runs[`run-${parsed.settings.seed}-${parsed.createdAt}`] =
-        reconcileRun(parsed);
-    }
+    if (!parsed) throw new Error("run.json has a run that cannot be read");
+    runs[`run-${parsed.settings.seed}-${parsed.createdAt}`] =
+      reconcileRun(parsed);
   }
 
   return { schemaVersion: 1, runs };

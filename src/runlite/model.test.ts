@@ -166,16 +166,6 @@ describe("parseRunStateFile", () => {
     expect(file.runs.beta.progress.hull).toBe(100);
   });
 
-  it("skips runs that fail validation", () => {
-    const file = parseRunStateFile(
-      JSON.stringify({
-        schemaVersion: 1,
-        runs: { good: baseRun(), bad: { type: "roguelite-run" } },
-      }),
-    );
-    expect(Object.keys(file.runs)).toEqual(["good"]);
-  });
-
   it("migrates a legacy single-run document into a one-entry map", () => {
     const file = parseRunStateFile(
       JSON.stringify({ schemaVersion: 1, run: baseRun() }),
@@ -185,11 +175,55 @@ describe("parseRunStateFile", () => {
     expect(file.runs[ids[0]].settings.seed).toBe(42);
   });
 
-  it("returns an empty map for a null legacy run and for garbage", () => {
+  it("returns an empty map for a null legacy run", () => {
     expect(
       parseRunStateFile(JSON.stringify({ schemaVersion: 1, run: null })).runs,
     ).toEqual({});
-    expect(parseRunStateFile("not json").runs).toEqual({});
+  });
+
+  it("reads an empty string and the plugin default as no runs", () => {
+    for (const text of ["", "  \n", '{"schemaVersion":1,"runs":{}}']) {
+      expect(parseRunStateFile(text).runs).toEqual({});
+    }
+  });
+
+  it("fails on text that is not JSON", () => {
+    expect(() => parseRunStateFile("not json")).toThrow(/not valid JSON/);
+    expect(() => parseRunStateFile('{"runs":{"a":')).toThrow(/not valid JSON/);
+  });
+
+  it("fails on JSON that is not an object with runs", () => {
+    for (const text of ["[]", "null", "42", '"text"', "true"]) {
+      expect(() => parseRunStateFile(text)).toThrow(/not a JSON object/);
+    }
+    expect(() => parseRunStateFile("{}")).toThrow(/no runs/);
+    expect(() => parseRunStateFile('{"runs":[]}')).toThrow(/not an object/);
+    expect(() => parseRunStateFile('{"runs":"x"}')).toThrow(/not an object/);
+  });
+
+  it("fails on a file made by a newer version", () => {
+    expect(() =>
+      parseRunStateFile(
+        JSON.stringify({ schemaVersion: 2, runs: { a: baseRun() } }),
+      ),
+    ).toThrow(/newer version of coilbox/);
+  });
+
+  it("fails when one run cannot be read, naming it", () => {
+    expect(() =>
+      parseRunStateFile(
+        JSON.stringify({
+          schemaVersion: 1,
+          runs: { good: baseRun(), bad: { type: "roguelite-run" } },
+        }),
+      ),
+    ).toThrow(/\(bad\)/);
+  });
+
+  it("fails on a legacy run that cannot be read", () => {
+    expect(() =>
+      parseRunStateFile(JSON.stringify({ schemaVersion: 1, run: {} })),
+    ).toThrow(/cannot be read/);
   });
 });
 

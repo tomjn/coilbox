@@ -173,3 +173,63 @@ describe("after the meta failed to load", () => {
     expect(hoisted.metaSave).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("a damaged run file", () => {
+  beforeEach(() => {
+    hoisted.metaLoad.mockResolvedValue({ json: goodMeta });
+  });
+
+  const damaged: [string, string, RegExp][] = [
+    [
+      "text that is not JSON",
+      '{"schemaVersion":1,"runs":{"a":',
+      /not valid JSON/,
+    ],
+    ["JSON of the wrong shape", "[]", /not a JSON object/],
+    ["a runs entry that is not an object", '{"runs":[]}', /not an object/],
+    [
+      "a file made by a newer coilbox",
+      JSON.stringify({ schemaVersion: 2, runs: { old: run("old") } }),
+      /newer version of coilbox/,
+    ],
+    [
+      "one unreadable run among good ones",
+      JSON.stringify({
+        schemaVersion: 1,
+        runs: { good: run("good"), bad: { type: "roguelite-run" } },
+      }),
+      /cannot be read \(bad\)/,
+    ],
+  ];
+
+  for (const [name, json, reason] of damaged) {
+    it(`reads ${name} as a failed load and a save writes nothing`, async () => {
+      hoisted.stateLoad.mockResolvedValue({ json });
+      const h = await load();
+      await waitFor(() => expect(h.runsApi().error).toMatch(reason));
+      await expect(h.runsApi().saveRun("r1", run("new"))).rejects.toThrow(
+        reason,
+      );
+      await expect(h.runsApi().deleteRun("good")).rejects.toThrow(reason);
+      expect(hoisted.stateSave).not.toHaveBeenCalled();
+    });
+  }
+
+  const empty: [string, string][] = [
+    ["an empty string", ""],
+    ["the plugin default", '{"schemaVersion":1,"runs":{}}'],
+  ];
+
+  for (const [name, json] of empty) {
+    it(`reads ${name} as no runs and a save writes`, async () => {
+      hoisted.stateLoad.mockResolvedValue({ json });
+      const h = await load();
+      await waitFor(() => expect(h.runsApi().loading).toBe(false));
+      expect(h.runsApi().error).toBeNull();
+      await act(async () => {
+        await h.runsApi().saveRun("r1", run("new"));
+      });
+      expect(hoisted.stateSave).toHaveBeenCalledTimes(1);
+    });
+  }
+});
