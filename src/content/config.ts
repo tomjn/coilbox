@@ -341,6 +341,10 @@ export async function primeScan(
       // cache, or the next open would resurface "cancelled" as a scan error.
       if (!(e instanceof ScanInitFailure) && !/cancelled/i.test(msg))
         scanErrorCache.set(key, msg);
+      // A rescan that failed leaves nothing to vouch for the answer before it,
+      // so a page opened next must not be handed that answer. A cancel learned
+      // nothing, so it keeps it (issue #3431).
+      if (!/cancelled/i.test(msg)) scanCache.delete(key);
       throw e;
     } finally {
       inFlightScans.delete(key);
@@ -427,9 +431,15 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (e instanceof ScanInitFailure) setUnvouched(e.result);
-        // A cancel lands in a stable "cancelled" state rather than an error.
+        // A cancel lands in a stable "cancelled" state rather than an error,
+        // and keeps the answer before it: nothing was learned. Any other
+        // failure drops that answer, since the reason to rescan is that
+        // something changed and the old lists no longer describe the install.
         if (/cancelled/i.test(msg)) setCancelled(true);
-        else setError(msg);
+        else {
+          setData(null);
+          setError(msg);
+        }
         return null;
       } finally {
         setLoading(false);
