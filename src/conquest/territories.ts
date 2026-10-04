@@ -9,9 +9,9 @@ import {
 import type { GalaxyDoc, LinkKind } from "./model";
 import { mulberry32, type Rng } from "./rng";
 import {
+  type GeneratedTerrain,
   generateTerrain,
   labelLandMasses,
-  type TerrainPixels,
 } from "./terrainGen";
 
 /**
@@ -168,7 +168,7 @@ function placeSeeds(
  * pixels, so borders run straight in open country and no province crosses
  * water. Each province is one piece and holds its own seed.
  */
-function growProvinces(terrain: TerrainPixels, seeds: number[]): Int16Array {
+function growProvinces(terrain: GeneratedTerrain, seeds: number[]): Int16Array {
   const { width, height, land } = terrain;
   const pixels = width * height;
   const count = seeds.length;
@@ -475,7 +475,7 @@ function traceOutlines(
  * with the same generator afterwards.
  */
 export function generateProvinces(
-  terrain: TerrainPixels,
+  terrain: GeneratedTerrain,
   count: number,
   rng: Rng,
 ): Provinces {
@@ -670,7 +670,7 @@ export function generateTerritories(
  * layout it carries. Null when the document's terrain is not a generated one:
  * an authored map, a galaxy, or a document saved without its `generated` block.
  */
-export function generatedTerrain(doc: GalaxyDoc): TerrainPixels | null {
+export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
   const g = doc.generated;
   if (!g || doc.terrain?.image !== GENERATED_TERRITORIES_IMAGE) return null;
   const shape = resolveLayout(g.layout, mulberry32(g.seed));

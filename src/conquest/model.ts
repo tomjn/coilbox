@@ -131,11 +131,7 @@ export interface GalaxyNode {
   /** Selection-panel flavour text. */
   blurb?: string;
   battle: NodeBattleSpec;
-  /** One or more closed polygons in map units, ring of [x, y] points, last point not repeated, no holes. Absent means a point location. `pos` stays the anchor. */
-  outline?: [number, number][][];
 }
-
-export type LinkKind = "border" | "crossing" | "road";
 
 /** Author-controlled presentation of the strategic map. */
 export interface GalaxyTheme {
@@ -646,16 +642,6 @@ export function parseGalaxyJson(json: string): GalaxyDoc | null {
     importedChallenge: d.importedChallenge === true ? true : undefined,
     generated: parseGenerated(d.generated),
   };
-}
-
-export function linkKind(
-  doc: GalaxyDoc,
-  a: string,
-  b: string,
-): LinkKind | undefined {
-  return doc.linkKinds?.find(
-    ([x, y]) => (x === a && y === b) || (x === b && y === a),
-  )?.[2];
 }
 
 /** Wrap a galaxy in the export/share file shape. */

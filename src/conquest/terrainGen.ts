@@ -40,7 +40,7 @@ export interface TerrainOptions {
   landRadius?: number;
 }
 
-export interface TerrainPixels {
+export interface GeneratedTerrain {
   /** Pixels across and down. Every array is row by row from the top left. */
   width: number;
   height: number;
@@ -295,7 +295,10 @@ function landColour(h: number): Rgb {
 
 /** The index of the pixel holding a point given in map units. */
 export function terrainPixelAt(
-  terrain: Pick<TerrainPixels, "width" | "height" | "mapWidth" | "mapHeight">,
+  terrain: Pick<
+    GeneratedTerrain,
+    "width" | "height" | "mapWidth" | "mapHeight"
+  >,
   x: number,
   y: number,
 ): number {
@@ -311,7 +314,7 @@ export function terrainPixelAt(
  * land: each one is the centre of a blob, and the noise cannot pull a blob's
  * centre under the sea (see {@link SEA_LEVEL}).
  */
-export function generateTerrain(opts: TerrainOptions): TerrainPixels {
+export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const rng = mulberry32(hashString(`terrain:${opts.seed >>> 0}`));
   const coastSeed = Math.floor(rng() * 4294967296) | 0;
   const peakSeed = Math.floor(rng() * 4294967296) | 0;
@@ -421,7 +424,7 @@ export interface LandMasses {
  * share an edge. Labels run in the order a row by row scan first meets them.
  */
 export function labelLandMasses(
-  terrain: Pick<TerrainPixels, "width" | "height" | "land">,
+  terrain: Pick<GeneratedTerrain, "width" | "height" | "land">,
 ): LandMasses {
   const { width, height, land } = terrain;
   const labels = new Int32Array(width * height).fill(-1);
