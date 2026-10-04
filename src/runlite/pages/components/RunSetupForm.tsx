@@ -37,7 +37,11 @@ import {
 import { loadoutById, unlockedLoadouts, unlocksFor } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
-import { setupLimitWarning } from "../../unitLimit";
+import {
+  buildGraphFor,
+  setupLimitNote,
+  setupLimitWarning,
+} from "../../unitLimit";
 
 /**
  * The run-setup form, shown in a drawer (see RunListPage). Assembles a
@@ -166,31 +170,22 @@ export function RunSetupForm({
 
   const side = sides.find((s) => s.name === sideName);
 
-  const build: GenBuildGraph | undefined = useMemo(() => {
-    if (!dataset || !side?.startUnit) return undefined;
-    const edges = new Map<string, string[]>();
-    const names = new Map<string, string>();
-    for (const u of dataset.units) {
-      edges.set(
-        u.name.toLowerCase(),
-        (u.buildOptions ?? []).map((o) => o.toLowerCase()),
-      );
-      names.set(u.name.toLowerCase(), u.fullName ?? u.name);
-    }
-    return { startUnit: side.startUnit.toLowerCase(), edges, names };
-  }, [dataset, side?.startUnit]);
+  const build: GenBuildGraph | undefined = useMemo(
+    () => (dataset ? buildGraphFor(side?.startUnit, dataset.units) : undefined),
+    [dataset, side?.startUnit],
+  );
 
   // Said before the run starts, so the player knows when no unit limit applies.
+  const limitInput = {
+    gameName: game?.name ?? "",
+    sideName: sideName || "this game",
+    startUnit: side?.startUnit,
+    status: datasetStatus,
+    units: dataset?.units,
+  };
   const limitWarning =
-    game && !gameLoading
-      ? setupLimitWarning({
-          gameName: game.name,
-          sideName: sideName || "this game",
-          startUnit: side?.startUnit,
-          status: datasetStatus,
-          units: dataset?.units,
-        })
-      : null;
+    game && !gameLoading ? setupLimitWarning(limitInput) : null;
+  const limitNote = game && !gameLoading ? setupLimitNote(limitInput) : null;
 
   // Excluded maps never enter the pool, so a generated run cannot put the player
   // on one (see `content/mapEligibility`).
@@ -401,6 +396,9 @@ export function RunSetupForm({
           </>
         )}
       </Button>
+      {limitNote && (
+        <p className="text-xs text-muted-foreground">{limitNote}</p>
+      )}
       {limitWarning && (
         <p className="text-xs text-muted-foreground">{limitWarning}</p>
       )}

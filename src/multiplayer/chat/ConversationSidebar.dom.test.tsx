@@ -372,3 +372,73 @@ describe("ConversationSidebar: join or watch a friend's battle (#3381)", () => {
     ).toBe(2);
   });
 });
+
+describe("ConversationSidebar: a Tachyon friend's lobby (#3394)", () => {
+  const online = { status: { ingame: false, away: false } };
+
+  // Tachyon's lobby list has no member names and no host, so the only link
+  // from a friend to a lobby is the friend's currentLobby.
+  function tachyonFriend(
+    currentLobby: string | null | undefined,
+    lobby: Record<string, unknown> = {},
+  ) {
+    wire.favourites = { [KEY_A]: ["amy"] };
+    wire.connections = {
+      [KEY_A]: connectionFor(KEY_A, true, {
+        users: {
+          amy: { name: "amy", currentLobby, ...online },
+        } as unknown as LobbyState["users"],
+        battles: {
+          "4": {
+            id: 4,
+            tachyonId: "uuid-4",
+            title: "Skirmish",
+            host: "",
+            members: {},
+            passworded: false,
+            locked: false,
+            maxPlayers: 8,
+            playerCount: 2,
+            inProgress: false,
+            ...lobby,
+          },
+        } as unknown as LobbyState["battles"],
+      }),
+    };
+  }
+
+  it("offers Join for a friend in an open lobby", () => {
+    tachyonFriend("uuid-4");
+    renderSidebar();
+
+    expect(screen.getByRole("button", { name: "Join Skirmish" })).toBeTruthy();
+  });
+
+  it("offers Watch for a friend in a running lobby", () => {
+    tachyonFriend("uuid-4", { inProgress: true });
+    renderSidebar();
+
+    expect(screen.getByRole("button", { name: "Watch Skirmish" })).toBeTruthy();
+  });
+
+  it("offers nothing for a friend in no lobby", () => {
+    tachyonFriend(null);
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: /^(Join|Watch)/ })).toBeNull();
+  });
+
+  it("offers nothing when the server never said which lobby", () => {
+    tachyonFriend(undefined);
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: /^(Join|Watch)/ })).toBeNull();
+  });
+
+  it("offers nothing for a lobby that is not in the list", () => {
+    tachyonFriend("uuid-elsewhere");
+    renderSidebar();
+
+    expect(screen.queryByRole("button", { name: /^(Join|Watch)/ })).toBeNull();
+  });
+});

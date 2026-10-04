@@ -8,6 +8,11 @@ const COMMANDS: &[&str] = &[
     "conquest_delete",
     "conquest_state_load",
     "conquest_state_save",
+    "conquest_map_list",
+    "conquest_map_stage",
+    "conquest_map_commit",
+    "conquest_map_discard",
+    "conquest_map_remove",
 ];
 
 fn main() {

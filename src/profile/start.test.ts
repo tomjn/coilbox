@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Campaign } from "../campaign/model";
 import { defaultSkirmishDraft } from "../play/drafts";
-import { resolveStart, type StartCampaign } from "./start";
+import { newScenario } from "../scenario/create";
+import { resolveStart, type StartCampaign, type StartScenario } from "./start";
 
 function mission(id: string, title: string): Campaign["missions"][number] {
   return {
@@ -35,9 +36,31 @@ function campaign(
   };
 }
 
+function scenario(
+  id: string,
+  source: StartScenario["source"] = "bundled",
+  setUp = true,
+): StartScenario {
+  const made = newScenario("First Steps");
+  return {
+    source,
+    scenario: {
+      ...made,
+      id,
+      setup: setUp
+        ? { ...made.setup, gameName: "Ironhold 1.2", mapName: "Red Comet" }
+        : made.setup,
+    },
+  };
+}
+
 /** The issue text of a resolution that must be a problem. */
-function issue(raw: unknown, campaigns: StartCampaign[]): string {
-  const r = resolveStart(raw, campaigns);
+function issue(
+  raw: unknown,
+  campaigns: StartCampaign[],
+  scenarios: StartScenario[] = [],
+): string {
+  const r = resolveStart(raw, campaigns, scenarios);
   if (r.status !== "problem")
     throw new Error(`expected a problem, got ${r.status}`);
   return r.issue;
@@ -97,5 +120,69 @@ describe("resolveStart", () => {
     expect(issue({ campaign: "c1", mission: 2 }, [campaign("c1")])).toContain(
       "`start.mission`",
     );
+  });
+});
+
+describe("resolveStart, naming a scenario", () => {
+  it("takes a bundled scenario", () => {
+    const r = resolveStart({ scenario: "s1" }, [], [scenario("s1")]);
+    expect(r.status === "scenario" && r.scenario.id).toBe("s1");
+  });
+
+  it("resolves a campaign start the same with scenarios loaded", () => {
+    // The unchanged case: a third argument must not move a campaign answer.
+    const campaigns = [campaign("c1")];
+    expect(
+      resolveStart({ campaign: "c1" }, campaigns, [scenario("s1")]),
+    ).toEqual(resolveStart({ campaign: "c1" }, campaigns));
+  });
+
+  it("reports a scenario that is not there", () => {
+    expect(issue({ scenario: "nope" }, [], [scenario("s1")])).toContain(
+      "'nope' is not bundled",
+    );
+  });
+
+  it("refuses a local scenario, which players will not have", () => {
+    expect(issue({ scenario: "s1" }, [], [scenario("s1", "local")])).toContain(
+      "not a bundled one",
+    );
+  });
+
+  it("takes the bundled copy when a local one shares its id", () => {
+    const r = resolveStart(
+      { scenario: "s1" },
+      [],
+      [scenario("s1", "local"), scenario("s1")],
+    );
+    expect(r.status).toBe("scenario");
+  });
+
+  it("reports both a campaign and a scenario as a mistake", () => {
+    expect(
+      issue(
+        { campaign: "c1", scenario: "s1" },
+        [campaign("c1")],
+        [scenario("s1")],
+      ),
+    ).toContain("both a `campaign` and a `scenario`");
+  });
+
+  it("reports a mission beside a scenario", () => {
+    expect(
+      issue({ scenario: "s1", mission: "m1" }, [], [scenario("s1")]),
+    ).toContain("`start.mission` goes with `campaign`");
+  });
+
+  it("reports a scenario with no game and map", () => {
+    expect(
+      issue({ scenario: "s1" }, [], [scenario("s1", "bundled", false)]),
+    ).toContain("names no game and map");
+  });
+
+  it("reports an id of the wrong shape instead of throwing", () => {
+    for (const raw of [{ scenario: 3 }, { scenario: "" }, { scenario: null }]) {
+      expect(issue(raw, [], [scenario("s1")])).toContain("`start.scenario`");
+    }
   });
 });

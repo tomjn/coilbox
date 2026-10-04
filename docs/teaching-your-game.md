@@ -215,6 +215,8 @@ The full rules are in [`start`](distribution-profile.md#start-object). The ones 
 - Only a campaign you bundle counts. A campaign that exists only on your machine does not.
 - The card stays until the player wins that mission.
 
+If you have one lesson and do not want a campaign around it, `start` can name a bundled scenario instead. Put the scenario's export in `.coilbox/scenarios/` and write `"start": { "scenario": "<scenario id>" }`. The card then opens the Scenarios page and stays until the player wins the scenario. See [Starting on a scenario](distribution-profile.md#starting-on-a-scenario).
+
 ## Check that it works
 
 1. Run coilbox from your distribution folder, using a fresh profile with no progress.
