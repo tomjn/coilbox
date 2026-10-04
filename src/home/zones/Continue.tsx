@@ -1,8 +1,20 @@
 import { buttonVariants, cn } from "@picoframe/frame";
 import { Play } from "lucide-react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
+import { missionNeeds } from "../../campaign/missionNeeds";
+import { useCampaignImage } from "../../campaign/panorama";
+import { useUnitsyncScan } from "../../content/config";
+import { mediaKind } from "../../lib/assetUrl";
+import { usePreferredTarget } from "../../play/config";
 import { CARD_FOCUS_CLASS, GROUP_HEADING_CLASS } from "../cardShell";
-import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
+import {
+  RESUME_KIND_COPY,
+  RESUME_KIND_ICON,
+  type ResumeCandidate,
+  startCopy,
+  useResume,
+} from "../continue";
 
 /**
  * One large card for the single most relevant thing to pick up again, with the
@@ -94,14 +106,126 @@ import { RESUME_KIND_COPY, RESUME_KIND_ICON, useResume } from "../continue";
  * to put this card somewhere else. How wide the card is arrives as `className`
  * from whichever layout placed it, which is how `stacked` sits it beside the
  * resume rail (#1041) without either zone learning about the other.
+ *
+ * ## The start card
+ *
+ * A distribution's profile can name a bundled campaign mission as where a new
+ * player starts (issue #3378). The collector puts it first until the mission is
+ * finished, so it arrives here as the top candidate and this card draws it. It
+ * is this card rather than a zone of its own because it wants this card's slot,
+ * its size and its place beside the rail, and a second zone would have had to
+ * be told all three. See {@link StartHero} for the two things it adds.
  */
 export default function Continue({ className }: { className?: string }) {
   const { candidates, loading } = useResume();
   const top = candidates[0];
   if (loading || !top) return null;
+  if (top.start)
+    return <StartHero top={top} start={top.start} className={className} />;
 
   const { label, action } = RESUME_KIND_COPY[top.kind];
-  const Icon = RESUME_KIND_ICON[top.kind];
+  return heroCard({
+    top,
+    label,
+    action,
+    detail: top.detail,
+    art: <KindIcon kind={top.kind} />,
+    className,
+  });
+}
+
+/** The tinted square holding the kind's icon, which is all the art a run has. */
+function KindIcon({ kind }: { kind: ResumeCandidate["kind"] }) {
+  const Icon = RESUME_KIND_ICON[kind];
+  return (
+    <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+      <Icon className="size-6" aria-hidden />
+    </span>
+  );
+}
+
+/**
+ * The hero for a distribution's start mission. The same card, with two changes.
+ *
+ * It draws the campaign's own emblem, or its background when it has no emblem.
+ * The "No art" argument above is about runs, which have no picture of their
+ * own. A campaign does, and the author drew it. A video background is skipped,
+ * since a clip looping in a 48px box is noise, and the icon stands in.
+ *
+ * It also checks whether the mission's engine, game and map are installed, with
+ * the same {@link missionNeeds} the briefing page asks, and says so on the card
+ * when they are not. The downloads themselves stay on the briefing page, which
+ * the card opens and which already holds the mission back until they are done.
+ *
+ * A component of its own so the install scan is only asked for on a page that
+ * has a start card. Every other home page never mounts it.
+ */
+function StartHero({
+  top,
+  start,
+  className,
+}: {
+  top: ResumeCandidate;
+  start: NonNullable<ResumeCandidate["start"]>;
+  className?: string;
+}) {
+  const { campaign, mission } = start;
+  const { target, loading: targetLoading } = usePreferredTarget();
+  const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
+  const gameName = mission.snapshot?.gameName ?? "";
+  const mapName = mission.snapshot?.mapName ?? "";
+  const needs = missionNeeds({
+    unfinished: !gameName || !mapName,
+    noEngine: !targetLoading && !target,
+    scanReady: !!scan.data,
+    gameName,
+    mapName,
+    games: scan.data?.games ?? [],
+    maps: scan.data?.maps ?? [],
+  });
+  const copy = startCopy(needs);
+  const src = useCampaignImage(
+    campaign.id,
+    campaign.icon ?? campaign.background,
+  );
+  const still = src && mediaKind(src) !== "video" ? src : undefined;
+  return heroCard({
+    top,
+    label: RESUME_KIND_COPY.start.label,
+    action: copy.action,
+    detail: copy.detail ?? top.detail,
+    art: still ? (
+      <img
+        src={still}
+        alt=""
+        className={cn(
+          "size-12 shrink-0 rounded-md",
+          campaign.icon ? "object-contain" : "object-cover",
+        )}
+      />
+    ) : (
+      <KindIcon kind="start" />
+    ),
+    className,
+  });
+}
+
+/** The card itself, shared by a thing to resume and a mission to start. */
+function heroCard({
+  top,
+  label,
+  action,
+  detail,
+  art,
+  className,
+}: {
+  top: ResumeCandidate;
+  label: string;
+  action: string;
+  detail: string;
+  art: ReactNode;
+  className?: string;
+}) {
   return (
     // The accent border and the filled action mark this as the card to look at.
     // A tinted fill would say the same thing three times. The tint was also
@@ -129,9 +253,7 @@ export default function Continue({ className }: { className?: string }) {
           CARD_FOCUS_CLASS,
         )}
       >
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-          <Icon className="size-6" aria-hidden />
-        </span>
+        {art}
         <div className="min-w-0 flex-1">
           {/* The heading is the kind, not the run's name. See above. A heading
               inside a link is valid, and the link's own label is what gets read
@@ -140,7 +262,7 @@ export default function Continue({ className }: { className?: string }) {
             {label}
           </h2>
           <p className="text-xl font-semibold">{top.title}</p>
-          <p className="text-sm text-muted-foreground">{top.detail}</p>
+          <p className="text-sm text-muted-foreground">{detail}</p>
         </div>
         {/* Inert. The card around it is the link. `title` so a pointer user who
             wants the words can still get them. */}

@@ -7,6 +7,7 @@ import type { GameAiConfig } from "../play/gameAi";
 import { describeJsonError } from "./jsonError";
 import { type OnboardingPlacement, onboardingPlacement } from "./onboarding";
 import { readProfileFile, resolveFileRef } from "./refs";
+import type { StartConfig } from "./start";
 
 /**
  * Distribution profile: a `profile.json` a bundler drops into the portable
@@ -259,6 +260,13 @@ export interface Profile {
    * treated as `"below"`.
    */
   onboarding?: OnboardingPlacement;
+  /**
+   * Where a new player starts: a campaign this distribution bundles, and
+   * optionally one mission in it (see `./start`). The home page's continue card
+   * offers it until the player finishes that mission, or the campaign's first
+   * mission when only a campaign is named. Omitted leaves the home page as it is.
+   */
+  start?: StartConfig;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */
   links?: LinkConfig[];
   /** Lobby-server presets: an official server, a preset allow-list, seed channels. */
