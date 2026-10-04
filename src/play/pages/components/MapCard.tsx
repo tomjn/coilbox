@@ -108,6 +108,7 @@ export function MapCard({
   markerColors,
   env,
   mapsLoading,
+  scanError,
   onSelectMap,
   disabled,
   selectLabel = "Choose map",
@@ -127,6 +128,8 @@ export function MapCard({
   env?: { minWind?: number; maxWind?: number; tidalStrength?: number };
   /** The map list is still being scanned, so no maps are available yet. */
   mapsLoading?: boolean;
+  /** The content scan failed with this reason, so the picker says so. */
+  scanError?: string | null;
   onSelectMap: (name: string) => void;
   disabled?: boolean;
   /** Label for the picker button (e.g. "Suggest map" in a joined battle). */
@@ -250,6 +253,7 @@ export function MapCard({
         selectedName={map?.name ?? ""}
         onSelect={onSelectMap}
         mapsLoading={mapsLoading}
+        scanError={scanError}
       />
     </div>
   );

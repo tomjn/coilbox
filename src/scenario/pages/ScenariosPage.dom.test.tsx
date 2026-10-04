@@ -212,4 +212,18 @@ describe("ScenariosPage download offer", () => {
     ).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Download/ })).toBeNull();
   });
+
+  it("keeps Play off and claims nothing is missing after a failed content scan", () => {
+    mocks.scan.data = null;
+    mocks.scan.error = "no space left on device";
+    render(<ScenariosPage />);
+
+    expect(play().disabled).toBe(true);
+    expect(
+      screen.getByText("The content scan failed: no space left on device"),
+    ).toBeTruthy();
+    expect(document.body.textContent).not.toMatch(
+      /not installed|No game is installed|Download/,
+    );
+  });
 });
