@@ -12,6 +12,11 @@ import { bodyLabel, type VoidBody } from "./bodies";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
+import {
+  type PlacedModelSources,
+  placedModelLoaders,
+} from "./placedModelLoaders";
+import { buildPlacedModels } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
 import { createSelection } from "./selection";
 import {
@@ -169,6 +174,12 @@ interface GalaxyViewProps {
    * between renders, because a new object rebuilds the scene.
    */
   terrainPixels?: TerrainPixels;
+  /**
+   * Where `galaxy.models` are read from: the installed game and the map's
+   * folder. A model whose source is absent is reported as missing. Keep it
+   * stable between renders, because a new object rebuilds the scene.
+   */
+  modelSources?: PlacedModelSources;
   display?: Partial<GalaxyDisplay>;
   className?: string;
 }
@@ -409,6 +420,7 @@ export function GalaxyView({
   focusNodeId,
   focusBiasX = 0,
   terrainPixels,
+  modelSources,
   display,
   className,
 }: GalaxyViewProps) {
@@ -522,6 +534,17 @@ export function GalaxyView({
         terrainColor ?? terrainSpec.image,
         renderRef,
       );
+      // Scenery. It loads in the background and never holds the map up.
+      if (galaxy.models?.length && !modelSources?.pending) {
+        buildPlacedModels(
+          scene,
+          disposables,
+          surface,
+          galaxy.models,
+          placedModelLoaders(modelSources),
+          renderRef,
+        );
+      }
     } else {
       buildBackdrop(
         scene,
@@ -1222,6 +1245,7 @@ export function GalaxyView({
     terrainReady,
     terrainHeights,
     terrainColor,
+    modelSources,
   ]);
 
   // Prop changes mutate the live scene (and render a frame when the loop is
