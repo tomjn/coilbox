@@ -36,7 +36,12 @@
       "battle": { "mapName": "MapA" }
     },
     { "color": "#7ab85a", "name": "Midvale", "owner": "west" },
-    { "color": "#4f9da6", "name": "Eastcliff", "difficulty": 2 },
+    {
+      "color": "#4f9da6",
+      "name": "Eastcliff",
+      "difficulty": 2,
+      "warpath": { "kind": "shop" }
+    },
     { "color": "#8a6fc2", "name": "Southreach" },
     { "color": "#b55f9a", "name": "Ironcoast", "difficulty": 3 },
     {
@@ -72,6 +77,7 @@
   "crossings": [["eastcliff", "ironcoast"]],
   "blockedBorders": [["northmarch", "midvale"]],
   "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]],
+  "warpath": { "start": "westhaven", "goal": "farwatch" },
   "models": [
     { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 }
   ]

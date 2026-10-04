@@ -396,8 +396,9 @@ export function runLocations(
  * so each step of the run is written from the earlier location to the later.
  * A link from a route location to scenery is written scenery first, which
  * never lights. A link between two route locations that is not a step joins
- * two of the same rank, and is left out: it cannot be travelled in this run,
- * and it would light as a choice whichever way round it was written.
+ * two of the same rank. It cannot be travelled in this run, and it would
+ * light as a choice whichever way round it was written, so it stays as the
+ * map has it and {@link mapRunClosedLinks} names it for the view.
  */
 export function mapRunToGalaxyDoc(
   run: RogueliteRun,
@@ -407,16 +408,7 @@ export function mapRunToGalaxyDoc(
   const nodeAt = new Map(
     run.nodes.map((n) => [locations.get(n.id) ?? n.id, n]),
   );
-  const steps = new Set(
-    run.edges.map(([a, b]) =>
-      linkKey(locations.get(a) ?? a, locations.get(b) ?? b),
-    ),
-  );
-  const sideways = (a: string, b: string) =>
-    nodeAt.has(a) &&
-    nodeAt.has(b) &&
-    !steps.has(linkKey(a, b)) &&
-    !steps.has(linkKey(b, a));
+  const steps = stepKeys(run, locations);
 
   return {
     ...map,
@@ -450,15 +442,57 @@ export function mapRunToGalaxyDoc(
         battle: { mapName: n.battle?.mapName ?? "" },
       };
     }),
-    links: map.links
-      .filter(([a, b]) => !sideways(a, b))
-      .map(([a, b]): [string, string] =>
-        steps.has(linkKey(b, a)) || (nodeAt.has(a) && !nodeAt.has(b))
-          ? [b, a]
-          : [a, b],
-      ),
-    linkKinds: map.linkKinds?.filter(([a, b]) => !sideways(a, b)),
+    links: map.links.map(([a, b]): [string, string] =>
+      steps.has(linkKey(b, a)) || (nodeAt.has(a) && !nodeAt.has(b))
+        ? [b, a]
+        : [a, b],
+    ),
   };
+}
+
+/** The steps of a run as link keys between location ids, earlier end first. */
+function stepKeys(run: RogueliteRun, locations: Map<string, string>) {
+  return new Set(
+    run.edges.map(([a, b]) =>
+      linkKey(locations.get(a) ?? a, locations.get(b) ?? b),
+    ),
+  );
+}
+
+/**
+ * The links between two route locations that are no step of the run, as the
+ * view's link keys. They are written as {@link mapRunToGalaxyDoc} writes
+ * them, which for these is the order the map has. The view draws such a link
+ * and never lights it as a way forward.
+ */
+export function mapRunClosedLinks(
+  run: RogueliteRun,
+  map: GalaxyDoc,
+  locations: Map<string, string>,
+): Set<string> {
+  const onRoute = new Set(locations.values());
+  const steps = stepKeys(run, locations);
+  const out = new Set<string>();
+  for (const [a, b] of map.links) {
+    if (!onRoute.has(a) || !onRoute.has(b)) continue;
+    if (steps.has(linkKey(a, b)) || steps.has(linkKey(b, a))) continue;
+    out.add(linkKey(a, b));
+  }
+  return out;
+}
+
+/**
+ * The locations on no route from the start to the goal. The view draws them
+ * and keeps the pointer off them: no hover, no cursor, no selection.
+ */
+export function mapRunScenery(
+  map: GalaxyDoc,
+  locations: Map<string, string>,
+): Set<string> {
+  const onRoute = new Set(locations.values());
+  return new Set(
+    map.nodes.filter((place) => !onRoute.has(place.id)).map((p) => p.id),
+  );
 }
 
 /** Move a set of answers keyed by run node id onto location ids. */
@@ -514,12 +548,25 @@ export function mapRunEmphasis(
   return out;
 }
 
-/** The start and goal markers and the danger tints, by location id. */
+/**
+ * The start and goal markers and the danger tints, by location id. The two
+ * ends also say which end they are, which is what a terrain map draws its
+ * start and goal markers from.
+ */
 export function mapRunIdentities(
   run: RogueliteRun,
   locations: Map<string, string>,
 ): Map<string, NodeIdentity> {
-  return new Map(byLocation(runIdentities(run), locations));
+  const out = new Map(byLocation(runIdentities(run), locations));
+  for (const n of run.nodes) {
+    if (n.type !== "start" && n.type !== "boss") continue;
+    const at = locations.get(n.id) ?? n.id;
+    out.set(at, {
+      ...out.get(at),
+      end: n.type === "start" ? "start" : "goal",
+    });
+  }
+  return out;
 }
 
 /** The path taken, as link keys between location ids. */

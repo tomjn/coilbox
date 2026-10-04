@@ -1,4 +1,5 @@
 import { parseMapDownload } from "../../campaign/model";
+import { MAP_RUN_KINDS, type MapRunKind } from "../../runlite/mapRun";
 import type { NodeBattleSpec } from "../model";
 import { MAX_DIFFICULTY, MIN_DIFFICULTY, NEUTRAL } from "../model";
 import {
@@ -74,10 +75,11 @@ export interface ManifestLocation {
   /** A sentence or two shown when the location is selected. */
   blurb?: string;
   /**
-   * Reserved for Warpath markings (issue #3514): the kind of location, one of
-   * battle, elite, shop, event or reward. The reader ignores it today.
+   * What this location is on a Warpath run: battle, elite, shop, event or
+   * reward. Leave it out and each run picks a kind from its seed. Conquest
+   * ignores it. The Warpath start and goal cannot have one.
    */
-  warpath?: { kind?: string };
+  warpath?: { kind?: MapRunKind };
   /**
    * A scenario played here in place of a skirmish: the name of a `.json` file
    * in the folder, as exported from the scenario builder. The scenario must be
@@ -145,8 +147,11 @@ export interface MapManifest {
   /** Pairs of location ids joined by a road. This is how a point location is reached. */
   roads?: [string, string][];
   /**
-   * Reserved for Warpath (issue #3514): the ids of the start and the goal. The
-   * reader ignores it today.
+   * The ids of the locations a Warpath run starts at and ends at. Give both to
+   * offer the map in Warpath, or leave `warpath` out for a map that is only
+   * for Conquest. The goal must be reachable from the start. A location on no
+   * shortest route between the two is scenery in Warpath. Conquest ignores
+   * this and uses every location.
    */
   warpath?: { start?: string; goal?: string };
   /**
@@ -158,7 +163,8 @@ export interface MapManifest {
 
 /**
  * A manifest after checking: every location has its id, colours are lower
- * case, the optional lists are present, and the reserved keys are dropped.
+ * case, the optional lists are present, the reserved keys are dropped, and
+ * `warpath` is present only with both of its ends.
  */
 export interface ResolvedManifest
   extends Omit<
@@ -177,6 +183,7 @@ export interface ResolvedManifest
   crossings: [string, string][];
   blockedBorders: [string, string][];
   roads: [string, string][];
+  warpath?: { start: string; goal: string };
 }
 
 type Obj = Record<string, unknown>;
@@ -499,9 +506,29 @@ export function parseManifest(text: string): {
     if (capital && owner === NEUTRAL) {
       field(`${label}.capital`, "is true, so the location needs an owner.");
     }
+    let warpath: { kind: MapRunKind } | undefined;
+    if (isObj(raw.warpath)) {
+      const kind = optText(raw.warpath, "kind", `${label}.warpath.kind`);
+      if (MAP_RUN_KINDS.includes(kind as MapRunKind)) {
+        warpath = { kind: kind as MapRunKind };
+      } else if (kind !== undefined) {
+        errors.push({
+          code: "warpath-kind",
+          name,
+          kind,
+          message: `${MANIFEST_FILE}: "${name}" has the Warpath kind "${kind}", which Warpath does not know. Use one of: ${MAP_RUN_KINDS.join(", ")}.`,
+        });
+      }
+    } else if (raw.warpath !== undefined) {
+      field(
+        `${label}.warpath`,
+        'must be an object such as { "kind": "shop" }.',
+      );
+    }
     return {
       id: locId,
       name,
+      warpath,
       owner,
       capital: capital || undefined,
       difficulty: optNumber(
@@ -652,6 +679,18 @@ export function parseManifest(text: string): {
     field("models", "must be a list of models.");
   }
 
+  let warpathStart: string | undefined;
+  let warpathGoal: string | undefined;
+  if (isObj(d.warpath)) {
+    warpathStart = optText(d.warpath, "start", "warpath.start");
+    warpathGoal = optText(d.warpath, "goal", "warpath.goal");
+  } else if (d.warpath !== undefined) {
+    field(
+      "warpath",
+      'must be an object such as { "start": "kent", "goal": "calais" }.',
+    );
+  }
+
   if (provinces.length + locations.length === 0 && Array.isArray(d.provinces)) {
     field("provinces", "is empty, and the map needs at least one location.");
   }
@@ -744,6 +783,60 @@ export function parseManifest(text: string): {
     }
   }
 
+  // Warpath markings. A map with neither end is for Conquest only.
+  let warpath: ResolvedManifest["warpath"];
+  const ends = [
+    ["start", warpathStart],
+    ["goal", warpathGoal],
+  ] as const;
+  for (const [end, endId] of ends) {
+    if (endId === undefined || nameOf.has(endId)) continue;
+    errors.push({
+      code: "warpath-unknown-location",
+      end,
+      id: endId,
+      message: `${MANIFEST_FILE}: warpath.${end} names "${endId}", which is not the id of any location.`,
+    });
+  }
+  if ((warpathStart === undefined) !== (warpathGoal === undefined)) {
+    const [has, missing] =
+      warpathGoal === undefined
+        ? (["start", "goal"] as const)
+        : (["goal", "start"] as const);
+    errors.push({
+      code: "warpath-one-end",
+      missing,
+      message: `${MANIFEST_FILE}: warpath has a ${has} and no ${missing}. Warpath needs both. Add warpath.${missing}, or remove warpath.${has} to offer the map in Conquest only.`,
+    });
+  } else if (warpathStart !== undefined && warpathGoal !== undefined) {
+    if (warpathStart === warpathGoal) {
+      if (nameOf.has(warpathStart)) {
+        errors.push({
+          code: "warpath-same-location",
+          id: warpathStart,
+          name: nameOf.get(warpathStart) ?? warpathStart,
+          message: `${MANIFEST_FILE}: the Warpath start and goal are both "${nameOf.get(warpathStart)}". They must be different locations.`,
+        });
+      }
+    } else if (nameOf.has(warpathStart) && nameOf.has(warpathGoal)) {
+      warpath = { start: warpathStart, goal: warpathGoal };
+    }
+    // A kind on either end would never be used, so it is the author's mistake.
+    for (const [end, endId] of ends) {
+      const at = all.find((l) => l.id === endId);
+      const kind = at?.warpath?.kind;
+      if (!at || !kind) continue;
+      errors.push({
+        code: "warpath-kind-on-end",
+        end,
+        id: at.id,
+        name: at.name,
+        kind,
+        message: `${MANIFEST_FILE}: "${at.name}" is the Warpath ${end}, so it cannot also have the kind "${kind}". Remove the kind, or move the ${end}.`,
+      });
+    }
+  }
+
   // A wrongly shaped pair list is a shape problem like the ones above.
   if (errors.some((e) => e.code === "manifest-field")) {
     return { manifest: null, errors };
@@ -768,6 +861,7 @@ export function parseManifest(text: string): {
       blockedBorders,
       roads,
       models,
+      warpath,
     },
     errors,
   };

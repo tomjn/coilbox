@@ -107,6 +107,8 @@ describe("listing hand-made maps", () => {
       source: "imported",
       pictureUrl:
         "coilbox://localhost/conquestmap/sample-two-shores/picture.png",
+      // The sample marks a Warpath start and goal.
+      warpath: true,
     });
     expect(maps[0].title).not.toBe("");
   });
@@ -128,6 +130,16 @@ describe("listing hand-made maps", () => {
     });
     const { maps } = await listHandmadeMaps();
     expect(maps[0].pictureUrl).toBeUndefined();
+  });
+
+  it("lists a map with no Warpath start and goal as one for Conquest only", async () => {
+    const edited = JSON.parse(manifest);
+    delete edited.warpath;
+    hoisted.list.mockResolvedValue({
+      items: [item({ manifest: JSON.stringify(edited) })],
+    });
+    const { maps } = await listHandmadeMaps();
+    expect(maps.map((m) => m.warpath)).toEqual([false]);
   });
 
   it("reports a folder whose manifest does not parse", async () => {

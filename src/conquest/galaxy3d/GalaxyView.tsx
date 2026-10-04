@@ -11,6 +11,7 @@ import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
 import { buildCueLayer } from "./cueLayer";
+import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
@@ -98,6 +99,11 @@ export interface NodeIdentity {
    * sites. Kept subtle and stellar-plausible by the caller.
    */
   starTint?: string;
+  /**
+   * The start or the goal of a run across a land map. Read on a terrain map
+   * only, where it draws a marker over the location. See endMarkerLayer.ts.
+   */
+  end?: "start" | "goal";
 }
 
 interface GalaxyViewProps {
@@ -144,6 +150,18 @@ interface GalaxyViewProps {
    * node. Only honoured with {@link laneFlow}. Default-off.
    */
   pathLinks?: Set<string>;
+  /**
+   * Links that are no step of the run, as `"a b"` in the order `galaxy.links`
+   * writes them. Such a link is drawn and never lit as a choice. Only
+   * honoured with {@link laneFlow}. Default-off.
+   */
+  closedLinks?: Set<string>;
+  /**
+   * Locations the pointer ignores: no hover, no pointer cursor, and a click
+   * on one selects nothing. A run across a land map lists its scenery here.
+   * They are still drawn.
+   */
+  inertIds?: Set<string>;
   /**
    * Fire a one-shot celebratory burst (shockwave + flare) on this node — e.g.
    * the star of a battle just won. Set it to the node id to play; set back to
@@ -426,6 +444,8 @@ export function GalaxyView({
   emphasis,
   laneFlow = false,
   pathLinks,
+  closedLinks,
+  inertIds,
   burstNodeId,
   spaceMaps,
   identities,
@@ -447,6 +467,8 @@ export function GalaxyView({
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
+  const closedLinksRef = useRef<Set<string> | undefined>(closedLinks);
+  const inertRef = useRef<Set<string> | undefined>(inertIds);
   const burstRef = useRef<string | null | undefined>(burstNodeId);
   const applyBurstRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
@@ -680,6 +702,7 @@ export function GalaxyView({
           ownerColor,
           ownersRef,
           labelObjects,
+          dimOf,
         )
       : undefined;
 
@@ -698,6 +721,19 @@ export function GalaxyView({
           cores,
         )
       : undefined;
+
+    // The start and the goal of a run across a land map. See endMarkerLayer.ts.
+    const endMarkers =
+      surface && identities
+        ? buildEndMarkerLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            identities,
+            ownerColor,
+          )
+        : undefined;
 
     // Crossings, blocked borders and the player's frontier, and the state of
     // every location and road on a terrain map. See cueLayer.ts.
@@ -719,7 +755,12 @@ export function GalaxyView({
               attackable: attackableRef.current,
               incursionNodeId: incursionRef.current?.nodeId,
               visible: visibleRef.current,
-              run: laneFlow ? { pathLinks: pathLinksRef.current } : undefined,
+              run: laneFlow
+                ? {
+                    pathLinks: pathLinksRef.current,
+                    closedLinks: closedLinksRef.current,
+                  }
+                : undefined,
             }),
           )
         : undefined;
@@ -863,7 +904,9 @@ export function GalaxyView({
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
-        cities.fitToCamera(camera.position.distanceTo(controls.target));
+        const distance = camera.position.distanceTo(controls.target);
+        cities.fitToCamera(distance);
+        endMarkers?.fitToCamera(distance);
       }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
@@ -886,6 +929,7 @@ export function GalaxyView({
       laneFlow,
       ownersRef,
       pathLinksRef,
+      closedLinksRef,
       isVisible,
       laneDim,
       ownerColor,
@@ -980,14 +1024,14 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      // Fogged locations aren't selectable. See picking.ts.
+      // Fogged and inert locations aren't selectable. See picking.ts.
       return pickLocation(
         hit?.instanceId ?? -1,
         provinces && {
           isProvince: provinces.isProvince,
           pick: () => provinces.pick(raycaster.ray),
         },
-        (i) => !isVisible(nodeIds[i]),
+        (i) => !isVisible(nodeIds[i]) || !!inertRef.current?.has(nodeIds[i]),
       );
     };
 
@@ -1350,11 +1394,22 @@ export function GalaxyView({
     visibleRef.current = visibleIds;
     emphasisRef.current = emphasis;
     pathLinksRef.current = pathLinks;
+    closedLinksRef.current = closedLinks;
+    inertRef.current = inertIds;
     attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, emphasis, pathLinks, attackableIds, reduceMotion]);
+  }, [
+    owners,
+    visibleIds,
+    emphasis,
+    pathLinks,
+    closedLinks,
+    inertIds,
+    attackableIds,
+    reduceMotion,
+  ]);
 
   useEffect(() => {
     selectedRef.current = selectedId;

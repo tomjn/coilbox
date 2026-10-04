@@ -29,7 +29,9 @@ import { usePreferredTarget } from "../../play/config";
 import { resolveGameDownload } from "../../play/gameOffer";
 import { resolveGameByShortname } from "../../play/installedGames";
 import { useGameCatalog } from "../../play/useGameCatalog";
+import { runLocations } from "../galaxyAdapter";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
+import { useRunHandmadeMap } from "../handmadeMap";
 import { isBattleNode, type RunNode, type RunNodeType } from "../model";
 import { hullLoss, isResolved, nextChoices, salvageReward } from "../progress";
 import { RunMapView } from "../RunMapView";
@@ -103,6 +105,17 @@ export default function RunPage() {
   const game = run
     ? resolveGameByShortname(run.settings.game, scan.data?.games ?? [])
     : undefined;
+  // The hand-made map the run was made on, and why it cannot be drawn on when
+  // it cannot: the map is gone or unreadable, or it has changed so the run no
+  // longer fits it.
+  const handmadeMap = useRunHandmadeMap(run?.settings.map);
+  const handmadeDoc = handmadeMap.map;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the graph, which is stable across moves
+  const mapProblem = useMemo(() => {
+    if (handmadeMap.problem) return handmadeMap.problem;
+    if (!run || !handmadeDoc || runLocations(run, handmadeDoc)) return null;
+    return `The hand-made map "${handmadeDoc.title}" has changed since this warpath began, and the run no longer fits it.`;
+  }, [handmadeMap.problem, handmadeDoc, run?.nodes, run?.edges]);
   // What to say about the run's game and engine on opening the run (issue
   // #3369). The map a battle needs is checked by that battle's own briefing.
   const gameNotice = run
@@ -285,6 +298,7 @@ export default function RunPage() {
         onSelect={onSelect}
         focusId={focusId}
         burstNodeId={burstId}
+        handmadeMap={handmadeMap}
         modelGame={{
           enginePath: target?.enginePath,
           dataDir: target?.dataDir,
@@ -371,6 +385,15 @@ export default function RunPage() {
             refreshTarget={refreshTarget}
             refreshScan={refreshScan}
           />
+        )}
+        {mapProblem && !active && (
+          <p
+            role="alert"
+            className={`pointer-events-auto max-w-xl p-3 text-sm ${HUD_CARD_CLASS}`}
+          >
+            {mapProblem} This warpath is drawn in columns until the map is back
+            as it was, and it can still be played.
+          </p>
         )}
         {selectedId && !active && (
           <div className="flex justify-end">

@@ -1,6 +1,11 @@
 import { decodeContainerText, readContainer } from "../../container/container";
 import { parseGameIdentity } from "../../container/gameIdentity";
 import { sameGameFamily } from "../../content/resolveContent";
+import {
+  MapRouteError,
+  type MapRunKind,
+  routeAcrossMap,
+} from "../../runlite/mapRun";
 import { parseScenarioJson } from "../../scenario/model";
 import {
   parseScenarioPayload,
@@ -75,7 +80,8 @@ const round = (v: number) => Math.round(v * 1000) / 1000;
  * the images is reported together. The one exception is the check that every
  * location can be reached: it is skipped while a colour is unlisted or
  * unpainted or a link names an unknown location, since each of those makes
- * provinces look cut off when they are not.
+ * provinces look cut off when they are not. The Warpath route from the start
+ * to the goal is skipped then too, for the same reason.
  */
 export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
   const { manifest, errors } = parseManifest(input.manifest);
@@ -309,7 +315,31 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     }
   }
 
+  // The same route a run takes, so a map the reader accepts is one a run can
+  // cross. It fails today only when the start or the goal is cut off from the
+  // other, which is reported above as well.
+  const links = linkKinds.map(([a, b]): [string, string] => [a, b]);
+  const { warpath } = manifest;
+  if (warpath && traceTrusted) {
+    try {
+      routeAcrossMap({ nodes, links }, warpath.start, warpath.goal);
+    } catch (e) {
+      if (!(e instanceof MapRouteError)) throw e;
+      errors.push({
+        code: "warpath-route",
+        startId: warpath.start,
+        goalId: warpath.goal,
+        message: `A Warpath run cannot get from the start ${described.get(warpath.start)} to the goal ${described.get(warpath.goal)}. Join them with a crossing or a road in ${MANIFEST_FILE}, or paint the land between them so it touches.`,
+      });
+    }
+  }
+
   if (errors.length > 0) return { ok: false, errors };
+
+  const warpathKinds: Record<string, MapRunKind> = {};
+  for (const l of [...manifest.provinces, ...manifest.locations]) {
+    if (l.warpath?.kind) warpathKinds[l.id] = l.warpath.kind;
+  }
 
   const playable = manifest.factions.filter((f) => f.playable !== false);
   const now = input.now ?? "";
@@ -326,7 +356,7 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       playableFactionIds: playable.map((f) => f.id),
       factions: manifest.factions.map(({ playable: _playable, ...f }) => f),
       nodes,
-      links: linkKinds.map(([a, b]) => [a, b]),
+      links,
       terrain: {
         image: pictureUrl,
         heightmap: heightmapUrl,
@@ -339,6 +369,15 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
       models: manifest.models.length > 0 ? manifest.models : undefined,
       theme: { skin: "theatre" },
+      ...(warpath
+        ? {
+            warpath: {
+              startId: warpath.start,
+              goalId: warpath.goal,
+              kinds: warpathKinds,
+            },
+          }
+        : {}),
       createdAt: now,
       updatedAt: now,
     },

@@ -19,7 +19,7 @@ local M = {}
 --
 -- @param engine the trigger engine
 -- @param state the published mission state, GG.CoilboxMission
--- @param hooks `say(lineId)` and `sound(name)`, both host-supplied
+-- @param hooks `say(lineId, hold)` and `sound(name)`, both host-supplied
 -- @return the dialogue itself, so a game's own actions speak through it
 function M.register(engine, state, hooks)
 	-- Dialogue id -> the scenario's line.
@@ -39,14 +39,18 @@ function M.register(engine, state, hooks)
 	-- speaker and its text as much as its id, and the runtime cannot invent
 	-- either. The compile step resolves every line a trigger names, so a stray
 	-- name means a mission edited by hand.
-	function dialogue.say(id)
+	--
+	-- `hold` keeps the line on the panel until the player dismisses it, where a
+	-- line otherwise leaves when its reading time is up. Only `true` holds, so a
+	-- flag written `false` is the line every runtime has always said.
+	function dialogue.say(id, hold)
 		local line = declared[id]
 		if not line then
 			engine:report("dialogue:" .. tostring(id), "warning",
 				"no dialogue line named " .. tostring(id) .. " in this mission, ignoring it")
 			return false
 		end
-		hooks.say(line.id)
+		hooks.say(line.id, hold == true)
 		return true
 	end
 
@@ -65,7 +69,7 @@ function M.register(engine, state, hooks)
 	end
 
 	engine:addAction("dialogue", function(params)
-		dialogue.say(params.line)
+		dialogue.say(params.line, params.hold)
 	end)
 
 	engine:addAction("play_sound", function(params)

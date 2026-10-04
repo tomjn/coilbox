@@ -19,9 +19,9 @@ const FILES = [
   "provinces.png",
   "heightmap.png",
   "cairn.gltf",
-  "highmoor-siege.json",
+  "ironcoast-siege.json",
 ];
-const scenarioText = readFileSync(`${SAMPLE}highmoor-siege.json`, "utf8");
+const scenarioText = readFileSync(`${SAMPLE}ironcoast-siege.json`, "utf8");
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
@@ -34,7 +34,7 @@ function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
     picture: { width: picture.width, height: picture.height },
     urlFor: (name) =>
       FILES.includes(name) ? `asset://map/${name}` : undefined,
-    scenarios: { "highmoor-siege.json": scenarioText },
+    scenarios: { "ironcoast-siege.json": scenarioText },
     ...change,
   };
 }
@@ -258,12 +258,10 @@ describe("the sample map", () => {
     expect(result.doc.models).toBeUndefined();
   });
 
-  it("ignores keys it does not know, including the reserved ones", () => {
+  it("ignores keys it does not know", () => {
     const result = readHandmadeMap(
       sample({
         manifest: manifestWith((m) => {
-          m.warpath = { start: "westhaven", goal: "farwatch" };
-          m.provinces[0].warpath = { kind: "shop" };
           (m as unknown as Record<string, unknown>).somethingNew = 1;
         }),
       }),
@@ -320,7 +318,9 @@ describe("a broken map folder", () => {
     ]);
     expect(errors[0].message).toContain('"Ironcoast" (#b55f9a)');
     expect(errors[0].message).toContain("cannot be reached");
-    expect(errors).toHaveLength(4);
+    // The Warpath goal is on the far side, so the route is reported too.
+    expect(only(errors, "warpath-route")).toHaveLength(1);
+    expect(errors).toHaveLength(5);
   });
 
   it("names a point location with no road to it", () => {
@@ -613,6 +613,144 @@ describe("a broken map folder", () => {
     expect(errors).toHaveLength(1);
     const [error] = only(errors, "link-conflict");
     expect(error.message).toContain("a blocked border and a road");
+  });
+});
+
+describe("Warpath markings", () => {
+  it("puts the start, the goal and the marked kinds on the document", () => {
+    expect(readSample().warpath).toEqual({
+      startId: "westhaven",
+      goalId: "farwatch",
+      kinds: { eastcliff: "shop", ironcoast: "battle" },
+    });
+  });
+
+  it("reads a map with neither end as one for Conquest only", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          delete m.warpath;
+        }),
+      }),
+    );
+    if (!result.ok) throw new Error("expected the read to pass");
+    expect(result.doc.warpath).toBeUndefined();
+  });
+
+  it("keeps the markings out of a saved galaxy", () => {
+    const doc = readSample();
+    const filled = {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        hasBlankBattle(n) ? { ...n, battle: { mapName: "MapA" } } : n,
+      ),
+    };
+    const parsed = parseGalaxyJson(JSON.stringify(filled));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.warpath).toBeUndefined();
+  });
+
+  it("names the start and the goal when one cannot be reached from the other", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.crossings = [];
+        }),
+      }),
+    );
+    const [error] = only(errors, "warpath-route");
+    expect(error.startId).toBe("westhaven");
+    expect(error.goalId).toBe("farwatch");
+    expect(error.message).toContain('the start "Westhaven" (#d9a441)');
+    expect(error.message).toContain('the goal "Farwatch" (#3fa374)');
+  });
+
+  it("refuses a start and a goal that are one location", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { start: "midvale", goal: "midvale" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-same-location");
+    expect(error.name).toBe("Midvale");
+    expect(error.message).toContain('both "Midvale"');
+  });
+
+  it("names a location marked with a kind Warpath does not know", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m.provinces[2] as { warpath?: unknown }).warpath = { kind: "shpo" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-kind");
+    expect(error.name).toBe("Midvale");
+    expect(error.kind).toBe("shpo");
+    expect(error.message).toContain('"Midvale" has the Warpath kind "shpo"');
+    expect(error.message).toContain("battle, elite, shop, event, reward");
+  });
+
+  it.each([
+    ["start", "goal"],
+    ["goal", "start"],
+  ] as const)("refuses a %s with no %s", (has, missing) => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { [has]: "westhaven" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-one-end");
+    expect(error.missing).toBe(missing);
+    expect(error.message).toContain(`a ${has} and no ${missing}`);
+  });
+
+  it("names a start that is not the id of any location", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { start: "atlantis", goal: "farwatch" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-unknown-location");
+    expect(error.end).toBe("start");
+    expect(error.id).toBe("atlantis");
+  });
+
+  it("refuses a kind on the start or the goal", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[1].warpath = { kind: "shop" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-kind-on-end");
+    expect(error.end).toBe("start");
+    expect(error.message).toContain('"Westhaven" is the Warpath start');
+  });
+
+  it("says when warpath is not an object", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).warpath = "westhaven";
+        }),
+      }),
+    );
+    expect(only(errors, "manifest-field").map((e) => e.path)).toEqual([
+      "warpath",
+    ]);
   });
 });
 

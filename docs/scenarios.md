@@ -186,6 +186,7 @@ The names below are the ones in the compiled mission. The editor shows them with
 | `unit_captured` | An actor has changed hands, optionally to a named team. |
 | `unit_selected` | A player has a unit selected. Any unit, or one of a unit type, or one actor. Optionally one team's player. |
 | `command_given` | A player has given an order since the trigger was armed. Any order, or one command, or an order to build one unit type. Optionally one team's player. |
+| `dialogue_dismissed` | A player has clicked away a dialogue line that was set to wait for them, since the trigger was armed. |
 | `time_elapsed` | This many seconds since the mission started. |
 | `var` | A variable compared against a number, or against another variable, with `eq`, `ne`, `lt`, `lte`, `gt` or `gte`. |
 | `zone_held_for` | A team has had a unit in a zone continuously for this many seconds. Leaving resets the clock. **Uncontested** asks for control instead of presence. |
@@ -204,6 +205,8 @@ You cannot build this out of `units_in_zone` with `max = 0`. That reads the mome
 
 Both work in a multiplayer mission and in a replay. With no team set, any player's selection or order will do.
 
+`dialogue_dismissed` is the third condition that reads the player. It names one dialogue line, and it holds once a player has clicked that line away. Only a line said with "wait for the player" switched on can be dismissed, so the condition never holds for an ordinary timed line. Like `command_given`, it counts a dismissal made after the trigger was armed. A scenario that uses it needs mission runtime 9. See [Stop and wait for the player](#stop-and-wait-for-the-player).
+
 ### Actions
 
 | Type | What it does |
@@ -216,12 +219,13 @@ Both work in a multiplayer mission and in a replay. With no team set, any player
 | `set_var` / `add_var` | Write a variable, or move one by a delta. Either takes a number or another variable. |
 | `enable_trigger` / `disable_trigger` | Arm or disarm another trigger. |
 | `complete_objective` / `fail_objective` | Settle an objective. The first outcome sticks. |
-| `dialogue` | Say one of the scenario's declared lines. |
+| `dialogue` | Say one of the scenario's declared lines. Switch on "wait for the player" to keep the line on screen until the player clicks it away. |
 | `play_sound` | Play a sound by name, either an entry in the game's own `sounds.lua` or a file in the game. |
 | `reveal_area` | Lift the fog over a zone for a participant, for a number of seconds or the rest of the mission. See the [limits](#what-a-scenario-cannot-do-yet). |
 | `unlock_unit` | Lift the scenario's build restriction on one unit type for one participant. |
 | `camera_pan` | Move the camera to a point over a number of seconds, one second by default. Optionally one participant's camera. |
 | `map_marker` | Drop one of the map's own labelled points, with your label or none. Optionally on one participant's map. |
+| `pause_game` / `unpause_game` | Pause the game, or start it again. Single player only. |
 | `victory` | End the mission with the named participant's ally team as the winner. |
 | `defeat` | End the mission with every other ally team as the winner. |
 
@@ -268,6 +272,24 @@ Change the speaker and the words whenever. The `dialogue` action points at an id
 In game, lines queue rather than interrupt, because a trigger with two lines in it is an author writing an exchange. A line holds the panel for as long as its text takes to read, at least three seconds and at most twelve, and the backlog behind it is capped at six.
 
 Dialogue lives on the scenario, not on the campaign mission, because triggers fire it while the game is running. The mission keeps only what the player sees before the engine starts.
+
+### Stop and wait for the player
+
+A new player reads slower than a mission runs. Three things let a scenario wait for them. All three need mission runtime 9.
+
+- The `dialogue` action has a "wait for the player" switch. With it on, the line stays on the panel until the player clicks it, and the panel says "Click to continue" under the text. Lines behind it wait their turn.
+- The `dialogue_dismissed` condition holds once the player has clicked that line away. Use it to carry on with the lesson.
+- The `pause_game` and `unpause_game` actions stop and start the game clock.
+
+The usual pattern is two triggers. The first runs `pause_game` and a `dialogue` action that waits for the player. The second waits on `dialogue_dismissed` for that line and runs `unpause_game`, then whatever comes next.
+
+A paused game does not run the mission's clock either. While the game is paused, triggers are checked only when the player does something: dismisses a line, selects a unit or gives an order. Dismissing a line checks every armed trigger. Selecting a unit or giving an order checks only the triggers that wait on that selection or order and on nothing else. Nothing that waits on time, such as `time_elapsed` or a cooldown, moves until the game is running again. So always unpause from a trigger that waits on `dialogue_dismissed`. The player's own pause key works the whole time, so a mission that forgets to unpause does not trap them.
+
+Pausing is single player only. A pause stops the game for everyone in it, so in a game with more than one player `pause_game` and `unpause_game` do nothing, and the infolog says so once. A held line still works in multiplayer. Each player clicks their own copy away, and the first click is the one `dialogue_dismissed` hears.
+
+A spectator sees a held line as an ordinary timed one, and so does anyone watching a replay. A replay does not pause. The engine does not record the wait, and the mission's request to pause is not sent during playback.
+
+If the game has no LuaUI, or the player has switched the mission widget off, there is no panel to click. The runtime then dismisses a held line for the player straight away, so the lesson carries on without the message instead of waiting for ever.
 
 ## Restrictions
 
@@ -412,6 +434,6 @@ Honest limits, all of them things you can hit while authoring:
 
 One thing nobody has watched happen, so treat it as unproven rather than working:
 
-- **The objectives panel, dialogue panel and debrief have never been drawn in a real engine.** What they decide to draw is tested outside one, but nothing has confirmed they appear, that they do not sit on top of the game's own UI, or that a portrait loads: [issue #850](https://github.com/tomjn/coilbox/issues/850).
+- **The objectives panel, dialogue panel and debrief have never been drawn in a real engine.** That includes the "Click to continue" line under a held dialogue line, and the click that dismisses it. What they decide to draw is tested outside one, but nothing has confirmed they appear, that they do not sit on top of the game's own UI, or that a portrait loads: [issue #850](https://github.com/tomjn/coilbox/issues/850).
 
 For what the runtime does and does not do inside the engine, and how a game adopts it, see [the mission runtime](mission-runtime.md).

@@ -21,8 +21,10 @@ export interface ProvincePicker {
  * pointer decides. A point location standing inside a province keeps its own
  * hit target and wins.
  *
- * A location hidden by fog is never picked, and neither is whatever lies
- * under it: a hidden city standing in a visible province picks nothing.
+ * A location `isHidden` names is never picked, and neither is whatever lies
+ * under it: a hidden city standing in a visible province picks nothing. The
+ * view names the locations hidden by fog and the ones it was told are inert,
+ * such as the scenery of a run.
  */
 export function pickLocation(
   coreHit: number,

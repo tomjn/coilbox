@@ -1,0 +1,189 @@
+{
+  "id": "briefing",
+  "name": "Briefing",
+  "description": "A lesson that stops the game and waits for the player to read.",
+  "runtimeVersion": 9,
+  "setup": {
+    "gameName": "Test Game",
+    "mapName": "Comet Catcher Redux",
+    "participants": [
+      {
+        "id": "player",
+        "kind": "you",
+        "name": "Recruit",
+        "side": "arm",
+        "color": [0, 0.6, 1],
+        "allyTeam": 0,
+        "spectator": false
+      },
+      {
+        "id": "rivals",
+        "kind": "ai",
+        "name": "Rivals",
+        "side": "core",
+        "color": [1, 0, 0],
+        "allyTeam": 1,
+        "spectator": false
+      }
+    ],
+    "startPosType": 0,
+    "modOptionValues": {}
+  },
+  "teams": {},
+  "zones": [],
+  "actors": [
+    {
+      "id": "engineer",
+      "unitDef": "armck",
+      "team": "player",
+      "pos": {
+        "x": 1000,
+        "z": 1000
+      },
+      "facing": 0
+    }
+  ],
+  "groups": [],
+  "blueprints": [],
+  "bases": [],
+  "restrictions": {},
+  "vars": {},
+  "triggers": [
+    {
+      "id": "brief",
+      "name": "The lesson opens",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 1
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "pause_game",
+          "params": {}
+        },
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "welcome",
+            "hold": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "read",
+      "name": "The player has read the welcome",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "dialogue_dismissed",
+            "params": {
+              "line": "welcome"
+            }
+          },
+          {
+            "type": "time_elapsed",
+            "params": {
+              "seconds": 1
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "read"
+          }
+        },
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "orders",
+            "hold": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "ready",
+      "name": "The player has read their orders",
+      "enabled": true,
+      "repeat": false,
+      "conditions": {
+        "op": "all",
+        "conditions": [
+          {
+            "type": "dialogue_dismissed",
+            "params": {
+              "line": "orders"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "type": "unpause_game",
+          "params": {}
+        },
+        {
+          "type": "complete_objective",
+          "params": {
+            "objective": "ready"
+          }
+        },
+        {
+          "type": "dialogue",
+          "params": {
+            "line": "thanks"
+          }
+        }
+      ]
+    }
+  ],
+  "objectives": [
+    {
+      "id": "read",
+      "kind": "primary",
+      "text": "Read the welcome.",
+      "hidden": false
+    },
+    {
+      "id": "ready",
+      "kind": "primary",
+      "text": "Read your orders.",
+      "hidden": false
+    }
+  ],
+  "dialogue": [
+    {
+      "id": "welcome",
+      "speaker": "Instructor",
+      "text": "Welcome, recruit. The game is paused while you read this."
+    },
+    {
+      "id": "orders",
+      "speaker": "Instructor",
+      "text": "Your engineer builds everything. Click when you are ready to start."
+    },
+    {
+      "id": "thanks",
+      "speaker": "Instructor",
+      "text": "Good. The clock is running again."
+    }
+  ],
+  "createdAt": "2026-10-05T00:00:00.000Z",
+  "updatedAt": "2026-10-05T00:00:00.000Z"
+}

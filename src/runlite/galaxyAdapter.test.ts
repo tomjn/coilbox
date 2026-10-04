@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { mapCues } from "../conquest/galaxy3d/mapCues";
 import type { GalaxyDoc } from "../conquest/model";
 import {
   forwardReachable,
+  mapRunClosedLinks,
   mapRunEmphasis,
   mapRunIdentities,
   mapRunOwners,
   mapRunPathLinks,
+  mapRunScenery,
   mapRunToGalaxyDoc,
   PLAYER_FACTION,
   RUN_DIM,
@@ -328,19 +331,29 @@ describe("mapRunToGalaxyDoc", () => {
     }
   });
 
-  it("writes each step forward, scenery first, and drops the link between two of one rank", () => {
+  it("writes each step forward and scenery first, and keeps the link between two of one rank", () => {
     expect(doc.links).toEqual([
       ["gate", "north"],
       ["gate", "south"],
       ["north", "east"],
       ["south", "east"],
+      ["north", "south"],
       ["far", "east"],
       ["far", "isle"],
     ]);
-    expect(doc.linkKinds?.map(([a, b]) => `${a} ${b}`)).not.toContain(
-      "north south",
+    expect(doc.linkKinds).toEqual(landMap().linkKinds);
+  });
+
+  it("names the link between two of one rank as closed, and no other", () => {
+    expect(mapRunClosedLinks(landRun(), landMap(), located(landRun()))).toEqual(
+      new Set(["north south"]),
     );
-    expect(doc.linkKinds).toHaveLength(6);
+  });
+
+  it("names the locations on no route as scenery", () => {
+    expect(mapRunScenery(landMap(), located(landRun()))).toEqual(
+      new Set(["far", "isle"]),
+    );
   });
 });
 
@@ -376,9 +389,18 @@ describe("a land run's live state", () => {
 
   it("marks the start and the goal, by location", () => {
     const ids = mapRunIdentities(moved, located(moved));
-    expect(ids.get("gate")).toEqual({ body: "beacon" });
-    expect(ids.get("east")?.body).toBe(warlordBodyFor(1));
+    expect(ids.get("gate")).toEqual({ body: "beacon", end: "start" });
+    expect(ids.get("east")).toEqual({ body: warlordBodyFor(1), end: "goal" });
     expect(ids.has("far")).toBe(false);
+    // The two battle sites keep their tint and are not an end.
+    expect(ids.get("north")?.end).toBeUndefined();
+    expect(ids.get("north")?.starTint).toBeDefined();
+  });
+
+  it("leaves a column run's start and warlord with no end marker", () => {
+    for (const identity of runIdentities(run()).values()) {
+      expect(identity.end).toBeUndefined();
+    }
   });
 
   it("names the path taken in the order the document writes its links", () => {
@@ -388,5 +410,87 @@ describe("a land run's live state", () => {
     const doc = mapRunToGalaxyDoc(moved, map, located(moved));
     const written = new Set(doc.links.map(([a, b]) => `${a} ${b}`));
     for (const key of path) expect(written.has(key)).toBe(true);
+  });
+});
+
+// What the terrain map draws for a land run: the adapter's real output put
+// through the function the view's cue layer reads.
+describe("a land run's cues on the strategic map", () => {
+  const map = landMap();
+  const cuesFor = (r: RogueliteRun) => {
+    const locations = located(r);
+    return mapCues({
+      galaxy: mapRunToGalaxyDoc(r, map, locations),
+      owners: mapRunOwners(r, map, locations),
+      playerFactionId: PLAYER_FACTION,
+      run: {
+        pathLinks: mapRunPathLinks(r, locations),
+        closedLinks: mapRunClosedLinks(r, map, locations),
+      },
+    });
+  };
+  const tones = (r: RogueliteRun) =>
+    Object.fromEntries(cuesFor(r).links.map((l) => [`${l.a} ${l.b}`, l.tone]));
+  const attackable = (r: RogueliteRun) =>
+    [...cuesFor(r).locations]
+      .filter(([, cue]) => cue.attackable)
+      .map(([id]) => id)
+      .sort();
+
+  it("offers both steps out of the start and nothing else", () => {
+    expect(tones(landRun())).toEqual({
+      "gate north": "choice",
+      "gate south": "choice",
+      "north east": "plain",
+      "south east": "plain",
+      "north south": "plain",
+      "far east": "plain",
+      "far isle": "plain",
+    });
+    expect(attackable(landRun())).toEqual(["north", "south"]);
+  });
+
+  it("shows the step made as taken and the one step ahead as the choice", () => {
+    const moved = resolveBattle(landRun(), "b1", "victory", "now"); // at north
+    expect(tones(moved)).toEqual({
+      "gate north": "taken",
+      "gate south": "plain",
+      "north east": "choice",
+      "south east": "plain",
+      "north south": "plain",
+      "far east": "plain",
+      "far isle": "plain",
+    });
+    expect(attackable(moved)).toEqual(["east"]);
+  });
+
+  it("would offer the link between two of one rank if it were not closed", () => {
+    const moved = resolveBattle(landRun(), "b1", "victory", "now");
+    const locations = located(moved);
+    const open = mapCues({
+      galaxy: mapRunToGalaxyDoc(moved, map, locations),
+      owners: mapRunOwners(moved, map, locations),
+      playerFactionId: PLAYER_FACTION,
+      run: { pathLinks: mapRunPathLinks(moved, locations) },
+    });
+    expect(
+      open.links.find((l) => l.a === "north" && l.b === "south")?.tone,
+    ).toBe("choice");
+  });
+
+  it("never offers scenery, from the goal either", () => {
+    const atNorth = resolveBattle(landRun(), "b1", "victory", "now");
+    const atGoal = resolveBattle(atNorth, "boss", "victory", "now");
+    expect(attackable(atGoal)).toEqual([]);
+    expect(Object.values(tones(atGoal))).not.toContain("choice");
+  });
+
+  it("draws each link as the kind the map gave it", () => {
+    const kinds = Object.fromEntries(
+      cuesFor(landRun()).links.map((l) => [`${l.a} ${l.b}`, l.kind]),
+    );
+    expect(kinds["gate north"]).toBe("border");
+    expect(kinds["north south"]).toBe("border");
+    expect(kinds["far east"]).toBe("crossing");
   });
 });
