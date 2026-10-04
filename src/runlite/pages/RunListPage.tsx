@@ -43,7 +43,7 @@ import { RunSetupForm } from "./components/RunSetupForm";
 export default function RunListPage() {
   const navigate = useNavigate();
   const drawer = useDrawer();
-  const { runs, loading: runsLoading, deleteRun } = useRuns();
+  const { runs, loading: runsLoading, error: runsError, deleteRun } = useRuns();
   // A run that ended while its page was closed is counted when the list shows it.
   useAwardFinishedRuns(runs, runsLoading);
 
@@ -156,6 +156,13 @@ export default function RunListPage() {
         }
       />
 
+      {!runsLoading && runsError && (
+        <ErrorBanner
+          message={`Your warpath runs could not be read. Nothing has been changed. ${runsError}`}
+        />
+      )}
+      {abandonError && <ErrorBanner message={abandonError} />}
+
       {state === "scanning" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -179,7 +186,6 @@ export default function RunListPage() {
       ) : state === "unreadable" ? (
         <div className="flex flex-col gap-3">
           {scanFailure && <ScanFailed noun="games" reason={scanFailure} />}
-          {abandonError && <ErrorBanner message={abandonError} />}
           <EmptyState
             label={
               <>
@@ -231,7 +237,7 @@ export default function RunListPage() {
             </li>
           ))}
         </ul>
-      ) : (
+      ) : runsError ? null : (
         <EmptyState label="No warpath in progress. Start a new warpath to begin." />
       )}
     </div>

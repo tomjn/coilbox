@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const readiness = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
+  runsError: null as string | null,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -31,7 +32,12 @@ vi.mock("../../deeplink/useImportParam", () => ({
 }));
 vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
 vi.mock("../runs", () => ({
-  useRuns: () => ({ runs: {}, deleteRun: vi.fn() }),
+  useRuns: () => ({
+    runs: {},
+    loading: false,
+    error: readiness.runsError,
+    deleteRun: vi.fn(),
+  }),
 }));
 vi.mock("../useAwardFinishedRuns", () => ({
   useAwardFinishedRuns: vi.fn(),
@@ -40,7 +46,10 @@ vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
 
 import RunListPage from "./RunListPage";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  readiness.runsError = null;
+});
 
 describe("RunListPage with a failed scan", () => {
   it("shows the reason and no scanning spinner", () => {
@@ -57,5 +66,28 @@ describe("RunListPage with a failed scan", () => {
     );
     expect(screen.getByText(/no space left on device/)).toBeTruthy();
     expect(screen.queryByText(/Scanning installed games/)).toBeNull();
+  });
+});
+
+describe("RunListPage with a run file that could not be read", () => {
+  it("says so, that nothing was changed, and gives the reason", () => {
+    readiness.current = {
+      hasGames: true,
+      state: "ready",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    readiness.runsError = "run.json is not valid JSON";
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+    expect(
+      screen.getByText(
+        "Your warpath runs could not be read. Nothing has been changed. run.json is not valid JSON",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/No warpath in progress/)).toBeNull();
   });
 });

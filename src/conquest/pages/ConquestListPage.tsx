@@ -97,7 +97,7 @@ import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
  */
 export default function ConquestListPage() {
   const { galaxies, loading, error } = useGalaxies();
-  const { file, saveFor } = useConquestState();
+  const { file, error: stateError, saveFor } = useConquestState();
   const [abandonError, setAbandonError] = useState<string | null>(null);
   const abandon = async (galaxyId: string) => {
     setAbandonError(null);
@@ -232,6 +232,11 @@ export default function ConquestListPage() {
       />
 
       {error && <ErrorBanner message={error} />}
+      {stateError && (
+        <ErrorBanner
+          message={`Your conquest progress could not be read. Nothing has been changed. ${stateError}`}
+        />
+      )}
       {abandonError && <ErrorBanner message={abandonError} />}
 
       {needsGame ? (

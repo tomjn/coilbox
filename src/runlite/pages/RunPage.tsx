@@ -21,6 +21,7 @@ import { useMapEligibility } from "../../content/mapEligibility";
 import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryList";
 import {
   EmptyState,
+  ErrorBanner,
   SkeletonList,
 } from "../../content/pages/components/states";
 import { UnitPicker } from "../../content/pages/components/UnitPicker";
@@ -56,7 +57,7 @@ export default function RunPage() {
   // The node map wants the full width. The nav stays reachable from the top bar.
   useHideSidebar();
   const { runId } = useParams();
-  const { run: savedRun, loading, save } = useRun(runId);
+  const { run: savedRun, loading, error: loadError, save } = useRun(runId);
   // A replay's "back to node" link deep-links here as `?node=<id>`, honoured
   // once on mount so the inspect panel opens straight to it (mirrors conquest's
   // `?node=` on GalaxyPage). A stale id (the node no longer exists in this run)
@@ -185,10 +186,16 @@ export default function RunPage() {
   if (!run) {
     return (
       <div className="p-6">
-        <EmptyState label="No active warpath." />
+        {loadError ? (
+          <ErrorBanner
+            message={`Your warpath runs could not be read. Nothing has been changed. ${loadError}`}
+          />
+        ) : (
+          <EmptyState label="No active warpath." />
+        )}
         <div className="mt-4">
           <Link to="/warpath">
-            <Button>Start a warpath</Button>
+            <Button>{loadError ? "Back to warpath" : "Start a warpath"}</Button>
           </Link>
         </div>
       </div>

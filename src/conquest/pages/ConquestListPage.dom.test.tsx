@@ -17,6 +17,7 @@ const h = vi.hoisted(() => ({
   runScan: vi.fn(),
   preset: null as string | null,
   importCode: null as string | null,
+  stateError: null as string | null,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -81,7 +82,11 @@ vi.mock("../../play/config", () => ({
 vi.mock("../conquests", () => ({
   refreshGalaxies: vi.fn(),
   useGalaxies: () => ({ galaxies: [], loading: false, error: null }),
-  useConquestState: () => ({ file: { conquests: {} }, saveFor: vi.fn() }),
+  useConquestState: () => ({
+    file: { conquests: {} },
+    error: h.stateError,
+    saveFor: vi.fn(),
+  }),
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
 // The unlocks live in the frame's settings store, which this page is rendered
@@ -101,6 +106,7 @@ beforeEach(() => {
   h.drawerContent = null;
   h.preset = null;
   h.importCode = null;
+  h.stateError = null;
   h.runScan.mockClear();
 });
 afterEach(cleanup);
@@ -127,5 +133,22 @@ describe("ConquestListPage with a failed scan", () => {
     cleanup();
     renderIn(h.drawerContent as ReactNode);
     expect(h.runScan).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConquestListPage with a run state file that could not be read", () => {
+  it("says so, that nothing was changed, and gives the reason", () => {
+    h.stateError = "state.json is not valid JSON";
+    renderIn(<ConquestListPage />);
+    expect(
+      screen.getByText(
+        "Your conquest progress could not be read. Nothing has been changed. state.json is not valid JSON",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("shows no such message when the file read", () => {
+    renderIn(<ConquestListPage />);
+    expect(screen.queryByText(/could not be read/)).toBeNull();
   });
 });
