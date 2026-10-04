@@ -270,7 +270,21 @@ export function HostBattleForm({
   // A password the OPENBATTLE line cannot carry opens a battle every joiner
   // sees as full (issue #3518).
   const passwordProblem = battlePasswordProblem(password);
-  const canHost = content.ready && !passwordProblem;
+  // The button and `submit` both read this, so a live button is never one whose
+  // press is swallowed. `target` is part of it because `submit` needs one.
+  const canHost = !!target && content.ready && !passwordProblem;
+  // Why Host is not live, when the form has not said so already. The password
+  // problem sits under its own field, a failed hash has its own row, and a hash
+  // still running is in the button's label.
+  const whyNotHost = !target
+    ? checkingEngines
+      ? "Reading engine versions…"
+      : "Choose an engine to host with."
+    : !gameName
+      ? "Choose a game."
+      : !mapName
+        ? "Choose a map."
+        : null;
   const route = hostingRoute(reachability, relayAvailable, relayMode);
   // Only when there was a relay to refuse. On a server with none the host's
   // answer changed nothing, and crediting them for an outcome that was never
@@ -675,6 +689,10 @@ export function HostBattleForm({
 
           {leftover && (
             <LeftoverRelayAgent pid={leftover.pid} ours={leftover.ours} />
+          )}
+
+          {whyNotHost && (
+            <p className="text-xs text-muted-foreground">{whyNotHost}</p>
           )}
 
           {leaves && <p className="text-sm">{leaves}</p>}
