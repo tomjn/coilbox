@@ -25,6 +25,7 @@ import { ReplayHistoryList } from "../../content/pages/components/ReplayHistoryL
 import {
   EmptyState,
   ErrorBanner,
+  ScanFailed,
   SkeletonList,
 } from "../../content/pages/components/states";
 import {
@@ -758,7 +759,7 @@ function SelectionPanel({
 }
 
 /** Faction + in-game side choice over the live galaxy preview. */
-function RunSetupPanel({
+export function RunSetupPanel({
   galaxy,
   faction,
   onFaction,
@@ -953,6 +954,9 @@ function RunSetupPanel({
           <Dices className="mr-1.5 size-4" aria-hidden />
           {regenBusy ? "Regenerating…" : "Regenerate galaxy"}
         </Button>
+      )}
+      {canRegenerate && scanError && (
+        <ScanFailed noun="maps" reason={scanError} />
       )}
       <Button
         disabled={busy || regenBusy}
