@@ -20,7 +20,7 @@ interface IconSrc {
   fit: "contain" | "cover";
 }
 
-/** A logo wider or taller than this is a wordmark, too thin to read at icon size. */
+/** A logo wider or taller than this does not fit a square well, so it is clipped to the square. */
 const MAX_LOGO_ASPECT = 1.5;
 
 /**
@@ -76,10 +76,13 @@ export function GameIcon({
   className?: string;
 }) {
   const candidates = useGameIconCandidates(name);
-  // Sources that failed to load or turned out to be the wrong shape.
+  // Sources that failed to load.
   const [rejected, setRejected] = useState<ReadonlySet<string>>(new Set());
   const reject = (src: string) => setRejected((prev) => new Set(prev).add(src));
+  // Logos too far from square to fit, which are clipped to the square instead.
+  const [clipped, setClipped] = useState<ReadonlySet<string>>(new Set());
   const shown = candidates.find((c) => !rejected.has(c.src));
+  const fit = shown && clipped.has(shown.src) ? "cover" : shown?.fit;
   return (
     <span
       data-testid="game-icon"
@@ -100,12 +103,14 @@ export function GameIcon({
             const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
             if (shown.fit === "contain" && w && h) {
               const aspect = Math.max(w / h, h / w);
-              if (aspect > MAX_LOGO_ASPECT) reject(shown.src);
+              if (aspect > MAX_LOGO_ASPECT) {
+                setClipped((prev) => new Set(prev).add(shown.src));
+              }
             }
           }}
           className={cn(
             "size-full",
-            shown.fit === "contain" ? "object-contain p-0.5" : "object-cover",
+            fit === "contain" ? "object-contain p-0.5" : "object-cover",
           )}
         />
       ) : (
