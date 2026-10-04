@@ -245,6 +245,28 @@ describe("seeding", () => {
   });
 });
 
+describe("a missing meta file", () => {
+  // The plugin returns this document for a file that does not exist, and an
+  // empty string is what an empty file reads as. Both are an empty meta.
+  const pluginDefault =
+    '{"schemaVersion":1,"loadouts":[],"eventPools":[],"ascensionTier":0,"stats":{"runs":0,"wins":0,"deepest":0}}';
+
+  it.each([
+    pluginDefault,
+    "",
+  ])("is seeded as an empty meta: %j", async (json) => {
+    hoisted.stateLoad.mockResolvedValue(stateDoc({ old: run("won") }));
+    hoisted.metaLoad.mockResolvedValue({ json });
+    const { List } = await load();
+    render(<List />);
+    await waitFor(() => expect(hoisted.metaSave).toHaveBeenCalledTimes(1));
+    const meta = written()[0];
+    expect(meta.seenSeeded).toBe(true);
+    expect(meta.legacy.seen).toEqual(["old"]);
+    expect(meta.legacy.stats.runs).toBe(0);
+  });
+});
+
 describe("writes", () => {
   it("writes nothing while the meta is loading", async () => {
     hoisted.stateLoad.mockResolvedValue(stateDoc({ r1: run("won") }));
@@ -273,6 +295,30 @@ describe("writes", () => {
   it("writes nothing while the runs are loading", async () => {
     hoisted.stateLoad.mockReturnValue(new Promise(() => {}));
     hoisted.metaLoad.mockResolvedValue({ json: metaDoc() });
+    const { List } = await load();
+    render(<List />);
+    await waitFor(() => expect(hoisted.metaLoad).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(hoisted.metaSave).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when meta.json is not valid JSON", async () => {
+    hoisted.stateLoad.mockResolvedValue(stateDoc({ r1: run("won") }));
+    hoisted.metaLoad.mockResolvedValue({ json: '{"schemaVersion":2,"leg' });
+    const { List } = await load();
+    render(<List />);
+    await waitFor(() => expect(hoisted.metaLoad).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(hoisted.metaSave).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when meta.json is JSON but not an object", async () => {
+    hoisted.stateLoad.mockResolvedValue(stateDoc({ r1: run("won") }));
+    hoisted.metaLoad.mockResolvedValue({ json: "[1,2]" });
     const { List } = await load();
     render(<List />);
     await waitFor(() => expect(hoisted.metaLoad).toHaveBeenCalled());
