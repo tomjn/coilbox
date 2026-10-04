@@ -217,6 +217,20 @@ export interface ResolveReadings {
    * whether it can be fetched have not landed. Only waited for while one of
    * those engines is missing. */
   engineCatalogPending: boolean;
+  /** An engine the requirements name may be installed, but it would not report
+   * its version, so the check cannot say. Set only once everything else is
+   * known. Reads as `unreadable`, because the install was not read, and the
+   * reader decides (issue #3405). */
+  engineUnconfirmed?: string | null;
+}
+
+/** A launch's own reading of which engines are installed, handed to the resolve
+ * drawer in place of its folder-name reading. `versions` holds only versions an
+ * engine reported, and `unconfirmed` says why one that might be the wanted
+ * engine could not be confirmed. */
+export interface EngineReading {
+  versions: string[];
+  unconfirmed: string | null;
 }
 
 /** What the resolve gate should say right now: whether it still has a question
@@ -288,11 +302,12 @@ export function resolveVerdict(r: ResolveReadings): ResolveVerdict {
       resolved: false,
     };
   }
-  if (installUnreadable) {
+  if (installUnreadable || r.engineUnconfirmed) {
     return {
       loading: false,
       unreadable: true,
-      unreadableReason: r.scan.error ?? initFailure,
+      unreadableReason:
+        r.scan.error ?? initFailure ?? r.engineUnconfirmed ?? null,
       missing: [],
       resolved: false,
     };
