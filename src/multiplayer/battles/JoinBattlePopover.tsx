@@ -5,6 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { validBattlePassword } from "@/deeplink/parse";
 import { leaveAndLabel } from "./oneBattle";
 
 /**
@@ -38,12 +39,16 @@ export function JoinBattlePopover({
   triggerLabel?: string;
 }) {
   const [key, setKey] = useState("");
+  const [refusal, setRefusal] = useState<string | null>(null);
   return (
     <Popover
       open={open}
       onOpenChange={(o) => {
         onOpenChange(o);
-        if (!o) setKey("");
+        if (!o) {
+          setKey("");
+          setRefusal(null);
+        }
       }}
     >
       <PopoverTrigger asChild>
@@ -56,6 +61,14 @@ export function JoinBattlePopover({
           className="flex flex-col gap-2"
           onSubmit={(e) => {
             e.preventDefault();
+            // The join line is split on spaces and has no escape, so a password
+            // with one would reach the server as two words (issue #3410).
+            if (needsPassword && key !== "" && !validBattlePassword(key)) {
+              setRefusal(
+                "Coilbox cannot send this password. A battle password cannot contain a space, and only letters, numbers and punctuation from the basic keyboard are allowed.",
+              );
+              return;
+            }
             onSubmit(key);
             onOpenChange(false);
           }}
@@ -69,10 +82,18 @@ export function JoinBattlePopover({
                 autoFocus
                 type="password"
                 value={key}
-                onChange={(e) => setKey(e.target.value)}
+                onChange={(e) => {
+                  setKey(e.target.value);
+                  setRefusal(null);
+                }}
                 placeholder="Battle password"
               />
             </label>
+          )}
+          {refusal && (
+            <p role="alert" className="text-xs text-destructive">
+              {refusal}
+            </p>
           )}
           <Button type="submit" className="h-8">
             {notice ? leaveAndLabel("join") : "Join"}
