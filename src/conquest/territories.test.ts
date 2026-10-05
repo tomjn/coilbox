@@ -1,18 +1,22 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy } from "./generate";
 import { type GalaxyDoc, parseGalaxyJson } from "./model";
+import { mulberry32 } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
 import {
   generateTerrain,
+  LAND_LAYOUTS,
   labelLandMasses,
   TERRAIN_MAP_UNITS,
   type TerrainShape,
   terrainPixelAt,
 } from "./terrainGen";
 import {
+  divideLand,
   GENERATED_TERRITORIES_IMAGE,
   generatedTerrain,
   generateTerritories,
+  landTerrain,
   type TerritoriesOptions,
 } from "./territories";
 
@@ -32,7 +36,7 @@ const base: TerritoriesOptions = {
   factionCount: 2,
 };
 
-const SHAPES: TerrainShape[] = ["scatter", "spiral", "clusters", "ring"];
+const SHAPES: TerrainShape[] = [...LAND_LAYOUTS];
 
 /** Every size the wizard offers, the unlockable ones included. */
 const SIZES = [
@@ -171,7 +175,7 @@ describe("generateTerritories", () => {
 
   it("joins separate islands with one crossing fewer than there are groups", () => {
     const doc = generateTerritories(
-      { ...base, layout: "clusters", nodeCount: 40 },
+      { ...base, layout: "archipelago", nodeCount: 40 },
       NOW,
     );
     const crossings = (doc.linkKinds ?? []).filter((l) => l[2] === "crossing");
@@ -230,41 +234,101 @@ describe("generatedTerrain", () => {
 });
 
 describe("generateTerrain", () => {
-  const points: [number, number][] = [
-    [0, 0],
-    [1023, 1023],
-    [512, 3],
-    [17.3, 900.9],
-    [640, 640],
-    [333, 111],
-  ];
-
-  for (const shape of [undefined, ...SHAPES]) {
-    it(`keeps every required point on land, shape ${shape ?? "none"}`, () => {
-      for (let seed = 1; seed <= 6; seed++) {
-        const terrain = generateTerrain({ seed, shape, mustBeLand: points });
-        for (const [x, y] of points) {
-          expect(terrain.land[terrainPixelAt(terrain, x, y)]).toBe(1);
-        }
-      }
-    });
-  }
-
-  it("has no land of its own without a shape", () => {
-    const terrain = generateTerrain({ seed: 1 });
-
-    expect(terrain.land.some((v) => v === 1)).toBe(false);
-  });
+  // Built once for the whole block: seeds 1 to 6 of every shape, at sizes
+  // taken in turn. Every assertion below counts over them.
+  const built = SHAPES.flatMap((shape) =>
+    [1, 2, 3, 4, 5, 6].map((seed) => {
+      const nodeCount = SIZES[seed % SIZES.length];
+      const rng = mulberry32(seed);
+      const terrain = landTerrain(seed, shape, nodeCount, rng);
+      const land = divideLand(terrain, nodeCount, rng);
+      const masses = labelLandMasses(terrain).sizes.sort((a, b) => b - a);
+      const total = masses.reduce((a, b) => a + b, 0);
+      return { shape, seed, nodeCount, terrain, land, masses, total };
+    }),
+  );
 
   it("keeps the sea at height 0 and the land above it", () => {
-    const terrain = generateTerrain({ seed: 1, shape: "scatter" });
-
     let wrong = 0;
-    for (let i = 0; i < terrain.land.length; i++) {
-      if (terrain.heightmap[i] > 0 !== (terrain.land[i] === 1)) wrong++;
+    for (const { terrain } of built) {
+      for (let i = 0; i < terrain.land.length; i++) {
+        if (terrain.heightmap[i] > 0 !== (terrain.land[i] === 1)) wrong++;
+      }
     }
-
-    expect(terrain.land.length).toBeGreaterThan(0);
     expect(wrong).toBe(0);
+  });
+
+  it("keeps the land off the edge of the map", () => {
+    let edge = 0;
+    for (const { terrain } of built) {
+      const { width: w, height: h, land } = terrain;
+      for (let i = 0; i < w; i++) edge += land[i] + land[(h - 1) * w + i];
+      for (let i = 0; i < h; i++) edge += land[i * w] + land[i * w + w - 1];
+    }
+    expect(edge).toBe(0);
+  });
+
+  it("puts every land pixel in a province, and only land pixels", () => {
+    let unowned = 0;
+    let wet = 0;
+    for (const { terrain, land } of built) {
+      for (let i = 0; i < terrain.land.length; i++) {
+        if (terrain.land[i] && land.owner[i] < 0) unowned++;
+        if (!terrain.land[i] && land.owner[i] >= 0) wet++;
+      }
+    }
+    expect(unowned).toBe(0);
+    expect(wet).toBe(0);
+  });
+
+  it("leaves no land mass without a province", () => {
+    const empty = built.filter(
+      ({ masses, nodeCount }) => masses.length > nodeCount,
+    );
+    expect(empty).toHaveLength(0);
+  });
+
+  it("makes one land mass for a continent or an inland sea", () => {
+    const split = built.filter(
+      ({ shape, masses, total }) =>
+        (shape === "continent" || shape === "inlandsea") &&
+        masses[0] < 0.9 * total,
+    );
+    expect(split.map((b) => `${b.shape} ${b.seed}`)).toEqual([]);
+  });
+
+  it("makes two large land masses for two continents, neither with three quarters of the land", () => {
+    const wrong = built.filter(
+      ({ shape, masses, total }) =>
+        shape === "continents" &&
+        (masses[0] + (masses[1] ?? 0) < 0.9 * total ||
+          masses[0] > 0.75 * total),
+    );
+    expect(wrong.map((b) => b.seed)).toEqual([]);
+  });
+
+  it("makes at least four islands for an archipelago", () => {
+    const few = built.filter(
+      ({ shape, masses }) => shape === "archipelago" && masses.length < 4,
+    );
+    expect(few.map((b) => b.seed)).toEqual([]);
+  });
+
+  it("varies the size of provinces", () => {
+    // Over seeds 1 to 40 of every shape the largest province was 2.3 to 21
+    // times the smallest.
+    const even = built.filter(({ land, nodeCount }) => {
+      const count = new Int32Array(nodeCount);
+      for (const p of land.owner) if (p >= 0) count[p]++;
+      return Math.max(...count) < 2 * Math.min(...count);
+    });
+    expect(even.map((b) => `${b.shape} ${b.seed}`)).toEqual([]);
+  });
+
+  it("is the same land from the same seed", () => {
+    const again = generateTerrain({ seed: 1, shape: "continent" });
+    const once = generateTerrain({ seed: 1, shape: "continent" });
+    // Compared as bytes: a deep equal walks a megabyte one element at a time.
+    expect(Buffer.from(again.image).equals(Buffer.from(once.image))).toBe(true);
   });
 });

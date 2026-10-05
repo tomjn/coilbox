@@ -2,10 +2,10 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { type CitiesOptions, generateCities } from "./cities";
-import type { GalaxyLayout } from "./generate";
 import type { GalaxyDoc } from "./model";
 import { hashString } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
+import { LAND_LAYOUTS, type LandLayout } from "./terrainGen";
 import { generatedTerrain } from "./territories";
 
 /**
@@ -42,7 +42,7 @@ const base: CitiesOptions = {
   factionCount: 2,
 };
 
-const LAYOUTS: GalaxyLayout[] = ["scatter", "spiral", "clusters", "ring"];
+const LAYOUTS: LandLayout[] = [...LAND_LAYOUTS];
 const SIZES = [
   ...BASE_SIZES.map((s) => Number(s.value)),
   ...LARGE_SIZES.map((s) => s.count),

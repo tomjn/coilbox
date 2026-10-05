@@ -57,12 +57,13 @@ describe("generateStyledRun", () => {
   for (const skin of LAND) {
     for (const length of LENGTHS) {
       it(`crosses a generated ${skin} map for a ${length} run`, () => {
-        const run = generateStyledRun({ ...base, skin, length });
+        // Seed 2 keeps its first map at every size, so the map is its own.
+        const run = generateStyledRun({ ...base, seed: 2, skin, length });
         expect(run.settings.skin).toBe(skin);
         expect(run.settings.map).toEqual({
           source: "generated",
           style: skin,
-          seed: 4242,
+          seed: 2,
           nodeCount: LAND_RUN_SIZES[skin][length],
           layout: "random",
         });
@@ -81,7 +82,14 @@ describe("generateStyledRun", () => {
         expect(run.nodes.filter((n) => n.type === "boss")).toHaveLength(1);
         // It is the run the map generator builds on that map.
         expect(run).toEqual(
-          generateMapRun({ ...base, skin, length, ...source, mapRef: ref }),
+          generateMapRun({
+            ...base,
+            seed: 2,
+            skin,
+            length,
+            ...source,
+            mapRef: ref,
+          }),
         );
       });
     }
@@ -123,11 +131,11 @@ describe("generateStyledRun", () => {
 describe("the choice of route on a generated land map", () => {
   const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
   // How many of the eight seeds got a route with no choice on their own map
-  // and so ended on a later one. A Territories map this small is often close
+  // and so ended on a later one. A small land map is often close
   // to a tree, and across a tree there is one way between any two places.
   const SWAPPED = {
-    cities: { quick: 0, standard: 0, long: 0 },
-    territories: { quick: 4, standard: 1, long: 0 },
+    cities: { quick: 4, standard: 2, long: 0 },
+    territories: { quick: 2, standard: 1, long: 0 },
   };
 
   for (const skin of LAND) {
@@ -174,13 +182,13 @@ describe("the choice of route on a generated land map", () => {
   it("gives the same run from the same seed, on a seed that moves map", () => {
     const opts: GenerateRunOpts = {
       ...base,
-      seed: 3,
+      seed: 1,
       skin: "territories",
       length: "quick",
     };
     const run = generateStyledRun(opts);
     const ref = run.settings.map;
-    expect(ref?.source === "generated" && ref.seed).not.toBe(3);
+    expect(ref?.source === "generated" && ref.seed).not.toBe(1);
     expect(generateStyledRun(opts)).toEqual(run);
   });
 });

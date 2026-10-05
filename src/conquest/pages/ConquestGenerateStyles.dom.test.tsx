@@ -264,7 +264,7 @@ describe("Conquest generate form: order and wording", () => {
 
     for (const style of ["theatre", "cities", "territories"]) {
       choose(selectOffering("territories"), style);
-      const shape = selectOffering("spiral");
+      const shape = selectOffering("random");
       expect(optionLabels(shape)).not.toContain(
         "Real stars (the solar neighbourhood)",
       );
@@ -276,6 +276,30 @@ describe("Conquest generate form: order and wording", () => {
       choose(selectOffering("territories"), "galaxy");
       choose(selectOffering("realstars"), "realstars");
     }
+  });
+
+  it("offers land shapes for the land styles and puts a galaxy shape back", () => {
+    openForm();
+    choose(selectOffering("spiral"), "spiral");
+    choose(selectOffering("territories"), "cities");
+    const shape = selectOffering("random");
+    expect(optionLabels(shape)).toEqual([
+      "Surprise me",
+      "One continent",
+      "Two continents",
+      "Archipelago",
+      "Inland sea",
+    ]);
+    // Spiral is not a land shape, so the shape goes back to the default.
+    expect(shape.value).toBe("random");
+    // A land shape carries over between the two land styles.
+    choose(shape, "archipelago");
+    choose(selectOffering("territories"), "territories");
+    expect(selectOffering("archipelago").value).toBe("archipelago");
+    // And a land shape is not a Theatre shape.
+    choose(selectOffering("territories"), "theatre");
+    expect(selectOffering("random").value).toBe("random");
+    expect(optionLabels(selectOffering("random"))).toContain("Spiral");
   });
 
   it("counts a map in the chosen style's own locations", () => {

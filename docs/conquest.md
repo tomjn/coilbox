@@ -14,7 +14,7 @@ Conquests live under **Conquest** in the sidebar. You can generate one for any i
 | --- | --- |
 | **Game** | Which installed game the battles use. Auto-selected when only one qualifies. |
 | **Map style** | **Galaxy** (stars in space), **Theatre** (a flat tactical chart), **Cities** (cities on generated land, joined by roads) or **Territories** (provinces on generated land masses). See [Map styles](#map-styles). |
-| **Shape** | How the map is laid out: **Scattered**, **Spiral**, **Clusters**, **Ring**, or **Surprise me**, which picks one from the seed. The Galaxy style calls the first two **Scattered disc** and **Spiral arms**. Every shape stays fully connected. The Galaxy style also offers **Real stars**, the real systems around Sol at their true positions. |
+| **Shape** | How the map is laid out. Galaxy and Theatre offer **Scattered**, **Spiral**, **Clusters** and **Ring**. The Galaxy style calls the first two **Scattered disc** and **Spiral arms**, and also offers **Real stars**, the real systems around Sol at their true positions. Cities and Territories shape the land instead: **One continent**, **Two continents** across a strait, an **Archipelago** of islands, or land around an **Inland sea**. **Surprise me** picks one from the seed. Every shape stays fully connected. |
 | **Map size** | How many locations the map has: Small (12), Medium (18), Large (28), Sprawling (40), Vast (56), Immense (80). Two larger sizes unlock with the threat levels. With Real stars this field is **Radius from Sol** instead, and every real system inside the radius is on the map. |
 | **Opposition** | One to three enemy factions. Each gets its own capital, spread far from yours. |
 | **Threat level** | How hard the opposing factions press. Higher levels unlock by winning. |
@@ -48,8 +48,8 @@ The style changes how the strategic map looks and what its locations are. The ru
 
 - **Galaxy** draws star systems joined by jump lanes over a 3D starfield.
 - **Theatre** draws the same locations and links as a flat tactical chart, for a terrestrial game (a WW2 title, say) where a galaxy of stars makes no sense.
-- **Cities** draws the locations as cities on generated land. Two cities on the same land mass are joined by a road, and two with sea between them by a crossing.
-- **Territories** splits generated land masses into provinces. Provinces that share a border are neighbours, and sea crossings join the land masses.
+- **Cities** draws the locations as cities on generated land. The land is made first and divided into one region per city. Each city stands on the best ground in its region, which is low, away from the region's edge and near the coast where it can be. Neighbouring cities are joined by roads that keep off high mountains, and cities with sea between them by a crossing.
+- **Territories** makes the land first and then divides all of it into provinces of different sizes, with borders that wander as real ones do. Provinces that share a border are neighbours, and sea crossings join the land masses.
 
 Choose the style as **Map style** when generating. An authored map sets it through the document's theme. **Regenerate map** on a generated map builds a new one in the same style.
 
