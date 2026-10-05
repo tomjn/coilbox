@@ -5,6 +5,8 @@ import {
   GROUND_LIT,
   type GroundShading,
   groundUniforms,
+  TOWN_BODY,
+  TOWN_HEAD,
 } from "./groundShader";
 import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 
@@ -397,16 +399,19 @@ export function applyTerrainShader(
       "#include <project_vertex>",
       `#include <project_vertex>\n${VERTEX_BODY}`,
     )}`;
+    const towns = !!shading.ground?.towns;
     const body = FRAGMENT_BODY.replace(
       "GROUND_BODY_HERE",
-      shading.ground ? GROUND_BODY : "",
+      shading.ground
+        ? GROUND_BODY.replace("TOWN_BODY_HERE", towns ? TOWN_BODY : "")
+        : "",
     ).replace("GROUND_LIT_HERE", shading.ground ? GROUND_LIT : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD}${shading.ground ? GROUND_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
+    shader.fragmentShader = `${FRAGMENT_HEAD}${shading.ground ? GROUND_HEAD : ""}${towns ? TOWN_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;
   };
   // One program for every terrain with the same switches.
   material.customProgramCacheKey = () =>
-    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}${shading.ground ? ":ground" : ""}`;
+    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}${shading.ground ? ":ground" : ""}${shading.ground?.towns ? ":towns" : ""}`;
 }

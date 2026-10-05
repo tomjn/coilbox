@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { describe, expect, it, vi } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
-import { CAPITAL_SCALE, MARKER_RADIUS } from "./cityLayer";
+import { markerZoom } from "./cityLayer";
 import {
+  BADGE_TOP,
   buildEndMarkerLayer,
   END_MARKER_RADIUS,
   endMarkerReach,
@@ -10,7 +11,7 @@ import {
 import type { RunEnd } from "./endMarkers";
 import {
   createTerrainSurface,
-  GALAXY_MAX_DISTANCE,
+  GALAXY_MIN_DISTANCE,
   type HeightGrid,
 } from "./terrain";
 
@@ -96,8 +97,7 @@ const model = (x: number, y: number) => ({
 });
 
 describe("endMarkerReach", () => {
-  it("is the marker's own reach, which is a capital block's radius, in map units", () => {
-    expect(END_MARKER_RADIUS).toBe(MARKER_RADIUS * CAPITAL_SCALE);
+  it("is the reach in map units", () => {
     expect(endMarkerReach(surface)).toBe(END_MARKER_RADIUS / 2);
   });
 });
@@ -127,14 +127,13 @@ describe("buildEndMarkerLayer", () => {
     expect(hex(goal)).toBe(0xff5468);
   });
 
-  it("keeps each head above a capital's block and within its radius", () => {
+  it("flies each head above the tallest badge and no wider than the reach", () => {
     const { marker } = build();
     for (const name of ["end-marker:start:gate", "end-marker:goal:keep"]) {
       const geo = head(marker(name)).geometry;
       geo.computeBoundingBox();
       const box = geo.boundingBox as THREE.Box3;
-      // The tallest a capital's block draws: see POLE_HEIGHT.
-      expect(box.min.y).toBeGreaterThan(3.57);
+      expect(box.min.y).toBeGreaterThan(BADGE_TOP);
       expect(box.max.x).toBeLessThanOrEqual(END_MARKER_RADIUS);
     }
   });
@@ -220,12 +219,13 @@ describe("buildEndMarkerLayer", () => {
     });
   });
 
-  it("grows past the galaxy view's furthest zoom and not before", () => {
+  it("grows with the camera's distance as the city badges do", () => {
     const { layer, marker } = build();
     const start = marker("end-marker:start:gate");
-    layer?.fitToCamera(GALAXY_MAX_DISTANCE / 2);
+    layer?.fitToCamera(GALAXY_MIN_DISTANCE);
     expect(start?.scale.x).toBe(1);
-    layer?.fitToCamera(GALAXY_MAX_DISTANCE * 2);
-    expect(start?.scale.x).toBe(2);
+    layer?.fitToCamera(GALAXY_MIN_DISTANCE * 4);
+    expect(start?.scale.x).toBeCloseTo(markerZoom(GALAXY_MIN_DISTANCE * 4), 5);
+    expect(start?.scale.x).toBeGreaterThan(2);
   });
 });

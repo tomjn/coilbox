@@ -585,7 +585,7 @@ export interface TerrainCameraLimits {
 }
 
 /** The zoom range the galaxy view uses, kept as the floor for a terrain map. */
-const GALAXY_MIN_DISTANCE = 25;
+export const GALAXY_MIN_DISTANCE = 25;
 export const GALAXY_MAX_DISTANCE = 220;
 /** The galaxy view's lowest tilt, in radians from straight down. */
 const GALAXY_MAX_POLAR = 1.25;

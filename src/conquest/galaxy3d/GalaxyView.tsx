@@ -573,7 +573,15 @@ export function GalaxyView({
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
-      ground = buildGroundLayer(disposables, galaxy, surface, terrainHeights);
+      // Towns are painted into a generated map only. A hand-made map's
+      // picture is its author's, and may show its own towns.
+      ground = buildGroundLayer(
+        disposables,
+        galaxy,
+        surface,
+        terrainHeights,
+        !performanceMode && !!terrainColor,
+      );
       buildTerrainMesh(
         scene,
         disposables,
@@ -1359,7 +1367,6 @@ export function GalaxyView({
               dimOf(galaxy.nodes[vp.i].id);
           }
           selection.tick(now);
-          cities?.tick(now);
         }
         winBurst.tick(now);
 
@@ -1383,9 +1390,8 @@ export function GalaxyView({
           headingEase: snapBack,
           cameraMoved,
           burst: winBurst.isPlaying(),
-          selectionPulse:
-            (selectedIdx >= 0 && !!ownerRings[selectedIdx]) ||
-            !!cities?.has(selectedRef.current ?? ""),
+          // A selected city holds still, so it asks for no frames.
+          selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
           effects,
         });

@@ -3,57 +3,64 @@ import type { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import type { GalaxyDoc } from "../model";
 import { NEUTRAL } from "../model";
 import { factionSides } from "./factionShape";
-import type { GroundLayer, RoadStyle } from "./groundLayer";
+import type { GroundLayer, RoadStyle, TownStyle } from "./groundLayer";
 import { ROAD_MODE } from "./groundShader";
 import { pairKey, roadLinks } from "./roads";
-import {
-  GALAXY_MAX_DISTANCE,
-  MARKER_LIFT,
-  type TerrainSurface,
-} from "./terrain";
+import { GALAXY_MIN_DISTANCE, type TerrainSurface } from "./terrain";
 
 /**
  * Point locations and roads on a terrain map. A point location is a node with
- * no outline: a city, a base, a landing site. Each one draws as a block
- * standing on the ground at its anchor, in its owner's colour and its owner's
- * faction shape, and a capital carries a second, white-topped tier. The links
- * `roadLinks` picks out are painted into the ground as tracks by
- * `groundLayer.ts`, and this layer gives each one its state there.
+ * no outline: a city, a base, a landing site. The place itself is a town
+ * painted into the ground (`groundLayer.ts`), which says nothing about who
+ * holds it, so each one also carries a badge on a short pole above it: a
+ * piece of interface rather than of the ground, in its owner's colour and its
+ * owner's faction shape, with a star for a capital. The badge faces the
+ * camera and keeps much the same size on screen at every zoom. The links
+ * `roadLinks` picks out are painted into the ground as tracks, and this
+ * layer gives each one its state there.
+ *
+ * Every state reads by shape or size as well as colour: brackets round an
+ * attackable badge, a bigger badge and a ring on the ground round a selected
+ * or hovered town, and a hollow grey badge with no name for a place hidden by
+ * fog. An incursion has its own warning sign over the place (`playLayer.ts`).
  *
  * Nothing here is built for a galaxy or theatre map, and a node with an
  * outline is left to the province drawing.
  *
- * Picking stays with the view's own hit targets (`cores`), so hover and
- * selection report through the same `onSelect` as every other map. This layer
- * only draws the result, through {@link CityLayer.hover} and
- * {@link CityLayer.select}.
+ * Picking stays with the view's own hit targets (`cores`), sized here to
+ * cover both the badge and the town under it, so hover and selection report
+ * through the same `onSelect` as every other map. This layer only draws the
+ * result, through {@link CityLayer.hover} and {@link CityLayer.select}.
  */
 
-/** The block's radius in world units, the theatre disc's own. */
-export const MARKER_RADIUS = 1.35;
-/** How far the block stands above the ground at its anchor. */
-const MARKER_HEIGHT = 1.2;
-/** How far the block reaches below its anchor, so a slope never shows under it. */
-const MARKER_FOOT = 1.5;
-/** A capital's block is this much bigger, as the theatre disc is. */
-export const CAPITAL_SCALE = 1.25;
-/** The capital's upper tier, as a share of the block's radius, and its height. */
-const TIER_RADIUS = 0.55;
-const TIER_HEIGHT = 0.9;
-/** Sides of a round block. */
-const ROUND_SEGMENTS = 32;
-/** How dark the block's wall is against its top, so the shape reads in 3D. */
-const WALL_SHADE = 0.55;
-/** Growth of a selected block and of a hovered or emphasised one. These are
- * the factors the galaxy's ownership ring takes. */
+/** The badge's radius in world units at the closest zoom. */
+export const BADGE_RADIUS = 0.28;
+/** How far the badge's centre stands above the ground, in badge radii. */
+export const POLE_RADII = 3;
+/** A capital's badge is this much bigger. */
+export const CAPITAL_SCALE = 1.2;
+/** Growth of a selected badge and of a hovered or emphasised one. */
 const SELECTED_SCALE = 1.3;
 const HOVER_SCALE = 1.15;
-/** Gap between a block and its name, in world units. */
-const LABEL_GAP = 0.5;
+/** A badge hidden by fog is this much smaller: a place, and no more. */
+const HIDDEN_SCALE = 0.8;
+/**
+ * How the badge grows as the camera pulls back: as the distance to this
+ * power, so it is a little smaller on screen far out than close in.
+ */
+const ZOOM_POWER = 0.85;
+/** Gap between a badge's edge and its name, in badge radii. */
+const LABEL_GAP = 0.35;
+/** Sides of a round badge. */
+const ROUND_SEGMENTS = 32;
 
 const WHITE = new THREE.Color(0xffffff);
+/** The badge's outline, dark so it stands off any ground. */
+const RIM_COLOR = new THREE.Color(0x161a22);
 /** A location or road hidden by fog: no owner shows through. */
-const HIDDEN_COLOR = new THREE.Color(0x565c68);
+const HIDDEN_COLOR = new THREE.Color(0x8a909c);
+const HIDDEN_CORE = new THREE.Color(0x2a2e36);
+const POLE_COLOR = new THREE.Color(0xe8e4d8);
 /** Edge lines on a plain road while one of its ends is hovered. */
 const ROAD_LIFT_COLOR = new THREE.Color(0xf4efe2);
 /** The warm gold the galaxy's contested lanes use. */
@@ -80,10 +87,10 @@ export interface MapItemState {
   /** A road the player has already travelled on a run. Not read for a location. */
   travelled?: boolean;
   /**
-   * Hidden by fog. A hidden location draws as a plain grey round block with
-   * no name and no capital tier. A hidden road is not drawn. A road with one
-   * hidden end loses its owner colour, and one with both ends hidden is not
-   * drawn either.
+   * Hidden by fog. A hidden location draws as a small hollow grey badge with
+   * no name and no capital star, over a dim grey town. A hidden road is not
+   * drawn. A road with one hidden end loses its owner colour, and one with
+   * both ends hidden is not drawn either.
    */
   hidden?: boolean;
 }
@@ -97,12 +104,10 @@ export interface CityLayer {
   select: (nodeId: string | null) => void;
   /** Mark one location hovered, or none. */
   hover: (nodeId: string | null) => void;
-  /** Advance the selected marker's pulse. Call once per animation frame. */
-  tick: (now: number) => void;
   /**
-   * Keep markers a readable size: past the galaxy view's furthest zoom they
-   * grow with the camera's distance, so they never draw smaller than a marker
-   * does there. `distance` is from the camera to the point it looks at.
+   * Keep badges a readable size: they grow with the camera's distance, so
+   * they stay much the same size on screen. `distance` is from the camera to
+   * the point it looks at.
    */
   fitToCamera: (distance: number) => void;
   /**
@@ -114,20 +119,210 @@ export interface CityLayer {
   setRoadState: (a: string, b: string, state: MapItemState | undefined) => void;
 }
 
+/** How a badge's size follows the camera, 1 at the closest zoom. */
+export function markerZoom(distance: number): number {
+  return (Math.max(distance, 1) / GALAXY_MIN_DISTANCE) ** ZOOM_POWER;
+}
+
+/** How one location's badge and town are drawn. */
+export interface MarkerLook {
+  /** Faction shape, 0 for round. */
+  sides: number;
+  fill: THREE.Color;
+  rim: THREE.Color;
+  star: boolean;
+  /** Brackets round the badge: it can be attacked. */
+  brackets: boolean;
+  /** Size against the plain badge. */
+  scale: number;
+  label: boolean;
+  town: TownStyle;
+}
+
+/**
+ * The look of one location for its state. `owner` is the owner's colour and
+ * `sides` its faction shape, or undefined for no owner. `dim` is the view's
+ * graded emphasis for the location, 0 to 1.
+ */
+export function markerLook(args: {
+  state: MapItemState | undefined;
+  owner: THREE.Color | undefined;
+  sides: number;
+  capital: boolean;
+  selected: boolean;
+  hovered: boolean;
+  dim: number;
+}): MarkerLook {
+  const { state, owner, capital, selected, hovered, dim } = args;
+  if (state?.hidden) {
+    return {
+      sides: 0,
+      fill: HIDDEN_CORE.clone().multiplyScalar(dim),
+      rim: HIDDEN_COLOR.clone().multiplyScalar(dim),
+      star: false,
+      brackets: false,
+      scale: HIDDEN_SCALE,
+      label: false,
+      town: { hidden: true },
+    };
+  }
+  const fill = (owner ?? HIDDEN_COLOR)
+    .clone()
+    .lerp(WHITE, hovered ? 0.3 : 0)
+    .multiplyScalar(dim);
+  let rim = RIM_COLOR.clone();
+  if (state?.threatened) rim = THREATENED_COLOR.clone();
+  else if (selected) rim = WHITE.clone();
+  else if (state?.attackable) rim = ATTACKABLE_COLOR.clone();
+  else if (state?.emphasised) rim = WHITE.clone().lerp(RIM_COLOR, 0.35);
+  rim.multiplyScalar(dim);
+  let town: TownStyle = { hidden: false };
+  if (selected) {
+    town = {
+      hidden: false,
+      ring: { color: WHITE, strength: 0.95, thick: true },
+    };
+  } else if (hovered) {
+    town = {
+      hidden: false,
+      ring: { color: WHITE, strength: 0.7, thick: false },
+    };
+  } else if (state?.emphasised) {
+    town = {
+      hidden: false,
+      ring: { color: WHITE, strength: 0.4, thick: false },
+    };
+  }
+  return {
+    sides: owner ? args.sides : 0,
+    fill,
+    rim,
+    star: capital,
+    brackets: !!state?.attackable,
+    scale:
+      (capital ? CAPITAL_SCALE : 1) *
+      (selected
+        ? SELECTED_SCALE
+        : hovered || state?.emphasised
+          ? HOVER_SCALE
+          : 1),
+    label: true,
+    town,
+  };
+}
+
+/* ------------------------------- geometry -------------------------------- */
+
+/** Badge parts, the geometry groups of a badge in this order. */
+const PART = { rim: 0, fill: 1, star: 2, brackets: 3 } as const;
+
+/** A flat polygon in x and y with its first corner straight up. */
+function polygon(
+  out: number[],
+  sides: number,
+  radius: number,
+  z: number,
+): void {
+  const n = sides || ROUND_SEGMENTS;
+  for (let k = 0; k < n; k++) {
+    const a = Math.PI / 2 + (k / n) * Math.PI * 2;
+    const b = Math.PI / 2 + ((k + 1) / n) * Math.PI * 2;
+    out.push(
+      0,
+      0,
+      z,
+      Math.cos(a) * radius,
+      Math.sin(a) * radius,
+      z,
+      Math.cos(b) * radius,
+      Math.sin(b) * radius,
+      z,
+    );
+  }
+}
+
+/**
+ * A badge of radius 1 in x and y facing +z, with a geometry group per
+ * {@link PART}. The parts stand a little forward of each other, so they
+ * never fight in depth and the pole behind stays behind.
+ */
+function badgeGeometry(sides: number): THREE.BufferGeometry {
+  const positions: number[] = [];
+  const groups: [number, number][] = [];
+  const part = (fill: () => void) => {
+    const start = positions.length / 3;
+    fill();
+    groups.push([start, positions.length / 3 - start]);
+  };
+  // A polygon's corners reach the radius and its sides fall short, so a
+  // shape with few sides is drawn a little larger to look as big as a disc.
+  const reach = sides === 0 ? 1 : 1 / Math.cos(Math.PI / sides) ** 0.5;
+  part(() => polygon(positions, sides, reach, 0.15));
+  part(() => polygon(positions, sides, reach * 0.74, 0.17));
+  part(() => {
+    // A five point star.
+    const rim: [number, number][] = [];
+    for (let k = 0; k < 10; k++) {
+      const r = k % 2 === 0 ? 0.52 : 0.22;
+      const a = Math.PI / 2 + (k / 10) * Math.PI * 2;
+      rim.push([Math.cos(a) * r, Math.sin(a) * r]);
+    }
+    for (let k = 0; k < 10; k++) {
+      const [x1, y1] = rim[k];
+      const [x2, y2] = rim[(k + 1) % 10];
+      positions.push(0, 0, 0.19, x1, y1, 0.19, x2, y2, 0.19);
+    }
+  });
+  part(() => {
+    // Four corner brackets round the badge, as round a target.
+    const at = 1.45;
+    const len = 0.5;
+    const w = 0.14;
+    for (const [sx, sy] of [
+      [1, 1],
+      [-1, 1],
+      [-1, -1],
+      [1, -1],
+    ]) {
+      const quad = (x0: number, y0: number, x1: number, y1: number) => {
+        const ax = sx * x0;
+        const ay = sy * y0;
+        const bx = sx * x1;
+        const by = sy * y1;
+        positions.push(ax, ay, 0.15, bx, ay, 0.15, bx, by, 0.15);
+        positions.push(ax, ay, 0.15, bx, by, 0.15, ax, by, 0.15);
+      };
+      quad(at - w, at - len, at, at);
+      quad(at - len, at - w, at - w, at);
+    }
+  });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  for (const [i, [start, count]] of groups.entries()) {
+    geo.addGroup(start, count, i);
+  }
+  geo.computeBoundingSphere();
+  return geo;
+}
+
 interface Marker {
   /** Index into `galaxy.nodes`. */
   i: number;
   id: string;
   capital: boolean;
   group: THREE.Group;
-  body: THREE.Mesh;
-  tier?: THREE.Mesh;
-  top: THREE.MeshBasicMaterial;
-  wall: THREE.MeshBasicMaterial;
+  pole: THREE.Mesh;
+  badge: THREE.Mesh;
+  mats: THREE.MeshBasicMaterial[];
+  poleMat: THREE.MeshBasicMaterial;
   /** The anchor on the ground, in world units. */
   x: number;
   ground: number;
   z: number;
+  /** The town's radius under the badge, 0 for none. */
+  townRadius: number;
+  /** The badge's size against a plain one, for the current state. */
+  look: number;
 }
 
 export function buildCityLayer(
@@ -143,8 +338,9 @@ export function buildCityLayer(
   labelObjects: CSS2DObject[],
   /** The view's hit targets, one instance per node. */
   cores: THREE.InstancedMesh,
-  /** Where the roads are painted, and their state with them. */
-  ground: Pick<GroundLayer, "setRoadStyle" | "commit">,
+  /** Where the roads and towns are painted, and their state with them. */
+  ground: Pick<GroundLayer, "setRoadStyle" | "commit"> &
+    Partial<Pick<GroundLayer, "setTownStyle" | "towns">>,
 ): CityLayer {
   const nodeById = new Map(galaxy.nodes.map((n) => [n.id, n]));
   const ownerOf = (id: string): string =>
@@ -155,145 +351,125 @@ export function buildCityLayer(
 
   /* ------------------------------- markers ------------------------------- */
 
-  // One block geometry per faction shape, shared and swapped on capture. The
-  // first corner points north, as the galaxy's ownership ring does.
-  const bodyGeos = new Map<number, THREE.CylinderGeometry>();
-  const tierGeos = new Map<number, THREE.CylinderGeometry>();
-  const prism = (
-    cache: Map<number, THREE.CylinderGeometry>,
-    sides: number,
-    radius: number,
-    bottom: number,
-    top: number,
-  ) => {
-    let geo = cache.get(sides);
+  // One badge geometry per faction shape, shared and swapped on capture.
+  const badgeGeos = new Map<number, THREE.BufferGeometry>();
+  const badgeGeoFor = (sides: number) => {
+    let geo = badgeGeos.get(sides);
     if (!geo) {
-      geo = new THREE.CylinderGeometry(
-        radius,
-        radius,
-        top - bottom,
-        sides || ROUND_SEGMENTS,
-        1,
-        false,
-        Math.PI,
-      );
-      geo.translate(0, (top + bottom) / 2, 0);
-      cache.set(sides, geo);
+      geo = badgeGeometry(sides);
+      badgeGeos.set(sides, geo);
       disposables.push(geo);
     }
     return geo;
   };
-  const bodyGeoFor = (sides: number) =>
-    prism(bodyGeos, sides, MARKER_RADIUS, -MARKER_FOOT, MARKER_HEIGHT);
-  const tierGeoFor = (sides: number) =>
-    prism(
-      tierGeos,
-      sides,
-      MARKER_RADIUS * TIER_RADIUS,
-      MARKER_HEIGHT,
-      MARKER_HEIGHT + TIER_HEIGHT,
+  // A pole one unit tall standing on its base.
+  const poleGeo = new THREE.CylinderGeometry(0.035, 0.035, 1, 6);
+  poleGeo.translate(0, 0.5, 0);
+  disposables.push(poleGeo);
+
+  // Which way is up on screen, so a name hangs below its badge at any tilt.
+  // Looking straight down with north up, that is world -z.
+  const screenUp = new THREE.Vector3(0, 0, -1);
+  let zoom = 1;
+  let selectedId: string | null = null;
+  let hoveredId: string | null = null;
+
+  const radiusOf = (m: Marker) => BADGE_RADIUS * zoom * m.look;
+  const poleOf = () => BADGE_RADIUS * zoom * POLE_RADII;
+
+  /** Put a marker's name just below its badge on screen. */
+  const placeLabel = (m: Marker) => {
+    const label = labelObjects[m.i];
+    if (!label) return;
+    const drop = radiusOf(m) * (1 + LABEL_GAP);
+    label.position.set(
+      m.x - screenUp.x * drop,
+      m.ground + poleOf() - screenUp.y * drop,
+      m.z - screenUp.z * drop,
     );
-  const tierTop = new THREE.MeshBasicMaterial({ color: 0xf4f1e6 });
-  disposables.push(tierTop);
+    // Hang the name below that point instead of centring it on it.
+    label.center.set(0.5, 0);
+  };
 
   const markers: Marker[] = [];
   const markerById = new Map<string, Marker>();
   galaxy.nodes.forEach((n, i) => {
     if (n.outline) return;
-    const [x, ground, z] = surface.mapToWorld(n.pos[0], n.pos[1]);
-    const top = new THREE.MeshBasicMaterial();
-    const wall = new THREE.MeshBasicMaterial();
-    disposables.push(top, wall);
+    const [x, groundY, z] = surface.mapToWorld(n.pos[0], n.pos[1]);
+    const mats = [0, 1, 2, 3].map(() => new THREE.MeshBasicMaterial());
+    const poleMat = new THREE.MeshBasicMaterial();
+    disposables.push(...mats, poleMat);
     const group = new THREE.Group();
-    group.position.set(x, ground, z);
-    // A cylinder's material groups are its wall, its top and its underside.
-    const body = new THREE.Mesh(bodyGeoFor(0), [wall, top, wall]);
-    body.raycast = () => {};
-    group.add(body);
-    const capital = n.kind === "capital";
-    let tier: THREE.Mesh | undefined;
-    if (capital) {
-      tier = new THREE.Mesh(tierGeoFor(0), [wall, tierTop, wall]);
-      tier.raycast = () => {};
-      group.add(tier);
-    }
+    group.name = `city-marker:${n.id}`;
+    group.position.set(x, groundY, z);
+    const pole = new THREE.Mesh(poleGeo, poleMat);
+    pole.raycast = () => {};
+    const badge = new THREE.Mesh(badgeGeoFor(0), mats);
+    badge.raycast = () => {};
+    // The badge turns to face the camera each time it is drawn, and its name
+    // moves with it. Always drawn, so the name never goes stale.
+    badge.frustumCulled = false;
+    group.add(pole, badge);
     scene.add(group);
-    const marker = {
+    const marker: Marker = {
       i,
       id: n.id,
-      capital,
+      capital: n.kind === "capital",
       group,
-      body,
-      tier,
-      top,
-      wall,
+      pole,
+      badge,
+      mats,
+      poleMat,
       x,
-      ground,
+      ground: groundY,
       z,
+      townRadius: ground.towns?.[i]?.radius ?? 0,
+      look: 1,
+    };
+    badge.onBeforeRender = (_r, _s, camera) => {
+      badge.quaternion.copy(camera.quaternion);
+      badge.updateMatrixWorld();
+      screenUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      placeLabel(marker);
     };
     markers.push(marker);
     markerById.set(n.id, marker);
   });
 
-  let zoom = 1;
-  let selectedId: string | null = null;
-  let hoveredId: string | null = null;
-
-  const baseScale = (m: Marker) => zoom * (m.capital ? CAPITAL_SCALE : 1);
-  const colorOf = (m: Marker): THREE.Color =>
-    isHidden(m.id) ? HIDDEN_COLOR : ownerColor(ownerOf(m.id));
-
-  /** Size a marker and put its name just south of it, clear of the block. */
-  const place = (m: Marker, stateScale: number) => {
-    const scale = baseScale(m) * stateScale;
-    m.group.scale.setScalar(scale);
-    const label = labelObjects[m.i];
-    if (label) {
-      label.position.set(
-        m.x,
-        m.ground,
-        m.z + MARKER_RADIUS * scale + LABEL_GAP * zoom,
-      );
-      // Hang the name below that point instead of centring it on it.
-      label.center.set(0.5, 0);
-    }
+  /** Size a marker's pole and badge for the zoom and its state. */
+  const place = (m: Marker) => {
+    const r = radiusOf(m);
+    m.badge.scale.setScalar(r);
+    m.badge.position.set(0, poleOf(), 0);
+    m.pole.scale.set(zoom, poleOf(), zoom);
+    placeLabel(m);
   };
 
   const style = (m: Marker) => {
     const state = locationStates.get(m.id);
-    const hidden = !!state?.hidden;
     const owner = ownerOf(m.id);
-    const sides = hidden || owner === NEUTRAL ? 0 : factionSides(galaxy, owner);
-    m.body.geometry = bodyGeoFor(sides);
-    if (m.tier) {
-      m.tier.geometry = tierGeoFor(sides);
-      m.tier.visible = !hidden;
-    }
-    const selected = m.id === selectedId;
-    const hovered = m.id === hoveredId;
-    const dim = dimOf(m.id);
-    const color = colorOf(m);
-    m.top.color
-      .copy(color)
-      .lerp(WHITE, selected ? 0.3 : hovered ? 0.35 : 0)
-      .multiplyScalar(dim);
-    if (state?.threatened && !hidden) {
-      m.wall.color.copy(THREATENED_COLOR).multiplyScalar(dim);
-    } else if (state?.attackable && !hidden) {
-      m.wall.color.copy(ATTACKABLE_COLOR).multiplyScalar(dim);
-    } else {
-      m.wall.color.copy(color).multiplyScalar(WALL_SHADE * dim);
-    }
+    const look = markerLook({
+      state,
+      owner: owner === NEUTRAL ? undefined : ownerColor(owner),
+      sides: owner === NEUTRAL ? 0 : factionSides(galaxy, owner),
+      capital: m.capital,
+      selected: m.id === selectedId,
+      hovered: m.id === hoveredId,
+      dim: dimOf(m.id),
+    });
+    m.badge.geometry = badgeGeoFor(look.sides);
+    m.mats[PART.rim].color.copy(look.rim);
+    m.mats[PART.fill].color.copy(look.fill);
+    m.mats[PART.star].color.copy(WHITE).multiplyScalar(dimOf(m.id));
+    m.mats[PART.star].visible = look.star;
+    m.mats[PART.brackets].color.copy(ATTACKABLE_COLOR);
+    m.mats[PART.brackets].visible = look.brackets;
+    m.poleMat.color.copy(POLE_COLOR).multiplyScalar(dimOf(m.id));
+    m.look = look.scale;
     const label = labelObjects[m.i];
-    if (label) label.visible = !hidden;
-    place(
-      m,
-      selected
-        ? SELECTED_SCALE
-        : hovered || state?.emphasised
-          ? HOVER_SCALE
-          : 1,
-    );
+    if (label) label.visible = look.label;
+    ground.setTownStyle?.(m.i, look.town);
+    place(m);
   };
 
   /* -------------------------------- roads -------------------------------- */
@@ -316,29 +492,36 @@ export function buildCityLayer(
         ),
       );
     });
-    ground.commit();
   };
 
   /* ------------------------------ hit targets ---------------------------- */
 
-  // The hit targets grow with the markers, so a marker enlarged at a far zoom
-  // is as easy to click as it looks.
+  // Each hit target covers the town on the ground and the badge above it, so
+  // either picks the place. It grows with the badge as the camera pulls back.
   const matrix = new THREE.Matrix4();
+  const at = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  const turn = new THREE.Quaternion();
   const fitCores = () => {
     for (const m of markers) {
-      const scale = (m.capital ? 2.6 : 2.0) * zoom;
-      matrix
-        .makeScale(scale, scale, scale)
-        .setPosition(m.x, m.ground + MARKER_LIFT, m.z);
-      cores.setMatrixAt(m.i, matrix);
+      const r = BADGE_RADIUS * zoom * (m.capital ? CAPITAL_SCALE : 1);
+      const top = poleOf() + r;
+      const across = Math.max(m.townRadius * 0.85, r * 1.4);
+      at.set(m.x, m.ground + top / 2, m.z);
+      size.set(across, top / 2 + r * 0.3, across);
+      cores.setMatrixAt(m.i, matrix.compose(at, turn, size));
     }
     cores.instanceMatrix.needsUpdate = true;
     cores.computeBoundingSphere();
   };
+  fitCores();
 
   const restyle = (id: string | null) => {
     const m = id === null ? undefined : markerById.get(id);
-    if (m) style(m);
+    if (m) {
+      style(m);
+      ground.commit();
+    }
   };
 
   return {
@@ -346,6 +529,7 @@ export function buildCityLayer(
     apply: () => {
       for (const m of markers) style(m);
       styleRoads();
+      ground.commit();
     },
     select: (nodeId) => {
       const previous = selectedId;
@@ -359,21 +543,11 @@ export function buildCityLayer(
       restyle(previous);
       restyle(nodeId);
     },
-    tick: (now) => {
-      const m = selectedId === null ? undefined : markerById.get(selectedId);
-      if (!m) return;
-      const wave = Math.sin(now / 280);
-      m.group.scale.setScalar(baseScale(m) * (SELECTED_SCALE + 0.06 * wave));
-      m.top.color
-        .copy(colorOf(m))
-        .lerp(WHITE, 0.3 + 0.25 * wave)
-        .multiplyScalar(dimOf(m.id));
-    },
     fitToCamera: (distance) => {
-      const next = Math.max(1, distance / GALAXY_MAX_DISTANCE);
-      if (Math.abs(next - zoom) < 0.01) return;
+      const next = markerZoom(distance);
+      if (Math.abs(next - zoom) < 0.01 * zoom) return;
       zoom = next;
-      for (const m of markers) style(m);
+      for (const m of markers) place(m);
       fitCores();
     },
     setLocationState: (nodeId, state) => {
