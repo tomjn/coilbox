@@ -210,10 +210,10 @@ const MAX_STRETCH = 0.35;
 
 /**
  * How far past its radius a town's texture reaches, as a multiple of the
- * radius: houses strung out along the roads, then the ring drawn round a
- * selected town.
+ * radius: its fields, which thin out by then. Houses along the roads and the
+ * ring round a selected town lie well inside.
  */
-export const TOWN_REACH = 1.85;
+export const TOWN_REACH = 3;
 
 /** Texels along the longer side of the town index. */
 export const TOWN_INDEX_TEXELS = 512;
@@ -340,8 +340,9 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
  * along its longer side, as four bytes a texel. Red and green: the town's
  * index plus one, high byte first, or 0 for open country. Blue: how fit the
  * ground is to build on, 255 for flat dry land, {@link STEEP_FIT} of that
- * for a steep slope, and 0 for sea, recorded only where some town reaches. The texel in column `i` and
- * row `j` stands for world `x = (i + 0.5) / width * worldWidth -
+ * for a steep slope, and 0 for sea. Alpha: how fit it is for fields, from
+ * {@link farmableAt}. Blue and alpha are recorded only where some town
+ * reaches. The texel in column `i` and row `j` stands for world `x = (i + 0.5) / width * worldWidth -
  * worldWidth / 2`, and the same down the sheet in z. A texel within
  * {@link TOWN_REACH} radii of more than one town goes to the one it is
  * nearest relative to its size.
@@ -377,6 +378,70 @@ export function buildableAt(
   };
 }
 
+/**
+ * The generator's biome colours (`terrainGen.ts`) in sRGB, and whether
+ * fields are laid on each: grassland and dry ground yes, forest, tundra,
+ * rock, scree, sand and snow no.
+ */
+const BIOMES: [number, number, number, boolean][] = [
+  [122, 154, 84, true],
+  [182, 168, 116, true],
+  [58, 98, 56, false],
+  [146, 146, 122, false],
+  [122, 106, 90, false],
+  [152, 146, 140, false],
+  [214, 200, 150, false],
+  [240, 240, 240, false],
+];
+
+/** Whether the biome nearest to a picture colour is one fields are laid on. */
+export function farmBiome(r: number, g: number, b: number): boolean {
+  let best = Number.POSITIVE_INFINITY;
+  let farm = false;
+  for (const [br, bg, bb, ok] of BIOMES) {
+    const d = (r - br) ** 2 + (g - bg) ** 2 + (b - bb) ** 2;
+    if (d < best) {
+      best = d;
+      farm = ok;
+    }
+  }
+  return farm;
+}
+
+/**
+ * How fit the ground at world `x, z` is for fields, 0 to 1: grassland or dry
+ * ground in the map's picture, which covers the sheet `worldWidth` by
+ * `worldDepth`, and flat, by `buildable`. Fields want flatter ground than
+ * houses, so only fully buildable ground counts.
+ */
+export function farmableAt(
+  picture: { data: ArrayLike<number>; width: number; height: number },
+  worldWidth: number,
+  worldDepth: number,
+  buildable: (x: number, z: number) => number,
+): (x: number, z: number) => number {
+  return (x, z) => {
+    const i = Math.min(
+      picture.width - 1,
+      Math.max(
+        0,
+        Math.floor(((x + worldWidth / 2) / worldWidth) * picture.width),
+      ),
+    );
+    const j = Math.min(
+      picture.height - 1,
+      Math.max(
+        0,
+        Math.floor(((z + worldDepth / 2) / worldDepth) * picture.height),
+      ),
+    );
+    const o = (j * picture.width + i) * 4;
+    const { data } = picture;
+    if (!farmBiome(data[o], data[o + 1], data[o + 2])) return 0;
+    return Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15));
+  };
+}
+
 /** Design values: towns build on slopes up to 1 in 5 and thin out by 1 in 2.5. */
 export const FLAT_SLOPE = 0.2;
 export const STEEP_SLOPE = 0.4;
@@ -392,6 +457,7 @@ export function buildTownIndex(
   worldDepth: number,
   texels: number = TOWN_INDEX_TEXELS,
   buildable: (x: number, z: number) => number = () => 1,
+  farmable: (x: number, z: number) => number = () => 0,
 ): TownIndex {
   const long = Math.max(worldWidth, worldDepth);
   const width = Math.max(1, Math.round((texels * worldWidth) / long));
@@ -438,8 +504,13 @@ export function buildTownIndex(
     for (let i = 0; i < width; i++) {
       const at = j * width + i;
       if (best[at] === Number.POSITIVE_INFINITY) continue;
-      const fit = buildable((i + 0.5) * tx - worldWidth / 2, z);
-      data[at * 4 + 2] = Math.round(Math.min(1, Math.max(0, fit)) * 255);
+      const x = (i + 0.5) * tx - worldWidth / 2;
+      data[at * 4 + 2] = Math.round(
+        Math.min(1, Math.max(0, buildable(x, z))) * 255,
+      );
+      data[at * 4 + 3] = Math.round(
+        Math.min(1, Math.max(0, farmable(x, z))) * 255,
+      );
     }
   }
   return { data, width, height };
