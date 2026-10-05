@@ -585,21 +585,25 @@ export function GalaxyView({
       // author's and may show its own, and performance mode goes without.
       // The towns are planned from the roads, and the roads then stop at
       // each town's edge.
+      // Neighbouring provinces' towns are joined by roads where there are
+      // towns to join.
       const planned: { towns?: Town[] } = {};
       const terrain = surface;
+      const drawTowns = !performanceMode && !!terrainColor;
       ground = buildGroundLayer(
         disposables,
         galaxy,
         surface,
         terrainHeights,
         crossingPlan?.tracks,
-        !performanceMode && terrainColor
+        drawTowns
           ? (roads) => {
               const shaped = townsOnRoads(galaxy, terrain, roads);
               planned.towns = shaped.towns;
               return shaped.roads;
             }
           : undefined,
+        drawTowns,
       );
       if (planned.towns) {
         towns = buildTownLayer(

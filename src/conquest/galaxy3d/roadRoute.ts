@@ -37,7 +37,16 @@ export interface RouteGrid {
    * {@link markRoad}, so roads routed later keep off the earlier ones.
    */
   taken: Uint8Array;
+  /**
+   * The province each cell lies in, as a node index, or -1 for none. Only a
+   * map with provinces has it. A route given two provinces to keep to pays
+   * {@link OUTSIDE_COST} for every step into any other.
+   */
+  region?: Int32Array;
 }
+
+/** The two regions a route keeps to. */
+export type Keep = readonly [number, number];
 
 /** No more cells than this along the grid's longer side, to keep routing fast. */
 export const ROUTE_MAX_CELLS = 512;
@@ -67,6 +76,19 @@ const BESIDE_CELLS = 3;
 /** Cells round a road's ends left unmarked, since every road into a town
  * meets the others there. */
 const END_CELLS = 8;
+/**
+ * The extra cost of a step into a province a route does not keep to, as a
+ * share of its length. Dear enough that a road between two neighbours never
+ * cuts through a third, and finite so a route always exists.
+ */
+const OUTSIDE_COST = 40;
+
+/** True when cell `c` is in a province other than the two in `keep`. */
+function outside(grid: RouteGrid, c: number, keep?: Keep): boolean {
+  if (!keep || !grid.region) return false;
+  const r = grid.region[c];
+  return r >= 0 && r !== keep[0] && r !== keep[1];
+}
 
 /** A 32 bit integer hash of two cell coordinates and a seed. */
 function hash3(x: number, y: number, seed: number): number {
@@ -222,7 +244,12 @@ function cellAt(grid: RouteGrid, [x, y]: MapXY): number {
 }
 
 /** The cost of one step between two neighbouring cells. */
-export function stepCost(grid: RouteGrid, from: number, to: number): number {
+export function stepCost(
+  grid: RouteGrid,
+  from: number,
+  to: number,
+  keep?: Keep,
+): number {
   const { cols, stepX, stepY, height, wander, heightScale } = grid;
   const dx = ((to % cols) - (from % cols)) * stepX;
   const dy = (Math.floor(to / cols) - Math.floor(from / cols)) * stepY;
@@ -230,14 +257,13 @@ export function stepCost(grid: RouteGrid, from: number, to: number): number {
   const h = height[to];
   if (grid.hasSea && h < SEA_LEVEL) return run * WATER_COST;
   const grade = (Math.abs(h - height[from]) * heightScale) / run;
-  return (
-    run *
-    (1 +
-      GRADE_WEIGHT * grade * grade +
-      HEIGHT_WEIGHT * h +
-      WANDER * wander[to] +
-      BESIDE_ROAD * grid.taken[to])
-  );
+  const base =
+    1 +
+    GRADE_WEIGHT * grade * grade +
+    HEIGHT_WEIGHT * h +
+    WANDER * wander[to] +
+    BESIDE_ROAD * grid.taken[to];
+  return run * (outside(grid, to, keep) ? base + OUTSIDE_COST : base);
 }
 
 /**
@@ -249,6 +275,7 @@ export function cheapestCells(
   grid: RouteGrid,
   from: MapXY,
   to: MapXY,
+  keep?: Keep,
 ): MapXY[] {
   const { cols, rows, stepX, stepY } = grid;
   const start = cellAt(grid, from);
@@ -279,7 +306,7 @@ export function cheapestCells(
       if (ni < 0 || nj < 0 || ni >= cols || nj >= rows) continue;
       const n = nj * cols + ni;
       if (done[n]) continue;
-      const cost = best[c] + stepCost(grid, c, n);
+      const cost = best[c] + stepCost(grid, c, n, keep);
       if (cost < best[n]) {
         best[n] = cost;
         came[n] = c;
@@ -357,13 +384,15 @@ function heightNear(grid: RouteGrid, [x, y]: MapXY): number {
  * climbs higher than the route does between them, or crosses water or runs
  * beside another road where it does not. A shortcut like that would carry a
  * smoothed road over a shoulder of the hill the route went round, or back
- * alongside the road it kept off.
+ * alongside the road it kept off. A shortcut into a province outside `keep`
+ * is refused too.
  */
 function shortcutClimbs(
   grid: RouteGrid,
   line: MapXY[],
   first: number,
   last: number,
+  keep?: Keep,
 ): boolean {
   let top = 0;
   let dry = true;
@@ -388,6 +417,7 @@ function shortcutClimbs(
       return true;
     }
     if (clear && grid.taken[cellAt(grid, p)]) return true;
+    if (outside(grid, cellAt(grid, p), keep)) return true;
   }
   return false;
 }
@@ -436,14 +466,20 @@ export function roundCorners(line: MapXY[], rounds: number): MapXY[] {
 /**
  * A road's route between two map positions: the cheapest chain of cells,
  * straightened within two cells of its course where that climbs no higher,
- * then rounded. It starts and ends on the two positions exactly.
+ * then rounded. It starts and ends on the two positions exactly. Given
+ * `keep`, it keeps to those two provinces of `grid.region` wherever it can.
  */
-export function routeRoad(grid: RouteGrid, from: MapXY, to: MapXY): MapXY[] {
-  const cells = cheapestCells(grid, from, to);
+export function routeRoad(
+  grid: RouteGrid,
+  from: MapXY,
+  to: MapXY,
+  keep?: Keep,
+): MapXY[] {
+  const cells = cheapestCells(grid, from, to, keep);
   const line: MapXY[] = [from, ...cells.slice(1, -1), to];
   const cell = Math.min(grid.stepX, grid.stepY);
   const straight = simplifyLine(line, cell * 2, (first, last) =>
-    shortcutClimbs(grid, line, first, last),
+    shortcutClimbs(grid, line, first, last, keep),
   );
   // Rounding cuts a quarter off each side of a corner, so long runs are
   // split first and no corner is cut by more than about a cell.

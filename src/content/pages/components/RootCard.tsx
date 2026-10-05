@@ -52,6 +52,9 @@ export function RootCard({
             {root.portable ? (
               <StatusBadge tone="info">portable</StatusBadge>
             ) : null}
+            {root.bundled ? (
+              <StatusBadge tone="info">bundled, read only</StatusBadge>
+            ) : null}
             {root.valid ? (
               <StatusBadge tone="good">valid</StatusBadge>
             ) : (
@@ -105,7 +108,7 @@ export function RootCard({
             )}
             Re-scan
           </Button>
-          {isManual && (
+          {isManual && !root.bundled && (
             <Button
               type="button"
               variant="outline"

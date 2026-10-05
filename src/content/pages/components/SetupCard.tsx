@@ -1,5 +1,5 @@
 import { Button, useSetting } from "@picoframe/frame";
-import { Download, FolderPlus, Loader2 } from "lucide-react";
+import { Download, FolderPlus, Loader2, RotateCcw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { Card } from "@/components/ui/card";
@@ -7,10 +7,12 @@ import {
   useDefaultWriteRoot,
   useWriteRootPath,
 } from "../../../downloads/config";
+import { useDownloadQueue } from "../../../downloads/DownloadQueueProvider";
 import { fetchNewestRecoil } from "../../../downloads/engineInstall";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
+import { useBundledEngine } from "../../BundledEngineSetup";
 import { contentCreateStandardRoot, contentRecreateRoot } from "../../bindings";
 import { useSetupStatus } from "../../config";
 import {
@@ -39,6 +41,14 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   );
   const [error, setError] = useState<string | null>(null);
   const engineDl = useQueuedDownload();
+  const bundled = useBundledEngine();
+  // The engine that came in the package is being set up, or is about to be, so
+  // there is nothing to download. A failed or cancelled copy falls back to the
+  // download offer below it.
+  const bundleCovers =
+    bundled.state.status === "checking" ||
+    bundled.state.status === "copying" ||
+    bundled.state.status === "done";
   const [newest, setNewest] = useState<{
     version: string;
     available: boolean;
@@ -46,7 +56,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
   } | null>(null);
 
   useEffect(() => {
-    if (!needsEngine) return;
+    if (!needsEngine || bundleCovers) return;
     fetchNewestRecoil()
       .then(({ release, platform }) =>
         setNewest({
@@ -56,7 +66,7 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
         }),
       )
       .catch(() => setNewest({ version: "", available: false, platform: "" }));
-  }, [needsEngine]);
+  }, [needsEngine, bundleCovers]);
 
   if (complete) return null;
   if (dismissible && dismissed) return null;
@@ -176,7 +186,10 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
           </Button>
         ))}
 
+      {needsEngine && <BundledEngineRow />}
+
       {needsEngine &&
+        !bundleCovers &&
         (newest?.available ? (
           <div className="space-y-2">
             <Button
@@ -221,6 +234,63 @@ export function SetupCard({ dismissible = false }: { dismissible?: boolean }) {
       )}
     </Card>
   );
+}
+
+/**
+ * The engine row while a distribution's bundled engine is set up (issue #3668).
+ * Short on purpose: the copy took about two seconds when measured, so it is a
+ * line and a bar rather than a screen. Nothing while the bundle is still being
+ * read or when there is none, so a plain coilbox sees the card it always did.
+ */
+function BundledEngineRow() {
+  const { state, retry } = useBundledEngine();
+  const { items } = useDownloadQueue();
+  switch (state.status) {
+    case "checking":
+    case "none":
+      return null;
+    case "copying": {
+      const item = items.find((i) => i.id === state.id);
+      return (
+        <div className="space-y-2" role="status">
+          <p className="flex items-center gap-2 text-xs">
+            <Loader2 className="size-3.5 motion-safe:animate-spin" />
+            Setting up engine {state.engine.version}
+          </p>
+          <QueueProgress item={item} />
+        </div>
+      );
+    }
+    case "done":
+      return (
+        <p className="flex items-center gap-2 text-xs" role="status">
+          <Loader2 className="size-3.5 motion-safe:animate-spin" />
+          Engine {state.engine.version} is set up. Finding your games…
+        </p>
+      );
+    case "failed":
+    case "cancelled":
+      return (
+        <div className="space-y-2">
+          <p
+            className={
+              state.status === "failed"
+                ? "text-xs text-destructive"
+                : "text-xs text-muted-foreground"
+            }
+          >
+            {state.status === "failed"
+              ? `Could not set up engine ${state.engine.version} from this package. ${state.error}`
+              : `Setting up engine ${state.engine.version} was cancelled.`}{" "}
+            Try again, or download an engine instead.
+          </p>
+          <Button variant="outline" onClick={retry}>
+            <RotateCcw />
+            Try again
+          </Button>
+        </div>
+      );
+  }
 }
 
 /**

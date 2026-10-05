@@ -39,6 +39,7 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
     my-campaign.json
   scenarios/         # you add these (optional) — bundled scenarios
     my-mission.json
+  content/           # you add this (optional): a bundled engine, game and maps, read only
   images/            # you add these (optional) — media referenced by profile/campaigns
   briefings/
   fonts/
@@ -54,7 +55,7 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 
 **Important distinction:** this covers Coilbox's *own* files. It does **not** automatically include the game itself — the engine, the `.sdz`/`.sd7` game archive, and maps. Those are **content**, and where they live is a separate choice covered in [Bundling the game content](#bundling-the-game-content) below.
 
-> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go at the **top level of the app folder** (the folder holding the binary and `.coilbox/`), in the standard Spring subfolders — `games/`, `maps/`, `engine/` — **not** inside `.coilbox/`. The app folder itself is the content root: it looks like an ordinary `~/.spring`-style data directory that happens to also contain `coilbox` and `.coilbox/`. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/`, won't be picked up as a content root, and could be lost if Coilbox's data is reset.
+> **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go at the **top level of the app folder** (the folder holding the binary and `.coilbox/`), in the standard Spring subfolders — `games/`, `maps/`, `engine/` — **not** inside `.coilbox/`. The app folder itself is the content root: it looks like an ordinary `~/.spring`-style data directory that happens to also contain `coilbox` and `.coilbox/`. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/`, won't be picked up as a content root, and could be lost if Coilbox's data is reset. The one exception is `.coilbox/content/`, a read-only bundle that coilbox searches after the app folder. See [Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps).
 
 ## Running Coilbox alongside skylobby
 
@@ -73,6 +74,8 @@ Sharing a content folder is read-mostly and safe, but note the two tools are ind
 ## Bundling the game content
 
 If you're **packaging Coilbox to hand to players**, you probably want the game itself inside the package too, so a player unzips one folder and everything is there — no separate Spring install, no downloads on first run.
+
+There are two places for it. `.coilbox/content/` is a read-only bundle coilbox never writes into, searched after the app folder, with the engine copied out on first run. [Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps) covers it. This section covers the other, the app folder itself, which is also where downloads go.
 
 Content (engine + game archive + maps) is tracked as **content roots** — folders Coilbox scans for game data. A content root can be stored two ways:
 
@@ -96,7 +99,7 @@ SplinterFaction/                 <- the folder you zip and distribute; THIS is t
   engine/
 ```
 
-The app folder plays the role of a `~/.spring`-style data directory: `games/`, `maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and `.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that buries the game *inside* `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that content won't be scanned and could be lost when Coilbox's data is reset.
+The app folder plays the role of a `~/.spring`-style data directory: `games/`, `maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and `.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that buries the game anywhere else inside `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that content won't be scanned and could be lost when Coilbox's data is reset.
 
 Rules to know:
 

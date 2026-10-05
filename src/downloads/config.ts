@@ -78,7 +78,7 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
   return useCallback(
     (state: ContentState) => {
       if (cfg.writeRootId) return;
-      const first = state.roots[0];
+      const first = state.roots.find((r) => !r.bundled);
       if (first) setCfg({ ...cfg, writeRootId: first.id });
     },
     [cfg, setCfg],

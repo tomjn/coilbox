@@ -1,6 +1,7 @@
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
+import { BundledEngineSetup } from "./BundledEngineSetup";
 import { contentRescan, contentStateLoad } from "./bindings";
 import {
   primeMapMeta,
@@ -81,11 +82,14 @@ export default function ContentStartupProvider({
     if (dlConfig.writeRootId) return;
     contentStateLoad(undefined)
       .then(({ state }) => {
-        const first = state.roots[0];
+        // Never the bundled content folder, which coilbox does not write into.
+        const first = state.roots.find((r) => !r.bundled);
         if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });
       })
       .catch(() => {});
   }, [dlConfig, setDlConfig]);
 
-  return <>{children}</>;
+  // The bundled engine copy starts here too, so it runs at launch whether or
+  // not any page shows the setup card.
+  return <BundledEngineSetup>{children}</BundledEngineSetup>;
 }

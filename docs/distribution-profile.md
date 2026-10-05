@@ -18,6 +18,7 @@ Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder 
   coilbox(.exe)            # or Coilbox.app on macOS (the folder beside it)
   .coilbox/
     profile.json          # <- the distribution profile
+    content/              # optional: a bundled engine, game and maps
     data/                 # (portable app data, created on first run)
     cache/
 ```
@@ -26,6 +27,14 @@ Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder 
 - In **development** (`bun tauri dev`), the binary runs from `target/debug/`, so the file lives at `target/debug/.coilbox/profile.json`.
 
 The profile is only read when Coilbox is running in portable mode (i.e. a `.coilbox` folder exists). A normal per-user install ignores it.
+
+### Bundled content
+
+A `content/` folder beside `profile.json` bundles the engine, the game and maps, so a new player has nothing to download. It is not a profile field. The folder being there turns it on, and a package without it behaves as before.
+
+Coilbox reads the folder in place and never writes into it. It searches it after the player's own content folder, so the player's copy of an archive wins. It copies only the engine, once, into the player's download folder on first run, and the home page's setup card says "Setting up engine" while it does. Mistakes in the folder show in the health checklist in Settings > Distribution profile.
+
+[Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps) has the layout, the measured sizes and the reasons.
 
 ## Minimal example
 
@@ -430,6 +439,8 @@ A win only counts when the player plays the scenario from the Scenarios page. A 
 The card is part of the `continue` zone, so it needs that zone on the page. A [`home.zones`](#home-object) list that leaves `continue` out, or a [`welcome`](#welcome-object) that replaces the page, shows no card. A welcome can link to the mission itself with `#/campaign/<campaign id>/<mission id>`.
 
 If `start` names a campaign or scenario that is not bundled, or a mission the campaign does not have, the home page shows no card and is otherwise unchanged. The health checklist in Settings > Distribution profile has a `start` row that says which it was. A campaign or scenario that exists only on your own machine counts as not bundled, because your players will not have it.
+
+With the mission's engine, game and map in [bundled content](#bundled-content), a new player's card is ready to play with nothing to download. The health checklist then has a second row that names any game or map `start` leads to that is neither in the bundle nor on your machine.
 
 Leave `start` out and nothing changes.
 

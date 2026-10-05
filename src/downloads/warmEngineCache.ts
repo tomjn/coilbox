@@ -4,6 +4,7 @@ import {
   contentStateLoad,
 } from "../content/bindings";
 import {
+  announceContentState,
   primeScan,
   type ScanTarget,
   targetsFromState,
@@ -53,6 +54,7 @@ export async function installEngine(
   const before = await contentStateLoad(undefined).catch(() => null);
   await download();
   const after = await contentRescan(undefined).catch(() => null);
+  announceContentState();
   warm(addedTargets(before?.state ?? null, after?.state ?? null)).catch(
     () => {},
   );

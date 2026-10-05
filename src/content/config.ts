@@ -97,6 +97,22 @@ export function useContentPrefs() {
   return useSetting<ContentPrefs>("content.prefs", defaultPrefs);
 }
 
+/** Every mounted {@link useContentState}, re-read by {@link announceContentState}. */
+const contentStateListeners = new Set<() => void>();
+
+/**
+ * Tell every screen holding a read of the content state to read it again.
+ *
+ * Called once an engine install has rescanned. Each `useContentState` reads the
+ * state when it mounts and not again, so before this an engine set up from the
+ * home page stayed invisible to the start card beside it until the player
+ * navigated away and back. It needs no provider, so a hook that is rendered
+ * outside the download queue still hears it.
+ */
+export function announceContentState(): void {
+  for (const fn of contentStateListeners) fn();
+}
+
 /**
  * Load + hold the persisted content state, shared by the Folders and Engines
  * pages. `setState` lets callers apply the result of a mutating command (rescan,
@@ -122,6 +138,14 @@ export function useContentState() {
 
   useEffect(() => {
     refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const listener = () => void refresh();
+    contentStateListeners.add(listener);
+    return () => {
+      contentStateListeners.delete(listener);
+    };
   }, [refresh]);
 
   return { state, setState, loading, error, refresh };

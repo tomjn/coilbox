@@ -6,8 +6,11 @@ import {
   ROAD_STATE_ROWS,
   type RoadMode,
 } from "./groundShader";
+import { planProvinceRoads } from "./provinceRoads";
 import { buildRoadMask, ROAD_REACH, type RoadLine } from "./roadMask";
-import { planRoads } from "./roadNetwork";
+import { planRoads, sceneSeed } from "./roadNetwork";
+import { routeGrid } from "./roadRoute";
+import type { RoadLink } from "./roads";
 import type { HeightGrid, TerrainSurface } from "./terrain";
 
 /**
@@ -36,6 +39,13 @@ export interface GroundLayer {
    * pieces it is painted in. A piece's `index` is its road's state.
    */
   roads: RoadLine[];
+  /**
+   * The roads between neighbouring provinces' towns, in order, from state
+   * index {@link firstProvince}. Empty unless asked for.
+   */
+  provinceRoads: RoadLink[];
+  /** The state index of the first road between provinces. */
+  firstProvince: number;
   /** The state index of the first extra track. */
   firstExtra: number;
   /** Restyle road `k`. Takes effect at {@link commit}. */
@@ -62,17 +72,35 @@ export function buildGroundLayer(
    * index, as `townsOnRoads` cuts them where they reach a town.
    */
   shape?: (roads: RoadLine[]) => RoadLine[],
+  /**
+   * Also join the towns of every two neighbouring provinces by a road. Only
+   * where towns are drawn, since the roads run from town to town.
+   */
+  provinceRoads = false,
 ): GroundLayer {
+  const grid = routeGrid(
+    surface.width,
+    surface.height,
+    surface.heightScale,
+    sceneSeed(galaxy),
+    heights,
+  );
   const linkRoads = planRoads(
     galaxy,
     surface.width,
     surface.height,
     surface.heightScale,
     heights,
+    grid,
   );
-  const firstExtra = linkRoads.length;
+  const firstProvince = linkRoads.length;
+  const between = provinceRoads
+    ? planProvinceRoads(galaxy, grid, firstProvince)
+    : { links: [], roads: [] };
+  const firstExtra = firstProvince + between.roads.length;
   const planned = [
     ...linkRoads,
+    ...between.roads,
     ...extra.map((t, j) => ({
       line: t.line,
       surface: t.surface,
@@ -131,6 +159,8 @@ export function buildGroundLayer(
 
   return {
     roads,
+    provinceRoads: between.links,
+    firstProvince,
     firstExtra,
     shading: {
       roadDistance,

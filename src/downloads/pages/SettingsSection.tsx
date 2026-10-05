@@ -36,7 +36,9 @@ export default function DownloadsSettings() {
 
   useEffect(() => {
     contentStateLoad(undefined)
-      .then(({ state }) => setRoots(state.roots))
+      // The bundled content folder is read-only to coilbox, so it is never
+      // offered as somewhere to download to.
+      .then(({ state }) => setRoots(state.roots.filter((r) => !r.bundled)))
       .catch(() => {
         // best-effort: the picker just shows no roots if content state is unavailable
       });

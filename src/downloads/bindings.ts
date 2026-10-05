@@ -7,9 +7,11 @@ import { withDownloadNotify } from "./downloadNotify";
  * `DownloadProgress`). `totalBytes`/`percent` are null for indeterminate
  * transfers (chunked responses without a length, or archive extraction);
  * `bytesPerSec` is null when unknown (e.g. the pr-downloader sidecar).
+ * `copying` is a distribution's bundled engine being copied into place, which
+ * the queue draws the way it draws a download.
  */
 export interface DownloadProgress {
-  phase: "downloading" | "extracting" | "done";
+  phase: "downloading" | "extracting" | "copying" | "done";
   downloadedBytes: number;
   totalBytes: number | null;
   percent: number | null;
