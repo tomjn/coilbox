@@ -1088,6 +1088,7 @@ Supplies system/faction names — and whole lore factions — for **[Galactic Co
 ```
 
 - `starNames` / `starPrefixes` / `starSuffixes` — full system names (used first), then syllables synthesized names are built from.
+- `placeNames` / `placePrefixes` / `placeSuffixes` — the same three for the Cities and Territories map styles. Each falls back to the matching `star*` field, then to built-in place names.
 - `factionNames` — full faction names, used when no `factions` presets are given.
 - `factions` — lore factions assigned in order (the player first); each is `{ name, color?, side?, aggression? }`.
 

@@ -635,6 +635,7 @@ export function generateTerritories(
       source: provinces.anchors.map(([x, y]) => ({ pos: [x, y, 0] })),
       links: [...provinces.borders, ...provinces.crossings],
       exactDistance: true,
+      land: true,
     },
     now,
   );

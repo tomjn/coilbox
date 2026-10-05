@@ -35,6 +35,16 @@ export interface ConquestNames {
   factionNames?: string[];
   /** Lore factions with colour/side/aggression, assigned in order. */
   factions?: FactionPreset[];
+  /**
+   * Full place names for the land styles (Cities and Territories), used
+   * before synthesis. Falls back to {@link starNames}, so a game with one pool
+   * gets it on every style.
+   */
+  placeNames?: string[];
+  /** Replaces the built-in land first-syllable pool. Falls back to {@link starPrefixes}. */
+  placePrefixes?: string[];
+  /** Replaces the built-in land last-syllable pool. Falls back to {@link starSuffixes}. */
+  placeSuffixes?: string[];
   /** Cap the galaxy to the named-star count and disable name fallback. */
   limitToNamed?: boolean;
 }
@@ -192,6 +202,101 @@ const STAR_LAST = [
   "quon",
 ];
 
+/**
+ * Built-in place names for the land styles are composed from these two lists,
+ * as in "Ironcoast" or "Northmarch". They are exported so a test can check
+ * every combination.
+ */
+export const LAND_FIRST = [
+  "Amber",
+  "Ash",
+  "Black",
+  "Bleak",
+  "Brack",
+  "Cinder",
+  "Cold",
+  "Crow",
+  "Dun",
+  "Dusk",
+  "Elder",
+  "Ember",
+  "Fallow",
+  "Fern",
+  "Flint",
+  "Frost",
+  "Gale",
+  "Gloam",
+  "Gold",
+  "Grey",
+  "Hart",
+  "Heath",
+  "High",
+  "Hollow",
+  "Iron",
+  "Kestrel",
+  "Lark",
+  "Lorn",
+  "Mist",
+  "Moss",
+  "North",
+  "Oak",
+  "Pike",
+  "Pine",
+  "Raven",
+  "Red",
+  "Reed",
+  "Rook",
+  "Rowan",
+  "Salt",
+  "Shale",
+  "Silver",
+  "Slate",
+  "Sorrel",
+  "South",
+  "Stone",
+  "Storm",
+  "Tarn",
+  "Thorn",
+  "Umber",
+  "West",
+  "East",
+  "Willow",
+  "Wind",
+  "Wolf",
+  "Wren",
+  "Yarrow",
+];
+
+export const LAND_LAST = [
+  "barrow",
+  "brook",
+  "coast",
+  "combe",
+  "crag",
+  "cross",
+  "dale",
+  "fall",
+  "fen",
+  "haven",
+  "holt",
+  "hollow",
+  "march",
+  "mere",
+  "moor",
+  "reach",
+  "ridge",
+  "shore",
+  "spire",
+  "stead",
+  "vale",
+  "ward",
+  "wold",
+  "wood",
+];
+
+/** Salt for the land name stream, kept apart from the stream that places things. */
+const LAND_NAME_SALT = 0x1a4d0a3e;
+
 const FACTION_ADJ = [
   "Crimson",
   "Obsidian",
@@ -259,6 +364,15 @@ export function mergeConquestNames(
     starNames: firstNonEmpty(profile?.starNames, branding?.starNames),
     starPrefixes: firstNonEmpty(profile?.starPrefixes, branding?.starPrefixes),
     starSuffixes: firstNonEmpty(profile?.starSuffixes, branding?.starSuffixes),
+    placeNames: firstNonEmpty(profile?.placeNames, branding?.placeNames),
+    placePrefixes: firstNonEmpty(
+      profile?.placePrefixes,
+      branding?.placePrefixes,
+    ),
+    placeSuffixes: firstNonEmpty(
+      profile?.placeSuffixes,
+      branding?.placeSuffixes,
+    ),
     factionNames: firstNonEmpty(profile?.factionNames, branding?.factionNames),
     factions: profile?.factions ?? branding?.factions,
     limitToNamed: profile?.limitToNamed ?? branding?.limitToNamed,
@@ -282,6 +396,51 @@ export function resolveConquestNames(names?: ConquestNames): ResolvedNames {
     factions: names?.factions,
     limitToNamed: names?.limitToNamed ?? false,
   };
+}
+
+/**
+ * The pools a land map names its locations from, or `undefined` when the game
+ * supplies a star pool and no place pool, so its one pool serves every style
+ * as before. Each place field falls back to the matching star field, then to
+ * the built-in land syllables. The built-in land pool has no full names, so
+ * names are composed from syllables.
+ */
+export function resolveLandNames(
+  names?: ConquestNames,
+): ResolvedNames | undefined {
+  const hasPlace = [
+    names?.placeNames,
+    names?.placePrefixes,
+    names?.placeSuffixes,
+  ].some((f) => f && f.length > 0);
+  const hasStar = [
+    names?.starNames,
+    names?.starPrefixes,
+    names?.starSuffixes,
+  ].some((f) => f && f.length > 0);
+  if (hasStar && !hasPlace) return undefined;
+  return {
+    starNames: firstNonEmpty(names?.placeNames, names?.starNames) ?? [],
+    starPrefixes:
+      firstNonEmpty(names?.placePrefixes, names?.starPrefixes, LAND_FIRST) ??
+      LAND_FIRST,
+    starSuffixes:
+      firstNonEmpty(names?.placeSuffixes, names?.starSuffixes, LAND_LAST) ??
+      LAND_LAST,
+    limitToNamed: false,
+  };
+}
+
+/**
+ * A namer for a land map. It draws from its own generator, seeded from the run
+ * seed and a fixed salt, so choosing names never consumes the stream that
+ * places things.
+ */
+export function makeLandNamer(
+  seed: number,
+  names: ResolvedNames,
+): (used: Set<string>) => string {
+  return makeStarNamer(mulberry32((seed ^ LAND_NAME_SALT) >>> 0), names);
 }
 
 /** Roman numeral for n (n >= 1); used to extend a name pool on-theme. */
