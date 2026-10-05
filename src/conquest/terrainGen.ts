@@ -23,7 +23,11 @@ import { hashString, mulberry32, pick, type Rng } from "./rng";
  */
 
 /** How the land is arranged. */
-export type LandLayout = "continent" | "continents" | "archipelago" | "inlandsea";
+export type LandLayout =
+  | "continent"
+  | "continents"
+  | "archipelago"
+  | "inlandsea";
 
 /** The land layouts, in the order the setup forms offer them. */
 export const LAND_LAYOUTS: readonly LandLayout[] = [
@@ -313,7 +317,12 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
           return need <= 0 || dx * dx + dy * dy >= need * need;
         });
         if (clear) {
-          islands.push({ c: p, along: unitVector(rng), a, b: a * (0.55 + rng() * 0.35) });
+          islands.push({
+            c: p,
+            along: unitVector(rng),
+            a,
+            b: a * (0.55 + rng() * 0.35),
+          });
           relax = 0;
         } else {
           relax += S / 200;
@@ -342,8 +351,18 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
         c + (rng() - 0.5) * 0.06 * S,
         c + (rng() - 0.5) * 0.06 * S,
       ];
-      const outer = ellipse(centre, u, (0.36 + rng() * 0.03) * S, (0.3 + rng() * 0.03) * S);
-      const inner = ellipse(centre, u, (0.17 + rng() * 0.04) * S, (0.11 + rng() * 0.03) * S);
+      const outer = ellipse(
+        centre,
+        u,
+        (0.36 + rng() * 0.03) * S,
+        (0.3 + rng() * 0.03) * S,
+      );
+      const inner = ellipse(
+        centre,
+        u,
+        (0.17 + rng() * 0.04) * S,
+        (0.11 + rng() * 0.03) * S,
+      );
       return {
         mask: (x, y) => {
           const o = outer(x, y);
@@ -400,7 +419,11 @@ const MAX_LAKE = 2500;
  * pixel on the other side of the coast. Two passes over the grid with integer
  * steps of 3 straight and 4 diagonal.
  */
-export function coastDistanceOf(land: Uint8Array, w: number, h: number): Uint16Array {
+export function coastDistanceOf(
+  land: Uint8Array,
+  w: number,
+  h: number,
+): Uint16Array {
   const far = 65535;
   const d = new Uint16Array(w * h);
   for (let y = 0; y < h; y++) {
@@ -601,7 +624,8 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       const px = x + 0.5;
       const wx = px + plan.warp * (bendX[y * S + x] - 0.5) * 2;
       const wy = py + plan.warp * (bendY[y * S + x] - 0.5) * 2;
-      let e = plan.mask(wx, wy) + plan.roughness * (base[y * S + x] - 0.5) * 2.8;
+      let e =
+        plan.mask(wx, wy) + plan.roughness * (base[y * S + x] - 0.5) * 2.8;
       const edge = Math.min(px, py, S - px, S - py);
       if (edge < EDGE_MARGIN) {
         const t = 1 - edge / EDGE_MARGIN;
@@ -613,7 +637,8 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const seaLevel = quantile(elevation, 1 - plan.landShare);
 
   let land: Uint8Array = new Uint8Array(S * S);
-  for (let i = 0; i < land.length; i++) land[i] = elevation[i] > seaLevel ? 1 : 0;
+  for (let i = 0; i < land.length; i++)
+    land[i] = elevation[i] > seaLevel ? 1 : 0;
   // Two passes of a three by three majority vote take out cracks and spurs a
   // pixel wide, which read as noise rather than coast.
   for (let pass = 0; pass < 2; pass++) land = majority(land);
@@ -648,23 +673,18 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const hillField = coarseNoise(S, S, 40, hillSeed, 3);
   const ridges = coarseNoise(S, S, 80, ridgeSeed, 5, 2);
   const heightmap = new Uint8Array(S * S);
-  for (let y = 0; y < S; y++) {
-    const py = y + 0.5;
-    for (let x = 0; x < S; x++) {
-      const i = y * S + x;
-      if (!land[i]) continue;
-      const px = x + 0.5;
-      // Rises from the coast and levels off inland.
-      const t = clamp01(coastDistance[i] / (3 * 40));
-      const inland = t * (2 - t);
-      // Ridges where the noise crosses its middle, gathered into ranges.
-      const r = 1 - Math.abs(ridges[i] - 0.5) * 2;
-      const ridge = r * r * r;
-      const range = clamp01((ranges[i] - 0.47) * 4);
-      const hills = hillField[i];
-      const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
-      heightmap[i] = 1 + Math.floor(h * 254);
-    }
+  for (let i = 0; i < S * S; i++) {
+    if (!land[i]) continue;
+    // Rises from the coast and levels off inland.
+    const t = clamp01(coastDistance[i] / (3 * 40));
+    const inland = t * (2 - t);
+    // Ridges where the noise crosses its middle, gathered into ranges.
+    const r = 1 - Math.abs(ridges[i] - 0.5) * 2;
+    const ridge = r * r * r;
+    const range = clamp01((ranges[i] - 0.47) * 4);
+    const hills = hillField[i];
+    const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
+    heightmap[i] = 1 + Math.floor(h * 254);
   }
 
   // Colours by height for land and by distance from the coast for sea,
@@ -690,7 +710,8 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
         rgb = landRamp[heightmap[i]];
         // Lit from the north west: a slope rising to the south east is bright.
         const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
-        const se = heightmap[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
+        const se =
+          heightmap[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
         shade = 1 + (se - nw) * 0.03;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {

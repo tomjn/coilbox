@@ -10,7 +10,6 @@ import {
 } from "../challenge/nodeMaps";
 import { clamp } from "../lib/helpers";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
-import { LAND_LAYOUTS, type LandLayout } from "./terrainGen";
 import {
   applyChallengeFactions,
   applyChallengeMaps,
@@ -27,6 +26,7 @@ import {
 import type { FactionPreset } from "./names";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
+import { LAND_LAYOUTS, type LandLayout } from "./terrainGen";
 import { readThreatLevel } from "./threat";
 
 /**
@@ -99,7 +99,11 @@ export interface ConquestChallengeSettings {
 }
 
 /** Every layout value a challenge can carry. */
-export type ChallengeLayout = GalaxyLayout | LandLayout | "random" | "realstars";
+export type ChallengeLayout =
+  | GalaxyLayout
+  | LandLayout
+  | "random"
+  | "realstars";
 
 /** A faction as a challenge records it, which is a {@link FactionPreset}
  *  without the tuning. */

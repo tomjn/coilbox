@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy } from "./generate";
 import { type GalaxyDoc, parseGalaxyJson } from "./model";
-import { BASE_SIZES, LARGE_SIZES } from "./size";
 import { mulberry32 } from "./rng";
+import { BASE_SIZES, LARGE_SIZES } from "./size";
 import {
   generateTerrain,
   LAND_LAYOUTS,
