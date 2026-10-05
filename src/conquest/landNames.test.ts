@@ -161,11 +161,22 @@ describe("land map naming", () => {
 
   it("changes only the names, not what else the seed draws", () => {
     const land = generateCities({ ...base, nodeCount: 40 }, NOW);
-    const galaxy = generateGalaxy({ ...base, nodeCount: 40 }, NOW);
-    expect(land.factions).toEqual(galaxy.factions);
-    expect(land.nodes.map((n) => [n.owner, n.difficulty, n.battle])).toEqual(
-      galaxy.nodes.map((n) => [n.owner, n.difficulty, n.battle]),
+    const renamed = generateCities(
+      {
+        ...base,
+        nodeCount: 40,
+        names: {
+          placeNames: Array.from({ length: 200 }, (_, i) => `Placename${i}`),
+        },
+      },
+      NOW,
     );
+    expect(names(renamed)).not.toEqual(names(land));
+    expect(renamed.factions).toEqual(land.factions);
+    expect(renamed.links).toEqual(land.links);
+    expect(
+      renamed.nodes.map((n) => [n.pos, n.owner, n.difficulty, n.battle]),
+    ).toEqual(land.nodes.map((n) => [n.pos, n.owner, n.difficulty, n.battle]));
   });
 
   it("uses a game's star pool on a land map, as before", () => {

@@ -1056,6 +1056,21 @@ const PLAIN_LAYOUT_OPTIONS = [
   { value: "clusters", label: "Clusters" },
   { value: "ring", label: "Ring" },
 ];
+// The land styles describe the land rather than how points are scattered.
+const LAND_LAYOUT_OPTIONS = [
+  { value: "random", label: "Surprise me" },
+  { value: "continent", label: "One continent" },
+  { value: "continents", label: "Two continents" },
+  { value: "archipelago", label: "Archipelago" },
+  { value: "inlandsea", label: "Inland sea" },
+];
+/** The shapes a style offers. */
+const layoutOptionsFor = (style: MapSkin) =>
+  style === "galaxy"
+    ? LAYOUT_OPTIONS
+    : isLandSkin(style)
+      ? LAND_LAYOUT_OPTIONS
+      : PLAIN_LAYOUT_OPTIONS;
 /** How long the form waits after the last change before it builds a land
  * preview. A choice, not a measurement: long enough that typing a seed builds
  * one map and not one per digit. */
@@ -1210,11 +1225,13 @@ function GenerateGalaxyForm({
   const [radius, setRadius] = useState(String(DEFAULT_RADIUS_LY));
   const realStars = layout === "realstars";
   const [style, setStyleChoice] = useState<MapSkin>("galaxy");
-  // Real stars belong to the Galaxy style alone, so leaving it for another
-  // style puts the shape back on the default.
+  // Each style has its own shapes, so a shape the new style does not offer,
+  // such as real stars outside the Galaxy style, goes back to the default.
   const setStyle = (next: string) => {
     setStyleChoice(next as MapSkin);
-    if (next !== "galaxy" && layout === "realstars") setLayout("random");
+    if (!layoutOptionsFor(next as MapSkin).some((o) => o.value === layout)) {
+      setLayout("random");
+    }
   };
   const land = isLandSkin(style);
   const noun = locationNoun(style);
@@ -1439,9 +1456,7 @@ function GenerateGalaxyForm({
             <OptionSelect
               value={layout}
               onValueChange={setLayout}
-              options={
-                style === "galaxy" ? LAYOUT_OPTIONS : PLAIN_LAYOUT_OPTIONS
-              }
+              options={layoutOptionsFor(style)}
             />
           </div>
           <div className="flex flex-col gap-1.5 text-sm">
