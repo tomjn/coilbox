@@ -60,6 +60,7 @@ export default defineConfig({
           { text: "Distribution profile", link: "/distribution-profile" },
           { text: "Branding catalog", link: "/branding-catalog" },
           { text: "Map packs", link: "/map-packs" },
+          { text: "Hand-made maps", link: "/hand-made-maps" },
           { text: "Routes", link: "/routes" },
           { text: "The s3o model format", link: "/s3o-format" },
           { text: "The 3do model format", link: "/3do-format" },
