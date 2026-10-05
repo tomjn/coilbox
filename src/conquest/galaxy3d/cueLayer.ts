@@ -46,7 +46,7 @@ import type { TerrainSurface } from "./terrain";
 const CUE_LIFT = 0.16;
 
 /** Line widths in world units. The province layer's strong border is 0.55. */
-const CROSSING_WIDTH = 1.1;
+const CROSSING_WIDTH = 0.8;
 const FRONTIER_WIDTH = 0.6;
 const BLOCKED_WIDTH = 1.1;
 
@@ -54,7 +54,7 @@ const BLOCKED_WIDTH = 1.1;
  * The least width a crossing's strip draws at, in CSS pixels, however far
  * out. The lane's dots are about a quarter of it.
  */
-const CROSSING_MIN_PIXELS = 12;
+const CROSSING_MIN_PIXELS = 11;
 /** How much wider a crossing out of the selected location draws. */
 const CROSSING_EMPHASIS = 1.3;
 

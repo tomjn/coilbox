@@ -168,8 +168,8 @@ void main() {
       over = cover(abs(y - 0.41) - 0.035, aa);
       if (vPattern > 1.5 && vPattern < 3.5) {
         // Round the lane and not over it, so the lane still shows.
-        float halo = (1.0 - smoothstep(0.18, 0.5, y)) * smoothstep(0.1, 0.18, y);
-        over = max(over, halo * 0.5);
+        float halo = (1.0 - smoothstep(0.15, 0.36, y)) * smoothstep(0.1, 0.15, y);
+        over = max(over, halo * 0.75);
       } else if (vPattern > 3.5) {
         over = max(over, cover(y - 0.19, aa) * 0.9);
       }
