@@ -31,8 +31,10 @@ export interface RoadStyle {
 
 export interface GroundLayer {
   shading: GroundShading;
-  /** The roads, in `roadLinks` order. */
+  /** The roads, in `roadLinks` order, then the extra tracks. */
   roads: RoadLine[];
+  /** The state index of the first extra track. */
+  firstExtra: number;
   /** Restyle road `k`. Takes effect at {@link commit}. */
   setRoadStyle: (k: number, style: RoadStyle) => void;
   /** Send the road states to the GPU. */
@@ -47,14 +49,28 @@ export function buildGroundLayer(
   galaxy: GalaxyDoc,
   surface: TerrainSurface,
   heights: HeightGrid | undefined,
+  /**
+   * Tracks painted after the roads, each with a state of its own, such as a
+   * sea crossing's track from a location down to its landing point.
+   */
+  extra: readonly Omit<RoadLine, "index">[] = [],
 ): GroundLayer {
-  const roads = planRoads(
+  const linkRoads = planRoads(
     galaxy,
     surface.width,
     surface.height,
     surface.heightScale,
     heights,
   );
+  const firstExtra = linkRoads.length;
+  const roads = [
+    ...linkRoads,
+    ...extra.map((t, j) => ({
+      line: t.line,
+      surface: t.surface,
+      index: firstExtra + j,
+    })),
+  ];
   const mask = buildRoadMask(
     roads,
     surface.width,
@@ -105,6 +121,7 @@ export function buildGroundLayer(
 
   return {
     roads,
+    firstExtra,
     shading: {
       roadDistance,
       roadMask,

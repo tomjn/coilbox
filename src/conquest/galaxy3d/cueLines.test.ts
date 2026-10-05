@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { crossingSpan, dashPolyline, sharedBorderLines } from "./cueLines";
+import { dashPolyline, sharedBorderLines } from "./cueLines";
 import type { WorldPos } from "./layout";
 import {
   type BorderPiece,
@@ -105,61 +105,6 @@ describe("dashPolyline", () => {
         1,
       ),
     ).toEqual([]);
-  });
-});
-
-describe("crossingSpan", () => {
-  // Two provinces 40 apart, with their anchors at their centres.
-  const index = createProvinceIndex([
-    { outline: [square(0, 0, 30)] },
-    { outline: [square(70, 0, 30)] },
-    {},
-  ]);
-
-  it("keeps the stretch over the gap between two provinces", () => {
-    const [from, to] = crossingSpan(index, 0, 1, [15, 15], [85, 15], 1, 5);
-    // Within one step of each coast.
-    expect(from[0]).toBeGreaterThan(28);
-    expect(from[0]).toBeLessThanOrEqual(30);
-    expect(to[0]).toBeGreaterThanOrEqual(70);
-    expect(to[0]).toBeLessThan(72);
-    expect(from[1]).toBe(15);
-  });
-
-  it("gives the same stretch from either end", () => {
-    const [from, to] = crossingSpan(index, 1, 0, [85, 15], [15, 15], 1, 5);
-    expect(from[0]).toBeGreaterThanOrEqual(70);
-    expect(to[0]).toBeLessThanOrEqual(30);
-  });
-
-  it("starts at the anchor of a point location", () => {
-    const [from, to] = crossingSpan(index, -1, 1, [50, 15], [85, 15], 1, 5);
-    expect(from).toEqual([50, 15]);
-    expect(to[0]).toBeLessThan(72);
-  });
-
-  it("keeps the whole line when there are no provinces", () => {
-    expect(crossingSpan(undefined, -1, -1, [0, 0], [10, 0], 1, 5)).toEqual([
-      [0, 0],
-      [10, 0],
-    ]);
-  });
-
-  it("widens a gap with no length to the least length", () => {
-    const touching = createProvinceIndex([
-      { outline: [square(0, 0, 50)] },
-      { outline: [square(50, 0, 50)] },
-    ]);
-    const [from, to] = crossingSpan(touching, 0, 1, [25, 25], [75, 25], 1, 10);
-    expect(to[0] - from[0]).toBeCloseTo(10);
-    expect((from[0] + to[0]) / 2).toBeGreaterThan(48);
-    expect((from[0] + to[0]) / 2).toBeLessThan(52);
-  });
-
-  it("never widens past the anchors", () => {
-    const [from, to] = crossingSpan(index, 0, 1, [29, 15], [71, 15], 1, 500);
-    expect(from).toEqual([29, 15]);
-    expect(to).toEqual([71, 15]);
   });
 });
 
