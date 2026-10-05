@@ -556,11 +556,11 @@ export const LAND_RUN_SIZES: Record<
  * How many maps {@link generateStyledRun} builds before it accepts a run with
  * no choice of route. A small land map is often close to a tree, where no two
  * of the furthest locations have two ways between them. Over seeds 1 to 200
- * that was 41 first maps of 14 provinces, 10 of 32 and none of 72, and 77
- * first maps of 12 cities, 29 of 22 and 7 of 48. The most maps any of those
- * 1200 runs needed was 7. At the worst rate, 77 in 200, sixteen maps in a row
- * fail about once in four million runs, so the limit is there to end the loop
- * and not to be met.
+ * that was 40 first maps of 14 provinces, 9 of 32 and none of 72, and 83
+ * first maps of 12 cities, 33 of 22 and 9 of 48. The most maps any of those
+ * 1200 runs needed was 6. At the worst rate, 83 in 200, sixteen maps in a row
+ * fail about once in a million runs, so the limit is there to end the loop and
+ * not to be met.
  */
 const LAND_MAP_TRIES = 16;
 
