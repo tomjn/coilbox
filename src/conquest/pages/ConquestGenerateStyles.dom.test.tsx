@@ -21,6 +21,8 @@ const h = vi.hoisted(() => ({
   generated: [] as { id?: string; skin?: string; seed: number }[],
   saved: [] as { id: string; json: string }[],
   onlyOwnMaps: [] as string[],
+  maps: [] as { id: string; game: { shortname: string } }[],
+  profile: {} as Record<string, unknown>,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -113,10 +115,14 @@ vi.mock("../conquests", () => ({
   useGalaxies: () => ({ galaxies: [], loading: false, error: null }),
   useConquestState: () => ({ file: { conquests: {} }, saveFor: vi.fn() }),
 }));
+vi.mock("../../profile/profile", async (orig) => ({
+  ...(await orig<typeof import("../../profile/profile")>()),
+  getProfile: () => h.profile,
+}));
 vi.mock("../handmade/useHandmadeMaps", () => ({
   refreshHandmadeMaps: vi.fn(),
   useHandmadeMaps: () => ({
-    maps: [],
+    maps: h.maps,
     unreadable: [],
     onlyOwnMaps: h.onlyOwnMaps,
     loading: false,
@@ -193,6 +199,8 @@ beforeEach(() => {
   h.generated = [];
   h.saved = [];
   h.onlyOwnMaps = [];
+  h.maps = [];
+  h.profile = {};
   vi.useFakeTimers();
 });
 afterEach(() => {
@@ -301,6 +309,7 @@ describe("Conquest generate form: order and wording", () => {
 describe("Conquest generate form: a game that wants its own maps", () => {
   it("offers no generated style and points at the game's maps", () => {
     h.onlyOwnMaps = ["Cool Game v1"];
+    h.maps = [{ id: "m", game: { shortname: "CG" } }];
     openForm();
     expect(
       screen.getByText(
@@ -320,6 +329,54 @@ describe("Conquest generate form: a game that wants its own maps", () => {
       "Cities (roads across generated land)",
       "Territories (provinces on generated land)",
     ]);
+  });
+});
+
+describe("Conquest generate form: a profile that wants hand-made maps only", () => {
+  const STYLES = [
+    "Galaxy (starfield)",
+    "Theatre (flat chart)",
+    "Cities (roads across generated land)",
+    "Territories (provinces on generated land)",
+  ];
+
+  it("offers no generated style once the game has a hand-made map", () => {
+    h.profile = { onlyOwnMaps: true };
+    h.maps = [{ id: "m", game: { shortname: "CG" } }];
+    openForm();
+    expect(
+      screen.getByText(
+        "Cool Game v1 plays Conquest only on the maps the game carries. Pick one from the Conquest list.",
+      ),
+    ).toBeTruthy();
+    expect(document.querySelectorAll("select")).toHaveLength(0);
+  });
+
+  it("keeps the styles when the game has no hand-made map", () => {
+    h.profile = { onlyOwnMaps: true };
+    openForm();
+    expect(optionLabels(selectOffering("galaxy"))).toEqual(STYLES);
+  });
+
+  it("keeps the styles when the only map is for another game", () => {
+    h.profile = { onlyOwnMaps: true };
+    h.maps = [{ id: "m", game: { shortname: "OTHER" } }];
+    openForm();
+    expect(optionLabels(selectOffering("galaxy"))).toEqual(STYLES);
+  });
+
+  it("changes nothing when the key is absent, false or not a boolean", () => {
+    h.maps = [{ id: "m", game: { shortname: "CG" } }];
+    for (const profile of [
+      {},
+      { onlyOwnMaps: false },
+      { onlyOwnMaps: "yes" },
+    ]) {
+      h.profile = profile;
+      openForm();
+      expect(optionLabels(selectOffering("galaxy"))).toEqual(STYLES);
+      cleanup();
+    }
   });
 });
 

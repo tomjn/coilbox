@@ -1,3 +1,4 @@
+import type { OnlyOwnMapsResolution } from "./onlyOwnMaps";
 import type { GameFilter, ProfileSource } from "./profile";
 import { canonicalProfileId } from "./renamedIds";
 import type { StartResolution } from "./start";
@@ -106,6 +107,8 @@ export interface HealthInputs {
    * and scenarios.
    */
   start: StartResolution;
+  /** What the profile's `onlyOwnMaps` key resolved to. */
+  onlyOwnMaps: OnlyOwnMapsResolution;
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -303,6 +306,36 @@ export function checkStart(start: StartResolution): HealthCheck | null {
     status: "warn",
     label: "`start` names nothing playable",
     hint: `The home page shows no start card: ${start.issue}.`,
+  };
+}
+
+/**
+ * Report the profile's `onlyOwnMaps` key (issue #3604).
+ *
+ * A value that is not `true` or `false` leaves the generated map styles on, which
+ * looks the same on screen as a key that was never written. This row is where
+ * the difference shows. `null` when the key is absent or false, in the shape of
+ * {@link checkHideIds}.
+ */
+export function checkOnlyOwnMaps(
+  onlyOwnMaps: OnlyOwnMapsResolution,
+): HealthCheck | null {
+  if (onlyOwnMaps.status === "none" || onlyOwnMaps.status === "off") {
+    return null;
+  }
+  if (onlyOwnMaps.status === "on") {
+    return {
+      id: "onlyOwnMaps",
+      status: "ok",
+      label: "Only own maps: generated map styles are hidden",
+      hint: "A game with no hand-made map to offer keeps them, so there is always something to pick.",
+    };
+  }
+  return {
+    id: "onlyOwnMaps",
+    status: "warn",
+    label: "`onlyOwnMaps` is not true or false",
+    hint: `The generated map styles stay on: ${onlyOwnMaps.issue}.`,
   };
 }
 
@@ -585,6 +618,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checkLinkIcons(i.linkIcons, i.validIconNames),
     checkHome(i.home),
     checkStart(i.start),
+    checkOnlyOwnMaps(i.onlyOwnMaps),
   ]) {
     if (c) checks.push(c);
   }

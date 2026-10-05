@@ -1094,6 +1094,24 @@ Supplies system/faction names — and whole lore factions — for **[Galactic Co
 
 See the [Names and factions](conquest.md#names-and-factions) section for how the pools are drawn and the full merge order (profile over catalog over built-ins).
 
+### `onlyOwnMaps` (boolean)
+
+Hides the four generated map styles (Galaxy, Theatre, Cities and Territories), so a distribution for a World War 2 game is never played across a galaxy. Use it with [hand-made maps you bundle](#bundling-a-hand-made-map).
+
+```json
+{ "version": 1, "onlyOwnMaps": true }
+```
+
+With the key set to `true`, the Generate a map drawer in Conquest does not offer a game that has a hand-made map, and the Warpath setup offers only the hand-made maps for the game picked. The key applies to every game the distribution offers. Use [`gameFilter`](#gamefilter-object) to narrow the games.
+
+The generated styles stay for a game with no hand-made map to offer, whether the map is bundled, carried in the game archive or imported by the player. In Warpath only a map with a start and a goal counts. A player is never left with nothing to pick.
+
+A game archive can ask for the same thing with `onlyOwnMaps` in its `coilbox/maps/index.json`, as [Ship a map](hand-made-maps.md#hide-the-generated-styles) describes. Either one is enough.
+
+Anything other than `true` or `false` leaves the styles on. The health checklist in Settings > Distribution profile has an `onlyOwnMaps` row that reports a value like that, and confirms the key when it is `true`.
+
+Leave `onlyOwnMaps` out and nothing changes.
+
 ### Bundling a hand-made map
 
 A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map folder inside `.coilbox/galaxies/`, the same folder that holds [bundled galaxy files](conquest.md#bundling-a-galaxy). No `profile.json` entry is needed.
@@ -1115,6 +1133,8 @@ A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map fold
 - If a player already imported a map with the same id, the bundled map is the one coilbox lists.
 - The Conquest page lists it with a Bundled label, and Warpath offers it when its manifest has a `warpath` start and goal.
 
-A game can also carry maps in its game archive, under `coilbox/maps/`, with an `index.json` that hides the generated styles. A profile has no matching setting yet. See [Ship a map](hand-made-maps.md#ship-a-map).
+A game can also carry maps in its game archive, under `coilbox/maps/`. See [Ship a map](hand-made-maps.md#ship-a-map).
+
+To stop players being offered a generated map as well, set [`onlyOwnMaps`](#onlyownmaps-boolean).
 
 The [hand-made maps guide](hand-made-maps.md) covers what goes in the folder.

@@ -7,6 +7,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
+import {
+  hidesGeneratedStyles,
+  profileOnlyOwnMaps,
+} from "../../../conquest/handmade/ownMapsOnly";
 import { useHandmadeMaps } from "../../../conquest/handmade/useHandmadeMaps";
 import { locationNoun, MAP_STYLE_OPTIONS } from "../../../conquest/mapStyle";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
@@ -146,13 +150,13 @@ export function RunSetupForm({
         (m) => m.warpath && resolveGameByShortname(m.game, [game]) === game,
       )
     : [];
-  // A game that asks for its own maps only is offered no generated style, as
-  // long as it has a map to offer here (issue #3511). Its first map is then
+  // A game that asks for its own maps only, in its archive or through the
+  // profile, is offered no generated style, as long as it has a map to offer
+  // here (issues #3511 and #3604). Its first map is then
   // the default.
   const ownMapsOnly =
     !!game &&
-    handmadeMaps.length > 0 &&
-    handmade.onlyOwnMaps.includes(game.name);
+    hidesGeneratedStyles(game, handmadeMaps, handmade, profileOnlyOwnMaps());
   // A map picked for another game falls back to the generated styles.
   const handmadeMap =
     handmadeMaps.find((m) => m.id === pickedMapId) ??

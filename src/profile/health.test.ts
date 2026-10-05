@@ -26,6 +26,7 @@ function base(): HealthInputs {
     validIconNames: ["discord", "globe", "docs"],
     home: null,
     start: { status: "none" },
+    onlyOwnMaps: { status: "none" },
   };
 }
 
@@ -425,6 +426,42 @@ describe("deriveHealthChecks", () => {
       );
       expect(c.status).toBe("warn");
       expect(c.hint).toContain("start campaign 'nope' is not bundled");
+    });
+  });
+
+  describe("onlyOwnMaps", () => {
+    it("adds no row for a profile without the key", () => {
+      expect(maybeById(base(), "onlyOwnMaps")).toBeUndefined();
+    });
+
+    it("adds no row when the key is false", () => {
+      expect(
+        maybeById({ ...base(), onlyOwnMaps: { status: "off" } }, "onlyOwnMaps"),
+      ).toBeUndefined();
+    });
+
+    it("confirms the generated styles are hidden when the key is true", () => {
+      const c = byId(
+        { ...base(), onlyOwnMaps: { status: "on" } },
+        "onlyOwnMaps",
+      );
+      expect(c.status).toBe("ok");
+      expect(c.label).toContain("hidden");
+    });
+
+    it("warns, with the reason, when the key is not true or false", () => {
+      const c = byId(
+        {
+          ...base(),
+          onlyOwnMaps: {
+            status: "problem",
+            issue: "`onlyOwnMaps` is a string, not true or false",
+          },
+        },
+        "onlyOwnMaps",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("is a string");
     });
   });
 });

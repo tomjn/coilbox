@@ -269,6 +269,15 @@ export interface Profile {
    * as it is.
    */
   start?: StartConfig;
+  /**
+   * Offer only hand-made maps in Conquest and Warpath: the generated map
+   * styles (Galaxy, Theatre, Cities, Territories) are hidden. It does for the
+   * whole distribution what `onlyOwnMaps` in a game archive's
+   * `coilbox/maps/index.json` does for one game, and either is enough. A game
+   * with no hand-made map to offer keeps the generated styles. Omitted or
+   * false leaves them on.
+   */
+  onlyOwnMaps?: boolean;
   /** External links added to the sidebar/launcher, e.g. a Discord invite. */
   links?: LinkConfig[];
   /** Lobby-server presets: an official server, a preset allow-list, seed channels. */
