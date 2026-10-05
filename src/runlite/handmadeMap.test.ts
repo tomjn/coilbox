@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encodeChallenge } from "../challenge/code";
+import { runIdentity, warpathIdentity } from "../challenge/identity";
 import type { MapManifest } from "../conquest/handmade/manifest";
 import { decodePng } from "../conquest/handmade/png.testhelper";
 import {
@@ -25,7 +27,8 @@ vi.mock("../conquest/handmade/useHandmadeMaps", () => ({
   useHandmadeMap: vi.fn(),
 }));
 
-const { handmadeRunSource, loadHandmadeRunMap } = await import("./handmadeMap");
+const { handmadeRunSource, loadChallengeRunMap, loadHandmadeRunMap } =
+  await import("./handmadeMap");
 const { runNodeScenario } = await import("./mapRun");
 const { parseRunStateFile } = await import("./model");
 
@@ -104,6 +107,8 @@ describe("a Warpath run on the sample map", () => {
       expect(run.settings.map).toEqual({
         source: "handmade",
         id: "sample-two-shores",
+        fingerprint: doc.handmade?.fingerprint,
+        title: "Two Shores",
       });
     }
   });
@@ -302,6 +307,153 @@ describe("loadHandmadeRunMap", () => {
       ok: false,
       message: "The hand-made maps could not be listed. disk unplugged",
     });
+  });
+});
+
+/** The sample with its strait turned into a road: another version of the map. */
+const otherVersion = (m: MapManifest) => {
+  m.crossings = [];
+  m.roads = [...(m.roads ?? []), ["eastcliff", "ironcoast"]];
+};
+
+describe("a Warpath challenge on a hand-made map", () => {
+  const doc = readSample();
+  const maps = [...MAPS, { name: "MapA" }, { name: "MapB" }];
+  const run = runOn(doc, 42, { maps });
+  const decode = (code: string) => {
+    const decoded = decodeWarpathChallenge(code);
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    return decoded.settings;
+  };
+  const settings = decode(encodeWarpathChallenge(run));
+
+  it("carries the map's id, fingerprint and title", () => {
+    expect(settings.map).toEqual({
+      source: "handmade",
+      id: "sample-two-shores",
+      fingerprint: doc.handmade?.fingerprint,
+      title: "Two Shores",
+    });
+  });
+
+  it("has the map's id and fingerprint in its identity, and not its title", () => {
+    const identity = warpathIdentity(settings);
+    expect(identity).toBe(runIdentity(run));
+    expect(identity).toContain('"sample-two-shores"');
+    expect(identity).toContain(`"${doc.handmade?.fingerprint}"`);
+    expect(identity).not.toContain("Two Shores");
+  });
+
+  it("is another challenge on another version of the map", () => {
+    const other = runOn(readSample(otherVersion), 42, { maps });
+    expect(runIdentity(other)).not.toBe(runIdentity(run));
+  });
+
+  it("is not built on another version of the map", () => {
+    const other = readSample(otherVersion);
+    expect(() =>
+      runFromChallenge(settings, {
+        maps,
+        handmadeMap: () => handmadeRunSource(other),
+      }),
+    ).toThrow(/different version/);
+  });
+
+  it("keeps the identity it had when it was written before fingerprints", () => {
+    // What main wrote for a run on a hand-made map before this: the id alone.
+    const { map: _map, ...rest } = run.settings;
+    const old = decode(
+      encodeChallenge("warpath", {
+        ...rest,
+        map: { source: "handmade", id: "sample-two-shores" },
+      }),
+    );
+    expect(old.map).toEqual({ source: "handmade", id: "sample-two-shores" });
+    expect(warpathIdentity(old)).toBe(
+      JSON.stringify([
+        "warpath",
+        old.game.shortname,
+        old.seed,
+        old.length,
+        old.difficulty,
+        old.ascension,
+        old.factionId,
+        old.side ?? null,
+        old.skin,
+        ["handmade", "sample-two-shores"],
+      ]),
+    );
+    // With no fingerprint to hold it to, it is built on the map installed.
+    const imported = runFromChallenge(old, {
+      maps,
+      handmadeMap: () => handmadeRunSource(readSample(otherVersion)),
+    });
+    expect(imported.settings.map).toEqual(old.map);
+  });
+});
+
+describe("loadChallengeRunMap", () => {
+  const doc = readSample();
+  const ref = {
+    source: "handmade" as const,
+    id: "sample-two-shores",
+    fingerprint: doc.handmade?.fingerprint,
+    title: "Two Shores",
+  };
+  beforeEach(() => {
+    hoisted.load.mockReset();
+  });
+
+  it("gives the run source when the installed map is the challenge's version", async () => {
+    hoisted.load.mockResolvedValue(read());
+    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    if (!loaded.ok) throw new Error(loaded.message);
+    expect(hoisted.load).toHaveBeenCalledWith("sample-two-shores");
+    expect(loaded.source.startId).toBe("westhaven");
+    expect(loaded.source.map.handmade?.fingerprint).toBe(ref.fingerprint);
+  });
+
+  it("says which map and game are needed when the map is not installed", async () => {
+    hoisted.load.mockResolvedValue({
+      ok: false,
+      errors: [
+        {
+          code: "file-missing",
+          file: "map.json",
+          message:
+            'No hand-made map with the id "sample-two-shores" is installed.',
+        },
+      ],
+    });
+    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    if (loaded.ok) throw new Error("expected a refusal");
+    expect(loaded.message).toContain('the hand-made map "Two Shores"');
+    expect(loaded.message).toContain("made for Test Game");
+    expect(loaded.message).toContain("not installed here");
+  });
+
+  it("says so when the installed map is a different version", async () => {
+    hoisted.load.mockResolvedValue(read(otherVersion));
+    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    if (loaded.ok) throw new Error("expected a refusal");
+    expect(loaded.message).toContain(
+      'a different version of the hand-made map "Two Shores"',
+    );
+    expect(loaded.message).toContain("was not started");
+  });
+
+  it("refuses a map with no Warpath markings, for a code with no fingerprint", async () => {
+    hoisted.load.mockResolvedValue(
+      read((m) => {
+        delete m.warpath;
+      }),
+    );
+    const loaded = await loadChallengeRunMap(
+      { source: "handmade", id: "sample-two-shores" },
+      "Test Game",
+    );
+    if (loaded.ok) throw new Error("expected a refusal");
+    expect(loaded.message).toContain("no Warpath start and goal");
   });
 });
 

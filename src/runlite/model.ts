@@ -1,5 +1,6 @@
 import type { MapDownloadHint } from "../campaign/model";
 import { parseMapDownload } from "../campaign/model";
+import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
 import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import { clamp } from "../lib/helpers";
@@ -196,7 +197,7 @@ export type RunMapRef =
       /** The generator's layout setting, as the map document recorded it. */
       layout?: string;
     }
-  | { source: "handmade"; id: string };
+  | HandmadeMapRef;
 
 /** A directed forward edge `[from, to]` with `from.col < to.col`. */
 export type RunEdge = [string, string];
@@ -543,11 +544,7 @@ function parseNode(value: unknown): RunNode | null {
  * as a run with no map. */
 function parseRunMapRef(value: unknown): RunMapRef | null {
   if (!isRecord(value)) return null;
-  if (value.source === "handmade") {
-    return typeof value.id === "string" && value.id !== ""
-      ? { source: "handmade", id: value.id }
-      : null;
-  }
+  if (value.source === "handmade") return parseHandmadeMapRef(value);
   if (value.source !== "generated") return null;
   if (typeof value.style !== "string" || value.style === "") return null;
   if (typeof value.seed !== "number" || !Number.isFinite(value.seed)) {

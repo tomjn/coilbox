@@ -266,8 +266,19 @@ export interface GalaxyDoc {
   handmade?: {
     /** The id of the map in the hand-made map library. */
     mapId: string;
+    /**
+     * What tells this version of the map from another (see
+     * `./handmade/fingerprint`). The reader sets it on every read.
+     */
+    fingerprint?: string;
     /** Threat level 0..3 the conquest was started at. Absent reads as 0. */
     threatLevel?: number;
+    /**
+     * nodeId -> battle map, for the locations whose battle the author left for
+     * coilbox to pick, as the conquest has them. Part of what a challenge on
+     * the map is, because the map itself does not settle them.
+     */
+    battles?: Record<string, string>;
   };
   /**
    * The Warpath markings of a hand-made map whose author gave it a start and a
@@ -398,6 +409,11 @@ export interface HandmadeRun {
    * the installed maps change.
    */
   battles: Record<string, string>;
+  /**
+   * nodeId -> the battle map an imported challenge named, for each location
+   * that is on another map because this install does not have that one.
+   */
+  substituted?: Record<string, string>;
   /**
    * The ids of the locations whose scenario the player has won. A scenario is
    * played once, so a later fight at one of these is a skirmish.

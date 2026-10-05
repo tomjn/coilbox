@@ -1,3 +1,5 @@
+import type { HandmadeMapRef } from "../challenge/mapRef";
+import { loadChallengeMap } from "../conquest/handmade/challenge";
 import { loadHandmadeMap } from "../conquest/handmade/library";
 import {
   type HandmadeMapResult,
@@ -79,6 +81,28 @@ export async function loadHandmadeRunMap(id: string): Promise<HandmadeRunMap> {
     return {
       ok: false,
       message: `The hand-made map "${result.doc.title}" has no Warpath start and goal, so it can only be played in Conquest.`,
+    };
+  }
+  return { ok: true, source };
+}
+
+/**
+ * Read the installed hand-made map a challenge names, for the run it
+ * describes. Fails with a sentence for the player when the map is not
+ * installed, is another version than the one the challenge was made on, or
+ * cannot be read. `gameName` is the challenge's game as the player knows it.
+ */
+export async function loadChallengeRunMap(
+  ref: HandmadeMapRef,
+  gameName: string,
+): Promise<HandmadeRunMap> {
+  const checked = await loadChallengeMap(ref, gameName);
+  if (!checked.ok) return checked;
+  const source = handmadeRunSource(checked.map);
+  if (!source) {
+    return {
+      ok: false,
+      message: `This challenge is a Warpath run on the hand-made map "${checked.map.title}", and the copy installed here has no Warpath start and goal, so the challenge was not started.`,
     };
   }
   return { ok: true, source };

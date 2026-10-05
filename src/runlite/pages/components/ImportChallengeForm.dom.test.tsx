@@ -55,7 +55,7 @@ vi.mock("../../../content/bindings", () => ({
   unitsyncGameInfo: async () => ({ sides: [] }),
   unitsyncUnitDataset: async () => ({ units: [] }),
 }));
-vi.mock("../../handmadeMap", () => ({ loadHandmadeRunMap: m.loadMap }));
+vi.mock("../../handmadeMap", () => ({ loadChallengeRunMap: m.loadMap }));
 vi.mock("../../challenge", () => ({
   decodeWarpathChallenge: vi.fn(),
   runFromChallenge: m.runFromChallenge,
@@ -104,7 +104,12 @@ describe("ImportChallengeForm finish", () => {
 describe("ImportChallengeForm finish, for a challenge on a hand-made map", () => {
   const ON_MAP = {
     game: { shortname: "TG" },
-    map: { source: "handmade", id: "two-shores" },
+    map: {
+      source: "handmade",
+      id: "two-shores",
+      fingerprint: "00000000000000aa",
+      title: "Two Shores",
+    },
   };
   const GAME = {
     name: "Test Game 1",
@@ -113,19 +118,19 @@ describe("ImportChallengeForm finish, for a challenge on a hand-made map", () =>
     info: { shortname: "TG", version: "1" },
   };
 
-  it("stops with the reason when this install has not got the map", async () => {
+  it("stops with the reason when the map cannot be used, and generates nothing", async () => {
     scan.games = [GAME];
     m.loadMap.mockResolvedValue({
       ok: false,
-      message: 'No hand-made map with the id "two-shores" is installed.',
+      message: 'The map "Two Shores" is not installed here.',
     });
 
     const message = await finishMessage(ON_MAP);
 
-    expect(m.loadMap).toHaveBeenCalledWith("two-shores");
-    expect(message).toMatch(/played on a hand-made map/);
-    expect(message).toMatch(/"two-shores" is installed/);
-    expect(message).toMatch(/Import the map/);
+    // The whole reference goes to the check, with the game as the player
+    // knows it, so the message can name both.
+    expect(m.loadMap).toHaveBeenCalledWith(ON_MAP.map, "Test Game 1");
+    expect(message).toBe('The map "Two Shores" is not installed here.');
     expect(m.runFromChallenge).not.toHaveBeenCalled();
     expect(m.saveRun).not.toHaveBeenCalled();
   });

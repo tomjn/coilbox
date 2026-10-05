@@ -15,7 +15,12 @@ import type { GalaxyDoc } from "../model";
 import { memoryTraceCache } from "./cache";
 import { decodeRgba, imageSize } from "./decode";
 import type { HandmadeMapError } from "./errors";
-import { MANIFEST_FILE, type MapManifest, parseManifest } from "./manifest";
+import {
+  MANIFEST_FILE,
+  type MapManifest,
+  parseManifest,
+  type ResolvedManifest,
+} from "./manifest";
 import { type HandmadeMapResult, readHandmadeMap } from "./read";
 
 /**
@@ -155,6 +160,89 @@ export async function listHandmadeMaps(): Promise<HandmadeMapList> {
   return { maps: listed.map((l) => l.summary), unreadable };
 }
 
+/**
+ * The files a `.gltf` names beside itself, as paths in the map folder. A
+ * `data:` uri holds its bytes inline and names nothing. A path that climbs out
+ * of the folder is returned as the uri was written, with `outside` set.
+ */
+function gltfSiblings(
+  gltf: string,
+  gltfFile: string,
+): { path: string; outside: boolean }[] {
+  let json: { buffers?: unknown; images?: unknown };
+  try {
+    json = JSON.parse(gltf);
+  } catch {
+    return [];
+  }
+  const dir = gltfFile.split("/").slice(0, -1);
+  const out: { path: string; outside: boolean }[] = [];
+  for (const list of [json?.buffers, json?.images]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const uri = entry?.uri;
+      if (typeof uri !== "string" || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(uri)) {
+        continue;
+      }
+      let decoded = uri;
+      try {
+        decoded = decodeURIComponent(uri);
+      } catch {}
+      const steps = [...dir];
+      let outside = false;
+      for (const step of decoded.split("/")) {
+        if (step === "" || step === ".") continue;
+        if (step !== "..") steps.push(step);
+        else if (steps.length > 0) steps.pop();
+        else outside = true;
+      }
+      out.push({ path: outside ? decoded : steps.join("/"), outside });
+    }
+  }
+  return out;
+}
+
+/**
+ * The `.gltf` models in `map.json` whose `.bin` or image files are not in the
+ * folder, one error for each file. A model file that cannot be fetched or is
+ * not JSON is left alone: the view reports that when it loads the model.
+ */
+async function missingModelFiles(
+  manifest: ResolvedManifest,
+  urlFor: UrlFor,
+): Promise<HandmadeMapError[]> {
+  const errors: HandmadeMapError[] = [];
+  const seen = new Set<string>();
+  for (const [i, placed] of manifest.models.entries()) {
+    if (!("file" in placed.model)) continue;
+    const { file } = placed.model;
+    const url = urlFor(file);
+    if (url === undefined || !/\.gltf$/i.test(file)) continue;
+    let text: string;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      text = await response.text();
+    } catch {
+      continue;
+    }
+    for (const { path, outside } of gltfSiblings(text, file)) {
+      if (!outside && urlFor(path) !== undefined) continue;
+      const key = `${file}\0${path}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      errors.push({
+        code: "file-missing",
+        file: path,
+        message: outside
+          ? `${MANIFEST_FILE}: models[${i}] names the model "${file}", which points at "${path}" outside the map folder. Put the file in the folder and point at it there.`
+          : `${MANIFEST_FILE}: models[${i}] names the model "${file}", which needs the file "${path}", but the folder has no file with that name.`,
+      });
+    }
+  }
+  return errors;
+}
+
 /** Decode a folder's images and run the reader on it. */
 async function readFolder(
   manifestText: string,
@@ -232,7 +320,7 @@ async function readFolder(
     if (text !== undefined) scenarios[file] = text;
   }
 
-  return readHandmadeMap({
+  const read = readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
@@ -240,6 +328,12 @@ async function readFolder(
     scenarios,
     cache: traces,
   });
+  const modelErrors = await missingModelFiles(manifest, urlFor);
+  if (modelErrors.length === 0) return read;
+  return {
+    ok: false,
+    errors: [...(read.ok ? [] : read.errors), ...modelErrors],
+  };
 }
 
 /** The text of a file in a map folder, or undefined when it cannot be read. */

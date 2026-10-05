@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { listedHandmadeMaps } from "../conquest/handmade/conquest";
 import type { AchievementResult } from "../content/achievements";
 import type { StatAi, StatPlayer, StatRecord } from "../content/bindings";
 import { emptyMeta, emptyRecord, type RogueliteMeta } from "../runlite/model";
@@ -234,6 +235,22 @@ describe("buildCareer", () => {
     expect(career.games).toHaveLength(1);
     expect(career.games[0].ai).toMatchObject({ games: 3, wins: 2, losses: 1 });
     expect(career.games[0].installed).toBeNull();
+  });
+
+  it("counts a conquest in progress on a hand-made map under its game", () => {
+    const career = buildCareer({
+      ...none,
+      installed: [BA],
+      conquest: {
+        galaxies: listedHandmadeMaps([
+          { id: "m", title: "M", game: { shortname: "BA" } },
+        ]),
+        state: { conquests: { m: { status: "active" } } },
+        unlocks: {},
+      },
+    });
+    expect(career.games[0].title).toBe("Balanced Annihilation");
+    expect(career.games[0].conquest).toMatchObject({ inProgress: 1 });
   });
 
   it("keeps a store's game that matches nothing, under the name the store has", () => {
