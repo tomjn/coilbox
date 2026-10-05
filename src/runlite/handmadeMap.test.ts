@@ -165,6 +165,22 @@ describe("a Warpath run on the sample map", () => {
     }
   });
 
+  it("carries the units the author banned onto the encounter", () => {
+    const banned = readSample((m) => {
+      const boss = m.provinces.find((p) => p.name === "Farwatch");
+      if (boss?.battle) boss.battle.disabledUnits = ["armcom", "corcom"];
+    });
+    for (const seed of SEEDS) {
+      expect(at(runOn(banned, seed), "farwatch").battle?.disabledUnits).toEqual(
+        ["armcom", "corcom"],
+      );
+      // A location whose battle bans nothing has no list.
+      expect(
+        at(runOn(banned, seed), "westhaven").battle?.disabledUnits,
+      ).toBeUndefined();
+    }
+  });
+
   it("keeps the generated encounter's own values where the author gave none", () => {
     const run = runOn(doc, 42);
     const plain = runOn(doc, 42, { battles: {} });

@@ -90,6 +90,36 @@ describe("parseRunJson", () => {
     expect(a?.name).toBe(b?.name);
   });
 
+  it("keeps the units an encounter bans", () => {
+    const run = baseRun();
+    const battle = run.nodes[1].battle;
+    if (battle) battle.disabledUnits = ["armcom", "corcom"];
+    const parsed = parseRunJson(JSON.stringify(run));
+    expect(parsed?.nodes[1].battle?.disabledUnits).toEqual([
+      "armcom",
+      "corcom",
+    ]);
+  });
+
+  it("reads a run saved before encounters could ban units", () => {
+    // A save as an older build wrote it: no `disabledUnits` on the encounter.
+    const saved = `{"schemaVersion":1,"type":"roguelite-run","name":"Old Reach",
+      "settings":{"seed":7,"length":"standard","difficulty":2,"ascension":0,
+        "game":{"shortname":"ba"},"factionId":"player","skin":"galaxy"},
+      "nodes":[{"id":"n0","type":"start","col":0,"row":0},
+        {"id":"n1","type":"battle","col":1,"row":0,"battle":{"mapName":"Comet Catcher",
+          "enemyAiCount":1,"handicap":0,"techTier":1}}],
+      "edges":[["n0","n1"]],
+      "progress":{"currentNodeId":"n0","visited":["n0"],"hull":100,"maxHull":100,
+        "salvage":0,"unlockedUnits":[],"perks":[],"status":"active"},
+      "history":[],"createdAt":"2026-07-18T00:00:00.000Z",
+      "updatedAt":"2026-07-18T00:00:00.000Z"}`;
+    const parsed = parseRunJson(saved);
+    expect(parsed?.schemaVersion).toBe(1);
+    expect(parsed?.nodes[1].battle?.mapName).toBe("Comet Catcher");
+    expect(parsed?.nodes[1].battle?.disabledUnits).toBeUndefined();
+  });
+
   it("rejects a non-run document", () => {
     expect(
       parseRunJson(JSON.stringify({ type: "conquest-galaxy" })),
