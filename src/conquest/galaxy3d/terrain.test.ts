@@ -297,6 +297,25 @@ describe("the ground past the sheet's edge", () => {
     }
   });
 
+  it("keeps the camera clear of hills past the edge", () => {
+    // A hill just past the east edge, higher than the sheet's edge there.
+    const hill: HeightGrid = {
+      data: Float32Array.from(extended.data, (v, i) =>
+        i % across === across - 1 ? 1 : v,
+      ),
+      width: across,
+      height: across,
+    };
+    const withHill = createMarginSurface(s, hill, margin);
+    const x = 45 + 60;
+    expect(cameraFloorAt(s, x, 0)).toBeCloseTo(
+      s.groundHeightAt(90, 45) + CAMERA_CLEARANCE,
+    );
+    expect(cameraFloorAt(s, x, 0, withHill)).toBeCloseTo(
+      30 + CAMERA_CLEARANCE,
+    );
+  });
+
   it("reaches the margin's pixels past every side", () => {
     // Three map pixels span the 90 unit sheet, so two pixels reach 60.
     expect(m.reachX).toBeCloseTo(60);

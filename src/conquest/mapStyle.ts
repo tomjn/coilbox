@@ -1,9 +1,14 @@
 import { generateCities } from "./cities";
+import { terrainMarginPixels } from "./galaxy3d/terrain";
 import type { TerrainPixels } from "./galaxy3d/terrainLoad";
 import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
 import type { GalaxyDoc, MapSkin } from "./model";
 import type { ConquestNames } from "./names";
-import { generatedTerrain, generateTerritories } from "./territories";
+import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
+import {
+  generatedTerrainWithMargin,
+  generateTerritories,
+} from "./territories";
 
 /**
  * The four map styles a player can generate (issue #3507), and the one place
@@ -83,16 +88,29 @@ export function drawsAsGalaxy(
  * strategic view takes in place of the document's `generated:` markers.
  * Undefined for every other document. Rebuilding the land is slow enough to
  * notice, so callers memoise this on the document.
+ *
+ * It carries the land on past the map's edge too, as far as the view's
+ * furthest zoom needs. The map's own pixels are the same as without it.
  */
 export function generatedTerrainPixels(
   doc: GalaxyDoc,
 ): TerrainPixels | undefined {
-  const terrain = generatedTerrain(doc);
-  if (!terrain) return undefined;
+  const built = generatedTerrainWithMargin(
+    doc,
+    terrainMarginPixels(doc.nodes.length, TERRAIN_PIXELS),
+  );
+  if (!built) return undefined;
+  const { terrain } = built;
   const { width, height } = terrain;
+  const wide = extendTerrain(terrain, built.margin);
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
+    extension: {
+      margin: wide.margin,
+      image: { data: wide.image, width: wide.width, height: wide.height },
+      heights: { data: wide.heights, width: wide.width, height: wide.height },
+    },
   };
 }
 

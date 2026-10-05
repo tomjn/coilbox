@@ -627,8 +627,13 @@ export function cameraFloorAt(
   surface: TerrainSurface,
   worldX: number,
   worldZ: number,
+  /** The land drawn past the sheet's edge, whose hills the camera must clear
+   * too when it looks in from outside the map. */
+  margin?: MarginSurface,
 ): number {
-  return surface.groundHeightAtWorld(worldX, worldZ) + CAMERA_CLEARANCE;
+  const ground = surface.groundHeightAtWorld(worldX, worldZ);
+  const beyond = margin ? margin.heightAtWorld(worldX, worldZ) : 0;
+  return Math.max(ground, beyond) + CAMERA_CLEARANCE;
 }
 
 /** A map document's terrain block when it is usable, otherwise `undefined`. */

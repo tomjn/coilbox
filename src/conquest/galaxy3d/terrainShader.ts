@@ -24,21 +24,24 @@ export interface TerrainShading {
   /** Procedural texture by biome. On for a generated map only. */
   detail: boolean;
   /**
-   * For the world beyond the map: the sheet it surrounds. Detail and relief
-   * die away past the sheet's edge, so the sheet's texture carries on over its
-   * edge and fades out instead of stopping on a line. Left out on the sheet.
+   * For a map drawn with land past its edge: the sheet the map fills. Past it
+   * the ground is greyed and darkened a little, so the map reads as the map
+   * and the rest as beyond it, and then hazes into `far` until it is gone.
+   * Left out, nothing past the sheet is drawn and nothing is changed.
    */
   frame?: TerrainFrame;
 }
 
-/** The sheet's place in world units, and how far past it detail fades. */
+/** The sheet's place in world units, and the haze past it. */
 export interface TerrainFrame {
   halfX: number;
   halfZ: number;
   width: number;
   depth: number;
-  /** How far past the edge the detail is gone, in sheets. */
-  fade: number;
+  /** How far past the edge the haze is complete, in sheets. */
+  haze: number;
+  /** The colour the haze reaches, which is also the scene's background. */
+  far: THREE.Color;
 }
 
 const VERTEX_HEAD = /* glsl */ `
@@ -58,7 +61,8 @@ uniform float uTerrainDetail;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
 uniform vec4 uTerrainFrame;
-uniform float uTerrainFade;
+uniform float uTerrainHaze;
+uniform vec3 uTerrainFar;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
 
@@ -167,16 +171,16 @@ const vec3 T_SNOW = vec3(240.0, 240.0, 240.0) / 255.0;
 `;
 
 const FRAGMENT_BODY = /* glsl */ `
-// How much of the detail and relief to draw: all of it on the sheet, dying
-// away past its edge on the world beyond, measured in sheets as the colour
-// fade is.
-float terrainAmount = 1.0;
-if (uTerrainFade > 0.0) {
+// How far past the map's edge this pixel lies, in sheets. 0 on the map.
+float terrainPast = 0.0;
+if (uTerrainHaze > 0.0) {
   vec2 past = max(abs(vTerrainPos.xz) - uTerrainFrame.xy, 0.0) / uTerrainFrame.zw;
-  terrainAmount = 1.0 - smoothstep(0.0, uTerrainFade, length(past));
+  terrainPast = length(past);
 }
-if (terrainAmount > 0.0) {
-  vec3 plain = diffuseColor.rgb;
+// Fully hazed ground is the background colour, so skip the work there.
+if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
+  diffuseColor.rgb = uTerrainFar;
+} else {
   vec4 nh = texture2D(uTerrainNormals, vTerrainUv);
   vec3 n = uTerrainRelief > 0.5 ? normalize(nh.xyz * 2.0 - 1.0) : vec3(0.0, 1.0, 0.0);
   vec3 albedo = diffuseColor.rgb;
@@ -287,8 +291,9 @@ if (terrainAmount > 0.0) {
     vec3 wave = sea > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
     float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.15, 0.2, fine.x);
-    // The world beyond's height is a blur, whose coastline is no real shore.
-    if (uTerrainFade > 0.0) foam = 0.0;
+    // Coasts past the edge are drawn at half the map's resolution, and foam
+    // traces their steps, so it thins out there.
+    foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
     vec2 landBump = bump;
     bump = mix(landBump, wave.yz * 0.05, sea);
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.1, sea);
@@ -304,7 +309,21 @@ if (terrainAmount > 0.0) {
 
   float facing = max(dot(n, uTerrainSun), 0.0);
   float shade = uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing / uTerrainSun.y);
-  diffuseColor.rgb = mix(plain, albedo * shade + spec, terrainAmount);
+  vec3 lit = albedo * shade + spec;
+  if (terrainPast > 0.0) {
+    // Past the edge the land turns a little greyer and darker, so the map
+    // reads as the map, then everything hazes into the background until it
+    // is gone. The change is spread over a third of the haze, since a quick
+    // one draws the very line at the edge it is meant to soften. The sea is
+    // left its colour, as a greyer sea is only a frame drawn on the water.
+    float beyond = smoothstep(0.0, uTerrainHaze / 3.0, terrainPast);
+    float landHere = smoothstep(0.35, 0.65, nh.a * 255.0);
+    float grey = dot(lit, vec3(0.2126, 0.7152, 0.0722));
+    lit = mix(lit, vec3(grey), 0.35 * beyond * landHere);
+    lit *= 1.0 - 0.12 * beyond * landHere;
+    lit = mix(lit, uTerrainFar, smoothstep(0.0, uTerrainHaze, terrainPast));
+  }
+  diffuseColor.rgb = lit;
 }
 `;
 
@@ -339,7 +358,10 @@ export function applyTerrainShader(
         ? new THREE.Vector4(frame.halfX, frame.halfZ, frame.width, frame.depth)
         : new THREE.Vector4(),
     };
-    shader.uniforms.uTerrainFade = { value: frame ? frame.fade : 0 };
+    shader.uniforms.uTerrainHaze = { value: frame ? frame.haze : 0 };
+    shader.uniforms.uTerrainFar = {
+      value: frame ? frame.far : new THREE.Color(),
+    };
     shader.uniforms.uTerrainSun = {
       value: new THREE.Vector3(...TERRAIN_SUN),
     };

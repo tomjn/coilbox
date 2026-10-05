@@ -5,7 +5,7 @@ import {
   type PlacedModelGame,
   usePlacedModelSources,
 } from "../conquest/galaxy3d/usePlacedModelSources";
-import { generatedTerrain } from "../conquest/territories";
+import { generatedTerrainPixels } from "../conquest/mapStyle";
 import { useKnownSpaceMaps } from "../content/mapAppearanceCache";
 import {
   useEffectsEnabled,
@@ -98,15 +98,11 @@ export function RunMapView({
     run.edges,
     handmadeMap?.map,
   ]);
-  const terrainPixels = useMemo((): TerrainPixels | undefined => {
-    const terrain = land ? generatedTerrain(land.map) : null;
-    if (!terrain) return undefined;
-    const { width, height } = terrain;
-    return {
-      color: { data: terrain.image, width, height },
-      height: { data: terrain.heightmap, width, height },
-    };
-  }, [land]);
+  const terrainPixels = useMemo(
+    (): TerrainPixels | undefined =>
+      land ? generatedTerrainPixels(land.map) : undefined,
+    [land],
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
   const doc = useMemo(

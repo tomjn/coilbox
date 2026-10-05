@@ -11,8 +11,10 @@ import {
   coarseNoise,
   type GeneratedTerrain,
   generateTerrain,
+  generateTerrainWithMargin,
   labelLandMasses,
   resolveLandLayout,
+  type TerrainMargin,
 } from "./terrainGen";
 
 /**
@@ -758,6 +760,31 @@ export function landTerrain(
  * saved without its `generated` block.
  */
 export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
+  const g = generatedLand(doc);
+  return g
+    ? landTerrain(g.seed, g.layout, doc.nodes.length, mulberry32(g.seed))
+    : null;
+}
+
+/**
+ * {@link generatedTerrain} with the land drawn on for `marginPixels` past
+ * every side, for the strategic view. The map itself is the same.
+ */
+export function generatedTerrainWithMargin(
+  doc: GalaxyDoc,
+  marginPixels: number,
+): { terrain: GeneratedTerrain; margin: TerrainMargin } | null {
+  const g = generatedLand(doc);
+  if (!g) return null;
+  const shape = resolveLandLayout(g.layout, mulberry32(g.seed));
+  return generateTerrainWithMargin(
+    { seed: g.seed, shape, maxMasses: doc.nodes.length },
+    marginPixels,
+  );
+}
+
+/** A document's generation settings, when its land is generated. */
+function generatedLand(doc: GalaxyDoc): GalaxyDoc["generated"] | null {
   const g = doc.generated;
   if (!g) return null;
   const image = doc.terrain?.image;
@@ -767,5 +794,5 @@ export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
   ) {
     return null;
   }
-  return landTerrain(g.seed, g.layout, doc.nodes.length, mulberry32(g.seed));
+  return g;
 }

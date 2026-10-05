@@ -27,10 +27,12 @@ import { createSelection } from "./selection";
 import {
   cameraFloorAt,
   clampPanToSheet,
+  createMarginSurface,
   layoutStrategicMap,
   TERRAIN_MAX_SEGMENTS,
   terrainCameraLimits,
   terrainSpecOf,
+  VIEW_FOV_DEGREES,
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
 import { buildTerrainMesh } from "./terrainMesh";
@@ -501,6 +503,7 @@ export function GalaxyView({
   // marker is placed at ground height during the build.
   const terrainSpec = terrainSpecOf(galaxy);
   const terrainColor = terrainPixels?.color;
+  const terrainExtension = terrainPixels?.extension;
   const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
     terrainSpec,
     terrainPixels?.height,
@@ -574,6 +577,7 @@ export function GalaxyView({
         renderRef,
         terrainHeights,
         !performanceMode,
+        terrainExtension,
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {
@@ -816,7 +820,17 @@ export function GalaxyView({
       if (surface) focus.y = surface.groundHeightAtWorld(focus.x, focus.z);
     }
 
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 2500);
+    const camera = new THREE.PerspectiveCamera(VIEW_FOV_DEGREES, 1, 0.1, 2500);
+    // The land drawn past a generated map's edge, which the camera must clear
+    // when it looks in from outside the map.
+    const marginGround =
+      surface && terrainExtension && surface.maxHeight > 0
+        ? createMarginSurface(
+            surface,
+            terrainExtension.heights,
+            terrainExtension.margin,
+          )
+        : undefined;
     // Start high above the plane (~27° from vertical), pulled back to frame the
     // player's region.
     camera.position.set(
@@ -844,7 +858,9 @@ export function GalaxyView({
     controls.maxDistance = 220;
     // A terrain map may be viewed straight down, where it reads as a 2D map,
     // and zooms out far enough to show the whole sheet.
-    if (surface) Object.assign(controls, terrainCameraLimits(surface, 50));
+    if (surface) {
+      Object.assign(controls, terrainCameraLimits(surface, VIEW_FOV_DEGREES));
+    }
     controls.zoomToCursor = true;
     controls.enableDamping = !reduceMotion;
 
@@ -899,7 +915,10 @@ export function GalaxyView({
         [t.x, t.z] = clampPanToSheet(surface, t.x, t.z);
         const ground = surface.groundHeightAtWorld(t.x, t.z);
         const p = camera.position;
-        p.y = Math.max(p.y + ground - t.y, cameraFloorAt(surface, p.x, p.z));
+        p.y = Math.max(
+          p.y + ground - t.y,
+          cameraFloorAt(surface, p.x, p.z, marginGround),
+        );
         t.y = ground;
         return;
       }
@@ -1390,6 +1409,7 @@ export function GalaxyView({
     terrainReady,
     terrainHeights,
     terrainColor,
+    terrainExtension,
     modelSources,
   ]);
 

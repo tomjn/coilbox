@@ -5,7 +5,7 @@ import {
   heightGridFromPixels,
   type TerrainSpec,
 } from "./terrain";
-import type { TerrainColorSource } from "./terrainMesh";
+import type { TerrainColorSource, TerrainExtension } from "./terrainMesh";
 
 /**
  * Getting a terrain's heights ready for the strategic view. The view builds
@@ -25,6 +25,8 @@ export interface TerrainPixels {
   color?: Exclude<TerrainColorSource, string>;
   /** The heights, in place of `terrain.heightmap`. */
   height?: HeightPixels;
+  /** A generated map's land drawn on past its edge, for the view alone. */
+  extension?: TerrainExtension;
 }
 
 /**
