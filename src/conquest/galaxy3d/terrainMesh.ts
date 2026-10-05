@@ -141,7 +141,9 @@ function buildMargin(
   scene.add(ring);
 }
 
-function isColorPixels(source: TerrainColorSource): source is ColorPixels {
+export function isColorPixels(
+  source: TerrainColorSource,
+): source is ColorPixels {
   return (
     typeof source === "object" &&
     "data" in source &&

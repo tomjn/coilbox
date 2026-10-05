@@ -6,6 +6,8 @@ import {
   CAPITAL_RADIUS,
   clipRoads,
   FLAT_SLOPE,
+  farmableAt,
+  farmBiome,
   leavingAngle,
   MAX_STREETS,
   planTowns,
@@ -365,5 +367,47 @@ describe("clipRoads", () => {
         expect(e).toBeLessThan(t.radius * 1.28);
       }
     }
+  });
+});
+
+describe("farmableAt", () => {
+  // A picture 2 pixels wide over a sheet 20 world units square: grassland on
+  // the left, forest on the right.
+  const picture = {
+    data: new Uint8Array([122, 154, 84, 255, 58, 98, 56, 255]),
+    width: 2,
+    height: 1,
+  };
+
+  it("lays fields on grassland and dry ground only", () => {
+    expect(farmBiome(122, 154, 84)).toBe(true);
+    expect(farmBiome(182, 168, 116)).toBe(true);
+    expect(farmBiome(58, 98, 56)).toBe(false);
+    expect(farmBiome(240, 240, 240)).toBe(false);
+    expect(farmBiome(214, 200, 150)).toBe(false);
+  });
+
+  it("keeps fields to flat ground and off the forest", () => {
+    const flat = farmableAt(picture, 20, 20, () => 1);
+    expect(flat(-5, 0)).toBe(1);
+    expect(flat(5, 0)).toBe(0);
+    // Ground a house would be built on, but too sloping for a field.
+    const sloping = farmableAt(picture, 20, 20, () => 0.8);
+    expect(sloping(-5, 0)).toBe(0);
+  });
+
+  it("is recorded in the town index's fourth byte", () => {
+    const one = planTowns([{ x: -5, z: 0, capital: false, roads: [] }], 1);
+    const index = buildTownIndex(
+      one,
+      20,
+      20,
+      20,
+      () => 1,
+      farmableAt(picture, 20, 20, () => 1),
+    );
+    const at = (x: number) => index.data[(10 * 20 + (x + 10)) * 4 + 3];
+    expect(at(-5)).toBe(255);
+    expect(at(1)).toBe(0);
   });
 });

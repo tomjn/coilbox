@@ -4,11 +4,13 @@ import type { GroundLayer } from "./groundLayer";
 import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
+import type { ColorPixels } from "./terrainMesh";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   buildableAt,
   buildTownIndex,
   clipRoads,
+  farmableAt,
   planTowns,
   roadEntries,
   TOWN_DATA_ROWS,
@@ -57,6 +59,8 @@ const PATCH_LIFT = 0.005;
  * own colours inside an owner's tint, and before the borders (-2).
  */
 const TOWN_ORDER = -2.5;
+/** Fields are drawn before the province fills, so they take an owner's tint. */
+const FIELD_ORDER = -4;
 /** The steps the ground's slope is judged over, in world units. */
 const SLOPE_STEP = 0.25;
 
@@ -79,18 +83,28 @@ export function buildTownLayer(
   surface: TerrainSurface,
   ground: Pick<GroundLayer, "shading">,
   towns: Town[],
+  /** The map's picture, which says where fields can go. Left out, none do. */
+  picture?: ColorPixels,
 ): TownLayer {
   const columns = Math.max(1, towns.length);
   const state = new Uint8Array(columns * TOWN_STATE_ROWS * 4);
 
   // A heightmap pixel of 1 in 255 is the lowest land, so half that is sea.
   const sea = (0.5 / 255) * surface.heightScale * surface.scale;
+  const buildable = buildableAt(
+    (x, z) => surface.groundHeightAtWorld(x, z),
+    sea,
+    SLOPE_STEP,
+  );
   const index = buildTownIndex(
     towns,
     surface.worldWidth,
     surface.worldDepth,
     undefined,
-    buildableAt((x, z) => surface.groundHeightAtWorld(x, z), sea, SLOPE_STEP),
+    buildable,
+    picture
+      ? farmableAt(picture, surface.worldWidth, surface.worldDepth, buildable)
+      : undefined,
   );
   // The town in each texel is read exactly, and the ground's fitness blended.
   const indexTexture = new THREE.DataTexture(
@@ -120,21 +134,27 @@ export function buildTownLayer(
   geo.setAttribute("position", new THREE.BufferAttribute(patches.positions, 3));
   geo.setAttribute("town", new THREE.BufferAttribute(patches.town, 1));
   geo.setIndex(new THREE.BufferAttribute(patches.index, 1));
-  const mat = townMaterial({
+  const shading = {
     index: indexTexture,
-    indexSize: [index.width, index.height],
+    indexSize: [index.width, index.height] as [number, number],
     data,
     state: stateTexture,
     roadDistance: ground.shading.roadDistance,
     roadReach: ground.shading.roadReach,
     frame: ground.shading.frame,
-  });
-  disposables.push(indexTexture, data, stateTexture, geo, mat);
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.name = "towns";
-  mesh.renderOrder = TOWN_ORDER;
-  mesh.raycast = () => {};
-  if (towns.length > 0) scene.add(mesh);
+  };
+  disposables.push(indexTexture, data, stateTexture, geo);
+  // The same patches twice: the fields first, under an owner's tint like
+  // the rest of the land, then the town over the tint.
+  for (const layer of ["fields", "town"] as const) {
+    const mat = townMaterial(shading, layer);
+    disposables.push(mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = layer === "town" ? "towns" : "fields";
+    mesh.renderOrder = layer === "town" ? TOWN_ORDER : FIELD_ORDER;
+    mesh.raycast = () => {};
+    if (towns.length > 0) scene.add(mesh);
+  }
 
   return {
     towns,
