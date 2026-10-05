@@ -48,6 +48,11 @@ describe("seaRoute", () => {
     expect(seaRoute([10, 50], [90, 50], () => true, 1)).toBeUndefined();
   });
 
+  it("finds no route over water narrower than a step", () => {
+    const strait = (x: number) => x < 49.5 || x > 50.2;
+    expect(seaRoute([10, 50], [90, 50], strait, 1)).toBeUndefined();
+  });
+
   it("finds no route between two points that are one", () => {
     expect(seaRoute([10, 50], [10, 50], twoShores, 1)).toBeUndefined();
   });

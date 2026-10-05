@@ -3,6 +3,7 @@ import type { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
 import { buildCityLayer, type MapItemState } from "./cityLayer";
+import { CROSSING_PATTERN } from "./crossingLine";
 import { buildCueLayer, type CueLine, type CueSource } from "./cueLayer";
 import { buildProvinceLayer } from "./provinceLayer";
 import type { Ring } from "./provinces";
@@ -140,6 +141,11 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
   );
   layer.apply();
   const mesh = scene.getObjectByName("map-cues") as THREE.Mesh | undefined;
+  const crossings = scene.getObjectByName("map-crossings") as
+    | THREE.Mesh
+    | undefined;
+  /** The mesh a line is drawn in. */
+  const meshOf = (l: CueLine) => (l.type === "crossing" ? crossings : mesh);
   const line = (type: CueLine["type"], a: string, b: string) => {
     const found = layer.lines.find(
       (l) => l.type === type && l.a === a && l.b === b,
@@ -149,7 +155,9 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
   };
   /** A line's colour as a hex number, and its opacity. */
   const paintOf = (l: CueLine): [number, number] => {
-    const attr = mesh?.geometry.getAttribute("color");
+    const attr = meshOf(l)?.geometry.getAttribute(
+      l.type === "crossing" ? "aColor" : "color",
+    );
     if (!attr) throw new Error("no cue mesh");
     return [
       new THREE.Color(
@@ -162,7 +170,7 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
   };
   /** The corners of a line's ribbons, as map points with world height. */
   const pointsOf = (l: CueLine): [number, number, number][] => {
-    const attr = mesh?.geometry.getAttribute("position");
+    const attr = meshOf(l)?.geometry.getAttribute("position");
     if (!attr) throw new Error("no cue mesh");
     const out: [number, number, number][] = [];
     for (let v = l.start; v < l.start + l.count; v++) {
@@ -170,6 +178,20 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
       out.push([x, y, attr.getY(v)]);
     }
     return out;
+  };
+  /** A crossing's points over the water, as map points. */
+  const seaPointsOf = (l: CueLine): [number, number][] => {
+    const sea = crossings?.geometry.getAttribute("aSea");
+    if (!sea) throw new Error("no crossing mesh");
+    return pointsOf(l)
+      .filter((_, i) => sea.getX(l.start + i) === 1)
+      .map(([x, y]) => [x, y]);
+  };
+  /** A crossing's pattern, from `CROSSING_PATTERN`, and its width factor. */
+  const styleOf = (l: CueLine): [number, number] => {
+    const attr = crossings?.geometry.getAttribute("aStyle");
+    if (!attr) throw new Error("no crossing mesh");
+    return [attr.getX(l.start), attr.getY(l.start)];
   };
   return {
     scene,
@@ -181,6 +203,8 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
     line,
     paintOf,
     pointsOf,
+    seaPointsOf,
+    styleOf,
     locationStates,
     roadStates,
   };
@@ -201,31 +225,84 @@ describe("buildCueLayer lines", () => {
     ]);
   });
 
-  it("draws a crossing over the gap between the two provinces", () => {
-    const { line, pointsOf } = build();
-    const points = pointsOf(line("crossing", "west", "isle"));
-    const ys = points.map(([, y]) => y);
-    // West ends at y = 30 and isle starts at y = 70. The line runs from the
-    // last step inside west to the first inside isle, and a step is 0.25.
-    expect(Math.min(...ys)).toBeGreaterThan(29);
-    expect(Math.min(...ys)).toBeLessThanOrEqual(30);
-    expect(Math.max(...ys)).toBeGreaterThan(68);
-    expect(Math.max(...ys)).toBeLessThan(71);
-    for (const [x] of points) expect(Math.abs(x - 15)).toBeLessThan(1);
+  it("puts a crossing to sea on one province's coast and lands on the other's", () => {
+    const { line, seaPointsOf } = build();
+    const sea = seaPointsOf(line("crossing", "west", "isle"));
+    const ys = sea.map(([, y]) => y);
+    // West ends at y = 30 and isle starts at y = 70. On a map that is not
+    // generated the provinces are the land.
+    expect(Math.min(...ys)).toBeCloseTo(30, 0);
+    expect(Math.max(...ys)).toBeCloseTo(70, 0);
+    // A gentle curve, not a straight line, and off the land.
+    const xs = sea.map(([x]) => x);
+    expect(Math.max(...xs.map((x) => Math.abs(x - 15)))).toBeGreaterThan(1);
+    for (const [, y] of sea) {
+      expect(y).toBeGreaterThan(29.5);
+      expect(y).toBeLessThan(70.5);
+    }
   });
 
-  it("dashes a crossing: its ribbons do not cover the whole stretch", () => {
+  it("runs a crossing on over land to each province's anchor", () => {
     const { line, pointsOf } = build();
-    const points = pointsOf(line("crossing", "west", "isle"));
-    // Four corners per stretch of ribbon. Sum the stretches' lengths in map y.
-    let drawn = 0;
-    for (let v = 0; v < points.length; v += 4) {
-      drawn += Math.abs(points[v + 2][1] - points[v][1]);
+    const ys = pointsOf(line("crossing", "west", "isle")).map(([, y]) => y);
+    expect(Math.min(...ys)).toBeCloseTo(15, 5);
+    expect(Math.max(...ys)).toBeCloseTo(85, 5);
+  });
+
+  it("finds a generated map's coast from its heightmap", () => {
+    // Land in the top two and bottom two rows of a 3 by 9 heightmap, and sea
+    // from the third row to the seventh.
+    const rows = [1, 1, 0, 0, 0, 0, 0, 1, 1];
+    const shores: HeightGrid = {
+      data: new Float32Array(rows.flatMap((h) => [h, h, h])),
+      width: 3,
+      height: 9,
+    };
+    const doc = {
+      ...galaxy,
+      nodes: [node("north", "red", [50, 5]), node("south", "blue", [50, 95])],
+      links: [["north", "south"]],
+      linkKinds: [["north", "south", "crossing"]],
+      blockedBorders: undefined,
+      terrain: {
+        image: "generated:cities",
+        heightmap: "generated:cities",
+        width: 100,
+        height: 100,
+      },
+    } as unknown as GalaxyDoc;
+    const { line, seaPointsOf, surface } = build(doc, shores);
+    const sea = seaPointsOf(line("crossing", "north", "south"));
+    const ys = sea.map(([, y]) => y);
+    // The heights fall from land at y = 0 to sea at y = 25, and rise from
+    // sea at y = 75 to land at y = 100, so each coast is at the sea's edge.
+    expect(Math.min(...ys)).toBeCloseTo(25, 0);
+    expect(Math.max(...ys)).toBeCloseTo(75, 0);
+    const level = (10 * surface.scale) / 255;
+    for (const [x, y] of sea) {
+      expect(surface.groundHeightAt(x, y)).toBeLessThan(level);
     }
-    const ys = points.map(([, y]) => y);
-    const span = Math.max(...ys) - Math.min(...ys);
-    expect(drawn).toBeGreaterThan(span * 0.4);
-    expect(drawn).toBeLessThan(span * 0.7);
+  });
+
+  it("reads no coast from the heightmap of a map that is not generated", () => {
+    const shores: HeightGrid = {
+      data: new Float32Array([1, 1, 1, 0, 0, 0, 1, 1, 1]),
+      width: 3,
+      height: 3,
+    };
+    const doc = {
+      ...galaxy,
+      nodes: [node("north", "red", [50, 5]), node("south", "blue", [50, 95])],
+      links: [["north", "south"]],
+      linkKinds: [["north", "south", "crossing"]],
+      blockedBorders: undefined,
+    } as unknown as GalaxyDoc;
+    const { line, seaPointsOf } = build(doc, shores);
+    // No provinces either, so the crossing is the straight line between.
+    const sea = seaPointsOf(line("crossing", "north", "south"));
+    expect(sea[0][1]).toBeCloseTo(5, 5);
+    expect(sea[sea.length - 1][1]).toBeCloseTo(95, 5);
+    for (const [x] of sea) expect(x).toBeCloseTo(50, 5);
   });
 
   it("lays a crossing on the ground it passes over", () => {
@@ -307,9 +384,25 @@ describe("buildCueLayer on a conquest", () => {
     expect(paintOf(line("frontier", "wall", "east"))[1]).toBe(0);
   });
 
-  it("draws a contested crossing in gold", () => {
-    const { line, paintOf } = build();
+  it("draws a contested crossing in gold dashes", () => {
+    const { line, paintOf, styleOf } = build();
     expect(paintOf(line("crossing", "west", "isle"))).toEqual([GOLD, 1]);
+    expect(styleOf(line("crossing", "west", "isle"))).toEqual([
+      CROSSING_PATTERN.dashes,
+      1,
+    ]);
+  });
+
+  it("tells a crossing's tone by its pattern as well as its colour", () => {
+    const { layer, input, line, styleOf } = build();
+    const pattern = () => styleOf(line("crossing", "west", "isle"))[0];
+    input.owners.isle = "red";
+    layer.apply();
+    expect(pattern()).toBe(CROSSING_PATTERN.beads);
+    input.owners.west = "blue";
+    input.owners.isle = "green";
+    layer.apply();
+    expect(pattern()).toBe(CROSSING_PATTERN.dots);
   });
 
   it("moves the frontier when a province is captured", () => {
@@ -369,19 +462,21 @@ describe("buildCueLayer on a conquest", () => {
   });
 
   it("emphasises the selected province's neighbours, over a crossing too", () => {
-    const { layer, input, locationStates, line, paintOf } = build();
+    const { layer, input, locationStates, line, paintOf, styleOf } = build();
     input.selectedId = "west";
     layer.apply();
     expect(locationStates.get("mid")?.emphasised).toBe(true);
     expect(locationStates.get("isle")?.emphasised).toBe(true);
     expect(locationStates.get("port")?.emphasised).toBe(true);
     expect(locationStates.get("east")?.emphasised).toBe(false);
-    // The crossing out of the selection is whitened.
+    // The crossing out of the selection is whitened and drawn wider.
     expect(paintOf(line("crossing", "west", "isle"))[0]).not.toBe(GOLD);
+    expect(styleOf(line("crossing", "west", "isle"))[1]).toBeGreaterThan(1);
     input.selectedId = null;
     layer.apply();
     expect(locationStates.get("mid")).toBeUndefined();
     expect(paintOf(line("crossing", "west", "isle"))[0]).toBe(GOLD);
+    expect(styleOf(line("crossing", "west", "isle"))[1]).toBe(1);
   });
 
   it("marks the province under incursion", () => {
@@ -446,10 +541,13 @@ describe("buildCueLayer under fog of war", () => {
   });
 
   it("draws a crossing into the fog plain, and no frontier onto hidden land", () => {
-    const { line, paintOf } = fogged();
+    const { line, paintOf, styleOf } = fogged();
     const [color, opacity] = paintOf(line("crossing", "west", "isle"));
     expect(color).toBe(0xe2dccb);
     expect(opacity).toBeGreaterThan(0);
+    expect(styleOf(line("crossing", "west", "isle"))[0]).toBe(
+      CROSSING_PATTERN.dots,
+    );
     const built = build();
     built.input.visible = new Set(["west", "mid", "port"]);
     built.layer.apply();
@@ -527,6 +625,21 @@ describe("buildCueLayer on a Warpath run", () => {
     expect(paintOf(line("frontier", "west", "mid"))).toEqual([GREEN, 1]);
     expect(paintOf(line("frontier", "mid", "east"))).toEqual([GOLD, 1]);
     expect(paintOf(line("frontier", "wall", "east"))[1]).toBe(0);
+  });
+
+  it("draws a crossing already taken as ticks and an open one as chevrons", () => {
+    const built = run();
+    const crossing = () => built.line("crossing", "west", "isle");
+    // The player stands on west, so the crossing to isle is open.
+    built.input.owners.west = "red";
+    built.input.run = { pathLinks: new Set() };
+    built.layer.apply();
+    expect(built.paintOf(crossing())[0]).toBe(GOLD);
+    expect(built.styleOf(crossing())[0]).toBe(CROSSING_PATTERN.chevrons);
+    built.input.run = { pathLinks: new Set(["west isle"]) };
+    built.layer.apply();
+    expect(built.paintOf(crossing())[0]).toBe(GREEN);
+    expect(built.styleOf(crossing())[0]).toBe(CROSSING_PATTERN.ticks);
   });
 
   it("marks the provinces the open choices lead to", () => {

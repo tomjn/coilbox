@@ -55,7 +55,7 @@ const FRONTIER_WIDTH = 0.6;
 const BLOCKED_WIDTH = 1.1;
 
 /** The least width a crossing draws at, in CSS pixels, however far out. */
-const CROSSING_MIN_PIXELS = 3;
+const CROSSING_MIN_PIXELS = 4.5;
 /** How much wider a crossing out of the selected location draws. */
 const CROSSING_EMPHASIS = 1.5;
 
@@ -81,7 +81,7 @@ const CROSSING_PATTERN_OF: Record<LinkTone, CrossingPattern> = {
   taken: "ticks",
 };
 
-const PLAIN_OPACITY = 0.7;
+const PLAIN_OPACITY = 0.85;
 const OWNED_OPACITY = 0.9;
 const BLOCKED_OPACITY = 0.95;
 
@@ -455,7 +455,10 @@ function coastOf(
     const shore = (0.5 * surface.heightScale * surface.scale) / 255;
     return {
       isLand: (x, y) => surface.groundHeightAt(x, y) > shore,
-      step: surface.width / surface.segmentsX,
+      step: Math.min(
+        surface.width / surface.segmentsX,
+        surface.height / surface.segmentsY,
+      ),
     };
   }
   if (index && index.nodes.length > 0) {

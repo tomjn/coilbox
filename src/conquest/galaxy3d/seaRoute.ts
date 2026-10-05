@@ -40,7 +40,8 @@ const MAX_CURVE_POINTS = 96;
 /**
  * The route of a crossing from `from` to `to`, or `undefined` when no coast
  * can be found on the line between them. That is when the line never reaches
- * the sea, and the caller then draws the straight line. `isLand` says whether
+ * the sea, or the water it crosses is narrower than a step, and the caller
+ * then draws the straight line. `isLand` says whether
  * a map point is land. `step` is the distance between samples, the size of
  * the smallest bay or headland the route notices.
  */
@@ -84,6 +85,9 @@ export function seaRoute(
   const t1 = last === count ? 1 : coast((last + 1) / count, last / count);
   const landingA = at(t0);
   const landingB = at(t1);
+  // Water narrower than a step is below what the samples can tell from the
+  // coast, and would leave the crossing with no stretch at sea to draw.
+  if (distance(landingA, landingB) < step) return undefined;
 
   return {
     jettyA: [from, landingA],
