@@ -54,6 +54,25 @@ describe("endMarkersToDraw", () => {
     expect(drawn([model(108, 208)])).toEqual(["start gate", "goal keep"]);
   });
 
+  it("draws the marker when the model on it failed to load", () => {
+    const placed = [
+      { model: { file: "gate.glb" }, pos: [100, 200] as [number, number] },
+      { model: { file: "tower.glb" }, pos: [500, 200] as [number, number] },
+    ];
+    const failed = new Set(["gate.glb"]);
+    expect(
+      endMarkersToDraw(nodes, ends, placed, REACH, failed).map((m) => m.id),
+    ).toEqual(["gate"]);
+    // One model that failed and one that did not: the one that loaded stands.
+    const two = [
+      ...placed,
+      { model: { file: "banner.glb" }, pos: [102, 200] as [number, number] },
+    ];
+    expect(
+      endMarkersToDraw(nodes, ends, two, REACH, failed).map((m) => m.id),
+    ).toEqual([]);
+  });
+
   it("is not moved by a model on a location that is not an end", () => {
     expect(drawn([model(300, 200)])).toEqual(["start gate", "goal keep"]);
   });
