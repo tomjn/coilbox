@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { GroundShading } from "./groundShader";
 import {
   createMarginSurface,
   type HeightGrid,
@@ -157,6 +158,8 @@ function isColorPixels(source: TerrainColorSource): source is ColorPixels {
  * `extension` draws a generated map's land on past its edge as one surface
  * with the sheet, greyed a little past the edge and hazing into the scene's
  * background.
+ *
+ * `ground` paints roads into the sheet.
  */
 export function buildTerrainMesh(
   scene: THREE.Scene,
@@ -167,6 +170,8 @@ export function buildTerrainMesh(
   heights?: HeightGrid,
   detail = true,
   extension?: TerrainExtension,
+  /** Roads painted into the ground. See `groundShader.ts`. */
+  ground?: GroundShading,
 ): THREE.Mesh {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
@@ -242,7 +247,7 @@ export function buildTerrainMesh(
   }
   applyTerrainShader(
     mat,
-    { normals, detail: detail && isColorPixels(color), frame },
+    { normals, detail: detail && isColorPixels(color), frame, ground },
     disposables,
   );
   if (margin) buildMargin(scene, disposables, surface, margin, mat);

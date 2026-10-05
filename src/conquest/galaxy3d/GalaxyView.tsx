@@ -13,6 +13,7 @@ import { buildCityLayer } from "./cityLayer";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
+import { buildGroundLayer, type GroundLayer } from "./groundLayer";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -567,8 +568,12 @@ export function GalaxyView({
     // Set where the scenery is built, for the markers that stand in for it.
     let placedModels: PlacedModelsLayer | undefined;
 
+    // Roads painted into a terrain map's ground. See groundLayer.ts.
+    let ground: GroundLayer | undefined;
+
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
+      ground = buildGroundLayer(disposables, galaxy, surface, terrainHeights);
       buildTerrainMesh(
         scene,
         disposables,
@@ -578,6 +583,7 @@ export function GalaxyView({
         terrainHeights,
         !performanceMode,
         terrainExtension,
+        ground.shading,
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {
@@ -716,20 +722,22 @@ export function GalaxyView({
       : undefined;
 
     // A terrain map's point locations and roads. See cityLayer.ts.
-    const cities = surface
-      ? buildCityLayer(
-          scene,
-          disposables,
-          galaxy,
-          surface,
-          ownerColor,
-          ownersRef,
-          laneDim,
-          dimOf,
-          labelObjects,
-          cores,
-        )
-      : undefined;
+    const cities =
+      surface && ground
+        ? buildCityLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            ownerColor,
+            ownersRef,
+            laneDim,
+            dimOf,
+            labelObjects,
+            cores,
+            ground,
+          )
+        : undefined;
 
     // The start and the goal of a run across a land map. See endMarkerLayer.ts.
     const endMarkers =
