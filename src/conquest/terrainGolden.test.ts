@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "./model";
 import { hashString } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
-import type { TerrainShape } from "./terrainGen";
+import { LAND_LAYOUTS, type TerrainShape } from "./terrainGen";
 import {
   generatedTerrain,
   generateTerritories,
@@ -49,7 +49,7 @@ const base: TerritoriesOptions = {
   factionCount: 2,
 };
 
-const SHAPES: TerrainShape[] = ["scatter", "spiral", "clusters", "ring"];
+const SHAPES: TerrainShape[] = [...LAND_LAYOUTS];
 const SIZES = [
   ...BASE_SIZES.map((s) => Number(s.value)),
   ...LARGE_SIZES.map((s) => s.count),

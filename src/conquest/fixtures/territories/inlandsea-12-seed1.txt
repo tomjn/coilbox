@@ -1,0 +1,40 @@
+id generated-1
+title TG Conquest
+description A generated map of 12 provinces.
+terrain image=generated:territories heightmap=generated:territories size=1024x1024 heightScale=64 projection=flat
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"inlandsea","skin":"territories"}
+faction player name="Sovereign Imperium" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Silent Remnant" color=#ff3524 aggression=0.4085108839906752 side=
+faction enemy-2 name="Verdant Enclave" color=#ffb300 aggression=0.35745911761187016 side=
+node node-0 name="Wrenhaven" pos=699,657 owner=enemy-1 kind=normal difficulty=5 map="Map 11" outline=762,514 788,538 800,562 796,638 808,680 802,742 780,768 764,780 710,784 674,750 656,720 626,686 584,650 568,618 604,616 644,602 678,574 684,556 728,528
+node node-1 name="Brackhaven" pos=515,241 owner=enemy-2 kind=capital difficulty=5 map="Map 9" outline=644,222 610,260 578,280 560,298 520,310 464,312 454,292 442,226 466,186 486,172 498,170 514,170 550,198 570,202 580,214 606,212 616,220
+node node-2 name="Fernbarrow" pos=823,511 owner=enemy-1 kind=capital difficulty=5 map="Map 10" outline=826,356 836,388 848,398 856,422 866,436 884,510 890,518 890,532 868,588 852,614 818,648 808,680 796,638 800,562 788,538 762,514 756,466 764,432 776,406 814,374
+node node-3 name="Redbarrow" pos=577,747 owner=neutral kind=normal difficulty=4 map="Map 7" outline=534,606 548,618 568,618 584,650 626,686 656,720 674,750 710,784 666,802 654,816 644,816 634,826 618,824 600,838 564,842 544,850 510,850 500,854 464,848 444,834 418,834 392,820 376,820 360,802 454,744 500,730 528,664
+node node-4 name="Winddale" pos=521,383 owner=enemy-2 kind=normal difficulty=3 map="Map 6" outline=560,298 566,316 596,354 592,444 586,458 570,452 550,452 510,458 494,448 464,440 458,432 394,428 392,352 444,328 464,312 520,310
+node node-5 name="Bleakwood" pos=151,433 owner=player kind=capital difficulty=1 map="Map 1" outline=132,364 156,380 196,424 198,434 176,456 176,476 140,520 102,536 98,530 98,470 104,424 108,408
+node node-6 name="Rookcross" pos=273,381 owner=player kind=normal difficulty=2 map="Map 3" outline=274,264 308,288 350,332 392,352 394,428 366,414 364,422 340,442 320,482 294,496 294,506 310,530 350,548 384,574 414,578 432,588 472,584 484,588 460,596 430,596 414,590 374,586 334,586 320,592 284,572 252,538 224,520 196,490 176,476 176,456 198,434 196,424 156,380 132,364 136,358 150,354 160,342 182,334 190,316 208,298 232,290 246,276
+node node-7 name="Duncombe" pos=699,483 owner=enemy-1 kind=normal difficulty=4 map="Map 8" outline=776,406 764,432 756,466 762,514 728,528 684,556 682,524 660,500 648,494 628,472 586,458 592,444 620,436 690,430
+node node-8 name="Easthollow" pos=679,331 owner=enemy-1 kind=normal difficulty=4 map="Map 7" outline=644,222 652,222 658,230 684,232 690,238 702,240 718,260 736,262 752,274 762,274 778,294 786,296 804,316 816,322 826,356 814,374 776,406 690,430 620,436 592,444 596,354 566,316 560,298 578,280 610,260
+node node-9 name="Larkmere" pos=363,269 owner=enemy-2 kind=normal difficulty=3 map="Map 4" outline=442,226 454,292 464,312 444,328 392,352 350,332 308,288 274,264 288,252 300,252 312,242 320,228 320,212 330,202 364,198 388,204 394,222 410,238 422,238
+node node-10 name="Stormcross" pos=391,683 owner=neutral kind=normal difficulty=3 map="Map 5" outline=484,588 514,600 528,600 534,606 528,664 500,730 454,744 360,802 346,798 328,774 304,758 302,748 294,740 290,698 314,648 320,592 334,586 374,586 414,590 430,596 460,596
+node node-11 name="Crowhollow" pos=203,583 owner=player kind=normal difficulty=2 map="Map 2" outline=176,476 196,490 224,520 252,538 284,572 320,592 314,648 290,698 294,740 248,730 240,712 204,684 160,624 118,594 118,572 102,536 140,520
+link node-0 node-2 node-0 node-2 border
+link node-0 node-3 node-0 node-3 border
+link node-0 node-7 node-0 node-7 border
+link node-1 node-4 node-1 node-4 border
+link node-1 node-8 node-1 node-8 border
+link node-1 node-9 node-1 node-9 border
+link node-2 node-7 node-2 node-7 border
+link node-2 node-8 node-2 node-8 border
+link node-3 node-10 node-3 node-10 border
+link node-4 node-6 node-4 node-6 border
+link node-4 node-7 node-4 node-7 border
+link node-4 node-8 node-4 node-8 border
+link node-4 node-9 node-4 node-9 border
+link node-5 node-6 node-5 node-6 border
+link node-5 node-11 node-5 node-11 border
+link node-6 node-9 node-6 node-9 border
+link node-6 node-10 node-6 node-10 border
+link node-6 node-11 node-6 node-11 border
+link node-7 node-8 node-7 node-8 border
+link node-10 node-11 node-10 node-11 border
