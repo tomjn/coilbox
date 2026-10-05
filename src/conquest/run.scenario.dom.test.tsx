@@ -375,3 +375,81 @@ describe("the other fights at a scenario location", () => {
     expect(engineLaunch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("the difficulty a scenario location plays at", () => {
+  /** Ironcoast with a scenario that has one unit only on hard, so the
+   * scenario varies by difficulty, and the location difficulty given. */
+  function varying(difficulty: number) {
+    const base = ironcoast?.scenario;
+    if (!base) throw new Error("the sample has no scenario");
+    return {
+      ...ironcoast,
+      difficulty,
+      scenario: {
+        ...base,
+        doc: {
+          ...base.doc,
+          actors: [
+            ...base.doc.actors,
+            {
+              ...base.doc.actors[0],
+              id: "hard-only",
+              difficulty: { atLeast: "hard" as const },
+            },
+          ],
+        },
+      },
+    } as typeof ironcoast;
+  }
+
+  /** A conquest on the sample started at `threatLevel`. */
+  function stateAt(threatLevel: number): ConquestState {
+    const fresh = freshState();
+    return {
+      ...fresh,
+      handmade: fresh.handmade && { ...fresh.handmade, threatLevel },
+    };
+  }
+
+  it("launches a scenario that does not vary by difficulty with none, as before", async () => {
+    const { result } = mount(stateAt(3));
+    expect(result.current.scenarioDifficulty).toBeUndefined();
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBeUndefined();
+  });
+
+  it("launches at the level the threat level and the location give", async () => {
+    const node = varying(5);
+    const { result } = renderHook(() =>
+      useConquestBattleRun(galaxy, stateAt(3), node, "attack"),
+    );
+    expect(result.current.scenarioDifficulty).toBe("hard");
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBe("hard");
+  });
+
+  it("plays easy at the lowest threat level on the easiest location", async () => {
+    const node = varying(1);
+    const { result } = renderHook(() =>
+      useConquestBattleRun(galaxy, stateAt(0), node, "attack"),
+    );
+    expect(result.current.scenarioDifficulty).toBe("easy");
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBe("easy");
+  });
+
+  it("reads a conquest saved without a threat level as level 0", () => {
+    const fresh = freshState();
+    const { threatLevel: _, ...old } = fresh.handmade ?? { mapId: "" };
+    const node = varying(5);
+    const { result } = renderHook(() =>
+      useConquestBattleRun(
+        galaxy,
+        { ...fresh, handmade: old as ConquestState["handmade"] },
+        node,
+        "attack",
+      ),
+    );
+    expect(result.current.scenarioDifficulty).toBe("normal");
+  });
+});

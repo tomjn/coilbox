@@ -10,6 +10,7 @@ import type { ConquestState, GalaxyDoc, GalaxyNode } from "../../model";
 
 const h = vi.hoisted(() => ({
   scenario: undefined as { name: string; description: string } | undefined,
+  scenarioDifficulty: undefined as string | undefined,
   gutter: vi.fn(),
   gate: vi.fn(),
 }));
@@ -52,6 +53,7 @@ vi.mock("../../run", () => ({
     installedGame: { name: "Test Game 2.0" },
     ais: [],
     scenario: h.scenario,
+    scenarioDifficulty: h.scenarioDifficulty,
     mapName: "Comet Catcher Redux",
     snapshot: () => null,
     lastSnapshot: null,
@@ -97,6 +99,7 @@ function show() {
 
 beforeEach(() => {
   h.scenario = undefined;
+  h.scenarioDifficulty = undefined;
   h.gutter.mockClear();
   h.gate.mockClear();
 });
@@ -131,6 +134,19 @@ describe("the briefing for a scenario location", () => {
     show();
     expect(h.gutter.mock.calls[0][0].installedGame).toBe(false);
     expect(h.gate.mock.calls[0][0].aisAvailable).toBe(true);
+  });
+
+  it("shows the difficulty it plays at, with nothing to change it", () => {
+    h.scenarioDifficulty = "hard";
+    show();
+    expect(screen.getByText("Difficulty")).toBeTruthy();
+    expect(screen.getByText("Hard")).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  it("shows no difficulty for a scenario that does not use one", () => {
+    show();
+    expect(screen.queryByText("Difficulty")).toBeNull();
   });
 
   it("reads well when the scenario has no description", () => {

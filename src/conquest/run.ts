@@ -4,6 +4,10 @@ import type { ReplayProvenance } from "../content/replayUserState";
 import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameChoice, InstalledGame } from "../play/installedGames";
+import {
+  conquestScenarioDifficulty,
+  scenarioLevel,
+} from "../play/scenarioDifficulty";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { useConquestState } from "./conquests";
 import { conquestGameRef, withGameChoice } from "./gameChoice";
@@ -109,6 +113,16 @@ export function useConquestBattleRun(
   // map swapped in for an excluded one applies to the skirmish only.
   const mapName = scenario?.doc.setup.mapName ?? node?.battle.mapName ?? "";
 
+  // The level comes from the threat level the conquest was started at and the
+  // location's own difficulty (issue #3593). Only a hand-made map has scenario
+  // locations, and its conquest saves the threat level in `handmade`.
+  const scenarioDifficulty = scenarioLevel(scenario?.doc, () =>
+    conquestScenarioDifficulty(
+      state?.handmade?.threatLevel ?? 0,
+      node?.difficulty ?? 0,
+    ),
+  );
+
   const battle = useBattleRun<ConquestState>({
     launchMode: "conquest",
     gameRef: conquestGameRef(galaxy, state),
@@ -122,11 +136,14 @@ export function useConquestBattleRun(
     persist,
     provenance,
     scenario,
+    scenarioDifficulty,
   });
   return {
     ...battle,
     /** The scenario this fight plays, or undefined for a skirmish. */
     scenario: scenario?.doc,
+    /** The level the scenario plays at, or undefined when it has none. */
+    scenarioDifficulty,
     /** The map the fight is on. */
     mapName,
   };

@@ -248,3 +248,69 @@ describe("a fight at a scenario location on a Warpath run", () => {
     expect(engineLaunch).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("the difficulty a scenario location plays at on a Warpath run", () => {
+  /** The Ironcoast fight on a run at `difficulty` with `ascension`, its node
+   * at `techTier`, and its scenario given a unit only on hard so it varies by
+   * difficulty. */
+  function varying(difficulty: number, ascension: number, techTier: number) {
+    const base = runAtEastcliff();
+    const run = {
+      ...base,
+      settings: { ...base.settings, difficulty, ascension },
+    };
+    const found = run.nodes.find((n) => n.location === "ironcoast");
+    if (!found?.battle) throw new Error("the run does not cross Ironcoast");
+    const node = { ...found, battle: { ...found.battle, techTier } };
+    const plain = runNodeScenario(map, node);
+    if (!plain) throw new Error("the sample has no scenario at Ironcoast");
+    const scenario = {
+      ...plain,
+      doc: {
+        ...plain.doc,
+        actors: [
+          ...plain.doc.actors,
+          {
+            ...plain.doc.actors[0],
+            id: "hard-only",
+            difficulty: { atLeast: "hard" as const },
+          },
+        ],
+      },
+    };
+    return renderHook(() =>
+      useRunEncounter(
+        run,
+        node,
+        vi.fn(async () => {}),
+        "run-1",
+        scenario,
+      ),
+    );
+  }
+
+  it("launches a scenario that does not vary by difficulty with none, as before", async () => {
+    const { result } = mount();
+    expect(result.current.scenarioDifficulty).toBeUndefined();
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBeUndefined();
+  });
+
+  it("plays easy early on an easy run", async () => {
+    const { result } = varying(1, 0, 1);
+    expect(result.current.scenarioDifficulty).toBe("easy");
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBe("easy");
+  });
+
+  it("plays harder late on the same run", () => {
+    expect(varying(1, 0, 5).result.current.scenarioDifficulty).toBe("normal");
+  });
+
+  it("plays hard late on a hard run, and ascension counts toward it", async () => {
+    const { result } = varying(3, 2, 5);
+    expect(result.current.scenarioDifficulty).toBe("hard");
+    await act(() => result.current.start());
+    expect(launchScenario.mock.calls[0][0].difficulty).toBe("hard");
+  });
+});
