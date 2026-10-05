@@ -8,6 +8,7 @@ import {
 } from "./challenge";
 import { type GenerateRunOpts, type GenRunMap, generateRun } from "./generate";
 import {
+  choiceOnSteps,
   generateMapRun,
   generateStyledRun,
   LAND_RUN_SIZES,
@@ -111,6 +112,76 @@ describe("generateStyledRun", () => {
       runIdentity(generateStyledRun({ ...base, skin })),
     );
     expect(new Set(ids).size).toBe(MAP_SKINS.length);
+  });
+});
+
+/**
+ * Issue #3571: a run with one location at every step offers no choice of
+ * route. Seeds 1 to 8 at each of the six sizes a setup can ask for, built
+ * while the file loads so no single test carries the cost of the maps.
+ */
+describe("the choice of route on a generated land map", () => {
+  const SEEDS = [1, 2, 3, 4, 5, 6, 7, 8];
+  // How many of the eight seeds got a route with no choice on their own map
+  // and so ended on a later one. A Territories map this small is often close
+  // to a tree, and across a tree there is one way between any two places.
+  const SWAPPED = {
+    cities: { quick: 0, standard: 0, long: 0 },
+    territories: { quick: 4, standard: 1, long: 0 },
+  };
+
+  for (const skin of LAND) {
+    for (const length of LENGTHS) {
+      const runs = SEEDS.map((seed) =>
+        generateStyledRun({ ...base, seed, skin, length }),
+      );
+      const swapped = runs.filter(
+        (run, i) =>
+          run.settings.map?.source === "generated" &&
+          run.settings.map.seed !== SEEDS[i],
+      );
+
+      it(`offers two next steps somewhere on every ${length} ${skin} run, whichever way the player goes`, () => {
+        for (const run of runs) {
+          const choice = choiceOnSteps(
+            run.nodes.map((n) => n.id),
+            run.edges,
+          );
+          expect(choice.fewest).toBeGreaterThanOrEqual(1);
+        }
+      });
+
+      it(`moves ${SWAPPED[skin][length]} of the ${SEEDS.length} ${length} ${skin} runs to another map`, () => {
+        expect(swapped).toHaveLength(SWAPPED[skin][length]);
+      });
+
+      it(`rebuilds a ${length} ${skin} run that moved map from its code`, () => {
+        for (const run of swapped) {
+          const decoded = decodeWarpathChallenge(encodeWarpathChallenge(run));
+          if (!decoded.ok) throw new Error("expected a successful decode");
+          const rebuilt = runFromChallenge(decoded.settings, {
+            maps: MAPS,
+            enemyAiKey: "native:BARb",
+          });
+          expect(rebuilt.nodes).toEqual(run.nodes);
+          expect(rebuilt.edges).toEqual(run.edges);
+          expect(rebuilt.settings.map).toEqual(run.settings.map);
+        }
+      });
+    }
+  }
+
+  it("gives the same run from the same seed, on a seed that moves map", () => {
+    const opts: GenerateRunOpts = {
+      ...base,
+      seed: 3,
+      skin: "territories",
+      length: "quick",
+    };
+    const run = generateStyledRun(opts);
+    const ref = run.settings.map;
+    expect(ref?.source === "generated" && ref.seed).not.toBe(3);
+    expect(generateStyledRun(opts)).toEqual(run);
   });
 });
 
