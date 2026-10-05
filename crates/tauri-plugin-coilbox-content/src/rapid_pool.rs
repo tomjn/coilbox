@@ -264,6 +264,9 @@ pub(crate) async fn content_warm_rapid_pool(roots: Vec<String>) -> CliResult {
 /// `apply=false` is a dry run that computes the summary without deleting.
 #[tauri::command]
 pub(crate) async fn content_prune_rapid_pool(root: String, apply: bool) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&root)) {
+        return CliResult::err(e);
+    }
     let res = tauri::async_runtime::spawn_blocking(move || prune(Path::new(&root), apply)).await;
     match res {
         Ok(Ok(summary)) => CliResult::ok(json!({ "summary": summary })),

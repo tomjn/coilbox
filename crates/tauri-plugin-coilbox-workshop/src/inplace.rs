@@ -163,7 +163,8 @@ pub struct AcceptOutcome {
 }
 
 /// `game_dir` must be a loose `.sdd` directly in a `games` folder, the same
-/// rule `isEditInPlaceEligible` applies before the route is offered.
+/// rule `isEditInPlaceEligible` applies before the route is offered, and not
+/// one the distribution bundles.
 pub(crate) fn require_loose_game(game_dir: &Path) -> Result<(), String> {
     if !coilbox_gamebackup::is_sdd(game_dir) || !coilbox_gamebackup::in_games_dir(game_dir) {
         return Err(format!(
@@ -171,7 +172,7 @@ pub(crate) fn require_loose_game(game_dir: &Path) -> Result<(), String> {
             game_dir.display()
         ));
     }
-    Ok(())
+    coilbox_portable::refuse_in_bundle(game_dir)
 }
 
 /// A project path as the patcher's steps.
