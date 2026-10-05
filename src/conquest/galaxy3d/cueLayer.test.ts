@@ -71,7 +71,8 @@ const ridge: HeightGrid = {
 /**
  * Build the layers. With `paintTracks`, the crossings are planned up front
  * and their tracks to the shore go to a stand-in ground layer, whose styles
- * are recorded in `trackStyles` by state index from {@link FIRST_TRACK}.
+ * are recorded in `trackStyles` by state index from {@link FIRST_TRACK}, and
+ * the roads between provinces in `provinceRoadStyles`.
  */
 function build(
   doc: GalaxyDoc = galaxy,
@@ -127,6 +128,7 @@ function build(
   const dim = { lane: 1 };
   const plan = paintTracks ? planCrossings(doc, surface) : undefined;
   const trackStyles = new Map<number, RoadStyle>();
+  const provinceRoadStyles = new Map<number, RoadStyle>();
   const layer = buildCueLayer(
     scene,
     [],
@@ -157,7 +159,15 @@ function build(
       plan,
       ground: {
         firstExtra: FIRST_TRACK,
-        setRoadStyle: (k, style) => trackStyles.set(k, { ...style }),
+        provinceRoads: [
+          { a: "west", b: "mid" },
+          { a: "wall", b: "east" },
+        ],
+        firstProvince: FIRST_PROVINCE_ROAD,
+        setRoadStyle: (k, style) =>
+          (k >= FIRST_TRACK ? trackStyles : provinceRoadStyles).set(k, {
+            ...style,
+          }),
         commit: () => {},
       },
     },
@@ -230,6 +240,7 @@ function build(
     styleOf,
     plan,
     trackStyles,
+    provinceRoadStyles,
     locationStates,
     roadStates,
   };
@@ -238,6 +249,8 @@ function build(
 const GOLD = 0xffcf8a;
 /** Where the stand-in ground layer's tracks start in its road states. */
 const FIRST_TRACK = 100;
+/** The state index the stand-in ground layer gives its first province road. */
+const FIRST_PROVINCE_ROAD = 50;
 const GREEN = 0x46e08a;
 
 describe("buildCueLayer lines", () => {
@@ -595,6 +608,25 @@ describe("buildCueLayer under fog of war", () => {
     built.input.visible = new Set(["west", "mid"]);
     built.layer.apply();
     expect(built.roadStates.get("port fort")).toMatchObject({ hidden: true });
+  });
+
+  it("draws a road between provinces plain, and hides it when both are hidden", () => {
+    const built = build(galaxy, undefined, true);
+    built.input.visible = new Set(["west", "mid", "port"]);
+    built.layer.apply();
+    const westMid = built.provinceRoadStyles.get(FIRST_PROVINCE_ROAD);
+    const wallEast = built.provinceRoadStyles.get(FIRST_PROVINCE_ROAD + 1);
+    expect(westMid).toMatchObject({ shown: true, mode: ROAD_MODE.plain });
+    expect(wallEast?.shown).toBe(false);
+    // Contested or owned, it stays plain: the provinces say that.
+    built.input.visible = undefined;
+    built.layer.apply();
+    expect(built.provinceRoadStyles.get(FIRST_PROVINCE_ROAD + 1)).toMatchObject(
+      {
+        shown: true,
+        mode: ROAD_MODE.plain,
+      },
+    );
   });
 
   it("restores colour, cues and lines when the fog lifts, with no rebuild", () => {

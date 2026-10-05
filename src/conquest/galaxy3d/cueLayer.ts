@@ -136,7 +136,14 @@ export function buildCueLayer(
    */
   painted?: {
     plan: CrossingPlan;
-    ground: Pick<GroundLayer, "setRoadStyle" | "commit" | "firstExtra">;
+    ground: Pick<
+      GroundLayer,
+      | "setRoadStyle"
+      | "commit"
+      | "firstExtra"
+      | "provinceRoads"
+      | "firstProvince"
+    >;
   },
 ): CueLayer {
   const nodeIndex = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
@@ -208,6 +215,11 @@ export function buildCueLayer(
       trackIndices.set(key, list);
     });
   }
+  /** The painted road between two provinces' towns, as a road state index. */
+  const provinceRoadIndex = new Map<string, number>();
+  painted?.ground.provinceRoads.forEach(({ a, b }, j) => {
+    provinceRoadIndex.set(pairKey(a, b), painted.ground.firstProvince + j);
+  });
   const strip: CrossingStrip = {
     positions: [],
     tangents: [],
@@ -451,6 +463,22 @@ export function buildCueLayer(
           : undefined;
       if (link.kind === "road") {
         cities.setRoadState(link.a, link.b, state);
+        continue;
+      }
+      // A road between two provinces' towns is plain scenery. Their fills
+      // and border already say who owns what and where a run goes, so the
+      // road shows only fog and the lift of a hovered or selected end.
+      const between = provinceRoadIndex.get(pairKey(link.a, link.b));
+      if (painted && between !== undefined) {
+        painted.ground.setRoadStyle(
+          between,
+          roadStyle(
+            emphasised || hidden ? { emphasised, hidden } : undefined,
+            hidden ? 2 : 0,
+            undefined,
+            laneDim(link.a, link.b),
+          ),
+        );
         continue;
       }
       // A crossing's tracks to the shore are painted as roads, and take the
