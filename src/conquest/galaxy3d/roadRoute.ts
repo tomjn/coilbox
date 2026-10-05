@@ -28,8 +28,15 @@ export interface RouteGrid {
   /** Height of a white heightmap pixel in map units. */
   heightScale: number;
   height: Float32Array;
+  /** False for a map with no heightmap, which is all land. */
+  hasSea: boolean;
   /** A small seeded field from 0 to 1 that makes a route wander. */
   wander: Float32Array;
+  /**
+   * 1 for a cell beside a road already routed, 0 elsewhere. Written by
+   * {@link markRoad}, so roads routed later keep off the earlier ones.
+   */
+  taken: Uint8Array;
 }
 
 /** No more cells than this along the grid's longer side, to keep routing fast. */
@@ -52,6 +59,14 @@ const WANDER = 0.45;
 const WATER_COST = 60;
 /** Cells across one bump of the wander field. */
 const WANDER_CELLS = 14;
+/** The extra cost of a step beside a road already routed, as a share of its
+ * length. Two tracks side by side read as one confused road. */
+const BESIDE_ROAD = 1.5;
+/** Cells either side of a routed road that count as beside it. */
+const BESIDE_CELLS = 3;
+/** Cells round a road's ends left unmarked, since every road into a town
+ * meets the others there. */
+const END_CELLS = 8;
 
 /** A 32 bit integer hash of two cell coordinates and a seed. */
 function hash3(x: number, y: number, seed: number): number {
@@ -135,7 +150,9 @@ export function routeGrid(
     stepY: mapHeight / (rows - 1),
     heightScale,
     height,
+    hasSea: !!heights,
     wander: valueNoise(cols, rows, WANDER_CELLS, seed),
+    taken: new Uint8Array(cols * rows),
   };
 }
 
@@ -211,11 +228,15 @@ export function stepCost(grid: RouteGrid, from: number, to: number): number {
   const dy = (Math.floor(to / cols) - Math.floor(from / cols)) * stepY;
   const run = Math.sqrt(dx * dx + dy * dy);
   const h = height[to];
-  if (h < SEA_LEVEL) return run * WATER_COST;
+  if (grid.hasSea && h < SEA_LEVEL) return run * WATER_COST;
   const grade = (Math.abs(h - height[from]) * heightScale) / run;
   return (
     run *
-    (1 + GRADE_WEIGHT * grade * grade + HEIGHT_WEIGHT * h + WANDER * wander[to])
+    (1 +
+      GRADE_WEIGHT * grade * grade +
+      HEIGHT_WEIGHT * h +
+      WANDER * wander[to] +
+      BESIDE_ROAD * grid.taken[to])
   );
 }
 
@@ -333,9 +354,10 @@ function heightNear(grid: RouteGrid, [x, y]: MapXY): number {
 
 /**
  * Whether the straight line between points `first` and `last` of a route
- * climbs higher than the route does between them, or crosses water it does
- * not. A shortcut like that would carry a smoothed road over a shoulder of
- * the hill the route went round.
+ * climbs higher than the route does between them, or crosses water or runs
+ * beside another road where it does not. A shortcut like that would carry a
+ * smoothed road over a shoulder of the hill the route went round, or back
+ * alongside the road it kept off.
  */
 function shortcutClimbs(
   grid: RouteGrid,
@@ -345,10 +367,14 @@ function shortcutClimbs(
 ): boolean {
   let top = 0;
   let dry = true;
+  let clear = true;
   for (let k = first; k <= last; k++) {
     const h = heightNear(grid, line[k]);
     if (h > top) top = h;
-    if (h < SEA_LEVEL) dry = false;
+    if (grid.hasSea && h < SEA_LEVEL) dry = false;
+    if (k > first && k < last && grid.taken[cellAt(grid, line[k])]) {
+      clear = false;
+    }
   }
   const [ax, ay] = line[first];
   const [bx, by] = line[last];
@@ -356,8 +382,12 @@ function shortcutClimbs(
   const samples = Math.ceil(Math.hypot(bx - ax, by - ay) / (cell / 2));
   for (let s = 1; s < samples; s++) {
     const f = s / samples;
-    const h = heightNear(grid, [ax + (bx - ax) * f, ay + (by - ay) * f]);
-    if (h > top + CLIMB_ALLOWANCE || (dry && h < SEA_LEVEL)) return true;
+    const p: MapXY = [ax + (bx - ax) * f, ay + (by - ay) * f];
+    const h = heightNear(grid, p);
+    if (h > top + CLIMB_ALLOWANCE || (dry && grid.hasSea && h < SEA_LEVEL)) {
+      return true;
+    }
+    if (clear && grid.taken[cellAt(grid, p)]) return true;
   }
   return false;
 }
@@ -421,4 +451,32 @@ export function routeRoad(grid: RouteGrid, from: MapXY, to: MapXY): MapXY[] {
   // Rounding leaves many points along gentle curves. Thinning them to within
   // a fiftieth of a cell keeps the curve and makes the line cheap to draw.
   return simplifyLine(round, cell * 0.02);
+}
+
+/**
+ * Mark the cells beside a routed road as taken, so a road routed after it
+ * keeps a little way off. The cells round its two ends are left alone.
+ */
+export function markRoad(grid: RouteGrid, line: MapXY[]): void {
+  if (line.length === 0) return;
+  const { cols, rows, stepX, stepY, taken } = grid;
+  const first = line[0];
+  const last = line[line.length - 1];
+  const cell = Math.min(stepX, stepY);
+  const endReach = END_CELLS * cell;
+  for (const p of splitLong(line, cell / 2)) {
+    if (
+      Math.hypot(p[0] - first[0], p[1] - first[1]) < endReach ||
+      Math.hypot(p[0] - last[0], p[1] - last[1]) < endReach
+    ) {
+      continue;
+    }
+    const ci = Math.round(p[0] / stepX);
+    const cj = Math.round(p[1] / stepY);
+    for (let j = cj - BESIDE_CELLS; j <= cj + BESIDE_CELLS; j++) {
+      for (let i = ci - BESIDE_CELLS; i <= ci + BESIDE_CELLS; i++) {
+        if (i >= 0 && j >= 0 && i < cols && j < rows) taken[j * cols + i] = 1;
+      }
+    }
+  }
 }

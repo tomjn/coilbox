@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   cheapestCells,
   type MapXY,
+  markRoad,
   ROUTE_MAX_CELLS,
   roundCorners,
   routeGrid,
@@ -69,6 +70,9 @@ describe("routeGrid", () => {
   it("gives a map with no heightmap a flat grid", () => {
     expect(flat.cols).toBeGreaterThan(1);
     expect(flat.height.every((h) => h === 0)).toBe(true);
+    // All land, though every height is 0, which is the sea on a heightmap.
+    expect(flat.hasSea).toBe(false);
+    expect(ridge.hasSea).toBe(true);
   });
 });
 
@@ -140,5 +144,39 @@ describe("simplifyLine and roundCorners", () => {
     // The corner itself is cut off.
     expect(round).not.toContainEqual([10, 0]);
     expect(round.length).toBeGreaterThan(corner.length);
+  });
+});
+
+describe("markRoad", () => {
+  it("keeps a later road off an earlier one between the same towns", () => {
+    const g = routeGrid(MAP, MAP, 64, 1);
+    const first = routeRoad(g, [20, 300], [610, 300]);
+    markRoad(g, first);
+    const second = routeRoad(g, [20, 310], [610, 310]);
+    // Points every map unit along a line.
+    const dense = (line: MapXY[]) =>
+      line.flatMap((p, k): MapXY[] => {
+        if (k === 0) return [p];
+        const [qx, qy] = line[k - 1];
+        const n = Math.ceil(Math.hypot(p[0] - qx, p[1] - qy));
+        return Array.from(
+          { length: n },
+          (_, s): MapXY => [
+            qx + ((p[0] - qx) * (s + 1)) / n,
+            qy + ((p[1] - qy) * (s + 1)) / n,
+          ],
+        );
+      });
+    const a = dense(first);
+    // Away from the towns, the second road runs clear of the first.
+    const middle = dense(second).filter((p) => p[0] > 150 && p[0] < 480);
+    const nearest = Math.min(
+      ...middle.map((p) =>
+        Math.min(...a.map((q) => Math.hypot(p[0] - q[0], p[1] - q[1]))),
+      ),
+    );
+    expect(middle.length).toBeGreaterThan(100);
+    // More than the three cells either side that count as beside a road.
+    expect(nearest).toBeGreaterThan(3 * g.stepY);
   });
 });

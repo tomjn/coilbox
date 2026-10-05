@@ -1,7 +1,13 @@
 import type { GalaxyDoc, GalaxyNode } from "../model";
 import { hashString } from "./layout";
 import type { RoadLine, RoadSurface } from "./roadMask";
-import { type MapXY, type RouteGrid, routeGrid, routeRoad } from "./roadRoute";
+import {
+  type MapXY,
+  markRoad,
+  type RouteGrid,
+  routeGrid,
+  routeRoad,
+} from "./roadRoute";
 import { roadLinks } from "./roads";
 import type { HeightGrid } from "./terrain";
 
@@ -72,14 +78,19 @@ export function planRoads(
     const pos = nodes.get(id)?.pos ?? [0, 0];
     return [pos[0], pos[1]];
   };
-  return links.map(({ a, b }, index) => ({
-    line: routeRoad(grid, at(a), at(b)),
-    surface: roadSurface(
-      (id) => nodes.get(id)?.kind === "capital",
-      (id) => degrees.get(id) ?? 0,
-      a,
-      b,
-    ),
-    index,
-  }));
+  // In link order, each road keeping off the ones before it.
+  return links.map(({ a, b }, index) => {
+    const line = routeRoad(grid, at(a), at(b));
+    markRoad(grid, line);
+    return {
+      line,
+      surface: roadSurface(
+        (id) => nodes.get(id)?.kind === "capital",
+        (id) => degrees.get(id) ?? 0,
+        a,
+        b,
+      ),
+      index,
+    };
+  });
 }
