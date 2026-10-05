@@ -24,30 +24,22 @@ describe("edgeColor", () => {
   });
 });
 
-describe("the sea beyond a generated sheet", () => {
-  const surface = createTerrainSurface({ width: 1024, height: 1024 }, 100);
-  const build = (color: Parameters<typeof buildTerrainMesh>[3]) => {
+describe("the sea around a generated sheet", () => {
+  it("fills the scene's background with the colour of the sheet's edge", () => {
+    const surface = createTerrainSurface({ width: 1024, height: 1024 }, 100);
     const scene = new THREE.Scene();
     const disposables: { dispose(): void }[] = [];
-    buildTerrainMesh(scene, disposables, surface, color, { current: null });
+    buildTerrainMesh(scene, disposables, surface, framed(), {
+      current: null,
+    });
     for (const d of disposables) d.dispose();
-    return scene.getObjectByName("sea-beyond") as THREE.Mesh | undefined;
-  };
-
-  it("lies under the sheet, far past it, in the colour of its edge", () => {
-    const sea = build(framed());
-    if (!sea) throw new Error("expected a sea beyond the sheet");
-    expect(sea.position.y).toBeLessThan(0);
-    const geo = sea.geometry as THREE.PlaneGeometry;
-    expect(geo.parameters.width).toBeGreaterThan(surface.worldWidth * 10);
     const expected = new THREE.Color().setRGB(
       24 / 255,
       58 / 255,
       96 / 255,
       THREE.SRGBColorSpace,
     );
-    expect(
-      (sea.material as THREE.MeshBasicMaterial).color.equals(expected),
-    ).toBe(true);
+    expect(scene.background).toBeInstanceOf(THREE.Color);
+    expect((scene.background as THREE.Color).equals(expected)).toBe(true);
   });
 });

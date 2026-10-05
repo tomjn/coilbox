@@ -93,38 +93,20 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
   return [sum[0] / count, sum[1] / count, sum[2] / count];
 }
 
-/** How many times the sheet's longer side the sea beyond it reaches. */
-const SEA_BEYOND_SCALE = 40;
-/** How far under the sheet's sea level the sea beyond it lies, in world
- * units, so the two never fight over the same depth. */
-const SEA_BEYOND_DROP = 0.05;
-
 /**
- * A flat plane in the colour of the sheet's edge, laid under and around it,
- * so a generated land map sits in its own sea rather than in the page's
- * black. Level ground is shaded exactly 1, so the plane needs no lighting to
- * match the sheet's edge.
+ * Fill everything the scene does not draw with the colour of the sheet's
+ * edge, so a generated land map sits in its own sea rather than in the page's
+ * black, at any zoom or tilt. Level ground is shaded exactly 1, so the sea
+ * around the sheet matches the sea at its edge.
  */
-function buildSeaBeyond(
-  scene: THREE.Scene,
-  disposables: { dispose(): void }[],
-  surface: TerrainSurface,
-  pixels: ColorPixels,
-): void {
-  const size =
-    Math.max(surface.worldWidth, surface.worldDepth) * SEA_BEYOND_SCALE;
-  const geo = new THREE.PlaneGeometry(size, size);
+function fillWithSea(scene: THREE.Scene, pixels: ColorPixels): void {
   const [r, g, b] = edgeColor(pixels);
-  const mat = new THREE.MeshBasicMaterial();
-  mat.color.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
-  disposables.push(geo, mat);
-  const plane = new THREE.Mesh(geo, mat);
-  plane.name = "sea-beyond";
-  plane.rotation.x = -Math.PI / 2;
-  plane.position.y = -SEA_BEYOND_DROP;
-  // Decoration: picking goes to the sheet and what stands on it.
-  plane.raycast = () => {};
-  scene.add(plane);
+  scene.background = new THREE.Color().setRGB(
+    r / 255,
+    g / 255,
+    b / 255,
+    THREE.SRGBColorSpace,
+  );
 }
 
 function isColorPixels(source: TerrainColorSource): source is ColorPixels {
@@ -205,7 +187,7 @@ export function buildTerrainMesh(
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
-      buildSeaBeyond(scene, disposables, surface, color);
+      fillWithSea(scene, color);
     } else {
       tex = new THREE.CanvasTexture(color);
     }
