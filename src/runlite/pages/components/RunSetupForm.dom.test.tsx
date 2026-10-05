@@ -14,6 +14,11 @@ import {
 } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  installSettingsStorage,
+  memorySettingsStorage,
+  readStoredSetting,
+} from "../../../lib/storedSetting";
 import { LAND_RUN_SIZES, resolveRunMap } from "../../mapRun";
 import {
   emptyMeta,
@@ -28,6 +33,20 @@ const hoisted = vi.hoisted(() => ({
   error: null as string | null,
   maps: [] as { name: string; width: number; height: number }[],
   saved: [] as { id: string; run: unknown }[],
+  /** Games that are not installed, by name. */
+  uninstalled: [] as string[],
+  /** A distribution profile's game filter, or null for none. */
+  matcher: null as ((name: string) => boolean) | null,
+}));
+
+// The frame's `useSetting` is stood in for by the installed storage, so a value
+// written by one form is read by the next, as in the app.
+vi.mock("@picoframe/frame", async (orig) => ({
+  ...(await orig<typeof import("@picoframe/frame")>()),
+  useSetting: (key: string, fallback: unknown) => [
+    readStoredSetting(key, fallback),
+    (next: unknown) => storage.set(key, JSON.stringify(next)),
+  ],
 }));
 
 const GAMES: {
@@ -89,7 +108,10 @@ vi.mock("../../../play/config", () => ({
 }));
 vi.mock("../../../content/config", () => ({
   useUnitsyncScan: () => ({
-    data: { games: GAMES, maps: hoisted.maps },
+    data: {
+      games: GAMES.filter((g) => !hoisted.uninstalled.includes(g.name)),
+      maps: hoisted.maps,
+    },
     loading: false,
   }),
   useUnitsyncGameHeaders: () => ({ headers: new Map() }),
@@ -108,7 +130,7 @@ vi.mock("../../../content/mapEligibility", () => ({
   useMapEligibility: () => ({ eligible: (maps: unknown[]) => maps }),
 }));
 vi.mock("../../../profile/profile", () => ({
-  getGameMatcher: () => null,
+  getGameMatcher: () => hoisted.matcher,
   getProfile: () => ({}),
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
@@ -150,8 +172,13 @@ const loadouts = () =>
     .map((r) => r.textContent ?? "")
     .filter((t) => !LENGTHS.includes(t));
 
+let storage = memorySettingsStorage();
+
 beforeEach(() => {
-  localStorage.clear();
+  storage = memorySettingsStorage();
+  installSettingsStorage(storage);
+  hoisted.uninstalled = [];
+  hoisted.matcher = null;
   hoisted.loading = false;
   hoisted.error = null;
   hoisted.saved = [];
@@ -395,4 +422,67 @@ describe("RunSetupForm and the four map styles (issue #3507)", () => {
       }
     });
   }
+});
+
+describe("RunSetupForm and the last game (issue #3637)", () => {
+  const KEY = "warpath.setup.lastGame";
+  const ZK = "Zero-K v1.14.10.1";
+  const BA = "Balanced Annihilation V15.9.8";
+  // The loadouts differ per game, so they say which game the form is on.
+  const meta = {
+    ...emptyMeta,
+    games: {
+      ba: { ...emptyRecord, loadouts: ["vanguard"] },
+      zk: { ...emptyRecord, loadouts: ["air"] },
+    },
+  };
+  const onGame = () => (loadouts().includes("Air superiority") ? ZK : BA);
+
+  it("opens on the first game when nothing is remembered", () => {
+    show(meta);
+    expect(onGame()).toBe(BA);
+    expect(storage.get(KEY)).toBeNull();
+  });
+
+  it("remembers the game the player picks and opens on it next time", () => {
+    show(meta);
+    pick(ZK);
+    expect(storage.get(KEY)).toBe(JSON.stringify(ZK));
+    cleanup();
+    show(meta);
+    expect(onGame()).toBe(ZK);
+  });
+
+  it("falls back to the first game when the remembered one is not installed", () => {
+    storage.set(KEY, JSON.stringify(ZK));
+    hoisted.uninstalled = [ZK];
+    show(meta);
+    expect(onGame()).toBe(BA);
+  });
+
+  it("falls back to the first game when a profile filter hides the remembered one", () => {
+    storage.set(KEY, JSON.stringify(ZK));
+    hoisted.matcher = (name) => name !== ZK;
+    show(meta);
+    expect(onGame()).toBe(BA);
+  });
+
+  it("prefers a game named by the caller over the remembered one", () => {
+    storage.set(KEY, JSON.stringify(ZK));
+    hoisted.meta = meta;
+    render(<RunSetupForm onStarted={() => {}} initialGameName={BA} />);
+    expect(onGame()).toBe(BA);
+  });
+
+  it("remembers the game a run was begun in, even when it was never picked", async () => {
+    hoisted.meta = meta;
+    hoisted.maps = [{ name: "Comet Catcher Remake", width: 16, height: 16 }];
+    render(<RunSetupForm onStarted={() => {}} initialGameName={ZK} />);
+    expect(storage.get(KEY)).toBeNull();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Begin warpath/ }));
+    });
+    expect(storage.get(KEY)).toBe(JSON.stringify(ZK));
+    hoisted.maps = [];
+  });
 });

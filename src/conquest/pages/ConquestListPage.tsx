@@ -1,4 +1,11 @@
-import { Button, buttonVariants, cn, Input, useDrawer } from "@picoframe/frame";
+import {
+  Button,
+  buttonVariants,
+  cn,
+  Input,
+  useDrawer,
+  useSetting,
+} from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   ChevronRight,
@@ -1133,6 +1140,9 @@ interface LandPreview {
   terrain: GeneratedTerrain | null;
 }
 
+/** Where the wizard keeps the game it was last used with. */
+const LAST_GAME_KEY = "conquest.generate.lastGame";
+
 /** What makes two installed archives the same game in the wizard: the modinfo
  * shortname and the name without its version. */
 function gameChoiceKey(g: {
@@ -1212,15 +1222,24 @@ function GenerateGalaxyForm({
   }, [scan.data, handmade]);
 
   const [gameShort, setGameShort] = useState("");
+  // The game this form was last used with, as a `gameChoiceKey`. A frame
+  // setting like the host form's, kept apart from Warpath's own.
+  const [lastGame, setLastGame] = useSetting(LAST_GAME_KEY, "");
   // Default to the preselected game (if it matches one on offer), else the
-  // first game, so the create button is never a silent dead-end. The user
-  // can still switch games via the select.
+  // last game used (if it is still on offer), else the first game, so the
+  // create button is never a silent dead-end. The user can still switch games
+  // via the select.
   const selected =
     gameChoices.find((g) => gameChoiceKey(g) === gameShort) ??
     (initialGameName
       ? gameChoices.find((g) => g.name === initialGameName)
       : undefined) ??
+    gameChoices.find((g) => gameChoiceKey(g) === lastGame) ??
     gameChoices[0];
+  const chooseGame = (key: string) => {
+    setGameShort(key);
+    setLastGame(key);
+  };
   const effectiveShort = selected
     ? (selected.info.shortname ?? selected.name).trim()
     : "";
@@ -1437,6 +1456,9 @@ function GenerateGalaxyForm({
       const id = `generated-${crypto.randomUUID()}`;
       const doc = generateMap(genOptions(id));
       await conquestSave({ id, json: JSON.stringify(doc) });
+      // A game reached from game detail is remembered too, not only one picked
+      // in the select.
+      setLastGame(gameChoiceKey(selected));
       await refreshGalaxies();
       onCreated(id);
     } catch (e) {
@@ -1456,7 +1478,7 @@ function GenerateGalaxyForm({
               <span className="font-medium">Game</span>
               <OptionSelect
                 value={selected ? gameChoiceKey(selected) : ""}
-                onValueChange={setGameShort}
+                onValueChange={chooseGame}
                 placeholder={scan.loading ? "Scanning…" : "Pick a game"}
                 options={gameChoices.map((g) => ({
                   value: gameChoiceKey(g),

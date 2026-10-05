@@ -36,6 +36,8 @@ vi.mock("@picoframe/frame", async (orig) => ({
     },
     close: vi.fn(),
   }),
+  // The frame's settings need its provider. The form reads a last game from them.
+  useSetting: (_key: string, fallback: unknown) => [fallback, () => {}],
 }));
 // The registry select opens a popover, which is more than these tests need to
 // drive. A native one takes the same props.
