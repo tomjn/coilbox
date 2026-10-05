@@ -77,6 +77,11 @@ export function buildGroundLayer(
    * where towns are drawn, since the roads run from town to town.
    */
   provinceRoads = false,
+  /**
+   * Border links between provinces that do not touch, over dry land, which
+   * are roads as well. See `CrossingPlan.landLinks`.
+   */
+  landLinks: readonly RoadLink[] = [],
 ): GroundLayer {
   const grid = routeGrid(
     surface.width,
@@ -95,7 +100,7 @@ export function buildGroundLayer(
   );
   const firstProvince = linkRoads.length;
   const between = provinceRoads
-    ? planProvinceRoads(galaxy, grid, firstProvince)
+    ? planProvinceRoads(galaxy, grid, firstProvince, landLinks)
     : { links: [], roads: [] };
   const firstExtra = firstProvince + between.roads.length;
   const planned = [

@@ -162,6 +162,7 @@ function build(
         provinceRoads: [
           { a: "west", b: "mid" },
           { a: "wall", b: "east" },
+          ...plan.landLinks,
         ],
         firstProvince: FIRST_PROVINCE_ROAD,
         setRoadStyle: (k, style) =>
@@ -715,6 +716,54 @@ describe("buildCueLayer on a Warpath run", () => {
       travelled: true,
       attackable: false,
     });
+  });
+});
+
+describe("buildCueLayer over a generated coast, for links between provinces that do not touch", () => {
+  // Land in the top two and bottom two rows of a 3 by 9 heightmap, and sea
+  // from the third row to the seventh.
+  const rows = [1, 1, 0, 0, 0, 0, 0, 1, 1];
+  const shores: HeightGrid = {
+    data: new Float32Array(rows.flatMap((h) => [h, h, h])),
+    width: 3,
+    height: 9,
+  };
+  const doc = (links: [string, string][]) =>
+    ({
+      ...galaxy,
+      nodes: [
+        node("west", "red", [15, 5], [rect(0, 0, 30, 10)]),
+        node("east", "blue", [65, 5], [rect(50, 0, 30, 10)]),
+        node("south", "blue", [15, 95], [rect(0, 90, 30, 10)]),
+      ],
+      links,
+      linkKinds: undefined,
+      blockedBorders: undefined,
+      terrain: {
+        image: "generated:cities",
+        heightmap: "generated:cities",
+        width: 100,
+        height: 100,
+      },
+    }) as unknown as GalaxyDoc;
+
+  it("draws no sea lane over dry land, and leaves the link to a road", () => {
+    const { layer, plan } = build(doc([["west", "east"]]), shores, true);
+    expect(layer.lines).toEqual([]);
+    expect(plan?.landLinks).toEqual([{ a: "west", b: "east" }]);
+  });
+
+  it("styles the road of such a link as the link, as a crossing's tracks are", () => {
+    const { provinceRoadStyles } = build(doc([["west", "east"]]), shores, true);
+    const style = provinceRoadStyles.get(FIRST_PROVINCE_ROAD + 2);
+    expect(style?.mode).toBe(ROAD_MODE.glow);
+    expect(style?.color.getHex()).toBe(GOLD);
+  });
+
+  it("still draws a sea lane where the line crosses water", () => {
+    const { layer, plan } = build(doc([["west", "south"]]), shores, true);
+    expect(layer.lines.map((l) => l.type)).toEqual(["crossing"]);
+    expect(plan?.landLinks).toEqual([]);
   });
 });
 

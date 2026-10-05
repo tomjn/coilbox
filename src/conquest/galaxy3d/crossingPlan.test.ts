@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
+import { generatedTerrain, generateTerritories } from "../territories";
 import { coastOf, planCrossings } from "./crossingPlan";
 import { buildGroundLayer } from "./groundLayer";
 import { createProvinceIndex, type Ring } from "./provinces";
@@ -74,6 +75,89 @@ describe("coastOf", () => {
   it("finds no coast on a map with neither", () => {
     const doc = { ...generated, handmade: {} } as unknown as GalaxyDoc;
     expect(coastOf(doc, surfaceOf(shores), undefined)).toBeUndefined();
+  });
+});
+
+describe("planCrossings, links between provinces that do not touch", () => {
+  const province = (id: string, x: number, y: number) =>
+    node(id, [x + 15, y + 5], [rect(x, y, 30, 10)]);
+  const doc = (links: [string, string][]) =>
+    ({
+      ...generated,
+      nodes: [
+        province("west", 0, 0),
+        province("east", 50, 0),
+        province("south", 0, 90),
+        province("next", 30, 0),
+      ],
+      links,
+      linkKinds: [],
+    }) as unknown as GalaxyDoc;
+
+  it("makes a road of a border link with dry land between", () => {
+    const plan = planCrossings(doc([["west", "east"]]), surfaceOf(shores));
+    expect(plan.landLinks).toEqual([{ a: "west", b: "east" }]);
+    expect(plan.crossings.size).toBe(0);
+  });
+
+  it("leaves a border link with water between to the sea lane", () => {
+    const plan = planCrossings(doc([["west", "south"]]), surfaceOf(shores));
+    expect(plan.landLinks).toEqual([]);
+  });
+
+  it("leaves provinces that touch to their border", () => {
+    const plan = planCrossings(doc([["west", "next"]]), surfaceOf(shores));
+    expect(plan.landLinks).toEqual([]);
+  });
+
+  it("leaves a link of kind crossing to the sea route", () => {
+    const linked = {
+      ...doc([["west", "east"]]),
+      linkKinds: [["west", "east", "crossing"]],
+    } as unknown as GalaxyDoc;
+    expect(planCrossings(linked, surfaceOf(shores)).landLinks).toEqual([]);
+  });
+});
+
+describe("planCrossings on a generated Territories map", () => {
+  // Issue 3679: on this map two provinces linked as borders meet at a corner
+  // and share no edge, with land all the way between them.
+  it("makes a road of the link between provinces that only meet at a corner", () => {
+    const maps = Array.from({ length: 12 }, (_, i) => ({
+      name: `Map ${i}`,
+      width: 4 + i,
+      height: 4 + i,
+    }));
+    const doc = generateTerritories(
+      {
+        seed: 21,
+        game: { shortname: "TG" },
+        maps,
+        nodeCount: 160,
+        factionCount: 2,
+        layout: "continent",
+      },
+      "2026-01-01T00:00:00.000Z",
+    );
+    const terrain = generatedTerrain(doc);
+    if (!terrain) throw new Error("a generated map has generated terrain");
+    const heights: HeightGrid = {
+      data: Float32Array.from(terrain.heightmap, (h) => h / 255),
+      width: terrain.width,
+      height: terrain.height,
+    };
+    const surface = createTerrainSurface(
+      {
+        width: terrain.mapWidth,
+        height: terrain.mapHeight,
+        heightScale: terrain.heightScale,
+      },
+      200,
+      heights,
+    );
+    const plan = planCrossings(doc, surface);
+    expect(plan.landLinks).toEqual([{ a: "node-54", b: "node-105" }]);
+    expect(plan.crossings.size).toBe(0);
   });
 });
 

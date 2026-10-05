@@ -1,14 +1,16 @@
 import type { GalaxyDoc, GalaxyNode } from "../model";
+import { sharedBorderLines } from "./cueLines";
 import { linkCueKind } from "./mapCues";
 import {
   BORDER_TOLERANCE_FRACTION,
   type MapPoint,
   type ProvinceIndex,
+  provinceBorders,
   provinceIndexFor,
 } from "./provinces";
 import type { RoadLine } from "./roadMask";
-import { pairKey } from "./roads";
-import { type SeaRoute, seaRoute } from "./seaRoute";
+import { pairKey, type RoadLink } from "./roads";
+import { isDryLine, type SeaRoute, seaRoute } from "./seaRoute";
 import type { TerrainSurface } from "./terrain";
 
 /**
@@ -78,6 +80,12 @@ export interface CrossingPlan {
    * to, so its state can follow the crossing's.
    */
   tracks: (Omit<RoadLine, "index"> & { a: string; b: string })[];
+  /**
+   * Border links between two provinces that share no edge to draw a border
+   * on, with only dry land along the line between them. They are neither a
+   * border nor a crossing, so the ground layer paints each as a road.
+   */
+  landLinks: RoadLink[];
 }
 
 /** Plan every link of `galaxy` that is drawn as a crossing. */
@@ -91,9 +99,18 @@ export function planCrossings(
   const kinds = new Map(
     (galaxy.linkKinds ?? []).map(([a, b, kind]) => [pairKey(a, b), kind]),
   );
-  const coast = coastOf(galaxy, surface, provinceIndexFor(galaxy));
+  const index = provinceIndexFor(galaxy);
+  const coast = coastOf(galaxy, surface, index);
+  const borders = index
+    ? provinceBorders(
+        index,
+        Math.max(surface.width, surface.height) * BORDER_TOLERANCE_FRACTION,
+      )
+    : [];
+  const nodeIndex = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
   const crossings = new Map<string, PlannedCrossing>();
   const tracks: CrossingPlan["tracks"] = [];
+  const landLinks: RoadLink[] = [];
   for (const [a, b] of galaxy.links) {
     const nodeA = nodes.get(a);
     const nodeB = nodes.get(b);
@@ -103,9 +120,24 @@ export function planCrossings(
       !nodeA.outline,
       !nodeB.outline,
     );
-    if (kind !== "crossing") continue;
     const from: MapPoint = [nodeA.pos[0], nodeA.pos[1]];
     const to: MapPoint = [nodeB.pos[0], nodeB.pos[1]];
+    if (kind === "border") {
+      // Two provinces linked as neighbours that share no edge: the cue layer
+      // has no border to draw, and would draw a sea lane. Where the land
+      // between them is dry that is wrong, and the link is a road.
+      const ia = nodeIndex.get(a) ?? -1;
+      const ib = nodeIndex.get(b) ?? -1;
+      if (
+        coast &&
+        sharedBorderLines(borders, ia, ib).length === 0 &&
+        isDryLine(from, to, coast.isLand, coast.step)
+      ) {
+        landLinks.push({ a, b });
+      }
+      continue;
+    }
+    if (kind !== "crossing") continue;
     const route = coast && seaRoute(from, to, coast.isLand, coast.step);
     crossings.set(pairKey(a, b), { a, b, route });
     if (!route) continue;
@@ -114,5 +146,5 @@ export function planCrossings(
       tracks.push({ line: [p, q], surface: "track", a, b });
     }
   }
-  return { crossings, tracks };
+  return { crossings, tracks, landLinks };
 }

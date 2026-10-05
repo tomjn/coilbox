@@ -604,6 +604,7 @@ export function GalaxyView({
             }
           : undefined,
         drawTowns,
+        crossingPlan?.landLinks,
       );
       if (planned.towns) {
         towns = buildTownLayer(
