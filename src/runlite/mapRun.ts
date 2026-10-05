@@ -541,14 +541,14 @@ export function runNodeScenario(
  * decides how long a land run is, so these are the smallest sizes whose routes
  * come out at the column runs of 6, 9 and 13. Measured over seeds 1 to 200
  * with the layout left to the seed and the retry below in place, the median
- * route was 6, 9 and 13 locations long on Cities maps of 12, 22 and 48, and on
+ * route was 6, 9 and 13 locations long on Cities maps of 12, 24 and 48, and on
  * Territories maps of 14, 32 and 72.
  */
 export const LAND_RUN_SIZES: Record<
   "cities" | "territories",
   Record<RunLength, number>
 > = {
-  cities: { quick: 12, standard: 22, long: 48 },
+  cities: { quick: 12, standard: 24, long: 48 },
   territories: { quick: 14, standard: 32, long: 72 },
 };
 
@@ -556,11 +556,11 @@ export const LAND_RUN_SIZES: Record<
  * How many maps {@link generateStyledRun} builds before it accepts a run with
  * no choice of route. A small land map is often close to a tree, where no two
  * of the furthest locations have two ways between them. Over seeds 1 to 200
- * that was 40 first maps of 14 provinces, 9 of 32 and none of 72, and 83
- * first maps of 12 cities, 33 of 22 and 9 of 48. The most maps any of those
- * 1200 runs needed was 6. At the worst rate, 83 in 200, sixteen maps in a row
- * fail about once in a million runs, so the limit is there to end the loop and
- * not to be met.
+ * that was 30 first maps of 14 provinces, 3 of 32 and none of 72, and 66
+ * first maps of 12 cities, 24 of 24 and 10 of 48. The most maps any of those
+ * 1200 runs needed was 6. At the worst rate, 66 in 200, sixteen maps in a row
+ * fail about once in fifty million runs, so the limit is there to end the loop
+ * and not to be met.
  */
 const LAND_MAP_TRIES = 16;
 

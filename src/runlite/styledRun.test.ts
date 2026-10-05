@@ -134,7 +134,7 @@ describe("the choice of route on a generated land map", () => {
   // and so ended on a later one. A small land map is often close
   // to a tree, and across a tree there is one way between any two places.
   const SWAPPED = {
-    cities: { quick: 4, standard: 2, long: 0 },
+    cities: { quick: 2, standard: 1, long: 1 },
     territories: { quick: 2, standard: 1, long: 0 },
   };
 
