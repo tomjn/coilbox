@@ -40,7 +40,7 @@ The heightmap writes six land values from 36 to 219 out of 255, and sea is 0. Wi
 
 The sample is for the game with `game.shortname` `TG`, a test game. To point it at another game, change `game.shortname` in `map.json`. The `battle` fields name maps, so change those to maps the new game's players have. The scenario was exported for `TG`, and a scenario must be for the same game as the map, so export your own from the scenario builder and name it in `scenario`.
 
-The sample has no model of the `game` kind, which would be `{ "game": "<model name>" }` in `models`. No model name for `TG` can be confirmed from this repository, so none is listed. Issue #3597 tracks adding one.
+The sample has no model of the `game` kind, which would be `{ "game": "<name>" }` in `models`. The name can be a path inside the game archive, a model file name, a unit name or a feature name the game defines, tried in that order. No model name for `TG` can be confirmed from this repository, so none is listed. Issue #3597 tracks adding one.
 
 ## Where the art comes from
 
