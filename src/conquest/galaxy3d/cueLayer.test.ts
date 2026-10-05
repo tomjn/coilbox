@@ -102,6 +102,7 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
       new THREE.MeshBasicMaterial(),
       doc.nodes.length,
     ),
+    { setRoadStyle: () => {}, commit: () => {} },
   );
   // Record what the cue layer tells the other two.
   const locationStates = new Map<string, MapItemState | undefined>();

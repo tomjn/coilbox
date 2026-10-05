@@ -3,13 +3,9 @@ import type { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import type { GalaxyDoc } from "../model";
 import { NEUTRAL } from "../model";
 import { factionSides } from "./factionShape";
-import {
-  type MapPoint,
-  pairKey,
-  roadLinks,
-  roadRibbon,
-  sampleRoadPath,
-} from "./roads";
+import type { GroundLayer, RoadStyle } from "./groundLayer";
+import { ROAD_MODE } from "./groundShader";
+import { pairKey, roadLinks } from "./roads";
 import {
   GALAXY_MAX_DISTANCE,
   MARKER_LIFT,
@@ -21,7 +17,8 @@ import {
  * no outline: a city, a base, a landing site. Each one draws as a block
  * standing on the ground at its anchor, in its owner's colour and its owner's
  * faction shape, and a capital carries a second, white-topped tier. The links
- * `roadLinks` picks out draw as roads that follow the ground.
+ * `roadLinks` picks out are painted into the ground as tracks by
+ * `groundLayer.ts`, and this layer gives each one its state there.
  *
  * Nothing here is built for a galaxy or theatre map, and a node with an
  * outline is left to the province drawing.
@@ -57,16 +54,17 @@ const LABEL_GAP = 0.5;
 const WHITE = new THREE.Color(0xffffff);
 /** A location or road hidden by fog: no owner shows through. */
 const HIDDEN_COLOR = new THREE.Color(0x565c68);
-/** A road whose ends do not share an owner. */
-const ROAD_NEUTRAL_COLOR = new THREE.Color(0xe2dccb);
+/** Edge lines on a plain road while one of its ends is hovered. */
+const ROAD_LIFT_COLOR = new THREE.Color(0xf4efe2);
 /** The warm gold the galaxy's contested lanes use. */
 const ATTACKABLE_COLOR = new THREE.Color(0xffcf8a);
 /** The amber of the incursion warning marker. */
 const THREATENED_COLOR = new THREE.Color(0xffb020);
 /** The green of the galaxy's path already travelled. */
 const TRAVELLED_COLOR = new THREE.Color(0x46e08a);
-const ROAD_OPACITY = 0.6;
-const ROAD_OWNED_OPACITY = 0.9;
+const ROAD_OWNED_STRENGTH = 0.9;
+/** How strongly a plain road's edges show per unit of hover lift. */
+const ROAD_LIFT_STRENGTH = 0.8;
 
 /**
  * A visual state for one location or one road, set by the attack cues (#3502)
@@ -145,6 +143,8 @@ export function buildCityLayer(
   labelObjects: CSS2DObject[],
   /** The view's hit targets, one instance per node. */
   cores: THREE.InstancedMesh,
+  /** Where the roads are painted, and their state with them. */
+  ground: Pick<GroundLayer, "setRoadStyle" | "commit">,
 ): CityLayer {
   const nodeById = new Map(galaxy.nodes.map((n) => [n.id, n]));
   const ownerOf = (id: string): string =>
@@ -299,76 +299,24 @@ export function buildCityLayer(
   /* -------------------------------- roads -------------------------------- */
 
   const roads = roadLinks(galaxy);
-  // `roadLinks` only returns links whose two nodes exist.
-  const anchorOf = (id: string): MapPoint => {
-    const pos = nodeById.get(id)?.pos ?? [0, 0];
-    return [pos[0], pos[1]];
-  };
-  const ribbon = roadRibbon(
-    surface,
-    roads.map((r) => sampleRoadPath(surface, anchorOf(r.a), anchorOf(r.b))),
-  );
-  // Red, green, blue and opacity per vertex, rewritten by `styleRoads`. The
-  // positions never change.
-  const roadColors = new THREE.BufferAttribute(
-    new Float32Array((ribbon.positions.length / 3) * 4),
-    4,
-  );
-  if (roads.length > 0) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute(
-      "position",
-      new THREE.BufferAttribute(ribbon.positions, 3),
-    );
-    geo.setAttribute("color", roadColors);
-    geo.setIndex(new THREE.BufferAttribute(ribbon.indices, 1));
-    const mat = new THREE.MeshBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      // Drawn just over the ground it lies on, and still hidden by a hill
-      // that stands in front of it.
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-    });
-    disposables.push(geo, mat);
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = "roads";
-    mesh.raycast = () => {};
-    scene.add(mesh);
-  }
 
   const styleRoads = () => {
     roads.forEach(({ a, b }, k) => {
-      const state = roadStates.get(pairKey(a, b));
       const hiddenEnds = (isHidden(a) ? 1 : 0) + (isHidden(b) ? 1 : 0);
-      let color = ROAD_NEUTRAL_COLOR;
-      let opacity = 0;
-      if (!state?.hidden && hiddenEnds < 2) {
-        const owner = ownerOf(a);
-        const shared =
-          hiddenEnds === 0 && owner === ownerOf(b) && owner !== NEUTRAL;
-        opacity = shared ? ROAD_OWNED_OPACITY : ROAD_OPACITY;
-        if (shared) color = ownerColor(owner);
-        if (state?.attackable) {
-          color = ATTACKABLE_COLOR;
-          opacity = ROAD_OWNED_OPACITY;
-        }
-        if (state?.travelled) {
-          color = TRAVELLED_COLOR;
-          opacity = ROAD_OWNED_OPACITY;
-        }
-        if (state?.emphasised) opacity = 1;
-        opacity = Math.min(1, opacity * laneDim(a, b));
-      }
-      const [start, count] = ribbon.ranges[k];
-      for (let v = start; v < start + count; v++) {
-        roadColors.setXYZW(v, color.r, color.g, color.b, opacity);
-      }
+      const owner = ownerOf(a);
+      const shared =
+        hiddenEnds === 0 && owner === ownerOf(b) && owner !== NEUTRAL;
+      ground.setRoadStyle(
+        k,
+        roadStyle(
+          roadStates.get(pairKey(a, b)),
+          hiddenEnds,
+          shared ? ownerColor(owner) : undefined,
+          laneDim(a, b),
+        ),
+      );
     });
-    roadColors.needsUpdate = true;
+    ground.commit();
   };
 
   /* ------------------------------ hit targets ---------------------------- */
@@ -437,4 +385,52 @@ export function buildCityLayer(
       else roadStates.delete(pairKey(a, b));
     },
   };
+}
+
+/**
+ * How a road is drawn for its state. `hiddenEnds` counts its ends hidden by
+ * fog, `owner` is the colour of the owner its two ends share, if they do, and
+ * `dim` is the lane dimming the view passes in, above 1 while an end is
+ * hovered.
+ *
+ * Each state draws differently as well as in its own colour: an owned road has
+ * thin edge lines, one that can be attacked along glows, and one already
+ * travelled is filled in. A road with both ends hidden is not drawn.
+ */
+export function roadStyle(
+  state: MapItemState | undefined,
+  hiddenEnds: number,
+  owner: THREE.Color | undefined,
+  dim: number,
+): RoadStyle {
+  const shown = !state?.hidden && hiddenEnds < 2;
+  const style: RoadStyle = {
+    shown,
+    mode: ROAD_MODE.plain,
+    color: ROAD_LIFT_COLOR,
+    strength: 0,
+    emphasised: !!state?.emphasised,
+  };
+  if (!shown) return style;
+  if (state?.travelled) {
+    style.mode = ROAD_MODE.filled;
+    style.color = TRAVELLED_COLOR;
+    style.strength = 1;
+  } else if (state?.attackable) {
+    style.mode = ROAD_MODE.glow;
+    style.color = ATTACKABLE_COLOR;
+    style.strength = 1;
+  } else if (owner) {
+    style.mode = ROAD_MODE.edges;
+    style.color = owner;
+    style.strength = ROAD_OWNED_STRENGTH;
+  } else if (state?.emphasised || dim > 1) {
+    // A plain road comes forward with its selected or hovered end.
+    style.mode = ROAD_MODE.edges;
+    style.strength = state?.emphasised ? 1 : (dim - 1) * ROAD_LIFT_STRENGTH;
+    return style;
+  }
+  if (state?.emphasised) style.strength = 1;
+  style.strength = Math.min(1, style.strength * dim);
+  return style;
 }
