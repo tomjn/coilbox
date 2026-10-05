@@ -213,7 +213,10 @@ const FRAGMENT_BODY = /* glsl */ `
         float reach = 0.45 + 0.25 * cell.w - thin * 0.25;
         float dome = 1.0 - smoothstep(0.05, reach, cell.x);
         float tone = (cell.w - 0.5) * 0.35;
-        shadeMul += wForest * keep * ((dome - 0.6) * (k == 0 ? 0.45 : 0.4) + tone * dome);
+        // Clumps light and shade both ways. Single crowns mostly darken their
+        // gaps, since bright tops on that scale read as a scatter of dots.
+        float lift = k == 0 ? (dome - 0.6) * 0.45 : (dome - 0.85) * 0.4;
+        shadeMul += wForest * keep * (lift + tone * dome);
         bump += wForest * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.12 : 0.05);
       }
       // Clearings show grass between the trees.
