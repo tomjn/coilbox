@@ -194,7 +194,9 @@ pub fn free_space(path: &std::path::Path) -> std::io::Result<u64> {
     #[cfg(not(any(unix, windows)))]
     {
         let _ = path;
-        Err(std::io::Error::other("free space is unknown on this platform"))
+        Err(std::io::Error::other(
+            "free space is unknown on this platform",
+        ))
     }
 }
 
