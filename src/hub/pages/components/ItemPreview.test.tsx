@@ -244,3 +244,35 @@ describe("ItemPreview, for a setup pack", () => {
     expect(html).not.toContain("Whatever you have");
   });
 });
+
+describe("a warpath run across a land map (issue #3582)", () => {
+  const land = (style: string): Container => ({
+    format: "coilbox",
+    container: 1,
+    kind: "challenge",
+    kindVersion: 1,
+    payload: {
+      mode: "warpath",
+      settings: {
+        seed: 7,
+        length: "quick",
+        difficulty: 3,
+        ascension: 0,
+        game: { shortname: "sf" },
+        factionId: "arm",
+        map: { source: "generated", style, seed: 11, nodeCount: 12 },
+      },
+    },
+  });
+
+  it.each([
+    "cities",
+    "territories",
+  ])("draws the route on the %s land", (style) => {
+    const html = markup(land(style));
+    expect(html).toContain('data-part="land"');
+    expect(html).toContain('data-part="route"');
+    expect(html).toContain("from the start to the boss");
+    expect(html).toContain("Boss");
+  });
+});

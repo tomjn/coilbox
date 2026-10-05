@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 /**
- * The Conquest "Generate a map" form for a game that depends on an archive
- * that is not installed (issue #3489). Creating a map is not a launch, so the
- * form stays usable, but it says the game cannot launch yet.
+ * The Conquest "Generate a map" form while the game's skirmish AI list is
+ * loading or has failed (issue #3613). Neither reads as "no skirmish AIs".
  */
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -12,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   drawerContent: null as unknown,
   games: [] as unknown[],
+  ais: { ais: [] as unknown[], loaded: false, failed: false },
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -66,11 +66,7 @@ vi.mock("../../play/config", () => ({
   usePreferredTarget: () => ({
     target: { enginePath: "/engine", dataDir: "/data" },
   }),
-  useSkirmishAis: () => ({
-    ais: [{ shortName: "NullAI", version: "1", name: "NullAI" }],
-    loading: false,
-    loaded: true,
-  }),
+  useSkirmishAis: () => ({ loading: false, ...h.ais }),
 }));
 vi.mock("../conquests", () => ({
   refreshGalaxies: vi.fn(),
@@ -100,11 +96,10 @@ vi.mock("../useUnlocks", () => ({
 
 import ConquestListPage from "./ConquestListPage";
 
-const game = (missingDependencies?: string[]) => ({
+const game = () => ({
   name: "Cool Game v1",
   info: { shortname: "CG", version: "v1" },
   primaryArchive: { name: "Cool Game v1" },
-  missingDependencies,
 });
 
 function openForm(games: unknown[]) {
@@ -120,23 +115,39 @@ function openForm(games: unknown[]) {
 
 beforeEach(() => {
   h.drawerContent = null;
+  h.ais = { ais: [], loaded: false, failed: false };
 });
 afterEach(cleanup);
 
-describe("Conquest generate form and a missing dependency archive", () => {
-  it("names the missing archive and still lets the player create the map", () => {
-    openForm([game(["base-content"])]);
-    expect(
-      screen.getByText(/Archive not installed: base-content\. Cool Game v1/),
-    ).toBeTruthy();
-    const create = screen.getByRole("button", { name: "Create map" });
-    expect((create as HTMLButtonElement).disabled).toBe(false);
+const NO_AIS = /This game has no skirmish AIs/;
+
+describe("Conquest generate form and the skirmish AI list", () => {
+  it("says the list is loading, not that the game has no AIs", () => {
+    openForm([game()]);
+    expect(screen.getByText(/Loading this game's skirmish AIs/)).toBeTruthy();
+    expect(screen.queryByText(NO_AIS)).toBeNull();
   });
 
-  it("says nothing when no dependency is missing", () => {
-    openForm([game(undefined)]);
+  it("says the list could not be read when the query failed", () => {
+    h.ais = { ais: [], loaded: true, failed: true };
+    openForm([game()]);
+    expect(screen.getByText(/could not be listed/)).toBeTruthy();
+    expect(screen.queryByText(NO_AIS)).toBeNull();
+  });
+
+  it("says the game has no AIs once an empty list has loaded", () => {
+    h.ais = { ais: [], loaded: true, failed: false };
+    openForm([game()]);
+    expect(screen.getByText(NO_AIS)).toBeTruthy();
+  });
+
+  it("shows the form once the AIs have loaded", () => {
+    h.ais = {
+      ais: [{ shortName: "NullAI", version: "1", name: "NullAI" }],
+      loaded: true,
+      failed: false,
+    };
+    openForm([game()]);
     expect(screen.getByRole("button", { name: "Create map" })).toBeTruthy();
-    expect(screen.queryByText(/Archive not installed/)).toBeNull();
-    expect(screen.queryByText(/missing something it depends on/)).toBeNull();
   });
 });

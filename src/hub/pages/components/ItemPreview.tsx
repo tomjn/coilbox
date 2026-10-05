@@ -186,8 +186,13 @@ const LAND = "#769852";
 export function Galaxy({
   shape,
   className = "mx-auto w-full max-w-md",
+  route,
 }: {
   shape: GalaxyShape;
+  /** A warpath run across this land map. Its route is drawn on the land, its
+   * stops in the colours of {@link RunMap}, and the rest of the map is dimmed
+   * scenery with no owners. */
+  route?: RunShape;
   // Capped rather than full width by default. The shape is square, so at the
   // column's own width it would be taller than the screen and read as a chart
   // rather than a picture of the thing being shared. A card's fixed box calls
@@ -202,6 +207,7 @@ export function Galaxy({
   const held = shape.systems.filter((s) => s.faction !== null).length;
   const { land } = shape;
   const noun = locationNoun(shape.skin).many;
+  const routeIds = new Set(route?.steps.map((step) => step.id));
 
   if (land) {
     // The land fills the box edge to edge, so nothing is inset.
@@ -212,7 +218,11 @@ export function Galaxy({
         viewBox="0 0 100 100"
         className={className}
         role="img"
-        aria-label={`${shape.systems.length} ${noun} on a map of land and sea, ${held} of them held at the start`}
+        aria-label={
+          route
+            ? `A route of ${route.steps.length} ${noun} across a map of ${shape.systems.length}, on land and sea, from the start to the boss`
+            : `${shape.systems.length} ${noun} on a map of land and sea, ${held} of them held at the start`
+        }
       >
         <rect width={100} height={100} rx={2} fill={SEA} />
         <path
@@ -231,7 +241,7 @@ export function Galaxy({
             key={i}
             points={ring.map(([x, y]) => `${x * 100},${y * 100}`).join(" ")}
             fill={
-              shape.systems[system].faction === null
+              route || shape.systems[system].faction === null
                 ? "none"
                 : colorOf(shape.systems[system].faction)
             }
@@ -251,7 +261,7 @@ export function Galaxy({
               x2={shape.systems[b].x * 100}
               y2={shape.systems[b].y * 100}
               stroke="#e2e8f0"
-              strokeOpacity={0.8}
+              strokeOpacity={route ? 0.25 : 0.8}
               strokeWidth={0.4}
               strokeDasharray={
                 land.laneKinds[i] === "crossing" ? "1.2 1.2" : undefined
@@ -259,8 +269,45 @@ export function Galaxy({
             />
           ),
         )}
+        {route ? (
+          <g data-part="route">
+            {route.routes.map(([a, b]) => (
+              <line
+                key={`${a}-${b}`}
+                x1={route.steps[a].x * 100}
+                y1={route.steps[a].y * 100}
+                x2={route.steps[b].x * 100}
+                y2={route.steps[b].y * 100}
+                stroke="#f8fafc"
+                strokeWidth={0.7}
+              />
+            ))}
+            {route.steps.map((step) => (
+              <circle
+                key={step.id}
+                cx={step.x * 100}
+                cy={step.y * 100}
+                r={step.type === "boss" ? 2.4 : 1.6}
+                fill={RUN_COLORS.get(step.type) ?? UNCLAIMED}
+                stroke="#0f172a"
+                strokeWidth={0.3}
+              />
+            ))}
+          </g>
+        ) : null}
         {shape.systems.map((system, i) =>
-          provinces.has(i) && !system.capital ? null : (
+          route ? (
+            routeIds.has(system.id) ? null : (
+              <circle
+                key={system.id}
+                cx={system.x * 100}
+                cy={system.y * 100}
+                r={0.8}
+                fill={UNCLAIMED}
+                fillOpacity={0.6}
+              />
+            )
+          ) : provinces.has(i) && !system.capital ? null : (
             <circle
               key={system.id}
               cx={system.x * 100}
@@ -374,12 +421,37 @@ export function RunMap({
   className?: string;
   legend?: boolean;
 }) {
-  const inset = 4;
-  const atX = (v: number) => inset + v * (100 - inset * 2);
-  const atY = (v: number) => inset + v * (40 - inset * 2);
   const kinds = RUN_NODE_KINDS.filter((k) =>
     shape.steps.some((s) => s.type === k.type),
   );
+  const legendList = legend && (
+    <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
+      {kinds.map((kind) => (
+        <li
+          key={kind.type}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <span
+            aria-hidden="true"
+            className="size-2 shrink-0 rounded-full"
+            style={{ background: kind.color }}
+          />
+          {kind.label}
+        </li>
+      ))}
+    </ul>
+  );
+  if (shape.land) {
+    return (
+      <div className="flex flex-col gap-3">
+        <Galaxy shape={shape.land} route={shape} className={className} />
+        {legendList}
+      </div>
+    );
+  }
+  const inset = 4;
+  const atX = (v: number) => inset + v * (100 - inset * 2);
+  const atY = (v: number) => inset + v * (40 - inset * 2);
   const fights = shape.steps.filter(
     (s) => s.type === "battle" || s.type === "elite" || s.type === "boss",
   ).length;
@@ -426,23 +498,7 @@ export function RunMap({
           ))}
         </g>
       </svg>
-      {legend && (
-        <ul className="flex flex-wrap justify-center gap-x-4 gap-y-1.5">
-          {kinds.map((kind) => (
-            <li
-              key={kind.type}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground"
-            >
-              <span
-                aria-hidden="true"
-                className="size-2 shrink-0 rounded-full"
-                style={{ background: kind.color }}
-              />
-              {kind.label}
-            </li>
-          ))}
-        </ul>
-      )}
+      {legendList}
     </div>
   );
 }

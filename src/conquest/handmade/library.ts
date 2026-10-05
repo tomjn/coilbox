@@ -184,14 +184,14 @@ type Listed = { summary: HandmadeMapSummary; manifest: string } & (
   | { item?: undefined; archive: ArchiveMapItem }
 );
 
-async function listFolders(): Promise<{
+async function listFolders(archives = true): Promise<{
   listed: Listed[];
   unreadable: UnreadableHandmadeMap[];
   onlyOwnMaps: string[];
   archiveError?: string;
 }> {
   const { items } = await conquestMapList({});
-  const reader = archiveReader;
+  const reader = archives ? archiveReader : null;
   let archive: Awaited<ReturnType<ArchiveReader["list"]>> = {
     items: [],
     unreadable: [],
@@ -306,9 +306,17 @@ async function listFolders(): Promise<{
 /**
  * Every hand-made map, checked only as far as its manifest. A folder whose
  * manifest does not parse is returned in `unreadable` with the reader's errors.
+ *
+ * `archives: false` leaves out the maps game archives carry. Those take one
+ * unitsync run a game, and the saved maps answer without one (issue #3616).
  */
-export async function listHandmadeMaps(): Promise<HandmadeMapList> {
-  const { listed, unreadable, onlyOwnMaps, archiveError } = await listFolders();
+export async function listHandmadeMaps({
+  archives = true,
+}: {
+  archives?: boolean;
+} = {}): Promise<HandmadeMapList> {
+  const { listed, unreadable, onlyOwnMaps, archiveError } =
+    await listFolders(archives);
   return {
     maps: listed.map((l) => l.summary),
     unreadable,

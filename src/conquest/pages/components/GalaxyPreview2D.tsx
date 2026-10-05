@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import type { GalaxyDoc, LinkKind } from "../../model";
+import type { GalaxyDoc, LinkKind, MapSkin } from "../../model";
 import { NEUTRAL } from "../../model";
 import type { GeneratedTerrain } from "../../terrainGen";
 
@@ -20,6 +20,13 @@ const SEA_COLOR = "#183a60";
  * dashed. A border is not drawn as a line, because the two outlines touching
  * already says it.
  */
+/** What a screen reader calls the preview. Only a galaxy is a galaxy. */
+export function previewLabel(skin: MapSkin | undefined): string {
+  return skin === "galaxy" || skin === undefined
+    ? "Galaxy layout preview"
+    : "Map preview";
+}
+
 export function GalaxyPreview2D({
   galaxy,
   terrain,
@@ -120,7 +127,7 @@ export function GalaxyPreview2D({
           : "aspect-square w-full rounded-md border border-border/50 bg-[#05070f]"
       }
       role="img"
-      aria-label={land ? "Map preview" : "Galaxy layout preview"}
+      aria-label={previewLabel(galaxy.theme?.skin)}
     >
       {view.provinces.map((p) => (
         <polygon

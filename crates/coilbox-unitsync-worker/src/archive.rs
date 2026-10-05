@@ -477,7 +477,7 @@ fn same_member(a: &str, b: &str) -> bool {
 
 /// Whether a VFS path looks like a map/game archive we can open (skips stray
 /// files like `.DS_Store` that the raw listing also returns).
-fn is_archive_file(path: &str) -> bool {
+pub(crate) fn is_archive_file(path: &str) -> bool {
     let lower = path.to_lowercase();
     [".sd7", ".sdz", ".sdd", ".sdp"]
         .iter()

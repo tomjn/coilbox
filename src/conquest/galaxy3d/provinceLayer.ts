@@ -5,6 +5,7 @@ import type { MapItemState } from "./cityLayer";
 import {
   BORDER_TOLERANCE_FRACTION,
   type BorderPiece,
+  capitalLabelPoint,
   drapeFill,
   drapeLine,
   isStrongBorder,
@@ -36,6 +37,9 @@ const CAPITAL_LIFT = 0.15;
 /** Line widths in world units. A point marker's disc is 2.7 across. */
 const BORDER_WIDTH = 0.2;
 const STRONG_BORDER_WIDTH = 0.55;
+
+/** World gap between a capital star's southern edge and its name. */
+const CAPITAL_LABEL_GAP = 0.5;
 
 /** Outer radius of the capital star in world units. */
 const CAPITAL_RADIUS = 1.3;
@@ -189,6 +193,18 @@ export function buildProvinceLayer(
       );
     }
     const [x, z] = surface.mapToWorldXZ(mapX, mapY);
+    // The name hangs below the star's southern edge instead of under it.
+    const label = labels[i];
+    if (label) {
+      label.position.set(
+        ...capitalLabelPoint(
+          surface.mapToWorld(mapX, mapY),
+          CAPITAL_RADIUS,
+          CAPITAL_LABEL_GAP,
+        ),
+      );
+      (label as { center?: THREE.Vector2 }).center?.set(0.5, 0);
+    }
     const star = new THREE.Mesh(capitalGeo, capitalMat);
     star.name = `province-capital:${galaxy.nodes[i].id}`;
     star.position.set(x, ground + CAPITAL_LIFT, z);

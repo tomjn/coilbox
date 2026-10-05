@@ -24,6 +24,9 @@ uuid = { version = "1", features = ["v4"] }
 # zip and `.sd7` is 7-zip, the same two readers content and mapconv already use.
 zip = { workspace = true }
 sevenz-rust2 = { workspace = true }
+# A rapid install's `.sdp` and the pool files it lists are gzip streams. The
+# content and downloads plugins already read them with this.
+flate2 = "1"
 
 [dev-dependencies]
 tempfile = { workspace = true }

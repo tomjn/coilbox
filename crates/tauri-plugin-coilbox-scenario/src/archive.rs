@@ -1,10 +1,14 @@
 //! Reading the missions a game ships inside its own archive (issue #2160).
 //!
 //! A game may carry finished missions of its own, and it may be packaged. The
-//! three kinds a game arrives as are a `.sdd` folder, a `.sdz` zip and a `.sd7`
-//! 7-zip, so one shape covers all three: list the mission folders, read one file
-//! out of one. Nothing here writes, and nothing here needs an engine, so a
-//! mission list costs no unitsync scan.
+//! four kinds a game arrives as are a `.sdd` folder, a `.sdz` zip, a `.sd7`
+//! 7-zip and a rapid `.sdp` package, so one shape covers all four: list the
+//! mission folders, read one file out of one. Nothing here writes, and nothing
+//! here needs an engine, so a mission list costs no unitsync scan.
+//!
+//! A `.sdp` is not an archive. It is a gzip list of the game's files, each with
+//! the md5 of a gzip file in the pool beside the `packages/` folder it sits in.
+//! The engine reads it the same way (`CPoolArchive` in RecoilEngine).
 //!
 //! The Tauri commands that expose these to the frontend
 //! (`scenario_game_missions`, `scenario_game_mission_file`,
@@ -134,8 +138,55 @@ fn list_packaged(root: &Path) -> Result<Vec<GameMissionEntry>, String> {
                 .collect();
             Ok(fold_members(names.into_iter()))
         }
+        Kind::Pool => Ok(fold_members(
+            pool_entries(root)?.into_iter().map(|e| e.name),
+        )),
         Kind::Unknown => Err(format!("not a game archive: {}", root.display())),
     }
+}
+
+/// One file a rapid package lists: its path in the game, and the md5 that
+/// names its gzip file in the pool.
+struct PoolEntry {
+    name: String,
+    md5: [u8; 16],
+}
+
+/// Every file the rapid package at `sdp` lists. Each record is a one byte name
+/// length, the name, a 16 byte md5, a 4 byte crc32 and a 4 byte size, until
+/// the stream ends, as `CPoolArchive` reads it.
+fn pool_entries(sdp: &Path) -> Result<Vec<PoolEntry>, String> {
+    let file = std::fs::File::open(sdp).map_err(|e| format!("{e}"))?;
+    let mut bytes = Vec::new();
+    flate2::read::GzDecoder::new(file)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("could not read {}: {e}", sdp.display()))?;
+    let mut entries = Vec::new();
+    let mut rest = bytes.as_slice();
+    while let Some((&len, after)) = rest.split_first() {
+        let len = usize::from(len);
+        if after.len() < len + 24 {
+            return Err(format!("{} ends part way through a file", sdp.display()));
+        }
+        let name = String::from_utf8_lossy(&after[..len]).into_owned();
+        let mut md5 = [0u8; 16];
+        md5.copy_from_slice(&after[len..len + 16]);
+        entries.push(PoolEntry { name, md5 });
+        rest = &after[len + 24..];
+    }
+    Ok(entries)
+}
+
+/// Where the engine finds a pool file: `pool/<first two hex digits>/<the
+/// other thirty>.gz`, under the folder that holds the package's `packages/`.
+fn pool_file(sdp: &Path, md5: &[u8; 16]) -> Option<PathBuf> {
+    let root = sdp.parent()?.parent()?;
+    let hex: String = md5.iter().map(|b| format!("{b:02x}")).collect();
+    Some(
+        root.join("pool")
+            .join(&hex[..2])
+            .join(format!("{}.gz", &hex[2..])),
+    )
 }
 
 /// A change signal for a packaged archive, or `None` for a loose `.sdd`.
@@ -160,11 +211,12 @@ pub fn stamp(root: &Path) -> Option<String> {
 enum Kind {
     Zip,
     SevenZip,
+    Pool,
     Unknown,
 }
 
-/// Which reader an archive needs, by extension. `.sdz` is a zip and `.sd7` is
-/// 7-zip, which is what the engine itself goes by.
+/// Which reader an archive needs, by extension. `.sdz` is a zip, `.sd7` is
+/// 7-zip and `.sdp` is a rapid package, which is what the engine itself goes by.
 fn kind(root: &Path) -> Kind {
     match root
         .extension()
@@ -174,6 +226,7 @@ fn kind(root: &Path) -> Kind {
     {
         Some("sdz") => Kind::Zip,
         Some("sd7") => Kind::SevenZip,
+        Some("sdp") => Kind::Pool,
         _ => Kind::Unknown,
     }
 }
@@ -223,6 +276,21 @@ fn read_member(root: &Path, member: &str) -> Result<Vec<u8>, String> {
             archive
                 .read_file(member)
                 .map_err(|e| format!("could not read {member}: {e}"))
+        }
+        Kind::Pool => {
+            let entry = pool_entries(root)?
+                .into_iter()
+                .find(|e| e.name == member)
+                .ok_or_else(|| format!("could not read {member}: not in the game"))?;
+            let path = pool_file(root, &entry.md5)
+                .ok_or_else(|| format!("{} is not in a packages folder", root.display()))?;
+            let file = std::fs::File::open(&path)
+                .map_err(|e| format!("could not read {member} from {}: {e}", path.display()))?;
+            let mut bytes = Vec::new();
+            flate2::read::GzDecoder::new(file)
+                .read_to_end(&mut bytes)
+                .map_err(|e| format!("could not read {member} from {}: {e}", path.display()))?;
+            Ok(bytes)
         }
         Kind::Unknown => Err(format!("not a game archive: {}", root.display())),
     }
@@ -291,6 +359,65 @@ mod tests {
         path
     }
 
+    fn gzip(bytes: &[u8]) -> Vec<u8> {
+        let mut gz = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        gz.write_all(bytes).unwrap();
+        gz.finish().unwrap()
+    }
+
+    /// The same tree as a rapid install: `packages/game.sdp` listing files whose
+    /// bytes are in `pool/`. The md5 is only a name here, so any distinct 16
+    /// bytes do.
+    fn rapid_game(dir: &Path) -> PathBuf {
+        let mut index = Vec::new();
+        for (n, (name, body)) in [
+            ("missions/first-contact/mission.lua", "return {}"),
+            ("missions/first-contact/scenario.json", "{}"),
+            ("missions/compiled-only/mission.lua", "return {}"),
+            ("missions/runtime.lua", "return { version = 3 }"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let md5 = [n as u8 + 0xa0; 16];
+            let pool = pool_file(&dir.join("packages/game.sdp"), &md5).unwrap();
+            std::fs::create_dir_all(pool.parent().unwrap()).unwrap();
+            std::fs::write(&pool, gzip(body.as_bytes())).unwrap();
+            index.push(name.len() as u8);
+            index.extend_from_slice(name.as_bytes());
+            index.extend_from_slice(&md5);
+            index.extend_from_slice(&[0; 4]);
+            index.extend_from_slice(&(body.len() as u32).to_be_bytes());
+        }
+        let path = dir.join("packages/game.sdp");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, gzip(&index)).unwrap();
+        path
+    }
+
+    #[test]
+    fn a_pool_file_is_named_by_its_md5_beside_packages() {
+        let mut md5 = [0u8; 16];
+        md5[0] = 0x0a;
+        md5[15] = 0xff;
+
+        let path = pool_file(Path::new("/data/packages/x.sdp"), &md5).unwrap();
+
+        assert_eq!(
+            path,
+            Path::new("/data/pool/0a/0000000000000000000000000000ff.gz")
+        );
+    }
+
+    #[test]
+    fn a_truncated_rapid_package_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("cut.sdp");
+        std::fs::write(&path, gzip(&[20, b'm', b'i'])).unwrap();
+
+        assert!(list_missions(&path).is_err());
+    }
+
     #[test]
     fn lists_a_loose_games_missions() {
         let game = loose_game();
@@ -317,7 +444,11 @@ mod tests {
     fn lists_a_packaged_games_missions() {
         let dir = tempfile::tempdir().unwrap();
 
-        for archive in [zipped_game(dir.path()), sevenzipped_game(dir.path())] {
+        for archive in [
+            zipped_game(dir.path()),
+            sevenzipped_game(dir.path()),
+            rapid_game(dir.path()),
+        ] {
             let found = list_missions(&archive).unwrap();
 
             assert_eq!(found.len(), 2, "in {}", archive.display());
@@ -335,6 +466,7 @@ mod tests {
             loose.path().to_path_buf(),
             zipped_game(dir.path()),
             sevenzipped_game(dir.path()),
+            rapid_game(dir.path()),
         ] {
             let bytes = read_file(&root, "first-contact", "scenario.json").unwrap();
 
@@ -359,6 +491,7 @@ mod tests {
             loose.path().to_path_buf(),
             zipped_game(dir.path()),
             sevenzipped_game(dir.path()),
+            rapid_game(dir.path()),
         ] {
             let bytes = read_root_file(&root, "runtime.lua").unwrap();
 

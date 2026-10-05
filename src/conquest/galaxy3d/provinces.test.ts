@@ -6,6 +6,7 @@ import { readHandmadeMap } from "../handmade/read";
 import {
   BORDER_TOLERANCE_FRACTION,
   type BorderPiece,
+  capitalLabelPoint,
   createProvinceIndex,
   drapeFill,
   drapeLine,
@@ -576,5 +577,11 @@ describe("isStrongBorder", () => {
     expect(isStrongBorder("red", "red", false, false)).toBe(false);
     expect(isStrongBorder("red", "blue", true, false)).toBe(false);
     expect(isStrongBorder("red", "blue", false, true)).toBe(false);
+  });
+});
+
+describe("capitalLabelPoint", () => {
+  it("moves the name south of the star's edge and a gap", () => {
+    expect(capitalLabelPoint([-50, 2, -50], 1.3, 0.5)).toEqual([-50, 2, -48.2]);
   });
 });
