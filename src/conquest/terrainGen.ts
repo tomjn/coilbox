@@ -443,7 +443,8 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
         mask: (x, y) => {
           let v = 0.15 - sea(x, y);
           if (strait) {
-            const along = (x - centre[0]) * strait[0] + (y - centre[1]) * strait[1];
+            const along =
+              (x - centre[0]) * strait[0] + (y - centre[1]) * strait[1];
             const off =
               ((x - centre[0]) * strait[1] - (y - centre[1]) * strait[0]) /
               width;
