@@ -67,6 +67,66 @@ export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
   return geo;
 }
 
+/**
+ * The average colour of a picture's outermost pixels, as 0 to 255 per
+ * channel. On a generated land map that is the deep sea at the sheet's edge.
+ */
+export function edgeColor(pixels: ColorPixels): [number, number, number] {
+  const { data, width, height } = pixels;
+  const sum = [0, 0, 0];
+  let count = 0;
+  const add = (x: number, y: number) => {
+    const i = (y * width + x) * 4;
+    sum[0] += data[i];
+    sum[1] += data[i + 1];
+    sum[2] += data[i + 2];
+    count++;
+  };
+  for (let x = 0; x < width; x++) {
+    add(x, 0);
+    if (height > 1) add(x, height - 1);
+  }
+  for (let y = 1; y < height - 1; y++) {
+    add(0, y);
+    if (width > 1) add(width - 1, y);
+  }
+  return [sum[0] / count, sum[1] / count, sum[2] / count];
+}
+
+/** How many times the sheet's longer side the sea beyond it reaches. */
+const SEA_BEYOND_SCALE = 40;
+/** How far under the sheet's sea level the sea beyond it lies, in world
+ * units, so the two never fight over the same depth. */
+const SEA_BEYOND_DROP = 0.05;
+
+/**
+ * A flat plane in the colour of the sheet's edge, laid under and around it,
+ * so a generated land map sits in its own sea rather than in the page's
+ * black. Level ground is shaded exactly 1, so the plane needs no lighting to
+ * match the sheet's edge.
+ */
+function buildSeaBeyond(
+  scene: THREE.Scene,
+  disposables: { dispose(): void }[],
+  surface: TerrainSurface,
+  pixels: ColorPixels,
+): void {
+  const size =
+    Math.max(surface.worldWidth, surface.worldDepth) * SEA_BEYOND_SCALE;
+  const geo = new THREE.PlaneGeometry(size, size);
+  const [r, g, b] = edgeColor(pixels);
+  const mat = new THREE.MeshBasicMaterial();
+  mat.color.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+  disposables.push(geo, mat);
+  const plane = new THREE.Mesh(geo, mat);
+  plane.name = "sea-beyond";
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = -SEA_BEYOND_DROP;
+  // Decoration: picking goes to the sheet and what stands on it.
+  plane.raycast = () => {};
+  scene.add(plane);
+}
+
 function isColorPixels(source: TerrainColorSource): source is ColorPixels {
   return (
     typeof source === "object" &&
@@ -145,6 +205,7 @@ export function buildTerrainMesh(
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
+      buildSeaBeyond(scene, disposables, surface, color);
     } else {
       tex = new THREE.CanvasTexture(color);
     }
