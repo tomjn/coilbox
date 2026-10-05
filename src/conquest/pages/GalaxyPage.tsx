@@ -314,7 +314,9 @@ function HandmadeGalaxy({
         label={
           known
             ? "This map could not be read."
-            : `The map "${run?.title ?? id}" is no longer installed.`
+            : run?.carriedBy
+              ? `The game ${run.carriedBy} no longer carries the map "${run.title}". A game update may have removed it.`
+              : `The map "${run?.title ?? id}" is no longer installed.`
         }
       >
         {known && result && !result.ok && (
@@ -325,7 +327,9 @@ function HandmadeGalaxy({
             Your conquest on it is saved and nothing has been changed.{" "}
             {known
               ? "It carries on once the map can be read again."
-              : "Import the map again from the Conquest page to carry on."}
+              : run.carriedBy
+                ? "It carries on if a game carries the map again."
+                : "Import the map again from the Conquest page to carry on."}
           </p>
         )}
       </NotOpened>

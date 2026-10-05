@@ -75,6 +75,7 @@ import {
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import type { GenerateOptions } from "../generate";
+import { ARCHIVE_MAPS_DIR } from "../handmade/archive";
 import {
   type ConquestImportSettings,
   decodeConquestImport,
@@ -188,14 +189,18 @@ export default function ConquestListPage() {
   const mapsUnstarted = maps.filter((m) => !file.conquests[m.id]);
   // A conquest whose map is gone is still a save, and is shown as one. Only
   // once the list has answered, or every conquest would look lost.
+  // A failed search of the game archives says nothing about a map a game
+  // carries, so no conquest is called lost then either.
   const lostRuns =
-    loading || handmade.loading || handmade.error
+    loading || handmade.loading || handmade.error || handmade.archiveError
       ? []
       : Object.entries(file.conquests).flatMap(([id, state]) => {
           const run = readHandmadeRun(state);
           const gone =
             run && !galaxyIds.has(id) && !maps.some((m) => m.id === id);
-          return gone ? [{ id, title: run.title, state }] : [];
+          return gone
+            ? [{ id, title: run.title, carriedBy: run.carriedBy, state }]
+            : [];
         });
   const [mapError, setMapError] = useState<string | null>(null);
   const removeMap = async (map: HandmadeMapSummary) => {
@@ -342,6 +347,11 @@ export default function ConquestListPage() {
           message={`The hand-made maps could not be listed. ${handmade.error}`}
         />
       )}
+      {handmade.archiveError && (
+        <ErrorBanner
+          message={`The installed games could not be searched for maps they carry, so none is listed. ${handmade.archiveError}`}
+        />
+      )}
       {mapError && <ErrorBanner message={mapError} />}
 
       {needsGame ? (
@@ -439,10 +449,11 @@ export default function ConquestListPage() {
                     />
                   </li>
                 ))}
-                {lostRuns.map(({ id, title, state }) => (
+                {lostRuns.map(({ id, title, carriedBy, state }) => (
                   <li key={id}>
                     <LostMapCard
                       title={title}
+                      carriedBy={carriedBy}
                       state={state}
                       onAbandon={() => abandon(id)}
                     />
@@ -489,11 +500,12 @@ export default function ConquestListPage() {
               </h2>
               <ul className="flex flex-col gap-2">
                 {handmade.unreadable.map((u) => (
-                  <li key={`${u.source}/${u.folder}`}>
+                  <li key={`${u.source}/${u.carriedBy ?? ""}/${u.folder}`}>
                     <Card className="gap-2 rounded-lg border-border/50 p-3 shadow-none">
                       <span className="text-sm font-medium">
-                        {u.source === "bundled" ? "Bundled map" : "Map"} folder
-                        "{u.folder}"
+                        {u.source === "game"
+                          ? `"${ARCHIVE_MAPS_DIR}/${u.folder}" in ${u.carriedBy}`
+                          : `${u.source === "bundled" ? "Bundled map" : "Map"} folder "${u.folder}"`}
                       </span>
                       <MapErrorList errors={u.errors} />
                     </Card>
@@ -606,6 +618,14 @@ function HandmadeMapCard({
                 Bundled
               </span>
             )}
+            {map.source === "game" && (
+              <span
+                className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
+                title={`The game ${map.carriedBy} carries this map`}
+              >
+                From the game
+              </span>
+            )}
             {resume && <ContinueBadge />}
           </div>
           <p className="line-clamp-1 text-xs text-muted-foreground">
@@ -711,10 +731,13 @@ function HandmadeChallengeShare({
 /** A saved conquest whose hand-made map is no longer installed. */
 function LostMapCard({
   title,
+  carriedBy,
   state,
   onAbandon,
 }: {
   title: string;
+  /** The game that carried the map when the conquest started. */
+  carriedBy?: string;
   state: ConquestState;
   onAbandon: () => void;
 }) {
@@ -726,9 +749,9 @@ function LostMapCard({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="truncate text-sm font-medium">{title}</span>
         <p className="text-xs text-muted-foreground">
-          The map this conquest is played on is no longer installed. Your
-          progress is saved (turn {state.turn}). Import the map again to carry
-          on.
+          {carriedBy
+            ? `The game ${carriedBy} no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn ${state.turn}), and it carries on if a game carries the map again.`
+            : `The map this conquest is played on is no longer installed. Your progress is saved (turn ${state.turn}). Import the map again to carry on.`}
         </p>
       </div>
       <Button
@@ -1107,7 +1130,10 @@ function GenerateGalaxyForm({
   // game is its shortname and its name without the version, so an archive that
   // only shares the shortname (Zero-K Benchmark v3 beside Zero-K) is its own
   // entry (issue #3465). The entry's full name is saved on the galaxy.
-  const gameChoices = useMemo(() => {
+  // A game that asks for its own maps only is not offered here, since every
+  // map this form makes is a generated one (issue #3511).
+  const { onlyOwnMaps } = useHandmadeMaps();
+  const { gameChoices, ownMapsOnly } = useMemo(() => {
     const matcher = getGameMatcher();
     // Never coilbox's own generated games: a campaign fought in the unit
     // builder's scratch game is not a campaign.
@@ -1127,8 +1153,14 @@ function GenerateGalaxyForm({
         byShort.set(key, g);
       }
     }
-    return [...byShort.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [scan.data]);
+    const newest = [...byShort.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+    return {
+      gameChoices: newest.filter((g) => !onlyOwnMaps.includes(g.name)),
+      ownMapsOnly: newest.filter((g) => onlyOwnMaps.includes(g.name)),
+    };
+  }, [scan.data, onlyOwnMaps]);
 
   const [gameShort, setGameShort] = useState("");
   // Default to the preselected game (if it matches one on offer), else the
@@ -1299,6 +1331,10 @@ function GenerateGalaxyForm({
     </>
   ) : scan.error ? (
     `The content scan failed, so installed games are not listed: ${scan.error}`
+  ) : initialGameName && onlyOwnMaps.includes(initialGameName) ? (
+    `${initialGameName} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
+  ) : gameChoices.length === 0 && ownMapsOnly.length > 0 ? (
+    `${ownMapsOnly.map((g) => g.name).join(", ")} ${ownMapsOnly.length === 1 ? "plays" : "play"} Conquest only on the maps the game carries. Pick one from the Conquest list.`
   ) : scan.data &&
     (scan.data.games.length === 0 || gameChoices.length === 0) ? (
     <>

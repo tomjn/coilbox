@@ -146,8 +146,17 @@ export function RunSetupForm({
         (m) => m.warpath && resolveGameByShortname(m.game, [game]) === game,
       )
     : [];
+  // A game that asks for its own maps only is offered no generated style, as
+  // long as it has a map to offer here (issue #3511). Its first map is then
+  // the default.
+  const ownMapsOnly =
+    !!game &&
+    handmadeMaps.length > 0 &&
+    handmade.onlyOwnMaps.includes(game.name);
   // A map picked for another game falls back to the generated styles.
-  const handmadeMap = handmadeMaps.find((m) => m.id === pickedMapId);
+  const handmadeMap =
+    handmadeMaps.find((m) => m.id === pickedMapId) ??
+    (ownMapsOnly ? handmadeMaps[0] : undefined);
   const archive = game?.primaryArchive.name;
   // Starting a run is not a launch, so this does not stop the form. The player
   // is told here, because every battle of the run would stop on it (issue #3489).
@@ -413,7 +422,7 @@ export function RunSetupForm({
               }
             }}
             options={[
-              ...MAP_STYLE_OPTIONS,
+              ...(ownMapsOnly ? [] : MAP_STYLE_OPTIONS),
               ...handmadeMaps.map((m) => ({
                 value: `${HANDMADE_PREFIX}${m.id}`,
                 label: `${m.title} (hand-made map)`,
