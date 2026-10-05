@@ -6,8 +6,6 @@ import {
 import { currentScan } from "../../content/config";
 import { withoutGeneratedGames } from "../../lib/generatedGames";
 import { compareGameVersions } from "../../play/installedGames";
-import type { HandmadeMapError } from "./errors";
-import { gltfUriEntries, resolveGltfUri } from "./gltf";
 import {
   type CachedListing,
   cachedListing,
@@ -15,6 +13,8 @@ import {
   rememberListing,
   saveListings,
 } from "./archiveCache";
+import type { HandmadeMapError } from "./errors";
+import { gltfUriEntries, resolveGltfUri } from "./gltf";
 import { MANIFEST_FILE } from "./manifest";
 
 /**
@@ -232,7 +232,7 @@ export interface ArchiveReader {
  */
 export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
   let listing: Promise<ArchiveListing> | undefined;
-  /** Each game's listing, by archive name, so a game is read once a reader. */
+  /** Each game's listing, by archive name, size and CRC, so a game is read once a reader. */
   const oneGame = new Map<string, Promise<ArchiveListing>>();
   const reads = new Map<string, Promise<ArchiveRead>>();
   /** The real path of each member, by archive and the path in lower case. */
@@ -507,10 +507,11 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       return listing;
     },
     listGame(game) {
-      let one = oneGame.get(game.archive);
+      const key = `${game.archive}\0${game.size ?? ""}\0${game.checksum ?? ""}`;
+      let one = oneGame.get(key);
       if (!one) {
         one = listOne(game);
-        oneGame.set(game.archive, one);
+        oneGame.set(key, one);
       }
       return one;
     },

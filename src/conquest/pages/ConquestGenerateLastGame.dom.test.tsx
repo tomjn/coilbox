@@ -23,6 +23,7 @@ const h = vi.hoisted(() => ({
   onlyOwnMaps: [] as string[],
   maps: [] as { id: string; game: { shortname: string } }[],
   preset: null as string | null,
+  factsLoading: false,
 }));
 
 const ALL_GAMES: Record<string, { shortname: string }> = {
@@ -180,7 +181,7 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     error: null,
   }),
   useGameMapFacts: () => ({
-    loading: false,
+    loading: h.factsLoading,
     facts: { maps: h.maps, onlyOwnMaps: h.onlyOwnMaps },
     error: undefined,
   }),
@@ -237,6 +238,7 @@ beforeEach(() => {
   h.onlyOwnMaps = [];
   h.maps = [];
   h.preset = null;
+  h.factsLoading = false;
 });
 afterEach(cleanup);
 
@@ -261,6 +263,17 @@ describe("Conquest generate form: the last game", () => {
     h.installed = ["Alpha Game v1", "Zed Game v1"];
     openForm();
     expect(chosenGame()).toBe("Alpha Game v1");
+  });
+
+  it("shows the game picker, usable, before any game's maps are known", () => {
+    h.factsLoading = true;
+    openForm();
+    expect(chosenGame()).toBe("Alpha Game v1");
+    pickGame("Cool Game v1");
+    expect(chosenGame()).toBe("Cool Game v1");
+    expect(
+      screen.getByText("Checking which maps this game carries…"),
+    ).toBeTruthy();
   });
 
   it("opens on the remembered game even when it asks for its own maps only, and says so", () => {

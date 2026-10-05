@@ -1,8 +1,8 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import type { GameItem } from "../../content/bindings";
 import { useScanEpoch } from "../../content/config";
 import { createDocumentStore } from "../../lib/documentStore";
 import { usePreferredTarget } from "../../play/config";
-import type { GameItem } from "../../content/bindings";
 import { type ArchiveTarget, archiveGameOf } from "./archive";
 import {
   type HandmadeMapList,
@@ -21,6 +21,12 @@ import type { HandmadeMapResult } from "./read";
  */
 let generation = 0;
 let appliedKey: string | undefined;
+/**
+ * Whether anything has asked for the whole list this session. Pointing the
+ * archives at a target starts the search of every game only once it has, so a
+ * form that reads one game (see {@link useGameMapFacts}) never starts it.
+ */
+let listWanted = false;
 const listeners = new Set<() => void>();
 
 /** The generation of a list that holds nothing yet. */
@@ -79,7 +85,7 @@ function applyArchiveTarget(key: string, target: ArchiveTarget | null) {
   setArchiveTarget(target);
   generation++;
   for (const listener of listeners) listener();
-  mapStore.refresh().catch(() => {});
+  if (listWanted) mapStore.refresh().catch(() => {});
 }
 
 /**
@@ -126,8 +132,17 @@ export const refreshHandmadeMaps = mapStore.refresh;
  * can show those first and say it is still searching the games.
  */
 export function useHandmadeMaps() {
+  listWanted = true;
   const at = useArchiveTarget();
   const { data, loading, error, refresh } = mapStore.useStore();
+  // A list left from before the target last changed, when nothing wanted the
+  // list to refresh it, is read again now that something does.
+  useEffect(() => {
+    const held = mapStore.getCached();
+    if (at > 0 && held && held.generation !== at) {
+      mapStore.refresh().catch(() => {});
+    }
+  }, [at]);
   const stale = !error && (at === 0 || data.generation !== at);
   const savedLoading = !error && data.generation === NOTHING_LISTED;
   return {

@@ -1,7 +1,7 @@
 import { isSddName } from "../../content/format";
 import { createPersistedCache } from "../../lib/persistedCache";
-import type { HandmadeMapError } from "./errors";
 import type { ArchiveGame, ArchiveTarget } from "./archive";
+import type { HandmadeMapError } from "./errors";
 
 /**
  * What reading inside one game archive found: the hand-made map folders, the
