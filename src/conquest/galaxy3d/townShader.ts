@@ -182,6 +182,11 @@ void main() {
   vec2 rel = gp - w0.xy;
   float wR = w0.z;
   float wSeed = w0.w;
+  // Throw away what neither pass can draw before any of the work below: for
+  // the fields, ground no field can lie on, and for the town, ground past
+  // its furthest house (an edge reaches 1.27 radii, houses along a road 1.55
+  // edges) and its ring.
+  if (uLayer < 0.5 ? (texture(uTownIndex, uv).a < 0.004 || length(rel) > wR * uFieldReach) : (length(rel) > wR * 2.0 && ws0.a < 0.004)) discard;
   vec2 wAlong = w1.xy;
   vec2 wAcross = vec2(-w1.y, w1.x);
   // The town's own frame: along its axis, then across it.
