@@ -4,6 +4,7 @@ import {
   planProvinceRoads,
   provinceRegions,
   provinceRoadLinks,
+  thinRoads,
   touchingRegions,
 } from "./provinceRoads";
 import type { Ring } from "./provinces";
@@ -121,6 +122,51 @@ describe("provinceRoadLinks", () => {
 
   it("is the same every time", () => {
     expect(provinceRoadLinks(doc, touches)).toEqual(links);
+  });
+});
+
+describe("thinRoads", () => {
+  const at = (id: string): [number, number] =>
+    ({ a: [0, 0], b: [10, 0], c: [5, 2], d: [5, 30] })[id] as [number, number];
+
+  it("drops a road with a shorter way round through a third town", () => {
+    const roads = [
+      { a: "a", b: "b" },
+      { a: "a", b: "c" },
+      { a: "c", b: "b" },
+    ];
+    expect(thinRoads(roads, at)).toEqual([
+      { a: "a", b: "c" },
+      { a: "c", b: "b" },
+    ]);
+  });
+
+  it("keeps a road whose way round is longer than it is", () => {
+    const roads = [
+      { a: "a", b: "b" },
+      { a: "a", b: "d" },
+      { a: "d", b: "b" },
+    ];
+    expect(thinRoads(roads, at)).toEqual(roads);
+  });
+
+  it("keeps every town joined that was joined", () => {
+    const ids = ["a", "b", "c", "d"];
+    const all = ids.flatMap((p, i) =>
+      ids.slice(i + 1).map((q) => ({ a: p, b: q })),
+    );
+    const kept = thinRoads(all, at);
+    const reach = new Set(["a"]);
+    for (let round = 0; round < ids.length; round++) {
+      for (const { a, b } of kept) {
+        if (reach.has(a) || reach.has(b)) {
+          reach.add(a);
+          reach.add(b);
+        }
+      }
+    }
+    expect([...reach].sort()).toEqual(ids);
+    expect(kept.length).toBeLessThan(all.length);
   });
 });
 

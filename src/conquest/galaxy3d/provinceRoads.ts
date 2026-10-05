@@ -101,15 +101,18 @@ export function touchingRegions(
 }
 
 /**
- * The links of a map that get a road between provinces: every link that
- * draws as a border, between two provinces that touch, in link order.
- * `touches` says whether two node indices touch. A crossing, a road, and a
- * link with a point location at either end are drawn elsewhere. A blocked
- * border is not a link, so it never gets one.
+ * The links of a map that get a road between provinces, in link order. A
+ * candidate is a link that draws as a border, between two provinces that
+ * touch: `touches` says whether two node indices do. A crossing, a road, and
+ * a link with a point location at either end are drawn elsewhere, and a
+ * blocked border is not a link, so it never gets one.
+ *
+ * Every province has several neighbours, so a road for each candidate covers
+ * a large map in lines. The candidates are thinned with {@link thinRoads}.
  */
 export function provinceRoadLinks(
   galaxy: Pick<GalaxyDoc, "links" | "linkKinds"> & {
-    nodes: Pick<GalaxyNode, "id" | "outline">[];
+    nodes: Pick<GalaxyNode, "id" | "pos" | "outline">[];
   },
   touches: (a: number, b: number) => boolean,
 ): RoadLink[] {
@@ -117,7 +120,7 @@ export function provinceRoadLinks(
   const kinds = new Map(
     (galaxy.linkKinds ?? []).map(([a, b, kind]) => [pairKey(a, b), kind]),
   );
-  const out: RoadLink[] = [];
+  const candidates: RoadLink[] = [];
   for (const [a, b] of galaxy.links) {
     const ia = index.get(a);
     const ib = index.get(b);
@@ -128,9 +131,45 @@ export function provinceRoadLinks(
     if (linkCueKind(kinds.get(pairKey(a, b)), false, false) !== "border") {
       continue;
     }
-    if (touches(ia, ib)) out.push({ a, b });
+    if (touches(ia, ib)) candidates.push({ a, b });
   }
-  return out;
+  return thinRoads(candidates, (id) => {
+    const pos = galaxy.nodes[index.get(id) ?? -1]?.pos ?? [0, 0];
+    return [pos[0], pos[1]];
+  });
+}
+
+/**
+ * Drop each road that has a shorter way round: a road from A to B goes when
+ * some C has a road to both and is nearer to each than A and B are to each
+ * other. What is left still joins every town that was joined, since the
+ * shortest roads are never dropped, and keeps the loops round each cluster
+ * of towns. Depends on the positions and the list alone, in its order.
+ */
+export function thinRoads(
+  roads: RoadLink[],
+  at: (id: string) => [number, number],
+): RoadLink[] {
+  const near = new Map<string, Set<string>>();
+  for (const { a, b } of roads) {
+    if (!near.has(a)) near.set(a, new Set());
+    if (!near.has(b)) near.set(b, new Set());
+    near.get(a)?.add(b);
+    near.get(b)?.add(a);
+  }
+  const length = (p: string, q: string) => {
+    const [px, py] = at(p);
+    const [qx, qy] = at(q);
+    return Math.hypot(px - qx, py - qy);
+  };
+  return roads.filter(({ a, b }) => {
+    const ab = length(a, b);
+    for (const c of near.get(a) ?? []) {
+      if (c === b || !near.get(b)?.has(c)) continue;
+      if (length(a, c) < ab && length(c, b) < ab) return false;
+    }
+    return true;
+  });
 }
 
 /**
