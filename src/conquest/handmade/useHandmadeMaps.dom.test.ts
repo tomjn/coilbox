@@ -122,7 +122,11 @@ describe("the hand-made map list", () => {
     expect(h.tree).toHaveBeenCalledTimes(reads);
   });
 
-  it("reads the games again after a rescan and keeps the list up meanwhile", async () => {
+  it("reads loose game folders again after a rescan and keeps the list up meanwhile", async () => {
+    // A `.sdd` can be edited under the same name, so it is never kept.
+    h.scan
+      .mockReset()
+      .mockResolvedValue({ games: [game("a.sdd"), game("b.sdd")] });
     const { result, rerender } = renderHook(() => useHandmadeMaps());
     await answerTrees();
     await waitFor(() => expect(result.current.loading).toBe(false));

@@ -82,6 +82,7 @@ vi.mock("../../challenge/ChallengeShare", () => ({
   ),
 }));
 vi.mock("../../content/config", () => ({
+  useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useUnitsyncScan: () => ({
     data: {
       maps: h.installedMaps,

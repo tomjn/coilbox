@@ -124,6 +124,11 @@ vi.mock("../../../conquest/handmade/useHandmadeMaps", () => ({
     onlyOwnMaps: hoisted.onlyOwnMaps,
     error: hoisted.listError,
   }),
+  useGameMapFacts: () => ({
+    loading: false,
+    facts: { maps: hoisted.maps, onlyOwnMaps: hoisted.onlyOwnMaps },
+    error: hoisted.listError,
+  }),
 }));
 vi.mock("../../handmadeMap", () => ({ loadHandmadeRunMap: hoisted.loadMap }));
 // A generated style goes through `generateStyledRun`, which is the column run

@@ -13,11 +13,13 @@ import {
 } from "../bindings";
 import type { GalaxyDoc } from "../model";
 import {
+  type ArchiveGame,
   type ArchiveMapItem,
   type ArchiveReader,
   type ArchiveTarget,
   createArchiveReader,
 } from "./archive";
+import { saveListings } from "./archiveCache";
 import { memoryTraceCache } from "./cache";
 import { decodeRgba, imageSize } from "./decode";
 import type { HandmadeMapError } from "./errors";
@@ -184,7 +186,20 @@ type Listed = { summary: HandmadeMapSummary; manifest: string } & (
   | { item?: undefined; archive: ArchiveMapItem }
 );
 
-async function listFolders(archives = true): Promise<{
+interface FolderScope {
+  /** Read game archives at all. */
+  archives?: boolean;
+  /** Read only this game's archive, rather than every installed game's. */
+  game?: ArchiveGame;
+  /** Read each carried map's picture. Off when only the count is needed. */
+  pictures?: boolean;
+}
+
+async function listFolders({
+  archives = true,
+  game: only,
+  pictures = true,
+}: FolderScope = {}): Promise<{
   listed: Listed[];
   unreadable: UnreadableHandmadeMap[];
   onlyOwnMaps: string[];
@@ -200,7 +215,7 @@ async function listFolders(archives = true): Promise<{
   let archiveError: string | undefined;
   if (reader) {
     try {
-      archive = await reader.list();
+      archive = await (only ? reader.listGame(only) : reader.list());
     } catch (e) {
       archiveError = messageOf(e);
     }
@@ -239,9 +254,10 @@ async function listFolders(archives = true): Promise<{
       ]);
       continue;
     }
-    const picture = carried.files.includes(manifest.files.picture)
-      ? await reader?.read(game, folder, manifest.files.picture)
-      : undefined;
+    const picture =
+      pictures && carried.files.includes(manifest.files.picture)
+        ? await reader?.read(game, folder, manifest.files.picture)
+        : undefined;
     keep({
       archive: carried,
       manifest: carried.manifest,
@@ -315,14 +331,35 @@ export async function listHandmadeMaps({
 }: {
   archives?: boolean;
 } = {}): Promise<HandmadeMapList> {
-  const { listed, unreadable, onlyOwnMaps, archiveError } =
-    await listFolders(archives);
+  const { listed, unreadable, onlyOwnMaps, archiveError } = await listFolders({
+    archives,
+  });
   return {
     maps: listed.map((l) => l.summary),
     unreadable,
     onlyOwnMaps,
     ...(archiveError === undefined ? {} : { archiveError }),
   };
+}
+
+/**
+ * What a form needs to decide whether a game is offered the generated styles:
+ * the hand-made maps this game can be played on, and whether the game asks for
+ * its own maps only. Only this game's archive is read, and from the same cache
+ * as {@link listHandmadeMaps}, so the two cannot disagree about a game.
+ */
+export async function listHandmadeMapsForGame(
+  game: ArchiveGame,
+): Promise<Pick<HandmadeMapList, "maps" | "onlyOwnMaps">> {
+  try {
+    const { listed, onlyOwnMaps } = await listFolders({
+      game,
+      pictures: false,
+    });
+    return { maps: listed.map((l) => l.summary), onlyOwnMaps };
+  } finally {
+    saveListings();
+  }
 }
 
 /**
