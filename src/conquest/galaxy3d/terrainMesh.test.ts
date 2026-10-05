@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface } from "./terrain";
-import { BEYOND_SHADE, buildTerrainMesh, edgeColor } from "./terrainMesh";
+import { beyondPixels, buildTerrainMesh, edgeColor } from "./terrainMesh";
 
 /** A 4 by 3 picture: the edge one colour, the middle another. */
 function framed(): { data: Uint8ClampedArray; width: number; height: number } {
@@ -24,44 +24,75 @@ describe("edgeColor", () => {
   });
 });
 
+/** A 64 by 64 picture, green land on the left half and blue sea on the right. */
+function halves(): { data: Uint8ClampedArray; width: number; height: number } {
+  const width = 64;
+  const height = 64;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      data.set(
+        x < 32 ? [100, 160, 80, 255] : [24, 58, 96, 255],
+        (y * width + x) * 4,
+      );
+    }
+  }
+  return { data, width, height };
+}
+
+describe("beyondPixels", () => {
+  const beyond = beyondPixels(halves());
+  const px = (x: number, y: number) =>
+    Array.from(
+      beyond.data.slice(
+        (y * beyond.width + x) * 4,
+        (y * beyond.width + x) * 4 + 3,
+      ),
+    );
+  // The picture spans three sheets, so the map's own place is the middle third.
+  const third = beyond.width / 3;
+  const mid = Math.floor(beyond.height / 2);
+
+  it("carries land on past an edge where land meets it, and sea where sea does", () => {
+    const left = px(Math.floor(third) - 1, mid);
+    const right = px(Math.ceil(2 * third), mid);
+    expect(left[1]).toBeGreaterThan(left[2]);
+    expect(right[2]).toBeGreaterThan(right[1]);
+  });
+
+  it("fades to the edge's darkened average far from the map", () => {
+    const mean = edgeColor(halves());
+    expect(px(0, 0)).toEqual(mean.map((c) => Math.round(c * 0.6)));
+    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(
+      mean.map((c) => Math.round(c * 0.6)),
+    );
+  });
+});
+
 describe("the world beyond a generated sheet", () => {
   const surface = createTerrainSurface({ width: 1024, height: 1024 }, 100);
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
-  buildTerrainMesh(scene, disposables, surface, framed(), { current: null });
+  buildTerrainMesh(scene, disposables, surface, halves(), { current: null });
   for (const d of disposables) d.dispose();
-  const beyond = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
+  const plane = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
 
-  it("mirrors the picture past every edge, darker, under the sheet", () => {
-    expect(beyond).toBeInstanceOf(THREE.Mesh);
-    expect(beyond.position.y).toBeLessThan(0);
-    const mat = beyond.material as THREE.MeshBasicMaterial;
-    expect(mat.map?.wrapS).toBe(THREE.MirroredRepeatWrapping);
-    expect(mat.map?.wrapT).toBe(THREE.MirroredRepeatWrapping);
-    expect(mat.color.r).toBe(BEYOND_SHADE);
+  it("lies under the sheet and reaches a sheet past every edge", () => {
+    expect(plane).toBeInstanceOf(THREE.Mesh);
+    expect(plane.position.y).toBeLessThan(0);
+    const geo = plane.geometry as THREE.PlaneGeometry;
+    expect(geo.parameters.width).toBeCloseTo(surface.worldWidth * 3);
+    expect(geo.parameters.height).toBeCloseTo(surface.worldDepth * 3);
   });
 
-  it("lays the middle copy exactly under the sheet, top of the picture first", () => {
-    // Rotated flat, the plane's first vertex is the far left corner, which is
-    // the picture's top left on the sheet. Two copies lie out past it.
-    const uv = beyond.geometry.getAttribute("uv");
-    expect([uv.getX(0), uv.getY(0)]).toEqual([-2, -2]);
-    expect([uv.getX(uv.count - 1), uv.getY(uv.count - 1)]).toEqual([3, 3]);
-    const pos = beyond.geometry.getAttribute("position");
-    const corner = new THREE.Vector3()
-      .fromBufferAttribute(pos, 0)
-      .applyMatrix4(
-        beyond.matrix.compose(beyond.position, beyond.quaternion, beyond.scale),
-      );
-    expect(corner.x).toBeCloseTo(-surface.worldWidth * 2.5);
-    expect(corner.z).toBeCloseTo(-surface.worldDepth * 2.5);
-  });
-
-  it("fills the rest with the darkened colour of the sheet's edge", () => {
-    const expected = new THREE.Color()
-      .setRGB(24 / 255, 58 / 255, 96 / 255, THREE.SRGBColorSpace)
-      .multiplyScalar(BEYOND_SHADE);
-    expect(scene.background).toBeInstanceOf(THREE.Color);
+  it("fills the rest with the colour the picture fades to", () => {
+    const [r, g, b] = edgeColor(halves());
+    const expected = new THREE.Color().setRGB(
+      (r * 0.6) / 255,
+      (g * 0.6) / 255,
+      (b * 0.6) / 255,
+      THREE.SRGBColorSpace,
+    );
     expect((scene.background as THREE.Color).equals(expected)).toBe(true);
   });
 });

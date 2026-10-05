@@ -93,51 +93,108 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
   return [sum[0] / count, sum[1] / count, sum[2] / count];
 }
 
-/** How bright the world beyond the map's edge is drawn, against 1 on it. */
-export const BEYOND_SHADE = 0.6;
-/** Copies of the picture drawn on each side of the sheet. */
-const BEYOND_TILES = 2;
-/** How far under the sheet the world beyond it lies, in world units, so the
- * two never fight over the same depth. */
+/** Sheets the world beyond the map reaches past each edge. */
+const BEYOND_SHEETS = 1;
+/** Pixels of the picture each side of a point that the edge colour is
+ * averaged over, so the world beyond shows the edge's colours but not its
+ * detail. */
+const EDGE_BLUR = 24;
+/** How far past the edge, in sheets, the edge's colours fade into their
+ * average. */
+const BEYOND_FADE = 0.25;
+/** How bright the world beyond is, against 1 on the map, right at the edge
+ * and once faded. */
+const BEYOND_NEAR = 0.85;
+const BEYOND_FAR = 0.6;
+/** Pixels across and down the picture of the world beyond. */
+const BEYOND_PIXELS = 192;
+/** How far under the sheet the world beyond lies, in world units, so the two
+ * never fight over the same depth. */
 const BEYOND_DROP = 0.05;
 
 /**
- * Draw the world beyond the map's edge, so a generated land map does not sit
- * in the page's black. Land can run off the map, so a flat sea would cut it
- * off at the frame. Instead the picture carries on past each edge as its own
- * mirror image, darker so the edge of the map still shows: land that crosses
- * the frame goes on as land, and sea as sea. Further out, the scene's
- * background is the same darkened average of the edge.
+ * A picture of the world beyond the map: `BEYOND_SHEETS` sheets past every
+ * edge, with the map's own place in the middle. Past each edge it shows the
+ * colours along that edge, blurred, fading into their average and darkening
+ * further out, so land that runs off the map trails off as land and sea as
+ * sea, and the edge of the map still shows.
+ */
+export function beyondPixels(pixels: ColorPixels): ColorPixels {
+  const { data, width, height } = pixels;
+  const mean = edgeColor(pixels);
+  const at = (x: number, y: number, c: number) => data[(y * width + x) * 4 + c];
+  /** The edge colour nearest a point given in picture pixels, averaged. */
+  const edgeNear = (x: number, y: number): [number, number, number] => {
+    const cx = Math.min(width - 1, Math.max(0, Math.floor(x)));
+    const cy = Math.min(height - 1, Math.max(0, Math.floor(y)));
+    const sum = [0, 0, 0];
+    let n = 0;
+    for (let yy = cy - EDGE_BLUR; yy <= cy + EDGE_BLUR; yy++) {
+      if (yy < 0 || yy >= height) continue;
+      for (let xx = cx - EDGE_BLUR; xx <= cx + EDGE_BLUR; xx++) {
+        if (xx < 0 || xx >= width) continue;
+        for (let c = 0; c < 3; c++) sum[c] += at(xx, yy, c);
+        n++;
+      }
+    }
+    return [sum[0] / n, sum[1] / n, sum[2] / n];
+  };
+  const span = 2 * BEYOND_SHEETS + 1;
+  const out = new Uint8ClampedArray(BEYOND_PIXELS * BEYOND_PIXELS * 4);
+  for (let j = 0; j < BEYOND_PIXELS; j++) {
+    for (let i = 0; i < BEYOND_PIXELS; i++) {
+      // In sheets, with the map from 0 to 1.
+      const u = ((i + 0.5) / BEYOND_PIXELS) * span - BEYOND_SHEETS;
+      const v = ((j + 0.5) / BEYOND_PIXELS) * span - BEYOND_SHEETS;
+      const cu = Math.min(1, Math.max(0, u));
+      const cv = Math.min(1, Math.max(0, v));
+      const d = Math.sqrt((u - cu) * (u - cu) + (v - cv) * (v - cv));
+      const t = Math.min(1, d / BEYOND_FADE);
+      const edge = edgeNear(cu * width, cv * height);
+      const shade = BEYOND_NEAR + (BEYOND_FAR - BEYOND_NEAR) * t;
+      const o = (j * BEYOND_PIXELS + i) * 4;
+      for (let c = 0; c < 3; c++) {
+        out[o + c] = (edge[c] + (mean[c] - edge[c]) * t) * shade;
+      }
+      out[o + 3] = 255;
+    }
+  }
+  return { data: out, width: BEYOND_PIXELS, height: BEYOND_PIXELS };
+}
+
+/**
+ * Draw {@link beyondPixels} round the sheet, so a generated land map does not
+ * sit in the page's black and land that runs off the map is not cut off
+ * against a flat sea. Further out still, the scene's background is the
+ * colour the picture fades to.
  */
 function buildBeyond(
   scene: THREE.Scene,
   disposables: { dispose(): void }[],
   surface: TerrainSurface,
-  sheet: THREE.Texture,
   pixels: ColorPixels,
 ): void {
-  const tiles = 2 * BEYOND_TILES + 1;
-  const geo = new THREE.PlaneGeometry(
-    surface.worldWidth * tiles,
-    surface.worldDepth * tiles,
+  const span = 2 * BEYOND_SHEETS + 1;
+  const picture = beyondPixels(pixels);
+  const tex = new THREE.DataTexture(
+    picture.data,
+    picture.width,
+    picture.height,
+    THREE.RGBAFormat,
   );
-  // The plane's own coordinates run 0 to 1 bottom up. The sheet's picture
-  // runs top down, so turn them over, then stretch them so the middle copy
-  // lies exactly under the sheet.
-  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
-  for (let i = 0; i < uv.count; i++) {
-    uv.setXY(
-      i,
-      uv.getX(i) * tiles - BEYOND_TILES,
-      (1 - uv.getY(i)) * tiles - BEYOND_TILES,
-    );
-  }
-  const tex = sheet.clone();
-  tex.wrapS = THREE.MirroredRepeatWrapping;
-  tex.wrapT = THREE.MirroredRepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.flipY = false;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
   tex.needsUpdate = true;
+  const geo = new THREE.PlaneGeometry(
+    surface.worldWidth * span,
+    surface.worldDepth * span,
+  );
+  // The plane's own coordinates run bottom up and the picture top down.
+  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
   const mat = new THREE.MeshBasicMaterial({ map: tex });
-  mat.color.setScalar(BEYOND_SHADE);
   disposables.push(geo, mat, tex);
   const plane = new THREE.Mesh(geo, mat);
   plane.name = "beyond-the-map";
@@ -148,9 +205,12 @@ function buildBeyond(
   scene.add(plane);
 
   const [r, g, b] = edgeColor(pixels);
-  scene.background = new THREE.Color()
-    .setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace)
-    .multiplyScalar(BEYOND_SHADE);
+  scene.background = new THREE.Color().setRGB(
+    (r * BEYOND_FAR) / 255,
+    (g * BEYOND_FAR) / 255,
+    (b * BEYOND_FAR) / 255,
+    THREE.SRGBColorSpace,
+  );
 }
 
 function isColorPixels(source: TerrainColorSource): source is ColorPixels {
@@ -231,7 +291,7 @@ export function buildTerrainMesh(
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
-      buildBeyond(scene, disposables, surface, tex, color);
+      buildBeyond(scene, disposables, surface, color);
     } else {
       tex = new THREE.CanvasTexture(color);
     }
