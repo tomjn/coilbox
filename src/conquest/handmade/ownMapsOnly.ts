@@ -39,16 +39,3 @@ export function mapsForGame(
 ): HandmadeMapSummary[] {
   return maps.filter((m) => resolveGameByShortname(m.game, [game]) === game);
 }
-
-/** The names of the games, out of `games`, that hide the generated styles. */
-export function gamesHidingGeneratedStyles<G extends InstalledGame>(
-  games: readonly G[],
-  list: Pick<HandmadeMapList, "maps" | "onlyOwnMaps">,
-  profileOnly: boolean,
-): string[] {
-  return games
-    .filter((g) =>
-      hidesGeneratedStyles(g, mapsForGame(g, list.maps), list, profileOnly),
-    )
-    .map((g) => g.name);
-}

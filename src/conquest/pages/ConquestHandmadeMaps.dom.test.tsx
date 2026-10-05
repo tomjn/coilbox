@@ -48,6 +48,7 @@ vi.mock("@picoframe/frame", async (orig) => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn(), open: h.open }));
 vi.mock("../../content/config", () => ({
+  useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useUnitsyncScan: () => ({
     data: { maps: [], games: [], errors: [] },
     error: null,
@@ -111,6 +112,11 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     loading: h.searching,
     savedLoading: false,
     error: null,
+  }),
+  useGameMapFacts: () => ({
+    loading: h.searching,
+    facts: { maps: h.maps, onlyOwnMaps: [] },
+    error: undefined,
   }),
 }));
 vi.mock("../handmade/library", () => ({

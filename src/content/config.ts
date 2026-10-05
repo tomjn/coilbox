@@ -280,6 +280,21 @@ export function useScanTargetSelection() {
  */
 const scanCache = new Map<string, ScanResult>();
 
+/**
+ * The archive record the last scan gave a game, by the file name of its primary
+ * archive, or undefined when the target has not been scanned this session. For
+ * a cache key that needs the archive's size and CRC without waiting on a scan.
+ */
+export function scannedGameArchive(
+  enginePath: string,
+  dataDir: string,
+  archiveName: string,
+): Archive | undefined {
+  return scanCache
+    .get(`${dataDir}::${enginePath}`)
+    ?.games.find((g) => g.primaryArchive.name === archiveName)?.primaryArchive;
+}
+
 /** Session cache of scan *failures*, so a failed target doesn't silently re-run
  * a multi-minute scan on every navigation. Cleared by a forced retry. */
 const scanErrorCache = new Map<string, string>();

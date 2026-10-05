@@ -11,7 +11,7 @@ import {
   hidesGeneratedStyles,
   profileOnlyOwnMaps,
 } from "../../../conquest/handmade/ownMapsOnly";
-import { useHandmadeMaps } from "../../../conquest/handmade/useHandmadeMaps";
+import { useGameMapFacts } from "../../../conquest/handmade/useHandmadeMaps";
 import { locationNoun, MAP_STYLE_OPTIONS } from "../../../conquest/mapStyle";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
@@ -111,7 +111,6 @@ export function RunSetupForm({
   const [skin, setSkin] = useState<RunSkin>("galaxy");
   // The hand-made map picked in place of a generated style, by its id.
   const [pickedMapId, setPickedMapId] = useState<string | null>(null);
-  const handmade = useHandmadeMaps();
   const [pickedLoadoutId, setLoadoutId] = useState("standard");
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
@@ -144,6 +143,14 @@ export function RunSetupForm({
   const ascensionTier = unlocks.ascensionTier;
   // The hand-made maps for this game whose author marked a Warpath start and
   // goal. A map with neither is offered only in Conquest.
+  // Read for this game alone, and the map style waits on it so a game that hides
+  // the generated styles is never offered them and then has them taken away
+  // (issue #3674).
+  const {
+    loading: stylesLoading,
+    facts: handmade,
+    error: handmadeError,
+  } = useGameMapFacts(game);
   const handmadeMaps = game
     ? handmade.maps.filter(
         (m) => m.warpath && resolveGameByShortname(m.game, [game]) === game,
@@ -155,6 +162,7 @@ export function RunSetupForm({
   // the default.
   const ownMapsOnly =
     !!game &&
+    !stylesLoading &&
     hidesGeneratedStyles(game, handmadeMaps, handmade, profileOnlyOwnMaps());
   // A map picked for another game falls back to the generated styles.
   const handmadeMap =
@@ -236,7 +244,8 @@ export function RunSetupForm({
   const aiConfig = mergeGameAi(getProfile().ai, brandingEntry?.ai);
   const enemyAi = aiForDifficulty(difficulty, ais, aiConfig);
   const enemyAiKey = enemyAi ? aiKey(enemyAi) : undefined;
-  const canGenerate = !!game && genMaps.length > 0 && !gameLoading;
+  const canGenerate =
+    !!game && genMaps.length > 0 && !gameLoading && !stylesLoading;
 
   // Why the last Begin did not start a run, so the player is told where they
   // pressed rather than sent to a run that was never saved.
@@ -416,24 +425,34 @@ export function RunSetupForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Map style">
-          <OptionSelect
-            value={handmadeMap ? `${HANDMADE_PREFIX}${handmadeMap.id}` : skin}
-            onValueChange={(v) => {
-              if (v.startsWith(HANDMADE_PREFIX)) {
-                setPickedMapId(v.slice(HANDMADE_PREFIX.length));
-              } else {
-                setPickedMapId(null);
-                setSkin(v as RunSkin);
-              }
-            }}
-            options={[
-              ...(ownMapsOnly ? [] : MAP_STYLE_OPTIONS),
-              ...handmadeMaps.map((m) => ({
-                value: `${HANDMADE_PREFIX}${m.id}`,
-                label: `${m.title} (hand-made map)`,
-              })),
-            ]}
-          />
+          {stylesLoading ? (
+            <div
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+              role="status"
+            >
+              <Loader2 className="size-4 animate-spin" aria-hidden />
+              Checking which maps this game carries…
+            </div>
+          ) : (
+            <OptionSelect
+              value={handmadeMap ? `${HANDMADE_PREFIX}${handmadeMap.id}` : skin}
+              onValueChange={(v) => {
+                if (v.startsWith(HANDMADE_PREFIX)) {
+                  setPickedMapId(v.slice(HANDMADE_PREFIX.length));
+                } else {
+                  setPickedMapId(null);
+                  setSkin(v as RunSkin);
+                }
+              }}
+              options={[
+                ...(ownMapsOnly ? [] : MAP_STYLE_OPTIONS),
+                ...handmadeMaps.map((m) => ({
+                  value: `${HANDMADE_PREFIX}${m.id}`,
+                  label: `${m.title} (hand-made map)`,
+                })),
+              ]}
+            />
+          )}
         </Field>
         {ascensionTier > 0 && (
           <Field label="Ascension">
@@ -449,9 +468,9 @@ export function RunSetupForm({
         )}
       </div>
 
-      {handmade.error && (
+      {handmadeError && (
         <ErrorBanner
-          message={`The hand-made maps could not be listed, so none is offered here. ${handmade.error}`}
+          message={`The hand-made maps could not be listed, so none is offered here. ${handmadeError}`}
         />
       )}
 

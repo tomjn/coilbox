@@ -1,12 +1,14 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
+import type { GameItem } from "../../content/bindings";
 import { useScanEpoch } from "../../content/config";
 import { createDocumentStore } from "../../lib/documentStore";
 import { usePreferredTarget } from "../../play/config";
-import type { ArchiveTarget } from "./archive";
+import { type ArchiveTarget, archiveGameOf } from "./archive";
 import {
   type HandmadeMapList,
   type HandmadeMapSummary,
   listHandmadeMaps,
+  listHandmadeMapsForGame,
   loadHandmadeMap,
   setArchiveTarget,
 } from "./library";
@@ -19,6 +21,12 @@ import type { HandmadeMapResult } from "./read";
  */
 let generation = 0;
 let appliedKey: string | undefined;
+/**
+ * Whether anything has asked for the whole list this session. Pointing the
+ * archives at a target starts the search of every game only once it has, so a
+ * form that reads one game (see {@link useGameMapFacts}) never starts it.
+ */
+let listWanted = false;
 const listeners = new Set<() => void>();
 
 /** The generation of a list that holds nothing yet. */
@@ -77,7 +85,7 @@ function applyArchiveTarget(key: string, target: ArchiveTarget | null) {
   setArchiveTarget(target);
   generation++;
   for (const listener of listeners) listener();
-  mapStore.refresh().catch(() => {});
+  if (listWanted) mapStore.refresh().catch(() => {});
 }
 
 /**
@@ -124,8 +132,17 @@ export const refreshHandmadeMaps = mapStore.refresh;
  * can show those first and say it is still searching the games.
  */
 export function useHandmadeMaps() {
+  listWanted = true;
   const at = useArchiveTarget();
   const { data, loading, error, refresh } = mapStore.useStore();
+  // A list left from before the target last changed, when nothing wanted the
+  // list to refresh it, is read again now that something does.
+  useEffect(() => {
+    const held = mapStore.getCached();
+    if (at > 0 && held && held.generation !== at) {
+      mapStore.refresh().catch(() => {});
+    }
+  }, [at]);
   const stale = !error && (at === 0 || data.generation !== at);
   const savedLoading = !error && data.generation === NOTHING_LISTED;
   return {
@@ -134,6 +151,75 @@ export function useHandmadeMaps() {
     savedLoading,
     error,
     refresh,
+  };
+}
+
+/** What a form needs to know about one game's own maps. */
+type GameMapFacts = Pick<HandmadeMapList, "maps" | "onlyOwnMaps">;
+
+const NO_FACTS: GameMapFacts = { maps: [], onlyOwnMaps: [] };
+
+/**
+ * The hand-made maps for one game and whether it asks for its own maps only,
+ * for a form that has to decide which map styles to offer (issue #3674). It
+ * reads that one game's archive, and none while no game is chosen. A game read
+ * before is answered from the cache the Conquest list shares, so switching
+ * back to it costs nothing.
+ *
+ * `loading` holds from the moment a game is chosen until its answer is in, and
+ * the form keeps its style choice empty until then, so a game that hides the
+ * generated styles never has them offered and taken away.
+ */
+export function useGameMapFacts(game: GameItem | null | undefined): {
+  loading: boolean;
+  facts: GameMapFacts;
+  /** Why the maps could not be listed, when they could not. */
+  error: string | undefined;
+} {
+  const at = useArchiveTarget();
+  const [answered, setAnswered] = useState<{
+    key: string;
+    facts: GameMapFacts;
+    error?: string;
+  }>();
+  const archive = game ? archiveGameOf(game) : undefined;
+  const key = archive
+    ? `${at}\0${archive.archive}\0${archive.size ?? ""}\0${archive.checksum ?? ""}`
+    : undefined;
+  // The game as a string, so a render that makes the same game again does not
+  // start the read again.
+  const wanted = archive ? JSON.stringify(archive) : undefined;
+  useEffect(() => {
+    if (wanted === undefined || key === undefined || at === 0) return;
+    let cancelled = false;
+    listHandmadeMapsForGame(JSON.parse(wanted)).then(
+      (facts) => {
+        if (!cancelled) setAnswered({ key, facts });
+      },
+      (e) => {
+        // The saved maps could not be listed. Nothing is known to hide the
+        // styles, so the form offers them rather than waiting for ever.
+        if (!cancelled) {
+          setAnswered({
+            key,
+            facts: NO_FACTS,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, key, at]);
+  if (key === undefined) {
+    return { loading: false, facts: NO_FACTS, error: undefined };
+  }
+  const current = answered?.key === key ? answered : undefined;
+  return {
+    loading: !current,
+    facts: current?.facts ?? NO_FACTS,
+    error: current?.error,
   };
 }
 
