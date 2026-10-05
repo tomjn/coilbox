@@ -8,6 +8,8 @@ export interface WriteRootCandidate {
   id: string;
   path: string;
   portable: boolean;
+  /** The distribution's bundled content folder, which is never written into. */
+  bundled?: boolean;
 }
 
 /** Whether `path` is the package dir or sits inside it (mirrors the health check). */
@@ -39,14 +41,19 @@ export function packageDirOf(portableRoot: string): string | null {
  *   external write root dragged in by copying/renaming a package — the footgun where
  *   downloads would otherwise land beside the *old* folder, not the running one.
  *
+ * The bundled content folder (`.coilbox/content`) is never chosen, configured or
+ * not. It sits inside the package and is marked portable, so without this it
+ * would pass both tests above, and coilbox does not write into it.
+ *
  * Returns `undefined` only when nothing usable exists (no configured root and, when
  * portable, no in-package root either).
  */
 export function healWriteRoot(
-  roots: WriteRootCandidate[],
+  allRoots: WriteRootCandidate[],
   writeRootId: string | undefined,
   packageDir: string | null,
 ): WriteRootCandidate | undefined {
+  const roots = allRoots.filter((r) => !r.bundled);
   const configured = writeRootId
     ? roots.find((r) => r.id === writeRootId)
     : undefined;

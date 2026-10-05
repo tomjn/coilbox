@@ -8,6 +8,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  contentBundleCancel,
+  contentBundleInstallEngine,
+} from "../content/bindings";
 import { invalidateScans } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
 import {
@@ -79,6 +83,15 @@ export type EnqueueInput = (
       kind: "engineSpring";
       label: string;
       args: { version: string; writePath?: string };
+    }
+  | {
+      // A distribution's bundled engine copied into the download destination
+      // (issue #3668). Nothing is downloaded, but it installs an engine the way
+      // the two kinds above do, so it runs in the same lane with the same
+      // rescan and cache warm after it.
+      kind: "engineBundled";
+      label: string;
+      args: { version: string; platform?: string | null; writePath: string };
     }
 ) & {
   /**
@@ -161,6 +174,8 @@ export function identityOf(input: EnqueueInput): string {
       return `engine:recoil:${input.args.version}`;
     case "engineSpring":
       return `engine:spring:${input.args.version}`;
+    case "engineBundled":
+      return `engine:bundled:${input.args.platform ?? ""}:${input.args.version}`;
   }
 }
 
@@ -395,6 +410,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             }),
           );
           return;
+        case "engineBundled":
+          await installEngine(() =>
+            contentBundleInstallEngine({
+              ...item.args,
+              opId: item.id,
+              onProgress: progressChannel(onProgress),
+            }),
+          );
+          return;
       }
     },
     [],
@@ -538,8 +562,12 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       const item = itemsRef.current.find((i) => i.id === id);
       if (!item) return;
       if (item.status === "active") {
-        // Best-effort backend stop, and `run`'s catch marks it canceled.
-        dlCancel({ opId: id }).catch(() => {});
+        // Best-effort backend stop, and `run`'s catch marks it canceled. A
+        // bundled engine copy runs in the content plugin, not the downloads
+        // one, so it is stopped there.
+        const stop =
+          item.kind === "engineBundled" ? contentBundleCancel : dlCancel;
+        stop({ opId: id }).catch(() => {});
       } else if (item.status === "queued") {
         itemsRef.current = itemsRef.current.filter((i) => i.id !== id);
         setItems((list) => list.filter((i) => i.id !== id));

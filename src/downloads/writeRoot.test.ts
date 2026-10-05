@@ -64,4 +64,17 @@ describe("healWriteRoot", () => {
   it("is undefined when no root is configured and none is in-package", () => {
     expect(healWriteRoot([outside], undefined, pkg)).toBeUndefined();
   });
+
+  it("never picks the bundled content folder, even when it is configured", () => {
+    // Inside the package and portable, so it passes every other test here.
+    const bundle: WriteRootCandidate = {
+      id: "bundle",
+      path: "E:\\Coilbox-test\\.coilbox\\content",
+      portable: true,
+      bundled: true,
+    };
+    expect(healWriteRoot([bundle, inside], "bundle", pkg)).toBe(inside);
+    expect(healWriteRoot([bundle, insideSub], undefined, pkg)).toBe(insideSub);
+    expect(healWriteRoot([bundle], "bundle", null)).toBeUndefined();
+  });
 });

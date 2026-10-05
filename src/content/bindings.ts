@@ -1,5 +1,6 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
+import type { DownloadProgress } from "../downloads/bindings";
 
 /**
  * Typed bindings to `plugin:coilbox-content|*` (crate `tauri-plugin-coilbox-content`,
@@ -53,6 +54,14 @@ export interface ContentRoot {
   /** Stored as a path relative to the app dir — a portable root that follows the
    * executable when the whole package is moved. */
   portable: boolean;
+  /**
+   * The distribution's bundled content folder (`.coilbox/content`). Read in
+   * place, searched after every other root and never written into, so it is
+   * never a download destination. Lists no engines: a bundled engine is copied
+   * into the player's own folder before it runs. Absent from a snapshot written
+   * before the field existed.
+   */
+  bundled?: boolean;
   /** Present when a manual root was added despite failing validation. */
   forced?: boolean;
   counts: RootCounts;
@@ -761,6 +770,83 @@ export const contentDeleteArchive = defineCommand<
   { path: string },
   { bytes: number }
 >("coilbox-content", "content_delete_archive");
+
+/** One engine a distribution's bundled content folder carries (issue #3668). */
+export interface BundledEngine {
+  /** Its platform folder, such as `macos_arm64`, or absent for `engine/<version>/`. */
+  platform?: string | null;
+  /** The version folder name. */
+  version: string;
+  /** Relative to the bundle folder. */
+  path: string;
+  /** What installing it copies. */
+  bytes: number;
+  forThisPlatform: boolean;
+  /** Already in one of the player's own content folders, by version. */
+  installed: boolean;
+}
+
+/** The kinds of authoring mistake `contentBundleInspect` reports. */
+export type BundleProblemKind =
+  | "looseArchive"
+  | "stray"
+  | "packagesWithoutPool"
+  | "looseGame"
+  | "unknownPlatform"
+  | "engineAtTop"
+  | "unreadableEngine"
+  | "noEngineForThisPlatform"
+  | "empty";
+
+/** One authoring mistake in the bundle, for the distribution health checklist. */
+export interface BundleProblem {
+  kind: BundleProblemKind;
+  /** Relative to the bundle folder. */
+  path: string;
+  detail?: string;
+}
+
+/** What the bundle holds, counted by file, and what is wrong with it. */
+export interface BundleReport {
+  path: string;
+  games: number;
+  maps: number;
+  packages: number;
+  engines: BundledEngine[];
+  problems: BundleProblem[];
+}
+
+/**
+ * The distribution's bundled content, or `bundle: null` when it has none, which
+ * is every install that is not portable. `writePath` is the download
+ * destination, used to tell whether a bundled engine is already installed.
+ */
+export const contentBundleInspect = defineCommand<
+  { writePath?: string },
+  { bundle: BundleReport | null }
+>("coilbox-content", "content_bundle_inspect");
+
+/**
+ * Copy the bundled engine for this platform into `writePath`, the way a
+ * download would install it. `copied` is false when it was already there.
+ * Cancelled through {@link contentBundleCancel} with the same `opId`.
+ */
+export const contentBundleInstallEngine = defineCommand<
+  {
+    writePath: string;
+    platform?: string | null;
+    version: string;
+    opId?: string;
+    onProgress: Channel<DownloadProgress>;
+  },
+  { path: string; copied: boolean; bytes: number }
+>("coilbox-content", "content_bundle_install_engine");
+
+/** Stop the engine copy started with this `opId`. */
+export const contentBundleCancel = defineCommand<
+  { opId: string },
+  { cancelled: boolean }
+>("coilbox-content", "content_bundle_cancel");
 
 /** What a gather moved out of the engine folders, or would move (issue #971). */
 export interface GatherSummary {
