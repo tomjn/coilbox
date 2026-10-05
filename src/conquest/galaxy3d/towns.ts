@@ -112,6 +112,35 @@ export function leavingAngle(
   return Math.atan2(dz, dx);
 }
 
+/**
+ * For each anchor, the directions every line ending on it leaves in, as
+ * {@link leavingAngle} reads them. A road or a crossing's track ends exactly
+ * on its location's anchor, so an end matches an anchor only when the two
+ * are the same point. Anchors and lines are in map units.
+ */
+export function roadEntries(
+  anchors: [number, number][],
+  lines: [number, number][][],
+  toWorld: (x: number, y: number) => [number, number],
+  reach: number,
+): number[][] {
+  const at = new Map<string, number[]>();
+  anchors.forEach(([x, y], i) => {
+    const key = `${x} ${y}`;
+    at.set(key, [...(at.get(key) ?? []), i]);
+  });
+  const out: number[][] = anchors.map(() => []);
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    for (const run of [line, [...line].reverse()]) {
+      for (const i of at.get(`${run[0][0]} ${run[0][1]}`) ?? []) {
+        out[i].push(leavingAngle(run, toWorld, reach));
+      }
+    }
+  }
+  return out;
+}
+
 /** One town per site, in the same order. `seed` is the map's scene seed. */
 export function planTowns(sites: TownSite[], seed: number): Town[] {
   return sites.map((site, node) => {

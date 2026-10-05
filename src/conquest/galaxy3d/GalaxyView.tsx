@@ -10,6 +10,7 @@ import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
+import { planCrossings } from "./crossingPlan";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
@@ -573,10 +574,19 @@ export function GalaxyView({
     let ground: GroundLayer | undefined;
     // A town at every location. See townLayer.ts.
     let towns: TownLayer | undefined;
+    // Where each sea crossing runs. Its tracks to the shore are painted with
+    // the roads. See crossingPlan.ts.
+    const crossingPlan = surface ? planCrossings(galaxy, surface) : undefined;
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
-      ground = buildGroundLayer(disposables, galaxy, surface, terrainHeights);
+      ground = buildGroundLayer(
+        disposables,
+        galaxy,
+        surface,
+        terrainHeights,
+        crossingPlan?.tracks,
+      );
       // Towns on a generated map only. A hand-made map's picture is its
       // author's and may show its own, and performance mode goes without.
       if (!performanceMode && terrainColor) {
@@ -797,6 +807,7 @@ export function GalaxyView({
                   }
                 : undefined,
             }),
+            crossingPlan && ground ? { plan: crossingPlan, ground } : undefined,
           )
         : undefined;
 

@@ -2,14 +2,13 @@ import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import type { GroundLayer } from "./groundLayer";
 import { sceneSeed } from "./roadNetwork";
-import { roadLinks } from "./roads";
 import type { TerrainSurface } from "./terrain";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   buildableAt,
   buildTownIndex,
-  leavingAngle,
   planTowns,
+  roadEntries,
   type Town,
   townDataTexels,
   townPatches,
@@ -158,20 +157,13 @@ function planMapTowns(
   roads: GroundLayer["roads"],
 ): Town[] {
   const toWorld = (x: number, y: number) => surface.mapToWorldXZ(x, y);
-  const index = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
-  const entries: number[][] = galaxy.nodes.map(() => []);
-  roadLinks(galaxy).forEach(({ a, b }, k) => {
-    const line = roads[k]?.line;
-    if (!line || line.length < 2) return;
-    const ia = index.get(a);
-    const ib = index.get(b);
-    if (ia !== undefined) {
-      entries[ia].push(leavingAngle(line, toWorld, ENTRY_REACH));
-    }
-    if (ib !== undefined) {
-      entries[ib].push(leavingAngle([...line].reverse(), toWorld, ENTRY_REACH));
-    }
-  });
+  // Every road and every crossing's track to its landing ends on an anchor.
+  const entries = roadEntries(
+    galaxy.nodes.map((n) => [n.pos[0], n.pos[1]]),
+    roads.map((r) => r.line),
+    toWorld,
+    ENTRY_REACH,
+  );
   return planTowns(
     galaxy.nodes.map((n, i) => {
       const [x, z] = toWorld(n.pos[0], n.pos[1]);

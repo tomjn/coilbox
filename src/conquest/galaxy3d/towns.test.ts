@@ -8,6 +8,7 @@ import {
   leavingAngle,
   planTowns,
   roadAxis,
+  roadEntries,
   STEEP_SLOPE,
   TOWN_RADIUS,
   TOWN_REACH,
@@ -55,6 +56,41 @@ describe("leavingAngle", () => {
     ];
     const angle = leavingAngle(line, (x, y) => [x, y], 1);
     expect(angle).toBeCloseTo(Math.PI / 4, 5);
+  });
+});
+
+describe("roadEntries", () => {
+  it("gives each anchor the roads and tracks that end on it, whichever way they run", () => {
+    const anchors: [number, number][] = [
+      [0, 0],
+      [10, 0],
+      [5, 5],
+    ];
+    const entries = roadEntries(
+      anchors,
+      [
+        // A road from the first anchor to the second.
+        [
+          [0, 0],
+          [10, 0],
+        ],
+        // A crossing's track from the third anchor down to a landing.
+        [
+          [5, 5],
+          [5, 9],
+        ],
+        // A track that ends on no anchor.
+        [
+          [1, 1],
+          [2, 2],
+        ],
+      ],
+      (x, y) => [x, y],
+      1,
+    );
+    expect(entries[0]).toEqual([0]);
+    expect(entries[1].map(Math.abs)).toEqual([Math.PI]);
+    expect(entries[2]).toEqual([Math.PI / 2]);
   });
 });
 
