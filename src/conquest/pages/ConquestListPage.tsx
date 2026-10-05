@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Dices,
   Download,
+  Loader2,
   Map as MapIcon,
   MapPlus,
   Orbit,
@@ -420,8 +421,10 @@ export default function ConquestListPage() {
           )}
           {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
-      ) : loading || handmade.loading ? (
+      ) : loading || handmade.savedLoading ? (
         <SkeletonList />
+      ) : nothingListed && handmade.loading ? (
+        <SearchingGames />
       ) : nothingListed ? (
         <EmptyState label="No conquest maps yet. Generate one for any installed game, or import a map or a challenge." />
       ) : (
@@ -530,9 +533,26 @@ export default function ConquestListPage() {
               </ul>
             </section>
           )}
+          {handmade.loading && <SearchingGames />}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Said while the installed games are searched for maps they carry, which takes
+ * one unitsync run a game. The rest of the list is already up (issue #3616).
+ */
+function SearchingGames() {
+  return (
+    <p
+      role="status"
+      className="flex items-center gap-2 text-sm text-muted-foreground"
+    >
+      <Loader2 className="size-4 animate-spin" aria-hidden />
+      Searching your installed games for maps they carry.
+    </p>
   );
 }
 
@@ -1343,6 +1363,10 @@ function GenerateGalaxyForm({
     </>
   ) : scan.error ? (
     `The content scan failed, so installed games are not listed: ${scan.error}`
+  ) : handmade.loading ? (
+    // Which games hide the generated styles is not known yet, and a game
+    // offered now could be taken away when it is (issue #3616).
+    "Checking which of your games carry their own maps."
   ) : initialGameName && onlyOwnMaps.includes(initialGameName) ? (
     `${initialGameName} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
   ) : gameChoices.length === 0 && ownMapsOnly.length > 0 ? (

@@ -21,14 +21,38 @@ let generation = 0;
 let appliedKey: string | undefined;
 const listeners = new Set<() => void>();
 
+/** The generation of a list that holds nothing yet. */
+const NOTHING_LISTED = -2;
+/** The generation of a list of the saved maps alone, before any game is read. */
+const SAVED_ONLY = -1;
+
+/**
+ * A list and the generation of game archives it covers. {@link SAVED_ONLY}
+ * and {@link NOTHING_LISTED} cover none.
+ */
 type StoredList = HandmadeMapList & { generation: number };
+
+function coversArchives(list: StoredList | null): boolean {
+  return list !== null && list.generation >= 0;
+}
 
 /**
  * List the maps for the current generation. A listing started before the
  * target changed is run again, so a slow read of an old target never lands
  * on top of a newer one.
+ *
+ * Reading the game archives takes one unitsync run a game, so while no list
+ * covers them the saved maps are published first and the page can show them
+ * (issue #3616). A list that already covers an older generation stays up
+ * instead, so a rescan does not take the archive maps away and give them back.
  */
 async function listCurrent(): Promise<StoredList> {
+  if (!coversArchives(mapStore.getCached())) {
+    const saved = await listHandmadeMaps({ archives: false });
+    if (!coversArchives(mapStore.getCached())) {
+      mapStore.publish({ ...saved, generation: SAVED_ONLY });
+    }
+  }
   for (;;) {
     const at = generation;
     const list = await listHandmadeMaps();
@@ -44,7 +68,7 @@ const mapStore = createDocumentStore<StoredList>(listCurrent, {
   maps: [],
   unreadable: [],
   onlyOwnMaps: [],
-  generation: -1,
+  generation: NOTHING_LISTED,
 });
 
 function applyArchiveTarget(key: string, target: ArchiveTarget | null) {
@@ -91,14 +115,26 @@ function useArchiveTarget(): number {
 /** Re-read the map folders. Call after an import or a remove. */
 export const refreshHandmadeMaps = mapStore.refresh;
 
-/** Every hand-made map, and the folders that could not be listed. */
+/**
+ * Every hand-made map, and the folders that could not be listed.
+ *
+ * `loading` holds until the list covers the game archives of the current
+ * target, because before then a map a game carries would look missing.
+ * `savedLoading` holds only until the saved maps are known, for a page that
+ * can show those first and say it is still searching the games.
+ */
 export function useHandmadeMaps() {
   const at = useArchiveTarget();
   const { data, loading, error, refresh } = mapStore.useStore();
-  // Until the list covers the game archives of the current target, a map a
-  // game carries would look missing, so the list counts as loading.
   const stale = !error && (at === 0 || data.generation !== at);
-  return { ...data, loading: loading || stale, error, refresh };
+  const savedLoading = !error && data.generation === NOTHING_LISTED;
+  return {
+    ...data,
+    loading: loading || stale,
+    savedLoading,
+    error,
+    refresh,
+  };
 }
 
 /** A listed map from the session cache, for callers outside React. */

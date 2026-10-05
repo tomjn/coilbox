@@ -78,6 +78,19 @@ vi.mock("../conquests", () => ({
   useConquestState: () => ({ file: { conquests: {} }, saveFor: vi.fn() }),
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogo: () => null }));
+// The form waits for the game archives to be searched, which this test is not
+// about, so the search has answered with nothing.
+vi.mock("../handmade/useHandmadeMaps", () => ({
+  refreshHandmadeMaps: vi.fn(),
+  useHandmadeMaps: () => ({
+    maps: [],
+    unreadable: [],
+    onlyOwnMaps: [],
+    loading: false,
+    savedLoading: false,
+    error: null,
+  }),
+}));
 // The unlocks live in the frame's settings store, which this page is rendered
 // without.
 vi.mock("../useUnlocks", () => ({

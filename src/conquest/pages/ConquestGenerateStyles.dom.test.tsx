@@ -23,6 +23,8 @@ const h = vi.hoisted(() => ({
   onlyOwnMaps: [] as string[],
   maps: [] as { id: string; game: { shortname: string } }[],
   profile: {} as Record<string, unknown>,
+  /** The game archives are still being searched for maps they carry. */
+  searching: false,
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -125,7 +127,8 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     maps: h.maps,
     unreadable: [],
     onlyOwnMaps: h.onlyOwnMaps,
-    loading: false,
+    loading: h.searching,
+    savedLoading: false,
     error: null,
   }),
 }));
@@ -201,6 +204,7 @@ beforeEach(() => {
   h.onlyOwnMaps = [];
   h.maps = [];
   h.profile = {};
+  h.searching = false;
   vi.useFakeTimers();
 });
 afterEach(() => {
@@ -329,6 +333,18 @@ describe("Conquest generate form: a game that wants its own maps", () => {
       "Cities (roads across generated land)",
       "Territories (provinces on generated land)",
     ]);
+  });
+});
+
+describe("Conquest generate form: before the games are searched", () => {
+  it("offers no game until it knows which hide the generated styles", () => {
+    h.searching = true;
+    openForm();
+    expect(
+      screen.getByText("Checking which of your games carry their own maps."),
+    ).toBeTruthy();
+    expect(headings()).not.toContain("Map style");
+    expect(document.querySelectorAll("select")).toHaveLength(0);
   });
 });
 
