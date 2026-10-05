@@ -11,8 +11,9 @@ import {
   layoutStrategicMap,
   MARKER_LIFT,
   sampleHeightGrid,
+  TERRAIN_SUN,
   terrainCameraLimits,
-  terrainShades,
+  terrainNormalPixels,
   terrainSpecOf,
   terrainTriangles,
 } from "./terrain";
@@ -190,26 +191,52 @@ describe("createTerrainSurface", () => {
   });
 });
 
-describe("terrainShades", () => {
-  it("leaves level ground at exactly 1", () => {
-    const flat = createTerrainSurface({ width: 100, height: 100 }, 100);
-    expect(Array.from(terrainShades(flat))).toEqual([1, 1, 1, 1]);
+describe("terrainNormalPixels", () => {
+  const rgba = (bytes: Uint8Array, i: number) =>
+    Array.from(bytes.slice(i * 4, i * 4 + 4));
+
+  it("points level ground straight up and carries its height in alpha", () => {
+    const grid: HeightGrid = {
+      data: new Float32Array(4).fill(0.5),
+      width: 2,
+      height: 2,
+    };
+    const s = createTerrainSurface({ width: 100, height: 100 }, 100, grid);
+    const bytes = terrainNormalPixels(s, grid);
+    expect(bytes.length).toBe(16);
+    for (let i = 0; i < 4; i++)
+      expect(rgba(bytes, i)).toEqual([128, 255, 128, 128]);
   });
 
-  it("brightens a slope facing north west and darkens one facing away", () => {
+  it("tilts the normal away from the rise", () => {
+    const s = createTerrainSurface(
+      { width: 100, height: 100, heightScale: 40 },
+      100,
+      ramp,
+    );
+    const [r, g, b, a] = rgba(terrainNormalPixels(s, ramp), 1);
+    // Rising toward +x, so the normal leans toward -x and not along z.
+    expect(r).toBeLessThan(128);
+    expect(g).toBeGreaterThan(128);
+    expect(b).toBe(128);
+    expect(a).toBe(255);
+  });
+
+  it("turns the north and west of a peak toward the sun", () => {
     const s = createTerrainSurface(
       { width: 100, height: 100, heightScale: 40 },
       100,
       peak,
     );
-    const shades = terrainShades(s);
-    // Vertices run top row first, 3 across. The north and west edges look
-    // up at the peak from the sunny side, the south and east from the far side.
-    expect(shades[1]).toBeGreaterThan(1);
-    expect(shades[3]).toBeGreaterThan(1);
-    expect(shades[7]).toBeLessThan(1);
-    expect(shades[5]).toBeLessThan(1);
-    expect(Math.min(...shades)).toBeGreaterThanOrEqual(0.45);
+    const bytes = terrainNormalPixels(s, peak);
+    const facing = (i: number) => {
+      const [r, g, b] = rgba(bytes, i).map((v) => v / 127.5 - 1);
+      const [sx, sy, sz] = TERRAIN_SUN;
+      return r * sx + g * sy + b * sz;
+    };
+    // North and west of the peak face the sun, south and east face away.
+    expect(facing(1)).toBeGreaterThan(facing(7));
+    expect(facing(3)).toBeGreaterThan(facing(5));
   });
 });
 

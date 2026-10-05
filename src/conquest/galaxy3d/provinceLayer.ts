@@ -35,8 +35,8 @@ const BORDER_LIFT = 0.1;
 const CAPITAL_LIFT = 0.15;
 
 /** Line widths in world units. A point marker's disc is 2.7 across. */
-const BORDER_WIDTH = 0.2;
-const STRONG_BORDER_WIDTH = 0.55;
+const BORDER_WIDTH = 0.12;
+const STRONG_BORDER_WIDTH = 0.4;
 
 /** World gap between a capital star's southern edge and its name. */
 const CAPITAL_LABEL_GAP = 0.5;

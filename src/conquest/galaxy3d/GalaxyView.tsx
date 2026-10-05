@@ -572,6 +572,8 @@ export function GalaxyView({
         surface,
         terrainColor ?? terrainSpec.image,
         renderRef,
+        terrainHeights,
+        !performanceMode,
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {

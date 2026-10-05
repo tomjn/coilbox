@@ -1,14 +1,16 @@
 import * as THREE from "three";
 import {
+  type HeightGrid,
   type TerrainSurface,
-  terrainShades,
+  terrainNormalPixels,
   terrainTriangles,
 } from "./terrain";
+import { applyTerrainShader } from "./terrainShader";
 
 /**
  * The terrain sheet as a three.js mesh: the map picture laid over a
- * {@link TerrainSurface}, raised where the surface is, with shaded relief
- * baked into its vertex colours. The maths lives in `terrain.ts`.
+ * {@link TerrainSurface}, raised where the surface is, lit and given surface
+ * detail in its shader (`terrainShader.ts`). The maths lives in `terrain.ts`.
  */
 
 /** Raw RGBA bytes, top row first, as a canvas or `ImageData` gives them. */
@@ -32,15 +34,13 @@ export type TerrainColorSource =
 /** Shown until a picture given as a URL has loaded, and if it fails to. */
 const PLACEHOLDER_COLOR = 0x2a3242;
 
-/** Sheet geometry for a surface: positions, picture coordinates and shading. */
+/** Sheet geometry for a surface: positions and picture coordinates. */
 export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
   const { segmentsX, segmentsY, vertexHeights } = surface;
   const cols = segmentsX + 1;
   const count = cols * (segmentsY + 1);
   const positions = new Float32Array(count * 3);
   const uvs = new Float32Array(count * 2);
-  const colors = new Float32Array(count * 3);
-  const shades = terrainShades(surface);
   for (let j = 0; j <= segmentsY; j++) {
     for (let i = 0; i <= segmentsX; i++) {
       const v = j * cols + i;
@@ -54,13 +54,11 @@ export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
       // The top of the picture is v = 0. Every texture below turns flipY off
       // to match, so a URL, a canvas and raw pixels all land the same way up.
       uvs.set([u, w], v * 2);
-      colors.fill(shades[v], v * 3, v * 3 + 3);
     }
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
   geo.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
-  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
   geo.setIndex(
     new THREE.BufferAttribute(terrainTriangles(segmentsX, segmentsY), 1),
   );
@@ -244,6 +242,11 @@ function isColorPixels(source: TerrainColorSource): source is ColorPixels {
  * A picture given as a URL loads in the background: the sheet shows a plain
  * placeholder colour until it arrives, then `renderRef` redraws. A picture
  * that fails to load is reported once and the placeholder stays.
+ *
+ * `heights` lights the sheet's slopes per pixel. A generated map, whose
+ * picture comes as pixels, also gets procedural texture by biome unless
+ * `detail` is off, as it is in performance mode. A hand-made map's painted
+ * picture is left as its author drew it.
  */
 export function buildTerrainMesh(
   scene: THREE.Scene,
@@ -251,12 +254,34 @@ export function buildTerrainMesh(
   surface: TerrainSurface,
   color: TerrainColorSource,
   renderRef: { current: (() => void) | null },
+  heights?: HeightGrid,
+  detail = true,
 ): THREE.Mesh {
   const geo = terrainGeometry(surface);
-  // Unlit: the relief shading is already in the vertex colours, which leaves
-  // the scene's lights to the few lit objects that expect them.
-  const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  // Unlit: the shader lights the sheet itself, which leaves the scene's
+  // lights to the few lit objects that expect them.
+  const mat = new THREE.MeshBasicMaterial();
   disposables.push(geo, mat);
+  let normals: THREE.DataTexture | null = null;
+  if (heights && surface.maxHeight > 0) {
+    normals = new THREE.DataTexture(
+      terrainNormalPixels(surface, heights),
+      heights.width,
+      heights.height,
+      THREE.RGBAFormat,
+    );
+    normals.flipY = false;
+    normals.magFilter = THREE.LinearFilter;
+    normals.minFilter = THREE.LinearMipmapLinearFilter;
+    normals.generateMipmaps = true;
+    normals.needsUpdate = true;
+    disposables.push(normals);
+  }
+  applyTerrainShader(
+    mat,
+    { normals, detail: detail && isColorPixels(color) },
+    disposables,
+  );
 
   const applyTexture = (tex: THREE.Texture) => {
     tex.colorSpace = THREE.SRGBColorSpace;
