@@ -37,6 +37,8 @@ export interface Visibility {
   /** Advance the ambient combat flash pulse. Call once per animation frame,
    * only while `effects` is on (reduce-motion never calls this). */
   tick: (now: number) => void;
+  /** Whether any location shows combat flashes, so the loop keeps drawing. */
+  isFlashing: () => boolean;
 }
 
 export function createVisibility(
@@ -251,5 +253,5 @@ export function createVisibility(
     }
   };
 
-  return { apply, tick };
+  return { apply, tick, isFlashing: () => flashEnabled.size > 0 };
 }

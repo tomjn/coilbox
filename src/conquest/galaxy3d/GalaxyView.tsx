@@ -13,6 +13,7 @@ import { buildCityLayer } from "./cityLayer";
 import { buildCueLayer } from "./cueLayer";
 import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
+import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -521,7 +522,6 @@ export function GalaxyView({
     let labelRenderer: CSS2DRenderer | undefined;
     let controls: OrbitControls | undefined;
     let observer: ResizeObserver | undefined;
-    let animationFrame: number | undefined;
 
     const scene = new THREE.Scene();
     const uTime = { value: 0 };
@@ -886,6 +886,7 @@ export function GalaxyView({
         controls.update();
       } else {
         snapBack = true;
+        requestRender();
       }
     });
     const easeHeading = () => {
@@ -937,19 +938,19 @@ export function GalaxyView({
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     };
-    // Draw at most once a frame. OrbitControls fires "change" from its pointer
-    // handler and again from the loop's update, and drawing on each drew the
-    // scene up to three times a frame with only the last one shown. The loop
-    // draws every frame, so it needs nothing more. Under reduce-motion there
-    // is no loop and one frame is asked for.
-    let requestedFrame: number | undefined;
-    const requestRender = () => {
-      if (!reduceMotion || requestedFrame !== undefined) return;
-      requestedFrame = requestAnimationFrame(() => {
-        requestedFrame = undefined;
-        render();
-      });
+    // Draw on demand, at most once a frame (issue #3653). Anything that
+    // changes the picture asks for a frame, and a frame asks for the next one
+    // only while something still moves. OrbitControls fires "change" from its
+    // pointer handler and again from the loop's update, and each is one more
+    // request for the same frame. The animation loop below replaces
+    // `drawFrame` when motion is allowed. Under reduce-motion a frame only
+    // draws.
+    let drawFrame = (): boolean => {
+      render();
+      return false;
     };
+    const frames = createFrameScheduler(() => drawFrame());
+    const requestRender = frames.request;
     renderRef.current = requestRender;
     controls.addEventListener("change", () => {
       clampTarget();
@@ -1110,7 +1111,7 @@ export function GalaxyView({
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
       }
-      if (reduceMotion) render();
+      requestRender();
     };
     const onPointerDown = (event: PointerEvent) => {
       downAt = [event.clientX, event.clientY];
@@ -1171,18 +1172,28 @@ export function GalaxyView({
       factionOnlyRebuild,
       camPoseRef.current,
     );
-    applyFocusRef.current = () => cameraFocus.apply(false);
+    applyFocusRef.current = () => {
+      cameraFocus.apply(false);
+      requestRender();
+    };
+    // A burst starts from a prop change, so it asks for the frames it plays in.
+    applyBurstRef.current = () => {
+      winBurst.apply();
+      requestRender();
+    };
 
     /* ---------------------------- animation loop --------------------------- */
 
-    // Continuous only when motion is allowed: the intro warp, twinkle time,
-    // binary-companion orbits, ring pulses and control damping. Under
-    // reduce-motion the scene renders on demand and stays perfectly still.
+    // Only when motion is allowed: the intro warp, twinkle time, binary
+    // orbits, ring pulses and control damping. A frame keeps the next one
+    // coming while any of them runs, see frameDemand.ts. A Galaxy or Theatre
+    // map always has something moving. Under reduce-motion the scene draws
+    // on demand and stays perfectly still.
     if (!reduceMotion) {
-      const animate = () => {
-        animationFrame = requestAnimationFrame(animate);
+      drawFrame = (): boolean => {
+        // The clock the eases started on, not the frame's own timestamp,
+        // which can sit a little before a start taken in the same frame.
         const now = performance.now();
-
         // Intro warp-in: drive sprite scales, lane opacity and the camera.
         if (introActive) {
           if (introStartedAt < 0) introStartedAt = now;
@@ -1346,17 +1357,32 @@ export function GalaxyView({
 
         // Controls own the camera only in the free overview — not during the
         // intro, a focus ease, or while a node is focused (controls locked).
+        let cameraMoved = false;
         if (
           !introActive &&
           !cameraFocus.isAnimating() &&
           !cameraFocus.isFocused()
         ) {
           easeHeading();
-          controls?.update();
+          cameraMoved = controls?.update() ?? false;
         }
         render();
+        const selectedIdx = selection.getIndex();
+        return needsAnotherFrame({
+          alwaysMoving: !surface,
+          intro: introActive,
+          focusEase: cameraFocus.isAnimating(),
+          headingEase: snapBack,
+          cameraMoved,
+          burst: winBurst.isPlaying(),
+          selectionPulse:
+            (selectedIdx >= 0 && !!ownerRings[selectedIdx]) ||
+            !!cities?.has(selectedRef.current ?? ""),
+          combatFlashes: visibility.isFlashing(),
+          effects,
+        });
       };
-      animationFrame = requestAnimationFrame(animate);
+      requestRender();
     }
 
     const resize = () => {
@@ -1378,8 +1404,7 @@ export function GalaxyView({
     resize();
 
     return () => {
-      if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
-      if (requestedFrame !== undefined) cancelAnimationFrame(requestedFrame);
+      frames.cancel();
       // Remember the final pose so a faction-switch rebuild can ease from here.
       camPoseRef.current = {
         pos: camera.position.clone(),
@@ -1427,8 +1452,7 @@ export function GalaxyView({
     modelSources,
   ]);
 
-  // Prop changes mutate the live scene (and render a frame when the loop is
-  // idle under reduce-motion). Fog changes touch both lanes (via owners.ts's
+  // Prop changes mutate the live scene and ask for a frame. Fog changes touch both lanes (via owners.ts's
   // apply) and the per-node styling.
   useEffect(() => {
     ownersRef.current = owners;
@@ -1440,7 +1464,7 @@ export function GalaxyView({
     attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
-    if (reduceMotion) renderRef.current?.();
+    renderRef.current?.();
   }, [
     owners,
     visibleIds,
@@ -1449,15 +1473,14 @@ export function GalaxyView({
     closedLinks,
     inertIds,
     attackableIds,
-    reduceMotion,
   ]);
 
   useEffect(() => {
     selectedRef.current = selectedId;
     incursionRef.current = incursion;
     applySelectionRef.current?.();
-    if (reduceMotion) renderRef.current?.();
-  }, [selectedId, incursion, reduceMotion]);
+    renderRef.current?.();
+  }, [selectedId, incursion]);
 
   useEffect(() => {
     focusRef.current = focusNodeId;
