@@ -410,12 +410,32 @@ fn copy_file(
     }
     dst.sync_all()
         .map_err(|e| format!("could not write {}: {e}", to.display()))?;
-    let perms = std::fs::metadata(from)
-        .map_err(|e| format!("could not read {}: {e}", from.display()))?
-        .permissions();
+    let perms = owner_writable(
+        std::fs::metadata(from)
+            .map_err(|e| format!("could not read {}: {e}", from.display()))?
+            .permissions(),
+    );
     std::fs::set_permissions(to, perms)
         .map_err(|e| format!("could not set permissions on {}: {e}", to.display()))?;
     Ok(())
+}
+
+/// `perms` with the owner allowed to write. A bundle is often read-only, and
+/// the engine rewrites its own `springsettings.cfg` in the folder it runs from,
+/// so a copy that kept a read-only mode would be an engine that cannot save its
+/// settings.
+fn owner_writable(perms: std::fs::Permissions) -> std::fs::Permissions {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::Permissions::from_mode(perms.mode() | 0o200)
+    }
+    #[cfg(not(unix))]
+    {
+        let mut perms = perms;
+        perms.set_readonly(false);
+        perms
+    }
 }
 
 fn make_link(src_root: &Path, rel: &Path, target: &Path, dest: &Path) -> Result<(), String> {
@@ -1064,6 +1084,36 @@ mod tests {
         assert!(!dest_root.join("engine/105.2").exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn a_read_only_bundle_still_installs_an_engine_that_can_save_its_settings() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("bundle/engine/105.1");
+        fake_engine(&src);
+        for f in ["springsettings.cfg", "spring"] {
+            let p = src.join(f);
+            let mode = fs::metadata(&p).unwrap().permissions().mode();
+            fs::set_permissions(&p, fs::Permissions::from_mode(mode & 0o555)).unwrap();
+        }
+        let dest_root = tmp.path().join("player");
+        fs::create_dir_all(&dest_root).unwrap();
+        install_engine(
+            &src,
+            &dest_root,
+            None,
+            "105.1",
+            plenty,
+            &AtomicBool::new(false),
+            |_, _| {},
+        )
+        .unwrap();
+        let dest = dest_root.join("engine/105.1");
+        let mode = |f: &str| fs::metadata(dest.join(f)).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode("springsettings.cfg"), 0o644);
+        assert_eq!(mode("spring"), 0o755);
+    }
+
     #[test]
     fn installed_matches_by_version_and_compatible_platform() {
         let own = vec![
@@ -1086,3 +1136,4 @@ mod tests {
         );
     }
 }
+
