@@ -27,6 +27,7 @@ vi.mock("@picoframe/frame", async (orig) => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("../../content/config", () => ({
+  useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useScanEpoch: () => 0,
   useUnitsyncScan: () => ({
     data: {
@@ -91,6 +92,11 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     loading: false,
     savedLoading: false,
     error: null,
+  }),
+  useGameMapFacts: () => ({
+    loading: false,
+    facts: { maps: [], onlyOwnMaps: [] },
+    error: undefined,
   }),
 }));
 // The unlocks live in the frame's settings store, which this page is rendered

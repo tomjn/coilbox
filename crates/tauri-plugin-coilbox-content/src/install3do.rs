@@ -465,6 +465,9 @@ pub fn undo(game_dir: &Path) -> Result<UndoOutcome, String> {
 /// (`outDir`) into the `.sdd` game it came from (`gameDir`).
 #[tauri::command]
 pub(crate) async fn content_install_3do_conversion(game_dir: String, out_dir: String) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&game_dir)) {
+        return CliResult::err(e);
+    }
     let (g, o) = (PathBuf::from(game_dir), PathBuf::from(out_dir));
     match tauri::async_runtime::spawn_blocking(move || install(&g, &o)).await {
         Ok(Ok(outcome)) => CliResult::ok(json!(outcome)),
@@ -477,6 +480,9 @@ pub(crate) async fn content_install_3do_conversion(game_dir: String, out_dir: St
 /// `content_install_3do_conversion` made under `gameDir`.
 #[tauri::command]
 pub(crate) async fn content_undo_3do_install(game_dir: String) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&game_dir)) {
+        return CliResult::err(e);
+    }
     let g = PathBuf::from(game_dir);
     match tauri::async_runtime::spawn_blocking(move || undo(&g)).await {
         Ok(Ok(outcome)) => CliResult::ok(json!(outcome)),

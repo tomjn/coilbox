@@ -6,6 +6,13 @@ import {
 import { currentScan } from "../../content/config";
 import { withoutGeneratedGames } from "../../lib/generatedGames";
 import { compareGameVersions } from "../../play/installedGames";
+import {
+  type CachedListing,
+  cachedListing,
+  listingKey,
+  rememberListing,
+  saveListings,
+} from "./archiveCache";
 import type { HandmadeMapError } from "./errors";
 import { gltfUriEntries, resolveGltfUri } from "./gltf";
 import { MANIFEST_FILE } from "./manifest";
@@ -48,6 +55,11 @@ export interface ArchiveGame {
   /** The archive file name unitsync opens, such as `S44_2.1.sdz`. */
   archive: string;
   shortname: string;
+  /** The archive's size in bytes and CRC, when the scan found them. They are
+   * part of the cache key, so an archive changed under the same name is read
+   * again. */
+  size?: number;
+  checksum?: string;
 }
 
 /** One map folder a game archive carries. */
@@ -76,6 +88,17 @@ export type ArchiveRead =
   | { ok: true; url: string; text?: string }
   | { ok: false; error: HandmadeMapError };
 
+/** The archive to search for one installed game. */
+export function archiveGameOf(g: GameItem): ArchiveGame {
+  return {
+    name: g.name,
+    archive: g.primaryArchive.name,
+    shortname: (g.info.shortname ?? g.name).trim(),
+    size: g.primaryArchive.size,
+    checksum: g.primaryArchive.checksum,
+  };
+}
+
 /**
  * The installed games to search, newest version first. A map id two versions
  * carry is then taken from the newer one.
@@ -86,11 +109,7 @@ export function archiveGames(games: readonly GameItem[]): ArchiveGame[] {
     .sort((a, b) =>
       compareGameVersions(b.info.version ?? "", a.info.version ?? ""),
     )
-    .map((g) => ({
-      name: g.name,
-      archive: g.primaryArchive.name,
-      shortname: (g.info.shortname ?? g.name).trim(),
-    }));
+    .map(archiveGameOf);
 }
 
 /**
@@ -191,7 +210,11 @@ function unreadable(file: string, why: string): ArchiveRead {
 }
 
 export interface ArchiveReader {
+  /** Every game's listing. Each game is read at most once, and not at all when
+   * the cache holds it (see `./archiveCache`). */
   list(): Promise<ArchiveListing>;
+  /** One game's listing, from the same source as {@link list}. */
+  listGame(game: ArchiveGame): Promise<ArchiveListing>;
   /**
    * Read `file` from the map folder `folder` of `game`. A `.gltf` comes back
    * with the files it names beside itself already read, so it loads from its
@@ -209,6 +232,8 @@ export interface ArchiveReader {
  */
 export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
   let listing: Promise<ArchiveListing> | undefined;
+  /** Each game's listing, by archive name, size and CRC, so a game is read once a reader. */
+  const oneGame = new Map<string, Promise<ArchiveListing>>();
   const reads = new Map<string, Promise<ArchiveRead>>();
   /** The real path of each member, by archive and the path in lower case. */
   const paths = new Map<string, Map<string, string>>();
@@ -329,22 +354,35 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     return { ok: true, url: blobUrl(JSON.stringify(json), mimeOf(file)) };
   };
 
-  const listGame = async (game: ArchiveGame, into: ArchiveListing) => {
+  /**
+   * Read one game's archive: its member list, `index.json` and the manifests.
+   * `cacheable` is false when any read failed, since a failure may pass and the
+   * next read should try again.
+   */
+  const readListing = async (
+    game: ArchiveGame,
+  ): Promise<{ listing: CachedListing; cacheable: boolean }> => {
+    const listing: CachedListing = {
+      items: [],
+      unreadable: [],
+      onlyOwnMaps: false,
+      members: [],
+    };
     let tree: Awaited<ReturnType<typeof unitsyncArchiveTree>>;
     try {
       tree = await unitsyncArchiveTree({ ...target, archive: game.archive });
     } catch {
       // A game whose archive will not open carries nothing coilbox can read.
-      return;
+      return { listing, cacheable: false };
     }
+    let cacheable = true;
     const prefix = `${ARCHIVE_MAPS_DIR}/`;
-    const byLower = new Map<string, string>();
     const folders = new Map<string, string[]>();
     let index: string | undefined;
     for (const { path } of tree.files) {
       if (path.endsWith("/")) continue;
       if (!path.toLowerCase().startsWith(prefix)) continue;
-      byLower.set(path.toLowerCase(), path);
+      listing.members.push(path);
       const rest = path.slice(prefix.length);
       const slash = rest.indexOf("/");
       if (slash < 0) {
@@ -356,11 +394,12 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       list.push(rest.slice(slash + 1));
       folders.set(folder, list);
     }
-    paths.set(game.archive, byLower);
+    rememberPaths(game, listing.members);
 
     if (index !== undefined) {
       const read = await member(game, ARCHIVE_INDEX_FILE, index);
       const text = read.ok ? read.text : undefined;
+      if (text === undefined) cacheable = false;
       const parsed =
         text === undefined
           ? {
@@ -368,10 +407,9 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
               errors: [read.ok ? unreadableIndex() : read.error],
             }
           : parseArchiveIndex(text);
-      if (parsed.onlyOwnMaps) into.onlyOwnMaps.push(game.name);
+      listing.onlyOwnMaps = parsed.onlyOwnMaps;
       if (parsed.errors.length > 0) {
-        into.unreadable.push({
-          game,
+        listing.unreadable.push({
           folder: ARCHIVE_INDEX_FILE,
           errors: parsed.errors,
         });
@@ -387,15 +425,40 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       );
       const manifest = read.ok ? read.text : undefined;
       if (manifest === undefined) {
-        into.unreadable.push({
-          game,
+        cacheable = false;
+        listing.unreadable.push({
           folder,
           errors: [read.ok ? unreadableIndex() : read.error],
         });
         continue;
       }
-      into.items.push({ game, folder, files: files.sort(), manifest });
+      listing.items.push({ folder, files: files.sort(), manifest });
     }
+    return { listing, cacheable };
+  };
+
+  /** Remember the real path of each member, by its lower case path. */
+  const rememberPaths = (game: ArchiveGame, members: readonly string[]) => {
+    paths.set(game.archive, new Map(members.map((m) => [m.toLowerCase(), m])));
+  };
+
+  const listOne = async (game: ArchiveGame): Promise<ArchiveListing> => {
+    const key = listingKey(target, game);
+    const cached = key === null ? undefined : cachedListing(key);
+    let listing: CachedListing;
+    if (cached) {
+      listing = cached;
+      rememberPaths(game, cached.members);
+    } else {
+      const read = await readListing(game);
+      listing = read.listing;
+      if (key !== null && read.cacheable) rememberListing(key, listing);
+    }
+    return {
+      items: listing.items.map((i) => ({ ...i, game })),
+      unreadable: listing.unreadable.map((u) => ({ ...u, game })),
+      onlyOwnMaps: listing.onlyOwnMaps ? [game.name] : [],
+    };
   };
 
   const pathIn = (game: ArchiveGame, folder: string, file: string) => {
@@ -417,7 +480,7 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     return read;
   };
 
-  return {
+  const reader: ArchiveReader = {
     list() {
       listing ??= (async () => {
         const out: ArchiveListing = {
@@ -426,12 +489,31 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
           onlyOwnMaps: [],
         };
         const scan = await currentScan(target.enginePath, target.dataDir);
-        // One game at a time: each read starts unitsync, and several at once
-        // would all scan the same content root together.
-        for (const game of archiveGames(scan.games)) await listGame(game, out);
+        const games = archiveGames(scan.games);
+        try {
+          // One game at a time: each read starts unitsync, and several at once
+          // would all scan the same content root together.
+          for (const game of games) {
+            const one = await reader.listGame(game);
+            out.items.push(...one.items);
+            out.unreadable.push(...one.unreadable);
+            out.onlyOwnMaps.push(...one.onlyOwnMaps);
+          }
+        } finally {
+          saveListings(games.map((g) => listingKey(target, g)));
+        }
         return out;
       })();
       return listing;
+    },
+    listGame(game) {
+      const key = `${game.archive}\0${game.size ?? ""}\0${game.checksum ?? ""}`;
+      let one = oneGame.get(key);
+      if (!one) {
+        one = listOne(game);
+        oneGame.set(key, one);
+      }
+      return one;
     },
     async read(game, folder, file) {
       const path = pathIn(game, folder, file);
@@ -449,6 +531,7 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       for (const url of blobs.splice(0)) URL.revokeObjectURL(url);
     },
   };
+  return reader;
 }
 
 function unreadableIndex(): HandmadeMapError {

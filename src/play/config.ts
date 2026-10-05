@@ -9,14 +9,18 @@ import {
 import {
   primeGameInfo,
   primeMapInfo,
+  scannedGameArchive,
   useContentState,
   usePreferredEngine,
+  useScanEpoch,
   useUnitsyncScan,
 } from "../content/config";
 import { compareEngineVersions } from "../content/engineVersion";
+import { isSddName } from "../content/format";
 import { shareInFlight } from "../content/inFlight";
 import { useDownloadComplete } from "../downloads/DownloadQueueProvider";
 import { withoutGeneratedGames } from "../lib/generatedGames";
+import { createPersistedCache } from "../lib/persistedCache";
 import { type GameListState, gameListState, needsGame } from "./gameListState";
 
 export type { Participant, Rgb } from "./participants";
@@ -322,9 +326,61 @@ export function useReplayTarget(demoVersion: string): {
  * Skirmish AIs — native engine AIs + the selected game's Lua AIs.
  * -------------------------------------------------------------------------- */
 
-/** Session cache of AI lists, keyed by `dataDir::enginePath::gameArchive`. */
+/** Session cache of AI lists, keyed by {@link skirmishAiKey}. */
 const skirmishAiCache = new Map<string, SkirmishAisResult>();
 const skirmishAiPending = new Map<string, Promise<SkirmishAisResult>>();
+
+/**
+ * AI lists kept across restarts, in the app settings (issue #3674). Raise the
+ * version when what is stored here changes meaning, and every entry is ignored.
+ *
+ * A list is the engine's own AIs plus the game's Lua AIs, so the key holds the
+ * engine folder (which is named for its version) as well as the archive. A
+ * packaged archive is a new file name when its game updates, so its list is
+ * kept until the key changes. A loose `.sdd` folder can be edited in place, so
+ * its list is only kept for the session, and for as long as the content is not
+ * rescanned.
+ */
+export const SKIRMISH_AI_CACHE_KEY = "play.skirmishAis";
+export const SKIRMISH_AI_CACHE_VERSION = 1;
+const persistedSkirmishAis = createPersistedCache<SkirmishAisResult>(
+  SKIRMISH_AI_CACHE_KEY,
+  SKIRMISH_AI_CACHE_VERSION,
+);
+
+/** What a hook instance tracks a list by: the inputs a render has. */
+function skirmishAiTrack(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string | undefined,
+  epoch: number,
+): string {
+  return `${dataDir}::${enginePath}::${gameArchive ?? ""}::${isSddName(gameArchive) ? epoch : ""}`;
+}
+
+/** The key an AI list is cached under. `epoch` only matters for a `.sdd`. */
+function skirmishAiKey(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string | undefined,
+  epoch: number,
+): { key: string; persist: boolean } {
+  const sdd = isSddName(gameArchive);
+  const archive = gameArchive
+    ? scannedGameArchive(enginePath, dataDir, gameArchive)
+    : undefined;
+  return {
+    key: [
+      dataDir,
+      enginePath,
+      gameArchive ?? "",
+      archive?.size ?? "",
+      archive?.checksum ?? "",
+      sdd ? epoch : "",
+    ].join("::"),
+    persist: !sdd,
+  };
+}
 
 /**
  * List the skirmish AIs available for a game: native engine AIs plus the game's
@@ -346,9 +402,13 @@ export function useSkirmishAis(
   // settle, or when there is no target.
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
+  const epoch = useScanEpoch(enginePath, dataDir);
+  // What the state below is tracked by. Only inputs a render has, so the
+  // archive's size and CRC, which the cache key adds, cannot make it differ
+  // from the one the effect settled.
   const key =
     enginePath && dataDir
-      ? `${dataDir}::${enginePath}::${gameArchive ?? ""}`
+      ? skirmishAiTrack(enginePath, dataDir, gameArchive, epoch)
       : null;
 
   useEffect(() => {
@@ -358,12 +418,20 @@ export function useSkirmishAis(
       setFailedKey(null);
       return;
     }
-    const k = `${dataDir}::${enginePath}::${gameArchive ?? ""}`;
-    const cached = skirmishAiCache.get(k);
+    const { key: k, persist } = skirmishAiKey(
+      enginePath,
+      dataDir,
+      gameArchive,
+      epoch,
+    );
+    const settled = skirmishAiTrack(enginePath, dataDir, gameArchive, epoch);
+    const cached =
+      skirmishAiCache.get(k) ?? (persist ? persistedSkirmishAis.get(k) : null);
     if (cached) {
+      skirmishAiCache.set(k, cached);
       setAis(cached.ais);
       setFailedKey(null);
-      setLoadedKey(k);
+      setLoadedKey(settled);
       return;
     }
     let cancelled = false;
@@ -374,24 +442,29 @@ export function useSkirmishAis(
       .then((res) => {
         if (cancelled) return;
         skirmishAiCache.set(k, res);
+        // A list with diagnostics may be a partial one, so it is asked for again.
+        if (persist && res.errors.length === 0) {
+          persistedSkirmishAis.set(k, res);
+          persistedSkirmishAis.save();
+        }
         setAis(res.ais);
         setFailedKey(null);
       })
       .catch(() => {
         if (cancelled) return;
         setAis([]);
-        setFailedKey(k);
+        setFailedKey(settled);
       })
       .finally(() => {
         if (!cancelled) {
           setLoading(false);
-          setLoadedKey(k);
+          setLoadedKey(settled);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive]);
+  }, [enginePath, dataDir, gameArchive, epoch]);
 
   // `ais` matches the current key only once this key has settled. During a key
   // change `loadedKey` still points at the previous key, so `loaded` is false

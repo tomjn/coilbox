@@ -118,3 +118,18 @@ export function updateStoredSetting<T>(
   const next = change(prev);
   if (next !== prev) write(next);
 }
+
+/**
+ * Write `value` under `key` from outside React, where no `useSetting` setter is
+ * at hand. For a cache that nothing renders from, so no component needs to
+ * hear about the change. Does nothing when no storage is installed, which only
+ * a test can see.
+ */
+export function writeStoredSetting<T>(key: string, value: T) {
+  installed?.set(key, JSON.stringify(value));
+}
+
+/** Like {@link readStoredSetting}, but answers `fallback` when no storage is installed. */
+export function readStoredSettingIfInstalled<T>(key: string, fallback: T): T {
+  return installed ? readStoredSetting(key, fallback) : fallback;
+}

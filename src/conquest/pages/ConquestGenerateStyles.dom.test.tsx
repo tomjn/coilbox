@@ -62,6 +62,7 @@ vi.mock("@/components/OptionSelect", () => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("../../content/config", () => ({
+  useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useUnitsyncScan: () => ({
     data: {
       games: [
@@ -132,6 +133,11 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     loading: h.searching,
     savedLoading: false,
     error: null,
+  }),
+  useGameMapFacts: () => ({
+    loading: h.searching,
+    facts: { maps: h.maps, onlyOwnMaps: h.onlyOwnMaps },
+    error: undefined,
   }),
 }));
 vi.mock("../bindings", () => ({
@@ -364,15 +370,23 @@ describe("Conquest generate form: a game that wants its own maps", () => {
   });
 });
 
-describe("Conquest generate form: before the games are searched", () => {
-  it("offers no game until it knows which hide the generated styles", () => {
+describe("Conquest generate form: before the selected game's maps are known", () => {
+  it("shows the wait in the map style field alone and offers no generated style", () => {
     h.searching = true;
     openForm();
     expect(
-      screen.getByText("Checking which of your games carry their own maps."),
+      screen.getByText("Checking which maps this game carries…"),
     ).toBeTruthy();
-    expect(headings()).not.toContain("Map style");
-    expect(document.querySelectorAll("select")).toHaveLength(0);
+    // The rest of the form is there, and no select offers a generated style.
+    expect(headings()).toContain("Shape");
+    expect(() => selectOffering("galaxy")).toThrow();
+    expect(
+      (
+        screen.getByRole("button", {
+          name: "Create map",
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
   });
 });
 

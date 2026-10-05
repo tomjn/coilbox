@@ -16,7 +16,7 @@ const ENGINE_BINARIES: &[&str] = &[
 const MAP_GAME_EXTS: &[&str] = &[".sd7", ".sdz", ".sdd"];
 
 /// First spring binary found directly inside `dir`, if any.
-fn spring_binary_in(dir: &Path) -> Option<PathBuf> {
+pub(crate) fn spring_binary_in(dir: &Path) -> Option<PathBuf> {
     ENGINE_BINARIES
         .iter()
         .map(|name| dir.join(name))

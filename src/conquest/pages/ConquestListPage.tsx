@@ -38,7 +38,7 @@ import {
   galaxyIdentity,
 } from "../../challenge/identity";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
-import { useUnitsyncScan } from "../../content/config";
+import { useUnitsyncGameHeaders, useUnitsyncScan } from "../../content/config";
 import { dependencyBlockReason } from "../../content/gameDependencies";
 import { useMapEligibility } from "../../content/mapEligibility";
 import { BrandingLinks } from "../../content/pages/components/BrandingLinks";
@@ -72,6 +72,8 @@ import {
 } from "../../play/installedGames";
 import { missingLaunchDependency } from "../../play/launchContent";
 import { DownloadGameButton } from "../../play/pages/components/DownloadGameButton";
+import { GamePickerButton } from "../../play/pages/components/GamePickerButton";
+import { GamePickerPanel } from "../../play/pages/components/GamePickerPanel";
 import { useGameCatalog } from "../../play/useGameCatalog";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { conquestDelete, conquestSave } from "../bindings";
@@ -105,11 +107,13 @@ import {
   removeHandmadeMap,
 } from "../handmade/library";
 import {
-  gamesHidingGeneratedStyles,
+  hidesGeneratedStyles,
+  mapsForGame,
   profileOnlyOwnMaps,
 } from "../handmade/ownMapsOnly";
 import {
   refreshHandmadeMaps,
+  useGameMapFacts,
   useHandmadeMap,
   useHandmadeMaps,
 } from "../handmade/useHandmadeMaps";
@@ -1181,10 +1185,10 @@ function GenerateGalaxyForm({
   // game is its shortname and its name without the version, so an archive that
   // only shares the shortname (Zero-K Benchmark v3 beside Zero-K) is its own
   // entry (issue #3465). The entry's full name is saved on the galaxy.
-  // A game that asks for its own maps only is not offered here, since every
-  // map this form makes is a generated one (issue #3511).
-  const handmade = useHandmadeMaps();
-  const { gameChoices, ownMapsOnly, onlyOwnMaps } = useMemo(() => {
+  // Every game is offered. Whether a game asks for its own maps only is read
+  // for the selected game alone (issue #3674), since finding it out for every
+  // game takes one archive read each.
+  const gameChoices = useMemo(() => {
     const matcher = getGameMatcher();
     // Never coilbox's own generated games: a campaign fought in the unit
     // builder's scratch game is not a campaign.
@@ -1204,22 +1208,8 @@ function GenerateGalaxyForm({
         byShort.set(key, g);
       }
     }
-    const newest = [...byShort.values()].sort((a, b) =>
-      a.name.localeCompare(b.name),
-    );
-    // The archive flag and the profile switch are one decision, made over
-    // every installed game so a game picked by name is covered too.
-    const onlyOwnMaps = gamesHidingGeneratedStyles(
-      games.filter((g) => !matcher || matcher(g.name)),
-      handmade,
-      profileOnlyOwnMaps(),
-    );
-    return {
-      gameChoices: newest.filter((g) => !onlyOwnMaps.includes(g.name)),
-      ownMapsOnly: newest.filter((g) => onlyOwnMaps.includes(g.name)),
-      onlyOwnMaps,
-    };
-  }, [scan.data, handmade]);
+    return [...byShort.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [scan.data]);
 
   const [gameShort, setGameShort] = useState("");
   // The game this form was last used with, as a `gameChoiceKey`. A frame
@@ -1253,6 +1243,25 @@ function GenerateGalaxyForm({
     target?.dataDir,
     selected?.primaryArchive.name,
   );
+
+  // Whether this game asks for its own maps only, read for this game alone.
+  // The map style field waits on it, so a game that hides the generated styles
+  // is never offered them and then has them taken away.
+  const { loading: factsLoading, facts } = useGameMapFacts(selected);
+  const hidesStyles =
+    !!selected &&
+    !factsLoading &&
+    hidesGeneratedStyles(
+      selected,
+      mapsForGame(selected, facts.maps),
+      facts,
+      profileOnlyOwnMaps(),
+    );
+  const { headers: gameHeaders } = useUnitsyncGameHeaders(
+    target?.enginePath,
+    target?.dataDir,
+  );
+  const [pickingGame, setPickingGame] = useState(false);
 
   // Naming pools / faction presets: the matched game's catalog defaults, with
   // a distribution's profile.json overriding on top.
@@ -1357,7 +1366,8 @@ function GenerateGalaxyForm({
     ],
   );
 
-  const canPreview = Boolean(selected) && maps.length > 0;
+  const canPreview =
+    Boolean(selected) && maps.length > 0 && !factsLoading && !hidesStyles;
   // A galaxy or a theatre builds in a few milliseconds, so its preview is
   // built as the form renders.
   const pointPreview = useMemo(() => {
@@ -1405,14 +1415,6 @@ function GenerateGalaxyForm({
     </>
   ) : scan.error ? (
     `The content scan failed, so installed games are not listed: ${scan.error}`
-  ) : handmade.loading ? (
-    // Which games hide the generated styles is not known yet, and a game
-    // offered now could be taken away when it is (issue #3616).
-    "Checking which of your games carry their own maps."
-  ) : initialGameName && onlyOwnMaps.includes(initialGameName) ? (
-    `${initialGameName} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
-  ) : gameChoices.length === 0 && ownMapsOnly.length > 0 ? (
-    `${ownMapsOnly.map((g) => g.name).join(", ")} ${ownMapsOnly.length === 1 ? "plays" : "play"} Conquest only on the maps the game carries. Pick one from the Conquest list.`
   ) : scan.data &&
     (scan.data.games.length === 0 || gameChoices.length === 0) ? (
     <>
@@ -1422,12 +1424,6 @@ function GenerateGalaxyForm({
       </Link>
       ).
     </>
-  ) : selected && aisFailed ? (
-    "The skirmish AIs for this game could not be listed."
-  ) : selected && !aisLoaded ? (
-    "Loading this game's skirmish AIs."
-  ) : selected && ais.length === 0 ? (
-    "This game has no skirmish AIs to fight against."
   ) : maps.length === 0 && scan.data ? (
     <>
       Install at least one map first (
@@ -1437,6 +1433,23 @@ function GenerateGalaxyForm({
       ).
     </>
   ) : null;
+
+  // Said under the picker, which stays usable so another game can be chosen.
+  const stylesBlock = hidesStyles
+    ? `${selected?.name} plays Conquest only on the maps the game carries. Pick one from the Conquest list.`
+    : null;
+  // The opponents are fought with the game's skirmish AIs, so a map cannot be
+  // made until the list is in, but the rest of the form can be filled in.
+  const aiNote =
+    !selected || stylesBlock
+      ? null
+      : aisFailed
+        ? "The skirmish AIs for this game could not be listed."
+        : !aisLoaded
+          ? "Loading this game's skirmish AIs."
+          : ais.length === 0
+            ? "This game has no skirmish AIs to fight against."
+            : null;
 
   // Creating a map is not a launch, so this does not stop the form. The
   // player is told here, because every battle of it would stop on it (issue
@@ -1467,6 +1480,28 @@ function GenerateGalaxyForm({
     }
   };
 
+  // The game picker takes over the drawer rather than opening a second one on
+  // top of it, as the host forms do (issue #2995). The form's state stays.
+  if (pickingGame) {
+    return (
+      <div className="p-4">
+        <GamePickerPanel
+          games={gameChoices}
+          headers={gameHeaders}
+          selectedName={selected?.name ?? ""}
+          onSelect={(name) => {
+            const picked = gameChoices.find((g) => g.name === name);
+            if (picked) chooseGame(gameChoiceKey(picked));
+          }}
+          onBack={() => setPickingGame(false)}
+          backLabel="Back to the map form"
+          gamesLoading={scan.loading}
+          scanError={scan.error}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-4 p-4">
       {blocked ? (
@@ -1476,14 +1511,12 @@ function GenerateGalaxyForm({
           {gameChoices.length > 1 && (
             <div className="flex flex-col gap-1.5 text-sm">
               <span className="font-medium">Game</span>
-              <OptionSelect
-                value={selected ? gameChoiceKey(selected) : ""}
-                onValueChange={chooseGame}
-                placeholder={scan.loading ? "Scanning…" : "Pick a game"}
-                options={gameChoices.map((g) => ({
-                  value: gameChoiceKey(g),
-                  label: g.name,
-                }))}
+              <GamePickerButton
+                value={selected?.name ?? ""}
+                games={gameChoices}
+                headers={gameHeaders}
+                placeholder={scan.loading ? "Scanning…" : "Select a game"}
+                onClick={() => setPickingGame(true)}
               />
             </div>
           )}
@@ -1499,137 +1532,173 @@ function GenerateGalaxyForm({
           {brandingEntry?.screenshots?.length ? (
             <BrandingScreenshots shots={brandingEntry.screenshots} />
           ) : null}
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Map style</span>
-            <OptionSelect
-              value={style}
-              onValueChange={setStyle}
-              options={MAP_STYLE_OPTIONS}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Shape</span>
-            <OptionSelect
-              value={layout}
-              onValueChange={setLayout}
-              options={layoutOptionsFor(style)}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">
-              {realStars ? "Radius from Sol" : "Map size"}
-            </span>
-            {realStars ? (
-              <OptionSelect
-                value={radius}
-                onValueChange={setRadius}
-                options={RADIUS_OPTIONS}
-              />
-            ) : (
-              <OptionSelect
-                value={String(nodeCount)}
-                onValueChange={setSize}
-                options={sizeOptions(ceiling, noun.many)}
-              />
-            )}
-            {realStars && (
-              <span className="text-xs text-muted-foreground">
-                Every real system within the radius, at its true position. You
-                start at Sol, in the middle.
-              </span>
-            )}
-          </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Opposition</span>
-            <OptionSelect
-              value={factions}
-              onValueChange={setFactions}
-              options={FACTION_OPTIONS}
-            />
-          </div>
-          <ThreatLevelSelect
-            value={threat}
-            ceiling={ceiling}
-            onChange={setThreatChoice}
-          />
-          {!realStars && (
-            <StartPositionSelect
-              value={startPosition ?? "edge"}
-              unlocked={startUnlocked}
-              onChange={setStartChoice}
-            />
-          )}
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Starting territory</span>
-            <OptionSelect
-              value={starting}
-              onValueChange={setStarting}
-              options={startingOptions(noun, realStars)}
-            />
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm">
-            <label htmlFor="conquest-fog" className="flex flex-col gap-0.5">
-              <span className="font-medium">Fog of war</span>
-              <span className="text-xs text-muted-foreground">
-                Hide {noun.many} more than two{" "}
-                {style === "galaxy" ? "jumps" : "moves"} from your territory.
-              </span>
-            </label>
-            <Switch id="conquest-fog" checked={fog} onCheckedChange={setFog} />
-          </div>
-          <div className="flex flex-col gap-1.5 text-sm">
-            <span className="font-medium">Seed</span>
-            <div className="flex gap-2">
-              <Input
-                value={seed}
-                onChange={(e) => setSeed(e.target.value.replace(/\D/g, ""))}
-                inputMode="numeric"
-                aria-label="Map seed"
-              />
-              <Button
-                variant="outline"
-                onClick={() =>
-                  setSeed(String(Math.floor(Math.random() * 100000)))
-                }
-              >
-                <Dices className="size-4" aria-hidden />
-                <span className="sr-only">Reroll seed</span>
-              </Button>
-            </div>
-            <span className="text-xs text-muted-foreground">
-              {realStars
-                ? "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
-                : "The same seed always builds the same map."}
-            </span>
-          </div>
-          {!realStars && (preview || (land && canPreview)) && (
-            <div className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Preview</span>
-              {preview ? (
-                <div className={previewStale ? "opacity-50" : undefined}>
-                  <GalaxyPreview2D
-                    galaxy={preview}
-                    terrain={land ? landPreview?.terrain : undefined}
+          {stylesBlock ? (
+            <p className="text-sm text-muted-foreground">{stylesBlock}</p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Map style</span>
+                {factsLoading ? (
+                  // Which styles this game offers is not known yet, and one shown
+                  // now could be taken away when it is (issues #3616 and #3674).
+                  <div
+                    className="flex items-center gap-2 text-sm text-muted-foreground"
+                    role="status"
+                  >
+                    <Loader2 className="size-4 animate-spin" aria-hidden />
+                    Checking which maps this game carries…
+                  </div>
+                ) : (
+                  <OptionSelect
+                    value={style}
+                    onValueChange={setStyle}
+                    options={MAP_STYLE_OPTIONS}
                   />
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Shape</span>
+                <OptionSelect
+                  value={layout}
+                  onValueChange={setLayout}
+                  options={layoutOptionsFor(style)}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">
+                  {realStars ? "Radius from Sol" : "Map size"}
+                </span>
+                {realStars ? (
+                  <OptionSelect
+                    value={radius}
+                    onValueChange={setRadius}
+                    options={RADIUS_OPTIONS}
+                  />
+                ) : (
+                  <OptionSelect
+                    value={String(nodeCount)}
+                    onValueChange={setSize}
+                    options={sizeOptions(ceiling, noun.many)}
+                  />
+                )}
+                {realStars && (
+                  <span className="text-xs text-muted-foreground">
+                    Every real system within the radius, at its true position.
+                    You start at Sol, in the middle.
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Opposition</span>
+                <OptionSelect
+                  value={factions}
+                  onValueChange={setFactions}
+                  options={FACTION_OPTIONS}
+                />
+              </div>
+              <ThreatLevelSelect
+                value={threat}
+                ceiling={ceiling}
+                onChange={setThreatChoice}
+              />
+              {!realStars && (
+                <StartPositionSelect
+                  value={startPosition ?? "edge"}
+                  unlocked={startUnlocked}
+                  onChange={setStartChoice}
+                />
+              )}
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Starting territory</span>
+                <OptionSelect
+                  value={starting}
+                  onValueChange={setStarting}
+                  options={startingOptions(noun, realStars)}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <label htmlFor="conquest-fog" className="flex flex-col gap-0.5">
+                  <span className="font-medium">Fog of war</span>
+                  <span className="text-xs text-muted-foreground">
+                    Hide {noun.many} more than two{" "}
+                    {style === "galaxy" ? "jumps" : "moves"} from your
+                    territory.
+                  </span>
+                </label>
+                <Switch
+                  id="conquest-fog"
+                  checked={fog}
+                  onCheckedChange={setFog}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5 text-sm">
+                <span className="font-medium">Seed</span>
+                <div className="flex gap-2">
+                  <Input
+                    value={seed}
+                    onChange={(e) => setSeed(e.target.value.replace(/\D/g, ""))}
+                    inputMode="numeric"
+                    aria-label="Map seed"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      setSeed(String(Math.floor(Math.random() * 100000)))
+                    }
+                  >
+                    <Dices className="size-4" aria-hidden />
+                    <span className="sr-only">Reroll seed</span>
+                  </Button>
                 </div>
-              ) : null}
-              {land && (previewStale || !preview) && (
-                <span className="text-xs text-muted-foreground" role="status">
-                  Building the preview…
-                </span>
-              )}
-              {preview && !previewStale && preview.nodes.length < nodeCount && (
                 <span className="text-xs text-muted-foreground">
-                  Capped at {preview.nodes.length} named {noun.many}.
+                  {realStars
+                    ? "The stars never change. The seed sets the factions, where your enemies start, and which maps each system is fought on."
+                    : "The same seed always builds the same map."}
                 </span>
+              </div>
+              {!realStars && (preview || (land && canPreview)) && (
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">Preview</span>
+                  {preview ? (
+                    <div className={previewStale ? "opacity-50" : undefined}>
+                      <GalaxyPreview2D
+                        galaxy={preview}
+                        terrain={land ? landPreview?.terrain : undefined}
+                      />
+                    </div>
+                  ) : null}
+                  {land && (previewStale || !preview) && (
+                    <span
+                      className="text-xs text-muted-foreground"
+                      role="status"
+                    >
+                      Building the preview…
+                    </span>
+                  )}
+                  {preview &&
+                    !previewStale &&
+                    preview.nodes.length < nodeCount && (
+                      <span className="text-xs text-muted-foreground">
+                        Capped at {preview.nodes.length} named {noun.many}.
+                      </span>
+                    )}
+                </div>
               )}
-            </div>
+              {dependencyBlock && (
+                <DependencyBlocked reason={dependencyBlock} />
+              )}
+              {aiNote && (
+                <p className="text-sm text-muted-foreground">{aiNote}</p>
+              )}
+              {error && <ErrorBanner message={error} />}
+              <Button
+                onClick={create}
+                disabled={busy || !selected || factsLoading || aiNote !== null}
+              >
+                {busy ? "Generating…" : "Create map"}
+              </Button>
+            </>
           )}
-          {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
-          {error && <ErrorBanner message={error} />}
-          <Button onClick={create} disabled={busy || !selected}>
-            {busy ? "Generating…" : "Create map"}
-          </Button>
         </>
       )}
     </div>
