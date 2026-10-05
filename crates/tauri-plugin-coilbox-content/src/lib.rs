@@ -14,6 +14,7 @@ mod archives;
 mod blueprints;
 mod branding;
 mod build_tree_export;
+mod bundle;
 mod caches;
 mod container_file;
 mod demo;
@@ -230,6 +231,13 @@ struct Acc {
     forced: bool,
     /// Stored as a relative (portable) path — surfaced as `ContentRoot.portable`.
     portable: bool,
+    /// The distribution's bundled content folder — surfaced as `ContentRoot.bundled`.
+    bundled: bool,
+}
+
+/// Whether `canon` is the distribution's bundled content folder.
+fn is_bundle(canon: &Path) -> bool {
+    coilbox_portable::bundle_dir().is_some_and(|b| canonical(&b) == canon)
 }
 
 fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
@@ -239,7 +247,9 @@ fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
     } else {
         None
     };
-    let engines = if exists {
+    // A bundled engine is never run where it sits: it is copied into the
+    // player's own folder first (see `bundle.rs`), so none is listed here.
+    let engines = if exists && !a.bundled {
         scan::discover_engines(&a.canon)
     } else {
         Vec::new()
@@ -262,6 +272,7 @@ fn build_root(a: Acc, with_counts: bool, now: u64) -> ContentRoot {
         exists,
         valid: kind_opt.is_some() || a.forced,
         portable: a.portable,
+        bundled: a.bundled,
         forced: if a.forced { Some(true) } else { None },
         counts,
         engines,
@@ -295,6 +306,7 @@ fn auto_accs(portable_app_dir: Option<PathBuf>, candidates: Vec<Candidate>) -> V
             label: None,
             forced: true,
             portable: true,
+            bundled: false,
         }];
     }
     let mut accs: Vec<Acc> = Vec::new();
@@ -313,10 +325,40 @@ fn auto_accs(portable_app_dir: Option<PathBuf>, candidates: Vec<Candidate>) -> V
                 label: None,
                 forced: false,
                 portable: false,
+                bundled: false,
             }),
         }
     }
     accs
+}
+
+/// Add the distribution's bundled content folder as the last root, or mark the
+/// root already at that path as bundled.
+///
+/// Last matters. `publish_roots` keeps this order, and the engine and unitsync
+/// read data directories in the order given, keeping the first archive of each
+/// file name they meet. So the player's own folder wins over the bundle, and a
+/// newer game they download is the one used.
+fn add_bundle_acc(accs: &mut Vec<Acc>, bundle: Option<PathBuf>) {
+    let Some(bundle) = bundle else {
+        return;
+    };
+    let canon = canonical(&bundle);
+    if let Some(i) = accs.iter().position(|a| a.canon == canon) {
+        let mut a = accs.remove(i);
+        a.bundled = true;
+        accs.push(a);
+        return;
+    }
+    accs.push(Acc {
+        canon,
+        origins: vec!["bundled".into()],
+        source: RootSource::Auto,
+        label: None,
+        forced: false,
+        portable: true,
+        bundled: true,
+    });
 }
 
 /// The core rescan: merge auto candidates with the user's manual roots, scan each,
@@ -362,9 +404,11 @@ fn compute_state<R: Runtime>(
                 label: u.label.clone(),
                 forced: u.forced,
                 portable,
+                bundled: false,
             }),
         }
     }
+    add_bundle_acc(&mut accs, coilbox_portable::bundle_dir());
 
     let now = now_ms();
     let mut roots: Vec<ContentRoot> = accs
@@ -438,7 +482,7 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
             let exists = canon.is_dir();
             let forced = r.forced == Some(true);
             let kind = if exists { scan::classify(&canon) } else { None };
-            let mut engines = if exists {
+            let mut engines = if exists && !r.bundled {
                 scan::discover_engines(&canon)
             } else {
                 Vec::new()
@@ -484,7 +528,32 @@ fn refresh_against_disk(state: ContentState) -> ContentState {
 /// persisted, mirrors `refresh_against_disk`'s read-only contract. An explicit
 /// rescan writes the seeded root for real, exactly like a first run does.
 fn ensure_portable_seed(roots: Vec<ContentRoot>) -> Vec<ContentRoot> {
-    ensure_portable_seed_in(roots, portable_seed_dir())
+    ensure_bundle_last_in(
+        ensure_portable_seed_in(roots, portable_seed_dir()),
+        coilbox_portable::bundle_dir(),
+    )
+}
+
+/// Make sure the bundled content folder is listed, and listed last, on a read.
+/// The same job [`ensure_portable_seed_in`] does for the app dir, for the same
+/// reason: a snapshot can predate the bundle, or come from another machine. A
+/// bundle with nothing Spring would recognise is left out, as a rescan would.
+fn ensure_bundle_last_in(roots: Vec<ContentRoot>, bundle: Option<PathBuf>) -> Vec<ContentRoot> {
+    let mut roots = roots;
+    if let Some(bundle) = bundle {
+        let canon = canonical(&bundle);
+        if !roots.iter().any(|r| canonical(Path::new(&r.path)) == canon) {
+            let mut accs = Vec::new();
+            add_bundle_acc(&mut accs, Some(bundle));
+            let root = build_root(accs.remove(0), false, now_ms());
+            if root.valid {
+                roots.push(root);
+            }
+        }
+    }
+    let (mut own, bundled): (Vec<_>, Vec<_>) = roots.into_iter().partition(|r| !r.bundled);
+    own.extend(bundled);
+    own
 }
 
 /// Pure core of [`ensure_portable_seed`], taking the portable app dir explicitly
@@ -508,6 +577,7 @@ fn ensure_portable_seed_in(
         label: None,
         forced: true,
         portable: true,
+        bundled: false,
     };
     roots.push(build_root(acc, false, now_ms()));
     roots
@@ -647,6 +717,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
             label: r.label.clone(),
             forced: r.forced.unwrap_or(false),
             portable,
+            bundled: r.bundled,
         },
         None => Acc {
             canon: canon.clone(),
@@ -659,6 +730,7 @@ async fn content_scan_root<R: Runtime>(app: AppHandle<R>, path: String) -> CliRe
             label: None,
             forced: false,
             portable,
+            bundled: is_bundle(&canon),
         },
     };
 
@@ -1042,6 +1114,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::content_delete_replay,
             demo::content_delete_replays,
             archives::content_delete_archive,
+            bundle::content_bundle_inspect,
+            bundle::content_bundle_install_engine,
+            bundle::content_bundle_cancel,
             demo::content_gather_replays,
             savegame::content_list_saves,
             savegame::content_delete_save,
@@ -1210,6 +1285,7 @@ mod tests {
             exists: true,
             valid: true,
             portable: false,
+            bundled: false,
             forced: if forced { Some(true) } else { None },
             counts: RootCounts {
                 games: 9,
@@ -1463,6 +1539,89 @@ mod tests {
         assert!(out[0].exists);
 
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn bundle_root_goes_last_and_lists_no_engines() {
+        let tmp = tempfile::tempdir().unwrap();
+        let app = tmp.path().join("pkg");
+        let bundle = app.join(".coilbox/content");
+        std::fs::create_dir_all(bundle.join("games")).unwrap();
+        std::fs::write(bundle.join("games/sf.sdz"), b"g").unwrap();
+        let engine = bundle.join("engine/linux64/105.1");
+        std::fs::create_dir_all(&engine).unwrap();
+        std::fs::write(engine.join("spring"), b"x").unwrap();
+
+        let mut accs = auto_accs(Some(app.clone()), Vec::new());
+        add_bundle_acc(&mut accs, Some(bundle.clone()));
+        let roots: Vec<_> = accs.into_iter().map(|a| build_root(a, true, 0)).collect();
+        assert_eq!(roots.len(), 2);
+        assert!(!roots[0].bundled, "the player's own folder comes first");
+        let b = &roots[1];
+        assert!(b.bundled && b.valid && b.portable);
+        assert_eq!(b.origins, vec!["bundled".to_string()]);
+        assert!(
+            b.engines.is_empty(),
+            "a bundled engine is never run in place"
+        );
+        assert_eq!(b.counts.games, 1);
+
+        // The same order on a read, whatever order the snapshot held.
+        let read = ensure_bundle_last_in(vec![b.clone(), roots[0].clone()], Some(bundle.clone()));
+        assert_eq!(
+            read.iter().map(|r| r.bundled).collect::<Vec<_>>(),
+            [false, true]
+        );
+        let refreshed = refresh_against_disk(ContentState {
+            schema_version: SCHEMA_VERSION,
+            roots: read,
+            last_scan_at: None,
+        });
+        assert!(refreshed.roots[1].engines.is_empty());
+    }
+
+    #[test]
+    fn ensure_bundle_last_in_adds_a_bundle_the_snapshot_predates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundle = tmp.path().join("content");
+        std::fs::create_dir_all(bundle.join("maps")).unwrap();
+        let own = stale_root("/some/path", RootSource::Manual, false);
+        let out = ensure_bundle_last_in(vec![own], Some(bundle.clone()));
+        assert_eq!(out.len(), 2);
+        assert!(out[1].bundled);
+
+        // An empty bundle is nothing Spring would read, so it is not listed.
+        let empty = tmp.path().join("empty");
+        std::fs::create_dir_all(&empty).unwrap();
+        assert_eq!(ensure_bundle_last_in(Vec::new(), Some(empty)).len(), 0);
+    }
+
+    #[test]
+    fn a_manual_root_at_the_bundle_is_marked_bundled_and_moved_last() {
+        let mut accs = vec![
+            Acc {
+                canon: PathBuf::from("/b"),
+                origins: vec!["manual".into()],
+                source: RootSource::Manual,
+                label: None,
+                forced: false,
+                portable: false,
+                bundled: false,
+            },
+            Acc {
+                canon: PathBuf::from("/a"),
+                origins: vec!["portable".into()],
+                source: RootSource::Auto,
+                label: None,
+                forced: true,
+                portable: true,
+                bundled: false,
+            },
+        ];
+        add_bundle_acc(&mut accs, Some(PathBuf::from("/b")));
+        assert_eq!(accs.len(), 2);
+        assert_eq!(accs[1].canon, PathBuf::from("/b"));
+        assert!(accs[1].bundled);
     }
 
     #[test]

@@ -136,6 +136,64 @@ pub fn cache_dir<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
         .map_err(|e| format!("could not resolve app cache dir: {e}"))
 }
 
+/// Pure core of [`bundle_dir`]: `<root>/content` when that is a directory.
+fn bundle_dir_in(root: Option<&Path>, is_dir: impl Fn(&Path) -> bool) -> Option<PathBuf> {
+    let dir = root?.join("content");
+    is_dir(&dir).then_some(dir)
+}
+
+/// The folder a distribution bundles game content in: `.coilbox/content`, when
+/// running portable and the folder exists.
+///
+/// It is a read-only extra content root, searched after the player's own. It is
+/// not [`data_dir`], which is coilbox's own state, and it is never where anything
+/// is written. See [`refuse_in_bundle`].
+pub fn bundle_dir() -> Option<PathBuf> {
+    bundle_dir_in(portable_root().as_deref(), |p| p.is_dir())
+}
+
+/// `path` with links resolved, for a path that may not exist yet. The deepest
+/// part that exists is resolved and the rest is put back on the end, so a file
+/// about to be created compares the same way as the folder it will sit in.
+fn resolve_existing(path: &Path) -> PathBuf {
+    let mut rest = Vec::new();
+    let mut at = path;
+    loop {
+        if let Ok(canon) = std::fs::canonicalize(at) {
+            return rest.iter().rev().fold(canon, |p, part| p.join(part));
+        }
+        match (at.parent(), at.file_name()) {
+            (Some(parent), Some(name)) => {
+                rest.push(name.to_os_string());
+                at = parent;
+            }
+            _ => return path.to_path_buf(),
+        }
+    }
+}
+
+/// Pure core of [`refuse_in_bundle`], with the bundle folder passed in.
+fn refuse_in(path: &Path, bundle: Option<&Path>) -> Result<(), String> {
+    let Some(bundle) = bundle else {
+        return Ok(());
+    };
+    if resolve_existing(path).starts_with(resolve_existing(bundle)) {
+        return Err(format!(
+            "{} is part of the content this distribution bundles, and coilbox does not write into it.",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+/// Refuse a write, delete or install aimed inside the distribution's bundled
+/// content folder. Every command that writes into a game or a content root
+/// calls this, so the bundle stays exactly as the distributor shipped it
+/// whether or not the player's file system would allow the write.
+pub fn refuse_in_bundle(path: &Path) -> Result<(), String> {
+    refuse_in(path, bundle_dir().as_deref())
+}
+
 /// Reject anything that could escape a resolved root: absolute paths, a Windows
 /// drive/root prefix, or any `..` component. Only plain forward-relative paths pass.
 /// Shared by the profile/campaign plugins and the `coilbox://` asset protocol so the
@@ -208,6 +266,41 @@ mod tests {
         assert!(!is_safe_rel(Path::new("../x.jpg")));
         assert!(!is_safe_rel(Path::new("/abs.jpg")));
         assert!(!is_safe_rel(Path::new("a/../b.jpg")));
+    }
+
+    #[test]
+    fn bundle_dir_is_the_content_folder_when_it_exists() {
+        let root = Path::new("/pkg/.coilbox");
+        assert_eq!(
+            bundle_dir_in(Some(root), |_| true),
+            Some(PathBuf::from("/pkg/.coilbox/content"))
+        );
+        assert_eq!(bundle_dir_in(Some(root), |_| false), None);
+        assert_eq!(bundle_dir_in(None, |_| true), None);
+    }
+
+    #[test]
+    fn refuse_in_blocks_the_bundle_and_everything_under_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundle = tmp.path().join("content");
+        std::fs::create_dir_all(bundle.join("games")).unwrap();
+        assert!(refuse_in(&bundle, Some(&bundle)).is_err());
+        assert!(refuse_in(&bundle.join("games/x.sdd"), Some(&bundle)).is_err());
+        // A sibling whose name merely starts the same way is not inside it.
+        assert!(refuse_in(&tmp.path().join("content-other"), Some(&bundle)).is_ok());
+        assert!(refuse_in(tmp.path(), Some(&bundle)).is_ok());
+        assert!(refuse_in(&bundle, None).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuse_in_sees_through_a_link_into_the_bundle() {
+        let tmp = tempfile::tempdir().unwrap();
+        let bundle = tmp.path().join("content");
+        std::fs::create_dir_all(bundle.join("maps")).unwrap();
+        let link = tmp.path().join("elsewhere");
+        std::os::unix::fs::symlink(bundle.join("maps"), &link).unwrap();
+        assert!(refuse_in(&link, Some(&bundle)).is_err());
     }
 
     #[test]

@@ -69,6 +69,12 @@ pub struct ContentRoot {
     /// portable root that follows the executable when the package is moved.
     #[serde(default)]
     pub portable: bool,
+    /// True for the distribution's bundled content folder (`.coilbox/content`).
+    /// Read in place, searched after every other root, never written into, and
+    /// never a download destination. Its engines are not listed: a bundled engine
+    /// is copied into the player's own folder before it runs.
+    #[serde(default)]
+    pub bundled: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub forced: Option<bool>,
     pub counts: RootCounts,

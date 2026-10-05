@@ -36,6 +36,7 @@ image = { workspace = true, features = [
 ] }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 # Backdating a fixture game's mtime in the issue #3025 tests, so the
 # install/undo's own touch has something older to move away from.
 filetime = "0.2"
