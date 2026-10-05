@@ -107,6 +107,73 @@ impl ModelArchive {
     }
 }
 
+/// The archives a game's models are looked for in when the game has none of
+/// its own by that name, in the order the engine searches them (issue #3615).
+///
+/// `CVFSHandler::AddArchiveWithDeps` mounts every archive
+/// `CArchiveScanner::GetAllArchivesUsedBy` names, and the first archive to add
+/// a file keeps it. A model is found in `SPRING_VFS_ZIP` order, which searches
+/// the game and its game-type dependencies before base content. So the game's
+/// dependencies come first, in that list's order, and base content last.
+///
+/// Close each with [`ModelArchive::close`].
+pub(crate) fn fallback_archives(us: &Unitsync, game_archive: &str) -> Vec<ModelArchive> {
+    let mut out: Vec<ModelArchive> = dependency_files(us, game_archive)
+        .iter()
+        .filter_map(|file| ModelArchive::open(us, file))
+        .collect();
+    out.extend(ModelArchive::open(us, BASE_CONTENT_ARCHIVE));
+    out
+}
+
+/// The files of a game's dependencies that live where games do, in the
+/// engine's search order.
+///
+/// unitsync names a dependency by its versioned name, such as "Spring Features
+/// v1.9", and has no export that turns a name into a file. `GetMapArchiveCount`
+/// runs `GetAllArchivesUsedBy` on any archive, though, and the first name it
+/// returns is the archive's own. So each archive under `games/` and
+/// `packages/` is named that way, and the dependencies are looked up by name.
+///
+/// Base content and the other engine archives live under `base/`, so they are
+/// not found here, and base content is added last by [`fallback_archives`].
+fn dependency_files(us: &Unitsync, game_archive: &str) -> Vec<String> {
+    let names = us.map_archives(game_archive);
+    let Some((_, deps)) = names.split_first() else {
+        return Vec::new();
+    };
+    if deps.is_empty() {
+        return Vec::new();
+    }
+    let candidates = us
+        .list_vfs_dir("games", "*", "r")
+        .into_iter()
+        .chain(us.list_vfs_subdirs("games", "*.sdd", "r"))
+        .chain(us.list_vfs_dir("packages", "*.sdp", "r"));
+    let mut files = BTreeMap::new();
+    for path in candidates {
+        let Some(file) = Path::new(path.trim_end_matches(['/', '\\']))
+            .file_name()
+            .and_then(|f| f.to_str())
+            .map(str::to_string)
+        else {
+            continue;
+        };
+        if !crate::archive::is_archive_file(&file) || file.eq_ignore_ascii_case(game_archive) {
+            continue;
+        }
+        if let Some(name) = us.map_archives(&file).into_iter().next() {
+            files.entry(name).or_insert(file);
+        }
+    }
+    order_dependencies(deps, &files)
+}
+
+/// The file of each dependency that has one, in the order `deps` names them.
+fn order_dependencies(deps: &[String], files: &BTreeMap<String, String>) -> Vec<String> {
+    deps.iter().filter_map(|d| files.get(d).cloned()).collect()
+}
+
 /// Model extensions tried for an `objectname` written without one, in the order
 /// the engine registers their parsers (`RegisterModelFormats` in
 /// `rts/Rendering/Models/IModelParser.cpp`). Order decides which file wins when
@@ -219,7 +286,7 @@ pub fn render(
     let palette = read_palette(&us);
     let key_base = cache_key_base(&us, game_archive, cache_dir);
     let cache = cache_dir.zip(key_base.as_deref());
-    let base = ModelArchive::open(&us, BASE_CONTENT_ARCHIVE);
+    let fallbacks = fallback_archives(&us, game_archive);
     let mut out = read_model(
         &us,
         handle,
@@ -229,11 +296,11 @@ pub fn render(
         cache,
         game_archive,
         object_name,
-        base.as_ref(),
+        &fallbacks,
     );
 
-    if let Some(base) = base {
-        base.close(&us);
+    for archive in fallbacks {
+        archive.close(&us);
     }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
@@ -252,8 +319,10 @@ pub fn render(
 /// for them once. `game_archive` is only used to say which archive a model is
 /// missing from.
 ///
-/// `base` is the engine's base content. A name the game has no model for is
-/// read from there, model and textures both, as the engine would find it.
+/// `fallbacks` are the game's dependencies and then base content, from
+/// [`fallback_archives`]. A name the game has no model for is read from the
+/// first of them that has one, model and textures both, as the engine would
+/// find it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn read_model(
     us: &Unitsync,
@@ -264,22 +333,22 @@ pub(crate) fn read_model(
     cache: Option<(&Path, &str)>,
     game_archive: &str,
     object_name: &str,
-    base: Option<&ModelArchive>,
+    fallbacks: &[ModelArchive],
 ) -> UnitModelOutput {
-    if let Some(base) = base {
-        if read_from_base(list, &base.list, object_name) {
-            return read_model(
-                us,
-                base.handle,
-                &base.list,
-                &base.teamtex,
-                palette,
-                cache,
-                &base.name,
-                object_name,
-                None,
-            );
-        }
+    let lists = fallbacks.iter().map(|a| a.list.as_slice());
+    if let Some(i) = fallback_with_model(list, lists, object_name) {
+        let from = &fallbacks[i];
+        return read_model(
+            us,
+            from.handle,
+            &from.list,
+            &from.teamtex,
+            palette,
+            cache,
+            &from.name,
+            object_name,
+            &[],
+        );
     }
     let mut out = match find_model(list, object_name) {
         Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
@@ -1032,11 +1101,19 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     None
 }
 
-/// Whether `object_name` is read from base content rather than the game: the
-/// game has no model by that name and base content has one. The game is
-/// searched first, as the engine's VFS searches it first.
-fn read_from_base(game: &[(String, String)], base: &[(String, String)], object_name: &str) -> bool {
-    find_model(game, object_name).is_none() && find_model(base, object_name).is_some()
+/// Which fallback archive `object_name` is read from, or `None` to read it
+/// from the game: the game has no model by that name and that fallback is the
+/// first with one. The game is searched first, as the engine's VFS searches it
+/// first.
+fn fallback_with_model<'a>(
+    game: &[(String, String)],
+    mut fallbacks: impl Iterator<Item = &'a [(String, String)]>,
+    object_name: &str,
+) -> Option<usize> {
+    if find_model(game, object_name).is_some() {
+        return None;
+    }
+    fallbacks.position(|list| find_model(list, object_name).is_some())
 }
 
 /// Formats the engine draws but coilbox does not read. It has a parser of its
@@ -1389,36 +1466,94 @@ mod tests {
         ])
     }
 
+    /// Which fallback reads `object_name`, given the game's listing and the
+    /// fallbacks' listings in search order.
+    fn reads_from(
+        game: &[(String, String)],
+        fallbacks: &[Vec<(String, String)>],
+        object_name: &str,
+    ) -> Option<usize> {
+        fallback_with_model(game, fallbacks.iter().map(Vec::as_slice), object_name)
+    }
+
     #[test]
     fn a_model_only_base_content_has_is_read_from_there() {
         let game = listing(&["objects3d/armcom.s3o"]);
-        assert!(read_from_base(
-            &game,
-            &base_content(),
-            "fir_tree_smallest.s3o"
-        ));
-        assert!(read_from_base(&game, &base_content(), "FIR_TREE_SMALLEST"));
+        let fallbacks = [base_content()];
+        assert_eq!(
+            reads_from(&game, &fallbacks, "fir_tree_smallest.s3o"),
+            Some(0)
+        );
+        assert_eq!(reads_from(&game, &fallbacks, "FIR_TREE_SMALLEST"), Some(0));
     }
 
     #[test]
     fn a_game_s_own_model_wins_over_base_content() {
         let game = listing(&["objects3d/Features/fir_tree_smallest.s3o"]);
-        assert!(!read_from_base(
-            &game,
-            &base_content(),
-            "fir_tree_smallest.s3o"
-        ));
-        assert!(!read_from_base(
-            &listing(&["objects3d/armcom.s3o"]),
-            &base_content(),
-            "armcom"
-        ));
+        let fallbacks = [base_content()];
+        assert_eq!(reads_from(&game, &fallbacks, "fir_tree_smallest.s3o"), None);
+        assert_eq!(
+            reads_from(&listing(&["objects3d/armcom.s3o"]), &fallbacks, "armcom"),
+            None
+        );
     }
 
     #[test]
     fn a_name_neither_has_is_not_read_from_base_content() {
         let game = listing(&["objects3d/armcom.s3o"]);
-        assert!(!read_from_base(&game, &base_content(), "pinetree"));
+        assert_eq!(reads_from(&game, &[base_content()], "pinetree"), None);
+    }
+
+    /// Dynamic Robot Defense on this machine ships none of the units it plays
+    /// with. They and their models come from Tech Annihilation.
+    #[test]
+    fn a_model_only_a_dependency_has_is_read_from_it() {
+        let game = listing(&["objects3d/rroost.3do"]);
+        let dependency = listing(&["objects3d/arm_big_bertha.3do", "objects3d/rroost.3do"]);
+        let fallbacks = [dependency, base_content()];
+
+        assert_eq!(reads_from(&game, &fallbacks, "arm_big_bertha"), Some(0));
+        assert_eq!(reads_from(&game, &fallbacks, "rroost"), None);
+    }
+
+    #[test]
+    fn a_dependency_wins_over_base_content_and_an_earlier_one_over_a_later() {
+        let game = listing(&["objects3d/armcom.s3o"]);
+        let first = listing(&["objects3d/fir_tree_smallest.s3o"]);
+        let second = listing(&["objects3d/fir_tree_smallest.s3o", "objects3d/corcom.s3o"]);
+        let fallbacks = [first, second, base_content()];
+
+        assert_eq!(reads_from(&game, &fallbacks, "fir_tree_smallest"), Some(0));
+        assert_eq!(reads_from(&game, &fallbacks, "corcom"), Some(1));
+        assert_eq!(reads_from(&game, &fallbacks, "fir_tree_large"), Some(2));
+    }
+
+    #[test]
+    fn dependencies_keep_the_engine_order_and_drop_any_without_a_file() {
+        let deps = [
+            "Spring content v1".to_string(),
+            "Spring Bitmaps".to_string(),
+            "Tech Annihilation test-10905-59391bf".to_string(),
+            "Spring Features v1.9".to_string(),
+        ];
+        let files = BTreeMap::from([
+            (
+                "Spring Features v1.9".to_string(),
+                "2fc302bf07ed8f0fe5294ef914d67020.sdp".to_string(),
+            ),
+            (
+                "Tech Annihilation test-10905-59391bf".to_string(),
+                "4811bb933441bb755f993d63bf595684.sdp".to_string(),
+            ),
+        ]);
+
+        assert_eq!(
+            order_dependencies(&deps, &files),
+            [
+                "4811bb933441bb755f993d63bf595684.sdp",
+                "2fc302bf07ed8f0fe5294ef914d67020.sdp"
+            ]
+        );
     }
 
     /// `CModelLoader::FindModelPath` (`rts/Rendering/Models/IModelParser.cpp`)
