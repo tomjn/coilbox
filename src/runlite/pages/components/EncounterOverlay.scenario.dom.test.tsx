@@ -9,7 +9,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NodeScenario } from "../../../conquest/model";
 import type { RogueliteRun, RunNode } from "../../model";
 
-const h = vi.hoisted(() => ({ gutter: vi.fn(), gate: vi.fn() }));
+const h = vi.hoisted(() => ({
+  gutter: vi.fn(),
+  gate: vi.fn(),
+  scenarioDifficulty: undefined as string | undefined,
+}));
 
 vi.mock("../../../content/config", () => ({
   useUnitsyncUnitDataset: () => ({ dataset: null }),
@@ -44,6 +48,7 @@ vi.mock("../../runlite-run", () => ({
     limit: { kind: "loading" },
     snapshot: () => null,
     lastSnapshot: null,
+    scenarioDifficulty: h.scenarioDifficulty,
   }),
 }));
 
@@ -91,6 +96,7 @@ function show(scenario?: NodeScenario) {
 }
 
 beforeEach(() => {
+  h.scenarioDifficulty = undefined;
   h.gutter.mockClear();
   h.gate.mockClear();
 });
@@ -117,6 +123,19 @@ describe("the Warpath briefing for a scenario location", () => {
     // The unit data is still loading, and the scenario does not wait on it.
     expect(h.gate.mock.calls[0][0].hold).toBeUndefined();
     expect(h.gate.mock.calls[0][0].aisAvailable).toBe(true);
+  });
+
+  it("shows the difficulty it plays at, with nothing to change it", () => {
+    h.scenarioDifficulty = "normal";
+    show(siege);
+    expect(screen.getByText("Difficulty")).toBeTruthy();
+    expect(screen.getByText("Normal")).toBeTruthy();
+    expect(screen.queryByRole("radio")).toBeNull();
+  });
+
+  it("shows no difficulty for a scenario that does not use one", () => {
+    show(siege);
+    expect(screen.queryByText("Difficulty")).toBeNull();
   });
 
   it("says so when the scenario could not be read and a skirmish stands in", () => {

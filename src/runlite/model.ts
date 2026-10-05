@@ -208,6 +208,10 @@ export type RunMapRef =
 /** A directed forward edge `[from, to]` with `from.col < to.col`. */
 export type RunEdge = [string, string];
 
+/** The run difficulty the setup's slider offers, easiest first. */
+export const MIN_RUN_DIFFICULTY = 1;
+export const MAX_RUN_DIFFICULTY = 5;
+
 export interface RunSettings {
   /** Everything procedural is deterministic from this seed. */
   seed: number;
@@ -602,7 +606,11 @@ export function parseRunSettings(value: unknown): RunSettings | null {
       value.length === "long"
         ? value.length
         : "standard",
-    difficulty: clamp(Math.round(num(value.difficulty, 2)), 1, 5),
+    difficulty: clamp(
+      Math.round(num(value.difficulty, 2)),
+      MIN_RUN_DIFFICULTY,
+      MAX_RUN_DIFFICULTY,
+    ),
     ascension: clamp(Math.round(num(value.ascension, 0)), 0, 99),
     game: {
       shortname: game.shortname,

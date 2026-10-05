@@ -8,6 +8,10 @@ import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameChoice, InstalledGame } from "../play/installedGames";
 import { decideLaunchGame } from "../play/installedGames";
+import {
+  scenarioLevel,
+  warpathScenarioDifficulty,
+} from "../play/scenarioDifficulty";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
 import { battleRestrictions } from "./build";
 import { withGameChoice } from "./gameChoice";
@@ -142,6 +146,16 @@ export function useRunEncounter(
     nodeId: node?.id,
   };
 
+  // The level comes from the run's difficulty and ascension, raised by the
+  // node's tech tier, the depth its encounter was built for (issue #3593).
+  const scenarioDifficulty = scenarioLevel(scenario?.doc, () =>
+    warpathScenarioDifficulty(
+      run.settings.difficulty,
+      run.settings.ascension,
+      node?.battle?.techTier ?? 1,
+    ),
+  );
+
   const battle = useBattleRun<RogueliteRun>({
     launchMode: "runlite",
     gameRef: run.settings.game,
@@ -156,6 +170,7 @@ export function useRunEncounter(
     persist,
     provenance,
     scenario,
+    scenarioDifficulty,
   });
 
   return {
@@ -164,5 +179,7 @@ export function useRunEncounter(
     canStart: battle.canStart && (!!scenario || limit.kind === "ready"),
     limit,
     reloadUnitData,
+    /** The level the scenario plays at, or undefined when it has none. */
+    scenarioDifficulty,
   };
 }

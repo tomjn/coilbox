@@ -14,6 +14,7 @@ import {
 import { UnitPicker } from "../../../content/pages/components/UnitPicker";
 import { usePreferredTarget } from "../../../play/config";
 import { resolveGameByShortname } from "../../../play/installedGames";
+import { DIFFICULTY_LABEL } from "../../../play/scenarioDifficulty";
 import { factionSides } from "../../galaxy3d/factionShape";
 import { conquestGameRef } from "../../gameChoice";
 import { drawsAsGalaxy, locationNoun } from "../../mapStyle";
@@ -303,14 +304,28 @@ function Briefing({
         </div>
         {run.scenario ? (
           // A scenario sets its own forces, so the garrison row would be wrong.
-          <div className="flex justify-between gap-2">
-            <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-              Scenario
-            </dt>
-            <dd className="min-w-0 text-right">
-              <span className="block truncate">{run.scenario.name}</span>
-            </dd>
-          </div>
+          <>
+            <div className="flex justify-between gap-2">
+              <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                Scenario
+              </dt>
+              <dd className="min-w-0 text-right">
+                <span className="block truncate">{run.scenario.name}</span>
+              </dd>
+            </div>
+            {/* Set by the conquest's threat level and this location, not
+                picked here (issue #3593). */}
+            {run.scenarioDifficulty && (
+              <div className="flex justify-between gap-2">
+                <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+                  Difficulty
+                </dt>
+                <dd className="min-w-0 text-right">
+                  {DIFFICULTY_LABEL[run.scenarioDifficulty]}
+                </dd>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex justify-between gap-2">
             <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">

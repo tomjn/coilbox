@@ -6,6 +6,7 @@ import { useUnitsyncScan } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
 import { getProfile } from "../profile/profile";
+import type { Difficulty } from "../scenario/model";
 import {
   launchScenarioForPlayer,
   scenarioOnGame,
@@ -122,6 +123,11 @@ export interface UseBattleRunOptions<TResolved> {
    * asked when the replay does not say.
    */
   scenario?: NodeScenario;
+  /**
+   * The level `scenario` plays at, from `./scenarioDifficulty`. Undefined for a
+   * scenario that does not vary by difficulty, which then launches as before.
+   */
+  scenarioDifficulty?: Difficulty;
 }
 
 /**
@@ -145,6 +151,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     persist,
     provenance,
     scenario,
+    scenarioDifficulty,
   } = opts;
 
   const { target, loading: targetLoading } = usePreferredTarget();
@@ -315,6 +322,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
           target,
           games,
           launch: startEngine,
+          difficulty: scenarioDifficulty,
         });
         if (!result.ok) return { refused: result.message };
         // The scenario's own setup names the player, not this hook.
@@ -424,6 +432,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     provenance,
     setProvenance,
     scenario,
+    scenarioDifficulty,
     games,
   ]);
 
