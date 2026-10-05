@@ -17,6 +17,8 @@ export interface WinBurst {
   apply: () => void;
   /** Advance the shockwave/flare animation. Call once per animation frame. */
   tick: (now: number) => void;
+  /** Whether a burst is playing, so the loop keeps drawing until it ends. */
+  isPlaying: () => boolean;
 }
 
 export function createWinBurst(
@@ -91,5 +93,5 @@ export function createWinBurst(
     }
   };
 
-  return { apply, tick };
+  return { apply, tick, isPlaying: () => burstAnim !== null };
 }
