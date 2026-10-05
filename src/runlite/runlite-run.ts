@@ -4,12 +4,12 @@ import type { SkirmishAi } from "../content/bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { usePreferredTarget } from "../play/config";
-import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
+import type { SkirmishDraft } from "../play/drafts";
 import type { GameAiConfig } from "../play/gameAi";
 import type { GameChoice, InstalledGame } from "../play/installedGames";
 import { decideLaunchGame } from "../play/installedGames";
 import { PLAYER_NAME, useBattleRun } from "../play/useBattleRun";
-import { perkTotals } from "./build";
+import { battleRestrictions } from "./build";
 import { withGameChoice } from "./gameChoice";
 import type { RogueliteRun, RunNode } from "./model";
 import { resolveBattle } from "./progress";
@@ -99,11 +99,11 @@ export function useRunEncounter(
       if (!draft) return null;
       const disabledUnits =
         limit.limit.kind === "limited" ? limit.limit.disabled : [];
-      const { advantage, income } = perkTotals(run.progress.perks);
-      const restrictions: BattleRestrictions = {};
-      if (disabledUnits.length > 0) restrictions.disabledUnits = disabledUnits;
-      if (advantage > 0) restrictions.advantage = advantage;
-      if (income > 0) restrictions.incomeMultiplier = income;
+      const restrictions = battleRestrictions(
+        disabledUnits,
+        node.battle?.disabledUnits,
+        run.progress.perks,
+      );
       return Object.keys(restrictions).length > 0
         ? { ...draft, restrictions }
         : draft;

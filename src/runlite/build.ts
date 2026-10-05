@@ -1,5 +1,6 @@
 import { reachableFrom } from "../content/buildTree";
 import type { BattleConfig } from "../play/bindings";
+import type { BattleRestrictions } from "../play/drafts";
 import type { Perk, RogueliteRun } from "./model";
 
 /**
@@ -94,6 +95,28 @@ export function perkTotals(perks: Perk[]): {
     else if (p.kind === "income") income += p.value;
   }
   return { advantage, income };
+}
+
+/**
+ * What a run's battle launches with: the arsenal's disabled units joined with
+ * the units the encounter bans itself, and the perk totals. Empty when there
+ * is nothing to apply. The one place the launch and the preset snapshot build
+ * their restrictions, so both agree.
+ */
+export function battleRestrictions(
+  arsenalDisabled: readonly string[],
+  encounterDisabled: readonly string[] | undefined,
+  perks: Perk[],
+): BattleRestrictions {
+  const disabledUnits = [
+    ...new Set([...arsenalDisabled, ...(encounterDisabled ?? [])]),
+  ];
+  const { advantage, income } = perkTotals(perks);
+  const out: BattleRestrictions = {};
+  if (disabledUnits.length > 0) out.disabledUnits = disabledUnits;
+  if (advantage > 0) out.advantage = advantage;
+  if (income > 0) out.incomeMultiplier = income;
+  return out;
 }
 
 /**

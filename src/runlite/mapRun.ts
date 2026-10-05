@@ -303,8 +303,8 @@ export interface GenerateMapRunOpts extends GenerateRunOpts {
   /** The battle the author set for a location, by location id. It is used when
    * the location turns out to be a fight: its map and whatever else it gives
    * replace the generated encounter's, and what it leaves out stays as
-   * generated. `disabledUnits` is not carried, because the run's arsenal
-   * decides which units can be built. */
+   * generated. Its `disabledUnits` are kept on the encounter and joined with
+   * the run's own disabled set at launch. */
   battles?: Record<string, NodeBattleSpec>;
 }
 
@@ -402,6 +402,9 @@ function authoredEncounter(battle: NodeBattleSpec): Partial<EncounterSpec> {
   if (battle.startPosType !== undefined) out.startPosType = battle.startPosType;
   if (battle.handicap !== undefined) out.handicap = battle.handicap;
   if (battle.modOptionValues) out.modOptionValues = battle.modOptionValues;
+  if (battle.disabledUnits && battle.disabledUnits.length > 0) {
+    out.disabledUnits = battle.disabledUnits;
+  }
   return out;
 }
 
