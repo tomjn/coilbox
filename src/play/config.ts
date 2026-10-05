@@ -337,6 +337,8 @@ export function useSkirmishAis(
 ) {
   const [ais, setAis] = useState<SkirmishAi[]>([]);
   const [loading, setLoading] = useState(false);
+  // The key whose AI query failed, so a failure is not read as "no AIs".
+  const [failedKey, setFailedKey] = useState<string | null>(null);
   // The key whose AI list `ais` currently holds, set once the query settles
   // (cache hit or fetch resolved). Lets callers tell "still loading" (an empty
   // list that hasn't settled) from "genuinely no AIs" (settled but empty), so a
@@ -353,12 +355,14 @@ export function useSkirmishAis(
     if (!enginePath || !dataDir) {
       setAis([]);
       setLoadedKey(null);
+      setFailedKey(null);
       return;
     }
     const k = `${dataDir}::${enginePath}::${gameArchive ?? ""}`;
     const cached = skirmishAiCache.get(k);
     if (cached) {
       setAis(cached.ais);
+      setFailedKey(null);
       setLoadedKey(k);
       return;
     }
@@ -371,9 +375,12 @@ export function useSkirmishAis(
         if (cancelled) return;
         skirmishAiCache.set(k, res);
         setAis(res.ais);
+        setFailedKey(null);
       })
       .catch(() => {
-        if (!cancelled) setAis([]);
+        if (cancelled) return;
+        setAis([]);
+        setFailedKey(k);
       })
       .finally(() => {
         if (!cancelled) {
@@ -391,7 +398,10 @@ export function useSkirmishAis(
   // until the new query settles.
   const loaded = key != null && loadedKey === key;
 
-  return { ais, loading, loaded };
+  // True when the query for the current key settled in an error.
+  const failed = key != null && failedKey === key;
+
+  return { ais, loading, loaded, failed };
 }
 
 /**

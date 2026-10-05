@@ -1208,7 +1208,11 @@ function GenerateGalaxyForm({
     ? (selected.info.shortname ?? selected.name).trim()
     : "";
 
-  const { ais } = useSkirmishAis(
+  const {
+    ais,
+    loaded: aisLoaded,
+    failed: aisFailed,
+  } = useSkirmishAis(
     target?.enginePath,
     target?.dataDir,
     selected?.primaryArchive.name,
@@ -1380,6 +1384,10 @@ function GenerateGalaxyForm({
       </Link>
       ).
     </>
+  ) : selected && aisFailed ? (
+    "The skirmish AIs for this game could not be listed."
+  ) : selected && !aisLoaded ? (
+    "Loading this game's skirmish AIs."
   ) : selected && ais.length === 0 ? (
     "This game has no skirmish AIs to fight against."
   ) : maps.length === 0 && scan.data ? (
