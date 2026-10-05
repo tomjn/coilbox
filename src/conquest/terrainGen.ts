@@ -149,6 +149,11 @@ function valueNoise(x: number, y: number, seed: number): number {
  * Octaves of value noise at a point given in lattice cells of the coarsest
  * octave, each finer octave at twice the frequency and half the weight. The
  * result is in [0, 1) and bunches around the middle.
+ *
+ * Value noise lines its features up with its lattice, which shows as straight
+ * coasts running across and down the map. So every octave turns its lattice a
+ * further step, by the angle of a 3, 4, 5 triangle, whose cosine and sine are
+ * the plain fractions 0.8 and 0.6.
  */
 export function fractalNoise(
   x: number,
@@ -159,12 +164,16 @@ export function fractalNoise(
   let sum = 0;
   let total = 0;
   let weight = 1;
-  let f = 1;
+  let px = x;
+  let py = y;
   for (let o = 0; o < octaves; o++) {
-    sum += weight * valueNoise(x * f, y * f, seed + o * 7919);
+    const rx = 0.8 * px - 0.6 * py;
+    const ry = 0.6 * px + 0.8 * py;
+    sum += weight * valueNoise(rx, ry, seed + o * 7919);
     total += weight;
     weight /= 2;
-    f *= 2;
+    px = rx * 2;
+    py = ry * 2;
   }
   return sum / total;
 }
@@ -216,14 +225,14 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       const a = ellipse(
         [c + u[0] * gap + perp[0] * slide, c + u[1] * gap + perp[1] * slide],
         perp,
-        (0.33 + rng() * 0.05) * S,
-        (0.16 + rng() * 0.03) * S,
+        (0.28 + rng() * 0.05) * S,
+        (0.15 + rng() * 0.03) * S,
       );
       const b = ellipse(
         [c - u[0] * gap - perp[0] * slide, c - u[1] * gap - perp[1] * slide],
         perp,
-        (0.33 + rng() * 0.05) * S,
-        (0.16 + rng() * 0.03) * S,
+        (0.28 + rng() * 0.05) * S,
+        (0.15 + rng() * 0.03) * S,
       );
       const strait = 0.05 * S;
       return {
@@ -247,8 +256,8 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       while (islands.length < count) {
         const p: Vec = [(0.15 + rng() * 0.7) * S, (0.15 + rng() * 0.7) * S];
         const big = rng();
-        const a = (0.07 + big * big * 0.1) * S;
-        const need = 0.2 * S - relax;
+        const a = (0.05 + big * big * 0.13) * S;
+        const need = 0.17 * S - relax;
         const clear = islands.every((q) => {
           const dx = p[0] - q.c[0];
           const dy = p[1] - q.c[1];
@@ -271,9 +280,9 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
           }
           return best;
         },
-        landShare: 0.24,
+        landShare: 0.22,
         minMass: 250,
-        warp: 34,
+        warp: 45,
         roughness: 1,
       };
     }
@@ -284,15 +293,15 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
         c + (rng() - 0.5) * 0.06 * S,
         c + (rng() - 0.5) * 0.06 * S,
       ];
-      const outer = ellipse(centre, u, (0.42 + rng() * 0.03) * S, (0.36 + rng() * 0.03) * S);
-      const inner = ellipse(centre, u, (0.2 + rng() * 0.04) * S, (0.14 + rng() * 0.03) * S);
+      const outer = ellipse(centre, u, (0.36 + rng() * 0.03) * S, (0.3 + rng() * 0.03) * S);
+      const inner = ellipse(centre, u, (0.17 + rng() * 0.04) * S, (0.11 + rng() * 0.03) * S);
       return {
         mask: (x, y) => {
           const o = outer(x, y);
           const i = inner(x, y);
-          return Math.min(o * 1.6, -i * 1.4 + 0.15);
+          return Math.min(o * 1.6, -i + 0.15);
         },
-        landShare: 0.38,
+        landShare: 0.32,
         minMass: 900,
         warp: 55,
         roughness: 0.7,
@@ -304,12 +313,12 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       const m = ellipse(
         [c + (rng() - 0.5) * 0.08 * S, c + (rng() - 0.5) * 0.08 * S],
         u,
-        (0.36 + rng() * 0.05) * S,
-        (0.25 + rng() * 0.05) * S,
+        (0.27 + rng() * 0.05) * S,
+        (0.19 + rng() * 0.05) * S,
       );
       return {
         mask: m,
-        landShare: 0.36,
+        landShare: 0.28,
         minMass: 900,
         warp: 70,
         roughness: 0.8,
@@ -318,8 +327,9 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
   }
 }
 
-/** Pixels from the map edge over which the land is pushed under the sea. */
-const EDGE_MARGIN = 36;
+/** Pixels from the map edge over which the land is pushed under the sea,
+ * harder the nearer the edge, so a coast bends away instead of being cut. */
+const EDGE_MARGIN = 64;
 /** A lake smaller than this many pixels is filled in as land. */
 const MAX_LAKE = 2500;
 
@@ -424,7 +434,7 @@ const LAND_RAMP: [number, Rgb][] = [
   [0.04, [118, 152, 82]],
   [0.3, [72, 112, 62]],
   [0.55, [122, 106, 90]],
-  [0.8, [152, 146, 140]],
+  [0.85, [152, 146, 140]],
   [1, [240, 240, 240]],
 ];
 const SEA_SHALLOW: Rgb = [70, 140, 170];
@@ -460,6 +470,26 @@ export function terrainPixelAt(
   const cx = Math.min(terrain.width - 1, Math.max(0, px));
   const cy = Math.min(terrain.height - 1, Math.max(0, py));
   return cy * terrain.width + cx;
+}
+
+/** Each pixel becomes what at least five of the nine around it are. */
+function majority(land: Uint8Array): Uint8Array {
+  const out = new Uint8Array(S * S);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const yy = y + dy;
+        if (yy < 0 || yy >= S) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx;
+          if (xx >= 0 && xx < S) n += land[yy * S + xx];
+        }
+      }
+      out[y * S + x] = n >= 5 ? 1 : 0;
+    }
+  }
+  return out;
 }
 
 /** The value below which `share` of `values` falls, to one bin in 4096. */
@@ -502,19 +532,25 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
     const py = y + 0.5;
     for (let x = 0; x < S; x++) {
       const px = x + 0.5;
-      const wx = px + plan.warp * (fractalNoise(px / 128, py / 128, warpX, 3) - 0.5) * 2;
-      const wy = py + plan.warp * (fractalNoise(px / 128, py / 128, warpY, 3) - 0.5) * 2;
-      const n = fractalNoise(wx / 96, wy / 96, baseSeed, 6);
-      let e = plan.mask(wx, wy) + plan.roughness * (n - 0.5) * 2.4;
+      const wx = px + plan.warp * (fractalNoise(px / 128, py / 128, warpX, 4) - 0.5) * 2;
+      const wy = py + plan.warp * (fractalNoise(px / 128, py / 128, warpY, 4) - 0.5) * 2;
+      const n = fractalNoise(wx / 80, wy / 80, baseSeed, 6);
+      let e = plan.mask(wx, wy) + plan.roughness * (n - 0.5) * 2.8;
       const edge = Math.min(px, py, S - px, S - py);
-      if (edge < EDGE_MARGIN) e -= (1 - edge / EDGE_MARGIN) * 3;
+      if (edge < EDGE_MARGIN) {
+        const t = 1 - edge / EDGE_MARGIN;
+        e -= t * t * 4;
+      }
       elevation[y * S + x] = e;
     }
   }
   const seaLevel = quantile(elevation, 1 - plan.landShare);
 
-  const land = new Uint8Array(S * S);
+  let land = new Uint8Array(S * S);
   for (let i = 0; i < land.length; i++) land[i] = elevation[i] > seaLevel ? 1 : 0;
+  // Two passes of a three by three majority vote take out cracks and spurs a
+  // pixel wide, which read as noise rather than coast.
+  for (let pass = 0; pass < 2; pass++) land = majority(land);
 
   // Sink specks and every land mass past the largest `maxMasses`.
   const masses = labelRegions(land, 1, S, S);
@@ -555,9 +591,9 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       // Ridges where the noise crosses its middle, gathered into ranges.
       const r = 1 - Math.abs(fractalNoise(px / 80, py / 80, ridgeSeed, 5) - 0.5) * 2;
       const ridge = r * r * r;
-      const range = clamp01((fractalNoise(px / 170, py / 170, rangeSeed, 2) - 0.42) * 4);
+      const range = clamp01((fractalNoise(px / 170, py / 170, rangeSeed, 2) - 0.47) * 4);
       const hills = fractalNoise(px / 40, py / 40, hillSeed, 3);
-      const h = clamp01(inland * (0.08 + 0.22 * hills + 0.85 * range * ridge));
+      const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
       heightmap[i] = 1 + Math.floor(h * 254);
     }
   }
