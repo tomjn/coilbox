@@ -9,6 +9,7 @@ import {
   planTowns,
   roadAxis,
   roadEntries,
+  STEEP_FIT,
   STEEP_SLOPE,
   TOWN_RADIUS,
   TOWN_REACH,
@@ -99,8 +100,8 @@ describe("planTowns", () => {
     expect(towns[0].radius).toBeGreaterThan(CAPITAL_RADIUS);
     expect(towns[1].radius).toBeGreaterThan(TOWN_RADIUS);
     expect(towns[2].radius).toBe(TOWN_RADIUS);
-    // Four units apart, so each keeps to 0.26 of that.
-    expect(towns[3].radius).toBeCloseTo(1.04, 5);
+    // Four units apart, so each keeps to 0.3 of that.
+    expect(towns[3].radius).toBeCloseTo(1.2, 5);
     expect(towns[3].radius + towns[4].radius).toBeLessThan(4);
   });
 
@@ -182,19 +183,19 @@ describe("buildableAt", () => {
       : x < 10
         ? 1 + x * FLAT_SLOPE * 0.5
         : 6 + (x - 10) * STEEP_SLOPE * 2;
-  const fit = buildableAt(height, 0.5, 0.25);
+  const fitness = buildableAt(height, 0.5, 0.25);
 
-  it("builds on gentle slopes, never on steep ones or in the sea", () => {
-    expect(fit(5, 5)).toBe(1);
-    expect(fit(20, 5)).toBe(0);
-    expect(fit(5, -5)).toBe(0);
+  it("builds on gentle slopes, little on steep ones and never in the sea", () => {
+    expect(fitness(5, 5)).toBe(1);
+    expect(fitness(20, 5)).toBe(STEEP_FIT);
+    expect(fitness(5, -5)).toBe(0);
   });
 
   it("records it in the town index, only where a town reaches", () => {
     const sea = planTowns([{ x: 5, z: -5, capital: false, roads: [] }], 1);
     const land = planTowns([{ x: 5, z: 5, capital: false, roads: [] }], 1);
     const fitAt = (towns: typeof sea) => {
-      const index = buildTownIndex(towns, 40, 40, 40, fit);
+      const index = buildTownIndex(towns, 40, 40, 40, fitness);
       const at = (z: number, x: number) =>
         index.data[((z + 20) * 40 + (x + 20)) * 4 + 2];
       return [at(5, 5), at(-5, 5), at(15, -15)];

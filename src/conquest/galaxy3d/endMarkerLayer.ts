@@ -34,9 +34,11 @@ const HEAD_REACH = BADGE_RADIUS * CAPITAL_SCALE * 1.5;
 
 /**
  * The tallest a city's badge reaches at the closest zoom: a selected
- * capital's, which is 1.3 times a capital's.
+ * capital's, which is 1.3 times a capital's, to the edge of its ring, which
+ * reaches 1.3 times the badge.
  */
-export const BADGE_TOP = BADGE_RADIUS * (POLE_RADII + CAPITAL_SCALE * 1.3);
+export const BADGE_TOP =
+  BADGE_RADIUS * (POLE_RADII + CAPITAL_SCALE * 1.3 * 1.3);
 
 /** The pole's height, so the head clears the tallest badge. */
 const POLE_HEIGHT = BADGE_TOP + HEAD_REACH * 0.9;

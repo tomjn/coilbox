@@ -35,11 +35,11 @@ import type { TownLayer, TownStyle } from "./townLayer";
  */
 
 /** The badge's radius in world units at the closest zoom. */
-export const BADGE_RADIUS = 0.28;
+export const BADGE_RADIUS = 0.36;
 /** How far the badge's centre stands above the ground, in badge radii. */
 export const POLE_RADII = 3;
-/** A capital's badge is this much bigger. */
-export const CAPITAL_SCALE = 1.2;
+/** A capital's badge is this much bigger, and ringed. */
+export const CAPITAL_SCALE = 1.35;
 /** Growth of a selected badge and of a hovered or emphasised one. */
 const SELECTED_SCALE = 1.3;
 const HOVER_SCALE = 1.15;
@@ -52,6 +52,8 @@ const HIDDEN_SCALE = 0.8;
 const ZOOM_POWER = 0.85;
 /** Gap between a badge's edge and its name, in badge radii. */
 const LABEL_GAP = 0.35;
+/** How far south of a town's middle its name sits, in town radii. */
+const LABEL_TOWN_SHARE = 0.55;
 /** Sides of a round badge. */
 const ROUND_SEGMENTS = 32;
 
@@ -215,7 +217,7 @@ export function markerLook(args: {
 /* ------------------------------- geometry -------------------------------- */
 
 /** Badge parts, the geometry groups of a badge in this order. */
-const PART = { rim: 0, fill: 1, star: 2, brackets: 3 } as const;
+const PART = { rim: 0, fill: 1, star: 2, brackets: 3, ring: 4 } as const;
 
 /** A flat polygon in x and y with its first corner straight up. */
 function polygon(
@@ -259,12 +261,12 @@ function badgeGeometry(sides: number): THREE.BufferGeometry {
   // shape with few sides is drawn a little larger to look as big as a disc.
   const reach = sides === 0 ? 1 : 1 / Math.cos(Math.PI / sides) ** 0.5;
   part(() => polygon(positions, sides, reach, 0.15));
-  part(() => polygon(positions, sides, reach * 0.74, 0.17));
+  part(() => polygon(positions, sides, reach * 0.8, 0.17));
   part(() => {
     // A five point star.
     const rim: [number, number][] = [];
     for (let k = 0; k < 10; k++) {
-      const r = k % 2 === 0 ? 0.52 : 0.22;
+      const r = k % 2 === 0 ? 0.56 : 0.24;
       const a = Math.PI / 2 + (k / 10) * Math.PI * 2;
       rim.push([Math.cos(a) * r, Math.sin(a) * r]);
     }
@@ -295,6 +297,45 @@ function badgeGeometry(sides: number): THREE.BufferGeometry {
       };
       quad(at - w, at - len, at, at);
       quad(at - len, at - w, at - w, at);
+    }
+  });
+  part(() => {
+    // A capital's ring, clear of the badge's outline.
+    const inner = reach * 1.12;
+    const outer = reach * 1.3;
+    for (let k = 0; k < ROUND_SEGMENTS; k++) {
+      const a = (k / ROUND_SEGMENTS) * Math.PI * 2;
+      const b = ((k + 1) / ROUND_SEGMENTS) * Math.PI * 2;
+      const [ca, sa, cb, sb] = [
+        Math.cos(a),
+        Math.sin(a),
+        Math.cos(b),
+        Math.sin(b),
+      ];
+      positions.push(
+        ca * inner,
+        sa * inner,
+        0.15,
+        ca * outer,
+        sa * outer,
+        0.15,
+      );
+      positions.push(
+        cb * outer,
+        sb * outer,
+        0.15,
+        ca * inner,
+        sa * inner,
+        0.15,
+      );
+      positions.push(
+        cb * outer,
+        sb * outer,
+        0.15,
+        cb * inner,
+        sb * inner,
+        0.15,
+      );
     }
   });
   const geo = new THREE.BufferGeometry();
@@ -368,9 +409,6 @@ export function buildCityLayer(
   poleGeo.translate(0, 0.5, 0);
   disposables.push(poleGeo);
 
-  // Which way is up on screen, so a name hangs below its badge at any tilt.
-  // Looking straight down with north up, that is world -z.
-  const screenUp = new THREE.Vector3(0, 0, -1);
   let zoom = 1;
   let selectedId: string | null = null;
   let hoveredId: string | null = null;
@@ -379,15 +417,19 @@ export function buildCityLayer(
   const poleOf = () => BADGE_RADIUS * zoom * POLE_RADII;
 
   /** Put a marker's name just below its badge on screen. */
+  /**
+   * Put a marker's name on the ground just south of the town's middle, clear
+   * of the badge above it and of the square where its roads meet, and
+   * further out as the badge grows with the zoom.
+   */
   const placeLabel = (m: Marker) => {
     const label = labelObjects[m.i];
     if (!label) return;
-    const drop = radiusOf(m) * (1 + LABEL_GAP);
-    label.position.set(
-      m.x - screenUp.x * drop,
-      m.ground + poleOf() - screenUp.y * drop,
-      m.z - screenUp.z * drop,
+    const drop = Math.max(
+      m.townRadius * LABEL_TOWN_SHARE,
+      radiusOf(m) * (1 + LABEL_GAP),
     );
+    label.position.set(m.x, m.ground, m.z + drop);
     // Hang the name below that point instead of centring it on it.
     label.center.set(0.5, 0);
   };
@@ -397,7 +439,7 @@ export function buildCityLayer(
   galaxy.nodes.forEach((n, i) => {
     if (n.outline) return;
     const [x, groundY, z] = surface.mapToWorld(n.pos[0], n.pos[1]);
-    const mats = [0, 1, 2, 3].map(() => new THREE.MeshBasicMaterial());
+    const mats = [0, 1, 2, 3, 4].map(() => new THREE.MeshBasicMaterial());
     const poleMat = new THREE.MeshBasicMaterial();
     disposables.push(...mats, poleMat);
     const group = new THREE.Group();
@@ -407,9 +449,7 @@ export function buildCityLayer(
     pole.raycast = () => {};
     const badge = new THREE.Mesh(badgeGeoFor(0), mats);
     badge.raycast = () => {};
-    // The badge turns to face the camera each time it is drawn, and its name
-    // moves with it. Always drawn, so the name never goes stale.
-    badge.frustumCulled = false;
+    // The badge turns to face the camera each time it is drawn.
     group.add(pole, badge);
     scene.add(group);
     const marker: Marker = {
@@ -430,8 +470,6 @@ export function buildCityLayer(
     badge.onBeforeRender = (_r, _s, camera) => {
       badge.quaternion.copy(camera.quaternion);
       badge.updateMatrixWorld();
-      screenUp.set(0, 1, 0).applyQuaternion(camera.quaternion);
-      placeLabel(marker);
     };
     markers.push(marker);
     markerById.set(n.id, marker);
@@ -463,6 +501,8 @@ export function buildCityLayer(
     m.mats[PART.fill].color.copy(look.fill);
     m.mats[PART.star].color.copy(WHITE).multiplyScalar(dimOf(m.id));
     m.mats[PART.star].visible = look.star;
+    m.mats[PART.ring].color.copy(WHITE).multiplyScalar(dimOf(m.id));
+    m.mats[PART.ring].visible = look.star;
     m.mats[PART.brackets].color.copy(ATTACKABLE_COLOR);
     m.mats[PART.brackets].visible = look.brackets;
     m.poleMat.color.copy(POLE_COLOR).multiplyScalar(dimOf(m.id));

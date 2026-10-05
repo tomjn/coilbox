@@ -44,11 +44,11 @@ export interface TownSite {
  * {@link RADIUS_PER_ROAD} up to four roads. None reaches further than a share
  * of the way to its nearest neighbour, so two towns never run together.
  */
-export const TOWN_RADIUS = 2.4;
-export const CAPITAL_RADIUS = 3.6;
-const RADIUS_PER_ROAD = 0.1;
-const NEIGHBOUR_SHARE = 0.26;
-const CAPITAL_NEIGHBOUR_SHARE = 0.34;
+export const TOWN_RADIUS = 1.8;
+export const CAPITAL_RADIUS = 3;
+const RADIUS_PER_ROAD = 0.3;
+const NEIGHBOUR_SHARE = 0.3;
+const CAPITAL_NEIGHBOUR_SHARE = 0.38;
 /** The most a town is stretched along its roads. */
 const MAX_STRETCH = 0.35;
 
@@ -57,7 +57,7 @@ const MAX_STRETCH = 0.35;
  * radius: houses strung out along the roads, then the ring drawn round a
  * selected town.
  */
-export const TOWN_REACH = 1.7;
+export const TOWN_REACH = 2.1;
 
 /** Texels along the longer side of the town index. */
 export const TOWN_INDEX_TEXELS = 512;
@@ -181,8 +181,8 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
  * Which town each part of the sheet belongs to, at {@link TOWN_INDEX_TEXELS}
  * along its longer side, as four bytes a texel. Red and green: the town's
  * index plus one, high byte first, or 0 for open country. Blue: how fit the
- * ground is to build on, 255 for flat dry land down to 0 for sea or a steep
- * slope, recorded only where some town reaches. The texel in column `i` and
+ * ground is to build on, 255 for flat dry land, {@link STEEP_FIT} of that
+ * for a steep slope, and 0 for sea, recorded only where some town reaches. The texel in column `i` and
  * row `j` stands for world `x = (i + 0.5) / width * worldWidth -
  * worldWidth / 2`, and the same down the sheet in z. A texel within
  * {@link TOWN_REACH} radii of more than one town goes to the one it is
@@ -215,13 +215,18 @@ export function buildableAt(
       1,
       Math.max(0, (slope - FLAT_SLOPE) / (STEEP_SLOPE - FLAT_SLOPE)),
     );
-    return 1 - t * t * (3 - 2 * t);
+    return 1 - (1 - STEEP_FIT) * t * t * (3 - 2 * t);
   };
 }
 
-/** Design values: towns build on slopes up to 1 in 5 and never past 1 in 2.5. */
+/** Design values: towns build on slopes up to 1 in 5 and thin out by 1 in 2.5. */
 export const FLAT_SLOPE = 0.2;
 export const STEEP_SLOPE = 0.4;
+/**
+ * How fit steep ground is, against flat. Not 0, so a place on a hillside
+ * keeps a village at its middle, which the town shader tells from the sea.
+ */
+export const STEEP_FIT = 0.25;
 
 export function buildTownIndex(
   towns: Town[],

@@ -48,8 +48,11 @@ export interface TownLayer {
 const ENTRY_REACH = 1;
 /** How far above the terrain the patches lie, in world units. */
 const PATCH_LIFT = 0.005;
-/** Drawn before the province fills, so an owner's tint lies over its towns. */
-const TOWN_ORDER = -4;
+/**
+ * Drawn after the province fills (`provinceLayer.ts`, -3), so a town keeps its
+ * own colours inside an owner's tint, and before the borders (-2).
+ */
+const TOWN_ORDER = -2.5;
 /** The steps the ground's slope is judged over, in world units. */
 const SLOPE_STEP = 0.25;
 

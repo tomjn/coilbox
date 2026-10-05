@@ -279,19 +279,19 @@ describe("buildCityLayer", () => {
     expect(at.y + size.y).toBeGreaterThanOrEqual(y + top);
   });
 
-  it("hangs each name below its badge and keeps it clear as badges grow", () => {
+  it("puts each name south of its town's middle, clear of the badge as it grows", () => {
     const { layer, labelObjects, groups, badge } = build();
     const label = labelObjects[1];
     expect(label.center.toArray()).toEqual([0.5, 0]);
     expect(label.position.x).toBe(groups[1].position.x);
-    // Looking straight down with north up, below on screen is south.
-    const gap = label.position.z - groups[1].position.z;
-    expect(gap).toBeGreaterThan(badge(groups[1]).scale.x);
-    layer.fitToCamera(GALAXY_MIN_DISTANCE * 4);
-    expect(label.position.z - groups[1].position.z).toBeCloseTo(
-      gap * markerZoom(GALAXY_MIN_DISTANCE * 4),
-      5,
-    );
+    expect(label.position.y).toBe(groups[1].position.y);
+    // The middle city's town reaches 3, so its name sits past the square
+    // where its roads meet, and past the badge's edge.
+    const gap = () => label.position.z - groups[1].position.z;
+    expect(gap()).toBeCloseTo(3 * 0.55, 5);
+    expect(gap()).toBeGreaterThan(badge(groups[1]).scale.x);
+    layer.fitToCamera(GALAXY_MIN_DISTANCE * 8);
+    expect(gap()).toBeGreaterThan(badge(groups[1]).scale.x * 1.3);
   });
 
   it("works with no labels, as in performance mode", () => {

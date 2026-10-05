@@ -74,9 +74,9 @@ const vec3 W_BROWN = vec3(0.212, 0.151, 0.106);
 const vec3 W_PALE = vec3(0.442, 0.410, 0.359);
 const vec3 W_STREET = vec3(0.442, 0.399, 0.330);
 const vec3 W_LANE = vec3(0.227, 0.211, 0.177);
-// What the roofs and streets of a town average to from far away, a grey tan,
-// sRGB (150, 136, 122).
-const vec3 W_TOWN = vec3(0.311, 0.251, 0.198);
+// What the roofs and streets of a town average to from far away, a warm
+// grey pink, sRGB (166, 134, 120).
+const vec3 W_TOWN = vec3(0.389, 0.243, 0.190);
 // Gardens and yards: the ground shows through, darker and greener.
 const vec4 W_GARDEN = vec4(0.012, 0.025, 0.008, 0.22);
 
@@ -168,17 +168,22 @@ void main() {
   // Most of a patch is open country. The ragged edge below moves the town's
   // edge by at most 0.375 radii, and houses along a road by 0.3, so past
   // those nothing is built, and only a ring could draw.
-  if ((rr > 1.48 && (roadD > 0.32 || rr > 1.95)) && ws0.a < 0.004) discard;
+  if ((rr > 1.48 && (roadD > 0.3 || rr > 2.3)) && ws0.a < 0.004) discard;
   vec4 ws1 = texelFetch(uTownState, ivec2(vTown, 1), 0);
   // A ragged edge, so no town is a disc.
   float rag = tNoise(q / wR * 2.0 + wSeed * 61.0).x - 0.5;
   rag += (tNoise(q / wR * 5.5 + wSeed * 23.0).x - 0.5) * 0.5;
   float dens = 1.0 - smoothstep(0.4, 1.1, rr + rag * 0.5);
+  // Denser quarters and looser ones, so the town has a centre and is not
+  // the same all the way out.
+  dens = clamp(dens * (0.7 + 0.6 * tNoise(q / wR * 1.3 + wSeed * 5.0).x), 0.0, 1.0);
   // Houses strung out along the roads past the edge of the town.
-  float ribbon = (1.0 - smoothstep(0.08, 0.32, roadD)) * (1.0 - smoothstep(0.8, 1.65, rr + rag * 0.4));
-  dens = max(dens, ribbon * 0.5);
-  // Flat dry land only: no town climbs a steep slope or stands in the sea.
-  dens *= smoothstep(0.1, 0.9, texture(uTownIndex, uv).b);
+  float ribbon = (1.0 - smoothstep(0.08, 0.3, roadD)) * (1.0 - smoothstep(1.0, 2.0, rr + rag * 0.4));
+  dens = max(dens, ribbon * 0.7);
+  // Flat dry land only: no town climbs a steep slope or stands in the sea,
+  // though a place on a hillside keeps a village at its middle.
+  float fit = texture(uTownIndex, uv).b;
+  dens *= max(smoothstep(0.3, 0.9, fit), (1.0 - smoothstep(0.3, 0.6, rr)) * smoothstep(0.1, 0.2, fit));
 
   // The ring round a selected or hovered town.
   float ringW = max(0.035, gFoot * 1.3) * (1.0 + 1.2 * ws1.g);
@@ -196,7 +201,8 @@ void main() {
   float offRoad = smoothstep(0.1, 0.14, roadD) * (1.0 - square);
   // Far away: one pale patch, the colour roofs and streets average to.
   float farCover = smoothstep(0.0, 0.55, dens) * 0.85 * smoothstep(0.07, 0.12, roadD);
-  vec4 far = vec4(W_TOWN * farCover, farCover);
+  // Mottled a little, as a town's quarters are from the air.
+  vec4 far = vec4(W_TOWN * (0.92 + 0.3 * rag) * farCover, farCover);
   town = far;
 
   float keepBlock = clamp((W_BLOCK / gFoot - 8.0) / 6.0, 0.0, 1.0);
