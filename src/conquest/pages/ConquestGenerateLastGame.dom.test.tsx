@@ -65,8 +65,50 @@ vi.mock("@/components/OptionSelect", () => ({
     </select>
   ),
 }));
+// The shared game picker, as a button that names the game and a panel that lists
+// them. Its own layout is tested with it.
+vi.mock("../../play/pages/components/GamePickerButton", () => ({
+  GamePickerButton: ({
+    value,
+    onClick,
+  }: {
+    value: string;
+    onClick: () => void;
+  }) => (
+    <button type="button" data-testid="game-picker" onClick={onClick}>
+      {value}
+    </button>
+  ),
+}));
+vi.mock("../../play/pages/components/GamePickerPanel", () => ({
+  GamePickerPanel: ({
+    games,
+    onSelect,
+    onBack,
+  }: {
+    games: { name: string }[];
+    onSelect: (name: string) => void;
+    onBack: () => void;
+  }) => (
+    <div>
+      {games.map((g) => (
+        <button
+          key={g.name}
+          type="button"
+          onClick={() => {
+            onSelect(g.name);
+            onBack();
+          }}
+        >
+          Pick {g.name}
+        </button>
+      ))}
+    </div>
+  ),
+}));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("../../content/config", () => ({
+  useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useUnitsyncScan: () => ({
     data: {
       games: h.installed.map((name) => ({
@@ -137,6 +179,11 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     savedLoading: false,
     error: null,
   }),
+  useGameMapFacts: () => ({
+    loading: false,
+    facts: { maps: h.maps, onlyOwnMaps: h.onlyOwnMaps },
+    error: undefined,
+  }),
 }));
 vi.mock("../bindings", () => ({
   conquestDelete: vi.fn(),
@@ -175,16 +222,13 @@ function openForm() {
   render(<MemoryRouter>{h.drawerContent as ReactNode}</MemoryRouter>);
 }
 
-/** The game select, the one that lists the installed games. */
-function gameSelect(): HTMLSelectElement {
-  const found = [...document.querySelectorAll("select")].find((s) =>
-    [...s.options].some((o) => o.textContent === "Alpha Game v1"),
-  );
-  if (!found) throw new Error("no select lists the games");
-  return found;
-}
+const chosenGame = () => screen.getByTestId("game-picker").textContent;
 
-const chosenGame = () => gameSelect().selectedOptions[0]?.textContent;
+/** Open the shared picker and pick a game from it. */
+function pickGame(name: string) {
+  fireEvent.click(screen.getByTestId("game-picker"));
+  fireEvent.click(screen.getByRole("button", { name: `Pick ${name}` }));
+}
 
 beforeEach(() => {
   storage = memorySettingsStorage();
@@ -205,45 +249,41 @@ describe("Conquest generate form: the last game", () => {
 
   it("remembers the game the player picks and opens on it next time", () => {
     openForm();
-    fireEvent.change(gameSelect(), {
-      target: { value: gameSelect().options[1].value },
-    });
-    expect(storage.get(KEY)).toBe(
-      JSON.stringify(gameSelect().options[1].value),
-    );
+    pickGame("Cool Game v1");
+    expect(storage.get(KEY)).toContain("cg|");
     openForm();
     expect(chosenGame()).toBe("Cool Game v1");
   });
 
   it("falls back to the first game when the remembered one is not installed", () => {
     openForm();
-    fireEvent.change(gameSelect(), {
-      target: { value: gameSelect().options[1].value },
-    });
+    pickGame("Cool Game v1");
     h.installed = ["Alpha Game v1", "Zed Game v1"];
     openForm();
     expect(chosenGame()).toBe("Alpha Game v1");
   });
 
-  it("falls back to the first game when the remembered one is hidden from the form", () => {
+  it("opens on the remembered game even when it asks for its own maps only, and says so", () => {
     openForm();
-    fireEvent.change(gameSelect(), {
-      target: { value: gameSelect().options[1].value },
-    });
-    // A game asking for its own maps only is hidden once it has a map to offer.
+    pickGame("Cool Game v1");
+    // Whether a game asks for its own maps only is read for the selected game
+    // alone, so it is offered and then explained rather than left out.
     h.onlyOwnMaps = ["Cool Game v1"];
     h.maps = [{ id: "cool-map", game: { shortname: "CG" } }];
-    // With one game left the form shows no select, only its name.
     openForm();
-    expect(document.body.textContent).toContain("Alpha Game v1");
-    expect(document.body.textContent).not.toContain("Cool Game v1");
+    expect(chosenGame()).toBe("Cool Game v1");
+    expect(document.body.textContent).toContain(
+      "Cool Game v1 plays Conquest only on the maps the game carries.",
+    );
+    // Another game can still be picked.
+    pickGame("Alpha Game v1");
+    expect(chosenGame()).toBe("Alpha Game v1");
+    expect(document.body.textContent).not.toContain("plays Conquest only");
   });
 
   it("prefers a game named by the caller over the remembered one", () => {
     openForm();
-    fireEvent.change(gameSelect(), {
-      target: { value: gameSelect().options[1].value },
-    });
+    pickGame("Cool Game v1");
     h.preset = "Alpha Game v1";
     openForm();
     expect(chosenGame()).toBe("Alpha Game v1");

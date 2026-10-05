@@ -158,11 +158,14 @@ const NO_FACTS: GameMapFacts = { maps: [], onlyOwnMaps: [] };
 export function useGameMapFacts(game: GameItem | null | undefined): {
   loading: boolean;
   facts: GameMapFacts;
+  /** Why the maps could not be listed, when they could not. */
+  error: string | undefined;
 } {
   const at = useArchiveTarget();
   const [answered, setAnswered] = useState<{
     key: string;
     facts: GameMapFacts;
+    error?: string;
   }>();
   const archive = game ? archiveGameOf(game) : undefined;
   const key = archive
@@ -178,19 +181,31 @@ export function useGameMapFacts(game: GameItem | null | undefined): {
       (facts) => {
         if (!cancelled) setAnswered({ key, facts });
       },
-      () => {
+      (e) => {
         // The saved maps could not be listed. Nothing is known to hide the
         // styles, so the form offers them rather than waiting for ever.
-        if (!cancelled) setAnswered({ key, facts: NO_FACTS });
+        if (!cancelled) {
+          setAnswered({
+            key,
+            facts: NO_FACTS,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
       },
     );
     return () => {
       cancelled = true;
     };
   }, [wanted, key, at]);
-  if (key === undefined) return { loading: false, facts: NO_FACTS };
+  if (key === undefined) {
+    return { loading: false, facts: NO_FACTS, error: undefined };
+  }
   const current = answered?.key === key ? answered : undefined;
-  return { loading: !current, facts: current?.facts ?? NO_FACTS };
+  return {
+    loading: !current,
+    facts: current?.facts ?? NO_FACTS,
+    error: current?.error,
+  };
 }
 
 /** A listed map from the session cache, for callers outside React. */

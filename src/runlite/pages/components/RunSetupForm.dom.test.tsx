@@ -136,6 +136,11 @@ vi.mock("../../../profile/profile", () => ({
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
 vi.mock("../../../conquest/handmade/useHandmadeMaps", () => ({
   useHandmadeMaps: () => ({ maps: [], unreadable: [], error: null }),
+  useGameMapFacts: () => ({
+    loading: false,
+    facts: { maps: [], onlyOwnMaps: [] },
+    error: undefined,
+  }),
 }));
 // The real card reads the frame. A button per game stands in for its picker.
 vi.mock("../../../play/pages/components/GameSelectCard", () => ({
