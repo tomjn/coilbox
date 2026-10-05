@@ -6,18 +6,18 @@ generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"spiral","skin":"ci
 faction player name="Verdant Union" color=#2f7dff aggression=0 side=
 faction enemy-1 name="Azure Enclave" color=#ff3524 aggression=0.3783934459090233 side=
 faction enemy-2 name="Molten Coalition" color=#ffb300 aggression=0.31360385911539196 side=
-node node-0 name="Alcor" pos=423.9,797 owner=player kind=normal difficulty=2 map="Map 3"
-node node-1 name="Acrux" pos=457,175.5 owner=enemy-2 kind=normal difficulty=5 map="Map 10"
-node node-2 name="Procyon" pos=337.9,486.8 owner=player kind=normal difficulty=2 map="Map 2"
-node node-3 name="Capella" pos=610.3,578.4 owner=enemy-1 kind=normal difficulty=4 map="Map 8"
-node node-4 name="Arcturus" pos=841.8,427.5 owner=enemy-1 kind=capital difficulty=5 map="Map 11"
-node node-5 name="Alkaid" pos=652.7,427.1 owner=enemy-1 kind=normal difficulty=5 map="Map 9"
-node node-6 name="Fomalhaut" pos=769.9,796.6 owner=neutral kind=normal difficulty=4 map="Map 7"
-node node-7 name="Wezen" pos=253.4,806 owner=player kind=capital difficulty=1 map="Map 0"
-node node-8 name="Algol" pos=270.6,231.3 owner=enemy-2 kind=capital difficulty=5 map="Map 10"
-node node-9 name="Saiph" pos=572.5,768.7 owner=neutral kind=normal difficulty=4 map="Map 8"
-node node-10 name="Mintaka" pos=532,285.2 owner=enemy-2 kind=normal difficulty=4 map="Map 7"
-node node-11 name="Mizar" pos=756.5,349.7 owner=enemy-1 kind=normal difficulty=5 map="Map 11"
+node node-0 name="Wrenhaven" pos=423.9,797 owner=player kind=normal difficulty=2 map="Map 3"
+node node-1 name="Brackhaven" pos=457,175.5 owner=enemy-2 kind=normal difficulty=5 map="Map 10"
+node node-2 name="Fernbarrow" pos=337.9,486.8 owner=player kind=normal difficulty=2 map="Map 2"
+node node-3 name="Redbarrow" pos=610.3,578.4 owner=enemy-1 kind=normal difficulty=4 map="Map 8"
+node node-4 name="Winddale" pos=841.8,427.5 owner=enemy-1 kind=capital difficulty=5 map="Map 11"
+node node-5 name="Bleakwood" pos=652.7,427.1 owner=enemy-1 kind=normal difficulty=5 map="Map 9"
+node node-6 name="Rookcross" pos=769.9,796.6 owner=neutral kind=normal difficulty=4 map="Map 7"
+node node-7 name="Duncombe" pos=253.4,806 owner=player kind=capital difficulty=1 map="Map 0"
+node node-8 name="Easthollow" pos=270.6,231.3 owner=enemy-2 kind=capital difficulty=5 map="Map 10"
+node node-9 name="Larkmere" pos=572.5,768.7 owner=neutral kind=normal difficulty=4 map="Map 8"
+node node-10 name="Stormcross" pos=532,285.2 owner=enemy-2 kind=normal difficulty=4 map="Map 7"
+node node-11 name="Crowhollow" pos=756.5,349.7 owner=enemy-1 kind=normal difficulty=5 map="Map 11"
 link node-4 node-11 node-4 node-11 road
 link node-5 node-11 node-5 node-11 road
 link node-1 node-10 node-1 node-10 road

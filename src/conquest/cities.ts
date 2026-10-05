@@ -120,7 +120,7 @@ export function generateCities(
   opts: CitiesOptions,
   now: string = new Date().toISOString(),
 ): GalaxyDoc {
-  const galaxy = generateGalaxy(opts, now);
+  const galaxy = generateGalaxy(opts, now, true);
   const scale = cityMapScale(galaxy.nodes.map((n) => [n.pos[0], n.pos[1]]));
   const nodes = galaxy.nodes.map((node) => ({
     ...node,
