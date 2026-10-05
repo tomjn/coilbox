@@ -106,4 +106,40 @@ describe("a game's own missions", () => {
       [],
     );
   });
+
+  it("reads a packaged game once per content scan, not once per visit", async () => {
+    vi.mocked(scenarioGameMissions).mockClear().mockResolvedValue({
+      missions: [
+        { folder: "first-contact", hasDocument: true, hasCompiled: true },
+      ],
+      stamp: "1024:1700000000",
+    });
+    vi.mocked(scenarioGameMissionFile).mockResolvedValue({
+      base64: btoa(document),
+    });
+
+    // A scan hands every visit the same game object, and a rescan a new one.
+    const scanned = game("SplinterFaction", "sf-once.sdp");
+    const first = await gameScenarios([scanned]);
+    const second = await gameScenarios([scanned]);
+    await gameScenarios([game("SplinterFaction", "sf-once.sdp")]);
+
+    expect(second).toEqual(first);
+    expect(scenarioGameMissions).toHaveBeenCalledTimes(2);
+  });
+
+  it("logs a game it cannot read once, however often it is read", async () => {
+    vi.mocked(scenarioGameMissions).mockRejectedValue(
+      new Error("not a game archive"),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const scanned = game("Broken", "broken.sdz");
+    await gameScenarios([scanned]);
+    await gameScenarios([scanned]);
+    await gameScenarios([game("Broken", "broken.sdz")]);
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
 });
