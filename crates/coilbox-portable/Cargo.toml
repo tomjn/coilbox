@@ -7,3 +7,6 @@ license = "MIT"
 
 [dependencies]
 tauri = { version = "2" }
+
+[dev-dependencies]
+tempfile = { workspace = true }

@@ -82,6 +82,9 @@ pub(crate) fn delete(path: &Path) -> Result<u64, String> {
 /// root's `games`/`maps`/`packages` so the engine's base archives cannot go.
 #[tauri::command]
 pub(crate) async fn content_delete_archive(path: String) -> CliResult {
+    if let Err(e) = coilbox_portable::refuse_in_bundle(Path::new(&path)) {
+        return CliResult::err(e);
+    }
     let p = PathBuf::from(&path);
     match tauri::async_runtime::spawn_blocking(move || delete(&p)).await {
         Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),

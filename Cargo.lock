@@ -855,6 +855,7 @@ name = "coilbox-portable"
 version = "0.0.0"
 dependencies = [
  "tauri",
+ "tempfile",
 ]
 
 [[package]]
@@ -6400,6 +6401,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tempfile",
  "zip 8.6.0",
 ]
 
