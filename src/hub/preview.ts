@@ -451,7 +451,7 @@ function rebuildRun(settings: Record<string, unknown>): RunShape | null {
 function rebuildLandRun(
   settings: NonNullable<ReturnType<typeof parseWarpathChallengeSettings>>,
 ): RunShape | null {
-  if (!settings.map || settings.map.source !== "generated") return null;
+  if (settings.map?.source !== "generated") return null;
   try {
     const source = resolveRunMap(settings.map, settings.game);
     if (!source) return null;
