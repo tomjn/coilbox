@@ -545,8 +545,6 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
 /** Pixels from the map edge over which the land is pushed under the sea,
  * harder the nearer the edge, so a coast bends away instead of being cut. */
 const EDGE_MARGIN = 64;
-/** Pixels over which land that runs off the map levels down to sea height. */
-const EDGE_RAMP = 16;
 /** A lake smaller than this many pixels is filled in as land. */
 const MAX_LAKE = 2500;
 
@@ -903,19 +901,7 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
     const ridge = r * r * r;
     const range = clamp01((ranges[i] - 0.47) * 4);
     const hills = hillField[i];
-    // Level off to the sea's height where land runs off the map, so the
-    // sheet meets what is drawn beyond it without a cliff.
-    const x = i % S;
-    const y = (i - x) / S;
-    let edge = 1;
-    for (const side of plan.open) {
-      edge = Math.min(edge, (toSide(x + 0.5, y + 0.5, side) - 1) / EDGE_RAMP);
-    }
-    const h = clamp01(
-      Math.max(0, edge) *
-        inland *
-        (0.06 + 0.2 * hills + 0.75 * range * ridge),
-    );
+    const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
     heightmap[i] = 1 + Math.floor(h * 254);
   }
 
