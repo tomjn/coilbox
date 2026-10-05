@@ -3,15 +3,16 @@ import type { CSS2DObject } from "three/addons/renderers/CSS2DRenderer.js";
 import type { GalaxyDoc } from "../model";
 import { NEUTRAL } from "../model";
 import { factionSides } from "./factionShape";
-import type { GroundLayer, RoadStyle, TownStyle } from "./groundLayer";
+import type { GroundLayer, RoadStyle } from "./groundLayer";
 import { ROAD_MODE } from "./groundShader";
 import { pairKey, roadLinks } from "./roads";
 import { GALAXY_MIN_DISTANCE, type TerrainSurface } from "./terrain";
+import type { TownLayer, TownStyle } from "./townLayer";
 
 /**
  * Point locations and roads on a terrain map. A point location is a node with
  * no outline: a city, a base, a landing site. The place itself is a town
- * painted into the ground (`groundLayer.ts`), which says nothing about who
+ * drawn on the ground (`townLayer.ts`), which says nothing about who
  * holds it, so each one also carries a badge on a short pole above it: a
  * piece of interface rather than of the ground, in its owner's colour and its
  * owner's faction shape, with a star for a capital. The badge faces the
@@ -340,7 +341,7 @@ export function buildCityLayer(
   cores: THREE.InstancedMesh,
   /** Where the roads and towns are painted, and their state with them. */
   ground: Pick<GroundLayer, "setRoadStyle" | "commit"> &
-    Partial<Pick<GroundLayer, "setTownStyle" | "towns">>,
+    Partial<Pick<TownLayer, "setTownStyle" | "towns">>,
 ): CityLayer {
   const nodeById = new Map(galaxy.nodes.map((n) => [n.id, n]));
   const ownerOf = (id: string): string =>

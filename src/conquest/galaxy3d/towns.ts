@@ -150,11 +150,14 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
 
 /**
  * Which town each part of the sheet belongs to, at {@link TOWN_INDEX_TEXELS}
- * along its longer side: two bytes a texel, the town's index plus one, high
- * byte first, or 0 for open country. The texel in column `i` and row `j`
- * stands for world `x = (i + 0.5) / width * worldWidth - worldWidth / 2`,
- * and the same down the sheet in z. A texel within {@link TOWN_REACH} radii
- * of more than one town goes to the one it is nearest relative to its size.
+ * along its longer side, as four bytes a texel. Red and green: the town's
+ * index plus one, high byte first, or 0 for open country. Blue: how fit the
+ * ground is to build on, 255 for flat dry land down to 0 for sea or a steep
+ * slope, recorded only where some town reaches. The texel in column `i` and
+ * row `j` stands for world `x = (i + 0.5) / width * worldWidth -
+ * worldWidth / 2`, and the same down the sheet in z. A texel within
+ * {@link TOWN_REACH} radii of more than one town goes to the one it is
+ * nearest relative to its size.
  */
 export interface TownIndex {
   data: Uint8Array;
@@ -162,11 +165,41 @@ export interface TownIndex {
   height: number;
 }
 
+/**
+ * How fit the ground at world `x, z` is to build on, 0 to 1, from the ground
+ * height there in world units, `height`. Sea is anything below `seaLevel`.
+ * Ground is flat enough up to a slope of {@link FLAT_SLOPE} and too steep
+ * from {@link STEEP_SLOPE}, as rise over run, judged over `step` world units.
+ */
+export function buildableAt(
+  height: (x: number, z: number) => number,
+  seaLevel: number,
+  step: number,
+): (x: number, z: number) => number {
+  return (x, z) => {
+    const h = height(x, z);
+    if (h < seaLevel) return 0;
+    const gx = (height(x + step, z) - height(x - step, z)) / (2 * step);
+    const gz = (height(x, z + step) - height(x, z - step)) / (2 * step);
+    const slope = Math.hypot(gx, gz);
+    const t = Math.min(
+      1,
+      Math.max(0, (slope - FLAT_SLOPE) / (STEEP_SLOPE - FLAT_SLOPE)),
+    );
+    return 1 - t * t * (3 - 2 * t);
+  };
+}
+
+/** Design values: towns build on slopes up to 1 in 5 and never past 1 in 2.5. */
+export const FLAT_SLOPE = 0.2;
+export const STEEP_SLOPE = 0.4;
+
 export function buildTownIndex(
   towns: Town[],
   worldWidth: number,
   worldDepth: number,
   texels: number = TOWN_INDEX_TEXELS,
+  buildable: (x: number, z: number) => number = () => 1,
 ): TownIndex {
   const long = Math.max(worldWidth, worldDepth);
   const width = Math.max(1, Math.round((texels * worldWidth) / long));
@@ -177,7 +210,7 @@ export function buildTownIndex(
   // reach still covers ground inside it.
   const slack = Math.hypot(tx, tz) / 2;
   const best = new Float32Array(width * height).fill(Number.POSITIVE_INFINITY);
-  const data = new Uint8Array(width * height * 2);
+  const data = new Uint8Array(width * height * 4);
   towns.forEach((town, k) => {
     const reach = town.radius * TOWN_REACH;
     const r = reach + slack;
@@ -202,13 +235,104 @@ export function buildTownIndex(
         const at = j * width + i;
         if (share < best[at]) {
           best[at] = share;
-          data[at * 2] = tag >> 8;
-          data[at * 2 + 1] = tag & 255;
+          data[at * 4] = tag >> 8;
+          data[at * 4 + 1] = tag & 255;
         }
       }
     }
   });
+  for (let j = 0; j < height; j++) {
+    const z = (j + 0.5) * tz - worldDepth / 2;
+    for (let i = 0; i < width; i++) {
+      const at = j * width + i;
+      if (best[at] === Number.POSITIVE_INFINITY) continue;
+      const fit = buildable((i + 0.5) * tx - worldWidth / 2, z);
+      data[at * 4 + 2] = Math.round(Math.min(1, Math.max(0, fit)) * 255);
+    }
+  }
   return { data, width, height };
+}
+
+/**
+ * The ground under every town as one draped mesh: the cells of the terrain
+ * mesh that the town's reach touches, split into triangles the same way the
+ * terrain is, so the patch lies exactly on it. `town` holds each vertex's
+ * town index, which the shader checks against the town index so a patch
+ * never draws over its neighbour's ground. Built from a {@link TerrainSurface}
+ * shaped argument so it is tested without a scene.
+ */
+export function townPatches(
+  towns: Town[],
+  surface: {
+    width: number;
+    height: number;
+    segmentsX: number;
+    segmentsY: number;
+    vertexHeights: Float32Array;
+    worldWidth: number;
+    worldDepth: number;
+    mapToWorldXZ(mapX: number, mapY: number): [number, number];
+  },
+  lift: number,
+): { positions: Float32Array; town: Float32Array; index: Uint32Array } {
+  const { segmentsX, segmentsY, vertexHeights } = surface;
+  const cols = segmentsX + 1;
+  const cellW = surface.worldWidth / segmentsX;
+  const cellD = surface.worldDepth / segmentsY;
+  const positions: number[] = [];
+  const town: number[] = [];
+  const index: number[] = [];
+  towns.forEach((t, k) => {
+    const reach = t.radius * TOWN_REACH;
+    const i0 = Math.max(
+      0,
+      Math.floor((t.x - reach + surface.worldWidth / 2) / cellW),
+    );
+    const i1 = Math.min(
+      segmentsX,
+      Math.ceil((t.x + reach + surface.worldWidth / 2) / cellW),
+    );
+    const j0 = Math.max(
+      0,
+      Math.floor((t.z - reach + surface.worldDepth / 2) / cellD),
+    );
+    const j1 = Math.min(
+      segmentsY,
+      Math.ceil((t.z + reach + surface.worldDepth / 2) / cellD),
+    );
+    if (i1 <= i0 || j1 <= j0) return;
+    const first = positions.length / 3;
+    const across = i1 - i0 + 1;
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const [x, z] = surface.mapToWorldXZ(
+          (i / segmentsX) * surface.width,
+          (j / segmentsY) * surface.height,
+        );
+        positions.push(x, vertexHeights[j * cols + i] + lift, z);
+        town.push(k);
+      }
+    }
+    for (let j = 0; j < j1 - j0; j++) {
+      for (let i = 0; i < i1 - i0; i++) {
+        const topLeft = first + j * across + i;
+        const bottomLeft = topLeft + across;
+        index.push(
+          topLeft,
+          bottomLeft,
+          topLeft + 1,
+          topLeft + 1,
+          bottomLeft,
+          bottomLeft + 1,
+        );
+      }
+    }
+  });
+  return {
+    positions: new Float32Array(positions),
+    town: new Float32Array(town),
+    index: new Uint32Array(index),
+  };
 }
 
 /**

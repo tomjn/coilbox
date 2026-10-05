@@ -5,20 +5,10 @@ import {
   ROAD_MODE,
   ROAD_STATE_ROWS,
   type RoadMode,
-  TOWN_STATE_ROWS,
-  type TownShading,
 } from "./groundShader";
 import { buildRoadMask, ROAD_REACH, type RoadLine } from "./roadMask";
-import { planRoads, sceneSeed } from "./roadNetwork";
-import { roadLinks } from "./roads";
+import { planRoads } from "./roadNetwork";
 import type { HeightGrid, TerrainSurface } from "./terrain";
-import {
-  buildTownIndex,
-  leavingAngle,
-  planTowns,
-  type Town,
-  townDataTexels,
-} from "./towns";
 
 /**
  * The textures that paint roads into a terrain map's ground, built once when
@@ -39,57 +29,24 @@ export interface RoadStyle {
   emphasised: boolean;
 }
 
-/** How one town is drawn now. */
-export interface TownStyle {
-  /** Hidden by fog: drawn dim and grey. */
-  hidden: boolean;
-  /** The ring round the town's edge, or none. */
-  ring?: {
-    color: THREE.Color;
-    /** 0 to 1. */
-    strength: number;
-    /** True for the thick ring of a selected town. */
-    thick: boolean;
-  };
-}
-
 export interface GroundLayer {
   shading: GroundShading;
   /** The roads, in `roadLinks` order. */
   roads: RoadLine[];
-  /** The towns by node index, or empty when none are drawn. */
-  towns: Town[];
   /** Restyle road `k`. Takes effect at {@link commit}. */
   setRoadStyle: (k: number, style: RoadStyle) => void;
-  /** Restyle the town of node `i`. Takes effect at {@link commit}. */
-  setTownStyle: (i: number, style: TownStyle) => void;
-  /** Send the road and town states to the GPU. */
+  /** Send the road states to the GPU. */
   commit: () => void;
 }
 
 const scratch = new THREE.Color();
 const byte = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255);
 
-/** A texture read texel by texel, never blended. */
-function exact(texture: THREE.DataTexture): THREE.DataTexture {
-  texture.flipY = false;
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.needsUpdate = true;
-  return texture;
-}
-
-/**
- * Build the roads and, with `withTowns`, a town at every node. Towns are
- * left off for a hand-made map, whose painted picture may show its own, and
- * in performance mode.
- */
 export function buildGroundLayer(
   disposables: { dispose(): void }[],
   galaxy: GalaxyDoc,
   surface: TerrainSurface,
   heights: HeightGrid | undefined,
-  withTowns = false,
 ): GroundLayer {
   const roads = planRoads(
     galaxy,
@@ -146,51 +103,9 @@ export function buildGroundLayer(
   roadState.needsUpdate = true;
   disposables.push(roadDistance, roadMask, roadState);
 
-  const towns = withTowns ? planMapTowns(galaxy, surface, roads) : [];
-  const townColumns = Math.max(1, towns.length);
-  const townState = new Uint8Array(townColumns * TOWN_STATE_ROWS * 4);
-  let townShading: TownShading | undefined;
-  if (towns.length > 0) {
-    const index = buildTownIndex(towns, surface.worldWidth, surface.worldDepth);
-    const indexTexture = exact(
-      new THREE.DataTexture(
-        index.data,
-        index.width,
-        index.height,
-        THREE.RGFormat,
-      ),
-    );
-    const data = exact(
-      new THREE.DataTexture(
-        townDataTexels(towns),
-        townColumns,
-        2,
-        THREE.RGBAFormat,
-        THREE.FloatType,
-      ),
-    );
-    const state = exact(
-      new THREE.DataTexture(
-        townState,
-        townColumns,
-        TOWN_STATE_ROWS,
-        THREE.RGBAFormat,
-      ),
-    );
-    disposables.push(indexTexture, data, state);
-    townShading = {
-      index: indexTexture,
-      indexSize: [index.width, index.height],
-      data,
-      state,
-    };
-  }
-
   return {
     roads,
-    towns,
     shading: {
-      towns: townShading,
       roadDistance,
       roadMask,
       roadMaskSize: [mask.width, mask.height],
@@ -217,55 +132,8 @@ export function buildGroundLayer(
       state[low + 1] = style.mode;
       state[low + 2] = style.emphasised ? 255 : 0;
     },
-    setTownStyle: (i, style) => {
-      if (!townShading || i < 0 || i >= towns.length) return;
-      const top = i * 4;
-      const ring = style.ring;
-      if (ring) scratch.copy(ring.color).convertLinearToSRGB();
-      townState[top] = ring ? byte(scratch.r) : 0;
-      townState[top + 1] = ring ? byte(scratch.g) : 0;
-      townState[top + 2] = ring ? byte(scratch.b) : 0;
-      townState[top + 3] = ring ? byte(ring.strength) : 0;
-      const low = (townColumns + i) * 4;
-      townState[low] = style.hidden ? 255 : 0;
-      townState[low + 1] = ring?.thick ? 255 : 0;
-    },
     commit: () => {
       roadState.needsUpdate = true;
-      if (townShading) townShading.state.needsUpdate = true;
     },
   };
-}
-
-/** How far along a road its direction into a town is read, in world units. */
-const ENTRY_REACH = 1;
-
-/** A town at every node, sized by its roads and shaped by where they go. */
-function planMapTowns(
-  galaxy: GalaxyDoc,
-  surface: TerrainSurface,
-  roads: RoadLine[],
-): Town[] {
-  const toWorld = (x: number, y: number) => surface.mapToWorldXZ(x, y);
-  const index = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
-  const entries: number[][] = galaxy.nodes.map(() => []);
-  roadLinks(galaxy).forEach(({ a, b }, k) => {
-    const line = roads[k]?.line;
-    if (!line || line.length < 2) return;
-    const ia = index.get(a);
-    const ib = index.get(b);
-    if (ia !== undefined) {
-      entries[ia].push(leavingAngle(line, toWorld, ENTRY_REACH));
-    }
-    if (ib !== undefined) {
-      entries[ib].push(leavingAngle([...line].reverse(), toWorld, ENTRY_REACH));
-    }
-  });
-  return planTowns(
-    galaxy.nodes.map((n, i) => {
-      const [x, z] = toWorld(n.pos[0], n.pos[1]);
-      return { x, z, capital: n.kind === "capital", roads: entries[i] };
-    }),
-    sceneSeed(galaxy),
-  );
 }

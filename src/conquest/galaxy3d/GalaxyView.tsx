@@ -38,6 +38,7 @@ import {
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
 import { buildTerrainMesh } from "./terrainMesh";
+import { buildTownLayer, type TownLayer } from "./townLayer";
 import { createVisibility } from "./visibility";
 
 /**
@@ -570,18 +571,17 @@ export function GalaxyView({
 
     // Roads painted into a terrain map's ground. See groundLayer.ts.
     let ground: GroundLayer | undefined;
+    // A town at every location. See townLayer.ts.
+    let towns: TownLayer | undefined;
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
-      // Towns are painted into a generated map only. A hand-made map's
-      // picture is its author's, and may show its own towns.
-      ground = buildGroundLayer(
-        disposables,
-        galaxy,
-        surface,
-        terrainHeights,
-        !performanceMode && !!terrainColor,
-      );
+      ground = buildGroundLayer(disposables, galaxy, surface, terrainHeights);
+      // Towns on a generated map only. A hand-made map's picture is its
+      // author's and may show its own, and performance mode goes without.
+      if (!performanceMode && terrainColor) {
+        towns = buildTownLayer(scene, disposables, galaxy, surface, ground);
+      }
       buildTerrainMesh(
         scene,
         disposables,
@@ -743,7 +743,15 @@ export function GalaxyView({
             dimOf,
             labelObjects,
             cores,
-            ground,
+            {
+              setRoadStyle: ground.setRoadStyle,
+              setTownStyle: towns?.setTownStyle,
+              towns: towns?.towns,
+              commit: () => {
+                ground?.commit();
+                towns?.commit();
+              },
+            },
           )
         : undefined;
 

@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
+import { createTerrainSurface, type HeightGrid } from "./terrain";
 import {
+  buildableAt,
   buildTownIndex,
   CAPITAL_RADIUS,
+  FLAT_SLOPE,
   leavingAngle,
   planTowns,
   roadAxis,
+  STEEP_SLOPE,
   TOWN_RADIUS,
   TOWN_REACH,
   type TownSite,
   townDataTexels,
+  townPatches,
 } from "./towns";
 
 const sites: TownSite[] = [
@@ -83,7 +88,7 @@ describe("buildTownIndex", () => {
   const tag = (x: number, z: number) => {
     const i = Math.floor((x + 50) / 2);
     const j = Math.floor((z + 40) / 2);
-    const o = (j * index.width + i) * 2;
+    const o = (j * index.width + i) * 4;
     return index.data[o] * 256 + index.data[o + 1];
   };
 
@@ -104,7 +109,7 @@ describe("buildTownIndex", () => {
     expect(tag(-20 + reach - 1, 0)).toBe(1);
     expect(tag(-20 + reach + 3, 0)).toBe(0);
     let marked = 0;
-    for (let k = 0; k < index.data.length; k += 2) {
+    for (let k = 0; k < index.data.length; k += 4) {
       if (index.data[k] * 256 + index.data[k + 1] === 1) marked++;
     }
     // About the disc's own area in texels, with at most a texel's slack.
@@ -130,5 +135,93 @@ describe("townDataTexels", () => {
     const row1 = (towns.length + 0) * 4;
     expect(data[row1 + 2]).toBe(1);
     expect(data[(towns.length + 1) * 4 + 2]).toBe(0);
+  });
+});
+
+describe("buildableAt", () => {
+  // Sea below z = 0, then a gentle slope to x = 10, then a steep one.
+  const height = (x: number, z: number) =>
+    z < 0
+      ? 0
+      : x < 10
+        ? 1 + x * FLAT_SLOPE * 0.5
+        : 6 + (x - 10) * STEEP_SLOPE * 2;
+  const fit = buildableAt(height, 0.5, 0.25);
+
+  it("builds on gentle slopes, never on steep ones or in the sea", () => {
+    expect(fit(5, 5)).toBe(1);
+    expect(fit(20, 5)).toBe(0);
+    expect(fit(5, -5)).toBe(0);
+  });
+
+  it("records it in the town index, only where a town reaches", () => {
+    const sea = planTowns([{ x: 5, z: -5, capital: false, roads: [] }], 1);
+    const land = planTowns([{ x: 5, z: 5, capital: false, roads: [] }], 1);
+    const fitAt = (towns: typeof sea) => {
+      const index = buildTownIndex(towns, 40, 40, 40, fit);
+      const at = (z: number, x: number) =>
+        index.data[((z + 20) * 40 + (x + 20)) * 4 + 2];
+      return [at(5, 5), at(-5, 5), at(15, -15)];
+    };
+    // Far from either town, nothing is recorded.
+    expect(fitAt(land)).toEqual([255, 0, 0]);
+    expect(fitAt(sea)[1]).toBe(0);
+  });
+});
+
+describe("townPatches", () => {
+  // A 4 by 4 grid of heights, 0 to 15, over a sheet 40 world units across.
+  const heights: HeightGrid = {
+    data: new Float32Array(16).map((_, k) => k / 15),
+    width: 4,
+    height: 4,
+  };
+  const surface = createTerrainSurface(
+    { width: 40, height: 40, heightScale: 1 },
+    40,
+    heights,
+  );
+  const patchTowns = planTowns(
+    [
+      { x: -10, z: -10, capital: false, roads: [] },
+      { x: 10, z: 10, capital: false, roads: [] },
+    ],
+    1,
+  );
+  const patches = townPatches(patchTowns, surface, 0.01);
+  const cell = surface.worldWidth / surface.segmentsX;
+
+  it("lies on the terrain's own vertices, a little above them", () => {
+    const { positions } = patches;
+    for (let v = 0; v < positions.length / 3; v++) {
+      const [x, y, z] = positions.slice(v * 3, v * 3 + 3);
+      const i = Math.round((x + 20) / cell);
+      const j = Math.round((z + 20) / cell);
+      expect(x).toBeCloseTo(i * cell - 20, 4);
+      expect(y).toBeCloseTo(
+        surface.vertexHeights[j * (surface.segmentsX + 1) + i] + 0.01,
+        4,
+      );
+    }
+  });
+
+  it("covers each town's reach and tags every vertex with its town", () => {
+    const { positions, town, index } = patches;
+    expect(index.length % 3).toBe(0);
+    expect(new Set(town)).toEqual(new Set([0, 1]));
+    for (const [k, t] of patchTowns.entries()) {
+      const xs: number[] = [];
+      for (let v = 0; v < town.length; v++) {
+        if (town[v] === k) xs.push(positions[v * 3]);
+      }
+      const reach = t.radius * TOWN_REACH;
+      expect(Math.min(...xs)).toBeLessThanOrEqual(Math.max(-20, t.x - reach));
+      expect(Math.max(...xs)).toBeGreaterThanOrEqual(Math.min(20, t.x + reach));
+    }
+    // Every triangle stays within one town's patch.
+    for (let k = 0; k < index.length; k += 3) {
+      expect(town[index[k]]).toBe(town[index[k + 1]]);
+      expect(town[index[k]]).toBe(town[index[k + 2]]);
+    }
   });
 });

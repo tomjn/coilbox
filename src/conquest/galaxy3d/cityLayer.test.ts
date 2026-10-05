@@ -10,13 +10,14 @@ import {
   markerLook,
   markerZoom,
 } from "./cityLayer";
-import type { RoadStyle, TownStyle } from "./groundLayer";
+import type { RoadStyle } from "./groundLayer";
 import { ROAD_MODE } from "./groundShader";
 import {
   createTerrainSurface,
   GALAXY_MIN_DISTANCE,
   type HeightGrid,
 } from "./terrain";
+import type { TownStyle } from "./townLayer";
 
 /** A 3 by 3 grid with a single peak in the middle. */
 const peak: HeightGrid = {
