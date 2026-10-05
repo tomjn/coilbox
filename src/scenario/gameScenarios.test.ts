@@ -108,12 +108,14 @@ describe("a game's own missions", () => {
   });
 
   it("reads a packaged game once per content scan, not once per visit", async () => {
-    vi.mocked(scenarioGameMissions).mockClear().mockResolvedValue({
-      missions: [
-        { folder: "first-contact", hasDocument: true, hasCompiled: true },
-      ],
-      stamp: "1024:1700000000",
-    });
+    vi.mocked(scenarioGameMissions)
+      .mockClear()
+      .mockResolvedValue({
+        missions: [
+          { folder: "first-contact", hasDocument: true, hasCompiled: true },
+        ],
+        stamp: "1024:1700000000",
+      });
     vi.mocked(scenarioGameMissionFile).mockResolvedValue({
       base64: btoa(document),
     });
