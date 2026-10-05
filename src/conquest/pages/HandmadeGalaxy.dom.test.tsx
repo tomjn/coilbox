@@ -126,6 +126,11 @@ vi.mock("./components/RunSetup", () => ({
 }));
 vi.mock("./components/BattleOverlay", () => ({ BattleOverlay: () => null }));
 
+import {
+  heldHandmadeChallenge,
+  holdHandmadeChallenge,
+  releaseHandmadeChallenge,
+} from "../handmade/heldChallenge";
 import GalaxyPage from "./GalaxyPage";
 
 const ID = "two-shores";
@@ -383,5 +388,103 @@ describe("resuming a conquest on a hand-made map", () => {
     h.listed = [];
     renderPage();
     expect(screen.getByText("Map not found.")).toBeTruthy();
+  });
+});
+
+describe("setting up a conquest from an imported challenge", () => {
+  const FINGERPRINT = "00000000000000aa";
+  const onMap = (fingerprint = FINGERPRINT) =>
+    mapDoc({ handmade: { mapId: ID, fingerprint } });
+  const hold = (nodeMaps?: Record<string, string>) =>
+    holdHandmadeChallenge({
+      game: { shortname: "TG" },
+      title: "Two Shores",
+      map: {
+        source: "handmade",
+        id: ID,
+        fingerprint: FINGERPRINT,
+        title: "Two Shores",
+      },
+      fogOfWar: true,
+      threatLevel: 3,
+      nodeMaps,
+    });
+  afterEach(() => releaseHandmadeChallenge(ID));
+
+  it("shows the challenge's choices in place of the fields", () => {
+    h.result = ok(onMap());
+    hold();
+    renderPage();
+    expect(screen.getByText("Imported challenge")).toBeTruthy();
+    expect(
+      screen.getByText(/fog of war is on and the threat level is 3/),
+    ).toBeTruthy();
+    expect(screen.queryByLabelText("Conquest seed")).toBeNull();
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("starts at the challenge's fog and threat level, above what is unlocked, on its battles", async () => {
+    h.result = ok(onMap());
+    h.maps = [
+      { name: "OnlyMap", width: 8, height: 8 },
+      { name: "Named", width: 8, height: 8 },
+    ];
+    hold({ midvale: "Named" });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Start conquest/ }));
+    await waitFor(() => expect(h.saveFor).toHaveBeenCalled());
+    const [, state] = h.saveFor.mock.calls[0] as [string, ConquestState];
+    expect(state.handmade).toEqual({
+      mapId: ID,
+      title: "Two Shores",
+      fogOfWar: true,
+      threatLevel: 3,
+      battles: { midvale: "Named" },
+    });
+    // The conquest holds the choices now, so nothing waits on the map.
+    expect(heldHandmadeChallenge(ID)).toBeUndefined();
+  });
+
+  it("stands in for a named battle map this install lacks, and records it", async () => {
+    h.result = ok(onMap());
+    hold({ midvale: "NotInstalled" });
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /Start conquest/ }));
+    await waitFor(() => expect(h.saveFor).toHaveBeenCalled());
+    const [, state] = h.saveFor.mock.calls[0] as [string, ConquestState];
+    expect(state.handmade?.battles).toEqual({ midvale: "OnlyMap" });
+    expect(state.handmade?.substituted).toEqual({ midvale: "NotInstalled" });
+  });
+
+  it("gives the fields back when the player chooses their own settings", () => {
+    h.result = ok(onMap());
+    hold();
+    renderPage();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Choose my own settings" }),
+    );
+    expect(screen.queryByText("Imported challenge")).toBeNull();
+    expect(screen.getByLabelText("Conquest seed")).toBeTruthy();
+    expect(heldHandmadeChallenge(ID)).toBeUndefined();
+  });
+
+  it("does not apply a challenge made on another version of the map", () => {
+    h.result = ok(onMap("00000000000000bb"));
+    hold();
+    renderPage();
+    expect(screen.queryByText("Imported challenge")).toBeNull();
+    expect(
+      screen.getByText(/made on a different version of this map/),
+    ).toBeTruthy();
+    expect(screen.getByLabelText("Conquest seed")).toBeTruthy();
+  });
+
+  it("leaves a conquest already in progress as it is", () => {
+    h.result = ok(onMap());
+    h.conquests = { [ID]: saved() };
+    hold();
+    renderPage();
+    expect(screen.queryByText("Imported challenge")).toBeNull();
+    expect(screen.queryByText("Begin conquest")).toBeNull();
   });
 });

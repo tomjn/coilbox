@@ -25,7 +25,10 @@ import { mostRecentOpen } from "@/lib/recency";
 import { challengeExport } from "../../challenge/bindings";
 import { ChallengeShare } from "../../challenge/ChallengeShare";
 import { ImportChallengeForm as SharedImportChallengeForm } from "../../challenge/ImportChallengeForm";
-import { conquestIdentity, galaxyIdentity } from "../../challenge/identity";
+import {
+  conquestImportIdentity,
+  galaxyIdentity,
+} from "../../challenge/identity";
 import { resolveBranding, useBrandingCatalog } from "../../content/branding";
 import { useUnitsyncScan } from "../../content/config";
 import { dependencyBlockReason } from "../../content/gameDependencies";
@@ -65,8 +68,6 @@ import { useGameCatalog } from "../../play/useGameCatalog";
 import { getGameMatcher, getProfile } from "../../profile/profile";
 import { conquestDelete, conquestSave } from "../bindings";
 import {
-  type ConquestChallengeSettings,
-  decodeConquestChallenge,
   encodeConquestChallenge,
   encodeConquestChallengeFile,
   galaxyFromChallenge,
@@ -74,7 +75,20 @@ import {
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import type { GenerateOptions } from "../generate";
-import { readHandmadeRun } from "../handmade/conquest";
+import {
+  type ConquestImportSettings,
+  decodeConquestImport,
+  encodeHandmadeChallenge,
+  encodeHandmadeChallengeFile,
+  isHandmadeChallenge,
+  loadChallengeMap,
+} from "../handmade/challenge";
+import {
+  handmadeConquestDoc,
+  handmadeRun,
+  readHandmadeRun,
+} from "../handmade/conquest";
+import { holdHandmadeChallenge } from "../handmade/heldChallenge";
 import {
   type HandmadeImportResult,
   type HandmadeMapSummary,
@@ -83,6 +97,7 @@ import {
 } from "../handmade/library";
 import {
   refreshHandmadeMaps,
+  useHandmadeMap,
   useHandmadeMaps,
 } from "../handmade/useHandmadeMaps";
 import { generateMap, locationNoun, MAP_STYLE_OPTIONS } from "../mapStyle";
@@ -551,6 +566,13 @@ function HandmadeMapCard({
   /** Present for an imported map with no conquest on it. */
   onRemove?: () => void;
 }) {
+  const drawer = useDrawer();
+  const openShareChallenge = (conquest: ConquestState) =>
+    drawer.open({
+      title: "Share challenge",
+      width: "26rem",
+      content: <HandmadeChallengeShare map={map} state={conquest} />,
+    });
   const statusLabel =
     state?.status === "won"
       ? "Victory"
@@ -597,6 +619,17 @@ function HandmadeMapCard({
           aria-hidden
         />
       </Link>
+      {state && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Share ${map.title} as a challenge code`}
+          title="Share challenge"
+          onClick={() => openShareChallenge(state)}
+        >
+          <Share2 className="size-4 text-muted-foreground" aria-hidden />
+        </Button>
+      )}
       {state && onAbandon ? (
         <Button
           variant="ghost"
@@ -621,6 +654,57 @@ function HandmadeMapCard({
         )
       )}
     </Card>
+  );
+}
+
+/**
+ * The challenge code for a conquest on a hand-made map. The card is drawn
+ * from the manifest alone, so the map is read here, when the code is asked
+ * for: its fingerprint comes from the read.
+ */
+function HandmadeChallengeShare({
+  map,
+  state,
+}: {
+  map: HandmadeMapSummary;
+  state: ConquestState;
+}) {
+  const { loading, result, failure } = useHandmadeMap(map.id);
+  if (loading) {
+    return (
+      <p className="p-4 text-sm text-muted-foreground">Reading the map…</p>
+    );
+  }
+  const run = readHandmadeRun(state);
+  if (!result?.ok || !run) {
+    return (
+      <div className="flex flex-col gap-2 p-4">
+        <ErrorBanner
+          message={`No challenge code can be made, because the map "${map.title}" could not be read.${failure ? ` ${failure}` : ""}`}
+        />
+        {result && !result.ok && <MapErrorList errors={result.errors} />}
+      </div>
+    );
+  }
+  const galaxy = handmadeConquestDoc(result.doc, run);
+  const exportChallengeFile = async () => {
+    const fileText = encodeHandmadeChallengeFile(galaxy);
+    if (!fileText) return;
+    const dest = await save({
+      title: "Export challenge",
+      defaultPath: `${galaxy.title || "challenge"}.json`,
+      filters: [{ name: "Coilbox challenge", extensions: ["json"] }],
+    });
+    if (!dest) return;
+    await challengeExport({ text: fileText, dest });
+  };
+  return (
+    <ChallengeShare
+      identity={galaxyIdentity(galaxy)}
+      code={encodeHandmadeChallenge(galaxy) ?? ""}
+      helpText="Anyone who pastes this code into Import challenge plays this map with the same settings, so results are directly comparable. They need the same game and the same version of this map installed. The code does not carry the map."
+      onExportFile={exportChallengeFile}
+    />
   );
 }
 
@@ -1459,6 +1543,8 @@ function ImportChallengeForm({
   const brandingEntries = useBrandingCatalog();
   const gameCatalog = useGameCatalog();
   const { eligible } = useMapEligibility();
+  const { galaxies } = useGalaxies();
+  const { file } = useConquestState();
 
   const {
     run: runScan,
@@ -1470,7 +1556,7 @@ function ImportChallengeForm({
     if (!scanData && !scanLoading && !scanError) runScan();
   }, [scanData, scanLoading, scanError, runScan]);
 
-  const finish = async (settings: ConquestChallengeSettings) => {
+  const finish = async (settings: ConquestImportSettings) => {
     const matcher = getGameMatcher();
     const games = (scanData?.games ?? []).filter(
       (g) => !matcher || matcher(g.name),
@@ -1496,6 +1582,44 @@ function ImportChallengeForm({
       width: m.width,
       height: m.height,
     }));
+
+    // A challenge on a hand-made map needs that map installed here, in the
+    // version the challenge was made on. Nothing is generated in its place,
+    // because that would be a different challenge under the same code.
+    if (isHandmadeChallenge(settings)) {
+      const checked = await loadChallengeMap(settings.map, installedGame.name);
+      if (!checked.ok) throw new Error(checked.message);
+      const { map } = checked;
+      if (galaxies.some((g) => g.galaxy.id === map.id)) {
+        throw new Error(
+          `The hand-made map "${map.title}" has the id "${map.id}", which another map in your list already uses, so it cannot be opened. Delete that map on the Conquest page, then import this code again.`,
+        );
+      }
+      if (file.conquests[map.id]) {
+        throw new Error(
+          `You already have a conquest on the hand-made map "${map.title}", and a map holds one conquest at a time. Abandon that conquest on the Conquest page, then import this code again.`,
+        );
+      }
+      // The conquest starts on the map's own page, once the player has picked
+      // a faction there. The seed only picks stand-ins here, for the count of
+      // battle maps this install lacks.
+      holdHandmadeChallenge(settings);
+      const preview = handmadeConquestDoc(
+        map,
+        handmadeRun(
+          map,
+          {
+            seed: 0,
+            fogOfWar: settings.fogOfWar === true,
+            threatLevel: settings.threatLevel ?? 0,
+            named: settings.nodeMaps,
+          },
+          maps,
+        ),
+      );
+      return { id: map.id, doc: preview };
+    }
+
     const brandingEntry = resolveBranding(brandingEntries, installedGame);
     const names = mergeConquestNames(
       getProfile().conquest,
@@ -1514,11 +1638,11 @@ function ImportChallengeForm({
 
   return (
     <SharedImportChallengeForm
-      helpText="Paste a challenge code shared by another player to generate the identical map on your own install."
+      helpText="Paste a challenge code shared by another player to generate the identical map on your own install. A challenge made on a hand-made map needs that map installed here."
       substitutedNoun="locations"
       initialCode={initialCode}
-      decode={decodeConquestChallenge}
-      identityOf={conquestIdentity}
+      decode={decodeConquestImport}
+      identityOf={conquestImportIdentity}
       buildRequirement={(settings) =>
         challengeGameRequirement(settings.game, gameCatalog)
       }

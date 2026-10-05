@@ -1,3 +1,4 @@
+import { handmadeMapRefFor } from "../challenge/mapRef";
 import { generateCities } from "../conquest/cities";
 import type {
   GalaxyDoc,
@@ -324,7 +325,7 @@ export function runMapRefFor(map: GalaxyDoc): RunMapRef {
       ...(g.layout ? { layout: g.layout } : {}),
     };
   }
-  return { source: "handmade", id: map.id };
+  return handmadeMapRefFor(map);
 }
 
 /** A map to cross, with the Warpath markings a hand-made one carries. */

@@ -21,6 +21,7 @@ import type {
 import { MIN_DIFFICULTY, NEUTRAL } from "../model";
 import { type TraceCache, traceCacheKey } from "./cache";
 import type { HandmadeMapError } from "./errors";
+import { handmadeMapFingerprint } from "./fingerprint";
 import { describeProvince, MANIFEST_FILE, parseManifest } from "./manifest";
 import { type ProvincePixels, type TracedMap, traceProvinces } from "./trace";
 
@@ -349,43 +350,47 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
 
   const playable = manifest.factions.filter((f) => f.playable !== false);
   const now = input.now ?? "";
+  const doc: GalaxyDoc = {
+    schemaVersion: 1,
+    id: manifest.id,
+    type: "conquest-galaxy",
+    title: manifest.title,
+    description: manifest.description ?? "",
+    game: manifest.game,
+    playerFactionId: manifest.playerFaction ?? playable[0].id,
+    playableFactionIds: playable.map((f) => f.id),
+    factions: manifest.factions.map(({ playable: _playable, ...f }) => f),
+    nodes,
+    links,
+    terrain: {
+      image: pictureUrl,
+      heightmap: heightmapUrl,
+      width: manifest.size.width,
+      height: manifest.size.height,
+      heightScale: manifest.heightScale,
+      projection: "flat",
+    },
+    linkKinds,
+    blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
+    models: manifest.models.length > 0 ? manifest.models : undefined,
+    theme: { skin: "theatre" },
+    ...(warpath
+      ? {
+          warpath: {
+            startId: warpath.start,
+            goalId: warpath.goal,
+            kinds: warpathKinds,
+          },
+        }
+      : {}),
+    createdAt: now,
+    updatedAt: now,
+  };
   return {
     ok: true,
     doc: {
-      schemaVersion: 1,
-      id: manifest.id,
-      type: "conquest-galaxy",
-      title: manifest.title,
-      description: manifest.description ?? "",
-      game: manifest.game,
-      playerFactionId: manifest.playerFaction ?? playable[0].id,
-      playableFactionIds: playable.map((f) => f.id),
-      factions: manifest.factions.map(({ playable: _playable, ...f }) => f),
-      nodes,
-      links,
-      terrain: {
-        image: pictureUrl,
-        heightmap: heightmapUrl,
-        width: manifest.size.width,
-        height: manifest.size.height,
-        heightScale: manifest.heightScale,
-        projection: "flat",
-      },
-      linkKinds,
-      blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
-      models: manifest.models.length > 0 ? manifest.models : undefined,
-      theme: { skin: "theatre" },
-      ...(warpath
-        ? {
-            warpath: {
-              startId: warpath.start,
-              goalId: warpath.goal,
-              kinds: warpathKinds,
-            },
-          }
-        : {}),
-      createdAt: now,
-      updatedAt: now,
+      ...doc,
+      handmade: { mapId: doc.id, fingerprint: handmadeMapFingerprint(doc) },
     },
   };
 }

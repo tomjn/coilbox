@@ -31,6 +31,34 @@ export interface HandmadeConquestOptions {
   fogOfWar: boolean;
   /** Threat level 0..3 (see `../threat`). */
   threatLevel: number;
+  /**
+   * nodeId -> the battle map an imported challenge names for a location the
+   * author left blank. A named map this install has is used. One it does not
+   * have is replaced by a pick from the seed and recorded as a stand-in.
+   */
+  named?: Record<string, string>;
+}
+
+/**
+ * Sort the battle maps a challenge names into the ones this install can use
+ * and the ones it cannot. Only blank locations count: the author's own battles
+ * are the map's, and a code cannot change them.
+ */
+export function challengeBattles(
+  doc: GalaxyDoc,
+  maps: GenMap[],
+  named: Record<string, string> = {},
+): { kept: Record<string, string>; missing: Record<string, string> } {
+  const installed = new Set(maps.map((m) => m.name));
+  const kept: Record<string, string> = {};
+  const missing: Record<string, string> = {};
+  for (const node of doc.nodes) {
+    const name = named[node.id];
+    if (!name || !hasBlankBattle(node)) continue;
+    if (installed.has(name)) kept[node.id] = name;
+    else missing[node.id] = name;
+  }
+  return { kept, missing };
 }
 
 /**
@@ -75,7 +103,10 @@ export function blankLocations(
  */
 export function handmadeConquestDoc(
   map: GalaxyDoc,
-  run: Pick<HandmadeRun, "fogOfWar" | "threatLevel" | "battles">,
+  run: Pick<
+    HandmadeRun,
+    "fogOfWar" | "threatLevel" | "battles" | "substituted"
+  >,
 ): GalaxyDoc {
   const threatLevel = readThreatLevel(run.threatLevel);
   return {
@@ -92,12 +123,23 @@ export function handmadeConquestDoc(
           })),
     nodes: map.nodes.map((node) => {
       const mapName = hasBlankBattle(node) ? run.battles[node.id] : undefined;
-      return mapName ? { ...node, battle: { ...node.battle, mapName } } : node;
+      if (!mapName) return node;
+      const named = run.substituted?.[node.id];
+      return {
+        ...node,
+        battle: {
+          ...node.battle,
+          mapName,
+          ...(named && named !== mapName ? { mapSubstitutedFrom: named } : {}),
+        },
+      };
     }),
     rules: run.fogOfWar ? { ...map.rules, fogOfWar: true } : map.rules,
     handmade: {
+      ...map.handmade,
       mapId: map.id,
       threatLevel: threatLevel > 0 ? threatLevel : undefined,
+      battles: run.battles,
     },
   };
 }
@@ -121,12 +163,19 @@ export function handmadeRun(
   maps: GenMap[],
 ): HandmadeRun {
   const threatLevel = readThreatLevel(options.threatLevel);
+  const { kept, missing } = challengeBattles(map, maps, options.named);
+  const battles = pickBlankBattles(map, maps, options.seed, kept);
+  // Only a location that did get a stand-in is recorded as having one.
+  const substituted = Object.fromEntries(
+    Object.entries(missing).filter(([id]) => battles[id]),
+  );
   return {
     mapId: map.id,
     title: map.title,
     fogOfWar: options.fogOfWar ? true : undefined,
     threatLevel: threatLevel > 0 ? threatLevel : undefined,
-    battles: pickBlankBattles(map, maps, options.seed),
+    battles,
+    ...(Object.keys(substituted).length > 0 ? { substituted } : {}),
   };
 }
 
@@ -173,6 +222,12 @@ export function readHandmadeRun(state: ConquestState): HandmadeRun | null {
       if (typeof name === "string" && name !== "") battles[id] = name;
     }
   }
+  const substituted: Record<string, string> = {};
+  if (typeof r.substituted === "object" && r.substituted !== null) {
+    for (const [id, name] of Object.entries(r.substituted)) {
+      if (typeof name === "string" && name !== "") substituted[id] = name;
+    }
+  }
   const threatLevel = readThreatLevel(r.threatLevel);
   return {
     mapId: r.mapId,
@@ -180,6 +235,7 @@ export function readHandmadeRun(state: ConquestState): HandmadeRun | null {
     fogOfWar: r.fogOfWar === true ? true : undefined,
     threatLevel: threatLevel > 0 ? threatLevel : undefined,
     battles,
+    ...(Object.keys(substituted).length > 0 ? { substituted } : {}),
     scenariosWon:
       Array.isArray(r.scenariosWon) && r.scenariosWon.length > 0
         ? r.scenariosWon.filter((id): id is string => typeof id === "string")
