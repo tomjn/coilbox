@@ -285,11 +285,19 @@ async function readFolder(
       return undefined;
     }
   };
-  const [provinces, picture] = await Promise.all([
+  // A heightmap the folder lacks is left for the reader to report as missing.
+  const { heightmap } = manifest.files;
+  const heightmapUrl = heightmap === undefined ? undefined : urlFor(heightmap);
+  const [provinces, picture, heights] = await Promise.all([
     decode(manifest.files.provinces, () => decodeRgba(provincesUrl)),
     decode(manifest.files.picture, () => imageSize(pictureUrl)),
+    heightmap === undefined || heightmapUrl === undefined
+      ? Promise.resolve(true)
+      : decode(heightmap, () => imageSize(heightmapUrl)),
   ]);
-  if (!provinces || !picture) return { ok: false, errors: unreadable };
+  if (!provinces || !picture || !heights) {
+    return { ok: false, errors: unreadable };
+  }
 
   const read = readHandmadeMap({
     manifest: manifestText,

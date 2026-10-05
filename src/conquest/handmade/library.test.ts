@@ -292,6 +292,29 @@ describe("loading a hand-made map", () => {
     });
   });
 
+  it("names a heightmap that cannot be decoded", async () => {
+    const edited = JSON.parse(manifest);
+    edited.files.heightmap = "broken.png";
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({
+          manifest: JSON.stringify(edited),
+          files: [...FILES, "broken.png"],
+        }),
+      ],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({
+          code: "image-unreadable",
+          file: "broken.png",
+        }),
+      ],
+    });
+  });
+
   it("reports an id no map has", async () => {
     const result = await loadHandmadeMap("nowhere");
     expect(result.ok).toBe(false);
