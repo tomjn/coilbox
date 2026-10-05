@@ -68,19 +68,24 @@ export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
 }
 
 /**
- * The average colour of a picture's outermost pixels, as 0 to 255 per
- * channel. On a generated land map that is the deep sea at the sheet's edge.
+ * The most common colour among a picture's outermost pixels, as 0 to 255 per
+ * channel. A generated map draws its deep sea in one exact colour, so wherever
+ * sea meets the edge this is that sea, even when land runs off another side.
  */
 export function edgeColor(pixels: ColorPixels): [number, number, number] {
   const { data, width, height } = pixels;
-  const sum = [0, 0, 0];
-  let count = 0;
+  const counts = new Map<number, number>();
+  let best = 0;
+  let bestCount = 0;
   const add = (x: number, y: number) => {
     const i = (y * width + x) * 4;
-    sum[0] += data[i];
-    sum[1] += data[i + 1];
-    sum[2] += data[i + 2];
-    count++;
+    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    const n = (counts.get(key) ?? 0) + 1;
+    counts.set(key, n);
+    if (n > bestCount) {
+      best = key;
+      bestCount = n;
+    }
   };
   for (let x = 0; x < width; x++) {
     add(x, 0);
@@ -90,7 +95,7 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
     add(0, y);
     if (width > 1) add(width - 1, y);
   }
-  return [sum[0] / count, sum[1] / count, sum[2] / count];
+  return [(best >> 16) & 255, (best >> 8) & 255, best & 255];
 }
 
 /** Sheets the world beyond the map reaches past each edge. */
@@ -99,8 +104,8 @@ const BEYOND_SHEETS = 1;
  * averaged over, so the world beyond shows the edge's colours but not its
  * detail. */
 const EDGE_BLUR = 24;
-/** How far past the edge, in sheets, the edge's colours fade into their
- * average. */
+/** How far past the edge, in sheets, the edge's colours fade into
+ * {@link edgeColor}. */
 const BEYOND_FADE = 0.25;
 /** Pixels across and down the picture of the world beyond. */
 const BEYOND_PIXELS = 192;
@@ -108,13 +113,13 @@ const BEYOND_PIXELS = 192;
 /**
  * A picture of the world beyond the map: `BEYOND_SHEETS` sheets past every
  * edge, with the map's own place in the middle. Past each edge it shows the
- * colours along that edge, blurred and fading into their average further out,
- * so land that runs off the map trails off as land and sea as sea. It is as
- * bright as the map, so no seam shows at the edge.
+ * colours along that edge, blurred and fading into {@link edgeColor} further
+ * out, so land that runs off the map trails off into the sea and sea carries
+ * on as sea. It is as bright as the map, so no seam shows at the edge.
  */
 export function beyondPixels(pixels: ColorPixels): ColorPixels {
   const { data, width, height } = pixels;
-  const mean = edgeColor(pixels);
+  const far = edgeColor(pixels);
   const at = (x: number, y: number, c: number) => data[(y * width + x) * 4 + c];
   /**
    * The edge colour nearest a point given in picture pixels, averaged along
@@ -157,7 +162,7 @@ export function beyondPixels(pixels: ColorPixels): ColorPixels {
       const edge = edgeNear(cu * width, cv * height, cu !== u, cv !== v);
       const o = (j * BEYOND_PIXELS + i) * 4;
       for (let c = 0; c < 3; c++) {
-        out[o + c] = edge[c] + (mean[c] - edge[c]) * t;
+        out[o + c] = edge[c] + (far[c] - edge[c]) * t;
       }
       out[o + 3] = 255;
     }

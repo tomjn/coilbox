@@ -19,8 +19,21 @@ function framed(): { data: Uint8ClampedArray; width: number; height: number } {
 }
 
 describe("edgeColor", () => {
-  it("averages only the outermost pixels", () => {
+  it("reads only the outermost pixels", () => {
     expect(edgeColor(framed())).toEqual([24, 58, 96]);
+  });
+
+  it("is the sea when land runs off one side, not a blend with the land", () => {
+    // 8 by 8, sea everywhere except a column of land down the left edge.
+    const width = 8;
+    const height = 8;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        data.set(x === 0 ? [100, 160, 80, 255] : [24, 58, 96, 255], (y * width + x) * 4);
+      }
+    }
+    expect(edgeColor({ data, width, height })).toEqual([24, 58, 96]);
   });
 });
 
@@ -62,11 +75,15 @@ describe("beyondPixels", () => {
 
   it("starts as bright as the map, so no seam shows at the edge", () => {
     // The sea half runs all the way to the right edge, so just past it the
-    // world beyond is the sea, barely begun on its fade.
-    const [r, g, b] = px(Math.ceil(2 * third), mid);
-    expect(Math.abs(r - 24)).toBeLessThanOrEqual(2);
-    expect(Math.abs(g - 58)).toBeLessThanOrEqual(2);
-    expect(Math.abs(b - 96)).toBeLessThanOrEqual(2);
+    // world beyond is the sea, under a twentieth of the way into its fade.
+    const sea = [24, 58, 96];
+    const far = edgeColor(halves());
+    const got = px(Math.ceil(2 * third), mid);
+    for (let c = 0; c < 3; c++) {
+      expect(Math.abs(got[c] - sea[c])).toBeLessThanOrEqual(
+        Math.abs(far[c] - sea[c]) / 20 + 1,
+      );
+    }
   });
 
   it("takes its colour from the edge itself, not from inside the map", () => {
@@ -86,10 +103,10 @@ describe("beyondPixels", () => {
     expect(Array.from(ringed.data.slice(o, o + 3))).toEqual([24, 58, 96]);
   });
 
-  it("fades to the edge's average far from the map", () => {
-    const mean = edgeColor(halves()).map((c) => Math.round(c));
-    expect(px(0, 0)).toEqual(mean);
-    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(mean);
+  it("fades to the edge's most common colour far from the map", () => {
+    const far = edgeColor(halves());
+    expect(px(0, 0)).toEqual(far);
+    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(far);
   });
 });
 
