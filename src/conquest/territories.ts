@@ -1,18 +1,18 @@
-import { citiesTerrain, GENERATED_CITIES_IMAGE } from "./cities";
+import { GENERATED_CITIES_IMAGE } from "./cities";
 import {
   assembleGalaxy,
-  type GalaxyLayout,
   type GenerateOptions,
   generatedNodeCount,
   repairConnectivity,
-  resolveLayout,
 } from "./generate";
 import type { GalaxyDoc, LinkKind } from "./model";
 import { mulberry32, type Rng } from "./rng";
 import {
+  fractalNoise,
   type GeneratedTerrain,
   generateTerrain,
   labelLandMasses,
+  resolveLandLayout,
 } from "./terrainGen";
 
 /**
@@ -41,7 +41,7 @@ export type TerritoriesOptions = Omit<
   "layout" | "radiusLy" | "skin"
 > & {
   /** How the land is arranged. `random` picks one from the seed. */
-  layout?: GalaxyLayout | "random";
+  layout?: GenerateOptions["layout"];
 };
 
 export interface Provinces {
@@ -55,8 +55,14 @@ export interface Provinces {
   crossings: [number, number][];
 }
 
-/** A land mass smaller than this many pixels holds no province. */
-const MIN_MASS_PIXELS = 400;
+/** How far the coordinate noise moves a border, in province spacings. */
+const BORDER_WARP = 0.45;
+/** The size of the coordinate noise's coarsest cell, in province spacings. */
+const BORDER_WARP_CELL = 1.3;
+/** The lightest and heaviest province weight. Weight scales the squared
+ * distance, so a province's width goes as one over its square root. */
+const MIN_WEIGHT = 0.6;
+const MAX_WEIGHT = 1.7;
 /** A border may stray this many pixels from the pixel edges it replaces. */
 const OUTLINE_TOLERANCE = 1.5;
 /** One coast pixel in this many is measured when looking for a crossing. */
@@ -164,13 +170,49 @@ function placeSeeds(
 }
 
 /**
- * Grow every seed over the land at once. A pixel goes to whichever seed is
- * nearest in a straight line among those that can reach it through their own
- * pixels, so borders run straight in open country and no province crosses
- * water. Each province is one piece and holds its own seed.
+ * Where each pixel sits once the coordinate noise has moved it, in pixels, as
+ * two arrays. The noise is scaled to the spacing between provinces, so a
+ * border bends about as much on a map of 160 provinces as on one of 8.
  */
-function growProvinces(terrain: GeneratedTerrain, seeds: number[]): Int16Array {
+function warpedPositions(
+  width: number,
+  height: number,
+  spacing: number,
+  rng: Rng,
+): { wx: Float64Array; wy: Float64Array } {
+  const seedX = Math.floor(rng() * 4294967296) | 0;
+  const seedY = Math.floor(rng() * 4294967296) | 0;
+  const cell = spacing * BORDER_WARP_CELL;
+  const reach = spacing * BORDER_WARP;
+  const wx = new Float64Array(width * height);
+  const wy = new Float64Array(width * height);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      const nx = (x + 0.5) / cell;
+      const ny = (y + 0.5) / cell;
+      wx[i] = x + reach * (fractalNoise(nx, ny, seedX, 3) - 0.5) * 2;
+      wy[i] = y + reach * (fractalNoise(nx, ny, seedY, 3) - 0.5) * 2;
+    }
+  }
+  return { wx, wy };
+}
+
+/**
+ * Grow every seed over the land at once. A pixel goes to whichever seed is
+ * nearest among those that can reach it through their own pixels, so no
+ * province crosses water, and each province is one piece holding its own
+ * seed. Nearness is measured between the pixels' bent positions and scaled by
+ * the province's weight, so borders curve and a heavier province stays small.
+ */
+function growProvinces(
+  terrain: GeneratedTerrain,
+  seeds: number[],
+  weights: number[],
+  warp: { wx: Float64Array; wy: Float64Array },
+): Int16Array {
   const { width, height, land } = terrain;
+  const { wx, wy } = warp;
   const pixels = width * height;
   const count = seeds.length;
   const owner = new Int16Array(pixels).fill(-1);
@@ -190,14 +232,14 @@ function growProvinces(terrain: GeneratedTerrain, seeds: number[]): Int16Array {
     owner[pixel] = seed;
     const x = pixel % width;
     const y = (pixel - x) / width;
-    const sx = seeds[seed] % width;
-    const sy = (seeds[seed] - sx) / width;
+    const s = seeds[seed];
+    const w = weights[seed];
     const offer = (nx: number, ny: number) => {
       const n = ny * width + nx;
       if (!land[n] || owner[n] !== -1) return;
-      const dx = nx - sx;
-      const dy = ny - sy;
-      heap.push(key(dx * dx + dy * dy, seed, n));
+      const dx = wx[n] - wx[s];
+      const dy = wy[n] - wy[s];
+      heap.push(key(Math.floor((dx * dx + dy * dy) * w), seed, n));
     };
     if (x > 0) offer(x - 1, y);
     if (x < width - 1) offer(x + 1, y);
@@ -470,28 +512,48 @@ function traceOutlines(
   return { thin, raw, corners };
 }
 
+/** Provinces, with the pixels behind them for a generator that wants more. */
+export interface DividedLand extends Provinces {
+  /** The province each pixel belongs to, or -1 for sea. */
+  owner: Int16Array;
+  /** Pixels from each province pixel to its province's edge, 1 on the edge. */
+  depth: Int32Array;
+}
+
 /**
  * Split a terrain's land into `count` provinces and work out how they join.
- * Draws from `rng` only to place the provinces, so the caller can carry on
- * with the same generator afterwards.
+ * Draws from `rng` only to place and shape the provinces, so the caller can
+ * carry on with the same generator afterwards.
  */
 export function generateProvinces(
   terrain: GeneratedTerrain,
   count: number,
   rng: Rng,
 ): Provinces {
+  const { anchors, outlines, borders, crossings } = divideLand(
+    terrain,
+    count,
+    rng,
+  );
+  return { anchors, outlines, borders, crossings };
+}
+
+/** {@link generateProvinces}, keeping the pixel arrays. */
+export function divideLand(
+  terrain: GeneratedTerrain,
+  count: number,
+  rng: Rng,
+): DividedLand {
   const { width, height, land } = terrain;
   const scale = terrain.mapWidth / width;
   const { labels, sizes } = labelLandMasses(terrain);
   if (sizes.length === 0) throw new Error("the terrain has no land");
 
-  // Largest land mass first, the earlier label on a tie. Specks hold nothing,
-  // unless specks are all there is.
-  const order = sizes
+  // Largest land mass first, the earlier label on a tie. The terrain has
+  // already sunk the specks, so every land mass gets a province.
+  const chosen = sizes
     .map((size, label) => ({ size, label }))
     .sort((a, b) => b.size - a.size || a.label - b.label);
-  const big = order.filter((m) => m.size >= MIN_MASS_PIXELS);
-  const chosen = big.length > 0 ? big : order;
   const slot = new Int32Array(sizes.length).fill(-1);
   const masses = chosen.map((m, i) => {
     slot[m.label] = i;
@@ -506,7 +568,16 @@ export function generateProvinces(
   const provinces = Math.min(count, room);
 
   const seeds = placeSeeds(width, masses, provinces, rng);
-  const owner = growProvinces(terrain, seeds);
+  const weights = seeds.map(
+    () => MIN_WEIGHT + rng() * (MAX_WEIGHT - MIN_WEIGHT),
+  );
+  const spacing = Math.sqrt(room / provinces);
+  const owner = growProvinces(
+    terrain,
+    seeds,
+    weights,
+    warpedPositions(width, height, spacing, rng),
+  );
   const depth = provinceDepth(owner, width, height);
   const { thin, raw, corners } = traceOutlines(owner, width, height, provinces);
 
@@ -611,7 +682,7 @@ export function generateProvinces(
     .slice(borders.length)
     .map(([a, b]): [number, number] => (a < b ? [a, b] : [b, a]));
 
-  return { anchors, outlines, borders, crossings };
+  return { anchors, outlines, borders, crossings, owner, depth };
 }
 
 /**
@@ -625,9 +696,9 @@ export function generateTerritories(
   now: string = new Date().toISOString(),
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
-  const shape = resolveLayout(opts.layout, rng);
-  const terrain = generateTerrain({ seed: opts.seed, shape });
-  const provinces = generateProvinces(terrain, generatedNodeCount(opts), rng);
+  const count = generatedNodeCount(opts);
+  const terrain = landTerrain(opts.seed, opts.layout, count, rng);
+  const provinces = generateProvinces(terrain, count, rng);
   const doc = assembleGalaxy(
     opts,
     rng,
@@ -670,22 +741,35 @@ export function generateTerritories(
 }
 
 /**
+ * The land under a generated Cities or Territories map. Both styles start
+ * their stream with `mulberry32(seed)` and draw the layout from it first, so
+ * this takes that stream and leaves it where the generator carries on.
+ */
+export function landTerrain(
+  seed: number,
+  layout: GenerateOptions["layout"],
+  locations: number,
+  rng: Rng,
+): GeneratedTerrain {
+  const shape = resolveLandLayout(layout, rng);
+  return generateTerrain({ seed, shape, maxMasses: locations });
+}
+
+/**
  * The pixels of a generated document's terrain, rebuilt from what it carries:
- * the seed and layout for a Territories map, the seed and the positions of its
- * own nodes for a Cities map. Null when the document's terrain is not a
- * generated one: an authored map, a galaxy, or a document saved without its
- * `generated` block.
+ * the seed, the layout and the number of locations. Null when the document's
+ * terrain is not a generated one: an authored map, a galaxy, or a document
+ * saved without its `generated` block.
  */
 export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
   const g = doc.generated;
   if (!g) return null;
-  if (doc.terrain?.image === GENERATED_CITIES_IMAGE) {
-    return citiesTerrain(
-      g.seed,
-      doc.nodes.map((n) => [n.pos[0], n.pos[1]]),
-    );
+  const image = doc.terrain?.image;
+  if (
+    image !== GENERATED_CITIES_IMAGE &&
+    image !== GENERATED_TERRITORIES_IMAGE
+  ) {
+    return null;
   }
-  if (doc.terrain?.image !== GENERATED_TERRITORIES_IMAGE) return null;
-  const shape = resolveLayout(g.layout, mulberry32(g.seed));
-  return generateTerrain({ seed: g.seed, shape });
+  return landTerrain(g.seed, g.layout, doc.nodes.length, mulberry32(g.seed));
 }

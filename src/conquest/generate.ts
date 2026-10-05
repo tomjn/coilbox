@@ -25,6 +25,7 @@ import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
+import type { LandLayout } from "./terrainGen";
 import { readThreatLevel, threatAggression } from "./threat";
 
 /**
@@ -137,8 +138,9 @@ export interface GenerateOptions {
   nodeCount: number;
   /** Enemy factions, clamped to 1..3. */
   factionCount: number;
-  /** Point-scatter shape; `random` picks one from the seed. Default `scatter`. */
-  layout?: GalaxyLayout | "random" | "realstars";
+  /** Point-scatter shape for a galaxy, or land layout for a land style;
+   * `random` picks one from the seed. Default `scatter`. */
+  layout?: GalaxyLayout | LandLayout | "random" | "realstars";
   /** Real-star mode only. Catalogue radius in light years, which decides the
    * node count. Ignored by every other layout. */
   radiusLy?: number;
@@ -281,14 +283,15 @@ export function resolveLayout(
   layout: GenerateOptions["layout"],
   rng: Rng,
 ): GalaxyLayout {
-  // `realstars` never reaches here, since it bypasses the scatters entirely.
-  if (!layout || layout === "scatter" || layout === "realstars") {
-    return "scatter";
-  }
   if (layout === "random") {
     return pick(rng, ["scatter", "spiral", "clusters", "ring"] as const);
   }
-  return layout;
+  if (layout === "spiral" || layout === "clusters" || layout === "ring") {
+    return layout;
+  }
+  // `realstars` never reaches here, since it bypasses the scatters entirely.
+  // A land layout handed to a galaxy reads as the plain scatter.
+  return "scatter";
 }
 
 /** Scatter points for a resolved layout. */
