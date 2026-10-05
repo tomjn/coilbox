@@ -11,6 +11,15 @@ import {
 const S = TERRAIN_PIXELS;
 const MARGIN = 200;
 
+/** How many places two arrays differ, counting a length mismatch as one. */
+function differences(a: ArrayLike<number>, b: ArrayLike<number>): number {
+  let n = a.length === b.length ? 0 : 1;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    if (a[i] !== b[i]) n++;
+  }
+  return n;
+}
+
 const build = (shape: LandLayout, seed: number) => {
   const r = generateTerrainWithMargin({ seed, shape, maxMasses: 30 }, MARGIN);
   return { ...r, extended: extendTerrain(r.terrain, r.margin) };
@@ -21,9 +30,11 @@ describe("land past the map's edge", () => {
     for (const shape of ["continent", "landlocked"] as const) {
       const { terrain } = build(shape, 4);
       const plain = generateTerrain({ seed: 4, shape, maxMasses: 30 });
-      expect(terrain.image).toEqual(plain.image);
-      expect(terrain.heightmap).toEqual(plain.heightmap);
-      expect(terrain.land).toEqual(plain.land);
+      // Plain comparisons and one expect: an expect per element of these
+      // arrays is slow enough to time out on a busy machine (issue #3566).
+      expect(differences(terrain.image, plain.image)).toBe(0);
+      expect(differences(terrain.heightmap, plain.heightmap)).toBe(0);
+      expect(differences(terrain.land, plain.land)).toBe(0);
     }
   });
 
