@@ -1113,6 +1113,8 @@ A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map fold
 - Any folder directly inside `galaxies/` that holds a `map.json` is a map. The folder can have any name.
 - A bundled map is read-only. A player cannot replace it or remove it, and cannot import a map with the same id.
 - If a player already imported a map with the same id, the bundled map is the one coilbox lists.
-- Coilbox finds the folder and reads its manifest today. The Conquest page does not offer a hand-made map to the player yet.
+- The Conquest page lists it with a Bundled label, and Warpath offers it when its manifest has a `warpath` start and goal.
+
+A game can also carry maps in its game archive, under `coilbox/maps/`, with an `index.json` that hides the generated styles. A profile has no matching setting yet. See [Ship a map](hand-made-maps.md#ship-a-map).
 
 The [hand-made maps guide](hand-made-maps.md) covers what goes in the folder.

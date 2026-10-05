@@ -53,7 +53,25 @@ The style changes how the strategic map looks and what its locations are. The ru
 
 Choose the style as **Map style** when generating. An authored map sets it through the document's theme. **Regenerate map** on a generated map builds a new one in the same style.
 
+Theatre changes only how the map looks. Cities and Territories also change the shape of the map, because the locations sit on land and are joined by roads, borders and sea crossings. The rules for taking a location are the same in all four.
+
 A challenge code carries the style, so whoever imports it plays the same map. A code made on a Cities or Territories map needs a Coilbox new enough to know those styles. An older one reads it as a Galaxy.
+
+### Playing a hand-made map
+
+A game maker can ship a map drawn by hand instead of a generated one. A hand-made map is listed on the **Conquest** page with its picture and title. A label shows where it came from: **Bundled** for a map a distribution ships, **From the game** for a map the game archive carries, or no label for a map you imported.
+
+To import one, choose **Import map** on the Conquest page and pick the zip. If a map with the same id is installed, Coilbox asks whether to replace it. A conquest in progress on it carries on with the new map. A map the reader refuses is not installed, and the drawer lists every reason. The [hand-made maps guide](hand-made-maps.md#error-messages) explains each message.
+
+A hand-made map has one conquest at a time. Its setup panel offers fog of war, a threat level and a seed. The size, shape and style are the map's own. The seed sets how enemies move and which battlefield each location with no set battle is fought on. The map itself never changes.
+
+Some locations on a hand-made map play a scenario in place of a skirmish. You play it once, when you first attack there. After that, attacks on that location are skirmishes on the scenario's map.
+
+A conquest saves the map's id and not the map. Coilbox reads the map from its folder each time, so an update to the map takes effect on a conquest in progress. A conquest cannot be opened while its map is missing. The Conquest page keeps the save and says why, and the conquest carries on once the map is back. **Remove** deletes an imported map. A map with a conquest on it offers **Abandon** instead.
+
+Once a conquest exists on a hand-made map, its card has a share button. The challenge code names the map and its version. The other player needs the same version installed, and a player without it is told which map and game to get. See [Versions and challenge codes](hand-made-maps.md#versions-and-challenge-codes) for what makes a new version.
+
+A game can ask for its own maps only. Then **Generate a map** does not offer that game, so a World War 2 game is never played across a galaxy. See [Hide the generated styles](hand-made-maps.md#hide-the-generated-styles).
 
 ## Names and factions
 
@@ -108,6 +126,7 @@ If you author or maintain a game, there are five ways to make conquest feel like
 - **AI rankings** — rank your AIs hardest to easiest, name the standard one, and say which are mini-games or belong on neutral worlds. A node's difficulty then picks the opponent: a frontier world is a gentler fight than an enemy capital. Set them on your [branding-catalog](branding-catalog.md#ai-rankings) entry's `ai` field, or in a [distribution profile](distribution-profile.md#ai-object).
 - **Map style** — a terrestrial game where stars make no sense can use the Theatre, Cities or Territories style in place of the starfield. See [Map styles](#map-styles).
 - **Ship a hand-made galaxy** — export a specific galaxy and bundle it so players get a curated campaign out of the box, alongside anything they generate. See [Bundling a galaxy](#bundling-a-galaxy).
+- **Ship a hand-made map of land** — paint provinces in an image editor and describe them in a text file. A distribution can bundle the folder, a player can import it as a zip, and a game archive can carry it. See the [hand-made maps guide](hand-made-maps.md).
 - **Faction AI sides / colours** — each lore faction's `side` and `color` control which in-game side its AI plays and how it's drawn on the map (see the schema in [Names and factions](#names-and-factions)).
 
-The strategic model itself is theme-agnostic (it speaks of *systems* and *lanes*), so all of the above is presentation layered on identical rules.
+The strategic model itself is theme-agnostic (it speaks of *systems* and *lanes*), so all of the above except the land map styles is presentation layered on identical rules.

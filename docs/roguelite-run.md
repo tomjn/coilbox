@@ -50,6 +50,18 @@ Winning or dying unlocks **options, not raw power**, kept in a separate meta doc
 - **Event pools** — extra event content drawn into the deck as you play more runs.
 - **Ascension** — one harder difficulty tier per win at the current ceiling, so the challenge can't be outrun.
 
+## Warpath on a land map
+
+On a Cities or Territories map the run crosses land from a start location to a goal, with no way back. Coilbox ranks every location by how many links it is from the start. You can step only to a neighbour one rank further on. A location on no route to the goal is scenery. It is drawn but has no fight and cannot be chosen.
+
+A generated map always offers a choice of route. The seed picks the start and goal among the furthest pairs, takes the pair that gives the most choice, and builds the next map from the seed if a map has none.
+
+A hand-made map shows in **Map style** as "Title (hand-made map)" when its author marked a start and a goal for Warpath. Its author also sets where the run starts and ends and what some locations are. A hand-made run is drawn in the Theatre style and has no **Length** choice, because the map decides both.
+
+A location the author gave a battle fights that battle. Its map, enemy count, AI, handicap, start positions, mod options and disabled units replace the generated ones where the author set them. A location with a scenario plays it as its author set it up, without your unit limit or perks. See [Warpath markings](hand-made-maps.md#warpath-markings) for the author's side.
+
+A run saves a reference to its map. If the map is missing, unreadable or changed so the run no longer fits, the run plays in columns and the run page says why. A challenge code on a hand-made map needs the same version of the map installed.
+
 ## Rendering
 
 The run map reuses the conquest galaxy renderer's toolkit with a forward-column layout: a starfield backdrop with node tokens coloured by type and lanes lit forward (amber where you've been, cyan for your open choices). The **theatre** skin swaps the starfield for a flat tactical grid, for terrestrial games.
