@@ -22,6 +22,8 @@ vi.mock("@picoframe/frame", async (orig) => ({
     },
     close: vi.fn(),
   }),
+  // The frame's settings need its provider. The form reads a last game from them.
+  useSetting: (_key: string, fallback: unknown) => [fallback, () => {}],
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("../../content/config", () => ({

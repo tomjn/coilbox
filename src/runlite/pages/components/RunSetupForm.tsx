@@ -1,4 +1,4 @@
-import { Button } from "@picoframe/frame";
+import { Button, useSetting } from "@picoframe/frame";
 import { Loader2, Swords } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -57,8 +57,12 @@ import {
  * bakes a self-contained run and saves it, then calls `onStarted`. A Cities or
  * Territories run also generates the land map it crosses.
  */
-/** Remembers the last game picked across runs (and the module-level default). */
-const LAST_GAME_KEY = "runlite:lastGame";
+/**
+ * The game the player last picked or started a run in, by its unitsync name. A
+ * frame setting like the host form's, so it is kept with the rest of the app's
+ * settings. Conquest keeps its own (`conquest.generate.lastGame`).
+ */
+const LAST_GAME_KEY = "warpath.setup.lastGame";
 
 /** Marks a map style value that names a hand-made map by its id. */
 const HANDMADE_PREFIX = "handmade:";
@@ -95,11 +99,10 @@ export function RunSetupForm({
   const maps = scan.data?.maps ?? [];
 
   const [gameName, setGameName] = useState("");
+  const [lastGame, setLastGame] = useSetting(LAST_GAME_KEY, "");
   const selectGame = (name: string) => {
     setGameName(name);
-    try {
-      localStorage.setItem(LAST_GAME_KEY, name);
-    } catch {}
+    setLastGame(name);
   };
   const [sideName, setSideName] = useState("");
   const [length, setLength] = useState<RunLength>("standard");
@@ -121,16 +124,12 @@ export function RunSetupForm({
   useEffect(() => {
     if (gameName && games.some((g) => g.name === gameName)) return;
     if (games.length === 0) return;
-    let last: string | null = null;
-    try {
-      last = localStorage.getItem(LAST_GAME_KEY);
-    } catch {}
     const pick =
       (initialGameName && games.find((g) => g.name === initialGameName)) ||
-      games.find((g) => g.name === last) ||
+      games.find((g) => g.name === lastGame) ||
       games[0];
     setGameName(pick.name);
-  }, [games, gameName, initialGameName]);
+  }, [games, gameName, initialGameName, lastGame]);
 
   const game = games.find((g) => g.name === gameName) ?? null;
   // What this game offers: the legacy unlocks plus its own. The key is the one a
@@ -245,6 +244,8 @@ export function RunSetupForm({
   const startRun = async () => {
     if (!game) return;
     setStartError(null);
+    // A game reached from game detail is remembered too, not only one picked here.
+    setLastGame(game.name);
     const opts: GenerateRunOpts = {
       seed: Math.floor(Math.random() * 1e9),
       length,

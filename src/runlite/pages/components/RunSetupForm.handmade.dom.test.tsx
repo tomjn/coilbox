@@ -37,6 +37,11 @@ const GAMES = [
   },
 ];
 
+// The frame's settings need its provider. These tests never set a last game.
+vi.mock("@picoframe/frame", async (orig) => ({
+  ...(await orig<typeof import("@picoframe/frame")>()),
+  useSetting: (_key: string, fallback: unknown) => [fallback, () => {}],
+}));
 vi.mock("../../runs", () => ({
   useRunMeta: () => ({ meta: emptyMeta, loading: false, error: null }),
   useRuns: () => ({ saveRun: hoisted.saveRun }),
