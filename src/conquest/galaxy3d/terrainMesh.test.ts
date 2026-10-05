@@ -1,7 +1,12 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
-import { beyondPixels, buildTerrainMesh, edgeColor } from "./terrainMesh";
+import {
+  beyondFrame,
+  beyondPixels,
+  buildTerrainMesh,
+  edgeColor,
+} from "./terrainMesh";
 
 /** A 4 by 3 picture: the edge one colour, the middle another. */
 function framed(): { data: Uint8ClampedArray; width: number; height: number } {
@@ -109,6 +114,52 @@ describe("beyondPixels", () => {
     expect(Array.from(ringed.data.slice(o, o + 3))).toEqual([24, 58, 96]);
   });
 
+  it("blurs only a few pixels beside the edge, and widely further out", () => {
+    // Sea everywhere but the top half of the left edge, so that edge changes
+    // colour halfway down and the sea is the colour far out.
+    const width = 64;
+    const height = 64;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const land = x === 0 && y < 32;
+        data.set(land ? [100, 160, 80, 255] : [24, 58, 96, 255], (y * width + x) * 4);
+      }
+    }
+    const out = beyondPixels({ data, width, height });
+    const px = (x: number, y: number) =>
+      Array.from(out.data.slice((y * out.width + x) * 4, (y * out.width + x) * 4 + 3));
+    // Eight rows above the change, just left of the edge: land, not a blend.
+    const row = Math.floor(third) + 23;
+    const [r, g, b] = px(Math.floor(third) - 1, row);
+    expect(Math.abs(r - 100)).toBeLessThanOrEqual(4);
+    expect(Math.abs(g - 160)).toBeLessThanOrEqual(4);
+    expect(Math.abs(b - 80)).toBeLessThanOrEqual(4);
+    // Far out the same row is blurred with the sea below it.
+    const [, farGreen] = px(Math.floor(third) - 12, row);
+    expect(farGreen).toBeLessThan(150);
+  });
+
+  it("carries alpha out the same way when asked for four channels", () => {
+    // Alpha as height: land (200) on the left half, sea (0) on the right.
+    const width = 64;
+    const height = 64;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        data.set([128, 255, 128, x < 32 ? 200 : 0], (y * width + x) * 4);
+      }
+    }
+    const carried = beyondPixels({ data, width, height }, 4);
+    const alpha = (x: number, y: number) =>
+      carried.data[(y * carried.width + x) * 4 + 3];
+    expect(alpha(Math.floor(third) - 1, mid)).toBeGreaterThan(150);
+    // Sea just past the right edge, under a twentieth of the way into its fade.
+    expect(alpha(Math.ceil(2 * third), mid)).toBeLessThanOrEqual(200 / 20 + 1);
+    // Without the fourth channel the picture is opaque, as before.
+    expect(beyondPixels({ data, width, height }).data[3]).toBe(255);
+  });
+
   it("fades to the edge's most common colour far from the map", () => {
     const far = edgeColor(halves());
     expect(px(0, 0)).toEqual(far);
@@ -162,8 +213,44 @@ describe("the sheet's shader", () => {
     expect(build(painted, grid).customProgramCacheKey()).toBe("terrain:1:0");
   });
 
-  it("has no relief to light on a flat sheet", () => {
-    expect(build(halves()).customProgramCacheKey()).toBe("terrain:0:1");
+  it("has no relief or detail on a flat sheet", () => {
+    // Detail tells sea from land by the height, so with none it stays off
+    // rather than reading the whole map as sea.
+    expect(build(halves()).customProgramCacheKey()).toBe("terrain:0:0");
+  });
+
+  it("carries the sheet's shading onto the world beyond, fading past the edge", () => {
+    const surface = createTerrainSurface({ width: 64, height: 64 }, 100, grid);
+    const scene = new THREE.Scene();
+    const disposables: { dispose(): void }[] = [];
+    buildTerrainMesh(scene, disposables, surface, halves(), { current: null }, grid);
+    for (const d of disposables) d.dispose();
+    const beyond = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
+    const mat = beyond.material as THREE.MeshBasicMaterial;
+    expect(mat.customProgramCacheKey()).toBe("terrain:1:1");
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.basic.vertexShader,
+      fragmentShader: THREE.ShaderLib.basic.fragmentShader,
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    mat.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    const u = shader.uniforms as Record<string, { value: unknown }>;
+    expect(u.uTerrainFade.value).toBe(beyondFrame(surface).fade);
+    expect((u.uTerrainFrame.value as THREE.Vector4).toArray()).toEqual([
+      50, 50, 100, 100,
+    ]);
+  });
+
+  it("leaves the world beyond plain when the sheet has no relief", () => {
+    const surface = createTerrainSurface({ width: 64, height: 64 }, 100);
+    const scene = new THREE.Scene();
+    const disposables: { dispose(): void }[] = [];
+    buildTerrainMesh(scene, disposables, surface, halves(), { current: null });
+    for (const d of disposables) d.dispose();
+    const beyond = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
+    expect((beyond.material as THREE.Material).onBeforeCompile.toString()).not.toContain(
+      "uTerrain",
+    );
   });
 
   it("finds the places it patches in three.js's own shader", () => {

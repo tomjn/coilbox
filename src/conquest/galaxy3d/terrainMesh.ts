@@ -5,7 +5,7 @@ import {
   terrainNormalPixels,
   terrainTriangles,
 } from "./terrain";
-import { applyTerrainShader } from "./terrainShader";
+import { applyTerrainShader, type TerrainFrame } from "./terrainShader";
 
 /**
  * The terrain sheet as a three.js mesh: the map picture laid over a
@@ -71,13 +71,20 @@ export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
  * sea meets the edge this is that sea, even when land runs off another side.
  */
 export function edgeColor(pixels: ColorPixels): [number, number, number] {
+  const [r, g, b] = edgeMode(pixels, 3);
+  return [r, g, b];
+}
+
+/** {@link edgeColor} over the first `channels` channels of each pixel. */
+function edgeMode(pixels: ColorPixels, channels: 3 | 4): number[] {
   const { data, width, height } = pixels;
   const counts = new Map<number, number>();
   let best = 0;
   let bestCount = 0;
   const add = (x: number, y: number) => {
     const i = (y * width + x) * 4;
-    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    let key = 0;
+    for (let c = 0; c < channels; c++) key = key * 256 + data[i + c];
     const n = (counts.get(key) ?? 0) + 1;
     counts.set(key, n);
     if (n > bestCount) {
@@ -93,7 +100,12 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
     add(0, y);
     if (width > 1) add(width - 1, y);
   }
-  return [(best >> 16) & 255, (best >> 8) & 255, best & 255];
+  const out: number[] = [];
+  for (let c = channels - 1; c >= 0; c--) {
+    out[c] = best % 256;
+    best = Math.floor(best / 256);
+  }
+  return out;
 }
 
 /** Sheets the world beyond the map reaches past each edge. */
@@ -114,10 +126,17 @@ const BEYOND_PIXELS = 192;
  * colours along that edge, blurred and fading into {@link edgeColor} further
  * out, so land that runs off the map trails off into the sea and sea carries
  * on as sea. It is as bright as the map, so no seam shows at the edge.
+ *
+ * With `channels` at 4 the alpha channel is carried out the same way, for a
+ * picture whose alpha means something, such as the ground's height in
+ * {@link terrainNormalPixels}. Otherwise alpha is opaque.
  */
-export function beyondPixels(pixels: ColorPixels): ColorPixels {
+export function beyondPixels(
+  pixels: ColorPixels,
+  channels: 3 | 4 = 3,
+): ColorPixels {
   const { data, width, height } = pixels;
-  const far = edgeColor(pixels);
+  const far = edgeMode(pixels, channels);
   const at = (x: number, y: number, c: number) => data[(y * width + x) * 4 + c];
   /**
    * The edge colour nearest a point given in picture pixels, averaged along
@@ -129,22 +148,23 @@ export function beyondPixels(pixels: ColorPixels): ColorPixels {
     y: number,
     acrossX: boolean,
     acrossY: boolean,
-  ): [number, number, number] => {
+    blur: number,
+  ): number[] => {
     const cx = Math.min(width - 1, Math.max(0, Math.floor(x)));
     const cy = Math.min(height - 1, Math.max(0, Math.floor(y)));
-    const bx = acrossX ? 0 : EDGE_BLUR;
-    const by = acrossY ? 0 : EDGE_BLUR;
-    const sum = [0, 0, 0];
+    const bx = acrossX ? 0 : blur;
+    const by = acrossY ? 0 : blur;
+    const sum = [0, 0, 0, 0];
     let n = 0;
     for (let yy = cy - by; yy <= cy + by; yy++) {
       if (yy < 0 || yy >= height) continue;
       for (let xx = cx - bx; xx <= cx + bx; xx++) {
         if (xx < 0 || xx >= width) continue;
-        for (let c = 0; c < 3; c++) sum[c] += at(xx, yy, c);
+        for (let c = 0; c < channels; c++) sum[c] += at(xx, yy, c);
         n++;
       }
     }
-    return [sum[0] / n, sum[1] / n, sum[2] / n];
+    return sum.map((s) => s / n);
   };
   const span = 2 * BEYOND_SHEETS + 1;
   const out = new Uint8ClampedArray(BEYOND_PIXELS * BEYOND_PIXELS * 4);
@@ -157,15 +177,35 @@ export function beyondPixels(pixels: ColorPixels): ColorPixels {
       const cv = Math.min(1, Math.max(0, v));
       const d = Math.sqrt((u - cu) * (u - cu) + (v - cv) * (v - cv));
       const t = Math.min(1, d / BEYOND_FADE);
-      const edge = edgeNear(cu * width, cv * height, cu !== u, cv !== v);
+      // The blur grows from nothing at the edge, so right beside it the world
+      // beyond is the edge pixel itself. It grows fast at first, so a ridge
+      // at the edge does not carry straight out as a stripe.
+      const blur = Math.floor(EDGE_BLUR * Math.sqrt(t));
+      const edge = edgeNear(cu * width, cv * height, cu !== u, cv !== v, blur);
       const o = (j * BEYOND_PIXELS + i) * 4;
-      for (let c = 0; c < 3; c++) {
+      for (let c = 0; c < channels; c++) {
         out[o + c] = edge[c] + (far[c] - edge[c]) * t;
       }
-      out[o + 3] = 255;
+      if (channels === 3) out[o + 3] = 255;
     }
   }
   return { data: out, width: BEYOND_PIXELS, height: BEYOND_PIXELS };
+}
+
+/**
+ * Where the sheet's surface detail dies away past its edge: the sheet's half
+ * size in world units, its size, and how far past the edge the detail is gone,
+ * in sheets. The world beyond's colours fade over the same distance, so the
+ * texture and the colour reach the far colour together.
+ */
+export function beyondFrame(surface: TerrainSurface): TerrainFrame {
+  return {
+    halfX: surface.worldWidth / 2,
+    halfZ: surface.worldDepth / 2,
+    width: surface.worldWidth,
+    depth: surface.worldDepth,
+    fade: BEYOND_FADE,
+  };
 }
 
 /**
@@ -173,12 +213,18 @@ export function beyondPixels(pixels: ColorPixels): ColorPixels {
  * sit in the page's black and land that runs off the map is not cut off
  * against a flat sea. Further out still, the scene's background is the
  * colour the picture fades to.
+ *
+ * Given the sheet's `normals`, it carries the sheet's shading over the edge
+ * too: the same ripples and ground texture, dying away with the colour, so
+ * the sheet's texture does not stop on a straight line.
  */
 function buildBeyond(
   scene: THREE.Scene,
   disposables: { dispose(): void }[],
   surface: TerrainSurface,
   pixels: ColorPixels,
+  normals: ColorPixels | null,
+  detail: boolean,
 ): void {
   const span = 2 * BEYOND_SHEETS + 1;
   const picture = beyondPixels(pixels);
@@ -209,6 +255,25 @@ function buildBeyond(
     depthWrite: false,
   });
   disposables.push(geo, mat, tex);
+  if (normals) {
+    const carried = beyondPixels(normals, 4);
+    const normalTex = new THREE.DataTexture(
+      carried.data,
+      carried.width,
+      carried.height,
+      THREE.RGBAFormat,
+    );
+    normalTex.flipY = false;
+    normalTex.magFilter = THREE.LinearFilter;
+    normalTex.minFilter = THREE.LinearFilter;
+    normalTex.needsUpdate = true;
+    disposables.push(normalTex);
+    applyTerrainShader(
+      mat,
+      { normals: normalTex, detail, frame: beyondFrame(surface) },
+      disposables,
+    );
+  }
   const plane = new THREE.Mesh(geo, mat);
   plane.name = "beyond-the-map";
   plane.renderOrder = -10;
@@ -263,9 +328,15 @@ export function buildTerrainMesh(
   const mat = new THREE.MeshBasicMaterial();
   disposables.push(geo, mat);
   let normals: THREE.DataTexture | null = null;
+  let normalPixels: ColorPixels | null = null;
   if (heights && surface.maxHeight > 0) {
+    normalPixels = {
+      data: terrainNormalPixels(surface, heights),
+      width: heights.width,
+      height: heights.height,
+    };
     normals = new THREE.DataTexture(
-      terrainNormalPixels(surface, heights),
+      normalPixels.data,
       heights.width,
       heights.height,
       THREE.RGBAFormat,
@@ -331,7 +402,7 @@ export function buildTerrainMesh(
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
-      buildBeyond(scene, disposables, surface, color);
+      buildBeyond(scene, disposables, surface, color, normalPixels, detail);
     } else {
       tex = new THREE.CanvasTexture(color);
     }
