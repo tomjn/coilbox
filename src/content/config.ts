@@ -355,6 +355,20 @@ export async function primeScan(
 }
 
 /**
+ * The newest scan of a target: the one running now, else the cached one, else
+ * a fresh one. A forced rescan bumps the epoch before its answer is cached, so
+ * a reader woken by the epoch waits for that answer here rather than taking
+ * the one it replaces.
+ */
+export function currentScan(
+  enginePath: string,
+  dataDir: string,
+): Promise<ScanResult> {
+  const inFlight = inFlightScans.get(`${dataDir}::${enginePath}`);
+  return inFlight ? inFlight.promise : primeScan(enginePath, dataDir);
+}
+
+/**
  * Drop every cached unitsync scan so the next open re-scans from disk. Called
  * after a content download so a freshly-installed game/map shows up (e.g. in the
  * singleplayer picker) without a manual rescan. Also bumps each known target's

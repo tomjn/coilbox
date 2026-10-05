@@ -53,12 +53,13 @@ function strategic(doc: GalaxyDoc) {
     generated,
     ...rest
   } = doc;
-  // The style is how the map is drawn, which is the one thing that differs.
+  // The style is how the map is drawn, and what its locations are called.
+  // Those are the two things that differ.
   const { skin: _skin, ...knobs } = generated ?? {};
   return {
     ...rest,
     generated: knobs,
-    nodes: doc.nodes.map(({ pos: _p, ...node }) => node),
+    nodes: doc.nodes.map(({ pos: _p, name: _n, ...node }) => node),
   };
 }
 

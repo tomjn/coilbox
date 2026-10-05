@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { BattleConfig } from "../play/bindings";
-import { applyPerks, disabledUnitsFor, perkTotals } from "./build";
+import {
+  applyPerks,
+  battleRestrictions,
+  disabledUnitsFor,
+  perkTotals,
+} from "./build";
 import type { Perk, RogueliteRun } from "./model";
 
 const EDGES = new Map<string, string[]>([
@@ -125,5 +130,25 @@ describe("perkTotals", () => {
 
   it("returns zeroes for an empty list", () => {
     expect(perkTotals([])).toEqual({ advantage: 0, income: 0 });
+  });
+});
+
+describe("battleRestrictions", () => {
+  it("joins the arsenal's disabled units and the encounter's own", () => {
+    expect(
+      battleRestrictions(["tank", "radar"], ["radar", "armcom"], []),
+    ).toEqual({ disabledUnits: ["tank", "radar", "armcom"] });
+  });
+
+  it("is empty when nothing is banned and there are no perks", () => {
+    expect(battleRestrictions([], undefined, [])).toEqual({});
+  });
+
+  it("carries the perk totals", () => {
+    const perks: Perk[] = [{ kind: "advantage", value: 0.1, label: "a" }];
+    expect(battleRestrictions([], ["armcom"], perks)).toEqual({
+      disabledUnits: ["armcom"],
+      advantage: 0.1,
+    });
   });
 });

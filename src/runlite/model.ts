@@ -72,6 +72,12 @@ export interface EncounterSpec {
   enemyAiKey?: string;
   startPosType?: number;
   modOptionValues?: Record<string, string>;
+  /**
+   * Units a hand-made map's author banned at this location. Joined with the
+   * run's own disabled set at launch. Absent on a generated encounter and on
+   * runs saved before the field existed.
+   */
+  disabledUnits?: string[];
   /** Enemy team handicap % (already depth-scaled). */
   handicap: number;
   /**
@@ -445,6 +451,10 @@ function parseEncounter(value: unknown): EncounterSpec | null {
         ? value.startPosType
         : undefined,
     modOptionValues,
+    disabledUnits:
+      stringArray(value.disabledUnits).length > 0
+        ? stringArray(value.disabledUnits)
+        : undefined,
     handicap: clamp(Math.round(num(value.handicap, 0)), 0, 300),
     techTier: clamp(Math.round(num(value.techTier, 1)), 1, 99),
   };

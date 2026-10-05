@@ -172,6 +172,7 @@ export function handmadeRun(
   return {
     mapId: map.id,
     title: map.title,
+    ...(map.handmade?.carriedBy ? { carriedBy: map.handmade.carriedBy } : {}),
     fogOfWar: options.fogOfWar ? true : undefined,
     threatLevel: threatLevel > 0 ? threatLevel : undefined,
     battles,
@@ -232,6 +233,9 @@ export function readHandmadeRun(state: ConquestState): HandmadeRun | null {
   return {
     mapId: r.mapId,
     title: typeof r.title === "string" && r.title !== "" ? r.title : r.mapId,
+    ...(typeof r.carriedBy === "string" && r.carriedBy !== ""
+      ? { carriedBy: r.carriedBy }
+      : {}),
     fogOfWar: r.fogOfWar === true ? true : undefined,
     threatLevel: threatLevel > 0 ? threatLevel : undefined,
     battles,

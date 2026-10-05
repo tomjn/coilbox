@@ -2,10 +2,11 @@ import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import { CAPITAL_SCALE, MARKER_RADIUS } from "./cityLayer";
 import { endMarkersToDraw, type RunEnd } from "./endMarkers";
+import type { PlacedModelsLayer } from "./placedModelsLayer";
 import { GALAXY_MAX_DISTANCE, type TerrainSurface } from "./terrain";
 
 /**
- * The start and the goal of a run across a land map: a pole standing on the
+ * The start and the goal of a run across a land map: a pole drawNow on the
  * location's anchor, with a pennant for the start and a diamond for the goal.
  * The two differ in shape as well as colour, and stand the same on a
  * province and on a city. Each takes the colour the document gives its
@@ -55,7 +56,12 @@ export interface EndMarkerLayer {
 
 /**
  * Build the markers into `scene`. Returns `undefined`, and adds nothing, when
- * no location is an end or every end has a model standing on it.
+ * no location is an end, or when every end has a model drawNow on it and
+ * there is no model layer to wait on.
+ *
+ * With a model layer, an end that has a model drawNow on it gets its marker
+ * after the models have settled if every model on it failed to load, so the
+ * location is never left with neither. `renderRef` redraws when that happens.
  */
 export function buildEndMarkerLayer(
   scene: THREE.Scene,
@@ -64,14 +70,17 @@ export function buildEndMarkerLayer(
   surface: TerrainSurface,
   ends: ReadonlyMap<string, { end?: RunEnd }>,
   ownerColor: (owner: string | undefined) => THREE.Color,
+  placed?: Pick<PlacedModelsLayer, "failed" | "settled">,
+  renderRef?: { current: (() => void) | null },
 ): EndMarkerLayer | undefined {
-  const markers = endMarkersToDraw(
-    galaxy.nodes,
-    ends,
-    galaxy.models,
-    endMarkerReach(surface),
+  const reach = endMarkerReach(surface);
+  const markers = endMarkersToDraw(galaxy.nodes, ends, undefined, reach);
+  const drawNow = new Set(
+    endMarkersToDraw(galaxy.nodes, ends, galaxy.models, reach).map((m) => m.id),
   );
-  if (markers.length === 0) return undefined;
+  if (markers.length === 0 || (drawNow.size === 0 && !placed)) {
+    return undefined;
+  }
 
   const poleGeo = new THREE.CylinderGeometry(
     POLE_RADIUS,
@@ -108,6 +117,7 @@ export function buildEndMarkerLayer(
   disposables.push(poleGeo, poleMat, pennantGeo, diamondGeo);
 
   const groups: THREE.Group[] = [];
+  const byId = new Map<string, THREE.Group>();
   for (const marker of markers) {
     const headMat = new THREE.MeshBasicMaterial({
       color: ownerColor(galaxy.nodes[marker.nodeIndex].owner),
@@ -126,8 +136,36 @@ export function buildEndMarkerLayer(
     pole.raycast = () => {};
     head.raycast = () => {};
     group.add(pole, head);
-    scene.add(group);
     groups.push(group);
+    byId.set(marker.id, group);
+    if (drawNow.has(marker.id)) scene.add(group);
+  }
+
+  if (placed) {
+    let disposed = false;
+    disposables.push({
+      dispose: () => {
+        disposed = true;
+      },
+    });
+    void placed.settled.then(() => {
+      if (disposed) return;
+      const failed = new Set(placed.failed);
+      let added = false;
+      for (const m of endMarkersToDraw(
+        galaxy.nodes,
+        ends,
+        galaxy.models,
+        reach,
+        failed,
+      )) {
+        const group = byId.get(m.id);
+        if (!group || group.parent) continue;
+        scene.add(group);
+        added = true;
+      }
+      if (added) renderRef?.current?.();
+    });
   }
 
   let zoom = 1;

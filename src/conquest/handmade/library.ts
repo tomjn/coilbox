@@ -12,20 +12,44 @@ import {
   type HandmadeMapItem,
 } from "../bindings";
 import type { GalaxyDoc } from "../model";
+import {
+  type ArchiveMapItem,
+  type ArchiveReader,
+  type ArchiveTarget,
+  createArchiveReader,
+} from "./archive";
 import { memoryTraceCache } from "./cache";
 import { decodeRgba, imageSize } from "./decode";
 import type { HandmadeMapError } from "./errors";
-import { MANIFEST_FILE, type MapManifest, parseManifest } from "./manifest";
+import {
+  MANIFEST_FILE,
+  type MapManifest,
+  parseManifest,
+  type ResolvedManifest,
+} from "./manifest";
 import { type HandmadeMapResult, readHandmadeMap } from "./read";
 
 /**
  * The hand-made maps coilbox holds: the ones bundled with a distribution in
- * `.coilbox/galaxies/` and the ones a player imported from a zip. The plugin
- * finds the folders and unpacks zips. This module turns a folder into a
- * galaxy through the reader.
+ * `.coilbox/galaxies/`, the ones an installed game carries in its archive (see
+ * `./archive`), and the ones a player imported from a zip. The plugin finds
+ * the folders and unpacks zips. This module turns a folder into a galaxy
+ * through the reader.
+ *
+ * When two sources have a map with the same id, the player sees one of them:
+ * a bundled map first, then a map a game carries, then an imported one. The
+ * first two cannot be replaced, so an import never hides them. Between two
+ * games, the newer version wins.
  */
 
-export type HandmadeMapSource = "imported" | "bundled";
+export type HandmadeMapSource = "imported" | "bundled" | "game";
+
+/** Which source a player sees when two have a map with the same id. */
+const RANK: Record<HandmadeMapSource, number> = {
+  imported: 0,
+  game: 1,
+  bundled: 2,
+};
 
 /** Enough of a map to list it. The picture is absent when its file is. */
 export interface HandmadeMapSummary {
@@ -34,6 +58,8 @@ export interface HandmadeMapSummary {
   description?: string;
   game: MapManifest["game"];
   source: HandmadeMapSource;
+  /** The game whose archive carries the map, by name. Only for `game`. */
+  carriedBy?: string;
   pictureUrl?: string;
   /** Whether the author marked a Warpath start and goal. Without them the map
    * is for Conquest only. */
@@ -44,12 +70,43 @@ export interface HandmadeMapSummary {
 export interface UnreadableHandmadeMap {
   folder: string;
   source: HandmadeMapSource;
+  /** The game whose archive holds the folder. Only for `game`. */
+  carriedBy?: string;
   errors: HandmadeMapError[];
 }
 
 export interface HandmadeMapList {
   maps: HandmadeMapSummary[];
   unreadable: UnreadableHandmadeMap[];
+  /**
+   * The games that ask for their own maps only, by name. The generated styles
+   * are not offered for them while they carry a map that can be listed.
+   */
+  onlyOwnMaps: string[];
+  /** Why the game archives could not be searched, when they could not. */
+  archiveError?: string;
+}
+
+/**
+ * Where game archives are read from. Undefined until the app has resolved its
+ * engine, null when there is none. Set by `useHandmadeMaps`.
+ */
+let archiveTarget: ArchiveTarget | null | undefined;
+let archiveReader: ArchiveReader | null = null;
+
+/**
+ * Point the library at the engine and content root the game archives are read
+ * with, and drop everything read from them before. Null means there is no
+ * engine, so no game carries a map.
+ */
+export function setArchiveTarget(target: ArchiveTarget | null): void {
+  archiveTarget = target;
+  archiveReader = target ? createArchiveReader(target) : null;
+}
+
+/** Whether the archive target has been set yet. */
+export function archiveTargetKnown(): boolean {
+  return archiveTarget !== undefined;
 }
 
 /** Bundled map folders sit beside the bundled galaxy files. */
@@ -92,18 +149,84 @@ export async function handmadeMapFileUrls(
   return undefined;
 }
 
-interface Listed {
-  item: HandmadeMapItem;
-  summary: HandmadeMapSummary;
-}
+type Listed = { summary: HandmadeMapSummary; manifest: string } & (
+  | { item: HandmadeMapItem; archive?: undefined }
+  | { item?: undefined; archive: ArchiveMapItem }
+);
 
 async function listFolders(): Promise<{
   listed: Listed[];
   unreadable: UnreadableHandmadeMap[];
+  onlyOwnMaps: string[];
+  archiveError?: string;
 }> {
   const { items } = await conquestMapList({});
+  const reader = archiveReader;
+  let archive: Awaited<ReturnType<ArchiveReader["list"]>> = {
+    items: [],
+    unreadable: [],
+    onlyOwnMaps: [],
+  };
+  let archiveError: string | undefined;
+  if (reader) {
+    try {
+      archive = await reader.list();
+    } catch (e) {
+      archiveError = messageOf(e);
+    }
+  }
   const byId = new Map<string, Listed>();
-  const unreadable: UnreadableHandmadeMap[] = [];
+  const unreadable: UnreadableHandmadeMap[] = archive.unreadable.map((u) => ({
+    folder: u.folder,
+    source: "game",
+    carriedBy: u.game.name,
+    errors: u.errors,
+  }));
+  const keep = (next: Listed) => {
+    const held = byId.get(next.summary.id);
+    if (held && RANK[held.summary.source] >= RANK[next.summary.source]) return;
+    byId.set(next.summary.id, next);
+  };
+  for (const carried of archive.items) {
+    const { folder, game } = carried;
+    const { manifest, errors } = parseManifest(carried.manifest);
+    const fail = (errors: HandmadeMapError[]) =>
+      unreadable.push({ folder, source: "game", carriedBy: game.name, errors });
+    if (!manifest) {
+      fail(errors);
+      continue;
+    }
+    // A map a game carries is for that game.
+    if (
+      manifest.game.shortname.toLowerCase() !== game.shortname.toLowerCase()
+    ) {
+      fail([
+        {
+          code: "manifest-field",
+          path: "game.shortname",
+          message: `${MANIFEST_FILE}: the game shortname "${manifest.game.shortname}" is not "${game.shortname}", the shortname of the game that carries the map.`,
+        },
+      ]);
+      continue;
+    }
+    const picture = carried.files.includes(manifest.files.picture)
+      ? await reader?.read(game, folder, manifest.files.picture)
+      : undefined;
+    keep({
+      archive: carried,
+      manifest: carried.manifest,
+      summary: {
+        id: manifest.id,
+        title: manifest.title,
+        description: manifest.description,
+        game: manifest.game,
+        source: "game",
+        carriedBy: game.name,
+        pictureUrl: picture?.ok ? picture.url : undefined,
+        warpath: manifest.warpath !== undefined,
+      },
+    });
+  }
   for (const item of items) {
     const { folder, source } = item;
     const { manifest, errors } = parseManifest(item.manifest);
@@ -127,11 +250,9 @@ async function listFolders(): Promise<{
       });
       continue;
     }
-    // Imported maps are listed first. A bundled map with the same id takes
-    // its place, because a bundled map cannot be replaced.
-    if (byId.has(manifest.id) && source !== "bundled") continue;
-    byId.set(manifest.id, {
+    keep({
       item,
+      manifest: item.manifest,
       summary: {
         id: manifest.id,
         title: manifest.title,
@@ -143,7 +264,13 @@ async function listFolders(): Promise<{
       },
     });
   }
-  return { listed: [...byId.values()], unreadable };
+  // Only a game that carries a map it can list loses the generated styles,
+  // so a game whose maps all fail to read is still playable.
+  const listed = [...byId.values()];
+  const onlyOwnMaps = archive.onlyOwnMaps.filter((name) =>
+    listed.some((l) => l.summary.carriedBy === name),
+  );
+  return { listed, unreadable, onlyOwnMaps, archiveError };
 }
 
 /**
@@ -151,8 +278,96 @@ async function listFolders(): Promise<{
  * manifest does not parse is returned in `unreadable` with the reader's errors.
  */
 export async function listHandmadeMaps(): Promise<HandmadeMapList> {
-  const { listed, unreadable } = await listFolders();
-  return { maps: listed.map((l) => l.summary), unreadable };
+  const { listed, unreadable, onlyOwnMaps, archiveError } = await listFolders();
+  return {
+    maps: listed.map((l) => l.summary),
+    unreadable,
+    onlyOwnMaps,
+    ...(archiveError === undefined ? {} : { archiveError }),
+  };
+}
+
+/**
+ * The files a `.gltf` names beside itself, as paths in the map folder. A
+ * `data:` uri holds its bytes inline and names nothing. A path that climbs out
+ * of the folder is returned as the uri was written, with `outside` set.
+ */
+function gltfSiblings(
+  gltf: string,
+  gltfFile: string,
+): { path: string; outside: boolean }[] {
+  let json: { buffers?: unknown; images?: unknown };
+  try {
+    json = JSON.parse(gltf);
+  } catch {
+    return [];
+  }
+  const dir = gltfFile.split("/").slice(0, -1);
+  const out: { path: string; outside: boolean }[] = [];
+  for (const list of [json?.buffers, json?.images]) {
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const uri = entry?.uri;
+      if (typeof uri !== "string" || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(uri)) {
+        continue;
+      }
+      let decoded = uri;
+      try {
+        decoded = decodeURIComponent(uri);
+      } catch {}
+      const steps = [...dir];
+      let outside = false;
+      for (const step of decoded.split("/")) {
+        if (step === "" || step === ".") continue;
+        if (step !== "..") steps.push(step);
+        else if (steps.length > 0) steps.pop();
+        else outside = true;
+      }
+      out.push({ path: outside ? decoded : steps.join("/"), outside });
+    }
+  }
+  return out;
+}
+
+/**
+ * The `.gltf` models in `map.json` whose `.bin` or image files are not in the
+ * folder, one error for each file. A model file that cannot be fetched or is
+ * not JSON is left alone: the view reports that when it loads the model.
+ */
+async function missingModelFiles(
+  manifest: ResolvedManifest,
+  urlFor: UrlFor,
+): Promise<HandmadeMapError[]> {
+  const errors: HandmadeMapError[] = [];
+  const seen = new Set<string>();
+  for (const [i, placed] of manifest.models.entries()) {
+    if (!("file" in placed.model)) continue;
+    const { file } = placed.model;
+    const url = urlFor(file);
+    if (url === undefined || !/\.gltf$/i.test(file)) continue;
+    let text: string;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      text = await response.text();
+    } catch {
+      continue;
+    }
+    for (const { path, outside } of gltfSiblings(text, file)) {
+      if (!outside && urlFor(path) !== undefined) continue;
+      const key = `${file}\0${path}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      errors.push({
+        code: "file-missing",
+        file: path,
+        message: outside
+          ? `${MANIFEST_FILE}: models[${i}] names the model "${file}", which points at "${path}" outside the map folder. Put the file in the folder and point at it there.`
+          : `${MANIFEST_FILE}: models[${i}] names the model "${file}", which needs the file "${path}", but the folder has no file with that name.`,
+      });
+    }
+  }
+  return errors;
 }
 
 /** Decode a folder's images and run the reader on it. */
@@ -232,7 +447,7 @@ async function readFolder(
     if (text !== undefined) scenarios[file] = text;
   }
 
-  return readHandmadeMap({
+  const read = readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
@@ -240,6 +455,12 @@ async function readFolder(
     scenarios,
     cache: traces,
   });
+  const modelErrors = await missingModelFiles(manifest, urlFor);
+  if (modelErrors.length === 0) return read;
+  return {
+    ok: false,
+    errors: [...(read.ok ? [] : read.errors), ...modelErrors],
+  };
 }
 
 /** The text of a file in a map folder, or undefined when it cannot be read. */
@@ -267,12 +488,61 @@ export async function loadHandmadeMap(id: string): Promise<HandmadeMapResult> {
         {
           code: "file-missing",
           file: MANIFEST_FILE,
-          message: `No hand-made map with the id "${id}" is installed.`,
+          message: `No hand-made map with the id "${id}" is installed, and no installed game carries one. A game update may have removed it.`,
         },
       ],
     };
   }
-  return readFolder(found.item.manifest, installedUrls(found.item));
+  if (found.item) return readFolder(found.manifest, installedUrls(found.item));
+  return readCarried(found.archive);
+}
+
+/**
+ * Read a map a game carries. Its files are read out of the archive first, so
+ * the reader gets URLs as it does for any other folder.
+ */
+async function readCarried(
+  carried: ArchiveMapItem,
+): Promise<HandmadeMapResult> {
+  const reader = archiveReader;
+  const { manifest, errors } = parseManifest(carried.manifest);
+  if (!manifest || !reader) return { ok: false, errors };
+  const wanted = new Set<string>([
+    manifest.files.provinces,
+    manifest.files.picture,
+    ...(manifest.files.heightmap === undefined
+      ? []
+      : [manifest.files.heightmap]),
+    ...[...manifest.provinces, ...manifest.locations].flatMap((l) =>
+      l.scenario === undefined ? [] : [l.scenario],
+    ),
+    ...manifest.models.flatMap((m) =>
+      "file" in m.model ? [m.model.file] : [],
+    ),
+  ]);
+  const urls = new Map<string, string>();
+  const failed: HandmadeMapError[] = [];
+  for (const file of wanted) {
+    // A file the folder lacks is left for the reader to report as missing.
+    if (!carried.files.includes(file)) continue;
+    const read = await reader.read(carried.game, carried.folder, file);
+    if (read.ok) urls.set(file, read.url);
+    else failed.push(read.error);
+  }
+  if (failed.length > 0) return { ok: false, errors: failed };
+  const read = await readFolder(carried.manifest, (file) => urls.get(file));
+  if (!read.ok) return read;
+  return {
+    ok: true,
+    doc: {
+      ...read.doc,
+      handmade: {
+        ...read.doc.handmade,
+        mapId: read.doc.id,
+        carriedBy: carried.game.name,
+      },
+    },
+  };
 }
 
 export type HandmadeImportResult =
@@ -309,6 +579,18 @@ export async function importHandmadeMap(
       urlsOf(staged.files, (file) => conquestMapStagingUrl(token, file)),
     );
     if (!read.ok) return { status: "invalid", errors: read.errors };
+    // A map a game carries cannot be replaced, so an import with its id would
+    // never be seen. The plugin refuses a bundled id the same way.
+    const { listed } = await listFolders();
+    const carried = listed.find(
+      (l) => l.summary.id === read.doc.id && l.summary.source === "game",
+    );
+    if (carried) {
+      return {
+        status: "refused",
+        message: `The game "${carried.summary.carriedBy}" carries a map with the id "${read.doc.id}", and a map a game carries cannot be replaced. Change the id in ${MANIFEST_FILE} and import it again.`,
+      };
+    }
 
     const { status, id } = await conquestMapCommit({
       token,

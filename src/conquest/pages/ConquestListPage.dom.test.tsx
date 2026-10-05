@@ -31,6 +31,7 @@ vi.mock("@picoframe/frame", async (orig) => ({
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ save: vi.fn() }));
 vi.mock("../../content/config", () => ({
+  useScanEpoch: () => 0,
   useUnitsyncScan: () => ({
     data: null,
     error: REASON,

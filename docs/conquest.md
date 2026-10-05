@@ -71,6 +71,9 @@ The schema (every field optional):
   "starNames":    ["Uros", "Ophvor", "..."],   // full system names, used first
   "starPrefixes": ["Al", "Bel", "Cyg"],         // syllables for synthesized names
   "starSuffixes": ["ara", "ion", "eth"],        // (used once starNames run out)
+  "placeNames":    ["Harrowgate", "..."],       // the same three, for Cities and Territories
+  "placePrefixes": ["Iron", "North"],           // (see "Land maps" below)
+  "placeSuffixes": ["coast", "march"],
   "factionNames": ["Sovereign Syndicate"],      // full names, if no `factions`
   "factions": [
     {
@@ -86,6 +89,7 @@ The schema (every field optional):
 How they're used when a galaxy is generated:
 
 - **System names** are drawn uniquely from `starNames` first (real star names by default), then synthesized from `starPrefixes` + `starSuffixes`.
+- **Land maps** (the Cities and Territories styles) name their locations from `placeNames`, then from `placePrefixes` + `placeSuffixes`. Each place field falls back to the matching star field, so a game that supplies only star names gets them on every style, as before. A game that supplies neither gets built-in composed place names such as "Ironcoast" and "Northmarch", drawn from a separate random stream so the names never change where anything is placed. Galaxy and Theatre maps keep using the star fields.
 - **Factions** come from `factions` presets, assigned in order with the player first. A preset wins for every field it sets; anything it omits falls back (colour to the palette, name to `factionNames` or a synthesized name). With no presets, `factionNames` (then synthesized names) supply the names and the built-in palette the colours.
 
 Merge order per field is **profile > catalog > built-in**; an empty array is treated as absent, so an override never blanks a pool.

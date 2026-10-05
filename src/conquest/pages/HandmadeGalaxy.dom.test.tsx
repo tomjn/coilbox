@@ -359,6 +359,39 @@ describe("resuming a conquest on a hand-made map", () => {
     expect(h.saveFor).not.toHaveBeenCalled();
   });
 
+  it("says a game update may have removed a map a game carried", () => {
+    h.result = {
+      ok: false,
+      errors: [
+        {
+          code: "file-missing",
+          file: "map.json",
+          message: `No hand-made map with the id "${ID}" is installed.`,
+        },
+      ],
+    } satisfies HandmadeMapResult;
+    h.listed = [];
+    const conquest = saved();
+    h.conquests = {
+      [ID]: {
+        ...conquest,
+        handmade: {
+          ...(conquest.handmade as NonNullable<ConquestState["handmade"]>),
+          carriedBy: "Test Game 1.0",
+        },
+      },
+    };
+    renderPage();
+    expect(
+      screen.getByText(
+        'The game Test Game 1.0 no longer carries the map "Two Shores". A game update may have removed it.',
+      ),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/It carries on if a game carries the map again\./),
+    ).toBeTruthy();
+  });
+
   it("lists the reader's reasons when the map can no longer be read", () => {
     h.result = {
       ok: false,

@@ -28,6 +28,7 @@ vi.mock("../../challenge/ChallengeRecordLine", () => ({
 vi.mock("../../content/config", () => ({
   useUnitsyncScan: () => ({ data: null, error: null, run: vi.fn() }),
   useUnitsyncUnitDataset: () => ({ dataset: null }),
+  useScanEpoch: () => 0,
 }));
 vi.mock("../../content/mapEligibility", () => ({
   useMapEligibility: () => ({ isExcluded: () => false }),

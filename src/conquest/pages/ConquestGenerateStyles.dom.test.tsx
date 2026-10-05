@@ -20,6 +20,7 @@ const h = vi.hoisted(() => ({
   drawerTitle: "",
   generated: [] as { id?: string; skin?: string; seed: number }[],
   saved: [] as { id: string; json: string }[],
+  onlyOwnMaps: [] as string[],
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -117,6 +118,7 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
   useHandmadeMaps: () => ({
     maps: [],
     unreadable: [],
+    onlyOwnMaps: h.onlyOwnMaps,
     loading: false,
     error: null,
   }),
@@ -190,6 +192,7 @@ beforeEach(() => {
   h.drawerContent = null;
   h.generated = [];
   h.saved = [];
+  h.onlyOwnMaps = [];
   vi.useFakeTimers();
 });
 afterEach(() => {
@@ -292,6 +295,31 @@ describe("Conquest generate form: order and wording", () => {
         screen.getByText("The same seed always builds the same map."),
       ).toBeTruthy();
     }
+  });
+});
+
+describe("Conquest generate form: a game that wants its own maps", () => {
+  it("offers no generated style and points at the game's maps", () => {
+    h.onlyOwnMaps = ["Cool Game v1"];
+    openForm();
+    expect(
+      screen.getByText(
+        "Cool Game v1 plays Conquest only on the maps the game carries. Pick one from the Conquest list.",
+      ),
+    ).toBeTruthy();
+    expect(headings()).not.toContain("Map style");
+    expect(document.querySelectorAll("select")).toHaveLength(0);
+  });
+
+  it("leaves the styles alone when another game asks for it", () => {
+    h.onlyOwnMaps = ["Some Other Game v3"];
+    openForm();
+    expect(optionLabels(selectOffering("galaxy"))).toEqual([
+      "Galaxy (starfield)",
+      "Theatre (flat chart)",
+      "Cities (roads across generated land)",
+      "Territories (provinces on generated land)",
+    ]);
   });
 });
 
