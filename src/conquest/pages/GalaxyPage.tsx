@@ -49,14 +49,20 @@ import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
 import { usePlacedModelSources } from "../galaxy3d/usePlacedModelSources";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
+import type { HandmadeConquestChallengeSettings } from "../handmade/challenge";
 import {
   blankLocations,
+  challengeBattles,
   type HandmadeConquestOptions,
   handmadeConquestDoc,
   newHandmadeConquest,
   pickBlankBattles,
   readHandmadeRun,
 } from "../handmade/conquest";
+import {
+  heldHandmadeChallenge,
+  releaseHandmadeChallenge,
+} from "../handmade/heldChallenge";
 import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
 import {
   drawsAsGalaxy,
@@ -68,6 +74,7 @@ import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
+import { readThreatLevel } from "../threat";
 import { finishedConquest, unlockedLevel } from "../unlocks";
 import { useAwardFinishedConquest, useConquestUnlocks } from "../useUnlocks";
 import { BattleOverlay } from "./components/BattleOverlay";
@@ -211,26 +218,70 @@ function HandmadeGalaxy({
   const map = result?.ok ? result.doc : undefined;
   const { unlocks } = useConquestUnlocks();
   const ceiling = map ? unlockedLevel(unlocks, map.game.shortname) : 0;
-  const threatLevel = Math.min(options.threatLevel, ceiling);
+
+  // A challenge imported for this map sets the choices in place of the player
+  // (see `../handmade/heldChallenge`). It applies only before a conquest
+  // exists, and only to the version of the map it was made on. The import
+  // checked that, and it is checked again here because the map can be replaced
+  // between the import and this visit.
+  const [held, setHeld] = useState(() => heldHandmadeChallenge(id));
+  const heldFits =
+    !held?.map.fingerprint ||
+    held.map.fingerprint === map?.handmade?.fingerprint;
+  const challenge = held && !saved && map && heldFits ? held : undefined;
+  const staleChallenge = Boolean(held && !saved && map && !heldFits);
+  const dropChallenge = () => {
+    releaseHandmadeChallenge(id);
+    setHeld(undefined);
+  };
+  // A challenge plays at its own level whatever the player has unlocked, so
+  // two players with one code face the same thing.
+  const threatLevel = challenge
+    ? readThreatLevel(challenge.threatLevel)
+    : Math.min(options.threatLevel, ceiling);
+  const chosen: HandmadeConquestOptions = challenge
+    ? {
+        seed: options.seed,
+        fogOfWar: challenge.fogOfWar === true,
+        threatLevel,
+        named: challenge.nodeMaps,
+      }
+    : { ...options, threatLevel };
 
   // A saved conquest keeps the battles it was given. Only a blank location it
-  // has no map for, one added to the map since, draws one now.
+  // has no map for, one added to the map since, draws one now. Before a
+  // conquest exists, a challenge's named battles are kept the same way, and
+  // the ones this install lacks are marked as stand-ins.
   const seed = saved?.seed ?? options.seed;
-  const battles = useMemo(
-    () => (map ? pickBlankBattles(map, maps, seed, run?.battles) : {}),
-    [map, maps, seed, run],
+  const named = challenge?.nodeMaps;
+  const fromChallenge = useMemo(
+    () => (map ? challengeBattles(map, maps, named) : undefined),
+    [map, maps, named],
   );
-  const fogOfWar = saved ? run?.fogOfWar : options.fogOfWar;
+  const battles = useMemo(
+    () =>
+      map
+        ? pickBlankBattles(map, maps, seed, run?.battles ?? fromChallenge?.kept)
+        : {},
+    [map, maps, seed, run, fromChallenge],
+  );
+  const fogOfWar = saved ? run?.fogOfWar : chosen.fogOfWar;
   const level = saved ? run?.threatLevel : threatLevel;
+  const substituted = saved ? run?.substituted : fromChallenge?.missing;
   const allMaps = scanData?.maps;
   const galaxy = useMemo(() => {
     if (!map) return undefined;
     return substituteExcludedMaps(
-      handmadeConquestDoc(map, { fogOfWar, threatLevel: level, battles }),
+      handmadeConquestDoc(map, {
+        fogOfWar,
+        threatLevel: level,
+        battles,
+        substituted,
+      }),
       allMaps ?? [],
       isExcluded,
     );
-  }, [map, fogOfWar, level, battles, allMaps, isExcluded]);
+  }, [map, fogOfWar, level, battles, substituted, allMaps, isExcluded]);
 
   // Save a battle drawn on this visit, so the location keeps it.
   const drawn = run
@@ -302,22 +353,62 @@ function HandmadeGalaxy({
       key={galaxy.id}
       galaxy={galaxy}
       handmade={{
-        fields: (
-          <HandmadeOptionFields
-            options={{ ...options, threatLevel }}
-            ceiling={ceiling}
-            onChange={setOptions}
-          />
+        fields: challenge ? (
+          <ChallengeSetupNote challenge={challenge} onDrop={dropChallenge} />
+        ) : (
+          <>
+            {staleChallenge && (
+              <p className="text-sm text-muted-foreground">
+                The challenge you imported was made on a different version of
+                this map, so its settings are not used here.
+              </p>
+            )}
+            <HandmadeOptionFields
+              options={chosen}
+              ceiling={ceiling}
+              onChange={setOptions}
+            />
+          </>
         ),
-        newState: (playerFactionId, playerSide) =>
-          newHandmadeConquest(
+        newState: (playerFactionId, playerSide) => {
+          // The conquest holds the challenge's choices from here on.
+          releaseHandmadeChallenge(id);
+          return newHandmadeConquest(
             map,
-            { ...options, threatLevel, playerFactionId, playerSide },
+            { ...chosen, playerFactionId, playerSide },
             maps,
-          ),
+          );
+        },
         onRestart: () => setOptions((o) => ({ ...o, seed: randomSeed() })),
       }}
     />
+  );
+}
+
+/**
+ * What the setup panel shows in place of the fields when an imported
+ * challenge has already made the choices.
+ */
+function ChallengeSetupNote({
+  challenge,
+  onDrop,
+}: {
+  challenge: HandmadeConquestChallengeSettings;
+  onDrop: () => void;
+}) {
+  const level = readThreatLevel(challenge.threatLevel);
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      <span className="font-medium">Imported challenge</span>
+      <p className="text-xs text-muted-foreground">
+        The challenge code sets this conquest up: fog of war is{" "}
+        {challenge.fogOfWar ? "on" : "off"} and the threat level is {level}.
+        Pick a faction and start.
+      </p>
+      <Button variant="outline" onClick={onDrop}>
+        Choose my own settings
+      </Button>
+    </div>
   );
 }
 
