@@ -153,6 +153,51 @@ pub fn is_running(pid: u32) -> bool {
     }
 }
 
+/// The bytes free to this user on the drive holding `path`, which must exist.
+///
+/// Lives here for the same reason as [`is_running`]: it asks the OS directly
+/// through `libc` and `windows-sys`, which this crate already carries.
+pub fn free_space(path: &std::path::Path) -> std::io::Result<u64> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let c_path = std::ffi::CString::new(path.as_os_str().as_bytes())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))?;
+        let mut stats: libc::statvfs = unsafe { std::mem::zeroed() };
+        if unsafe { libc::statvfs(c_path.as_ptr(), &mut stats) } != 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        // The field widths differ between macOS and Linux, so the casts are
+        // needed on one and redundant on the other.
+        #[allow(clippy::unnecessary_cast)]
+        Ok(stats.f_bavail as u64 * stats.f_frsize as u64)
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::ffi::OsStrExt;
+        use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+        let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+        let mut available: u64 = 0;
+        let ok = unsafe {
+            GetDiskFreeSpaceExW(
+                wide.as_ptr(),
+                &mut available,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(available)
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = path;
+        Err(std::io::Error::other("free space is unknown on this platform"))
+    }
+}
+
 /// Give `program` an owner execute bit when it has none at all.
 ///
 /// Coilbox extracts Recoil engine releases from `.7z`, and the crate that does it
@@ -300,6 +345,16 @@ mod liveness {
             "a finished process reading as running is what leaves a relay agent \
              waiting on an engine that ended minutes ago"
         );
+    }
+}
+
+#[cfg(test)]
+mod free_space_tests {
+    #[test]
+    fn free_space_reads_a_real_folder_and_refuses_a_missing_one() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(super::free_space(dir.path()).unwrap() > 0);
+        assert!(super::free_space(&dir.path().join("not-there")).is_err());
     }
 }
 
