@@ -88,7 +88,10 @@ vec4 gGlow = vec4(0.0);
   // The furthest from a road anything is drawn: the widest track, then its
   // glow or its worn verge.
   float gNeed = max(0.13, 0.75 * gFoot) + max(0.2, gFoot * 3.5);
-  if (gDist * uRoadReach < gNeed) {
+  // Towards the horizon a pixel spans so much ground that a road held to a
+  // pixel's width would cover it all, so roads fade out there instead.
+  float gFade = 1.0 - smoothstep(0.2, 0.4, gFoot);
+  if (gDist < 0.999 && gDist * uRoadReach < gNeed && gFade > 0.0) {
     // Which road this is, read without blending.
     ivec2 tc = clamp(ivec2(gUv * uRoadMaskSize), ivec2(0), ivec2(uRoadMaskSize) - 1);
     vec4 idx = texelFetch(uRoadMask, tc, 0);
@@ -125,14 +128,14 @@ vec4 gGlow = vec4(0.0);
       float hwE = max(hw, hwMin);
       float soft = max(hw * 0.3, gFoot * 0.7);
       float cover = 1.0 - smoothstep(hwE - soft, hwE + soft, d);
-      cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin));
+      cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin)) * gFade;
 
       vec3 track = surf < 0.5 ? mix(G_TRACK, G_GRAVEL, surf * 2.0) : mix(G_GRAVEL, G_PAVED, surf * 2.0 - 1.0);
       track *= 1.0 + grain * 0.35;
       // Worn ground beside the track, paler and drier than what grows there.
       float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover);
       vec3 worn = mix(albedo, track * 0.85 + albedo * 0.15, 0.35);
-      albedo = mix(albedo, worn, verge * 0.55 * tKeep(0.2, gFoot));
+      albedo = mix(albedo, worn, verge * 0.55 * tKeep(0.2, gFoot) * gFade);
       albedo = mix(albedo, track, cover * 0.95);
 
       // A slight cut: the ground falls into the track at its edges, so one
@@ -163,7 +166,7 @@ vec4 gGlow = vec4(0.0);
         } else if (mode > 2.5) {
           a = max(a, cover * 0.8);
         }
-        gGlow = vec4(pow(tone.rgb, vec3(2.2)), clamp(a * tone.a, 0.0, 1.0));
+        gGlow = vec4(pow(tone.rgb, vec3(2.2)), clamp(a * tone.a * gFade, 0.0, 1.0));
       }
     }
   }
