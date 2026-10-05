@@ -1,0 +1,139 @@
+import * as THREE from "three";
+import type { GalaxyDoc } from "../model";
+import {
+  type GroundShading,
+  ROAD_MODE,
+  ROAD_STATE_ROWS,
+  type RoadMode,
+} from "./groundShader";
+import { buildRoadMask, ROAD_REACH, type RoadLine } from "./roadMask";
+import { planRoads } from "./roadNetwork";
+import type { HeightGrid, TerrainSurface } from "./terrain";
+
+/**
+ * The textures that paint roads into a terrain map's ground, built once when
+ * the map is drawn, and the per-road state the shader reads from them. The
+ * routing and the mask are pure (`roadNetwork.ts`, `roadMask.ts`). This only
+ * puts them on the GPU and keeps the state texture current.
+ */
+
+/** How one road is drawn now. */
+export interface RoadStyle {
+  /** False hides the road altogether, as fog does. */
+  shown: boolean;
+  mode: RoadMode;
+  /** The state's colour. Not read for {@link ROAD_MODE.plain}. */
+  color: THREE.Color;
+  /** How strongly the state shows, 0 to 1. */
+  strength: number;
+  emphasised: boolean;
+}
+
+export interface GroundLayer {
+  shading: GroundShading;
+  /** The roads, in `roadLinks` order. */
+  roads: RoadLine[];
+  /** Restyle road `k`. Takes effect at {@link commit}. */
+  setRoadStyle: (k: number, style: RoadStyle) => void;
+  /** Send the road states to the GPU. */
+  commit: () => void;
+}
+
+const scratch = new THREE.Color();
+const byte = (v: number) => Math.round(Math.min(1, Math.max(0, v)) * 255);
+
+export function buildGroundLayer(
+  disposables: { dispose(): void }[],
+  galaxy: GalaxyDoc,
+  surface: TerrainSurface,
+  heights: HeightGrid | undefined,
+): GroundLayer {
+  const roads = planRoads(
+    galaxy,
+    surface.width,
+    surface.height,
+    surface.heightScale,
+    heights,
+  );
+  const mask = buildRoadMask(
+    roads,
+    surface.width,
+    surface.height,
+    surface.scale,
+  );
+  // The distances alone, one byte a texel, blended and mipmapped: the one read
+  // every pixel of the sheet makes. The whole mask is read only near a road.
+  const distances = new Uint8Array(mask.width * mask.height);
+  for (let t = 0; t < distances.length; t++) distances[t] = mask.data[t * 4];
+  const roadDistance = new THREE.DataTexture(
+    distances,
+    mask.width,
+    mask.height,
+    THREE.RedFormat,
+  );
+  roadDistance.flipY = false;
+  roadDistance.magFilter = THREE.LinearFilter;
+  roadDistance.minFilter = THREE.LinearMipmapLinearFilter;
+  roadDistance.generateMipmaps = true;
+  roadDistance.needsUpdate = true;
+  const roadMask = new THREE.DataTexture(
+    mask.data,
+    mask.width,
+    mask.height,
+    THREE.RGBAFormat,
+  );
+  roadMask.flipY = false;
+  roadMask.magFilter = THREE.NearestFilter;
+  roadMask.minFilter = THREE.NearestFilter;
+  roadMask.needsUpdate = true;
+
+  const columns = Math.max(1, roads.length);
+  const state = new Uint8Array(columns * ROAD_STATE_ROWS * 4);
+  // Every road starts drawn and plain.
+  for (let k = 0; k < columns; k++) state[(columns + k) * 4] = 255;
+  const roadState = new THREE.DataTexture(
+    state,
+    columns,
+    ROAD_STATE_ROWS,
+    THREE.RGBAFormat,
+  );
+  roadState.flipY = false;
+  roadState.magFilter = THREE.NearestFilter;
+  roadState.minFilter = THREE.NearestFilter;
+  roadState.needsUpdate = true;
+  disposables.push(roadDistance, roadMask, roadState);
+
+  return {
+    roads,
+    shading: {
+      roadDistance,
+      roadMask,
+      roadMaskSize: [mask.width, mask.height],
+      roadState,
+      roadReach: ROAD_REACH,
+      frame: new THREE.Vector4(
+        surface.worldWidth / 2,
+        surface.worldDepth / 2,
+        surface.worldWidth,
+        surface.worldDepth,
+      ),
+    },
+    setRoadStyle: (k, style) => {
+      if (k < 0 || k >= roads.length) return;
+      const top = k * 4;
+      scratch.copy(style.color).convertLinearToSRGB();
+      state[top] = byte(scratch.r);
+      state[top + 1] = byte(scratch.g);
+      state[top + 2] = byte(scratch.b);
+      state[top + 3] =
+        style.mode === ROAD_MODE.plain ? 0 : byte(style.strength);
+      const low = (columns + k) * 4;
+      state[low] = style.shown ? 255 : 0;
+      state[low + 1] = style.mode;
+      state[low + 2] = style.emphasised ? 255 : 0;
+    },
+    commit: () => {
+      roadState.needsUpdate = true;
+    },
+  };
+}

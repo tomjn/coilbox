@@ -1,4 +1,11 @@
 import * as THREE from "three";
+import {
+  GROUND_BODY,
+  GROUND_HEAD,
+  GROUND_LIT,
+  type GroundShading,
+  groundUniforms,
+} from "./groundShader";
 import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 
 /**
@@ -30,6 +37,8 @@ export interface TerrainShading {
    * Left out, nothing past the sheet is drawn and nothing is changed.
    */
   frame?: TerrainFrame;
+  /** Roads painted into the ground. See `groundShader.ts`. */
+  ground?: GroundShading;
 }
 
 /** The sheet's place in world units, and the haze past it. */
@@ -314,9 +323,13 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     spec = pow(max(dot(n, h), 0.0), 40.0) * 0.08 * sea * (1.0 - foam);
   }
 
+  // Roads (groundShader.ts), when the sheet has them.
+  GROUND_BODY_HERE
+
   float facing = max(dot(n, uTerrainSun), 0.0);
   float shade = uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing / uTerrainSun.y);
   vec3 lit = albedo * shade + spec;
+  GROUND_LIT_HERE
   if (terrainPast > 0.0) {
     // Past the edge the land turns a little greyer and darker, so the map
     // reads as the map, then everything hazes into the background until it
@@ -376,16 +389,24 @@ export function applyTerrainShader(
       value: new THREE.Vector3(...TERRAIN_SUN),
     };
     shader.uniforms.uTerrainAmbient = { value: SHADE_AMBIENT };
+    // Roads (groundShader.ts).
+    if (shading.ground) {
+      Object.assign(shader.uniforms, groundUniforms(shading.ground));
+    }
     shader.vertexShader = `${VERTEX_HEAD}${shader.vertexShader.replace(
       "#include <project_vertex>",
       `#include <project_vertex>\n${VERTEX_BODY}`,
     )}`;
-    shader.fragmentShader = `${FRAGMENT_HEAD}${BIOMES}${shader.fragmentShader.replace(
+    const body = FRAGMENT_BODY.replace(
+      "GROUND_BODY_HERE",
+      shading.ground ? GROUND_BODY : "",
+    ).replace("GROUND_LIT_HERE", shading.ground ? GROUND_LIT : "");
+    shader.fragmentShader = `${FRAGMENT_HEAD}${shading.ground ? GROUND_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
       "#include <color_fragment>",
-      `#include <color_fragment>\n${FRAGMENT_BODY}`,
+      `#include <color_fragment>\n${body}`,
     )}`;
   };
   // One program for every terrain with the same switches.
   material.customProgramCacheKey = () =>
-    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}`;
+    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}${shading.ground ? ":ground" : ""}`;
 }

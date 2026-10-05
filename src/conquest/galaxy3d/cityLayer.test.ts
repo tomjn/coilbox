@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
 import { NEUTRAL } from "../model";
 import { buildCityLayer } from "./cityLayer";
+import type { RoadStyle } from "./groundLayer";
+import { ROAD_MODE } from "./groundShader";
 import {
   createTerrainSurface,
   GALAXY_MAX_DISTANCE,
@@ -83,6 +85,17 @@ function build(labels = true) {
     galaxy.nodes.length,
   );
   const dims = { lane: 1, node: 1 };
+  // The ground the roads are painted on, recording each road's style.
+  const styles: RoadStyle[] = [];
+  let commits = 0;
+  const ground = {
+    setRoadStyle: (k: number, style: RoadStyle) => {
+      styles[k] = style;
+    },
+    commit: () => {
+      commits++;
+    },
+  };
   const layer = buildCityLayer(
     scene,
     disposables,
@@ -94,24 +107,13 @@ function build(labels = true) {
     () => dims.node,
     labelObjects,
     cores,
+    ground,
   );
   layer.apply();
   const groups = scene.children.filter(
     (c): c is THREE.Group => c instanceof THREE.Group,
   );
-  const roads = scene.getObjectByName("roads") as THREE.Mesh;
-  const roadColor = (road: number) => {
-    // The mesh has cells of 50 map units, so a road is sampled every 25. The
-    // first two roads are 50 long: 3 points, 6 vertices each.
-    const attr = roads.geometry.getAttribute("color");
-    const firstVertex = [0, 6, 12][road];
-    return [
-      attr.getX(firstVertex),
-      attr.getY(firstVertex),
-      attr.getZ(firstVertex),
-      attr.getW(firstVertex),
-    ];
-  };
+  const road = (k: number) => styles[k];
   const tops = groups.map(
     (g) =>
       ((g.children[0] as THREE.Mesh).material as THREE.MeshBasicMaterial[])[1],
@@ -126,8 +128,8 @@ function build(labels = true) {
     groups,
     tops,
     sidesOf,
-    roads,
-    roadColor,
+    road,
+    commits: () => commits,
     ownersRef,
     labelObjects,
     cores,
@@ -169,29 +171,28 @@ describe("buildCityLayer", () => {
     expect(groups[0].scale.x).toBeGreaterThan(groups[1].scale.x);
   });
 
-  it("recolours a marker and its roads when it changes hands", () => {
-    const { layer, tops, groups, sidesOf, roadColor, ownersRef } = build();
-    const red = new THREE.Color(RED);
-    const blue = new THREE.Color(BLUE);
+  it("edges a road in its owner's colour, and moves it when a city changes hands", () => {
+    const { layer, tops, groups, sidesOf, road, ownersRef, commits } = build();
     // west to mid shares red. mid to east does not share an owner.
-    expect(roadColor(0).slice(0, 3)).toEqual([red.r, red.g, red.b]);
-    expect(roadColor(1).slice(0, 3)).not.toEqual([blue.r, blue.g, blue.b]);
+    expect(road(0).mode).toBe(ROAD_MODE.edges);
+    expect(hex(road(0).color)).toBe(RED);
+    expect(road(1).mode).toBe(ROAD_MODE.plain);
     ownersRef.current = { mid: "blue" };
     layer.apply();
     expect(hex(tops[1].color)).toBe(BLUE);
     expect(sidesOf(groups[1])).toBe(6);
-    expect(roadColor(0).slice(0, 3)).not.toEqual([red.r, red.g, red.b]);
-    expect(roadColor(1).slice(0, 3)).toEqual([blue.r, blue.g, blue.b]);
+    expect(road(0).mode).toBe(ROAD_MODE.plain);
+    expect(road(1).mode).toBe(ROAD_MODE.edges);
+    expect(hex(road(1).color)).toBe(BLUE);
+    // Each restyle sends the states to the GPU once.
+    expect(commits()).toBe(2);
   });
 
-  it("draws a road from a point location to a province's anchor", () => {
-    const { roads, surface } = build();
-    const position = roads.geometry.getAttribute("position");
-    const last = position.count - 1;
-    const [x, , z] = surface.mapToWorld(50, 90);
-    // The last two vertices sit either side of the province's anchor.
-    expect((position.getX(last) + position.getX(last - 1)) / 2).toBeCloseTo(x);
-    expect((position.getZ(last) + position.getZ(last - 1)) / 2).toBeCloseTo(z);
+  it("styles a road from a point location to a province's anchor", () => {
+    const { road } = build();
+    // east and land share blue.
+    expect(road(2).mode).toBe(ROAD_MODE.edges);
+    expect(hex(road(2).color)).toBe(BLUE);
   });
 
   it("grows the selected marker and the hovered one", () => {
@@ -210,11 +211,17 @@ describe("buildCityLayer", () => {
   });
 
   it("fades roads with the lane dimming the view passes in", () => {
-    const { layer, roadColor, dims } = build();
-    const full = roadColor(1)[3];
+    const { layer, road, dims } = build();
+    const full = road(0).strength;
     dims.lane = 0.5;
     layer.apply();
-    expect(roadColor(1)[3]).toBeCloseTo(full * 0.5, 5);
+    expect(road(0).strength).toBeCloseTo(full * 0.5, 5);
+    // A plain road gains edges while an end is hovered.
+    expect(road(1).mode).toBe(ROAD_MODE.plain);
+    dims.lane = 1.6;
+    layer.apply();
+    expect(road(1).mode).toBe(ROAD_MODE.edges);
+    expect(road(1).strength).toBeGreaterThan(0);
   });
 
   it("holds marker size past the galaxy view's furthest zoom", () => {
@@ -257,7 +264,7 @@ describe("buildCityLayer", () => {
   });
 
   it("strips colour, shape, name and capital tier from a hidden location", () => {
-    const { layer, tops, groups, sidesOf, labelObjects, roadColor } = build();
+    const { layer, tops, groups, sidesOf, labelObjects, road } = build();
     layer.setLocationState("east", { hidden: true });
     layer.setLocationState("west", { hidden: true });
     layer.apply();
@@ -267,12 +274,12 @@ describe("buildCityLayer", () => {
     expect(groups[0].children[1].visible).toBe(false);
     // One hidden end leaves a road drawn. A road is gone when its state says
     // so, or when both of its ends are hidden.
-    expect(roadColor(1)[3]).toBeGreaterThan(0);
+    expect(road(1).shown).toBe(true);
     layer.setRoadState("east", "mid", { hidden: true });
     layer.setLocationState("mid", { hidden: true });
     layer.apply();
-    expect(roadColor(1)[3]).toBe(0);
-    expect(roadColor(0)[3]).toBe(0);
+    expect(road(1).shown).toBe(false);
+    expect(road(0).shown).toBe(false);
     // Clearing the states puts everything back without a rebuild.
     for (const id of ["east", "west", "mid"]) {
       layer.setLocationState(id, undefined);
@@ -283,24 +290,24 @@ describe("buildCityLayer", () => {
     expect(sidesOf(groups[2])).toBe(6);
     expect(labelObjects[2].visible).toBe(true);
     expect(groups[0].children[1].visible).toBe(true);
-    expect(roadColor(1)[3]).toBeGreaterThan(0);
+    expect(road(1).shown).toBe(true);
   });
 
   it("picks out attackable and emphasised locations and roads", () => {
-    const { layer, groups, roadColor } = build();
+    const { layer, groups, road } = build();
     const plain = groups[2].scale.x;
     const wall = (
       (groups[2].children[0] as THREE.Mesh)
         .material as THREE.MeshBasicMaterial[]
     )[0];
     const before = hex(wall.color);
-    const opacity = roadColor(1)[3];
     layer.setLocationState("east", { attackable: true, emphasised: true });
     layer.setRoadState("mid", "east", { attackable: true, emphasised: true });
     layer.apply();
     expect(hex(wall.color)).not.toBe(before);
     expect(groups[2].scale.x).toBeGreaterThan(plain);
-    expect(roadColor(1)[3]).toBeGreaterThan(opacity);
+    expect(road(1).mode).toBe(ROAD_MODE.glow);
+    expect(road(1).emphasised).toBe(true);
   });
 
   it("gives a location under incursion the warning colour, over the attack one", () => {
@@ -319,13 +326,10 @@ describe("buildCityLayer", () => {
   });
 
   it("draws a road already travelled in the path green", () => {
-    const { layer, roadColor } = build();
+    const { layer, road } = build();
     layer.setRoadState("west", "mid", { travelled: true });
     layer.apply();
-    const [r, g, b] = roadColor(0);
-    const green = new THREE.Color(0x46e08a);
-    expect(r).toBeCloseTo(green.r);
-    expect(g).toBeCloseTo(green.g);
-    expect(b).toBeCloseTo(green.b);
+    expect(road(0).mode).toBe(ROAD_MODE.filled);
+    expect(hex(road(0).color)).toBe("#46e08a");
   });
 });
