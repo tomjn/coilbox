@@ -21,6 +21,7 @@ import {
 import { memoryTraceCache } from "./cache";
 import { decodeRgba, imageSize } from "./decode";
 import type { HandmadeMapError } from "./errors";
+import { gltfSiblings } from "./gltf";
 import {
   MANIFEST_FILE,
   type MapManifest,
@@ -100,6 +101,7 @@ let archiveReader: ArchiveReader | null = null;
  * engine, so no game carries a map.
  */
 export function setArchiveTarget(target: ArchiveTarget | null): void {
+  archiveReader?.dispose();
   archiveTarget = target;
   archiveReader = target ? createArchiveReader(target) : null;
 }
@@ -145,6 +147,34 @@ export async function handmadeMapFileUrls(
   for (const item of items) {
     const urlFor = installedUrls(item);
     if (item.files.some((file) => urlFor(file) === imageUrl)) return urlFor;
+  }
+  return carriedModelUrls(imageUrl);
+}
+
+/**
+ * The same for a map a game carries, answering for the model files its
+ * `map.json` places. They are read out of the archive here, so the answer
+ * can be given at once. The reader read them when the map was opened, so
+ * this reads nothing again.
+ */
+async function carriedModelUrls(imageUrl: string): Promise<UrlFor | undefined> {
+  const reader = archiveReader;
+  if (!reader) return undefined;
+  for (const carried of (await reader.list()).items) {
+    const { manifest } = parseManifest(carried.manifest);
+    if (!manifest || !carried.files.includes(manifest.files.picture)) continue;
+    const { game, folder } = carried;
+    const picture = await reader.read(game, folder, manifest.files.picture);
+    if (!picture.ok || picture.url !== imageUrl) continue;
+    const urls = new Map<string, string>();
+    for (const placed of manifest.models) {
+      if (!("file" in placed.model)) continue;
+      const { file } = placed.model;
+      if (!carried.files.includes(file)) continue;
+      const read = await reader.read(game, folder, file);
+      if (read.ok) urls.set(file, read.url);
+    }
+    return (file) => urls.get(file);
   }
   return undefined;
 }
@@ -293,48 +323,6 @@ export async function listHandmadeMaps({
     onlyOwnMaps,
     ...(archiveError === undefined ? {} : { archiveError }),
   };
-}
-
-/**
- * The files a `.gltf` names beside itself, as paths in the map folder. A
- * `data:` uri holds its bytes inline and names nothing. A path that climbs out
- * of the folder is returned as the uri was written, with `outside` set.
- */
-function gltfSiblings(
-  gltf: string,
-  gltfFile: string,
-): { path: string; outside: boolean }[] {
-  let json: { buffers?: unknown; images?: unknown };
-  try {
-    json = JSON.parse(gltf);
-  } catch {
-    return [];
-  }
-  const dir = gltfFile.split("/").slice(0, -1);
-  const out: { path: string; outside: boolean }[] = [];
-  for (const list of [json?.buffers, json?.images]) {
-    if (!Array.isArray(list)) continue;
-    for (const entry of list) {
-      const uri = entry?.uri;
-      if (typeof uri !== "string" || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(uri)) {
-        continue;
-      }
-      let decoded = uri;
-      try {
-        decoded = decodeURIComponent(uri);
-      } catch {}
-      const steps = [...dir];
-      let outside = false;
-      for (const step of decoded.split("/")) {
-        if (step === "" || step === ".") continue;
-        if (step !== "..") steps.push(step);
-        else if (steps.length > 0) steps.pop();
-        else outside = true;
-      }
-      out.push({ path: outside ? decoded : steps.join("/"), outside });
-    }
-  }
-  return out;
 }
 
 /**

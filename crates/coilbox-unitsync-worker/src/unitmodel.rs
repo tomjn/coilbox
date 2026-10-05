@@ -62,6 +62,51 @@ const TEXTURE_CACHE_BUDGET: usize = 256 * 1024 * 1024;
 /// Where the engine looks for a unitdef's `objectname`.
 pub(crate) const MODEL_DIR: &str = "objects3d";
 
+/// The engine's base content archive (issue #3606). `CArchiveScanner` adds
+/// "Spring content v1", which is this file, as a dependency of every game, so
+/// it is mounted whenever a game is. It holds the default trees the base
+/// `treetype0` to `treetype15` features draw, and their textures.
+///
+/// The engine finds a model through the VFS in `SPRING_VFS_ZIP` order, which
+/// searches the game's own archives before base content. So it is only read
+/// for a name the game has no model for, and a game's own file of the same
+/// name still wins.
+pub(crate) const BASE_CONTENT_ARCHIVE: &str = "springcontent.sdz";
+
+/// An archive opened for reading models: its handle, its member listing as
+/// `(lower case, real)` pairs, and the `teamtex.txt` names it declares.
+pub(crate) struct ModelArchive {
+    pub name: String,
+    pub handle: i32,
+    pub list: Vec<(String, String)>,
+    pub teamtex: Vec<String>,
+}
+
+impl ModelArchive {
+    /// Open `name` for model reads, or `None` when unitsync cannot.
+    pub(crate) fn open(us: &Unitsync, name: &str) -> Option<Self> {
+        let handle = crate::archive::resolve_open_path(us, name)
+            .as_deref()
+            .and_then(|p| us.open_archive(p))?;
+        let list: Vec<(String, String)> = us
+            .list_archive_files(handle)
+            .into_iter()
+            .map(|(path, _)| (path.to_lowercase(), path))
+            .collect();
+        let teamtex = read_teamtex(us, handle, &list);
+        Some(ModelArchive {
+            name: name.to_string(),
+            handle,
+            list,
+            teamtex,
+        })
+    }
+
+    pub(crate) fn close(self, us: &Unitsync) {
+        us.close_archive(self.handle);
+    }
+}
+
 /// Model extensions tried for an `objectname` written without one, in the order
 /// the engine registers their parsers (`RegisterModelFormats` in
 /// `rts/Rendering/Models/IModelParser.cpp`). Order decides which file wins when
@@ -174,6 +219,7 @@ pub fn render(
     let palette = read_palette(&us);
     let key_base = cache_key_base(&us, game_archive, cache_dir);
     let cache = cache_dir.zip(key_base.as_deref());
+    let base = ModelArchive::open(&us, BASE_CONTENT_ARCHIVE);
     let mut out = read_model(
         &us,
         handle,
@@ -183,8 +229,12 @@ pub fn render(
         cache,
         game_archive,
         object_name,
+        base.as_ref(),
     );
 
+    if let Some(base) = base {
+        base.close(&us);
+    }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
     us.remove_all_archives();
@@ -201,6 +251,9 @@ pub fn render(
 /// are properties of the archive, not of a model, so a batch (issue #1684) pays
 /// for them once. `game_archive` is only used to say which archive a model is
 /// missing from.
+///
+/// `base` is the engine's base content. A name the game has no model for is
+/// read from there, model and textures both, as the engine would find it.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn read_model(
     us: &Unitsync,
@@ -211,7 +264,23 @@ pub(crate) fn read_model(
     cache: Option<(&Path, &str)>,
     game_archive: &str,
     object_name: &str,
+    base: Option<&ModelArchive>,
 ) -> UnitModelOutput {
+    if let Some(base) = base {
+        if read_from_base(list, &base.list, object_name) {
+            return read_model(
+                us,
+                base.handle,
+                &base.list,
+                &base.teamtex,
+                palette,
+                cache,
+                &base.name,
+                object_name,
+                None,
+            );
+        }
+    }
     let mut out = match find_model(list, object_name) {
         Some(path) => match us.read_archive_member(handle, &path, MODEL_READ_CAP) {
             Some((_, bytes)) => build(&path, &bytes, palette),
@@ -963,6 +1032,13 @@ fn find_model(list: &[(String, String)], object_name: &str) -> Option<String> {
     None
 }
 
+/// Whether `object_name` is read from base content rather than the game: the
+/// game has no model by that name and base content has one. The game is
+/// searched first, as the engine's VFS searches it first.
+fn read_from_base(game: &[(String, String)], base: &[(String, String)], object_name: &str) -> bool {
+    find_model(game, object_name).is_none() && find_model(base, object_name).is_some()
+}
+
 /// Formats the engine draws but coilbox does not read. It has a parser of its
 /// own for these rather than going through Assimp, so adding them here would be
 /// a second reader rather than another extension in [`MODEL_EXTS`].
@@ -1301,6 +1377,48 @@ mod tests {
             .iter()
             .map(|p| (p.to_lowercase(), p.to_string()))
             .collect()
+    }
+
+    /// What `springcontent.sdz` holds under `objects3d/` in engine 2026.07.04.
+    fn base_content() -> Vec<(String, String)> {
+        listing(&[
+            "objects3d/fir_tree_large.s3o",
+            "objects3d/fir_tree_medium.s3o",
+            "objects3d/fir_tree_small.s3o",
+            "objects3d/fir_tree_smallest.s3o",
+        ])
+    }
+
+    #[test]
+    fn a_model_only_base_content_has_is_read_from_there() {
+        let game = listing(&["objects3d/armcom.s3o"]);
+        assert!(read_from_base(
+            &game,
+            &base_content(),
+            "fir_tree_smallest.s3o"
+        ));
+        assert!(read_from_base(&game, &base_content(), "FIR_TREE_SMALLEST"));
+    }
+
+    #[test]
+    fn a_game_s_own_model_wins_over_base_content() {
+        let game = listing(&["objects3d/Features/fir_tree_smallest.s3o"]);
+        assert!(!read_from_base(
+            &game,
+            &base_content(),
+            "fir_tree_smallest.s3o"
+        ));
+        assert!(!read_from_base(
+            &listing(&["objects3d/armcom.s3o"]),
+            &base_content(),
+            "armcom"
+        ));
+    }
+
+    #[test]
+    fn a_name_neither_has_is_not_read_from_base_content() {
+        let game = listing(&["objects3d/armcom.s3o"]);
+        assert!(!read_from_base(&game, &base_content(), "pinetree"));
     }
 
     /// `CModelLoader::FindModelPath` (`rts/Rendering/Models/IModelParser.cpp`)

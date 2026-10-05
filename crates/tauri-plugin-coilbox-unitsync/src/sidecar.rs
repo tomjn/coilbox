@@ -768,21 +768,29 @@ pub fn build_archive_tree_args(lib: &str, datadir: &str, archive: &str) -> Vec<S
             archive: archive.into(),
             file: None,
             extract: None,
+            raw: false,
         })
         .to_args(),
     );
     args
 }
 
-/// Build args for `--archive` file (member preview) mode: the archive name
-/// plus the member's path within it.
-pub fn build_archive_file_args(lib: &str, datadir: &str, archive: &str, file: &str) -> Vec<String> {
+/// Build args for `--archive` file mode: the archive name plus the member's
+/// path within it. `raw` asks for the member's own bytes instead of a preview.
+pub fn build_archive_file_args(
+    lib: &str,
+    datadir: &str,
+    archive: &str,
+    file: &str,
+    raw: bool,
+) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::Archive(coilbox_unitsync_worker::ArchiveArgs {
             archive: archive.into(),
             file: Some(file.into()),
             extract: None,
+            raw,
         })
         .to_args(),
     );
@@ -844,6 +852,7 @@ pub fn build_archive_extract_args(
             archive: archive.into(),
             file: Some(file.into()),
             extract: Some(dest.into()),
+            raw: false,
         })
         .to_args(),
     );
@@ -1305,16 +1314,41 @@ mod tests {
                 archive: "Map.sd7".into(),
                 file: None,
                 extract: None,
+                raw: false,
             }
         );
 
-        let file = build_archive_file_args("/eng/libunitsync.so", "/data", "Map.sd7", "maps/x.smd");
+        let file = build_archive_file_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map.sd7",
+            "maps/x.smd",
+            false,
+        );
         assert_eq!(
             ArchiveArgs::from_args(&file).expect("valid argv"),
             ArchiveArgs {
                 archive: "Map.sd7".into(),
                 file: Some("maps/x.smd".into()),
                 extract: None,
+                raw: false,
+            }
+        );
+
+        let raw = build_archive_file_args(
+            "/eng/libunitsync.so",
+            "/data",
+            "Map.sd7",
+            "maps/x.glb",
+            true,
+        );
+        assert_eq!(
+            ArchiveArgs::from_args(&raw).expect("valid argv"),
+            ArchiveArgs {
+                archive: "Map.sd7".into(),
+                file: Some("maps/x.glb".into()),
+                extract: None,
+                raw: true,
             }
         );
 
@@ -1331,6 +1365,7 @@ mod tests {
                 archive: "Map.sd7".into(),
                 file: Some("maps/x.smd".into()),
                 extract: Some("/out/x.smd".into()),
+                raw: false,
             }
         );
     }
@@ -1391,7 +1426,20 @@ mod tests {
 
         let cases = [
             build_archive_tree_args("/no/such/libunitsync.so", "/tmp", "Map.sd7"),
-            build_archive_file_args("/no/such/libunitsync.so", "/tmp", "Map.sd7", "maps/x.smd"),
+            build_archive_file_args(
+                "/no/such/libunitsync.so",
+                "/tmp",
+                "Map.sd7",
+                "maps/x.smd",
+                false,
+            ),
+            build_archive_file_args(
+                "/no/such/libunitsync.so",
+                "/tmp",
+                "Map.sd7",
+                "maps/x.glb",
+                true,
+            ),
             build_archive_extract_args(
                 "/no/such/libunitsync.so",
                 "/tmp",
