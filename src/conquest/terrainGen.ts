@@ -309,15 +309,26 @@ function toSide(x: number, y: number, side: number): number {
 /**
  * Raise the land towards each open side, so a shape that leans towards it
  * runs off the map there instead of stopping short.
+ *
+ * Past the side the lift stops growing, so land drawn beyond the map (see
+ * {@link generateTerrainMargin}) carries on for a while and then meets a coast
+ * instead of running on for ever. Inside the map a point is bent by less than
+ * `warp` pixels, so it never reaches the cap and the map is unchanged by it.
  */
-function towardSides(mask: ShapeMask, open: number[], lift: number): ShapeMask {
+function towardSides(
+  mask: ShapeMask,
+  open: number[],
+  lift: number,
+  warp: number,
+): ShapeMask {
   if (open.length === 0) return mask;
   const reach = 0.3 * S;
+  const cap = 1 + warp / reach;
   return (x, y) => {
     let v = mask(x, y);
     for (const side of open) {
       const t = 1 - toSide(x, y, side) / reach;
-      if (t > 0) v += lift * t;
+      if (t > 0) v += lift * (t < cap ? t : cap);
     }
     return v;
   };
@@ -370,6 +381,7 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
           },
           open,
           1,
+          60,
         ),
         open,
         landShare: 0.36 + 0.07 * open.length,
@@ -532,6 +544,7 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
           (x, y) => Math.max(main(x, y), lobe(x, y)),
           open,
           1.2,
+          70,
         ),
         open,
         landShare: 0.34 + 0.09 * open.length,
@@ -661,6 +674,15 @@ const SEA_SHALLOW: Rgb = [70, 140, 170];
 const SEA_DEEP: Rgb = [24, 58, 96];
 /** Coast distance, in thirds of a pixel, at which the sea is fully deep. */
 const SEA_DEPTH = 108;
+/** Sea colours by distance from the coast, worked out once per value. */
+const SEA_RAMP = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
+  const depth = d / SEA_DEPTH;
+  return [
+    SEA_SHALLOW[0] + (SEA_DEEP[0] - SEA_SHALLOW[0]) * depth,
+    SEA_SHALLOW[1] + (SEA_DEEP[1] - SEA_SHALLOW[1]) * depth,
+    SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
+  ];
+});
 
 const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
   a[0] + (b[0] - a[0]) * t,
@@ -804,8 +826,107 @@ function quantile(values: Float64Array, share: number): number {
   return hi;
 }
 
+/**
+ * The elevation at a pixel centre `px`, `py`: the shape, bent by the
+ * coordinate noise `bx` and `by`, plus the fractal noise `baseValue`, pushed
+ * under the sea near each closed side. Past a closed side it falls ever
+ * deeper, so the sea beyond it stays sea.
+ */
+function elevationAt(
+  plan: ShapePlan,
+  closed: number[],
+  px: number,
+  py: number,
+  bx: number,
+  by: number,
+  baseValue: number,
+): number {
+  const wx = px + plan.warp * (bx - 0.5) * 2;
+  const wy = py + plan.warp * (by - 0.5) * 2;
+  let e = plan.mask(wx, wy) + plan.roughness * (baseValue - 0.5) * 2.8;
+  for (const side of closed) {
+    const edge = toSide(px, py, side);
+    if (edge < EDGE_MARGIN) {
+      const t = 1 - edge / EDGE_MARGIN;
+      e -= t * t * 4;
+    }
+  }
+  return e;
+}
+
+/**
+ * The heightmap byte for land `coastDist` thirds of a pixel from the coast,
+ * from 1 to 255, given the range, hill and ridge noise there.
+ */
+function landHeightByte(
+  coastDist: number,
+  rangeValue: number,
+  hillValue: number,
+  ridgeValue: number,
+): number {
+  // Rises from the coast and levels off inland.
+  const t = clamp01(coastDist / (3 * 40));
+  const inland = t * (2 - t);
+  // Ridges where the noise crosses its middle, gathered into ranges.
+  const r = 1 - Math.abs(ridgeValue - 0.5) * 2;
+  const ridge = r * r * r;
+  const range = clamp01((rangeValue - 0.47) * 4);
+  const h = clamp01(inland * (0.06 + 0.2 * hillValue + 0.75 * range * ridge));
+  return 1 + Math.floor(h * 254);
+}
+
+/**
+ * The colour of land at pixel `x`, `y` with height `h` from 0 to 1. Wetter
+ * near the coast, and warmer one way across the map by an amount the seed
+ * picks, so some maps run from tundra to dry land and others stay temperate.
+ * Height cools it further.
+ */
+function climateColour(
+  x: number,
+  y: number,
+  h: number,
+  coastDist: number,
+  wetValue: number,
+  warmValue: number,
+  warmth: Vec,
+  warmSpread: number,
+): Rgb {
+  const near = 1 - Math.min(1, coastDist / (3 * 30));
+  const wet = clamp01(0.5 + (wetValue - 0.5) * 2.4 + 0.15 * near);
+  const across = ((x - S / 2) * warmth[0] + (y - S / 2) * warmth[1]) / S;
+  const warm =
+    0.55 + across * warmSpread * 2 + (warmValue - 0.5) * 0.6 - h * 0.5;
+  return biomeColour(h, wet, clamp01((0.3 - warm) / 0.25));
+}
+
+/** What a build of the land needs again to draw land past the map's edge. */
+interface TerrainContext {
+  plan: ShapePlan;
+  closed: number[];
+  seeds: {
+    warpX: number;
+    warpY: number;
+    base: number;
+    ridge: number;
+    range: number;
+    hill: number;
+    wet: number;
+    warm: number;
+  };
+  warmth: Vec;
+  warmSpread: number;
+  seaLevel: number;
+}
+
 /** Build the land for a seed and a layout. */
 export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
+  return buildTerrain(opts).terrain;
+}
+
+function buildTerrain(opts: TerrainOptions): {
+  terrain: GeneratedTerrain;
+  context: TerrainContext;
+} {
   const rng = mulberry32(hashString(`terrain:${opts.seed >>> 0}`));
   const warpX = noiseSeed(rng);
   const warpY = noiseSeed(rng);
@@ -829,19 +950,16 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   for (let y = 0; y < S; y++) {
     const py = y + 0.5;
     for (let x = 0; x < S; x++) {
-      const px = x + 0.5;
-      const wx = px + plan.warp * (bendX[y * S + x] - 0.5) * 2;
-      const wy = py + plan.warp * (bendY[y * S + x] - 0.5) * 2;
-      let e =
-        plan.mask(wx, wy) + plan.roughness * (base[y * S + x] - 0.5) * 2.8;
-      for (const side of closed) {
-        const edge = toSide(px, py, side);
-        if (edge < EDGE_MARGIN) {
-          const t = 1 - edge / EDGE_MARGIN;
-          e -= t * t * 4;
-        }
-      }
-      elevation[y * S + x] = e;
+      const i = y * S + x;
+      elevation[i] = elevationAt(
+        plan,
+        closed,
+        x + 0.5,
+        py,
+        bendX[i],
+        bendY[i],
+        base[i],
+      );
     }
   }
   const seaLevel = quantile(elevation, 1 - plan.landShare);
@@ -894,43 +1012,32 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const heightmap = new Uint8Array(S * S);
   for (let i = 0; i < S * S; i++) {
     if (!land[i]) continue;
-    // Rises from the coast and levels off inland.
-    const t = clamp01(coastDistance[i] / (3 * 40));
-    const inland = t * (2 - t);
-    // Ridges where the noise crosses its middle, gathered into ranges.
-    const r = 1 - Math.abs(ridges[i] - 0.5) * 2;
-    const ridge = r * r * r;
-    const range = clamp01((ranges[i] - 0.47) * 4);
-    const hills = hillField[i];
-    const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
-    heightmap[i] = 1 + Math.floor(h * 254);
+    heightmap[i] = landHeightByte(
+      coastDistance[i],
+      ranges[i],
+      hillField[i],
+      ridges[i],
+    );
   }
 
-  // Climate, for colour alone. Wetter near the coast, and warmer one way
-  // across the map by an amount the seed picks, so some maps run from tundra
-  // to dry land and others stay temperate. Height cools it further.
+  // Climate, for colour alone.
   const wetField = coarseNoise(S, S, 130, wetSeed, 3);
   const warmField = coarseNoise(S, S, 160, warmSeed, 2);
   const landAt = (i: number): Rgb => {
     const x = i % S;
     const y = (i - x) / S;
-    const h = (heightmap[i] - 1) / 254;
-    const near = 1 - Math.min(1, coastDistance[i] / (3 * 30));
-    const wet = clamp01(0.5 + (wetField[i] - 0.5) * 2.4 + 0.15 * near);
-    const across = ((x - S / 2) * warmth[0] + (y - S / 2) * warmth[1]) / S;
-    const warm =
-      0.55 + across * warmSpread * 2 + (warmField[i] - 0.5) * 0.6 - h * 0.5;
-    return biomeColour(h, wet, clamp01((0.3 - warm) / 0.25));
+    return climateColour(
+      x,
+      y,
+      (heightmap[i] - 1) / 254,
+      coastDistance[i],
+      wetField[i],
+      warmField[i],
+      warmth,
+      warmSpread,
+    );
   };
-  // Sea colours by distance from the coast, worked out once per value.
-  const seaRamp = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
-    const depth = d / SEA_DEPTH;
-    return [
-      SEA_SHALLOW[0] + (SEA_DEEP[0] - SEA_SHALLOW[0]) * depth,
-      SEA_SHALLOW[1] + (SEA_DEEP[1] - SEA_SHALLOW[1]) * depth,
-      SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
-    ];
-  });
+  const seaRamp = SEA_RAMP;
   const beach = BEACH;
   const shallows = seaRamp[3];
   const image = new Uint8ClampedArray(S * S * 4);
@@ -969,15 +1076,34 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   }
 
   return {
-    width: S,
-    height: S,
-    mapWidth: TERRAIN_MAP_UNITS,
-    mapHeight: TERRAIN_MAP_UNITS,
-    heightScale: TERRAIN_HEIGHT_SCALE,
-    land,
-    heightmap,
-    image,
-    coastDistance,
+    terrain: {
+      width: S,
+      height: S,
+      mapWidth: TERRAIN_MAP_UNITS,
+      mapHeight: TERRAIN_MAP_UNITS,
+      heightScale: TERRAIN_HEIGHT_SCALE,
+      land,
+      heightmap,
+      image,
+      coastDistance,
+    },
+    context: {
+      plan,
+      closed,
+      seeds: {
+        warpX,
+        warpY,
+        base: baseSeed,
+        ridge: ridgeSeed,
+        range: rangeSeed,
+        hill: hillSeed,
+        wet: wetSeed,
+        warm: warmSeed,
+      },
+      warmth,
+      warmSpread,
+      seaLevel,
+    },
   };
 }
 
@@ -1002,4 +1128,325 @@ export function labelLandMasses(
     terrain.height,
   );
   return { labels, sizes };
+}
+
+/* ------------------------------------------------------------------------ */
+/* Land past the map's edge, for display only                               */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Map pixels per pixel of the margin. The margin fades out past the map's
+ * edge, so half the map's resolution is enough, and costs a quarter as much.
+ */
+export const MARGIN_SCALE = 2;
+/** The margin is a whole number of every noise lattice's step (4 and 2) and
+ * of {@link MARGIN_SCALE}, so the lattices line up with the map's. */
+const MARGIN_ALIGN = 4;
+
+/**
+ * The land beyond the map's edge, at {@link MARGIN_SCALE} map pixels to a
+ * pixel. Display only: nothing in play reads it, and unlike the map it does
+ * not have to be the same on every platform, though it uses the same noise.
+ */
+export interface TerrainMargin {
+  /** Map pixels it reaches past every side. */
+  margin: number;
+  /** Map pixels per pixel of it. */
+  scale: number;
+  /** Its pixels across and down, covering the map and the margin. */
+  width: number;
+  height: number;
+  /** RGBA colour, as the map's image. */
+  image: Uint8ClampedArray;
+  /** Height bytes, as the map's heightmap: sea 0, land 1 to 255. */
+  heightmap: Uint8Array;
+}
+
+/**
+ * {@link coarseNoise}'s field at any pixel, inside the map or past its edge.
+ * It measures the noise on the same lattice, every `step` pixels, so inside
+ * the map it gives the same values. `x` and `y` are pixel indices and may be
+ * fractional. The lattice is filled for pixels from `from` to `to`.
+ */
+function noiseSampler(
+  cell: number,
+  seed: number,
+  octaves: number,
+  step: number,
+  from: number,
+  to: number,
+): (x: number, y: number) => number {
+  const g0 = Math.floor(from / step) - 1;
+  const span = Math.floor(to / step) + 2 - g0 + 1;
+  const grid = new Float64Array(span * span);
+  for (let gy = 0; gy < span; gy++) {
+    for (let gx = 0; gx < span; gx++) {
+      grid[gy * span + gx] = fractalNoise(
+        ((gx + g0) * step + 0.5) / cell,
+        ((gy + g0) * step + 0.5) / cell,
+        seed,
+        octaves,
+      );
+    }
+  }
+  return (x, y) => {
+    const gx = Math.floor(x / step);
+    const gy = Math.floor(y / step);
+    const tx = (x - gx * step) / step;
+    const ty = (y - gy * step) / step;
+    const i = (gy - g0) * span + (gx - g0);
+    const top = grid[i] + (grid[i + 1] - grid[i]) * tx;
+    const bottom = grid[i + span] + (grid[i + span + 1] - grid[i + span]) * tx;
+    return top + (bottom - top) * ty;
+  };
+}
+
+/**
+ * Build the land for a seed and a layout, and the land around it for
+ * `marginPixels` map pixels past every side. The map is exactly what
+ * {@link generateTerrain} builds. The margin carries on the same noise and the
+ * same shape: land that runs off an open side keeps going for a while and may
+ * meet a coast, and the sea past a closed side stays sea. Land in the margin
+ * that joins no land on the map is sunk, so a land mass the map sank does not
+ * reappear just past its edge.
+ */
+export function generateTerrainWithMargin(
+  opts: TerrainOptions,
+  marginPixels: number,
+): { terrain: GeneratedTerrain; margin: TerrainMargin } {
+  const { terrain, context } = buildTerrain(opts);
+  const { plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
+  const k = MARGIN_SCALE;
+  const M = Math.ceil(marginPixels / MARGIN_ALIGN) * MARGIN_ALIGN;
+  const W = (S + 2 * M) / k;
+  const from = -M - 1;
+  const to = S + M + 1;
+  const bendX = noiseSampler(128, seeds.warpX, 4, 4, from, to);
+  const bendY = noiseSampler(128, seeds.warpY, 4, 4, from, to);
+  const base = noiseSampler(80, seeds.base, 5, 2, from, to);
+  const ranges = noiseSampler(170, seeds.range, 2, 4, from, to);
+  const hills = noiseSampler(40, seeds.hill, 3, 4, from, to);
+  const ridges = noiseSampler(80, seeds.ridge, 5, 2, from, to);
+  const wetField = noiseSampler(130, seeds.wet, 3, 4, from, to);
+  const warmField = noiseSampler(160, seeds.warm, 2, 4, from, to);
+
+  // A margin pixel covers k by k map pixels. Its sample point, as a fractional
+  // map pixel index, is the middle of them.
+  const at = (i: number) => -M + i * k + (k - 1) / 2;
+  const mapPixel = (i: number) => -M + i * k;
+  const insideAxis = (i: number) => mapPixel(i) >= 0 && mapPixel(i) < S;
+  const count = W * W;
+  const inside = new Uint8Array(count);
+  let land: Uint8Array = new Uint8Array(count);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (insideAxis(i) && insideAxis(j)) {
+        inside[o] = 1;
+        land[o] = terrain.land[mapPixel(j) * S + mapPixel(i)];
+        continue;
+      }
+      const x = at(i);
+      const y = at(j);
+      const e = elevationAt(
+        plan,
+        closed,
+        x + 0.5,
+        y + 0.5,
+        bendX(x, y),
+        bendY(x, y),
+        base(x, y),
+      );
+      land[o] = e > seaLevel ? 1 : 0;
+    }
+  }
+
+  // The map's own clean-up, on the margin only: the vote, then sink land that
+  // joins nothing on the map, then fill small lakes.
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(land);
+    for (let j = 0; j < W; j++) {
+      for (let i = 0; i < W; i++) {
+        const o = j * W + i;
+        if (inside[o]) continue;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          const jj = j + dy;
+          if (jj < 0 || jj >= W) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const ii = i + dx;
+            if (ii >= 0 && ii < W) n += land[jj * W + ii];
+          }
+        }
+        next[o] = n >= 5 ? 1 : 0;
+      }
+    }
+    land = next;
+  }
+  const masses = labelRegions(land, 1, W, W);
+  const joined = new Uint8Array(masses.sizes.length);
+  for (let o = 0; o < count; o++) {
+    if (inside[o] && masses.labels[o] >= 0) joined[masses.labels[o]] = 1;
+  }
+  for (let o = 0; o < count; o++) {
+    if (!inside[o] && land[o] && !joined[masses.labels[o]]) land[o] = 0;
+  }
+  const seas = labelRegions(land, 0, W, W);
+  const seaOnMap = new Uint8Array(seas.sizes.length);
+  for (let o = 0; o < count; o++) {
+    if (inside[o] && seas.labels[o] >= 0) seaOnMap[seas.labels[o]] = 1;
+  }
+  for (let o = 0; o < count; o++) {
+    const l = seas.labels[o];
+    if (
+      !inside[o] &&
+      l >= 0 &&
+      !seas.edge[l] &&
+      !seaOnMap[l] &&
+      seas.sizes[l] * k * k < MAX_LAKE
+    ) {
+      land[o] = 1;
+    }
+  }
+
+  // In thirds of a margin pixel, so k times as many thirds of a map pixel.
+  const coast = coastDistanceOf(land, W, W);
+  const heightmap = new Uint8Array(count);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (inside[o]) {
+        heightmap[o] = terrain.heightmap[mapPixel(j) * S + mapPixel(i)];
+      } else if (land[o]) {
+        const x = at(i);
+        const y = at(j);
+        heightmap[o] = landHeightByte(
+          coast[o] * k,
+          ranges(x, y),
+          hills(x, y),
+          ridges(x, y),
+        );
+      }
+    }
+  }
+  const image = new Uint8ClampedArray(count * 4);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (inside[o]) {
+        const m = (mapPixel(j) * S + mapPixel(i)) * 4;
+        image.set(terrain.image.subarray(m, m + 4), o * 4);
+        continue;
+      }
+      let rgb: Rgb;
+      let shade = 1;
+      if (land[o]) {
+        const x = at(i);
+        const y = at(j);
+        rgb = climateColour(
+          x,
+          y,
+          (heightmap[o] - 1) / 254,
+          coast[o] * k,
+          wetField(x, y),
+          warmField(x, y),
+          warmth,
+          warmSpread,
+        );
+        // Lit from the north west, as the map is. The neighbours are k map
+        // pixels apart, so the difference is k times the map's.
+        const nw = heightmap[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
+        const se =
+          heightmap[Math.min(W - 1, j + 1) * W + Math.min(W - 1, i + 1)];
+        shade = 1 + ((se - nw) * 0.03) / k;
+        shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
+      } else {
+        rgb = SEA_RAMP[Math.min(SEA_DEPTH, coast[o] * k)];
+      }
+      image[o * 4] = rgb[0] * shade;
+      image[o * 4 + 1] = rgb[1] * shade;
+      image[o * 4 + 2] = rgb[2] * shade;
+      image[o * 4 + 3] = 255;
+    }
+  }
+  return {
+    terrain,
+    margin: { margin: M, scale: k, width: W, height: W, image, heightmap },
+  };
+}
+
+/** The map and its margin as one picture and one set of heights. */
+export interface ExtendedTerrain {
+  /** Map pixels past every side, as in {@link TerrainMargin.margin}. */
+  margin: number;
+  /** Pixels across and down: the map's plus twice the margin. */
+  width: number;
+  height: number;
+  /** RGBA colour. */
+  image: Uint8ClampedArray;
+  /** Heights from 0 to 1, as a heightmap byte over 255. */
+  heights: Float32Array;
+}
+
+/**
+ * The map with its margin round it, at the map's resolution: the map's own
+ * pixels and heights exactly in the middle, and the margin blended up from its
+ * coarser pixels round them.
+ */
+export function extendTerrain(
+  terrain: Pick<GeneratedTerrain, "width" | "height" | "image" | "heightmap">,
+  margin: TerrainMargin,
+): ExtendedTerrain {
+  const M = margin.margin;
+  const k = margin.scale;
+  const w = terrain.width + 2 * M;
+  const h = terrain.height + 2 * M;
+  const image = new Uint8ClampedArray(w * h * 4);
+  const heights = new Float32Array(w * h);
+  const mw = margin.width;
+  const mh = margin.height;
+  for (let y = 0; y < h; y++) {
+    const my = y - M;
+    // Where this row falls among the margin's pixel centres.
+    const cy = Math.min(mh - 1, Math.max(0, (y - (k - 1) / 2) / k));
+    const y0 = Math.min(mh - 2, Math.floor(cy));
+    const fy = cy - y0;
+    for (let x = 0; x < w; x++) {
+      const mx = x - M;
+      const o = y * w + x;
+      if (mx >= 0 && mx < terrain.width && my >= 0 && my < terrain.height) {
+        const m = my * terrain.width + mx;
+        image.set(terrain.image.subarray(m * 4, m * 4 + 4), o * 4);
+        heights[o] = terrain.heightmap[m] / 255;
+        continue;
+      }
+      const cx = Math.min(mw - 1, Math.max(0, (x - (k - 1) / 2) / k));
+      const x0 = Math.min(mw - 2, Math.floor(cx));
+      const fx = cx - x0;
+      const a = y0 * mw + x0;
+      const b = a + 1;
+      const c = a + mw;
+      const d = c + 1;
+      const blend = (va: number, vb: number, vc: number, vd: number) => {
+        const top = va + (vb - va) * fx;
+        return top + (vc + (vd - vc) * fx - top) * fy;
+      };
+      for (let ch = 0; ch < 4; ch++) {
+        image[o * 4 + ch] = blend(
+          margin.image[a * 4 + ch],
+          margin.image[b * 4 + ch],
+          margin.image[c * 4 + ch],
+          margin.image[d * 4 + ch],
+        );
+      }
+      heights[o] =
+        blend(
+          margin.heightmap[a],
+          margin.heightmap[b],
+          margin.heightmap[c],
+          margin.heightmap[d],
+        ) / 255;
+    }
+  }
+  return { margin: M, width: w, height: h, image, heights };
 }

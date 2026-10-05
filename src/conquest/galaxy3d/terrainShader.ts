@@ -23,6 +23,25 @@ export interface TerrainShading {
   normals: THREE.Texture | null;
   /** Procedural texture by biome. On for a generated map only. */
   detail: boolean;
+  /**
+   * For a map drawn with land past its edge: the sheet the map fills. Past it
+   * the ground is greyed and darkened a little, so the map reads as the map
+   * and the rest as beyond it, and then hazes into `far` until it is gone.
+   * Left out, nothing past the sheet is drawn and nothing is changed.
+   */
+  frame?: TerrainFrame;
+}
+
+/** The sheet's place in world units, and the haze past it. */
+export interface TerrainFrame {
+  halfX: number;
+  halfZ: number;
+  width: number;
+  depth: number;
+  /** How far past the edge the haze is complete, in sheets. */
+  haze: number;
+  /** The colour the haze reaches, which is also the scene's background. */
+  far: THREE.Color;
 }
 
 const VERTEX_HEAD = /* glsl */ `
@@ -41,6 +60,9 @@ uniform float uTerrainRelief;
 uniform float uTerrainDetail;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
+uniform vec4 uTerrainFrame;
+uniform float uTerrainHaze;
+uniform vec3 uTerrainFar;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
 
@@ -149,7 +171,16 @@ const vec3 T_SNOW = vec3(240.0, 240.0, 240.0) / 255.0;
 `;
 
 const FRAGMENT_BODY = /* glsl */ `
-{
+// How far past the map's edge this pixel lies, in sheets. 0 on the map.
+float terrainPast = 0.0;
+if (uTerrainHaze > 0.0) {
+  vec2 past = max(abs(vTerrainPos.xz) - uTerrainFrame.xy, 0.0) / uTerrainFrame.zw;
+  terrainPast = length(past);
+}
+// Fully hazed ground is the background colour, so skip the work there.
+if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
+  diffuseColor.rgb = uTerrainFar;
+} else {
   vec4 nh = texture2D(uTerrainNormals, vTerrainUv);
   vec3 n = uTerrainRelief > 0.5 ? normalize(nh.xyz * 2.0 - 1.0) : vec3(0.0, 1.0, 0.0);
   vec3 albedo = diffuseColor.rgb;
@@ -244,7 +275,7 @@ const FRAGMENT_BODY = /* glsl */ `
     // Rock and scree, and any steep slope: broken, strongly lit stone.
     float r = max(wRock, steep);
     if (r > 0.02) {
-      vec3 stone = tField(vec2(p.x * 0.6, p.y) + 3.0, 0.5, 4, footprint);
+      vec3 stone = tField(p + 3.0, 0.5, 4, footprint);
       shadeMul += r * (stone.x * 0.6 + broad.x * 0.2);
       bump += r * stone.yz * 1.1;
       albedo = mix(albedo, pow(mix(T_ROCK, T_SCREE, 0.5 + broad.x), vec3(2.2)), steep * (1.0 - wSnow) * 0.85);
@@ -260,6 +291,9 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 wave = sea > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
     float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.15, 0.2, fine.x);
+    // Coasts past the edge are drawn at half the map's resolution, and foam
+    // traces their steps, so it thins out there.
+    foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
     vec2 landBump = bump;
     bump = mix(landBump, wave.yz * 0.05, sea);
     shadeMul = mix(shadeMul, 1.0 + wave.x * 0.1, sea);
@@ -275,7 +309,21 @@ const FRAGMENT_BODY = /* glsl */ `
 
   float facing = max(dot(n, uTerrainSun), 0.0);
   float shade = uTerrainAmbient + (1.0 - uTerrainAmbient) * (facing / uTerrainSun.y);
-  diffuseColor.rgb = albedo * shade + spec;
+  vec3 lit = albedo * shade + spec;
+  if (terrainPast > 0.0) {
+    // Past the edge the land turns a little greyer and darker, so the map
+    // reads as the map, then everything hazes into the background until it
+    // is gone. The change is spread over a third of the haze, since a quick
+    // one draws the very line at the edge it is meant to soften. The sea is
+    // left its colour, as a greyer sea is only a frame drawn on the water.
+    float beyond = smoothstep(0.0, uTerrainHaze / 3.0, terrainPast);
+    float landHere = smoothstep(0.35, 0.65, nh.a * 255.0);
+    float grey = dot(lit, vec3(0.2126, 0.7152, 0.0722));
+    lit = mix(lit, vec3(grey), 0.35 * beyond * landHere);
+    lit *= 1.0 - 0.12 * beyond * landHere;
+    lit = mix(lit, uTerrainFar, smoothstep(0.0, uTerrainHaze, terrainPast));
+  }
+  diffuseColor.rgb = lit;
 }
 `;
 
@@ -295,12 +343,25 @@ export function applyTerrainShader(
   );
   placeholder.needsUpdate = true;
   disposables.push(placeholder);
+  // Detail tells sea from land by the height the normals carry, so without
+  // them it would read every pixel as sea.
+  const detail = shading.detail && shading.normals !== null;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTerrainNormals = {
       value: shading.normals ?? placeholder,
     };
     shader.uniforms.uTerrainRelief = { value: shading.normals ? 1 : 0 };
-    shader.uniforms.uTerrainDetail = { value: shading.detail ? 1 : 0 };
+    shader.uniforms.uTerrainDetail = { value: detail ? 1 : 0 };
+    const frame = shading.frame;
+    shader.uniforms.uTerrainFrame = {
+      value: frame
+        ? new THREE.Vector4(frame.halfX, frame.halfZ, frame.width, frame.depth)
+        : new THREE.Vector4(),
+    };
+    shader.uniforms.uTerrainHaze = { value: frame ? frame.haze : 0 };
+    shader.uniforms.uTerrainFar = {
+      value: frame ? frame.far : new THREE.Color(),
+    };
     shader.uniforms.uTerrainSun = {
       value: new THREE.Vector3(...TERRAIN_SUN),
     };
@@ -316,5 +377,5 @@ export function applyTerrainShader(
   };
   // One program for every terrain with the same switches.
   material.customProgramCacheKey = () =>
-    `terrain:${shading.normals ? 1 : 0}:${shading.detail ? 1 : 0}`;
+    `terrain:${shading.normals ? 1 : 0}:${detail ? 1 : 0}`;
 }

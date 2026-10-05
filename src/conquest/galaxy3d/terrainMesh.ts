@@ -1,11 +1,14 @@
 import * as THREE from "three";
 import {
+  createMarginSurface,
   type HeightGrid,
+  type MarginSurface,
+  marginGeometry,
   type TerrainSurface,
   terrainNormalPixels,
   terrainTriangles,
 } from "./terrain";
-import { applyTerrainShader } from "./terrainShader";
+import { applyTerrainShader, type TerrainFrame } from "./terrainShader";
 
 /**
  * The terrain sheet as a three.js mesh: the map picture laid over a
@@ -66,24 +69,20 @@ export function terrainGeometry(surface: TerrainSurface): THREE.BufferGeometry {
 }
 
 /**
- * The most common colour among a picture's outermost pixels, as 0 to 255 per
- * channel. A generated map draws its deep sea in one exact colour, so wherever
- * sea meets the edge this is that sea, even when land runs off another side.
+ * The average colour of a picture's outermost ring of pixels, as 0 to 255 per
+ * channel. For a map drawn with land past its edge this is where the land
+ * beyond has hazed to, so it is the haze's colour and the scene's background.
  */
-export function edgeColor(pixels: ColorPixels): [number, number, number] {
+export function outerRingColor(pixels: ColorPixels): [number, number, number] {
   const { data, width, height } = pixels;
-  const counts = new Map<number, number>();
-  let best = 0;
-  let bestCount = 0;
+  const sum = [0, 0, 0];
+  let count = 0;
   const add = (x: number, y: number) => {
     const i = (y * width + x) * 4;
-    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
-    const n = (counts.get(key) ?? 0) + 1;
-    counts.set(key, n);
-    if (n > bestCount) {
-      best = key;
-      bestCount = n;
-    }
+    sum[0] += data[i];
+    sum[1] += data[i + 1];
+    sum[2] += data[i + 2];
+    count++;
   };
   for (let x = 0; x < width; x++) {
     add(x, 0);
@@ -93,137 +92,44 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
     add(0, y);
     if (width > 1) add(width - 1, y);
   }
-  return [(best >> 16) & 255, (best >> 8) & 255, best & 255];
-}
-
-/** Sheets the world beyond the map reaches past each edge. */
-const BEYOND_SHEETS = 1;
-/** Pixels of the picture each side of a point that the edge colour is
- * averaged over, so the world beyond shows the edge's colours but not its
- * detail. */
-const EDGE_BLUR = 24;
-/** How far past the edge, in sheets, the edge's colours fade into
- * {@link edgeColor}. */
-const BEYOND_FADE = 0.25;
-/** Pixels across and down the picture of the world beyond. */
-const BEYOND_PIXELS = 192;
-
-/**
- * A picture of the world beyond the map: `BEYOND_SHEETS` sheets past every
- * edge, with the map's own place in the middle. Past each edge it shows the
- * colours along that edge, blurred and fading into {@link edgeColor} further
- * out, so land that runs off the map trails off into the sea and sea carries
- * on as sea. It is as bright as the map, so no seam shows at the edge.
- */
-export function beyondPixels(pixels: ColorPixels): ColorPixels {
-  const { data, width, height } = pixels;
-  const far = edgeColor(pixels);
-  const at = (x: number, y: number, c: number) => data[(y * width + x) * 4 + c];
-  /**
-   * The edge colour nearest a point given in picture pixels, averaged along
-   * the edge only. Across an edge the blur stays on the edge pixel itself, so
-   * a lighter shallow just inside the map does not lighten the world beyond.
-   */
-  const edgeNear = (
-    x: number,
-    y: number,
-    acrossX: boolean,
-    acrossY: boolean,
-  ): [number, number, number] => {
-    const cx = Math.min(width - 1, Math.max(0, Math.floor(x)));
-    const cy = Math.min(height - 1, Math.max(0, Math.floor(y)));
-    const bx = acrossX ? 0 : EDGE_BLUR;
-    const by = acrossY ? 0 : EDGE_BLUR;
-    const sum = [0, 0, 0];
-    let n = 0;
-    for (let yy = cy - by; yy <= cy + by; yy++) {
-      if (yy < 0 || yy >= height) continue;
-      for (let xx = cx - bx; xx <= cx + bx; xx++) {
-        if (xx < 0 || xx >= width) continue;
-        for (let c = 0; c < 3; c++) sum[c] += at(xx, yy, c);
-        n++;
-      }
-    }
-    return [sum[0] / n, sum[1] / n, sum[2] / n];
-  };
-  const span = 2 * BEYOND_SHEETS + 1;
-  const out = new Uint8ClampedArray(BEYOND_PIXELS * BEYOND_PIXELS * 4);
-  for (let j = 0; j < BEYOND_PIXELS; j++) {
-    for (let i = 0; i < BEYOND_PIXELS; i++) {
-      // In sheets, with the map from 0 to 1.
-      const u = ((i + 0.5) / BEYOND_PIXELS) * span - BEYOND_SHEETS;
-      const v = ((j + 0.5) / BEYOND_PIXELS) * span - BEYOND_SHEETS;
-      const cu = Math.min(1, Math.max(0, u));
-      const cv = Math.min(1, Math.max(0, v));
-      const d = Math.sqrt((u - cu) * (u - cu) + (v - cv) * (v - cv));
-      const t = Math.min(1, d / BEYOND_FADE);
-      const edge = edgeNear(cu * width, cv * height, cu !== u, cv !== v);
-      const o = (j * BEYOND_PIXELS + i) * 4;
-      for (let c = 0; c < 3; c++) {
-        out[o + c] = edge[c] + (far[c] - edge[c]) * t;
-      }
-      out[o + 3] = 255;
-    }
-  }
-  return { data: out, width: BEYOND_PIXELS, height: BEYOND_PIXELS };
+  return [sum[0] / count, sum[1] / count, sum[2] / count];
 }
 
 /**
- * Draw {@link beyondPixels} round the sheet, so a generated land map does not
- * sit in the page's black and land that runs off the map is not cut off
- * against a flat sea. Further out still, the scene's background is the
- * colour the picture fades to.
+ * A generated map's picture and heights with land drawn past its edge, as
+ * `extendTerrain` builds them: the map's own in the middle, `margin` pixels
+ * round it.
  */
-function buildBeyond(
+export interface TerrainExtension {
+  image: ColorPixels;
+  heights: HeightGrid;
+  margin: number;
+}
+
+/**
+ * Draw the land past the sheet's edge with the sheet's own material, so the
+ * two are one surface with one shading. The ring meets the sheet at the
+ * sheet's edge vertices and never lies under or over it, so nothing is
+ * coplanar with the sea and the two never fight for depth.
+ */
+function buildMargin(
   scene: THREE.Scene,
   disposables: { dispose(): void }[],
   surface: TerrainSurface,
-  pixels: ColorPixels,
+  margin: MarginSurface,
+  mat: THREE.Material,
 ): void {
-  const span = 2 * BEYOND_SHEETS + 1;
-  const picture = beyondPixels(pixels);
-  const tex = new THREE.DataTexture(
-    picture.data,
-    picture.width,
-    picture.height,
-    THREE.RGBAFormat,
-  );
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.flipY = false;
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
-  const geo = new THREE.PlaneGeometry(
-    surface.worldWidth * span,
-    surface.worldDepth * span,
-  );
-  // The plane's own coordinates run bottom up and the picture top down.
-  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
-  for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
-  // Drawn first and kept out of the depth buffer, so the sheet always covers
-  // it. Any gap in depth between the two is below the buffer's precision at a
-  // far zoom, and the two fought there as dark streaks.
-  const mat = new THREE.MeshBasicMaterial({
-    map: tex,
-    depthTest: false,
-    depthWrite: false,
-  });
-  disposables.push(geo, mat, tex);
-  const plane = new THREE.Mesh(geo, mat);
-  plane.name = "beyond-the-map";
-  plane.renderOrder = -10;
-  plane.rotation.x = -Math.PI / 2;
-  // Decoration: picking goes to the sheet and what stands on it.
-  plane.raycast = () => {};
-  scene.add(plane);
-
-  const [r, g, b] = edgeColor(pixels);
-  scene.background = new THREE.Color().setRGB(
-    r / 255,
-    g / 255,
-    b / 255,
-    THREE.SRGBColorSpace,
-  );
+  const data = marginGeometry(surface, margin);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(data.positions, 3));
+  geo.setAttribute("uv", new THREE.BufferAttribute(data.uvs, 2));
+  geo.setIndex(new THREE.BufferAttribute(data.index, 1));
+  disposables.push(geo);
+  const ring = new THREE.Mesh(geo, mat);
+  ring.name = "terrain-margin";
+  // Decoration: picking goes to the map and what stands on it.
+  ring.raycast = () => {};
+  scene.add(ring);
 }
 
 function isColorPixels(source: TerrainColorSource): source is ColorPixels {
@@ -247,6 +153,10 @@ function isColorPixels(source: TerrainColorSource): source is ColorPixels {
  * picture comes as pixels, also gets procedural texture by biome unless
  * `detail` is off, as it is in performance mode. A hand-made map's painted
  * picture is left as its author drew it.
+ *
+ * `extension` draws a generated map's land on past its edge as one surface
+ * with the sheet, greyed a little past the edge and hazing into the scene's
+ * background.
  */
 export function buildTerrainMesh(
   scene: THREE.Scene,
@@ -256,18 +166,47 @@ export function buildTerrainMesh(
   renderRef: { current: (() => void) | null },
   heights?: HeightGrid,
   detail = true,
+  extension?: TerrainExtension,
 ): THREE.Mesh {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
   // lights to the few lit objects that expect them.
   const mat = new THREE.MeshBasicMaterial();
   disposables.push(geo, mat);
+
+  // With land past the edge, the picture and heights are the wider ones and
+  // the sheet's picture coordinates move into their middle.
+  const ext =
+    extension && heights && surface.maxHeight > 0 ? extension : undefined;
+  const margin = ext
+    ? createMarginSurface(surface, ext.heights, ext.margin)
+    : undefined;
+  if (ext && margin) {
+    const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
+    const across = ext.heights.width;
+    const down = ext.heights.height;
+    for (let i = 0; i < uv.count; i++) {
+      uv.setXY(
+        i,
+        (uv.getX(i) * margin.mapPixels + ext.margin) / across,
+        (uv.getY(i) * (down - 2 * ext.margin) + ext.margin) / down,
+      );
+    }
+  }
+
   let normals: THREE.DataTexture | null = null;
-  if (heights && surface.maxHeight > 0) {
+  const grid = ext ? ext.heights : heights;
+  if (grid && surface.maxHeight > 0) {
+    const span = margin
+      ? {
+          width: surface.worldWidth + 2 * margin.reachX,
+          depth: surface.worldDepth + 2 * margin.reachZ,
+        }
+      : undefined;
     normals = new THREE.DataTexture(
-      terrainNormalPixels(surface, heights),
-      heights.width,
-      heights.height,
+      terrainNormalPixels(surface, grid, span),
+      grid.width,
+      grid.height,
       THREE.RGBAFormat,
     );
     normals.flipY = false;
@@ -277,11 +216,36 @@ export function buildTerrainMesh(
     normals.needsUpdate = true;
     disposables.push(normals);
   }
+
+  let frame: TerrainFrame | undefined;
+  if (ext && margin) {
+    const [r, g, b] = outerRingColor(ext.image);
+    const far = new THREE.Color().setRGB(
+      r / 255,
+      g / 255,
+      b / 255,
+      THREE.SRGBColorSpace,
+    );
+    scene.background = far;
+    frame = {
+      halfX: surface.worldWidth / 2,
+      halfZ: surface.worldDepth / 2,
+      width: surface.worldWidth,
+      depth: surface.worldDepth,
+      // Hazed out by the time the margin ends, so its end never shows.
+      haze: Math.min(
+        margin.reachX / surface.worldWidth,
+        margin.reachZ / surface.worldDepth,
+      ),
+      far,
+    };
+  }
   applyTerrainShader(
     mat,
-    { normals, detail: detail && isColorPixels(color) },
+    { normals, detail: detail && isColorPixels(color), frame },
     disposables,
   );
+  if (margin) buildMargin(scene, disposables, surface, margin, mat);
 
   const applyTexture = (tex: THREE.Texture) => {
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -322,16 +286,16 @@ export function buildTerrainMesh(
   } else {
     let tex: THREE.Texture;
     if (isColorPixels(color)) {
+      const picture = ext ? ext.image : color;
       tex = new THREE.DataTexture(
-        color.data,
-        color.width,
-        color.height,
+        picture.data,
+        picture.width,
+        picture.height,
         THREE.RGBAFormat,
       );
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
-      buildBeyond(scene, disposables, surface, color);
     } else {
       tex = new THREE.CanvasTexture(color);
     }

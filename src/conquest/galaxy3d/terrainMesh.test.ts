@@ -1,44 +1,11 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
-import { beyondPixels, buildTerrainMesh, edgeColor } from "./terrainMesh";
-
-/** A 4 by 3 picture: the edge one colour, the middle another. */
-function framed(): { data: Uint8ClampedArray; width: number; height: number } {
-  const width = 4;
-  const height = 3;
-  const data = new Uint8ClampedArray(width * height * 4);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4;
-      const edge = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-      data.set(edge ? [24, 58, 96, 255] : [200, 200, 0, 255], i);
-    }
-  }
-  return { data, width, height };
-}
-
-describe("edgeColor", () => {
-  it("reads only the outermost pixels", () => {
-    expect(edgeColor(framed())).toEqual([24, 58, 96]);
-  });
-
-  it("is the sea when land runs off one side, not a blend with the land", () => {
-    // 8 by 8, sea everywhere except a column of land down the left edge.
-    const width = 8;
-    const height = 8;
-    const data = new Uint8ClampedArray(width * height * 4);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        data.set(
-          x === 0 ? [100, 160, 80, 255] : [24, 58, 96, 255],
-          (y * width + x) * 4,
-        );
-      }
-    }
-    expect(edgeColor({ data, width, height })).toEqual([24, 58, 96]);
-  });
-});
+import {
+  buildTerrainMesh,
+  outerRingColor,
+  type TerrainExtension,
+} from "./terrainMesh";
 
 /** A 64 by 64 picture, green land on the left half and blue sea on the right. */
 function halves(): { data: Uint8ClampedArray; width: number; height: number } {
@@ -56,63 +23,22 @@ function halves(): { data: Uint8ClampedArray; width: number; height: number } {
   return { data, width, height };
 }
 
-describe("beyondPixels", () => {
-  const beyond = beyondPixels(halves());
-  const px = (x: number, y: number) =>
-    Array.from(
-      beyond.data.slice(
-        (y * beyond.width + x) * 4,
-        (y * beyond.width + x) * 4 + 3,
-      ),
-    );
-  // The picture spans three sheets, so the map's own place is the middle third.
-  const third = beyond.width / 3;
-  const mid = Math.floor(beyond.height / 2);
-
-  it("carries land on past an edge where land meets it, and sea where sea does", () => {
-    const left = px(Math.floor(third) - 1, mid);
-    const right = px(Math.ceil(2 * third), mid);
-    expect(left[1]).toBeGreaterThan(left[2]);
-    expect(right[2]).toBeGreaterThan(right[1]);
-  });
-
-  it("starts as bright as the map, so no seam shows at the edge", () => {
-    // The sea half runs all the way to the right edge, so just past it the
-    // world beyond is the sea, under a twentieth of the way into its fade.
-    const sea = [24, 58, 96];
-    const far = edgeColor(halves());
-    const got = px(Math.ceil(2 * third), mid);
-    for (let c = 0; c < 3; c++) {
-      expect(Math.abs(got[c] - sea[c])).toBeLessThanOrEqual(
-        Math.abs(far[c] - sea[c]) / 20 + 1,
-      );
-    }
-  });
-
-  it("takes its colour from the edge itself, not from inside the map", () => {
-    // Sea at every edge and a lighter ring just inside, as round an island
-    // near the frame. The world beyond must match the deep sea at the edge.
-    const width = 64;
-    const height = 64;
+describe("outerRingColor", () => {
+  it("averages only the outermost pixels", () => {
+    // 4 by 3: the ring one colour, the middle another.
+    const width = 4;
+    const height = 3;
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const edge = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+        const ring = x === 0 || y === 0 || x === width - 1 || y === height - 1;
         data.set(
-          edge ? [24, 58, 96, 255] : [80, 140, 180, 255],
+          ring ? [24, 58, 96, 255] : [200, 200, 0, 255],
           (y * width + x) * 4,
         );
       }
     }
-    const ringed = beyondPixels({ data, width, height });
-    const o = (mid * ringed.width + Math.floor(third) - 1) * 4;
-    expect(Array.from(ringed.data.slice(o, o + 3))).toEqual([24, 58, 96]);
-  });
-
-  it("fades to the edge's most common colour far from the map", () => {
-    const far = edgeColor(halves());
-    expect(px(0, 0)).toEqual(far);
-    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(far);
+    expect(outerRingColor({ data, width, height })).toEqual([24, 58, 96]);
   });
 });
 
@@ -162,8 +88,10 @@ describe("the sheet's shader", () => {
     expect(build(painted, grid).customProgramCacheKey()).toBe("terrain:1:0");
   });
 
-  it("has no relief to light on a flat sheet", () => {
-    expect(build(halves()).customProgramCacheKey()).toBe("terrain:0:1");
+  it("has no relief or detail on a flat sheet", () => {
+    // Detail tells sea from land by the height, so with none it stays off
+    // rather than reading the whole map as sea.
+    expect(build(halves()).customProgramCacheKey()).toBe("terrain:0:0");
   });
 
   it("finds the places it patches in three.js's own shader", () => {
@@ -181,39 +109,108 @@ describe("the sheet's shader", () => {
   });
 });
 
-describe("the world beyond a generated sheet", () => {
-  const surface = createTerrainSurface({ width: 1024, height: 1024 }, 100);
+describe("a generated map with land past its edge", () => {
+  // A 4 by 4 map, rising west to east, inside a picture with 2 pixels round it.
+  const margin = 2;
+  const across = 8;
+  const mapGrid: HeightGrid = {
+    data: Float32Array.from({ length: 16 }, (_, i) => ((i % 4) + 1) / 10),
+    width: 4,
+    height: 4,
+  };
+  const extension: TerrainExtension = {
+    margin,
+    heights: {
+      data: Float32Array.from({ length: across * across }, (_, i) => {
+        const x = (i % across) - margin;
+        return Math.max(0, (x + 1) / 10);
+      }),
+      width: across,
+      height: across,
+    },
+    image: {
+      data: new Uint8ClampedArray(across * across * 4).fill(60),
+      width: across,
+      height: across,
+    },
+  };
+  const surface = createTerrainSurface(
+    { width: 90, height: 90, heightScale: 30 },
+    90,
+    mapGrid,
+  );
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
-  buildTerrainMesh(scene, disposables, surface, halves(), { current: null });
+  const sheet = buildTerrainMesh(
+    scene,
+    disposables,
+    surface,
+    halves(),
+    { current: null },
+    mapGrid,
+    true,
+    extension,
+  );
   for (const d of disposables) d.dispose();
-  const plane = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
+  const ring = scene.getObjectByName("terrain-margin") as THREE.Mesh;
 
-  it("is drawn before the sheet and never contests its depth", () => {
-    // A plane a little under the sea fought the sea for depth at a far zoom
-    // and showed through as dark lines across it.
-    const sheet = scene.getObjectByName("terrain") as THREE.Mesh;
-    const mat = plane.material as THREE.Material;
-    expect(mat.depthTest).toBe(false);
-    expect(mat.depthWrite).toBe(false);
-    expect(plane.renderOrder).toBeLessThan(sheet.renderOrder);
+  it("draws the land past the edge as a ring in the sheet's own material", () => {
+    expect(ring).toBeInstanceOf(THREE.Mesh);
+    expect(ring.material).toBe(sheet.material);
   });
 
-  it("reaches a sheet past every edge", () => {
-    expect(plane).toBeInstanceOf(THREE.Mesh);
-    const geo = plane.geometry as THREE.PlaneGeometry;
-    expect(geo.parameters.width).toBeCloseTo(surface.worldWidth * 3);
-    expect(geo.parameters.height).toBeCloseTo(surface.worldDepth * 3);
+  it("depth tests the ring like the sheet, since it never lies under it", () => {
+    const mat = ring.material as THREE.Material;
+    expect(mat.depthTest).toBe(true);
+    expect(mat.depthWrite).toBe(true);
   });
 
-  it("fills the rest with the colour the picture fades to", () => {
-    const [r, g, b] = edgeColor(halves());
+  it("leaves picking to the sheet", () => {
+    const hits: THREE.Intersection[] = [];
+    ring.raycast(new THREE.Raycaster(), hits);
+    expect(hits).toHaveLength(0);
+  });
+
+  it("moves the sheet's picture coordinates into the middle of the wider picture", () => {
+    const uv = sheet.geometry.getAttribute("uv") as THREE.BufferAttribute;
+    expect(uv.getX(0)).toBeCloseTo(margin / across);
+    expect(uv.getY(0)).toBeCloseTo(margin / across);
+    expect(uv.getX(uv.count - 1)).toBeCloseTo((margin + 4) / across);
+  });
+
+  it("hazes into the background by the time the land beyond ends", () => {
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.basic.vertexShader,
+      fragmentShader: THREE.ShaderLib.basic.fragmentShader,
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    (sheet.material as THREE.Material).onBeforeCompile(
+      shader,
+      {} as THREE.WebGLRenderer,
+    );
+    const u = shader.uniforms as Record<string, { value: unknown }>;
+    // Three map pixels span the 90 unit sheet, so two reach 60: two thirds.
+    expect(u.uTerrainHaze.value).toBeCloseTo(60 / 90);
+    expect((u.uTerrainFrame.value as THREE.Vector4).toArray()).toEqual([
+      45, 45, 90, 90,
+    ]);
+    expect(u.uTerrainFar.value).toBe(scene.background);
+  });
+
+  it("sets the background to the colour the land beyond hazes to", () => {
     const expected = new THREE.Color().setRGB(
-      r / 255,
-      g / 255,
-      b / 255,
+      60 / 255,
+      60 / 255,
+      60 / 255,
       THREE.SRGBColorSpace,
     );
     expect((scene.background as THREE.Color).equals(expected)).toBe(true);
+  });
+
+  it("draws nothing past the edge without an extension", () => {
+    const plain = new THREE.Scene();
+    buildTerrainMesh(plain, [], surface, halves(), { current: null }, mapGrid);
+    expect(plain.getObjectByName("terrain-margin")).toBeUndefined();
+    expect(plain.background).toBeNull();
   });
 });

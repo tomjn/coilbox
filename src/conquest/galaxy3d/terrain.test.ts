@@ -4,18 +4,22 @@ import {
   CAMERA_CLEARANCE,
   cameraFloorAt,
   clampPanToSheet,
+  createMarginSurface,
   createTerrainSurface,
   DEFAULT_HEIGHT_SCALE_FRACTION,
   type HeightGrid,
   heightGridFromPixels,
   layoutStrategicMap,
   MARKER_LIFT,
+  marginGeometry,
   sampleHeightGrid,
   TERRAIN_SUN,
   terrainCameraLimits,
+  terrainMarginPixels,
   terrainNormalPixels,
   terrainSpecOf,
   terrainTriangles,
+  VIEW_FOV_DEGREES,
 } from "./terrain";
 
 /** A 3 by 3 grid with a single peak in the middle. */
@@ -237,6 +241,137 @@ describe("terrainNormalPixels", () => {
     // North and west of the peak face the sun, south and east face away.
     expect(facing(1)).toBeGreaterThan(facing(7));
     expect(facing(3)).toBeGreaterThan(facing(5));
+  });
+});
+
+describe("terrainMarginPixels", () => {
+  it("covers half the furthest top-down view past the edge", () => {
+    // 28 locations: the sheet is playExtentFor(28) across and the furthest
+    // zoom is the galaxy view's 220, which beats the sheet's own fit.
+    const sheet = playExtentFor(28);
+    const reach = (220 * Math.tan((VIEW_FOV_DEGREES * Math.PI) / 360)) / sheet;
+    expect(terrainMarginPixels(28, 512)).toBe(Math.ceil(reach * 0.5 * 512));
+  });
+
+  it("reaches a smaller share of a large map, whose fit sets the zoom", () => {
+    expect(terrainMarginPixels(400, 512) / 512).toBeLessThan(
+      terrainMarginPixels(28, 512) / 512,
+    );
+  });
+});
+
+describe("the ground past the sheet's edge", () => {
+  // A 4 by 4 map with a 2 pixel margin, rising from west to east.
+  const margin = 2;
+  const across = 4 + 2 * margin;
+  const extended: HeightGrid = {
+    data: Float32Array.from(
+      { length: across * across },
+      (_, i) => (i % across) / (across - 1),
+    ),
+    width: across,
+    height: across,
+  };
+  const mapGrid: HeightGrid = {
+    data: Float32Array.from({ length: 16 }, (_, i) => {
+      const x = (i % 4) + margin;
+      return x / (across - 1);
+    }),
+    width: 4,
+    height: 4,
+  };
+  const s = createTerrainSurface(
+    { width: 90, height: 90, heightScale: 30 },
+    90,
+    mapGrid,
+  );
+  const m = createMarginSurface(s, extended, margin);
+
+  it("reads the sheet's own heights on the sheet", () => {
+    for (const [mx, my] of [
+      [0, 0],
+      [45, 20],
+      [90, 90],
+    ]) {
+      const [x, z] = s.mapToWorldXZ(mx, my);
+      expect(m.heightAtWorld(x, z)).toBeCloseTo(s.groundHeightAt(mx, my));
+    }
+  });
+
+  it("keeps the camera clear of hills past the edge", () => {
+    // A hill just past the east edge, higher than the sheet's edge there.
+    const hill: HeightGrid = {
+      data: Float32Array.from(extended.data, (v, i) =>
+        i % across === across - 1 ? 1 : v,
+      ),
+      width: across,
+      height: across,
+    };
+    const withHill = createMarginSurface(s, hill, margin);
+    const x = 45 + 60;
+    expect(cameraFloorAt(s, x, 0)).toBeCloseTo(
+      s.groundHeightAt(90, 45) + CAMERA_CLEARANCE,
+    );
+    expect(cameraFloorAt(s, x, 0, withHill)).toBeCloseTo(30 + CAMERA_CLEARANCE);
+  });
+
+  it("reaches the margin's pixels past every side", () => {
+    // Three map pixels span the 90 unit sheet, so two pixels reach 60.
+    expect(m.reachX).toBeCloseTo(60);
+    expect(m.reachZ).toBeCloseTo(60);
+    expect(m.heightAtWorld(-45 - 60, 0)).toBeCloseTo(0);
+  });
+
+  it("joins the sheet at its own edge vertices, with no cell over it", () => {
+    const geo = marginGeometry(s, m);
+    const at = (v: number) => Array.from(geo.positions.slice(v * 3, v * 3 + 3));
+    const count = geo.positions.length / 3;
+    // Every sheet edge vertex is in the ring, at the sheet's height.
+    const cols = s.segmentsX + 1;
+    for (let j = 0; j <= s.segmentsY; j++) {
+      for (let i = 0; i <= s.segmentsX; i++) {
+        if (i > 0 && i < s.segmentsX && j > 0 && j < s.segmentsY) continue;
+        const [x, z] = s.mapToWorldXZ(
+          (i / s.segmentsX) * s.width,
+          (j / s.segmentsY) * s.height,
+        );
+        const y = s.vertexHeights[j * cols + i];
+        let found = false;
+        for (let v = 0; v < count && !found; v++) {
+          const [px, py, pz] = at(v);
+          found =
+            Math.abs(px - x) < 1e-4 &&
+            Math.abs(pz - z) < 1e-4 &&
+            Math.abs(py - y) < 1e-6;
+        }
+        expect(found).toBe(true);
+      }
+    }
+    // No triangle's centre lies inside the sheet.
+    for (let t = 0; t < geo.index.length; t += 3) {
+      const [a, b, c] = [geo.index[t], geo.index[t + 1], geo.index[t + 2]];
+      const cx = (at(a)[0] + at(b)[0] + at(c)[0]) / 3;
+      const cz = (at(a)[2] + at(b)[2] + at(c)[2]) / 3;
+      expect(Math.abs(cx) < 45 && Math.abs(cz) < 45).toBe(false);
+    }
+    // And it reaches the margin's edge.
+    const xs = Array.from({ length: count }, (_, v) => at(v)[0]);
+    expect(Math.min(...xs)).toBeCloseTo(-45 - 60);
+    expect(Math.max(...xs)).toBeCloseTo(45 + 60);
+  });
+
+  it("places the sheet's corners on the map's pixels in the wider picture", () => {
+    const geo = marginGeometry(s, m);
+    const count = geo.positions.length / 3;
+    for (let v = 0; v < count; v++) {
+      const x = geo.positions[v * 3];
+      const z = geo.positions[v * 3 + 2];
+      if (Math.abs(x + 45) < 1e-4 && Math.abs(z + 45) < 1e-4) {
+        // The map starts `margin` pixels into a picture `across` wide.
+        expect(geo.uvs[v * 2]).toBeCloseTo(margin / across);
+        expect(geo.uvs[v * 2 + 1]).toBeCloseTo(margin / across);
+      }
+    }
   });
 });
 
