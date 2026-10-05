@@ -1129,3 +1129,324 @@ export function labelLandMasses(
   );
   return { labels, sizes };
 }
+
+/* ------------------------------------------------------------------------ */
+/* Land past the map's edge, for display only                               */
+/* ------------------------------------------------------------------------ */
+
+/**
+ * Map pixels per pixel of the margin. The margin fades out past the map's
+ * edge, so half the map's resolution is enough, and costs a quarter as much.
+ */
+export const MARGIN_SCALE = 2;
+/** The margin is a whole number of every noise lattice's step (4 and 2) and
+ * of {@link MARGIN_SCALE}, so the lattices line up with the map's. */
+const MARGIN_ALIGN = 4;
+
+/**
+ * The land beyond the map's edge, at {@link MARGIN_SCALE} map pixels to a
+ * pixel. Display only: nothing in play reads it, and unlike the map it does
+ * not have to be the same on every platform, though it uses the same noise.
+ */
+export interface TerrainMargin {
+  /** Map pixels it reaches past every side. */
+  margin: number;
+  /** Map pixels per pixel of it. */
+  scale: number;
+  /** Its pixels across and down, covering the map and the margin. */
+  width: number;
+  height: number;
+  /** RGBA colour, as the map's image. */
+  image: Uint8ClampedArray;
+  /** Height bytes, as the map's heightmap: sea 0, land 1 to 255. */
+  heightmap: Uint8Array;
+}
+
+/**
+ * {@link coarseNoise}'s field at any pixel, inside the map or past its edge.
+ * It measures the noise on the same lattice, every `step` pixels, so inside
+ * the map it gives the same values. `x` and `y` are pixel indices and may be
+ * fractional. The lattice is filled for pixels from `from` to `to`.
+ */
+function noiseSampler(
+  cell: number,
+  seed: number,
+  octaves: number,
+  step: number,
+  from: number,
+  to: number,
+): (x: number, y: number) => number {
+  const g0 = Math.floor(from / step) - 1;
+  const span = Math.floor(to / step) + 2 - g0 + 1;
+  const grid = new Float64Array(span * span);
+  for (let gy = 0; gy < span; gy++) {
+    for (let gx = 0; gx < span; gx++) {
+      grid[gy * span + gx] = fractalNoise(
+        ((gx + g0) * step + 0.5) / cell,
+        ((gy + g0) * step + 0.5) / cell,
+        seed,
+        octaves,
+      );
+    }
+  }
+  return (x, y) => {
+    const gx = Math.floor(x / step);
+    const gy = Math.floor(y / step);
+    const tx = (x - gx * step) / step;
+    const ty = (y - gy * step) / step;
+    const i = (gy - g0) * span + (gx - g0);
+    const top = grid[i] + (grid[i + 1] - grid[i]) * tx;
+    const bottom = grid[i + span] + (grid[i + span + 1] - grid[i + span]) * tx;
+    return top + (bottom - top) * ty;
+  };
+}
+
+/**
+ * Build the land for a seed and a layout, and the land around it for
+ * `marginPixels` map pixels past every side. The map is exactly what
+ * {@link generateTerrain} builds. The margin carries on the same noise and the
+ * same shape: land that runs off an open side keeps going for a while and may
+ * meet a coast, and the sea past a closed side stays sea. Land in the margin
+ * that joins no land on the map is sunk, so a land mass the map sank does not
+ * reappear just past its edge.
+ */
+export function generateTerrainWithMargin(
+  opts: TerrainOptions,
+  marginPixels: number,
+): { terrain: GeneratedTerrain; margin: TerrainMargin } {
+  const { terrain, context } = buildTerrain(opts);
+  const { plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
+  const k = MARGIN_SCALE;
+  const M = Math.ceil(marginPixels / MARGIN_ALIGN) * MARGIN_ALIGN;
+  const W = (S + 2 * M) / k;
+  const from = -M - 1;
+  const to = S + M + 1;
+  const bendX = noiseSampler(128, seeds.warpX, 4, 4, from, to);
+  const bendY = noiseSampler(128, seeds.warpY, 4, 4, from, to);
+  const base = noiseSampler(80, seeds.base, 5, 2, from, to);
+  const ranges = noiseSampler(170, seeds.range, 2, 4, from, to);
+  const hills = noiseSampler(40, seeds.hill, 3, 4, from, to);
+  const ridges = noiseSampler(80, seeds.ridge, 5, 2, from, to);
+  const wetField = noiseSampler(130, seeds.wet, 3, 4, from, to);
+  const warmField = noiseSampler(160, seeds.warm, 2, 4, from, to);
+
+  // A margin pixel covers k by k map pixels. Its sample point, as a fractional
+  // map pixel index, is the middle of them.
+  const at = (i: number) => -M + i * k + (k - 1) / 2;
+  const mapPixel = (i: number) => -M + i * k;
+  const insideAxis = (i: number) => mapPixel(i) >= 0 && mapPixel(i) < S;
+  const count = W * W;
+  const inside = new Uint8Array(count);
+  let land: Uint8Array = new Uint8Array(count);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (insideAxis(i) && insideAxis(j)) {
+        inside[o] = 1;
+        land[o] = terrain.land[mapPixel(j) * S + mapPixel(i)];
+        continue;
+      }
+      const x = at(i);
+      const y = at(j);
+      const e = elevationAt(
+        plan,
+        closed,
+        x + 0.5,
+        y + 0.5,
+        bendX(x, y),
+        bendY(x, y),
+        base(x, y),
+      );
+      land[o] = e > seaLevel ? 1 : 0;
+    }
+  }
+
+  // The map's own clean-up, on the margin only: the vote, then sink land that
+  // joins nothing on the map, then fill small lakes.
+  for (let pass = 0; pass < 2; pass++) {
+    const next = new Uint8Array(land);
+    for (let j = 0; j < W; j++) {
+      for (let i = 0; i < W; i++) {
+        const o = j * W + i;
+        if (inside[o]) continue;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          const jj = j + dy;
+          if (jj < 0 || jj >= W) continue;
+          for (let dx = -1; dx <= 1; dx++) {
+            const ii = i + dx;
+            if (ii >= 0 && ii < W) n += land[jj * W + ii];
+          }
+        }
+        next[o] = n >= 5 ? 1 : 0;
+      }
+    }
+    land = next;
+  }
+  const masses = labelRegions(land, 1, W, W);
+  const joined = new Uint8Array(masses.sizes.length);
+  for (let o = 0; o < count; o++) {
+    if (inside[o] && masses.labels[o] >= 0) joined[masses.labels[o]] = 1;
+  }
+  for (let o = 0; o < count; o++) {
+    if (!inside[o] && land[o] && !joined[masses.labels[o]]) land[o] = 0;
+  }
+  const seas = labelRegions(land, 0, W, W);
+  const seaOnMap = new Uint8Array(seas.sizes.length);
+  for (let o = 0; o < count; o++) {
+    if (inside[o] && seas.labels[o] >= 0) seaOnMap[seas.labels[o]] = 1;
+  }
+  for (let o = 0; o < count; o++) {
+    const l = seas.labels[o];
+    if (
+      !inside[o] &&
+      l >= 0 &&
+      !seas.edge[l] &&
+      !seaOnMap[l] &&
+      seas.sizes[l] * k * k < MAX_LAKE
+    ) {
+      land[o] = 1;
+    }
+  }
+
+  // In thirds of a margin pixel, so k times as many thirds of a map pixel.
+  const coast = coastDistanceOf(land, W, W);
+  const heightmap = new Uint8Array(count);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (inside[o]) {
+        heightmap[o] = terrain.heightmap[mapPixel(j) * S + mapPixel(i)];
+      } else if (land[o]) {
+        const x = at(i);
+        const y = at(j);
+        heightmap[o] = landHeightByte(
+          coast[o] * k,
+          ranges(x, y),
+          hills(x, y),
+          ridges(x, y),
+        );
+      }
+    }
+  }
+  const image = new Uint8ClampedArray(count * 4);
+  for (let j = 0; j < W; j++) {
+    for (let i = 0; i < W; i++) {
+      const o = j * W + i;
+      if (inside[o]) {
+        const m = (mapPixel(j) * S + mapPixel(i)) * 4;
+        image.set(terrain.image.subarray(m, m + 4), o * 4);
+        continue;
+      }
+      let rgb: Rgb;
+      let shade = 1;
+      if (land[o]) {
+        const x = at(i);
+        const y = at(j);
+        rgb = climateColour(
+          x,
+          y,
+          (heightmap[o] - 1) / 254,
+          coast[o] * k,
+          wetField(x, y),
+          warmField(x, y),
+          warmth,
+          warmSpread,
+        );
+        // Lit from the north west, as the map is. The neighbours are k map
+        // pixels apart, so the difference is k times the map's.
+        const nw = heightmap[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
+        const se =
+          heightmap[Math.min(W - 1, j + 1) * W + Math.min(W - 1, i + 1)];
+        shade = 1 + ((se - nw) * 0.03) / k;
+        shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
+      } else {
+        rgb = SEA_RAMP[Math.min(SEA_DEPTH, coast[o] * k)];
+      }
+      image[o * 4] = rgb[0] * shade;
+      image[o * 4 + 1] = rgb[1] * shade;
+      image[o * 4 + 2] = rgb[2] * shade;
+      image[o * 4 + 3] = 255;
+    }
+  }
+  return {
+    terrain,
+    margin: { margin: M, scale: k, width: W, height: W, image, heightmap },
+  };
+}
+
+/** The map and its margin as one picture and one set of heights. */
+export interface ExtendedTerrain {
+  /** Map pixels past every side, as in {@link TerrainMargin.margin}. */
+  margin: number;
+  /** Pixels across and down: the map's plus twice the margin. */
+  width: number;
+  height: number;
+  /** RGBA colour. */
+  image: Uint8ClampedArray;
+  /** Heights from 0 to 1, as a heightmap byte over 255. */
+  heights: Float32Array;
+}
+
+/**
+ * The map with its margin round it, at the map's resolution: the map's own
+ * pixels and heights exactly in the middle, and the margin blended up from its
+ * coarser pixels round them.
+ */
+export function extendTerrain(
+  terrain: Pick<GeneratedTerrain, "width" | "height" | "image" | "heightmap">,
+  margin: TerrainMargin,
+): ExtendedTerrain {
+  const M = margin.margin;
+  const k = margin.scale;
+  const w = terrain.width + 2 * M;
+  const h = terrain.height + 2 * M;
+  const image = new Uint8ClampedArray(w * h * 4);
+  const heights = new Float32Array(w * h);
+  const mw = margin.width;
+  const mh = margin.height;
+  for (let y = 0; y < h; y++) {
+    const my = y - M;
+    // Where this row falls among the margin's pixel centres.
+    const cy = Math.min(mh - 1, Math.max(0, (y - (k - 1) / 2) / k));
+    const y0 = Math.min(mh - 2, Math.floor(cy));
+    const fy = cy - y0;
+    for (let x = 0; x < w; x++) {
+      const mx = x - M;
+      const o = y * w + x;
+      if (mx >= 0 && mx < terrain.width && my >= 0 && my < terrain.height) {
+        const m = my * terrain.width + mx;
+        image.set(terrain.image.subarray(m * 4, m * 4 + 4), o * 4);
+        heights[o] = terrain.heightmap[m] / 255;
+        continue;
+      }
+      const cx = Math.min(mw - 1, Math.max(0, (x - (k - 1) / 2) / k));
+      const x0 = Math.min(mw - 2, Math.floor(cx));
+      const fx = cx - x0;
+      const a = y0 * mw + x0;
+      const b = a + 1;
+      const c = a + mw;
+      const d = c + 1;
+      const blend = (va: number, vb: number, vc: number, vd: number) => {
+        const top = va + (vb - va) * fx;
+        return top + (vc + (vd - vc) * fx - top) * fy;
+      };
+      for (let ch = 0; ch < 4; ch++) {
+        image[o * 4 + ch] = blend(
+          margin.image[a * 4 + ch],
+          margin.image[b * 4 + ch],
+          margin.image[c * 4 + ch],
+          margin.image[d * 4 + ch],
+        );
+      }
+      heights[o] =
+        blend(
+          margin.heightmap[a],
+          margin.heightmap[b],
+          margin.heightmap[c],
+          margin.heightmap[d],
+        ) / 255;
+    }
+  }
+  return { margin: M, width: w, height: h, image, heights };
+}
