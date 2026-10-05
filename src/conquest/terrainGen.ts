@@ -516,7 +516,7 @@ type Rgb = [number, number, number];
 /** Land colour by height, lowest first: beach, grass, forest, rock, scree, snow. */
 const LAND_RAMP: [number, Rgb][] = [
   [0, [214, 200, 150]],
-  [0.04, [118, 152, 82]],
+  [0.015, [118, 152, 82]],
   [0.3, [72, 112, 62]],
   [0.55, [122, 106, 90]],
   [0.85, [152, 146, 140]],
@@ -557,6 +557,64 @@ export function terrainPixelAt(
   const cx = Math.min(terrain.width - 1, Math.max(0, px));
   const cy = Math.min(terrain.height - 1, Math.max(0, py));
   return cy * terrain.width + cx;
+}
+
+/** How far the elevation is moved to agree with the mask at a pixel centre. */
+const NUDGE = 1e-6;
+/** Samples across and down a coast pixel when measuring its land cover. */
+const COVER_SAMPLES = 4;
+
+/**
+ * The share of a coast pixel above sea level, from 0 to 1, measured at a grid
+ * of points blended between pixel centres. -1 for a pixel whose eight
+ * neighbours are all on its own side of the coast.
+ */
+function coastCover(
+  elevation: Float64Array,
+  land: Uint8Array,
+  seaLevel: number,
+  x: number,
+  y: number,
+): number {
+  const me = land[y * S + x];
+  let mixed = false;
+  for (let dy = -1; dy <= 1 && !mixed; dy++) {
+    const yy = y + dy;
+    if (yy < 0 || yy >= S) continue;
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx;
+      if (xx >= 0 && xx < S && land[yy * S + xx] !== me) {
+        mixed = true;
+        break;
+      }
+    }
+  }
+  if (!mixed) return -1;
+  const at = (px: number, py: number) => {
+    // Pixel centres sit at whole numbers plus a half.
+    const gx = Math.min(S - 1.000001, Math.max(0, px - 0.5));
+    const gy = Math.min(S - 1.000001, Math.max(0, py - 0.5));
+    const ix = Math.floor(gx);
+    const iy = Math.floor(gy);
+    const fx = gx - ix;
+    const fy = gy - iy;
+    const i = iy * S + ix;
+    const top = elevation[i] + (elevation[i + 1] - elevation[i]) * fx;
+    const bottom =
+      elevation[i + S] + (elevation[i + S + 1] - elevation[i + S]) * fx;
+    return top + (bottom - top) * fy;
+  };
+  let above = 0;
+  for (let sy = 0; sy < COVER_SAMPLES; sy++) {
+    for (let sx = 0; sx < COVER_SAMPLES; sx++) {
+      const v = at(
+        x + (sx + 0.5) / COVER_SAMPLES,
+        y + (sy + 0.5) / COVER_SAMPLES,
+      );
+      if (v > seaLevel) above++;
+    }
+  }
+  return above / (COVER_SAMPLES * COVER_SAMPLES);
 }
 
 /** Each pixel becomes what at least five of the nine around it are. */
@@ -669,6 +727,15 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
 
   const coastDistance = coastDistanceOf(land, S, S);
 
+  // The elevation is smooth between pixel centres where the mask is a step.
+  // Nudge it to agree with the mask at every centre, which the vote, the
+  // sunk specks and the filled lakes changed, so its contour at sea level is
+  // a smooth line through the same pixels. The coast is drawn from that line.
+  for (let i = 0; i < elevation.length; i++) {
+    if (land[i] && elevation[i] <= seaLevel) elevation[i] = seaLevel + NUDGE;
+    if (!land[i] && elevation[i] > seaLevel) elevation[i] = seaLevel - NUDGE;
+  }
+
   const ranges = coarseNoise(S, S, 170, rangeSeed, 2);
   const hillField = coarseNoise(S, S, 40, hillSeed, 3);
   const ridges = coarseNoise(S, S, 80, ridgeSeed, 5, 2);
@@ -700,13 +767,25 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
     ];
   });
+  const beach = landRamp[1];
+  const shallows = seaRamp[3];
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const i = y * S + x;
       let rgb: Rgb;
       let shade = 1;
-      if (land[i]) {
+      const cover = coastCover(elevation, land, seaLevel, x, y);
+      if (cover >= 0) {
+        // A pixel the coast runs through: land and sea mixed by how much of
+        // the pixel lies above sea level.
+        const lnd = land[i] ? landRamp[heightmap[i]] : beach;
+        rgb = [
+          shallows[0] + (lnd[0] - shallows[0]) * cover,
+          shallows[1] + (lnd[1] - shallows[1]) * cover,
+          shallows[2] + (lnd[2] - shallows[2]) * cover,
+        ];
+      } else if (land[i]) {
         rgb = landRamp[heightmap[i]];
         // Lit from the north west: a slope rising to the south east is bright.
         const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
