@@ -7,14 +7,18 @@ import type { TerrainSurface } from "./terrain";
 import type { ColorPixels } from "./terrainMesh";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
+  anyTexelNear,
   buildableAt,
   buildTownIndex,
   clipRoads,
   farmableAt,
+  fieldCell,
   planTowns,
+  RIBBON_ROAD,
   roadEntries,
   TOWN_DATA_ROWS,
   type Town,
+  townCell,
   townDataTexels,
   townPatches,
   withStreets,
@@ -129,11 +133,52 @@ export function buildTownLayer(
   const stateTexture = exact(
     new THREE.DataTexture(state, columns, TOWN_STATE_ROWS, THREE.RGBAFormat),
   );
-  const patches = townPatches(towns, surface, PATCH_LIFT);
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.BufferAttribute(patches.positions, 3));
-  geo.setAttribute("town", new THREE.BufferAttribute(patches.town, 1));
-  geo.setIndex(new THREE.BufferAttribute(patches.index, 1));
+  // Each pass draws only the cells it can show anything on. Every pixel of a
+  // patch runs the shader's first reads before it can be thrown away, and
+  // over discs of the fields' whole reach that cost each pass up to 0.6 ms a
+  // frame (#3670).
+  const grid = { ...index, stride: 4 };
+  const roads = ground.shading.roadDistance.image as {
+    data: Uint8Array;
+    width: number;
+    height: number;
+  };
+  const roadGrid = { ...roads, stride: 1 };
+  const nearByte = (RIBBON_ROAD / ground.shading.roadReach) * 255;
+  const roadNear = (x: number, z: number, r: number) =>
+    anyTexelNear(
+      roadGrid,
+      surface.worldWidth,
+      surface.worldDepth,
+      x,
+      z,
+      r,
+      (at) => roads.data[at] <= nearByte,
+    );
+  const townCells = towns.map((t, k) =>
+    townCell(t, k, grid, surface.worldWidth, surface.worldDepth, roadNear),
+  );
+  const fieldCells = towns.map((t, k) =>
+    fieldCell(t, k, grid, surface.worldWidth, surface.worldDepth),
+  );
+  const patchGeometry = (
+    keep: (k: number, x: number, z: number, half: number) => boolean,
+  ) => {
+    const patches = townPatches(towns, surface, PATCH_LIFT, keep);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(patches.positions, 3),
+    );
+    geo.setAttribute("town", new THREE.BufferAttribute(patches.town, 1));
+    geo.setIndex(new THREE.BufferAttribute(patches.index, 1));
+    disposables.push(geo);
+    return geo;
+  };
+  const geometry = {
+    town: patchGeometry((k, x, z, half) => townCells[k](x, z, half)),
+    fields: patchGeometry((k, x, z, half) => fieldCells[k](x, z, half)),
+  };
   const shading = {
     index: indexTexture,
     indexSize: [index.width, index.height] as [number, number],
@@ -143,13 +188,13 @@ export function buildTownLayer(
     roadReach: ground.shading.roadReach,
     frame: ground.shading.frame,
   };
-  disposables.push(indexTexture, data, stateTexture, geo);
-  // The same patches twice: the fields first, under an owner's tint like
-  // the rest of the land, then the town over the tint.
+  disposables.push(indexTexture, data, stateTexture);
+  // The fields first, under an owner's tint like the rest of the land, then
+  // the town over the tint.
   for (const layer of ["fields", "town"] as const) {
     const mat = townMaterial(shading, layer);
     disposables.push(mat);
-    const mesh = new THREE.Mesh(geo, mat);
+    const mesh = new THREE.Mesh(geometry[layer], mat);
     mesh.name = layer === "town" ? "towns" : "fields";
     mesh.renderOrder = layer === "town" ? TOWN_ORDER : FIELD_ORDER;
     mesh.raycast = () => {};

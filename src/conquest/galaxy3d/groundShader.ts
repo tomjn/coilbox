@@ -18,8 +18,11 @@ import * as THREE from "three";
 
 /** What the terrain shader is given to draw roads. */
 export interface GroundShading {
-  /** The road mask's distances alone, blended between texels. */
-  roadDistance: THREE.Texture;
+  /**
+   * The road mask's distances alone, blended between texels. One byte a
+   * texel, so the town layer reads the same distances on the CPU.
+   */
+  roadDistance: THREE.DataTexture;
   /** The whole road mask, `roadMask.ts`, read texel by texel. */
   roadMask: THREE.Texture;
   roadMaskSize: [number, number];
