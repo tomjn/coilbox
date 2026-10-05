@@ -24,6 +24,8 @@ pub const MANIFEST_FILE: &str = "map.json";
 /// A 4096 by 4096 image is 64 MiB as raw RGBA, and its PNG is smaller than
 /// that, so three images fit in 192 MiB. The rest is left for glTF models,
 /// which the manifest reserves a key for. Revisit once authors have made maps.
+/// `RAW_CAP` in the unitsync worker's `archive.rs` is the same number, for one
+/// file of a map a game carries. Change both together.
 pub const MAX_UNPACKED_BYTES: u64 = 256 * 1024 * 1024;
 
 /// The most entries a zip may hold, counting the ones that are skipped. A guess

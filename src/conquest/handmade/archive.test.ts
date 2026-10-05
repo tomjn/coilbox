@@ -1,3 +1,4 @@
+import { resolveObjectURL } from "node:buffer";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -8,7 +9,8 @@ import { decodePng } from "./png.testhelper";
  * Maps a game archive carries (issue #3511), read through a fake unitsync.
  * The fake answers the way the worker does: a tree of member paths, text for
  * text members up to 512 KB, a data URL for images up to 8 MB, and nothing
- * but a kind for anything else. Lookups ignore case, as unitsync's do.
+ * but a kind for anything else. A raw read returns any member's bytes up to
+ * 256 MB. Lookups ignore case, as unitsync's do.
  */
 
 const hoisted = vi.hoisted(() => ({
@@ -36,38 +38,52 @@ vi.mock("../../content/bindings", () => ({
 vi.mock("../../content/config", () => ({ currentScan: hoisted.scan }));
 
 // The webview decodes through a canvas. Here an image URL is a data URL the
-// fake unitsync made, or a protocol URL into the sample folder.
+// fake unitsync made, a blob URL the reader made, or a protocol URL into the
+// sample folder.
 const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
-const pixelsOf = (url: string) =>
+/** The bytes behind a blob URL, or undefined once it is revoked. */
+const blobBytes = async (url: string) => {
+  const blob = resolveObjectURL(url);
+  return blob && Buffer.from(await blob.arrayBuffer());
+};
+const pixelsOf = async (url: string) =>
   decodePng(
     url.startsWith("data:")
       ? Buffer.from(url.slice(url.indexOf(",") + 1), "base64")
-      : readFileSync(
-          `${SAMPLE}${decodeURIComponent(url.split("/").at(-1) ?? "")}`,
-        ),
+      : url.startsWith("blob:")
+        ? ((await blobBytes(url)) ?? Buffer.alloc(0))
+        : readFileSync(
+            `${SAMPLE}${decodeURIComponent(url.split("/").at(-1) ?? "")}`,
+          ),
   );
 vi.mock("./decode", () => ({
   decodeRgba: async (url: string) => pixelsOf(url),
   imageSize: async (url: string) => {
-    const { width, height } = pixelsOf(url);
+    const { width, height } = await pixelsOf(url);
     return { width, height };
   },
 }));
 
-// A data URL is fetched as the webview would. A protocol URL into an
-// imported folder is read from the sample folder.
+// A data URL or a blob URL is fetched as the webview would. A protocol URL
+// into an imported folder is read from the sample folder.
 const realFetch = globalThis.fetch;
-vi.stubGlobal("fetch", async (url: string) => {
-  if (url.startsWith("data:")) return realFetch(url);
+const fetchText = async (url: string) => {
+  if (url.startsWith("data:")) return (await realFetch(url)).text();
+  if (url.startsWith("blob:")) return (await blobBytes(url))?.toString("utf8");
   const file = decodeURIComponent(url.split("/").at(-1) ?? "");
-  const text = readFileSync(`${SAMPLE}${file}`, "utf8");
+  return readFileSync(`${SAMPLE}${file}`, "utf8");
+};
+vi.stubGlobal("fetch", async (url: string) => {
+  const text = await fetchText(url);
+  if (text === undefined) throw new TypeError("Failed to fetch");
   return { ok: true, text: async () => text };
 });
 
 const { parseArchiveIndex } = await import("./archive");
 const {
+  handmadeMapFileUrls,
   importHandmadeMap,
   listHandmadeMaps,
   loadHandmadeMap,
@@ -76,18 +92,15 @@ const {
 const { handmadeRun, readHandmadeRun } = await import("./conquest");
 
 const sample = (file: string) => readFileSync(`${SAMPLE}${file}`);
-/** The sample manifest without its model: models are not read from archives. */
-const MANIFEST = (() => {
-  const json = JSON.parse(sample("map.json").toString("utf8"));
-  delete json.models;
-  return JSON.stringify(json);
-})();
+/** The whole sample map, its model included. */
+const MANIFEST = sample("map.json").toString("utf8");
 const SAMPLE_FILES: Record<string, Buffer> = {
   "map.json": Buffer.from(MANIFEST),
   "picture.png": sample("picture.png"),
   "provinces.png": sample("provinces.png"),
   "heightmap.png": sample("heightmap.png"),
   "ironcoast-siege.json": sample("ironcoast-siege.json"),
+  "cairn.gltf": sample("cairn.gltf"),
 };
 
 /** Every archive the fake unitsync can open: name, then path to bytes. */
@@ -95,8 +108,17 @@ let archives: Record<string, Record<string, Buffer>> = {};
 
 const TEXT_CAP = 512 * 1024;
 const IMAGE_CAP = 8 * 1024 * 1024;
+const RAW_CAP = 256 * 1024 * 1024;
 
-function fakeFile({ archive, file }: { archive: string; file: string }) {
+function fakeFile({
+  archive,
+  file,
+  raw,
+}: {
+  archive: string;
+  file: string;
+  raw?: boolean;
+}) {
   const members = archives[archive] ?? {};
   const key = Object.keys(members).find(
     (p) => p.toLowerCase() === file.toLowerCase(),
@@ -112,6 +134,17 @@ function fakeFile({ archive, file }: { archive: string; file: string }) {
   const bytes = members[key];
   const ext = file.split(".").at(-1)?.toLowerCase();
   const size = bytes.length;
+  if (raw) {
+    return size > RAW_CAP
+      ? { kind: "binary", size, truncated: true, errors: [] }
+      : {
+          kind: "binary",
+          dataUrl: `data:application/octet-stream;base64,${bytes.toString("base64")}`,
+          size,
+          truncated: false,
+          errors: [],
+        };
+  }
   if (ext === "json") {
     return size > TEXT_CAP
       ? { kind: "binary", size, truncated: true, errors: [] }
@@ -196,7 +229,8 @@ beforeEach(() => {
     errors: [],
   }));
   hoisted.file.mockImplementation(
-    async (args: { archive: string; file: string }) => fakeFile(args),
+    async (args: { archive: string; file: string; raw?: boolean }) =>
+      fakeFile(args),
   );
   hoisted.discard.mockResolvedValue({});
   setArchiveTarget(TARGET);
@@ -383,44 +417,108 @@ describe("reading a map a game carries", () => {
     );
   });
 
-  it("says a model file cannot be read from a game archive", async () => {
+  it("reads the sample's model and gives the 3D view its URL", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    const image = result.doc.terrain?.image;
+    if (!image) throw new Error("the map has a picture");
+    const urlFor = await handmadeMapFileUrls(image);
+    const url = urlFor?.("cairn.gltf");
+    expect(url).toMatch(/^blob:/);
+    expect(await fetchText(url ?? "")).toBe(
+      sample("cairn.gltf").toString("utf8"),
+    );
+    expect(urlFor?.("picture.png")).toBeUndefined();
+    // The model is read raw, and the preview is never asked for it.
+    expect(hoisted.file).toHaveBeenCalledWith(
+      expect.objectContaining({
+        file: "coilbox/maps/two-shores/cairn.gltf",
+        raw: true,
+      }),
+    );
+  });
+
+  it("reads the sample's model from a packaged .sdz", async () => {
+    archives = { "tg-1.0.sdz": carrying("two-shores") };
+    games = [game("Test Game 1.0", "tg-1.0.sdz", "1.0")];
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    const urlFor = await handmadeMapFileUrls(result.doc.terrain?.image ?? "");
+    expect(urlFor?.("cairn.gltf")).toMatch(/^blob:/);
+  });
+
+  /** The sample with its model as a `.gltf` whose buffer is in `bin`. */
+  const withBuffer = (extra: Record<string, Buffer> = {}) => {
     const json = JSON.parse(MANIFEST);
-    json.models = [{ model: { file: "cairn.gltf" }, pos: [440, 600] }];
+    json.models = [{ model: { file: "models/tower.gltf" }, pos: [440, 600] }];
+    const gltf = {
+      asset: { version: "2.0" },
+      buffers: [{ uri: "tower%20data.bin", byteLength: 4 }],
+    };
+    return carrying("two-shores", {
+      ...SAMPLE_FILES,
+      "map.json": Buffer.from(JSON.stringify(json)),
+      "models/tower.gltf": Buffer.from(JSON.stringify(gltf)),
+      ...extra,
+    });
+  };
+
+  it("points a .gltf's buffer at the buffer read from the archive", async () => {
     archives = {
-      "tg-1.0.sdd": carrying("two-shores", {
-        ...SAMPLE_FILES,
-        "map.json": Buffer.from(JSON.stringify(json)),
-        "cairn.gltf": sample("cairn.gltf"),
+      "tg-1.0.sdd": withBuffer({
+        "models/tower data.bin": Buffer.from([1, 2, 3, 4]),
       }),
     };
     const result = await loadHandmadeMap("sample-two-shores");
-    expect(result).toEqual({
-      ok: false,
-      errors: [
-        {
-          code: "archive-unreadable",
-          file: "cairn.gltf",
-          message:
-            '"cairn.gltf" is in the game archive, but coilbox cannot read model files from a game archive yet. Leave models out of a map the game carries.',
-        },
-      ],
-    });
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    const urlFor = await handmadeMapFileUrls(result.doc.terrain?.image ?? "");
+    const gltf = JSON.parse(
+      (await fetchText(urlFor?.("models/tower.gltf") ?? "")) ?? "",
+    );
+    const bin = gltf.buffers[0].uri;
+    expect(bin).toMatch(/^blob:/);
+    expect([...((await blobBytes(bin)) ?? [])]).toEqual([1, 2, 3, 4]);
   });
 
-  it("says an image is too large to read from a game archive", async () => {
-    archives = {
-      "tg-1.0.sdd": carrying("two-shores", {
-        ...SAMPLE_FILES,
-        "picture.png": Buffer.alloc(IMAGE_CAP + 1),
-      }),
-    };
+  it("reports a .gltf's buffer the folder lacks as missing", async () => {
+    archives = { "tg-1.0.sdd": withBuffer() };
     const result = await loadHandmadeMap("sample-two-shores");
     expect(result).toMatchObject({
       ok: false,
-      errors: [{ code: "archive-unreadable", file: "picture.png" }],
+      errors: [{ code: "file-missing", file: "models/tower data.bin" }],
+    });
+  });
+
+  it("reads an image over the preview's 8 MB as raw bytes", async () => {
+    const big = Buffer.concat([
+      sample("picture.png"),
+      Buffer.alloc(IMAGE_CAP + 1 - sample("picture.png").length),
+    ]);
+    archives = {
+      "tg-1.0.sdd": carrying("two-shores", {
+        ...SAMPLE_FILES,
+        "picture.png": big,
+      }),
+    };
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.doc.terrain?.image).toMatch(/^blob:/);
+  });
+
+  it("says a file over the raw cap is too large", async () => {
+    hoisted.file.mockImplementation(
+      async (args: { archive: string; file: string; raw?: boolean }) =>
+        args.raw && args.file.endsWith("cairn.gltf")
+          ? { kind: "binary", size: RAW_CAP + 1, truncated: true, errors: [] }
+          : fakeFile(args),
+    );
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toMatchObject({
+      ok: false,
+      errors: [{ code: "archive-unreadable", file: "cairn.gltf" }],
     });
     if (result.ok) return;
-    expect(result.errors[0].message).toMatch(/too large/);
+    expect(result.errors[0].message).toMatch(/larger than 256 MB/);
   });
 
   it("leaves a file the folder lacks for the reader to report", async () => {
@@ -472,6 +570,16 @@ describe("reading the archives again", () => {
     expect((await listHandmadeMaps()).maps[0].title).toBe(
       "Two Shores, revised",
     );
+  });
+
+  it("revokes the blob URLs of a reader that is replaced", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error("should read");
+    const urlFor = await handmadeMapFileUrls(result.doc.terrain?.image ?? "");
+    const url = urlFor?.("cairn.gltf") ?? "";
+    expect(await blobBytes(url)).toBeDefined();
+    setArchiveTarget(TARGET);
+    expect(await blobBytes(url)).toBeUndefined();
   });
 
   it("drops a map a game update removed", async () => {
