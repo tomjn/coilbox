@@ -2,11 +2,13 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { useScanEpoch } from "../../content/config";
 import { createDocumentStore } from "../../lib/documentStore";
 import { usePreferredTarget } from "../../play/config";
-import type { ArchiveTarget } from "./archive";
+import type { GameItem } from "../../content/bindings";
+import { type ArchiveTarget, archiveGameOf } from "./archive";
 import {
   type HandmadeMapList,
   type HandmadeMapSummary,
   listHandmadeMaps,
+  listHandmadeMapsForGame,
   loadHandmadeMap,
   setArchiveTarget,
 } from "./library";
@@ -135,6 +137,60 @@ export function useHandmadeMaps() {
     error,
     refresh,
   };
+}
+
+/** What a form needs to know about one game's own maps. */
+type GameMapFacts = Pick<HandmadeMapList, "maps" | "onlyOwnMaps">;
+
+const NO_FACTS: GameMapFacts = { maps: [], onlyOwnMaps: [] };
+
+/**
+ * The hand-made maps for one game and whether it asks for its own maps only,
+ * for a form that has to decide which map styles to offer (issue #3674). It
+ * reads that one game's archive, and none while no game is chosen. A game read
+ * before is answered from the cache the Conquest list shares, so switching
+ * back to it costs nothing.
+ *
+ * `loading` holds from the moment a game is chosen until its answer is in, and
+ * the form keeps its style choice empty until then, so a game that hides the
+ * generated styles never has them offered and taken away.
+ */
+export function useGameMapFacts(game: GameItem | null | undefined): {
+  loading: boolean;
+  facts: GameMapFacts;
+} {
+  const at = useArchiveTarget();
+  const [answered, setAnswered] = useState<{
+    key: string;
+    facts: GameMapFacts;
+  }>();
+  const archive = game ? archiveGameOf(game) : undefined;
+  const key = archive
+    ? `${at}\0${archive.archive}\0${archive.size ?? ""}\0${archive.checksum ?? ""}`
+    : undefined;
+  // The game as a string, so a render that makes the same game again does not
+  // start the read again.
+  const wanted = archive ? JSON.stringify(archive) : undefined;
+  useEffect(() => {
+    if (wanted === undefined || key === undefined || at === 0) return;
+    let cancelled = false;
+    listHandmadeMapsForGame(JSON.parse(wanted)).then(
+      (facts) => {
+        if (!cancelled) setAnswered({ key, facts });
+      },
+      () => {
+        // The saved maps could not be listed. Nothing is known to hide the
+        // styles, so the form offers them rather than waiting for ever.
+        if (!cancelled) setAnswered({ key, facts: NO_FACTS });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [wanted, key, at]);
+  if (key === undefined) return { loading: false, facts: NO_FACTS };
+  const current = answered?.key === key ? answered : undefined;
+  return { loading: !current, facts: current?.facts ?? NO_FACTS };
 }
 
 /** A listed map from the session cache, for callers outside React. */
