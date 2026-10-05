@@ -39,7 +39,8 @@ import {
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
 import { buildTerrainMesh } from "./terrainMesh";
-import { buildTownLayer, type TownLayer } from "./townLayer";
+import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
+import type { Town } from "./towns";
 import { createVisibility } from "./visibility";
 
 /**
@@ -580,17 +581,34 @@ export function GalaxyView({
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
+      // Towns on a generated map only. A hand-made map's picture is its
+      // author's and may show its own, and performance mode goes without.
+      // The towns are planned from the roads, and the roads then stop at
+      // each town's edge.
+      const planned: { towns?: Town[] } = {};
+      const terrain = surface;
       ground = buildGroundLayer(
         disposables,
         galaxy,
         surface,
         terrainHeights,
         crossingPlan?.tracks,
+        !performanceMode && terrainColor
+          ? (roads) => {
+              const shaped = townsOnRoads(galaxy, terrain, roads);
+              planned.towns = shaped.towns;
+              return shaped.roads;
+            }
+          : undefined,
       );
-      // Towns on a generated map only. A hand-made map's picture is its
-      // author's and may show its own, and performance mode goes without.
-      if (!performanceMode && terrainColor) {
-        towns = buildTownLayer(scene, disposables, galaxy, surface, ground);
+      if (planned.towns) {
+        towns = buildTownLayer(
+          scene,
+          disposables,
+          surface,
+          ground,
+          planned.towns,
+        );
       }
       buildTerrainMesh(
         scene,

@@ -1,17 +1,21 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import type { GroundLayer } from "./groundLayer";
+import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   buildableAt,
   buildTownIndex,
+  clipRoads,
   planTowns,
   roadEntries,
+  TOWN_DATA_ROWS,
   type Town,
   townDataTexels,
   townPatches,
+  withStreets,
 } from "./towns";
 
 /**
@@ -68,14 +72,14 @@ function exact(texture: THREE.DataTexture): THREE.DataTexture {
   return texture;
 }
 
+/** Build the towns {@link townsOnRoads} planned into `scene`. */
 export function buildTownLayer(
   scene: THREE.Scene,
   disposables: { dispose(): void }[],
-  galaxy: GalaxyDoc,
   surface: TerrainSurface,
-  ground: Pick<GroundLayer, "roads" | "shading">,
+  ground: Pick<GroundLayer, "shading">,
+  towns: Town[],
 ): TownLayer {
-  const towns = planMapTowns(galaxy, surface, ground.roads);
   const columns = Math.max(1, towns.length);
   const state = new Uint8Array(columns * TOWN_STATE_ROWS * 4);
 
@@ -103,7 +107,7 @@ export function buildTownLayer(
     new THREE.DataTexture(
       townDataTexels(towns),
       columns,
-      2,
+      TOWN_DATA_ROWS,
       THREE.RGBAFormat,
       THREE.FloatType,
     ),
@@ -153,12 +157,18 @@ export function buildTownLayer(
   };
 }
 
-/** A town at every node, sized by its roads and shaped by where they go. */
-function planMapTowns(
+/**
+ * A town at every node, sized by its roads and shaped by where they go, and
+ * the roads cut where they reach a town, so a road stops at the town's edge
+ * and its state is never drawn over the houses. Each town's main streets run
+ * on from where its roads stop. Give the result's roads to the ground layer
+ * in place of `roads`, and its towns to {@link buildTownLayer}.
+ */
+export function townsOnRoads(
   galaxy: GalaxyDoc,
   surface: TerrainSurface,
-  roads: GroundLayer["roads"],
-): Town[] {
+  roads: RoadLine[],
+): { towns: Town[]; roads: RoadLine[] } {
   const toWorld = (x: number, y: number) => surface.mapToWorldXZ(x, y);
   // Every road and every crossing's track to its landing ends on an anchor.
   const entries = roadEntries(
@@ -167,11 +177,22 @@ function planMapTowns(
     toWorld,
     ENTRY_REACH,
   );
-  return planTowns(
+  const planned = planTowns(
     galaxy.nodes.map((n, i) => {
       const [x, z] = toWorld(n.pos[0], n.pos[1]);
       return { x, z, capital: n.kind === "capital", roads: entries[i] };
     }),
     sceneSeed(galaxy),
   );
+  const { pieces, arrivals } = clipRoads(
+    roads.map((r) => r.line),
+    planned,
+    toWorld,
+  );
+  return {
+    towns: withStreets(planned, arrivals),
+    roads: roads.flatMap((road, k) =>
+      pieces[k].map((line) => ({ ...road, line })),
+    ),
+  };
 }

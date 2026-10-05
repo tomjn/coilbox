@@ -4,9 +4,12 @@ import {
   buildableAt,
   buildTownIndex,
   CAPITAL_RADIUS,
+  clipRoads,
   FLAT_SLOPE,
   leavingAngle,
+  MAX_STREETS,
   planTowns,
+  ROAD_CLIP,
   roadAxis,
   roadEntries,
   STEEP_FIT,
@@ -15,7 +18,9 @@ import {
   TOWN_REACH,
   type TownSite,
   townDataTexels,
+  townEdge,
   townPatches,
+  withStreets,
 } from "./towns";
 
 const sites: TownSite[] = [
@@ -163,15 +168,24 @@ describe("buildTownIndex", () => {
 });
 
 describe("townDataTexels", () => {
-  it("lays each town out in two rows, one column per town", () => {
-    const data = townDataTexels(towns);
-    expect(data).toHaveLength(towns.length * 8);
-    expect(Array.from(data.slice(0, 4))).toEqual(
+  it("lays each town out in five rows, one column per town", () => {
+    const streets = [0.5, 1, 1.5, 2, 2.5];
+    const data = townDataTexels(
+      towns.map((t, k) => (k === 0 ? { ...t, streets } : t)),
+    );
+    const n = towns.length;
+    const at = (row: number, k: number) =>
+      Array.from(data.slice((row * n + k) * 4, (row * n + k) * 4 + 4));
+    expect(data).toHaveLength(n * 4 * 5);
+    expect(at(0, 0)).toEqual(
       [-20, 0, towns[0].radius, towns[0].seed].map(Math.fround),
     );
-    const row1 = (towns.length + 0) * 4;
-    expect(data[row1 + 2]).toBe(1);
-    expect(data[(towns.length + 1) * 4 + 2]).toBe(0);
+    expect(at(1, 0)[2]).toBe(1);
+    expect(at(1, 1)[2]).toBe(0);
+    expect(at(2, 0)).toEqual([...towns[0].waves, 5].map(Math.fround));
+    expect([...at(3, 0), ...at(4, 0)]).toEqual(
+      [0.5, 1, 1.5, 2, 2.5, 0, 0, 0].map(Math.fround),
+    );
   });
 });
 
@@ -259,6 +273,97 @@ describe("townPatches", () => {
     for (let k = 0; k < index.length; k += 3) {
       expect(town[index[k]]).toBe(town[index[k + 1]]);
       expect(town[index[k]]).toBe(town[index[k + 2]]);
+    }
+  });
+});
+
+describe("clipRoads", () => {
+  // Map units are world units here. A capital, a town on one road, a town a
+  // road passes through, and a town no road reaches.
+  const clipTowns = planTowns(
+    [
+      { x: 0, z: 0, capital: true, roads: [0] },
+      { x: 30, z: 0, capital: false, roads: [Math.PI] },
+      { x: 15, z: 20, capital: false, roads: [] },
+      { x: -20, z: 25, capital: false, roads: [] },
+    ],
+    3,
+  );
+  const lines: [number, number][][] = [
+    // From the capital's anchor to the town on one road.
+    [
+      [0, 0],
+      [30, 0],
+    ],
+    // From the capital, straight through the third town and on.
+    [
+      [0, 0],
+      [15, 20],
+      [30, 40],
+    ],
+    // A crossing's track from the one-road town down to its landing.
+    [
+      [30, 0],
+      [30, 12],
+    ],
+  ];
+  const same = (x: number, y: number): [number, number] => [x, y];
+  const { pieces, arrivals } = clipRoads(lines, clipTowns, same);
+
+  it("leaves no point of any road inside a town's edge", () => {
+    let points = 0;
+    for (const line of pieces.flat()) {
+      for (const [x, z] of line) {
+        points++;
+        for (const t of clipTowns) {
+          const d = Math.hypot(x - t.x, z - t.z);
+          const edge = townEdge(t, Math.atan2(z - t.z, x - t.x));
+          expect(d).toBeGreaterThan(edge * ROAD_CLIP - 1e-3);
+        }
+      }
+    }
+    expect(points).toBeGreaterThan(10);
+  });
+
+  it("ends each road at the town's edge, with no gap to it", () => {
+    // The first road keeps one piece, cut at both towns.
+    expect(pieces[0]).toHaveLength(1);
+    const piece = pieces[0][0];
+    const [sx, sz] = piece[0];
+    const [ex, ez] = piece[piece.length - 1];
+    const at = (t: (typeof clipTowns)[number], x: number, z: number) =>
+      Math.hypot(x - t.x, z - t.z) / townEdge(t, Math.atan2(z - t.z, x - t.x));
+    expect(at(clipTowns[0], sx, sz)).toBeCloseTo(ROAD_CLIP, 3);
+    expect(at(clipTowns[1], ex, ez)).toBeCloseTo(ROAD_CLIP, 3);
+  });
+
+  it("splits a road that passes through a town, and records where roads arrive", () => {
+    expect(pieces[1]).toHaveLength(2);
+    // The capital takes both of its roads, the one-road town its road and
+    // its crossing's track, and the town passed through two arrivals.
+    expect(arrivals[0]).toHaveLength(2);
+    expect(arrivals[1]).toHaveLength(2);
+    expect(arrivals[2]).toHaveLength(2);
+    expect(arrivals[3]).toHaveLength(0);
+    // The road to the east arrives at the capital from the east.
+    expect(Math.cos(arrivals[0][0])).toBeCloseTo(1, 3);
+  });
+
+  it("gives every town main streets, its own where no road arrives", () => {
+    const streets = withStreets(clipTowns, arrivals);
+    expect(streets[0].streets).toHaveLength(2);
+    expect(streets[3].streets.length).toBeGreaterThanOrEqual(2);
+    expect(streets.every((t) => t.streets.length <= MAX_STREETS)).toBe(true);
+  });
+
+  it("keeps a town's edge within a quarter of its ellipse either way", () => {
+    for (const t of clipTowns) {
+      for (let k = 0; k < 64; k++) {
+        const a = (k / 64) * Math.PI * 2;
+        const e = townEdge(t, a);
+        expect(e).toBeGreaterThan((t.radius / t.aspect) * 0.72);
+        expect(e).toBeLessThan(t.radius * 1.28);
+      }
     }
   });
 });

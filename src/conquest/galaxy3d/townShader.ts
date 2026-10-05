@@ -163,23 +163,46 @@ void main() {
   vec2 wAcross = vec2(-w1.y, w1.x);
   // The town's own frame: along its axis, then across it.
   vec2 q = vec2(dot(rel, wAlong), dot(rel, wAcross));
-  float rr = length(vec2(q.x, q.y * w1.w)) / wR;
+  vec4 w2 = texelFetch(uTownData, ivec2(vTown, 2), 0);
+  // The town's edge in this direction, as townEdge in towns.ts works it out,
+  // so the roads the CPU cut at the edge stop where the houses begin.
+  float dist = length(rel);
+  float ang = atan(rel.y, rel.x);
+  float ell = length(q) / max(length(vec2(q.x, q.y * w1.w)), 1e-5);
+  float edge = wR * ell * (1.0 + 0.14 * sin(2.0 * ang + w2.x) + 0.08 * sin(3.0 * ang + w2.y) + 0.05 * sin(5.0 * ang + w2.z));
+  float rr = dist / edge;
   float roadD = texture(uRoadDistance, uv).r * uRoadReach;
-  // Most of a patch is open country. The ragged edge below moves the town's
-  // edge by at most 0.375 radii, and houses along a road by 0.3, so past
-  // those nothing is built, and only a ring could draw.
-  if ((rr > 1.48 && (roadD > 0.3 || rr > 2.3)) && ws0.a < 0.004) discard;
+  // Most of a patch is open country. Houses reach a little past the edge,
+  // and along a road half as far again, so past those nothing is built, and
+  // only a ring could draw.
+  if ((rr > 1.08 && (roadD > 0.3 || rr > 1.55)) && ws0.a < 0.004) discard;
   vec4 ws1 = texelFetch(uTownState, ivec2(vTown, 1), 0);
-  // A ragged edge, so no town is a disc.
+  // The edge is ragged house by house, and mottled quarter by quarter.
   float rag = tNoise(q / wR * 2.0 + wSeed * 61.0).x - 0.5;
-  rag += (tNoise(q / wR * 5.5 + wSeed * 23.0).x - 0.5) * 0.5;
-  float dens = 1.0 - smoothstep(0.4, 1.1, rr + rag * 0.5);
+  float fray = tNoise(rel / 0.35 + wSeed * 23.0).x - 0.5;
+  float dens = 1.0 - smoothstep(0.72, 1.02, rr + fray * 0.12);
   // Denser quarters and looser ones, so the town has a centre and is not
   // the same all the way out.
   dens = clamp(dens * (0.7 + 0.6 * tNoise(q / wR * 1.3 + wSeed * 5.0).x), 0.0, 1.0);
   // Houses strung out along the roads past the edge of the town.
-  float ribbon = (1.0 - smoothstep(0.08, 0.3, roadD)) * (1.0 - smoothstep(1.0, 2.0, rr + rag * 0.4));
+  float ribbon = (1.0 - smoothstep(0.08, 0.3, roadD)) * (1.0 - smoothstep(1.0, 1.5, rr + fray * 0.2));
+  ribbon *= 1.0 - smoothstep(1.6, 1.8, dist / wR);
   dens = max(dens, ribbon * 0.7);
+  // The main streets: one on from each road that stops at the edge, from the
+  // square out to the edge, a little wider than the side streets.
+  float mainD = 8.0;
+  int streets = int(w2.w + 0.5);
+  vec4 sa = texelFetch(uTownData, ivec2(vTown, 3), 0);
+  vec4 sb = texelFetch(uTownData, ivec2(vTown, 4), 0);
+  for (int k = 0; k < 8; k++) {
+    if (k >= streets) break;
+    float a = k < 4 ? sa[k] : sb[k - 4];
+    vec2 dir = vec2(cos(a), sin(a));
+    float out_ = dot(rel, dir);
+    float side = abs(dot(rel, vec2(-dir.y, dir.x)));
+    mainD = min(mainD, out_ > 0.0 ? side : 8.0);
+  }
+  mainD = mix(mainD, 8.0, smoothstep(0.98, 1.04, rr));
   // Flat dry land only: no town climbs a steep slope or stands in the sea,
   // though a place on a hillside keeps a village at its middle.
   float fit = texture(uTownIndex, uv).b;
@@ -187,7 +210,7 @@ void main() {
 
   // The ring round a selected or hovered town.
   float ringW = max(0.035, gFoot * 1.3) * (1.0 + 1.2 * ws1.g);
-  float ringD = abs(length(vec2(q.x, q.y * w1.w)) - wR * 1.12);
+  float ringD = abs(dist - edge * 1.12);
   float ring = (1.0 - smoothstep(ringW * 0.5 - gFoot * 0.5, ringW * 0.5 + gFoot * 0.5, ringD)) * ws0.a;
   if (dens < 0.004 && ring < 0.004) discard;
 
@@ -197,8 +220,10 @@ void main() {
   vec3 roofN = vec3(0.0, 1.0, 0.0);
   // Where the roads meet, a square with no houses on it.
   float square = 1.0 - smoothstep(0.1, 0.16, length(rel) / (1.0 + w1.z * 0.6));
-  // No houses on a road or close beside one, so the road shows through.
-  float offRoad = smoothstep(0.1, 0.14, roadD) * (1.0 - square);
+  // No houses on a road or close beside one, so the road shows through, and
+  // none on a main street.
+  const float W_MAIN = 0.028;
+  float offRoad = smoothstep(0.1, 0.14, roadD) * (1.0 - square) * smoothstep(W_MAIN, W_MAIN + 0.02, mainD);
   // Far away: one pale patch, the colour roofs and streets average to.
   float farCover = smoothstep(0.0, 0.55, dens) * 0.85 * smoothstep(0.07, 0.12, roadD);
   // Mottled a little, as a town's quarters are from the air.
@@ -216,16 +241,21 @@ void main() {
     float sw = mix(0.014, 0.024, dens);
     float swE = max(sw, gFoot * 0.55);
     float street = (1.0 - smoothstep(swE - gFoot * 0.5, swE + gFoot * 0.5, e)) * smoothstep(0.2, 0.45, dens);
-    vec3 streetCol = mix(W_LANE, W_STREET, square);
+    float mainW = max(W_MAIN, gFoot * 0.6);
+    float main_ = 1.0 - smoothstep(mainW - gFoot * 0.5, mainW + gFoot * 0.5, mainD);
+    vec3 streetCol = mix(W_LANE, W_STREET, max(square, main_));
     street = max(street, square * smoothstep(0.2, 0.5, dens));
+    street = max(street, main_);
     street *= smoothstep(0.07, 0.1, roadD);
     // Middle distance: blocks in the roofs' colour, lighter or darker block
     // by block, with gardens where houses thin out. Before single roofs can
     // be drawn, a grain of roof colours stands for them.
     float built = clamp(dens * 1.4 - 0.1, 0.0, 1.0) * offRoad;
     vec3 roofs = W_TOWN * (0.8 + 0.4 * bCell);
+    // Once single roofs are fully drawn the grain is never seen.
+    float keepLot = clamp((W_LOT / gFoot - 2.5) / 3.0, 0.0, 1.0);
     float keepGrain = tKeep(0.2, gFoot);
-    if (keepGrain > 0.0) {
+    if (keepGrain > 0.0 && keepLot < 1.0) {
       vec4 speck = tCell(q / 0.2 + wSeed * 7.0);
       roofs = mix(roofs, wRoofTone(speck.w) * (0.75 + 0.5 * smoothstep(0.6, 0.1, speck.x)), keepGrain * 0.7);
     }
@@ -233,7 +263,6 @@ void main() {
     mid = wOver(mid, roofs, built);
     mid = wOver(mid, streetCol, street);
 
-    float keepLot = clamp((W_LOT / gFoot - 2.5) / 3.0, 0.0, 1.0);
     if (keepLot > 0.0) {
       // Close in: houses side by side along each street, in a front row
       // and, nearer the middle of town, rows behind it.

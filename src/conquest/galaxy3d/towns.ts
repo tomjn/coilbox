@@ -23,6 +23,162 @@ export interface Town {
   axis: number;
   /** How much longer the town is along its axis than across it, from 1. */
   aspect: number;
+  /** The phases of the three waves that shape the town's edge. */
+  waves: [number, number, number];
+  /**
+   * The town's main streets, as directions from its anchor in radians from
+   * world +x to +z: where each road arrives, or a few of its own for a town
+   * with none. At most {@link MAX_STREETS}. Set by {@link withStreets}.
+   */
+  streets: number[];
+}
+
+/** The most main streets a town has. */
+export const MAX_STREETS = 8;
+
+/**
+ * How far the built-up area reaches in the world direction `angle`, in world
+ * units from the anchor: an ellipse along the town's axis, wobbled by three
+ * waves so no town is a regular shape. `townShader.ts` works out the same.
+ * Between 0.73 and 1.27 times the ellipse.
+ */
+export function townEdge(town: Town, angle: number): number {
+  const a = angle - town.axis;
+  const ellipse = 1 / Math.hypot(Math.cos(a), town.aspect * Math.sin(a));
+  const [p0, p1, p2] = town.waves;
+  return (
+    town.radius *
+    ellipse *
+    (1 +
+      0.14 * Math.sin(2 * angle + p0) +
+      0.08 * Math.sin(3 * angle + p1) +
+      0.05 * Math.sin(5 * angle + p2))
+  );
+}
+
+/**
+ * Where a road stops as it reaches a town, as a share of the town's edge:
+ * just inside it, among the first houses, where the town's own main street
+ * takes over.
+ */
+export const ROAD_CLIP = 0.92;
+
+/** The longest step along a road the clip checks, in world units. */
+const CLIP_STEP = 0.25;
+
+/** A point in map units. */
+type MapPoint = [number, number];
+
+/**
+ * Cut every line where it enters a town, so a road stops at the town's edge
+ * and runs on only as the town's own street. `lines` are in map units and
+ * `toWorld` turns a map point into world x and z, which is where the towns
+ * are. Returns each line's pieces outside every town, which may be none, and
+ * for each town the directions roads arrive from, as world angles from its
+ * anchor to where each road was cut.
+ */
+export function clipRoads(
+  lines: MapPoint[][],
+  towns: Town[],
+  toWorld: (x: number, y: number) => [number, number],
+): { pieces: MapPoint[][][]; arrivals: number[][] } {
+  const arrivals: number[][] = towns.map(() => []);
+  const reach = towns.map((t) => t.radius * 1.3);
+  /** The town a map point lies inside, or -1. */
+  const inside = (p: MapPoint): number => {
+    const [x, z] = toWorld(p[0], p[1]);
+    for (let k = 0; k < towns.length; k++) {
+      const t = towns[k];
+      const dx = x - t.x;
+      const dz = z - t.z;
+      if (Math.abs(dx) > reach[k] || Math.abs(dz) > reach[k]) continue;
+      const d = Math.hypot(dx, dz);
+      if (d < townEdge(t, Math.atan2(dz, dx)) * ROAD_CLIP) return k;
+    }
+    return -1;
+  };
+  const lerp = (a: MapPoint, b: MapPoint, s: number): MapPoint => [
+    a[0] + (b[0] - a[0]) * s,
+    a[1] + (b[1] - a[1]) * s,
+  ];
+  /** The last point outside on the way from `out` to `inn`. */
+  const edge = (out: MapPoint, inn: MapPoint): MapPoint => {
+    let lo = 0;
+    let hi = 1;
+    for (let k = 0; k < 20; k++) {
+      const mid = (lo + hi) / 2;
+      if (inside(lerp(out, inn, mid)) < 0) lo = mid;
+      else hi = mid;
+    }
+    return lerp(out, inn, lo);
+  };
+  const arrive = (k: number, p: MapPoint) => {
+    const [x, z] = toWorld(p[0], p[1]);
+    arrivals[k].push(Math.atan2(z - towns[k].z, x - towns[k].x));
+  };
+  const pieces = lines.map((sparse) => {
+    // A long straight stretch could step over a town, so it is cut into
+    // steps no longer than CLIP_STEP first.
+    const line: MapPoint[] = [];
+    sparse.forEach((p, i) => {
+      if (i > 0) {
+        const q = sparse[i - 1];
+        const [ax, az] = toWorld(q[0], q[1]);
+        const [bx, bz] = toWorld(p[0], p[1]);
+        const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / CLIP_STEP);
+        for (let s = 1; s < steps; s++) line.push(lerp(q, p, s / steps));
+      }
+      line.push(p);
+    });
+    const out: MapPoint[][] = [];
+    let run: MapPoint[] = [];
+    let was = line.length > 0 ? inside(line[0]) : -1;
+    if (line.length > 0 && was < 0) run.push(line[0]);
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1];
+      const b = line[i];
+      const now = inside(b);
+      if (was < 0 && now < 0) {
+        run.push(b);
+      } else if (was < 0) {
+        const c = edge(a, b);
+        run.push(c);
+        arrive(now, c);
+        if (run.length > 1) out.push(run);
+        run = [];
+      } else if (now < 0) {
+        const c = edge(b, a);
+        arrive(was, c);
+        run = [c, b];
+      }
+      was = now;
+    }
+    if (run.length > 1) out.push(run);
+    return out;
+  });
+  return { pieces, arrivals };
+}
+
+/**
+ * Give each town its main streets: one towards each direction a road
+ * arrives from, leaving out any within a few degrees of one already kept,
+ * and for a town no road reaches, two or three of its own along its axis.
+ */
+export function withStreets(towns: Town[], arrivals: number[][]): Town[] {
+  return towns.map((t, k) => {
+    const kept: number[] = [];
+    for (const a of arrivals[k] ?? []) {
+      const close = kept.some(
+        (b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.25,
+      );
+      if (!close && kept.length < MAX_STREETS) kept.push(a);
+    }
+    if (kept.length === 0) {
+      kept.push(t.axis, t.axis + Math.PI);
+      if (t.seed > 0.4) kept.push(t.axis + Math.PI / 2 + (t.seed - 0.7));
+    }
+    return { ...t, streets: kept };
+  });
 }
 
 /** What a town is planned from: one entry per node of the map. */
@@ -57,7 +213,7 @@ const MAX_STRETCH = 0.35;
  * radius: houses strung out along the roads, then the ring drawn round a
  * selected town.
  */
-export const TOWN_REACH = 2.1;
+export const TOWN_REACH = 1.85;
 
 /** Texels along the longer side of the town index. */
 export const TOWN_INDEX_TEXELS = 512;
@@ -173,6 +329,8 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
       seed: own,
       axis,
       aspect: 1 + MAX_STRETCH * strength,
+      waves: [own * 61.7, own * 23.3, own * 47.9] as [number, number, number],
+      streets: [],
     };
   });
 }
@@ -347,9 +505,14 @@ export function townPatches(
         town.push(k);
       }
     }
+    // Only the cells the reach touches: a disc, not the square round it.
+    const touch = reach + Math.hypot(cellW, cellD) / 2;
     for (let j = 0; j < j1 - j0; j++) {
       for (let i = 0; i < i1 - i0; i++) {
         const topLeft = first + j * across + i;
+        const cx = positions[topLeft * 3] + cellW / 2;
+        const cz = positions[topLeft * 3 + 2] + cellD / 2;
+        if (Math.hypot(cx - t.x, cz - t.z) > touch) continue;
         const bottomLeft = topLeft + across;
         index.push(
           topLeft,
@@ -369,20 +532,31 @@ export function townPatches(
   };
 }
 
+/** Rows of {@link townDataTexels}. */
+export const TOWN_DATA_ROWS = 5;
+
 /**
- * The towns as two rows of four floats a town, for a texture one column per
- * town: row 0 holds `x, z, radius, seed`, row 1 the axis as its cosine and
- * sine, whether it is a capital, and its aspect.
+ * The towns as {@link TOWN_DATA_ROWS} rows of four floats a town, for a
+ * texture one column per town: row 0 holds `x, z, radius, seed`, row 1 the
+ * axis as its cosine and sine, whether it is a capital, and its aspect, row 2
+ * the three wave phases and the number of main streets, and rows 3 and 4 the
+ * main streets' directions.
  */
 export function townDataTexels(towns: Town[]): Float32Array {
   const columns = Math.max(1, towns.length);
-  const out = new Float32Array(columns * 2 * 4);
+  const out = new Float32Array(columns * TOWN_DATA_ROWS * 4);
+  const row = (r: number, k: number) => (r * columns + k) * 4;
   towns.forEach((t, k) => {
-    out.set([t.x, t.z, t.radius, t.seed], k * 4);
+    out.set([t.x, t.z, t.radius, t.seed], row(0, k));
     out.set(
       [Math.cos(t.axis), Math.sin(t.axis), t.capital ? 1 : 0, t.aspect],
-      (columns + k) * 4,
+      row(1, k),
     );
+    const streets = t.streets.slice(0, MAX_STREETS);
+    out.set([...t.waves, streets.length], row(2, k));
+    streets.forEach((a, s) => {
+      out[row(3 + Math.floor(s / 4), k) + (s % 4)] = a;
+    });
   });
   return out;
 }

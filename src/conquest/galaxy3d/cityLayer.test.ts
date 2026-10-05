@@ -117,6 +117,8 @@ function build(labels = true) {
       seed: 0,
       axis: 0,
       aspect: 1,
+      waves: [0, 0, 0] as [number, number, number],
+      streets: [],
     })),
     commit: () => {
       commits++;
