@@ -50,7 +50,7 @@ vi.mock("../content/config", () => ({
   useUnitsyncScan: () => ({
     data: {
       games: scanGames.list,
-      maps: [{ name: "Comet Catcher Redux" }, { name: "MapA" }],
+      maps: [{ name: "AcidicQuarry 5.17" }, { name: "MapA" }],
     },
     error: null,
     loading: false,
@@ -119,7 +119,7 @@ if (!ironcoast) throw new Error("the sample has no Ironcoast");
 
 /** A new conquest on the sample, already settled on `pinnedGame`, so the only
  * save a test sees is the one a battle makes. */
-function freshState(pinnedGame = "Test Game 2.0"): ConquestState {
+function freshState(pinnedGame = "SplinterFaction 2.0"): ConquestState {
   return {
     ...newHandmadeConquest(
       galaxy,
@@ -163,8 +163,8 @@ beforeEach(() => {
   }
   scanGames.list = [
     {
-      name: "Test Game 2.0",
-      info: { shortname: "TG", version: "2.0" },
+      name: "SplinterFaction 2.0",
+      info: { shortname: "SF", version: "2.0" },
       primaryArchive: { name: "tg.sdz" },
     },
   ];
@@ -178,7 +178,7 @@ afterEach(cleanup);
 describe("attacking a scenario location", () => {
   it("says which scenario the fight plays", () => {
     const { result } = mount();
-    expect(result.current.scenario?.name).toBe("Siege");
+    expect(result.current.scenario?.name).toBe("Hold Ironcoast");
     expect(result.current.canStart).toBe(true);
   });
 
@@ -189,10 +189,10 @@ describe("attacking a scenario location", () => {
     const input = launchScenario.mock.calls[0][0];
     expect(input.reader).toBe("player");
     expect(input.dataDir).toBe("/data");
-    expect(input.scenario.id).toBe("siege");
-    // The scenario was made on "Test Game". The conquest is on a later build
+    expect(input.scenario.id).toBe("ironcoast-siege");
+    // The scenario was made on "SplinterFaction". The conquest is on a later build
     // of the same game, and that is the one it plays on.
-    expect(input.scenario.setup.gameName).toBe("Test Game 2.0");
+    expect(input.scenario.setup.gameName).toBe("SplinterFaction 2.0");
     // The runtime the scenario needs travels with it, for the launch to check.
     expect(input.scenario.runtimeVersion).toBe(
       ironcoast.scenario?.doc.runtimeVersion,
@@ -285,7 +285,7 @@ describe("attacking a scenario location", () => {
     scanGames.list = [
       {
         name: "Other Game 1.0",
-        info: { shortname: "TG", version: "1.0" },
+        info: { shortname: "SF", version: "1.0" },
         primaryArchive: { name: "other.sdz" },
       },
     ];
@@ -304,7 +304,7 @@ describe("attacking a scenario location", () => {
     const { result } = renderHook(() =>
       useConquestBattleRun(galaxy, freshState(), swapped, "attack"),
     );
-    expect(result.current.mapName).toBe("Comet Catcher Redux");
+    expect(result.current.mapName).toBe("AcidicQuarry 5.17");
     const defending = renderHook(() =>
       useConquestBattleRun(galaxy, freshState(), swapped, "defend"),
     );
@@ -332,7 +332,7 @@ describe("attacking a scenario location", () => {
     );
     await act(() => result.current.start());
     expect(mediaWrite).toHaveBeenCalledWith({
-      scenarioId: "siege",
+      scenarioId: "ironcoast-siege",
       file: "radio.ogg",
       dataUri: "data:audio/ogg;base64,AAAA",
     });
@@ -353,7 +353,7 @@ describe("the other fights at a scenario location", () => {
     };
     const { result } = mount(state, "defend");
     expect(result.current.scenario).toBeUndefined();
-    expect(result.current.snapshot()?.mapName).toBe("Comet Catcher Redux");
+    expect(result.current.snapshot()?.mapName).toBe("AcidicQuarry 5.17");
     await act(() => result.current.start());
     expect(launchScenario).not.toHaveBeenCalled();
     expect(engineLaunch).toHaveBeenCalledTimes(1);

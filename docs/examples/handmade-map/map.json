@@ -3,7 +3,7 @@
   "id": "sample-two-shores",
   "title": "Two Shores",
   "description": "A small sample map: two land masses, a strait between them, and a faction on each side.",
-  "game": { "shortname": "TG" },
+  "game": { "shortname": "SF" },
   "size": { "width": 1600, "height": 960 },
   "files": {
     "picture": "picture.png",
@@ -33,7 +33,7 @@
       "name": "Westhaven",
       "owner": "west",
       "capital": true,
-      "battle": { "mapName": "MapA" }
+      "battle": { "mapName": "AcidicQuarry 5.17" }
     },
     { "color": "#7ab85a", "name": "Midvale", "owner": "west" },
     {
@@ -47,7 +47,7 @@
       "color": "#b55f9a",
       "name": "Ironcoast",
       "difficulty": 3,
-      "blurb": "The keep that guards the landing. Taking it is a scenario, not a skirmish.",
+      "blurb": "The camp that guards the landing. Taking it is a scenario, not a skirmish.",
       "scenario": "ironcoast-siege.json",
       "warpath": { "kind": "battle" }
     },
@@ -64,7 +64,7 @@
       "owner": "east",
       "capital": true,
       "difficulty": 5,
-      "battle": { "mapName": "MapB", "enemyAiCount": 2 }
+      "battle": { "mapName": "AcidicQuarry 5.17", "enemyAiCount": 2 }
     }
   ],
   "locations": [
@@ -80,6 +80,7 @@
   "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]],
   "warpath": { "start": "westhaven", "goal": "farwatch" },
   "models": [
-    { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 }
+    { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 },
+    { "model": { "game": "ammobox" }, "pos": [260, 520], "rotation": 120 }
   ]
 }

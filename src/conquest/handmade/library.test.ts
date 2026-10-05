@@ -106,7 +106,7 @@ describe("listing hand-made maps", () => {
     expect(maps).toHaveLength(1);
     expect(maps[0]).toMatchObject({
       id: "sample-two-shores",
-      game: { shortname: "TG" },
+      game: { shortname: "SF" },
       source: "imported",
       pictureUrl:
         "coilbox://localhost/conquestmap/sample-two-shores/picture.png",
@@ -514,7 +514,7 @@ describe("a map with a scenario location", () => {
       "coilbox://localhost/conquestmap/sample-two-shores/ironcoast-siege.json",
     );
     const ironcoast = result.doc.nodes.find((n) => n.id === "ironcoast");
-    expect(ironcoast?.scenario?.doc.name).toBe("Siege");
+    expect(ironcoast?.scenario?.doc.name).toBe("Hold Ironcoast");
   });
 
   it("names the location when the folder has no such file", async () => {

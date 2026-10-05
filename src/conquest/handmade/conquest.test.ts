@@ -97,7 +97,7 @@ describe("picking battles for blank locations", () => {
     // One node of generation at each difficulty names the tier's maps.
     const generated = generateGalaxy({
       seed: 1,
-      game: { shortname: "TG" },
+      game: { shortname: "SF" },
       maps: MAPS,
       nodeCount: 40,
       factionCount: 2,
@@ -166,7 +166,7 @@ describe("starting a conquest on a hand-made map", () => {
     expect(doc.nodes.every((n) => n.battle.mapName !== "")).toBe(true);
     // The authored battle is untouched, extras included.
     expect(doc.nodes.find((n) => n.id === "farwatch")?.battle).toEqual({
-      mapName: "MapB",
+      mapName: "AcidicQuarry 5.17",
       enemyAiCount: 2,
     });
     expect(parseGalaxyJson(JSON.stringify(doc))).not.toBeNull();

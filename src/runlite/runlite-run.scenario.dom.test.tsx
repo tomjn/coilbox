@@ -24,8 +24,8 @@ const { detectBattleResult, engineLaunch, launchScenario, unitData } =
 
 const GAMES = [
   {
-    name: "Test Game 2.0",
-    info: { shortname: "TG", version: "2.0" },
+    name: "SplinterFaction 2.0",
+    info: { shortname: "SF", version: "2.0" },
     primaryArchive: { name: "tg.sdz" },
   },
 ];
@@ -43,7 +43,7 @@ vi.mock("../content/config", () => ({
   useUnitsyncScan: () => ({
     data: {
       games: GAMES,
-      maps: [{ name: "Comet Catcher Redux" }, { name: "Small" }],
+      maps: [{ name: "AcidicQuarry 5.17" }, { name: "Small" }],
     },
     error: null,
     loading: false,
@@ -127,7 +127,7 @@ function runAtEastcliff(): RogueliteRun {
     seed: 42,
     length: "standard",
     difficulty: 2,
-    game: { shortname: "TG", pinnedName: "Test Game 2.0" },
+    game: { shortname: "SF", pinnedName: "SplinterFaction 2.0" },
     factionId: "player",
     skin: "theatre",
     maps: [{ name: "Small", size: 64 }],
@@ -190,8 +190,8 @@ describe("a fight at a scenario location on a Warpath run", () => {
     expect(launchScenario).toHaveBeenCalledTimes(1);
     const input = launchScenario.mock.calls[0][0];
     expect(input.reader).toBe("player");
-    expect(input.scenario.id).toBe("siege");
-    expect(input.scenario.setup.gameName).toBe("Test Game 2.0");
+    expect(input.scenario.id).toBe("ironcoast-siege");
+    expect(input.scenario.setup.gameName).toBe("SplinterFaction 2.0");
     // It plays as its author set it up, with none of the run's unit limit.
     expect(input.disabledUnits).toBeUndefined();
     expect(engineLaunch).not.toHaveBeenCalled();
@@ -242,7 +242,7 @@ describe("a fight at a scenario location on a Warpath run", () => {
   it("fights the node's own skirmish when the map cannot give the scenario", async () => {
     const { result, node } = mount(false);
     expect(node.scenario).toBe("ironcoast-siege.json");
-    expect(result.current.snapshot()?.mapName).toBe("Comet Catcher Redux");
+    expect(result.current.snapshot()?.mapName).toBe("AcidicQuarry 5.17");
     await act(() => result.current.start());
     expect(launchScenario).not.toHaveBeenCalled();
     expect(engineLaunch).toHaveBeenCalledTimes(1);

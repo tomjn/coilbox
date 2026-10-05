@@ -22,13 +22,24 @@ const SCENARIO_FILE = "ironcoast-siege.json";
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const scenarioText = readFileSync(`${SAMPLE}${SCENARIO_FILE}`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
-const siege = parseScenarioJson(
+/**
+ * The scenario builder's smallest Splinter Faction document, named and described
+ * for the location it sits at. The sample's file is this, exported.
+ */
+const splinter = parseScenarioJson(
   readFileSync(
-    new URL("../../scenario/fixtures/siege.json", import.meta.url),
+    new URL("../../scenario/fixtures/splinter.json", import.meta.url),
     "utf8",
   ),
 );
-if (!siege) throw new Error("the Siege fixture did not parse");
+if (!splinter) throw new Error("the Splinter fixture did not parse");
+const ironcoastScenario = {
+  ...splinter,
+  id: "ironcoast-siege",
+  name: "Hold Ironcoast",
+  description:
+    "The player's engineer must hold out against the Loz Alliance watchpost for ninety seconds.",
+};
 
 function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
   return {
@@ -62,19 +73,22 @@ function readDoc(input: HandmadeMapInput = sample()) {
 }
 
 describe("the sample map's scenario location", () => {
-  it("is the Siege fixture as the scenario builder exports it", () => {
-    const exported = encodeScenarioExport({ scenario: siege, media: {} }, [
-      { name: "Test Game", info: { shortname: "TG" } },
-    ]);
+  it("is the Splinter fixture as the scenario builder exports it", () => {
+    const exported = encodeScenarioExport(
+      { scenario: ironcoastScenario, media: {} },
+      [{ name: "SplinterFaction", info: { shortname: "SF" } }],
+    );
     expect(JSON.parse(scenarioText)).toEqual(JSON.parse(exported));
   });
 
   it("carries the scenario, and fights on the scenario's map", () => {
     const ironcoast = readDoc().nodes.find((n) => n.id === "ironcoast");
     expect(ironcoast?.scenario?.file).toBe(SCENARIO_FILE);
-    expect(ironcoast?.scenario?.doc).toEqual(siege);
+    expect(ironcoast?.scenario?.doc).toEqual(ironcoastScenario);
     expect(ironcoast?.scenario?.media).toEqual({});
-    expect(ironcoast?.battle).toEqual({ mapName: siege.setup.mapName });
+    expect(ironcoast?.battle).toEqual({
+      mapName: ironcoastScenario.setup.mapName,
+    });
   });
 
   it("leaves every other location without one", () => {
@@ -89,15 +103,17 @@ describe("the sample map's scenario location", () => {
       [{ name: "Some Map", width: 8, height: 8 }],
     );
     expect(run.battles.ironcoast).toBeUndefined();
-    expect(JSON.stringify(run)).not.toContain("Siege");
+    expect(JSON.stringify(run)).not.toContain("Hold Ironcoast");
   });
 
   it("reads a bare scenario document too", () => {
     const doc = readDoc(
-      sample({ scenarios: { [SCENARIO_FILE]: JSON.stringify(siege) } }),
+      sample({
+        scenarios: { [SCENARIO_FILE]: JSON.stringify(ironcoastScenario) },
+      }),
     );
     expect(doc.nodes.find((n) => n.id === "ironcoast")?.scenario?.doc).toEqual(
-      siege,
+      ironcoastScenario,
     );
   });
 
@@ -116,7 +132,7 @@ describe("the sample map's scenario location", () => {
     );
     expect(
       doc.nodes.find((n) => n.id === "stonebridge")?.scenario?.doc.id,
-    ).toBe("siege");
+    ).toBe("ironcoast-siege");
   });
 });
 
@@ -144,7 +160,7 @@ describe("a scenario location the author got wrong", () => {
     ["is JSON but not a scenario", JSON.stringify({ hello: "world" })],
     [
       "is a scenario with its triggers damaged",
-      JSON.stringify({ ...siege, triggers: "none" }),
+      JSON.stringify({ ...ironcoastScenario, triggers: "none" }),
     ],
     [
       "is another kind of coilbox file",
@@ -171,8 +187,8 @@ describe("a scenario location the author got wrong", () => {
 
   it("refuses a scenario that has no game and map", () => {
     const blank = {
-      ...siege,
-      setup: { ...siege.setup, gameName: "", mapName: "" },
+      ...ironcoastScenario,
+      setup: { ...ironcoastScenario.setup, gameName: "", mapName: "" },
     };
     const errors = errorsOf(
       sample({ scenarios: { [SCENARIO_FILE]: JSON.stringify(blank) } }),
@@ -183,24 +199,26 @@ describe("a scenario location the author got wrong", () => {
   });
 
   it("refuses an exported scenario whose game has another shortname", () => {
-    const other = encodeScenarioExport({ scenario: siege, media: {} }, [
-      { name: "Test Game", info: { shortname: "OTHER" } },
-    ]);
+    const other = encodeScenarioExport(
+      { scenario: ironcoastScenario, media: {} },
+      [{ name: "SplinterFaction", info: { shortname: "OTHER" } }],
+    );
     const errors = errorsOf(sample({ scenarios: { [SCENARIO_FILE]: other } }));
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatchObject({
       code: "scenario-wrong-game",
       id: "ironcoast",
-      game: "Test Game",
+      game: "SplinterFaction",
     });
     expect(errors[0].message).toContain('"Ironcoast"');
-    expect(errors[0].message).toContain('"TG"');
+    expect(errors[0].message).toContain('"SF"');
   });
 
   it("matches the shortname whatever its case", () => {
-    const lower = encodeScenarioExport({ scenario: siege, media: {} }, [
-      { name: "Test Game", info: { shortname: "tg" } },
-    ]);
+    const lower = encodeScenarioExport(
+      { scenario: ironcoastScenario, media: {} },
+      [{ name: "SplinterFaction", info: { shortname: "sf" } }],
+    );
     expect(
       readHandmadeMap(sample({ scenarios: { [SCENARIO_FILE]: lower } })).ok,
     ).toBe(true);
@@ -210,10 +228,10 @@ describe("a scenario location the author got wrong", () => {
     const pinned = (pinnedName: string) =>
       sample({
         manifest: manifestWith((m) => {
-          m.game = { shortname: "TG", pinnedName };
+          m.game = { shortname: "SF", pinnedName };
         }),
       });
-    expect(readHandmadeMap(pinned("Test Game 1.2")).ok).toBe(true);
+    expect(readHandmadeMap(pinned("SplinterFaction 1.2")).ok).toBe(true);
     const errors = errorsOf(pinned("Other Game 1.2"));
     expect(errors).toHaveLength(1);
     expect(errors[0].code).toBe("scenario-wrong-game");
@@ -264,7 +282,9 @@ describe("which fight at a scenario location plays the scenario", () => {
   } as unknown as ConquestState;
 
   it("plays it on the first attack", () => {
-    expect(scenarioToPlay(fresh, ironcoast, "attack")?.doc.id).toBe("siege");
+    expect(scenarioToPlay(fresh, ironcoast, "attack")?.doc.id).toBe(
+      "ironcoast-siege",
+    );
   });
 
   it("never plays it on a defence", () => {

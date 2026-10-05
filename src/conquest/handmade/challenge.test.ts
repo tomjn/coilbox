@@ -101,7 +101,7 @@ describe("a challenge code for a conquest on a hand-made map", () => {
       fingerprint: map.handmade?.fingerprint,
       title: "Two Shores",
     });
-    expect(settings.game).toEqual({ shortname: "TG" });
+    expect(settings.game).toEqual({ shortname: "SF" });
     expect(settings.fogOfWar).toBe(true);
     expect(settings.threatLevel).toBe(2);
     expect(settings).not.toHaveProperty("seed");
@@ -266,7 +266,7 @@ describe("importing a challenge whose battle maps are not all installed", () => 
       MAPS,
     );
     expect(tampered.nodes.find((n) => n.id === "westhaven")?.battle).toEqual({
-      mapName: "MapA",
+      mapName: "AcidicQuarry 5.17",
     });
   });
 });

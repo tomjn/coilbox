@@ -158,7 +158,7 @@ describe("a Warpath run on the sample map", () => {
   it("fights the author's battle where one is set", () => {
     for (const seed of SEEDS) {
       const boss = at(runOn(doc, seed), "farwatch");
-      expect(boss.battle?.mapName).toBe("MapB");
+      expect(boss.battle?.mapName).toBe("AcidicQuarry 5.17");
       expect(boss.battle?.enemyAiCount).toBe(2);
       // The map is the author's, so the generated map's download hint goes.
       expect(boss.battle?.mapDownload).toBeUndefined();
@@ -218,7 +218,7 @@ describe("a Warpath run on the sample map", () => {
       ...MAPS,
       { name: "MapA" },
       { name: "MapB" },
-      { name: "Comet Catcher Redux" },
+      { name: "AcidicQuarry 5.17" },
     ];
     const run = runOn(doc, 42, { maps });
     const decoded = decodeWarpathChallenge(encodeWarpathChallenge(run));
@@ -249,7 +249,7 @@ describe("handmadeRunSource", () => {
       "westhaven",
     ]);
     expect(source?.battles?.ironcoast).toEqual({
-      mapName: "Comet Catcher Redux",
+      mapName: "AcidicQuarry 5.17",
     });
   });
 });
@@ -422,7 +422,7 @@ describe("loadChallengeRunMap", () => {
 
   it("gives the run source when the installed map is the challenge's version", async () => {
     hoisted.load.mockResolvedValue(read());
-    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    const loaded = await loadChallengeRunMap(ref, "SplinterFaction");
     if (!loaded.ok) throw new Error(loaded.message);
     expect(hoisted.load).toHaveBeenCalledWith("sample-two-shores");
     expect(loaded.source.startId).toBe("westhaven");
@@ -441,16 +441,16 @@ describe("loadChallengeRunMap", () => {
         },
       ],
     });
-    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    const loaded = await loadChallengeRunMap(ref, "SplinterFaction");
     if (loaded.ok) throw new Error("expected a refusal");
     expect(loaded.message).toContain('the hand-made map "Two Shores"');
-    expect(loaded.message).toContain("made for Test Game");
+    expect(loaded.message).toContain("made for SplinterFaction");
     expect(loaded.message).toContain("not installed here");
   });
 
   it("says so when the installed map is a different version", async () => {
     hoisted.load.mockResolvedValue(read(otherVersion));
-    const loaded = await loadChallengeRunMap(ref, "Test Game");
+    const loaded = await loadChallengeRunMap(ref, "SplinterFaction");
     if (loaded.ok) throw new Error("expected a refusal");
     expect(loaded.message).toContain(
       'a different version of the hand-made map "Two Shores"',
@@ -466,7 +466,7 @@ describe("loadChallengeRunMap", () => {
     );
     const loaded = await loadChallengeRunMap(
       { source: "handmade", id: "sample-two-shores" },
-      "Test Game",
+      "SplinterFaction",
     );
     if (loaded.ok) throw new Error("expected a refusal");
     expect(loaded.message).toContain("no Warpath start and goal");
@@ -482,7 +482,7 @@ describe("a scenario location on a Warpath run", () => {
       expect(ironcoast.type).toBe("battle");
       expect(ironcoast.scenario).toBe("ironcoast-siege.json");
       // The skirmish to fall back on is set on the scenario's map.
-      expect(ironcoast.battle?.mapName).toBe("Comet Catcher Redux");
+      expect(ironcoast.battle?.mapName).toBe("AcidicQuarry 5.17");
       expect(ironcoast.battle?.mapDownload).toBeUndefined();
     }
   });
@@ -508,7 +508,7 @@ describe("a scenario location on a Warpath run", () => {
 
   it("finds the scenario again from the map", () => {
     const ironcoast = at(runOn(doc, 42), "ironcoast");
-    expect(runNodeScenario(doc, ironcoast)?.doc.name).toBe("Siege");
+    expect(runNodeScenario(doc, ironcoast)?.doc.name).toBe("Hold Ironcoast");
     expect(runNodeScenario(doc, at(runOn(doc, 42), "farwatch"))).toBe(
       undefined,
     );

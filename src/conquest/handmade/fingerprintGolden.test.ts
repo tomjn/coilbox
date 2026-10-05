@@ -47,8 +47,8 @@ describe("the sample map's fingerprint", () => {
   const doc = readSample();
 
   it("is the pinned value", () => {
-    expect(doc.handmade?.fingerprint).toBe("908fbba63c234e18");
-    expect(handmadeMapFingerprint(doc)).toBe("908fbba63c234e18");
+    expect(doc.handmade?.fingerprint).toBe("28e347f8df860fd7");
+    expect(handmadeMapFingerprint(doc)).toBe("28e347f8df860fd7");
   });
 
   it("is as many hex digits as its size in bits needs", () => {
