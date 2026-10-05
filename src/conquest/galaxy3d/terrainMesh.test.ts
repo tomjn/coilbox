@@ -19,8 +19,24 @@ function framed(): { data: Uint8ClampedArray; width: number; height: number } {
 }
 
 describe("edgeColor", () => {
-  it("averages only the outermost pixels", () => {
+  it("reads only the outermost pixels", () => {
     expect(edgeColor(framed())).toEqual([24, 58, 96]);
+  });
+
+  it("is the sea when land runs off one side, not a blend with the land", () => {
+    // 8 by 8, sea everywhere except a column of land down the left edge.
+    const width = 8;
+    const height = 8;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        data.set(
+          x === 0 ? [100, 160, 80, 255] : [24, 58, 96, 255],
+          (y * width + x) * 4,
+        );
+      }
+    }
+    expect(edgeColor({ data, width, height })).toEqual([24, 58, 96]);
   });
 });
 
@@ -60,12 +76,43 @@ describe("beyondPixels", () => {
     expect(right[2]).toBeGreaterThan(right[1]);
   });
 
-  it("fades to the edge's darkened average far from the map", () => {
-    const mean = edgeColor(halves());
-    expect(px(0, 0)).toEqual(mean.map((c) => Math.round(c * 0.6)));
-    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(
-      mean.map((c) => Math.round(c * 0.6)),
-    );
+  it("starts as bright as the map, so no seam shows at the edge", () => {
+    // The sea half runs all the way to the right edge, so just past it the
+    // world beyond is the sea, under a twentieth of the way into its fade.
+    const sea = [24, 58, 96];
+    const far = edgeColor(halves());
+    const got = px(Math.ceil(2 * third), mid);
+    for (let c = 0; c < 3; c++) {
+      expect(Math.abs(got[c] - sea[c])).toBeLessThanOrEqual(
+        Math.abs(far[c] - sea[c]) / 20 + 1,
+      );
+    }
+  });
+
+  it("takes its colour from the edge itself, not from inside the map", () => {
+    // Sea at every edge and a lighter ring just inside, as round an island
+    // near the frame. The world beyond must match the deep sea at the edge.
+    const width = 64;
+    const height = 64;
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const edge = x === 0 || y === 0 || x === width - 1 || y === height - 1;
+        data.set(
+          edge ? [24, 58, 96, 255] : [80, 140, 180, 255],
+          (y * width + x) * 4,
+        );
+      }
+    }
+    const ringed = beyondPixels({ data, width, height });
+    const o = (mid * ringed.width + Math.floor(third) - 1) * 4;
+    expect(Array.from(ringed.data.slice(o, o + 3))).toEqual([24, 58, 96]);
+  });
+
+  it("fades to the edge's most common colour far from the map", () => {
+    const far = edgeColor(halves());
+    expect(px(0, 0)).toEqual(far);
+    expect(px(beyond.width - 1, beyond.height - 1)).toEqual(far);
   });
 });
 
@@ -77,9 +124,18 @@ describe("the world beyond a generated sheet", () => {
   for (const d of disposables) d.dispose();
   const plane = scene.getObjectByName("beyond-the-map") as THREE.Mesh;
 
-  it("lies under the sheet and reaches a sheet past every edge", () => {
+  it("is drawn before the sheet and never contests its depth", () => {
+    // A plane a little under the sea fought the sea for depth at a far zoom
+    // and showed through as dark lines across it.
+    const sheet = scene.getObjectByName("terrain") as THREE.Mesh;
+    const mat = plane.material as THREE.Material;
+    expect(mat.depthTest).toBe(false);
+    expect(mat.depthWrite).toBe(false);
+    expect(plane.renderOrder).toBeLessThan(sheet.renderOrder);
+  });
+
+  it("reaches a sheet past every edge", () => {
     expect(plane).toBeInstanceOf(THREE.Mesh);
-    expect(plane.position.y).toBeLessThan(0);
     const geo = plane.geometry as THREE.PlaneGeometry;
     expect(geo.parameters.width).toBeCloseTo(surface.worldWidth * 3);
     expect(geo.parameters.height).toBeCloseTo(surface.worldDepth * 3);
@@ -88,9 +144,9 @@ describe("the world beyond a generated sheet", () => {
   it("fills the rest with the colour the picture fades to", () => {
     const [r, g, b] = edgeColor(halves());
     const expected = new THREE.Color().setRGB(
-      (r * 0.6) / 255,
-      (g * 0.6) / 255,
-      (b * 0.6) / 255,
+      r / 255,
+      g / 255,
+      b / 255,
       THREE.SRGBColorSpace,
     );
     expect((scene.background as THREE.Color).equals(expected)).toBe(true);
