@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { describe, expect, it } from "vitest";
-import { createTerrainSurface } from "./terrain";
+import { createTerrainSurface, type HeightGrid } from "./terrain";
 import { beyondPixels, buildTerrainMesh, edgeColor } from "./terrainMesh";
 
 /** A 4 by 3 picture: the edge one colour, the middle another. */
@@ -66,6 +66,67 @@ describe("beyondPixels", () => {
     expect(px(beyond.width - 1, beyond.height - 1)).toEqual(
       mean.map((c) => Math.round(c * 0.6)),
     );
+  });
+});
+
+describe("the sheet's shader", () => {
+  const grid: HeightGrid = {
+    data: new Float32Array([0, 0.5, 0.5, 1]),
+    width: 2,
+    height: 2,
+  };
+  const build = (
+    color: Parameters<typeof buildTerrainMesh>[3],
+    heights?: HeightGrid,
+    detail?: boolean,
+  ) => {
+    const surface = createTerrainSurface({ width: 64, height: 64 }, 100, heights);
+    const disposables: { dispose(): void }[] = [];
+    const mesh = buildTerrainMesh(
+      new THREE.Scene(),
+      disposables,
+      surface,
+      color,
+      { current: null },
+      heights,
+      detail,
+    );
+    for (const d of disposables) d.dispose();
+    return mesh.material as THREE.MeshBasicMaterial;
+  };
+
+  it("lights the slopes and adds detail on a generated map", () => {
+    expect(build(halves(), grid).customProgramCacheKey()).toBe("terrain:1:1");
+  });
+
+  it("drops the detail when asked, as performance mode does", () => {
+    expect(build(halves(), grid, false).customProgramCacheKey()).toBe(
+      "terrain:1:0",
+    );
+  });
+
+  it("leaves a hand-made picture without procedural detail", () => {
+    // A bitmap stands in for a painted picture, which never arrives as pixels.
+    const painted = { width: 2, height: 2 } as unknown as ImageBitmap;
+    expect(build(painted, grid).customProgramCacheKey()).toBe("terrain:1:0");
+  });
+
+  it("has no relief to light on a flat sheet", () => {
+    expect(build(halves()).customProgramCacheKey()).toBe("terrain:0:1");
+  });
+
+  it("finds the places it patches in three.js's own shader", () => {
+    // A three.js upgrade that renamed these would silently drop the detail.
+    const mat = build(halves(), grid);
+    const shader = {
+      uniforms: {},
+      vertexShader: THREE.ShaderLib.basic.vertexShader,
+      fragmentShader: THREE.ShaderLib.basic.fragmentShader,
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    mat.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    expect(shader.vertexShader).toContain("vTerrainPos = (modelMatrix");
+    expect(shader.fragmentShader).toContain("texture2D(uTerrainNormals");
+    expect(Object.keys(shader.uniforms)).toContain("uTerrainNormals");
   });
 });
 

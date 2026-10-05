@@ -229,8 +229,9 @@ function isColorPixels(source: TerrainColorSource): source is ColorPixels {
  * that fails to load is reported once and the placeholder stays.
  *
  * `heights` lights the sheet's slopes per pixel. A generated map, whose
- * picture comes as pixels, also gets procedural texture by biome. A hand-made
- * map's painted picture is left as its author drew it.
+ * picture comes as pixels, also gets procedural texture by biome unless
+ * `detail` is off, as it is in performance mode. A hand-made map's painted
+ * picture is left as its author drew it.
  */
 export function buildTerrainMesh(
   scene: THREE.Scene,
@@ -239,6 +240,7 @@ export function buildTerrainMesh(
   color: TerrainColorSource,
   renderRef: { current: (() => void) | null },
   heights?: HeightGrid,
+  detail = true,
 ): THREE.Mesh {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
@@ -262,7 +264,7 @@ export function buildTerrainMesh(
   }
   applyTerrainShader(
     mat,
-    { normals, detail: isColorPixels(color) },
+    { normals, detail: detail && isColorPixels(color) },
     disposables,
   );
 

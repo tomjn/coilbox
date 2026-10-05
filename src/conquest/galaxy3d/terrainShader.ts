@@ -50,6 +50,13 @@ float tHash(vec2 p) {
   return fract(p.x * p.y);
 }
 
+// Two independent values in 0 to 1 from one point.
+vec2 tHash2(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.xx + q.yz) * q.zy);
+}
+
 // Value noise and its gradient, 0 to 1.
 vec3 tNoise(vec2 p) {
   vec2 i = floor(p);
@@ -76,22 +83,21 @@ vec4 tCell(vec2 p) {
   vec2 f = fract(p);
   float best = 8.0;
   vec2 toward = vec2(0.0);
-  float id = 0.0;
+  vec2 bestCell = vec2(0.0);
   for (int y = -1; y <= 1; y++) {
     for (int x = -1; x <= 1; x++) {
       vec2 g = vec2(float(x), float(y));
-      vec2 o = vec2(tHash(i + g), tHash(i + g + 19.7));
-      vec2 d = g + 0.15 + o * 0.7 - f;
+      vec2 d = g + 0.15 + tHash2(i + g) * 0.7 - f;
       float dd = dot(d, d);
       if (dd < best) {
         best = dd;
         toward = d;
-        id = tHash(i + g + 41.3);
+        bestCell = g;
       }
     }
   }
   float dist = sqrt(best);
-  return vec4(dist, -toward / max(dist, 1e-4), id);
+  return vec4(dist, -toward / max(dist, 1e-4), tHash(i + bestCell + 41.3));
 }
 
 // How much of a pattern of wavelength w (world units) to keep, given the
@@ -177,15 +183,21 @@ const FRAGMENT_BODY = /* glsl */ `
     // Steep ground shows bare rock, whatever grows on the level.
     float steep = smoothstep(0.08, 0.22, 1.0 - n.y) * (1.0 - sea);
 
-    // Broad patches, then fine grain.
-    vec3 broad = tField(p, 3.0, 2, footprint);
-    vec3 fine = tField(p * 1.0 + 31.0, 0.45, 4, footprint);
+    // Broad patches, then fine grain. Open sea needs neither. Each block
+    // below runs only where its share is worth drawing: biomes lie in large
+    // patches, so the GPU skips them together and the cost stays low.
+    vec3 broad = vec3(0.0);
+    vec3 fine = vec3(0.0);
+    if (sea < 0.99 || coast > 0.01) {
+      broad = tField(p, 3.0, 2, footprint);
+      fine = tField(p + 31.0, 0.45, 4, footprint);
+    }
 
     float shadeMul = 1.0;
     vec2 bump = vec2(0.0);
 
     // Forest: a canopy of crowns with dark gaps between them.
-    {
+    if (wForest > 0.02) {
       // Clumps of trees, and the crowns within them, each domed with dark
       // gaps between. The dome's slope is steepest at its rim and faces out
       // from its centre.
@@ -195,6 +207,7 @@ const FRAGMENT_BODY = /* glsl */ `
       for (int k = 0; k < 2; k++) {
         float size = k == 0 ? 0.5 : 0.17;
         float keep = tKeep(size, footprint);
+        if (keep <= 0.0) break;
         vec4 cell = tCell(p / size + float(k) * 7.3 + fine.x * 0.5);
         // Each crown a little bigger or smaller, lighter or darker.
         float reach = 0.45 + 0.25 * cell.w - thin * 0.25;
@@ -226,9 +239,9 @@ const FRAGMENT_BODY = /* glsl */ `
       bump += wTundra * fine.yz * 0.3;
     }
     // Rock and scree, and any steep slope: broken, strongly lit stone.
-    {
+    float r = max(wRock, steep);
+    if (r > 0.02) {
       vec3 stone = tField(vec2(p.x * 0.6, p.y) + 3.0, 0.5, 4, footprint);
-      float r = max(wRock, steep);
       shadeMul += r * (stone.x * 0.6 + broad.x * 0.2);
       bump += r * stone.yz * 1.1;
       albedo = mix(albedo, pow(mix(T_ROCK, T_SCREE, 0.5 + broad.x), vec3(2.2)), steep * (1.0 - wSnow) * 0.85);
@@ -241,7 +254,7 @@ const FRAGMENT_BODY = /* glsl */ `
     }
 
     // Sea: ripples, a glint of the sun, and foam where it meets the land.
-    vec3 wave = tField(p + 11.0, 0.6, 3, footprint);
+    vec3 wave = sea > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
     float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.15, 0.2, fine.x);
     vec2 landBump = bump;
