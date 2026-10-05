@@ -25,16 +25,20 @@ import { hashString, mulberry32, pick, type Rng } from "./rng";
 /** How the land is arranged. */
 export type LandLayout =
   | "continent"
+  | "coast"
   | "continents"
   | "archipelago"
-  | "inlandsea";
+  | "inlandsea"
+  | "landlocked";
 
 /** The land layouts, in the order the setup forms offer them. */
 export const LAND_LAYOUTS: readonly LandLayout[] = [
   "continent",
+  "coast",
   "continents",
   "archipelago",
   "inlandsea",
+  "landlocked",
 ];
 
 export const isLandLayout = (value: unknown): value is LandLayout =>
@@ -54,9 +58,11 @@ export function resolveLandLayout(
 ): LandLayout {
   switch (layout) {
     case "continent":
+    case "coast":
     case "continents":
     case "archipelago":
     case "inlandsea":
+    case "landlocked":
       return layout;
     case "scatter":
       return "continent";
@@ -250,6 +256,9 @@ interface ShapePlan {
   warp: number;
   /** How much the fractal noise counts against the shape. */
   roughness: number;
+  /** The sides, from {@link SIDES}, that land may run off. The others are
+   * kept clear of land so the sea runs along them. */
+  open: number[];
 }
 
 /** An ellipse falloff: 1 at the centre, 0 on the edge, negative outside. */
@@ -263,11 +272,63 @@ function ellipse(c: Vec, along: Vec, a: number, b: number): ShapeMask {
   };
 }
 
+/** The map's sides, in the order top, right, bottom, left, as the direction
+ * that points out of the map across each. */
+const SIDES: readonly Vec[] = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0],
+];
+
+/**
+ * `count` sides next to each other, from a first side drawn from the seed: one
+ * side, a corner, or three sides. Opposite sides would pull a continent both
+ * ways at once and leave it in the middle.
+ */
+function adjacentSides(rng: Rng, count: number): number[] {
+  const first = Math.floor(rng() * 4);
+  return Array.from({ length: count }, (_, i) => (first + i) % 4);
+}
+
+/** The side a direction points out of the map across. */
+function sideFacing(v: Vec): number {
+  let best = 0;
+  for (let i = 1; i < 4; i++) {
+    const d = v[0] * SIDES[i][0] + v[1] * SIDES[i][1];
+    if (d > v[0] * SIDES[best][0] + v[1] * SIDES[best][1]) best = i;
+  }
+  return best;
+}
+
+/** Pixels from a point to one side of the map. */
+function toSide(x: number, y: number, side: number): number {
+  return side === 0 ? y : side === 1 ? S - x : side === 2 ? S - y : x;
+}
+
+/**
+ * Raise the land towards each open side, so a shape that leans towards it
+ * runs off the map there instead of stopping short.
+ */
+function towardSides(mask: ShapeMask, open: number[], lift: number): ShapeMask {
+  if (open.length === 0) return mask;
+  const reach = 0.3 * S;
+  return (x, y) => {
+    let v = mask(x, y);
+    for (const side of open) {
+      const t = 1 - toSide(x, y, side) / reach;
+      if (t > 0) v += lift * t;
+    }
+    return v;
+  };
+}
+
 function planShape(shape: LandLayout, rng: Rng): ShapePlan {
   const c = S / 2;
   switch (shape) {
     case "continents": {
       // Two masses facing each other across a strait that runs between them.
+      // Each may run off the map on the side it faces away from the strait.
       const u = unitVector(rng);
       const gap = (0.2 + rng() * 0.03) * S;
       const slide = (rng() - 0.5) * 0.12 * S;
@@ -275,26 +336,43 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       // One continent is larger than the other.
       const big = 1 + rng() * 0.12;
       const small = 0.72 + rng() * 0.15;
+      const outA = rng() < 0.7;
+      const outB = rng() < 0.7;
+      const push = 0.15 * S;
       const a = ellipse(
-        [c + u[0] * gap + perp[0] * slide, c + u[1] * gap + perp[1] * slide],
+        [
+          c + u[0] * (gap + (outA ? push : 0)) + perp[0] * slide,
+          c + u[1] * (gap + (outA ? push : 0)) + perp[1] * slide,
+        ],
         perp,
         (0.28 + rng() * 0.05) * S * big,
         (0.15 + rng() * 0.03) * S * big,
       );
       const b = ellipse(
-        [c - u[0] * gap - perp[0] * slide, c - u[1] * gap - perp[1] * slide],
+        [
+          c - u[0] * (gap + (outB ? push : 0)) - perp[0] * slide,
+          c - u[1] * (gap + (outB ? push : 0)) - perp[1] * slide,
+        ],
         perp,
         (0.28 + rng() * 0.05) * S * small,
         (0.15 + rng() * 0.03) * S * small,
       );
+      const open: number[] = [];
+      if (outA) open.push(sideFacing(u));
+      if (outB) open.push(sideFacing([-u[0], -u[1]]));
       const strait = 0.05 * S;
       return {
-        mask: (x, y) => {
-          const across = ((x - c) * u[0] + (y - c) * u[1]) / strait;
-          const channel = across * across < 1 ? 1 - across * across : 0;
-          return Math.max(a(x, y), b(x, y)) - 0.9 * channel;
-        },
-        landShare: 0.36,
+        mask: towardSides(
+          (x, y) => {
+            const across = ((x - c) * u[0] + (y - c) * u[1]) / strait;
+            const channel = across * across < 1 ? 1 - across * across : 0;
+            return Math.max(a(x, y), b(x, y)) - 0.9 * channel;
+          },
+          open,
+          1,
+        ),
+        open,
+        landShare: 0.36 + 0.07 * open.length,
         minMass: 900,
         warp: 60,
         roughness: 0.8,
@@ -302,7 +380,7 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
     }
     case "archipelago": {
       // Many islands of mixed sizes, kept apart by a spacing that eases off
-      // after each miss so the loop always ends.
+      // after each miss so the loop always ends. The sea runs all round.
       const count = 8 + Math.floor(rng() * 5);
       const islands: { c: Vec; along: Vec; a: number; b: number }[] = [];
       let relax = 0;
@@ -338,6 +416,7 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
           }
           return best;
         },
+        open: [],
         landShare: 0.22,
         minMass: 250,
         warp: 45,
@@ -345,49 +424,100 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       };
     }
     case "inlandsea": {
-      // Land around a sea in the middle, which may open to the ocean.
+      // A sea in the middle with land filling the frame round it, open to
+      // the ocean through a strait on half of the seeds.
       const u = unitVector(rng);
       const centre: Vec = [
-        c + (rng() - 0.5) * 0.06 * S,
-        c + (rng() - 0.5) * 0.06 * S,
+        c + (rng() - 0.5) * 0.1 * S,
+        c + (rng() - 0.5) * 0.1 * S,
       ];
-      const outer = ellipse(
+      const sea = ellipse(
         centre,
         u,
-        (0.36 + rng() * 0.03) * S,
-        (0.3 + rng() * 0.03) * S,
+        (0.26 + rng() * 0.05) * S,
+        (0.16 + rng() * 0.04) * S,
       );
-      const inner = ellipse(
-        centre,
-        u,
-        (0.17 + rng() * 0.04) * S,
-        (0.11 + rng() * 0.03) * S,
-      );
+      const strait = rng() < 0.5 ? SIDES[Math.floor(rng() * 4)] : undefined;
+      const width = 0.05 * S;
       return {
         mask: (x, y) => {
-          const o = outer(x, y);
-          const i = inner(x, y);
-          return Math.min(o * 1.6, -i + 0.15);
+          let v = 0.15 - sea(x, y);
+          if (strait) {
+            const along =
+              (x - centre[0]) * strait[0] + (y - centre[1]) * strait[1];
+            const off =
+              ((x - centre[0]) * strait[1] - (y - centre[1]) * strait[0]) /
+              width;
+            if (along > 0 && off * off < 1) v = Math.min(v, off * off - 1);
+          }
+          return v;
         },
-        landShare: 0.32,
+        open: [0, 1, 2, 3],
+        landShare: 0.8,
         minMass: 900,
-        warp: 55,
-        roughness: 0.7,
+        warp: 50,
+        roughness: 0.6,
+      };
+    }
+    case "coast": {
+      // Land on one side of a long coastline that crosses the map.
+      const land = Math.floor(rng() * 4);
+      const tilt = (rng() - 0.5) * 0.9;
+      const d = SIDES[land];
+      const len = Math.sqrt(1 + tilt * tilt);
+      const u: Vec = [(d[0] - d[1] * tilt) / len, (d[1] + d[0] * tilt) / len];
+      const offset = (rng() - 0.3) * 0.12 * S;
+      const open = [0, 1, 2, 3].filter((side) => side !== (land + 2) % 4);
+      return {
+        mask: (x, y) => ((x - c) * u[0] + (y - c) * u[1] + offset) / (0.2 * S),
+        open,
+        landShare: 0.5,
+        minMass: 900,
+        warp: 75,
+        roughness: 0.9,
+      };
+    }
+    case "landlocked": {
+      // All land, with a few large lakes and no sea.
+      const lakes = Array.from({ length: 2 + Math.floor(rng() * 3) }, () => {
+        const a = (0.07 + rng() * 0.05) * S;
+        return ellipse(
+          [(0.2 + rng() * 0.6) * S, (0.2 + rng() * 0.6) * S],
+          unitVector(rng),
+          a,
+          a * (0.45 + rng() * 0.4),
+        );
+      });
+      return {
+        mask: (x, y) => {
+          let wet = 0;
+          for (const lake of lakes) wet = Math.max(wet, lake(x, y));
+          return 0.5 - 2 * wet;
+        },
+        open: [0, 1, 2, 3],
+        landShare: 0.88,
+        minMass: 900,
+        warp: 50,
+        roughness: 0.5,
       };
     }
     default: {
-      // One large continent, a little off centre and longer one way, with a
-      // smaller lobe off one side so the outline is not an oval.
+      // One large continent that runs off the map on one to three sides,
+      // with a smaller lobe so the outline is not an oval.
+      const open = adjacentSides(rng, 1 + Math.floor(rng() * 3));
+      let cx = c + (rng() - 0.5) * 0.08 * S;
+      let cy = c + (rng() - 0.5) * 0.08 * S;
+      for (const side of open) {
+        cx += SIDES[side][0] * 0.24 * S;
+        cy += SIDES[side][1] * 0.24 * S;
+      }
+      const centre: Vec = [cx, cy];
       const u = unitVector(rng);
-      const centre: Vec = [
-        c + (rng() - 0.5) * 0.08 * S,
-        c + (rng() - 0.5) * 0.08 * S,
-      ];
       const main = ellipse(
         centre,
         u,
-        (0.25 + rng() * 0.05) * S,
-        (0.17 + rng() * 0.05) * S,
+        (0.3 + rng() * 0.06) * S,
+        (0.22 + rng() * 0.05) * S,
       );
       const w = unitVector(rng);
       const reach = (0.2 + rng() * 0.06) * S;
@@ -398,8 +528,13 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
         (0.08 + rng() * 0.03) * S,
       );
       return {
-        mask: (x, y) => Math.max(main(x, y), lobe(x, y)),
-        landShare: 0.28,
+        mask: towardSides(
+          (x, y) => Math.max(main(x, y), lobe(x, y)),
+          open,
+          1.2,
+        ),
+        open,
+        landShare: 0.34 + 0.09 * open.length,
         minMass: 900,
         warp: 70,
         roughness: 0.8,
@@ -679,6 +814,7 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const rangeSeed = noiseSeed(rng);
   const hillSeed = noiseSeed(rng);
   const plan = planShape(opts.shape, rng);
+  const closed = [0, 1, 2, 3].filter((side) => !plan.open.includes(side));
   // Drawn after the shape, so the climate changes no land and no height.
   const wetSeed = noiseSeed(rng);
   const warmSeed = noiseSeed(rng);
@@ -698,10 +834,12 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       const wy = py + plan.warp * (bendY[y * S + x] - 0.5) * 2;
       let e =
         plan.mask(wx, wy) + plan.roughness * (base[y * S + x] - 0.5) * 2.8;
-      const edge = Math.min(px, py, S - px, S - py);
-      if (edge < EDGE_MARGIN) {
-        const t = 1 - edge / EDGE_MARGIN;
-        e -= t * t * 4;
+      for (const side of closed) {
+        const edge = toSide(px, py, side);
+        if (edge < EDGE_MARGIN) {
+          const t = 1 - edge / EDGE_MARGIN;
+          e -= t * t * 4;
+        }
       }
       elevation[y * S + x] = e;
     }

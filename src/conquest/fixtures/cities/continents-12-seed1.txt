@@ -3,38 +3,35 @@ title TG Conquest
 description A generated map of 12 cities.
 terrain image=generated:cities heightmap=generated:cities size=1024x1024 heightScale=64 projection=flat
 generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"continents","skin":"cities"}
-faction player name="Scarlet Syndicate" color=#2f7dff aggression=0 side=
-faction enemy-1 name="Silent Legion" color=#ff3524 aggression=0.3615037826821208 side=
-faction enemy-2 name="Crimson Enclave" color=#ffb300 aggression=0.3409222161397338 side=
-node node-0 name="Wrenhaven" pos=167,459 owner=player kind=capital difficulty=1 map="Map 0"
-node node-1 name="Brackhaven" pos=795,301 owner=enemy-1 kind=normal difficulty=4 map="Map 8"
-node node-2 name="Fernbarrow" pos=201,649 owner=player kind=normal difficulty=1 map="Map 1"
-node node-3 name="Redbarrow" pos=737,719 owner=enemy-1 kind=normal difficulty=5 map="Map 11"
-node node-4 name="Winddale" pos=349,355 owner=player kind=normal difficulty=1 map="Map 0"
-node node-5 name="Bleakwood" pos=717,437 owner=enemy-1 kind=normal difficulty=3 map="Map 4"
-node node-6 name="Rookcross" pos=251,229 owner=player kind=normal difficulty=1 map="Map 1"
-node node-7 name="Duncombe" pos=351,571 owner=player kind=normal difficulty=1 map="Map 0"
-node node-8 name="Easthollow" pos=423,143 owner=enemy-2 kind=capital difficulty=5 map="Map 9"
-node node-9 name="Larkmere" pos=609,637 owner=enemy-1 kind=normal difficulty=4 map="Map 7"
-node node-10 name="Stormcross" pos=475,295 owner=enemy-2 kind=normal difficulty=2 map="Map 2"
-node node-11 name="Crowhollow" pos=825,481 owner=enemy-1 kind=capital difficulty=5 map="Map 10"
-link node-0 node-2 node-0 node-2 road
+faction player name="Molten Enclave" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Scarlet Coalition" color=#ff3524 aggression=0.458364347089082 side=
+faction enemy-2 name="Sovereign Union" color=#ffb300 aggression=0.3441612501628697 side=
+node node-0 name="Wrenhaven" pos=171,529 owner=neutral kind=normal difficulty=3 map="Map 4"
+node node-1 name="Brackhaven" pos=967,247 owner=enemy-1 kind=capital difficulty=5 map="Map 9"
+node node-2 name="Fernbarrow" pos=73,889 owner=player kind=capital difficulty=1 map="Map 0"
+node node-3 name="Redbarrow" pos=945,849 owner=neutral kind=normal difficulty=4 map="Map 8"
+node node-4 name="Winddale" pos=77,437 owner=enemy-2 kind=normal difficulty=4 map="Map 7"
+node node-5 name="Bleakwood" pos=883,319 owner=enemy-1 kind=normal difficulty=4 map="Map 8"
+node node-6 name="Rookcross" pos=949,433 owner=enemy-1 kind=normal difficulty=4 map="Map 7"
+node node-7 name="Duncombe" pos=221,669 owner=player kind=normal difficulty=2 map="Map 2"
+node node-8 name="Easthollow" pos=169,215 owner=enemy-2 kind=capital difficulty=5 map="Map 10"
+node node-9 name="Larkmere" pos=241,401 owner=enemy-2 kind=normal difficulty=4 map="Map 8"
+node node-10 name="Stormcross" pos=353,213 owner=enemy-2 kind=normal difficulty=5 map="Map 11"
+node node-11 name="Crowhollow" pos=757,631 owner=neutral kind=normal difficulty=3 map="Map 5"
 link node-0 node-4 node-0 node-4 road
-link node-0 node-6 node-0 node-6 road
 link node-0 node-7 node-0 node-7 road
+link node-0 node-9 node-0 node-9 road
 link node-1 node-5 node-1 node-5 road
-link node-1 node-11 node-1 node-11 road
+link node-1 node-6 node-1 node-6 road
 link node-2 node-7 node-2 node-7 road
-link node-3 node-9 node-3 node-9 road
+link node-3 node-6 node-3 node-6 road
 link node-3 node-11 node-3 node-11 road
-link node-4 node-6 node-4 node-6 road
-link node-4 node-7 node-4 node-7 road
-link node-4 node-10 node-4 node-10 road
-link node-5 node-9 node-5 node-9 road
+link node-4 node-8 node-4 node-8 road
+link node-4 node-9 node-4 node-9 road
+link node-5 node-6 node-5 node-6 road
 link node-5 node-11 node-5 node-11 road
-link node-6 node-8 node-6 node-8 road
-link node-6 node-10 node-6 node-10 road
-link node-7 node-10 node-7 node-10 road
+link node-6 node-11 node-6 node-11 road
+link node-8 node-9 node-8 node-9 road
 link node-8 node-10 node-8 node-10 road
-link node-9 node-11 node-9 node-11 road
-link node-5 node-10 node-5 node-10 crossing
+link node-9 node-10 node-9 node-10 road
+link node-7 node-11 node-7 node-11 crossing

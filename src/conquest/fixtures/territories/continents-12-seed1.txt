@@ -3,38 +3,35 @@ title TG Conquest
 description A generated map of 12 provinces.
 terrain image=generated:territories heightmap=generated:territories size=1024x1024 heightScale=64 projection=flat
 generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"continents","skin":"territories"}
-faction player name="Scarlet Syndicate" color=#2f7dff aggression=0 side=
-faction enemy-1 name="Silent Legion" color=#ff3524 aggression=0.3615037826821208 side=
-faction enemy-2 name="Crimson Enclave" color=#ffb300 aggression=0.3409222161397338 side=
-node node-0 name="Wrenhaven" pos=157,479 owner=player kind=capital difficulty=1 map="Map 0" outline=212,390 238,478 246,548 242,562 218,580 196,580 138,566 74,566 78,452 92,394 162,396
-node node-1 name="Brackhaven" pos=779,291 owner=enemy-1 kind=normal difficulty=4 map="Map 8" outline=878,392 832,388 780,366 746,346 666,322 690,298 698,282 694,264 700,250 718,242 736,216 748,216 756,226 772,226 776,218 804,208 824,212 840,220 854,238 852,294 854,336 860,344 858,368 872,378
-node node-2 name="Fernbarrow" pos=191,663 owner=player kind=normal difficulty=1 map="Map 1" outline=242,562 244,586 268,630 296,706 314,736 322,780 312,784 278,772 256,782 218,786 196,778 192,768 136,714 122,680 104,662 94,620 78,596 74,566 138,566 196,580 218,580
-node node-3 name="Redbarrow" pos=719,733 owner=enemy-1 kind=normal difficulty=5 map="Map 11" outline=736,602 826,654 818,700 824,724 822,778 792,800 776,826 762,830 744,846 732,846 688,828 672,830 660,844 618,840 610,846 598,846 584,842 568,828 552,800 548,766 536,742 544,718 574,704 622,700 656,688 674,674 702,634
-node node-4 name="Winddale" pos=327,393 owner=player kind=normal difficulty=1 map="Map 0" outline=356,250 386,274 416,336 418,374 406,418 378,446 340,468 246,548 238,478 212,390 268,368 290,344 332,276
-node node-5 name="Bleakwood" pos=697,429 owner=enemy-1 kind=normal difficulty=3 map="Map 4" outline=666,322 746,346 780,366 832,388 826,412 784,450 768,508 736,572 726,558 698,538 684,514 660,490 632,474 602,468 580,454 578,442 592,424 594,406 634,366 644,342
-node node-6 name="Rookcross" pos=267,243 owner=player kind=normal difficulty=1 map="Map 1" outline=348,98 346,130 368,196 356,228 356,250 332,276 290,344 268,368 212,390 162,396 92,394 100,366 100,348 110,326 126,304 152,290 180,266 180,228 208,188 214,170 234,158 244,146 250,134 250,120 258,112 298,108 326,98
-node node-7 name="Duncombe" pos=339,585 owner=player kind=normal difficulty=1 map="Map 0" outline=406,418 420,432 460,450 472,464 468,468 448,468 440,478 416,488 408,496 406,540 428,570 436,594 426,626 406,648 402,670 386,696 382,718 396,732 396,740 392,746 382,746 372,728 360,730 344,756 342,772 322,780 314,736 296,706 268,630 244,586 242,562 246,548 340,468 378,446
-node node-8 name="Easthollow" pos=421,155 owner=enemy-2 kind=capital difficulty=5 map="Map 9" outline=518,254 480,252 420,214 368,196 346,130 348,98 382,92 450,96 468,138 506,168 508,180 514,186 522,214
-node node-9 name="Larkmere" pos=659,575 owner=enemy-1 kind=normal difficulty=4 map="Map 7" outline=580,454 602,468 632,474 660,490 684,514 698,538 726,558 736,572 736,602 702,634 674,674 656,688 622,700 574,704 544,718 544,680 530,652 530,638 554,628 578,606 586,582 572,564 546,564 540,538 546,536 552,544 604,542 616,534 622,516 614,502 586,494
-node node-10 name="Stormcross" pos=457,297 owner=enemy-2 kind=normal difficulty=2 map="Map 2" outline=368,196 420,214 480,252 518,254 522,308 516,336 526,358 524,378 514,390 518,418 510,436 494,452 472,464 460,450 420,432 406,418 418,374 416,336 386,274 356,250 356,228
-node node-11 name="Crowhollow" pos=807,555 owner=enemy-1 kind=capital difficulty=5 map="Map 10" outline=832,388 878,392 876,530 864,578 826,654 736,602 736,572 768,508 784,450 826,412
-link node-0 node-2 node-0 node-2 border
+faction player name="Molten Enclave" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Scarlet Coalition" color=#ff3524 aggression=0.458364347089082 side=
+faction enemy-2 name="Sovereign Union" color=#ffb300 aggression=0.3441612501628697 side=
+node node-0 name="Wrenhaven" pos=137,523 owner=player kind=normal difficulty=1 map="Map 0" outline=136,454 156,468 204,488 316,510 320,528 344,552 346,574 342,576 322,582 236,576 142,590 94,592 64,602 32,628 0,642 0,566 20,548 44,508 56,496 118,474
+node node-1 name="Brackhaven" pos=953,213 owner=enemy-1 kind=capital difficulty=5 map="Map 9" outline=1024,344 988,334 928,264 892,242 850,202 814,188 834,176 868,174 890,166 904,154 942,148 1010,118 1022,118
+node node-2 name="Fernbarrow" pos=77,877 owner=neutral kind=normal difficulty=3 map="Map 5" outline=194,822 184,852 180,904 154,922 126,930 108,948 76,950 42,942 18,922 0,916 0,810 36,812 72,804 112,804 172,812
+node node-3 name="Redbarrow" pos=857,839 owner=enemy-2 kind=capital difficulty=5 map="Map 10" outline=992,746 1024,748 1024,832 1016,840 1018,870 1006,880 1008,892 1018,900 1018,912 1014,916 1000,916 990,910 972,924 906,916 848,930 808,930 730,920 712,890 704,840 704,808 686,790 684,778 714,764 762,750 798,754 860,750 950,754
+node node-4 name="Winddale" pos=61,433 owner=player kind=capital difficulty=1 map="Map 1" outline=0,336 30,350 66,358 88,400 126,434 136,454 118,474 56,496 44,508 20,548 0,566
+node node-5 name="Bleakwood" pos=861,319 owner=enemy-1 kind=normal difficulty=4 map="Map 8" outline=814,188 850,202 892,242 928,264 988,334 968,352 894,392 856,434 814,432 784,422 774,414 750,374 730,352 754,324 752,304 734,284 736,260 744,242 768,224 770,214 784,200 798,198
+node node-6 name="Rookcross" pos=943,445 owner=enemy-1 kind=normal difficulty=4 map="Map 7" outline=988,334 1024,344 1024,748 992,746 958,726 936,698 934,666 948,616 946,582 936,570 894,548 880,532 870,506 868,466 856,434 894,392 968,352
+node node-7 name="Duncombe" pos=171,697 owner=neutral kind=normal difficulty=2 map="Map 2" outline=342,576 328,594 336,626 314,680 260,720 250,740 252,758 246,770 224,794 212,798 194,822 172,812 112,804 72,804 36,812 0,810 0,642 32,628 64,602 94,592 142,590 236,576 322,582
+node node-8 name="Easthollow" pos=153,191 owner=player kind=normal difficulty=1 map="Map 0" outline=300,60 292,104 292,190 276,250 272,292 234,308 130,334 92,352 66,358 30,350 0,336 2,80 30,72 118,68 166,52 186,50 220,36 264,42
+node node-9 name="Larkmere" pos=241,399 owner=player kind=normal difficulty=1 map="Map 1" outline=272,292 320,336 350,372 344,390 334,402 334,450 316,510 204,488 156,468 136,454 126,434 88,400 66,358 92,352 130,334 234,308
+node node-10 name="Stormcross" pos=343,211 owner=neutral kind=normal difficulty=2 map="Map 3" outline=300,60 388,86 408,104 406,124 394,136 400,166 396,234 378,270 382,278 380,294 358,318 350,372 320,336 272,292 276,250 292,190 292,104
+node node-11 name="Crowhollow" pos=801,607 owner=enemy-2 kind=normal difficulty=3 map="Map 6" outline=730,352 750,374 774,414 784,422 814,432 856,434 868,466 870,506 880,532 894,548 936,570 946,582 948,616 934,666 936,698 958,726 992,746 950,754 860,750 798,754 762,750 714,764 684,778 678,760 680,730 672,720 654,718 642,724 616,724 608,718 606,704 624,648 650,616 672,576 674,556 686,528 686,498 696,486 700,444 708,434 706,400
 link node-0 node-4 node-0 node-4 border
-link node-0 node-6 node-0 node-6 border
 link node-0 node-7 node-0 node-7 border
+link node-0 node-9 node-0 node-9 border
 link node-1 node-5 node-1 node-5 border
-link node-1 node-11 node-1 node-11 border
+link node-1 node-6 node-1 node-6 border
 link node-2 node-7 node-2 node-7 border
-link node-3 node-9 node-3 node-9 border
+link node-3 node-6 node-3 node-6 border
 link node-3 node-11 node-3 node-11 border
-link node-4 node-6 node-4 node-6 border
-link node-4 node-7 node-4 node-7 border
-link node-4 node-10 node-4 node-10 border
-link node-5 node-9 node-5 node-9 border
+link node-4 node-8 node-4 node-8 border
+link node-4 node-9 node-4 node-9 border
+link node-5 node-6 node-5 node-6 border
 link node-5 node-11 node-5 node-11 border
-link node-6 node-8 node-6 node-8 border
-link node-6 node-10 node-6 node-10 border
-link node-7 node-10 node-7 node-10 border
+link node-6 node-11 node-6 node-11 border
+link node-8 node-9 node-8 node-9 border
 link node-8 node-10 node-8 node-10 border
-link node-9 node-11 node-9 node-11 border
-link node-5 node-10 node-5 node-10 crossing
+link node-9 node-10 node-9 node-10 border
+link node-7 node-11 node-7 node-11 crossing

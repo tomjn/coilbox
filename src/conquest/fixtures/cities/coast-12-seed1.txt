@@ -1,0 +1,39 @@
+id generated-1
+title TG Conquest
+description A generated map of 12 cities.
+terrain image=generated:cities heightmap=generated:cities size=1024x1024 heightScale=64 projection=flat
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"coast","skin":"cities"}
+faction player name="Sovereign Imperium" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Silent Remnant" color=#ff3524 aggression=0.4085108839906752 side=
+faction enemy-2 name="Verdant Enclave" color=#ffb300 aggression=0.35745911761187016 side=
+node node-0 name="Wrenhaven" pos=45,449 owner=player kind=capital difficulty=1 map="Map 1"
+node node-1 name="Brackhaven" pos=409,755 owner=neutral kind=normal difficulty=3 map="Map 4"
+node node-2 name="Fernbarrow" pos=423,401 owner=neutral kind=normal difficulty=3 map="Map 5"
+node node-3 name="Redbarrow" pos=129,937 owner=enemy-2 kind=capital difficulty=5 map="Map 11"
+node node-4 name="Winddale" pos=537,241 owner=enemy-1 kind=normal difficulty=4 map="Map 8"
+node node-5 name="Bleakwood" pos=263,653 owner=player kind=normal difficulty=2 map="Map 3"
+node node-6 name="Rookcross" pos=385,151 owner=neutral kind=normal difficulty=3 map="Map 6"
+node node-7 name="Duncombe" pos=201,263 owner=player kind=normal difficulty=2 map="Map 2"
+node node-8 name="Easthollow" pos=697,97 owner=enemy-1 kind=capital difficulty=5 map="Map 9"
+node node-9 name="Larkmere" pos=549,361 owner=neutral kind=normal difficulty=4 map="Map 7"
+node node-10 name="Stormcross" pos=81,107 owner=neutral kind=normal difficulty=3 map="Map 4"
+node node-11 name="Crowhollow" pos=209,439 owner=player kind=normal difficulty=2 map="Map 3"
+link node-0 node-5 node-0 node-5 road
+link node-0 node-7 node-0 node-7 road
+link node-0 node-11 node-0 node-11 road
+link node-2 node-5 node-2 node-5 road
+link node-2 node-6 node-2 node-6 road
+link node-2 node-7 node-2 node-7 road
+link node-2 node-9 node-2 node-9 road
+link node-2 node-11 node-2 node-11 road
+link node-3 node-5 node-3 node-5 road
+link node-4 node-6 node-4 node-6 road
+link node-4 node-8 node-4 node-8 road
+link node-4 node-9 node-4 node-9 road
+link node-5 node-11 node-5 node-11 road
+link node-6 node-7 node-6 node-7 road
+link node-6 node-9 node-6 node-9 road
+link node-6 node-10 node-6 node-10 road
+link node-7 node-10 node-7 node-10 road
+link node-7 node-11 node-7 node-11 road
+link node-1 node-5 node-1 node-5 crossing

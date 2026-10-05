@@ -286,9 +286,11 @@ describe("Conquest generate form: order and wording", () => {
     expect(optionLabels(shape)).toEqual([
       "Surprise me",
       "One continent",
+      "Coast",
       "Two continents",
       "Archipelago",
       "Inland sea",
+      "Landlocked",
     ]);
     // Spiral is not a land shape, so the shape goes back to the default.
     expect(shape.value).toBe("random");
