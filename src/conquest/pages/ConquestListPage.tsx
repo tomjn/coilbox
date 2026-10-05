@@ -85,6 +85,12 @@ import {
 } from "../challenge";
 import { refreshGalaxies, useConquestState, useGalaxies } from "../conquests";
 import type { GenerateOptions } from "../generate";
+import {
+  GENERATE_CHOICES_KEY,
+  type GenerateChoices,
+  offeredOr,
+  readGenerateChoices,
+} from "../generateChoices";
 import { ARCHIVE_MAPS_DIR } from "../handmade/archive";
 import {
   type ConquestImportSettings,
@@ -130,17 +136,13 @@ import {
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import { maxUnlockedNodeCount } from "../size";
 import type { GeneratedTerrain } from "../terrainGen";
 import { generatedTerrain } from "../territories";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 import { MapErrorList } from "./components/MapErrorList";
-import {
-  type StartChoice,
-  StartPositionSelect,
-} from "./components/StartPositionSelect";
+import { StartPositionSelect } from "./components/StartPositionSelect";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
 /**
@@ -1273,37 +1275,50 @@ function GenerateGalaxyForm({
     [brandingEntry],
   );
 
-  const [size, setSize] = useState("18");
-  const [factions, setFactions] = useState("2");
-  const [layout, setLayout] = useState("random");
-  const [radius, setRadius] = useState(String(DEFAULT_RADIUS_LY));
-  const realStars = layout === "realstars";
-  const [style, setStyleChoice] = useState<MapSkin>("galaxy");
-  // Each style has its own shapes, so a shape the new style does not offer,
-  // such as real stars outside the Galaxy style, goes back to the default.
-  const setStyle = (next: string) => {
-    setStyleChoice(next as MapSkin);
-    if (!layoutOptionsFor(next as MapSkin).some((o) => o.value === layout)) {
-      setLayout("random");
-    }
+  // What the form remembers from the last map made, apart from the seed. What
+  // the player changes in this session is in `picked`, because the stored
+  // setting only reaches the form again the next time it opens.
+  const [remembered, setRemembered] = useSetting<unknown>(
+    GENERATE_CHOICES_KEY,
+    {},
+  );
+  const saved = readGenerateChoices(remembered);
+  const [picked, setPicked] = useState<Partial<GenerateChoices>>({});
+  const choices = { ...saved, ...picked };
+  const choose = (patch: Partial<GenerateChoices>) => {
+    setPicked((p) => ({ ...p, ...patch }));
+    setRemembered({ ...saved, ...picked, ...patch });
   };
+  // A remembered choice the form does not offer now, such as a size or level
+  // this game has not unlocked, goes back to the default.
+  const style: MapSkin = choices.style ?? "galaxy";
+  const layout = offeredOr(choices.layout, layoutOptionsFor(style), "random");
+  const radius = offeredOr(
+    choices.radius,
+    RADIUS_OPTIONS,
+    String(DEFAULT_RADIUS_LY),
+  );
+  const realStars = layout === "realstars";
   const land = isLandSkin(style);
   const noun = locationNoun(style);
-  const [starting, setStarting] = useState(STARTING_DEFAULT);
-  const [fog, setFog] = useState(false);
-  const [threatChoice, setThreatChoice] = useState(0);
+  const starting = offeredOr(
+    choices.starting,
+    startingOptions(noun, realStars),
+    STARTING_DEFAULT,
+  );
+  const factions = offeredOr(choices.factions, FACTION_OPTIONS, "2");
+  const fog = choices.fog ?? false;
   // Unlocks are per game, so a level chosen for one game never carries to a
   // game that has not unlocked it.
   const { unlocks } = useConquestUnlocks();
   const ceiling = unlockedLevel(unlocks, effectiveShort);
-  const threat = Math.min(threatChoice, ceiling);
-  // A size above 80 follows the same unlocks, so one chosen for a game that has
-  // not earned it is held to the largest it has.
-  const nodeCount = Math.min(Number(size), maxUnlockedNodeCount(ceiling));
-  const [startChoice, setStartChoice] = useState<StartChoice>("edge");
+  const threat = (choices.threat ?? 0) <= ceiling ? (choices.threat ?? 0) : 0;
+  // A size above 80 follows the same unlocks.
+  const size = offeredOr(choices.size, sizeOptions(ceiling, noun.many), "18");
+  const nodeCount = Number(size);
   const startUnlocked = startPositionUnlocked(unlocks, effectiveShort);
   const startPosition =
-    startChoice === "centre" && startUnlocked ? "centre" : undefined;
+    choices.start === "centre" && startUnlocked ? "centre" : undefined;
   const [seed, setSeed] = useState(() =>
     String(Math.floor(Math.random() * 100000)),
   );
@@ -1472,6 +1487,17 @@ function GenerateGalaxyForm({
       // A game reached from game detail is remembered too, not only one picked
       // in the select.
       setLastGame(gameChoiceKey(selected));
+      setRemembered({
+        style,
+        layout,
+        size,
+        radius,
+        factions,
+        starting,
+        fog,
+        threat,
+        start: startPosition ?? "edge",
+      } satisfies GenerateChoices);
       await refreshGalaxies();
       onCreated(id);
     } catch (e) {
@@ -1551,7 +1577,9 @@ function GenerateGalaxyForm({
                 ) : (
                   <OptionSelect
                     value={style}
-                    onValueChange={setStyle}
+                    onValueChange={(style) =>
+                      choose({ style: style as MapSkin })
+                    }
                     options={MAP_STYLE_OPTIONS}
                   />
                 )}
@@ -1560,7 +1588,7 @@ function GenerateGalaxyForm({
                 <span className="font-medium">Shape</span>
                 <OptionSelect
                   value={layout}
-                  onValueChange={setLayout}
+                  onValueChange={(layout) => choose({ layout })}
                   options={layoutOptionsFor(style)}
                 />
               </div>
@@ -1571,13 +1599,13 @@ function GenerateGalaxyForm({
                 {realStars ? (
                   <OptionSelect
                     value={radius}
-                    onValueChange={setRadius}
+                    onValueChange={(radius) => choose({ radius })}
                     options={RADIUS_OPTIONS}
                   />
                 ) : (
                   <OptionSelect
                     value={String(nodeCount)}
-                    onValueChange={setSize}
+                    onValueChange={(size) => choose({ size })}
                     options={sizeOptions(ceiling, noun.many)}
                   />
                 )}
@@ -1592,27 +1620,27 @@ function GenerateGalaxyForm({
                 <span className="font-medium">Opposition</span>
                 <OptionSelect
                   value={factions}
-                  onValueChange={setFactions}
+                  onValueChange={(factions) => choose({ factions })}
                   options={FACTION_OPTIONS}
                 />
               </div>
               <ThreatLevelSelect
                 value={threat}
                 ceiling={ceiling}
-                onChange={setThreatChoice}
+                onChange={(threat) => choose({ threat })}
               />
               {!realStars && (
                 <StartPositionSelect
                   value={startPosition ?? "edge"}
                   unlocked={startUnlocked}
-                  onChange={setStartChoice}
+                  onChange={(start) => choose({ start })}
                 />
               )}
               <div className="flex flex-col gap-1.5 text-sm">
                 <span className="font-medium">Starting territory</span>
                 <OptionSelect
                   value={starting}
-                  onValueChange={setStarting}
+                  onValueChange={(starting) => choose({ starting })}
                   options={startingOptions(noun, realStars)}
                 />
               </div>
@@ -1628,7 +1656,7 @@ function GenerateGalaxyForm({
                 <Switch
                   id="conquest-fog"
                   checked={fog}
-                  onCheckedChange={setFog}
+                  onCheckedChange={(fog) => choose({ fog })}
                 />
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
