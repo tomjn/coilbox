@@ -54,8 +54,8 @@ float tHash(vec2 p) {
 vec3 tNoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  vec2 du = 6.0 * f * (1.0 - f);
+  vec2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  vec2 du = 30.0 * f * f * (f * (f - 2.0) + 1.0);
   float a = tHash(i);
   float b = tHash(i + vec2(1.0, 0.0));
   float c = tHash(i + vec2(0.0, 1.0));
@@ -67,6 +67,31 @@ vec3 tNoise(vec2 p) {
     a + k1 * u.x + k2 * u.y + k4 * u.x * u.y,
     du * vec2(k1 + k4 * u.y, k2 + k4 * u.x)
   );
+}
+
+// Distance to the nearest of a scatter of points, one per cell, its gradient,
+// and a random 0 to 1 for the nearest point. Round blobs, for tree crowns.
+vec4 tCell(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  float best = 8.0;
+  vec2 toward = vec2(0.0);
+  float id = 0.0;
+  for (int y = -1; y <= 1; y++) {
+    for (int x = -1; x <= 1; x++) {
+      vec2 g = vec2(float(x), float(y));
+      vec2 o = vec2(tHash(i + g), tHash(i + g + 19.7));
+      vec2 d = g + 0.15 + o * 0.7 - f;
+      float dd = dot(d, d);
+      if (dd < best) {
+        best = dd;
+        toward = d;
+        id = tHash(i + g + 41.3);
+      }
+    }
+  }
+  float dist = sqrt(best);
+  return vec4(dist, -toward / max(dist, 1e-4), id);
 }
 
 // How much of a pattern of wavelength w (world units) to keep, given the
@@ -81,14 +106,19 @@ vec3 tField(vec2 p, float w0, int octaves, float footprint) {
   vec3 sum = vec3(0.0);
   float w = w0;
   float amp = 1.0;
+  // Each octave turns a little, so the noise's square lattice never lines up
+  // and shows as blocks.
+  mat2 turn = mat2(0.8, 0.6, -0.6, 0.8);
+  mat2 r = turn;
   for (int k = 0; k < 5; k++) {
     if (k >= octaves) break;
     float keep = tKeep(w, footprint);
     if (keep <= 0.0) break;
-    vec3 n = tNoise(p / w + float(k) * 17.0);
-    sum += vec3(n.x - 0.5, n.yz / w) * amp * keep;
+    vec3 n = tNoise(r * p / w + float(k) * 17.0);
+    sum += vec3(n.x - 0.5, (transpose(r) * n.yz) / w) * amp * keep;
     w /= 3.0;
     amp *= 0.5;
+    r = turn * r;
   }
   return sum;
 }
@@ -134,13 +164,15 @@ const FRAGMENT_BODY = /* glsl */ `
     float wTundra = tNear(s, T_TUNDRA, 0.1);
     float wRock = max(tNear(s, T_ROCK, 0.12), tNear(s, T_SCREE, 0.1));
     float wSnow = smoothstep(0.78, 0.9, min(s.r, min(s.g, s.b)));
+    // Shares of the land, which the sea has none of.
     float total = wForest + wGrass + wDry + wTundra + wRock + wSnow + 1e-3;
-    wForest /= total;
-    wGrass /= total;
-    wDry /= total;
-    wTundra /= total;
-    wRock /= total;
-    wSnow /= total;
+    float land = (1.0 - sea) / total;
+    wForest *= land;
+    wGrass *= land;
+    wDry *= land;
+    wTundra *= land;
+    wRock *= land;
+    wSnow *= land;
 
     // Steep ground shows bare rock, whatever grows on the level.
     float steep = smoothstep(0.08, 0.22, 1.0 - n.y) * (1.0 - sea);
@@ -154,10 +186,25 @@ const FRAGMENT_BODY = /* glsl */ `
 
     // Forest: a canopy of crowns with dark gaps between them.
     {
-      vec3 crown = tField(p + 7.0, 0.32, 3, footprint);
-      float c = smoothstep(-0.25, 0.25, crown.x + broad.x * 0.3);
-      shadeMul += wForest * ((c - 0.55) * 0.75 + broad.x * 0.25);
-      bump += wForest * crown.yz * 0.9;
+      // Clumps of trees, and the crowns within them, each domed with dark
+      // gaps between. The dome's slope is steepest at its rim and faces out
+      // from its centre.
+      shadeMul += wForest * (broad.x * 0.3 + fine.x * 0.15);
+      // Where the broad noise is low the trees thin out into clearings.
+      float thin = smoothstep(0.05, -0.25, broad.x);
+      for (int k = 0; k < 2; k++) {
+        float size = k == 0 ? 0.5 : 0.17;
+        float keep = tKeep(size, footprint);
+        vec4 cell = tCell(p / size + float(k) * 7.3 + fine.x * 0.5);
+        // Each crown a little bigger or smaller, lighter or darker.
+        float reach = 0.45 + 0.25 * cell.w - thin * 0.25;
+        float dome = 1.0 - smoothstep(0.05, reach, cell.x);
+        float tone = (cell.w - 0.5) * 0.35;
+        shadeMul += wForest * keep * ((dome - 0.6) * (k == 0 ? 0.45 : 0.4) + tone * dome);
+        bump += wForest * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.12 : 0.05);
+      }
+      // Clearings show grass between the trees.
+      albedo = mix(albedo, pow(T_GRASS, vec3(2.2)), wForest * thin * 0.5);
     }
     // Grass: lighter and darker patches with a fine grain.
     {
