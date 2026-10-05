@@ -102,36 +102,40 @@ const EDGE_BLUR = 24;
 /** How far past the edge, in sheets, the edge's colours fade into their
  * average. */
 const BEYOND_FADE = 0.25;
-/** How bright the world beyond is, against 1 on the map, right at the edge
- * and once faded. */
-const BEYOND_NEAR = 0.85;
-const BEYOND_FAR = 0.6;
 /** Pixels across and down the picture of the world beyond. */
 const BEYOND_PIXELS = 192;
-/** How far under the sheet the world beyond lies, in world units, so the two
- * never fight over the same depth. */
-const BEYOND_DROP = 0.05;
 
 /**
  * A picture of the world beyond the map: `BEYOND_SHEETS` sheets past every
  * edge, with the map's own place in the middle. Past each edge it shows the
- * colours along that edge, blurred, fading into their average and darkening
- * further out, so land that runs off the map trails off as land and sea as
- * sea, and the edge of the map still shows.
+ * colours along that edge, blurred and fading into their average further out,
+ * so land that runs off the map trails off as land and sea as sea. It is as
+ * bright as the map, so no seam shows at the edge.
  */
 export function beyondPixels(pixels: ColorPixels): ColorPixels {
   const { data, width, height } = pixels;
   const mean = edgeColor(pixels);
   const at = (x: number, y: number, c: number) => data[(y * width + x) * 4 + c];
-  /** The edge colour nearest a point given in picture pixels, averaged. */
-  const edgeNear = (x: number, y: number): [number, number, number] => {
+  /**
+   * The edge colour nearest a point given in picture pixels, averaged along
+   * the edge only. Across an edge the blur stays on the edge pixel itself, so
+   * a lighter shallow just inside the map does not lighten the world beyond.
+   */
+  const edgeNear = (
+    x: number,
+    y: number,
+    acrossX: boolean,
+    acrossY: boolean,
+  ): [number, number, number] => {
     const cx = Math.min(width - 1, Math.max(0, Math.floor(x)));
     const cy = Math.min(height - 1, Math.max(0, Math.floor(y)));
+    const bx = acrossX ? 0 : EDGE_BLUR;
+    const by = acrossY ? 0 : EDGE_BLUR;
     const sum = [0, 0, 0];
     let n = 0;
-    for (let yy = cy - EDGE_BLUR; yy <= cy + EDGE_BLUR; yy++) {
+    for (let yy = cy - by; yy <= cy + by; yy++) {
       if (yy < 0 || yy >= height) continue;
-      for (let xx = cx - EDGE_BLUR; xx <= cx + EDGE_BLUR; xx++) {
+      for (let xx = cx - bx; xx <= cx + bx; xx++) {
         if (xx < 0 || xx >= width) continue;
         for (let c = 0; c < 3; c++) sum[c] += at(xx, yy, c);
         n++;
@@ -150,11 +154,10 @@ export function beyondPixels(pixels: ColorPixels): ColorPixels {
       const cv = Math.min(1, Math.max(0, v));
       const d = Math.sqrt((u - cu) * (u - cu) + (v - cv) * (v - cv));
       const t = Math.min(1, d / BEYOND_FADE);
-      const edge = edgeNear(cu * width, cv * height);
-      const shade = BEYOND_NEAR + (BEYOND_FAR - BEYOND_NEAR) * t;
+      const edge = edgeNear(cu * width, cv * height, cu !== u, cv !== v);
       const o = (j * BEYOND_PIXELS + i) * 4;
       for (let c = 0; c < 3; c++) {
-        out[o + c] = (edge[c] + (mean[c] - edge[c]) * t) * shade;
+        out[o + c] = edge[c] + (mean[c] - edge[c]) * t;
       }
       out[o + 3] = 255;
     }
@@ -194,21 +197,28 @@ function buildBeyond(
   // The plane's own coordinates run bottom up and the picture top down.
   const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
   for (let i = 0; i < uv.count; i++) uv.setY(i, 1 - uv.getY(i));
-  const mat = new THREE.MeshBasicMaterial({ map: tex });
+  // Drawn first and kept out of the depth buffer, so the sheet always covers
+  // it. Any gap in depth between the two is below the buffer's precision at a
+  // far zoom, and the two fought there as dark streaks.
+  const mat = new THREE.MeshBasicMaterial({
+    map: tex,
+    depthTest: false,
+    depthWrite: false,
+  });
   disposables.push(geo, mat, tex);
   const plane = new THREE.Mesh(geo, mat);
   plane.name = "beyond-the-map";
+  plane.renderOrder = -10;
   plane.rotation.x = -Math.PI / 2;
-  plane.position.y = -BEYOND_DROP;
   // Decoration: picking goes to the sheet and what stands on it.
   plane.raycast = () => {};
   scene.add(plane);
 
   const [r, g, b] = edgeColor(pixels);
   scene.background = new THREE.Color().setRGB(
-    (r * BEYOND_FAR) / 255,
-    (g * BEYOND_FAR) / 255,
-    (b * BEYOND_FAR) / 255,
+    r / 255,
+    g / 255,
+    b / 255,
     THREE.SRGBColorSpace,
   );
 }
