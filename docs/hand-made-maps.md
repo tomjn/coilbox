@@ -393,9 +393,34 @@ A location can play a scenario in place of a skirmish. Set `scenario` to the nam
 - The scenario must be for the same game as the map. Coilbox checks the export's game shortname against `game.shortname`, and the scenario's game against `game.pinnedName` when the map has one. A bare scenario document on a map with no `pinnedName` cannot be checked until it is played, and the launch refuses it then if the game differs.
 - The scenario needs a game and a map set in the scenario builder.
 - The player plays it once, when they first attack the location. After they win it, any later attack on the location is a skirmish on the scenario's map. A defeat leaves the scenario to try again.
-- A scenario location always plays at the default difficulty. The location's `difficulty` does not change it. This is issue #3593.
+- The player does not pick the scenario's difficulty. Coilbox works it out from what the player chose when they started, as described below, and the briefing shows it.
 - In Warpath the scenario plays as you set it up. The run's unit limit and perks are not applied to it.
 - Coilbox decides the result from the replay. When it cannot, the briefing asks the player whether they won.
+
+### How hard a scenario location plays
+
+This only matters for a scenario where something is set to appear only on some difficulties. A scenario with nothing like that plays the same whatever the level, and coilbox does not set one.
+
+In Conquest the level comes from the threat level the player started at and the location's `difficulty`, which count equally. A higher threat level or a higher `difficulty` never makes it easier.
+
+| Threat level | `difficulty` 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| 0 | Easy | Easy | Easy | Normal | Normal |
+| 1 | Easy | Easy | Normal | Normal | Hard |
+| 2 | Normal | Normal | Normal | Hard | Hard |
+| 3 | Normal | Normal | Hard | Hard | Hard |
+
+In Warpath the level comes from the run's difficulty and how far along the route the location is, which count equally. Coilbox measures how far along by the same tech tier the skirmishes around it use, from 1 at the start to 5 at the goal. Ascension adds to the run's difficulty, as it does for a skirmish, up to the top row.
+
+| Run difficulty | Tier 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|
+| 1 | Easy | Easy | Easy | Normal | Normal |
+| 2 | Easy | Easy | Normal | Normal | Normal |
+| 3 | Easy | Normal | Normal | Normal | Hard |
+| 4 | Normal | Normal | Normal | Hard | Hard |
+| 5 or more | Normal | Normal | Hard | Hard | Hard |
+
+Defending a scenario location in Conquest is a skirmish, so the location's `difficulty` sets it as it does any other.
 
 ## Versions and challenge codes
 
