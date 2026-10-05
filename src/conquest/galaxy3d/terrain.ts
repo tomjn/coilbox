@@ -335,7 +335,7 @@ export function terrainTriangles(
 }
 
 /** Share of the light that reaches a slope facing away from the sun. */
-const SHADE_AMBIENT = 0.45;
+export const SHADE_AMBIENT = 0.45;
 
 /**
  * Direction to the sun, as world `[x, y, z]` before normalising: high in the
@@ -343,45 +343,55 @@ const SHADE_AMBIENT = 0.45;
  */
 const SUN: [number, number, number] = [-1, 1.5, -1];
 
+/** {@link SUN} normalised, for the terrain shader. */
+export const TERRAIN_SUN: [number, number, number] = (() => {
+  const length = Math.hypot(SUN[0], SUN[1], SUN[2]);
+  return [SUN[0] / length, SUN[1] / length, SUN[2] / length];
+})();
+
 /**
- * Brightness for each mesh vertex, a multiplier on the map picture. Level
- * ground is exactly 1, so a flat sheet shows the picture unchanged. A slope
- * facing the sun is brighter than 1 and a slope facing away is darker, down
- * to {@link SHADE_AMBIENT}. The light is fixed to the map and not the camera,
- * so relief reads the same from every heading.
+ * The ground's normal and height at every heightmap pixel, as RGBA bytes for
+ * a texture laid over the sheet, top row first. Red, green and blue hold the
+ * world normal's x, y and z, mapped from -1 to 1 onto 0 to 255. Alpha holds
+ * the height, 0 to 255. It is read at the heightmap's own resolution, so the
+ * light picks out ridges finer than the mesh.
  */
-export function terrainShades(surface: TerrainSurface): Float32Array {
-  const { segmentsX, segmentsY, vertexHeights } = surface;
-  const cols = segmentsX + 1;
-  const shades = new Float32Array(cols * (segmentsY + 1)).fill(1);
-  if (surface.maxHeight === 0) return shades;
-  const stepX = surface.worldWidth / segmentsX;
-  const stepZ = surface.worldDepth / segmentsY;
-  const sunLength = Math.hypot(SUN[0], SUN[1], SUN[2]);
-  const sx = SUN[0] / sunLength;
-  const sy = SUN[1] / sunLength;
-  const sz = SUN[2] / sunLength;
-  for (let j = 0; j <= segmentsY; j++) {
-    for (let i = 0; i <= segmentsX; i++) {
-      // Slope from the neighbours either side, one sided at the sheet's edge.
-      const i0 = Math.max(0, i - 1);
-      const i1 = Math.min(segmentsX, i + 1);
-      const j0 = Math.max(0, j - 1);
-      const j1 = Math.min(segmentsY, j + 1);
+export function terrainNormalPixels(
+  surface: TerrainSurface,
+  grid: HeightGrid,
+): Uint8Array {
+  const { width, height, data } = grid;
+  const out = new Uint8Array(width * height * 4);
+  const toWorld = surface.heightScale * surface.scale;
+  const stepX = surface.worldWidth / Math.max(1, width - 1);
+  const stepZ = surface.worldDepth / Math.max(1, height - 1);
+  const byte = (v: number) => Math.round((v * 0.5 + 0.5) * 255);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      // Slope from the neighbours either side, one sided at the edge.
+      const x0 = Math.max(0, x - 1);
+      const x1 = Math.min(width - 1, x + 1);
+      const y0 = Math.max(0, y - 1);
+      const y1 = Math.min(height - 1, y + 1);
       const slopeX =
-        (vertexHeights[j * cols + i1] - vertexHeights[j * cols + i0]) /
-        ((i1 - i0) * stepX);
+        x1 === x0
+          ? 0
+          : ((data[y * width + x1] - data[y * width + x0]) * toWorld) /
+            ((x1 - x0) * stepX);
       const slopeZ =
-        (vertexHeights[j1 * cols + i] - vertexHeights[j0 * cols + i]) /
-        ((j1 - j0) * stepZ);
-      // The surface normal is (-slopeX, 1, -slopeZ), normalised.
+        y1 === y0
+          ? 0
+          : ((data[y1 * width + x] - data[y0 * width + x]) * toWorld) /
+            ((y1 - y0) * stepZ);
       const length = Math.hypot(slopeX, 1, slopeZ);
-      const facing = Math.max(0, (-slopeX * sx + sy - slopeZ * sz) / length);
-      shades[j * cols + i] =
-        SHADE_AMBIENT + (1 - SHADE_AMBIENT) * (facing / sy);
+      const o = (y * width + x) * 4;
+      out[o] = byte(-slopeX / length);
+      out[o + 1] = byte(1 / length);
+      out[o + 2] = byte(-slopeZ / length);
+      out[o + 3] = Math.round(clamp01(data[y * width + x]) * 255);
     }
   }
-  return shades;
+  return out;
 }
 
 /** Orbit limits for a terrain map, in the terms `OrbitControls` takes. */
