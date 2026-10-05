@@ -138,6 +138,18 @@ export function runFromChallenge(
       "This challenge is played on a map this install cannot find or rebuild.",
     );
   }
+  // The caller is expected to have checked this and said so in full (see
+  // `checkChallengeMap`). It is checked again here so no caller can start a
+  // challenge on another version of its map.
+  if (
+    settings.map.source === "handmade" &&
+    settings.map.fingerprint &&
+    source.map.handmade?.fingerprint !== settings.map.fingerprint
+  ) {
+    throw new Error(
+      "This challenge was made on a different version of its hand-made map than the one installed here.",
+    );
+  }
   const run = generateMapRun({ ...opts, ...source, mapRef: settings.map });
   return applyChallengeMaps(run, settings.nodeMaps, env.maps);
 }

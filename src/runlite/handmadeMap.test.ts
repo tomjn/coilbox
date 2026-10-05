@@ -100,6 +100,8 @@ describe("a Warpath run on the sample map", () => {
       expect(run.settings.map).toEqual({
         source: "handmade",
         id: "sample-two-shores",
+        fingerprint: doc.handmade?.fingerprint,
+        title: "Two Shores",
       });
     }
   });

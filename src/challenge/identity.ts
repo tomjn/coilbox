@@ -2,6 +2,12 @@ import {
   type ConquestChallengeSettings,
   challengeSettingsFromGalaxy,
 } from "../conquest/challenge";
+import {
+  type ConquestImportSettings,
+  type HandmadeConquestChallengeSettings,
+  handmadeChallengeSettings,
+  isHandmadeChallenge,
+} from "../conquest/handmade/challenge";
 import type { GalaxyDoc } from "../conquest/model";
 import { readThreatLevel } from "../conquest/threat";
 import type { RogueliteRun, RunSettings } from "../runlite/model";
@@ -48,10 +54,46 @@ export function conquestIdentity(s: ConquestChallengeSettings): string {
 }
 
 /**
- * The identity of a conquest galaxy, or null when it has no generation knobs
- * (an authored or bundled galaxy, which no code can be made from).
+ * The identity of a conquest challenge on a hand-made map. The map's id and
+ * fingerprint stand where a generated challenge has its generator settings, so
+ * results on different maps, or on different versions of one map, are never
+ * compared. The battle maps of the locations the author left blank follow, in
+ * id order, because the map does not settle them and two conquests on other
+ * battlefields are not the same challenge. The map's title is a label and is
+ * left out.
+ */
+export function handmadeConquestIdentity(
+  s: HandmadeConquestChallengeSettings,
+): string {
+  return JSON.stringify([
+    "conquest",
+    s.game.shortname,
+    "handmade",
+    s.map.id,
+    s.map.fingerprint ?? null,
+    s.fogOfWar === true,
+    readThreatLevel(s.threatLevel),
+    Object.entries(s.nodeMaps ?? {}).sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    ),
+  ]);
+}
+
+/** The identity of a decoded conquest code of either sort. */
+export function conquestImportIdentity(s: ConquestImportSettings): string {
+  return isHandmadeChallenge(s)
+    ? handmadeConquestIdentity(s)
+    : conquestIdentity(s);
+}
+
+/**
+ * The identity of a conquest map, or null when no code can be made from it: an
+ * authored or bundled galaxy, which has no generation knobs and is no
+ * hand-made map.
  */
 export function galaxyIdentity(galaxy: GalaxyDoc): string | null {
+  const handmade = handmadeChallengeSettings(galaxy);
+  if (handmade) return handmadeConquestIdentity(handmade);
   const settings = challengeSettingsFromGalaxy(galaxy);
   return settings ? conquestIdentity(settings) : null;
 }

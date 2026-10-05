@@ -24,7 +24,7 @@ import {
   substitutedMapCount,
   type WarpathChallengeSettings,
 } from "../../challenge";
-import { loadHandmadeRunMap } from "../../handmadeMap";
+import { loadChallengeRunMap } from "../../handmadeMap";
 import type { RunMapSource } from "../../mapRun";
 import { useRuns } from "../../runs";
 import { buildGraphFor, setupLimitWarning } from "../../unitLimit";
@@ -103,16 +103,17 @@ export function ImportChallengeForm({
       );
     }
 
-    // A challenge made on a hand-made map needs that map installed here. It is
-    // read before anything else is asked, so the player hears of it first.
+    // A challenge made on a hand-made map needs that map installed here, in
+    // the version the challenge was made on. It is read before anything else
+    // is asked, so the player hears of it first. Nothing is generated in its
+    // place, because that would be a different challenge under the same code.
     let handmade: RunMapSource | undefined;
     if (settings.map?.source === "handmade") {
-      const loaded = await loadHandmadeRunMap(settings.map.id);
-      if (!loaded.ok) {
-        throw new Error(
-          `This challenge is played on a hand-made map that cannot be used here. ${loaded.message} Import the map from the Conquest page, then try again.`,
-        );
-      }
+      const loaded = await loadChallengeRunMap(
+        settings.map,
+        installedGame.name,
+      );
+      if (!loaded.ok) throw new Error(loaded.message);
       handmade = loaded.source;
     }
 
