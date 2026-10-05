@@ -1,5 +1,6 @@
 import { handmadeMapRefFor } from "../challenge/mapRef";
 import { generateCities } from "../conquest/cities";
+import type { GenerateOptions } from "../conquest/generate";
 import type {
   GalaxyDoc,
   GameRef,
@@ -7,6 +8,7 @@ import type {
   NodeScenario,
 } from "../conquest/model";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
+import { LAND_LAYOUTS } from "../conquest/terrainGen";
 import { generateTerritories } from "../conquest/territories";
 import {
   assembleRun,
@@ -340,7 +342,14 @@ export interface RunMapSource {
 /** Finds a hand-made map by id. Null when this install does not have it. */
 export type HandmadeMapLookup = (id: string) => RunMapSource | null;
 
-const MAP_LAYOUTS = ["scatter", "spiral", "clusters", "ring", "random"];
+const MAP_LAYOUTS: readonly string[] = [
+  ...LAND_LAYOUTS,
+  "scatter",
+  "spiral",
+  "clusters",
+  "ring",
+  "random",
+];
 
 /** The generators a map can be built again with, by the style it records. */
 const MAP_GENERATORS: Record<
@@ -366,7 +375,7 @@ export function resolveRunMap(
   if (!Object.hasOwn(MAP_GENERATORS, ref.style)) return null;
   const generate = MAP_GENERATORS[ref.style];
   const layout = MAP_LAYOUTS.includes(ref.layout ?? "")
-    ? (ref.layout as "scatter" | "spiral" | "clusters" | "ring" | "random")
+    ? (ref.layout as GenerateOptions["layout"])
     : undefined;
   try {
     return {
@@ -529,28 +538,29 @@ export function runNodeScenario(
 
 /**
  * How many locations the generated map has for each run length. The map
- * decides how long a land run is, so these are the sizes whose routes come out
- * nearest the column runs of 6, 9 and 13. Measured over seeds 1 to 200 with the
- * layout left to the seed, the median route was 7, 9 and 13 locations long on
- * Cities maps of 18, 28 and 56, and 6, 9 and 13 on Territories maps of 12, 18
- * and 40.
+ * decides how long a land run is, so these are the smallest sizes whose routes
+ * come out at the column runs of 6, 9 and 13. Measured over seeds 1 to 200
+ * with the layout left to the seed and the retry below in place, the median
+ * route was 6, 9 and 13 locations long on Cities maps of 12, 22 and 48, and on
+ * Territories maps of 14, 32 and 72.
  */
 export const LAND_RUN_SIZES: Record<
   "cities" | "territories",
   Record<RunLength, number>
 > = {
-  cities: { quick: 18, standard: 28, long: 56 },
-  territories: { quick: 12, standard: 18, long: 40 },
+  cities: { quick: 12, standard: 22, long: 48 },
+  territories: { quick: 14, standard: 32, long: 72 },
 };
 
 /**
  * How many maps {@link generateStyledRun} builds before it accepts a run with
- * no choice of route. A small Territories map is often close to a tree, where
- * no two of the furthest locations have two ways between them. Over seeds 1 to
- * 200 that was 73 maps of 12 provinces, 25 of 18, 2 of 40, and no Cities map
- * of 18, 28 or 56. The most maps any of those 1200 runs needed was 7. At the
- * worst rate, 73 in 200, sixteen maps in a row fail about once in ten million
- * runs, so the limit is there to end the loop and not to be met.
+ * no choice of route. A small land map is often close to a tree, where no two
+ * of the furthest locations have two ways between them. Over seeds 1 to 200
+ * that was 41 first maps of 14 provinces, 10 of 32 and none of 72, and 77
+ * first maps of 12 cities, 29 of 22 and 7 of 48. The most maps any of those
+ * 1200 runs needed was 7. At the worst rate, 77 in 200, sixteen maps in a row
+ * fail about once in four million runs, so the limit is there to end the loop
+ * and not to be met.
  */
 const LAND_MAP_TRIES = 16;
 

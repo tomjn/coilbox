@@ -49,7 +49,11 @@ type Pt = [number, number];
 const COAST_REACH = 8;
 /** A road whose highest point is above this height, out of 255, crosses
  * mountains, and is left out when the map stays connected without it. */
-const MOUNTAIN_ROAD = 110;
+const MOUNTAIN_ROAD = 150;
+/** A road is crowded when a third city sits inside the circle on it, by this
+ * much: the squared distances from the third city to its ends sum to less
+ * than this share of the road's own squared length. */
+const CROWDED = 0.6;
 /** A road with more than this many sea pixels under it crosses water. */
 const WET_ROAD = 2;
 
@@ -137,7 +141,7 @@ function chooseRoads(
     for (let c = 0; c < sites.length && !crowded; c++) {
       if (c === a || c === b) continue;
       const pc = xy(c);
-      crowded = d2(pa, pc) + d2(pc, pb) < span;
+      crowded = d2(pa, pc) + d2(pc, pb) < CROWDED * span;
     }
     return { pair: [a, b] as [number, number], top, wet, crowded };
   });
