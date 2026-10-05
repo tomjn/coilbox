@@ -32,6 +32,12 @@ export const DIFFICULTY_LABEL: Record<Difficulty, string> = {
   hard: "Hard",
 };
 
+/** A whole number from `lo` to `hi`, and `lo` for anything that is not a
+ * number, so a damaged save plays at the easiest level rather than at none. */
+function whole(value: number, lo: number, hi: number): number {
+  return Number.isFinite(value) ? clamp(Math.round(value), lo, hi) : lo;
+}
+
 /**
  * The level for two inputs, each a whole number from 0 to its own top. The
  * shares are put over a common denominator, `aTop * bTop` each, so the mean of
@@ -63,8 +69,7 @@ export function conquestScenarioDifficulty(
 ): Difficulty {
   const threat = readThreatLevel(threatLevel);
   const location =
-    clamp(Math.round(locationDifficulty), MIN_DIFFICULTY, MAX_DIFFICULTY) -
-    MIN_DIFFICULTY;
+    whole(locationDifficulty, MIN_DIFFICULTY, MAX_DIFFICULTY) - MIN_DIFFICULTY;
   return evenBands(
     threat,
     MAX_THREAT_LEVEL,
@@ -96,14 +101,13 @@ export function warpathScenarioDifficulty(
   techTier: number,
 ): Difficulty {
   const chosenTop = MAX_RUN_DIFFICULTY - MIN_RUN_DIFFICULTY;
-  const chosen = clamp(
-    Math.round(runDifficulty) +
-      Math.max(0, Math.round(ascension)) -
-      MIN_RUN_DIFFICULTY,
-    0,
+  const chosen = Math.min(
     chosenTop,
+    whole(runDifficulty, MIN_RUN_DIFFICULTY, MAX_RUN_DIFFICULTY) +
+      whole(ascension, 0, chosenTop) -
+      MIN_RUN_DIFFICULTY,
   );
-  const depth = clamp(Math.round(techTier), 1, MAX_TIER) - 1;
+  const depth = whole(techTier, 1, MAX_TIER) - 1;
   return evenBands(chosen, chosenTop, depth, MAX_TIER - 1);
 }
 

@@ -104,6 +104,13 @@ describe("warpathScenarioDifficulty", () => {
     expect(warpathScenarioDifficulty(5, 0, 99)).toBe("hard");
     expect(warpathScenarioDifficulty(1, 0, 0)).toBe("easy");
   });
+
+  it("reads anything that is not a number as the easiest value", () => {
+    expect(warpathScenarioDifficulty(Number.NaN, Number.NaN, Number.NaN)).toBe(
+      "easy",
+    );
+    expect(conquestScenarioDifficulty(0, Number.NaN)).toBe("easy");
+  });
 });
 
 describe("scenarioLevel", () => {
