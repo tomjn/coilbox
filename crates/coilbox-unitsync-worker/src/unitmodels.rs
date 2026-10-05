@@ -103,8 +103,7 @@ pub(crate) fn resolve(
 
     let teamtex = crate::unitmodel::read_teamtex(us, handle, &list);
     let palette = crate::unitmodel::read_palette(us);
-    let base_content =
-        crate::unitmodel::ModelArchive::open(us, crate::unitmodel::BASE_CONTENT_ARCHIVE);
+    let fallbacks = crate::unitmodel::fallback_archives(us, game_archive);
     let key_base = crate::unitmodel::cache_key_base(us, game_archive, Some(cache_dir));
     let mut models = BTreeMap::new();
     let mut skipped = BTreeMap::new();
@@ -130,7 +129,7 @@ pub(crate) fn resolve(
                             cache,
                             game_archive,
                             object,
-                            base_content.as_ref(),
+                            &fallbacks,
                         );
                         write_model(cache_dir, &base, model, &mut written)
                     })
@@ -150,8 +149,8 @@ pub(crate) fn resolve(
         )),
     }
 
-    if let Some(base_content) = base_content {
-        base_content.close(us);
+    for archive in fallbacks {
+        archive.close(us);
     }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
