@@ -33,6 +33,9 @@ export const LAND_LAYOUTS: readonly LandLayout[] = [
   "inlandsea",
 ];
 
+export const isLandLayout = (value: unknown): value is LandLayout =>
+  LAND_LAYOUTS.includes(value as LandLayout);
+
 /** Kept as a name for the land layout, which is what a terrain's shape is. */
 export type TerrainShape = LandLayout;
 
@@ -178,6 +181,49 @@ export function fractalNoise(
   return sum / total;
 }
 
+/**
+ * {@link fractalNoise} over a whole grid, measured every `step` pixels and
+ * blended in between. A field whose finest octave spans several steps loses
+ * nothing to this and costs a sixteenth as much at a step of 4. Points are
+ * pixel centres divided by `cell`.
+ */
+export function coarseNoise(
+  width: number,
+  height: number,
+  cell: number,
+  seed: number,
+  octaves: number,
+  step = 4,
+): Float64Array {
+  const gw = Math.floor(width / step) + 2;
+  const gh = Math.floor(height / step) + 2;
+  const grid = new Float64Array(gw * gh);
+  for (let gy = 0; gy < gh; gy++) {
+    for (let gx = 0; gx < gw; gx++) {
+      grid[gy * gw + gx] = fractalNoise(
+        (gx * step + 0.5) / cell,
+        (gy * step + 0.5) / cell,
+        seed,
+        octaves,
+      );
+    }
+  }
+  const out = new Float64Array(width * height);
+  for (let y = 0; y < height; y++) {
+    const gy = Math.floor(y / step);
+    const ty = (y - gy * step) / step;
+    for (let x = 0; x < width; x++) {
+      const gx = Math.floor(x / step);
+      const tx = (x - gx * step) / step;
+      const i = gy * gw + gx;
+      const top = grid[i] + (grid[i + 1] - grid[i]) * tx;
+      const bottom = grid[i + gw] + (grid[i + gw + 1] - grid[i + gw]) * tx;
+      out[y * width + x] = top + (bottom - top) * ty;
+    }
+  }
+  return out;
+}
+
 /** A random seed for one noise field. */
 const noiseSeed = (rng: Rng) => Math.floor(rng() * 4294967296) | 0;
 
@@ -222,17 +268,20 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       const gap = (0.2 + rng() * 0.03) * S;
       const slide = (rng() - 0.5) * 0.12 * S;
       const perp: Vec = [-u[1], u[0]];
+      // One continent is larger than the other.
+      const big = 1 + rng() * 0.12;
+      const small = 0.72 + rng() * 0.15;
       const a = ellipse(
         [c + u[0] * gap + perp[0] * slide, c + u[1] * gap + perp[1] * slide],
         perp,
-        (0.28 + rng() * 0.05) * S,
-        (0.15 + rng() * 0.03) * S,
+        (0.28 + rng() * 0.05) * S * big,
+        (0.15 + rng() * 0.03) * S * big,
       );
       const b = ellipse(
         [c - u[0] * gap - perp[0] * slide, c - u[1] * gap - perp[1] * slide],
         perp,
-        (0.28 + rng() * 0.05) * S,
-        (0.15 + rng() * 0.03) * S,
+        (0.28 + rng() * 0.05) * S * small,
+        (0.15 + rng() * 0.03) * S * small,
       );
       const strait = 0.05 * S;
       return {
@@ -308,16 +357,29 @@ function planShape(shape: LandLayout, rng: Rng): ShapePlan {
       };
     }
     default: {
-      // One large continent, a little off centre and longer one way.
+      // One large continent, a little off centre and longer one way, with a
+      // smaller lobe off one side so the outline is not an oval.
       const u = unitVector(rng);
-      const m = ellipse(
-        [c + (rng() - 0.5) * 0.08 * S, c + (rng() - 0.5) * 0.08 * S],
+      const centre: Vec = [
+        c + (rng() - 0.5) * 0.08 * S,
+        c + (rng() - 0.5) * 0.08 * S,
+      ];
+      const main = ellipse(
+        centre,
         u,
-        (0.27 + rng() * 0.05) * S,
-        (0.19 + rng() * 0.05) * S,
+        (0.25 + rng() * 0.05) * S,
+        (0.17 + rng() * 0.05) * S,
+      );
+      const w = unitVector(rng);
+      const reach = (0.2 + rng() * 0.06) * S;
+      const lobe = ellipse(
+        [centre[0] + w[0] * reach, centre[1] + w[1] * reach],
+        unitVector(rng),
+        (0.13 + rng() * 0.04) * S,
+        (0.08 + rng() * 0.03) * S,
       );
       return {
-        mask: m,
+        mask: (x, y) => Math.max(main(x, y), lobe(x, y)),
         landShare: 0.28,
         minMass: 900,
         warp: 70,
@@ -439,6 +501,8 @@ const LAND_RAMP: [number, Rgb][] = [
 ];
 const SEA_SHALLOW: Rgb = [70, 140, 170];
 const SEA_DEEP: Rgb = [24, 58, 96];
+/** Coast distance, in thirds of a pixel, at which the sea is fully deep. */
+const SEA_DEPTH = 108;
 
 function landColour(h: number): Rgb {
   for (let i = 1; i < LAND_RAMP.length; i++) {
@@ -474,7 +538,7 @@ export function terrainPixelAt(
 
 /** Each pixel becomes what at least five of the nine around it are. */
 function majority(land: Uint8Array): Uint8Array {
-  const out = new Uint8Array(S * S);
+  const out: Uint8Array = new Uint8Array(S * S);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       let n = 0;
@@ -527,15 +591,17 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const plan = planShape(opts.shape, rng);
 
   // Elevation: the shape, bent by the coordinate noise, plus fractal noise.
+  const bendX = coarseNoise(S, S, 128, warpX, 4);
+  const bendY = coarseNoise(S, S, 128, warpY, 4);
+  const base = coarseNoise(S, S, 80, baseSeed, 5, 2);
   const elevation = new Float64Array(S * S);
   for (let y = 0; y < S; y++) {
     const py = y + 0.5;
     for (let x = 0; x < S; x++) {
       const px = x + 0.5;
-      const wx = px + plan.warp * (fractalNoise(px / 128, py / 128, warpX, 4) - 0.5) * 2;
-      const wy = py + plan.warp * (fractalNoise(px / 128, py / 128, warpY, 4) - 0.5) * 2;
-      const n = fractalNoise(wx / 80, wy / 80, baseSeed, 6);
-      let e = plan.mask(wx, wy) + plan.roughness * (n - 0.5) * 2.8;
+      const wx = px + plan.warp * (bendX[y * S + x] - 0.5) * 2;
+      const wy = py + plan.warp * (bendY[y * S + x] - 0.5) * 2;
+      let e = plan.mask(wx, wy) + plan.roughness * (base[y * S + x] - 0.5) * 2.8;
       const edge = Math.min(px, py, S - px, S - py);
       if (edge < EDGE_MARGIN) {
         const t = 1 - edge / EDGE_MARGIN;
@@ -546,7 +612,7 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   }
   const seaLevel = quantile(elevation, 1 - plan.landShare);
 
-  let land = new Uint8Array(S * S);
+  let land: Uint8Array = new Uint8Array(S * S);
   for (let i = 0; i < land.length; i++) land[i] = elevation[i] > seaLevel ? 1 : 0;
   // Two passes of a three by three majority vote take out cracks and spurs a
   // pixel wide, which read as noise rather than coast.
@@ -578,6 +644,9 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
 
   const coastDistance = coastDistanceOf(land, S, S);
 
+  const ranges = coarseNoise(S, S, 170, rangeSeed, 2);
+  const hillField = coarseNoise(S, S, 40, hillSeed, 3);
+  const ridges = coarseNoise(S, S, 80, ridgeSeed, 5, 2);
   const heightmap = new Uint8Array(S * S);
   for (let y = 0; y < S; y++) {
     const py = y + 0.5;
@@ -589,38 +658,48 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       const t = clamp01(coastDistance[i] / (3 * 40));
       const inland = t * (2 - t);
       // Ridges where the noise crosses its middle, gathered into ranges.
-      const r = 1 - Math.abs(fractalNoise(px / 80, py / 80, ridgeSeed, 5) - 0.5) * 2;
+      const r = 1 - Math.abs(ridges[i] - 0.5) * 2;
       const ridge = r * r * r;
-      const range = clamp01((fractalNoise(px / 170, py / 170, rangeSeed, 2) - 0.47) * 4);
-      const hills = fractalNoise(px / 40, py / 40, hillSeed, 3);
+      const range = clamp01((ranges[i] - 0.47) * 4);
+      const hills = hillField[i];
       const h = clamp01(inland * (0.06 + 0.2 * hills + 0.75 * range * ridge));
       heightmap[i] = 1 + Math.floor(h * 254);
     }
   }
 
+  // Colours by height for land and by distance from the coast for sea,
+  // worked out once per value rather than once per pixel.
+  const landRamp = Array.from({ length: 256 }, (_, h) =>
+    landColour(Math.max(0, h - 1) / 254),
+  );
+  const seaRamp = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
+    const depth = d / SEA_DEPTH;
+    return [
+      SEA_SHALLOW[0] + (SEA_DEEP[0] - SEA_SHALLOW[0]) * depth,
+      SEA_SHALLOW[1] + (SEA_DEEP[1] - SEA_SHALLOW[1]) * depth,
+      SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
+    ];
+  });
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const i = y * S + x;
       let rgb: Rgb;
+      let shade = 1;
       if (land[i]) {
-        const base = landColour((heightmap[i] - 1) / 254);
+        rgb = landRamp[heightmap[i]];
         // Lit from the north west: a slope rising to the south east is bright.
-        const nw = heightmap[Math.max(0, y - 1) * S + Math.max(0, x - 1)];
-        const se = heightmap[Math.min(S - 1, y + 1) * S + Math.min(S - 1, x + 1)];
-        const shade = Math.min(1.25, Math.max(0.75, 1 + (se - nw) * 0.03));
-        rgb = [base[0] * shade, base[1] * shade, base[2] * shade];
+        const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
+        const se = heightmap[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
+        shade = 1 + (se - nw) * 0.03;
+        shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        const depth = clamp01(coastDistance[i] / (3 * 36));
-        rgb = [
-          SEA_SHALLOW[0] + (SEA_DEEP[0] - SEA_SHALLOW[0]) * depth,
-          SEA_SHALLOW[1] + (SEA_DEEP[1] - SEA_SHALLOW[1]) * depth,
-          SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
-        ];
+        rgb = seaRamp[Math.min(SEA_DEPTH, coastDistance[i])];
       }
-      image[i * 4] = Math.min(255, Math.round(rgb[0]));
-      image[i * 4 + 1] = Math.min(255, Math.round(rgb[1]));
-      image[i * 4 + 2] = Math.min(255, Math.round(rgb[2]));
+      // The clamped array rounds half to even on the way in.
+      image[i * 4] = rgb[0] * shade;
+      image[i * 4 + 1] = rgb[1] * shade;
+      image[i * 4 + 2] = rgb[2] * shade;
       image[i * 4 + 3] = 255;
     }
   }

@@ -8,7 +8,7 @@ import {
 import type { GalaxyDoc, LinkKind } from "./model";
 import { mulberry32, type Rng } from "./rng";
 import {
-  fractalNoise,
+  coarseNoise,
   type GeneratedTerrain,
   generateTerrain,
   labelLandMasses,
@@ -184,16 +184,12 @@ function warpedPositions(
   const seedY = Math.floor(rng() * 4294967296) | 0;
   const cell = spacing * BORDER_WARP_CELL;
   const reach = spacing * BORDER_WARP;
-  const wx = new Float64Array(width * height);
-  const wy = new Float64Array(width * height);
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const i = y * width + x;
-      const nx = (x + 0.5) / cell;
-      const ny = (y + 0.5) / cell;
-      wx[i] = x + reach * (fractalNoise(nx, ny, seedX, 3) - 0.5) * 2;
-      wy[i] = y + reach * (fractalNoise(nx, ny, seedY, 3) - 0.5) * 2;
-    }
+  const wx = coarseNoise(width, height, cell, seedX, 3);
+  const wy = coarseNoise(width, height, cell, seedY, 3);
+  for (let i = 0; i < wx.length; i++) {
+    const x = i % width;
+    wx[i] = x + reach * (wx[i] - 0.5) * 2;
+    wy[i] = (i - x) / width + reach * (wy[i] - 0.5) * 2;
   }
   return { wx, wy };
 }

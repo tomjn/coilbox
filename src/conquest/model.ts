@@ -7,6 +7,7 @@ import { expandRevealed } from "./fog";
 import { type PlacedModel, parsePlacedModels } from "./placedModels";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
+import { isLandLayout, type LandLayout } from "./terrainGen";
 import { readThreatLevel } from "./threat";
 
 /**
@@ -315,6 +316,7 @@ export interface GalaxyDoc {
       | "spiral"
       | "clusters"
       | "ring"
+      | LandLayout
       | "random"
       | "realstars";
     skin?: MapSkin;
@@ -597,7 +599,8 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
       g.layout === "clusters" ||
       g.layout === "ring" ||
       g.layout === "random" ||
-      g.layout === "realstars"
+      g.layout === "realstars" ||
+      isLandLayout(g.layout)
         ? g.layout
         : undefined,
     radiusLy:

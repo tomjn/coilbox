@@ -10,6 +10,7 @@ import {
 } from "../challenge/nodeMaps";
 import { clamp } from "../lib/helpers";
 import type { GalaxyLayout, GenerateOptions } from "./generate";
+import { LAND_LAYOUTS, type LandLayout } from "./terrainGen";
 import {
   applyChallengeFactions,
   applyChallengeMaps,
@@ -42,7 +43,7 @@ export interface ConquestChallengeSettings {
   title: string;
   nodeCount: number;
   factionCount: number;
-  layout: GalaxyLayout | "random" | "realstars";
+  layout: ChallengeLayout;
   /** Real-star mode only, so the recipient rebuilds the same radius. */
   radiusLy?: number;
   /** The map style. A code from before a style existed never names it, so
@@ -97,15 +98,25 @@ export interface ConquestChallengeSettings {
   factions?: ChallengeFaction[];
 }
 
+/** Every layout value a challenge can carry. */
+export type ChallengeLayout = GalaxyLayout | LandLayout | "random" | "realstars";
+
 /** A faction as a challenge records it, which is a {@link FactionPreset}
  *  without the tuning. */
 export type ChallengeFaction = Pick<FactionPreset, "name" | "color" | "side">;
 
-const LAYOUTS: readonly (GalaxyLayout | "random" | "realstars")[] = [
+/**
+ * The layouts a code can name. The land layouts were added after codes were
+ * first shared, with no version bump. A coilbox from before them reads a land
+ * layout as `scatter`, and a coilbox from before the land styles reads the
+ * style as `galaxy`, so such a code builds a scatter galaxy there.
+ */
+const LAYOUTS: readonly ChallengeLayout[] = [
   "scatter",
   "spiral",
   "clusters",
   "ring",
+  ...LAND_LAYOUTS,
   "random",
   "realstars",
 ];
@@ -191,8 +202,8 @@ export function parseConquestChallengeSettings(
       typeof v.radiusLy === "number" && Number.isFinite(v.radiusLy)
         ? clamp(v.radiusLy, 1, 25)
         : undefined,
-    layout: LAYOUTS.includes(v.layout as GalaxyLayout | "random" | "realstars")
-      ? (v.layout as GalaxyLayout | "random" | "realstars")
+    layout: LAYOUTS.includes(v.layout as ChallengeLayout)
+      ? (v.layout as ChallengeLayout)
       : "scatter",
     skin: readMapSkin(v.skin) ?? "galaxy",
     startingSystems:
