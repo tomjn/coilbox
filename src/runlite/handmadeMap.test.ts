@@ -26,11 +26,14 @@ vi.mock("../conquest/handmade/useHandmadeMaps", () => ({
 }));
 
 const { handmadeRunSource, loadHandmadeRunMap } = await import("./handmadeMap");
+const { runNodeScenario } = await import("./mapRun");
+const { parseRunStateFile } = await import("./model");
 
 const SAMPLE = fileURLToPath(
   new URL("../../docs/examples/handmade-map/", import.meta.url),
 );
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
+const scenarioText = readFileSync(`${SAMPLE}ironcoast-siege.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 
 function read(edit: (m: MapManifest) => void = () => {}): HandmadeMapResult {
@@ -41,6 +44,7 @@ function read(edit: (m: MapManifest) => void = () => {}): HandmadeMapResult {
     provinces,
     picture: { width: provinces.width, height: provinces.height },
     urlFor: (name) => `coilbox://sample/${name}`,
+    scenarios: { "ironcoast-siege.json": scenarioText },
   });
 }
 
@@ -136,6 +140,9 @@ describe("a Warpath run on the sample map", () => {
   it("never makes that location a shop when the author did not mark it", () => {
     const unmarked = readSample((m) => {
       delete m.provinces[3].warpath;
+      // Ironcoast is left to the seed too. It is then the depot before the
+      // goal, which is what keeps a depot off Eastcliff.
+      delete m.provinces[5].warpath;
     });
     expect(unmarked.warpath?.kinds).toEqual({});
     for (const seed of SEEDS) {
@@ -167,7 +174,10 @@ describe("a Warpath run on the sample map", () => {
     for (const seed of SEEDS) {
       const run = runOn(doc, seed);
       for (const node of run.nodes) {
-        if (!node.battle || node.location === "farwatch") continue;
+        // Farwatch has the author's battle, and Ironcoast its scenario's map.
+        if (!node.battle || node.location === "farwatch" || node.scenario) {
+          continue;
+        }
         expect(MAPS.map((m) => m.name)).toContain(node.battle.mapName);
       }
     }
@@ -183,7 +193,12 @@ describe("a Warpath run on the sample map", () => {
 
   it("is rebuilt from a challenge code when the map can be looked up", () => {
     // The importing install has the author's maps too, so none is stood in for.
-    const maps = [...MAPS, { name: "MapA" }, { name: "MapB" }];
+    const maps = [
+      ...MAPS,
+      { name: "MapA" },
+      { name: "MapB" },
+      { name: "Comet Catcher Redux" },
+    ];
     const run = runOn(doc, 42, { maps });
     const decoded = decodeWarpathChallenge(encodeWarpathChallenge(run));
     if (!decoded.ok) throw new Error("expected a successful decode");
@@ -206,10 +221,15 @@ describe("handmadeRunSource", () => {
 
   it("carries only the battles the author set", () => {
     const source = handmadeRunSource(readSample());
+    // Ironcoast names a scenario, and its battle is the scenario's map.
     expect(Object.keys(source?.battles ?? {}).sort()).toEqual([
       "farwatch",
+      "ironcoast",
       "westhaven",
     ]);
+    expect(source?.battles?.ironcoast).toEqual({
+      mapName: "Comet Catcher Redux",
+    });
   });
 });
 
@@ -224,7 +244,10 @@ describe("loadHandmadeRunMap", () => {
     if (!loaded.ok) throw new Error(loaded.message);
     expect(loaded.source.startId).toBe("westhaven");
     expect(loaded.source.goalId).toBe("farwatch");
-    expect(loaded.source.kinds).toEqual({ eastcliff: "shop" });
+    expect(loaded.source.kinds).toEqual({
+      eastcliff: "shop",
+      ironcoast: "battle",
+    });
   });
 
   it("says a map with no markings is for Conquest only", async () => {
@@ -279,5 +302,66 @@ describe("loadHandmadeRunMap", () => {
       ok: false,
       message: "The hand-made maps could not be listed. disk unplugged",
     });
+  });
+});
+
+describe("a scenario location on a Warpath run", () => {
+  const doc = readSample();
+
+  it("marks the fight at Ironcoast with the scenario file on every seed", () => {
+    for (const seed of SEEDS) {
+      const ironcoast = at(runOn(doc, seed), "ironcoast");
+      expect(ironcoast.type).toBe("battle");
+      expect(ironcoast.scenario).toBe("ironcoast-siege.json");
+      // The skirmish to fall back on is set on the scenario's map.
+      expect(ironcoast.battle?.mapName).toBe("Comet Catcher Redux");
+      expect(ironcoast.battle?.mapDownload).toBeUndefined();
+    }
+  });
+
+  it("marks no other location", () => {
+    const run = runOn(doc, 42);
+    expect(run.nodes.filter((n) => n.scenario).map((n) => n.location)).toEqual([
+      "ironcoast",
+    ]);
+  });
+
+  it("plays no scenario where the author made the location a depot", () => {
+    const depot = readSample((m) => {
+      const ironcoast = m.provinces.find((p) => p.name === "Ironcoast");
+      if (ironcoast) ironcoast.warpath = { kind: "shop" };
+      // One depot never follows another, so the sample's own gives way.
+      delete m.provinces[3].warpath;
+    });
+    const ironcoast = at(runOn(depot, 42), "ironcoast");
+    expect(ironcoast.type).toBe("shop");
+    expect(ironcoast.scenario).toBeUndefined();
+  });
+
+  it("finds the scenario again from the map", () => {
+    const ironcoast = at(runOn(doc, 42), "ironcoast");
+    expect(runNodeScenario(doc, ironcoast)?.doc.name).toBe("Siege");
+    expect(runNodeScenario(doc, at(runOn(doc, 42), "farwatch"))).toBe(
+      undefined,
+    );
+  });
+
+  it("finds nothing when the map is gone or the location changed", () => {
+    const ironcoast = at(runOn(doc, 42), "ironcoast");
+    expect(runNodeScenario(undefined, ironcoast)).toBeUndefined();
+    const plain = readSample((m) => {
+      const province = m.provinces.find((p) => p.name === "Ironcoast");
+      if (province) delete province.scenario;
+    });
+    expect(runNodeScenario(plain, ironcoast)).toBeUndefined();
+  });
+
+  it("saves the file name and never the scenario", () => {
+    const run = runOn(doc, 42);
+    const json = JSON.stringify({ schemaVersion: 1, runs: { r1: run } });
+    expect(json).toContain("ironcoast-siege.json");
+    expect(json).not.toContain("hold the keep");
+    const back = parseRunStateFile(json).runs.r1;
+    expect(at(back, "ironcoast").scenario).toBe("ironcoast-siege.json");
   });
 });
