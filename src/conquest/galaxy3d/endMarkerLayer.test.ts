@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
 import { CAPITAL_SCALE, MARKER_RADIUS } from "./cityLayer";
 import {
@@ -65,7 +65,12 @@ const colors: Record<string, number> = {
 const ownerColor = (owner: string | undefined) =>
   new THREE.Color(owner && owner in colors ? colors[owner] : 0x808080);
 
-function build(models?: GalaxyDoc["models"], which = ends) {
+function build(
+  models?: GalaxyDoc["models"],
+  which = ends,
+  placed?: { failed: string[]; settled: Promise<void> },
+  renderRef?: { current: (() => void) | null },
+) {
   const scene = new THREE.Scene();
   const disposables: { dispose(): void }[] = [];
   const layer = buildEndMarkerLayer(
@@ -75,6 +80,8 @@ function build(models?: GalaxyDoc["models"], which = ends) {
     surface,
     which,
     ownerColor,
+    placed,
+    renderRef,
   );
   const marker = (name: string) =>
     scene.getObjectByName(name) as THREE.Group | undefined;
@@ -160,6 +167,57 @@ describe("buildEndMarkerLayer", () => {
     expect(both.scene.children).toEqual([]);
     expect(both.disposables).toEqual([]);
     expect(build(undefined, new Map()).layer).toBeUndefined();
+  });
+
+  describe("when the model on an end fails to load", () => {
+    const reach = endMarkerReach(surface);
+    const onStart = [
+      { model: { file: "gate.glb" }, pos: [50, 50] as [number, number] },
+    ];
+
+    it("draws the marker once the models have settled", async () => {
+      let settle: () => void = () => {};
+      const placed = {
+        failed: [] as string[],
+        settled: new Promise<void>((resolve) => {
+          settle = resolve;
+        }),
+      };
+      const redraw = vi.fn();
+      const { marker } = build(onStart, ends, placed, { current: redraw });
+      // The model might still arrive, so nothing is drawn yet.
+      expect(marker("end-marker:start:gate")).toBeUndefined();
+
+      placed.failed.push("gate.glb");
+      settle();
+      await placed.settled;
+      await Promise.resolve();
+      expect(marker("end-marker:start:gate")).toBeDefined();
+      expect(redraw).toHaveBeenCalled();
+    });
+
+    it("keeps the marker away when the model loaded", async () => {
+      const placed = { failed: [], settled: Promise.resolve() };
+      const { marker } = build(onStart, ends, placed);
+      await placed.settled;
+      await Promise.resolve();
+      expect(marker("end-marker:start:gate")).toBeUndefined();
+    });
+
+    it("draws the marker only when every model on the end failed", async () => {
+      const both = [
+        ...onStart,
+        {
+          model: { file: "banner.glb" },
+          pos: [50 + reach / 2, 50] as [number, number],
+        },
+      ];
+      const placed = { failed: ["gate.glb"], settled: Promise.resolve() };
+      const { marker } = build(both, ends, placed);
+      await placed.settled;
+      await Promise.resolve();
+      expect(marker("end-marker:start:gate")).toBeUndefined();
+    });
   });
 
   it("grows past the galaxy view's furthest zoom and not before", () => {

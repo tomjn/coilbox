@@ -20,7 +20,7 @@ import {
   type PlacedModelSources,
   placedModelLoaders,
 } from "./placedModelLoaders";
-import { buildPlacedModels } from "./placedModelsLayer";
+import { buildPlacedModels, type PlacedModelsLayer } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
 import { buildProvinceLayer } from "./provinceLayer";
 import { createSelection } from "./selection";
@@ -561,6 +561,9 @@ export function GalaxyView({
 
     /* ------------------------- decorative backdrop ------------------------- */
 
+    // Set where the scenery is built, for the markers that stand in for it.
+    let placedModels: PlacedModelsLayer | undefined;
+
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
       buildTerrainMesh(
@@ -572,7 +575,7 @@ export function GalaxyView({
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {
-        buildPlacedModels(
+        placedModels = buildPlacedModels(
           scene,
           disposables,
           surface,
@@ -732,6 +735,8 @@ export function GalaxyView({
             surface,
             identities,
             ownerColor,
+            placedModels,
+            renderRef,
           )
         : undefined;
 
