@@ -826,6 +826,30 @@ export function useUnitsyncUnitDataset(
 }
 
 /**
+ * Read a game's unit dataset outside a component, off the same session cache
+ * and in-flight reads as {@link useUnitsyncUnitDataset}. For a caller that only
+ * knows at load time whether it needs the units, such as a terrain map naming a
+ * placed model by its unit name.
+ */
+export async function loadUnitsyncUnitDataset(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+): Promise<UnitDatasetResult> {
+  const key = `${dataDir}::${enginePath}::${gameArchive}`;
+  const cached = unitDatasetCache.get(key);
+  if (cached) return cached;
+  const res = await shareInFlight(unitDatasetPending, key, () =>
+    unitsyncUnitDataset({ enginePath, dataDir, gameArchive }),
+  );
+  // Cached on the hook's terms: a read that loaded units and is syncable.
+  if (res.checksum && !(res.units.length === 0 && res.errors.length > 0)) {
+    unitDatasetCache.set(key, res);
+  }
+  return res;
+}
+
+/**
  * Drop a game's session-cached unit dataset so the next `reload()` refetches
  * from the worker instead of serving the cache. The same gap `reload()` alone
  * has on `useUnitsyncGameInfo`: a ready result stays cached for the session,

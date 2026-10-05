@@ -1,8 +1,12 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { loadUnitsyncUnitModels } from "@/content/config";
+import {
+  loadUnitsyncUnitDataset,
+  loadUnitsyncUnitModels,
+} from "@/content/config";
 import { buildModel, prepareTextureAtlas } from "@/content/unitModel";
 import { TEAM_COLOUR } from "@/lib/springTexture";
+import { loadFeatureObjects, resolveGameModels } from "./gameModelNames";
 import type { LoadedModel, PlacedModelLoaders } from "./placedModelsLayer";
 
 /**
@@ -78,13 +82,37 @@ export function placedModelLoaders(
     },
     async game(names) {
       if (!game) throw new Error("the game is not installed");
-      // One call for the whole list, which is one mount of the game's archive.
-      const read = await loadUnitsyncUnitModels(
-        game.enginePath,
-        game.dataDir,
-        game.gameArchive,
-        names,
-      );
+      const { enginePath, dataDir, gameArchive } = game;
+      // One read for the whole list, which is one mount of the game's archive,
+      // and one more only for names that turn out to be units or features.
+      const read = await resolveGameModels(names, {
+        async read(objects) {
+          const got = await loadUnitsyncUnitModels(
+            enginePath,
+            dataDir,
+            gameArchive,
+            objects,
+          );
+          return new Map(
+            objects.map((o) => [o, got.get(o)?.root ? got.get(o) : null]),
+          );
+        },
+        async unitObjects() {
+          const dataset = await loadUnitsyncUnitDataset(
+            enginePath,
+            dataDir,
+            gameArchive,
+          );
+          const out = new Map<string, string>();
+          for (const unit of dataset.units) {
+            const object = unit.objectName?.trim();
+            if (object) out.set(unit.name.toLowerCase(), object);
+          }
+          return out;
+        },
+        featureObjects: () =>
+          loadFeatureObjects({ enginePath, dataDir }, gameArchive),
+      });
       const out = new Map<string, LoadedModel | null>();
       await Promise.all(
         names.map(async (name) => {

@@ -11,9 +11,18 @@
  * Which model to draw. The two kinds are tagged so one cannot be read as the
  * other:
  *
- * - `game`: a model the game ships, named the way a unit or feature definition
- *   names it in its `objectname` or `object` field, for example `"armcom"` or
- *   `"features/pinetree.s3o"`. A whole path inside the game archive works too.
+ * - `game`: a model the game ships. The name is tried in this order, and the
+ *   first that gives a model wins:
+ *   1. a whole path inside the game archive, such as
+ *      `"objects3d/features/pinetree.s3o"`
+ *   2. a model file name with or without its extension, the way a unit's
+ *      `objectname` or a feature's `object` writes it, such as `"armcom"` or
+ *      `"features/pinetree.s3o"`
+ *   3. a unit name, drawing the model the unit's `objectname` names
+ *   4. a feature name the game defines under `features/`, drawing the model
+ *      the feature's `object` names
+ *   Unit and feature names match whatever their case. A name that matches a
+ *   model file and also a unit or feature draws the model file.
  * - `file`: a `.gltf` or `.glb` file in the map's own folder, as a path
  *   relative to that folder.
  */
