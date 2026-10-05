@@ -1,25 +1,43 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
 import type { CityLayer, MapItemState } from "./cityLayer";
-import { crossingSpan, dashPolyline, sharedBorderLines } from "./cueLines";
+import {
+  addCrossingStrip,
+  CROSSING_PATTERN,
+  type CrossingPattern,
+  type CrossingStrip,
+  crossingMaterial,
+  stripIndices,
+  updateCrossingMaterial,
+} from "./crossingLine";
+import { dashPolyline, sharedBorderLines } from "./cueLines";
 import type { WorldPos } from "./layout";
-import { type LinkCue, type MapCueInput, mapCues } from "./mapCues";
+import {
+  type LinkCue,
+  type LinkTone,
+  type MapCueInput,
+  mapCues,
+} from "./mapCues";
 import type { ProvinceLayer } from "./provinceLayer";
 import {
   BORDER_TOLERANCE_FRACTION,
   drapeLine,
   type MapPoint,
+  type ProvinceIndex,
   ribbonPositions,
 } from "./provinces";
 import { pairKey } from "./roads";
+import { seaRoute } from "./seaRoute";
 import type { TerrainSurface } from "./terrain";
 
 /**
  * The attack cues of a terrain map. Two jobs:
  *
- * - It draws the lines no other layer draws: a crossing as a dashed line over
- *   the gap it spans, a blocked border as a heavy dark line along the shared
- *   edge, and the player's frontier as gold dashes along the shared edge.
+ * - It draws the lines no other layer draws: a crossing as a chart line on
+ *   the sea from one coast to the other (see `seaRoute.ts` and
+ *   `crossingLine.ts`), a blocked border as a heavy dark line along the
+ *   shared edge, and the player's frontier as gold dashes along the shared
+ *   edge.
  * - On every change it works the cues out with `mapCues` and hands each
  *   location and road its state, so the province and city layers restyle.
  *
@@ -32,16 +50,18 @@ import type { TerrainSurface } from "./terrain";
 const CUE_LIFT = 0.16;
 
 /** Line widths in world units. The province layer's strong border is 0.55. */
-const CROSSING_WIDTH = 0.5;
+const CROSSING_WIDTH = 0.4;
 const FRONTIER_WIDTH = 0.6;
 const BLOCKED_WIDTH = 1.1;
+
+/** The least width a crossing draws at, in CSS pixels, however far out. */
+const CROSSING_MIN_PIXELS = 3;
+/** How much wider a crossing out of the selected location draws. */
+const CROSSING_EMPHASIS = 1.5;
 
 /** Dash and gap in world units, the galaxy's contested lane pattern. */
 const DASH = 1.5;
 const GAP = 1.2;
-
-/** A crossing never draws shorter than this many dashes. */
-const CROSSING_MIN_DASHES = 3;
 
 /** The pale neutral of a road whose ends do not share an owner. */
 const PLAIN_COLOR = new THREE.Color(0xe2dccb);
@@ -51,6 +71,15 @@ const ATTACK_COLOR = new THREE.Color(0xffcf8a);
 const TAKEN_COLOR = new THREE.Color(0x46e08a);
 const BLOCKED_COLOR = new THREE.Color(0x14161c);
 const WHITE = new THREE.Color(0xffffff);
+
+/** The pattern a crossing draws in for each tone. See `crossingLine.ts`. */
+const CROSSING_PATTERN_OF: Record<LinkTone, CrossingPattern> = {
+  plain: "dots",
+  owned: "beads",
+  contested: "dashes",
+  choice: "chevrons",
+  taken: "ticks",
+};
 
 const PLAIN_OPACITY = 0.7;
 const OWNED_OPACITY = 0.9;
@@ -65,7 +94,10 @@ export interface CueLine {
   type: "crossing" | "frontier" | "blocked";
   a: string;
   b: string;
-  /** First vertex and vertex count in the layer's mesh. */
+  /**
+   * First vertex and vertex count in the layer's mesh: `map-crossings` for a
+   * crossing and `map-cues` for the other two.
+   */
   start: number;
   count: number;
 }
@@ -156,11 +188,40 @@ export function buildCueLayer(
   // Link kinds and blocked borders do not depend on who owns what, so one
   // pass with no owners says what there is to draw.
   const structure = mapCues({ galaxy, owners: {}, playerFactionId: "" });
-  const minSpan = (CROSSING_MIN_DASHES * (DASH + GAP)) / surface.scale;
-  // The coast is looked for in steps of the distance the province layer
-  // treats as touching, so the two agree on where a province ends.
-  const coastStep =
-    Math.max(surface.width, surface.height) * BORDER_TOLERANCE_FRACTION;
+  const coast = coastOf(galaxy, surface, provinces?.index);
+  const strip: CrossingStrip = {
+    positions: [],
+    tangents: [],
+    sides: [],
+    alongs: [],
+    seas: [],
+  };
+  const stripIndex: number[] = [];
+  /** Add one crossing: the track to the shore, the sea, the far track. */
+  const addCrossing = (a: string, b: string) => {
+    const from = anchorOf(a);
+    const to = anchorOf(b);
+    const route = coast && seaRoute(from, to, coast.isLand, coast.step);
+    const stretches: [MapPoint[], boolean][] = route
+      ? [
+          [route.jettyA, false],
+          [route.sea, true],
+          [route.jettyB, false],
+        ]
+      : // No coast to find, so the whole line between the two is the crossing.
+        [[[from, to], true]];
+    const start = strip.positions.length / 3;
+    let along = 0;
+    for (const [line, sea] of stretches) {
+      const points = drape(line);
+      if (points.length < 2 || pathLength(points) === 0) continue;
+      const first = strip.positions.length / 3;
+      along = addCrossingStrip(strip, points, along, sea);
+      stripIndex.push(...stripIndices(first, points.length));
+    }
+    const count = strip.positions.length / 3 - start;
+    if (count > 0) lines.push({ type: "crossing", a, b, start, count });
+  };
   for (const { a, b, kind } of structure.links) {
     if (kind === "road") continue; // cityLayer.ts draws it
     if (kind === "border") {
@@ -178,22 +239,7 @@ export function buildCueLayer(
       // Two linked provinces that do not touch have no border to draw the
       // link on, so it draws as a crossing does and the link stays visible.
     }
-    const [from, to] = crossingSpan(
-      provinces?.index,
-      provinceOf(a),
-      provinceOf(b),
-      anchorOf(a),
-      anchorOf(b),
-      coastStep,
-      minSpan,
-    );
-    addLine(
-      "crossing",
-      a,
-      b,
-      dashPolyline(drape([from, to]), DASH, GAP),
-      CROSSING_WIDTH,
-    );
+    addCrossing(a, b);
   }
   for (const { a, b } of structure.blocked) {
     addLine("blocked", a, b, sharedEdge(a, b), BLOCKED_WIDTH);
@@ -236,12 +282,58 @@ export function buildCueLayer(
     scene.add(mesh);
   }
 
+  // The crossings' own mesh. Colour and opacity, then pattern and width, per
+  // vertex, rewritten by `styleLines`.
+  const crossingVertices = strip.positions.length / 3;
+  const crossingColors = new THREE.BufferAttribute(
+    new Float32Array(crossingVertices * 4),
+    4,
+  );
+  const crossingStyles = new THREE.BufferAttribute(
+    new Float32Array(crossingVertices * 2),
+    2,
+  );
+  if (crossingVertices > 0) {
+    const geo = new THREE.BufferGeometry();
+    const attr = (values: number[], size: number) =>
+      new THREE.BufferAttribute(new Float32Array(values), size);
+    geo.setAttribute("position", attr(strip.positions, 3));
+    geo.setAttribute("aTangent", attr(strip.tangents, 3));
+    geo.setAttribute("aSide", attr(strip.sides, 1));
+    geo.setAttribute("aAlong", attr(strip.alongs, 1));
+    geo.setAttribute("aSea", attr(strip.seas, 1));
+    geo.setAttribute("aColor", crossingColors);
+    geo.setAttribute("aStyle", crossingStyles);
+    geo.setIndex(stripIndex);
+    const mat = crossingMaterial(CROSSING_WIDTH);
+    disposables.push(geo, mat);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = "map-crossings";
+    mesh.renderOrder = -1;
+    mesh.raycast = () => {};
+    // The line is widened on screen, so the box the camera culls by would
+    // be the bare centre line's.
+    mesh.frustumCulled = false;
+    mesh.onBeforeRender = (renderer) =>
+      updateCrossingMaterial(mat, renderer, CROSSING_MIN_PIXELS);
+    scene.add(mesh);
+  }
+
   /* -------------------------------- style -------------------------------- */
 
   const scratch = new THREE.Color();
-  const paint = (line: CueLine, color: THREE.Color, opacity: number) => {
+  const paint = (
+    line: CueLine,
+    color: THREE.Color,
+    opacity: number,
+    pattern: CrossingPattern = "dots",
+    width = 1,
+  ) => {
+    const crossing = line.type === "crossing";
+    const target = crossing ? crossingColors : colors;
     for (let v = line.start; v < line.start + line.count; v++) {
-      colors.setXYZW(v, color.r, color.g, color.b, opacity);
+      target.setXYZW(v, color.r, color.g, color.b, opacity);
+      if (crossing) crossingStyles.setXY(v, CROSSING_PATTERN[pattern], width);
     }
   };
 
@@ -285,9 +377,17 @@ export function buildCueLayer(
         // The lift and fade a road takes while a location is hovered.
         opacity = Math.min(1, opacity * laneDim(line.a, line.b));
       }
-      paint(line, scratch, opacity);
+      paint(
+        line,
+        scratch,
+        opacity,
+        CROSSING_PATTERN_OF[link?.hidden ? "plain" : tone],
+        link?.emphasised ? CROSSING_EMPHASIS : 1,
+      );
     }
     colors.needsUpdate = true;
+    crossingColors.needsUpdate = true;
+    crossingStyles.needsUpdate = true;
   };
 
   const apply = () => {
@@ -325,4 +425,55 @@ export function buildCueLayer(
   };
 
   return { lines, apply };
+}
+
+/** How a crossing finds the coast its landing points are on. */
+interface Coast {
+  isLand: (x: number, y: number) => boolean;
+  /** Distance between samples, in map units. */
+  step: number;
+}
+
+/**
+ * Where the land is on this map, or `undefined` when nothing says.
+ *
+ * A generated map's heightmap puts the sea at 0 and the lowest land at 1 in
+ * 255, so land is anything above half that, read at the terrain mesh's own
+ * spacing. A hand-made map's picture may put its sea at any height, so its
+ * land is its provinces, looked for in steps of the distance the province
+ * layer treats as touching. A hand-made map of cities alone has neither, and
+ * its crossings draw straight from one city to the other.
+ */
+function coastOf(
+  galaxy: Pick<GalaxyDoc, "terrain" | "handmade">,
+  surface: TerrainSurface,
+  index: ProvinceIndex | undefined,
+): Coast | undefined {
+  const generated =
+    !galaxy.handmade && !!galaxy.terrain?.heightmap?.startsWith("generated:");
+  if (generated && surface.maxHeight > 0) {
+    const shore = (0.5 * surface.heightScale * surface.scale) / 255;
+    return {
+      isLand: (x, y) => surface.groundHeightAt(x, y) > shore,
+      step: surface.width / surface.segmentsX,
+    };
+  }
+  if (index && index.nodes.length > 0) {
+    return {
+      isLand: (x, y) => index.at(x, y) >= 0,
+      step: Math.max(surface.width, surface.height) * BORDER_TOLERANCE_FRACTION,
+    };
+  }
+  return undefined;
+}
+
+/** Length of a line of world points across the ground. */
+function pathLength(points: readonly WorldPos[]): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const a = points[i - 1];
+    const b = points[i];
+    total += Math.hypot(b[0] - a[0], b[2] - a[2]);
+  }
+  return total;
 }

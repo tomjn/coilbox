@@ -1,10 +1,10 @@
 import type { WorldPos } from "./layout";
-import type { BorderPiece, MapPoint, ProvinceIndex } from "./provinces";
+import type { BorderPiece, MapPoint } from "./provinces";
 
 /**
- * The geometry of the lines `cueLayer.ts` draws on a terrain map: the stretch
- * of a crossing that lies over the gap, the shared edge of two provinces as
- * continuous lines, and a line cut into dashes. Pure and free of three.js.
+ * The geometry of the lines `cueLayer.ts` draws on a terrain map: the shared
+ * edge of two provinces as continuous lines, and a line cut into dashes. Pure
+ * and free of three.js. A crossing's route is in `seaRoute.ts`.
  */
 
 /**
@@ -55,61 +55,6 @@ export function dashPolyline(
     out.push(piece);
   }
   return out;
-}
-
-/**
- * The two ends of the stretch of a crossing to draw, as map points on the
- * straight line between two anchors.
- *
- * A crossing joins two provinces that do not touch, so the stretch that tells
- * the player anything is the one over the gap between them. The line is
- * walked in steps of `step` map units: it starts at the last step inside the
- * first province and ends at the first step after that inside the second. An
- * end that is a point location, given as node index -1, keeps its anchor.
- *
- * Where the two outlines meet or overlap along the line the gap has no
- * length, so the stretch is widened about its middle to `minLength` map
- * units, or to the whole line if that is shorter.
- */
-export function crossingSpan(
-  index: Pick<ProvinceIndex, "contains"> | undefined,
-  nodeA: number,
-  nodeB: number,
-  from: MapPoint,
-  to: MapPoint,
-  step: number,
-  minLength: number,
-): [MapPoint, MapPoint] {
-  const length = Math.hypot(to[0] - from[0], to[1] - from[1]);
-  if (length === 0 || step <= 0) return [from, to];
-  const count = Math.max(1, Math.ceil(length / step));
-  const at = (t: number): MapPoint => [
-    from[0] + (to[0] - from[0]) * t,
-    from[1] + (to[1] - from[1]) * t,
-  ];
-  const inside = (node: number, i: number): boolean => {
-    if (!index || node < 0) return false;
-    const [x, y] = at(i / count);
-    return index.contains(node, x, y);
-  };
-  let start = 0;
-  for (let i = 0; i <= count; i++) if (inside(nodeA, i)) start = i;
-  let end = count;
-  for (let i = start + 1; i <= count; i++) {
-    if (inside(nodeB, i)) {
-      end = i;
-      break;
-    }
-  }
-  let t0 = start / count;
-  let t1 = end / count;
-  const want = Math.min(1, minLength / length);
-  if (t1 - t0 < want) {
-    const mid = Math.min(1 - want / 2, Math.max(want / 2, (t0 + t1) / 2));
-    t0 = mid - want / 2;
-    t1 = mid + want / 2;
-  }
-  return [at(t0), at(t1)];
 }
 
 /**
