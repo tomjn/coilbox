@@ -96,7 +96,7 @@ describe("the sample map", () => {
   it("reads into a galaxy document", () => {
     expect(doc.id).toBe("sample-two-shores");
     expect(doc.type).toBe("conquest-galaxy");
-    expect(doc.game).toEqual({ shortname: "TG" });
+    expect(doc.game).toEqual({ shortname: "SF" });
     expect(doc.nodes.map((n) => n.id)).toEqual([
       "northmarch",
       "westhaven",
@@ -196,7 +196,7 @@ describe("the sample map", () => {
     expect(node("midvale").battle).toEqual({ mapName: "" });
     expect(hasBlankBattle(node("farwatch"))).toBe(false);
     expect(node("farwatch").battle).toEqual({
-      mapName: "MapB",
+      mapName: "AcidicQuarry 5.17",
       enemyAiCount: 2,
     });
     expect(node("farwatch").difficulty).toBe(5);
@@ -221,6 +221,7 @@ describe("the sample map", () => {
   it("places the manifest's models on the document", () => {
     expect(doc.models).toEqual([
       { model: { file: "cairn.gltf" }, pos: [440, 600], rotation: 30 },
+      { model: { game: "ammobox" }, pos: [260, 520], rotation: 120 },
     ]);
   });
 
@@ -241,7 +242,7 @@ describe("the sample map", () => {
     expect(doc.blockedBorders).toHaveLength(1);
     expect(doc.factions).toHaveLength(2);
     expect(doc.nodes.filter((n) => n.owner === "neutral").length).toBe(6);
-    expect(doc.models).toHaveLength(1);
+    expect(doc.models).toHaveLength(2);
     expect(doc.warpath?.startId).toBe("westhaven");
     expect(doc.warpath?.goalId).toBe("farwatch");
     expect(Object.keys(doc.warpath?.kinds ?? {})).toHaveLength(2);
@@ -523,7 +524,7 @@ describe("a broken map folder", () => {
     const [error] = only(errors, "file-missing");
     expect(error.file).toBe("tower.glb");
     expect(error.message).toContain(
-      'models[1] names the model file "tower.glb"',
+      'models[2] names the model file "tower.glb"',
     );
   });
 
@@ -551,7 +552,7 @@ describe("a broken map folder", () => {
     );
     expect(errors).toHaveLength(1);
     const [error] = only(errors, "manifest-field");
-    expect(error.path).toBe('models[1] ("armcom").pos');
+    expect(error.path).toBe('models[2] ("armcom").pos');
     expect(error.message).toContain("outside the map (1600 by 960)");
   });
 

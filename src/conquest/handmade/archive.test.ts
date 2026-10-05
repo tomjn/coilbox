@@ -189,7 +189,7 @@ const game = (
   name: string,
   archive: string,
   version: string,
-  shortname = "TG",
+  shortname = "SF",
 ) => ({
   name,
   primaryArchive: { name: archive },
@@ -244,7 +244,7 @@ describe("listing the maps a game archive carries", () => {
     expect(maps[0]).toMatchObject({
       id: "sample-two-shores",
       title: "Two Shores",
-      game: { shortname: "TG" },
+      game: { shortname: "SF" },
       source: "game",
       carriedBy: "Test Game 1.0",
       warpath: true,

@@ -14,13 +14,13 @@ The map has nine painted provinces on two land masses with sea between them, and
 
 `heightmap.png` is the optional heightmap named by `files.heightmap`. Black is lowest and white is highest, and `heightScale` is how high white is in map units.
 
-`cairn.gltf` is the placed model. The `models` list stands it on the terrain at `pos`, turned by `rotation`. The file is one `.gltf` with its data inside, so there is nothing else to copy.
+`cairn.gltf` is the placed model that comes from a file. The `models` list stands it on the terrain at `pos`, turned by `rotation`. The file is one `.gltf` with its data inside, so there is nothing else to copy.
 
-`ironcoast-siege.json` is a scenario, exported from the scenario builder. Ironcoast names it in its `scenario` field, so the player plays it in place of a skirmish the first time they attack there.
+`ironcoast-siege.json` is a scenario, exported by the scenario builder's own export code from the Splinter Faction fixture in `src/scenario/fixtures/splinter.json`. Ironcoast names it in its `scenario` field, so the player plays it in place of a skirmish the first time they attack there.
 
 ## What the manifest shows
 
-Provinces have an `owner`, a `difficulty` and a `blurb`. Westhaven and Farwatch have `capital` set to true, which each faction needs exactly once. Westhaven and Farwatch also have a `battle`, which names the skirmish map. A province with no `battle` has one picked from the player's maps by its difficulty.
+Provinces have an `owner`, a `difficulty` and a `blurb`. Westhaven and Farwatch have `capital` set to true, which each faction needs exactly once. Westhaven and Farwatch also have a `battle`, which names the skirmish map. Both use `AcidicQuarry 5.17`. A province with no `battle` has one picked from the player's maps by its difficulty.
 
 `locations` holds point locations, which have a `pos` and no painted area. Stonebridge is the sample's city. A point location joins the map through `roads`.
 
@@ -38,10 +38,22 @@ The heightmap writes six land values from 36 to 219 out of 255, and sea is 0. Wi
 
 ## The game and the models
 
-The sample is for the game with `game.shortname` `TG`, a test game. To point it at another game, change `game.shortname` in `map.json`. The `battle` fields name maps, so change those to maps the new game's players have. The scenario was exported for `TG`, and a scenario must be for the same game as the map, so export your own from the scenario builder and name it in `scenario`.
+The sample is for Splinter Faction, the game whose modinfo shortname is `SF`. The map names the game by shortname alone and pins no archive name, so it keeps working when the game updates. Coilbox picks the newest installed Splinter Faction.
 
-The sample has no model of the `game` kind, which would be `{ "game": "<name>" }` in `models`. The name can be a path inside the game archive, a model file name, a unit name or a feature name the game defines, tried in that order. No model name for `TG` can be confirmed from this repository, so none is listed. Issue #3597 tracks adding one.
+To point the sample at another game, change `game.shortname` in `map.json` to that game's shortname. Then change three more things:
+
+1. The `battle` fields name skirmish maps, so change them to maps the new game's players have.
+2. The `game` model in `models` names `ammobox`, so change it to a model name the new game ships.
+3. The scenario is for Splinter Faction, and a scenario must be for the same game as the map. Export your own from the scenario builder and name it in `scenario`. Its units, sides and map are Splinter Faction's, so they would not work in another game even if the file were accepted.
+
+The placed models are of two kinds. `cairn.gltf` is a file in this folder. `{ "game": "ammobox" }` is a model the game ships. The name can be a path inside the game archive, a model file name, a unit name or a feature name the game defines, tried in that order. `ammobox` is a Splinter Faction feature, and it is scenery, which is what an author would place. It was resolved against a real Splinter Faction install in #3607, through the same reader the map uses. That check was not made in the app.
+
+What the sample could not confirm for Splinter Faction:
+
+- `AcidicQuarry 5.17` is the only skirmish map this repository names for the game, so Westhaven and Farwatch share it.
+- The scenario's units, sides and map come from the Splinter Faction fixture that the repository's engine proof scripts use. The scenario as exported here has not been played in the app.
+- The scenario names the game `SplinterFaction`, with no version. A conquest or a run plays it on the installed build.
 
 ## Where the art comes from
 
-Nobody drew these files in an image editor. `scripts/build-sample-handmade-map.mjs` draws `picture.png`, `provinces.png`, `heightmap.png` and `cairn.gltf` from numbers in the script, so the art was made for this repo and has no outside licence. `map.json` and `ironcoast-siege.json` are written by hand. If you change a province colour in the script, change it in `map.json` too. Run the script with `bun scripts/build-sample-handmade-map.mjs`.
+Nobody drew these files in an image editor. `scripts/build-sample-handmade-map.mjs` draws `picture.png`, `provinces.png`, `heightmap.png` and `cairn.gltf` from numbers in the script, so the art was made for this repo and has no outside licence. `map.json` is written by hand. `ironcoast-siege.json` is not drawn by the script. It is the scenario fixture run through the scenario builder's export code. If you change a province colour in the script, change it in `map.json` too. Run the script with `bun scripts/build-sample-handmade-map.mjs`.

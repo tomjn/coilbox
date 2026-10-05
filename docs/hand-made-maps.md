@@ -20,7 +20,7 @@ The sample map is in the coilbox repository at [`docs/examples/handmade-map`](ht
 
 The manifest must be called `map.json`. The images can have any name, because the manifest names them in `files`.
 
-The sample is small. Its three images are 160 by 96 pixels and its `size` is 1600 by 960, so one pixel is 10 map units. It has two land masses with sea between them, nine provinces, two factions and one city. It is for a test game with the shortname `TG`. Change `game.shortname` to your game's before you try it.
+The sample is small. Its three images are 160 by 96 pixels and its `size` is 1600 by 960, so one pixel is 10 map units. It has two land masses with sea between them, nine provinces, two factions and one city. It is for Splinter Faction, whose shortname is `SF`. Change `game.shortname` to your game's before you try it.
 
 `scripts/build-sample-handmade-map.mjs` draws the sample's picture, province image, heightmap and model, so you can read how each one is made.
 
@@ -98,7 +98,7 @@ This is the sample's `map.json`.
   "id": "sample-two-shores",
   "title": "Two Shores",
   "description": "A small sample map: two land masses, a strait between them, and a faction on each side.",
-  "game": { "shortname": "TG" },
+  "game": { "shortname": "SF" },
   "size": { "width": 1600, "height": 960 },
   "files": {
     "picture": "picture.png",
@@ -128,7 +128,7 @@ This is the sample's `map.json`.
       "name": "Westhaven",
       "owner": "west",
       "capital": true,
-      "battle": { "mapName": "MapA" }
+      "battle": { "mapName": "AcidicQuarry 5.17" }
     },
     { "color": "#7ab85a", "name": "Midvale", "owner": "west" },
     {
@@ -142,7 +142,7 @@ This is the sample's `map.json`.
       "color": "#b55f9a",
       "name": "Ironcoast",
       "difficulty": 3,
-      "blurb": "The keep that guards the landing. Taking it is a scenario, not a skirmish.",
+      "blurb": "The camp that guards the landing. Taking it is a scenario, not a skirmish.",
       "scenario": "ironcoast-siege.json",
       "warpath": { "kind": "battle" }
     },
@@ -159,7 +159,7 @@ This is the sample's `map.json`.
       "owner": "east",
       "capital": true,
       "difficulty": 5,
-      "battle": { "mapName": "MapB", "enemyAiCount": 2 }
+      "battle": { "mapName": "AcidicQuarry 5.17", "enemyAiCount": 2 }
     }
   ],
   "locations": [
@@ -175,7 +175,8 @@ This is the sample's `map.json`.
   "roads": [["stonebridge", "midvale"], ["stonebridge", "southreach"]],
   "warpath": { "start": "westhaven", "goal": "farwatch" },
   "models": [
-    { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 }
+    { "model": { "file": "cairn.gltf" }, "pos": [440, 600], "rotation": 30 },
+    { "model": { "game": "ammobox" }, "pos": [260, 520], "rotation": 120 }
   ]
 }
 ```
@@ -353,7 +354,7 @@ Coilbox cannot know how big a model should be against your map, so set `scale` t
 
 A `file` model is a `.gltf` or `.glb` file in the map folder, with a path written with `/`. A `.gltf` can keep its `.bin` and texture files beside it, in the folder or a folder inside it. Coilbox reports a `.gltf` whose `.bin` or texture is missing, or points outside the folder, when it reads the map. A model with its data inside the file, as `cairn.gltf` has, needs nothing else.
 
-A `game` model is one the game ships. The name can be a whole path inside the game archive, such as `features/pinetree.s3o`, a model file name with or without its extension, a unit name or a feature name, tried in that order. A model the game does not ship is looked for in the archives the game depends on, in the engine's order, and then in the engine's base content, as the engine does. So a game built on another game draws that game's models, and the engine's default trees `treetype0` to `treetype15` draw. A file the game ships wins over a dependency's file of the same name, and a dependency's wins over base content. The sample uses no `game` model, because the repository has no model name to confirm for its game.
+A `game` model is one the game ships. The name can be a whole path inside the game archive, such as `features/pinetree.s3o`, a model file name with or without its extension, a unit name or a feature name, tried in that order. A model the game does not ship is looked for in the archives the game depends on, in the engine's order, and then in the engine's base content, as the engine does. So a game built on another game draws that game's models, and the engine's default trees `treetype0` to `treetype15` draw. A file the game ships wins over a dependency's file of the same name, and a dependency's wins over base content. The sample places Splinter Faction's `ammobox` feature as a `game` model.
 
 If a model cannot be loaded when the map is drawn, the rest of the map still draws, and the failure is written once to the console for each name.
 
