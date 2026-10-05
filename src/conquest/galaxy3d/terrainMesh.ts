@@ -1,6 +1,14 @@
 import * as THREE from "three";
 import type { GroundShading } from "./groundShader";
 import {
+  apronHeights,
+  apronPicture,
+  apronPixels,
+  commonEdgeColor,
+  drawnPixels,
+  flatGrid,
+} from "./handmadeEdge";
+import {
   createMarginSurface,
   type HeightGrid,
   type MarginSurface,
@@ -157,7 +165,8 @@ function isColorPixels(source: TerrainColorSource): source is ColorPixels {
  *
  * `extension` draws a generated map's land on past its edge as one surface
  * with the sheet, greyed a little past the edge and hazing into the scene's
- * background.
+ * background. A map without one, such as a hand-made map, gets a short apron
+ * the same way instead. See handmadeEdge.ts.
  *
  * `ground` paints roads into the sheet.
  */
@@ -183,24 +192,41 @@ export function buildTerrainMesh(
   // the sheet's picture coordinates move into their middle.
   const ext =
     extension && heights && surface.maxHeight > 0 ? extension : undefined;
-  const margin = ext
-    ? createMarginSurface(surface, ext.heights, ext.margin)
+  // A map with no land past its edge gets a short apron in the same shape.
+  const apronFrom =
+    heights && surface.maxHeight > 0
+      ? heights
+      : flatGrid(surface.worldWidth, surface.worldDepth);
+  const apron = ext
+    ? undefined
+    : {
+        heights: apronHeights(apronFrom, apronPixels(apronFrom)),
+        margin: apronPixels(apronFrom),
+      };
+  const wide = ext ?? apron;
+  const margin = wide
+    ? createMarginSurface(surface, wide.heights, wide.margin)
     : undefined;
-  if (ext && margin) {
+  if (wide && margin) {
     const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
-    const across = ext.heights.width;
-    const down = ext.heights.height;
+    const across = wide.heights.width;
+    const down = wide.heights.height;
     for (let i = 0; i < uv.count; i++) {
       uv.setXY(
         i,
-        (uv.getX(i) * margin.mapPixels + ext.margin) / across,
-        (uv.getY(i) * (down - 2 * ext.margin) + ext.margin) / down,
+        (uv.getX(i) * margin.mapPixels + wide.margin) / across,
+        (uv.getY(i) * (down - 2 * wide.margin) + wide.margin) / down,
       );
     }
   }
+  // The apron's picture is the map's own, widened by its edge pixels.
+  const widened = (picture: ColorPixels): ColorPixels =>
+    apron
+      ? apronPicture(picture, apronFrom.width, apronFrom.height, apron.margin)
+      : picture;
 
   let normals: THREE.DataTexture | null = null;
-  const grid = ext ? ext.heights : heights;
+  const grid = wide && surface.maxHeight > 0 ? wide.heights : heights;
   if (grid && surface.maxHeight > 0) {
     const span = margin
       ? {
@@ -223,14 +249,16 @@ export function buildTerrainMesh(
   }
 
   let frame: TerrainFrame | undefined;
-  if (ext && margin) {
-    const [r, g, b] = outerRingColor(ext.image);
-    const far = new THREE.Color().setRGB(
-      r / 255,
-      g / 255,
-      b / 255,
-      THREE.SRGBColorSpace,
-    );
+  // The haze's colour, and the background's. An apron round a picture still
+  // loading takes the placeholder's until the picture arrives.
+  const far = new THREE.Color(PLACEHOLDER_COLOR);
+  const hazeTo = (picture: ColorPixels) => {
+    const [r, g, b] = (ext ? outerRingColor : commonEdgeColor)(picture);
+    far.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace);
+  };
+  if (ext) hazeTo(ext.image);
+  else if (isColorPixels(color)) hazeTo(color);
+  if (margin) {
     scene.background = far;
     frame = {
       halfX: surface.worldWidth / 2,
@@ -243,6 +271,7 @@ export function buildTerrainMesh(
         margin.reachZ / surface.worldDepth,
       ),
       far,
+      greyBeyond: !apron,
     };
   }
   applyTerrainShader(
@@ -251,6 +280,19 @@ export function buildTerrainMesh(
     disposables,
   );
   if (margin) buildMargin(scene, disposables, surface, margin, mat);
+
+  const pixelTexture = (picture: ColorPixels): THREE.Texture => {
+    const tex = new THREE.DataTexture(
+      picture.data,
+      picture.width,
+      picture.height,
+      THREE.RGBAFormat,
+    );
+    tex.magFilter = THREE.LinearFilter;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.generateMipmaps = true;
+    return tex;
+  };
 
   const applyTexture = (tex: THREE.Texture) => {
     tex.colorSpace = THREE.SRGBColorSpace;
@@ -273,11 +315,19 @@ export function buildTerrainMesh(
     });
     new THREE.TextureLoader().load(
       color,
-      (tex) => {
+      (arrived) => {
         // The view was torn down while the picture was on its way.
         if (disposed) {
-          tex.dispose();
+          arrived.dispose();
           return;
+        }
+        let tex: THREE.Texture = arrived;
+        if (apron) {
+          // Widen the picture by its edge for the apron, and haze to it.
+          const picture = drawnPixels(arrived.image);
+          hazeTo(picture);
+          arrived.dispose();
+          tex = pixelTexture(widened(picture));
         }
         loaded = tex;
         applyTexture(tex);
@@ -291,16 +341,11 @@ export function buildTerrainMesh(
   } else {
     let tex: THREE.Texture;
     if (isColorPixels(color)) {
-      const picture = ext ? ext.image : color;
-      tex = new THREE.DataTexture(
-        picture.data,
-        picture.width,
-        picture.height,
-        THREE.RGBAFormat,
-      );
-      tex.magFilter = THREE.LinearFilter;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.generateMipmaps = true;
+      tex = pixelTexture(ext ? ext.image : widened(color));
+    } else if (apron) {
+      const picture = drawnPixels(color);
+      hazeTo(picture);
+      tex = pixelTexture(widened(picture));
     } else {
       tex = new THREE.CanvasTexture(color);
     }

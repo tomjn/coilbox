@@ -51,6 +51,12 @@ export interface TerrainFrame {
   haze: number;
   /** The colour the haze reaches, which is also the scene's background. */
   far: THREE.Color;
+  /**
+   * Whether land past the edge is greyed and darkened. Off for a hand-made
+   * map's apron, whose heights ease down across its picture's colours, so the
+   * line where it sinks below the coast would show as a ruled band.
+   */
+  greyBeyond: boolean;
 }
 
 const VERTEX_HEAD = /* glsl */ `
@@ -72,6 +78,7 @@ uniform float uTerrainAmbient;
 uniform vec4 uTerrainFrame;
 uniform float uTerrainHaze;
 uniform vec3 uTerrainFar;
+uniform float uTerrainGreyBeyond;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
 
@@ -330,7 +337,7 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     // one draws the very line at the edge it is meant to soften. The sea is
     // left its colour, as a greyer sea is only a frame drawn on the water.
     float beyond = smoothstep(0.0, uTerrainHaze / 3.0, terrainPast);
-    float landHere = smoothstep(0.35, 0.65, nh.a * 255.0);
+    float landHere = smoothstep(0.35, 0.65, nh.a * 255.0) * uTerrainGreyBeyond;
     float grey = dot(lit, vec3(0.2126, 0.7152, 0.0722));
     lit = mix(lit, vec3(grey), 0.35 * beyond * landHere);
     lit *= 1.0 - 0.12 * beyond * landHere;
@@ -374,6 +381,9 @@ export function applyTerrainShader(
     shader.uniforms.uTerrainHaze = { value: frame ? frame.haze : 0 };
     shader.uniforms.uTerrainFar = {
       value: frame ? frame.far : new THREE.Color(),
+    };
+    shader.uniforms.uTerrainGreyBeyond = {
+      value: frame?.greyBeyond ? 1 : 0,
     };
     shader.uniforms.uTerrainSun = {
       value: new THREE.Vector3(...TERRAIN_SUN),

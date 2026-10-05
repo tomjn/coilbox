@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { commonEdgeColor } from "./handmadeEdge";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
 import {
   buildTerrainMesh,
@@ -82,8 +83,25 @@ describe("the sheet's shader", () => {
     );
   });
 
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("leaves a hand-made picture without procedural detail", () => {
     // A bitmap stands in for a painted picture, which never arrives as pixels.
+    // The apron reads it back through a canvas, which this test has none of.
+    vi.stubGlobal("document", {
+      createElement: () => ({
+        getContext: () => ({
+          drawImage: () => {},
+          getImageData: () => ({
+            data: new Uint8ClampedArray(16),
+            width: 2,
+            height: 2,
+          }),
+        }),
+      }),
+    });
     const painted = { width: 2, height: 2 } as unknown as ImageBitmap;
     expect(build(painted, grid).customProgramCacheKey()).toBe("terrain:1:0");
   });
@@ -206,11 +224,85 @@ describe("a generated map with land past its edge", () => {
     );
     expect((scene.background as THREE.Color).equals(expected)).toBe(true);
   });
+});
 
-  it("draws nothing past the edge without an extension", () => {
+describe("a map with nothing past its edge", () => {
+  // A 64 by 64 map raised along its west edge, as a mountain on the frame.
+  const mapGrid: HeightGrid = {
+    data: Float32Array.from({ length: 64 * 64 }, (_, i) =>
+      i % 64 === 0 ? 0.8 : 0.1,
+    ),
+    width: 64,
+    height: 64,
+  };
+  const surface = createTerrainSurface(
+    { width: 90, height: 90, heightScale: 30 },
+    90,
+    mapGrid,
+  );
+  const scene = new THREE.Scene();
+  const sheet = buildTerrainMesh(
+    scene,
+    [],
+    surface,
+    halves(),
+    { current: null },
+    mapGrid,
+  );
+  const ring = scene.getObjectByName("terrain-margin") as THREE.Mesh;
+  const positions = () =>
+    ring.geometry.getAttribute("position") as THREE.BufferAttribute;
+
+  it("draws a short apron round it in the sheet's own material", () => {
+    expect(ring).toBeInstanceOf(THREE.Mesh);
+    expect(ring.material).toBe(sheet.material);
+  });
+
+  it("carries a raised edge on with no gap, then eases it down", () => {
+    const p = positions();
+    const west = -surface.worldWidth / 2;
+    let atEdge = 0;
+    let outermost = Number.POSITIVE_INFINITY;
+    let outerY = 0;
+    for (let i = 0; i < p.count; i++) {
+      if (Math.abs(p.getZ(i)) > 1) continue;
+      if (Math.abs(p.getX(i) - west) < 1e-6) atEdge = p.getY(i);
+      if (p.getX(i) < outermost) {
+        outermost = p.getX(i);
+        outerY = p.getY(i);
+      }
+    }
+    expect(atEdge).toBeCloseTo(surface.groundHeightAtWorld(west, 0));
+    // The lowest ground on the frame, here 0.1 of the 30 unit height scale.
+    expect(outerY).toBeCloseTo(0.1 * 30 * surface.scale);
+    expect(outerY).toBeLessThan(atEdge);
+  });
+
+  it("hazes to the commonest colour on the picture's edge", () => {
+    const [r, g, b] = commonEdgeColor(halves());
+    const expected = new THREE.Color().setRGB(
+      r / 255,
+      g / 255,
+      b / 255,
+      THREE.SRGBColorSpace,
+    );
+    expect((scene.background as THREE.Color).equals(expected)).toBe(true);
+  });
+
+  it("puts the sheet's picture in the middle of the widened one", () => {
+    const uv = sheet.geometry.getAttribute("uv") as THREE.BufferAttribute;
+    const margin = Math.ceil(0.08 * 64);
+    const across = 64 + 2 * margin;
+    expect(uv.getX(0)).toBeCloseTo(margin / across);
+    expect(uv.getX(uv.count - 1)).toBeCloseTo((margin + 64) / across);
+  });
+
+  it("gives a flat map an apron too, lying flat beside the sheet", () => {
+    const flat = createTerrainSurface({ width: 90, height: 60 }, 90);
     const plain = new THREE.Scene();
-    buildTerrainMesh(plain, [], surface, halves(), { current: null }, mapGrid);
-    expect(plain.getObjectByName("terrain-margin")).toBeUndefined();
-    expect(plain.background).toBeNull();
+    buildTerrainMesh(plain, [], flat, halves(), { current: null });
+    const flatRing = plain.getObjectByName("terrain-margin") as THREE.Mesh;
+    const p = flatRing.geometry.getAttribute("position");
+    for (let i = 0; i < p.count; i++) expect(p.getY(i)).toBe(0);
   });
 });
