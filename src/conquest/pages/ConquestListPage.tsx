@@ -1080,9 +1080,11 @@ const PLAIN_LAYOUT_OPTIONS = [
 const LAND_LAYOUT_OPTIONS = [
   { value: "random", label: "Surprise me" },
   { value: "continent", label: "One continent" },
+  { value: "coast", label: "Coast" },
   { value: "continents", label: "Two continents" },
   { value: "archipelago", label: "Archipelago" },
   { value: "inlandsea", label: "Inland sea" },
+  { value: "landlocked", label: "Landlocked" },
 ];
 /** The shapes a style offers. */
 const layoutOptionsFor = (style: MapSkin) =>

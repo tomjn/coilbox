@@ -56,13 +56,13 @@ export interface Provinces {
 }
 
 /** How far the coordinate noise moves a border, in province spacings. */
-const BORDER_WARP = 0.7;
+const BORDER_WARP = 0.45;
 /** The size of the coordinate noise's coarsest cell, in province spacings. */
 const BORDER_WARP_CELL = 1.3;
 /** The lightest and heaviest province weight. Weight scales the squared
  * distance, so a province's width goes as one over its square root. */
-const MIN_WEIGHT = 0.45;
-const MAX_WEIGHT = 2.4;
+const MIN_WEIGHT = 0.6;
+const MAX_WEIGHT = 1.7;
 /** A border may stray this many pixels from the pixel edges it replaces. */
 const OUTLINE_TOLERANCE = 1.5;
 /** One coast pixel in this many is measured when looking for a crossing. */

@@ -258,14 +258,40 @@ describe("generateTerrain", () => {
     expect(wrong).toBe(0);
   });
 
-  it("keeps the land off the edge of the map", () => {
+  const edgeLand = ({
+    width: w,
+    height: h,
+    land,
+  }: (typeof built)[0]["terrain"]) => {
     let edge = 0;
-    for (const { terrain } of built) {
-      const { width: w, height: h, land } = terrain;
-      for (let i = 0; i < w; i++) edge += land[i] + land[(h - 1) * w + i];
-      for (let i = 0; i < h; i++) edge += land[i * w] + land[i * w + w - 1];
-    }
-    expect(edge).toBe(0);
+    for (let i = 0; i < w; i++) edge += land[i] + land[(h - 1) * w + i];
+    for (let i = 0; i < h; i++) edge += land[i * w] + land[i * w + w - 1];
+    return edge;
+  };
+
+  it("keeps an archipelago off the edge of the map", () => {
+    const touching = built.filter(
+      (b) => b.shape === "archipelago" && edgeLand(b.terrain) > 0,
+    );
+    expect(touching.map((b) => b.seed)).toEqual([]);
+  });
+
+  it("runs a continent, a coast, an inland sea and a landlocked map off the edge", () => {
+    // Over seeds 1 to 40 each of these reached the edge every time.
+    const inside = built.filter(
+      (b) =>
+        ["continent", "coast", "inlandsea", "landlocked"].includes(b.shape) &&
+        edgeLand(b.terrain) === 0,
+    );
+    expect(inside.map((b) => `${b.shape} ${b.seed}`)).toEqual([]);
+  });
+
+  it("keeps some water in every shape", () => {
+    // Over seeds 1 to 40 the least was 7% of the map, on a landlocked map.
+    const dry = built.filter(({ terrain, total }) => {
+      return total > 0.95 * terrain.land.length;
+    });
+    expect(dry.map((b) => `${b.shape} ${b.seed}`)).toEqual([]);
   });
 
   it("puts every land pixel in a province, and only land pixels", () => {
@@ -288,10 +314,10 @@ describe("generateTerrain", () => {
     expect(empty).toHaveLength(0);
   });
 
-  it("makes one land mass for a continent or an inland sea", () => {
+  it("makes one main land mass for every shape but the islands", () => {
     const split = built.filter(
       ({ shape, masses, total }) =>
-        (shape === "continent" || shape === "inlandsea") &&
+        ["continent", "coast", "inlandsea", "landlocked"].includes(shape) &&
         masses[0] < 0.9 * total,
     );
     expect(split.map((b) => `${b.shape} ${b.seed}`)).toEqual([]);

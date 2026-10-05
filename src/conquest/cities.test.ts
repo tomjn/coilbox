@@ -113,7 +113,8 @@ describe("generateCities", () => {
           }
         });
 
-        it("keeps the land off the edge of the map", () => {
+        it("keeps an archipelago off the edge of the map, and only that", () => {
+          if (layout !== "archipelago") return;
           expect(landOnEdge(terrain.land, terrain.width, terrain.height)).toBe(
             false,
           );
