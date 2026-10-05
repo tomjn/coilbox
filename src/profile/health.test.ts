@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Campaign } from "../campaign/model";
+import type { BundleReport } from "../content/bindings";
 import type { Scenario } from "../scenario/model";
 import { deriveHealthChecks, type HealthInputs } from "./health";
 
@@ -27,8 +28,41 @@ function base(): HealthInputs {
     home: null,
     start: { status: "none" },
     onlyOwnMaps: { status: "none" },
+    bundle: null,
+    startMissing: null,
   };
 }
+
+/** A bundle with one game, one map and an engine for this machine. */
+function bundle(over: Partial<BundleReport> = {}): BundleReport {
+  return {
+    path: "/pkg/.coilbox/content",
+    games: 1,
+    maps: 1,
+    packages: 0,
+    engines: [
+      {
+        platform: "macos_arm64",
+        version: "2025.06.12",
+        path: "engine/macos_arm64/2025.06.12",
+        bytes: 149066152,
+        forThisPlatform: true,
+        installed: true,
+      },
+    ],
+    problems: [],
+    ...over,
+  };
+}
+
+const SCENARIO_START = {
+  status: "scenario",
+  scenario: {
+    id: "s1",
+    name: "First Steps",
+    setup: { gameName: "Splinter Faction 1.3", mapName: "Duck" },
+  } as Scenario,
+} as const;
 
 function maybeById(inputs: HealthInputs, id: string) {
   return deriveHealthChecks(inputs).find((x) => x.id === id);
@@ -426,6 +460,126 @@ describe("deriveHealthChecks", () => {
       );
       expect(c.status).toBe("warn");
       expect(c.hint).toContain("start campaign 'nope' is not bundled");
+    });
+  });
+
+  describe("bundle", () => {
+    it("adds no row, and no start row, for a distribution without a bundle", () => {
+      const i = { ...base(), start: SCENARIO_START, startMissing: ["Duck"] };
+      expect(maybeById(i, "bundle")).toBeUndefined();
+      expect(maybeById(i, "bundleStart")).toBeUndefined();
+    });
+
+    it("confirms a bundle with nothing wrong, naming what it carries", () => {
+      const c = byId({ ...base(), bundle: bundle() }, "bundle");
+      expect(c.status).toBe("ok");
+      expect(c.label).toBe(
+        "Bundled content: 1 game(s), 1 map(s), engine 2025.06.12",
+      );
+    });
+
+    it("lists each authoring mistake on a line of its own", () => {
+      const c = byId(
+        {
+          ...base(),
+          bundle: bundle({
+            problems: [
+              { kind: "looseArchive", path: "duck.sd7" },
+              { kind: "unknownPlatform", path: "engine/macos" },
+            ],
+          }),
+        },
+        "bundle",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.label).toBe("2 problem(s) in the bundled content");
+      const lines = c.detail?.split("\n") ?? [];
+      expect(lines).toHaveLength(2);
+      expect(lines[0]).toContain("duck.sd7 sits at the top");
+      expect(lines[1]).toContain("engine/macos is not a platform folder");
+    });
+
+    it("says an empty folder is empty", () => {
+      const c = byId(
+        {
+          ...base(),
+          bundle: bundle({
+            games: 0,
+            maps: 0,
+            engines: [],
+            problems: [{ kind: "empty", path: "." }],
+          }),
+        },
+        "bundle",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.detail).toContain("The folder is empty");
+    });
+
+    it("tells the author when players will download the engine after all", () => {
+      const other = byId(
+        {
+          ...base(),
+          bundle: bundle({
+            engines: [
+              {
+                platform: "windows64",
+                version: "2025.06.12",
+                path: "engine/windows64/2025.06.12",
+                bytes: 1,
+                forThisPlatform: false,
+                installed: false,
+              },
+            ],
+            problems: [
+              {
+                kind: "noEngineForThisPlatform",
+                path: "engine",
+                detail: "macos_arm64",
+              },
+            ],
+          }),
+        },
+        "bundle",
+      );
+      expect(other.status).toBe("warn");
+      expect(other.hint).toContain("no engine for this platform");
+      expect(other.detail).toContain(
+        "a player on macos_arm64 downloads one on first run",
+      );
+
+      const none = byId(
+        { ...base(), bundle: bundle({ engines: [] }) },
+        "bundle",
+      );
+      expect(none.status).toBe("warn");
+      expect(none.detail).toContain("players download one on first run");
+    });
+
+    it("warns when the start's game or map is neither bundled nor installed", () => {
+      const c = byId(
+        {
+          ...base(),
+          bundle: bundle(),
+          start: SCENARIO_START,
+          startMissing: ["Duck"],
+        },
+        "bundleStart",
+      );
+      expect(c.status).toBe("warn");
+      expect(c.hint).toContain("download Duck before the first lesson");
+    });
+
+    it("confirms the start's content, and says when nothing has scanned yet", () => {
+      const i = { ...base(), bundle: bundle(), start: SCENARIO_START };
+      expect(byId({ ...i, startMissing: [] }, "bundleStart").status).toBe("ok");
+      expect(byId({ ...i, startMissing: null }, "bundleStart").status).toBe(
+        "unknown",
+      );
+      // No start that leads anywhere, so the start row speaks for it.
+      expect(maybeById({ ...base(), bundle: bundle() }, "bundleStart")).toBe(
+        undefined,
+      );
     });
   });
 

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
 import { parseCampaignJson } from "../campaign/model";
-import { contentStateLoad } from "../content/bindings";
+import { contentBundleInspect, contentStateLoad } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
@@ -11,6 +11,7 @@ import { describeHome, resolveHome } from "../home/config";
 import { homeMarkupIssues } from "../home/markup";
 import { resolveCardArtOverrides } from "../home/profileArt";
 import { usePreferredTarget } from "../play/config";
+import { missingLaunchContent } from "../play/launchContent";
 import { scenarioList } from "../scenario/bindings";
 import { parseStoredScenario } from "../scenario/storage";
 import { installedGameNames } from "./authoring";
@@ -34,7 +35,12 @@ import {
   getProfileSource,
 } from "./profile";
 import { describeScenarioFailure } from "./scenarioFailure";
-import { resolveStart, type StartCampaign, type StartScenario } from "./start";
+import {
+  resolveStart,
+  type StartCampaign,
+  type StartResolution,
+  type StartScenario,
+} from "./start";
 
 /** The campaign's own `name`, or a placeholder when the JSON can't be read. */
 function campaignName(json: string): string {
@@ -82,6 +88,29 @@ function homeHealth(home: unknown): HomeHealth | null {
   return { summary: describeHome(resolved), issues };
 }
 
+/**
+ * The game and map `start` leads to that the scan did not find, by the same
+ * exact-name check the start card makes. Null when there is nothing to check
+ * or no scan has answered, since an empty list would say both are installed.
+ */
+function startMissing(
+  start: StartResolution,
+  games: { name: string }[] | undefined,
+  maps: { name: string }[] | undefined,
+): string[] | null {
+  const setup =
+    start.status === "ok"
+      ? start.mission.snapshot
+      : start.status === "scenario"
+        ? start.scenario.setup
+        : null;
+  if (!setup?.gameName || !setup.mapName || !games || !maps) return null;
+  return missingLaunchContent(
+    { game: setup.gameName, map: setup.mapName },
+    { games, maps: maps.map((m) => m.name), engineVersions: [] },
+  ).map((r) => r.label);
+}
+
 /** Assemble health-check inputs and derive the checklist. Fails soft: any input
  * that can't be read falls back to an empty/neutral value, so the affected check
  * renders "unknown" rather than throwing. */
@@ -97,6 +126,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const scannedGames = scan.data?.games;
+  const scannedMaps = scan.data?.maps;
   const scanError = scan.error;
   const installedGames = useMemo(
     () => (scannedGames ? installedGameNames(scannedGames) : null),
@@ -172,6 +202,13 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
               .catch(() => undefined)
           : Promise.resolve(undefined);
 
+      // Only a portable install can bundle content, so a plain one never asks.
+      const bundle = portableRoot
+        ? await contentBundleInspect({ writePath: writeRootPath })
+            .then((r) => r.bundle)
+            .catch(() => null)
+        : null;
+
       const dataDirPath = portableRoot ? `${portableRoot}/data` : undefined;
       const [writeRootProbe, dataDirProbe] = await Promise.all([
         probe(writeRootPath),
@@ -191,6 +228,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         .map((l) => l.icon)
         .filter((i): i is string => typeof i === "string" && i.trim() !== "");
 
+      const start = resolveStart(profile.start, campaigns, scenarios);
       const inputs: HealthInputs = {
         portableRoot,
         profileSource: getProfileSource(),
@@ -211,8 +249,10 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         linkIcons,
         validIconNames: linkIconNames(),
         home: homeHealth(profile.home),
-        start: resolveStart(profile.start, campaigns, scenarios),
+        start,
         onlyOwnMaps: resolveOnlyOwnMaps(profile.onlyOwnMaps),
+        bundle,
+        startMissing: startMissing(start, scannedGames, scannedMaps),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);
@@ -221,7 +261,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [writeRootId, installedGames, scanError]);
+  }, [writeRootId, installedGames, scannedGames, scannedMaps, scanError]);
 
   return { checks, loading };
 }
