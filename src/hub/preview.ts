@@ -47,8 +47,10 @@ import { type Participant, RANDOM_SIDE, type Rgb } from "@/play/participants";
 import {
   optionsFromChallenge as optionsFromWarpathChallenge,
   parseWarpathChallengeSettings,
+  runFromChallenge,
 } from "@/runlite/challenge";
 import { type GenRunMap, generateRun } from "@/runlite/generate";
+import { resolveRunMap } from "@/runlite/mapRun";
 import type { RogueliteRun, RunNodeType } from "@/runlite/model";
 import { bleedFromPixels, RENDER_BLEED_SQUARES } from "./assets/vocabulary";
 
@@ -128,6 +130,10 @@ export interface RunShape {
   routes: [number, number][];
   /** Columns from start to boss, which is how long the run is. */
   columns: number;
+  /** Present for a run across a generated Cities or Territories map. The map
+   * it is drawn on, whose systems the steps stand on, in the same unit square.
+   * The steps are then drawn where their locations are, not in columns. */
+  land?: GalaxyShape;
 }
 
 /** One building, as a rectangle inside the box below. Build squares throughout,
@@ -423,13 +429,59 @@ const PLACEHOLDER_RUN_MAPS: GenRunMap[] = [{ name: "" }];
  */
 function rebuildRun(settings: Record<string, unknown>): RunShape | null {
   const parsed = parseWarpathChallengeSettings(settings);
-  // A run across a land map is not columns, so there is no shape to draw here.
-  if (!parsed || parsed.map) return null;
+  if (!parsed) return null;
+  if (parsed.map) return rebuildLandRun(parsed);
   try {
     const run = generateRun(
       optionsFromWarpathChallenge(parsed, { maps: PLACEHOLDER_RUN_MAPS }),
     );
     return run.nodes.length > 0 ? runShapeOf(run) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Rebuild a run across a generated Cities or Territories map: the map from
+ * `resolveRunMap` and the run from `runFromChallenge`, as the app does when the
+ * challenge is imported. Each stop is placed where its location is on the map.
+ * Null for a hand-made map, which is a file on the sharer's machine and cannot
+ * be rebuilt from the settings, so the caller falls back to the numbers.
+ */
+function rebuildLandRun(
+  settings: NonNullable<ReturnType<typeof parseWarpathChallengeSettings>>,
+): RunShape | null {
+  if (settings.map?.source !== "generated") return null;
+  try {
+    const source = resolveRunMap(settings.map, settings.game);
+    if (!source) return null;
+    const run = runFromChallenge(
+      { ...settings, nodeMaps: undefined },
+      { maps: PLACEHOLDER_RUN_MAPS },
+    );
+    const land = shapeOf(source.map);
+    const index = new Map(land.systems.map((system, i) => [system.id, i]));
+    const steps: RunStep[] = [];
+    const stepOf = new Map<string, number>();
+    for (const node of run.nodes) {
+      const system = land.systems[index.get(node.location ?? node.id) ?? -1];
+      if (!system) continue;
+      stepOf.set(node.id, steps.length);
+      steps.push({ id: system.id, x: system.x, y: system.y, type: node.type });
+    }
+    if (steps.length === 0) return null;
+    return {
+      steps,
+      routes: run.edges.flatMap(([from, to]) => {
+        const a = stepOf.get(from);
+        const b = stepOf.get(to);
+        return a === undefined || b === undefined
+          ? []
+          : [[a, b] as [number, number]];
+      }),
+      columns: Math.max(...run.nodes.map((n) => n.col)) + 1,
+      land,
+    };
   } catch {
     return null;
   }
