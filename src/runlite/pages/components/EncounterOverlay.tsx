@@ -14,6 +14,7 @@ import {
 } from "../../../conquest/pages/components/hudChrome";
 import { useUnitsyncUnitDataset } from "../../../content/config";
 import { usePreferredTarget } from "../../../play/config";
+import { DIFFICULTY_LABEL } from "../../../play/scenarioDifficulty";
 import { unitsMissingFrom } from "../../gameChoice";
 import type { RogueliteRun, RunNode } from "../../model";
 import { useRunEncounter } from "../../runlite-run";
@@ -123,6 +124,14 @@ export function EncounterOverlay({
                 <>
                   <Row label="Battlefield" value={scenario.doc.setup.mapName} />
                   <Row label="Scenario" value={scenario.doc.name} />
+                  {/* Set by the run's difficulty and how far along it this
+                      location is, not picked here (issue #3593). */}
+                  {enc.scenarioDifficulty && (
+                    <Row
+                      label="Difficulty"
+                      value={DIFFICULTY_LABEL[enc.scenarioDifficulty]}
+                    />
+                  )}
                 </>
               ) : (
                 <>
