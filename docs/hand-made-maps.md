@@ -666,4 +666,4 @@ A game that wants only its own maps can say so in `coilbox/maps/index.json`.
 
 With the flag set, the Generate a map drawer does not offer that game, and the Warpath setup offers only its maps. If the game carries no map that can be listed, or in Warpath no map with a start and a goal, the generated styles stay, so a broken archive never leaves a player with nothing.
 
-A distribution profile has no matching setting yet. Issue #3604 covers it.
+A distribution profile has the same switch, `onlyOwnMaps` in `profile.json`. It applies to every game the distribution offers, so a distribution built for one game needs nothing more. Either the profile or the game archive is enough to hide the styles. The same fallback applies. A game with no hand-made map to offer, whether bundled, from its archive or imported, keeps the generated styles. See [`onlyOwnMaps`](distribution-profile.md#onlyownmaps-boolean).
