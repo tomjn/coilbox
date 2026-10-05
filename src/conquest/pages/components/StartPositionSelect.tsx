@@ -7,7 +7,7 @@ import { startPositionRequirement } from "../../unlocks";
 export type StartChoice = "edge" | StartPosition;
 
 const NOTES: Record<StartChoice, string> = {
-  edge: "You start on the western edge, with your rivals far across the galaxy.",
+  edge: "You start on the western edge, with your rivals far across the map.",
   centre:
     "You start in the middle, and your rivals start out on the rim all around you.",
 };

@@ -1,11 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GameRef } from "../conquest/model";
+import type { GameRef, NodeScenario } from "../conquest/model";
 import { contentListReplays, type SkirmishAi } from "../content/bindings";
 import { useBrandingEntry } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
 import { useReplayUserState } from "../content/replayUserState";
 import { getProfile } from "../profile/profile";
+import {
+  launchScenarioForPlayer,
+  scenarioOnGame,
+  storeScenarioMedia,
+} from "../scenario/playerLaunch";
+import type { BattleConfig } from "./bindings";
 import {
   applyRestrictions,
   gameOptionSchema,
@@ -107,6 +113,15 @@ export interface UseBattleRunOptions<TResolved> {
   persist: (next: TResolved) => Promise<void>;
   /** Provenance to attach to a freshly-detected replay. */
   provenance: ReplayProvenance;
+  /**
+   * A scenario this battle plays in place of the skirmish `snapshot` builds,
+   * for a location on a hand-made map that names one. It is launched the way
+   * a campaign mission's scenario is, on the game the run uses, and `mapName`
+   * must be the scenario's map. Everything after the engine exits is the same
+   * as for a skirmish: the result is read from the replay, and the player is
+   * asked when the replay does not say.
+   */
+  scenario?: NodeScenario;
 }
 
 /**
@@ -129,6 +144,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     resolveOutcome,
     persist,
     provenance,
+    scenario,
   } = opts;
 
   const { target, loading: targetLoading } = usePreferredTarget();
@@ -237,7 +253,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     !gameOffer &&
     !running &&
     !scan.loading &&
-    ais.length > 0 &&
+    // A scenario brings its own participants, so it needs no AI from the list.
+    (!!scenario || ais.length > 0) &&
     canStartExtra;
 
   /** Advance through the resolved battle and persist. Shared by the manual
@@ -272,26 +289,66 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
 
   const start = useCallback(async () => {
     if (!target || !hasDomainState || !installedGame) return;
-    const draft = snapshot();
-    if (!draft) return;
-    setLastSnapshot(draft);
-    const config = applyRestrictions(
-      toBattleConfig({
-        participants: draft.participants,
-        mapName: draft.mapName,
-        gameType: draft.gameName,
-        startPosType: draft.startPosType,
-        startRects: draft.startRects,
-        modOptions: draft.modOptionValues,
-        optionSchema: await gameOptionSchema(
+    const startEngine = (config: BattleConfig) =>
+      launch(launchMode, {
+        config,
+        executable: target.executable,
+        dataDir: target.dataDir,
+      });
+    // What starts the engine, and the name the replay will record the player
+    // under. A refusal comes back as a message and nothing has run.
+    let run: () => Promise<
+      { exitCode: number | null; playerName: string } | { refused: string }
+    >;
+    if (scenario) {
+      const onGame = scenarioOnGame(scenario.doc, installedGame.name);
+      if (!onGame) {
+        setError(
+          `The scenario "${scenario.doc.name}" was made for ${scenario.doc.setup.gameName}, which is a different game from ${installedGame.name}. It cannot be played here.`,
+        );
+        return;
+      }
+      run = async () => {
+        await storeScenarioMedia(onGame.id, scenario.media);
+        const result = await launchScenarioForPlayer({
+          scenario: onGame,
           target,
-          installedGame.primaryArchive.name,
-        ),
-        mapOptionSchema: await mapOptionSchema(target, draft.mapName),
-        disabledUnits: draft.restrictions?.disabledUnits,
-      }),
-      draft.restrictions,
-    );
+          games,
+          launch: startEngine,
+        });
+        if (!result.ok) return { refused: result.message };
+        // The scenario's own setup names the player, not this hook.
+        return {
+          exitCode: result.exitCode,
+          playerName: result.config.myPlayerName,
+        };
+      };
+    } else {
+      const draft = snapshot();
+      if (!draft) return;
+      setLastSnapshot(draft);
+      const config = applyRestrictions(
+        toBattleConfig({
+          participants: draft.participants,
+          mapName: draft.mapName,
+          gameType: draft.gameName,
+          startPosType: draft.startPosType,
+          startRects: draft.startRects,
+          modOptions: draft.modOptionValues,
+          optionSchema: await gameOptionSchema(
+            target,
+            installedGame.primaryArchive.name,
+          ),
+          mapOptionSchema: await mapOptionSchema(target, draft.mapName),
+          disabledUnits: draft.restrictions?.disabledUnits,
+        }),
+        draft.restrictions,
+      );
+      run = async () => ({
+        exitCode: (await startEngine(config)).exitCode,
+        playerName: PLAYER_NAME,
+      });
+    }
     setError(null);
     // Snapshot the replays that exist before the engine runs. A failure here
     // only disables detection, never the launch.
@@ -303,11 +360,11 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
       beforePaths = null;
     }
     try {
-      const res = await launch(launchMode, {
-        config,
-        executable: target.executable,
-        dataDir: target.dataDir,
-      });
+      const res = await run();
+      if ("refused" in res) {
+        setError(res.refused);
+        return;
+      }
       // Cancelled before the game started: nothing consumed, no detection.
       if (res.exitCode === null) return;
       const exitCode = res.exitCode;
@@ -326,7 +383,7 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
       const { outcome, replay } = await detectBattleResult({
         target,
         beforePaths,
-        playerName: PLAYER_NAME,
+        playerName: res.playerName,
       }).catch((): { outcome: DetectedResult; replay: null } => ({
         outcome: "ambiguous",
         replay: null,
@@ -366,6 +423,8 @@ export function useBattleRun<TResolved>(opts: UseBattleRunOptions<TResolved>) {
     applyResult,
     provenance,
     setProvenance,
+    scenario,
+    games,
   ]);
 
   const recordVictory = useCallback(

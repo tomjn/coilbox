@@ -1,7 +1,27 @@
-import type { GalaxyDoc, GalaxyNode, LinkKind, NodeBattleSpec } from "../model";
+import { decodeContainerText, readContainer } from "../../container/container";
+import { parseGameIdentity } from "../../container/gameIdentity";
+import { sameGameFamily } from "../../content/resolveContent";
+import {
+  MapRouteError,
+  type MapRunKind,
+  routeAcrossMap,
+} from "../../runlite/mapRun";
+import { parseScenarioJson } from "../../scenario/model";
+import {
+  parseScenarioPayload,
+  scenarioImportErrorMessage,
+} from "../../scenario/transfer";
+import type {
+  GalaxyDoc,
+  GalaxyNode,
+  LinkKind,
+  NodeBattleSpec,
+  NodeScenario,
+} from "../model";
 import { MIN_DIFFICULTY, NEUTRAL } from "../model";
 import { type TraceCache, traceCacheKey } from "./cache";
 import type { HandmadeMapError } from "./errors";
+import { handmadeMapFingerprint } from "./fingerprint";
 import { describeProvince, MANIFEST_FILE, parseManifest } from "./manifest";
 import { type ProvincePixels, type TracedMap, traceProvinces } from "./trace";
 
@@ -31,6 +51,11 @@ export interface HandmadeMapInput {
    * undefined when the folder has no such file.
    */
   urlFor: (fileName: string) => string | undefined;
+  /**
+   * The text of each scenario file the manifest names, by file name. A file
+   * that is in the folder but could not be read is left out.
+   */
+  scenarios?: Record<string, string>;
   /** Keeps traced maps between reads. Without one, every read traces. */
   cache?: TraceCache;
   /** The `createdAt` and `updatedAt` of the document. Defaults to empty. */
@@ -56,7 +81,8 @@ const round = (v: number) => Math.round(v * 1000) / 1000;
  * the images is reported together. The one exception is the check that every
  * location can be reached: it is skipped while a colour is unlisted or
  * unpainted or a link names an unknown location, since each of those makes
- * provinces look cut off when they are not.
+ * provinces look cut off when they are not. The Warpath route from the start
+ * to the goal is skipped then too, for the same reason.
  */
 export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
   const { manifest, errors } = parseManifest(input.manifest);
@@ -87,6 +113,17 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     manifest.files.heightmap === undefined
       ? undefined
       : url("heightmap", manifest.files.heightmap);
+
+  manifest.models.forEach((placed, i) => {
+    if (!("file" in placed.model)) return;
+    const { file } = placed.model;
+    if (input.urlFor(file) !== undefined) return;
+    errors.push({
+      code: "file-missing",
+      file,
+      message: `${MANIFEST_FILE}: models[${i}] names the model file "${file}", but the folder has no file with that name.`,
+    });
+  });
 
   const key = input.cache ? traceCacheKey(input.manifest, image) : "";
   let traced: TracedMap | undefined = input.cache?.get(key);
@@ -126,12 +163,74 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
 
   const battleOf = (battle: NodeBattleSpec | undefined): NodeBattleSpec =>
     battle ?? { mapName: BLANK_BATTLE_MAP };
+  /**
+   * The scenario a location names, read and checked. Every problem with it is
+   * reported with the location's name, so the author knows where to look.
+   */
+  const scenarioOf = (l: {
+    id: string;
+    name: string;
+    scenario?: string;
+  }): NodeScenario | undefined => {
+    const file = l.scenario;
+    if (file === undefined) return undefined;
+    const at = { id: l.id, name: l.name, file };
+    if (input.urlFor(file) === undefined) {
+      errors.push({
+        code: "scenario-missing",
+        ...at,
+        message: `${MANIFEST_FILE}: "${l.name}" names the scenario file "${file}", but the folder has no file with that name.`,
+      });
+      return undefined;
+    }
+    const invalid = (why: string) => {
+      errors.push({
+        code: "scenario-invalid",
+        ...at,
+        message: `The scenario file "${file}" for "${l.name}" cannot be used. ${why}`,
+      });
+      return undefined;
+    };
+    const text = input.scenarios?.[file];
+    if (text === undefined) return invalid("The file could not be read.");
+    const read = readScenarioFile(text);
+    if (!read.ok) return invalid(read.why);
+    const { doc, media, shortname } = read;
+    if (!doc.setup.gameName || !doc.setup.mapName) {
+      return invalid(
+        "It has no game and map yet. Set it up in the scenario builder and export it again.",
+      );
+    }
+    const { game } = manifest;
+    const otherShortname =
+      shortname !== undefined &&
+      shortname.toLowerCase() !== game.shortname.toLowerCase();
+    const otherFamily =
+      game.pinnedName !== undefined &&
+      !sameGameFamily(doc.setup.gameName, game.pinnedName);
+    if (otherShortname || otherFamily) {
+      errors.push({
+        code: "scenario-wrong-game",
+        ...at,
+        game: doc.setup.gameName,
+        message: `The scenario file "${file}" for "${l.name}" is for the game "${doc.setup.gameName}", and this map is for "${game.pinnedName ?? game.shortname}". A location can only play a scenario made for the map's game.`,
+      });
+      return undefined;
+    }
+    return { file, doc, media };
+  };
+  /** A scenario location fights on the scenario's map whenever it is a skirmish. */
+  const scenarioBattle = (scenario: NodeScenario): NodeBattleSpec => ({
+    mapName: scenario.doc.setup.mapName,
+  });
+
   const nodes: GalaxyNode[] = [];
   /** How each location is named in a message, by id. */
   const described = new Map<string, string>();
   manifest.provinces.forEach((p, i) => {
     const shape = traced.provinces[i];
     described.set(p.id, describeProvince(p.name, p.color));
+    const scenario = scenarioOf(p);
     if (!shape) return;
     nodes.push({
       id: p.id,
@@ -147,11 +246,13 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       kind: p.capital ? "capital" : undefined,
       difficulty: p.difficulty ?? MIN_DIFFICULTY,
       blurb: p.blurb,
-      battle: battleOf(p.battle),
+      battle: scenario ? scenarioBattle(scenario) : battleOf(p.battle),
+      scenario,
     });
   });
   for (const l of manifest.locations) {
     described.set(l.id, `"${l.name}"`);
+    const scenario = scenarioOf(l);
     nodes.push({
       id: l.id,
       name: l.name,
@@ -160,7 +261,8 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       kind: l.capital ? "capital" : undefined,
       difficulty: l.difficulty ?? MIN_DIFFICULTY,
       blurb: l.blurb,
-      battle: battleOf(l.battle),
+      battle: scenario ? scenarioBattle(scenario) : battleOf(l.battle),
+      scenario,
     });
   }
 
@@ -200,53 +302,122 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     for (const stranded of findUnreachable(nodes, linkKinds)) {
       const node = stranded.node;
       const who = described.get(node.id);
+      const painted = Boolean(node.outline);
       const company =
         stranded.group.length === 0
-          ? "Nothing touches it."
+          ? painted
+            ? "Nothing touches it."
+            : "No road or crossing joins it."
           : `It is joined only to ${stranded.group.map((id) => described.get(id)).join(", ")}.`;
+      const advice = painted
+        ? `Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`
+        : `Add a road or a crossing to it in ${MANIFEST_FILE}.`;
       errors.push({
         code: "unreachable",
         id: node.id,
         name: node.name,
         color: manifest.provinces.find((p) => p.id === node.id)?.color,
-        message: `${node.outline ? "The province" : "The location"} ${who} cannot be reached from the rest of the map. ${company} Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`,
+        message: `${painted ? "The province" : "The location"} ${who} cannot be reached from the rest of the map. ${company} ${advice}`,
+      });
+    }
+  }
+
+  // The same route a run takes, so a map the reader accepts is one a run can
+  // cross. It fails today only when the start or the goal is cut off from the
+  // other, which is reported above as well.
+  const links = linkKinds.map(([a, b]): [string, string] => [a, b]);
+  const { warpath } = manifest;
+  if (warpath && traceTrusted) {
+    try {
+      routeAcrossMap({ nodes, links }, warpath.start, warpath.goal);
+    } catch (e) {
+      if (!(e instanceof MapRouteError)) throw e;
+      errors.push({
+        code: "warpath-route",
+        startId: warpath.start,
+        goalId: warpath.goal,
+        message: `A Warpath run cannot get from the start ${described.get(warpath.start)} to the goal ${described.get(warpath.goal)}. Join them with a crossing or a road in ${MANIFEST_FILE}, or paint the land between them so it touches.`,
       });
     }
   }
 
   if (errors.length > 0) return { ok: false, errors };
 
+  const warpathKinds: Record<string, MapRunKind> = {};
+  for (const l of [...manifest.provinces, ...manifest.locations]) {
+    if (l.warpath?.kind) warpathKinds[l.id] = l.warpath.kind;
+  }
+
   const playable = manifest.factions.filter((f) => f.playable !== false);
   const now = input.now ?? "";
+  const doc: GalaxyDoc = {
+    schemaVersion: 1,
+    id: manifest.id,
+    type: "conquest-galaxy",
+    title: manifest.title,
+    description: manifest.description ?? "",
+    game: manifest.game,
+    playerFactionId: manifest.playerFaction ?? playable[0].id,
+    playableFactionIds: playable.map((f) => f.id),
+    factions: manifest.factions.map(({ playable: _playable, ...f }) => f),
+    nodes,
+    links,
+    terrain: {
+      image: pictureUrl,
+      heightmap: heightmapUrl,
+      width: manifest.size.width,
+      height: manifest.size.height,
+      heightScale: manifest.heightScale,
+      projection: "flat",
+    },
+    linkKinds,
+    blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
+    models: manifest.models.length > 0 ? manifest.models : undefined,
+    theme: { skin: "theatre" },
+    ...(warpath
+      ? {
+          warpath: {
+            startId: warpath.start,
+            goalId: warpath.goal,
+            kinds: warpathKinds,
+          },
+        }
+      : {}),
+    createdAt: now,
+    updatedAt: now,
+  };
   return {
     ok: true,
     doc: {
-      schemaVersion: 1,
-      id: manifest.id,
-      type: "conquest-galaxy",
-      title: manifest.title,
-      description: manifest.description ?? "",
-      game: manifest.game,
-      playerFactionId: manifest.playerFaction ?? playable[0].id,
-      playableFactionIds: playable.map((f) => f.id),
-      factions: manifest.factions.map(({ playable: _playable, ...f }) => f),
-      nodes,
-      links: linkKinds.map(([a, b]) => [a, b]),
-      terrain: {
-        image: pictureUrl,
-        heightmap: heightmapUrl,
-        width: manifest.size.width,
-        height: manifest.size.height,
-        heightScale: manifest.heightScale,
-        projection: "flat",
-      },
-      linkKinds,
-      blockedBorders: blockedBorders.length > 0 ? blockedBorders : undefined,
-      theme: { skin: "theatre" },
-      createdAt: now,
-      updatedAt: now,
+      ...doc,
+      handmade: { mapId: doc.id, fingerprint: handmadeMapFingerprint(doc) },
     },
   };
+}
+
+/**
+ * Read the text of a scenario file. An author has the file the scenario
+ * builder exports, which carries the dialogue clips and names the game by its
+ * shortname. The bare document is read too, because that is what coilbox
+ * stores and what a bundled scenario may be.
+ */
+function readScenarioFile(
+  text: string,
+):
+  | ({ ok: true; shortname?: string } & Pick<NodeScenario, "doc" | "media">)
+  | { ok: false; why: string } {
+  const bare = parseScenarioJson(text);
+  if (bare) return { ok: true, doc: bare, media: {} };
+  const read = readContainer(decodeContainerText(text), "scenario", (value) => {
+    const payload = parseScenarioPayload(value);
+    if (!payload) return null;
+    const game = parseGameIdentity((value as { game?: unknown }).game);
+    return { ...payload, shortname: game?.shortname };
+  });
+  if (!read.ok)
+    return { ok: false, why: scenarioImportErrorMessage(read.error) };
+  const { scenario, media, shortname } = read.payload;
+  return { ok: true, doc: scenario, media, shortname };
 }
 
 /**

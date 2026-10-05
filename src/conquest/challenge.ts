@@ -14,9 +14,15 @@ import {
   applyChallengeFactions,
   applyChallengeMaps,
   applyChallengeNames,
-  generateGalaxy,
 } from "./generate";
-import { type GalaxyDoc, type GameRef, MIN_NODE_COUNT } from "./model";
+import { generateMap } from "./mapStyle";
+import {
+  type GalaxyDoc,
+  type GameRef,
+  type MapSkin,
+  MIN_NODE_COUNT,
+  readMapSkin,
+} from "./model";
 import type { FactionPreset } from "./names";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
@@ -24,7 +30,7 @@ import { readThreatLevel } from "./threat";
 
 /**
  * Shareable challenge settings for a generated conquest galaxy — everything
- * {@link generateGalaxy} needs *other* than installed content (maps, AIs,
+ * {@link generateMap} needs *other* than installed content (maps, AIs,
  * naming pools), which re-resolve from the recipient's own install. This is
  * deliberately the same knob set already persisted on `GalaxyDoc.generated`
  * (see `../conquest/model.ts`), so a challenge is exactly "the reroll knobs,
@@ -39,7 +45,9 @@ export interface ConquestChallengeSettings {
   layout: GalaxyLayout | "random" | "realstars";
   /** Real-star mode only, so the recipient rebuilds the same radius. */
   radiusLy?: number;
-  skin: "galaxy" | "theatre";
+  /** The map style. A code from before a style existed never names it, so
+   * every older code reads as the style it always was. */
+  skin: MapSkin;
   startingSystems?: number;
   fogOfWar?: boolean;
   /**
@@ -186,7 +194,7 @@ export function parseConquestChallengeSettings(
     layout: LAYOUTS.includes(v.layout as GalaxyLayout | "random" | "realstars")
       ? (v.layout as GalaxyLayout | "random" | "realstars")
       : "scatter",
-    skin: v.skin === "theatre" ? "theatre" : "galaxy",
+    skin: readMapSkin(v.skin) ?? "galaxy",
     startingSystems:
       typeof v.startingSystems === "number" &&
       Number.isFinite(v.startingSystems)
@@ -304,7 +312,7 @@ export function galaxyFromChallenge(
   id: string,
   now?: string,
 ): GalaxyDoc {
-  const doc = generateGalaxy(optionsFromChallenge(settings, env, id), now);
+  const doc = generateMap(optionsFromChallenge(settings, env, id), now);
   const named = applyChallengeNames(doc, settings.nodeNames);
   const factioned = applyChallengeFactions(named, settings.factions);
   return applyChallengeMaps(factioned, settings.nodeMaps, env.maps);

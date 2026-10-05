@@ -1,9 +1,23 @@
 import { describe, expect, it } from "vitest";
+import { mapCues } from "../conquest/galaxy3d/mapCues";
+import type { GalaxyDoc } from "../conquest/model";
 import {
   forwardReachable,
+  mapRunClosedLinks,
+  mapRunEmphasis,
+  mapRunIdentities,
+  mapRunOwners,
+  mapRunPathLinks,
+  mapRunScenery,
+  mapRunToGalaxyDoc,
+  PLAYER_FACTION,
   RUN_DIM,
   runEmphasis,
   runIdentities,
+  runLocations,
+  runOwners,
+  runPathLinks,
+  runToGalaxyDoc,
   warlordBodyFor,
 } from "./galaxyAdapter";
 import type { RogueliteRun, RunNode } from "./model";
@@ -155,5 +169,328 @@ describe("runEmphasis", () => {
     expect(e.get("start")?.marker).toBe("check");
     // b2 (the fork you passed on) is unreachable now -> greatly dimmed.
     expect(e.get("b2")?.opacity).toBe(RUN_DIM.unreachable);
+  });
+});
+
+describe("a Galaxy or Theatre run", () => {
+  it("is laid out in columns, each centred on the lane", () => {
+    const doc = runToGalaxyDoc(run());
+    expect(doc.nodes.map((n) => [n.id, n.pos])).toEqual([
+      ["start", [0, 0]],
+      ["b1", [1, -0.5]],
+      ["b2", [1, 0.5]],
+      ["boss", [2, 0]],
+    ]);
+    expect(doc.links).toEqual(run().edges);
+    expect(doc.terrain).toBeUndefined();
+    expect(doc.theme?.skin).toBe("galaxy");
+    expect(
+      runToGalaxyDoc({
+        ...run(),
+        settings: { ...run().settings, skin: "theatre" },
+      }).theme?.skin,
+    ).toBe("theatre");
+  });
+
+  it("mutes what was crossed and gives the rest its type colour", () => {
+    const r = resolveBattle(run(), "b1", "victory", "now");
+    expect(runOwners(r)).toEqual({
+      start: "done",
+      b1: PLAYER_FACTION,
+      b2: "type-battle",
+      boss: "type-boss",
+    });
+  });
+});
+
+// The diamond run laid on a map. The run's node ids are not the map's ids, so
+// every answer has to be moved from one to the other. The map also has a link
+// between the two middle locations, and two locations on no route: `far`,
+// joined to the goal, and `isle`, joined to `far` alone.
+function landMap(): GalaxyDoc {
+  const at = (id: string, x: number, y: number) => ({
+    id,
+    name: `Place ${id}`,
+    pos: [x, y] as [number, number],
+    outline: [
+      [
+        [x, y],
+        [x + 10, y],
+        [x, y + 10],
+      ] as [number, number][],
+    ],
+    owner: "enemy-1",
+    kind: id === "east" ? ("capital" as const) : undefined,
+    difficulty: 4,
+    battle: { mapName: "A conquest map" },
+  });
+  return {
+    schemaVersion: 1,
+    id: "land",
+    type: "conquest-galaxy",
+    title: "Land",
+    description: "",
+    game: { shortname: "ba" },
+    playerFactionId: "player",
+    factions: [{ id: "player", name: "Player", color: "#ffffff" }],
+    nodes: [
+      at("gate", 100, 200),
+      at("north", 300, 100),
+      at("south", 300, 300),
+      at("east", 500, 200),
+      at("far", 700, 200),
+      at("isle", 900, 200),
+    ],
+    // Written against the direction of travel where it matters.
+    links: [
+      ["north", "gate"],
+      ["gate", "south"],
+      ["east", "north"],
+      ["south", "east"],
+      ["north", "south"],
+      ["east", "far"],
+      ["far", "isle"],
+    ],
+    linkKinds: [
+      ["north", "gate", "border"],
+      ["gate", "south", "border"],
+      ["east", "north", "border"],
+      ["south", "east", "border"],
+      ["north", "south", "border"],
+      ["east", "far", "crossing"],
+      ["far", "isle", "crossing"],
+    ],
+    terrain: { image: "data:,", width: 1000, height: 400 },
+    createdAt: "t",
+    updatedAt: "t",
+  };
+}
+
+const AT: Record<string, string> = {
+  start: "gate",
+  b1: "north",
+  b2: "south",
+  boss: "east",
+};
+
+function landRun(): RogueliteRun {
+  const r = run();
+  return { ...r, nodes: r.nodes.map((n) => ({ ...n, location: AT[n.id] })) };
+}
+
+function located(r: RogueliteRun): Map<string, string> {
+  const locations = runLocations(r, landMap());
+  if (!locations) throw new Error("the run fits the map");
+  return locations;
+}
+
+describe("runLocations", () => {
+  it("maps each run node to its location", () => {
+    expect(Object.fromEntries(located(landRun()))).toEqual(AT);
+  });
+
+  it("is null for a column run, a location the map lacks and a step the map does not join", () => {
+    expect(runLocations(run(), landMap())).toBeNull();
+    const lost = landRun();
+    lost.nodes[1] = { ...lost.nodes[1], location: "atlantis" };
+    expect(runLocations(lost, landMap())).toBeNull();
+    const unjoined = { ...landMap(), links: landMap().links.slice(1) };
+    expect(runLocations(landRun(), unjoined)).toBeNull();
+  });
+});
+
+describe("mapRunToGalaxyDoc", () => {
+  const doc = mapRunToGalaxyDoc(landRun(), landMap(), located(landRun()));
+  const node = (id: string) => doc.nodes.find((n) => n.id === id);
+
+  it("draws every location where the map has it, and invents no position", () => {
+    expect(doc.nodes.map((n) => [n.id, n.name, n.pos, n.outline])).toEqual(
+      landMap().nodes.map((n) => [n.id, n.name, n.pos, n.outline]),
+    );
+    expect(doc.terrain).toEqual(landMap().terrain);
+    expect(doc.id).toBe("land");
+  });
+
+  it("gives a route location its run node's type, tier and battle map", () => {
+    expect(node("gate")?.owner).toBe("type-start");
+    expect(node("gate")?.kind).toBe("capital");
+    expect(node("north")?.owner).toBe("type-battle");
+    expect(node("north")?.kind).toBeUndefined();
+    expect(node("north")?.difficulty).toBe(2);
+    expect(node("north")?.battle).toEqual({ mapName: "m" });
+    expect(node("east")?.owner).toBe("type-boss");
+    expect(node("east")?.kind).toBe("capital");
+    expect(doc.playerFactionId).toBe(PLAYER_FACTION);
+  });
+
+  it("makes scenery neutral, with no battle and no capital", () => {
+    for (const id of ["far", "isle"]) {
+      expect(node(id)?.owner).toBe("neutral");
+      expect(node(id)?.battle).toEqual({ mapName: "" });
+      expect(node(id)?.kind).toBeUndefined();
+    }
+  });
+
+  it("writes each step forward and scenery first, and keeps the link between two of one rank", () => {
+    expect(doc.links).toEqual([
+      ["gate", "north"],
+      ["gate", "south"],
+      ["north", "east"],
+      ["south", "east"],
+      ["north", "south"],
+      ["far", "east"],
+      ["far", "isle"],
+    ]);
+    expect(doc.linkKinds).toEqual(landMap().linkKinds);
+  });
+
+  it("names the link between two of one rank as closed, and no other", () => {
+    expect(mapRunClosedLinks(landRun(), landMap(), located(landRun()))).toEqual(
+      new Set(["north south"]),
+    );
+  });
+
+  it("names the locations on no route as scenery", () => {
+    expect(mapRunScenery(landMap(), located(landRun()))).toEqual(
+      new Set(["far", "isle"]),
+    );
+  });
+});
+
+describe("a land run's live state", () => {
+  const map = landMap();
+  const moved = resolveBattle(landRun(), "b1", "victory", "now"); // at north
+
+  it("shows the passed location as taken, the one gone around in its own colour and scenery neutral", () => {
+    expect(mapRunOwners(moved, map, located(moved))).toEqual({
+      gate: "taken",
+      north: PLAYER_FACTION,
+      south: "type-battle",
+      east: "type-boss",
+      far: "neutral",
+      isle: "neutral",
+    });
+    const doc = mapRunToGalaxyDoc(moved, map, located(moved));
+    const color = (id: string) => doc.factions.find((f) => f.id === id)?.color;
+    expect(color("taken")).toBe(color(PLAYER_FACTION));
+  });
+
+  it("dims scenery right back and keeps the location gone around clear", () => {
+    const e = mapRunEmphasis(moved, map, located(moved));
+    expect(e.get("far")).toEqual({ opacity: RUN_DIM.unreachable });
+    expect(e.get("isle")).toEqual({ opacity: RUN_DIM.unreachable });
+    expect(e.get("south")?.opacity).toBe(RUN_DIM.future);
+    expect(e.get("gate")).toEqual({ opacity: RUN_DIM.done, marker: "check" });
+    // Where the player stands, and the one choice ahead, are at full strength.
+    expect(e.has("north")).toBe(false);
+    expect(e.get("east")?.opacity).toBeUndefined();
+    expect(e.has("b2")).toBe(false);
+  });
+
+  it("marks the start and the goal, by location", () => {
+    const ids = mapRunIdentities(moved, located(moved));
+    expect(ids.get("gate")).toEqual({ body: "beacon", end: "start" });
+    expect(ids.get("east")).toEqual({ body: warlordBodyFor(1), end: "goal" });
+    expect(ids.has("far")).toBe(false);
+    // The two battle sites keep their tint and are not an end.
+    expect(ids.get("north")?.end).toBeUndefined();
+    expect(ids.get("north")?.starTint).toBeDefined();
+  });
+
+  it("leaves a column run's start and warlord with no end marker", () => {
+    for (const identity of runIdentities(run()).values()) {
+      expect(identity.end).toBeUndefined();
+    }
+  });
+
+  it("names the path taken in the order the document writes its links", () => {
+    expect(runPathLinks(moved)).toEqual(new Set(["start b1"]));
+    const path = mapRunPathLinks(moved, located(moved));
+    expect(path).toEqual(new Set(["gate north"]));
+    const doc = mapRunToGalaxyDoc(moved, map, located(moved));
+    const written = new Set(doc.links.map(([a, b]) => `${a} ${b}`));
+    for (const key of path) expect(written.has(key)).toBe(true);
+  });
+});
+
+// What the terrain map draws for a land run: the adapter's real output put
+// through the function the view's cue layer reads.
+describe("a land run's cues on the strategic map", () => {
+  const map = landMap();
+  const cuesFor = (r: RogueliteRun) => {
+    const locations = located(r);
+    return mapCues({
+      galaxy: mapRunToGalaxyDoc(r, map, locations),
+      owners: mapRunOwners(r, map, locations),
+      playerFactionId: PLAYER_FACTION,
+      run: {
+        pathLinks: mapRunPathLinks(r, locations),
+        closedLinks: mapRunClosedLinks(r, map, locations),
+      },
+    });
+  };
+  const tones = (r: RogueliteRun) =>
+    Object.fromEntries(cuesFor(r).links.map((l) => [`${l.a} ${l.b}`, l.tone]));
+  const attackable = (r: RogueliteRun) =>
+    [...cuesFor(r).locations]
+      .filter(([, cue]) => cue.attackable)
+      .map(([id]) => id)
+      .sort();
+
+  it("offers both steps out of the start and nothing else", () => {
+    expect(tones(landRun())).toEqual({
+      "gate north": "choice",
+      "gate south": "choice",
+      "north east": "plain",
+      "south east": "plain",
+      "north south": "plain",
+      "far east": "plain",
+      "far isle": "plain",
+    });
+    expect(attackable(landRun())).toEqual(["north", "south"]);
+  });
+
+  it("shows the step made as taken and the one step ahead as the choice", () => {
+    const moved = resolveBattle(landRun(), "b1", "victory", "now"); // at north
+    expect(tones(moved)).toEqual({
+      "gate north": "taken",
+      "gate south": "plain",
+      "north east": "choice",
+      "south east": "plain",
+      "north south": "plain",
+      "far east": "plain",
+      "far isle": "plain",
+    });
+    expect(attackable(moved)).toEqual(["east"]);
+  });
+
+  it("would offer the link between two of one rank if it were not closed", () => {
+    const moved = resolveBattle(landRun(), "b1", "victory", "now");
+    const locations = located(moved);
+    const open = mapCues({
+      galaxy: mapRunToGalaxyDoc(moved, map, locations),
+      owners: mapRunOwners(moved, map, locations),
+      playerFactionId: PLAYER_FACTION,
+      run: { pathLinks: mapRunPathLinks(moved, locations) },
+    });
+    expect(
+      open.links.find((l) => l.a === "north" && l.b === "south")?.tone,
+    ).toBe("choice");
+  });
+
+  it("never offers scenery, from the goal either", () => {
+    const atNorth = resolveBattle(landRun(), "b1", "victory", "now");
+    const atGoal = resolveBattle(atNorth, "boss", "victory", "now");
+    expect(attackable(atGoal)).toEqual([]);
+    expect(Object.values(tones(atGoal))).not.toContain("choice");
+  });
+
+  it("draws each link as the kind the map gave it", () => {
+    const kinds = Object.fromEntries(
+      cuesFor(landRun()).links.map((l) => [`${l.a} ${l.b}`, l.kind]),
+    );
+    expect(kinds["gate north"]).toBe("border");
+    expect(kinds["north south"]).toBe("border");
+    expect(kinds["far east"]).toBe("crossing");
   });
 });

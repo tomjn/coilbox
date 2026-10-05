@@ -7,6 +7,8 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogos } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
+import { useHandmadeMaps } from "../../../conquest/handmade/useHandmadeMaps";
+import { locationNoun, MAP_STYLE_OPTIONS } from "../../../conquest/mapStyle";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
   useUnitsyncGameHeaders,
@@ -24,16 +26,18 @@ import {
 } from "../../../content/pages/components/states";
 import { usePreferredTarget, useSkirmishAis } from "../../../play/config";
 import { aiForDifficulty, mergeGameAi } from "../../../play/gameAi";
+import { resolveGameByShortname } from "../../../play/installedGames";
 import { missingLaunchDependency } from "../../../play/launchContent";
 import { GameSelectCard } from "../../../play/pages/components/GameSelectCard";
 import { aiKey } from "../../../play/participants";
 import { getGameMatcher, getProfile } from "../../../profile/profile";
+import type { GenBuildGraph, GenerateRunOpts, GenRunMap } from "../../generate";
+import { loadHandmadeRunMap } from "../../handmadeMap";
 import {
-  type GenBuildGraph,
-  type GenerateRunOpts,
-  type GenRunMap,
-  generateRun,
-} from "../../generate";
+  generateMapRun,
+  generateStyledRun,
+  LAND_RUN_SIZES,
+} from "../../mapRun";
 import { loadoutById, unlockedLoadouts, unlocksFor } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
@@ -46,10 +50,14 @@ import {
 /**
  * The run-setup form, shown in a drawer (see RunListPage). Assembles a
  * {@link GenerateRunOpts} from the installed game's maps, sides and build graph,
- * bakes a self-contained run and saves it, then calls `onStarted`.
+ * bakes a self-contained run and saves it, then calls `onStarted`. A Cities or
+ * Territories run also generates the land map it crosses.
  */
 /** Remembers the last game picked across runs (and the module-level default). */
 const LAST_GAME_KEY = "runlite:lastGame";
+
+/** Marks a map style value that names a hand-made map by its id. */
+const HANDMADE_PREFIX = "handmade:";
 
 export function RunSetupForm({
   onStarted,
@@ -94,6 +102,9 @@ export function RunSetupForm({
   const [difficulty, setDifficulty] = useState(2);
   const [ascension, setAscension] = useState(0);
   const [skin, setSkin] = useState<RunSkin>("galaxy");
+  // The hand-made map picked in place of a generated style, by its id.
+  const [pickedMapId, setPickedMapId] = useState<string | null>(null);
+  const handmade = useHandmadeMaps();
   const [pickedLoadoutId, setLoadoutId] = useState("standard");
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
@@ -128,6 +139,15 @@ export function RunSetupForm({
     ? pickedLoadoutId
     : "standard";
   const ascensionTier = unlocks.ascensionTier;
+  // The hand-made maps for this game whose author marked a Warpath start and
+  // goal. A map with neither is offered only in Conquest.
+  const handmadeMaps = game
+    ? handmade.maps.filter(
+        (m) => m.warpath && resolveGameByShortname(m.game, [game]) === game,
+      )
+    : [];
+  // A map picked for another game falls back to the generated styles.
+  const handmadeMap = handmadeMaps.find((m) => m.id === pickedMapId);
   const archive = game?.primaryArchive.name;
   // Starting a run is not a launch, so this does not stop the form. The player
   // is told here, because every battle of the run would stop on it (issue #3489).
@@ -233,7 +253,17 @@ export function RunSetupForm({
     };
     const id = `run-${crypto.randomUUID()}`;
     try {
-      await saveRun(id, generateRun(opts));
+      if (handmadeMap) {
+        // Read now, so a map changed since it was listed is the one played.
+        const loaded = await loadHandmadeRunMap(handmadeMap.id);
+        if (!loaded.ok) throw new Error(loaded.message);
+        await saveRun(
+          id,
+          generateMapRun({ ...opts, skin: "theatre", ...loaded.source }),
+        );
+      } else {
+        await saveRun(id, generateStyledRun(opts));
+      }
     } catch (e) {
       setStartError(
         `The warpath was not started. ${e instanceof Error ? e.message : String(e)}`,
@@ -242,6 +272,12 @@ export function RunSetupForm({
     }
     onStarted(id);
   };
+
+  // Set for the two styles that cross a generated land map.
+  const landSizes =
+    !handmadeMap && (skin === "cities" || skin === "territories")
+      ? LAND_RUN_SIZES[skin]
+      : null;
 
   const toggleItem =
     "rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -325,24 +361,33 @@ export function RunSetupForm({
         </Field>
       )}
 
-      <Field label="Length">
-        <ToggleGroup
-          type="single"
-          value={length}
-          onValueChange={(v) => v && setLength(v as RunLength)}
-          className="justify-start gap-2"
-        >
-          {(["quick", "standard", "long"] as const).map((l) => (
-            <ToggleGroupItem
-              key={l}
-              value={l}
-              className={`${toggleItem} capitalize`}
-            >
-              {l}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-      </Field>
+      {/* A hand-made map decides how long its run is. */}
+      {!handmadeMap && (
+        <Field label="Length">
+          <ToggleGroup
+            type="single"
+            value={length}
+            onValueChange={(v) => v && setLength(v as RunLength)}
+            className="justify-start gap-2"
+          >
+            {(["quick", "standard", "long"] as const).map((l) => (
+              <ToggleGroupItem
+                key={l}
+                value={l}
+                className={`${toggleItem} capitalize`}
+              >
+                {l}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+          {landSizes && (
+            <span className="text-xs text-muted-foreground">
+              The map decides how long this warpath is. This length crosses a
+              map of {landSizes[length]} {locationNoun(skin).many}.
+            </span>
+          )}
+        </Field>
+      )}
 
       <Field label={`Difficulty — level ${difficulty}`}>
         <Slider
@@ -358,11 +403,21 @@ export function RunSetupForm({
       <div className="grid grid-cols-2 gap-4">
         <Field label="Map style">
           <OptionSelect
-            value={skin}
-            onValueChange={(v) => setSkin(v as RunSkin)}
+            value={handmadeMap ? `${HANDMADE_PREFIX}${handmadeMap.id}` : skin}
+            onValueChange={(v) => {
+              if (v.startsWith(HANDMADE_PREFIX)) {
+                setPickedMapId(v.slice(HANDMADE_PREFIX.length));
+              } else {
+                setPickedMapId(null);
+                setSkin(v as RunSkin);
+              }
+            }}
             options={[
-              { value: "galaxy", label: "Galaxy (starfield)" },
-              { value: "theatre", label: "Theatre (flat chart)" },
+              ...MAP_STYLE_OPTIONS,
+              ...handmadeMaps.map((m) => ({
+                value: `${HANDMADE_PREFIX}${m.id}`,
+                label: `${m.title} (hand-made map)`,
+              })),
             ]}
           />
         </Field>
@@ -379,6 +434,12 @@ export function RunSetupForm({
           </Field>
         )}
       </div>
+
+      {handmade.error && (
+        <ErrorBanner
+          message={`The hand-made maps could not be listed, so none is offered here. ${handmade.error}`}
+        />
+      )}
 
       {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
 

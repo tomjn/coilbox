@@ -74,8 +74,39 @@
 -- answers the question the right way up, which is the exact opposite of the
 -- mission that was written. So a scenario using any of them asks for 7.
 
+-- 8 adds two conditions, the first that read what a player did rather than what
+-- the world looks like (issue #3551):
+--
+--   * unit_selected holds while a player has a unit selected: any unit, one of
+--     a type, or one the scenario placed
+--   * command_given holds once a player has given an order since the trigger
+--     was armed: any order, one command, or building one unit type
+--
+-- A runtime behind 8 has no implementation for either, so each reports itself
+-- once and never holds, and a lesson waiting on one waits for ever. So a
+-- scenario using either asks for 8.
+
+-- 9 is what lets a lesson stop and wait for the player to read (issue #3552).
+-- Two actions, one condition and one format feature:
+--
+--   * pause_game stops the game clock and unpause_game starts it again, in
+--     single player only
+--   * dialogue_dismissed holds once a player has clicked away a line the
+--     mission held on screen, since the trigger was armed
+--   * a dialogue action may carry `hold = true`, and then its line stays on the
+--     panel until the player dismisses it
+--
+-- A runtime behind 9 has no implementation for the two actions or the
+-- condition, and it reads past the flag and takes the line down on its timer.
+-- So a lesson built on any of them would run on without waiting, or wait for
+-- ever on a dismissal that cannot come, and a scenario using one asks for 9.
+--
+-- 9 rather than more of 8, although 8 had not been in a release when this was
+-- written. A game may already have installed 8 from a development build, and a
+-- second, different 8 is one the version check cannot tell from the first.
+
 return {
-	version = 7,
+	version = 9,
 
 	-- The compiled mission format this runtime reads.
 	schemaVersion = 1,
@@ -87,6 +118,9 @@ return {
 		"unit_health_below",
 		"unit_built",
 		"unit_captured",
+		"unit_selected",
+		"command_given",
+		"dialogue_dismissed",
 		"time_elapsed",
 		"var",
 		"zone_held_for",
@@ -117,5 +151,7 @@ return {
 		"give_resources",
 		"set_income",
 		"give_storage",
+		"pause_game",
+		"unpause_game",
 	},
 }

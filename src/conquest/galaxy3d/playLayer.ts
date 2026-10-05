@@ -1577,8 +1577,9 @@ export function buildPlayLayer(
       discMats.push(undefined);
       return;
     }
-    // A point location on a terrain map is drawn by cityLayer.ts.
-    if (surface && !n.outline) {
+    // Nothing on a terrain map takes a marker here: cityLayer.ts draws a
+    // point location and provinceLayer.ts draws a node with an outline.
+    if (surface) {
       starSprites.push(undefined);
       starMats.push(undefined);
       spikeSprites.push(undefined);

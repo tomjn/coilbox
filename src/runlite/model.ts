@@ -1,6 +1,7 @@
 import type { MapDownloadHint } from "../campaign/model";
 import { parseMapDownload } from "../campaign/model";
-import type { GameRef } from "../conquest/model";
+import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
+import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import { clamp } from "../lib/helpers";
 
@@ -20,9 +21,10 @@ import { clamp } from "../lib/helpers";
 /** How long a run is — maps to an act/column count in the generator. */
 export type RunLength = "quick" | "standard" | "long";
 
-/** Presentation of the node map. `theatre` is the flat skin for terrestrial
- * games where a starfield makes no sense (see the conquest renderer). */
-export type RunSkin = "galaxy" | "theatre";
+/** Presentation of the node map, in the styles Conquest has. `galaxy` and
+ * `theatre` draw the run in columns. `cities` and `territories` are a run
+ * across a generated land map, which `RunSettings.map` then names. */
+export type RunSkin = MapSkin;
 
 /**
  * Node kinds on the run graph. Battle-like nodes (`battle`/`elite`/`boss`)
@@ -166,7 +168,36 @@ export interface RunNode {
   event?: EventSpec;
   /** Present on shop nodes. */
   shop?: ShopSpec;
+  /** The id of the map location this node stands for, on a run across a land
+   * map (see `./mapRun.ts`). Absent on a Galaxy or Theatre run, whose nodes are
+   * laid out in columns. */
+  location?: string;
+  /**
+   * The scenario file this fight plays in place of the skirmish in `battle`,
+   * when the location on a hand-made map names one. Only the file name is
+   * saved. The scenario itself is read from the map folder when the run is
+   * opened, and `battle` is what is fought if it cannot be read then.
+   */
+  scenario?: string;
 }
+
+/**
+ * How a run across a land map finds that map again. The map is not saved with
+ * the run: a generated one is rebuilt from these settings, and a hand-made one
+ * is looked up by its id. See `resolveRunMap` in `./mapRun.ts`.
+ */
+export type RunMapRef =
+  | {
+      source: "generated";
+      /** Which generator made it: `territories` or `cities`. */
+      style: string;
+      /** The map's own seed, which need not be the run's. */
+      seed: number;
+      nodeCount: number;
+      /** The generator's layout setting, as the map document recorded it. */
+      layout?: string;
+    }
+  | HandmadeMapRef;
 
 /** A directed forward edge `[from, to]` with `from.col < to.col`. */
 export type RunEdge = [string, string];
@@ -184,6 +215,9 @@ export interface RunSettings {
   /** In-game side for the player's participant. */
   side?: string;
   skin: RunSkin;
+  /** Present on a run across a land map. Part of the settings so a challenge
+   * code carries it and the recipient crosses the same map. */
+  map?: RunMapRef;
 }
 
 export type RunStatus = "active" | "won" | "lost";
@@ -497,6 +531,39 @@ function parseNode(value: unknown): RunNode | null {
     reward: parseReward(value.reward),
     event: parseEvent(value.event),
     shop: parseShop(value.shop),
+    ...(typeof value.location === "string" && value.location !== ""
+      ? { location: value.location }
+      : {}),
+    ...(typeof value.scenario === "string" && value.scenario !== ""
+      ? { scenario: value.scenario }
+      : {}),
+  };
+}
+
+/** Parse a run's map reference. Null for anything that is not one, which reads
+ * as a run with no map. */
+function parseRunMapRef(value: unknown): RunMapRef | null {
+  if (!isRecord(value)) return null;
+  if (value.source === "handmade") return parseHandmadeMapRef(value);
+  if (value.source !== "generated") return null;
+  if (typeof value.style !== "string" || value.style === "") return null;
+  if (typeof value.seed !== "number" || !Number.isFinite(value.seed)) {
+    return null;
+  }
+  if (
+    typeof value.nodeCount !== "number" ||
+    !Number.isFinite(value.nodeCount)
+  ) {
+    return null;
+  }
+  return {
+    source: "generated",
+    style: value.style,
+    seed: value.seed,
+    nodeCount: value.nodeCount,
+    ...(typeof value.layout === "string" && value.layout !== ""
+      ? { layout: value.layout }
+      : {}),
   };
 }
 
@@ -516,6 +583,7 @@ export function parseRunSettings(value: unknown): RunSettings | null {
   if (typeof value.factionId !== "string" || value.factionId === "") {
     return null;
   }
+  const map = parseRunMapRef(value.map);
   return {
     seed: num(value.seed, 0),
     length:
@@ -538,7 +606,8 @@ export function parseRunSettings(value: unknown): RunSettings | null {
       typeof value.side === "string" && value.side !== ""
         ? value.side
         : undefined,
-    skin: value.skin === "theatre" ? "theatre" : "galaxy",
+    skin: readMapSkin(value.skin) ?? "galaxy",
+    ...(map ? { map } : {}),
   };
 }
 

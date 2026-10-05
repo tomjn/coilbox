@@ -28,8 +28,10 @@
 --
 -- The widget reads the mission's state out of game rules params, which every Lua
 -- handle can read, and hears about a line of dialogue through a global the
--- gadget's unsynced half calls. It never talks back: nothing on one player's
--- screen may reach the game.
+-- gadget's unsynced half calls. It talks back once: when the player clicks away
+-- a line the mission is holding, it says which line in a Lua message, which the
+-- server relays to every machine's synced half. Nothing else on one player's
+-- screen reaches the game.
 
 local WIDGET_NAME = "Coilbox mission UI"
 local LOG_SECTION = "coilbox-mission"
@@ -69,6 +71,9 @@ local MISSION
 local MISSION_DIR
 
 local queue
+-- Dialogue time, in frames. It follows the game, one for each game frame, and
+-- runs on its own through a pause only while a held line is stuck behind another.
+local clock = 0
 local debrief
 local myAllyTeam = 0
 local vsx, vsy = 1024, 768
@@ -285,6 +290,7 @@ end
 local function rebuildScene()
 	scene.objectives = MODEL.objectives(MISSION, read)
 	scene.line = queue.current()
+	scene.hold = queue.holding()
 	scene.portraitBad = (scene.line and scene.line.portrait and badTexture[scene.line.portrait]) == true
 	scene.debrief = debrief
 	local key = MODEL.sceneKey(scene)
@@ -413,8 +419,11 @@ function widget:Initialize()
 	myAllyTeam = Spring.GetMyAllyTeamID()
 	vsx, vsy = Spring.GetViewGeometry()
 
-	registered = widgetHandler:RegisterGlobal(DIALOGUE_GLOBAL, function(lineId)
-		queue.push(lineId)
+	-- A spectator, which is what somebody watching a replay is, has nothing to
+	-- dismiss a line for: the players' own dismissals are what the mission
+	-- hears. So a held line is an ordinary one to them.
+	registered = widgetHandler:RegisterGlobal(DIALOGUE_GLOBAL, function(lineId, hold)
+		queue.push(lineId, hold == true and not Spring.GetSpectatingState())
 	end)
 	if not registered then
 		log("error", DIALOGUE_GLOBAL .. " is already taken, so this mission will say nothing")
@@ -443,20 +452,54 @@ function widget:ViewResize(x, y)
 	vsx, vsy = x, y
 end
 
---- Dialogue runs on game time rather than on wall time, so a paused game does
--- not run through a conversation while nobody is watching.
-function widget:GameFrame(frame)
-	if not ready then
-		return
-	end
-	local started = queue.update(frame)
+--- Move the conversation on to the clock, and start the clip of a line that
+-- has just taken the panel.
+local function advance()
+	local started = queue.update(clock)
 	if started and started.audio then
 		Spring.PlaySoundFile(mediaPath(started.audio), 1)
 	end
+end
+
+--- Dialogue runs on game time rather than on wall time, so a paused game does
+-- not run through a conversation while nobody is watching.
+function widget:GameFrame()
+	if not ready then
+		return
+	end
+	clock = clock + 1
+	advance()
 	if not debrief and read(MODEL.OVER_PARAM) == 1 then
 		buildDebrief()
 	end
 	rebuildScene()
+end
+
+--- The one thing dialogue does while the game is paused.
+--
+-- A paused game sends no game frames, so nothing above runs. A lesson that
+-- pauses and then says a line still has to get that line on screen, and a held
+-- line stuck behind one that is counting down has to get its turn, or the
+-- player is left looking at a stopped game with nothing to dismiss. So a
+-- waiting line takes an empty panel here, and the clock runs on wall time for
+-- as long as a held line is blocked. A line with nothing held behind it stays
+-- frozen through a pause, as it always has.
+function widget:Update()
+	if not ready or debrief then
+		return
+	end
+	local _, _, paused = Spring.GetGameSpeed()
+	if not paused then
+		return
+	end
+	if queue.blocked() then
+		clock = clock + (Spring.GetLastUpdateSeconds() or 0) * Game.gameSpeed
+	end
+	local before = queue.current()
+	advance()
+	if queue.current() ~= before then
+		rebuildScene()
+	end
 end
 
 --- The engine hands the winning ally teams to this callin and the stock widget
@@ -468,17 +511,36 @@ function widget:GameOver()
 	end
 end
 
---- Click the debrief away. It covers the middle of the screen, and a player who
--- wants to look at the map they just fought over should be able to.
+local function inside(box, x, y)
+	return box ~= nil and x >= box[1] and x <= box[3] and y >= box[2] and y <= box[4]
+end
+
+--- Click the debrief away, or a line the mission is holding.
+--
+-- The debrief covers the middle of the screen, and a player who wants to look
+-- at the map they just fought over should be able to.
+--
+-- A held line is dismissed here and the game is told, because a trigger may be
+-- waiting on it. The next line takes the panel at once rather than on the next
+-- game frame, which a paused game would never send.
 function widget:MousePress(x, y)
-	if not ready or not debrief then
+	if not ready or not layout then
 		return false
 	end
-	local box = layout and layout.debriefBox
-	if not box or x < box[1] or x > box[3] or y < box[2] or y > box[4] then
+	if debrief then
+		if not inside(layout.debriefBox, x, y) then
+			return false
+		end
+		debrief = nil
+		rebuildScene()
+		return true
+	end
+	if not queue.holding() or not inside(layout.dialogueBox, x, y) then
 		return false
 	end
-	debrief = nil
+	local line = queue.dismiss()
+	Spring.SendLuaRulesMsg(MODEL.DISMISSED_MESSAGE .. line.id)
+	advance()
 	rebuildScene()
 	return true
 end

@@ -21,6 +21,7 @@ vi.mock("../multiplayer/chat/mentionCue", () => ({
 }));
 
 import type { Campaign, ProgressFile } from "../campaign/model";
+import { listedHandmadeMaps } from "../conquest/handmade/conquest";
 import type { ConquestStateFile } from "../conquest/model";
 import { defaultSkirmishDraft, type StoredSkirmishDraft } from "../play/drafts";
 import type { SkirmishPreset } from "../play/presets";
@@ -340,6 +341,21 @@ describe("conquestCandidate", () => {
     const galaxies = [{ galaxy: { id: "g1", title: "The Rim" } }];
     const file = conquestFile("g1", minutesAgo(2), "won");
     expect(conquestCandidate(galaxies, file)).toBeUndefined();
+  });
+
+  it("offers a conquest on a hand-made map, titled with the map", () => {
+    const maps = [
+      { id: "two-shores", title: "Two Shores", game: { shortname: "TG" } },
+    ];
+    const file = conquestFile("two-shores", minutesAgo(2));
+    const c = conquestCandidate(listedHandmadeMaps(maps), file);
+    expect(c?.title).toBe("Two Shores");
+    expect(c?.to).toBe("/conquest/two-shores");
+  });
+
+  it("does not offer a conquest whose hand-made map has been removed", () => {
+    const file = conquestFile("two-shores", minutesAgo(2));
+    expect(conquestCandidate(listedHandmadeMaps([]), file)).toBeUndefined();
   });
 });
 

@@ -96,6 +96,13 @@ if not UNIT_CONDITIONS then
 	return false
 end
 
+local PLAYER_ACTIONS, playerActionsError =
+	includeTable("luarules/mission_runtime/coilbox_player_actions.lua")
+if not PLAYER_ACTIONS then
+	log("error", playerActionsError)
+	return false
+end
+
 local ZONES, zonesError = includeTable("luarules/mission_runtime/coilbox_zones.lua")
 if not ZONES then
 	log("error", zonesError)
@@ -141,6 +148,12 @@ end
 local DIALOGUE, dialogueError = includeTable("luarules/mission_runtime/coilbox_dialogue.lua")
 if not DIALOGUE then
 	log("error", dialogueError)
+	return false
+end
+
+local PAUSE, pauseError = includeTable("luarules/mission_runtime/coilbox_pause.lua")
+if not PAUSE then
+	log("error", pauseError)
 	return false
 end
 
@@ -241,6 +254,9 @@ local DIALOGUE_MESSAGE = "coilbox_mission_dialogue"
 local SOUND_MESSAGE = "coilbox_mission_sound"
 local CAMERA_MESSAGE = "coilbox_mission_camera"
 local MARKER_MESSAGE = "coilbox_mission_marker"
+-- And the one that asks this client to pause the game or start it again, which
+-- synced Lua cannot do for itself.
+local PAUSE_MESSAGE = "coilbox_mission_pause"
 
 -- The global the widget registers on the widget handler to hear a line. A
 -- missing one is a no-op in the engine, so a game with no LuaUI, or a player who
@@ -376,6 +392,9 @@ if gadgetHandler:IsSyncedCode() then
 	-- every machine runs them.
 	local triggers
 	local unitHooks
+	-- The hooks its player conditions want fed: an order a player gave, and what
+	-- a player's client says they have selected.
+	local playerHooks
 	-- The scenario's groups, once registered.
 	local groups
 	-- What ends the mission, and what stops anything else ending it.
@@ -592,6 +611,7 @@ if gadgetHandler:IsSyncedCode() then
 			log = log,
 		})
 		unitHooks = UNIT_CONDITIONS.register(triggers, published)
+		playerHooks = PLAYER_ACTIONS.register(triggers, published)
 		-- The zone geometry is published as well as read, so anything else that has
 		-- to work out where a zone is reads the same corners the conditions do.
 		published.zones = ZONES.register(triggers, published)
@@ -683,8 +703,15 @@ if gadgetHandler:IsSyncedCode() then
 		-- rather than things that happen in the game, so synced Lua decides only
 		-- that they happened and the unsynced half takes it from there.
 		published.dialogue = DIALOGUE.register(triggers, published, {
-			say = function(lineId)
-				SendToUnsynced(DIALOGUE_MESSAGE, lineId)
+			-- A held line is noted before it goes out, so the dismissal that
+			-- answers it finds a line the mission is holding. Nothing rides along
+			-- for a line that is not held, which is the message every runtime
+			-- before this one sent.
+			say = function(lineId, hold)
+				if hold then
+					playerHooks.held(lineId)
+				end
+				SendToUnsynced(DIALOGUE_MESSAGE, lineId, hold or nil)
 			end,
 			sound = function(name)
 				SendToUnsynced(SOUND_MESSAGE, name)
@@ -700,6 +727,13 @@ if gadgetHandler:IsSyncedCode() then
 			end,
 			mark = function(x, z, text, team)
 				SendToUnsynced(MARKER_MESSAGE, x, z, text, team)
+			end,
+		})
+		-- Stopping the clock is the server's to do and a client's to ask for, so
+		-- this goes to the unsynced half as well.
+		published.pause = PAUSE.register(triggers, {
+			pause = function(paused)
+				SendToUnsynced(PAUSE_MESSAGE, paused)
 			end,
 		})
 		published.triggers = triggers
@@ -807,6 +841,67 @@ if gadgetHandler:IsSyncedCode() then
 				return true
 			end
 			return restrictions.allowsCommand(cmdID, unitTeam)
+		end
+	end
+
+	-- What a player did, for the two conditions that wait on it.
+	--
+	-- Both callins are defined only when a trigger asks, for the reason the two
+	-- above are: UnitCommand runs for every order every unit accepts, and
+	-- RecvLuaMsg for every message any gadget or widget in the game sends.
+
+	if PLAYER_ACTIONS.uses(MISSION, "command_given") then
+		--- A unit accepted an order. The engine calls this in synced code on every
+		-- machine, after AllowCommand, with the player the order came from.
+		function gadget:UnitCommand(unitID, unitDefID, unitTeam, cmdID, _, _, _, playerID, _, fromLua)
+			if playerHooks.command(unitTeam, cmdID, playerID, fromLua) then
+				raise("command_given", {
+					unitID = unitID,
+					unitDefID = unitDefID,
+					team = unitTeam,
+					cmdID = cmdID,
+					player = playerID,
+				})
+			end
+		end
+	end
+
+	local HEARS_SELECTION = PLAYER_ACTIONS.uses(MISSION, "unit_selected")
+	local HEARS_DISMISSAL = PLAYER_ACTIONS.uses(MISSION, "dialogue_dismissed")
+
+	if HEARS_SELECTION or HEARS_DISMISSAL then
+		--- A client said what its player has selected, or that its player clicked
+		-- a held line of dialogue away. A message the server relayed, so it
+		-- arrives here on every machine alike, and comes back out of a replay the
+		-- same way. The engine hands it over when it arrives rather than on a game
+		-- frame, so it is heard while the game is paused too.
+		--
+		-- True for a message of ours, so it stops there, and nothing for anything
+		-- else: another gadget's messages are not ours to swallow.
+		function gadget:RecvLuaMsg(message, playerID)
+			if HEARS_SELECTION then
+				local ours, changed = playerHooks.selection(playerID, message)
+				if changed then
+					raise("selection_changed", { player = playerID })
+				end
+				if ours then
+					return true
+				end
+			end
+			if HEARS_DISMISSAL then
+				local ours, lineId = playerHooks.dismissal(playerID, message)
+				if lineId then
+					raise("dialogue_dismissed", { line = lineId, player = playerID })
+					-- And the polled triggers, because a dismissal is often what a
+					-- paused lesson is waiting on and no frame is coming to ask them.
+					if not suppressing and not gameOver.isOver() then
+						triggers:poll()
+					end
+				end
+				if ours then
+					return true
+				end
+			end
 		end
 	end
 
@@ -990,6 +1085,86 @@ else
 		Spring.MarkerAddPoint(x, Spring.GetGroundHeight(x, z), z, text, true)
 	end
 
+	--- Whether a player who can pause is at this client. A spectator may not, and
+	-- in a replay the engine reads any pause request as a toggle of the playback,
+	-- so a mission played back must never send one.
+	local function mayPause()
+		return not Spring.IsReplay() and not Spring.GetSpectatingState()
+	end
+
+	--- Pause the game or start it again, the way the pause key does.
+	--
+	-- The state wanted is always named and never toggled, and it is sent whatever
+	-- the game looks like from here: this client only learns the game is paused
+	-- when the server says so, so a pause and an unpause a moment apart would
+	-- otherwise cancel wrongly.
+	local function setPaused(paused)
+		if mayPause() then
+			Spring.SendCommands(paused and "pause 1" or "pause 0")
+		end
+	end
+
+	--- Dismiss a held line on the player's behalf, when there is no panel for
+	-- them to dismiss it on. A lesson waiting on the dismissal would otherwise
+	-- wait for ever in a game with no LuaUI, or with the widget switched off.
+	local function dismissUnseen(lineId)
+		if not Spring.GetSpectatingState() then
+			Spring.SendLuaRulesMsg(PLAYER_ACTIONS.DISMISSED_MESSAGE .. lineId)
+		end
+	end
+
+	-- What this player has selected, reported to the synced half for the
+	-- `unit_selected` condition. Defined only when a trigger asks, so a mission
+	-- that does not costs nothing per drawn frame.
+	local WATCH = PLAYER_ACTIONS.watch(MISSION)
+
+	if WATCH then
+		local previous = {}
+		local lastSent = nil
+
+		local function defNameOf(unitID)
+			local defID = Spring.GetUnitDefID(unitID)
+			local def = defID and UnitDefs[defID]
+			return def and def.name
+		end
+
+		--- Whether the selection is the one last looked at. The engine has no
+		-- callin for a selection changing, so this is the comparison its own
+		-- widget handler makes to invent one.
+		local function unchanged(selected)
+			if #selected ~= #previous then
+				return false
+			end
+			for index = 1, #selected do
+				if selected[index] ~= previous[index] then
+					return false
+				end
+			end
+			return true
+		end
+
+		--- Send a report when what it would say has changed.
+		--
+		-- A spectator sends none, which covers somebody watching a replay as well:
+		-- the reports the players sent are in the replay already.
+		function gadget:Update()
+			if Spring.GetSpectatingState() then
+				return
+			end
+			local selected = Spring.GetSelectedUnits()
+			if unchanged(selected) then
+				return
+			end
+			previous = selected
+
+			local message = PLAYER_ACTIONS.encode(WATCH, selected, defNameOf, published.units)
+			if message ~= lastSent then
+				lastSent = message
+				Spring.SendLuaRulesMsg(message)
+			end
+		end
+	end
+
 	--- Returns nothing: a true return would stop the message reaching the gadgets
 	-- behind this one, and their messages are not ours to swallow.
 	function gadget:RecvFromSynced(message, first, second, third, fourth)
@@ -1005,8 +1180,14 @@ else
 			-- The panel is a widget, so the line goes on to LuaUI, which draws it
 			-- and plays its clip in step with the text. A game with no LuaUI, or a
 			-- player who has switched the widget off, gets no dialogue: there is
-			-- nowhere for it to appear.
-			Script.LuaUI[DIALOGUE_GLOBAL](first)
+			-- nowhere for it to appear. `second` is whether the line is held.
+			if second and not Script.LuaUI(DIALOGUE_GLOBAL) then
+				dismissUnseen(first)
+			else
+				Script.LuaUI[DIALOGUE_GLOBAL](first, second)
+			end
+		elseif message == PAUSE_MESSAGE then
+			setPaused(first)
 		elseif message == SOUND_MESSAGE then
 			-- Played here rather than in the widget, because a sound is not part of
 			-- the conversation and has nothing to queue behind.

@@ -92,6 +92,29 @@ export function isUnitDefParam(name: string): boolean {
 /** Comparisons a `var` condition can make. */
 export const VAR_OPS = ["eq", "ne", "lt", "lte", "gt", "gte"] as const;
 
+/**
+ * The orders a `command_given` condition can name. Each is the engine's own
+ * name for the command, lower case, which the runtime looks up in the engine's
+ * `CMD` table. `build` is the exception: a build order has no one command id,
+ * so the runtime reads it as "any build order".
+ */
+export const GIVEN_COMMANDS = [
+  "move",
+  "attack",
+  "fight",
+  "patrol",
+  "guard",
+  "stop",
+  "wait",
+  "repair",
+  "reclaim",
+  "resurrect",
+  "capture",
+  "load_units",
+  "unload_units",
+  "build",
+] as const;
+
 /** Conditions the runtime implements at runtime version 1. */
 export const CONDITION_TYPES: Record<string, TypeSpec> = {
   units_in_zone: {
@@ -125,6 +148,38 @@ export const CONDITION_TYPES: Record<string, TypeSpec> = {
     actor: { kind: "actorId" },
     /** The capturing team. Absent means any. */
     team: { kind: "teamId", optional: true, label: "capturing team" },
+  },
+  /**
+   * Holds while a player has a unit selected. With no unit type and no placed
+   * unit it is any unit at all, and with both it is that placed unit.
+   *
+   * A selection lives on the player's own client, so the runtime carries it to
+   * the synced half in a message the server relays (issue #3551).
+   */
+  unit_selected: {
+    /** Whose selection. Absent means any player's. */
+    team: { kind: "teamId", optional: true },
+    unitDef: { kind: "string", optional: true, label: "unit type" },
+    actor: { kind: "actorId", optional: true, label: "placed unit" },
+  },
+  /**
+   * Holds once a player has given an order since the trigger was armed, or
+   * since it last fired. With no command it is any order. A unit type asks for
+   * an order to build that type, whatever the command says.
+   */
+  command_given: {
+    /** Whose order. Absent means any player's. */
+    team: { kind: "teamId", optional: true },
+    command: { kind: "enum", values: GIVEN_COMMANDS, optional: true },
+    unitDef: { kind: "string", optional: true, label: "unit to build" },
+  },
+  /**
+   * Holds once a player has clicked away a line the mission held on screen,
+   * since the trigger was armed or since it last fired. It is how a lesson
+   * carries on after the player has read an instruction (issue #3552).
+   */
+  dialogue_dismissed: {
+    line: { kind: "dialogueId", label: "dialogue line" },
   },
   time_elapsed: {
     seconds: { kind: "number" },
@@ -178,7 +233,14 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
   disable_trigger: { trigger: { kind: "triggerId" } },
   complete_objective: { objective: { kind: "objectiveId" } },
   fail_objective: { objective: { kind: "objectiveId" } },
-  dialogue: { line: { kind: "dialogueId" } },
+  /**
+   * `hold` keeps the line on the panel until the player clicks it away, where
+   * a line otherwise leaves when its reading time is up (issue #3552).
+   */
+  dialogue: {
+    line: { kind: "dialogueId" },
+    hold: { kind: "boolean", optional: true, label: "wait for the player" },
+  },
   /** A sound file beside the compiled mission, by name. */
   play_sound: { sound: { kind: "string" } },
   reveal_area: {
@@ -264,6 +326,13 @@ export const ACTION_TYPES: Record<string, TypeSpec> = {
     metal: { kind: "amount", optional: true, label: "metal storage" },
     energy: { kind: "amount", optional: true, label: "energy storage" },
   },
+  /**
+   * Stop the game clock, and start it again. Single player only: the runtime
+   * ignores both in a game with more than one player, because a pause stops
+   * the game for everybody in it (issue #3552).
+   */
+  pause_game: {},
+  unpause_game: {},
 };
 
 /**
@@ -290,6 +359,12 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   unit_built: "Holds once a team has finished building enough of a unit type.",
   unit_captured:
     "True once an actor changes hands, whether captured or gifted away.",
+  unit_selected:
+    "Holds while a player has a unit selected: any unit, one of a type, or one you placed.",
+  command_given:
+    "Holds once a player has given an order after this trigger was armed: any order, one command, or building a unit type.",
+  dialogue_dismissed:
+    "Holds once a player has clicked away a dialogue line that was set to wait for them.",
   time_elapsed:
     "True once a set number of seconds has passed since the mission began.",
   var: "Compares a variable to a number, or to another variable.",
@@ -311,7 +386,8 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   disable_trigger: "Disarms a trigger until something enables it again.",
   complete_objective: "Marks an objective as done.",
   fail_objective: "Marks an objective as failed.",
-  dialogue: "Plays one of the mission's dialogue lines.",
+  dialogue:
+    "Plays one of the mission's dialogue lines, and can keep it on screen until the player clicks it away.",
   play_sound: "Plays a named sound file.",
   reveal_area:
     "Lifts the fog over a zone for a team, for a set time or the rest of the mission.",
@@ -329,6 +405,9 @@ export const TYPE_DESCRIPTIONS: Record<string, string> = {
   set_income:
     "Sets what a team is paid per second from now on. A negative number bleeds it instead.",
   give_storage: "Moves how much metal or energy a team can hold.",
+  pause_game:
+    "Pauses the game, in single player only. Unpause from a trigger the player wakes, such as one waiting on a dismissed dialogue line.",
+  unpause_game: "Starts a paused game again, in single player only.",
 };
 
 /**
@@ -356,6 +435,9 @@ export const TYPE_GROUPS: Record<string, string> = {
   unit_health_below: "Units",
   unit_built: "Units",
   unit_captured: "Units",
+  unit_selected: "Player",
+  command_given: "Player",
+  dialogue_dismissed: "Player",
   var: "Variables",
   time_elapsed: "Time",
   zone_held_for: "Time",
@@ -382,12 +464,19 @@ export const TYPE_GROUPS: Record<string, string> = {
   reveal_area: "Presentation",
   camera_pan: "Presentation",
   map_marker: "Presentation",
+  pause_game: "Presentation",
+  unpause_game: "Presentation",
   victory: "Ending",
   defeat: "Ending",
 };
 
 /** The bands `AddStep` offers for the conditions list, in the order shown. */
-export const CONDITION_GROUP_ORDER = ["Units", "Variables", "Time"] as const;
+export const CONDITION_GROUP_ORDER = [
+  "Units",
+  "Player",
+  "Variables",
+  "Time",
+] as const;
 
 /** The bands `AddStep` offers for the actions list, in the order shown. */
 export const ACTION_GROUP_ORDER = [
@@ -427,6 +516,16 @@ export const TYPE_RUNTIME_VERSION: Record<string, number> = {
   give_resources: 7,
   set_income: 7,
   give_storage: 7,
+  /** Issue #3551. A runtime behind 8 has no implementation for either, so a
+   *  lesson waiting on one waits for ever. */
+  unit_selected: 8,
+  command_given: 8,
+  /** Issue #3552. A runtime behind 9 has no implementation for any of them,
+   *  so a lesson would run on without pausing, or wait for ever on a dismissal
+   *  that cannot come. */
+  pause_game: 9,
+  unpause_game: 9,
+  dialogue_dismissed: 9,
 };
 
 /**

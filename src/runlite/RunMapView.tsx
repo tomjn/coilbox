@@ -1,5 +1,11 @@
 import { useMemo } from "react";
 import { GalaxyView } from "../conquest/galaxy3d/GalaxyView";
+import type { TerrainPixels } from "../conquest/galaxy3d/terrainLoad";
+import {
+  type PlacedModelGame,
+  usePlacedModelSources,
+} from "../conquest/galaxy3d/usePlacedModelSources";
+import { generatedTerrain } from "../conquest/territories";
 import { useKnownSpaceMaps } from "../content/mapAppearanceCache";
 import {
   useEffectsEnabled,
@@ -7,14 +13,26 @@ import {
   useReduceMotion,
 } from "../general/display";
 import {
+  mapRunClosedLinks,
+  mapRunEmphasis,
+  mapRunIdentities,
+  mapRunOwners,
+  mapRunPathLinks,
+  mapRunScenery,
+  mapRunToGalaxyDoc,
   PLAYER_FACTION,
   runEmphasis,
   runIdentities,
+  runLocations,
   runOwners,
   runPathLinks,
   runToGalaxyDoc,
 } from "./galaxyAdapter";
+import type { RunHandmadeMap } from "./handmadeMap";
+import { resolveRunMap } from "./mapRun";
 import type { RogueliteRun } from "./model";
+
+const NO_MODEL_GAME: PlacedModelGame = {};
 
 /**
  * The run map. Rather than a bespoke renderer, it adapts the run into a
@@ -28,6 +46,14 @@ import type { RogueliteRun } from "./model";
  * the pure transitions preserve by identity across moves, so advancing doesn't
  * rebuild the scene — only `owners`/`selectedId`/`focusId` change, which
  * GalaxyView applies live.
+ *
+ * A run across a land map (`run.settings.map`) is drawn on that map instead:
+ * the map document goes to the view with the run's state laid over it. The
+ * view speaks in location ids there, so the ids going in and the selection
+ * coming out are translated. A run whose map cannot be had falls back to the
+ * column layout. A hand-made map is read by the page and handed in as
+ * `handmadeMap`, and nothing is drawn until that read has answered, so the
+ * column layout never shows for a moment in place of the map.
  */
 export function RunMapView({
   run,
@@ -35,6 +61,8 @@ export function RunMapView({
   onSelect,
   focusId,
   burstNodeId,
+  modelGame,
+  handmadeMap,
   className,
 }: {
   run: RogueliteRun;
@@ -44,39 +72,112 @@ export function RunMapView({
   focusId?: string | null;
   /** Fire a one-shot win burst on this node (e.g. a battle just won). */
   burstNodeId?: string | null;
+  /** The installed game a land map's placed models are read out of. */
+  modelGame?: PlacedModelGame;
+  /** The hand-made map the run was made on, from `useRunHandmadeMap`. */
+  handmadeMap?: RunHandmadeMap;
   className?: string;
 }) {
+  // The map a land run crosses, built again from the run's settings, and which
+  // location each run node stands for. Both null for a column run.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the map settings and the graph, both stable across moves
+  const land = useMemo(() => {
+    const ref = run.settings.map;
+    const handmade = handmadeMap?.map;
+    const map = ref
+      ? resolveRunMap(ref, run.settings.game, (id) =>
+          handmade && handmade.id === id ? { map: handmade } : null,
+        )?.map
+      : undefined;
+    const locations = map ? runLocations(run, map) : null;
+    return map && locations ? { map, locations } : null;
+  }, [
+    run.settings.map,
+    run.settings.game,
+    run.nodes,
+    run.edges,
+    handmadeMap?.map,
+  ]);
+  const terrainPixels = useMemo((): TerrainPixels | undefined => {
+    const terrain = land ? generatedTerrain(land.map) : null;
+    if (!terrain) return undefined;
+    const { width, height } = terrain;
+    return {
+      color: { data: terrain.image, width, height },
+      height: { data: terrain.heightmap, width, height },
+    };
+  }, [land]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
   const doc = useMemo(
-    () => runToGalaxyDoc(run),
-    [run.nodes, run.edges, run.settings.skin, run.settings.seed],
+    () =>
+      land
+        ? mapRunToGalaxyDoc(run, land.map, land.locations)
+        : runToGalaxyDoc(run),
+    [land, run.nodes, run.edges, run.settings.skin, run.settings.seed],
   );
   // Per-node identity bodies (station/wreck/anomaly/beacon/warlord) + battle
   // danger-tints. Derived from the run's stable structure, so it's a build-time
   // prop — a new map rebuilds the scene, which only happens when the graph does.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the graph + seed, both stable across moves
   const identities = useMemo(
-    () => runIdentities(run),
-    [run.nodes, run.settings.seed],
+    () => (land ? mapRunIdentities(run, land.locations) : runIdentities(run)),
+    [land, run.nodes, run.settings.seed],
   );
   // biome-ignore lint/correctness/useExhaustiveDependencies: owners depend only on progress moving, applied live by GalaxyView
   const owners = useMemo(
-    () => runOwners(run),
-    [run.nodes, run.progress.currentNodeId, run.progress.visited],
+    () => (land ? mapRunOwners(run, land.map, land.locations) : runOwners(run)),
+    [land, run.nodes, run.progress.currentNodeId, run.progress.visited],
   );
   // Graded de-emphasis: same live channel as owners, keyed on progress + the
   // graph (edges decide what's still reachable).
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on progress + graph, applied live by GalaxyView
   const emphasis = useMemo(
-    () => runEmphasis(run),
-    [run.nodes, run.edges, run.progress.currentNodeId, run.progress.visited],
+    () =>
+      land ? mapRunEmphasis(run, land.map, land.locations) : runEmphasis(run),
+    [
+      land,
+      run.nodes,
+      run.edges,
+      run.progress.currentNodeId,
+      run.progress.visited,
+    ],
   );
   // The path already travelled, highlighted green up to the current node.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on progress + graph, applied live by GalaxyView
   const pathLinks = useMemo(
-    () => runPathLinks(run),
-    [run.nodes, run.edges, run.progress.visited],
+    () => (land ? mapRunPathLinks(run, land.locations) : runPathLinks(run)),
+    [land, run.nodes, run.edges, run.progress.visited],
   );
+
+  // A land map's links between two locations of one rank, which are drawn and
+  // never offered as a step, and its scenery, which the pointer ignores.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the map and the graph, both stable across moves
+  const closedLinks = useMemo(
+    () => (land ? mapRunClosedLinks(run, land.map, land.locations) : undefined),
+    [land, run.edges],
+  );
+  const inertIds = useMemo(
+    () => (land ? mapRunScenery(land.map, land.locations) : undefined),
+    [land],
+  );
+
+  // On a land map the view knows locations, and the page knows run nodes.
+  const nodeIdAt = useMemo(
+    () => new Map([...(land?.locations ?? [])].map(([id, at]) => [at, id])),
+    [land],
+  );
+  const toView = (id: string | null | undefined) =>
+    id ? (land?.locations.get(id) ?? id) : (id ?? null);
+  const onViewSelect =
+    onSelect && land
+      ? (at: string | null) => {
+          if (at === null) return onSelect(null);
+          // Scenery has no run node, so a click on it selects nothing.
+          const id = nodeIdAt.get(at);
+          if (id) onSelect(id);
+        }
+      : onSelect;
 
   // The maps this run's nodes are played on, so the hub can say which are void
   // for the ones this machine has not got (issue #1739).
@@ -85,9 +186,12 @@ export function RunMapView({
     [doc.nodes],
   );
   const spaceMaps = useKnownSpaceMaps(nodeMaps);
+  const modelSources = usePlacedModelSources(doc, modelGame ?? NO_MODEL_GAME);
   const reduceMotion = useReduceMotion();
   const effects = useEffectsEnabled();
   const performanceMode = usePerformanceMode();
+
+  if (handmadeMap?.loading) return <div className={className} />;
 
   return (
     <GalaxyView
@@ -95,15 +199,19 @@ export function RunMapView({
       owners={owners}
       emphasis={emphasis}
       identities={identities}
-      depthMood
+      depthMood={!land}
       laneFlow
       pathLinks={pathLinks}
-      burstNodeId={burstNodeId}
+      closedLinks={closedLinks}
+      inertIds={inertIds}
+      burstNodeId={toView(burstNodeId)}
       playerFactionId={PLAYER_FACTION}
-      selectedId={selectedId}
-      onSelect={onSelect}
-      focusNodeId={focusId ?? null}
+      selectedId={toView(selectedId)}
+      onSelect={onViewSelect}
+      focusNodeId={toView(focusId)}
+      terrainPixels={terrainPixels}
       spaceMaps={spaceMaps}
+      modelSources={modelSources}
       display={{ reduceMotion, effects, performanceMode }}
       className={className}
     />

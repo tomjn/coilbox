@@ -10,6 +10,11 @@ import {
 } from "../challenge/nodeMaps";
 import type { GenBuildGraph, GenerateRunOpts, GenRunMap } from "./generate";
 import { applyChallengeMaps, generateRun } from "./generate";
+import {
+  generateMapRun,
+  type HandmadeMapLookup,
+  resolveRunMap,
+} from "./mapRun";
 import type { RogueliteRun, RunSettings } from "./model";
 import { parseRunSettings } from "./model";
 
@@ -106,6 +111,11 @@ export function optionsFromChallenge(
  * encounter on the map the challenge names (issue #1393). Conquest's
  * `galaxyFromChallenge` is the same pairing for the same reason, and the two
  * steps belong together for the same reason too.
+ *
+ * A challenge made on a land map names that map in its settings. The map is
+ * found again first and the run is generated across it. Throws when the map
+ * cannot be had, because a column run of the same seed would be a different
+ * challenge under the same code.
  */
 export function runFromChallenge(
   settings: WarpathChallengeSettings,
@@ -114,9 +124,33 @@ export function runFromChallenge(
     build?: GenBuildGraph;
     enemyAiKey?: string;
     loadoutBranch?: number;
+    /** Finds a hand-made map by id. Without it only generated maps resolve. */
+    handmadeMap?: HandmadeMapLookup;
   },
 ): RogueliteRun {
-  const run = generateRun(optionsFromChallenge(settings, env));
+  const opts = optionsFromChallenge(settings, env);
+  if (!settings.map) {
+    return applyChallengeMaps(generateRun(opts), settings.nodeMaps, env.maps);
+  }
+  const source = resolveRunMap(settings.map, settings.game, env.handmadeMap);
+  if (!source) {
+    throw new Error(
+      "This challenge is played on a map this install cannot find or rebuild.",
+    );
+  }
+  // The caller is expected to have checked this and said so in full (see
+  // `checkChallengeMap`). It is checked again here so no caller can start a
+  // challenge on another version of its map.
+  if (
+    settings.map.source === "handmade" &&
+    settings.map.fingerprint &&
+    source.map.handmade?.fingerprint !== settings.map.fingerprint
+  ) {
+    throw new Error(
+      "This challenge was made on a different version of its hand-made map than the one installed here.",
+    );
+  }
+  const run = generateMapRun({ ...opts, ...source, mapRef: settings.map });
   return applyChallengeMaps(run, settings.nodeMaps, env.maps);
 }
 

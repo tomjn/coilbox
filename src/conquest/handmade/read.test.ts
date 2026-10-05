@@ -13,7 +13,15 @@ import { pointInRing } from "./trace";
 const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
-const FILES = ["map.json", "picture.png", "provinces.png", "heightmap.png"];
+const FILES = [
+  "map.json",
+  "picture.png",
+  "provinces.png",
+  "heightmap.png",
+  "cairn.gltf",
+  "ironcoast-siege.json",
+];
+const scenarioText = readFileSync(`${SAMPLE}ironcoast-siege.json`, "utf8");
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
@@ -26,6 +34,7 @@ function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
     picture: { width: picture.width, height: picture.height },
     urlFor: (name) =>
       FILES.includes(name) ? `asset://map/${name}` : undefined,
+    scenarios: { "ironcoast-siege.json": scenarioText },
     ...change,
   };
 }
@@ -209,14 +218,76 @@ describe("the sample map", () => {
     expect(parseGalaxyJson(JSON.stringify(doc))).toBeNull();
   });
 
-  it("ignores keys it does not know, including the reserved ones", () => {
+  it("places the manifest's models on the document", () => {
+    expect(doc.models).toEqual([
+      { model: { file: "cairn.gltf" }, pos: [440, 600], rotation: 30 },
+    ]);
+  });
+
+  it("reads with no errors and holds every feature the issue asks for", () => {
+    const result = readHandmadeMap(sample());
+    expect(result.ok).toBe(true);
+    const manifest = JSON.parse(manifestText) as MapManifest;
+    expect(manifest.provinces).toHaveLength(9);
+    expect(manifest.locations).toHaveLength(1);
+    expect(doc.nodes).toHaveLength(10);
+    expect(doc.nodes.filter((n) => n.outline === undefined)).toHaveLength(1);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "crossing")).toEqual([
+      ["eastcliff", "ironcoast", "crossing"],
+    ]);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "road")).toHaveLength(
+      2,
+    );
+    expect(doc.blockedBorders).toHaveLength(1);
+    expect(doc.factions).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.owner === "neutral").length).toBe(6);
+    expect(doc.models).toHaveLength(1);
+    expect(doc.warpath?.startId).toBe("westhaven");
+    expect(doc.warpath?.goalId).toBe("farwatch");
+    expect(Object.keys(doc.warpath?.kinds ?? {})).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.scenario)).toHaveLength(1);
+    expect(node("ironcoast").scenario).toBeDefined();
+    expect(doc.terrain?.heightmap).toBeDefined();
+  });
+
+  it("takes a game model and a file in a folder inside the map folder", () => {
     const result = readHandmadeMap(
       sample({
         manifest: manifestWith((m) => {
-          m.warpath = { start: "westhaven", goal: "farwatch" };
-          m.models = [{ file: "tower.gltf" }];
-          m.provinces[0].scenario = "intro.json";
-          m.provinces[0].warpath = { kind: "shop" };
+          m.models = [
+            { model: { game: "armcom" }, pos: [100, 100], scale: 2 },
+            { model: { file: "models/Gate.GLB" }, pos: [0, 960], height: 5 },
+          ];
+        }),
+        urlFor: (name) =>
+          [...FILES, "models/Gate.GLB"].includes(name)
+            ? `asset://map/${name}`
+            : undefined,
+      }),
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.doc.models).toEqual([
+      { model: { game: "armcom" }, pos: [100, 100], scale: 2 },
+      { model: { file: "models/Gate.GLB" }, pos: [0, 960], height: 5 },
+    ]);
+  });
+
+  it("leaves models off a document whose manifest lists none", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models = [];
+        }),
+      }),
+    );
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(result.doc.models).toBeUndefined();
+  });
+
+  it("ignores keys it does not know", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
           (m as unknown as Record<string, unknown>).somethingNew = 1;
         }),
       }),
@@ -273,7 +344,9 @@ describe("a broken map folder", () => {
     ]);
     expect(errors[0].message).toContain('"Ironcoast" (#b55f9a)');
     expect(errors[0].message).toContain("cannot be reached");
-    expect(errors).toHaveLength(4);
+    // The Warpath goal is on the far side, so the route is reported too.
+    expect(only(errors, "warpath-route")).toHaveLength(1);
+    expect(errors).toHaveLength(5);
   });
 
   it("names a point location with no road to it", () => {
@@ -289,6 +362,9 @@ describe("a broken map folder", () => {
     expect(error.name).toBe("Stonebridge");
     expect(error.color).toBeUndefined();
     expect(error.message).toContain('The location "Stonebridge"');
+    expect(error.message).toContain("No road or crossing joins it.");
+    expect(error.message).toContain("Add a road or a crossing to it");
+    expect(error.message).not.toMatch(/paint|touch/i);
   });
 
   it("says when the province image and the map picture are different sizes", () => {
@@ -435,6 +511,98 @@ describe("a broken map folder", () => {
     expect(only(errors, "file-missing")[0].file).toBe("europe.png");
   });
 
+  it("names a model file the folder does not hold", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models?.push({ model: { file: "tower.glb" }, pos: [10, 10] });
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "file-missing");
+    expect(error.file).toBe("tower.glb");
+    expect(error.message).toContain(
+      'models[1] names the model file "tower.glb"',
+    );
+  });
+
+  it("names a model file that is not glTF", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models = [{ model: { file: "tower.obj" }, pos: [10, 10] }];
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "manifest-field");
+    expect(error.path).toBe('models[0] ("tower.obj").model.file');
+    expect(error.message).toContain("must end in .gltf or .glb");
+  });
+
+  it("names a model placed outside the map", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.models?.push({ model: { game: "armcom" }, pos: [1700, 20] });
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "manifest-field");
+    expect(error.path).toBe('models[1] ("armcom").pos');
+    expect(error.message).toContain("outside the map (1600 by 960)");
+  });
+
+  it("lists every malformed model entry and does not drop one unsaid", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).models = [
+            "cairn.gltf",
+            { pos: [10, 10] },
+            { model: { file: "cairn.gltf", game: "armcom" }, pos: [10, 10] },
+            { model: { game: " " }, pos: [10, 10] },
+            { model: { file: "../cairn.gltf" }, pos: [10, 10] },
+            { model: { file: "cairn.gltf" } },
+            {
+              model: { file: "cairn.gltf" },
+              pos: [10, 10],
+              height: "high",
+              rotation: null,
+              scale: 0,
+            },
+          ];
+        }),
+      }),
+    );
+    expect(only(errors, "manifest-field").map((e) => e.path)).toEqual([
+      "models[0]",
+      "models[1].model",
+      'models[2] ("cairn.gltf").model',
+      "models[3].model.game",
+      'models[4] ("../cairn.gltf").model.file',
+      'models[5] ("cairn.gltf").pos',
+      'models[6] ("cairn.gltf").height',
+      'models[6] ("cairn.gltf").rotation',
+      'models[6] ("cairn.gltf").scale',
+    ]);
+    expect(errors).toHaveLength(9);
+  });
+
+  it("says when models is not a list", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).models = {};
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    expect(only(errors, "manifest-field")[0].path).toBe("models");
+  });
+
   it("names a crossing to a location that does not exist", () => {
     const errors = errorsOf(
       sample({
@@ -474,6 +642,144 @@ describe("a broken map folder", () => {
     expect(errors).toHaveLength(1);
     const [error] = only(errors, "link-conflict");
     expect(error.message).toContain("a blocked border and a road");
+  });
+});
+
+describe("Warpath markings", () => {
+  it("puts the start, the goal and the marked kinds on the document", () => {
+    expect(readSample().warpath).toEqual({
+      startId: "westhaven",
+      goalId: "farwatch",
+      kinds: { eastcliff: "shop", ironcoast: "battle" },
+    });
+  });
+
+  it("reads a map with neither end as one for Conquest only", () => {
+    const result = readHandmadeMap(
+      sample({
+        manifest: manifestWith((m) => {
+          delete m.warpath;
+        }),
+      }),
+    );
+    if (!result.ok) throw new Error("expected the read to pass");
+    expect(result.doc.warpath).toBeUndefined();
+  });
+
+  it("keeps the markings out of a saved galaxy", () => {
+    const doc = readSample();
+    const filled = {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        hasBlankBattle(n) ? { ...n, battle: { mapName: "MapA" } } : n,
+      ),
+    };
+    const parsed = parseGalaxyJson(JSON.stringify(filled));
+    expect(parsed).not.toBeNull();
+    expect(parsed?.warpath).toBeUndefined();
+  });
+
+  it("names the start and the goal when one cannot be reached from the other", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.crossings = [];
+        }),
+      }),
+    );
+    const [error] = only(errors, "warpath-route");
+    expect(error.startId).toBe("westhaven");
+    expect(error.goalId).toBe("farwatch");
+    expect(error.message).toContain('the start "Westhaven" (#d9a441)');
+    expect(error.message).toContain('the goal "Farwatch" (#3fa374)');
+  });
+
+  it("refuses a start and a goal that are one location", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { start: "midvale", goal: "midvale" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-same-location");
+    expect(error.name).toBe("Midvale");
+    expect(error.message).toContain('both "Midvale"');
+  });
+
+  it("names a location marked with a kind Warpath does not know", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m.provinces[2] as { warpath?: unknown }).warpath = { kind: "shpo" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-kind");
+    expect(error.name).toBe("Midvale");
+    expect(error.kind).toBe("shpo");
+    expect(error.message).toContain('"Midvale" has the Warpath kind "shpo"');
+    expect(error.message).toContain("battle, elite, shop, event, reward");
+  });
+
+  it.each([
+    ["start", "goal"],
+    ["goal", "start"],
+  ] as const)("refuses a %s with no %s", (has, missing) => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { [has]: "westhaven" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-one-end");
+    expect(error.missing).toBe(missing);
+    expect(error.message).toContain(`a ${has} and no ${missing}`);
+  });
+
+  it("names a start that is not the id of any location", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.warpath = { start: "atlantis", goal: "farwatch" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-unknown-location");
+    expect(error.end).toBe("start");
+    expect(error.id).toBe("atlantis");
+  });
+
+  it("refuses a kind on the start or the goal", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          m.provinces[1].warpath = { kind: "shop" };
+        }),
+      }),
+    );
+    expect(errors).toHaveLength(1);
+    const [error] = only(errors, "warpath-kind-on-end");
+    expect(error.end).toBe("start");
+    expect(error.message).toContain('"Westhaven" is the Warpath start');
+  });
+
+  it("says when warpath is not an object", () => {
+    const errors = errorsOf(
+      sample({
+        manifest: manifestWith((m) => {
+          (m as unknown as Record<string, unknown>).warpath = "westhaven";
+        }),
+      }),
+    );
+    expect(only(errors, "manifest-field").map((e) => e.path)).toEqual([
+      "warpath",
+    ]);
   });
 });
 

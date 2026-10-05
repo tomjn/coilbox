@@ -10,15 +10,19 @@ import type { GalaxyDoc, Incursion, NodeStar } from "../model";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
+import { buildCueLayer } from "./cueLayer";
+import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
+import { pickLocation } from "./picking";
 import {
   type PlacedModelSources,
   placedModelLoaders,
 } from "./placedModelLoaders";
 import { buildPlacedModels } from "./placedModelsLayer";
 import { buildPlayLayer } from "./playLayer";
+import { buildProvinceLayer } from "./provinceLayer";
 import { createSelection } from "./selection";
 import {
   cameraFloorAt,
@@ -95,6 +99,11 @@ export interface NodeIdentity {
    * sites. Kept subtle and stellar-plausible by the caller.
    */
   starTint?: string;
+  /**
+   * The start or the goal of a run across a land map. Read on a terrain map
+   * only, where it draws a marker over the location. See endMarkerLayer.ts.
+   */
+  end?: "start" | "goal";
 }
 
 interface GalaxyViewProps {
@@ -105,11 +114,19 @@ interface GalaxyViewProps {
   playerFactionId: string;
   selectedId?: string | null;
   incursion?: Incursion;
+  /**
+   * The locations the player can attack this turn, from `attackableNodes`.
+   * Read on a terrain map only, where each one is picked out. A run with
+   * {@link laneFlow} works its open choices out from `owners` instead.
+   */
+  attackableIds?: Set<string>;
   onSelect?: (nodeId: string | null) => void;
   /**
    * Fog of war: the node ids the player can see. `undefined` means no fog —
    * everything is shown. Fogged nodes render as dim, unlabelled, unselectable
-   * ghosts; lanes into the fog fade out.
+   * ghosts; lanes into the fog fade out. On a terrain map a fogged province
+   * keeps its shape and loses its owner colour, name and capital marker, and
+   * a fogged city is a plain grey marker. A theatre map draws no fog.
    */
   visibleIds?: Set<string>;
   /**
@@ -133,6 +150,18 @@ interface GalaxyViewProps {
    * node. Only honoured with {@link laneFlow}. Default-off.
    */
   pathLinks?: Set<string>;
+  /**
+   * Links that are no step of the run, as `"a b"` in the order `galaxy.links`
+   * writes them. Such a link is drawn and never lit as a choice. Only
+   * honoured with {@link laneFlow}. Default-off.
+   */
+  closedLinks?: Set<string>;
+  /**
+   * Locations the pointer ignores: no hover, no pointer cursor, and a click
+   * on one selects nothing. A run across a land map lists its scenery here.
+   * They are still drawn.
+   */
+  inertIds?: Set<string>;
   /**
    * Fire a one-shot celebratory burst (shockwave + flare) on this node — e.g.
    * the star of a battle just won. Set it to the node id to play; set back to
@@ -409,11 +438,14 @@ export function GalaxyView({
   playerFactionId,
   selectedId,
   incursion,
+  attackableIds,
   onSelect,
   visibleIds,
   emphasis,
   laneFlow = false,
   pathLinks,
+  closedLinks,
+  inertIds,
   burstNodeId,
   spaceMaps,
   identities,
@@ -431,9 +463,12 @@ export function GalaxyView({
   const ownersRef = useRef(owners);
   const selectedRef = useRef<string | null | undefined>(selectedId);
   const incursionRef = useRef(incursion);
+  const attackableRef = useRef<Set<string> | undefined>(attackableIds);
   const visibleRef = useRef<Set<string> | undefined>(visibleIds);
   const emphasisRef = useRef<Map<string, NodeEmphasis> | undefined>(emphasis);
   const pathLinksRef = useRef<Set<string> | undefined>(pathLinks);
+  const closedLinksRef = useRef<Set<string> | undefined>(closedLinks);
+  const inertRef = useRef<Set<string> | undefined>(inertIds);
   const burstRef = useRef<string | null | undefined>(burstNodeId);
   const applyBurstRef = useRef<(() => void) | null>(null);
   const focusRef = useRef<string | null | undefined>(focusNodeId);
@@ -656,6 +691,21 @@ export function GalaxyView({
       });
     }
 
+    // Nodes with an outline, drawn as areas on the terrain. `undefined` on a
+    // galaxy or theatre map, and on a terrain map of point locations only.
+    const provinces = surface
+      ? buildProvinceLayer(
+          scene,
+          disposables,
+          galaxy,
+          surface,
+          ownerColor,
+          ownersRef,
+          labelObjects,
+          dimOf,
+        )
+      : undefined;
+
     // A terrain map's point locations and roads. See cityLayer.ts.
     const cities = surface
       ? buildCityLayer(
@@ -671,6 +721,49 @@ export function GalaxyView({
           cores,
         )
       : undefined;
+
+    // The start and the goal of a run across a land map. See endMarkerLayer.ts.
+    const endMarkers =
+      surface && identities
+        ? buildEndMarkerLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            identities,
+            ownerColor,
+          )
+        : undefined;
+
+    // Crossings, blocked borders and the player's frontier, and the state of
+    // every location and road on a terrain map. See cueLayer.ts.
+    const cues =
+      surface && cities
+        ? buildCueLayer(
+            scene,
+            disposables,
+            galaxy,
+            surface,
+            ownerColor,
+            laneDim,
+            cities,
+            provinces,
+            () => ({
+              owners: ownersRef.current,
+              playerFactionId,
+              selectedId: selectedRef.current,
+              attackable: attackableRef.current,
+              incursionNodeId: incursionRef.current?.nodeId,
+              visible: visibleRef.current,
+              run: laneFlow
+                ? {
+                    pathLinks: pathLinksRef.current,
+                    closedLinks: closedLinksRef.current,
+                  }
+                : undefined,
+            }),
+          )
+        : undefined;
 
     /* ------------------------ renderer + camera ---------------------------- */
 
@@ -811,7 +904,9 @@ export function GalaxyView({
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
-        cities.fitToCamera(camera.position.distanceTo(controls.target));
+        const distance = camera.position.distanceTo(controls.target);
+        cities.fitToCamera(distance);
+        endMarkers?.fitToCamera(distance);
       }
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
@@ -834,6 +929,7 @@ export function GalaxyView({
       laneFlow,
       ownersRef,
       pathLinksRef,
+      closedLinksRef,
       isVisible,
       laneDim,
       ownerColor,
@@ -856,7 +952,8 @@ export function GalaxyView({
     );
     const applyOwners = () => {
       owners.apply();
-      cities?.apply();
+      // On a terrain map this restyles the cities and the provinces too.
+      cues?.apply();
     };
     applyOwnersRef.current = applyOwners;
 
@@ -878,6 +975,9 @@ export function GalaxyView({
     const applySelection = () => {
       selection.apply();
       cities?.select(selectedRef.current ?? null);
+      provinces?.select(selectedRef.current ?? null);
+      // The selected location's neighbours and the incursion are cues.
+      cues?.apply();
     };
     applySelectionRef.current = applySelection;
 
@@ -924,10 +1024,15 @@ export function GalaxyView({
       );
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObject(cores, false)[0];
-      const idx = hit?.instanceId ?? -1;
-      // Fogged systems aren't selectable.
-      if (idx >= 0 && !isVisible(nodeIds[idx])) return -1;
-      return idx;
+      // Fogged and inert locations aren't selectable. See picking.ts.
+      return pickLocation(
+        hit?.instanceId ?? -1,
+        provinces && {
+          isProvince: provinces.isProvince,
+          pick: () => provinces.pick(raycaster.ray),
+        },
+        (i) => !isVisible(nodeIds[i]) || !!inertRef.current?.has(nodeIds[i]),
+      );
     };
 
     /** Hover: swell the corona and lift the ownership ring (the selection
@@ -961,6 +1066,7 @@ export function GalaxyView({
       // change already does, and it only runs when the hovered node changes.
       hoveredNodeId = idx >= 0 ? galaxy.nodes[idx].id : null;
       cities?.hover(hoveredNodeId);
+      provinces?.hover(hoveredNodeId);
       applyOwners();
       if (renderer) {
         renderer.domElement.style.cursor = hovered >= 0 ? "pointer" : "";
@@ -1288,10 +1394,22 @@ export function GalaxyView({
     visibleRef.current = visibleIds;
     emphasisRef.current = emphasis;
     pathLinksRef.current = pathLinks;
+    closedLinksRef.current = closedLinks;
+    inertRef.current = inertIds;
+    attackableRef.current = attackableIds;
     applyOwnersRef.current?.();
     applyVisibilityRef.current?.();
     if (reduceMotion) renderRef.current?.();
-  }, [owners, visibleIds, emphasis, pathLinks, reduceMotion]);
+  }, [
+    owners,
+    visibleIds,
+    emphasis,
+    pathLinks,
+    closedLinks,
+    inertIds,
+    attackableIds,
+    reduceMotion,
+  ]);
 
   useEffect(() => {
     selectedRef.current = selectedId;

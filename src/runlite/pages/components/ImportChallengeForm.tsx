@@ -24,6 +24,8 @@ import {
   substitutedMapCount,
   type WarpathChallengeSettings,
 } from "../../challenge";
+import { loadChallengeRunMap } from "../../handmadeMap";
+import type { RunMapSource } from "../../mapRun";
 import { useRuns } from "../../runs";
 import { buildGraphFor, setupLimitWarning } from "../../unitLimit";
 
@@ -101,6 +103,20 @@ export function ImportChallengeForm({
       );
     }
 
+    // A challenge made on a hand-made map needs that map installed here, in
+    // the version the challenge was made on. It is read before anything else
+    // is asked, so the player hears of it first. Nothing is generated in its
+    // place, because that would be a different challenge under the same code.
+    let handmade: RunMapSource | undefined;
+    if (settings.map?.source === "handmade") {
+      const loaded = await loadChallengeRunMap(
+        settings.map,
+        installedGame.name,
+      );
+      if (!loaded.ok) throw new Error(loaded.message);
+      handmade = loaded.source;
+    }
+
     const archive = installedGame.primaryArchive.name;
     const maps = eligible(scan.data?.maps ?? []).map((m) => ({
       name: m.name,
@@ -148,7 +164,12 @@ export function ImportChallengeForm({
       : undefined;
 
     const id = `run-${crypto.randomUUID()}`;
-    const run = runFromChallenge(settings, { maps, build, enemyAiKey });
+    const run = runFromChallenge(settings, {
+      maps,
+      build,
+      enemyAiKey,
+      handmadeMap: () => handmade ?? null,
+    });
     await saveRun(id, { ...run, importedChallenge: true });
     return { id, doc: run };
   };

@@ -86,6 +86,8 @@ function M.missionFiles(mission)
 		["luarules/mission_runtime/coilbox_triggers.lua"] = module("luarules/mission_runtime/coilbox_triggers.lua"),
 		["luarules/mission_runtime/coilbox_unit_conditions.lua"] = module(
 			"luarules/mission_runtime/coilbox_unit_conditions.lua"),
+		["luarules/mission_runtime/coilbox_player_actions.lua"] = module(
+			"luarules/mission_runtime/coilbox_player_actions.lua"),
 		["luarules/mission_runtime/coilbox_zones.lua"] = module("luarules/mission_runtime/coilbox_zones.lua"),
 		["luarules/mission_runtime/coilbox_vars.lua"] = module("luarules/mission_runtime/coilbox_vars.lua"),
 		["luarules/mission_runtime/coilbox_groups.lua"] = module("luarules/mission_runtime/coilbox_groups.lua"),
@@ -97,6 +99,7 @@ function M.missionFiles(mission)
 			"luarules/mission_runtime/coilbox_gameover.lua"),
 		["luarules/mission_runtime/coilbox_dialogue.lua"] = module(
 			"luarules/mission_runtime/coilbox_dialogue.lua"),
+		["luarules/mission_runtime/coilbox_pause.lua"] = module("luarules/mission_runtime/coilbox_pause.lua"),
 		["luarules/mission_runtime/coilbox_view.lua"] = module("luarules/mission_runtime/coilbox_view.lua"),
 		["luarules/mission_runtime/coilbox_reveal.lua"] = module("luarules/mission_runtime/coilbox_reveal.lua"),
 		["luarules/mission_runtime/coilbox_restrictions.lua"] = module(
@@ -138,7 +141,10 @@ end
 --
 -- `options.players` is keyed by player id and says which team each one is on,
 -- `options.allyTeams` is keyed by engine team number, and `options.allyTeamList`
--- is every ally team the game has.
+-- is every ally team the game has. `options.aiTeams` is the set of engine teams
+-- an AI plays, and `options.spectating` makes this client a spectator.
+-- `options.replay` makes it a client watching a replay, and `options.noLuaUI`
+-- leaves LuaUI without the global a line of dialogue is handed to.
 --
 -- `options.allowTransfer(unitID, newTeam, given)` is the game's own
 -- `AllowUnitTransfer`, and a test that says nothing about it has a game that
@@ -202,6 +208,13 @@ function M.newEngine(modOptions, files, options)
 		-- How many units have had their command descriptions read, so a test can
 		-- say which units the runtime never asked about at all.
 		cmdDescReads = 0,
+		-- What this client's player has selected, as the unit ids in the order the
+		-- engine would hand them over. A test sets it and runs Update.
+		selected = {},
+		-- Every Spring.SendLuaRulesMsg call the unsynced half made.
+		luaRulesMsgs = {},
+		-- Every console command sent through Spring.SendCommands.
+		commands = {},
 	}
 
 	--- Engine team -> ally team. A team nothing says otherwise about is in an ally
@@ -322,6 +335,15 @@ function M.newEngine(modOptions, files, options)
 			engine.finish(unitID)
 		end
 		return unitID
+	end
+
+	--- A player ordered a unit, the way the engine tells synced Lua once the unit
+	-- has accepted the order. `fromLua` is true for an order synced Lua gave, and
+	-- the engine names no player for one of those.
+	function engine.command(unitID, cmdID, playerID, fromLua)
+		local unit = engine.units[unitID]
+		fire("UnitCommand", unitID, unit.defID, unit.team, cmdID, {}, {}, 0,
+			fromLua and -1 or playerID, true, fromLua == true)
 	end
 
 	--- Transfer a unit to another team, captured or gifted: the engine tells Lua
@@ -593,7 +615,7 @@ function M.newEngine(modOptions, files, options)
 				return #winners
 			end,
 			GetTeamInfo = function(team)
-				return team, 0, false, false, "", allyTeamOf(team), 1, {}
+				return team, 0, false, (options.aiTeams or {})[team] == true, "", allyTeamOf(team), 1, {}
 			end,
 			GetAllyTeamList = function()
 				-- Two sides unless a test says otherwise, which is what a mission
@@ -626,6 +648,32 @@ function M.newEngine(modOptions, files, options)
 				local player = (options.players or {})[playerID] or {}
 				return "player" .. playerID, true, player.spectator == true, player.team,
 					allyTeamOf(player.team)
+			end,
+			-- A fresh table every call, the way the engine's own is.
+			GetSelectedUnits = function()
+				local copy = {}
+				for index, unitID in ipairs(engine.selected) do
+					copy[index] = unitID
+				end
+				return copy
+			end,
+			GetSpectatingState = function()
+				return options.spectating == true
+			end,
+			IsReplay = function()
+				return options.replay == true
+			end,
+			-- Every console command the runtime sent, one string each.
+			SendCommands = function(...)
+				for _, command in ipairs({ ... }) do
+					table.insert(engine.commands, command)
+				end
+			end,
+			-- Recorded rather than delivered. The server relays a Lua message to
+			-- every client's synced half, and a test that wants that hands the
+			-- recorded string to a synced engine's RecvLuaMsg itself.
+			SendLuaRulesMsg = function(message)
+				table.insert(engine.luaRulesMsgs, message)
 			end,
 			SetUnitBlocking = function(unitID, isBlocking)
 				engine.blocking[unitID] = isBlocking
@@ -684,11 +732,13 @@ function M.newEngine(modOptions, files, options)
 		-- The engine's own command constants, at the numbers it uses.
 		CMD = {
 			OPT_SHIFT = 32,
+			STOP = 0,
 			MOVE = 10,
 			PATROL = 15,
 			FIGHT = 16,
 			ATTACK = 20,
 			GUARD = 25,
+			REPAIR = 40,
 			FIRE_STATE = 45,
 			MOVE_STATE = 50,
 			SELFD = 65,
@@ -725,13 +775,17 @@ function M.newEngine(modOptions, files, options)
 		end,
 		-- Calling into another Lua handle. The engine answers any name with a
 		-- callable and does nothing at all when the other handle has no such
-		-- global, so the stub records the call and never refuses one.
+		-- global, so the stub records the call and never refuses one. Called
+		-- with a name, it answers whether the other handle has that global.
 		Script = {
 			LuaUI = setmetatable({}, {
 				__index = function(_, name)
 					return function(...)
 						table.insert(engine.luaUI, { name, ... })
 					end
+				end,
+				__call = function()
+					return options.noLuaUI ~= true
 				end,
 			}),
 		},

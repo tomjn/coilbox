@@ -26,6 +26,7 @@ export default defineConfig({
   srcExclude: [
     "**/superpowers/**",
     "mockups/**",
+    "examples/**",
     "reports/**",
     "ideas-*.md",
     "README.md",

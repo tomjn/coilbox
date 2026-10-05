@@ -33,13 +33,13 @@ import {
  */
 
 /** The block's radius in world units, the theatre disc's own. */
-const MARKER_RADIUS = 1.35;
+export const MARKER_RADIUS = 1.35;
 /** How far the block stands above the ground at its anchor. */
 const MARKER_HEIGHT = 1.2;
 /** How far the block reaches below its anchor, so a slope never shows under it. */
 const MARKER_FOOT = 1.5;
 /** A capital's block is this much bigger, as the theatre disc is. */
-const CAPITAL_SCALE = 1.25;
+export const CAPITAL_SCALE = 1.25;
 /** The capital's upper tier, as a share of the block's radius, and its height. */
 const TIER_RADIUS = 0.55;
 const TIER_HEIGHT = 0.9;
@@ -61,6 +61,10 @@ const HIDDEN_COLOR = new THREE.Color(0x565c68);
 const ROAD_NEUTRAL_COLOR = new THREE.Color(0xe2dccb);
 /** The warm gold the galaxy's contested lanes use. */
 const ATTACKABLE_COLOR = new THREE.Color(0xffcf8a);
+/** The amber of the incursion warning marker. */
+const THREATENED_COLOR = new THREE.Color(0xffb020);
+/** The green of the galaxy's path already travelled. */
+const TRAVELLED_COLOR = new THREE.Color(0x46e08a);
 const ROAD_OPACITY = 0.6;
 const ROAD_OWNED_OPACITY = 0.9;
 
@@ -73,6 +77,10 @@ export interface MapItemState {
   attackable?: boolean;
   /** Picked out from the rest, as a neighbour of the selected location is. */
   emphasised?: boolean;
+  /** An incursion is under way at this location. Not read for a road. */
+  threatened?: boolean;
+  /** A road the player has already travelled on a run. Not read for a location. */
+  travelled?: boolean;
   /**
    * Hidden by fog. A hidden location draws as a plain grey round block with
    * no name and no capital tier. A hidden road is not drawn. A road with one
@@ -269,7 +277,9 @@ export function buildCityLayer(
       .copy(color)
       .lerp(WHITE, selected ? 0.3 : hovered ? 0.35 : 0)
       .multiplyScalar(dim);
-    if (state?.attackable && !hidden) {
+    if (state?.threatened && !hidden) {
+      m.wall.color.copy(THREATENED_COLOR).multiplyScalar(dim);
+    } else if (state?.attackable && !hidden) {
       m.wall.color.copy(ATTACKABLE_COLOR).multiplyScalar(dim);
     } else {
       m.wall.color.copy(color).multiplyScalar(WALL_SHADE * dim);
@@ -344,6 +354,10 @@ export function buildCityLayer(
         if (shared) color = ownerColor(owner);
         if (state?.attackable) {
           color = ATTACKABLE_COLOR;
+          opacity = ROAD_OWNED_OPACITY;
+        }
+        if (state?.travelled) {
+          color = TRAVELLED_COLOR;
           opacity = ROAD_OWNED_OPACITY;
         }
         if (state?.emphasised) opacity = 1;

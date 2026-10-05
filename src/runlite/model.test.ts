@@ -365,3 +365,73 @@ describe("a run's game choice (issue #3465)", () => {
     expect(parsed?.declinedGameUpdate).toBeUndefined();
   });
 });
+
+describe("a run across a land map", () => {
+  function landRun(): RogueliteRun {
+    const run = baseRun();
+    return {
+      ...run,
+      settings: {
+        ...run.settings,
+        map: {
+          source: "generated",
+          style: "territories",
+          seed: 9,
+          nodeCount: 20,
+          layout: "ring",
+        },
+      },
+      nodes: run.nodes.map((n, i) => ({ ...n, location: `node-${i}` })),
+    };
+  }
+
+  it("round-trips each node's location and the map reference", () => {
+    const run = landRun();
+    const parsed = parseRunJson(JSON.stringify(run));
+    expect(parsed?.settings.map).toEqual(run.settings.map);
+    expect(parsed?.nodes.map((n) => n.location)).toEqual([
+      "node-0",
+      "node-1",
+      "node-2",
+    ]);
+  });
+
+  it("keeps both through the run file", () => {
+    const run = landRun();
+    const file = parseRunStateFile(
+      JSON.stringify({ schemaVersion: 1, runs: { a: run } }),
+    );
+    expect(file.runs.a.settings.map).toEqual(run.settings.map);
+    expect(file.runs.a.nodes[1].location).toBe("node-1");
+  });
+
+  it("reads a hand-made map by its id", () => {
+    const run = landRun();
+    run.settings.map = { source: "handmade", id: "two-gates" };
+    expect(parseRunJson(JSON.stringify(run))?.settings.map).toEqual({
+      source: "handmade",
+      id: "two-gates",
+    });
+  });
+
+  it("reads a run saved before the fields existed, and writes nothing", () => {
+    const parsed = parseRunJson(JSON.stringify(baseRun()));
+    if (!parsed) throw new Error("expected a run");
+    expect("map" in parsed.settings).toBe(false);
+    expect(parsed.nodes.some((n) => "location" in n)).toBe(false);
+  });
+
+  it("drops a map reference it cannot read and still loads the run", () => {
+    for (const map of [
+      "territories",
+      { source: "generated", style: "territories" },
+      { source: "handmade" },
+      { source: "elsewhere", id: "x" },
+    ]) {
+      const raw = { ...baseRun(), settings: { ...baseRun().settings, map } };
+      const parsed = parseRunJson(JSON.stringify(raw));
+      if (!parsed) throw new Error("expected a run");
+      expect("map" in parsed.settings).toBe(false);
+    }
+  });
+});

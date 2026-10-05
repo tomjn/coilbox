@@ -5,16 +5,22 @@
  * scan has no games then because the engine could not start, so the import must
  * not tell the player the challenge's game "isn't installed". The shared form is
  * stood in for, to reach the `finish` this wrapper hands it.
+ *
+ * Also a challenge made on a hand-made map (issue #3514): the map is read
+ * first, and the import stops with the reason when this install has not got it.
  */
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { scan, shared } = vi.hoisted(() => ({
-  scan: { error: null as string | null },
+const { scan, shared, m } = vi.hoisted(() => ({
+  scan: { error: null as string | null, games: [] as unknown[] },
   shared: {
-    finish: null as null | ((s: unknown, t: unknown) => Promise<unknown>),
+    finish: null as
+      | null
+      | ((s: unknown, t: unknown, accepted?: boolean) => Promise<unknown>),
   },
+  m: { loadMap: vi.fn(), runFromChallenge: vi.fn(), saveRun: vi.fn() },
 }));
 
 vi.mock("../../../challenge/ImportChallengeForm", () => ({
@@ -26,7 +32,7 @@ vi.mock("../../../challenge/ImportChallengeForm", () => ({
 
 vi.mock("../../../content/config", () => ({
   useUnitsyncScan: () => ({
-    data: scan.error ? null : { games: [], maps: [] },
+    data: scan.error ? null : { games: scan.games, maps: [] },
     error: scan.error,
     loading: false,
   }),
@@ -43,23 +49,36 @@ vi.mock("../../../play/config", () => ({
 }));
 
 vi.mock("../../../play/useGameCatalog", () => ({ useGameCatalog: () => [] }));
-vi.mock("../../runs", () => ({ useRuns: () => ({ saveRun: vi.fn() }) }));
+vi.mock("../../runs", () => ({ useRuns: () => ({ saveRun: m.saveRun }) }));
+vi.mock("../../../content/bindings", () => ({
+  unitsyncSkirmishAis: async () => ({ ais: [] }),
+  unitsyncGameInfo: async () => ({ sides: [] }),
+  unitsyncUnitDataset: async () => ({ units: [] }),
+}));
+vi.mock("../../handmadeMap", () => ({ loadChallengeRunMap: m.loadMap }));
+vi.mock("../../challenge", () => ({
+  decodeWarpathChallenge: vi.fn(),
+  runFromChallenge: m.runFromChallenge,
+  substitutedMapCount: () => 0,
+}));
 
 import { ImportChallengeForm } from "./ImportChallengeForm";
 
 afterEach(() => {
   cleanup();
   scan.error = null;
+  scan.games = [];
   shared.finish = null;
+  vi.clearAllMocks();
 });
 
 const SETTINGS = { game: { shortname: "BAR" } };
 const TARGET = { enginePath: "/engine", dataDir: "/data" };
 
-async function finishMessage(): Promise<string> {
+async function finishMessage(settings: unknown = SETTINGS): Promise<string> {
   render(<ImportChallengeForm onImported={() => {}} />);
   try {
-    await shared.finish?.(SETTINGS, TARGET);
+    await shared.finish?.(settings, TARGET, true);
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
@@ -79,5 +98,64 @@ describe("ImportChallengeForm finish", () => {
 
   it("still says the game is not installed when the scan answered without it", async () => {
     expect(await finishMessage()).toMatch(/"BAR", which isn't installed/);
+  });
+});
+
+describe("ImportChallengeForm finish, for a challenge on a hand-made map", () => {
+  const ON_MAP = {
+    game: { shortname: "TG" },
+    map: {
+      source: "handmade",
+      id: "two-shores",
+      fingerprint: "00000000000000aa",
+      title: "Two Shores",
+    },
+  };
+  const GAME = {
+    name: "Test Game 1",
+    primaryArchive: { name: "test_game_1.sdz" },
+    dependencyArchives: [],
+    info: { shortname: "TG", version: "1" },
+  };
+
+  it("stops with the reason when the map cannot be used, and generates nothing", async () => {
+    scan.games = [GAME];
+    m.loadMap.mockResolvedValue({
+      ok: false,
+      message: 'The map "Two Shores" is not installed here.',
+    });
+
+    const message = await finishMessage(ON_MAP);
+
+    // The whole reference goes to the check, with the game as the player
+    // knows it, so the message can name both.
+    expect(m.loadMap).toHaveBeenCalledWith(ON_MAP.map, "Test Game 1");
+    expect(message).toBe('The map "Two Shores" is not installed here.');
+    expect(m.runFromChallenge).not.toHaveBeenCalled();
+    expect(m.saveRun).not.toHaveBeenCalled();
+  });
+
+  it("hands the map it read to the run generator", async () => {
+    scan.games = [GAME];
+    const source = { map: { id: "two-shores" } };
+    m.loadMap.mockResolvedValue({ ok: true, source });
+    m.runFromChallenge.mockReturnValue({ nodes: [] });
+
+    expect(await finishMessage(ON_MAP)).toBe("");
+
+    const [, env] = m.runFromChallenge.mock.calls[0];
+    expect(env.handmadeMap("two-shores")).toBe(source);
+    expect(m.saveRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("reads no map for a challenge that is not on a hand-made one", async () => {
+    scan.games = [GAME];
+    m.runFromChallenge.mockReturnValue({ nodes: [] });
+
+    expect(await finishMessage({ game: { shortname: "TG" } })).toBe("");
+
+    expect(m.loadMap).not.toHaveBeenCalled();
+    const [, env] = m.runFromChallenge.mock.calls[0];
+    expect(env.handmadeMap("anything")).toBeNull();
   });
 });

@@ -15,6 +15,34 @@ export type HandmadeMapError =
   | { code: "duplicate-id"; id: string; message: string }
   /** The manifest names a file the folder does not hold. */
   | { code: "file-missing"; file: string; message: string }
+  /** A location has both a scenario and a battle. */
+  | { code: "scenario-and-battle"; id: string; name: string; message: string }
+  /** A location's scenario file is not in the folder. */
+  | {
+      code: "scenario-missing";
+      id: string;
+      name: string;
+      file: string;
+      message: string;
+    }
+  /** A location's scenario file is not a scenario coilbox can play. */
+  | {
+      code: "scenario-invalid";
+      id: string;
+      name: string;
+      file: string;
+      message: string;
+    }
+  /** A location's scenario is for a different game than the map. */
+  | {
+      code: "scenario-wrong-game";
+      id: string;
+      name: string;
+      file: string;
+      /** The game the scenario names. */
+      game: string;
+      message: string;
+    }
   /** An image is in the folder but cannot be decoded. */
   | { code: "image-unreadable"; file: string; message: string }
   /** The province image and the map picture are different sizes. */
@@ -74,6 +102,35 @@ export type HandmadeMapError =
       message: string;
     }
   /** The same pair is both blocked and joined by a crossing or a road. */
-  | { code: "link-conflict"; a: string; b: string; message: string };
+  | { code: "link-conflict"; a: string; b: string; message: string }
+  /** A location's Warpath kind is not one Warpath knows. */
+  | { code: "warpath-kind"; name: string; kind: string; message: string }
+  /** The Warpath start or goal names a location that does not exist. */
+  | {
+      code: "warpath-unknown-location";
+      end: "start" | "goal";
+      id: string;
+      message: string;
+    }
+  /** Only one of the Warpath start and goal is given. */
+  | { code: "warpath-one-end"; missing: "start" | "goal"; message: string }
+  /** The Warpath start and goal are the same location. */
+  | { code: "warpath-same-location"; id: string; name: string; message: string }
+  /** The Warpath start or goal is also marked with a kind. */
+  | {
+      code: "warpath-kind-on-end";
+      end: "start" | "goal";
+      id: string;
+      name: string;
+      kind: string;
+      message: string;
+    }
+  /** The Warpath goal cannot be reached from the start. */
+  | {
+      code: "warpath-route";
+      startId: string;
+      goalId: string;
+      message: string;
+    };
 
 export type HandmadeMapErrorCode = HandmadeMapError["code"];

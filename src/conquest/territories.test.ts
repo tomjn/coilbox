@@ -156,9 +156,9 @@ describe("generateTerritories", () => {
       });
 
       it("survives a save and a load", () => {
-        const loaded = parseGalaxyJson(JSON.stringify(doc));
-        expect(loaded?.nodes).toHaveLength(nodeCount);
-        expect(loaded?.links).toHaveLength(doc.links.length);
+        // The whole document, so the generator and the validator cannot drift
+        // apart: terrain, outlines and link kinds all have to come back.
+        expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);
       });
 
       it("is the same document from the same seed", () => {
@@ -259,8 +259,12 @@ describe("generateTerrain", () => {
   it("keeps the sea at height 0 and the land above it", () => {
     const terrain = generateTerrain({ seed: 1, shape: "scatter" });
 
+    let wrong = 0;
     for (let i = 0; i < terrain.land.length; i++) {
-      expect(terrain.heightmap[i] > 0).toBe(terrain.land[i] === 1);
+      if (terrain.heightmap[i] > 0 !== (terrain.land[i] === 1)) wrong++;
     }
+
+    expect(terrain.land.length).toBeGreaterThan(0);
+    expect(wrong).toBe(0);
   });
 });

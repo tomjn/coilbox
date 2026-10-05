@@ -24,7 +24,14 @@ const SAMPLE = fileURLToPath(
   new URL("../../../docs/examples/handmade-map/", import.meta.url),
 );
 const manifest = readFileSync(`${SAMPLE}map.json`, "utf8");
-const FILES = ["heightmap.png", "map.json", "picture.png", "provinces.png"];
+const FILES = [
+  "cairn.gltf",
+  "heightmap.png",
+  "ironcoast-siege.json",
+  "map.json",
+  "picture.png",
+  "provinces.png",
+];
 
 // The webview decodes through a canvas. Here the file named last in the URL is
 // decoded from the sample folder, and "broken.png" stands for a damaged image.
@@ -41,7 +48,21 @@ vi.mock("./decode", () => ({
   },
 }));
 
+// The webview reads a scenario file over the same protocol. Here the file
+// named last in the URL is read from the sample folder.
+const fetchFile = vi.fn(async (url: string) => {
+  const file = decodeURIComponent(url.split("/").at(-1) ?? "");
+  try {
+    const text = readFileSync(`${SAMPLE}${file}`, "utf8");
+    return { ok: true, text: async () => text };
+  } catch {
+    return { ok: false, text: async () => "" };
+  }
+});
+vi.stubGlobal("fetch", fetchFile);
+
 const {
+  handmadeMapFileUrls,
   importHandmadeMap,
   listHandmadeMaps,
   loadHandmadeMap,
@@ -68,6 +89,7 @@ const staged = (change: object = {}) => ({
 });
 
 beforeEach(() => {
+  fetchFile.mockClear();
   for (const mock of Object.values(hoisted)) mock.mockReset();
   hoisted.list.mockResolvedValue({ items: [item()] });
   hoisted.discard.mockResolvedValue({});
@@ -85,6 +107,8 @@ describe("listing hand-made maps", () => {
       source: "imported",
       pictureUrl:
         "coilbox://localhost/conquestmap/sample-two-shores/picture.png",
+      // The sample marks a Warpath start and goal.
+      warpath: true,
     });
     expect(maps[0].title).not.toBe("");
   });
@@ -106,6 +130,16 @@ describe("listing hand-made maps", () => {
     });
     const { maps } = await listHandmadeMaps();
     expect(maps[0].pictureUrl).toBeUndefined();
+  });
+
+  it("lists a map with no Warpath start and goal as one for Conquest only", async () => {
+    const edited = JSON.parse(manifest);
+    delete edited.warpath;
+    hoisted.list.mockResolvedValue({
+      items: [item({ manifest: JSON.stringify(edited) })],
+    });
+    const { maps } = await listHandmadeMaps();
+    expect(maps.map((m) => m.warpath)).toEqual([false]);
   });
 
   it("reports a folder whose manifest does not parse", async () => {
@@ -202,9 +236,65 @@ describe("loading a hand-made map", () => {
     });
   });
 
+  it("names a heightmap that cannot be decoded", async () => {
+    const edited = JSON.parse(manifest);
+    edited.files.heightmap = "broken.png";
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({
+          manifest: JSON.stringify(edited),
+          files: [...FILES, "broken.png"],
+        }),
+      ],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({
+          code: "image-unreadable",
+          file: "broken.png",
+        }),
+      ],
+    });
+  });
+
   it("reports an id no map has", async () => {
     const result = await loadHandmadeMap("nowhere");
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("the files of a map folder", () => {
+  it("resolves a file the folder holds and no other", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    const fileUrl = await handmadeMapFileUrls(result.doc.terrain?.image ?? "");
+    expect(fileUrl?.("cairn.gltf")).toBe(
+      "coilbox://localhost/conquestmap/sample-two-shores/cairn.gltf",
+    );
+    expect(fileUrl?.("tower.glb")).toBeUndefined();
+  });
+
+  it("resolves inside a bundled map's folder beside the app", async () => {
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({ folder: "other", files: ["map.json", "picture.png"] }),
+        item({ source: "bundled", folder: "Two Shores" }),
+      ],
+    });
+    const fileUrl = await handmadeMapFileUrls(
+      "coilbox://localhost/portable/galaxies/Two%20Shores/picture.png",
+    );
+    expect(fileUrl?.("cairn.gltf")).toBe(
+      "coilbox://localhost/portable/galaxies/Two%20Shores/cairn.gltf",
+    );
+  });
+
+  it("has no resolver for a picture no installed map holds", async () => {
+    expect(
+      await handmadeMapFileUrls("coilbox://localhost/conquestmap/gone/a.png"),
+    ).toBeUndefined();
   });
 });
 
@@ -301,6 +391,43 @@ describe("importing a hand-made map", () => {
     });
     expect(hoisted.discard).toHaveBeenCalledWith({ token: "tok-1" });
   });
+
+  it("takes the map out again when the installed copy cannot be read", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    // The installed folder lost a file between the install and the read.
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result).toEqual({
+      status: "invalid",
+      errors: [expect.objectContaining({ code: "file-missing" })],
+    });
+    expect(hoisted.remove).toHaveBeenCalledWith({ id: "sample-two-shores" });
+  });
+
+  it("says the map is still installed when it cannot be taken out", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    hoisted.commit.mockResolvedValue({
+      status: "imported",
+      id: "sample-two-shores",
+    });
+    hoisted.list.mockResolvedValue({
+      items: [item({ files: ["map.json", "picture.png"] })],
+    });
+    hoisted.remove.mockRejectedValue(new Error("folder is in use"));
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result.status).toBe("refused");
+    if (result.status !== "refused") return;
+    expect(result.message).toContain(
+      'The map was installed as "sample-two-shores"',
+    );
+    expect(result.message).toContain("folder is in use");
+  });
 });
 
 describe("removing a hand-made map", () => {
@@ -312,5 +439,62 @@ describe("removing a hand-made map", () => {
     await expect(removeHandmadeMap("shipped")).rejects.toThrow(
       "cannot be removed",
     );
+  });
+});
+
+describe("a map with a scenario location", () => {
+  it("reads the scenario file from the folder", async () => {
+    const result = await loadHandmadeMap("sample-two-shores");
+    if (!result.ok) throw new Error(JSON.stringify(result.errors));
+    expect(fetchFile).toHaveBeenCalledWith(
+      "coilbox://localhost/conquestmap/sample-two-shores/ironcoast-siege.json",
+    );
+    const ironcoast = result.doc.nodes.find((n) => n.id === "ironcoast");
+    expect(ironcoast?.scenario?.doc.name).toBe("Siege");
+  });
+
+  it("names the location when the folder has no such file", async () => {
+    hoisted.list.mockResolvedValue({
+      items: [
+        item({ files: FILES.filter((f) => f !== "ironcoast-siege.json") }),
+      ],
+    });
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({
+          code: "scenario-missing",
+          name: "Ironcoast",
+        }),
+      ],
+    });
+    expect(fetchFile).not.toHaveBeenCalled();
+  });
+
+  it("names the location when the file cannot be fetched", async () => {
+    fetchFile.mockRejectedValueOnce(new Error("no such host"));
+    const result = await loadHandmadeMap("sample-two-shores");
+    expect(result).toEqual({
+      ok: false,
+      errors: [
+        expect.objectContaining({
+          code: "scenario-invalid",
+          name: "Ironcoast",
+        }),
+      ],
+    });
+  });
+
+  it("does not install a zip whose scenario file is damaged", async () => {
+    hoisted.stage.mockResolvedValue(staged());
+    fetchFile.mockResolvedValueOnce({ ok: true, text: async () => "{ nope" });
+    const result = await importHandmadeMap("/tmp/map.zip");
+    expect(result).toEqual({
+      status: "invalid",
+      errors: [expect.objectContaining({ code: "scenario-invalid" })],
+    });
+    expect(hoisted.commit).not.toHaveBeenCalled();
+    expect(hoisted.discard).toHaveBeenCalledWith({ token: "tok-1" });
   });
 });

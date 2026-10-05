@@ -35,6 +35,9 @@ export interface HandmadeMapSummary {
   game: MapManifest["game"];
   source: HandmadeMapSource;
   pictureUrl?: string;
+  /** Whether the author marked a Warpath start and goal. Without them the map
+   * is for Conquest only. */
+  warpath: boolean;
 }
 
 /** A map folder whose manifest cannot be listed, with the reader's reasons. */
@@ -69,6 +72,24 @@ function installedUrls(item: HandmadeMapItem): UrlFor {
       ? assetUrl(`${BUNDLED_DIR}/${item.folder}/${file}`)
       : conquestMapUrl(item.folder, file),
   );
+}
+
+/**
+ * The resolver for the other files of the map folder that `imageUrl` points
+ * into, where `imageUrl` is the terrain picture of a document the reader made.
+ * A placed model's `file` goes through it. It answers `undefined` for a name
+ * the folder does not hold, and the whole call answers `undefined` when no
+ * installed map has that picture.
+ */
+export async function handmadeMapFileUrls(
+  imageUrl: string,
+): Promise<UrlFor | undefined> {
+  const { items } = await conquestMapList({});
+  for (const item of items) {
+    const urlFor = installedUrls(item);
+    if (item.files.some((file) => urlFor(file) === imageUrl)) return urlFor;
+  }
+  return undefined;
 }
 
 interface Listed {
@@ -118,6 +139,7 @@ async function listFolders(): Promise<{
         game: manifest.game,
         source,
         pictureUrl: installedUrls(item)(manifest.files.picture),
+        warpath: manifest.warpath !== undefined,
       },
     });
   }
@@ -175,19 +197,60 @@ async function readFolder(
       return undefined;
     }
   };
-  const [provinces, picture] = await Promise.all([
+  // A heightmap the folder lacks is left for the reader to report as missing.
+  const { heightmap } = manifest.files;
+  const heightmapUrl = heightmap === undefined ? undefined : urlFor(heightmap);
+  const scenarioFiles = new Set(
+    [...manifest.provinces, ...manifest.locations].flatMap((l) =>
+      l.scenario === undefined ? [] : [l.scenario],
+    ),
+  );
+  // Started here so the files are fetched while the images decode.
+  const scenarioReads = Promise.all(
+    [...scenarioFiles].map(
+      async (file): Promise<[string, string | undefined]> => [
+        file,
+        await fileText(urlFor(file)),
+      ],
+    ),
+  );
+  const [provinces, picture, heights] = await Promise.all([
     decode(manifest.files.provinces, () => decodeRgba(provincesUrl)),
     decode(manifest.files.picture, () => imageSize(pictureUrl)),
+    heightmap === undefined || heightmapUrl === undefined
+      ? Promise.resolve(true)
+      : decode(heightmap, () => imageSize(heightmapUrl)),
   ]);
-  if (!provinces || !picture) return { ok: false, errors: unreadable };
+  if (!provinces || !picture || !heights) {
+    return { ok: false, errors: unreadable };
+  }
+
+  // A scenario file that is missing or would not read is left out, and the
+  // reader says which location it belongs to.
+  const scenarios: Record<string, string> = {};
+  for (const [file, text] of await scenarioReads) {
+    if (text !== undefined) scenarios[file] = text;
+  }
 
   return readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
     urlFor,
+    scenarios,
     cache: traces,
   });
+}
+
+/** The text of a file in a map folder, or undefined when it cannot be read. */
+async function fileText(url: string | undefined): Promise<string | undefined> {
+  if (url === undefined) return undefined;
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.text() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -258,7 +321,19 @@ export async function importHandmadeMap(
     // The document read above points at the staging folder, which is gone
     // now. Read the installed copy. The trace is cached, so this is cheap.
     const installed = await loadHandmadeMap(id);
-    if (!installed.ok) return { status: "invalid", errors: installed.errors };
+    if (!installed.ok) {
+      // The map is installed but cannot be read back. Take it out again, so
+      // "invalid" still means nothing was installed.
+      try {
+        await conquestMapRemove({ id });
+      } catch (e) {
+        return {
+          status: "refused",
+          message: `The map was installed as "${id}" but could not be read back, and taking it out again failed. Remove it from the Conquest page. ${messageOf(e)}`,
+        };
+      }
+      return { status: "invalid", errors: installed.errors };
+    }
     return {
       status: "imported",
       id,

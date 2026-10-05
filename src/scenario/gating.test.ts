@@ -85,6 +85,43 @@ describe("requiredRuntimeVersion", () => {
     expect(typeRuntimeVersion("release_group")).toBe(3);
   });
 
+  /**
+   * Issue #3551. A runtime behind 8 has neither condition, so a lesson waiting
+   * for the player to select a unit or give an order would wait for ever.
+   */
+  it("is raised by the two conditions that read what a player did", () => {
+    expect(requiredRuntimeVersion(withTrigger(["unit_selected"], []))).toBe(8);
+    expect(requiredRuntimeVersion(withTrigger(["command_given"], []))).toBe(8);
+  });
+
+  /**
+   * Issue #3552. A runtime behind 9 has neither pause action and no
+   * `dialogue_dismissed`, so a lesson would run on without pausing or wait for
+   * ever on a dismissal that cannot come.
+   */
+  it("is raised by pausing and by waiting on a dismissed line", () => {
+    expect(requiredRuntimeVersion(withTrigger([], ["pause_game"]))).toBe(9);
+    expect(requiredRuntimeVersion(withTrigger([], ["unpause_game"]))).toBe(9);
+    expect(
+      requiredRuntimeVersion(withTrigger(["dialogue_dismissed"], [])),
+    ).toBe(9);
+  });
+
+  /**
+   * A runtime behind 9 reads past `hold` and takes the line down on its timer,
+   * so only a line that is actually held asks for it.
+   */
+  it("is raised by a dialogue line that is held, and only by one", () => {
+    const saying = (params: Record<string, string | boolean>): Scenario => {
+      const scenario = withTrigger([], ["dialogue"]);
+      scenario.triggers[0].actions[0].params = params;
+      return scenario;
+    };
+    expect(requiredRuntimeVersion(saying({ line: "a", hold: true }))).toBe(9);
+    expect(requiredRuntimeVersion(saying({ line: "a", hold: false }))).toBe(1);
+    expect(requiredRuntimeVersion(saying({ line: "a" }))).toBe(1);
+  });
+
   it("takes the highest version any type used needs", () => {
     const since = (type: string) =>
       ({ zone_held_for: 2, map_marker: 3 })[type] ?? 1;

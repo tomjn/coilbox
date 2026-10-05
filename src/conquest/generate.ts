@@ -9,6 +9,7 @@ import type {
   GalaxyDoc,
   GalaxyNode,
   GameRef,
+  MapSkin,
   NodeBattleSpec,
 } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
@@ -97,6 +98,29 @@ function mapTier(byArea: GenMap[], difficulty: number): GenMap[] {
   return byArea.slice(start, end);
 }
 
+/**
+ * Hands out a battle map for a difficulty: maps by area, bucketed into
+ * difficulty tiers (bigger -> harder), cycling within a tier so a small pool
+ * still varies. Each tier starts at a place the `rng` picks, so the same seed
+ * and the same pool give the same maps in the same order. Returns "" when the
+ * pool is empty.
+ */
+export function tierMapPicker(
+  maps: GenMap[],
+  rng: Rng,
+): (difficulty: number) => string {
+  const byArea = mapsByArea(maps);
+  const tierCursor = new Map<number, number>();
+  return (d) => {
+    const tier = mapTier(byArea, d);
+    const poolAll = tier.length > 0 ? tier : byArea;
+    if (poolAll.length === 0) return "";
+    const cursor = tierCursor.get(d) ?? Math.floor(rng() * poolAll.length);
+    tierCursor.set(d, cursor + 1);
+    return poolAll[cursor % poolAll.length].name;
+  };
+}
+
 export interface GenerateOptions {
   seed: number;
   /** `pinnedName` is the full name of the game the player chose, so every
@@ -112,8 +136,12 @@ export interface GenerateOptions {
   /** Real-star mode only. Catalogue radius in light years, which decides the
    * node count. Ignored by every other layout. */
   radiusLy?: number;
-  /** Strategic-map presentation; sets `theme.skin`. Default `galaxy`. */
-  skin?: "galaxy" | "theatre";
+  /**
+   * Strategic-map presentation. `generateGalaxy` builds `galaxy` and `theatre`
+   * and reads anything else as `galaxy`. The two land styles have generators
+   * of their own, and `generateMap` in `./mapStyle` picks between them.
+   */
+  skin?: MapSkin;
   /**
    * Starting systems per faction (1..4): the capital plus that many minus one
    * nearest neighbours. Omitted keeps the capital plus *all* its neighbours.
@@ -653,19 +681,7 @@ export function assembleGalaxy(
     return Math.max(1, Math.min(MAX_DIFFICULTY, Math.ceil(t * MAX_DIFFICULTY)));
   });
 
-  // Maps by area, bucketed into difficulty tiers (bigger -> harder), cycling
-  // within a tier so a small pool still varies.
-  const byArea = mapsByArea(opts.maps);
-  const tierFor = (d: number) => mapTier(byArea, d);
-  const tierCursor = new Map<number, number>();
-  const mapFor = (d: number): string => {
-    const tier = tierFor(d);
-    const poolAll = tier.length > 0 ? tier : byArea;
-    if (poolAll.length === 0) return "";
-    const cursor = tierCursor.get(d) ?? Math.floor(rng() * poolAll.length);
-    tierCursor.set(d, cursor + 1);
-    return poolAll[cursor % poolAll.length].name;
-  };
+  const mapFor = tierMapPicker(opts.maps, rng);
 
   const nodes: GalaxyNode[] = source.map((s, i) => ({
     id: `node-${i}`,
@@ -896,48 +912,4 @@ export function restoreChallengeMap(
   nodeId: string,
 ): GalaxyDoc {
   return restoreChallengeMapShared(galaxy, nodeId);
-}
-
-/** The content environment a reroll resolves at call time (never persisted). */
-export interface RegenerateEnv {
-  maps: GenMap[];
-  names?: ConquestNames;
-}
-
-/**
- * Reroll a generated galaxy in place: same id, title and generation knobs,
- * new seed, content environment re-resolved by the caller. Returns null for
- * docs without persisted knobs (authored galaxies, or generated ones saved
- * before the knobs existed).
- */
-export function regenerateGalaxy(
-  galaxy: GalaxyDoc,
-  env: RegenerateEnv,
-  seed: number,
-  now: string = new Date().toISOString(),
-): GalaxyDoc | null {
-  const g = galaxy.generated;
-  if (!g || g.nodeCount === undefined || g.factionCount === undefined) {
-    return null;
-  }
-  const doc = generateGalaxy(
-    {
-      seed,
-      game: galaxy.game,
-      maps: env.maps,
-      nodeCount: g.nodeCount,
-      factionCount: g.factionCount,
-      layout: g.layout,
-      radiusLy: g.radiusLy,
-      skin: g.skin,
-      startingSystems: g.startingSystems,
-      fogOfWar: g.fogOfWar,
-      threatLevel: g.threatLevel,
-      names: env.names,
-      id: galaxy.id,
-      title: galaxy.title,
-    },
-    now,
-  );
-  return { ...doc, createdAt: galaxy.createdAt };
 }

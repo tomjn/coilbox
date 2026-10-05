@@ -24,7 +24,8 @@ Each of these exists in the scenario editor now.
 Two other things help a lesson.
 
 - Dialogue lines, which are radio messages with a speaker, text, and an optional portrait and voice clip. See [Dialogue and sound](scenarios.md#dialogue-and-sound).
-- Conditions that notice what the player did, such as `units_in_zone` (walked somewhere), `unit_built` (built something) and `unit_count`. See [Conditions](scenarios.md#conditions).
+- Conditions that notice what the player did, such as `unit_selected` (selected a unit), `command_given` (gave an order), `units_in_zone` (walked somewhere) and `unit_built` (built something). See [Conditions](scenarios.md#conditions).
+- A way to stop and wait. A `dialogue` action can keep its line on screen until the player clicks it away, `pause_game` stops the game while they read, and the `dialogue_dismissed` condition carries on afterwards. A game's bundled mission runtime must be version 9 or later. See [Stop and wait for the player](scenarios.md#stop-and-wait-for-the-player).
 
 ### Two kinds of unit ban
 
@@ -32,8 +33,8 @@ A scenario restriction is enforced by the mission runtime, can be lifted mid-mis
 
 ### What a lesson cannot do yet
 
-- **It cannot wait for the player to select a unit or give a command.** The conditions watch the world, not the player's input. A lesson can check that the player built something or walked into a zone. See [issue #3551](https://github.com/tomjn/coilbox/issues/3551).
-- **It cannot pause the game or hold a message until the player has read it.** A dialogue line stays on screen for between three and twelve seconds, then the next one queues. Keep the first minutes of a lesson free of enemies and timers. See [issue #3552](https://github.com/tomjn/coilbox/issues/3552).
+- **It cannot pause a multiplayer game.** `pause_game` works in single player only, because a pause stops the game for everyone in it. A held dialogue line works in both.
+- **A paused lesson only moves when the player acts.** A paused game runs no clock, so a trigger that waits on time does nothing until the game is running again. Unpause from a trigger that waits on `dialogue_dismissed`. See [Stop and wait for the player](scenarios.md#stop-and-wait-for-the-player).
 - **A bundled campaign plays its radio messages silent.** The portraits and voice clips do not travel with a bundled campaign. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) and [issue #877](https://github.com/tomjn/coilbox/issues/877).
 - **Nobody has watched the objectives and dialogue panels drawn in a real engine.** See [What a scenario cannot do yet](scenarios.md#what-a-scenario-cannot-do-yet).
 

@@ -1,3 +1,4 @@
+import { citiesTerrain, GENERATED_CITIES_IMAGE } from "./cities";
 import {
   assembleGalaxy,
   type GalaxyLayout,
@@ -646,6 +647,8 @@ export function generateTerritories(
   return {
     ...doc,
     description: `A generated map of ${doc.nodes.length} provinces.`,
+    theme: { skin: "territories" },
+    generated: doc.generated && { ...doc.generated, skin: "territories" },
     nodes: doc.nodes.map((node, i) => ({
       ...node,
       outline: [provinces.outlines[i]],
@@ -666,13 +669,22 @@ export function generateTerritories(
 }
 
 /**
- * The pixels of a generated document's terrain, rebuilt from the seed and
- * layout it carries. Null when the document's terrain is not a generated one:
- * an authored map, a galaxy, or a document saved without its `generated` block.
+ * The pixels of a generated document's terrain, rebuilt from what it carries:
+ * the seed and layout for a Territories map, the seed and the positions of its
+ * own nodes for a Cities map. Null when the document's terrain is not a
+ * generated one: an authored map, a galaxy, or a document saved without its
+ * `generated` block.
  */
 export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
   const g = doc.generated;
-  if (!g || doc.terrain?.image !== GENERATED_TERRITORIES_IMAGE) return null;
+  if (!g) return null;
+  if (doc.terrain?.image === GENERATED_CITIES_IMAGE) {
+    return citiesTerrain(
+      g.seed,
+      doc.nodes.map((n) => [n.pos[0], n.pos[1]]),
+    );
+  }
+  if (doc.terrain?.image !== GENERATED_TERRITORIES_IMAGE) return null;
   const shape = resolveLayout(g.layout, mulberry32(g.seed));
   return generateTerrain({ seed: g.seed, shape });
 }

@@ -161,6 +161,85 @@ if not gadgetHandler:IsSyncedCode() then
 			table.concat(aimedAt.marker, ","))
 	end
 
+	-- Briefing: the pause and the dismissal (issue #3552).
+	--
+	-- A paused game sends no game frames, so the synced half of this probe stops
+	-- with it and this half has to carry the plan through the pause. It watches
+	-- for the pause in Update, which the engine calls every draw frame whatever
+	-- the game is doing.
+	--
+	-- Who dismisses the two held lines depends on the run. With LuaUI the mission
+	-- widget has them, and this half stands in for the player's two clicks by
+	-- sending what the widget sends when a held line is clicked away. The
+	-- widget's own click handling needs a mouse, which a headless run has not
+	-- got. With no LuaUI the runtime dismisses each line itself, the way it does
+	-- for a player with no panel, and the whole exchange can be over between two
+	-- calls to Update. So this half checks nothing then, and the claim is made
+	-- by scripts/mission-headless.sh from the engine's own log, which names the
+	-- frame of the pause and of the unpause.
+	--
+	-- 0 is waiting for the pause, 1 has dismissed the first line, 2 the second,
+	-- and 3 has seen the game start again.
+	local briefingStage = 0
+	local briefingFrame, briefingTimer
+
+	-- How long the run may sit paused before the probe gives up and unpauses it
+	-- itself, in seconds of wall time. A probe that waited for ever would be a
+	-- hung harness rather than a failed one. A dismissal is a trip to the local
+	-- server and back, so this is long.
+	local BRIEFING_PATIENCE = 20
+
+	if MISSION_ID == "briefing" then
+		local DISMISSED_MESSAGE = "coilbox_mission_dismissed:"
+
+		local function objective(id)
+			local value = Spring.GetGameRulesParam("coilbox_mission_objective_" .. id)
+			return value
+		end
+
+		function gadget:Update()
+			if briefingStage == 3 then
+				return
+			end
+			local _, _, paused = Spring.GetGameSpeed()
+
+			if briefingStage == 0 then
+				if not paused then
+					return
+				end
+				briefingStage = 1
+				briefingFrame = Spring.GetGameFrame()
+				briefingTimer = Spring.GetTimer()
+				if proving then
+					check("pause_game pauses the game, asked for by the runtime's own unsynced half", true)
+					check("and nothing has dismissed the held line yet", objective("read") == 0, objective("read"))
+					Spring.SendLuaRulesMsg(DISMISSED_MESSAGE .. "welcome")
+				else
+					say("skip this run has no LuaUI, so the runtime dismisses the held lines itself and no click is stood in for")
+				end
+			elseif briefingStage == 1 and objective("read") == 1 then
+				briefingStage = 2
+				if proving then
+					check("a dismissal reaches synced code while the game is paused, and fires a polled trigger",
+						paused == true, tostring(paused))
+					check("with no game frame run since the pause",
+						Spring.GetGameFrame() == briefingFrame,
+						tostring(Spring.GetGameFrame()) .. " from " .. tostring(briefingFrame))
+					Spring.SendLuaRulesMsg(DISMISSED_MESSAGE .. "orders")
+				end
+			elseif briefingStage == 2 and not paused then
+				briefingStage = 3
+				if proving then
+					check("unpause_game starts the game again, from a trigger a dismissal woke", true)
+				end
+			elseif Spring.DiffTimers(Spring.GetTimer(), briefingTimer) > BRIEFING_PATIENCE then
+				say("fail the briefing sat paused at stage " .. briefingStage .. ", so the probe unpaused it")
+				briefingStage = 3
+				Spring.SendCommands("pause 0")
+			end
+		end
+	end
+
 	function gadget:RecvFromSynced(message, ...)
 		if message == "coilbox_harness_done" then
 			-- Last of all, because a widget the handler threw out over an error in
@@ -172,9 +251,18 @@ if not gadgetHandler:IsSyncedCode() then
 			if MISSION_ID == "ambush" then
 				checkAimed()
 			end
+			if MISSION_ID == "briefing" and proving then
+				check("the briefing was paused, dismissed twice and started again",
+					briefingStage == 3, "stopped at stage " .. briefingStage)
+			end
 			Spring.Quit()
 		elseif message == "coilbox_harness_player_order" then
 			playerOrder(...)
+		elseif message == "coilbox_harness_select" then
+			-- What a player's click or drag does to the selection. Nothing here
+			-- tells the runtime: its own unsynced half has to notice, and carry
+			-- it to the synced half, which is the claim (issue #3551).
+			Spring.SelectUnitArray({ ... })
 		elseif message == CAMERA_MESSAGE then
 			local _, _, _, team = ...
 			aimedAt.camera[#aimedAt.camera + 1] = team
@@ -1153,6 +1241,125 @@ plans.outbreak = {
 			local wave = state().groups.units("second-wave")
 			check("spawn_group puts a hard-only group on the map only on hard",
 				#wave == (state().difficulty == "hard" and 4 or 0), #wave)
+		end },
+	},
+}
+
+-- Drill: the two conditions that read what a player did (issue #3551).
+--
+-- The claims only a real engine can settle are the two routes. That a selection
+-- made on the client reaches synced code at all: the runtime's unsynced half has
+-- to see it in Update, the engine has to carry its Lua message through the
+-- server, and RecvLuaMsg has to be handed it. And that an order a player gives
+-- arrives at UnitCommand with a player on it and fromLua false, while an order
+-- the game itself gives does not.
+--
+-- The steps are spaced wider than the others' because a selection makes two
+-- trips, one out of the client and one back from the server, where an order
+-- makes one.
+local drillSite = {}
+
+local function objectiveIs(id)
+	return rules("coilbox_mission_objective_" .. id)
+end
+
+plans.drill = {
+	deadline = 345,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			check("with nothing selected, neither selection objective has moved",
+				objectiveIs("pick") == ACTIVE and objectiveIs("engineer") == ACTIVE)
+			SendToUnsynced("coilbox_harness_select", state().units.scout)
+		end },
+		{ frame = 45, run = function()
+			check("a selection made on the client reaches the synced half and completes unit_selected",
+				objectiveIs("pick") == COMPLETE, objectiveIs("pick"))
+			check("and a condition naming another placed unit does not hold",
+				objectiveIs("engineer") == ACTIVE, objectiveIs("engineer"))
+			-- A move order before the trigger that waits on one is armed, down the
+			-- player's own path, and one from the game itself.
+			local x, _, z = Spring.GetUnitPosition(state().units.scout)
+			SendToUnsynced("coilbox_harness_player_order", state().units.scout, CMD.MOVE,
+				x + 100, Spring.GetGroundHeight(x + 100, z), z)
+		end },
+		{ frame = 70, run = function()
+			SendToUnsynced("coilbox_harness_select", state().units.scout, state().units.engineer)
+		end },
+		{ frame = 110, run = function()
+			check("selecting the placed unit a condition names completes it",
+				objectiveIs("engineer") == COMPLETE, objectiveIs("engineer"))
+			check("which arms the trigger waiting on a move order", armed("order-move") == true)
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			Spring.GiveOrderToUnit(state().units.engineer, CMD.MOVE,
+				{ x + 50, Spring.GetGroundHeight(x + 50, z), z }, 0)
+		end },
+		{ frame = 130, run = function()
+			check("neither the move given before it was armed nor one synced Lua gave answers command_given",
+				objectiveIs("move") == ACTIVE, objectiveIs("move"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			SendToUnsynced("coilbox_harness_player_order", state().units.engineer, CMD.MOVE,
+				x + 50, Spring.GetGroundHeight(x + 50, z), z)
+		end },
+		{ frame = 160, run = function()
+			check("a move order the player gives reaches UnitCommand and completes command_given",
+				objectiveIs("move") == COMPLETE, objectiveIs("move"))
+			check("and the order that answered one trigger does not answer the one it armed",
+				armed("order-again") == true and objectiveIs("again") == ACTIVE, objectiveIs("again"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			SendToUnsynced("coilbox_harness_player_order", state().units.engineer, CMD.MOVE,
+				x + 60, Spring.GetGroundHeight(x + 60, z), z)
+		end },
+		{ frame = 190, run = function()
+			check("a second move order does", objectiveIs("again") == COMPLETE, objectiveIs("again"))
+			local x, _, z = Spring.GetUnitPosition(state().units.engineer)
+			drillSite.x, drillSite.y, drillSite.z = buildSite("armsolar", x, z, 200)
+			check("there is somewhere near the engineer a solar collector may be built",
+				drillSite.x ~= nil)
+			if drillSite.x then
+				SendToUnsynced("coilbox_harness_player_order", state().units.engineer,
+					-UnitDefNames["armsolar"].id, drillSite.x, drillSite.y, drillSite.z, 0)
+			end
+		end },
+		{ frame = 220, run = function()
+			check("a build order for the type a condition names, with a builder selected, completes both",
+				objectiveIs("solar") == COMPLETE, objectiveIs("solar"))
+			check("and the repeating trigger counted that one build order once",
+				rules("coilbox_mission_var_orders") == 1, rules("coilbox_mission_var_orders"))
+		end },
+		{ frame = 340, run = function()
+			check("ten seconds in, the negated command_given has not held, because orders were given",
+				objectiveIs("prompt") == ACTIVE, objectiveIs("prompt"))
+		end },
+	},
+}
+
+-- Briefing: a pause, two held lines and the dismissals that move the lesson on
+-- (issue #3552).
+--
+-- The unsynced half of this probe does the driving, because the game is paused
+-- for the middle of the run and this half gets no frames then. What is checked
+-- here is the two ends: nothing has moved before the mission pauses, and the
+-- game came back with both objectives done.
+--
+-- The mission pauses on the polled beat at frame 30. The run is at twenty times
+-- speed, so the pause lands some frames after that, and the last step is set
+-- far enough out that it cannot run before the pause has.
+plans.briefing = {
+	deadline = 930,
+	steps = {
+		{ frame = 1, run = checkPlacement },
+		{ frame = 5, run = function()
+			check("before the lesson opens, neither line has been dismissed",
+				objectiveIs("read") == ACTIVE and objectiveIs("ready") == ACTIVE)
+			check("the triggers waiting on a dismissal are armed",
+				armed("read") == true and armed("ready") == true)
+		end },
+		{ frame = 900, run = function()
+			check("the game is running again with the first held line dismissed",
+				objectiveIs("read") == COMPLETE, objectiveIs("read"))
+			check("and the second, whose trigger unpaused it",
+				objectiveIs("ready") == COMPLETE, objectiveIs("ready"))
 		end },
 	},
 }
