@@ -7,17 +7,18 @@ faction player name="Silent Enclave" color=#2f7dff aggression=0 side=
 faction enemy-1 name="Iron Protectorate" color=#ff3524 aggression=0.3624398990534246 side=
 faction enemy-2 name="Molten Union" color=#ffb300 aggression=0.48182114539667964 side=
 node node-0 name="Wrenhaven" pos=575,643 owner=neutral kind=normal difficulty=4 map="Map 8"
-node node-1 name="Brackhaven" pos=375,167 owner=neutral kind=normal difficulty=2 map="Map 3"
-node node-2 name="Fernbarrow" pos=339,613 owner=player kind=normal difficulty=1 map="Map 1"
-node node-3 name="Redbarrow" pos=829,619 owner=enemy-1 kind=normal difficulty=4 map="Map 7"
-node node-4 name="Winddale" pos=385,341 owner=player kind=normal difficulty=1 map="Map 0"
-node node-5 name="Bleakwood" pos=209,433 owner=player kind=capital difficulty=1 map="Map 1"
-node node-6 name="Rookcross" pos=781,769 owner=enemy-1 kind=capital difficulty=5 map="Map 9"
-node node-7 name="Duncombe" pos=607,463 owner=neutral kind=normal difficulty=2 map="Map 2"
-node node-8 name="Easthollow" pos=665,557 owner=neutral kind=normal difficulty=3 map="Map 5"
-node node-9 name="Larkmere" pos=575,799 owner=enemy-1 kind=normal difficulty=5 map="Map 10"
-node node-10 name="Stormcross" pos=789,339 owner=enemy-2 kind=capital difficulty=5 map="Map 11"
+node node-1 name="Brackhaven" pos=375,167 owner=neutral kind=normal difficulty=3 map="Map 5"
+node node-2 name="Fernbarrow" pos=339,613 owner=player kind=normal difficulty=2 map="Map 3"
+node node-3 name="Redbarrow" pos=829,619 owner=enemy-1 kind=normal difficulty=5 map="Map 9"
+node node-4 name="Winddale" pos=385,341 owner=player kind=normal difficulty=2 map="Map 2"
+node node-5 name="Bleakwood" pos=209,433 owner=player kind=capital difficulty=1 map="Map 0"
+node node-6 name="Rookcross" pos=781,769 owner=enemy-1 kind=capital difficulty=5 map="Map 10"
+node node-7 name="Duncombe" pos=607,463 owner=neutral kind=normal difficulty=3 map="Map 6"
+node node-8 name="Easthollow" pos=665,557 owner=enemy-1 kind=normal difficulty=4 map="Map 7"
+node node-9 name="Larkmere" pos=575,799 owner=enemy-1 kind=normal difficulty=5 map="Map 11"
+node node-10 name="Stormcross" pos=789,339 owner=enemy-2 kind=capital difficulty=5 map="Map 9"
 node node-11 name="Crowhollow" pos=789,511 owner=enemy-2 kind=normal difficulty=4 map="Map 8"
+link node-0 node-7 node-0 node-7 road
 link node-0 node-8 node-0 node-8 road
 link node-0 node-9 node-0 node-9 road
 link node-1 node-4 node-1 node-4 road
@@ -26,8 +27,10 @@ link node-3 node-6 node-3 node-6 road
 link node-3 node-8 node-3 node-8 road
 link node-3 node-11 node-3 node-11 road
 link node-4 node-5 node-4 node-5 road
+link node-6 node-8 node-6 node-8 road
 link node-6 node-9 node-6 node-9 road
 link node-7 node-8 node-7 node-8 road
+link node-7 node-11 node-7 node-11 road
 link node-8 node-11 node-8 node-11 road
 link node-10 node-11 node-10 node-11 road
 link node-4 node-7 node-4 node-7 crossing
