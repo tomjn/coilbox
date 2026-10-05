@@ -80,7 +80,11 @@ describe("the sheet's shader", () => {
     heights?: HeightGrid,
     detail?: boolean,
   ) => {
-    const surface = createTerrainSurface({ width: 64, height: 64 }, 100, heights);
+    const surface = createTerrainSurface(
+      { width: 64, height: 64 },
+      100,
+      heights,
+    );
     const disposables: { dispose(): void }[] = [];
     const mesh = buildTerrainMesh(
       new THREE.Scene(),

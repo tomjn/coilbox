@@ -204,7 +204,8 @@ describe("terrainNormalPixels", () => {
     const s = createTerrainSurface({ width: 100, height: 100 }, 100, grid);
     const bytes = terrainNormalPixels(s, grid);
     expect(bytes.length).toBe(16);
-    for (let i = 0; i < 4; i++) expect(rgba(bytes, i)).toEqual([128, 255, 128, 128]);
+    for (let i = 0; i < 4; i++)
+      expect(rgba(bytes, i)).toEqual([128, 255, 128, 128]);
   });
 
   it("tilts the normal away from the rise", () => {
