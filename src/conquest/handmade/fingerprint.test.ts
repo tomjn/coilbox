@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { parseScenarioJson, type Scenario } from "../../scenario/model";
 import type { MapManifest } from "./manifest";
 import { decodePng } from "./png.testhelper";
 import { readHandmadeMap } from "./read";
@@ -11,12 +12,23 @@ const SAMPLE = fileURLToPath(
 );
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
+const SCENARIO_FILE = "ironcoast-siege.json";
+/** The sample's scenario file, as the scenario builder exported it. */
+const scenarioText = readFileSync(`${SAMPLE}${SCENARIO_FILE}`, "utf8");
+const siege = parseScenarioJson(
+  readFileSync(
+    new URL("../../scenario/fixtures/siege.json", import.meta.url),
+    "utf8",
+  ),
+);
+if (!siege) throw new Error("the Siege fixture did not parse");
 
 /** The sample's fingerprint after `edit` to its manifest, on `image`. */
 function fingerprint(
   edit: (m: MapManifest) => void = () => {},
   image: ProvincePixels = provinces,
   folder = "one",
+  scenarios: Record<string, string> = { [SCENARIO_FILE]: scenarioText },
 ): string {
   const m = JSON.parse(manifestText) as MapManifest;
   edit(m);
@@ -25,6 +37,7 @@ function fingerprint(
     provinces: image,
     picture: { width: image.width, height: image.height },
     urlFor: (name) => `coilbox://${folder}/${name}`,
+    scenarios,
   });
   if (!result.ok) {
     throw new Error(result.errors.map((e) => e.message).join("\n"));
@@ -147,12 +160,6 @@ describe("what changes a hand-made map's fingerprint", () => {
       },
     ],
     [
-      "the game",
-      (m) => {
-        m.game = { shortname: "OTHER" };
-      },
-    ],
-    [
       "the order of the locations",
       (m) => {
         m.provinces.reverse();
@@ -165,6 +172,21 @@ describe("what changes a hand-made map's fingerprint", () => {
       expect(fingerprint(edit)).not.toBe(BASE);
     });
   }
+
+  it("changes with the game", () => {
+    // A scenario is tied to its game, so Ironcoast plays a skirmish here.
+    const skirmish = (m: MapManifest) => {
+      const ironcoast = province(m, "Ironcoast");
+      ironcoast.scenario = undefined;
+      ironcoast.battle = { mapName: "MapC" };
+    };
+    expect(
+      fingerprint((m) => {
+        skirmish(m);
+        m.game = { shortname: "OTHER" };
+      }),
+    ).not.toBe(fingerprint(skirmish));
+  });
 
   it("gives each of those changes a fingerprint of its own", () => {
     const all = [BASE, ...changes.map(([, edit]) => fingerprint(edit))];
@@ -253,5 +275,66 @@ describe("what leaves a hand-made map's fingerprint alone", () => {
         repaint(from, "#010203"),
       ),
     ).toBe(BASE);
+  });
+});
+
+describe("a location's scenario in the fingerprint", () => {
+  /** The sample with Ironcoast playing `scenario`, a bare document. */
+  const withScenario = (scenario: Scenario, file = SCENARIO_FILE) =>
+    fingerprint(
+      (m) => {
+        province(m, "Ironcoast").scenario = file;
+      },
+      provinces,
+      "one",
+      { [file]: JSON.stringify(scenario) },
+    );
+
+  it("is the same for the exported file and the bare scenario inside it", () => {
+    expect(withScenario(siege)).toBe(BASE);
+  });
+
+  it("is the same when the file is renamed", () => {
+    expect(withScenario(siege, "renamed.json")).toBe(BASE);
+  });
+
+  it("is the same when the scenario's name, description and dates change", () => {
+    expect(
+      withScenario({
+        ...siege,
+        id: "another-id",
+        name: "Another name",
+        description: "Another description.",
+        createdAt: "2030-01-01T00:00:00.000Z",
+        updatedAt: "2030-01-02T00:00:00.000Z",
+      }),
+    ).toBe(BASE);
+  });
+
+  it("changes when the scenario changes under the same file name", () => {
+    expect(siege.triggers.length).toBeGreaterThan(0);
+    const fewer = withScenario({
+      ...siege,
+      triggers: siege.triggers.slice(1),
+    });
+    const otherMap = withScenario({
+      ...siege,
+      setup: { ...siege.setup, mapName: "Another Map" },
+    });
+    const otherVars = withScenario({
+      ...siege,
+      vars: { ...siege.vars, added: 1 },
+    });
+    expect(new Set([BASE, fewer, otherMap, otherVars]).size).toBe(4);
+  });
+
+  it("changes when the location stops playing a scenario", () => {
+    expect(
+      fingerprint((m) => {
+        const ironcoast = province(m, "Ironcoast");
+        ironcoast.scenario = undefined;
+        ironcoast.battle = { mapName: siege.setup.mapName };
+      }),
+    ).not.toBe(BASE);
   });
 });

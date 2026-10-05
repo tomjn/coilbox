@@ -15,6 +15,8 @@ import type { GalaxyDoc, GalaxyNode, NodeBattleSpec } from "../model";
  *   battle (the map, enemy count, AI, start positions, mod options, disabled
  *   units and handicap), its Warpath kind, and the order the locations are
  *   listed in
+ * - the scenario a location plays: its setup, teams, zones, units, triggers,
+ *   objectives and the rest of what the scenario builder exported
  * - which locations are joined and how: borders from the province image,
  *   crossings and roads
  * - blocked borders
@@ -23,6 +25,8 @@ import type { GalaxyDoc, GalaxyNode, NodeBattleSpec } from "../model";
  * What does not:
  *
  * - the map's title and description, and a location's name and blurb
+ * - a scenario's file name, its own name and description, its dates and its
+ *   dialogue clips
  * - a faction's name and colour, and the faction picked by default
  * - the map picture, the heightmap and its scale, the map's size in map units
  *   and the placed models
@@ -102,12 +106,32 @@ function battleOf(battle: NodeBattleSpec): Plain {
 }
 
 /**
- * The scenario a location plays in place of a skirmish. The reader does not
- * read one yet (issue #3515). When it does, return the reference here and it
- * joins the fingerprint of the maps that use one.
+ * The scenario a location plays in place of a skirmish, as it counts for
+ * play: the scenario itself as the reader parsed it, and not the name of its
+ * file. A scenario changed under the same file name is a different fight, and
+ * the same scenario under a new file name is not.
+ *
+ * Its id, name, description, dates and the editor's id counters are left out,
+ * as are the dialogue clips, which are sound. Everything else stays in, the
+ * game build it was exported on included. The scenario builder writes many
+ * fields and picking through them for the ones a mission reads would go stale
+ * the first time one is added. The cost is that exporting the scenario again
+ * after any other change gives a new version of the map, which errs on the
+ * side of saying so.
  */
-function scenarioOf(_node: GalaxyNode): Plain {
-  return undefined;
+function scenarioOf(node: GalaxyNode): Plain {
+  if (!node.scenario) return undefined;
+  const {
+    id: _id,
+    name: _name,
+    description: _description,
+    createdAt: _createdAt,
+    updatedAt: _updatedAt,
+    idCounters: _idCounters,
+    ...play
+  } = node.scenario.doc;
+  // A parsed scenario is plain JSON.
+  return play as unknown as Plain;
 }
 
 /**

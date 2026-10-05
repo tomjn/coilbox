@@ -30,6 +30,12 @@ function readSample() {
     provinces,
     picture: { width: provinces.width, height: provinces.height },
     urlFor: (name) => `coilbox://sample/${name}`,
+    scenarios: {
+      "ironcoast-siege.json": readFileSync(
+        `${SAMPLE}ironcoast-siege.json`,
+        "utf8",
+      ),
+    },
   });
   if (!result.ok) {
     throw new Error(result.errors.map((e) => e.message).join("\n"));
@@ -41,8 +47,8 @@ describe("the sample map's fingerprint", () => {
   const doc = readSample();
 
   it("is the pinned value", () => {
-    expect(doc.handmade?.fingerprint).toBe("85ad273de1da363a");
-    expect(handmadeMapFingerprint(doc)).toBe("85ad273de1da363a");
+    expect(doc.handmade?.fingerprint).toBe("908fbba63c234e18");
+    expect(handmadeMapFingerprint(doc)).toBe("908fbba63c234e18");
   });
 
   it("is as many hex digits as its size in bits needs", () => {

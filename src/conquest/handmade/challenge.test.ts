@@ -37,6 +37,9 @@ const SAMPLE = fileURLToPath(
 );
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
+const scenarios = {
+  "ironcoast-siege.json": readFileSync(`${SAMPLE}ironcoast-siege.json`, "utf8"),
+};
 
 function read(edit: (m: MapManifest) => void = () => {}): HandmadeMapResult {
   const m = JSON.parse(manifestText) as MapManifest;
@@ -46,6 +49,7 @@ function read(edit: (m: MapManifest) => void = () => {}): HandmadeMapResult {
     provinces,
     picture: { width: provinces.width, height: provinces.height },
     urlFor: (name) => `coilbox://sample/${name}`,
+    scenarios,
   });
 }
 
