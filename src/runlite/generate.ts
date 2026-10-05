@@ -98,7 +98,7 @@ const COLUMNS: Record<RunLength, number> = {
 const STARTER_UNIT_COUNT = 12;
 
 /** Tech tiers spread across the run (drives map size + enemy scaling). */
-const MAX_TIER = 5;
+export const MAX_TIER = 5;
 
 function techTierForCol(col: number, cols: number): number {
   if (cols <= 2) return 1;
