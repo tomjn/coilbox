@@ -615,3 +615,16 @@ export function isStrongBorder(
 ): boolean {
   return !hiddenA && !hiddenB && ownerA !== ownerB;
 }
+
+/**
+ * Where a capital's name hangs: on the same ground point as its star, moved
+ * south (world +Z) past the star's edge and a gap. The name's top edge sits at
+ * this point, so the star and the name never overlap at any zoom.
+ */
+export function capitalLabelPoint(
+  anchor: [number, number, number],
+  starRadius: number,
+  gap: number,
+): [number, number, number] {
+  return [anchor[0], anchor[1], anchor[2] + starRadius + gap];
+}

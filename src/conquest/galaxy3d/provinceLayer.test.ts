@@ -253,9 +253,37 @@ describe("buildProvinceLayer", () => {
 
   it("puts a province's name on its anchor", () => {
     const { labels } = build();
-    // Map (25, 25) on a 100 unit map 200 world units across.
-    expect(labels[0].position.toArray()).toEqual([-50, 0, -50]);
+    // Map (75, 25) on a 100 unit map 200 world units across.
+    expect(labels[2].position.toArray()).toEqual([50, 0, -50]);
     // A point location's label is left where it was.
     expect(labels[1].position.toArray()).toEqual([0, 0, 0]);
+  });
+
+  it("hangs a capital's name south of its star, never on it", () => {
+    const { scene, labels } = build();
+    const star = scene.getObjectByName("province-capital:west");
+    const label = labels[0];
+    // Same spot east to west, and past the star's southern edge.
+    expect(label.position.x).toBe(star?.position.x);
+    expect(label.position.z).toBeGreaterThan((star?.position.z ?? 0) + 1.3);
+  });
+
+  it("hangs a CSS label below its point", () => {
+    const galaxy = doc(nodes);
+    const scene = new THREE.Scene();
+    // A CSS2DObject without the element, which needs a document.
+    const label = Object.assign(new THREE.Object3D(), {
+      center: new THREE.Vector2(0.5, 0.5),
+    });
+    buildProvinceLayer(
+      scene,
+      [],
+      galaxy,
+      createTerrainSurface(terrain, 200),
+      ownerColor,
+      { current: {} },
+      [label, undefined, undefined],
+    );
+    expect(label.center.toArray()).toEqual([0.5, 0]);
   });
 });
