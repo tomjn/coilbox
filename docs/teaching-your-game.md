@@ -8,6 +8,7 @@ This page follows that route in order. Each step links to the page that covers i
 
 - A game that coilbox can play scenarios on. The game archive must bundle the coilbox mission runtime, with the guards described in [the adoption contract](mission-runtime.md#the-adoption-contract). A game that ships its missions in its own archive plays them whatever its archive format. See [Ship missions in your game](scenarios.md#ship-missions-in-your-game).
 - A distribution that ships `.coilbox/profile.json`. See [Distribution profiles](distribution-profile.md) and [Distributing coilbox with your game](distributing.md).
+- Optionally, the engine, the game and the lesson's map bundled in `.coilbox/content/`, so the first lesson needs no download. Coilbox does not write into that folder, so a loose `.sdd` game that takes your scenario missions stays in a `games/` folder beside the binary. See [Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps).
 - Advanced mode, which you turn on in Settings > General. The Scenario Builder and Campaign Builder are in the sidebar once it is on.
 
 ## What a teaching mission can use today
