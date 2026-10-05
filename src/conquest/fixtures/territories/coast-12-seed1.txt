@@ -1,0 +1,39 @@
+id generated-1
+title TG Conquest
+description A generated map of 12 provinces.
+terrain image=generated:territories heightmap=generated:territories size=1024x1024 heightScale=64 projection=flat
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"coast","skin":"territories"}
+faction player name="Sovereign Imperium" color=#2f7dff aggression=0 side=
+faction enemy-1 name="Silent Remnant" color=#ff3524 aggression=0.4085108839906752 side=
+faction enemy-2 name="Verdant Enclave" color=#ffb300 aggression=0.35745911761187016 side=
+node node-0 name="Wrenhaven" pos=47,499 owner=player kind=capital difficulty=1 map="Map 1" outline=0,306 24,344 38,356 62,392 82,438 94,498 96,566 78,604 40,644 18,680 0,694
+node node-1 name="Brackhaven" pos=413,769 owner=enemy-2 kind=capital difficulty=5 map="Map 9" outline=402,726 410,726 416,732 426,752 440,750 444,754 470,756 480,766 482,780 474,790 484,794 488,810 476,824 470,824 456,812 420,814 406,810 398,800 392,778 386,778 382,786 376,784 382,774 378,740
+node node-2 name="Fernbarrow" pos=381,373 owner=neutral kind=normal difficulty=3 map="Map 6" outline=370,262 404,270 450,296 474,344 502,384 526,438 548,474 536,484 526,504 500,520 496,538 486,534 484,524 476,520 470,508 440,488 404,484 392,494 390,508 374,530 374,548 380,562 394,574 410,576 418,584 420,602 428,608 436,626 450,626 472,652 470,662 446,664 440,658 438,646 420,644 406,654 404,666 390,648 366,600 350,510 312,414 296,396 244,368 272,342 334,304
+node node-3 name="Redbarrow" pos=109,911 owner=neutral kind=normal difficulty=3 map="Map 4" outline=0,776 10,794 28,804 110,802 210,826 218,836 222,864 230,872 254,874 262,892 260,910 248,920 254,938 242,952 222,952 226,970 220,978 234,988 230,1010 238,1018 254,1018 258,1010 252,992 258,988 258,982 246,976 252,964 262,966 270,978 294,970 284,952 284,922 294,918 300,926 308,926 312,922 312,900 328,884 332,870 350,856 350,844 362,830 374,824 382,846 400,854 430,848 440,866 440,872 416,890 408,904 382,914 370,926 356,950 342,948 338,952 332,966 320,976 320,990 308,1004 308,1024 2,1024
+node node-4 name="Winddale" pos=547,213 owner=enemy-1 kind=normal difficulty=4 map="Map 8" outline=558,0 596,0 592,26 604,60 606,128 614,176 608,260 592,276 594,290 572,298 518,298 480,292 470,268 470,248 502,136 510,70 524,42
+node node-5 name="Bleakwood" pos=199,677 owner=player kind=normal difficulty=2 map="Map 3" outline=390,648 404,666 398,676 402,716 392,712 390,702 376,696 346,696 352,712 346,750 350,760 348,780 354,784 350,796 338,794 336,806 326,810 304,788 286,788 276,780 270,788 248,790 242,798 216,808 210,826 110,802 28,804 10,794 0,776 0,694 18,680 40,644 78,604 96,566 156,540 192,530 278,538 300,554 320,594 338,612
+node node-6 name="Rookcross" pos=375,131 owner=neutral kind=normal difficulty=3 map="Map 5" outline=296,0 558,0 524,42 510,70 502,136 470,248 470,268 480,292 450,296 404,270 370,262 342,234 324,224 258,214 226,190 200,178 278,98 286,80 288,38
+node node-7 name="Duncombe" pos=131,279 owner=player kind=normal difficulty=2 map="Map 2" outline=0,162 32,164 86,180 130,174 200,178 226,190 258,214 324,224 342,234 370,262 334,304 272,342 244,368 208,372 160,386 122,386 76,374 38,356 24,344 0,306
+node node-8 name="Easthollow" pos=681,95 owner=enemy-1 kind=capital difficulty=5 map="Map 10" outline=596,0 760,0 760,14 766,18 766,24 756,30 752,40 740,42 734,60 736,76 750,80 758,90 758,110 748,124 750,136 746,146 734,152 714,178 690,176 688,180 666,184 662,188 664,212 654,218 650,228 642,228 628,238 626,252 620,258 608,260 614,176 606,128 604,60 592,26
+node node-9 name="Larkmere" pos=575,375 owner=neutral kind=normal difficulty=4 map="Map 7" outline=594,290 628,324 632,344 644,350 644,364 658,362 650,344 660,334 674,334 690,346 690,352 684,356 684,374 680,376 682,392 670,406 664,424 646,424 608,436 600,448 574,454 548,474 526,438 502,384 474,344 450,296 480,292 518,298 572,298
+node node-10 name="Stormcross" pos=89,89 owner=neutral kind=normal difficulty=3 map="Map 6" outline=296,0 288,38 286,80 278,98 200,178 130,174 86,180 32,164 0,162 2,0
+node node-11 name="Crowhollow" pos=233,451 owner=player kind=normal difficulty=2 map="Map 3" outline=38,356 76,374 122,386 160,386 208,372 244,368 296,396 312,414 350,510 366,600 390,648 338,612 320,594 300,554 278,538 192,530 156,540 96,566 94,498 82,438 62,392
+link node-0 node-5 node-0 node-5 border
+link node-0 node-7 node-0 node-7 border
+link node-0 node-11 node-0 node-11 border
+link node-2 node-5 node-2 node-5 border
+link node-2 node-6 node-2 node-6 border
+link node-2 node-7 node-2 node-7 border
+link node-2 node-9 node-2 node-9 border
+link node-2 node-11 node-2 node-11 border
+link node-3 node-5 node-3 node-5 border
+link node-4 node-6 node-4 node-6 border
+link node-4 node-8 node-4 node-8 border
+link node-4 node-9 node-4 node-9 border
+link node-5 node-11 node-5 node-11 border
+link node-6 node-7 node-6 node-7 border
+link node-6 node-9 node-6 node-9 border
+link node-6 node-10 node-6 node-10 border
+link node-7 node-10 node-7 node-10 border
+link node-7 node-11 node-7 node-11 border
+link node-1 node-5 node-1 node-5 crossing
