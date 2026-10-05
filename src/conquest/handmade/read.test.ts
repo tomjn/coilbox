@@ -224,6 +224,32 @@ describe("the sample map", () => {
     ]);
   });
 
+  it("reads with no errors and holds every feature the issue asks for", () => {
+    const result = readHandmadeMap(sample());
+    expect(result.ok).toBe(true);
+    const manifest = JSON.parse(manifestText) as MapManifest;
+    expect(manifest.provinces).toHaveLength(9);
+    expect(manifest.locations).toHaveLength(1);
+    expect(doc.nodes).toHaveLength(10);
+    expect(doc.nodes.filter((n) => n.outline === undefined)).toHaveLength(1);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "crossing")).toEqual([
+      ["eastcliff", "ironcoast", "crossing"],
+    ]);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "road")).toHaveLength(
+      2,
+    );
+    expect(doc.blockedBorders).toHaveLength(1);
+    expect(doc.factions).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.owner === "neutral").length).toBe(6);
+    expect(doc.models).toHaveLength(1);
+    expect(doc.warpath?.startId).toBe("westhaven");
+    expect(doc.warpath?.goalId).toBe("farwatch");
+    expect(Object.keys(doc.warpath?.kinds ?? {})).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.scenario)).toHaveLength(1);
+    expect(node("ironcoast").scenario).toBeDefined();
+    expect(doc.terrain?.heightmap).toBeDefined();
+  });
+
   it("takes a game model and a file in a folder inside the map folder", () => {
     const result = readHandmadeMap(
       sample({
