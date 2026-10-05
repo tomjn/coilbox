@@ -166,7 +166,8 @@ export function BattleOverlay({
             fight (issue #489). */}
         <BattleGutter
           onClose={onClose}
-          installedGame={!!run.installedGame}
+          // A scenario is not a skirmish setup, so there is no preset to save.
+          installedGame={!!run.installedGame && !run.scenario}
           getDraft={() => run.lastSnapshot ?? run.snapshot()}
           defaultName={`${node.name} vs ${enemyFaction?.name ?? "garrison"}`}
           extra={
@@ -291,27 +292,44 @@ function Briefing({
             Battlefield
           </dt>
           <dd className="min-w-0 text-right">
-            <span className="block truncate">{node.battle.mapName}</span>
-            <SubstitutedMapNote
-              original={node.battle.mapSubstitutedFrom}
-              onRestore={() => onRestoreMap(node.id)}
-            />
-          </dd>
-        </div>
-        <div className="flex justify-between gap-2">
-          <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
-            Opposition
-          </dt>
-          <dd className="flex items-center gap-1.5">
-            {enemyLogo ? (
-              <FactionLogo logo={enemyLogo} sideName={enemyName} size={16} />
-            ) : (
-              <FactionDot color={enemyColor ?? "#6b7280"} sides={enemySides} />
+            <span className="block truncate">{run.mapName}</span>
+            {!run.scenario && (
+              <SubstitutedMapNote
+                original={node.battle.mapSubstitutedFrom}
+                onRestore={() => onRestoreMap(node.id)}
+              />
             )}
-            {enemyCount} × {enemyName ?? "garrison"}
-            {handicap > 0 ? ` (+${handicap}%)` : ""}
           </dd>
         </div>
+        {run.scenario ? (
+          // A scenario sets its own forces, so the garrison row would be wrong.
+          <div className="flex justify-between gap-2">
+            <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Scenario
+            </dt>
+            <dd className="min-w-0 text-right">
+              <span className="block truncate">{run.scenario.name}</span>
+            </dd>
+          </div>
+        ) : (
+          <div className="flex justify-between gap-2">
+            <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Opposition
+            </dt>
+            <dd className="flex items-center gap-1.5">
+              {enemyLogo ? (
+                <FactionLogo logo={enemyLogo} sideName={enemyName} size={16} />
+              ) : (
+                <FactionDot
+                  color={enemyColor ?? "#6b7280"}
+                  sides={enemySides}
+                />
+              )}
+              {enemyCount} × {enemyName ?? "garrison"}
+              {handicap > 0 ? ` (+${handicap}%)` : ""}
+            </dd>
+          </div>
+        )}
         {playerFaction && (
           <div className="flex justify-between gap-2">
             <dt className="font-display text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
@@ -334,6 +352,13 @@ function Briefing({
               {state.playerSide ? ` · ${state.playerSide}` : ""}
             </dd>
           </div>
+        )}
+        {run.scenario && (
+          <p className="text-sm text-muted-foreground">
+            This location is a scenario, not a skirmish.
+            {run.scenario.description ? ` ${run.scenario.description}` : ""} Win
+            it to take {node.name}.
+          </p>
         )}
         {mode === "attack" && (
           <p className="text-xs text-muted-foreground">
@@ -361,10 +386,10 @@ function Briefing({
         canStart={run.canStart}
         running={run.running}
         scanLoading={run.scanLoading}
-        aisAvailable={run.ais.length > 0}
+        aisAvailable={run.ais.length > 0 || !!run.scenario}
         onStart={run.start}
-        mapName={node.battle.mapName}
-        mapDownload={node.battle.mapDownload}
+        mapName={run.mapName}
+        mapDownload={run.scenario ? undefined : node.battle.mapDownload}
         game={conquestGameRef(galaxy, state)}
         onRecheck={run.recheck}
         gameOffer={run.gameOffer}

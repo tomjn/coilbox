@@ -16,6 +16,7 @@ import {
   substituteExcludedMaps,
 } from "./generate";
 import {
+  choiceOnSteps,
   type GenerateMapRunOpts,
   generateMapRun,
   MapRouteError,
@@ -23,6 +24,7 @@ import {
   type RouteMap,
   resolveRunMap,
   routeAcrossMap,
+  routeChoice,
   runMapRefFor,
 } from "./mapRun";
 import { parseRunJson, type RogueliteRun } from "./model";
@@ -269,6 +271,162 @@ describe("pickEnds", () => {
     expect(() => pickEnds(routeMap(["a", "b"], []), mulberry32(1))).toThrow(
       MapRouteError,
     );
+  });
+
+  /** The choice on every furthest pair of a map, in both directions. */
+  function furthestChoices(map: RouteMap) {
+    const all = map.nodes.flatMap((from) =>
+      map.nodes
+        .filter((to) => to.id !== from.id)
+        .map((to) => {
+          const route = routeAcrossMap(map, from.id, to.id);
+          return {
+            ends: [from.id, to.id],
+            links: route.rank.get(to.id) ?? 0,
+            ...routeChoice(route),
+          };
+        }),
+    );
+    const furthest = Math.max(...all.map((p) => p.links));
+    return all.filter((p) => p.links === furthest);
+  }
+
+  //   s - a - b - c - t     s to t is four links with one way there. s to v is
+  //       |       |         four links with two ways, by b or by d.
+  //       d - e - v
+  const FORK = routeMap(
+    ["s", "a", "b", "c", "t", "d", "e", "v"],
+    [
+      ["s", "a"],
+      ["a", "b"],
+      ["b", "c"],
+      ["c", "t"],
+      ["a", "d"],
+      ["d", "e"],
+      ["e", "v"],
+      ["c", "v"],
+    ],
+  );
+
+  //   s - a - c - t     From s the player chooses at s and again at a if they
+  //   |   |       |     went that way. From t they choose once, at t, so the
+  //   |   d - - - +     same two ends give less choice the other way round.
+  //   b - e - - - +
+  const FAN = routeMap(
+    ["s", "a", "b", "c", "d", "e", "t"],
+    [
+      ["s", "a"],
+      ["s", "b"],
+      ["a", "c"],
+      ["a", "d"],
+      ["b", "e"],
+      ["c", "t"],
+      ["d", "t"],
+      ["e", "t"],
+    ],
+  );
+
+  it("takes a furthest pair with a choice of route over one with none", () => {
+    expect(routeChoice(routeAcrossMap(FORK, "s", "t")).points).toBe(0);
+    expect(routeChoice(routeAcrossMap(FORK, "s", "v")).points).toBe(1);
+    for (let seed = 0; seed < 20; seed++) {
+      const [start, goal] = pickEnds(FORK, mulberry32(seed));
+      const route = routeAcrossMap(FORK, start, goal);
+      expect(route.rank.get(goal)).toBe(4);
+      expect(routeChoice(route).points).toBeGreaterThan(0);
+    }
+  });
+
+  it("takes the direction with more choice", () => {
+    expect(routeChoice(routeAcrossMap(FAN, "s", "t"))).toEqual({
+      fewest: 1,
+      points: 2,
+    });
+    expect(routeChoice(routeAcrossMap(FAN, "t", "s"))).toEqual({
+      fewest: 1,
+      points: 1,
+    });
+    for (let seed = 0; seed < 20; seed++) {
+      expect(pickEnds(FAN, mulberry32(seed))).not.toEqual(["t", "s"]);
+    }
+  });
+
+  it("picks a pair no other furthest pair beats, first on the fewest choices and then on the count", () => {
+    for (const map of [FORK, FAN]) {
+      const pairs = furthestChoices(map);
+      const fewest = Math.max(...pairs.map((p) => p.fewest));
+      const points = Math.max(
+        ...pairs.filter((p) => p.fewest === fewest).map((p) => p.points),
+      );
+      for (let seed = 0; seed < 20; seed++) {
+        const ends = pickEnds(map, mulberry32(seed));
+        expect(pairs.find((p) => p.ends.join() === ends.join())).toMatchObject({
+          fewest,
+          points,
+        });
+      }
+    }
+  });
+
+  it("never gives up length for choice", () => {
+    //   a - b - c - d - e    b to d has two ways, by c or by x, and is two
+    //       |       |        links. a to e is four links with one way.
+    //       + - x - +
+    const map = routeMap(
+      ["a", "b", "c", "d", "e", "x"],
+      [
+        ["a", "b"],
+        ["b", "c"],
+        ["c", "d"],
+        ["d", "e"],
+        ["b", "x"],
+        ["x", "d"],
+      ],
+    );
+    expect(routeChoice(routeAcrossMap(map, "b", "d")).points).toBe(1);
+    for (let seed = 0; seed < 8; seed++) {
+      expect(pickEnds(map, mulberry32(seed)).sort()).toEqual(["a", "e"]);
+    }
+  });
+});
+
+describe("routeChoice", () => {
+  it("counts no choice on a line", () => {
+    const line = routeMap(
+      ["m", "n", "o"],
+      [
+        ["m", "n"],
+        ["n", "o"],
+      ],
+    );
+    expect(routeChoice(routeAcrossMap(line, "m", "o"))).toEqual({
+      fewest: 0,
+      points: 0,
+    });
+  });
+
+  it("counts the locations with two steps onward, and the fewest a player can meet", () => {
+    // By b the player chooses twice, at a and at b. By c they choose once.
+    expect(
+      choiceOnSteps(
+        ["a", "b", "c", "d", "e", "z"],
+        [
+          ["a", "b"],
+          ["a", "c"],
+          ["b", "d"],
+          ["b", "e"],
+          ["c", "e"],
+          ["d", "z"],
+          ["e", "z"],
+        ],
+      ),
+    ).toEqual({ fewest: 1, points: 2 });
+  });
+
+  it("does not count a way round that is longer than the shortest", () => {
+    // a to f goes by b and d. The way by c and e is one link longer.
+    const route = routeAcrossMap(routeMap(IDS, LINKS), "a", "f");
+    expect(routeChoice(route)).toEqual({ fewest: 0, points: 0 });
   });
 });
 

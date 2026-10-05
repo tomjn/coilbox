@@ -377,10 +377,11 @@ describe("RunSetupForm and the four map styles (issue #3507)", () => {
 
       const run = await begin();
       expect(run.settings.skin).toBe(style);
+      // The map's seed is not checked. The form draws a random seed, and a
+      // run whose first map offers no choice of route moves to a later map.
       expect(run.settings.map).toMatchObject({
         source: "generated",
         style,
-        seed: run.settings.seed,
         nodeCount: LAND_RUN_SIZES[style].quick,
       });
       // The saved run opens on the map it was made on.

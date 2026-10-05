@@ -2,6 +2,7 @@ import type { ImageRef, MapDownloadHint, MediaRef } from "../campaign/model";
 import { parseImageRef, parseMapDownload } from "../campaign/model";
 import { clamp } from "../lib/helpers";
 import type { MapRunKind } from "../runlite/mapRun";
+import type { Scenario } from "../scenario/model";
 import { expandRevealed } from "./fog";
 import { type PlacedModel, parsePlacedModels } from "./placedModels";
 import { MAX_NODE_COUNT } from "./size";
@@ -114,6 +115,19 @@ export interface NodeStar {
  */
 export type LinkKind = "border" | "crossing" | "road";
 
+/**
+ * A scenario a location plays in place of a skirmish, as the hand-made map
+ * reader read it from the map folder. It lives on the document in memory and
+ * is never saved, because a hand-made document is read again on every load.
+ */
+export interface NodeScenario {
+  /** The file in the map folder it was read from. */
+  file: string;
+  doc: Scenario;
+  /** The dialogue clips the file carried, by file name, as `data:` URIs. */
+  media: Record<string, string>;
+}
+
 export interface GalaxyNode {
   /** Stable id referenced by links, owners and run state. */
   id: string;
@@ -145,6 +159,13 @@ export interface GalaxyNode {
   /** Selection-panel flavour text. */
   blurb?: string;
   battle: NodeBattleSpec;
+  /**
+   * The scenario the player plays the first time they attack here. `battle`
+   * then names the scenario's map, and is what every other fight here uses.
+   * Only the hand-made map reader sets this, and {@link parseGalaxyJson} does
+   * not read it.
+   */
+  scenario?: NodeScenario;
 }
 
 /**
@@ -377,6 +398,11 @@ export interface HandmadeRun {
    * the installed maps change.
    */
   battles: Record<string, string>;
+  /**
+   * The ids of the locations whose scenario the player has won. A scenario is
+   * played once, so a later fight at one of these is a skirmish.
+   */
+  scenariosWon?: string[];
 }
 
 export const HISTORY_CAP = 200;

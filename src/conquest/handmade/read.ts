@@ -1,9 +1,23 @@
+import { decodeContainerText, readContainer } from "../../container/container";
+import { parseGameIdentity } from "../../container/gameIdentity";
+import { sameGameFamily } from "../../content/resolveContent";
 import {
   MapRouteError,
   type MapRunKind,
   routeAcrossMap,
 } from "../../runlite/mapRun";
-import type { GalaxyDoc, GalaxyNode, LinkKind, NodeBattleSpec } from "../model";
+import { parseScenarioJson } from "../../scenario/model";
+import {
+  parseScenarioPayload,
+  scenarioImportErrorMessage,
+} from "../../scenario/transfer";
+import type {
+  GalaxyDoc,
+  GalaxyNode,
+  LinkKind,
+  NodeBattleSpec,
+  NodeScenario,
+} from "../model";
 import { MIN_DIFFICULTY, NEUTRAL } from "../model";
 import { type TraceCache, traceCacheKey } from "./cache";
 import type { HandmadeMapError } from "./errors";
@@ -36,6 +50,11 @@ export interface HandmadeMapInput {
    * undefined when the folder has no such file.
    */
   urlFor: (fileName: string) => string | undefined;
+  /**
+   * The text of each scenario file the manifest names, by file name. A file
+   * that is in the folder but could not be read is left out.
+   */
+  scenarios?: Record<string, string>;
   /** Keeps traced maps between reads. Without one, every read traces. */
   cache?: TraceCache;
   /** The `createdAt` and `updatedAt` of the document. Defaults to empty. */
@@ -143,12 +162,74 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
 
   const battleOf = (battle: NodeBattleSpec | undefined): NodeBattleSpec =>
     battle ?? { mapName: BLANK_BATTLE_MAP };
+  /**
+   * The scenario a location names, read and checked. Every problem with it is
+   * reported with the location's name, so the author knows where to look.
+   */
+  const scenarioOf = (l: {
+    id: string;
+    name: string;
+    scenario?: string;
+  }): NodeScenario | undefined => {
+    const file = l.scenario;
+    if (file === undefined) return undefined;
+    const at = { id: l.id, name: l.name, file };
+    if (input.urlFor(file) === undefined) {
+      errors.push({
+        code: "scenario-missing",
+        ...at,
+        message: `${MANIFEST_FILE}: "${l.name}" names the scenario file "${file}", but the folder has no file with that name.`,
+      });
+      return undefined;
+    }
+    const invalid = (why: string) => {
+      errors.push({
+        code: "scenario-invalid",
+        ...at,
+        message: `The scenario file "${file}" for "${l.name}" cannot be used. ${why}`,
+      });
+      return undefined;
+    };
+    const text = input.scenarios?.[file];
+    if (text === undefined) return invalid("The file could not be read.");
+    const read = readScenarioFile(text);
+    if (!read.ok) return invalid(read.why);
+    const { doc, media, shortname } = read;
+    if (!doc.setup.gameName || !doc.setup.mapName) {
+      return invalid(
+        "It has no game and map yet. Set it up in the scenario builder and export it again.",
+      );
+    }
+    const { game } = manifest;
+    const otherShortname =
+      shortname !== undefined &&
+      shortname.toLowerCase() !== game.shortname.toLowerCase();
+    const otherFamily =
+      game.pinnedName !== undefined &&
+      !sameGameFamily(doc.setup.gameName, game.pinnedName);
+    if (otherShortname || otherFamily) {
+      errors.push({
+        code: "scenario-wrong-game",
+        ...at,
+        game: doc.setup.gameName,
+        message: `The scenario file "${file}" for "${l.name}" is for the game "${doc.setup.gameName}", and this map is for "${game.pinnedName ?? game.shortname}". A location can only play a scenario made for the map's game.`,
+      });
+      return undefined;
+    }
+    return { file, doc, media };
+  };
+  /** A scenario location fights on the scenario's map whenever it is a skirmish. */
+  const scenarioBattle = (scenario: NodeScenario): NodeBattleSpec => ({
+    mapName: scenario.doc.setup.mapName,
+  });
+
   const nodes: GalaxyNode[] = [];
   /** How each location is named in a message, by id. */
   const described = new Map<string, string>();
   manifest.provinces.forEach((p, i) => {
     const shape = traced.provinces[i];
     described.set(p.id, describeProvince(p.name, p.color));
+    const scenario = scenarioOf(p);
     if (!shape) return;
     nodes.push({
       id: p.id,
@@ -164,11 +245,13 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       kind: p.capital ? "capital" : undefined,
       difficulty: p.difficulty ?? MIN_DIFFICULTY,
       blurb: p.blurb,
-      battle: battleOf(p.battle),
+      battle: scenario ? scenarioBattle(scenario) : battleOf(p.battle),
+      scenario,
     });
   });
   for (const l of manifest.locations) {
     described.set(l.id, `"${l.name}"`);
+    const scenario = scenarioOf(l);
     nodes.push({
       id: l.id,
       name: l.name,
@@ -177,7 +260,8 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       kind: l.capital ? "capital" : undefined,
       difficulty: l.difficulty ?? MIN_DIFFICULTY,
       blurb: l.blurb,
-      battle: battleOf(l.battle),
+      battle: scenario ? scenarioBattle(scenario) : battleOf(l.battle),
+      scenario,
     });
   }
 
@@ -304,6 +388,31 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
       updatedAt: now,
     },
   };
+}
+
+/**
+ * Read the text of a scenario file. An author has the file the scenario
+ * builder exports, which carries the dialogue clips and names the game by its
+ * shortname. The bare document is read too, because that is what coilbox
+ * stores and what a bundled scenario may be.
+ */
+function readScenarioFile(
+  text: string,
+):
+  | ({ ok: true; shortname?: string } & Pick<NodeScenario, "doc" | "media">)
+  | { ok: false; why: string } {
+  const bare = parseScenarioJson(text);
+  if (bare) return { ok: true, doc: bare, media: {} };
+  const read = readContainer(decodeContainerText(text), "scenario", (value) => {
+    const payload = parseScenarioPayload(value);
+    if (!payload) return null;
+    const game = parseGameIdentity((value as { game?: unknown }).game);
+    return { ...payload, shortname: game?.shortname };
+  });
+  if (!read.ok)
+    return { ok: false, why: scenarioImportErrorMessage(read.error) };
+  const { scenario, media, shortname } = read.payload;
+  return { ok: true, doc: scenario, media, shortname };
 }
 
 /**

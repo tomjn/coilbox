@@ -288,6 +288,20 @@ async function readFolder(
   // A heightmap the folder lacks is left for the reader to report as missing.
   const { heightmap } = manifest.files;
   const heightmapUrl = heightmap === undefined ? undefined : urlFor(heightmap);
+  const scenarioFiles = new Set(
+    [...manifest.provinces, ...manifest.locations].flatMap((l) =>
+      l.scenario === undefined ? [] : [l.scenario],
+    ),
+  );
+  // Started here so the files are fetched while the images decode.
+  const scenarioReads = Promise.all(
+    [...scenarioFiles].map(
+      async (file): Promise<[string, string | undefined]> => [
+        file,
+        await fileText(urlFor(file)),
+      ],
+    ),
+  );
   const [provinces, picture, heights] = await Promise.all([
     decode(manifest.files.provinces, () => decodeRgba(provincesUrl)),
     decode(manifest.files.picture, () => imageSize(pictureUrl)),
@@ -299,11 +313,19 @@ async function readFolder(
     return { ok: false, errors: unreadable };
   }
 
+  // A scenario file that is missing or would not read is left out, and the
+  // reader says which location it belongs to.
+  const scenarios: Record<string, string> = {};
+  for (const [file, text] of await scenarioReads) {
+    if (text !== undefined) scenarios[file] = text;
+  }
+
   const read = readHandmadeMap({
     manifest: manifestText,
     provinces,
     picture,
     urlFor,
+    scenarios,
     cache: traces,
   });
   const modelErrors = await missingModelFiles(manifest, urlFor);
@@ -312,6 +334,17 @@ async function readFolder(
     ok: false,
     errors: [...(read.ok ? [] : read.errors), ...modelErrors],
   };
+}
+
+/** The text of a file in a map folder, or undefined when it cannot be read. */
+async function fileText(url: string | undefined): Promise<string | undefined> {
+  if (url === undefined) return undefined;
+  try {
+    const res = await fetch(url);
+    return res.ok ? await res.text() : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

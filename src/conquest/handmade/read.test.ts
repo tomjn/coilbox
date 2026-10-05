@@ -19,7 +19,9 @@ const FILES = [
   "provinces.png",
   "heightmap.png",
   "cairn.gltf",
+  "ironcoast-siege.json",
 ];
+const scenarioText = readFileSync(`${SAMPLE}ironcoast-siege.json`, "utf8");
 const manifestText = readFileSync(`${SAMPLE}map.json`, "utf8");
 const provinces = decodePng(readFileSync(`${SAMPLE}provinces.png`));
 const picture = decodePng(readFileSync(`${SAMPLE}picture.png`));
@@ -32,6 +34,7 @@ function sample(change: Partial<HandmadeMapInput> = {}): HandmadeMapInput {
     picture: { width: picture.width, height: picture.height },
     urlFor: (name) =>
       FILES.includes(name) ? `asset://map/${name}` : undefined,
+    scenarios: { "ironcoast-siege.json": scenarioText },
     ...change,
   };
 }
@@ -221,6 +224,32 @@ describe("the sample map", () => {
     ]);
   });
 
+  it("reads with no errors and holds every feature the issue asks for", () => {
+    const result = readHandmadeMap(sample());
+    expect(result.ok).toBe(true);
+    const manifest = JSON.parse(manifestText) as MapManifest;
+    expect(manifest.provinces).toHaveLength(9);
+    expect(manifest.locations).toHaveLength(1);
+    expect(doc.nodes).toHaveLength(10);
+    expect(doc.nodes.filter((n) => n.outline === undefined)).toHaveLength(1);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "crossing")).toEqual([
+      ["eastcliff", "ironcoast", "crossing"],
+    ]);
+    expect(doc.linkKinds?.filter(([, , kind]) => kind === "road")).toHaveLength(
+      2,
+    );
+    expect(doc.blockedBorders).toHaveLength(1);
+    expect(doc.factions).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.owner === "neutral").length).toBe(6);
+    expect(doc.models).toHaveLength(1);
+    expect(doc.warpath?.startId).toBe("westhaven");
+    expect(doc.warpath?.goalId).toBe("farwatch");
+    expect(Object.keys(doc.warpath?.kinds ?? {})).toHaveLength(2);
+    expect(doc.nodes.filter((n) => n.scenario)).toHaveLength(1);
+    expect(node("ironcoast").scenario).toBeDefined();
+    expect(doc.terrain?.heightmap).toBeDefined();
+  });
+
   it("takes a game model and a file in a folder inside the map folder", () => {
     const result = readHandmadeMap(
       sample({
@@ -255,11 +284,10 @@ describe("the sample map", () => {
     expect(result.doc.models).toBeUndefined();
   });
 
-  it("ignores keys it does not know, including the reserved ones", () => {
+  it("ignores keys it does not know", () => {
     const result = readHandmadeMap(
       sample({
         manifest: manifestWith((m) => {
-          m.provinces[0].scenario = "intro.json";
           (m as unknown as Record<string, unknown>).somethingNew = 1;
         }),
       }),
@@ -622,7 +650,7 @@ describe("Warpath markings", () => {
     expect(readSample().warpath).toEqual({
       startId: "westhaven",
       goalId: "farwatch",
-      kinds: { eastcliff: "shop" },
+      kinds: { eastcliff: "shop", ironcoast: "battle" },
     });
   });
 

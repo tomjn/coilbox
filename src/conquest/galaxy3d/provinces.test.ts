@@ -434,6 +434,12 @@ describe("provinceBorders on the sample hand-made map", () => {
     provinces: image,
     picture: { width: image.width, height: image.height },
     urlFor: (name) => `asset://map/${name}`,
+    scenarios: {
+      "ironcoast-siege.json": readFileSync(
+        `${SAMPLE}ironcoast-siege.json`,
+        "utf8",
+      ),
+    },
   });
   if (!result.ok) throw new Error("the sample map did not read");
   const doc = result.doc;
