@@ -18,6 +18,8 @@ import type {
 } from "../campaign/model";
 import { resumeMissionId } from "../campaign/progress";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
+import { listedHandmadeMaps } from "../conquest/handmade/conquest";
+import { useHandmadeMaps } from "../conquest/handmade/useHandmadeMaps";
 import type { ConquestStateFile, GalaxyDoc } from "../conquest/model";
 import { mostRecentOpen } from "../lib/recency";
 import { useInBattleKey } from "../multiplayer/battle/useBattleRoomKey";
@@ -655,6 +657,7 @@ export function useResume(): {
   const campaigns = useCampaigns();
   const progress = useCampaignProgress();
   const galaxies = useGalaxies();
+  const handmade = useHandmadeMaps();
   const conquests = useConquestState();
   const { presets } = useSkirmishPresets();
   const [draft] = useSkirmishDraft();
@@ -676,7 +679,7 @@ export function useResume(): {
         runs: runs.runs,
         campaigns: campaigns.campaigns,
         progress: progress.progress,
-        galaxies: galaxies.galaxies,
+        galaxies: [...galaxies.galaxies, ...listedHandmadeMaps(handmade.maps)],
         conquests: conquests.file,
         lobby: mirror.state,
         draft,
@@ -707,6 +710,7 @@ export function useResume(): {
     campaigns.loading ||
     progress.loading ||
     galaxies.loading ||
+    handmade.loading ||
     conquests.loading ||
     startScenarios.loading;
 

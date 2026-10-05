@@ -4,6 +4,7 @@ import {
   DEFAULT_AGGRESSION,
   type GalaxyDoc,
   type GalaxyNode,
+  type GameRef,
   type HandmadeRun,
   type NodeScenario,
   newConquestState,
@@ -99,6 +100,18 @@ export function handmadeConquestDoc(
       threatLevel: threatLevel > 0 ? threatLevel : undefined,
     },
   };
+}
+
+/**
+ * The installed hand-made maps in the shape of the galaxy list, for the pages
+ * that find conquests through it (Home's continue list and Career). A map that
+ * is not installed is not in the list, so a conquest on a removed map is not
+ * found through it.
+ */
+export function listedHandmadeMaps(
+  maps: readonly { id: string; title: string; game: GameRef }[],
+): { galaxy: { id: string; title: string; game: GameRef } }[] {
+  return maps.map(({ id, title, game }) => ({ galaxy: { id, title, game } }));
 }
 
 /** What a conquest saves about its map and choices when it starts. */
