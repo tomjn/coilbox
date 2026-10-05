@@ -937,10 +937,23 @@ export function GalaxyView({
       renderer.render(scene, camera);
       labelRenderer.render(scene, camera);
     };
-    renderRef.current = render;
+    // Draw at most once a frame. OrbitControls fires "change" from its pointer
+    // handler and again from the loop's update, and drawing on each drew the
+    // scene up to three times a frame with only the last one shown. The loop
+    // draws every frame, so it needs nothing more. Under reduce-motion there
+    // is no loop and one frame is asked for.
+    let requestedFrame: number | undefined;
+    const requestRender = () => {
+      if (!reduceMotion || requestedFrame !== undefined) return;
+      requestedFrame = requestAnimationFrame(() => {
+        requestedFrame = undefined;
+        render();
+      });
+    };
+    renderRef.current = requestRender;
     controls.addEventListener("change", () => {
       clampTarget();
-      render();
+      requestRender();
     });
 
     /* ---------------------- live-mutation callbacks ------------------------ */
@@ -1366,6 +1379,7 @@ export function GalaxyView({
 
     return () => {
       if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+      if (requestedFrame !== undefined) cancelAnimationFrame(requestedFrame);
       // Remember the final pose so a faction-switch rebuild can ease from here.
       camPoseRef.current = {
         pos: camera.position.clone(),
