@@ -32,7 +32,10 @@ describe("outerRingColor", () => {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const ring = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-        data.set(ring ? [24, 58, 96, 255] : [200, 200, 0, 255], (y * width + x) * 4);
+        data.set(
+          ring ? [24, 58, 96, 255] : [200, 200, 0, 255],
+          (y * width + x) * 4,
+        );
       }
     }
     expect(outerRingColor({ data, width, height })).toEqual([24, 58, 96]);

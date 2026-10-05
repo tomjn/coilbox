@@ -265,8 +265,9 @@ describe("the ground past the sheet's edge", () => {
   const margin = 2;
   const across = 4 + 2 * margin;
   const extended: HeightGrid = {
-    data: Float32Array.from({ length: across * across }, (_, i) =>
-      (i % across) / (across - 1),
+    data: Float32Array.from(
+      { length: across * across },
+      (_, i) => (i % across) / (across - 1),
     ),
     width: across,
     height: across,
@@ -311,9 +312,7 @@ describe("the ground past the sheet's edge", () => {
     expect(cameraFloorAt(s, x, 0)).toBeCloseTo(
       s.groundHeightAt(90, 45) + CAMERA_CLEARANCE,
     );
-    expect(cameraFloorAt(s, x, 0, withHill)).toBeCloseTo(
-      30 + CAMERA_CLEARANCE,
-    );
+    expect(cameraFloorAt(s, x, 0, withHill)).toBeCloseTo(30 + CAMERA_CLEARANCE);
   });
 
   it("reaches the margin's pixels past every side", () => {

@@ -560,7 +560,14 @@ export function marginGeometry(
       const topRight = topLeft + 1;
       const bottomLeft = topLeft + cols;
       const bottomRight = bottomLeft + 1;
-      cells.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
+      cells.push(
+        topLeft,
+        bottomLeft,
+        topRight,
+        topRight,
+        bottomLeft,
+        bottomRight,
+      );
     }
   }
   return { positions, uvs, index: Uint32Array.from(cells) };

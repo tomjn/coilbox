@@ -5,10 +5,7 @@ import { type GenerateOptions, type GenMap, generateGalaxy } from "./generate";
 import type { GalaxyDoc, MapSkin } from "./model";
 import type { ConquestNames } from "./names";
 import { extendTerrain, TERRAIN_PIXELS } from "./terrainGen";
-import {
-  generatedTerrainWithMargin,
-  generateTerritories,
-} from "./territories";
+import { generatedTerrainWithMargin, generateTerritories } from "./territories";
 
 /**
  * The four map styles a player can generate (issue #3507), and the one place

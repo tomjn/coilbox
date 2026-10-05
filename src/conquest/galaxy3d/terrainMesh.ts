@@ -176,7 +176,8 @@ export function buildTerrainMesh(
 
   // With land past the edge, the picture and heights are the wider ones and
   // the sheet's picture coordinates move into their middle.
-  const ext = extension && heights && surface.maxHeight > 0 ? extension : undefined;
+  const ext =
+    extension && heights && surface.maxHeight > 0 ? extension : undefined;
   const margin = ext
     ? createMarginSurface(surface, ext.heights, ext.margin)
     : undefined;
