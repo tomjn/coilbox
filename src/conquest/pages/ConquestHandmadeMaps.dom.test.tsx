@@ -32,6 +32,8 @@ const h = vi.hoisted(() => ({
   maps: [] as unknown[],
   unreadable: [] as unknown[],
   archiveError: undefined as string | undefined,
+  /** The saved maps are known and the game archives are still being read. */
+  searching: false,
   conquests: {} as Record<string, unknown>,
 }));
 
@@ -106,7 +108,8 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
     unreadable: h.unreadable,
     onlyOwnMaps: [],
     archiveError: h.archiveError,
-    loading: false,
+    loading: h.searching,
+    savedLoading: false,
     error: null,
   }),
 }));
@@ -168,6 +171,7 @@ beforeEach(() => {
   h.maps = [TWO_SHORES];
   h.unreadable = [];
   h.archiveError = undefined;
+  h.searching = false;
   h.conquests = {};
   for (const mock of [
     h.drawerClose,
@@ -440,5 +444,42 @@ describe("Import map", () => {
         'The map was not imported. The zip holds "../x", which points outside the map folder.',
       ),
     ).toBeTruthy();
+  });
+});
+
+describe("while the installed games are still searched", () => {
+  it("lists the saved maps and says the search is still running", () => {
+    h.searching = true;
+    renderIn(<ConquestListPage />);
+    expect(screen.getByText("Two Shores")).toBeTruthy();
+    expect(
+      screen
+        .getByRole("status")
+        .textContent?.includes(
+          "Searching your installed games for maps they carry.",
+        ),
+    ).toBe(true);
+  });
+
+  it("calls no conquest lost before the search answers", () => {
+    h.searching = true;
+    h.maps = [];
+    h.conquests = { "sample-two-shores": conquest() };
+    renderIn(<ConquestListPage />);
+    expect(screen.queryByText(/no longer installed/)).toBeNull();
+  });
+
+  it("says it is searching rather than that there are no maps", () => {
+    h.searching = true;
+    h.maps = [];
+    renderIn(<ConquestListPage />);
+    expect(screen.queryByText(/No conquest maps yet/)).toBeNull();
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+
+  it("drops the searching line once the search answers", () => {
+    renderIn(<ConquestListPage />);
+    expect(screen.getByText("Two Shores")).toBeTruthy();
+    expect(screen.queryByText(/Searching your installed games/)).toBeNull();
   });
 });
