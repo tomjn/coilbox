@@ -31,6 +31,7 @@ const h = vi.hoisted(() => ({
   saveFor: vi.fn(),
   maps: [] as unknown[],
   unreadable: [] as unknown[],
+  archiveError: undefined as string | undefined,
   conquests: {} as Record<string, unknown>,
 }));
 
@@ -103,6 +104,8 @@ vi.mock("../handmade/useHandmadeMaps", () => ({
   useHandmadeMaps: () => ({
     maps: h.maps,
     unreadable: h.unreadable,
+    onlyOwnMaps: [],
+    archiveError: h.archiveError,
     loading: false,
     error: null,
   }),
@@ -164,6 +167,7 @@ beforeEach(() => {
   h.drawerContent = null;
   h.maps = [TWO_SHORES];
   h.unreadable = [];
+  h.archiveError = undefined;
   h.conquests = {};
   for (const mock of [
     h.drawerClose,
@@ -263,6 +267,67 @@ describe("a hand-made map on the Conquest hub", () => {
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Abandon Two Shores" }));
     expect(h.saveFor).toHaveBeenCalledWith("sample-two-shores", undefined);
+  });
+});
+
+describe("a hand-made map a game carries", () => {
+  const CARRIED: HandmadeMapSummary = {
+    ...TWO_SHORES,
+    source: "game",
+    carriedBy: "Test Game 1.0",
+  };
+
+  it("is marked as the game's and cannot be removed", () => {
+    h.maps = [CARRIED];
+    renderIn(<ConquestListPage />);
+    expect(screen.getByText("From the game")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
+  });
+
+  it("names the folder and the game when the folder cannot be listed", () => {
+    h.unreadable = [
+      {
+        folder: "europe",
+        source: "game",
+        carriedBy: "Test Game 1.0",
+        errors: [{ code: "manifest-json", message: "map.json is not JSON." }],
+      },
+    ];
+    renderIn(<ConquestListPage />);
+    expect(
+      screen.getByText('"coilbox/maps/europe" in Test Game 1.0'),
+    ).toBeTruthy();
+  });
+
+  it("says a game update may have removed the map of a saved conquest", () => {
+    h.maps = [];
+    h.conquests = {
+      "sample-two-shores": conquest({
+        handmade: {
+          mapId: "sample-two-shores",
+          title: "Two Shores",
+          carriedBy: "Test Game 1.0",
+          battles: {},
+        },
+      }),
+    };
+    renderIn(<ConquestListPage />);
+    expect(
+      screen.getByText(
+        "The game Test Game 1.0 no longer carries the map this conquest is played on. A game update may have removed it. Your progress is saved (turn 3), and it carries on if a game carries the map again.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("calls no conquest lost while the games could not be searched", () => {
+    h.maps = [];
+    h.archiveError = "Init failed";
+    h.conquests = { "sample-two-shores": conquest() };
+    renderIn(<ConquestListPage />);
+    expect(
+      screen.getByText(/installed games could not be searched.*Init failed/),
+    ).toBeTruthy();
+    expect(screen.queryByText(/no longer installed/)).toBeNull();
   });
 });
 

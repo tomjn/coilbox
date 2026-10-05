@@ -14,6 +14,7 @@ import { emptyMeta } from "../../model";
 
 const hoisted = vi.hoisted(() => ({
   maps: [] as unknown[],
+  onlyOwnMaps: [] as string[],
   listError: null as string | null,
   loadMap: vi.fn(),
   generateMapRun: vi.fn(),
@@ -114,6 +115,7 @@ vi.mock("../../../conquest/handmade/useHandmadeMaps", () => ({
   useHandmadeMaps: () => ({
     maps: hoisted.maps,
     unreadable: [],
+    onlyOwnMaps: hoisted.onlyOwnMaps,
     error: hoisted.listError,
   }),
 }));
@@ -158,6 +160,7 @@ const begin = () =>
 beforeEach(() => {
   localStorage.clear();
   hoisted.maps = [];
+  hoisted.onlyOwnMaps = [];
   hoisted.listError = null;
   hoisted.saveRun.mockResolvedValue(undefined);
   hoisted.generateRun.mockReturnValue({ kind: "column run" });
@@ -247,6 +250,46 @@ describe("RunSetupForm and hand-made maps", () => {
     await vi.waitFor(() => expect(hoisted.onStarted).toHaveBeenCalledTimes(1));
     expect(hoisted.saveRun.mock.calls[0][1]).toEqual({ kind: "column run" });
     expect(hoisted.loadMap).not.toHaveBeenCalled();
+  });
+
+  it("offers only the game's own maps when the game asks for that", () => {
+    hoisted.maps = [map({ source: "game", carriedBy: "Test Game 1" })];
+    hoisted.onlyOwnMaps = ["Test Game 1"];
+    show();
+    expect(styles()).toEqual(["Two Shores (hand-made map)"]);
+    // A hand-made map decides the length, so it is the one picked.
+    expect(screen.queryByText("Length")).toBeNull();
+  });
+
+  it("still offers the styles to every other game", () => {
+    hoisted.maps = [map({ source: "game", carriedBy: "Test Game 1" })];
+    hoisted.onlyOwnMaps = ["Test Game 1"];
+    show();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pick Zero-K v1.14.10.1" }),
+    );
+    expect(styles()).toEqual(GENERATED_STYLES);
+  });
+
+  it("offers the styles when the game has no map with Warpath markings", () => {
+    hoisted.maps = [map({ source: "game", warpath: false })];
+    hoisted.onlyOwnMaps = ["Test Game 1"];
+    show();
+    expect(styles()).toEqual(GENERATED_STYLES);
+  });
+
+  it("begins a run on the game's own map with nothing picked", async () => {
+    hoisted.maps = [map({ source: "game", carriedBy: "Test Game 1" })];
+    hoisted.onlyOwnMaps = ["Test Game 1"];
+    hoisted.loadMap.mockResolvedValue({
+      ok: true,
+      source: { map: { id: "two-shores" }, startId: "a", goalId: "b" },
+    });
+    show();
+    begin();
+    await vi.waitFor(() => expect(hoisted.onStarted).toHaveBeenCalledTimes(1));
+    expect(hoisted.loadMap).toHaveBeenCalledWith("two-shores");
+    expect(hoisted.generateRun).not.toHaveBeenCalled();
   });
 
   it("says when the hand-made maps could not be listed", () => {

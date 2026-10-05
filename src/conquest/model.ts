@@ -266,6 +266,8 @@ export interface GalaxyDoc {
   handmade?: {
     /** The id of the map in the hand-made map library. */
     mapId: string;
+    /** The game whose archive carries the map, by name, when one does. */
+    carriedBy?: string;
     /**
      * What tells this version of the map from another (see
      * `./handmade/fingerprint`). The reader sets it on every read.
@@ -400,6 +402,11 @@ export interface HandmadeRun {
   mapId: string;
   /** The map's title when the conquest started, to name it if the map goes. */
   title: string;
+  /**
+   * The game whose archive carried the map when the conquest started, by
+   * name. Set so a save can say a game update took the map away.
+   */
+  carriedBy?: string;
   fogOfWar?: boolean;
   /** Threat level 0..3 (see `./threat`). Absent reads as 0. */
   threatLevel?: number;

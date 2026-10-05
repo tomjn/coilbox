@@ -45,6 +45,9 @@ export type HandmadeMapError =
     }
   /** An image is in the folder but cannot be decoded. */
   | { code: "image-unreadable"; file: string; message: string }
+  /** A file is in a map folder a game archive carries, but coilbox cannot
+   * read it out of the archive. */
+  | { code: "archive-unreadable"; file: string; message: string }
   /** The province image and the map picture are different sizes. */
   | {
       code: "size-mismatch";
