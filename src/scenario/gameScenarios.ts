@@ -140,6 +140,66 @@ async function fileBase64(
 }
 
 /**
+ * A packaged game's missions, by the game the content scan returned. A rescan
+ * returns new game objects, so this holds one read per archive per scan, and a
+ * page visit within the same scan reuses it, failures included (issue #3622).
+ * A loose `.sdd` is never held, for the reason {@link cacheable} gives.
+ */
+const packagedReads = new WeakMap<GameItem, Promise<LoadedScenario[]>>();
+
+/** The failures already logged, by archive and message, so each logs once. */
+const warned = new Set<string>();
+
+/** Warn about a game that could not be read, once per archive and reason. */
+function warnOnce(game: GameItem, archivePath: string, e: unknown): void {
+  const key = `${archivePath}\n${e instanceof Error ? e.message : String(e)}`;
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn("could not read missions from", game.name, e);
+}
+
+/** One game's missions that ship a document, as scenarios. */
+async function readGame(
+  game: GameItem,
+  archivePath: string,
+  loose: boolean,
+): Promise<LoadedScenario[]> {
+  const found: LoadedScenario[] = [];
+  try {
+    const missions = await missionList(game, archivePath);
+    for (const mission of missions) {
+      if (!mission.hasDocument) continue;
+      const base64 = await fileBase64(
+        archivePath,
+        mission.folder,
+        "scenario.json",
+        loose,
+      );
+      const scenario = parseStoredScenario(text(base64));
+      if (!scenario) {
+        console.warn(
+          "skipping invalid mission document",
+          game.name,
+          mission.folder,
+        );
+        continue;
+      }
+      const origin: GameOrigin = {
+        gameName: game.name,
+        archivePath,
+        folder: mission.folder,
+        loose,
+      };
+      origins.set(scenario.id, origin);
+      found.push({ scenario, source: "game", origin });
+    }
+  } catch (e) {
+    warnOnce(game, archivePath, e);
+  }
+  return found;
+}
+
+/**
  * Every mission every installed game ships, as scenarios.
  *
  * A mission folder counts as a mission when it holds `mission.lua`, which
@@ -159,37 +219,16 @@ export async function gameScenarios(
     const archivePath = game.primaryArchive.path;
     if (!archivePath) continue;
     const loose = isSdd(game.primaryArchive);
-    try {
-      const missions = await missionList(game, archivePath);
-      for (const mission of missions) {
-        if (!mission.hasDocument) continue;
-        const base64 = await fileBase64(
-          archivePath,
-          mission.folder,
-          "scenario.json",
-          loose,
-        );
-        const scenario = parseStoredScenario(text(base64));
-        if (!scenario) {
-          console.warn(
-            "skipping invalid mission document",
-            game.name,
-            mission.folder,
-          );
-          continue;
-        }
-        const origin: GameOrigin = {
-          gameName: game.name,
-          archivePath,
-          folder: mission.folder,
-          loose,
-        };
-        origins.set(scenario.id, origin);
-        found.push({ scenario, source: "game", origin });
-      }
-    } catch (e) {
-      console.warn("could not read missions from", game.name, e);
+    if (!cacheable(loose)) {
+      found.push(...(await readGame(game, archivePath, loose)));
+      continue;
     }
+    let read = packagedReads.get(game);
+    if (!read) {
+      read = readGame(game, archivePath, loose);
+      packagedReads.set(game, read);
+    }
+    found.push(...(await read));
   }
   return found;
 }

@@ -6596,6 +6596,7 @@ dependencies = [
  "base64 0.22.1",
  "coilbox-portable",
  "coilbox-springlua",
+ "flate2",
  "picoframe-core",
  "serde",
  "serde_json",
