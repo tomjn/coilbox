@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from "react";
+import type { NodeScenario } from "../conquest/model";
 import type { SkirmishAi } from "../content/bindings";
 import { useUnitsyncScan, useUnitsyncUnitDataset } from "../content/config";
 import type { ReplayProvenance } from "../content/replayUserState";
@@ -32,6 +33,12 @@ export type { BattleRequirement, BattleRunPhase } from "../play/useBattleRun";
  * them back, so this re-resolves them (the same cached calls `useBattleRun`
  * makes internally) rather than threading them out through it. The launch
  * waits for the unit data the limit needs, and does not go ahead without it.
+ *
+ * A node on a hand-made map can play a scenario in place of its encounter. It
+ * is launched the way a campaign mission's scenario is and plays as its author
+ * set it up: the run's unit limit and perks are not applied to it. The result
+ * is folded through `resolveBattle` like any other, so a win clears the node
+ * and a defeat costs hull.
  */
 export function useRunEncounter(
   run: RogueliteRun,
@@ -40,6 +47,9 @@ export function useRunEncounter(
   /** The run's opaque id in `RunStateFile.runs` (see `runlite/runs.ts`), for
    * tagging a freshly-detected replay's provenance. */
   runId?: string,
+  /** The scenario this node plays, from `runNodeScenario`. Given, the fight
+   * is the scenario and not the node's encounter. */
+  scenario?: NodeScenario,
 ) {
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
@@ -137,19 +147,21 @@ export function useRunEncounter(
     gameRef: run.settings.game,
     declinedGameUpdate: run.declinedGameUpdate,
     onGameChoice,
-    mapName: node?.battle?.mapName ?? "",
+    // A scenario is set on its own map, whatever the encounter's became.
+    mapName: scenario?.doc.setup.mapName ?? node?.battle?.mapName ?? "",
     canStartExtra: !!node && !!node.battle && run.progress.status === "active",
     hasDomainState: !!node,
     snapshot,
     resolveOutcome,
     persist,
     provenance,
+    scenario,
   });
 
   return {
     ...battle,
-    // The launch waits for the limit to be known.
-    canStart: battle.canStart && limit.kind === "ready",
+    // The launch waits for the limit to be known. A scenario does not use it.
+    canStart: battle.canStart && (!!scenario || limit.kind === "ready"),
     limit,
     reloadUnitData,
   };

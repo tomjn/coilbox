@@ -1,6 +1,7 @@
 import { Button } from "@picoframe/frame";
 import { Swords } from "lucide-react";
 import { SubstitutedMapNote } from "../../../challenge/SubstitutedMapNote";
+import type { NodeScenario } from "../../../conquest/model";
 import {
   BattleCheckingNotice,
   BattleGutter,
@@ -33,6 +34,7 @@ export function EncounterOverlay({
   onRestoreMap,
   onClose,
   onCelebrate,
+  scenario,
 }: {
   run: RogueliteRun;
   /** The run's opaque id, for tagging a freshly-detected replay's provenance. */
@@ -44,8 +46,13 @@ export function EncounterOverlay({
   onClose: () => void;
   /** Called when leaving the map after a victory, to fire the win burst. */
   onCelebrate?: () => void;
+  /** The scenario this node plays, read from the run's hand-made map. */
+  scenario?: NodeScenario;
 }) {
-  const enc = useRunEncounter(run, node, onResolved, runId);
+  const enc = useRunEncounter(run, node, onResolved, runId, scenario);
+  // The node names a scenario and the map could not give it, so the node's
+  // own encounter is fought and the briefing says why.
+  const scenarioLost = !!node.scenario && !scenario;
   const { target } = usePreferredTarget();
   // Before offering a move to another version, check that the units the run
   // has unlocked exist there (issue #3465).
@@ -92,7 +99,8 @@ export function EncounterOverlay({
             live briefing snapshot. */}
         <BattleGutter
           onClose={onClose}
-          installedGame={!!enc.installedGame}
+          // A scenario is not a skirmish setup, so there is no preset to save.
+          installedGame={!!enc.installedGame && !scenario}
           getDraft={() => enc.lastSnapshot ?? enc.snapshot()}
           defaultName={`${kindLabel} — ${spec?.mapName ?? "battle"}`}
         />
@@ -109,43 +117,69 @@ export function EncounterOverlay({
               {enc.installedGame && (
                 <Row label="Game" value={enc.installedGame.name} />
               )}
-              <Row
-                label="Battlefield"
-                value={spec.mapName}
-                note={spec.mapSubstitutedFrom}
-                onRestoreNote={() => onRestoreMap(node.id)}
-              />
-              <Row
-                label="Opposition"
-                value={`${spec.enemyAiCount} × hostile${spec.handicap > 0 ? ` (+${spec.handicap}%)` : ""}`}
-              />
-              <Row label="Tech tier" value={`${spec.techTier}`} />
+              {scenario ? (
+                // A scenario sets its own map and forces, and the run's unit
+                // limit is not applied to it.
+                <>
+                  <Row label="Battlefield" value={scenario.doc.setup.mapName} />
+                  <Row label="Scenario" value={scenario.doc.name} />
+                </>
+              ) : (
+                <>
+                  <Row
+                    label="Battlefield"
+                    value={spec.mapName}
+                    note={spec.mapSubstitutedFrom}
+                    onRestoreNote={() => onRestoreMap(node.id)}
+                  />
+                  <Row
+                    label="Opposition"
+                    value={`${spec.enemyAiCount} × hostile${spec.handicap > 0 ? ` (+${spec.handicap}%)` : ""}`}
+                  />
+                  <Row label="Tech tier" value={`${spec.techTier}`} />
+                </>
+              )}
             </dl>
-            <UnitLimitNote
-              limit={enc.limit}
-              startUnit={run.startUnit}
-              gameName={
-                enc.installedGame?.name ??
-                run.settings.game.pinnedName ??
-                run.settings.game.shortname
-              }
-            />
+            {scenario ? (
+              <p className="text-sm text-muted-foreground">
+                This location is a scenario, not a skirmish.
+                {scenario.doc.description ? ` ${scenario.doc.description}` : ""}{" "}
+                Win it to clear the location.
+              </p>
+            ) : (
+              <UnitLimitNote
+                limit={enc.limit}
+                startUnit={run.startUnit}
+                gameName={
+                  enc.installedGame?.name ??
+                  run.settings.game.pinnedName ??
+                  run.settings.game.shortname
+                }
+              />
+            )}
+            {scenarioLost && (
+              <p className={`text-xs ${HUD_ACCENT_INK.amber}`}>
+                This location plays a scenario from the hand-made map, and the
+                scenario could not be read. It is a skirmish on the same
+                battlefield until the map is back as it was.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Defeat costs health, not the warpath — you retreat and press on.
             </p>
             <BattleLaunchGate
-              error={enc.error ?? hold?.error}
-              hold={hold ?? undefined}
+              error={enc.error ?? (scenario ? undefined : hold?.error)}
+              hold={scenario ? undefined : (hold ?? undefined)}
               noEngine={enc.noEngine}
               missing={enc.missing}
               scanFailure={enc.scanFailure}
               canStart={enc.canStart}
               running={enc.running}
               scanLoading={enc.scanLoading}
-              aisAvailable={enc.ais.length > 0}
+              aisAvailable={enc.ais.length > 0 || !!scenario}
               onStart={enc.start}
-              mapName={spec.mapName}
-              mapDownload={spec.mapDownload}
+              mapName={scenario?.doc.setup.mapName ?? spec.mapName}
+              mapDownload={scenario ? undefined : spec.mapDownload}
               game={run.settings.game}
               onRecheck={enc.recheck}
               gameOffer={enc.gameOffer}
@@ -157,7 +191,7 @@ export function EncounterOverlay({
                 enc.answerGameOffer({ declinedUpdate: name })
               }
             />
-            {enc.limit.kind === "failed" && (
+            {enc.limit.kind === "failed" && !scenario && (
               <Button
                 variant="outline"
                 onClick={enc.reloadUnitData}

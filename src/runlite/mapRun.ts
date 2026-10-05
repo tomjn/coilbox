@@ -1,6 +1,11 @@
 import { handmadeMapRefFor } from "../challenge/mapRef";
 import { generateCities } from "../conquest/cities";
-import type { GalaxyDoc, GameRef, NodeBattleSpec } from "../conquest/model";
+import type {
+  GalaxyDoc,
+  GameRef,
+  NodeBattleSpec,
+  NodeScenario,
+} from "../conquest/model";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
 import { generateTerritories } from "../conquest/territories";
 import {
@@ -363,6 +368,7 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
   const kinds = opts.kinds ?? {};
   const willRest = (id: string) => id === restId && kinds[id] === undefined;
 
+  const scenarioAt = new Map(map.nodes.map((n) => [n.id, n.scenario]));
   const planner = opts.build ? planUnlocks(opts.build) : null;
   const usedUnlocks = new Set<string>();
   const typeOf = new Map<string, RunNodeType>();
@@ -400,6 +406,18 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
     if (node.battle && authored) {
       node.battle = { ...node.battle, ...authoredEncounter(authored) };
     }
+    // A fight at a location that names a scenario plays the scenario. The
+    // encounter stays as the skirmish to fall back on, set on the scenario's
+    // map. A depot or an event there has no fight, so it plays nothing.
+    const scenario = scenarioAt.get(id);
+    if (node.battle && scenario) {
+      node.scenario = scenario.file;
+      node.battle = {
+        ...node.battle,
+        mapName: scenario.doc.setup.mapName,
+        mapDownload: undefined,
+      };
+    }
     return node;
   });
 
@@ -412,6 +430,21 @@ export function generateMapRun(opts: GenerateMapRunOpts): RogueliteRun {
     startId,
     opts.mapRef ?? runMapRefFor(map),
   );
+}
+
+/**
+ * The scenario a run node plays, read off the map the run was made on. It is
+ * undefined for a node that names none, and also when the map is not to hand
+ * or its location no longer has that scenario file, in which case the node's
+ * own encounter is fought.
+ */
+export function runNodeScenario(
+  map: GalaxyDoc | undefined,
+  node: Pick<RunNode, "scenario" | "location">,
+): NodeScenario | undefined {
+  if (!node.scenario || !map) return undefined;
+  const found = map.nodes.find((n) => n.id === node.location)?.scenario;
+  return found?.file === node.scenario ? found : undefined;
 }
 
 /**
