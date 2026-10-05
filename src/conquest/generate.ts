@@ -14,7 +14,13 @@ import type {
 } from "./model";
 import { MAX_DIFFICULTY, NEUTRAL } from "./model";
 import type { ConquestNames } from "./names";
-import { factionSpecs, makeStarNamer, resolveConquestNames } from "./names";
+import {
+  factionSpecs,
+  makeLandNamer,
+  makeStarNamer,
+  resolveConquestNames,
+  resolveLandNames,
+} from "./names";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 import { MAX_NODE_COUNT } from "./size";
@@ -512,6 +518,7 @@ function hopDistances(count: number, links: [number, number][], start: number) {
 export function generateGalaxy(
   opts: GenerateOptions,
   now: string = new Date().toISOString(),
+  land = false,
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
   // Real-star galaxies take their size and their names from the catalogue, so
@@ -531,7 +538,12 @@ export function generateGalaxy(
   const links = realStars
     ? buildRangeLinks(source, JUMP_RANGE_LY)
     : buildLinks(pts);
-  return assembleGalaxy(opts, rng, { source, links, realStars, radiusLy }, now);
+  return assembleGalaxy(
+    opts,
+    rng,
+    { source, links, realStars, radiusLy, land },
+    now,
+  );
 }
 
 /** How many nodes a procedural layout builds for these options. */
@@ -560,6 +572,8 @@ export interface GalaxyGraph {
   /** Measure with `Math.sqrt` alone instead of `Math.hypot`. The galaxy
    * layouts leave it off, since their fixtures pin the `Math.hypot` results. */
   exactDistance?: boolean;
+  /** Name the locations as places on land rather than as stars. */
+  land?: boolean;
 }
 
 /**
@@ -624,7 +638,12 @@ export function assembleGalaxy(
   // resolved pools (a game's lore factions when supplied, else synthesized);
   // aggression uses a preset when given, else a generated spread.
   const usedNames = new Set<string>();
+  // The star namer is always built, because shuffling its pool draws from
+  // `rng` and every later draw depends on that. A land map then names from its
+  // own stream instead (see `makeLandNamer`), leaving `rng` as it was.
   const starName = makeStarNamer(rng, names);
+  const landPools = graph.land ? resolveLandNames(opts.names) : undefined;
+  const nameNode = landPools ? makeLandNamer(opts.seed, landPools) : starName;
   const specs = factionSpecs(rng, names, enemyCount + 1);
   const factions: Faction[] = specs.map((spec, i) => ({
     id: i === 0 ? "player" : `enemy-${i}`,
@@ -685,7 +704,7 @@ export function assembleGalaxy(
 
   const nodes: GalaxyNode[] = source.map((s, i) => ({
     id: `node-${i}`,
-    name: s.name ?? starName(usedNames),
+    name: s.name ?? nameNode(usedNames),
     // Catalogue positions are already rounded and are in light years, so they
     // keep their precision. Scatter positions keep the original 0.1 rounding.
     pos: realStars
