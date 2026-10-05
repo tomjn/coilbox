@@ -637,7 +637,7 @@ fn run() -> i32 {
         }
         if let Some(inner) = mode.file.as_deref() {
             return run_mode(
-                || archive::file(&args.lib, &mode.archive, inner),
+                || archive::file(&args.lib, &mode.archive, inner, mode.raw),
                 print_ok,
                 || archive::emit_file_error("worker panicked while reading archive member".into()),
             );
@@ -1035,6 +1035,7 @@ fn parse_args() -> Result<Args, String> {
             "--file" | "--extract" => {
                 it.next();
             }
+            "--raw" => {}
             "--thumbnails" => thumbnails_flag = true,
             "--heightmap" => heightmap_flag = true,
             "--height-field" => height_field_flag = true,

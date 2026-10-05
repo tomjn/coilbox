@@ -1484,19 +1484,28 @@ async fn unitsync_archive_tree(
 }
 
 /// `unitsync_archive_file` — read one member of an archive for preview. `file` is
-/// the member's slash-separated path within `archive`.
+/// the member's slash-separated path within `archive`. `raw` returns the
+/// member's own bytes as an `application/octet-stream` data URL instead, for a
+/// hand-made map's models and files over the preview caps (issue #3603).
 #[tauri::command]
 async fn unitsync_archive_file(
     engine_path: String,
     data_dir: String,
     archive: String,
     file: String,
+    raw: Option<bool>,
 ) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_archive_file_args(&libpath.to_string_lossy(), &data_dir, &archive, &file);
+    let args = build_archive_file_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        &file,
+        raw.unwrap_or(false),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "archive file", None).await
 }

@@ -16,6 +16,13 @@ use std::path::Path;
 const TEXT_CAP: usize = 512 * 1024;
 /// Image members are previewed up to 8 MiB.
 const IMAGE_CAP: usize = 8 * 1024 * 1024;
+/// The most a raw read returns: one file of a hand-made map folder that a game
+/// carries (issue #3603). It is the same number as `MAX_UNPACKED_BYTES` in
+/// `crates/tauri-plugin-coilbox-conquest/src/maps.rs`, the most a map zip may
+/// unpack to, because a map folder holds the same files whichever way it ships.
+/// The reasoning for the number is written beside that constant. One file can
+/// never be more than the whole folder, so a member past this is refused.
+const RAW_CAP: usize = 256 * 1024 * 1024;
 /// Audio members are previewed up to 16 MiB (voice lines and short cues). A
 /// bigger track still plays fine in-game, it is just too large to round-trip
 /// as a data URL for preview.
@@ -509,8 +516,9 @@ fn absolute_archive_path(us: &Unitsync, open_path: &str) -> Option<String> {
     Some(Path::new(&dir).join(&fname).to_string_lossy().into_owned())
 }
 
-/// Read one member of `archive` for preview, classifying it by extension.
-pub fn file(lib: &str, archive_name: &str, inner: &str) -> ArchiveFileOutput {
+/// Read one member of `archive` for preview, classifying it by extension. With
+/// `raw`, return the member's own bytes instead, as [`read_raw`] does.
+pub fn file(lib: &str, archive_name: &str, inner: &str, raw: bool) -> ArchiveFileOutput {
     let us = match unsafe { Unitsync::load(Path::new(lib)) } {
         Ok(u) => u,
         Err(e) => {
@@ -530,7 +538,11 @@ pub fn file(lib: &str, archive_name: &str, inner: &str) -> ArchiveFileOutput {
     let handle = open_path.and_then(|p| us.open_archive(&p));
     let out = match handle {
         Some(handle) => {
-            let result = read_member(&us, handle, inner);
+            let result = if raw {
+                read_raw(&us, handle, inner)
+            } else {
+                read_member(&us, handle, inner)
+            };
             us.close_archive(handle);
             result
         }
@@ -619,6 +631,33 @@ fn read_member(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
             truncated: !matches!(kind, Kind::Binary) && oversize,
             ..Default::default()
         },
+    }
+}
+
+/// Read a member's own bytes, up to [`RAW_CAP`], as an
+/// `application/octet-stream` data URL. Nothing is transcoded, so a model, its
+/// buffer and a picture over the image cap all come back as they are stored.
+/// A member past the cap comes back `truncated` with no bytes.
+fn read_raw(us: &Unitsync, handle: i32, inner: &str) -> ArchiveFileOutput {
+    let Some((size, bytes)) = us.read_archive_member(handle, inner, RAW_CAP) else {
+        return ArchiveFileOutput {
+            kind: "binary".into(),
+            errors: vec![format!("could not read member {inner}")],
+            ..Default::default()
+        };
+    };
+    raw_output(size, &bytes)
+}
+
+/// The output for a raw read of a member `size` bytes long.
+fn raw_output(size: u64, bytes: &[u8]) -> ArchiveFileOutput {
+    let truncated = size > RAW_CAP as u64;
+    ArchiveFileOutput {
+        kind: "binary".into(),
+        data_url: (!truncated).then(|| raw_data_url("application/octet-stream", bytes)),
+        size,
+        truncated,
+        ..Default::default()
     }
 }
 
@@ -1432,6 +1471,25 @@ mod tests {
         assert_eq!(audio_mime("opus"), Some("audio/opus"));
         assert_eq!(audio_mime("m4a"), Some("audio/mp4"));
         assert_eq!(audio_mime("dds"), None);
+    }
+
+    #[test]
+    fn a_raw_read_returns_the_bytes_untouched() {
+        let out = raw_output(5, b"hello");
+        assert_eq!(out.kind, "binary");
+        assert!(!out.truncated);
+        assert_eq!(
+            out.data_url.as_deref(),
+            Some("data:application/octet-stream;base64,aGVsbG8=")
+        );
+    }
+
+    #[test]
+    fn a_raw_read_past_the_cap_returns_no_bytes() {
+        let out = raw_output(RAW_CAP as u64 + 1, b"");
+        assert!(out.truncated);
+        assert_eq!(out.data_url, None);
+        assert_eq!(out.size, RAW_CAP as u64 + 1);
     }
 
     #[test]
