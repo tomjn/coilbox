@@ -359,12 +359,18 @@ export const TERRAIN_SUN: [number, number, number] = (() => {
 export function terrainNormalPixels(
   surface: TerrainSurface,
   grid: HeightGrid,
+  /** World units the grid covers, when it reaches past the sheet. The sheet's
+   * own size when left out. */
+  span: { width: number; depth: number } = {
+    width: surface.worldWidth,
+    depth: surface.worldDepth,
+  },
 ): Uint8Array {
   const { width, height, data } = grid;
   const out = new Uint8Array(width * height * 4);
   const toWorld = surface.heightScale * surface.scale;
-  const stepX = surface.worldWidth / Math.max(1, width - 1);
-  const stepZ = surface.worldDepth / Math.max(1, height - 1);
+  const stepX = span.width / Math.max(1, width - 1);
+  const stepZ = span.depth / Math.max(1, height - 1);
   const byte = (v: number) => Math.round((v * 0.5 + 0.5) * 255);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -392,6 +398,172 @@ export function terrainNormalPixels(
     }
   }
   return out;
+}
+
+/** The strategic view's vertical field of view, in degrees. */
+export const VIEW_FOV_DEGREES = 50;
+
+/**
+ * How much of the furthest top-down view past the map's edge the land beyond
+ * it covers before it has faded into the background. At the furthest zoom the
+ * fade then fills half the space past the edge and the background fills the
+ * rest, so the land beyond ends in a long fade and not at a line. A design
+ * value: wider costs generation time. A margin of 200 pixels added 54 to 94 ms
+ * to a map's generation on an M1 Pro, depending on its layout.
+ */
+const MARGIN_SHARE_OF_VIEW = 0.5;
+
+/**
+ * Map pixels of land to draw past every side of a generated map, for a map of
+ * `nodeCount` locations whose picture is `pixels` across.
+ *
+ * The pan stops at the map's edge and the furthest zoom is the
+ * `maxDistance` of {@link terrainCameraLimits}. Looking straight down from
+ * there, centred on the edge, the view reaches `maxDistance * tan(fov / 2)`
+ * world units past it. The land beyond fades out over
+ * {@link MARGIN_SHARE_OF_VIEW} of that. A tilted view sees to the horizon,
+ * which no margin could cover, and the same fade hides the end there.
+ */
+export function terrainMarginPixels(nodeCount: number, pixels: number): number {
+  const sheet = playExtentFor(nodeCount);
+  const half = Math.tan((VIEW_FOV_DEGREES * Math.PI) / 360);
+  const furthest = Math.max(
+    GALAXY_MAX_DISTANCE,
+    (sheet / (2 * half)) * FIT_MARGIN,
+  );
+  const reach = (furthest * half) / sheet;
+  return Math.ceil(reach * MARGIN_SHARE_OF_VIEW * pixels);
+}
+
+/**
+ * The ground past the sheet's edge as well as on it: heights for a grid that
+ * holds the map's heightmap in its middle with `margin` pixels round it.
+ */
+export interface MarginSurface {
+  /** Pixels of the grid past every side of the map. */
+  readonly margin: number;
+  /** The heightmap's pixels across the map alone. */
+  readonly mapPixels: number;
+  readonly grid: HeightGrid;
+  /** World units the margin reaches past the sheet's sides, along X and Z. */
+  readonly reachX: number;
+  readonly reachZ: number;
+  /** Ground height in world units at any world x and z, clamped to the grid. */
+  heightAtWorld(worldX: number, worldZ: number): number;
+}
+
+/**
+ * Lay a heightmap with a margin round it out in world space, at the same
+ * spacing and height as `surface`. On the sheet it reads the same heights the
+ * sheet does.
+ */
+export function createMarginSurface(
+  surface: TerrainSurface,
+  grid: HeightGrid,
+  margin: number,
+): MarginSurface {
+  const mapPixels = grid.width - 2 * margin;
+  const mapRows = grid.height - 2 * margin;
+  const pixelX = surface.worldWidth / Math.max(1, mapPixels - 1);
+  const pixelZ = surface.worldDepth / Math.max(1, mapRows - 1);
+  const toWorld = surface.heightScale * surface.scale;
+  return {
+    margin,
+    mapPixels,
+    grid,
+    reachX: margin * pixelX,
+    reachZ: margin * pixelZ,
+    heightAtWorld: (worldX, worldZ) => {
+      const px = margin + (worldX / surface.worldWidth + 0.5) * (mapPixels - 1);
+      const pz = margin + (worldZ / surface.worldDepth + 0.5) * (mapRows - 1);
+      return (
+        sampleHeightGrid(
+          grid,
+          px / Math.max(1, grid.width - 1),
+          pz / Math.max(1, grid.height - 1),
+        ) * toWorld
+      );
+    },
+  };
+}
+
+/**
+ * Geometry for the ground past the sheet's edge: a ring of cells round it out
+ * to the margin's reach, at twice the sheet's spacing. The ring's inner
+ * vertices are the sheet's own edge vertices at the sheet's own heights, so
+ * the two meet with no gap and no overlap. `uvs` place each vertex on a
+ * picture that holds the map's in its middle with the same margin round it.
+ */
+export function marginGeometry(
+  surface: TerrainSurface,
+  margin: MarginSurface,
+): { positions: Float32Array; uvs: Float32Array; index: Uint32Array } {
+  const { segmentsX, segmentsY, worldWidth, worldDepth } = surface;
+  const axis = (segments: number, size: number, reach: number): number[] => {
+    const inner = Array.from(
+      { length: segments + 1 },
+      (_, i) => (i / segments) * size - size / 2,
+    );
+    const step = (2 * size) / segments;
+    const outer = Math.max(1, Math.ceil(reach / step));
+    const before: number[] = [];
+    const after: number[] = [];
+    for (let k = outer; k >= 1; k--) {
+      const d = Math.min(reach, k * step);
+      before.push(-size / 2 - d);
+      after.unshift(size / 2 + d);
+    }
+    return [...before, ...inner, ...after];
+  };
+  const xs = axis(segmentsX, worldWidth, margin.reachX);
+  const zs = axis(segmentsY, worldDepth, margin.reachZ);
+  const firstX = xs.indexOf(-worldWidth / 2);
+  const firstZ = zs.indexOf(-worldDepth / 2);
+  const cols = xs.length;
+  const rows = zs.length;
+  const positions = new Float32Array(cols * rows * 3);
+  const uvs = new Float32Array(cols * rows * 2);
+  const across = margin.mapPixels + 2 * margin.margin;
+  const down = margin.grid.height;
+  const mapRows = down - 2 * margin.margin;
+  for (let j = 0; j < rows; j++) {
+    for (let i = 0; i < cols; i++) {
+      const x = xs[i];
+      const z = zs[j];
+      const si = i - firstX;
+      const sj = j - firstZ;
+      const onSheet = si >= 0 && si <= segmentsX && sj >= 0 && sj <= segmentsY;
+      const y = onSheet
+        ? surface.vertexHeights[sj * (segmentsX + 1) + si]
+        : margin.heightAtWorld(x, z);
+      const v = j * cols + i;
+      positions.set([x, y, z], v * 3);
+      // The same placement the sheet's picture coordinates use, widened.
+      const u = x / worldWidth + 0.5;
+      const w = z / worldDepth + 0.5;
+      uvs.set(
+        [
+          (u * margin.mapPixels + margin.margin) / across,
+          (w * mapRows + margin.margin) / down,
+        ],
+        v * 2,
+      );
+    }
+  }
+  const cells: number[] = [];
+  for (let j = 0; j < rows - 1; j++) {
+    for (let i = 0; i < cols - 1; i++) {
+      const si = i - firstX;
+      const sj = j - firstZ;
+      if (si >= 0 && si < segmentsX && sj >= 0 && sj < segmentsY) continue;
+      const topLeft = j * cols + i;
+      const topRight = topLeft + 1;
+      const bottomLeft = topLeft + cols;
+      const bottomRight = bottomLeft + 1;
+      cells.push(topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight);
+    }
+  }
+  return { positions, uvs, index: Uint32Array.from(cells) };
 }
 
 /** Orbit limits for a terrain map, in the terms `OrbitControls` takes. */
