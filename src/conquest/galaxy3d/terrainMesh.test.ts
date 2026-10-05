@@ -30,7 +30,10 @@ describe("edgeColor", () => {
     const data = new Uint8ClampedArray(width * height * 4);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        data.set(x === 0 ? [100, 160, 80, 255] : [24, 58, 96, 255], (y * width + x) * 4);
+        data.set(
+          x === 0 ? [100, 160, 80, 255] : [24, 58, 96, 255],
+          (y * width + x) * 4,
+        );
       }
     }
     expect(edgeColor({ data, width, height })).toEqual([24, 58, 96]);
@@ -95,7 +98,10 @@ describe("beyondPixels", () => {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const edge = x === 0 || y === 0 || x === width - 1 || y === height - 1;
-        data.set(edge ? [24, 58, 96, 255] : [80, 140, 180, 255], (y * width + x) * 4);
+        data.set(
+          edge ? [24, 58, 96, 255] : [80, 140, 180, 255],
+          (y * width + x) * 4,
+        );
       }
     }
     const ringed = beyondPixels({ data, width, height });
