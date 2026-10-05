@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
-import type { CityLayer, MapItemState } from "./cityLayer";
+import { type CityLayer, type MapItemState, roadStyle } from "./cityLayer";
 import {
   addCrossingStrip,
   CROSSING_PATTERN,
@@ -10,7 +10,9 @@ import {
   stripIndices,
   updateCrossingMaterial,
 } from "./crossingLine";
+import { type CrossingPlan, coastOf, planCrossings } from "./crossingPlan";
 import { dashPolyline, sharedBorderLines } from "./cueLines";
+import type { GroundLayer } from "./groundLayer";
 import type { WorldPos } from "./layout";
 import {
   type LinkCue,
@@ -19,13 +21,7 @@ import {
   mapCues,
 } from "./mapCues";
 import type { ProvinceLayer } from "./provinceLayer";
-import {
-  BORDER_TOLERANCE_FRACTION,
-  drapeLine,
-  type MapPoint,
-  type ProvinceIndex,
-  ribbonPositions,
-} from "./provinces";
+import { drapeLine, type MapPoint, ribbonPositions } from "./provinces";
 import { pairKey } from "./roads";
 import { seaRoute } from "./seaRoute";
 import type { TerrainSurface } from "./terrain";
@@ -50,14 +46,17 @@ import type { TerrainSurface } from "./terrain";
 const CUE_LIFT = 0.16;
 
 /** Line widths in world units. The province layer's strong border is 0.55. */
-const CROSSING_WIDTH = 0.4;
+const CROSSING_WIDTH = 1.1;
 const FRONTIER_WIDTH = 0.6;
 const BLOCKED_WIDTH = 1.1;
 
-/** The least width a crossing draws at, in CSS pixels, however far out. */
-const CROSSING_MIN_PIXELS = 4.5;
+/**
+ * The least width a crossing's strip draws at, in CSS pixels, however far
+ * out. The lane's dots are about a quarter of it.
+ */
+const CROSSING_MIN_PIXELS = 12;
 /** How much wider a crossing out of the selected location draws. */
-const CROSSING_EMPHASIS = 1.5;
+const CROSSING_EMPHASIS = 1.3;
 
 /** Dash and gap in world units, the galaxy's contested lane pattern. */
 const DASH = 1.5;
@@ -75,10 +74,10 @@ const WHITE = new THREE.Color(0xffffff);
 /** The pattern a crossing draws in for each tone. See `crossingLine.ts`. */
 const CROSSING_PATTERN_OF: Record<LinkTone, CrossingPattern> = {
   plain: "dots",
-  owned: "beads",
-  contested: "dashes",
+  owned: "edges",
+  contested: "glow",
   choice: "chevrons",
-  taken: "ticks",
+  taken: "filled",
 };
 
 const PLAIN_OPACITY = 0.85;
@@ -130,6 +129,15 @@ export function buildCueLayer(
     | Pick<ProvinceLayer, "index" | "borders" | "setProvinceState" | "apply">
     | undefined,
   source: CueSource,
+  /**
+   * The crossings as planned for the ground layer, which paints each one's
+   * tracks to the shore as roads. Left out, the layer plans the crossings
+   * itself and draws those tracks as fine lines.
+   */
+  painted?: {
+    plan: CrossingPlan;
+    ground: Pick<GroundLayer, "setRoadStyle" | "commit" | "firstExtra">;
+  },
 ): CueLayer {
   const nodeIndex = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
   /** A node id as a province's node index, or -1 for a point location. */
@@ -188,7 +196,18 @@ export function buildCueLayer(
   // Link kinds and blocked borders do not depend on who owns what, so one
   // pass with no owners says what there is to draw.
   const structure = mapCues({ galaxy, owners: {}, playerFactionId: "" });
+  const plan = painted?.plan ?? planCrossings(galaxy, surface);
   const coast = coastOf(galaxy, surface, provinces?.index);
+  /** The painted tracks to the shore of each crossing, as road state indices. */
+  const trackIndices = new Map<string, number[]>();
+  if (painted) {
+    painted.plan.tracks.forEach(({ a, b }, j) => {
+      const key = pairKey(a, b);
+      const list = trackIndices.get(key) ?? [];
+      list.push(painted.ground.firstExtra + j);
+      trackIndices.set(key, list);
+    });
+  }
   const strip: CrossingStrip = {
     positions: [],
     tangents: [],
@@ -197,16 +216,25 @@ export function buildCueLayer(
     seas: [],
   };
   const stripIndex: number[] = [];
-  /** Add one crossing: the track to the shore, the sea, the far track. */
+  /**
+   * Add one crossing: the track to the shore, the sea, the far track. The
+   * tracks are left to the ground layer where it paints them as roads.
+   */
   const addCrossing = (a: string, b: string) => {
     const from = anchorOf(a);
     const to = anchorOf(b);
-    const route = coast && seaRoute(from, to, coast.isLand, coast.step);
+    const planned = plan.crossings.get(pairKey(a, b));
+    // A link planned as a border whose provinces turn out not to touch is
+    // not in the plan, and has its route worked out here.
+    const route = planned
+      ? planned.route
+      : coast && seaRoute(from, to, coast.isLand, coast.step);
+    const tracksPainted = trackIndices.has(pairKey(a, b));
     const stretches: [MapPoint[], boolean][] = route
       ? [
-          [route.jettyA, false],
+          [tracksPainted ? [] : route.jettyA, false],
           [route.sea, true],
-          [route.jettyB, false],
+          [tracksPainted ? [] : route.jettyB, false],
         ]
       : // No coast to find, so the whole line between the two is the crossing.
         [[[from, to], true]];
@@ -305,7 +333,7 @@ export function buildCueLayer(
     geo.setAttribute("aColor", crossingColors);
     geo.setAttribute("aStyle", crossingStyles);
     geo.setIndex(stripIndex);
-    const mat = crossingMaterial(CROSSING_WIDTH);
+    const mat = crossingMaterial(CROSSING_WIDTH, PLAIN_COLOR);
     disposables.push(geo, mat);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = "map-crossings";
@@ -377,11 +405,17 @@ export function buildCueLayer(
         // The lift and fade a road takes while a location is hovered.
         opacity = Math.min(1, opacity * laneDim(line.a, line.b));
       }
+      // A plain crossing out of the selection takes edge lines, as a plain
+      // road does.
+      const pattern =
+        tone === "plain" && link?.emphasised
+          ? "edges"
+          : CROSSING_PATTERN_OF[link?.hidden ? "plain" : tone];
       paint(
         line,
         scratch,
         opacity,
-        CROSSING_PATTERN_OF[link?.hidden ? "plain" : tone],
+        pattern,
         link?.emphasised ? CROSSING_EMPHASIS : 1,
       );
     }
@@ -408,66 +442,35 @@ export function buildCueLayer(
       else provinces?.setProvinceState(id, state);
     }
     for (const link of cues.links) {
-      if (link.kind !== "road") continue;
       const attackable = link.tone === "contested" || link.tone === "choice";
       const travelled = link.tone === "taken";
       const { emphasised, hidden } = link;
-      cities.setRoadState(
-        link.a,
-        link.b,
+      const state =
         attackable || travelled || emphasised || hidden
           ? { attackable, travelled, emphasised, hidden }
-          : undefined,
+          : undefined;
+      if (link.kind === "road") {
+        cities.setRoadState(link.a, link.b, state);
+        continue;
+      }
+      // A crossing's tracks to the shore are painted as roads, and take the
+      // state a road between the same two places would.
+      const tracks = trackIndices.get(pairKey(link.a, link.b));
+      if (!painted || !tracks) continue;
+      const style = roadStyle(
+        state,
+        hidden ? 2 : 0,
+        link.tone === "owned" ? ownerColor(link.owner) : undefined,
+        laneDim(link.a, link.b),
       );
+      for (const k of tracks) painted.ground.setRoadStyle(k, style);
     }
+    painted?.ground.commit();
     cities.apply();
     provinces?.apply();
   };
 
   return { lines, apply };
-}
-
-/** How a crossing finds the coast its landing points are on. */
-interface Coast {
-  isLand: (x: number, y: number) => boolean;
-  /** Distance between samples, in map units. */
-  step: number;
-}
-
-/**
- * Where the land is on this map, or `undefined` when nothing says.
- *
- * A generated map's heightmap puts the sea at 0 and the lowest land at 1 in
- * 255, so land is anything above half that, read at the terrain mesh's own
- * spacing. A hand-made map's picture may put its sea at any height, so its
- * land is its provinces, looked for in steps of the distance the province
- * layer treats as touching. A hand-made map of cities alone has neither, and
- * its crossings draw straight from one city to the other.
- */
-function coastOf(
-  galaxy: Pick<GalaxyDoc, "terrain" | "handmade">,
-  surface: TerrainSurface,
-  index: ProvinceIndex | undefined,
-): Coast | undefined {
-  const generated =
-    !galaxy.handmade && !!galaxy.terrain?.heightmap?.startsWith("generated:");
-  if (generated && surface.maxHeight > 0) {
-    const shore = (0.5 * surface.heightScale * surface.scale) / 255;
-    return {
-      isLand: (x, y) => surface.groundHeightAt(x, y) > shore,
-      step: Math.min(
-        surface.width / surface.segmentsX,
-        surface.height / surface.segmentsY,
-      ),
-    };
-  }
-  if (index && index.nodes.length > 0) {
-    return {
-      isLand: (x, y) => index.at(x, y) >= 0,
-      step: Math.max(surface.width, surface.height) * BORDER_TOLERANCE_FRACTION,
-    };
-  }
-  return undefined;
 }
 
 /** Length of a line of world points across the ground. */

@@ -2,25 +2,28 @@ import * as THREE from "three";
 import type { WorldPos } from "./layout";
 
 /**
- * The line a sea crossing draws as: a fine chart line laid on the water,
- * drawn in screen space so it keeps a minimum width at any zoom. Its pattern
- * says what state the crossing is in, so no state is told by colour alone.
+ * The line a sea crossing draws as: a dotted shipping lane laid on the water,
+ * drawn in screen space so it keeps a minimum width at any zoom. Its state is
+ * drawn over the lane the way a painted road's is over its track (see
+ * `groundShader.ts`), so a route reads the same on land and sea, and no state
+ * is told by colour alone.
  *
- * - `dots`: a plain crossing, a dotted shipping lane
- * - `beads`: owned by one side, dots strung on a fine line
- * - `dashes`: contested, the galaxy's dashed lane
- * - `chevrons`: a Warpath choice, arrowheads pointing the way the step goes
- * - `ticks`: a Warpath step already taken, a line crossed by tick marks
+ * - `dots`: a plain crossing, the lane alone
+ * - `edges`: owned by one side, thin edge lines in its colour
+ * - `glow`: can be attacked along, a glow round the lane
+ * - `chevrons`: an open Warpath step, the glow with the lane drawn as
+ *   arrowheads pointing the way the step goes
+ * - `filled`: a Warpath step already taken, the lane filled in, with edges
  *
- * Over land, from a location to its landing point, every state draws as a
- * fine solid line, a short track down to the shore.
+ * Where no road is painted from a location to its landing point, that stretch
+ * draws here as a fine solid line.
  */
 export const CROSSING_PATTERN = {
   dots: 0,
-  beads: 1,
-  dashes: 2,
+  edges: 1,
+  glow: 2,
   chevrons: 3,
-  ticks: 4,
+  filled: 4,
 } as const;
 
 export type CrossingPattern = keyof typeof CROSSING_PATTERN;
@@ -128,49 +131,69 @@ void main() {
 `;
 
 const fragmentShader = /* glsl */ `
+uniform vec3 uLane;
 varying vec4 vColor;
 varying vec2 vLine;
 varying float vSea;
 varying float vPattern;
 
-float dots(float x, float y, float period, float radius) {
-  return length(vec2(mod(x, period) - period * 0.5, y)) - radius;
+// Coverage of a shape from its signed distance, softened over one pixel.
+float cover(float d, float aa) {
+  return 1.0 - smoothstep(-aa, aa, d);
 }
 
 void main() {
+  // Along and across in line widths. The strip is one width across, so
+  // |y| runs from 0 on the centre line to 0.5 at the strip's edge.
   float x = vLine.x;
-  float y = vLine.y;
-  float d;
+  float y = abs(vLine.y);
+  float aa = max(length(vec2(fwidth(x), fwidth(vLine.y))) * 0.7, 1e-4);
+  float lane;
+  float over = 0.0;
   if (vSea < 0.5) {
-    d = abs(y) - 0.16;
-  } else if (vPattern < 0.5) {
-    d = dots(x, y, 2.6, 0.4);
-  } else if (vPattern < 1.5) {
-    d = min(abs(y) - 0.12, dots(x, y, 3.0, 0.42));
-  } else if (vPattern < 2.5) {
-    vec2 q = vec2(abs(mod(x, 3.4) - 1.7) - 1.0, abs(y) - 0.32);
-    d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - 0.1;
-  } else if (vPattern < 3.5) {
-    float lx = mod(x, 2.2) - 1.1;
-    d = max(abs(lx + abs(y) * 1.3 - 0.35) * 0.61 - 0.17, abs(y) - 0.46);
+    // A stretch over land with no painted road: a fine line in the state's
+    // colour, or the lane's when it has none.
+    lane = cover(y - 0.05, aa);
+    over = vPattern > 0.5 ? lane : 0.0;
   } else {
-    float tick = max(abs(mod(x, 1.8) - 0.9) - 0.13, abs(y) - 0.46);
-    d = min(abs(y) - 0.15, tick);
+    if (vPattern > 2.5 && vPattern < 3.5) {
+      // Arrowheads pointing along the line.
+      float lx = mod(x, 1.1) - 0.55;
+      lane = cover(max(abs(lx + y * 1.3 - 0.18) * 0.61 - 0.06, y - 0.22), aa);
+    } else {
+      lane = cover(length(vec2(mod(x, 0.9) - 0.45, y)) - 0.13, aa);
+    }
+    if (vPattern > 0.5) {
+      // Every state has the edge lines a painted road's state has.
+      over = cover(abs(y - 0.41) - 0.035, aa);
+      if (vPattern > 1.5 && vPattern < 3.5) {
+        // Round the lane and not over it, so the lane still shows.
+        float halo = (1.0 - smoothstep(0.18, 0.5, y)) * smoothstep(0.1, 0.18, y);
+        over = max(over, halo * 0.5);
+      } else if (vPattern > 3.5) {
+        over = max(over, cover(y - 0.19, aa) * 0.9);
+      }
+    }
   }
-  float aa = max(length(vec2(fwidth(x), fwidth(y))) * 0.7, 1e-4);
-  float alpha = vColor.a * (1.0 - smoothstep(-aa, aa, d));
-  if (alpha < 0.004) discard;
-  gl_FragColor = vec4(vColor.rgb, alpha);
+  // The state laid over the lane.
+  float alpha = over + lane * (1.0 - over);
+  if (alpha * vColor.a < 0.004) discard;
+  vec3 color = (vColor.rgb * over + uLane * lane * (1.0 - over)) / alpha;
+  gl_FragColor = vec4(color, alpha * vColor.a);
+  #include <colorspace_fragment>
 }
 `;
 
 /**
- * The material every crossing shares. `width` is the line's width in world
- * units and `minPixels` the least it draws at, in CSS pixels. The mesh that
- * uses it must call {@link updateCrossingMaterial} before each draw, which
- * `onBeforeRender` does.
+ * The material every crossing shares. `width` is the strip's width in world
+ * units, the lane and the state drawn round it, and `lane` the lane's colour.
+ * The mesh that uses it must call {@link updateCrossingMaterial} before each
+ * draw, which `onBeforeRender` does.
  */
-export function crossingMaterial(width: number): THREE.ShaderMaterial {
+export function crossingMaterial(
+  width: number,
+  lane: THREE.Color,
+): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader,
     fragmentShader,
@@ -178,6 +201,7 @@ export function crossingMaterial(width: number): THREE.ShaderMaterial {
       uResolution: { value: new THREE.Vector2(1, 1) },
       uWidth: { value: width },
       uMinPx: { value: 1 },
+      uLane: { value: lane },
     },
     transparent: true,
     depthWrite: false,
@@ -193,7 +217,10 @@ export function crossingMaterial(width: number): THREE.ShaderMaterial {
 
 const bufferSize = new THREE.Vector2();
 
-/** Tell the material the drawing buffer's size and pixel ratio. */
+/**
+ * Tell the material the drawing buffer's size and pixel ratio. `minPixels` is
+ * the least width the strip draws at, in CSS pixels.
+ */
 export function updateCrossingMaterial(
   material: THREE.ShaderMaterial,
   renderer: THREE.WebGLRenderer,

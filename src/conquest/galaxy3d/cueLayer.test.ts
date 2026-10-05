@@ -4,7 +4,10 @@ import { describe, expect, it } from "vitest";
 import type { GalaxyDoc, GalaxyNode } from "../model";
 import { buildCityLayer, type MapItemState } from "./cityLayer";
 import { CROSSING_PATTERN } from "./crossingLine";
+import { planCrossings } from "./crossingPlan";
 import { buildCueLayer, type CueLine, type CueSource } from "./cueLayer";
+import type { RoadStyle } from "./groundLayer";
+import { ROAD_MODE } from "./groundShader";
 import { buildProvinceLayer } from "./provinceLayer";
 import type { Ring } from "./provinces";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
@@ -65,7 +68,16 @@ const ridge: HeightGrid = {
   height: 3,
 };
 
-function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
+/**
+ * Build the layers. With `paintTracks`, the crossings are planned up front
+ * and their tracks to the shore go to a stand-in ground layer, whose styles
+ * are recorded in `trackStyles` by state index from {@link FIRST_TRACK}.
+ */
+function build(
+  doc: GalaxyDoc = galaxy,
+  heights?: HeightGrid,
+  paintTracks = false,
+) {
   const scene = new THREE.Scene();
   const surface = createTerrainSurface(
     { width: 100, height: 100, heightScale: 10 },
@@ -113,6 +125,8 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
     attackable: new Set(["east", "isle", "fort"]),
   };
   const dim = { lane: 1 };
+  const plan = paintTracks ? planCrossings(doc, surface) : undefined;
+  const trackStyles = new Map<number, RoadStyle>();
   const layer = buildCueLayer(
     scene,
     [],
@@ -139,6 +153,14 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
       },
     },
     () => input,
+    plan && {
+      plan,
+      ground: {
+        firstExtra: FIRST_TRACK,
+        setRoadStyle: (k, style) => trackStyles.set(k, { ...style }),
+        commit: () => {},
+      },
+    },
   );
   layer.apply();
   const mesh = scene.getObjectByName("map-cues") as THREE.Mesh | undefined;
@@ -206,12 +228,16 @@ function build(doc: GalaxyDoc = galaxy, heights?: HeightGrid) {
     pointsOf,
     seaPointsOf,
     styleOf,
+    plan,
+    trackStyles,
     locationStates,
     roadStates,
   };
 }
 
 const GOLD = 0xffcf8a;
+/** Where the stand-in ground layer's tracks start in its road states. */
+const FIRST_TRACK = 100;
 const GREEN = 0x46e08a;
 
 describe("buildCueLayer lines", () => {
@@ -385,11 +411,11 @@ describe("buildCueLayer on a conquest", () => {
     expect(paintOf(line("frontier", "wall", "east"))[1]).toBe(0);
   });
 
-  it("draws a contested crossing in gold dashes", () => {
+  it("draws a contested crossing with a gold glow", () => {
     const { line, paintOf, styleOf } = build();
     expect(paintOf(line("crossing", "west", "isle"))).toEqual([GOLD, 1]);
     expect(styleOf(line("crossing", "west", "isle"))).toEqual([
-      CROSSING_PATTERN.dashes,
+      CROSSING_PATTERN.glow,
       1,
     ]);
   });
@@ -399,7 +425,7 @@ describe("buildCueLayer on a conquest", () => {
     const pattern = () => styleOf(line("crossing", "west", "isle"))[0];
     input.owners.isle = "red";
     layer.apply();
-    expect(pattern()).toBe(CROSSING_PATTERN.beads);
+    expect(pattern()).toBe(CROSSING_PATTERN.edges);
     input.owners.west = "blue";
     input.owners.isle = "green";
     layer.apply();
@@ -628,7 +654,7 @@ describe("buildCueLayer on a Warpath run", () => {
     expect(paintOf(line("frontier", "wall", "east"))[1]).toBe(0);
   });
 
-  it("draws a crossing already taken as ticks and an open one as chevrons", () => {
+  it("fills a crossing already taken and points an open one with chevrons", () => {
     const built = run();
     const crossing = () => built.line("crossing", "west", "isle");
     // The player stands on west, so the crossing to isle is open.
@@ -640,7 +666,7 @@ describe("buildCueLayer on a Warpath run", () => {
     built.input.run = { pathLinks: new Set(["west isle"]) };
     built.layer.apply();
     expect(built.paintOf(crossing())[0]).toBe(GREEN);
-    expect(built.styleOf(crossing())[0]).toBe(CROSSING_PATTERN.ticks);
+    expect(built.styleOf(crossing())[0]).toBe(CROSSING_PATTERN.filled);
   });
 
   it("marks the provinces the open choices lead to", () => {
@@ -657,5 +683,47 @@ describe("buildCueLayer on a Warpath run", () => {
       travelled: true,
       attackable: false,
     });
+  });
+});
+
+describe("buildCueLayer with the tracks to the shore painted as roads", () => {
+  it("leaves the tracks to the ground layer and draws only the sea", () => {
+    const { plan, line, pointsOf, seaPointsOf } = build(
+      galaxy,
+      undefined,
+      true,
+    );
+    const crossing = line("crossing", "west", "isle");
+    expect(plan?.tracks.map((t) => `${t.a} ${t.b}`)).toEqual([
+      "west isle",
+      "west isle",
+    ]);
+    expect(seaPointsOf(crossing)).toHaveLength(pointsOf(crossing).length);
+  });
+
+  it("styles a contested crossing's tracks as a road that can be attacked along", () => {
+    const { trackStyles } = build(galaxy, undefined, true);
+    expect([...trackStyles.keys()]).toEqual([FIRST_TRACK, FIRST_TRACK + 1]);
+    for (const style of trackStyles.values()) {
+      expect(style.mode).toBe(ROAD_MODE.glow);
+      expect(style.color.getHex()).toBe(GOLD);
+      expect(style.shown).toBe(true);
+    }
+  });
+
+  it("styles an owned crossing's tracks with its owner's edge lines", () => {
+    const built = build(galaxy, undefined, true);
+    built.input.owners.isle = "red";
+    built.layer.apply();
+    const style = built.trackStyles.get(FIRST_TRACK);
+    expect(style?.mode).toBe(ROAD_MODE.edges);
+    expect(style?.color.getHex()).toBe(0xff0000);
+  });
+
+  it("hides the tracks of a crossing whose two ends are hidden", () => {
+    const built = build(galaxy, undefined, true);
+    built.input.visible = new Set(["mid"]);
+    built.layer.apply();
+    expect(built.trackStyles.get(FIRST_TRACK)?.shown).toBe(false);
   });
 });
