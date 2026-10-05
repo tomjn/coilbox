@@ -97,6 +97,10 @@ import {
   removeHandmadeMap,
 } from "../handmade/library";
 import {
+  gamesHidingGeneratedStyles,
+  profileOnlyOwnMaps,
+} from "../handmade/ownMapsOnly";
+import {
   refreshHandmadeMaps,
   useHandmadeMap,
   useHandmadeMaps,
@@ -1132,8 +1136,8 @@ function GenerateGalaxyForm({
   // entry (issue #3465). The entry's full name is saved on the galaxy.
   // A game that asks for its own maps only is not offered here, since every
   // map this form makes is a generated one (issue #3511).
-  const { onlyOwnMaps } = useHandmadeMaps();
-  const { gameChoices, ownMapsOnly } = useMemo(() => {
+  const handmade = useHandmadeMaps();
+  const { gameChoices, ownMapsOnly, onlyOwnMaps } = useMemo(() => {
     const matcher = getGameMatcher();
     // Never coilbox's own generated games: a campaign fought in the unit
     // builder's scratch game is not a campaign.
@@ -1156,11 +1160,19 @@ function GenerateGalaxyForm({
     const newest = [...byShort.values()].sort((a, b) =>
       a.name.localeCompare(b.name),
     );
+    // The archive flag and the profile switch are one decision, made over
+    // every installed game so a game picked by name is covered too.
+    const onlyOwnMaps = gamesHidingGeneratedStyles(
+      games.filter((g) => !matcher || matcher(g.name)),
+      handmade,
+      profileOnlyOwnMaps(),
+    );
     return {
       gameChoices: newest.filter((g) => !onlyOwnMaps.includes(g.name)),
       ownMapsOnly: newest.filter((g) => onlyOwnMaps.includes(g.name)),
+      onlyOwnMaps,
     };
-  }, [scan.data, onlyOwnMaps]);
+  }, [scan.data, handmade]);
 
   const [gameShort, setGameShort] = useState("");
   // Default to the preselected game (if it matches one on offer), else the

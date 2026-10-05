@@ -25,6 +25,7 @@ import {
 import { HIDEABLE_NAV_IDS } from "./hidden";
 import { describeJsonError } from "./jsonError";
 import { linkIconNames } from "./links";
+import { resolveOnlyOwnMaps } from "./onlyOwnMaps";
 import {
   getProfile,
   getProfileError,
@@ -211,6 +212,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         validIconNames: linkIconNames(),
         home: homeHealth(profile.home),
         start: resolveStart(profile.start, campaigns, scenarios),
+        onlyOwnMaps: resolveOnlyOwnMaps(profile.onlyOwnMaps),
       };
       setChecks(deriveHealthChecks(inputs));
       setLoading(false);

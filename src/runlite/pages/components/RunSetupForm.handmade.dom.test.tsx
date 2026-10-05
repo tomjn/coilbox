@@ -15,6 +15,7 @@ import { emptyMeta } from "../../model";
 const hoisted = vi.hoisted(() => ({
   maps: [] as unknown[],
   onlyOwnMaps: [] as string[],
+  profile: {} as Record<string, unknown>,
   listError: null as string | null,
   loadMap: vi.fn(),
   generateMapRun: vi.fn(),
@@ -71,7 +72,7 @@ vi.mock("../../../content/mapEligibility", () => ({
 }));
 vi.mock("../../../profile/profile", () => ({
   getGameMatcher: () => null,
-  getProfile: () => ({}),
+  getProfile: () => hoisted.profile,
 }));
 vi.mock("@/factions/logos", () => ({ useFactionLogos: () => ({}) }));
 vi.mock("../../../play/pages/components/GameSelectCard", () => ({
@@ -161,6 +162,7 @@ beforeEach(() => {
   localStorage.clear();
   hoisted.maps = [];
   hoisted.onlyOwnMaps = [];
+  hoisted.profile = {};
   hoisted.listError = null;
   hoisted.saveRun.mockResolvedValue(undefined);
   hoisted.generateRun.mockReturnValue({ kind: "column run" });
@@ -276,6 +278,44 @@ describe("RunSetupForm and hand-made maps", () => {
     hoisted.onlyOwnMaps = ["Test Game 1"];
     show();
     expect(styles()).toEqual(GENERATED_STYLES);
+  });
+
+  it("offers only hand-made maps when the profile asks for that", () => {
+    hoisted.maps = [map({ source: "bundled" })];
+    hoisted.profile = { onlyOwnMaps: true };
+    show();
+    expect(styles()).toEqual(["Two Shores (hand-made map)"]);
+  });
+
+  it("keeps the styles for a game with no map with markings, whatever the profile says", () => {
+    hoisted.maps = [map({ source: "bundled", warpath: false })];
+    hoisted.profile = { onlyOwnMaps: true };
+    show();
+    expect(styles()).toEqual(GENERATED_STYLES);
+  });
+
+  it("keeps the styles for a game the maps were not made for", () => {
+    hoisted.maps = [map({ source: "bundled" })];
+    hoisted.profile = { onlyOwnMaps: true };
+    show();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Pick Zero-K v1.14.10.1" }),
+    );
+    expect(styles()).toEqual(GENERATED_STYLES);
+  });
+
+  it("changes nothing when the profile key is absent, false or not a boolean", () => {
+    hoisted.maps = [map({ source: "bundled" })];
+    for (const profile of [
+      {},
+      { onlyOwnMaps: false },
+      { onlyOwnMaps: "yes" },
+    ]) {
+      hoisted.profile = profile;
+      show();
+      expect(styles()).toContain("Galaxy (starfield)");
+      cleanup();
+    }
   });
 
   it("begins a run on the game's own map with nothing picked", async () => {
