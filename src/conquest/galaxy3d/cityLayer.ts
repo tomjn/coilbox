@@ -278,9 +278,9 @@ function badgeGeometry(sides: number): THREE.BufferGeometry {
   });
   part(() => {
     // Four corner brackets round the badge, as round a target.
-    const at = 1.45;
-    const len = 0.5;
-    const w = 0.14;
+    const at = 1.5;
+    const len = 0.62;
+    const w = 0.22;
     for (const [sx, sy] of [
       [1, 1],
       [-1, 1],

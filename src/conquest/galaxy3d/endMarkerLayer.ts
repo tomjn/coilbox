@@ -147,6 +147,15 @@ export function buildEndMarkerLayer(
     // The location under the marker is what the pointer picks.
     pole.raycast = () => {};
     head.raycast = () => {};
+    // The marker turns to face the camera as a city's badge does, so its pole
+    // runs up the screen and the head flies clear above the badge even when
+    // the map is seen from straight above.
+    const face: THREE.Object3D["onBeforeRender"] = (_r, _s, camera) => {
+      group.quaternion.copy(camera.quaternion);
+      group.updateMatrixWorld(true);
+    };
+    pole.onBeforeRender = face;
+    head.onBeforeRender = face;
     group.add(pole, head);
     groups.push(group);
     byId.set(marker.id, group);
