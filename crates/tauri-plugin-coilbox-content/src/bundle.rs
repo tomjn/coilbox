@@ -366,6 +366,23 @@ pub(crate) fn engine_dest(dest_root: &Path, platform: Option<&str>, version: &st
     }
 }
 
+/// A size the way the frontend's `formatBytes` writes it, such as `142 MB`,
+/// because the free space error is shown to the player as it stands.
+fn human_bytes(n: u64) -> String {
+    if n < 1024 {
+        return format!("{n} B");
+    }
+    let units = ["KB", "MB", "GB", "TB"];
+    let mut v = n as f64 / 1024.0;
+    let mut i = 0;
+    while v >= 1024.0 && i < units.len() - 1 {
+        v /= 1024.0;
+        i += 1;
+    }
+    let digits = if v < 10.0 { 1 } else { 0 };
+    format!("{v:.digits$} {}", units[i])
+}
+
 #[derive(Debug, PartialEq)]
 pub(crate) enum Installed {
     Copied { dest: PathBuf, bytes: u64 },
@@ -498,8 +515,10 @@ pub(crate) fn install_engine(
     })?;
     if free < total {
         return Err(format!(
-            "The engine needs {total} bytes and the drive holding {} has {free} free.",
-            dest_root.display()
+            "Setting up the engine needs {} of free space, and the drive holding {} has {} free.",
+            human_bytes(total),
+            dest_root.display(),
+            human_bytes(free)
         ));
     }
 
@@ -971,12 +990,13 @@ mod tests {
             &dest_root,
             None,
             "105.1",
-            |_| Ok(8021),
+            |_| Ok(4000),
             &AtomicBool::new(false),
             |_, _| {},
         )
         .unwrap_err();
-        assert!(err.contains("8022") && err.contains("8021"), "{err}");
+        // The fake engine is 8022 bytes. Both sizes are written for a player.
+        assert!(err.contains("7.8 KB") && err.contains("3.9 KB"), "{err}");
         assert_eq!(fs::read_dir(&dest_root).unwrap().count(), 0);
     }
 
@@ -1137,5 +1157,14 @@ mod tests {
             v,
             json!({ "phase": "copying", "downloadedBytes": 50, "totalBytes": 200, "percent": 25.0, "bytesPerSec": null })
         );
+    }
+
+    #[test]
+    fn sizes_read_as_the_frontend_writes_them() {
+        assert_eq!(human_bytes(512), "512 B");
+        assert_eq!(human_bytes(8022), "7.8 KB");
+        // The engine measured on a Mac for issue #3668.
+        assert_eq!(human_bytes(149_066_152), "142 MB");
+        assert_eq!(human_bytes(5 * 1024 * 1024 * 1024), "5.0 GB");
     }
 }
