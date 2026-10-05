@@ -1,3 +1,5 @@
+import type { BundleReport } from "../content/bindings";
+import { bundleProblemText } from "../content/bundle";
 import type { OnlyOwnMapsResolution } from "./onlyOwnMaps";
 import type { GameFilter, ProfileSource } from "./profile";
 import { canonicalProfileId } from "./renamedIds";
@@ -109,6 +111,17 @@ export interface HealthInputs {
   start: StartResolution;
   /** What the profile's `onlyOwnMaps` key resolved to. */
   onlyOwnMaps: OnlyOwnMapsResolution;
+  /**
+   * The distribution's bundled content folder, `.coilbox/content` (issue
+   * #3668), or null when there is none or it could not be read.
+   */
+  bundle: BundleReport | null;
+  /**
+   * The game and map the `start` key leads to that a unitsync scan did not
+   * find, by name. Empty when both are there. Null when nothing has been
+   * checked: no `start`, nothing it leads to, or no scan yet.
+   */
+  startMissing: string[] | null;
 }
 
 /** Strip the trailing `.coilbox` segment to get the app dir the package sits in. */
@@ -336,6 +349,89 @@ export function checkOnlyOwnMaps(
     status: "warn",
     label: "`onlyOwnMaps` is not true or false",
     hint: `The generated map styles stay on: ${onlyOwnMaps.issue}.`,
+  };
+}
+
+/**
+ * Report the distribution's bundled content folder (issue #3668).
+ *
+ * Every mistake here fails quietly for the player. A map in the wrong folder is
+ * simply not there, and an engine for another platform means a download the
+ * distribution meant to spare them. So this row is the only place the author
+ * sees it. `null` when there is no bundle, in the shape of {@link checkHideIds},
+ * so a distribution without one sees no new row.
+ */
+export function checkBundle(bundle: BundleReport | null): HealthCheck | null {
+  if (!bundle) return null;
+  const forHere = bundle.engines.filter((e) => e.forThisPlatform);
+  const engineText =
+    forHere.length > 0
+      ? `engine ${forHere.map((e) => e.version).join(", ")}`
+      : "no engine for this platform";
+  const summary = `${bundle.games} game(s), ${bundle.maps} map(s), ${engineText}`;
+  const lines = bundle.problems.map(bundleProblemText);
+  // No engine at all is not a mistake the Rust side reports, because a bundle
+  // may carry only games and maps on purpose. It still costs the player a
+  // download, so the author is told.
+  if (bundle.engines.length === 0 && bundle.problems.length === 0) {
+    lines.push(
+      "There is no engine in engine/, so players download one on first run. Copy engine/<platform>/<version>/ from a working install to bundle it.",
+    );
+  }
+  if (lines.length === 0) {
+    return {
+      id: "bundle",
+      status: "ok",
+      label: `Bundled content: ${summary}`,
+      hint: `Read in place from ${bundle.path}. Only the engine is copied, once, into the download folder.`,
+    };
+  }
+  return {
+    id: "bundle",
+    status: "warn",
+    label: `${lines.length} problem(s) in the bundled content`,
+    hint: `${bundle.path} has ${summary}. Each line below is one thing to fix.`,
+    detail: lines.join("\n"),
+  };
+}
+
+/**
+ * Report whether the game and map the `start` key leads to are installed, when
+ * the distribution bundles its content (issue #3668).
+ *
+ * The scan reads the bundle and the player's own folders together, so a name
+ * it does not find is one the bundle does not carry and this machine does not
+ * have. A player would be sent to download it on their first click. `null`
+ * without a bundle or a `start` that leads somewhere, where the `start` row
+ * already says what there is to say.
+ */
+export function checkBundleStart(
+  bundle: BundleReport | null,
+  start: StartResolution,
+  missing: string[] | null,
+): HealthCheck | null {
+  if (!bundle) return null;
+  if (start.status !== "ok" && start.status !== "scenario") return null;
+  if (missing === null) {
+    return {
+      id: "bundleStart",
+      status: "unknown",
+      label: "Start game and map not checked against the bundle",
+      hint: "Nothing has scanned the content folders yet. Let the scan finish, then re-run this.",
+    };
+  }
+  if (missing.length === 0) {
+    return {
+      id: "bundleStart",
+      status: "ok",
+      label: "The start's game and map are installed",
+    };
+  }
+  return {
+    id: "bundleStart",
+    status: "warn",
+    label: "`start` needs content the bundle does not carry",
+    hint: `A new player is asked to download ${missing.join(" and ")} before the first lesson. Copy it into .coilbox/content/games/ or .coilbox/content/maps/.`,
   };
 }
 
@@ -619,6 +715,8 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
     checkHome(i.home),
     checkStart(i.start),
     checkOnlyOwnMaps(i.onlyOwnMaps),
+    checkBundle(i.bundle),
+    checkBundleStart(i.bundle, i.start, i.startMissing),
   ]) {
     if (c) checks.push(c);
   }
