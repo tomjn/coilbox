@@ -31,7 +31,10 @@ export interface RoadStyle {
 
 export interface GroundLayer {
   shading: GroundShading;
-  /** The roads, in `roadLinks` order, then the extra tracks. */
+  /**
+   * The roads, in `roadLinks` order, then the extra tracks, each as the
+   * pieces it is painted in. A piece's `index` is its road's state.
+   */
   roads: RoadLine[];
   /** The state index of the first extra track. */
   firstExtra: number;
@@ -54,6 +57,11 @@ export function buildGroundLayer(
    * sea crossing's track from a location down to its landing point.
    */
   extra: readonly Omit<RoadLine, "index">[] = [],
+  /**
+   * Reshape the roads and tracks before they are painted, keeping each one's
+   * index, as `townsOnRoads` cuts them where they reach a town.
+   */
+  shape?: (roads: RoadLine[]) => RoadLine[],
 ): GroundLayer {
   const linkRoads = planRoads(
     galaxy,
@@ -63,7 +71,7 @@ export function buildGroundLayer(
     heights,
   );
   const firstExtra = linkRoads.length;
-  const roads = [
+  const planned = [
     ...linkRoads,
     ...extra.map((t, j) => ({
       line: t.line,
@@ -71,6 +79,7 @@ export function buildGroundLayer(
       index: firstExtra + j,
     })),
   ];
+  const roads = shape ? shape(planned) : planned;
   const mask = buildRoadMask(
     roads,
     surface.width,
@@ -103,7 +112,8 @@ export function buildGroundLayer(
   roadMask.minFilter = THREE.NearestFilter;
   roadMask.needsUpdate = true;
 
-  const columns = Math.max(1, roads.length);
+  // One state per planned road, whatever pieces it was cut into.
+  const columns = Math.max(1, planned.length);
   const state = new Uint8Array(columns * ROAD_STATE_ROWS * 4);
   // Every road starts drawn and plain.
   for (let k = 0; k < columns; k++) state[(columns + k) * 4] = 255;
@@ -136,7 +146,7 @@ export function buildGroundLayer(
       ),
     },
     setRoadStyle: (k, style) => {
-      if (k < 0 || k >= roads.length) return;
+      if (k < 0 || k >= planned.length) return;
       const top = k * 4;
       scratch.copy(style.color).convertLinearToSRGB();
       state[top] = byte(scratch.r);

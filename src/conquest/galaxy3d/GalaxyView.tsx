@@ -39,6 +39,8 @@ import {
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
 import { buildTerrainMesh } from "./terrainMesh";
+import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
+import type { Town } from "./towns";
 import { createVisibility } from "./visibility";
 
 /**
@@ -571,19 +573,43 @@ export function GalaxyView({
 
     // Roads painted into a terrain map's ground. See groundLayer.ts.
     let ground: GroundLayer | undefined;
+    // A town at every location. See townLayer.ts.
+    let towns: TownLayer | undefined;
     // Where each sea crossing runs. Its tracks to the shore are painted with
     // the roads. See crossingPlan.ts.
     const crossingPlan = surface ? planCrossings(galaxy, surface) : undefined;
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
+      // Towns on a generated map only. A hand-made map's picture is its
+      // author's and may show its own, and performance mode goes without.
+      // The towns are planned from the roads, and the roads then stop at
+      // each town's edge.
+      const planned: { towns?: Town[] } = {};
+      const terrain = surface;
       ground = buildGroundLayer(
         disposables,
         galaxy,
         surface,
         terrainHeights,
         crossingPlan?.tracks,
+        !performanceMode && terrainColor
+          ? (roads) => {
+              const shaped = townsOnRoads(galaxy, terrain, roads);
+              planned.towns = shaped.towns;
+              return shaped.roads;
+            }
+          : undefined,
       );
+      if (planned.towns) {
+        towns = buildTownLayer(
+          scene,
+          disposables,
+          surface,
+          ground,
+          planned.towns,
+        );
+      }
       buildTerrainMesh(
         scene,
         disposables,
@@ -745,7 +771,15 @@ export function GalaxyView({
             dimOf,
             labelObjects,
             cores,
-            ground,
+            {
+              setRoadStyle: ground.setRoadStyle,
+              setTownStyle: towns?.setTownStyle,
+              towns: towns?.towns,
+              commit: () => {
+                ground?.commit();
+                towns?.commit();
+              },
+            },
           )
         : undefined;
 
@@ -1370,7 +1404,6 @@ export function GalaxyView({
               dimOf(galaxy.nodes[vp.i].id);
           }
           selection.tick(now);
-          cities?.tick(now);
         }
         winBurst.tick(now);
 
@@ -1394,9 +1427,8 @@ export function GalaxyView({
           headingEase: snapBack,
           cameraMoved,
           burst: winBurst.isPlaying(),
-          selectionPulse:
-            (selectedIdx >= 0 && !!ownerRings[selectedIdx]) ||
-            !!cities?.has(selectedRef.current ?? ""),
+          // A selected city holds still, so it asks for no frames.
+          selectionPulse: selectedIdx >= 0 && !!ownerRings[selectedIdx],
           combatFlashes: visibility.isFlashing(),
           effects,
         });

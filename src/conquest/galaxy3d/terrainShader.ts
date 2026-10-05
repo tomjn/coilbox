@@ -81,7 +81,14 @@ uniform vec3 uTerrainFar;
 uniform float uTerrainGreyBeyond;
 varying vec2 vTerrainUv;
 varying vec3 vTerrainPos;
+TERRAIN_NOISE_HERE`;
 
+/**
+ * Hashes, noise and the helpers that fade a pattern out with distance, for
+ * any shader that draws on the ground: the terrain's own, and the towns'
+ * (`townShader.ts`).
+ */
+export const TERRAIN_NOISE = /* glsl */ `
 float tHash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -401,7 +408,7 @@ export function applyTerrainShader(
       "GROUND_BODY_HERE",
       shading.ground ? GROUND_BODY : "",
     ).replace("GROUND_LIT_HERE", shading.ground ? GROUND_LIT : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD}${shading.ground ? GROUND_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
+    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${shading.ground ? GROUND_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;

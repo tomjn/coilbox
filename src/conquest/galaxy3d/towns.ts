@@ -1,0 +1,562 @@
+/**
+ * Towns painted into a terrain map's ground: where each one stands, how big
+ * it is and which way it runs, and the two small textures the terrain shader
+ * draws them from. The streets and roofs themselves are worked out in the
+ * shader (`groundShader.ts`), so nothing here is drawn at roof scale and the
+ * textures stay small. Display only, and worked out from the document alone,
+ * so the same map always draws the same towns. Pure, so it is tested without
+ * a scene.
+ */
+
+/** One town, in world units on the sheet. */
+export interface Town {
+  /** The node's index in `galaxy.nodes`. */
+  node: number;
+  x: number;
+  z: number;
+  /** How far the built-up area reaches from the anchor along its axis. */
+  radius: number;
+  capital: boolean;
+  /** 0 to 1, different for every town, so no two are drawn alike. */
+  seed: number;
+  /** The direction the town runs along, in radians from world +x to +z. */
+  axis: number;
+  /** How much longer the town is along its axis than across it, from 1. */
+  aspect: number;
+  /** The phases of the three waves that shape the town's edge. */
+  waves: [number, number, number];
+  /**
+   * The town's main streets, as directions from its anchor in radians from
+   * world +x to +z: where each road arrives, or a few of its own for a town
+   * with none. At most {@link MAX_STREETS}. Set by {@link withStreets}.
+   */
+  streets: number[];
+}
+
+/** The most main streets a town has. */
+export const MAX_STREETS = 8;
+
+/**
+ * How far the built-up area reaches in the world direction `angle`, in world
+ * units from the anchor: an ellipse along the town's axis, wobbled by three
+ * waves so no town is a regular shape. `townShader.ts` works out the same.
+ * Between 0.73 and 1.27 times the ellipse.
+ */
+export function townEdge(town: Town, angle: number): number {
+  const a = angle - town.axis;
+  const ellipse = 1 / Math.hypot(Math.cos(a), town.aspect * Math.sin(a));
+  const [p0, p1, p2] = town.waves;
+  return (
+    town.radius *
+    ellipse *
+    (1 +
+      0.14 * Math.sin(2 * angle + p0) +
+      0.08 * Math.sin(3 * angle + p1) +
+      0.05 * Math.sin(5 * angle + p2))
+  );
+}
+
+/**
+ * Where a road stops as it reaches a town, as a share of the town's edge:
+ * just inside it, among the first houses, where the town's own main street
+ * takes over.
+ */
+export const ROAD_CLIP = 0.92;
+
+/** The longest step along a road the clip checks, in world units. */
+const CLIP_STEP = 0.25;
+
+/** A point in map units. */
+type MapPoint = [number, number];
+
+/**
+ * Cut every line where it enters a town, so a road stops at the town's edge
+ * and runs on only as the town's own street. `lines` are in map units and
+ * `toWorld` turns a map point into world x and z, which is where the towns
+ * are. Returns each line's pieces outside every town, which may be none, and
+ * for each town the directions roads arrive from, as world angles from its
+ * anchor to where each road was cut.
+ */
+export function clipRoads(
+  lines: MapPoint[][],
+  towns: Town[],
+  toWorld: (x: number, y: number) => [number, number],
+): { pieces: MapPoint[][][]; arrivals: number[][] } {
+  const arrivals: number[][] = towns.map(() => []);
+  const reach = towns.map((t) => t.radius * 1.3);
+  /** The town a map point lies inside, or -1. */
+  const inside = (p: MapPoint): number => {
+    const [x, z] = toWorld(p[0], p[1]);
+    for (let k = 0; k < towns.length; k++) {
+      const t = towns[k];
+      const dx = x - t.x;
+      const dz = z - t.z;
+      if (Math.abs(dx) > reach[k] || Math.abs(dz) > reach[k]) continue;
+      const d = Math.hypot(dx, dz);
+      if (d < townEdge(t, Math.atan2(dz, dx)) * ROAD_CLIP) return k;
+    }
+    return -1;
+  };
+  const lerp = (a: MapPoint, b: MapPoint, s: number): MapPoint => [
+    a[0] + (b[0] - a[0]) * s,
+    a[1] + (b[1] - a[1]) * s,
+  ];
+  /** The last point outside on the way from `out` to `inn`. */
+  const edge = (out: MapPoint, inn: MapPoint): MapPoint => {
+    let lo = 0;
+    let hi = 1;
+    for (let k = 0; k < 20; k++) {
+      const mid = (lo + hi) / 2;
+      if (inside(lerp(out, inn, mid)) < 0) lo = mid;
+      else hi = mid;
+    }
+    return lerp(out, inn, lo);
+  };
+  const arrive = (k: number, p: MapPoint) => {
+    const [x, z] = toWorld(p[0], p[1]);
+    arrivals[k].push(Math.atan2(z - towns[k].z, x - towns[k].x));
+  };
+  const pieces = lines.map((sparse) => {
+    // A long straight stretch could step over a town, so it is cut into
+    // steps no longer than CLIP_STEP first.
+    const line: MapPoint[] = [];
+    sparse.forEach((p, i) => {
+      if (i > 0) {
+        const q = sparse[i - 1];
+        const [ax, az] = toWorld(q[0], q[1]);
+        const [bx, bz] = toWorld(p[0], p[1]);
+        const steps = Math.ceil(Math.hypot(bx - ax, bz - az) / CLIP_STEP);
+        for (let s = 1; s < steps; s++) line.push(lerp(q, p, s / steps));
+      }
+      line.push(p);
+    });
+    const out: MapPoint[][] = [];
+    let run: MapPoint[] = [];
+    let was = line.length > 0 ? inside(line[0]) : -1;
+    if (line.length > 0 && was < 0) run.push(line[0]);
+    for (let i = 1; i < line.length; i++) {
+      const a = line[i - 1];
+      const b = line[i];
+      const now = inside(b);
+      if (was < 0 && now < 0) {
+        run.push(b);
+      } else if (was < 0) {
+        const c = edge(a, b);
+        run.push(c);
+        arrive(now, c);
+        if (run.length > 1) out.push(run);
+        run = [];
+      } else if (now < 0) {
+        const c = edge(b, a);
+        arrive(was, c);
+        run = [c, b];
+      }
+      was = now;
+    }
+    if (run.length > 1) out.push(run);
+    return out;
+  });
+  return { pieces, arrivals };
+}
+
+/**
+ * Give each town its main streets: one towards each direction a road
+ * arrives from, leaving out any within a few degrees of one already kept,
+ * and for a town no road reaches, two or three of its own along its axis.
+ */
+export function withStreets(towns: Town[], arrivals: number[][]): Town[] {
+  return towns.map((t, k) => {
+    const kept: number[] = [];
+    for (const a of arrivals[k] ?? []) {
+      const close = kept.some(
+        (b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 0.25,
+      );
+      if (!close && kept.length < MAX_STREETS) kept.push(a);
+    }
+    if (kept.length === 0) {
+      kept.push(t.axis, t.axis + Math.PI);
+      if (t.seed > 0.4) kept.push(t.axis + Math.PI / 2 + (t.seed - 0.7));
+    }
+    return { ...t, streets: kept };
+  });
+}
+
+/** What a town is planned from: one entry per node of the map. */
+export interface TownSite {
+  /** The anchor in world x and z. */
+  x: number;
+  z: number;
+  capital: boolean;
+  /**
+   * The directions roads leave the anchor in, radians from world +x to +z.
+   * Empty for a place with no roads.
+   */
+  roads: number[];
+}
+
+/**
+ * Design values, in world units. A town reaches {@link TOWN_RADIUS}, a
+ * capital {@link CAPITAL_RADIUS}, and each road into a place adds
+ * {@link RADIUS_PER_ROAD} up to four roads. None reaches further than a share
+ * of the way to its nearest neighbour, so two towns never run together.
+ */
+export const TOWN_RADIUS = 1.8;
+export const CAPITAL_RADIUS = 3;
+const RADIUS_PER_ROAD = 0.3;
+const NEIGHBOUR_SHARE = 0.3;
+const CAPITAL_NEIGHBOUR_SHARE = 0.38;
+/** The most a town is stretched along its roads. */
+const MAX_STRETCH = 0.35;
+
+/**
+ * How far past its radius a town's texture reaches, as a multiple of the
+ * radius: houses strung out along the roads, then the ring drawn round a
+ * selected town.
+ */
+export const TOWN_REACH = 1.85;
+
+/** Texels along the longer side of the town index. */
+export const TOWN_INDEX_TEXELS = 512;
+
+/** A 0 to 1 value from two integers, for seeding each town. */
+function unit(a: number, b: number): number {
+  let h = Math.imul(a ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul(b, 0xc2b2ae35);
+  h = Math.imul(h ^ (h >>> 13), 0x27d4eb2d);
+  h ^= h >>> 16;
+  return (h >>> 0) / 0x100000000;
+}
+
+/**
+ * The axis a set of road directions mostly runs along, and how strongly, 0
+ * when they spread evenly and 1 when they all lie on one line. A road out
+ * and a road back the opposite way count as one line, so a town on a
+ * through road runs along it.
+ */
+export function roadAxis(roads: number[]): { axis: number; strength: number } {
+  if (roads.length === 0) return { axis: 0, strength: 0 };
+  let c = 0;
+  let s = 0;
+  for (const a of roads) {
+    c += Math.cos(2 * a);
+    s += Math.sin(2 * a);
+  }
+  return {
+    axis: Math.atan2(s, c) / 2,
+    strength: Math.hypot(c, s) / roads.length,
+  };
+}
+
+/**
+ * The direction a road leaves its first point in, in radians from world +x
+ * to +z: towards the first point of `line` at least `reach` world units away,
+ * or its far end if none is. `toWorld` turns a map point into world x and z.
+ */
+export function leavingAngle(
+  line: [number, number][],
+  toWorld: (x: number, y: number) => [number, number],
+  reach: number,
+): number {
+  const [ox, oz] = toWorld(line[0][0], line[0][1]);
+  let dx = 0;
+  let dz = 0;
+  for (let k = 1; k < line.length; k++) {
+    const [x, z] = toWorld(line[k][0], line[k][1]);
+    dx = x - ox;
+    dz = z - oz;
+    if (Math.hypot(dx, dz) >= reach) break;
+  }
+  return Math.atan2(dz, dx);
+}
+
+/**
+ * For each anchor, the directions every line ending on it leaves in, as
+ * {@link leavingAngle} reads them. A road or a crossing's track ends exactly
+ * on its location's anchor, so an end matches an anchor only when the two
+ * are the same point. Anchors and lines are in map units.
+ */
+export function roadEntries(
+  anchors: [number, number][],
+  lines: [number, number][][],
+  toWorld: (x: number, y: number) => [number, number],
+  reach: number,
+): number[][] {
+  const at = new Map<string, number[]>();
+  anchors.forEach(([x, y], i) => {
+    const key = `${x} ${y}`;
+    at.set(key, [...(at.get(key) ?? []), i]);
+  });
+  const out: number[][] = anchors.map(() => []);
+  for (const line of lines) {
+    if (line.length < 2) continue;
+    for (const run of [line, [...line].reverse()]) {
+      for (const i of at.get(`${run[0][0]} ${run[0][1]}`) ?? []) {
+        out[i].push(leavingAngle(run, toWorld, reach));
+      }
+    }
+  }
+  return out;
+}
+
+/** One town per site, in the same order. `seed` is the map's scene seed. */
+export function planTowns(sites: TownSite[], seed: number): Town[] {
+  return sites.map((site, node) => {
+    let nearest = Number.POSITIVE_INFINITY;
+    sites.forEach((other, k) => {
+      if (k === node) return;
+      nearest = Math.min(
+        nearest,
+        Math.hypot(other.x - site.x, other.z - site.z),
+      );
+    });
+    const want =
+      (site.capital ? CAPITAL_RADIUS : TOWN_RADIUS) +
+      RADIUS_PER_ROAD * Math.min(4, site.roads.length);
+    const radius = Math.min(
+      want,
+      nearest * (site.capital ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE),
+    );
+    const own = unit(seed, node);
+    const { axis, strength } =
+      site.roads.length > 0
+        ? roadAxis(site.roads)
+        : { axis: own * Math.PI, strength: 0.3 };
+    return {
+      node,
+      x: site.x,
+      z: site.z,
+      radius,
+      capital: site.capital,
+      seed: own,
+      axis,
+      aspect: 1 + MAX_STRETCH * strength,
+      waves: [own * 61.7, own * 23.3, own * 47.9] as [number, number, number],
+      streets: [],
+    };
+  });
+}
+
+/**
+ * Which town each part of the sheet belongs to, at {@link TOWN_INDEX_TEXELS}
+ * along its longer side, as four bytes a texel. Red and green: the town's
+ * index plus one, high byte first, or 0 for open country. Blue: how fit the
+ * ground is to build on, 255 for flat dry land, {@link STEEP_FIT} of that
+ * for a steep slope, and 0 for sea, recorded only where some town reaches. The texel in column `i` and
+ * row `j` stands for world `x = (i + 0.5) / width * worldWidth -
+ * worldWidth / 2`, and the same down the sheet in z. A texel within
+ * {@link TOWN_REACH} radii of more than one town goes to the one it is
+ * nearest relative to its size.
+ */
+export interface TownIndex {
+  data: Uint8Array;
+  width: number;
+  height: number;
+}
+
+/**
+ * How fit the ground at world `x, z` is to build on, 0 to 1, from the ground
+ * height there in world units, `height`. Sea is anything below `seaLevel`.
+ * Ground is flat enough up to a slope of {@link FLAT_SLOPE} and too steep
+ * from {@link STEEP_SLOPE}, as rise over run, judged over `step` world units.
+ */
+export function buildableAt(
+  height: (x: number, z: number) => number,
+  seaLevel: number,
+  step: number,
+): (x: number, z: number) => number {
+  return (x, z) => {
+    const h = height(x, z);
+    if (h < seaLevel) return 0;
+    const gx = (height(x + step, z) - height(x - step, z)) / (2 * step);
+    const gz = (height(x, z + step) - height(x, z - step)) / (2 * step);
+    const slope = Math.hypot(gx, gz);
+    const t = Math.min(
+      1,
+      Math.max(0, (slope - FLAT_SLOPE) / (STEEP_SLOPE - FLAT_SLOPE)),
+    );
+    return 1 - (1 - STEEP_FIT) * t * t * (3 - 2 * t);
+  };
+}
+
+/** Design values: towns build on slopes up to 1 in 5 and thin out by 1 in 2.5. */
+export const FLAT_SLOPE = 0.2;
+export const STEEP_SLOPE = 0.4;
+/**
+ * How fit steep ground is, against flat. Not 0, so a place on a hillside
+ * keeps a village at its middle, which the town shader tells from the sea.
+ */
+export const STEEP_FIT = 0.25;
+
+export function buildTownIndex(
+  towns: Town[],
+  worldWidth: number,
+  worldDepth: number,
+  texels: number = TOWN_INDEX_TEXELS,
+  buildable: (x: number, z: number) => number = () => 1,
+): TownIndex {
+  const long = Math.max(worldWidth, worldDepth);
+  const width = Math.max(1, Math.round((texels * worldWidth) / long));
+  const height = Math.max(1, Math.round((texels * worldDepth) / long));
+  const tx = worldWidth / width;
+  const tz = worldDepth / height;
+  // A texel is read whole, so one whose centre lies just outside a town's
+  // reach still covers ground inside it.
+  const slack = Math.hypot(tx, tz) / 2;
+  const best = new Float32Array(width * height).fill(Number.POSITIVE_INFINITY);
+  const data = new Uint8Array(width * height * 4);
+  towns.forEach((town, k) => {
+    const reach = town.radius * TOWN_REACH;
+    const r = reach + slack;
+    const i0 = Math.max(0, Math.floor((town.x - r + worldWidth / 2) / tx));
+    const i1 = Math.min(
+      width - 1,
+      Math.ceil((town.x + r + worldWidth / 2) / tx),
+    );
+    const j0 = Math.max(0, Math.floor((town.z - r + worldDepth / 2) / tz));
+    const j1 = Math.min(
+      height - 1,
+      Math.ceil((town.z + r + worldDepth / 2) / tz),
+    );
+    const tag = k + 1;
+    for (let j = j0; j <= j1; j++) {
+      const dz = (j + 0.5) * tz - worldDepth / 2 - town.z;
+      for (let i = i0; i <= i1; i++) {
+        const dx = (i + 0.5) * tx - worldWidth / 2 - town.x;
+        const d = Math.hypot(dx, dz);
+        if (d > r) continue;
+        const share = d / reach;
+        const at = j * width + i;
+        if (share < best[at]) {
+          best[at] = share;
+          data[at * 4] = tag >> 8;
+          data[at * 4 + 1] = tag & 255;
+        }
+      }
+    }
+  });
+  for (let j = 0; j < height; j++) {
+    const z = (j + 0.5) * tz - worldDepth / 2;
+    for (let i = 0; i < width; i++) {
+      const at = j * width + i;
+      if (best[at] === Number.POSITIVE_INFINITY) continue;
+      const fit = buildable((i + 0.5) * tx - worldWidth / 2, z);
+      data[at * 4 + 2] = Math.round(Math.min(1, Math.max(0, fit)) * 255);
+    }
+  }
+  return { data, width, height };
+}
+
+/**
+ * The ground under every town as one draped mesh: the cells of the terrain
+ * mesh that the town's reach touches, split into triangles the same way the
+ * terrain is, so the patch lies exactly on it. `town` holds each vertex's
+ * town index, which the shader checks against the town index so a patch
+ * never draws over its neighbour's ground. Built from a {@link TerrainSurface}
+ * shaped argument so it is tested without a scene.
+ */
+export function townPatches(
+  towns: Town[],
+  surface: {
+    width: number;
+    height: number;
+    segmentsX: number;
+    segmentsY: number;
+    vertexHeights: Float32Array;
+    worldWidth: number;
+    worldDepth: number;
+    mapToWorldXZ(mapX: number, mapY: number): [number, number];
+  },
+  lift: number,
+): { positions: Float32Array; town: Float32Array; index: Uint32Array } {
+  const { segmentsX, segmentsY, vertexHeights } = surface;
+  const cols = segmentsX + 1;
+  const cellW = surface.worldWidth / segmentsX;
+  const cellD = surface.worldDepth / segmentsY;
+  const positions: number[] = [];
+  const town: number[] = [];
+  const index: number[] = [];
+  towns.forEach((t, k) => {
+    const reach = t.radius * TOWN_REACH;
+    const i0 = Math.max(
+      0,
+      Math.floor((t.x - reach + surface.worldWidth / 2) / cellW),
+    );
+    const i1 = Math.min(
+      segmentsX,
+      Math.ceil((t.x + reach + surface.worldWidth / 2) / cellW),
+    );
+    const j0 = Math.max(
+      0,
+      Math.floor((t.z - reach + surface.worldDepth / 2) / cellD),
+    );
+    const j1 = Math.min(
+      segmentsY,
+      Math.ceil((t.z + reach + surface.worldDepth / 2) / cellD),
+    );
+    if (i1 <= i0 || j1 <= j0) return;
+    const first = positions.length / 3;
+    const across = i1 - i0 + 1;
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) {
+        const [x, z] = surface.mapToWorldXZ(
+          (i / segmentsX) * surface.width,
+          (j / segmentsY) * surface.height,
+        );
+        positions.push(x, vertexHeights[j * cols + i] + lift, z);
+        town.push(k);
+      }
+    }
+    // Only the cells the reach touches: a disc, not the square round it.
+    const touch = reach + Math.hypot(cellW, cellD) / 2;
+    for (let j = 0; j < j1 - j0; j++) {
+      for (let i = 0; i < i1 - i0; i++) {
+        const topLeft = first + j * across + i;
+        const cx = positions[topLeft * 3] + cellW / 2;
+        const cz = positions[topLeft * 3 + 2] + cellD / 2;
+        if (Math.hypot(cx - t.x, cz - t.z) > touch) continue;
+        const bottomLeft = topLeft + across;
+        index.push(
+          topLeft,
+          bottomLeft,
+          topLeft + 1,
+          topLeft + 1,
+          bottomLeft,
+          bottomLeft + 1,
+        );
+      }
+    }
+  });
+  return {
+    positions: new Float32Array(positions),
+    town: new Float32Array(town),
+    index: new Uint32Array(index),
+  };
+}
+
+/** Rows of {@link townDataTexels}. */
+export const TOWN_DATA_ROWS = 5;
+
+/**
+ * The towns as {@link TOWN_DATA_ROWS} rows of four floats a town, for a
+ * texture one column per town: row 0 holds `x, z, radius, seed`, row 1 the
+ * axis as its cosine and sine, whether it is a capital, and its aspect, row 2
+ * the three wave phases and the number of main streets, and rows 3 and 4 the
+ * main streets' directions.
+ */
+export function townDataTexels(towns: Town[]): Float32Array {
+  const columns = Math.max(1, towns.length);
+  const out = new Float32Array(columns * TOWN_DATA_ROWS * 4);
+  const row = (r: number, k: number) => (r * columns + k) * 4;
+  towns.forEach((t, k) => {
+    out.set([t.x, t.z, t.radius, t.seed], row(0, k));
+    out.set(
+      [Math.cos(t.axis), Math.sin(t.axis), t.capital ? 1 : 0, t.aspect],
+      row(1, k),
+    );
+    const streets = t.streets.slice(0, MAX_STREETS);
+    out.set([...t.waves, streets.length], row(2, k));
+    streets.forEach((a, s) => {
+      out[row(3 + Math.floor(s / 4), k) + (s % 4)] = a;
+    });
+  });
+  return out;
+}
