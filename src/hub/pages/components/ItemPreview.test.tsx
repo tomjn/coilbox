@@ -165,6 +165,56 @@ function outlines(html: string): number {
   return [...html.matchAll(/<svg /g)].length;
 }
 
+describe("ItemPreview, for a conquest challenge", () => {
+  const challenge = (skin?: string): Container => ({
+    format: "coilbox",
+    container: 1,
+    kind: "challenge",
+    kindVersion: 1,
+    payload: {
+      mode: "conquest",
+      settings: {
+        seed: 12345,
+        title: "A shared map",
+        game: { shortname: "sf" },
+        nodeCount: 20,
+        factionCount: 2,
+        layout: "ring",
+        skin,
+      },
+    },
+  });
+  const count = (html: string, tag: string) =>
+    [...html.matchAll(new RegExp(`<${tag}[ >]`, "g"))].length;
+
+  it("draws a galaxy as stars and lanes, with no land", () => {
+    const html = markup(challenge());
+    expect(html).toContain("20 systems joined by");
+    expect(count(html, "circle")).toBe(20);
+    expect(html).not.toContain('data-part="land"');
+    expect(count(html, "polygon")).toBe(0);
+  });
+
+  it("draws a Territories map as land with a province outline each", () => {
+    const html = markup(challenge("territories"));
+    expect(html).toContain("20 provinces on a map of land and sea");
+    expect(html).toContain('data-part="land"');
+    expect(count(html, "polygon")).toBe(20);
+    // A province is its outline. Only the three capitals are marked.
+    expect(count(html, "circle")).toBe(3);
+    expect(html).toContain(">Provinces<");
+  });
+
+  it("draws a Cities map as land with a marker for every city", () => {
+    const html = markup(challenge("cities"));
+    expect(html).toContain("20 cities on a map of land and sea");
+    expect(html).toContain('data-part="land"');
+    expect(count(html, "polygon")).toBe(0);
+    expect(count(html, "circle")).toBe(20);
+    expect(count(html, "line")).toBeGreaterThan(0);
+  });
+});
+
 describe("ItemPreview, for a setup pack", () => {
   it("gives each sort of thing a heading, and names what is in it", () => {
     const html = markup(

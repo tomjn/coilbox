@@ -48,11 +48,7 @@ import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
 import { galaxyPalette } from "../galaxy3d/palette";
 import { usePlacedModelSources } from "../galaxy3d/usePlacedModelSources";
-import {
-  regenerateGalaxy,
-  restoreChallengeMap,
-  substituteExcludedMaps,
-} from "../generate";
+import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
 import {
   blankLocations,
   type HandmadeConquestOptions,
@@ -62,6 +58,12 @@ import {
   readHandmadeRun,
 } from "../handmade/conquest";
 import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
+import {
+  drawsAsGalaxy,
+  generatedTerrainPixels,
+  locationNoun,
+  regenerateGalaxy,
+} from "../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
@@ -115,7 +117,7 @@ export default function GalaxyPage() {
   if (!loaded || !galaxy) {
     // Not a stored galaxy, so it may be a hand-made map.
     if (id) return <HandmadeGalaxy id={id} listError={error} />;
-    return <NotOpened error={error} label="Galaxy not found." />;
+    return <NotOpened error={error} label="Map not found." />;
   }
   return <GalaxyScreen key={galaxy.id} galaxy={galaxy} />;
 }
@@ -254,7 +256,7 @@ function HandmadeGalaxy({
   if (!map) {
     const known = listed.maps.some((m) => m.id === id);
     if (!run && !known) {
-      return <NotOpened error={listError} label="Galaxy not found." />;
+      return <NotOpened error={listError} label="Map not found." />;
     }
     return (
       <NotOpened
@@ -517,8 +519,9 @@ function GalaxyScreen({
   // tints) unless its theme already sets one — so a fresh galaxy reads as its
   // own place instead of the single restrained default. Only the render doc is
   // themed; all strategic logic keeps using `galaxy` (identical nodes/links).
+  const space = drawsAsGalaxy(galaxy);
   const themedGalaxy = useMemo<GalaxyDoc>(() => {
-    if (galaxy.theme?.skin === "theatre") return galaxy;
+    if (!drawsAsGalaxy(galaxy)) return galaxy;
     if (galaxy.theme?.starPalette || galaxy.theme?.nebulaColors) return galaxy;
     const p = galaxyPalette(galaxy.id);
     return {
@@ -526,6 +529,10 @@ function GalaxyScreen({
       theme: { ...galaxy.theme, starPalette: p.stars, nebulaColors: p.nebula },
     };
   }, [galaxy]);
+
+  // A generated land map stores no pixels, so its land is built again from the
+  // document here and handed to the view.
+  const terrainPixels = useMemo(() => generatedTerrainPixels(galaxy), [galaxy]);
 
   // Where the map's placed models are read from: the installed game, and the
   // map's own folder for a hand-made map.
@@ -556,16 +563,15 @@ function GalaxyScreen({
     .sort((a, b) => a.expiresOnTurn - b.expiresOnTurn)[0];
 
   // Space skins get a soft two-tone nebula wash behind the (transparent) GL
-  // canvas; a theatre map keeps the flat backdrop.
-  const backdrop =
-    galaxy.theme?.skin === "theatre"
-      ? undefined
-      : {
-          background:
-            "radial-gradient(60% 55% at 22% 18%, rgba(24,48,90,0.55) 0%, transparent 60%)," +
-            "radial-gradient(55% 55% at 82% 88%, rgba(58,20,52,0.5) 0%, transparent 62%)," +
-            "#05070f",
-        };
+  // canvas. Every other style keeps the flat backdrop.
+  const backdrop = !space
+    ? undefined
+    : {
+        background:
+          "radial-gradient(60% 55% at 22% 18%, rgba(24,48,90,0.55) 0%, transparent 60%)," +
+          "radial-gradient(55% 55% at 82% 88%, rgba(58,20,52,0.5) 0%, transparent 62%)," +
+          "#05070f",
+      };
 
   // Wait for the saved run to load before building the map: otherwise the first
   // build frames the *default* faction (state not yet known) and recentres with
@@ -613,6 +619,7 @@ function GalaxyScreen({
         focusNodeId={battleNodeId ?? factionFocus}
         focusBiasX={state ? 0 : 0.13}
         modelSources={modelSources}
+        terrainPixels={terrainPixels}
         display={{ reduceMotion, effects, performanceMode }}
         className="absolute inset-0"
       />
@@ -1010,7 +1017,7 @@ function SelectionPanel({
             {faction?.name ?? "Unclaimed"}
             {node.kind === "capital" && " · Capital"}
           </span>
-          {galaxy.theme?.skin !== "theatre" && (
+          {drawsAsGalaxy(galaxy) && (
             <span className="text-xs capitalize text-muted-foreground">
               {nodeBodyLabel(
                 node.id,
@@ -1075,11 +1082,14 @@ function SelectionPanel({
       ) : isPlayers ? (
         <p className="text-xs text-muted-foreground">
           Under your control
-          {node.kind === "capital" ? " — your homeworld." : "."}
+          {node.kind === "capital"
+            ? ` — your ${drawsAsGalaxy(galaxy) ? "homeworld" : "capital"}.`
+            : "."}
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">
-          Out of reach — capture an adjacent system first.
+          Out of reach — capture an adjacent{" "}
+          {locationNoun(galaxy.theme?.skin).one} first.
         </p>
       )}
     </BracketFrame>
@@ -1284,7 +1294,7 @@ export function RunSetupPanel({
           onClick={regenerate}
         >
           <Dices className="mr-1.5 size-4" aria-hidden />
-          {regenBusy ? "Regenerating…" : "Regenerate galaxy"}
+          {regenBusy ? "Regenerating…" : "Regenerate map"}
         </Button>
       )}
       {canRegenerate && scanError && (
@@ -1332,11 +1342,15 @@ function EndScreen({
         <h2
           className={`font-display text-2xl font-bold uppercase tracking-wide ${won ? "text-emerald-400" : HUD_ACCENT_INK.danger}`}
         >
-          {won ? "Galaxy conquered" : "Conquest lost"}
+          {won
+            ? drawsAsGalaxy(galaxy)
+              ? "Galaxy conquered"
+              : "Conquest won"
+            : "Conquest lost"}
         </h2>
         <p className="text-sm text-muted-foreground">
           {won
-            ? "Every enemy capital has fallen. The galaxy is yours."
+            ? `Every enemy capital has fallen. The ${drawsAsGalaxy(galaxy) ? "galaxy" : "map"} is yours.`
             : "Your capital has fallen."}{" "}
           {battles} battle{battles === 1 ? "" : "s"} fought over {state.turn}{" "}
           turn{state.turn === 1 ? "" : "s"}, {victories} won.

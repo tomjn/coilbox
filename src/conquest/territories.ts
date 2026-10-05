@@ -647,6 +647,8 @@ export function generateTerritories(
   return {
     ...doc,
     description: `A generated map of ${doc.nodes.length} provinces.`,
+    theme: { skin: "territories" },
+    generated: doc.generated && { ...doc.generated, skin: "territories" },
     nodes: doc.nodes.map((node, i) => ({
       ...node,
       outline: [provinces.outlines[i]],

@@ -5,16 +5,29 @@
  * selected in it: the legacy record's unlocks plus that game's own.
  */
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { emptyMeta, emptyRecord, type RogueliteMeta } from "../../model";
+import { LAND_RUN_SIZES, resolveRunMap } from "../../mapRun";
+import {
+  emptyMeta,
+  emptyRecord,
+  type RogueliteMeta,
+  type RogueliteRun,
+} from "../../model";
 
 const hoisted = vi.hoisted(() => ({
   meta: null as unknown,
   loading: false,
   error: null as string | null,
   maps: [] as { name: string; width: number; height: number }[],
+  saved: [] as { id: string; run: unknown }[],
 }));
 
 const GAMES: {
@@ -41,7 +54,32 @@ vi.mock("../../runs", () => ({
     loading: hoisted.loading,
     error: hoisted.error,
   }),
-  useRuns: () => ({ saveRun: vi.fn() }),
+  useRuns: () => ({
+    saveRun: async (id: string, run: unknown) => {
+      hoisted.saved.push({ id, run });
+    },
+  }),
+}));
+// The registry select opens a popover, which is more than these tests need to
+// drive. A native one takes the same props.
+vi.mock("@/components/OptionSelect", () => ({
+  OptionSelect: ({
+    value,
+    onValueChange,
+    options,
+  }: {
+    value: string;
+    onValueChange: (v: string) => void;
+    options: { value: string; label: string }[];
+  }) => (
+    <select value={value} onChange={(e) => onValueChange(e.target.value)}>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  ),
 }));
 vi.mock("../../../play/config", () => ({
   usePreferredTarget: () => ({
@@ -116,6 +154,7 @@ beforeEach(() => {
   localStorage.clear();
   hoisted.loading = false;
   hoisted.error = null;
+  hoisted.saved = [];
 });
 afterEach(cleanup);
 
@@ -270,4 +309,89 @@ describe("RunSetupForm and a Warpath record that failed to load", () => {
     expect(begin().disabled).toBe(false);
     hoisted.maps = [];
   });
+});
+
+describe("RunSetupForm and the four map styles (issue #3507)", () => {
+  beforeEach(() => {
+    hoisted.maps = [{ name: "Comet Catcher Remake", width: 16, height: 16 }];
+  });
+  afterEach(() => {
+    hoisted.maps = [];
+  });
+
+  const styleSelect = () => {
+    const found = [...document.querySelectorAll("select")].find((s) =>
+      [...s.options].some((o) => o.value === "territories"),
+    );
+    if (!found) throw new Error("no map style select");
+    return found;
+  };
+  const begin = async (): Promise<RogueliteRun> => {
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Begin warpath/ }));
+    });
+    expect(hoisted.saved).toHaveLength(1);
+    return hoisted.saved[0].run as RogueliteRun;
+  };
+
+  it("offers the four styles Conquest offers, under the same names", () => {
+    show(emptyMeta);
+    expect([...styleSelect().options].map((o) => o.textContent)).toEqual([
+      "Galaxy (starfield)",
+      "Theatre (flat chart)",
+      "Cities (roads across generated land)",
+      "Territories (provinces on generated land)",
+    ]);
+    expect(document.body.textContent).not.toMatch(/galaxy of|star system/i);
+  });
+
+  for (const style of ["galaxy", "theatre"] as const) {
+    it(`begins a ${style} run in columns, with no map`, async () => {
+      show(emptyMeta);
+      fireEvent.change(styleSelect(), { target: { value: style } });
+      expect(screen.queryByText(/The map decides how long/)).toBeNull();
+      const run = await begin();
+      expect(run.settings.skin).toBe(style);
+      expect(run.settings.map).toBeUndefined();
+    });
+  }
+
+  for (const [style, many] of [
+    ["cities", "cities"],
+    ["territories", "provinces"],
+  ] as const) {
+    it(`begins a ${style} run across a generated map of the chosen length`, async () => {
+      show(emptyMeta);
+      fireEvent.change(styleSelect(), { target: { value: style } });
+      expect(
+        screen.getByText(
+          `The map decides how long this warpath is. This length crosses a map of ${LAND_RUN_SIZES[style].standard} ${many}.`,
+        ),
+      ).toBeTruthy();
+      fireEvent.click(screen.getByRole("radio", { name: "quick" }));
+      expect(
+        screen.getByText(
+          new RegExp(`a map of ${LAND_RUN_SIZES[style].quick} ${many}\\.`),
+        ),
+      ).toBeTruthy();
+
+      const run = await begin();
+      expect(run.settings.skin).toBe(style);
+      expect(run.settings.map).toMatchObject({
+        source: "generated",
+        style,
+        seed: run.settings.seed,
+        nodeCount: LAND_RUN_SIZES[style].quick,
+      });
+      // The saved run opens on the map it was made on.
+      const ref = run.settings.map;
+      if (!ref) throw new Error("expected a map reference");
+      const map = resolveRunMap(ref, run.settings.game)?.map;
+      const locations = new Set(map?.nodes.map((n) => n.id));
+      expect(run.nodes.length).toBeGreaterThan(1);
+      for (const node of run.nodes) {
+        expect(locations.has(node.location ?? "")).toBe(true);
+      }
+    });
+  }
 });

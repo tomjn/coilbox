@@ -1,6 +1,6 @@
 import type { MapDownloadHint } from "../campaign/model";
 import { parseMapDownload } from "../campaign/model";
-import type { GameRef } from "../conquest/model";
+import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
 import { clamp } from "../lib/helpers";
 
@@ -20,9 +20,10 @@ import { clamp } from "../lib/helpers";
 /** How long a run is — maps to an act/column count in the generator. */
 export type RunLength = "quick" | "standard" | "long";
 
-/** Presentation of the node map. `theatre` is the flat skin for terrestrial
- * games where a starfield makes no sense (see the conquest renderer). */
-export type RunSkin = "galaxy" | "theatre";
+/** Presentation of the node map, in the styles Conquest has. `galaxy` and
+ * `theatre` draw the run in columns. `cities` and `territories` are a run
+ * across a generated land map, which `RunSettings.map` then names. */
+export type RunSkin = MapSkin;
 
 /**
  * Node kinds on the run graph. Battle-like nodes (`battle`/`elite`/`boss`)
@@ -608,7 +609,7 @@ export function parseRunSettings(value: unknown): RunSettings | null {
       typeof value.side === "string" && value.side !== ""
         ? value.side
         : undefined,
-    skin: value.skin === "theatre" ? "theatre" : "galaxy",
+    skin: readMapSkin(value.skin) ?? "galaxy",
     ...(map ? { map } : {}),
   };
 }

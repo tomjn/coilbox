@@ -2,7 +2,7 @@ id generated-1
 title TG Conquest
 description A generated map of 12 cities.
 terrain image=generated:cities heightmap=generated:cities size=1024x1024 heightScale=64 projection=flat
-generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"ring","skin":"galaxy"}
+generated {"seed":1,"nodeCount":12,"factionCount":2,"layout":"ring","skin":"cities"}
 faction player name="Radiant Assembly" color=#2f7dff aggression=0 side=
 faction enemy-1 name="Wandering Vanguard" color=#ff3524 aggression=0.4955403446685523 side=
 faction enemy-2 name="Eternal Collective" color=#ffb300 aggression=0.30293718790635465 side=

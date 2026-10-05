@@ -382,6 +382,6 @@ describe("resuming a conquest on a hand-made map", () => {
     h.result = { ok: false, errors: [] } satisfies HandmadeMapResult;
     h.listed = [];
     renderPage();
-    expect(screen.getByText("Galaxy not found.")).toBeTruthy();
+    expect(screen.getByText("Map not found.")).toBeTruthy();
   });
 });

@@ -13,9 +13,9 @@ Runs live under **Run** in the sidebar, next to Conquest. You can start one for 
 | **Game** | Which installed game the battles use. |
 | **Faction / side** | The in-game side your commander plays (also the build tree the run unlocks). |
 | **Loadout** | A starting doctrine that pre-unlocks one of your commander's build branches. Only the default is available until you unlock more (see [Meta-progression](#meta-progression)). |
-| **Length** | Quick / Standard / Long — how many columns the map has. |
+| **Length** | Quick / Standard / Long — how many columns the map has. On a Cities or Territories run the map decides the length, so this sets how many locations the generated map has. |
 | **Difficulty** | 1–5. Scales enemy count and handicap and lowers your starting health. |
-| **Map style** | **Galaxy** (a 3D starfield) or **Theatre** (a flat tactical chart) — pick theatre for a terrestrial game where a galaxy of stars makes no sense. |
+| **Map style** | **Galaxy** (a 3D starfield) and **Theatre** (a flat tactical chart) draw the run in columns. **Cities** and **Territories** generate a land map and the run crosses it from one side to the other, location by location. Pick one of the last three for a terrestrial game where a galaxy of stars makes no sense. |
 | **Ascension** | An extra difficulty tier on top, unlocked by winning (hidden until you have one). |
 | **Seed** | The number the whole run is rolled from. Reroll for a new run. |
 

@@ -118,10 +118,23 @@ vi.mock("../../../conquest/handmade/useHandmadeMaps", () => ({
   }),
 }));
 vi.mock("../../handmadeMap", () => ({ loadHandmadeRunMap: hoisted.loadMap }));
-vi.mock("../../mapRun", () => ({ generateMapRun: hoisted.generateMapRun }));
-vi.mock("../../generate", () => ({ generateRun: hoisted.generateRun }));
+// A generated style goes through `generateStyledRun`, which is the column run
+// for Galaxy and Theatre.
+vi.mock("../../mapRun", async (orig) => ({
+  ...(await orig<typeof import("../../mapRun")>()),
+  generateMapRun: hoisted.generateMapRun,
+  generateStyledRun: hoisted.generateRun,
+}));
 
 import { RunSetupForm } from "./RunSetupForm";
+
+/** The four generated styles, which every game is offered. */
+const GENERATED_STYLES = [
+  "Galaxy (starfield)",
+  "Theatre (flat chart)",
+  "Cities (roads across generated land)",
+  "Territories (provinces on generated land)",
+];
 
 const map = (change: Partial<HandmadeMapSummary>): HandmadeMapSummary => ({
   id: "two-shores",
@@ -160,8 +173,7 @@ describe("RunSetupForm and hand-made maps", () => {
     hoisted.maps = [map({})];
     show();
     expect(styles()).toEqual([
-      "Galaxy (starfield)",
-      "Theatre (flat chart)",
+      ...GENERATED_STYLES,
       "Two Shores (hand-made map)",
     ]);
   });
@@ -169,13 +181,13 @@ describe("RunSetupForm and hand-made maps", () => {
   it("does not offer a map with no start and goal", () => {
     hoisted.maps = [map({ warpath: false })];
     show();
-    expect(styles()).toEqual(["Galaxy (starfield)", "Theatre (flat chart)"]);
+    expect(styles()).toEqual(GENERATED_STYLES);
   });
 
   it("does not offer a map made for another game", () => {
     hoisted.maps = [map({ game: { shortname: "BA" } })];
     show();
-    expect(styles()).toEqual(["Galaxy (starfield)", "Theatre (flat chart)"]);
+    expect(styles()).toEqual(GENERATED_STYLES);
   });
 
   it("follows the selected game, and drops a map picked for the last one", () => {
@@ -187,7 +199,7 @@ describe("RunSetupForm and hand-made maps", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Pick Zero-K v1.14.10.1" }),
     );
-    expect(styles()).toEqual(["Galaxy (starfield)", "Theatre (flat chart)"]);
+    expect(styles()).toEqual(GENERATED_STYLES);
     expect(screen.getByText("Length")).toBeTruthy();
   });
 

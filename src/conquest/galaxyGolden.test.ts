@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { decodeConquestChallenge, galaxyFromChallenge } from "./challenge";
 import { type GenerateOptions, generateGalaxy } from "./generate";
 import type { GalaxyDoc } from "./model";
 
@@ -129,6 +130,49 @@ describe("conquest golden galaxies", () => {
       expect(emitted).toBe(readFileSync(path, "utf8"));
     });
   }
+
+  /**
+   * Challenge codes made before the Cities and Territories styles existed
+   * (issue #3507). `challenge-codes.txt` holds one for each golden galaxy, and
+   * one for a Theatre map, written by the code as it stood at 9b474713. Each
+   * has to go on rebuilding the galaxy it was made from.
+   */
+  describe("challenge codes from before the land styles", () => {
+    const codes = readFileSync(join(GOLDEN_DIR, "challenge-codes.txt"), "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => line.split(" ") as [string, string]);
+
+    it("has a code for every golden galaxy, and one for a theatre", () => {
+      expect(codes.map(([name]) => name)).toEqual([
+        ...cases.map((c) => c.file),
+        "theatre-of-scatter-24-seed1.txt",
+      ]);
+    });
+
+    for (const [name, code] of codes) {
+      it(`${name} still rebuilds its galaxy`, () => {
+        const decoded = decodeConquestChallenge(code);
+        if (!decoded.ok) throw new Error("expected a successful decode");
+        const theatre = name.startsWith("theatre-of-");
+        expect(decoded.settings.skin).toBe(theatre ? "theatre" : "galaxy");
+        const rebuilt = galaxyFromChallenge(
+          decoded.settings,
+          { maps },
+          `generated-${decoded.settings.seed}`,
+          "2026-01-01T00:00:00.000Z",
+        );
+        expect(rebuilt.theme?.skin).toBe(theatre ? "theatre" : undefined);
+        expect(rebuilt.terrain).toBeUndefined();
+        expect(render(rebuilt)).toBe(
+          readFileSync(
+            join(GOLDEN_DIR, name.replace("theatre-of-", "")),
+            "utf8",
+          ),
+        );
+      });
+    }
+  });
 
   /**
    * The golden files only prove portability if they cover the code paths that

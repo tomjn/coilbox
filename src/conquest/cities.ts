@@ -145,6 +145,8 @@ export function generateCities(
   return {
     ...galaxy,
     description: `A generated map of ${nodes.length} cities.`,
+    theme: { skin: "cities" },
+    generated: galaxy.generated && { ...galaxy.generated, skin: "cities" },
     nodes,
     terrain: {
       image: GENERATED_CITIES_IMAGE,

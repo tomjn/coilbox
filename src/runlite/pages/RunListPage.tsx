@@ -38,7 +38,7 @@ import { RunSetupForm } from "./components/RunSetupForm";
  * The Warpath hub: every run in flight (resume/abandon), plus a "New warpath"
  * button that opens the setup in a right-hand drawer. Runs are keyed by id, so
  * warpaths for different games/factions coexist here — mirroring the Conquest
- * list + its "Generate a galaxy" drawer.
+ * list + its "Generate a map" drawer.
  */
 export default function RunListPage() {
   const navigate = useNavigate();

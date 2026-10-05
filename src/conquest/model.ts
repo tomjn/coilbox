@@ -168,11 +168,35 @@ export interface GalaxyNode {
   scenario?: NodeScenario;
 }
 
+/**
+ * How a strategic map is presented. `galaxy` is stars in space, `theatre` is
+ * points on a flat chart, `cities` is points on generated land joined by
+ * roads, and `territories` is provinces on generated land masses.
+ */
+export type MapSkin = "galaxy" | "theatre" | "cities" | "territories";
+
+export const MAP_SKINS: readonly MapSkin[] = [
+  "galaxy",
+  "theatre",
+  "cities",
+  "territories",
+];
+
+/** A stored skin value, or undefined for anything that is not one. */
+export function readMapSkin(value: unknown): MapSkin | undefined {
+  return MAP_SKINS.includes(value as MapSkin) ? (value as MapSkin) : undefined;
+}
+
+/** True for the two styles drawn on generated land. */
+export function isLandSkin(skin: MapSkin | undefined): boolean {
+  return skin === "cities" || skin === "territories";
+}
+
 /** Author-controlled presentation of the strategic map. */
 export interface GalaxyTheme {
-  /** `galaxy` (default) or `theatre` (flat tactical chart; both fully rendered
-   * by the galaxy view, and reused by the roguelite run map). */
-  skin?: "galaxy" | "theatre";
+  /** `galaxy` when absent. Every style is drawn by the galaxy view, and
+   * reused by the roguelite run map. */
+  skin?: MapSkin;
   /** Theatre plane texture / galaxy nebula backdrop. */
   backdrop?: ImageRef;
   /** Decorative starfield tints (`#rrggbb`). */
@@ -280,7 +304,7 @@ export interface GalaxyDoc {
       | "ring"
       | "random"
       | "realstars";
-    skin?: "galaxy" | "theatre";
+    skin?: MapSkin;
     startingSystems?: number;
     fogOfWar?: boolean;
     /** Threat level 0..3 (see `./threat`). Absent reads as 0. */
@@ -514,7 +538,7 @@ function parseTheme(value: unknown): GalaxyTheme | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const t = value as Record<string, unknown>;
   const theme: GalaxyTheme = {
-    skin: t.skin === "galaxy" || t.skin === "theatre" ? t.skin : undefined,
+    skin: readMapSkin(t.skin),
     backdrop: parseImageRef(t.backdrop),
     starPalette:
       stringArray(t.starPalette).length > 0
@@ -557,7 +581,7 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
       typeof g.radiusLy === "number" && Number.isFinite(g.radiusLy)
         ? clamp(g.radiusLy, 1, 25)
         : undefined,
-    skin: g.skin === "galaxy" || g.skin === "theatre" ? g.skin : undefined,
+    skin: readMapSkin(g.skin),
     startingSystems:
       typeof g.startingSystems === "number" &&
       Number.isFinite(g.startingSystems)

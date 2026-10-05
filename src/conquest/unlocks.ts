@@ -172,12 +172,18 @@ export interface SizeOption {
  *
  * A larger size opens with the threat level it is tied to, so what unlocks it is
  * what unlocks that level: a win at the level before.
+ *
+ * `many` is what the chosen map style calls its locations, so a Territories
+ * map is counted in provinces.
  */
-export function sizeOptions(ceiling: number): SizeOption[] {
-  const options: SizeOption[] = [...BASE_SIZES];
+export function sizeOptions(ceiling: number, many = "systems"): SizeOption[] {
+  const options: SizeOption[] = BASE_SIZES.map((s) => ({
+    ...s,
+    label: s.label.replace(/ systems\)$/, ` ${many})`),
+  }));
   const next = LARGE_SIZES.find((s) => ceiling < s.level);
   for (const size of LARGE_SIZES) {
-    const label = `${size.label} (${size.count} systems)`;
+    const label = `${size.label} (${size.count} ${many})`;
     if (ceiling >= size.level) {
       options.push({ value: String(size.count), label });
     } else if (size === next) {
