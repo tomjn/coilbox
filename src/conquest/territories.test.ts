@@ -328,6 +328,7 @@ describe("generateTerrain", () => {
   it("is the same land from the same seed", () => {
     const again = generateTerrain({ seed: 1, shape: "continent" });
     const once = generateTerrain({ seed: 1, shape: "continent" });
-    expect(again.image).toEqual(once.image);
+    // Compared as bytes: a deep equal walks a megabyte one element at a time.
+    expect(Buffer.from(again.image).equals(Buffer.from(once.image))).toBe(true);
   });
 });
