@@ -397,6 +397,52 @@ describe("readPreview", () => {
     }
   });
 
+  it.each(["cities", "territories"])(
+    "draws a warpath run across a generated %s map on its land (issue #3582)",
+    (style) => {
+      const preview = readPreview(
+        container("challenge", {
+          mode: "warpath",
+          settings: {
+            ...WARPATH,
+            length: "quick",
+            map: { source: "generated", style, seed: 11, nodeCount: 12 },
+          },
+        }),
+      );
+      if (preview?.kind !== "challenge" || !preview.run?.land) {
+        throw new Error("expected a run on land");
+      }
+      const { steps, routes, land } = preview.run;
+      expect(land.land?.runs.length).toBeGreaterThan(0);
+      expect(land.skin).toBe(style);
+      expect(steps[0].type).toBe("start");
+      expect(steps.at(-1)?.type).toBe("boss");
+      expect(routes.length).toBeGreaterThan(0);
+      // Each stop stands on a location of the map it is drawn on.
+      for (const step of steps) {
+        const system = land.systems.find((s) => s.id === step.id);
+        expect(system).toBeDefined();
+        expect([step.x, step.y]).toEqual([system?.x, system?.y]);
+      }
+      // Only some of the map is on the route, the rest is scenery.
+      expect(steps.length).toBeLessThanOrEqual(land.systems.length);
+    },
+  );
+
+  it("draws no run for a hand-made map, which the sharer's machine holds", () => {
+    const preview = readPreview(
+      container("challenge", {
+        mode: "warpath",
+        settings: {
+          ...WARPATH,
+          map: { source: "handmade", id: "my-map" },
+        },
+      }),
+    );
+    expect(preview).toMatchObject({ kind: "challenge", run: null });
+  });
+
   it("draws the same run every time, because the seed decides it", () => {
     const once = readPreview(
       container("challenge", { mode: "warpath", settings: WARPATH }),
