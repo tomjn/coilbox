@@ -2,6 +2,8 @@ import { useSetting } from "@picoframe/frame";
 import { useMemo } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import { useConquestState, useGalaxies } from "../conquest/conquests";
+import { listedHandmadeMaps } from "../conquest/handmade/conquest";
+import { useHandmadeMaps } from "../conquest/handmade/useHandmadeMaps";
 import { useConquestUnlocks } from "../conquest/useUnlocks";
 import {
   type AchievementResult,
@@ -67,6 +69,7 @@ export function useCareer(): CareerData {
   const campaigns = useCampaigns();
   const progress = useCampaignProgress();
   const galaxies = useGalaxies();
+  const handmade = useHandmadeMaps();
   const conquestState = useConquestState();
   const { unlocks } = useConquestUnlocks();
   const meta = useRunMeta();
@@ -101,8 +104,9 @@ export function useCareer(): CareerData {
     progress.error,
   );
   const conquestStatus = settle(
-    galaxies.loading || conquestState.loading,
+    galaxies.loading || handmade.loading || conquestState.loading,
     galaxies.error,
+    handmade.error,
     conquestState.error,
   );
   const warpathStatus = settle(meta.loading, meta.error);
@@ -149,7 +153,14 @@ export function useCareer(): CareerData {
         ? { campaigns: campaigns.campaigns, progress: progress.progress }
         : null,
       conquest: conquestReady
-        ? { galaxies: galaxies.galaxies, state: conquestState.file, unlocks }
+        ? {
+            galaxies: [
+              ...galaxies.galaxies,
+              ...listedHandmadeMaps(handmade.maps),
+            ],
+            state: conquestState.file,
+            unlocks,
+          }
         : null,
       ai:
         aiReady && player
@@ -165,6 +176,7 @@ export function useCareer(): CareerData {
     progress.progress,
     conquestReady,
     galaxies.galaxies,
+    handmade.maps,
     conquestState.file,
     unlocks,
     aiReady,
