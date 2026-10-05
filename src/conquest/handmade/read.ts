@@ -218,16 +218,22 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     for (const stranded of findUnreachable(nodes, linkKinds)) {
       const node = stranded.node;
       const who = described.get(node.id);
+      const painted = Boolean(node.outline);
       const company =
         stranded.group.length === 0
-          ? "Nothing touches it."
+          ? painted
+            ? "Nothing touches it."
+            : "No road or crossing joins it."
           : `It is joined only to ${stranded.group.map((id) => described.get(id)).join(", ")}.`;
+      const advice = painted
+        ? `Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`
+        : `Add a road or a crossing to it in ${MANIFEST_FILE}.`;
       errors.push({
         code: "unreachable",
         id: node.id,
         name: node.name,
         color: manifest.provinces.find((p) => p.id === node.id)?.color,
-        message: `${node.outline ? "The province" : "The location"} ${who} cannot be reached from the rest of the map. ${company} Add a crossing or a road in ${MANIFEST_FILE}, or paint it so it touches a neighbour.`,
+        message: `${painted ? "The province" : "The location"} ${who} cannot be reached from the rest of the map. ${company} ${advice}`,
       });
     }
   }
