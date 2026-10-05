@@ -433,6 +433,9 @@ fn owner_writable(perms: std::fs::Permissions) -> std::fs::Permissions {
     #[cfg(not(unix))]
     {
         let mut perms = perms;
+        // The lint warns that this makes a file writable by everyone on Unix.
+        // This branch is Windows, where it clears the read-only attribute.
+        #[allow(clippy::permissions_set_readonly_false)]
         perms.set_readonly(false);
         perms
     }
