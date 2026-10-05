@@ -93,20 +93,64 @@ export function edgeColor(pixels: ColorPixels): [number, number, number] {
   return [sum[0] / count, sum[1] / count, sum[2] / count];
 }
 
+/** How bright the world beyond the map's edge is drawn, against 1 on it. */
+export const BEYOND_SHADE = 0.6;
+/** Copies of the picture drawn on each side of the sheet. */
+const BEYOND_TILES = 2;
+/** How far under the sheet the world beyond it lies, in world units, so the
+ * two never fight over the same depth. */
+const BEYOND_DROP = 0.05;
+
 /**
- * Fill everything the scene does not draw with the colour of the sheet's
- * edge, so a generated land map sits in its own sea rather than in the page's
- * black, at any zoom or tilt. Level ground is shaded exactly 1, so the sea
- * around the sheet matches the sea at its edge.
+ * Draw the world beyond the map's edge, so a generated land map does not sit
+ * in the page's black. Land can run off the map, so a flat sea would cut it
+ * off at the frame. Instead the picture carries on past each edge as its own
+ * mirror image, darker so the edge of the map still shows: land that crosses
+ * the frame goes on as land, and sea as sea. Further out, the scene's
+ * background is the same darkened average of the edge.
  */
-function fillWithSea(scene: THREE.Scene, pixels: ColorPixels): void {
-  const [r, g, b] = edgeColor(pixels);
-  scene.background = new THREE.Color().setRGB(
-    r / 255,
-    g / 255,
-    b / 255,
-    THREE.SRGBColorSpace,
+function buildBeyond(
+  scene: THREE.Scene,
+  disposables: { dispose(): void }[],
+  surface: TerrainSurface,
+  sheet: THREE.Texture,
+  pixels: ColorPixels,
+): void {
+  const tiles = 2 * BEYOND_TILES + 1;
+  const geo = new THREE.PlaneGeometry(
+    surface.worldWidth * tiles,
+    surface.worldDepth * tiles,
   );
+  // The plane's own coordinates run 0 to 1 bottom up. The sheet's picture
+  // runs top down, so turn them over, then stretch them so the middle copy
+  // lies exactly under the sheet.
+  const uv = geo.getAttribute("uv") as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(
+      i,
+      uv.getX(i) * tiles - BEYOND_TILES,
+      (1 - uv.getY(i)) * tiles - BEYOND_TILES,
+    );
+  }
+  const tex = sheet.clone();
+  tex.wrapS = THREE.MirroredRepeatWrapping;
+  tex.wrapT = THREE.MirroredRepeatWrapping;
+  tex.needsUpdate = true;
+  const mat = new THREE.MeshBasicMaterial({ map: tex });
+  mat.color.setScalar(BEYOND_SHADE);
+  disposables.push(geo, mat, tex);
+  const plane = new THREE.Mesh(geo, mat);
+  plane.name = "beyond-the-map";
+  plane.rotation.x = -Math.PI / 2;
+  plane.position.y = -BEYOND_DROP;
+  // Decoration: picking goes to the sheet and what stands on it.
+  plane.raycast = () => {};
+  scene.add(plane);
+
+  const [r, g, b] = edgeColor(pixels);
+  scene.background = new THREE.Color()
+    .setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace)
+    .multiplyScalar(BEYOND_SHADE);
 }
 
 function isColorPixels(source: TerrainColorSource): source is ColorPixels {
@@ -187,7 +231,7 @@ export function buildTerrainMesh(
       tex.magFilter = THREE.LinearFilter;
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.generateMipmaps = true;
-      fillWithSea(scene, color);
+      buildBeyond(scene, disposables, surface, tex, color);
     } else {
       tex = new THREE.CanvasTexture(color);
     }
