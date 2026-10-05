@@ -513,34 +513,43 @@ function labelRegions(
 
 type Rgb = [number, number, number];
 
-/** Land colour by height, lowest first: beach, grass, forest, rock, scree, snow. */
-const LAND_RAMP: [number, Rgb][] = [
-  [0, [214, 200, 150]],
-  [0.015, [118, 152, 82]],
-  [0.3, [72, 112, 62]],
-  [0.55, [122, 106, 90]],
-  [0.85, [152, 146, 140]],
-  [1, [240, 240, 240]],
-];
+// Land colours. Colour only: nothing in play reads which of these a place is.
+const BEACH: Rgb = [214, 200, 150];
+const DRY: Rgb = [182, 168, 116];
+const GRASS: Rgb = [122, 154, 84];
+const FOREST: Rgb = [58, 98, 56];
+const TUNDRA: Rgb = [146, 146, 122];
+const ROCK: Rgb = [122, 106, 90];
+const SCREE: Rgb = [152, 146, 140];
+const SNOW: Rgb = [240, 240, 240];
 const SEA_SHALLOW: Rgb = [70, 140, 170];
 const SEA_DEEP: Rgb = [24, 58, 96];
 /** Coast distance, in thirds of a pixel, at which the sea is fully deep. */
 const SEA_DEPTH = 108;
 
-function landColour(h: number): Rgb {
-  for (let i = 1; i < LAND_RAMP.length; i++) {
-    const [t1, c1] = LAND_RAMP[i];
-    if (h <= t1) {
-      const [t0, c0] = LAND_RAMP[i - 1];
-      const t = (h - t0) / (t1 - t0);
-      return [
-        c0[0] + (c1[0] - c0[0]) * t,
-        c0[1] + (c1[1] - c0[1]) * t,
-        c0[2] + (c1[2] - c0[2]) * t,
-      ];
-    }
-  }
-  return LAND_RAMP[LAND_RAMP.length - 1][1];
+const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
+  a[0] + (b[0] - a[0]) * t,
+  a[1] + (b[1] - a[1]) * t,
+  a[2] + (b[2] - a[2]) * t,
+];
+
+/**
+ * The colour of land at height `h` (0 to 1), with `wet` the moisture and
+ * `cold` how far below temperate it is, both 0 to 1. Low ground runs from dry
+ * land through grassland to forest as it gets wetter, and to tundra as it gets
+ * colder. Higher up it turns to rock, then scree, then snow, and the snow line
+ * comes down where it is cold. The lowest land is sand.
+ */
+function biomeColour(h: number, wet: number, cold: number): Rgb {
+  let c =
+    wet < 0.42
+      ? mix(DRY, GRASS, clamp01((wet - 0.2) / 0.18))
+      : mix(GRASS, FOREST, clamp01((wet - 0.48) / 0.2));
+  c = mix(c, TUNDRA, cold);
+  c = mix(c, ROCK, clamp01((h - 0.42) / 0.15));
+  c = mix(c, SCREE, clamp01((h - 0.66) / 0.14));
+  c = mix(c, SNOW, clamp01((h - (0.84 - 0.25 * cold)) / 0.08));
+  return mix(BEACH, c, clamp01(h / 0.015));
 }
 
 /** The index of the pixel holding a point given in map units. */
@@ -670,6 +679,11 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
   const rangeSeed = noiseSeed(rng);
   const hillSeed = noiseSeed(rng);
   const plan = planShape(opts.shape, rng);
+  // Drawn after the shape, so the climate changes no land and no height.
+  const wetSeed = noiseSeed(rng);
+  const warmSeed = noiseSeed(rng);
+  const warmth = unitVector(rng);
+  const warmSpread = 0.15 + rng() * 0.35;
 
   // Elevation: the shape, bent by the coordinate noise, plus fractal noise.
   const bendX = coarseNoise(S, S, 128, warpX, 4);
@@ -754,11 +768,23 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
     heightmap[i] = 1 + Math.floor(h * 254);
   }
 
-  // Colours by height for land and by distance from the coast for sea,
-  // worked out once per value rather than once per pixel.
-  const landRamp = Array.from({ length: 256 }, (_, h) =>
-    landColour(Math.max(0, h - 1) / 254),
-  );
+  // Climate, for colour alone. Wetter near the coast, and warmer one way
+  // across the map by an amount the seed picks, so some maps run from tundra
+  // to dry land and others stay temperate. Height cools it further.
+  const wetField = coarseNoise(S, S, 130, wetSeed, 3);
+  const warmField = coarseNoise(S, S, 160, warmSeed, 2);
+  const landAt = (i: number): Rgb => {
+    const x = i % S;
+    const y = (i - x) / S;
+    const h = (heightmap[i] - 1) / 254;
+    const near = 1 - Math.min(1, coastDistance[i] / (3 * 30));
+    const wet = clamp01(0.5 + (wetField[i] - 0.5) * 2.4 + 0.15 * near);
+    const across = ((x - S / 2) * warmth[0] + (y - S / 2) * warmth[1]) / S;
+    const warm =
+      0.55 + across * warmSpread * 2 + (warmField[i] - 0.5) * 0.6 - h * 0.5;
+    return biomeColour(h, wet, clamp01((0.3 - warm) / 0.25));
+  };
+  // Sea colours by distance from the coast, worked out once per value.
   const seaRamp = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
     const depth = d / SEA_DEPTH;
     return [
@@ -767,7 +793,7 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
     ];
   });
-  const beach = landRamp[1];
+  const beach = BEACH;
   const shallows = seaRamp[3];
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
@@ -779,14 +805,14 @@ export function generateTerrain(opts: TerrainOptions): GeneratedTerrain {
       if (cover >= 0) {
         // A pixel the coast runs through: land and sea mixed by how much of
         // the pixel lies above sea level.
-        const lnd = land[i] ? landRamp[heightmap[i]] : beach;
+        const lnd = land[i] ? landAt(i) : beach;
         rgb = [
           shallows[0] + (lnd[0] - shallows[0]) * cover,
           shallows[1] + (lnd[1] - shallows[1]) * cover,
           shallows[2] + (lnd[2] - shallows[2]) * cover,
         ];
       } else if (land[i]) {
-        rgb = landRamp[heightmap[i]];
+        rgb = landAt(i);
         // Lit from the north west: a slope rising to the south east is bright.
         const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
         const se =
