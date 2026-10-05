@@ -7,6 +7,7 @@ import { currentScan } from "../../content/config";
 import { withoutGeneratedGames } from "../../lib/generatedGames";
 import { compareGameVersions } from "../../play/installedGames";
 import type { HandmadeMapError } from "./errors";
+import { gltfUriEntries, resolveGltfUri } from "./gltf";
 import { MANIFEST_FILE } from "./manifest";
 
 /**
@@ -22,6 +23,10 @@ import { MANIFEST_FILE } from "./manifest";
  *
  * Every read opens the archive afresh, so it sees the files as they are on
  * disk now. A refresh, or a rescan of the game's content, starts a new reader.
+ *
+ * Text and pictures come from unitsync's preview, as data URLs. Model files,
+ * and any file the preview cannot return, are read as raw bytes and become
+ * blob URLs (issue #3603). The reader revokes those when it is disposed.
  */
 
 /** Where map folders live inside a game archive. */
@@ -138,6 +143,36 @@ export function parseArchiveIndex(text: string): {
   };
 }
 
+/** Model files, which unitsync's preview never returns, so they are read raw. */
+const MODEL_FILE = /\.(gltf|glb|bin)$/i;
+
+/** Files read raw whose text the reader also wants. */
+const TEXT_FILE = /\.(json|gltf)$/i;
+
+/** The content type of a file read raw, by its extension. */
+const MIME_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  json: "application/json",
+  gltf: "model/gltf+json",
+  glb: "model/gltf-binary",
+};
+
+function mimeOf(file: string): string {
+  const ext = file.split(".").at(-1)?.toLowerCase() ?? "";
+  return MIME_TYPES[ext] ?? "application/octet-stream";
+}
+
+/** The bytes of a base64 data URL. */
+function dataUrlBytes(url: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(url.slice(url.indexOf(",") + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 /** The text of a member as a URL, so it reads like any other map file. */
 function textUrl(text: string): string {
   return `data:application/json;charset=utf-8,${encodeURIComponent(text)}`;
@@ -157,8 +192,14 @@ function unreadable(file: string, why: string): ArchiveRead {
 
 export interface ArchiveReader {
   list(): Promise<ArchiveListing>;
-  /** Read `file` from the map folder `folder` of `game`. */
+  /**
+   * Read `file` from the map folder `folder` of `game`. A `.gltf` comes back
+   * with the files it names beside itself already read, so it loads from its
+   * URL alone.
+   */
   read(game: ArchiveGame, folder: string, file: string): Promise<ArchiveRead>;
+  /** Revoke the blob URLs the reader made. Its URLs stop loading. */
+  dispose(): void;
 }
 
 /**
@@ -171,23 +212,71 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
   const reads = new Map<string, Promise<ArchiveRead>>();
   /** The real path of each member, by archive and the path in lower case. */
   const paths = new Map<string, Map<string, string>>();
+  /** Every blob URL made, revoked by `dispose`. */
+  const blobs: string[] = [];
 
-  const fetchMember = async (game: ArchiveGame, path: string) =>
-    unitsyncArchiveFile({ ...target, archive: game.archive, file: path });
+  const blobUrl = (part: BlobPart, type: string) => {
+    const url = URL.createObjectURL(new Blob([part], { type }));
+    blobs.push(url);
+    return url;
+  };
 
-  const readMember = async (
+  const fetchMember = async (game: ArchiveGame, path: string, raw = false) =>
+    unitsyncArchiveFile({
+      ...target,
+      archive: game.archive,
+      file: path,
+      ...(raw ? { raw } : {}),
+    });
+
+  const failed = (file: string, e: unknown) =>
+    unreadable(
+      file,
+      `it could not be read. ${e instanceof Error ? e.message : String(e)}`,
+    );
+
+  /** Read a member's own bytes into a blob URL. */
+  const readRaw = async (
     game: ArchiveGame,
     file: string,
     path: string,
   ): Promise<ArchiveRead> => {
     let res: Awaited<ReturnType<typeof fetchMember>>;
     try {
-      res = await fetchMember(game, path);
+      res = await fetchMember(game, path, true);
     } catch (e) {
+      return failed(file, e);
+    }
+    if (res.truncated) {
       return unreadable(
         file,
-        `it could not be read. ${e instanceof Error ? e.message : String(e)}`,
+        "it is larger than 256 MB, the most coilbox reads from a game archive for one file.",
       );
+    }
+    if (!res.dataUrl) {
+      return unreadable(
+        file,
+        `it could not be read. ${res.errors.join(" ")}`.trim(),
+      );
+    }
+    const bytes = dataUrlBytes(res.dataUrl);
+    const url = blobUrl(bytes, mimeOf(file));
+    return TEXT_FILE.test(file)
+      ? { ok: true, url, text: new TextDecoder().decode(bytes) }
+      : { ok: true, url };
+  };
+
+  const readMember = async (
+    game: ArchiveGame,
+    file: string,
+    path: string,
+  ): Promise<ArchiveRead> => {
+    if (MODEL_FILE.test(file)) return readRaw(game, file, path);
+    let res: Awaited<ReturnType<typeof fetchMember>>;
+    try {
+      res = await fetchMember(game, path);
+    } catch (e) {
+      return failed(file, e);
     }
     if (res.kind === "text" && res.text !== undefined) {
       return { ok: true, url: textUrl(res.text), text: res.text };
@@ -195,25 +284,49 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     if (res.kind === "image" && res.dataUrl) {
       return { ok: true, url: res.dataUrl };
     }
-    if (res.truncated) {
-      return unreadable(
-        file,
-        "it is too large to read from a game archive. Text files can be up to 512 KB and images up to 8 MB.",
-      );
-    }
-    if (/\.(gltf|glb|bin)$/i.test(file)) {
-      return unreadable(
-        file,
-        "coilbox cannot read model files from a game archive yet. Leave models out of a map the game carries.",
-      );
-    }
-    if (res.errors.length > 0) {
+    if (res.errors.length > 0 && !res.truncated) {
       return unreadable(file, `it could not be read. ${res.errors.join(" ")}`);
     }
-    return unreadable(
-      file,
-      "coilbox cannot read this kind of file from a game archive. Use PNG or JPEG for images and JSON for text.",
-    );
+    // Too large for a preview, or a kind the preview does not return. The map
+    // reader says so when the bytes are not a picture or text it can use.
+    return readRaw(game, file, path);
+  };
+
+  /**
+   * Read a `.gltf` and the files it names beside itself, and point its uris at
+   * their URLs. A blob URL has no folder, so a relative uri in it would not
+   * load. A named file the folder lacks keeps its uri, and the map reader
+   * reports it as missing.
+   */
+  const readGltf = async (
+    game: ArchiveGame,
+    folder: string,
+    file: string,
+  ): Promise<ArchiveRead> => {
+    const read = await member(game, file, pathIn(game, folder, file));
+    if (!read.ok || read.text === undefined) return read;
+    let json: unknown;
+    try {
+      json = JSON.parse(read.text);
+    } catch {
+      // The view reports a model it cannot read when it loads it.
+      return read;
+    }
+    let changed = false;
+    for (const entry of gltfUriEntries(json)) {
+      const found = resolveGltfUri(entry.uri, file);
+      if (!found || found.outside) continue;
+      const path = paths
+        .get(game.archive)
+        ?.get(`${ARCHIVE_MAPS_DIR}/${folder}/${found.path}`.toLowerCase());
+      if (path === undefined) continue;
+      const sibling = await member(game, found.path, path);
+      if (!sibling.ok) return sibling;
+      entry.uri = sibling.url;
+      changed = true;
+    }
+    if (!changed) return read;
+    return { ok: true, url: blobUrl(JSON.stringify(json), mimeOf(file)) };
   };
 
   const listGame = async (game: ArchiveGame, into: ArchiveListing) => {
@@ -285,6 +398,11 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
     }
   };
 
+  const pathIn = (game: ArchiveGame, folder: string, file: string) => {
+    const wanted = `${ARCHIVE_MAPS_DIR}/${folder}/${file}`;
+    return paths.get(game.archive)?.get(wanted.toLowerCase()) ?? wanted;
+  };
+
   const member = (
     game: ArchiveGame,
     file: string,
@@ -316,9 +434,19 @@ export function createArchiveReader(target: ArchiveTarget): ArchiveReader {
       return listing;
     },
     async read(game, folder, file) {
-      const wanted = `${ARCHIVE_MAPS_DIR}/${folder}/${file}`;
-      const path = paths.get(game.archive)?.get(wanted.toLowerCase()) ?? wanted;
-      return member(game, file, path);
+      const path = pathIn(game, folder, file);
+      if (!/\.gltf$/i.test(file)) return member(game, file, path);
+      // Kept apart from the plain read of the same file, which it starts from.
+      const key = `gltf\0${game.archive}\0${path.toLowerCase()}`;
+      let read = reads.get(key);
+      if (!read) {
+        read = readGltf(game, folder, file);
+        reads.set(key, read);
+      }
+      return read;
+    },
+    dispose() {
+      for (const url of blobs.splice(0)) URL.revokeObjectURL(url);
     },
   };
 }

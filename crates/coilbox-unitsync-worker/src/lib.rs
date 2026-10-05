@@ -1717,12 +1717,15 @@ impl LuaArgs {
 /// `extract` layer: neither given is a tree listing, `file` alone is a
 /// preview, and both together is an extract. `extract` given without `file`
 /// is silently ignored by `run()`, the same treatment the old code gave the
-/// combination, since there is no member named to extract.
+/// combination, since there is no member named to extract. `raw` turns a
+/// preview into a read of the member's own bytes, with no transcode and the
+/// larger cap a map folder needs (issue #3603).
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct ArchiveArgs {
     pub archive: String,
     pub file: Option<String>,
     pub extract: Option<String>,
+    pub raw: bool,
 }
 
 impl ArchiveArgs {
@@ -1738,6 +1741,9 @@ impl ArchiveArgs {
             args.push("--extract".to_string());
             args.push(e.clone());
         }
+        if self.raw {
+            args.push("--raw".to_string());
+        }
         args
     }
 
@@ -1749,12 +1755,14 @@ impl ArchiveArgs {
         let mut archive = None;
         let mut file = None;
         let mut extract = None;
+        let mut raw = false;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--archive" => archive = it.next().cloned(),
                 "--file" => file = it.next().cloned(),
                 "--extract" => extract = it.next().cloned(),
+                "--raw" => raw = true,
                 _ => {}
             }
         }
@@ -1762,6 +1770,7 @@ impl ArchiveArgs {
             archive: archive.unwrap_or_default(),
             file,
             extract,
+            raw,
         })
     }
 }
@@ -2945,6 +2954,7 @@ mod tests {
             archive: "Map.sd7".into(),
             file: Some("maps/x.smd".into()),
             extract: Some("/out/x.smd".into()),
+            raw: false,
         }
     }
 
@@ -2966,6 +2976,20 @@ mod tests {
         };
         let a = original.to_args();
         assert!(!a.contains(&"--extract".to_string()));
+        let recovered = ArchiveArgs::from_args(&a).expect("valid argv");
+        assert_eq!(recovered, original);
+    }
+
+    /// A raw read keeps its flag through the round trip.
+    #[test]
+    fn archive_raw_file_round_trips_through_to_args_and_from_args() {
+        let original = ArchiveArgs {
+            extract: None,
+            raw: true,
+            ..archive_extract_args()
+        };
+        let a = original.to_args();
+        assert!(a.contains(&"--raw".to_string()));
         let recovered = ArchiveArgs::from_args(&a).expect("valid argv");
         assert_eq!(recovered, original);
     }

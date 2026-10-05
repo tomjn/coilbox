@@ -2537,7 +2537,7 @@ export interface ArchiveFileResult {
   kind: "text" | "image" | "audio" | "binary";
   /** Decoded contents, when `kind === "text"`. */
   text?: string;
-  /** `data:` URL, when `kind === "image"` or `kind === "audio"`. */
+  /** `data:` URL, when `kind === "image"` or `kind === "audio"`, or a raw read. */
   dataUrl?: string;
   /** The member's real size in bytes. */
   size: number;
@@ -2553,7 +2553,18 @@ export interface ArchiveFileResult {
  * returns as binary.
  */
 export const unitsyncArchiveFile = defineCommand<
-  { enginePath: string; dataDir: string; archive: string; file: string },
+  {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    file: string;
+    /**
+     * Return the member's own bytes as an `application/octet-stream` data URL
+     * in `dataUrl`, with no preview cap or transcode. A member past the raw
+     * cap comes back `truncated` with no bytes.
+     */
+    raw?: boolean;
+  },
   ArchiveFileResult
 >("coilbox-unitsync", "unitsync_archive_file");
 

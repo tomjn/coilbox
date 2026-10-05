@@ -355,7 +355,7 @@ A `file` model is a `.gltf` or `.glb` file in the map folder, with a path writte
 
 A `game` model is one the game ships. The name works as a unit definition's `objectname` does. It can be a model file name with or without its extension, or a whole path inside the game archive, such as `features/pinetree.s3o`. A unit name works only when the game names the model file after the unit. A feature name does not work when its model file is named differently, because coilbox does not read feature definitions. The sample uses no `game` model, because the repository has no model name to confirm for its game.
 
-If a model cannot be loaded when the map is drawn, the rest of the map still draws, and the failure is written once to the console for each name. A game archive cannot carry a map with a `file` model yet. See [Inside a game archive](#inside-a-game-archive).
+If a model cannot be loaded when the map is drawn, the rest of the map still draws, and the failure is written once to the console for each name.
 
 ## Warpath markings
 
@@ -652,9 +652,9 @@ coilbox/
 - Coilbox reads the list again when it rescans the games or finishes a download. A conquest on a carried map records the game's name. If a game update removes the map, the save says the game no longer carries it.
 - On an id clash the order is the bundled map, then the map a game carries, then an imported map. Between two installed versions of a game, the newer version's map is shown.
 
-A map read from a game archive cannot use model files yet. A `.gltf`, `.glb` or `.bin` file is refused with an error naming the file. Leave `models` out of such a map. Issue #3603 covers this.
+A map in a game archive can use everything a folder on disk can, models included. A `.gltf` finds its `.bin` and texture files beside it in the archive, as it does on disk.
 
-Text files in the archive can be up to 512 KB and images up to 8 MB. These are the constants `TEXT_CAP` and `IMAGE_CAP` in `crates/coilbox-unitsync-worker/src/archive.rs`. A larger file is refused with an error naming the file. A file the reader cannot decode is refused the same way, and the error says to use PNG or JPEG for images and JSON for text.
+One file can be up to 256 MB, the same as the most a map zip may unpack to. This is the constant `RAW_CAP` in `crates/coilbox-unitsync-worker/src/archive.rs`. A larger file is refused with an error naming the file.
 
 #### Hide the generated styles
 
