@@ -46,6 +46,7 @@ import { FOG_RANGE, withinJumps } from "../fog";
 import { isVoidNode, type VoidBody, voidBodiesFor } from "../galaxy3d/bodies";
 import { factionSides } from "../galaxy3d/factionShape";
 import { GalaxyView, nodeBodyLabel } from "../galaxy3d/GalaxyView";
+import { MapLoading } from "../galaxy3d/MapLoading";
 import { galaxyPalette } from "../galaxy3d/palette";
 import { usePlacedModelSources } from "../galaxy3d/usePlacedModelSources";
 import { restoreChallengeMap, substituteExcludedMaps } from "../generate";
@@ -64,18 +65,15 @@ import {
   releaseHandmadeChallenge,
 } from "../handmade/heldChallenge";
 import { useHandmadeMap, useHandmadeMaps } from "../handmade/useHandmadeMaps";
-import {
-  drawsAsGalaxy,
-  generatedTerrainPixels,
-  locationNoun,
-  regenerateGalaxy,
-} from "../mapStyle";
+import { regenerateOffThread } from "../landJobs";
+import { drawsAsGalaxy, locationNoun } from "../mapStyle";
 import type { ConquestState, GalaxyDoc, GalaxyNode, TurnEvent } from "../model";
 import { NEUTRAL, newConquestState, playableFactions } from "../model";
 import { mergeConquestNames } from "../names";
 import { advanceTurn, attackableNodes } from "../rules";
 import { readThreatLevel } from "../threat";
 import { finishedConquest, unlockedLevel } from "../unlocks";
+import { useGeneratedTerrainPixels } from "../useGeneratedTerrainPixels";
 import { useAwardFinishedConquest, useConquestUnlocks } from "../useUnlocks";
 import { BattleOverlay } from "./components/BattleOverlay";
 import {
@@ -627,7 +625,7 @@ function GalaxyScreen({
 
   // A generated land map stores no pixels, so its land is built again from the
   // document here and handed to the view.
-  const terrainPixels = useMemo(() => generatedTerrainPixels(galaxy), [galaxy]);
+  const terrain = useGeneratedTerrainPixels(galaxy);
 
   // Where the map's placed models are read from: the installed game, and the
   // map's own folder for a hand-made map.
@@ -672,14 +670,7 @@ function GalaxyScreen({
   // build frames the *default* faction (state not yet known) and recentres with
   // a jump once the played faction resolves.
   if (loading) {
-    return (
-      <div className="flex h-full items-center justify-center bg-[#05070f]">
-        <Loader2
-          className="size-6 animate-spin text-muted-foreground"
-          aria-hidden
-        />
-      </div>
-    );
+    return <MapLoading label="Loading your campaign…" />;
   }
 
   return (
@@ -698,26 +689,37 @@ function GalaxyScreen({
           )}
         </div>
       )}
-      <GalaxyView
-        galaxy={themedGalaxy}
-        owners={owners}
-        playerFactionId={playerFactionId}
-        selectedId={selectedId}
-        incursion={primaryIncursion}
-        attackableIds={attackable}
-        onSelect={(id) => {
-          setSelectedId(id);
-          setFactionFocus(null);
-        }}
-        visibleIds={visibleIds}
-        spaceMaps={spaceMaps}
-        focusNodeId={battleNodeId ?? factionFocus}
-        focusBiasX={state ? 0 : 0.13}
-        modelSources={modelSources}
-        terrainPixels={terrainPixels}
-        display={{ reduceMotion, effects, performanceMode }}
-        className="absolute inset-0"
-      />
+      {terrain.error && (
+        <div className="pointer-events-auto absolute left-1/2 top-4 z-50 w-[28rem] max-w-[90%] -translate-x-1/2">
+          <ErrorBanner
+            message={`The land of this map could not be built. ${terrain.error}`}
+          />
+        </div>
+      )}
+      {terrain.pending ? (
+        <MapLoading label="Building the land…" className="absolute inset-0" />
+      ) : terrain.error ? null : (
+        <GalaxyView
+          galaxy={themedGalaxy}
+          owners={owners}
+          playerFactionId={playerFactionId}
+          selectedId={selectedId}
+          incursion={primaryIncursion}
+          attackableIds={attackable}
+          onSelect={(id) => {
+            setSelectedId(id);
+            setFactionFocus(null);
+          }}
+          visibleIds={visibleIds}
+          spaceMaps={spaceMaps}
+          focusNodeId={battleNodeId ?? factionFocus}
+          focusBiasX={state ? 0 : 0.13}
+          modelSources={modelSources}
+          terrainPixels={terrain.pixels}
+          display={{ reduceMotion, effects, performanceMode }}
+          className="absolute inset-0"
+        />
+      )}
       {effects && <AmbienceAudio galaxy={galaxy} />}
 
       {/* Legibility scrim so the transparent top bar reads over a bright field */}
@@ -1269,7 +1271,7 @@ export function RunSetupPanel({
     if (maps.length === 0) return;
     setRegenBusy(true);
     try {
-      const doc = regenerateGalaxy(
+      const doc = await regenerateOffThread(
         galaxy,
         {
           maps,
@@ -1388,7 +1390,14 @@ export function RunSetupPanel({
           disabled={regenBusy || busy || !scan.data}
           onClick={regenerate}
         >
-          <Dices className="mr-1.5 size-4" aria-hidden />
+          {regenBusy ? (
+            <Loader2
+              className="mr-1.5 size-4 motion-safe:animate-spin"
+              aria-hidden
+            />
+          ) : (
+            <Dices className="mr-1.5 size-4" aria-hidden />
+          )}
           {regenBusy ? "Regenerating…" : "Regenerate map"}
         </Button>
       )}

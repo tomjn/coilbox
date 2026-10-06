@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { GalaxyView } from "../conquest/galaxy3d/GalaxyView";
-import type { TerrainPixels } from "../conquest/galaxy3d/terrainLoad";
+import { MapLoading } from "../conquest/galaxy3d/MapLoading";
 import {
   type PlacedModelGame,
   usePlacedModelSources,
 } from "../conquest/galaxy3d/usePlacedModelSources";
-import { generatedTerrainPixels } from "../conquest/mapStyle";
+import { useGeneratedTerrainPixels } from "../conquest/useGeneratedTerrainPixels";
 import { useKnownSpaceMaps } from "../content/mapAppearanceCache";
+import { ErrorBanner } from "../content/pages/components/states";
 import {
   useEffectsEnabled,
   usePerformanceMode,
@@ -98,11 +99,7 @@ export function RunMapView({
     run.edges,
     handmadeMap?.map,
   ]);
-  const terrainPixels = useMemo(
-    (): TerrainPixels | undefined =>
-      land ? generatedTerrainPixels(land.map) : undefined,
-    [land],
-  );
+  const terrain = useGeneratedTerrainPixels(land?.map);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: deliberately keyed on the run's structure, not the whole run, so advancing doesn't rebuild the scene
   const doc = useMemo(
@@ -188,6 +185,18 @@ export function RunMapView({
   const performanceMode = usePerformanceMode();
 
   if (handmadeMap?.loading) return <div className={className} />;
+  if (terrain.pending) {
+    return <MapLoading label="Building the land…" className={className} />;
+  }
+  if (terrain.error) {
+    return (
+      <div className={className}>
+        <ErrorBanner
+          message={`The land of this map could not be built. ${terrain.error}`}
+        />
+      </div>
+    );
+  }
 
   return (
     <GalaxyView
@@ -205,7 +214,7 @@ export function RunMapView({
       selectedId={toView(selectedId)}
       onSelect={onViewSelect}
       focusNodeId={toView(focusId)}
-      terrainPixels={terrainPixels}
+      terrainPixels={terrain.pixels}
       spaceMaps={spaceMaps}
       modelSources={modelSources}
       display={{ reduceMotion, effects, performanceMode }}
