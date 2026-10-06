@@ -537,6 +537,12 @@ export function townPatches(
     mapToWorldXZ(mapX: number, mapY: number): [number, number];
   },
   lift: number,
+  /**
+   * Whether town `k` draws on the cell centred on world `x, z`, whose corners
+   * lie `half` from its centre. Left out, every cell the town's reach touches
+   * is kept: a disc, not the square round it.
+   */
+  keep?: (k: number, x: number, z: number, half: number) => boolean,
 ): { positions: Float32Array; town: Float32Array; index: Uint32Array } {
   const { segmentsX, segmentsY, vertexHeights } = surface;
   const cols = segmentsX + 1;
@@ -576,14 +582,15 @@ export function townPatches(
         town.push(k);
       }
     }
-    // Only the cells the reach touches: a disc, not the square round it.
-    const touch = reach + Math.hypot(cellW, cellD) / 2;
+    const half = Math.hypot(cellW, cellD) / 2;
+    const touch = reach + half;
     for (let j = 0; j < j1 - j0; j++) {
       for (let i = 0; i < i1 - i0; i++) {
         const topLeft = first + j * across + i;
         const cx = positions[topLeft * 3] + cellW / 2;
         const cz = positions[topLeft * 3 + 2] + cellD / 2;
         if (Math.hypot(cx - t.x, cz - t.z) > touch) continue;
+        if (keep && !keep(k, cx, cz, half)) continue;
         const bottomLeft = topLeft + across;
         index.push(
           topLeft,
@@ -600,6 +607,178 @@ export function townPatches(
     positions: new Float32Array(positions),
     town: new Float32Array(town),
     index: new Uint32Array(index),
+  };
+}
+
+/**
+ * The town shader's limits (`townShader.ts`), as shares of the town's edge in
+ * that direction unless named in world units. Kept equal to the shader's own
+ * literals by hand, and the geometry below drops ground past them.
+ *
+ * Houses reach {@link HOUSE_REACH}. Along a road, within
+ * {@link RIBBON_ROAD} world units of it, they reach {@link RIBBON_REACH},
+ * and never past {@link RIBBON_RADII} radii. The ring round a selected or
+ * hovered town is centred on {@link RING_AT}. No field is sown inside
+ * {@link FIELD_INNER}.
+ */
+export const HOUSE_REACH = 1.08;
+export const RIBBON_REACH = 1.55;
+export const RIBBON_ROAD = 0.3;
+export const RIBBON_RADII = 1.8;
+export const RING_AT = 1.12;
+export const FIELD_INNER = 0.85;
+/**
+ * How far the ring reaches past {@link RING_AT}, in world units. The shader
+ * draws it to 1.93 screen pixels out (half of a thick ring's 2.86 pixels,
+ * plus half a pixel of smoothing). A pixel covers at most 0.103 world units
+ * looking straight down from the camera's farthest, 220 units with a 50
+ * degree field of view over 2006 pixels, so 0.198 units. This allows twice
+ * that. Only a town at the far horizon of a tilted view, where the ring is a
+ * pixel or two across, could see its outer edge cut.
+ */
+export const RING_REACH = 0.4;
+
+/**
+ * The least and most a town's edge reaches, as {@link townEdge} works it
+ * out, over every direction from its anchor to a point of the disc of radius
+ * `half` round world `x, z`. Sampled at most {@link EDGE_STEP} radians apart,
+ * then widened by {@link EDGE_SLACK} for what lies between samples.
+ */
+export function edgeBounds(
+  town: Town,
+  x: number,
+  z: number,
+  half: number,
+): [number, number] {
+  const d = Math.hypot(x - town.x, z - town.z);
+  const centre = Math.atan2(z - town.z, x - town.x);
+  const spread = d > half ? Math.asin(half / d) : Math.PI;
+  const steps = Math.max(2, Math.ceil((2 * spread) / EDGE_STEP));
+  let lo = Number.POSITIVE_INFINITY;
+  let hi = 0;
+  for (let s = 0; s <= steps; s++) {
+    const e = townEdge(town, centre - spread + (2 * spread * s) / steps);
+    lo = Math.min(lo, e);
+    hi = Math.max(hi, e);
+  }
+  return [lo * (1 - EDGE_SLACK), hi * (1 + EDGE_SLACK)];
+}
+
+/**
+ * The edge changes by at most 1.36 of itself per radian: 1.05 from the
+ * three waves (0.14 by 2, plus 0.08 by 3, plus 0.05 by 5, is 0.77, over
+ * their least sum of 0.73) and 0.31 from the most stretched ellipse, (1.35
+ * squared less 1) over (2 by 1.35). Between samples 0.02 radians apart the
+ * edge strays at most 1.36 by 0.01, 1.4%, from the nearer one. 2% covers it.
+ */
+const EDGE_STEP = 0.02;
+const EDGE_SLACK = 0.02;
+
+/**
+ * A grid over the whole sheet, read texel by texel: the town index or the
+ * road mask's distances. `stride` bytes a texel.
+ */
+export interface SheetGrid {
+  data: ArrayLike<number>;
+  width: number;
+  height: number;
+  stride: number;
+}
+
+/**
+ * Whether `test` holds for any texel of `grid` that touches the square of
+ * half side `r` round world `x, z`, or the texel beyond it on every side, so
+ * a texture blended between texels is covered too. `test` is given the
+ * texel's first byte's offset.
+ */
+export function anyTexelNear(
+  grid: SheetGrid,
+  worldWidth: number,
+  worldDepth: number,
+  x: number,
+  z: number,
+  r: number,
+  test: (at: number) => boolean,
+): boolean {
+  const col = (v: number) => ((v + worldWidth / 2) / worldWidth) * grid.width;
+  const row = (v: number) => ((v + worldDepth / 2) / worldDepth) * grid.height;
+  const i0 = Math.max(0, Math.floor(col(x - r)) - 1);
+  const i1 = Math.min(grid.width - 1, Math.floor(col(x + r)) + 1);
+  const j0 = Math.max(0, Math.floor(row(z - r)) - 1);
+  const j1 = Math.min(grid.height - 1, Math.floor(row(z + r)) + 1);
+  for (let j = j0; j <= j1; j++) {
+    for (let i = i0; i <= i1; i++) {
+      if (test((j * grid.width + i) * grid.stride)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Whether a cell of ground, centred on world `x, z` with its corners `half`
+ * away, can show any of town `k`: in the town index as that town, and close
+ * enough to hold a house or the ring, or a house along a road where
+ * `roadNear` says one passes within {@link RIBBON_ROAD} of the cell.
+ */
+export function townCell(
+  town: Town,
+  k: number,
+  index: SheetGrid,
+  worldWidth: number,
+  worldDepth: number,
+  roadNear: (x: number, z: number, r: number) => boolean,
+): (x: number, z: number, half: number) => boolean {
+  const tag = k + 1;
+  return (x, z, half) => {
+    const near = Math.max(0, Math.hypot(x - town.x, z - town.z) - half);
+    const [, hi] = edgeBounds(town, x, z, half);
+    const ring = near <= hi * RING_AT + RING_REACH;
+    const ribbon =
+      near <= Math.min(hi * RIBBON_REACH, town.radius * RIBBON_RADII) &&
+      roadNear(x, z, half);
+    if (!ring && !ribbon) return false;
+    return anyTexelNear(
+      index,
+      worldWidth,
+      worldDepth,
+      x,
+      z,
+      half,
+      (at) => index.data[at] * 256 + index.data[at + 1] === tag,
+    );
+  };
+}
+
+/**
+ * Whether a cell of ground, as for {@link townCell}, can show any of town
+ * `k`'s fields: in the town index as that town, fit for fields, within
+ * {@link TOWN_REACH} radii, and not wholly inside {@link FIELD_INNER} of the
+ * town's edge, where nothing is sown.
+ */
+export function fieldCell(
+  town: Town,
+  k: number,
+  index: SheetGrid,
+  worldWidth: number,
+  worldDepth: number,
+): (x: number, z: number, half: number) => boolean {
+  const tag = k + 1;
+  return (x, z, half) => {
+    const d = Math.hypot(x - town.x, z - town.z);
+    if (d - half > town.radius * TOWN_REACH) return false;
+    const [lo] = edgeBounds(town, x, z, half);
+    if (d + half < lo * FIELD_INNER) return false;
+    return anyTexelNear(
+      index,
+      worldWidth,
+      worldDepth,
+      x,
+      z,
+      half,
+      (at) =>
+        index.data[at] * 256 + index.data[at + 1] === tag &&
+        index.data[at + 3] > 0,
+    );
   };
 }
 

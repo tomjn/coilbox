@@ -58,8 +58,9 @@ uniform sampler2D uRoadDistance;
 uniform vec2 uTownIndexSize;
 uniform float uRoadReach;
 uniform float uFieldReach;
-// 0 draws the fields, 1 the town over them.
-uniform float uLayer;
+// 0 draws the fields, 1 the town over them. A constant, so each pass is
+// compiled without the other's code, which holds fewer registers.
+const float uLayer = LAYER_HERE;
 uniform vec4 uFrame;
 uniform vec3 uSun;
 uniform float uAmbient;
@@ -202,11 +203,12 @@ void main() {
   float roadD = texture(uRoadDistance, uv).r * uRoadReach;
   // Houses reach a little past the edge, and along a road half as far
   // again, so past those nothing is built and only a ring could draw. Past
-  // that there are only fields, and past the fields nothing.
+  // that there are only fields, and past the fields nothing. Nothing is sown
+  // inside 0.85 of the edge or on a road (see sown below).
   bool noTown = uLayer < 0.5 || ((rr > 1.08 && (roadD > 0.3 || rr > 1.55)) && ws0.a < 0.004);
   float fd = dist / (wR * uFieldReach);
   float farm = texture(uTownIndex, uv).a;
-  if (noTown && (uLayer > 0.5 || fd > 1.0 || farm < 0.004)) discard;
+  if (noTown && (uLayer > 0.5 || fd > 1.0 || farm < 0.004 || rr <= 0.85 || roadD <= 0.1)) discard;
   vec4 ws1 = texelFetch(uTownState, ivec2(vTown, 1), 0);
   // Built up colour and coverage, premultiplied.
   vec4 town = vec4(0.0);
@@ -406,7 +408,10 @@ export function townMaterial(
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader: VERTEX,
-    fragmentShader: FRAGMENT.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE),
+    fragmentShader: FRAGMENT.replace(
+      "TERRAIN_NOISE_HERE",
+      TERRAIN_NOISE,
+    ).replace("LAYER_HERE", layer === "town" ? "1.0" : "0.0"),
     uniforms: {
       uTownIndex: { value: shading.index },
       uTownData: { value: shading.data },
@@ -415,7 +420,6 @@ export function townMaterial(
       uTownIndexSize: { value: new THREE.Vector2(...shading.indexSize) },
       uRoadReach: { value: shading.roadReach },
       uFieldReach: { value: TOWN_REACH },
-      uLayer: { value: layer === "town" ? 1 : 0 },
       uFrame: { value: shading.frame },
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uAmbient: { value: SHADE_AMBIENT },

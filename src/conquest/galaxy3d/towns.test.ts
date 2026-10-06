@@ -1,16 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
 import {
+  anyTexelNear,
   buildableAt,
   buildTownIndex,
   CAPITAL_RADIUS,
   clipRoads,
+  edgeBounds,
+  FIELD_INNER,
   FLAT_SLOPE,
   farmableAt,
   farmBiome,
+  fieldCell,
   leavingAngle,
   MAX_STREETS,
   planTowns,
+  RIBBON_RADII,
+  RIBBON_REACH,
+  RING_AT,
+  RING_REACH,
   ROAD_CLIP,
   roadAxis,
   roadEntries,
@@ -19,6 +27,7 @@ import {
   TOWN_RADIUS,
   TOWN_REACH,
   type TownSite,
+  townCell,
   townDataTexels,
   townEdge,
   townPatches,
@@ -276,6 +285,190 @@ describe("townPatches", () => {
       expect(town[index[k]]).toBe(town[index[k + 1]]);
       expect(town[index[k]]).toBe(town[index[k + 2]]);
     }
+  });
+});
+
+describe("edgeBounds", () => {
+  it("holds the town's edge in every direction to a point of the disc", () => {
+    for (const t of towns) {
+      for (let s = 0; s < 200; s++) {
+        // Points round the town, near and far, with discs large and small.
+        const a = s * 2.399;
+        const d = 0.2 + (s % 17) * 0.6;
+        const x = t.x + Math.cos(a) * d;
+        const z = t.z + Math.sin(a) * d;
+        const half = 0.1 + (s % 5) * 0.3;
+        const [lo, hi] = edgeBounds(t, x, z, half);
+        for (let k = 0; k < 40; k++) {
+          const b = k * 2.399;
+          const r = half * Math.sqrt((k + 0.5) / 40);
+          const px = x + Math.cos(b) * r;
+          const pz = z + Math.sin(b) * r;
+          const e = townEdge(t, Math.atan2(pz - t.z, px - t.x));
+          expect(e).toBeGreaterThanOrEqual(lo);
+          expect(e).toBeLessThanOrEqual(hi);
+        }
+      }
+    }
+  });
+});
+
+describe("anyTexelNear", () => {
+  // A 10 by 10 grid over a sheet 10 units across, one marked texel at
+  // column 6, row 3, which covers world x 1 to 2 and z -2 to -1.
+  const data = new Uint8Array(100);
+  data[3 * 10 + 6] = 1;
+  const grid = { data, width: 10, height: 10, stride: 1 };
+  const marked = (at: number) => data[at] === 1;
+
+  it("finds a texel the square touches, or the texel beyond it", () => {
+    expect(anyTexelNear(grid, 10, 10, 1.5, -1.5, 0.1, marked)).toBe(true);
+    // The square reaches x 2.6, in the next texel, one from the marked one.
+    expect(anyTexelNear(grid, 10, 10, 2.5, -1.5, 0.1, marked)).toBe(true);
+  });
+
+  it("misses a texel two or more away", () => {
+    expect(anyTexelNear(grid, 10, 10, 3.5, -1.5, 0.1, marked)).toBe(false);
+    expect(anyTexelNear(grid, 10, 10, -3, 3, 0.4, marked)).toBe(false);
+  });
+});
+
+describe("townCell and fieldCell", () => {
+  // A flat sheet 40 units across in 80 cells of 0.5, the size of a real
+  // map's cells, and an index of 0.25 unit texels.
+  const flat: HeightGrid = {
+    data: new Float32Array(81 * 81),
+    width: 81,
+    height: 81,
+  };
+  const surface = createTerrainSurface(
+    { width: 40, height: 40, heightScale: 1 },
+    40,
+    flat,
+  );
+  const cell = surface.worldWidth / surface.segmentsX;
+  const local = withStreets(
+    planTowns(
+      [
+        { x: -8, z: -6, capital: true, roads: [0, Math.PI / 3] },
+        { x: 9, z: 7, capital: false, roads: [] },
+      ],
+      3,
+    ),
+    [],
+  );
+  const built = buildTownIndex(
+    local,
+    40,
+    40,
+    160,
+    () => 1,
+    () => 1,
+  );
+  const index = { ...built, stride: 4 };
+  const tagAt = (x: number, z: number) => {
+    const i = Math.min(159, Math.floor(((x + 20) / 40) * 160));
+    const j = Math.min(159, Math.floor(((z + 20) / 40) * 160));
+    const at = (j * 160 + i) * 4;
+    return built.data[at] * 256 + built.data[at + 1] - 1;
+  };
+  /** The cells each town's patch keeps, as `i j` keys per town. */
+  const kept = (
+    keep?: (k: number, x: number, z: number, half: number) => boolean,
+  ) => {
+    const p = townPatches(local, surface, 0, keep);
+    const out = local.map(() => new Set<string>());
+    for (let t = 0; t < p.index.length; t += 3) {
+      let x = 0;
+      let z = 0;
+      for (const v of p.index.slice(t, t + 3)) {
+        x += p.positions[v * 3] / 3;
+        z += p.positions[v * 3 + 2] / 3;
+      }
+      const key = `${Math.floor((x + 20) / cell)} ${Math.floor((z + 20) / cell)}`;
+      out[p.town[p.index[t]]].add(key);
+    }
+    return out;
+  };
+  const cellOf = (x: number, z: number) =>
+    `${Math.floor((x + 20) / cell)} ${Math.floor((z + 20) / cell)}`;
+  /** Every point 0.05 apart where `draws` says town k could draw. */
+  const covered = (
+    cells: Set<string>[],
+    draws: (k: number, d: number, edge: number) => boolean,
+  ) => {
+    let checked = 0;
+    for (let z = -19.98; z < 20; z += 0.05) {
+      for (let x = -19.98; x < 20; x += 0.05) {
+        const k = tagAt(x, z);
+        if (k < 0) continue;
+        const t = local[k];
+        const d = Math.hypot(x - t.x, z - t.z);
+        const edge = townEdge(t, Math.atan2(z - t.z, x - t.x));
+        if (!draws(k, d, edge)) continue;
+        checked++;
+        if (!cells[k].has(cellOf(x, z))) return { checked, missed: [x, z] };
+      }
+    }
+    return { checked, missed: null };
+  };
+  const townKeep =
+    (roadNear: () => boolean) =>
+    (k: number, x: number, z: number, half: number) =>
+      townCell(local[k], k, index, 40, 40, roadNear)(x, z, half);
+
+  it("keeps every cell a house or the ring can draw on, and far fewer than the disc", () => {
+    const cells = kept(townKeep(() => false));
+    const result = covered(
+      cells,
+      (_k, d, edge) => d <= edge * RING_AT + RING_REACH,
+    );
+    expect(result.missed).toBeNull();
+    expect(result.checked).toBeGreaterThan(1000);
+    const disc = kept();
+    for (const [k, set] of cells.entries()) {
+      expect(set.size).toBeLessThan(disc[k].size * 0.5);
+    }
+  });
+
+  it("keeps the cells of houses along a road when one passes", () => {
+    const cells = kept(townKeep(() => true));
+    const result = covered(
+      cells,
+      (k, d, edge) =>
+        d <= Math.min(edge * RIBBON_REACH, local[k].radius * RIBBON_RADII),
+    );
+    expect(result.missed).toBeNull();
+  });
+
+  it("keeps every cell a field can lie on and none wholly inside the town", () => {
+    const cells = kept((k, x, z, half) =>
+      fieldCell(local[k], k, index, 40, 40)(x, z, half),
+    );
+    const result = covered(
+      cells,
+      (k, d, edge) =>
+        d > edge * FIELD_INNER && d <= local[k].radius * TOWN_REACH,
+    );
+    expect(result.missed).toBeNull();
+    for (const [k, t] of local.entries()) {
+      expect(cells[k].has(cellOf(t.x, t.z))).toBe(false);
+    }
+  });
+
+  it("keeps no field cells where no ground is fit for fields", () => {
+    const barren = buildTownIndex(
+      local,
+      40,
+      40,
+      160,
+      () => 1,
+      () => 0,
+    );
+    const p = townPatches(local, surface, 0, (k, x, z, half) =>
+      fieldCell(local[k], k, { ...barren, stride: 4 }, 40, 40)(x, z, half),
+    );
+    expect(p.index.length).toBe(0);
   });
 });
 
