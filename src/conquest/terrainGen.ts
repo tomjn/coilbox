@@ -1162,7 +1162,7 @@ function climateWeights(
   const warm =
     0.55 + across * warmSpread * 2 + (warmValue - 0.5) * 0.6 - h * 0.5;
   const cold = clamp01(clamp01((0.3 - warm) / 0.25) + planet.climate.cold);
-  planet.weights(h, wet, cold, SHARES);
+  planet.weights(h, wet, cold, SHARES, clamp01(coastDist / (3 * 40)));
   weightBytes(SHARES, BYTES, 0);
   for (let c = 0; c < 4; c++) {
     biomes.a[o + c] = BYTES[c];

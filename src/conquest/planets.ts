@@ -72,8 +72,17 @@ export interface Planet {
   clearing: Rgb;
   /** Added to moisture and to cold before the rule runs. */
   climate: { wet: number; cold: number };
-  /** Fill `out` (length 8) with shares summing to 1. `h`, `wet`, `cold` are 0 to 1. */
-  weights(h: number, wet: number, cold: number, out: Float64Array): void;
+  /**
+   * Fill `out` (length 8) with shares summing to 1. `h`, `wet`, `cold` are 0 to
+   * 1, and so is `inland`: 0 at the coast and 1 from 40 pixels in.
+   */
+  weights(
+    h: number,
+    wet: number,
+    cold: number,
+    out: Float64Array,
+    inland: number,
+  ): void;
   sea: {
     look: SeaLook;
     shallow: Rgb;
@@ -191,14 +200,22 @@ const DESERT: Planet = {
   ],
   clearing: [150, 148, 96],
   climate: { wet: -0.35, cold: -0.2 },
-  weights(h, wet, cold, out) {
+  weights(h, wet, _cold, out, inland) {
     out.fill(0);
     const t = ramp(wet, 0.2, 0.4);
     out[0] = 1 - t;
     out[3] = t;
+    // Salt lies where water once pooled and dried: the floors of dry basins
+    // well back from the sea.
+    blend(
+      out,
+      4,
+      ramp(inland, 0.4, 0.3) *
+        (1 - ramp(h, 0.11, 0.05)) *
+        (1 - ramp(wet, 0.1, 0.2)),
+    );
     blend(out, 1, ramp(h, 0.42, 0.15));
     blend(out, 2, ramp(h, 0.66, 0.14));
-    blend(out, 4, ramp(h, 0.84 - 0.25 * cold, 0.08));
     blend(out, 5, 1 - ramp(h, 0, 0.015));
   },
   sea: {

@@ -77,13 +77,14 @@ describe("planets", () => {
       const out = new Float64Array(BIOME_SLOTS);
       for (const h of [0, 0.01, 0.3, 0.5, 0.7, 0.9, 1])
         for (const wet of [0, 0.3, 0.45, 0.7, 1])
-          for (const cold of [0, 0.5, 1]) {
-            p.weights(h, wet, cold, out);
-            expect(out.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
-            for (let s = p.biomes.length; s < BIOME_SLOTS; s++)
-              expect(out[s]).toBe(0);
-            for (const v of out) expect(v).toBeGreaterThanOrEqual(0);
-          }
+          for (const cold of [0, 0.5, 1])
+            for (const inland of [0, 0.8, 1]) {
+              p.weights(h, wet, cold, out, inland);
+              expect(out.reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
+              for (let s = p.biomes.length; s < BIOME_SLOTS; s++)
+                expect(out[s]).toBe(0);
+              for (const v of out) expect(v).toBeGreaterThanOrEqual(0);
+            }
     }
   });
 
@@ -104,7 +105,7 @@ describe("planets", () => {
       [1, 0.9, 1],
     ];
     for (const [h, wet, cold] of inputs) {
-      p.weights(h, wet, cold, out);
+      p.weights(h, wet, cold, out, 1);
       const got: Rgb = [0, 0, 0];
       for (let s = 0; s < p.biomes.length; s++)
         for (let ch = 0; ch < 3; ch++)
