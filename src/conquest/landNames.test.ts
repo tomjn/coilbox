@@ -3,11 +3,11 @@ import { generateCities } from "./cities";
 import { generateGalaxy } from "./generate";
 import {
   type ConquestNames,
-  LAND_FIRST,
-  LAND_LAST,
+  LAND_NAME_POOLS,
   makeLandNamer,
   resolveLandNames,
 } from "./names";
+import { PLANETS } from "./planets";
 import { generateTerritories } from "./territories";
 
 const NOW = "2026-01-01T00:00:00.000Z";
@@ -32,9 +32,10 @@ const LAYOUTS = ["scatter", "spiral", "clusters", "ring"] as const;
 const names = (doc: { nodes: { name: string }[] }) =>
   doc.nodes.map((n) => n.name);
 
-describe("built-in land names", () => {
-  const composed = LAND_FIRST.flatMap((a) =>
-    LAND_LAST.map((b) => `${a}${b}`.toLowerCase()),
+describe.each(PLANETS)("built-in land names on %s", (planet) => {
+  const { first, last } = LAND_NAME_POOLS[planet];
+  const composed = first.flatMap((a) =>
+    last.map((b) => `${a}${b}`.toLowerCase()),
   );
 
   it("compose to a name no two combinations share", () => {
@@ -86,7 +87,7 @@ describe("built-in land names", () => {
     expect(hits).toEqual([]);
   });
 
-  it("do not spell a country or a well-known city", () => {
+  it("do not spell a country, a well-known city or a place out of Tolkien", () => {
     const real = [
       "england",
       "ireland",
@@ -120,6 +121,15 @@ describe("built-in land names", () => {
       "boston",
       "dublin",
       "oslo",
+      "mordor",
+      "moria",
+      "morgul",
+      "gorgoroth",
+      "khazadum",
+      "khazad-dum",
+      "barad-dur",
+      "angband",
+      "gundabad",
     ];
     expect(composed.filter((name) => real.includes(name))).toEqual([]);
   });
@@ -143,6 +153,30 @@ describe("land map naming", () => {
       });
     }
   }
+
+  it("names each planet from its own lists", () => {
+    for (const planet of PLANETS) {
+      const { first, last } = LAND_NAME_POOLS[planet];
+      const list = names(
+        generateTerritories({ ...base, nodeCount: 24, planet }, NOW),
+      );
+      for (const name of list) {
+        expect(
+          first.some(
+            (a) => name.startsWith(a) && last.includes(name.slice(a.length)),
+          ),
+          `${name} on ${planet}`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("gives two planets of one seed different names", () => {
+    const on = (planet: "moon" | "volcanic") =>
+      names(generateTerritories({ ...base, nodeCount: 24, planet }, NOW));
+    const volcanic = on("volcanic");
+    expect(on("moon").some((n) => volcanic.includes(n))).toBe(false);
+  });
 
   it("keeps Galaxy and Theatre on star names", () => {
     const galaxy = names(generateGalaxy({ ...base, nodeCount: 24 }, NOW));
