@@ -14,6 +14,8 @@ The map has nine painted provinces on two land masses with sea between them, and
 
 `heightmap.png` is the optional heightmap named by `files.heightmap`. Black is lowest and white is highest, and `heightScale` is how high white is in map units.
 
+`towns` in the manifest is set to `true`, so coilbox paints a town at each location, fields round them and roads between neighbouring provinces' towns. Without it the map shows only the picture and the listed roads.
+
 `cairn.gltf` is the placed model that comes from a file. The `models` list stands it on the terrain at `pos`, turned by `rotation`. The file is one `.gltf` with its data inside, so there is nothing else to copy.
 
 `ironcoast-siege.json` is a scenario, exported by the scenario builder's own export code from the Splinter Faction fixture in `src/scenario/fixtures/splinter.json`. Ironcoast names it in its `scenario` field, so the player plays it in place of a skirmish the first time they attack there.

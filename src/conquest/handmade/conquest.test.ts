@@ -175,6 +175,7 @@ describe("starting a conquest on a hand-made map", () => {
       mapId: "sample-two-shores",
       fingerprint: map.handmade?.fingerprint,
       battles: state.handmade?.battles,
+      towns: true,
     });
     expect(doc.handmade?.fingerprint).toMatch(/^[0-9a-f]{16}$/);
   });

@@ -841,3 +841,62 @@ describe("caching", () => {
     ).not.toBe(key);
   });
 });
+
+describe("the towns switch", () => {
+  const read = (edit: (m: Record<string, unknown>) => void) => {
+    const m = JSON.parse(manifestText) as Record<string, unknown>;
+    edit(m);
+    return readHandmadeMap(sample({ manifest: JSON.stringify(m) }));
+  };
+
+  it("is on in the sample and sits on the document's handmade block", () => {
+    const doc = readSample();
+    expect(doc.handmade?.towns).toBe(true);
+  });
+
+  it("is off when absent or false, with no key on the document", () => {
+    for (const edit of [
+      (m: Record<string, unknown>) => {
+        delete m.towns;
+      },
+      (m: Record<string, unknown>) => {
+        m.towns = false;
+      },
+    ]) {
+      const result = read(edit);
+      if (!result.ok) throw new Error("the read failed");
+      expect(result.doc.handmade).toBeDefined();
+      expect("towns" in (result.doc.handmade ?? {})).toBe(false);
+    }
+  });
+
+  it("draws nothing else differently, so the rest of the document is the same", () => {
+    const on = readSample();
+    const off = read((m) => {
+      delete m.towns;
+    });
+    if (!off.ok) throw new Error("the read failed");
+    const { towns: _towns, ...handmade } = on.handmade ?? { mapId: "" };
+    expect({ ...on, handmade }).toEqual(off.doc);
+  });
+
+  it("refuses a value that is not true or false", () => {
+    for (const bad of ["yes", 1, null, {}]) {
+      const errors = errorsOf(
+        sample({
+          manifest: manifestWith((m) => {
+            (m as unknown as Record<string, unknown>).towns = bad;
+          }),
+        }),
+      );
+      const found = only(errors, "manifest-field");
+      expect(found.map((e) => e.path)).toEqual(["towns"]);
+      expect(found[0].message).toBe("map.json: towns must be true or false.");
+    }
+  });
+
+  it("is not read back from a saved document", () => {
+    const doc = readSample();
+    expect(parseGalaxyJson(JSON.stringify(doc))?.handmade).toBeUndefined();
+  });
+});

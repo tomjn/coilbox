@@ -134,6 +134,12 @@ export interface MapManifest {
    * that cannot save transparency. Transparent pixels never belong to one.
    */
   background?: string;
+  /**
+   * True to have coilbox paint towns on the map, with fields round them and
+   * roads between neighbouring provinces' towns. Off by default, because the
+   * map picture may already show towns. This only changes how the map looks.
+   */
+  towns?: boolean;
   factions: ManifestFaction[];
   /** The faction picked by default. Defaults to the first playable one. */
   playerFaction?: string;
@@ -385,6 +391,8 @@ export function parseManifest(text: string): {
     background = normaliseHex(d.background) ?? undefined;
     if (!background) field("background", "must be a colour such as #ffffff.");
   }
+
+  const towns = optBool(d, "towns", "towns");
 
   // Factions.
   const factions: ManifestFaction[] = [];
@@ -853,6 +861,7 @@ export function parseManifest(text: string): {
       files,
       heightScale,
       background,
+      towns,
       factions,
       playerFaction,
       provinces,

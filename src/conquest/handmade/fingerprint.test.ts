@@ -195,6 +195,12 @@ describe("what changes a hand-made map's fingerprint", () => {
 describe("what leaves a hand-made map's fingerprint alone", () => {
   const same: [string, (m: MapManifest) => void][] = [
     [
+      "the towns switch",
+      (m) => {
+        m.towns = !m.towns;
+      },
+    ],
+    [
       "the title and description",
       (m) => {
         m.title = "Another name";

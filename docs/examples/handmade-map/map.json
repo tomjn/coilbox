@@ -11,6 +11,7 @@
     "heightmap": "heightmap.png"
   },
   "heightScale": 120,
+  "towns": true,
   "factions": [
     { "id": "west", "name": "Western League", "color": "#d9a441" },
     {

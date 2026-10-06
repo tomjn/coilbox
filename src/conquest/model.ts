@@ -282,6 +282,11 @@ export interface GalaxyDoc {
      * the map is, because the map itself does not settle them.
      */
     battles?: Record<string, string>;
+    /**
+     * The author asked for painted towns, fields and province roads. Display
+     * only: it is left out of the fingerprint, and Conquest never reads it.
+     */
+    towns?: boolean;
   };
   /**
    * The Warpath markings of a hand-made map whose author gave it a start and a
