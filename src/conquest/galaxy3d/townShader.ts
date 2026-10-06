@@ -30,6 +30,10 @@ export interface TownShading {
   roadReach: number;
   /** The sheet's half width and half depth, then its width and depth. */
   frame: THREE.Vector4;
+  /** `dryFarmShare`: where the farm ground is dry, over the sheet. */
+  dry: THREE.Texture;
+  /** The dry farm ground's colour, linear. */
+  dryGround: THREE.Color;
 }
 
 /**
@@ -58,6 +62,8 @@ uniform sampler2D uRoadDistance;
 uniform vec2 uTownIndexSize;
 uniform float uRoadReach;
 uniform float uFieldReach;
+uniform sampler2D uDryFarm;
+uniform vec3 uDryGround;
 // 0 draws the fields, 1 the town over them. A constant, so each pass is
 // compiled without the other's code, which holds fewer registers.
 const float uLayer = LAYER_HERE;
@@ -101,6 +107,23 @@ const vec3 W_PALEGRASS = vec3(0.384, 0.421, 0.164);
 const vec3 W_OCHRE = vec3(0.453, 0.311, 0.106);
 const vec3 W_CROP_MEAN = vec3(0.338, 0.319, 0.108);
 const vec3 W_HEDGE = vec3(0.021, 0.048, 0.012);
+// Fields on dry ground, linear, from sRGB irrigated crops (40, 70, 45) and
+// (58, 92, 50), bare pale soil (190, 170, 140), fallow (170, 160, 140),
+// ploughed earth (150, 112, 80), olive trees (70, 80, 56), vines (80, 104,
+// 56) and the tracks between plots (205, 185, 150). First guesses, from
+// photographs of desert farms from the air.
+const vec3 W_WET = vec3(0.021, 0.061, 0.027);
+const vec3 W_WET2 = vec3(0.042, 0.107, 0.032);
+const vec3 W_SOIL = vec3(0.515, 0.402, 0.267);
+const vec3 W_FALLOW = vec3(0.402, 0.352, 0.267);
+const vec3 W_DRYPLOUGH = vec3(0.311, 0.164, 0.078);
+const vec3 W_OLIVE = vec3(0.060, 0.078, 0.036);
+const vec3 W_VINE = vec3(0.078, 0.137, 0.036);
+const vec3 W_TRACK = vec3(0.612, 0.485, 0.311);
+const vec3 W_DRY_MEAN = vec3(0.2, 0.2, 0.12);
+// Trees in a grove and rows of vines are this far apart, in world units.
+const float W_TREES = 0.045;
+const float W_VINES = 0.03;
 // A field's plot is about this wide, in world units.
 const float W_PLOT = 0.42;
 
@@ -366,20 +389,57 @@ void main() {
     // Plots fade to their average once they are a few pixels across, so a
     // distant patchwork never shimmers.
     float keepPlot = clamp((W_PLOT / gFoot - 2.0) / 4.0, 0.0, 1.0);
-    float sowThis = mix(min(1.0, sown * 1.2), step(ph, sown * 1.7), keepPlot);
+    // Dry ground is farmed where water is brought to it, in plots packed
+    // tight up to a hard edge, where wetter country's fields thin out.
+    float arid = texture(uDryFarm, uv).r;
+    float packed = mix(sown, smoothstep(0.08, 0.2, sown), arid);
+    float sowThis = mix(min(1.0, packed * 1.2), step(ph, packed * 1.7), keepPlot);
     vec3 crop = wCropTone(ph2);
+    vec3 cropMean = W_CROP_MEAN;
+    if (arid > 0.01) {
+      // Irrigated crops, bare and fallow plots, groves and vines.
+      vec2 inPlot = vec2(fa * plotW, fr * rowH);
+      vec3 dry = W_DRYPLOUGH;
+      if (ph2 < 0.22) {
+        dry = W_WET;
+      } else if (ph2 < 0.4) {
+        dry = W_WET2;
+      } else if (ph2 < 0.55) {
+        // A grove: trees in a grid on bare soil, an even tone from far off.
+        float keepTree = clamp((W_TREES / gFoot - 2.0) / 2.0, 0.0, 1.0);
+        float tree = 1.0 - smoothstep(0.2, 0.34, length(fract(inPlot / W_TREES) - 0.5));
+        dry = mix(W_SOIL, W_OLIVE, mix(0.32, tree, keepTree));
+      } else if (ph2 < 0.67) {
+        // Vines: green rows with soil between.
+        float keepVine = clamp((W_VINES / gFoot - 2.0) / 2.0, 0.0, 1.0);
+        float vine = smoothstep(-0.2, 0.3, sin((ph > 0.5 ? inPlot.x : inPlot.y) / W_VINES * 6.2832));
+        dry = mix(W_SOIL, W_VINE, mix(0.5, vine, keepVine) * 0.9);
+      } else if (ph2 < 0.82) {
+        dry = W_SOIL;
+      } else if (ph2 < 0.92) {
+        dry = W_FALLOW;
+      }
+      crop = mix(crop, dry, arid);
+      cropMean = mix(cropMean, W_DRY_MEAN, arid);
+    }
     // Furrows close in, along or across the plot.
     float furrow = sin((ph > 0.5 ? fq.x : fq.y) / 0.025) * tKeep(0.16, gFoot);
     crop *= 1.0 + 0.07 * furrow;
     // Uneven growth across a plot.
     crop *= 0.9 + 0.2 * tNoise(fq / 0.12 + ph * 31.0).x * tKeep(0.12, gFoot);
-    crop = mix(W_CROP_MEAN, crop, keepPlot);
-    vec4 fields = vec4(crop, 1.0) * sowThis * 0.8;
+    crop = mix(cropMean, crop, keepPlot);
+    // Dry ground is levelled before it is farmed, so the fields lie on bare
+    // earth and none of the dunes show between them.
+    vec4 fields = vec4(uDryGround * (0.9 + 0.2 * rag), 1.0) * smoothstep(0.0, 0.2, sown) * arid;
+    fields = wOver(fields, crop, sowThis * mix(0.8, 0.96, arid));
     // Hedges along most plot edges where fields are thick.
     float hedgeW = max(0.014, gFoot * 0.7);
     float hedge = 1.0 - smoothstep(hedgeW * 0.5, hedgeW * 0.5 + gFoot, border);
-    hedge *= step(0.2, tHash(plot * 2.3 + wSeed)) * smoothstep(0.15, 0.4, sown) * keepPlot;
-    fields = wOver(fields, W_HEDGE, hedge * 0.85);
+    hedge *= mix(step(0.2, tHash(plot * 2.3 + wSeed)), 1.0, arid) * smoothstep(0.15, 0.4, sown) * keepPlot;
+    // On dry ground most plots are edged by a pale track, and a few by a row
+    // of trees against the wind.
+    float windbreak = step(0.82, tHash(plot * 3.1 + wSeed));
+    fields = wOver(fields, mix(W_HEDGE, W_TRACK, arid * (1.0 - windbreak)), hedge * 0.85);
     town = town + fields * (1.0 - town.a);
   }
   if (town.a < 0.002 && ring < 0.002) discard;
@@ -420,6 +480,8 @@ export function townMaterial(
       uTownIndexSize: { value: new THREE.Vector2(...shading.indexSize) },
       uRoadReach: { value: shading.roadReach },
       uFieldReach: { value: TOWN_REACH },
+      uDryFarm: { value: shading.dry },
+      uDryGround: { value: shading.dryGround },
       uFrame: { value: shading.frame },
       uSun: { value: new THREE.Vector3(...TERRAIN_SUN) },
       uAmbient: { value: SHADE_AMBIENT },

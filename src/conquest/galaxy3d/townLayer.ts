@@ -11,6 +11,8 @@ import {
   buildableAt,
   buildTownIndex,
   clipRoads,
+  dryFarmColour,
+  dryFarmShare,
   farmableAt,
   fieldCell,
   planTowns,
@@ -186,7 +188,27 @@ export function buildTownLayer(
     town: patchGeometry((k, x, z, half) => townCells[k](x, z, half)),
     fields: patchGeometry((k, x, z, half) => fieldCells[k](x, z, half)),
   };
+  // Where the farm ground is dry, for the fields' look. None on a map with
+  // no weights.
+  const dry = new THREE.DataTexture(
+    biomes ? dryFarmShare(biomes) : new Uint8Array(1),
+    biomes?.width ?? 1,
+    biomes?.height ?? 1,
+    THREE.RedFormat,
+  );
+  dry.flipY = false;
+  dry.magFilter = THREE.LinearFilter;
+  dry.minFilter = THREE.LinearFilter;
+  dry.needsUpdate = true;
+  const dryRgb = (biomes && dryFarmColour(biomes.planet)) ?? [0, 0, 0];
   const shading = {
+    dry,
+    dryGround: new THREE.Color().setRGB(
+      dryRgb[0] / 255,
+      dryRgb[1] / 255,
+      dryRgb[2] / 255,
+      THREE.SRGBColorSpace,
+    ),
     index: indexTexture,
     indexSize: [index.width, index.height] as [number, number],
     data,
@@ -195,7 +217,7 @@ export function buildTownLayer(
     roadReach: ground.shading.roadReach,
     frame: ground.shading.frame,
   };
-  disposables.push(indexTexture, data, stateTexture);
+  disposables.push(indexTexture, data, stateTexture, dry);
   // The fields first, under an owner's tint like the rest of the land, then
   // the town over the tint.
   for (const layer of ["fields", "town"] as const) {

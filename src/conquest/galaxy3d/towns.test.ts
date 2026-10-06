@@ -7,6 +7,8 @@ import {
   buildTownIndex,
   CAPITAL_RADIUS,
   clipRoads,
+  dryFarmColour,
+  dryFarmShare,
   edgeBounds,
   FIELD_INNER,
   FLAT_SLOPE,
@@ -583,6 +585,26 @@ describe("farmableAt", () => {
     const flat = farmableAt(picture, 20, 20, () => 1);
     expect(flat(-5, 0)).toBe(1);
     expect(flat(5, 0)).toBe(0);
+  });
+
+  it("marks dry farm ground, and no other, for the fields' look", () => {
+    // Desert: slot 0 is dunes, which nothing is farmed on, and slot 3 is
+    // scrub, its dry farm ground. Two texels, one of each.
+    const mixed: BiomePixels = {
+      a: new Uint8Array([255, 0, 0, 0, 55, 0, 0, 200]),
+      b: new Uint8Array(8),
+      width: 2,
+      height: 1,
+      planet: "desert",
+    };
+    expect(Array.from(dryFarmShare(mixed))).toEqual([0, 200]);
+    expect(dryFarmColour("desert")).toEqual([150, 148, 96]);
+    // Temperate farms its grass, which is not dry. The Moon farms nothing.
+    expect(dryFarmColour("temperate")).toBeUndefined();
+    expect(dryFarmColour("moon")).toBeUndefined();
+    expect(Array.from(dryFarmShare({ ...mixed, planet: "moon" }))).toEqual([
+      0, 0,
+    ]);
   });
 
   it("puts no fields on a planet with no farm slot", () => {

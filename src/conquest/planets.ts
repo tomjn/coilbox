@@ -83,6 +83,22 @@ export interface Planet {
   craters: boolean;
 }
 
+/**
+ * Patterns of ground too dry to farm without water brought to it. Fields on
+ * a farm slot with one of these are drawn as dry country's are: irrigated
+ * plots, fallow ones, groves and vines, on levelled earth.
+ */
+const DRY_PATTERNS: readonly BiomePattern[] = [
+  // Not dunes. Nothing is farmed on them.
+  "scrub",
+  "sand",
+  "dust",
+];
+
+/** True for a farm slot whose ground is dry. */
+export const farmsDry = (biome: Biome): boolean =>
+  biome.farm && DRY_PATTERNS.includes(biome.pattern);
+
 /** Scale every share by `1 - t` and add `t` to `slot`. */
 export function blend(out: Float64Array, slot: number, t: number): void {
   for (let i = 0; i < out.length; i++) out[i] *= 1 - t;
@@ -116,7 +132,7 @@ const TEMPERATE: Planet = {
   label: "Temperate",
   biomes: [
     biome("grass", [122, 154, 84], "grass", true),
-    biome("dry", [182, 168, 116], "dunes", true),
+    biome("dry", [182, 168, 116], "dunes"),
     biome("forest", [58, 98, 56], "forest"),
     biome("tundra", [146, 146, 122], "tundra"),
     biome("rock", [122, 106, 90], "rock"),

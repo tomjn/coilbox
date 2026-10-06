@@ -1,4 +1,4 @@
-import { planetOf } from "../planets";
+import { farmsDry, type PlanetId, planetOf } from "../planets";
 import type { BiomePixels } from "./terrainMesh";
 
 /**
@@ -420,6 +420,36 @@ export function farmableAt(
     if (farm < 128) return 0;
     return Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15));
   };
+}
+
+/**
+ * The share of each texel's weight that lies in dry farm slots
+ * (`farmsDry` in `planets.ts`), a byte a texel, at the weights' own size.
+ * The field shader draws dry country's farming where it is high.
+ */
+export function dryFarmShare(biomes: BiomePixels): Uint8Array {
+  const slots = planetOf(biomes.planet)
+    .biomes.map((biome, slot) => (farmsDry(biome) ? slot : -1))
+    .filter((slot) => slot >= 0);
+  const out = new Uint8Array(biomes.width * biomes.height);
+  for (let i = 0; i < out.length; i++) {
+    let dry = 0;
+    for (const slot of slots) {
+      dry += slot < 4 ? biomes.a[i * 4 + slot] : biomes.b[i * 4 + slot - 4];
+    }
+    out[i] = Math.min(255, dry);
+  }
+  return out;
+}
+
+/**
+ * The colour of a planet's dry farm ground in sRGB, 0 to 255: its first dry
+ * farm slot's. Undefined when it has none.
+ */
+export function dryFarmColour(
+  planet: PlanetId,
+): [number, number, number] | undefined {
+  return planetOf(planet).biomes.find(farmsDry)?.colour;
 }
 
 /** Design values: towns build on slopes up to 1 in 5 and thin out by 1 in 2.5. */
