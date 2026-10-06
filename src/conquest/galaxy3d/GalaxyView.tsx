@@ -16,6 +16,7 @@ import { buildEndMarkerLayer } from "./endMarkerLayer";
 import { createFocus } from "./focus";
 import { createFrameScheduler, needsAnotherFrame } from "./frameDemand";
 import { buildGroundLayer, type GroundLayer } from "./groundLayer";
+import { declutterLabels, type LabelBox } from "./labelDeclutter";
 import { hashString } from "./layout";
 import { createOwners } from "./owners";
 import { pickLocation } from "./picking";
@@ -992,6 +993,13 @@ export function GalaxyView({
       t.y = 0;
     };
 
+    // Assigned once the hover and selection state exist. Only a terrain map
+    // sets it, so Galaxy and Theatre names are left as they were.
+    let declutter: (() => void) | undefined;
+    // Bumped whenever ownership, selection, hover or fog changes, so the name
+    // placement reruns for those as well as for a moved camera.
+    let labelEpoch = 0;
+
     const render = () => {
       if (!renderer || !labelRenderer) return;
       if (cities && controls) {
@@ -1000,6 +1008,7 @@ export function GalaxyView({
         endMarkers?.fitToCamera(distance);
       }
       renderer.render(scene, camera);
+      declutter?.();
       labelRenderer.render(scene, camera);
     };
     // Draw on demand, at most once a frame (issue #3653). Anything that
@@ -1055,6 +1064,7 @@ export function GalaxyView({
       () => selection.getIndex(),
     );
     const applyOwners = () => {
+      labelEpoch++;
       owners.apply();
       // On a terrain map this restyles the cities and the provinces too.
       cues?.apply();
@@ -1077,6 +1087,7 @@ export function GalaxyView({
       owners.styleRing,
     );
     const applySelection = () => {
+      labelEpoch++;
       selection.apply();
       cities?.select(selectedRef.current ?? null);
       provinces?.select(selectedRef.current ?? null);
@@ -1106,7 +1117,10 @@ export function GalaxyView({
       companions,
       structureDims,
     );
-    applyVisibilityRef.current = visibility.apply;
+    applyVisibilityRef.current = () => {
+      labelEpoch++;
+      visibility.apply();
+    };
 
     applyOwners();
     applySelection();
@@ -1117,6 +1131,56 @@ export function GalaxyView({
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let hovered = -1;
+
+    // Names that would overlap at this camera: the less important hides until
+    // the camera comes closer, and a selected, hovered or player-owned name
+    // stays and moves clear instead (issue #3685). Reruns only when the camera
+    // or the labels changed, not on every frame that draws.
+    if (surface && labelObjects.length > 0) {
+      const projected = new THREE.Vector3();
+      let placedFor = "";
+      declutter = () => {
+        const w = container.clientWidth || 1;
+        const h = container.clientHeight || 1;
+        const key = `${w}x${h}|${labelEpoch}|${camera.matrixWorldInverse.elements.join()}|${camera.projectionMatrix.elements.join()}`;
+        if (key === placedFor) return;
+        placedFor = key;
+        const selectedIndex = selection.getIndex();
+        const entries: { label: CSS2DObject; box: LabelBox }[] = [];
+        labelObjects.forEach((label, i) => {
+          const el = label.element as HTMLElement;
+          // Reset first, so a name that stops colliding comes back.
+          el.style.visibility = "";
+          el.style.marginTop = "";
+          if (!label.visible) return;
+          projected.copy(label.position).project(camera);
+          if (projected.z < -1 || projected.z > 1) return;
+          const width = el.offsetWidth;
+          const height = el.offsetHeight;
+          const node = galaxy.nodes[i];
+          entries.push({
+            label,
+            box: {
+              left: (projected.x * 0.5 + 0.5) * w - width * label.center.x,
+              top: (-projected.y * 0.5 + 0.5) * h - height * label.center.y,
+              width,
+              height,
+              rank: node.kind === "capital" ? 2 : 1,
+              pinned:
+                i === hovered ||
+                i === selectedIndex ||
+                (ownersRef.current[node.id] ?? node.owner) === playerFactionId,
+            },
+          });
+        });
+        const placed = declutterLabels(entries.map((e) => e.box));
+        placed.forEach((p, k) => {
+          const el = entries[k].label.element as HTMLElement;
+          if (p.hidden) el.style.visibility = "hidden";
+          else if (p.dy !== 0) el.style.marginTop = `${p.dy}px`;
+        });
+      };
+    }
     let downAt: [number, number] | null = null;
 
     const pickAt = (event: PointerEvent): number => {
