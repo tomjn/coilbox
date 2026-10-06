@@ -7,6 +7,7 @@ import {
   labelLandMasses,
   landColour,
   landLayoutsFor,
+  mariaCraterDelta,
   resolveLandLayout,
   seaRampOf,
 } from "./terrainGen";
@@ -67,6 +68,15 @@ describe("planet terrain", () => {
     expect(open).toBeGreaterThan(0);
     expect(shaded).toBeGreaterThan(0);
   }, 60_000);
+
+  it("keeps the middle of a maria crater flat", () => {
+    const floor = [0, 0.2, 0.49].map(mariaCraterDelta);
+    const flat = floor.every((v) => v === floor[0]);
+    expect(flat).toBe(true);
+    expect(mariaCraterDelta(0.81)).toBeGreaterThan(0);
+    expect(mariaCraterDelta(1.44)).toBe(0);
+    expect(mariaCraterDelta(2)).toBe(0);
+  });
 
   it("does not shade the sea on a planet without craters", () => {
     const S = 512;

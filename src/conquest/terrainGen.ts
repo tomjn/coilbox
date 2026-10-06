@@ -936,28 +936,59 @@ const CRATER_RIM = 20;
  * and they stay from 1 to 255.
  */
 function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
-  stampCraterField(`craters:${seed >>> 0}`, land, 1, (i, delta) => {
-    heightmap[i] = Math.max(1, Math.min(255, heightmap[i] + delta));
-  });
+  stampCraterField(
+    `craters:${seed >>> 0}`,
+    land,
+    1,
+    CRATER_COUNT,
+    (rng) =>
+      CRATER_MIN_RADIUS +
+      Math.floor(rng() * (CRATER_MAX_RADIUS - CRATER_MIN_RADIUS + 1)),
+    craterDelta,
+    (i, delta) => {
+      heightmap[i] = Math.max(1, Math.min(255, heightmap[i] + delta));
+    },
+  );
 }
 
+const MARIA_CRATER_DEPTH = 5;
+const MARIA_CRATER_RIM = 3;
+const MARIA_CRATER_MAX = 80;
+/** Sea pixels that earn one maria crater. */
+const MARIA_PIXELS_PER_CRATER = 1500;
+
 /**
- * Relief for the sea pixels of a cratered planet, and 0 on land. It uses the
- * crater count, radii, tries and profile of {@link stampCraters}, with a
- * stream of its own. The heightmap never sees it. It only shades the picture,
- * so the maria read as cratered ground while the sea stays at byte 0.
+ * Relief for the sea pixels of a cratered planet, and 0 on land. Craters are
+ * smaller than the land's, mostly small, with a count that follows the sea's
+ * area, and a newer crater replaces what lies under it. They come from a
+ * stream of their own. The heightmap never sees the relief. It only shades the
+ * picture, so the maria read as cratered ground while the sea stays at byte 0.
  */
 function mariaRelief(seed: number, land: Uint8Array): Float64Array {
   const relief = new Float64Array(S * S);
-  stampCraterField(`mariacraters:${seed >>> 0}`, land, 0, (i, delta) => {
-    relief[i] += delta;
-  });
+  let sea = 0;
+  for (let i = 0; i < land.length; i++) if (!land[i]) sea++;
+  stampCraterField(
+    `mariacraters:${seed >>> 0}`,
+    land,
+    0,
+    Math.min(MARIA_CRATER_MAX, Math.floor(sea / MARIA_PIXELS_PER_CRATER)),
+    (rng) => {
+      const t = rng();
+      return 2 + Math.floor(8 * t * t);
+    },
+    mariaCraterDelta,
+    (i, delta) => {
+      relief[i] = delta;
+    },
+  );
   return relief;
 }
 
 /**
- * Depth of a crater profile, in height bytes, at `u`: the squared distance
- * from the centre over the squared radius. Zero past 1.2 of the radius.
+ * Depth of a land crater profile, in height bytes, at `u`: the squared
+ * distance from the centre over the squared radius. Zero past 1.2 of the
+ * radius.
  */
 function craterDelta(u: number): number {
   if (u < 0.64) return Math.floor(-CRATER_DEPTH * (1 - u / 0.64));
@@ -969,21 +1000,38 @@ function craterDelta(u: number): number {
 }
 
 /**
- * Draw the craters from the stream named `stream` and hand each change to
- * `apply` with the pixel index. A centre must be a pixel where `land` equals
- * `onLand`, and only pixels of that kind are passed on.
+ * A maria crater's profile at `u`, in relief units: a flat floor, a straight
+ * wall up to the rim, then the rim's outer slope falling to nothing.
+ */
+export function mariaCraterDelta(u: number): number {
+  if (u < 0.5) return -MARIA_CRATER_DEPTH;
+  if (u < 0.81) {
+    const s = (u - 0.5) / 0.31;
+    return -MARIA_CRATER_DEPTH + (MARIA_CRATER_DEPTH + MARIA_CRATER_RIM) * s;
+  }
+  if (u < 1.44) return (MARIA_CRATER_RIM * (1.44 - u)) / 0.63;
+  return 0;
+}
+
+/**
+ * Draw `count` craters from the stream named `stream` and hand each change to
+ * `apply` with the pixel index. `radiusOf` draws a crater's radius and
+ * `profile` gives its depth at `u`. A centre must be a pixel where `land`
+ * equals `onLand`, and only pixels of that kind inside the crater's reach
+ * (`u` under 1.44) are passed on.
  */
 function stampCraterField(
   stream: string,
   land: Uint8Array,
   onLand: 0 | 1,
+  count: number,
+  radiusOf: (rng: Rng) => number,
+  profile: (u: number) => number,
   apply: (i: number, delta: number) => void,
 ) {
   const rng = mulberry32(hashString(stream));
-  for (let n = 0; n < CRATER_COUNT; n++) {
-    const radius =
-      CRATER_MIN_RADIUS +
-      Math.floor(rng() * (CRATER_MAX_RADIUS - CRATER_MIN_RADIUS + 1));
+  for (let n = 0; n < count; n++) {
+    const radius = radiusOf(rng);
     const room = S - 2 * (radius + 2);
     let cx = -1;
     let cy = -1;
@@ -1008,7 +1056,7 @@ function stampCraterField(
         const i = y * S + x;
         if ((land[i] ? 1 : 0) !== onLand) continue;
         const u = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / r2;
-        apply(i, craterDelta(u));
+        if (u < 1.44) apply(i, profile(u));
       }
     }
   }
