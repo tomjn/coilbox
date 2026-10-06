@@ -194,6 +194,7 @@ This is the sample's `map.json`.
 | `files` | object | Yes | The file names of the images. See [Files](#files). |
 | `heightScale` | number | No | How high a white heightmap pixel is, in map units. A number above 0. See [The heightmap](#the-heightmap) for the default. |
 | `background` | colour | No | `#rrggbb` of a colour that belongs to no province. No default. |
+| `towns` | true or false | No | Whether coilbox paints towns on the map. Defaults to false. See [Towns](#towns). |
 | `factions` | list | Yes | At least one faction. See [Factions](#factions). |
 | `playerFaction` | text | No | The id of the faction picked by default. It must be a faction the player can pick. Defaults to the first one the player can pick. |
 | `provinces` | list | Yes | The painted provinces. See [Provinces and locations](#provinces-and-locations). |
@@ -338,6 +339,23 @@ The terrain is drawn with at most 256 steps along the map's longer side (`TERRAI
 
 If `map.json` names a heightmap that is not in the folder, the reader reports it. A heightmap that is in the folder but cannot be opened as an image is reported too.
 
+## Towns
+
+Coilbox can paint a town at each location, fields on the flat ground round the towns, and roads between the towns of neighbouring provinces. A map you make gets none of these by default, because your picture may already show towns and a second set on top would look wrong. Roads from the `roads` list are painted either way.
+
+Set `towns` to `true` to turn all three on together.
+
+```json
+"towns": true
+```
+
+- The towns sit on the ground from the heightmap. They keep off steep slopes and the sea, and a capital is larger.
+- The fields go on any flat land near a town. Coilbox does not read your picture to find farmland, so a map painted as desert or snow still gets fields.
+- The roads between provinces join the towns of provinces that touch.
+- Performance mode in the player's settings turns the towns off.
+
+`towns` only changes how the map looks. It does not change the fingerprint, so a challenge code works the same with it on or off. The sample sets it to `true`.
+
 ## Placing models
 
 The `models` list stands models on the land as scenery. A model is not a location, cannot be selected and has no effect on the rules. Each entry is an object.
@@ -441,7 +459,7 @@ These do not change it.
 
 - The map's `title` and `description`, and a location's `name` and `blurb`.
 - A faction's `name` and `color`, and `playerFaction`.
-- The picture, the heightmap, `heightScale`, `size` and the placed models.
+- The picture, the heightmap, `heightScale`, `size`, `towns` and the placed models.
 - Where a marker sits, from `anchor` or `pos`.
 - The colour a province is painted in, and how the images are compressed.
 - A repaint that leaves every province touching the same neighbours.
@@ -507,7 +525,7 @@ Each of these follows `map.json:` and the key. A province or point location is n
 | A faction's `id` | `cannot be "neutral", which means no owner.` | Pick another id. |
 | A faction's `id` | `"ID" is used by two factions.` | Give each faction its own id. |
 | A faction's `aggression` | `must be a number from 0 to 1.` | Give a number from 0 to 1. |
-| A faction's `playable`, a location's `capital` | `must be true or false.` | Write `true` or `false` without quotes. |
+| `towns`, a faction's `playable`, a location's `capital` | `must be true or false.` | Write `true` or `false` without quotes. |
 | `playerFaction` | `"ID" is not the id of a faction the player can pick.` | Use the id of a faction that is not `"playable": false`. |
 | `provinces` | `must be a list of provinces.` | Add `provinces` as a list, inside `[` and `]`. |
 | `provinces` | `is empty, and the map needs at least one location.` | Add a province or a point location. |

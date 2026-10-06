@@ -85,6 +85,11 @@ export function buildTownLayer(
   towns: Town[],
   /** The map's picture, which says where fields can go. Left out, none do. */
   picture?: ColorPixels,
+  /**
+   * With no picture to read, put fields on any buildable ground, for a
+   * hand-made map whose painted picture has no known palette.
+   */
+  fieldsAnywhere = false,
 ): TownLayer {
   const columns = Math.max(1, towns.length);
   const state = new Uint8Array(columns * TOWN_STATE_ROWS * 4);
@@ -104,7 +109,9 @@ export function buildTownLayer(
     buildable,
     picture
       ? farmableAt(picture, surface.worldWidth, surface.worldDepth, buildable)
-      : undefined,
+      : fieldsAnywhere
+        ? (x, z) => Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15))
+        : undefined,
   );
   // The town in each texel is read exactly, and the ground's fitness blended.
   const indexTexture = new THREE.DataTexture(

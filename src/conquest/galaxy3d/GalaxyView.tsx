@@ -39,6 +39,7 @@ import {
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
 import { buildTerrainMesh, isColorPixels } from "./terrainMesh";
+import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
 import type { Town } from "./towns";
 import { createVisibility } from "./visibility";
@@ -581,15 +582,16 @@ export function GalaxyView({
 
     // A terrain map draws its sheet and nothing else: no starfield, no nebula.
     if (surface && terrainSpec) {
-      // Towns on a generated map only. A hand-made map's picture is its
-      // author's and may show its own, and performance mode goes without.
+      // Towns on a generated map, and on a hand-made map whose manifest asks
+      // for them, since the author's picture may show its own. Performance
+      // mode goes without.
       // The towns are planned from the roads, and the roads then stop at
       // each town's edge.
       // Neighbouring provinces' towns are joined by roads where there are
       // towns to join.
       const planned: { towns?: Town[] } = {};
       const terrain = surface;
-      const drawTowns = !performanceMode && !!terrainColor;
+      const drawTowns = paintsTowns(galaxy, !!terrainColor, performanceMode);
       ground = buildGroundLayer(
         disposables,
         galaxy,
@@ -616,6 +618,7 @@ export function GalaxyView({
           terrainColor && isColorPixels(terrainColor)
             ? terrainColor
             : undefined,
+          !terrainColor,
         );
       }
       buildTerrainMesh(

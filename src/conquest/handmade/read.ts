@@ -390,7 +390,11 @@ export function readHandmadeMap(input: HandmadeMapInput): HandmadeMapResult {
     ok: true,
     doc: {
       ...doc,
-      handmade: { mapId: doc.id, fingerprint: handmadeMapFingerprint(doc) },
+      handmade: {
+        mapId: doc.id,
+        fingerprint: handmadeMapFingerprint(doc),
+        ...(manifest.towns ? { towns: true } : {}),
+      },
     },
   };
 }
