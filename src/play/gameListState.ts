@@ -15,7 +15,10 @@
 export type GameListState =
   /** A scan found games to play. */
   | "ready"
-  /** No engine is installed, so there is nothing to scan with. */
+  /** The installed engines have not been read yet, so nobody knows whether
+   *  there is one. Not a reason to tell the player to install an engine. */
+  | "finding-engine"
+  /** The engines were read and none is installed, so there is nothing to scan with. */
   | "no-engine"
   /** A scan is running and has not answered yet. */
   | "scanning"
@@ -26,6 +29,7 @@ export type GameListState =
 
 export function gameListState({
   hasTarget,
+  engineLoading,
   scanned,
   hasGames,
   scanErrors,
@@ -33,6 +37,9 @@ export function gameListState({
 }: {
   /** Whether an engine was resolved to scan with. */
   hasTarget: boolean;
+  /** Whether the lookup of installed engines is still running. Only read when
+   *  there is no target, where it tells "not found yet" from "none installed". */
+  engineLoading: boolean;
   /** Whether a scan result has landed for that engine. */
   scanned: boolean;
   /** Whether the result held any game a player could pick. */
@@ -44,7 +51,7 @@ export function gameListState({
    *  `data` null (issue #3423). A scan that errored counts as `scanned`. */
   initFailure?: string | null;
 }): GameListState {
-  if (!hasTarget) return "no-engine";
+  if (!hasTarget) return engineLoading ? "finding-engine" : "no-engine";
   if (!scanned) return "scanning";
   if (hasGames) return "ready";
   return scanErrors.length > 0 || initFailure ? "unreadable" : "empty";

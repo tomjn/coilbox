@@ -4,12 +4,20 @@ import { gameListState, needsGame } from "./gameListState";
 /** The common case: a scan that ran and found something. */
 const base = {
   hasTarget: true,
+  engineLoading: false,
   scanned: true,
   hasGames: true,
   scanErrors: [] as string[],
 };
 
 describe("gameListState", () => {
+  it("is finding the engine, not missing one, while the engines are being read", () => {
+    expect(
+      gameListState({ ...base, hasTarget: false, engineLoading: true }),
+    ).toBe("finding-engine");
+    expect(needsGame("finding-engine")).toBe(false);
+  });
+
   it("is ready when a scan found games", () => {
     expect(gameListState(base)).toBe("ready");
   });

@@ -223,6 +223,7 @@ export function usePlayReadiness(): {
   const scanErrors = scan.data?.errors ?? [];
   const state = gameListState({
     hasTarget: !!target,
+    engineLoading: targetLoading,
     scanned: scanResolved,
     hasGames,
     scanErrors,
