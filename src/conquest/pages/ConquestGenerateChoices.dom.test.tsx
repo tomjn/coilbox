@@ -163,6 +163,10 @@ vi.mock("../../play/config", () => ({
     loaded: true,
   }),
 }));
+vi.mock("../mapStyle", async (orig) => {
+  const actual = await orig<typeof import("../mapStyle")>();
+  return { ...actual, generateMap: vi.fn(actual.generateMap) };
+});
 vi.mock("../conquests", () => ({
   refreshGalaxies: vi.fn(),
   useGalaxies: () => ({ galaxies: [], loading: false, error: null }),
@@ -206,6 +210,7 @@ import {
   readStoredSetting,
 } from "../../lib/storedSetting";
 import { conquestSave } from "../bindings";
+import { generateMap } from "../mapStyle";
 import ConquestListPage from "./ConquestListPage";
 
 let storage = memorySettingsStorage();
@@ -333,6 +338,7 @@ describe("Conquest generate form: the other choices", () => {
     expect(JSON.parse(storage.get(KEY) ?? "null")).toEqual({
       style: "galaxy",
       layout: "random",
+      planet: "random",
       size: "28",
       radius: expect.any(String),
       factions: "2",
@@ -388,6 +394,68 @@ describe("Conquest generate form: the other choices", () => {
     openForm();
     expect(shown("territories")).toBe("territories");
     expect(shown("continent")).toBe("random");
+  });
+
+  it("offers a planet for a land style and not for a galaxy", () => {
+    openForm();
+    expect(screen.queryByText("Planet")).toBeNull();
+    expect(() => selectOffering("volcanic")).toThrow();
+    choose("territories", "territories");
+    expect(screen.getByText("Planet")).toBeTruthy();
+    const planets = [...selectOffering("volcanic").options];
+    expect(planets.map((o) => o.value)).toEqual([
+      "random",
+      "temperate",
+      "desert",
+      "ice",
+      "red",
+      "moon",
+      "volcanic",
+      "acid",
+    ]);
+    expect(planets).toHaveLength(8);
+  });
+
+  it("narrows the shapes for Volcanic", () => {
+    openForm();
+    choose("territories", "territories");
+    choose("volcanic", "volcanic");
+    const shapes = [...selectOffering("landlocked").options];
+    expect(shapes.map((o) => o.textContent)).toEqual([
+      "Surprise me",
+      "One continent",
+      "Coast",
+      "Inland sea",
+      "Landlocked",
+    ]);
+  });
+
+  it("drops a remembered shape Volcanic does not offer", async () => {
+    storage.set(
+      KEY,
+      JSON.stringify({
+        style: "territories",
+        layout: "continents",
+        planet: "volcanic",
+      }),
+    );
+    openForm();
+    const shape = selectOffering("landlocked");
+    expect(shape.value).toBe("random");
+    expect(shape.selectedOptions[0].textContent).toBe("Surprise me");
+    vi.mocked(generateMap).mockClear();
+    await create();
+    expect(vi.mocked(generateMap)).toHaveBeenCalledWith(
+      expect.objectContaining({ layout: "random", planet: "volcanic" }),
+    );
+  });
+
+  it("falls back to Surprise me for a stored planet nobody defined", () => {
+    storage.set(KEY, JSON.stringify({ style: "territories", planet: "pluto" }));
+    openForm();
+    const planet = selectOffering("volcanic");
+    expect(planet.value).toBe("random");
+    expect(planet.selectedOptions[0].textContent).toBe("Surprise me");
   });
 
   it("ignores a stored value that is not a set of choices", () => {

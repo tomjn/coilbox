@@ -132,17 +132,19 @@ import {
   type MapSkin,
 } from "../model";
 import { mergeConquestNames } from "../names";
+import { isPlanetId, PLANETS, planetOf } from "../planets";
 import {
   DEFAULT_RADIUS_LY,
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import type { GeneratedTerrain } from "../terrainGen";
+import { type GeneratedTerrain, landLayoutsFor } from "../terrainGen";
 import { generatedTerrain } from "../territories";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 import { MapErrorList } from "./components/MapErrorList";
+import { PlanetSwatch } from "./components/PlanetSwatch";
 import { StartPositionSelect } from "./components/StartPositionSelect";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
@@ -1131,13 +1133,30 @@ const LAND_LAYOUT_OPTIONS = [
   { value: "inlandsea", label: "Inland sea" },
   { value: "landlocked", label: "Landlocked" },
 ];
-/** The shapes a style offers. */
-const layoutOptionsFor = (style: MapSkin) =>
-  style === "galaxy"
-    ? LAYOUT_OPTIONS
-    : isLandSkin(style)
-      ? LAND_LAYOUT_OPTIONS
-      : PLAIN_LAYOUT_OPTIONS;
+/** Surprise me, then each planet with a chip of its colours. */
+const PLANET_OPTIONS = [
+  {
+    value: "random",
+    label: "Surprise me",
+    icon: <PlanetSwatch planet="random" />,
+  },
+  ...PLANETS.map((id) => ({
+    value: id,
+    label: planetOf(id).label,
+    icon: <PlanetSwatch planet={id} />,
+  })),
+];
+/** The shapes a style offers. A land style on a planet whose sea cannot be
+ * crossed offers only the single-mass shapes. */
+const layoutOptionsFor = (style: MapSkin, planet: string) => {
+  if (style === "galaxy") return LAYOUT_OPTIONS;
+  if (!isLandSkin(style)) return PLAIN_LAYOUT_OPTIONS;
+  if (!isPlanetId(planet)) return LAND_LAYOUT_OPTIONS;
+  const offered: readonly string[] = landLayoutsFor(planet);
+  return LAND_LAYOUT_OPTIONS.filter(
+    (o) => o.value === "random" || offered.includes(o.value),
+  );
+};
 /** How long the form waits after the last change before it builds a land
  * preview. A choice, not a measurement: long enough that typing a seed builds
  * one map and not one per digit. */
@@ -1324,7 +1343,12 @@ function GenerateGalaxyForm({
   // A remembered choice the form does not offer now, such as a size or level
   // this game has not unlocked, goes back to the default.
   const style: MapSkin = choices.style ?? "galaxy";
-  const layout = offeredOr(choices.layout, layoutOptionsFor(style), "random");
+  const planet = offeredOr(choices.planet, PLANET_OPTIONS, "random");
+  const layout = offeredOr(
+    choices.layout,
+    layoutOptionsFor(style, planet),
+    "random",
+  );
   const radius = offeredOr(
     choices.radius,
     RADIUS_OPTIONS,
@@ -1383,6 +1407,7 @@ function GenerateGalaxyForm({
       nodeCount,
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
+      ...(land ? { planet: planet as GenerateOptions["planet"] } : {}),
       radiusLy: Number(radius),
       skin: style,
       startingSystems:
@@ -1402,6 +1427,8 @@ function GenerateGalaxyForm({
       nodeCount,
       factions,
       layout,
+      land,
+      planet,
       radius,
       realStars,
       style,
@@ -1527,6 +1554,7 @@ function GenerateGalaxyForm({
       setRemembered({
         style,
         layout,
+        planet,
         size,
         radius,
         factions,
@@ -1621,12 +1649,22 @@ function GenerateGalaxyForm({
                   />
                 )}
               </div>
+              {land && (
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">Planet</span>
+                  <OptionSelect
+                    value={planet}
+                    onValueChange={(planet) => choose({ planet })}
+                    options={PLANET_OPTIONS}
+                  />
+                </div>
+              )}
               <div className="flex flex-col gap-1.5 text-sm">
                 <span className="font-medium">Shape</span>
                 <OptionSelect
                   value={layout}
                   onValueChange={(layout) => choose({ layout })}
-                  options={layoutOptionsFor(style)}
+                  options={layoutOptionsFor(style, planet)}
                 />
               </div>
               <div className="flex flex-col gap-1.5 text-sm">

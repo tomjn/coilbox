@@ -272,7 +272,8 @@ describe("Conquest generate form: order and wording", () => {
 
     for (const style of ["theatre", "cities", "territories"]) {
       choose(selectOffering("territories"), style);
-      const shape = selectOffering("random");
+      // The land styles also have a Planet select offering "random".
+      const shape = selectOffering(style === "theatre" ? "ring" : "landlocked");
       expect(optionLabels(shape)).not.toContain(
         "Real stars (the solar neighbourhood)",
       );
@@ -290,7 +291,8 @@ describe("Conquest generate form: order and wording", () => {
     openForm();
     choose(selectOffering("spiral"), "spiral");
     choose(selectOffering("territories"), "cities");
-    const shape = selectOffering("random");
+    // The Planet select also offers "random", so find Shape by a shape.
+    const shape = selectOffering("landlocked");
     expect(optionLabels(shape)).toEqual([
       "Surprise me",
       "One continent",
