@@ -200,8 +200,8 @@ const headings = () =>
     e.textContent?.trim(),
   );
 
-/** Let the wait before a land preview run out. */
-const settle = () => act(() => vi.advanceTimersByTime(1000));
+/** Let the wait before a land preview run out, and the preview arrive. */
+const settle = () => act(() => vi.advanceTimersByTimeAsync(1000));
 
 const previewBuilds = () => h.generated.filter((g) => g.id === "preview");
 
@@ -448,7 +448,7 @@ describe("Conquest generate form: the preview", () => {
     expect(svg.querySelectorAll("polygon")).toHaveLength(0);
   });
 
-  it("builds a land preview once the form has been still, not per keystroke", () => {
+  it("builds a land preview once the form has been still, not per keystroke", async () => {
     openForm();
     choose(selectOffering("territories"), "territories");
     h.generated = [];
@@ -465,17 +465,17 @@ describe("Conquest generate form: the preview", () => {
     }
     expect(previewBuilds()).toHaveLength(0);
 
-    settle();
+    await settle();
     expect(previewBuilds()).toEqual([
       { id: "preview", skin: "territories", seed: 42421 },
     ]);
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("draws a Territories map as provinces on its own land", () => {
+  it("draws a Territories map as provinces on its own land", async () => {
     openForm();
     choose(selectOffering("territories"), "territories");
-    settle();
+    await settle();
     const svg = screen.getByRole("img", { name: "Map preview" });
     expect(svg.getAttribute("viewBox")).toBe("0 0 1024 1024");
     // One outline per province, and a marker on each of the three capitals.
@@ -487,10 +487,10 @@ describe("Conquest generate form: the preview", () => {
     expect(canvas?.getAttribute("height")).toBe("512");
   });
 
-  it("draws a Cities map as cities and roads, with no outlines", () => {
+  it("draws a Cities map as cities and roads, with no outlines", async () => {
     openForm();
     choose(selectOffering("territories"), "cities");
-    settle();
+    await settle();
     const svg = screen.getByRole("img", { name: "Map preview" });
     expect(svg.querySelectorAll("polygon")).toHaveLength(0);
     expect(svg.querySelectorAll("circle")).toHaveLength(18);
@@ -498,10 +498,10 @@ describe("Conquest generate form: the preview", () => {
     expect(document.querySelector("canvas")).toBeTruthy();
   });
 
-  it("keeps the last land preview up, dimmed, while the next one waits", () => {
+  it("keeps the last land preview up, dimmed, while the next one waits", async () => {
     openForm();
     choose(selectOffering("territories"), "territories");
-    settle();
+    await settle();
     const frame = () =>
       screen.getByRole("img", { name: "Map preview" }).parentElement
         ?.parentElement;
@@ -513,7 +513,7 @@ describe("Conquest generate form: the preview", () => {
     expect(frame()?.className).toContain("opacity-50");
     expect(screen.getByRole("status")).toBeTruthy();
 
-    settle();
+    await settle();
     expect(frame()?.className).not.toContain("opacity-50");
   });
 });
@@ -526,7 +526,7 @@ describe("Conquest generate form: creating a map", () => {
       fireEvent.change(screen.getByLabelText("Map seed"), {
         target: { value: "31" },
       });
-      settle();
+      await settle();
       vi.useRealTimers();
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: "Create map" }));
