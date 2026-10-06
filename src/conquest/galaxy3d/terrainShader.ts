@@ -88,6 +88,7 @@ uniform float uBiomePattern[8];
 uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform float uSeaLiquid;
+uniform float uSeaLava;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
 uniform vec4 uTerrainFrame;
@@ -334,10 +335,19 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     vec2 landBump = bump;
     // A sea that is not liquid is ground of a kind, with the grain dry
     // ground has.
-    vec2 seaBump = mix(fine.yz * 0.2, wave.yz * 0.05, uSeaLiquid);
-    float seaShade = mix(fine.x * 0.25 + broad.x * 0.2, wave.x * 0.1, uSeaLiquid);
+    float grain = 1.0 - uSeaLava;
+    vec2 seaBump = mix(fine.yz * 0.2 * grain, wave.yz * 0.05, uSeaLiquid);
+    float seaShade = mix((fine.x * 0.25 + broad.x * 0.2) * grain, wave.x * 0.1, uSeaLiquid);
     bump = mix(landBump, seaBump, sea);
     shadeMul = mix(shadeMul, 1.0 + seaShade, sea);
+    // Lava: plates of dark crust drifting on the glow, with bright cracks
+    // between them.
+    if (uSeaLava > 0.5 && sea > 0.01) {
+      vec4 plate = tCell(p / 0.9 + broad.x * 0.6);
+      float crust = (1.0 - smoothstep(0.28, 0.5, plate.x)) * tKeep(0.9, footprint);
+      crust *= 0.55 + 0.45 * plate.w;
+      albedo = mix(albedo, albedo * vec3(0.16, 0.1, 0.09), crust * sea);
+    }
 
     albedo *= max(shadeMul, 0.2);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
@@ -446,6 +456,9 @@ export function applyTerrainShader(
     };
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
+    };
+    shader.uniforms.uSeaLava = {
+      value: planet?.sea.look === "lava" ? 1 : 0,
     };
     const frame = shading.frame;
     shader.uniforms.uTerrainFrame = {

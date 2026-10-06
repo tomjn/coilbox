@@ -283,30 +283,32 @@ const VOLCANIC: Planet = {
   id: "volcanic",
   label: "Volcanic",
   biomes: [
-    biome("dark basalt", [54, 48, 48], "rock"),
-    biome("brown rock", [96, 70, 54], "rock"),
-    biome("ash", [122, 116, 112], "dry"),
-    biome("cooled flows", [34, 30, 32], "rock"),
+    biome("dark basalt", [46, 40, 40], "rock"),
+    biome("brown rock", [88, 58, 42], "rock"),
+    biome("ash", [92, 80, 72], "dry"),
+    biome("cooled flows", [28, 24, 26], "rock"),
   ],
   shore: 0,
   steep: [
-    [34, 30, 32],
-    [96, 70, 54],
+    [28, 24, 26],
+    [88, 58, 42],
   ],
-  clearing: [54, 48, 48],
+  clearing: [46, 40, 40],
   climate: { wet: -0.2, cold: -0.3 },
   weights(h, wet, _cold, out) {
     out.fill(0);
+    // Basalt and brown rock share the low ground. Ash only dusts the slopes,
+    // and the peaks are black flows.
     const t = ramp(wet, 0.2, 0.4);
     out[0] = 1 - t;
-    out[2] = t;
-    blend(out, 1, ramp(h, 0.42, 0.15));
-    blend(out, 3, ramp(h, 0.66, 0.14));
+    out[1] = t;
+    blend(out, 2, 0.4 * ramp(h, 0.3, 0.2));
+    blend(out, 3, ramp(h, 0.6, 0.15));
   },
   sea: {
     look: "lava",
-    shallow: [240, 120, 30],
-    deep: [150, 36, 16],
+    shallow: [255, 150, 40],
+    deep: [208, 64, 18],
     crossing: "none",
   },
   craters: false,
