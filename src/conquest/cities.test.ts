@@ -83,6 +83,48 @@ describe("the planet of a generated cities map", () => {
   it("writes no planet when none was asked for", () => {
     expect("planet" in (generateCities(base, NOW).generated ?? {})).toBe(false);
   });
+
+  it("gives no crossings where the sea cannot be crossed", () => {
+    for (const planet of ["volcanic", "acid"] as const)
+      for (const layout of [
+        "continent",
+        "coast",
+        "inlandsea",
+        "landlocked",
+      ] as const)
+        for (const nodeCount of [12, 28])
+          for (const seed of [1, 2, 3]) {
+            const doc = generateCities(
+              { ...base, seed, nodeCount, planet, layout },
+              NOW,
+            );
+            const label = `${planet} ${layout} ${nodeCount} seed ${seed}`;
+            expect(
+              (doc.linkKinds ?? []).filter(([, , kind]) => kind === "crossing")
+                .length,
+              label,
+            ).toBe(0);
+            expect(reachable(doc), label).toBe(doc.nodes.length);
+          }
+  }, 120_000);
+
+  it("still crosses water on Temperate", () => {
+    let crossings = 0;
+    for (const seed of [1, 2, 3, 4, 5, 6])
+      crossings += (
+        generateCities(
+          {
+            ...base,
+            seed,
+            nodeCount: 28,
+            planet: "temperate",
+            layout: "continents",
+          },
+          NOW,
+        ).linkKinds ?? []
+      ).filter(([, , kind]) => kind === "crossing").length;
+    expect(crossings).toBeGreaterThan(0);
+  }, 120_000);
 });
 
 describe("generateCities", () => {
