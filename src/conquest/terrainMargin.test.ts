@@ -103,4 +103,67 @@ describe("land past the map's edge", () => {
     for (const h of margin.heightmap) if (h > 0) land++;
     expect(land / margin.heightmap.length).toBeGreaterThan(0.5);
   });
+
+  it("carries weights past the edge", () => {
+    const { terrain, margin } = generateTerrainWithMargin(
+      { seed: 4, shape: "coast", planet: "desert" },
+      64,
+    );
+    const wide = extendTerrain(terrain, margin);
+    expect(margin.biomes.a.length).toBe(margin.width * margin.height * 4);
+    expect(wide.biomes.a.length).toBe(wide.width * wide.height * 4);
+    expect(wide.biomes.b.length).toBe(wide.width * wide.height * 4);
+    // The middle equals the map's own bytes exactly.
+    const M = wide.margin;
+    for (const [x, y] of [
+      [0, 0],
+      [100, 200],
+      [S - 1, S - 1],
+    ]) {
+      const o = ((y + M) * wide.width + (x + M)) * 4;
+      const m = (y * terrain.width + x) * 4;
+      expect([...wide.biomes.a.subarray(o, o + 4)]).toEqual([
+        ...terrain.biomes.a.subarray(m, m + 4),
+      ]);
+      expect([...wide.biomes.b.subarray(o, o + 4)]).toEqual([
+        ...terrain.biomes.b.subarray(m, m + 4),
+      ]);
+    }
+  });
+
+  it("gives margin land weights that sum to 255 and sea none", () => {
+    const { margin } = build("landlocked", 3);
+    let land = 0;
+    let sea = 0;
+    for (let o = 0; o < margin.heightmap.length; o++) {
+      const sum = [0, 1, 2, 3].reduce(
+        (n, c) => n + margin.biomes.a[o * 4 + c] + margin.biomes.b[o * 4 + c],
+        0,
+      );
+      if (margin.heightmap[o] > 0) {
+        if (sum === 255) land++;
+      } else if (sum === 0) sea++;
+    }
+    const total = margin.heightmap.length;
+    let seaPixels = 0;
+    for (const h of margin.heightmap) if (h === 0) seaPixels++;
+    expect(land).toBeGreaterThan(0);
+    expect(land + seaPixels).toBe(total);
+    expect(sea).toBe(seaPixels);
+  });
+
+  it("leaves the map unchanged when it has a margin", () => {
+    const plain = generateTerrain({
+      seed: 4,
+      shape: "coast",
+      planet: "desert",
+    });
+    const { terrain } = generateTerrainWithMargin(
+      { seed: 4, shape: "coast", planet: "desert" },
+      64,
+    );
+    expect(differences(terrain.biomes.a, plain.biomes.a)).toBe(0);
+    expect(differences(terrain.biomes.b, plain.biomes.b)).toBe(0);
+    expect(differences(terrain.image, plain.image)).toBe(0);
+  });
 });

@@ -1299,6 +1299,8 @@ export interface TerrainMargin {
   image: Uint8ClampedArray;
   /** Height bytes, as the map's heightmap: sea 0, land 1 to 255. */
   heightmap: Uint8Array;
+  /** Biome weights, as the map's, at the margin's own width and height. */
+  biomes: TerrainBiomes;
 }
 
 /**
@@ -1356,8 +1358,6 @@ export function generateTerrainWithMargin(
   const { terrain, context } = buildTerrain(opts);
   const { planet, plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
   const seaRamp = seaRampOf(planet);
-  // One pixel of weights, for the colour of a margin pixel.
-  const scratch: TerrainBiomes = { a: new Uint8Array(4), b: new Uint8Array(4) };
   const k = MARGIN_SCALE;
   const M = Math.ceil(marginPixels / MARGIN_ALIGN) * MARGIN_ALIGN;
   const W = (S + 2 * M) / k;
@@ -1472,12 +1472,18 @@ export function generateTerrainWithMargin(
     }
   }
   const image = new Uint8ClampedArray(count * 4);
+  const biomes: TerrainBiomes = {
+    a: new Uint8Array(count * 4),
+    b: new Uint8Array(count * 4),
+  };
   for (let j = 0; j < W; j++) {
     for (let i = 0; i < W; i++) {
       const o = j * W + i;
       if (inside[o]) {
         const m = (mapPixel(j) * S + mapPixel(i)) * 4;
         image.set(terrain.image.subarray(m, m + 4), o * 4);
+        biomes.a.set(terrain.biomes.a.subarray(m, m + 4), o * 4);
+        biomes.b.set(terrain.biomes.b.subarray(m, m + 4), o * 4);
         continue;
       }
       let rgb: Rgb;
@@ -1495,10 +1501,10 @@ export function generateTerrainWithMargin(
           warmField(x, y),
           warmth,
           warmSpread,
-          scratch,
-          0,
+          biomes,
+          o * 4,
         );
-        rgb = landColour(planet, scratch, 0);
+        rgb = landColour(planet, biomes, o * 4);
         // Lit from the north west, as the map is. The neighbours are k map
         // pixels apart, so the difference is k times the map's.
         const nw = heightmap[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
@@ -1517,7 +1523,15 @@ export function generateTerrainWithMargin(
   }
   return {
     terrain,
-    margin: { margin: M, scale: k, width: W, height: W, image, heightmap },
+    margin: {
+      margin: M,
+      scale: k,
+      width: W,
+      height: W,
+      image,
+      heightmap,
+      biomes,
+    },
   };
 }
 
@@ -1532,15 +1546,20 @@ export interface ExtendedTerrain {
   image: Uint8ClampedArray;
   /** Heights from 0 to 1, as a heightmap byte over 255. */
   heights: Float32Array;
+  /** Biome weights, as the map's. Blended bytes need not sum to 255. */
+  biomes: TerrainBiomes;
 }
 
 /**
  * The map with its margin round it, at the map's resolution: the map's own
- * pixels and heights exactly in the middle, and the margin blended up from its
+ * pixels, heights and weights exactly in the middle, and the margin blended up from its
  * coarser pixels round them.
  */
 export function extendTerrain(
-  terrain: Pick<GeneratedTerrain, "width" | "height" | "image" | "heightmap">,
+  terrain: Pick<
+    GeneratedTerrain,
+    "width" | "height" | "image" | "heightmap" | "biomes"
+  >,
   margin: TerrainMargin,
 ): ExtendedTerrain {
   const M = margin.margin;
@@ -1549,6 +1568,10 @@ export function extendTerrain(
   const h = terrain.height + 2 * M;
   const image = new Uint8ClampedArray(w * h * 4);
   const heights = new Float32Array(w * h);
+  const biomes: TerrainBiomes = {
+    a: new Uint8Array(w * h * 4),
+    b: new Uint8Array(w * h * 4),
+  };
   const mw = margin.width;
   const mh = margin.height;
   for (let y = 0; y < h; y++) {
@@ -1564,6 +1587,8 @@ export function extendTerrain(
         const m = my * terrain.width + mx;
         image.set(terrain.image.subarray(m * 4, m * 4 + 4), o * 4);
         heights[o] = terrain.heightmap[m] / 255;
+        biomes.a.set(terrain.biomes.a.subarray(m * 4, m * 4 + 4), o * 4);
+        biomes.b.set(terrain.biomes.b.subarray(m * 4, m * 4 + 4), o * 4);
         continue;
       }
       const cx = Math.min(mw - 1, Math.max(0, (x - (k - 1) / 2) / k));
@@ -1584,6 +1609,15 @@ export function extendTerrain(
           margin.image[c * 4 + ch],
           margin.image[d * 4 + ch],
         );
+        for (const slots of ["a", "b"] as const) {
+          const from = margin.biomes[slots];
+          biomes[slots][o * 4 + ch] = blend(
+            from[a * 4 + ch],
+            from[b * 4 + ch],
+            from[c * 4 + ch],
+            from[d * 4 + ch],
+          );
+        }
       }
       heights[o] =
         blend(
@@ -1594,5 +1628,5 @@ export function extendTerrain(
         ) / 255;
     }
   }
-  return { margin: M, width: w, height: h, image, heights };
+  return { margin: M, width: w, height: h, image, heights, biomes };
 }
