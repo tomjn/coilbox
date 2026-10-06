@@ -891,9 +891,7 @@ describe("the towns switch", () => {
       );
       const found = only(errors, "manifest-field");
       expect(found.map((e) => e.path)).toEqual(["towns"]);
-      expect(found[0].message).toBe(
-        "map.json: towns must be true or false.",
-      );
+      expect(found[0].message).toBe("map.json: towns must be true or false.");
     }
   });
 
