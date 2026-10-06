@@ -24,6 +24,36 @@ describe("planet terrain", () => {
     }
   });
 
+  it("craters the Moon without moving its coast", () => {
+    const plain = generateTerrain({ seed: 9, shape: "continent" });
+    const moon = generateTerrain({
+      seed: 9,
+      shape: "continent",
+      planet: "moon",
+    });
+    expect(moon.land).toEqual(plain.land);
+    expect(moon.coastDistance).toEqual(plain.coastDistance);
+    expect(moon.heightmap).not.toEqual(plain.heightmap);
+    for (let i = 0; i < moon.land.length; i++)
+      expect(moon.heightmap[i] === 0).toBe(moon.land[i] === 0);
+  });
+
+  it("leaves the Moon's edge rows and columns as they were", () => {
+    const S = 512;
+    for (const seed of [9, 10, 11]) {
+      const plain = generateTerrain({ seed, shape: "continent" });
+      const moon = generateTerrain({
+        seed,
+        shape: "continent",
+        planet: "moon",
+      });
+      for (let k = 0; k < S; k++) {
+        for (const i of [k, (S - 1) * S + k, k * S, k * S + S - 1])
+          expect(moon.heightmap[i]).toBe(plain.heightmap[i]);
+      }
+    }
+  });
+
   it("gives land weights that sum to 255 and sea none", () => {
     for (const planet of PLANETS) {
       const t = generateTerrain({ ...opts, planet });

@@ -917,6 +917,70 @@ function landHeightByte(
   return 1 + Math.floor(h * 254);
 }
 
+const CRATER_COUNT = 40;
+const CRATER_MIN_RADIUS = 4;
+const CRATER_MAX_RADIUS = 18;
+const CRATER_TRIES = 20;
+/** How many height bytes the floor sinks at the centre, and the rim rises. */
+const CRATER_DEPTH = 40;
+const CRATER_RIM = 20;
+
+/**
+ * Stamp craters into `heightmap`, and return nothing. Each has its own random
+ * centre and radius from a stream of its own, so the land and the other
+ * noise do not move. A centre is redrawn until it is on land and clear of
+ * every side by its radius plus 2 pixels, and a crater that finds none in
+ * {@link CRATER_TRIES} tries is skipped. Inside 0.8 of the radius the floor
+ * sinks, deepest at the centre. From 0.8 to 1.2 of the radius it rises into a
+ * rim. Only land pixels away from the outermost rows and columns are written,
+ * and they stay from 1 to 255.
+ */
+function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
+  const rng = mulberry32(hashString(`craters:${seed >>> 0}`));
+  for (let n = 0; n < CRATER_COUNT; n++) {
+    const radius =
+      CRATER_MIN_RADIUS +
+      Math.floor(rng() * (CRATER_MAX_RADIUS - CRATER_MIN_RADIUS + 1));
+    const room = S - 2 * (radius + 2);
+    let cx = -1;
+    let cy = -1;
+    for (let t = 0; t < CRATER_TRIES; t++) {
+      const x = radius + 2 + Math.floor(rng() * room);
+      const y = radius + 2 + Math.floor(rng() * room);
+      if (land[y * S + x]) {
+        cx = x;
+        cy = y;
+        break;
+      }
+    }
+    if (cx < 0) continue;
+    const r2 = radius * radius;
+    const reach = Math.floor(radius * 1.2) + 1;
+    const y0 = Math.max(1, cy - reach);
+    const y1 = Math.min(S - 2, cy + reach);
+    const x0 = Math.max(1, cx - reach);
+    const x1 = Math.min(S - 2, cx + reach);
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const i = y * S + x;
+        if (!land[i]) continue;
+        const u = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / r2;
+        let delta = 0;
+        if (u < 0.64) {
+          delta = -CRATER_DEPTH * (1 - u / 0.64);
+        } else if (u < 1.44) {
+          const s = (u - 0.64) / 0.8;
+          delta = CRATER_RIM * 4 * s * (1 - s);
+        }
+        heightmap[i] = Math.max(
+          1,
+          Math.min(255, heightmap[i] + Math.floor(delta)),
+        );
+      }
+    }
+  }
+}
+
 /**
  * Write the weight bytes of land at pixel `x`, `y` with height `h` from 0 to
  * 1, and return nothing. Wetter near the coast, and warmer one way across the
@@ -1082,6 +1146,7 @@ function buildTerrain(opts: TerrainOptions): {
       ridges[i],
     );
   }
+  if (planet.craters) stampCraters(opts.seed, land, heightmap);
 
   // Climate, for colour alone.
   const wetField = coarseNoise(S, S, 130, wetSeed, 3);
