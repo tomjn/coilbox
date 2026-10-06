@@ -178,7 +178,12 @@ export default function RunListPage() {
         />
       )}
 
-      {state === "scanning" ? (
+      {state === "finding-engine" ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden />
+          Looking for an engine…
+        </div>
+      ) : state === "scanning" ? (
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin" aria-hidden />
           Scanning installed games…

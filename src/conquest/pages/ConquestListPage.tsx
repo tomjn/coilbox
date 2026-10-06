@@ -188,8 +188,9 @@ export default function ConquestListPage() {
         : [],
     [target, galaxies, gameCatalog],
   );
-  // "scanning" is deliberately absent: a scan that has not answered yet leaves
-  // the list up rather than flashing an empty state that is about to be wrong.
+  // "scanning" and "finding-engine" are deliberately absent: a scan or an engine
+  // lookup that has not answered yet leaves the list up rather than flashing an
+  // empty state that is about to be wrong.
   const needsGame =
     state === "no-engine" || state === "empty" || state === "unreadable";
 
@@ -434,7 +435,7 @@ export default function ConquestListPage() {
           )}
           {state === "unreadable" && <Diagnostics errors={scanErrors} />}
         </div>
-      ) : loading || handmade.savedLoading ? (
+      ) : loading || handmade.savedLoading || state === "finding-engine" ? (
         <SkeletonList />
       ) : nothingListed && handmade.loading ? (
         <SearchingGames />
@@ -1177,7 +1178,7 @@ function GenerateGalaxyForm({
    */
   initialGameName?: string;
 }) {
-  const { target } = usePreferredTarget();
+  const { target, loading: targetLoading } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const brandingEntries = useBrandingCatalog();
   const [busy, setBusy] = useState(false);
@@ -1420,34 +1421,39 @@ function GenerateGalaxyForm({
   }, [landKey]);
   const preview = land ? (landPreview?.doc ?? null) : pointPreview;
   const previewStale = land && landPreview?.key !== landKey;
-  const blocked: ReactNode = !target ? (
-    <>
-      Install an engine first (
-      <Link className="underline underline-offset-4" to="/settings/engines">
-        Settings → Engines
-      </Link>
-      ).
-    </>
-  ) : scan.error ? (
-    `The content scan failed, so installed games are not listed: ${scan.error}`
-  ) : scan.data &&
-    (scan.data.games.length === 0 || gameChoices.length === 0) ? (
-    <>
-      Install a game first (
-      <Link className="underline underline-offset-4" to="/library/games">
-        Content → Games
-      </Link>
-      ).
-    </>
-  ) : maps.length === 0 && scan.data ? (
-    <>
-      Install at least one map first (
-      <Link className="underline underline-offset-4" to="/library/maps">
-        Content → Maps
-      </Link>
-      ).
-    </>
-  ) : null;
+  // Not knowing yet is not the same as having none: while the installed engines
+  // are being read, the form waits rather than telling the player to install one.
+  const blocked: ReactNode =
+    !target && targetLoading ? (
+      "Looking for an engine…"
+    ) : !target ? (
+      <>
+        Install an engine first (
+        <Link className="underline underline-offset-4" to="/settings/engines">
+          Settings → Engines
+        </Link>
+        ).
+      </>
+    ) : scan.error ? (
+      `The content scan failed, so installed games are not listed: ${scan.error}`
+    ) : scan.data &&
+      (scan.data.games.length === 0 || gameChoices.length === 0) ? (
+      <>
+        Install a game first (
+        <Link className="underline underline-offset-4" to="/library/games">
+          Content → Games
+        </Link>
+        ).
+      </>
+    ) : maps.length === 0 && scan.data ? (
+      <>
+        Install at least one map first (
+        <Link className="underline underline-offset-4" to="/library/maps">
+          Content → Maps
+        </Link>
+        ).
+      </>
+    ) : null;
 
   // Said under the picker, which stays usable so another game can be chosen.
   const stylesBlock = hidesStyles

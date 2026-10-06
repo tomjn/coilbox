@@ -5,30 +5,34 @@
  * hook must settle on "unreadable" and stop loading (issue #3423).
  */
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const scan = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
+  engines: true,
+  contentLoading: false,
 }));
 
 vi.mock("../content/config", () => ({
   useContentState: () => ({
-    state: {
-      roots: [
-        {
-          path: "/root",
-          engines: [
+    state: scan.engines
+      ? {
+          roots: [
             {
-              id: "e",
-              version: "2026.03.01",
-              path: "/root/engine/e",
-              executable: "/root/engine/e/spring",
+              path: "/root",
+              engines: [
+                {
+                  id: "e",
+                  version: "2026.03.01",
+                  path: "/root/engine/e",
+                  executable: "/root/engine/e/spring",
+                },
+              ],
             },
           ],
-        },
-      ],
-    },
-    loading: false,
+        }
+      : null,
+    loading: scan.contentLoading,
     error: null,
     refresh: vi.fn(),
   }),
@@ -44,6 +48,11 @@ const run = vi.fn();
 const cancel = vi.fn();
 
 describe("usePlayReadiness with a failed scan", () => {
+  beforeEach(() => {
+    scan.engines = true;
+    scan.contentLoading = false;
+  });
+
   it("is unreadable, not scanning, and carries the reason", () => {
     scan.current = {
       data: null,
@@ -75,5 +84,35 @@ describe("usePlayReadiness with a failed scan", () => {
     expect(result.current.state).toBe("scanning");
     expect(result.current.loading).toBe(true);
     expect(result.current.scanFailure).toBeNull();
+  });
+});
+
+describe("usePlayReadiness before the engines are known", () => {
+  const idle = {
+    data: null,
+    error: null,
+    loading: false,
+    cancelled: false,
+    unvouched: null,
+    run,
+    cancel,
+  };
+
+  it("is finding the engine while the engine lookup runs", () => {
+    scan.current = idle;
+    scan.engines = false;
+    scan.contentLoading = true;
+    const { result } = renderHook(() => usePlayReadiness());
+    expect(result.current.state).toBe("finding-engine");
+    expect(result.current.loading).toBe(true);
+  });
+
+  it("is no-engine only once the lookup has finished and found none", () => {
+    scan.current = idle;
+    scan.engines = false;
+    scan.contentLoading = false;
+    const { result } = renderHook(() => usePlayReadiness());
+    expect(result.current.state).toBe("no-engine");
+    expect(result.current.loading).toBe(false);
   });
 });

@@ -135,3 +135,36 @@ describe("RunListPage with runs kept in the file that could not be read", () => 
     expect(screen.queryByText(/could not be read/)).toBeNull();
   });
 });
+
+describe("RunListPage while the engine is still being found", () => {
+  it("shows a loading line and never the install message", () => {
+    readiness.current = {
+      hasGames: false,
+      state: "finding-engine",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText("Looking for an engine…")).toBeTruthy();
+    expect(screen.queryByText(/Install an engine/)).toBeNull();
+  });
+
+  it("shows the install message once none was found", () => {
+    readiness.current = {
+      hasGames: false,
+      state: "no-engine",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText(/Install an engine first/)).toBeTruthy();
+  });
+});
