@@ -340,14 +340,6 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     float seaShade = mix((fine.x * 0.25 + broad.x * 0.2) * grain, wave.x * 0.1, uSeaLiquid);
     bump = mix(landBump, seaBump, sea);
     shadeMul = mix(shadeMul, 1.0 + seaShade, sea);
-    // Lava: plates of dark crust drifting on the glow, with bright cracks
-    // between them.
-    if (uSeaLava > 0.5 && sea > 0.01) {
-      vec4 plate = tCell(p / 0.9 + broad.x * 0.6);
-      float crust = (1.0 - smoothstep(0.28, 0.5, plate.x)) * tKeep(0.9, footprint);
-      crust *= 0.55 + 0.45 * plate.w;
-      albedo = mix(albedo, albedo * vec3(0.16, 0.1, 0.09), crust * sea);
-    }
 
     albedo *= max(shadeMul, 0.2);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
