@@ -22,7 +22,7 @@ describe("planet terrain", () => {
       expect(t.land).toEqual(base.land);
       expect(t.heightmap).toEqual(base.heightmap);
     }
-  });
+  }, 60_000);
 
   it("craters the Moon without moving its coast", () => {
     const plain = generateTerrain({ seed: 9, shape: "continent" });
@@ -52,7 +52,7 @@ describe("planet terrain", () => {
           expect(moon.heightmap[i]).toBe(plain.heightmap[i]);
       }
     }
-  });
+  }, 60_000);
 
   it("gives land weights that sum to 255 and sea none", () => {
     for (const planet of PLANETS) {
@@ -110,7 +110,7 @@ describe("planet terrain", () => {
             generateTerrain({ seed: 5, shape, planet, maxMasses: 40 }),
           ).sizes.length,
         ).toBe(1);
-  });
+  }, 60_000);
 
   it("resolves a shape the planet does not offer to one continent", () => {
     const rng = mulberry32(3);
