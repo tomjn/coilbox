@@ -91,7 +91,7 @@ export function buildTownLayer(
   biomes?: BiomePixels,
   /**
    * With no weights to read, put fields on any buildable ground, for a
-   * hand-made map whose painted picture has no known palette.
+   * hand-made map, which has no biome weights to say where fields go.
    */
   fieldsAnywhere = false,
 ): TownLayer {

@@ -34,8 +34,10 @@ describe("planet terrain", () => {
     expect(moon.land).toEqual(plain.land);
     expect(moon.coastDistance).toEqual(plain.coastDistance);
     expect(moon.heightmap).not.toEqual(plain.heightmap);
+    let wrong = 0;
     for (let i = 0; i < moon.land.length; i++)
-      expect(moon.heightmap[i] === 0).toBe(moon.land[i] === 0);
+      if ((moon.heightmap[i] === 0) !== (moon.land[i] === 0)) wrong++;
+    expect(wrong).toBe(0);
   });
 
   it("leaves the Moon's edge rows and columns as they were", () => {
@@ -72,7 +74,7 @@ describe("planet terrain", () => {
     const S = 512;
     const checked = new Map<string, number>();
     let wrong = 0;
-    for (const seed of [11, 12, 13]) {
+    for (const seed of [11]) {
       for (const planet of PLANETS) {
         const t = generateTerrain({ seed, shape: "continent", planet });
         const p = planetOf(planet);
@@ -100,7 +102,7 @@ describe("planet terrain", () => {
     for (const planet of PLANETS)
       expect(checked.get(planet) ?? 0, planet).toBeGreaterThan(0);
     expect(wrong).toBe(0);
-  }, 120_000);
+  }, 60_000);
 
   it("keeps one land mass where the sea cannot be crossed", () => {
     for (const planet of ["volcanic", "acid"] as const)

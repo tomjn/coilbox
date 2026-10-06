@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy } from "./generate";
 import { type GalaxyDoc, parseGalaxyJson } from "./model";
+import { resolvePlanet } from "./planets";
 import { mulberry32 } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
 import {
@@ -74,6 +75,22 @@ describe("the planet of a generated territories map", () => {
       }
     }
     expect(seen.size).toBe(doc.nodes.length);
+  });
+
+  it("does not let the way the planet was picked move the land", () => {
+    let seed = 0;
+    while (seed < 500 && resolvePlanet("random", seed) !== "desert") seed++;
+    expect(resolvePlanet("random", seed)).toBe("desert");
+    const random = generatedTerrain(
+      generateTerritories({ ...base, seed, planet: "random" }),
+    );
+    const named = generatedTerrain(
+      generateTerritories({ ...base, seed, planet: "desert" }),
+    );
+    expect(random?.planet).toBe("desert");
+    expect(random?.land).toEqual(named?.land);
+    expect(random?.heightmap).toEqual(named?.heightmap);
+    expect(random?.planet).toEqual(named?.planet);
   });
 
   it("does not let the planet choice move the land", () => {
