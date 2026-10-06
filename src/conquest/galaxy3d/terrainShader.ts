@@ -254,7 +254,7 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     // patches, so the GPU skips them together and the cost stays low.
     vec3 broad = vec3(0.0);
     vec3 fine = vec3(0.0);
-    if (sea < 0.99 || coast > 0.01) {
+    if (sea < 0.99 || coast > 0.01 || uSeaLiquid < 0.5) {
       broad = tField(p, 3.0, 2, footprint);
       fine = tField(p + 31.0, 0.45, 4, footprint);
     }
@@ -332,8 +332,12 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
     vec2 landBump = bump;
-    bump = mix(landBump, wave.yz * 0.05 * uSeaLiquid, sea);
-    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.1 * uSeaLiquid, sea);
+    // A sea that is not liquid is ground of a kind, with the grain dry
+    // ground has.
+    vec2 seaBump = mix(fine.yz * 0.2, wave.yz * 0.05, uSeaLiquid);
+    float seaShade = mix(fine.x * 0.25 + broad.x * 0.2, wave.x * 0.1, uSeaLiquid);
+    bump = mix(landBump, seaBump, sea);
+    shadeMul = mix(shadeMul, 1.0 + seaShade, sea);
 
     albedo *= max(shadeMul, 0.2);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
