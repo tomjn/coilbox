@@ -122,6 +122,8 @@ describe("territories golden maps", () => {
           `land=${hashBytes(terrain.land)}`,
           `heightmap=${hashBytes(terrain.heightmap)}`,
           `image=${hashBytes(terrain.image)}`,
+          `biomesA=${hashBytes(terrain.biomes.a)}`,
+          `biomesB=${hashBytes(terrain.biomes.b)}`,
           `doc=${hashString(text).toString(16).padStart(8, "0")}`,
         ].join(" ");
         emitted.push(line);

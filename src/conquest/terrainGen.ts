@@ -1,3 +1,11 @@
+import {
+  BIOME_SLOTS,
+  type Planet,
+  type PlanetId,
+  planetOf,
+  type Rgb,
+  weightBytes,
+} from "./planets";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 
 /**
@@ -47,15 +55,34 @@ export const isLandLayout = (value: unknown): value is LandLayout =>
 /** Kept as a name for the land layout, which is what a terrain's shape is. */
 export type TerrainShape = LandLayout;
 
+/** The shapes a planet offers where its sea cannot be crossed: one land mass. */
+export const SINGLE_MASS_LAYOUTS: readonly LandLayout[] = [
+  "continent",
+  "coast",
+  "inlandsea",
+  "landlocked",
+];
+
+/** The shapes a planet offers: all six, or {@link SINGLE_MASS_LAYOUTS} where the sea cannot be crossed. */
+export function landLayoutsFor(planet: PlanetId): readonly LandLayout[] {
+  return planetOf(planet).sea.crossing === "none"
+    ? SINGLE_MASS_LAYOUTS
+    : LAND_LAYOUTS;
+}
+
 /**
  * The land layout a stored layout value builds. `random`, or nothing, is left
  * to the seed. A galaxy layout, which a land map made before the land layouts
- * existed may carry, reads as the land layout nearest it.
+ * existed may carry, reads as the land layout nearest it. A shape the planet
+ * does not offer reads as a continent and draws nothing from `rng`.
  */
 export function resolveLandLayout(
   layout: string | undefined,
   rng: Rng,
+  planet: PlanetId = "temperate",
 ): LandLayout {
+  const offered = landLayoutsFor(planet);
+  let named: LandLayout;
   switch (layout) {
     case "continent":
     case "coast":
@@ -63,18 +90,24 @@ export function resolveLandLayout(
     case "archipelago":
     case "inlandsea":
     case "landlocked":
-      return layout;
+      named = layout;
+      break;
     case "scatter":
-      return "continent";
+      named = "continent";
+      break;
     case "spiral":
-      return "continents";
+      named = "continents";
+      break;
     case "clusters":
-      return "archipelago";
+      named = "archipelago";
+      break;
     case "ring":
-      return "inlandsea";
+      named = "inlandsea";
+      break;
     default:
-      return pick(rng, LAND_LAYOUTS);
+      return pick(rng, offered);
   }
+  return offered.includes(named) ? named : "continent";
 }
 
 /** Pixels along each side of every generated array. */
@@ -92,9 +125,24 @@ export interface TerrainOptions {
    * of locations, so no land mass is left without one.
    */
   maxMasses?: number;
+  /** Left out is Temperate. */
+  planet?: PlanetId;
+}
+
+/**
+ * How much of each ground type a pixel has, as bytes summing to 255 on land
+ * and all 0 at sea. RGBA bytes per pixel: `a` holds slots 0 to 3, `b` 4 to 7.
+ */
+export interface TerrainBiomes {
+  a: Uint8Array;
+  b: Uint8Array;
 }
 
 export interface GeneratedTerrain {
+  /** The planet whose palette and sea the terrain is drawn with. */
+  planet: PlanetId;
+  /** The weight bytes land colour is mixed from. */
+  biomes: TerrainBiomes;
   /** Pixels across and down. Every array is row by row from the top left. */
   width: number;
   height: number;
@@ -659,54 +707,48 @@ function labelRegions(
   return { labels, sizes, edge };
 }
 
-type Rgb = [number, number, number];
-
-// Land colours. Colour only: nothing in play reads which of these a place is.
-const BEACH: Rgb = [214, 200, 150];
-const DRY: Rgb = [182, 168, 116];
-const GRASS: Rgb = [122, 154, 84];
-const FOREST: Rgb = [58, 98, 56];
-const TUNDRA: Rgb = [146, 146, 122];
-const ROCK: Rgb = [122, 106, 90];
-const SCREE: Rgb = [152, 146, 140];
-const SNOW: Rgb = [240, 240, 240];
-const SEA_SHALLOW: Rgb = [70, 140, 170];
-const SEA_DEEP: Rgb = [24, 58, 96];
 /** Coast distance, in thirds of a pixel, at which the sea is fully deep. */
 const SEA_DEPTH = 108;
-/** Sea colours by distance from the coast, worked out once per value. */
-const SEA_RAMP = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
-  const depth = d / SEA_DEPTH;
-  return [
-    SEA_SHALLOW[0] + (SEA_DEEP[0] - SEA_SHALLOW[0]) * depth,
-    SEA_SHALLOW[1] + (SEA_DEEP[1] - SEA_SHALLOW[1]) * depth,
-    SEA_SHALLOW[2] + (SEA_DEEP[2] - SEA_SHALLOW[2]) * depth,
-  ];
-});
-
-const mix = (a: Rgb, b: Rgb, t: number): Rgb => [
-  a[0] + (b[0] - a[0]) * t,
-  a[1] + (b[1] - a[1]) * t,
-  a[2] + (b[2] - a[2]) * t,
-];
+const SEA_RAMPS = new Map<PlanetId, Rgb[]>();
+/** A planet's sea colours by distance from the coast, worked out once per planet. */
+function seaRampOf(planet: Planet): Rgb[] {
+  let ramp = SEA_RAMPS.get(planet.id);
+  if (!ramp) {
+    const { shallow, deep } = planet.sea;
+    ramp = Array.from({ length: SEA_DEPTH + 1 }, (_, d): Rgb => {
+      const depth = d / SEA_DEPTH;
+      return [
+        shallow[0] + (deep[0] - shallow[0]) * depth,
+        shallow[1] + (deep[1] - shallow[1]) * depth,
+        shallow[2] + (deep[2] - shallow[2]) * depth,
+      ];
+    });
+    SEA_RAMPS.set(planet.id, ramp);
+  }
+  return ramp;
+}
 
 /**
- * The colour of land at height `h` (0 to 1), with `wet` the moisture and
- * `cold` how far below temperate it is, both 0 to 1. Low ground runs from dry
- * land through grassland to forest as it gets wetter, and to tundra as it gets
- * colder. Higher up it turns to rock, then scree, then snow, and the snow line
- * comes down where it is cold. The lowest land is sand.
+ * The sRGB colour of a pixel's land from its weight bytes: the planet's
+ * palette weighted by the bytes over 255. `o` is the pixel's byte offset in
+ * `a` and `b`.
  */
-function biomeColour(h: number, wet: number, cold: number): Rgb {
-  let c =
-    wet < 0.42
-      ? mix(DRY, GRASS, clamp01((wet - 0.2) / 0.18))
-      : mix(GRASS, FOREST, clamp01((wet - 0.48) / 0.2));
-  c = mix(c, TUNDRA, cold);
-  c = mix(c, ROCK, clamp01((h - 0.42) / 0.15));
-  c = mix(c, SCREE, clamp01((h - 0.66) / 0.14));
-  c = mix(c, SNOW, clamp01((h - (0.84 - 0.25 * cold)) / 0.08));
-  return mix(BEACH, c, clamp01(h / 0.015));
+export function landColour(
+  planet: Planet,
+  biomes: TerrainBiomes,
+  o: number,
+): Rgb {
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  for (let slot = 0; slot < planet.biomes.length; slot++) {
+    const w = slot < 4 ? biomes.a[o + slot] : biomes.b[o + slot - 4];
+    const c = planet.biomes[slot].colour;
+    r += w * c[0];
+    g += w * c[1];
+    b += w * c[2];
+  }
+  return [r / 255, g / 255, b / 255];
 }
 
 /** The index of the pixel holding a point given in map units. */
@@ -879,9 +921,12 @@ function landHeightByte(
  * The colour of land at pixel `x`, `y` with height `h` from 0 to 1. Wetter
  * near the coast, and warmer one way across the map by an amount the seed
  * picks, so some maps run from tundra to dry land and others stay temperate.
- * Height cools it further.
+ * Height cools it further. The planet's bias is added to both, and its rule
+ * turns them and the height into weight bytes, written to slot `o` of
+ * `biomes`.
  */
-function climateColour(
+function climateWeights(
+  planet: Planet,
   x: number,
   y: number,
   h: number,
@@ -890,17 +935,32 @@ function climateColour(
   warmValue: number,
   warmth: Vec,
   warmSpread: number,
-): Rgb {
+  biomes: TerrainBiomes,
+  o: number,
+): void {
   const near = 1 - Math.min(1, coastDist / (3 * 30));
-  const wet = clamp01(0.5 + (wetValue - 0.5) * 2.4 + 0.15 * near);
+  const wet = clamp01(
+    0.5 + (wetValue - 0.5) * 2.4 + 0.15 * near + planet.climate.wet,
+  );
   const across = ((x - S / 2) * warmth[0] + (y - S / 2) * warmth[1]) / S;
   const warm =
     0.55 + across * warmSpread * 2 + (warmValue - 0.5) * 0.6 - h * 0.5;
-  return biomeColour(h, wet, clamp01((0.3 - warm) / 0.25));
+  const cold = clamp01(clamp01((0.3 - warm) / 0.25) + planet.climate.cold);
+  planet.weights(h, wet, cold, SHARES);
+  weightBytes(SHARES, BYTES, 0);
+  for (let c = 0; c < 4; c++) {
+    biomes.a[o + c] = BYTES[c];
+    biomes.b[o + c] = BYTES[4 + c];
+  }
 }
+
+/** Scratch for {@link climateWeights}: the rule's shares, then their bytes. */
+const SHARES = new Float64Array(BIOME_SLOTS);
+const BYTES = new Uint8Array(BIOME_SLOTS);
 
 /** What a build of the land needs again to draw land past the map's edge. */
 interface TerrainContext {
+  planet: Planet;
   plan: ShapePlan;
   closed: number[];
   seeds: {
@@ -927,6 +987,9 @@ function buildTerrain(opts: TerrainOptions): {
   terrain: GeneratedTerrain;
   context: TerrainContext;
 } {
+  const planet = planetOf(opts.planet ?? "temperate");
+  // Where the sea cannot be crossed there is one land mass, whatever was asked.
+  const maxMasses = planet.sea.crossing === "none" ? 1 : opts.maxMasses;
   const rng = mulberry32(hashString(`terrain:${opts.seed >>> 0}`));
   const warpX = noiseSeed(rng);
   const warpY = noiseSeed(rng);
@@ -977,7 +1040,7 @@ function buildTerrain(opts: TerrainOptions): {
     .map((size, label) => ({ size, label }))
     .filter((m) => m.size >= plan.minMass)
     .sort((a, b) => b.size - a.size || a.label - b.label)
-    .slice(0, Math.max(1, opts.maxMasses ?? Number.POSITIVE_INFINITY));
+    .slice(0, Math.max(1, maxMasses ?? Number.POSITIVE_INFINITY));
   if (keep.length === 0) {
     // Nothing reached the size wanted, so keep the largest there is.
     const largest = masses.sizes.indexOf(Math.max(...masses.sizes));
@@ -1023,10 +1086,16 @@ function buildTerrain(opts: TerrainOptions): {
   // Climate, for colour alone.
   const wetField = coarseNoise(S, S, 130, wetSeed, 3);
   const warmField = coarseNoise(S, S, 160, warmSeed, 2);
-  const landAt = (i: number): Rgb => {
+  const biomes: TerrainBiomes = {
+    a: new Uint8Array(S * S * 4),
+    b: new Uint8Array(S * S * 4),
+  };
+  for (let i = 0; i < S * S; i++) {
+    if (!land[i]) continue;
     const x = i % S;
     const y = (i - x) / S;
-    return climateColour(
+    climateWeights(
+      planet,
       x,
       y,
       (heightmap[i] - 1) / 254,
@@ -1035,10 +1104,12 @@ function buildTerrain(opts: TerrainOptions): {
       warmField[i],
       warmth,
       warmSpread,
+      biomes,
+      i * 4,
     );
-  };
-  const seaRamp = SEA_RAMP;
-  const beach = BEACH;
+  }
+  const seaRamp = seaRampOf(planet);
+  const beach = planet.biomes[planet.shore].colour;
   const shallows = seaRamp[3];
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
@@ -1050,14 +1121,14 @@ function buildTerrain(opts: TerrainOptions): {
       if (cover >= 0) {
         // A pixel the coast runs through: land and sea mixed by how much of
         // the pixel lies above sea level.
-        const lnd = land[i] ? landAt(i) : beach;
+        const lnd = land[i] ? landColour(planet, biomes, i * 4) : beach;
         rgb = [
           shallows[0] + (lnd[0] - shallows[0]) * cover,
           shallows[1] + (lnd[1] - shallows[1]) * cover,
           shallows[2] + (lnd[2] - shallows[2]) * cover,
         ];
       } else if (land[i]) {
-        rgb = landAt(i);
+        rgb = landColour(planet, biomes, i * 4);
         // Lit from the north west: a slope rising to the south east is bright.
         const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
         const se =
@@ -1077,6 +1148,8 @@ function buildTerrain(opts: TerrainOptions): {
 
   return {
     terrain: {
+      planet: planet.id,
+      biomes,
       width: S,
       height: S,
       mapWidth: TERRAIN_MAP_UNITS,
@@ -1088,6 +1161,7 @@ function buildTerrain(opts: TerrainOptions): {
       coastDistance,
     },
     context: {
+      planet,
       plan,
       closed,
       seeds: {
@@ -1215,7 +1289,10 @@ export function generateTerrainWithMargin(
   marginPixels: number,
 ): { terrain: GeneratedTerrain; margin: TerrainMargin } {
   const { terrain, context } = buildTerrain(opts);
-  const { plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
+  const { planet, plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
+  const seaRamp = seaRampOf(planet);
+  // One pixel of weights, for the colour of a margin pixel.
+  const scratch: TerrainBiomes = { a: new Uint8Array(4), b: new Uint8Array(4) };
   const k = MARGIN_SCALE;
   const M = Math.ceil(marginPixels / MARGIN_ALIGN) * MARGIN_ALIGN;
   const W = (S + 2 * M) / k;
@@ -1343,7 +1420,8 @@ export function generateTerrainWithMargin(
       if (land[o]) {
         const x = at(i);
         const y = at(j);
-        rgb = climateColour(
+        climateWeights(
+          planet,
           x,
           y,
           (heightmap[o] - 1) / 254,
@@ -1352,7 +1430,10 @@ export function generateTerrainWithMargin(
           warmField(x, y),
           warmth,
           warmSpread,
+          scratch,
+          0,
         );
+        rgb = landColour(planet, scratch, 0);
         // Lit from the north west, as the map is. The neighbours are k map
         // pixels apart, so the difference is k times the map's.
         const nw = heightmap[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
@@ -1361,7 +1442,7 @@ export function generateTerrainWithMargin(
         shade = 1 + ((se - nw) * 0.03) / k;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        rgb = SEA_RAMP[Math.min(SEA_DEPTH, coast[o] * k)];
+        rgb = seaRamp[Math.min(SEA_DEPTH, coast[o] * k)];
       }
       image[o * 4] = rgb[0] * shade;
       image[o * 4 + 1] = rgb[1] * shade;
