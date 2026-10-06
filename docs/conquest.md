@@ -63,12 +63,16 @@ A challenge code carries the style, so whoever imports it plays the same map. A 
 A Cities or Territories map is built on one of seven planets. The planet decides the ground, the sea and whether the sea can be crossed. It does not change the rules.
 
 - **Temperate** has grassland, forest, desert, tundra and snowy mountains round a blue sea.
-- **Desert** has dunes, rock flats, mesas and salt pans, with a little water.
+- **Desert** has dunes, rock flats, mesas and scrub, with salt pans in its low basins and a little water.
 - **Ice** has snowfields, bare ice and tundra. Its sea is a frozen sheet.
 - **Red** has red dust and dark basalt. Its sea is a dry basin.
 - **Moon** has grey regolith and craters. Its sea is the dark maria.
 - **Volcanic** has dark basalt and ash round a sea of lava.
 - **Acid** has dull yellow and brown ground and brown forest round a green acid sea.
+
+Each kind of ground is drawn with its own surface as you zoom in: dune ridges, cracked salt, cratered regolith, blocks of basalt, a crust on the lava and cracks and ridges in the sea ice. Performance mode draws the plain colours without it.
+
+Towns farm the land round them where it can be farmed. Grassland gets a green patchwork with hedges. Desert's scrub gets dry country's farming: irrigated plots, fallow ones, olive groves and vineyards, with tracks between them. Nothing is farmed on dunes, on Temperate or on Desert.
 
 Nothing crosses lava or acid, so a Volcanic or Acid map is one land mass and offers four shapes: **One continent**, **Coast**, **Inland sea** and **Landlocked**. On the other planets a crossing joins the land masses. It is a shipping lane over water, and a solid track over ice, a dry basin or the maria.
 
