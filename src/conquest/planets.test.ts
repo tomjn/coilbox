@@ -141,3 +141,21 @@ describe("planets", () => {
     ).toBeGreaterThan(1);
   });
 });
+
+describe("settlements", () => {
+  it("gives a planet works round its outposts only where nothing is farmed", () => {
+    for (const id of PLANETS) {
+      const p = planetOf(id);
+      const farmed = p.biomes.some((b) => b.farm);
+      if (p.settlement.outskirts === "works") expect(farmed).toBe(false);
+      if (p.settlement.outskirts === "farms") expect(farmed).toBe(true);
+    }
+  });
+
+  it("seals the roads of a planet whose settlements are sealed", () => {
+    for (const id of PLANETS) {
+      const s = planetOf(id).settlement;
+      expect(s.roads.look === "sealed").toBe(s.style === "sealed");
+    }
+  });
+});

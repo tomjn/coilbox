@@ -59,6 +59,43 @@ export interface Biome {
 
 export type SeaLook = "water" | "acid" | "lava" | "ice" | "basin" | "maria";
 
+/**
+ * How a planet's settlements are laid out. `organic` and `compound` stand
+ * in the open air. `sealed` is domes and modules joined by tubes.
+ */
+export type SettlementStyle = "organic" | "compound" | "sealed";
+
+/**
+ * What a planet's settlements and roads look like. Display only. Every
+ * colour here is a first guess, in sRGB.
+ */
+export interface Settlement {
+  style: SettlementStyle;
+  /** For `sealed`: the share of structures that are domes, 0 to 1. */
+  domes: number;
+  /** Most roofs and hulls. */
+  hull: Rgb;
+  /** The second colour: glass, a dome's skin, a shed's roof. */
+  trim: Rgb;
+  /**
+   * What lies round a settlement: `farms` where the ground can be farmed,
+   * `works` for solar arrays, greenhouses and pads on any flat ground, or
+   * `none`.
+   */
+  outskirts: "farms" | "works" | "none";
+  roads: {
+    /**
+     * `open` is a dirt track, a minor road and a surfaced main road.
+     * `sealed` is wheel ruts, a graded way and a transit tube.
+     */
+    look: "open" | "sealed";
+    /** The surface of each, from the least used to the most. */
+    track: Rgb;
+    minor: Rgb;
+    main: Rgb;
+  };
+}
+
 export interface Planet {
   id: PlanetId;
   label: string;
@@ -90,6 +127,7 @@ export interface Planet {
     crossing: "lane" | "solid" | "none";
   };
   craters: boolean;
+  settlement: Settlement;
 }
 
 /**
@@ -180,6 +218,19 @@ const TEMPERATE: Planet = {
     crossing: "lane",
   },
   craters: false,
+  settlement: {
+    style: "organic",
+    domes: 0,
+    hull: [140, 134, 128],
+    trim: [104, 106, 112],
+    outskirts: "farms",
+    roads: {
+      look: "open",
+      track: [222, 206, 170],
+      minor: [196, 190, 178],
+      main: [104, 104, 106],
+    },
+  },
 };
 
 const DESERT: Planet = {
@@ -225,6 +276,19 @@ const DESERT: Planet = {
     crossing: "lane",
   },
   craters: false,
+  settlement: {
+    style: "organic",
+    domes: 0,
+    hull: [214, 198, 172],
+    trim: [176, 140, 110],
+    outskirts: "farms",
+    roads: {
+      look: "open",
+      track: [232, 214, 176],
+      minor: [204, 190, 166],
+      main: [112, 108, 104],
+    },
+  },
 };
 
 const ICE: Planet = {
@@ -260,6 +324,19 @@ const ICE: Planet = {
     crossing: "solid",
   },
   craters: false,
+  settlement: {
+    style: "sealed",
+    domes: 0.25,
+    hull: [200, 84, 52],
+    trim: [228, 232, 238],
+    outskirts: "works",
+    roads: {
+      look: "sealed",
+      track: [176, 194, 208],
+      minor: [150, 170, 188],
+      main: [92, 98, 106],
+    },
+  },
 };
 
 const RED: Planet = {
@@ -293,6 +370,19 @@ const RED: Planet = {
     crossing: "solid",
   },
   craters: false,
+  settlement: {
+    style: "sealed",
+    domes: 0.7,
+    hull: [228, 224, 214],
+    trim: [150, 190, 204],
+    outskirts: "works",
+    roads: {
+      look: "sealed",
+      track: [120, 64, 46],
+      minor: [104, 60, 48],
+      main: [204, 198, 188],
+    },
+  },
 };
 
 const MOON: Planet = {
@@ -323,6 +413,19 @@ const MOON: Planet = {
     crossing: "solid",
   },
   craters: true,
+  settlement: {
+    style: "sealed",
+    domes: 0.7,
+    hull: [232, 232, 236],
+    trim: [124, 152, 184],
+    outskirts: "works",
+    roads: {
+      look: "sealed",
+      track: [104, 104, 108],
+      minor: [92, 92, 98],
+      main: [216, 216, 222],
+    },
+  },
 };
 
 const VOLCANIC: Planet = {
@@ -359,6 +462,19 @@ const VOLCANIC: Planet = {
     crossing: "none",
   },
   craters: false,
+  settlement: {
+    style: "sealed",
+    domes: 0.2,
+    hull: [126, 130, 136],
+    trim: [240, 150, 60],
+    outskirts: "works",
+    roads: {
+      look: "sealed",
+      track: [96, 86, 80],
+      minor: [110, 100, 94],
+      main: [152, 152, 158],
+    },
+  },
 };
 
 const ACID: Planet = {
@@ -397,6 +513,19 @@ const ACID: Planet = {
     crossing: "none",
   },
   craters: false,
+  settlement: {
+    style: "sealed",
+    domes: 0.6,
+    hull: [208, 212, 192],
+    trim: [120, 172, 112],
+    outskirts: "works",
+    roads: {
+      look: "sealed",
+      track: [100, 84, 62],
+      minor: [90, 80, 66],
+      main: [182, 186, 172],
+    },
+  },
 };
 
 const BY_ID: Record<PlanetId, Planet> = {
