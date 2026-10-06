@@ -151,6 +151,7 @@ it("resolves a planet", () => {
 **Files:**
 - Modify: `terrainGen.ts` (palette constants at 662 to 710, `climateColour` at 884, `resolveLandLayout` at 55, `TerrainOptions` and `GeneratedTerrain` at 87 to 118, `buildTerrain` at 926)
 - Modify: `fixtures/territories/hashes.txt` and `fixtures/cities/` by regeneration
+- Create: `terrainGen.test.ts`
 - Test: `terrainGen.test.ts`, `terrainGolden.test.ts`, `citiesGolden.test.ts`
 
 **Interfaces:**
@@ -485,7 +486,7 @@ it("gives a hand-made map no detail", () => {
 })
 ```
 
-- [ ] **Step 2: Run** `bun run test mapStyle terrainMesh terrainShader` and confirm the new tests fail.
+- [ ] **Step 2: Run** `bun run test mapStyle terrainMesh` and confirm the new tests fail.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** the same command and `bun run typecheck`, and confirm both pass.
 - [ ] **Step 5: Commit.**
@@ -588,6 +589,7 @@ it("draws crossings solid when asked", () => {
 - Modify: `generateChoices.ts` (`GenerateChoices` at 13, `readGenerateChoices` at 32)
 - Modify: `pages/ConquestListPage.tsx` (`LAND_LAYOUT_OPTIONS` at 1125, `layoutOptionsFor` at 1135, the choices at 1326, `genOptions` at 1378, the "Shape" field at 1625)
 - Create: `pages/components/PlanetSwatch.tsx`
+- Create: `generateChoices.test.ts`
 - Test: `generateChoices.test.ts`, `pages/ConquestGenerateChoices.dom.test.tsx`
 
 **Interfaces:**
