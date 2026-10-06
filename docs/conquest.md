@@ -72,6 +72,8 @@ A Cities or Territories map is built on one of seven planets. The planet decides
 
 Each kind of ground is drawn with its own surface as you zoom in: dune ridges, cracked salt, cratered regolith, blocks of basalt, a crust on the lava and cracks and ridges in the sea ice. Performance mode draws the plain colours without it.
 
+The planet also decides what its settlements look like. Temperate, Desert and Ice are settled in the open: towns of small roofs along curving streets, with sheds at the edge and taller blocks in the middle of a large one. Red, Moon, Volcanic and Acid have sealed outposts: domes and long modules joined by tubes, with landing pads, solar arrays and greenhouses beside them. Roads follow suit. A sealed planet has wheel ruts, graded ways and a transit tube into each capital where an open one has dirt tracks and surfaced roads. A place where many roads meet grows into a city, and one at the end of a single track stays an outpost.
+
 Towns farm the land round them where it can be farmed. Grassland gets a green patchwork with hedges. Desert's scrub gets dry country's farming: irrigated plots, fallow ones, olive groves and vineyards, with tracks between them. Nothing is farmed on dunes, on Temperate or on Desert.
 
 Nothing crosses lava or acid, so a Volcanic or Acid map is one land mass and offers four shapes: **One continent**, **Coast**, **Inland sea** and **Landlocked**. On the other planets a crossing joins the land masses. It is a shipping lane over water, and a solid track over ice, a dry basin or the maria.
