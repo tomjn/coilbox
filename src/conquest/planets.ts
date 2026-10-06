@@ -60,10 +60,10 @@ export interface Biome {
 export type SeaLook = "water" | "acid" | "lava" | "ice" | "basin" | "maria";
 
 /**
- * How a planet's settlements are laid out. `organic` and `compound` stand
- * in the open air. `sealed` is domes and modules joined by tubes.
+ * How a planet's settlements are laid out. `organic` is a town in the open
+ * air. `sealed` is domes and modules joined by tubes.
  */
-export type SettlementStyle = "organic" | "compound" | "sealed";
+export type SettlementStyle = "organic" | "sealed";
 
 /**
  * What a planet's settlements and roads look like. Display only. Every
@@ -325,13 +325,13 @@ const ICE: Planet = {
   },
   craters: false,
   settlement: {
-    style: "sealed",
-    domes: 0.25,
-    hull: [200, 84, 52],
-    trim: [228, 232, 238],
-    outskirts: "works",
+    style: "organic",
+    domes: 0,
+    hull: [146, 148, 152],
+    trim: [120, 124, 130],
+    outskirts: "none",
     roads: {
-      look: "sealed",
+      look: "open",
       track: [176, 194, 208],
       minor: [150, 170, 188],
       main: [92, 98, 106],

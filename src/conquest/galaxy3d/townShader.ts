@@ -87,31 +87,25 @@ uniform vec3 uTrim;
 uniform float uDomes;
 // What grows between the buildings of an open town, linear.
 uniform vec3 uGarden;
-// The layout, a constant so only one is compiled: 0 curving streets, 1 a walled
-// compound, 2 rings round a plaza, 3 sealed domes and modules.
+// The layout, a constant so only one is compiled: 0 a town in the open air,
+// 3 sealed domes and modules.
 #define W_STYLE STYLE_HERE
 // What lies round a settlement: 0 fields, 1 solar arrays and greenhouses.
 #define W_OUTSKIRTS OUTSKIRTS_HERE
 
-// Ground colours inside a settlement, linear, from sRGB asphalt (78, 80, 84),
-// paving (168, 166, 160), concrete (150, 148, 142), a park (64, 92, 52) and
-// painted markings (226, 222, 204). First guesses.
+// Ground colours inside a sealed outpost, linear, from sRGB asphalt
+// (78, 80, 84), concrete (150, 148, 142) and painted markings
+// (226, 222, 204). First guesses.
 const vec3 W_ASPHALT = vec3(0.076, 0.080, 0.089);
-const vec3 W_PAVE = vec3(0.392, 0.381, 0.352);
 const vec3 W_CONCRETE = vec3(0.305, 0.296, 0.270);
-const vec3 W_PARK = vec3(0.051, 0.107, 0.034);
 const vec3 W_MARK = vec3(0.760, 0.730, 0.600);
 // Solar panels (28, 40, 68) and a greenhouse's skin (196, 216, 196).
 const vec3 W_SOLAR = vec3(0.012, 0.021, 0.058);
 const vec3 W_GLASSHOUSE = vec3(0.552, 0.686, 0.552);
 
-// A cell of the layout is this wide in world units: a city block, a plot of
-// a compound, or the ground one dome stands on.
-#if W_STYLE == 1
-const float W_CELL = 0.7;
-const vec3 W_FAR = W_CONCRETE;
-const float W_FAR_COVER = 0.9;
-#elif W_STYLE == 3
+// The ground one dome or module of a sealed outpost stands on is this wide,
+// in world units.
+#if W_STYLE == 3
 const float W_CELL = 0.5;
 #define W_FAR (uHull * 0.8)
 const float W_FAR_COVER = 0.45;
@@ -205,62 +199,6 @@ float wCellDens(vec2 id) {
 // What stands at g (wCellAt): the coverage of a structure, with its colour,
 // its height in world units and the lean of its roof in the town's frame, and
 // the ground it stands on as a colour and coverage.
-#if W_STYLE == 1
-// A base: hangars, tank farms, pads and rows of huts on a concrete apron.
-float wStructure(vec2 g, float foot, out vec3 tone, out float high, out vec4 ground, out vec2 lean) {
-  vec2 id = floor(g);
-  vec2 f = fract(g);
-  float dens = wCellDens(id);
-  float bh = tHash(id + 3.7);
-  tone = uHull;
-  high = 0.0;
-  lean = vec2(0.0);
-  vec2 slab = abs(fract(g * 4.0) - 0.5);
-  float joint = 1.0 - smoothstep(0.0, foot / W_CELL * 4.0 + 0.02, 0.5 - max(slab.x, slab.y));
-  const float m = 0.035;
-  float eb = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)) * W_CELL;
-  float street = 1.0 - smoothstep(m * W_CELL - foot * 0.5, m * W_CELL + foot * 0.5, eb);
-  ground = vec4(W_CONCRETE * (1.0 - 0.12 * joint) * (1.0 - 0.22 * street), 0.95);
-  if (dens < 0.45) return 0.0;
-  vec2 p = (f - 0.5) * W_CELL;
-  bool turn = fract(bh * 13.0) > 0.5;
-  if (turn) p = p.yx;
-  float b = 0.0;
-  if (bh < 0.28) {
-    // A hangar with a barrel roof.
-    vec2 hs = W_CELL * vec2(0.36, 0.22);
-    b = wBox(p, hs, foot);
-    lean = vec2(0.0, p.y / hs.y * 0.7);
-    tone = uTrim * (0.85 + 0.15 * step(0.5, fract(p.x / 0.04)));
-    high = 0.05;
-  } else if (bh < 0.48) {
-    // Four storage tanks.
-    vec2 c = (fract(f * 2.0) - 0.5) * W_CELL * 0.5;
-    float r = W_CELL * 0.15;
-    b = wDisc(c, r, foot);
-    lean = c / r * 0.6;
-    turn = false;
-    tone = uHull * 1.05;
-    high = 0.03;
-  } else if (bh < 0.62) {
-    // A landing pad: a ring and a cross.
-    float rn = length(p) / (W_CELL * 0.34);
-    float pad = wDisc(p, W_CELL * 0.34, foot);
-    float ring = 1.0 - smoothstep(0.04, 0.08, abs(rn - 0.8));
-    float cross_ = step(min(abs(p.x), abs(p.y)), 0.01) * step(rn, 0.5);
-    ground.rgb = mix(ground.rgb, mix(W_ASPHALT, W_MARK, max(ring, cross_)), pad);
-  } else if (bh < 0.86) {
-    // Four long huts side by side.
-    float fv = fract((p.y / W_CELL + 0.5) * 4.0) - 0.5;
-    b = wBox(vec2(p.x, fv * W_CELL / 4.0), W_CELL * vec2(0.36, 0.075), foot) * step(abs(p.y), W_CELL * 0.42);
-    lean = vec2(0.0, sign(fv) * 0.4);
-    tone = uHull * 0.8;
-    high = 0.012;
-  }
-  if (turn) lean = lean.yx;
-  return b;
-}
-#else
 // Where the structure of a sealed cell stands, in cell units, and in .z
 // whether one stands there at all.
 vec3 wPod(vec2 id) {
@@ -337,7 +275,6 @@ float wStructure(vec2 g, float foot, out vec3 tone, out float high, out vec4 gro
   }
   return b;
 }
-#endif
 
 #else
 // A block of a town is about this wide, and a building's plot this long
@@ -666,22 +603,10 @@ void main() {
     float paved = max(main_, square * smoothstep(0.2, 0.5, dens));
     vec4 near = vec4(0.0, 0.0, 0.0, shade * 0.35);
     near = wOver(near, gnd.rgb * (1.0 - 0.45 * shade), gnd.a);
-#if W_STYLE == 3
     near = wOver(near, W_CONCRETE * 0.6, paved * 0.8);
-#else
-    near = wOver(near, mix(W_CONCRETE * 0.72, W_PAVE, square) * (1.0 - 0.3 * shade), paved);
-#endif
     b *= offRoad;
     near = wOver(near, tone, b);
     near *= fitMask;
-#if W_STYLE == 1
-    // A wall round the base, open where a road comes in.
-    near *= 1.0 - smoothstep(0.955, 0.965, rr);
-    float wallW = max(0.014, gFoot * 0.7);
-    float wall = 1.0 - smoothstep(wallW * 0.5, wallW * 0.5 + gFoot, abs(dist - edge * 0.96));
-    near = wOver(near, uHull * 0.45, wall * smoothstep(0.04, 0.07, mainD) * fitMask);
-    b *= 1.0 - smoothstep(0.955, 0.965, rr);
-#endif
     vec2 leanW = wAlong * lean.x + wAcross * lean.y;
     roofN = normalize(vec3(leanW.x, sqrt(max(1.0 - dot(lean, lean), 0.04)), leanW.y));
     roof = b * fitMask * keepNear;
@@ -774,18 +699,18 @@ void main() {
   vec2 yg = q / W_YARD + wSeed * 53.0;
   vec2 yid = floor(yg);
   vec2 yc = (yid + 0.5 - wSeed * 53.0) * W_YARD;
-  float clump = step(0.58, tNoise(yc / wR * 1.2 + wSeed * 37.0).x);
+  float clump = step(0.66, tNoise(yc / wR * 1.2 + wSeed * 37.0).x);
   float yard = (1.0 - smoothstep(0.3, 0.45, fd)) * smoothstep(0.95, 1.15, rr) * farm * clump * smoothstep(0.1, 0.16, roadD);
   if (uLayer < 0.5 && yard > 0.004) {
     vec2 yp = (fract(yg) - 0.5) * W_YARD;
     float yh = tHash(yid + 2.2);
     vec4 works = vec4(0.0);
-    if (yh < 0.6) {
+    if (yh < 0.45) {
       // Panels in rows, an even dark tone from far off.
       float rows = smoothstep(0.1, 0.2, abs(fract(yp.y / 0.05) - 0.5));
       float cover = wBox(yp, W_YARD * vec2(0.42, 0.36), gFoot) * mix(0.8, rows, tKeep(0.05, gFoot));
       works = vec4(W_SOLAR, 1.0) * cover;
-    } else if (yh < 0.8) {
+    } else if (yh < 0.6) {
       // Three tunnels side by side, lit along their tops.
       float fv = fract(yp.y / W_YARD * 3.0 + 0.5) - 0.5;
       float cover = wBox(vec2(yp.x, fv * W_YARD / 3.0), W_YARD * vec2(0.4, 0.12), gFoot) * step(abs(yp.y), W_YARD * 0.45);
@@ -820,7 +745,6 @@ void main() {
 /** The shader's number for each layout. */
 const STYLE_INDEX: Record<SettlementStyle, number> = {
   organic: 0,
-  compound: 1,
   sealed: 3,
 };
 
