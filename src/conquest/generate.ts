@@ -21,7 +21,7 @@ import {
   resolveConquestNames,
   resolveLandNames,
 } from "./names";
-import type { PlanetId } from "./planets";
+import { type PlanetId, resolvePlanet } from "./planets";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 import { MAX_NODE_COUNT } from "./size";
@@ -649,7 +649,9 @@ export function assembleGalaxy(
   // `rng` and every later draw depends on that. A land map then names from its
   // own stream instead (see `makeLandNamer`), leaving `rng` as it was.
   const starName = makeStarNamer(rng, names);
-  const landPools = graph.land ? resolveLandNames(opts.names) : undefined;
+  const landPools = graph.land
+    ? resolveLandNames(opts.names, resolvePlanet(opts.planet, opts.seed))
+    : undefined;
   const nameNode = landPools ? makeLandNamer(opts.seed, landPools) : starName;
   const specs = factionSpecs(rng, names, enemyCount + 1);
   const factions: Faction[] = specs.map((spec, i) => ({

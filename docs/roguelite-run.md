@@ -16,6 +16,7 @@ Runs live under **Run** in the sidebar, next to Conquest. You can start one for 
 | **Length** | Quick / Standard / Long — how many columns the map has. On a Cities or Territories run the map decides the length, so this sets how many locations the generated map has. |
 | **Difficulty** | 1–5. Scales enemy count and handicap and lowers your starting health. |
 | **Map style** | **Galaxy** (a 3D starfield) and **Theatre** (a flat tactical chart) draw the run in columns. **Cities** and **Territories** generate a land map and the run crosses it from one side to the other, location by location. The seed picks the shape of the land: one continent, a coast, two continents, an archipelago, an inland sea or landlocked land with lakes. Pick one of the last three for a terrestrial game where a galaxy of stars makes no sense. |
+| **Planet** | Cities and Territories only. Which world the land is on: Temperate, Desert, Ice, Red, Moon, Volcanic or Acid. It decides the ground, the sea, the settlements and the place names, as it does in [Conquest](conquest.md#planets). **Surprise me** picks one from the seed. The Warpath list shows the planet under the run. |
 | **Ascension** | An extra difficulty tier on top, unlocked by winning (hidden until you have one). |
 | **Seed** | The number the whole run is rolled from. Reroll for a new run. |
 
@@ -59,6 +60,8 @@ A generated map always offers a choice of route. The seed picks the start and go
 A hand-made map shows in **Map style** as "Title (hand-made map)" when its author marked a start and a goal for Warpath. Its author also sets where the run starts and ends and what some locations are. A hand-made run is drawn in the Theatre style and has no **Length** choice, because the map decides both.
 
 A location the author gave a battle fights that battle. Its map, enemy count, AI, handicap, start positions, mod options and disabled units replace the generated ones where the author set them. A location with a scenario plays it as its author set it up, without your unit limit or perks. See [Warpath markings](hand-made-maps.md#warpath-markings) for the author's side.
+
+A challenge code carries the planet. A Coilbox from before Warpath had planets ignores it and builds the Temperate map of the same seed, which for Volcanic and Acid can be a different land and so a different run. A run started before then is on Temperate.
 
 A run saves a reference to its map. If the map is missing, unreadable or changed so the run no longer fits, the run plays in columns and the run page says why. A challenge code on a hand-made map needs the same version of the map installed.
 

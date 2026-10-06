@@ -121,6 +121,9 @@ export function warpathIdentity(s: RunSettings): string {
                 s.map.seed,
                 s.map.nodeCount,
                 s.map.layout ?? null,
+                // Only when the run carries one, so a run made before planets
+                // keeps the identity it had.
+                ...(s.map.planet ? [s.map.planet] : []),
               ]
             : [
                 "handmade",

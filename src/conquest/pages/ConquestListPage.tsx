@@ -8,6 +8,7 @@ import {
 } from "@picoframe/frame";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
+  Astroid,
   ChevronRight,
   Dices,
   Download,
@@ -23,12 +24,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { ContinueBadge } from "@/components/ContinueBadge";
+import { GameIcon } from "@/components/GameIcon";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { FactionLogo } from "@/factions/FactionLogo";
-import { useFactionLogo } from "@/factions/logos";
 import { withoutGeneratedGames } from "@/lib/generatedGames";
 import { mostRecentOpen } from "@/lib/recency";
 import { challengeExport } from "../../challenge/bindings";
@@ -134,18 +134,20 @@ import {
   type MapSkin,
 } from "../model";
 import { mergeConquestNames } from "../names";
-import { isPlanetId, PLANETS, planetOf } from "../planets";
+import { isPlanetId, planetOf } from "../planets";
 import {
   DEFAULT_RADIUS_LY,
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
 import { landLayoutsFor } from "../terrainGen";
+import { generatedPlanet } from "../territories";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 import { MapErrorList } from "./components/MapErrorList";
 import { PlanetSwatch } from "./components/PlanetSwatch";
+import { PLANET_OPTIONS } from "./components/planetOptions";
 import { StartPositionSelect } from "./components/StartPositionSelect";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
@@ -967,23 +969,12 @@ function GalaxyCard({
         />
       ),
     });
-  // The player's chosen faction emblem (by its in-game side), shown in place of the
-  // generic orbit glyph. Resolved per card, hooks are shared/cached per target.
+  // The installed game this map is for, so the card shows that game's icon.
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const installedGame = resolveGameByShortname(
     galaxy.game,
     scan.data?.games ?? [],
-  );
-  const playerLogo = useFactionLogo(
-    {
-      game: installedGame ?? undefined,
-      enginePath: target?.enginePath,
-      dataDir: target?.dataDir,
-      gameArchive: installedGame?.primaryArchive.name,
-      size: 24,
-    },
-    state?.playerSide,
   );
   const statusLabel =
     state?.status === "won"
@@ -993,6 +984,9 @@ function GalaxyCard({
         : state
           ? `Turn ${state.turn} · ${territoryPercent(galaxy, state)}% held`
           : "Not started";
+  // Set for a generated Cities or Territories map, which is the only kind
+  // built on a planet.
+  const planet = generatedPlanet(galaxy);
 
   return (
     <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none transition-colors hover:border-border hover:bg-accent/50">
@@ -1000,17 +994,14 @@ function GalaxyCard({
         to={`/conquest/${encodeURIComponent(galaxy.id)}`}
         className="flex min-w-0 flex-1 items-center gap-3"
       >
-        <div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted">
-          {playerLogo ? (
-            <FactionLogo
-              logo={playerLogo}
-              sideName={state?.playerSide}
-              size={24}
-            />
-          ) : (
-            <Orbit className="size-5 text-muted-foreground" aria-hidden />
-          )}
-        </div>
+        <GameIcon
+          name={
+            galaxy.game.pinnedName ??
+            installedGame?.name ??
+            galaxy.game.shortname
+          }
+          size={40}
+        />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <div className="flex items-center gap-2">
             <span className="truncate text-sm font-medium">{galaxy.title}</span>
@@ -1026,10 +1017,22 @@ function GalaxyCard({
             )}
             {resume && <ContinueBadge />}
           </div>
-          <p className="line-clamp-1 text-xs text-muted-foreground">
-            {galaxy.game.shortname} · {galaxy.nodes.length}{" "}
-            {locationNoun(galaxy.theme?.skin).many} · {galaxy.factions.length}{" "}
-            factions
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span className="truncate">
+              {galaxy.game.shortname} · {galaxy.nodes.length}{" "}
+              {locationNoun(galaxy.theme?.skin).many} · {galaxy.factions.length}{" "}
+              factions
+              {planet && ` · ${planetOf(planet).label}`}
+            </span>
+            {planet ? (
+              <PlanetSwatch planet={planet} />
+            ) : (
+              <Astroid
+                className="size-4 shrink-0"
+                fill="currentColor"
+                aria-hidden
+              />
+            )}
           </p>
           <span
             className={`text-xs ${
@@ -1133,19 +1136,6 @@ const LAND_LAYOUT_OPTIONS = [
   { value: "archipelago", label: "Archipelago" },
   { value: "inlandsea", label: "Inland sea" },
   { value: "landlocked", label: "Landlocked" },
-];
-/** Surprise me, then each planet with a chip of its colours. */
-const PLANET_OPTIONS = [
-  {
-    value: "random",
-    label: "Surprise me",
-    icon: <PlanetSwatch planet="random" />,
-  },
-  ...PLANETS.map((id) => ({
-    value: id,
-    label: planetOf(id).label,
-    icon: <PlanetSwatch planet={id} />,
-  })),
 ];
 /** The shapes a style offers. A land style on a planet whose sea cannot be
  * crossed offers only the single-mass shapes. */

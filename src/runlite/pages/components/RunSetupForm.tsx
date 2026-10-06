@@ -13,6 +13,7 @@ import {
 } from "../../../conquest/handmade/ownMapsOnly";
 import { useGameMapFacts } from "../../../conquest/handmade/useHandmadeMaps";
 import { locationNoun, MAP_STYLE_OPTIONS } from "../../../conquest/mapStyle";
+import { PLANET_OPTIONS } from "../../../conquest/pages/components/planetOptions";
 import { resolveBranding, useBrandingCatalog } from "../../../content/branding";
 import {
   useUnitsyncGameHeaders,
@@ -127,6 +128,7 @@ export function RunSetupForm({
   const length = choices.length ?? "standard";
   const difficulty = choices.difficulty ?? 2;
   const skin: RunSkin = choices.skin ?? "galaxy";
+  const planet = choices.planet ?? "random";
   // The hand-made map picked in place of a generated style, by its id.
   const pickedMapId = choices.mapId ?? null;
   const pickedLoadoutId = choices.loadout ?? "standard";
@@ -270,6 +272,12 @@ export function RunSetupForm({
   const canGenerate =
     !!game && genMaps.length > 0 && !gameLoading && !stylesLoading;
 
+  // Set for the two styles that cross a generated land map.
+  const landSizes =
+    !handmadeMap && (skin === "cities" || skin === "territories")
+      ? LAND_RUN_SIZES[skin]
+      : null;
+
   // Why the last Begin did not start a run, so the player is told where they
   // pressed rather than sent to a run that was never saved.
   const [startError, setStartError] = useState<string | null>(null);
@@ -280,6 +288,7 @@ export function RunSetupForm({
     setLastGame(game.name);
     setRemembered({
       skin,
+      planet,
       mapId: pickedMapId,
       side: sideName || undefined,
       length,
@@ -301,6 +310,7 @@ export function RunSetupForm({
       factionId: "player",
       side: sideName || undefined,
       skin,
+      ...(landSizes ? { planet: planet as GenerateRunOpts["planet"] } : {}),
       maps: genMaps,
       build,
       enemyAiKey,
@@ -327,12 +337,6 @@ export function RunSetupForm({
     }
     onStarted(id);
   };
-
-  // Set for the two styles that cross a generated land map.
-  const landSizes =
-    !handmadeMap && (skin === "cities" || skin === "territories")
-      ? LAND_RUN_SIZES[skin]
-      : null;
 
   const toggleItem =
     "rounded-md border border-border/60 px-4 data-[state=on]:border-primary data-[state=on]:bg-primary/10";
@@ -489,6 +493,15 @@ export function RunSetupForm({
             />
           )}
         </Field>
+        {landSizes && (
+          <Field label="Planet">
+            <OptionSelect
+              value={planet}
+              onValueChange={(v) => choose({ planet: v })}
+              options={PLANET_OPTIONS}
+            />
+          </Field>
+        )}
         {ascensionTier > 0 && (
           <Field label="Ascension">
             <OptionSelect

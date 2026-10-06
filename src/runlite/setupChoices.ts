@@ -1,4 +1,5 @@
 import { MAP_STYLE_OPTIONS } from "../conquest/mapStyle";
+import { isPlanetId } from "../conquest/planets";
 import type { RunLength, RunSkin } from "./model";
 
 /**
@@ -12,6 +13,8 @@ export const SETUP_CHOICES_KEY = "warpath.setup.choices";
 
 export interface SetupChoices {
   skin: RunSkin;
+  /** Cities and Territories only: a planet id, or `random`. */
+  planet: string;
   /** The hand-made map picked in place of a style, or null for a style. */
   mapId: string | null;
   side: string;
@@ -36,6 +39,7 @@ export function readSetupChoices(stored: unknown): Partial<SetupChoices> {
   if (typeof s.skin === "string" && STYLES.includes(s.skin)) {
     out.skin = s.skin as RunSkin;
   }
+  if (s.planet === "random" || isPlanetId(s.planet)) out.planet = s.planet;
   if (typeof s.mapId === "string" || s.mapId === null) out.mapId = s.mapId;
   if (typeof s.side === "string") out.side = s.side;
   if (typeof s.length === "string" && LENGTHS.includes(s.length)) {

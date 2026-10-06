@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { runIdentity } from "../challenge/identity";
 import { MAP_SKINS } from "../conquest/model";
+import { resolvePlanet } from "../conquest/planets";
+import { generatedPlanet } from "../conquest/territories";
 import {
   decodeWarpathChallenge,
   encodeWarpathChallenge,
@@ -114,6 +116,58 @@ describe("generateStyledRun", () => {
       expect(runIdentity(rebuilt)).toBe(runIdentity(run));
     });
   }
+
+  it("builds the land as the planet asked for, on every map it tries", () => {
+    for (const skin of LAND) {
+      const run = generateStyledRun({ ...base, skin, planet: "volcanic" });
+      const ref = run.settings.map;
+      if (ref?.source !== "generated") throw new Error("expected a map");
+      expect(ref.planet).toBe("volcanic");
+      const source = resolveRunMap(ref, run.settings.game);
+      expect(source?.map.generated?.planet).toBe("volcanic");
+      expect(source ? generatedPlanet(source.map) : null).toBe("volcanic");
+    }
+  });
+
+  it("picks one planet from the seed for a random one, and stores it", () => {
+    const run = generateStyledRun({
+      ...base,
+      skin: "territories",
+      planet: "random",
+    });
+    const ref = run.settings.map;
+    if (ref?.source !== "generated") throw new Error("expected a map");
+    expect(ref.planet).toBe(resolvePlanet("random", base.seed));
+  });
+
+  it("carries the planet in a challenge code and in the identity", () => {
+    const plain = generateStyledRun({ ...base, skin: "territories" });
+    const run = generateStyledRun({
+      ...base,
+      skin: "territories",
+      planet: "moon",
+    });
+    expect(runIdentity(run)).not.toBe(runIdentity(plain));
+    const decoded = decodeWarpathChallenge(encodeWarpathChallenge(run));
+    if (!decoded.ok) throw new Error("expected a successful decode");
+    const rebuilt = runFromChallenge(decoded.settings, {
+      maps: MAPS,
+      enemyAiKey: "native:BARb",
+    });
+    expect(rebuilt.settings).toEqual(run.settings);
+    expect(rebuilt.nodes).toEqual(run.nodes);
+    expect(parseRunJson(JSON.stringify(run))).toEqual(run);
+  });
+
+  it("reads a planet it does not know as no planet", () => {
+    const run = generateStyledRun({ ...base, skin: "cities", planet: "ice" });
+    const settings = parseRunSettings({
+      ...run.settings,
+      map: { ...run.settings.map, planet: "gas giant" },
+    });
+    expect(settings?.map).toEqual({ ...run.settings.map, planet: undefined });
+    expect(settings?.map && "planet" in settings.map).toBe(false);
+  });
 
   it("gives each style a challenge identity of its own", () => {
     const ids = MAP_SKINS.map((skin) =>

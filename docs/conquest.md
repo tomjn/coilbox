@@ -78,6 +78,20 @@ Towns farm the land round them where it can be farmed. Grassland gets a green pa
 
 Nothing crosses lava or acid, so a Volcanic or Acid map is one land mass and offers four shapes: **One continent**, **Coast**, **Inland sea** and **Landlocked**. On the other planets a crossing joins the land masses. It is a shipping lane over water, and a solid track over ice, a dry basin or the maria.
 
+The planet also names the places on it:
+
+- **Temperate** has composed English names, such as "Ironcoast" and "Northmarch".
+- **Desert** has dry country's, such as "Bonedraw" and "Saltsink".
+- **Ice** has northern ones, such as "Stormfjord" and "Winterhold".
+- **Red** has a classical name and the kind of feature, as Mars is mapped: "Utopia Fossae", "Solis Montes".
+- **Moon** has the kind of feature and a Latin name, as the Moon is mapped: "Mare Ventorum", "Lacus Aestuum".
+- **Volcanic** has hard invented names, such as "Moradum" and "Rukh-kor".
+- **Acid** has poisoned ground's, such as "Vitriolmoor" and "Brineflats".
+
+A game that supplies its own place names gets them on every planet (see [Names and factions](#names-and-factions)).
+
+The Conquest list shows the planet under each Cities or Territories map.
+
 A map made before planets existed is Temperate. A challenge code carries the planet. A Coilbox from before planets ignores it and builds the Temperate map of the same seed, which for Volcanic and Acid can be a different land.
 
 ### Playing a hand-made map
@@ -130,7 +144,7 @@ The schema (every field optional):
 How they're used when a galaxy is generated:
 
 - **System names** are drawn uniquely from `starNames` first (real star names by default), then synthesized from `starPrefixes` + `starSuffixes`.
-- **Land maps** (the Cities and Territories styles) name their locations from `placeNames`, then from `placePrefixes` + `placeSuffixes`. Each place field falls back to the matching star field, so a game that supplies only star names gets them on every style, as before. A game that supplies neither gets built-in composed place names such as "Ironcoast" and "Northmarch", drawn from a separate random stream so the names never change where anything is placed. Galaxy and Theatre maps keep using the star fields.
+- **Land maps** (the Cities and Territories styles) name their locations from `placeNames`, then from `placePrefixes` + `placeSuffixes`. Each place field falls back to the matching star field, so a game that supplies only star names gets them on every style, as before. A game that supplies neither gets built-in place names composed from two lists, and each [planet](#planets) has its own pair. They are drawn from a separate random stream so the names never change where anything is placed. Galaxy and Theatre maps keep using the star fields.
 - **Factions** come from `factions` presets, assigned in order with the player first. A preset wins for every field it sets; anything it omits falls back (colour to the palette, name to `factionNames` or a synthesized name). With no presets, `factionNames` (then synthesized names) supply the names and the built-in palette the colours.
 
 Merge order per field is **profile > catalog > built-in**; an empty array is treated as absent, so an override never blanks a pool.

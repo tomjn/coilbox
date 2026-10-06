@@ -7,6 +7,7 @@ import {
 } from "../conquest/mapSubstitution";
 import type { GameRef } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
+import type { PlanetId } from "../conquest/planets";
 import {
   hashString,
   mulberry32,
@@ -75,6 +76,9 @@ export interface GenerateRunOpts {
   factionId: string;
   side?: string;
   skin: RunSkin;
+  /** Cities and Territories only: the planet the generated land is built as,
+   * or `random` to pick one from the seed. Absent builds the Temperate map. */
+  planet?: PlanetId | "random";
   maps: GenRunMap[];
   /** Absent -> perk-only rewards and no unit gating (full arsenal). */
   build?: GenBuildGraph;

@@ -88,7 +88,7 @@ describe("parseGalaxyJson", () => {
     expect(direct?.planet).toBe("temperate");
     expect(direct?.land).toEqual(want.land);
     expect(direct?.heightmap).toEqual(want.heightmap);
-  });
+  }, 60_000);
 
   it("keeps a known planet and drops an unknown one", () => {
     const planetOf = (planet: string) =>

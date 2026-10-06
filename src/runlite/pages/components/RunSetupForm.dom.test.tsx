@@ -405,6 +405,24 @@ describe("RunSetupForm and the four map styles (issue #3507)", () => {
     });
   }
 
+  const planetSelect = () =>
+    [...document.querySelectorAll("select")].find((s) =>
+      [...s.options].some((o) => o.value === "volcanic"),
+    );
+
+  it("offers a planet for the two land styles only, and begins on it", async () => {
+    show(emptyMeta);
+    expect(planetSelect()).toBeUndefined();
+    fireEvent.change(styleSelect(), { target: { value: "territories" } });
+    const select = planetSelect();
+    if (!select) throw new Error("no planet select");
+    expect(select.value).toBe("random");
+    fireEvent.change(select, { target: { value: "moon" } });
+    fireEvent.click(screen.getByRole("radio", { name: "quick" }));
+    const run = await begin();
+    expect(run.settings.map).toMatchObject({ planet: "moon" });
+  });
+
   for (const [style, many] of [
     ["cities", "cities"],
     ["territories", "provinces"],
@@ -592,6 +610,7 @@ describe("RunSetupForm and the other choices (issue #3638)", () => {
     await begin();
     expect(stored()).toEqual({
       skin: "galaxy",
+      planet: "random",
       mapId: null,
       length: "standard",
       difficulty: 2,
