@@ -6,6 +6,7 @@ import { Link, useNavigate } from "react-router";
 import { challengeExport } from "@/challenge/bindings";
 import { ChallengeShare } from "@/challenge/ChallengeShare";
 import { runIdentity } from "@/challenge/identity";
+import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
@@ -270,7 +271,7 @@ function RunCard({
   /** The single most-recently-updated active run (issue #374). */
   resume?: boolean;
   onResume: () => void;
-  onAbandon: () => void;
+  onAbandon: () => void | Promise<void>;
 }) {
   const drawer = useDrawer();
   const exportChallengeFile = async () => {
@@ -360,9 +361,20 @@ function RunCard({
           <Play className="mr-1.5 size-4" aria-hidden />
           {status === "active" ? "Resume" : "View"}
         </Button>
-        <Button variant="outline" onClick={onAbandon}>
+        <ConfirmPopover
+          triggerProps={{ variant: "outline" }}
+          heading={`Abandon ${run.name}?`}
+          description={`This deletes the warpath for good, including its progress (${
+            status === "active"
+              ? `health ${hull}/${maxHull}`
+              : label.toLowerCase()
+          }). It cannot be undone.`}
+          confirmLabel="Abandon warpath"
+          busyLabel="Abandoning…"
+          onConfirm={onAbandon}
+        >
           <Trash2 className="mr-1.5 size-4" aria-hidden /> Abandon
-        </Button>
+        </ConfirmPopover>
       </div>
     </div>
   );
