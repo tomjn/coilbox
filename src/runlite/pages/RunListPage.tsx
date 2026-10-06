@@ -1,6 +1,14 @@
 import { Button, useDrawer } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, Loader2, Play, Rocket, Share2, Trash2 } from "lucide-react";
+import {
+  Astroid,
+  Download,
+  Loader2,
+  Play,
+  Rocket,
+  Share2,
+  Trash2,
+} from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { challengeExport } from "@/challenge/bindings";
@@ -12,6 +20,8 @@ import { PageHeader } from "@/components/PageHeader";
 import { FactionLogo } from "@/factions/FactionLogo";
 import { useFactionLogo } from "@/factions/logos";
 import { mostRecentOpen } from "@/lib/recency";
+import { PlanetSwatch } from "../../conquest/pages/components/PlanetSwatch";
+import { planetOf } from "../../conquest/planets";
 import { useUnitsyncScan } from "../../content/config";
 import {
   Diagnostics,
@@ -319,6 +329,11 @@ function RunCard({
   );
 
   const { status, hull, maxHull } = run.progress;
+  // A run across a generated land map is on a planet. One made before
+  // planets existed is on Temperate.
+  const map = run.settings.map;
+  const planet =
+    map?.source === "generated" ? (map.planet ?? "temperate") : null;
   const label =
     status === "won"
       ? "Warpath complete"
@@ -347,8 +362,22 @@ function RunCard({
             )}
             {resume && <ContinueBadge />}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {label} · {run.settings.game.shortname} · health {hull}/{maxHull}
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span>
+              {label} · {run.settings.game.shortname} · health {hull}/{maxHull}
+              {planet && ` · ${planetOf(planet).label}`}
+            </span>
+            {planet ? (
+              <PlanetSwatch planet={planet} />
+            ) : (
+              map?.source !== "handmade" && (
+                <Astroid
+                  className="size-4 shrink-0"
+                  fill="currentColor"
+                  aria-hidden
+                />
+              )
+            )}
           </div>
         </div>
       </div>

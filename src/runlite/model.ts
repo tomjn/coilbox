@@ -3,6 +3,7 @@ import { parseMapDownload } from "../campaign/model";
 import { type HandmadeMapRef, parseHandmadeMapRef } from "../challenge/mapRef";
 import { type GameRef, type MapSkin, readMapSkin } from "../conquest/model";
 import { sectorNameForSeed } from "../conquest/names";
+import { isPlanetId, type PlanetId } from "../conquest/planets";
 import { clamp } from "../lib/helpers";
 
 /**
@@ -202,6 +203,9 @@ export type RunMapRef =
       nodeCount: number;
       /** The generator's layout setting, as the map document recorded it. */
       layout?: string;
+      /** The planet the land is built as. Absent is Temperate, which is what
+       * every map was before planets existed. */
+      planet?: PlanetId;
     }
   | HandmadeMapRef;
 
@@ -578,6 +582,7 @@ function parseRunMapRef(value: unknown): RunMapRef | null {
     ...(typeof value.layout === "string" && value.layout !== ""
       ? { layout: value.layout }
       : {}),
+    ...(isPlanetId(value.planet) ? { planet: value.planet } : {}),
   };
 }
 

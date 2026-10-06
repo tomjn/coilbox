@@ -187,14 +187,14 @@ describe("Abandon on a warpath run", () => {
     updatedAt: "2026-01-01T00:00:00Z",
   };
 
-  function renderRun() {
+  function renderRun(run: unknown = RUN) {
     readiness.current = {
       hasGames: true,
       state: "ready",
       scanErrors: [],
       scanFailure: null,
     };
-    readiness.runs = { "run-1": RUN };
+    readiness.runs = { "run-1": run };
     render(
       <MemoryRouter>
         <RunListPage />
@@ -226,5 +226,34 @@ describe("Abandon on a warpath run", () => {
     await waitFor(() =>
       expect(readiness.deleteRun).toHaveBeenCalledWith("run-1"),
     );
+  });
+
+  const onMap = (map: Record<string, unknown>) => ({
+    ...RUN,
+    settings: { ...RUN.settings, map },
+  });
+  const LAND = {
+    source: "generated",
+    style: "cities",
+    seed: 1,
+    nodeCount: 12,
+  };
+
+  it("names the planet of a run across generated land", () => {
+    renderRun(onMap({ ...LAND, planet: "volcanic" }));
+    expect(screen.getByText(/· Volcanic$/)).toBeTruthy();
+  });
+
+  it("calls a land run from before planets Temperate", () => {
+    renderRun(onMap(LAND));
+    expect(screen.getByText(/· Temperate$/)).toBeTruthy();
+  });
+
+  it("names no planet for a column run or a hand-made map", () => {
+    renderRun();
+    expect(screen.queryByText(/Temperate/)).toBeNull();
+    cleanup();
+    renderRun(onMap({ source: "handmade", id: "m" }));
+    expect(screen.queryByText(/Temperate/)).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ import type {
   NodeBattleSpec,
   NodeScenario,
 } from "../conquest/model";
+import { resolvePlanet } from "../conquest/planets";
 import { hashString, mulberry32, type Rng } from "../conquest/rng";
 import { LAND_LAYOUTS } from "../conquest/terrainGen";
 import { generateTerritories } from "../conquest/territories";
@@ -325,6 +326,7 @@ export function runMapRefFor(map: GalaxyDoc): RunMapRef {
       seed: g.seed,
       nodeCount: g.nodeCount ?? map.nodes.length,
       ...(g.layout ? { layout: g.layout } : {}),
+      ...(g.planet ? { planet: resolvePlanet(g.planet, g.seed) } : {}),
     };
   }
   return handmadeMapRefFor(map);
@@ -388,6 +390,7 @@ export function resolveRunMap(
           nodeCount: ref.nodeCount,
           factionCount: 1,
           layout,
+          ...(ref.planet ? { planet: ref.planet } : {}),
         },
         new Date(0).toISOString(),
       ),
@@ -580,6 +583,10 @@ const LAND_MAP_TRIES = 16;
 export function generateStyledRun(opts: GenerateRunOpts): RogueliteRun {
   const { skin } = opts;
   if (skin !== "cities" && skin !== "territories") return generateRun(opts);
+  // Picked once from the run's seed, so every map tried is the same planet.
+  const planet = opts.planet
+    ? resolvePlanet(opts.planet, opts.seed)
+    : undefined;
   const runOnMap = (attempt: number): RogueliteRun => {
     const mapRef: RunMapRef = {
       source: "generated",
@@ -590,6 +597,7 @@ export function generateStyledRun(opts: GenerateRunOpts): RogueliteRun {
           : hashString(`warpath-map:${opts.seed >>> 0}:${attempt}`),
       nodeCount: LAND_RUN_SIZES[skin][opts.length],
       layout: "random",
+      ...(planet ? { planet } : {}),
     };
     const source = resolveRunMap(mapRef, opts.game);
     if (!source) {
