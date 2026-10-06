@@ -235,6 +235,18 @@ describe("generatedTerrainPixels", () => {
     expect(generatedTerrainPixels(generateMap(base, NOW))).toBeUndefined();
   });
 
+  it("hands the view the weights and the planet", () => {
+    const px = generatedTerrainPixels(
+      generateTerritories({ ...base, planet: "ice" }),
+    );
+    expect(px?.biomes?.planet).toBe("ice");
+    expect(px?.biomes?.a.length).toBe(512 * 512 * 4);
+    const image = px?.extension?.image;
+    expect(px?.extension?.biomes?.a.length).toBe(
+      (image?.width ?? 0) * (image?.height ?? 0) * 4,
+    );
+  });
+
   for (const skin of LAND) {
     it(`gives the view a picture and heights for a ${skin} map`, () => {
       const pixels = generatedTerrainPixels(

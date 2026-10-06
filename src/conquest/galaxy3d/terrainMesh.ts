@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { PlanetId } from "../planets";
 import type { GroundShading } from "./groundShader";
 import {
   apronHeights,
@@ -113,6 +114,21 @@ export interface TerrainExtension {
   image: ColorPixels;
   heights: HeightGrid;
   margin: number;
+  /** The generator's weights at this picture's size. */
+  biomes?: BiomePixels;
+}
+
+/**
+ * A generator's biome weights as RGBA bytes: `a` holds slots 0 to 3 and `b`
+ * slots 4 to 7. Row by row from the top left, the same size as the picture
+ * they go with.
+ */
+export interface BiomePixels {
+  a: Uint8Array;
+  b: Uint8Array;
+  width: number;
+  height: number;
+  planet: PlanetId;
 }
 
 /**
@@ -183,6 +199,8 @@ export function buildTerrainMesh(
   extension?: TerrainExtension,
   /** Roads painted into the ground. See `groundShader.ts`. */
   ground?: GroundShading,
+  /** The map's own weights, which go with `color` when it is pixels. */
+  biomes?: BiomePixels,
 ): THREE.Mesh {
   const geo = terrainGeometry(surface);
   // Unlit: the shader lights the sheet itself, which leaves the scene's
@@ -250,6 +268,40 @@ export function buildTerrainMesh(
     disposables.push(normals);
   }
 
+  // The weights for the picture the mesh draws: the extension's with the
+  // extension, otherwise the map's, widened as its picture is. Data, so they
+  // take no colour space.
+  let biomeTextures: {
+    a: THREE.Texture;
+    b: THREE.Texture;
+    planet: PlanetId;
+  } | null = null;
+  const weights = ext ? ext.biomes : biomes;
+  if (detail && weights && isColorPixels(color)) {
+    const texture = (data: Uint8Array): THREE.Texture => {
+      const picture = { data, width: weights.width, height: weights.height };
+      const drawn = ext ? picture : widened(picture);
+      const tex = new THREE.DataTexture(
+        drawn.data,
+        drawn.width,
+        drawn.height,
+        THREE.RGBAFormat,
+      );
+      tex.flipY = false;
+      tex.magFilter = THREE.LinearFilter;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+      disposables.push(tex);
+      return tex;
+    };
+    biomeTextures = {
+      a: texture(weights.a),
+      b: texture(weights.b),
+      planet: weights.planet,
+    };
+  }
+
   let frame: TerrainFrame | undefined;
   // The haze's colour, and the background's. An apron round a picture still
   // loading takes the placeholder's until the picture arrives.
@@ -278,7 +330,13 @@ export function buildTerrainMesh(
   }
   applyTerrainShader(
     mat,
-    { normals, detail: detail && isColorPixels(color), frame, ground },
+    {
+      normals,
+      biomes: biomeTextures,
+      detail: detail && isColorPixels(color),
+      frame,
+      ground,
+    },
     disposables,
   );
   if (margin) buildMargin(scene, disposables, surface, margin, mat);

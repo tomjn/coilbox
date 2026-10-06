@@ -1,8 +1,10 @@
 import * as THREE from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { commonEdgeColor } from "./handmadeEdge";
+import type { PlanetId } from "../planets";
+import { apronPicture, apronPixels, commonEdgeColor } from "./handmadeEdge";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
 import {
+  type BiomePixels,
   buildTerrainMesh,
   outerRingColor,
   type TerrainExtension,
@@ -68,6 +70,16 @@ describe("the sheet's shader", () => {
       { current: null },
       heights,
       detail,
+      undefined,
+      undefined,
+      // Detail reads the generator's weights, so a generated map brings them.
+      {
+        a: new Uint8Array(64 * 64 * 4),
+        b: new Uint8Array(64 * 64 * 4),
+        width: 64,
+        height: 64,
+        planet: "temperate",
+      },
     );
     for (const d of disposables) d.dispose();
     return mesh.material as THREE.MeshBasicMaterial;
@@ -124,6 +136,161 @@ describe("the sheet's shader", () => {
     expect(shader.vertexShader).toContain("vTerrainPos = (modelMatrix");
     expect(shader.fragmentShader).toContain("texture2D(uTerrainNormals");
     expect(Object.keys(shader.uniforms)).toContain("uTerrainNormals");
+  });
+});
+
+describe("the sheet's biome weights", () => {
+  const grid: HeightGrid = {
+    data: new Float32Array([0, 0.5, 0.5, 1]),
+    width: 2,
+    height: 2,
+  };
+  const weights = (planet: PlanetId, size = 64): BiomePixels => ({
+    a: new Uint8Array(size * size * 4).fill(10),
+    b: new Uint8Array(size * size * 4).fill(20),
+    width: size,
+    height: size,
+    planet,
+  });
+  /** The uniforms the material hands to a compiling shader. */
+  const uniformsOf = (
+    material: THREE.Material,
+  ): Record<string, { value: unknown }> => {
+    const shader = {
+      uniforms: {},
+      vertexShader: "#include <project_vertex>",
+      fragmentShader: "#include <color_fragment>",
+    } as unknown as THREE.WebGLProgramParametersWithUniforms;
+    material.onBeforeCompile(shader, {} as THREE.WebGLRenderer);
+    return shader.uniforms as Record<string, { value: unknown }>;
+  };
+  const build = (
+    biomes: BiomePixels | undefined,
+    detail = true,
+    extension?: TerrainExtension,
+  ) => {
+    const surface = createTerrainSurface({ width: 64, height: 64 }, 100, grid);
+    const disposables: { dispose(): void }[] = [];
+    const mesh = buildTerrainMesh(
+      new THREE.Scene(),
+      disposables,
+      surface,
+      halves(),
+      { current: null },
+      grid,
+      detail,
+      extension,
+      undefined,
+      biomes,
+    );
+    for (const d of disposables) d.dispose();
+    return uniformsOf(mesh.material as THREE.Material);
+  };
+
+  it("binds the weights when detail is on and not when it is off", () => {
+    const on = build(weights("temperate"));
+    expect(on.uBiomeA.value).toBeInstanceOf(THREE.DataTexture);
+    expect(on.uBiomeB.value).toBeInstanceOf(THREE.DataTexture);
+    expect(on.uTerrainDetail.value).toBe(1);
+    const a = on.uBiomeA.value as THREE.DataTexture;
+    expect(a.colorSpace).toBe(THREE.NoColorSpace);
+    expect(a.flipY).toBe(false);
+    expect(a.minFilter).toBe(THREE.LinearMipmapLinearFilter);
+    const off = build(weights("temperate"), false);
+    expect(off.uTerrainDetail.value).toBe(0);
+    // Only the one texel placeholder is bound, never the weights.
+    expect((off.uBiomeA.value as THREE.DataTexture).image.width).toBe(1);
+    expect((off.uBiomeB.value as THREE.DataTexture).image.width).toBe(1);
+  });
+
+  it("widens the weights exactly as the picture is widened", () => {
+    const on = build(weights("temperate"));
+    const a = on.uBiomeA.value as THREE.DataTexture;
+    const b = on.uBiomeB.value as THREE.DataTexture;
+    const apron = apronPicture(halves(), 2, 2, apronPixels(grid));
+    expect(a.image.width).toBe(apron.width);
+    expect(a.image.height).toBe(apron.height);
+    expect(b.image.width).toBe(apron.width);
+    expect(b.image.height).toBe(apron.height);
+  });
+
+  it("uploads the extension's weights when it draws the extension", () => {
+    const across = 8;
+    const extension: TerrainExtension = {
+      margin: 2,
+      heights: {
+        data: new Float32Array(across * across).fill(0.2),
+        width: across,
+        height: across,
+      },
+      image: {
+        data: new Uint8ClampedArray(across * across * 4).fill(60),
+        width: across,
+        height: across,
+      },
+      biomes: weights("temperate", across),
+    };
+    const on = build(weights("temperate"), true, extension);
+    expect((on.uBiomeA.value as THREE.DataTexture).image.width).toBe(across);
+  });
+
+  it("gives each slot its pattern's index, and -1 to a slot with none", () => {
+    const u = build(weights("moon"));
+    // Moon: dry, tundra, rock, then five unused slots.
+    expect(u.uBiomePattern.value).toEqual([2, 3, 4, -1, -1, -1, -1, -1]);
+  });
+
+  it("turns water effects off on a sea that is not liquid", () => {
+    expect(build(weights("moon")).uSeaLiquid.value).toBe(0);
+    expect(build(weights("acid")).uSeaLiquid.value).toBe(1);
+    expect(build(weights("temperate")).uSeaLiquid.value).toBe(1);
+    expect(build(weights("volcanic")).uSeaLiquid.value).toBe(0);
+  });
+
+  it("passes the planet's steep and clearing colours in linear", () => {
+    const u = build(weights("temperate"));
+    const [dark] = u.uBiomeSteep.value as THREE.Color[];
+    const expected = new THREE.Color().setRGB(
+      122 / 255,
+      106 / 255,
+      90 / 255,
+      THREE.SRGBColorSpace,
+    );
+    expect(dark.equals(expected)).toBe(true);
+    expect((u.uBiomeClearing.value as THREE.Color).g).toBeCloseTo(
+      new THREE.Color().setRGB(0, 154 / 255, 0, THREE.SRGBColorSpace).g,
+    );
+  });
+
+  it("gives a hand-made map no detail", () => {
+    const surface = createTerrainSurface({ width: 64, height: 64 }, 100, grid);
+    vi.stubGlobal("document", {
+      createElement: () => ({
+        getContext: () => ({
+          drawImage: () => {},
+          getImageData: () => ({
+            data: new Uint8ClampedArray(16),
+            width: 2,
+            height: 2,
+          }),
+        }),
+      }),
+    });
+    const painted = { width: 2, height: 2 } as unknown as ImageBitmap;
+    const mesh = buildTerrainMesh(
+      new THREE.Scene(),
+      [],
+      surface,
+      painted,
+      { current: null },
+      grid,
+    );
+    vi.unstubAllGlobals();
+    expect(
+      uniformsOf(mesh.material as THREE.Material).uTerrainDetail.value,
+    ).toBe(0);
+    // No weights passed to a generated-looking picture either.
+    expect(build(undefined).uTerrainDetail.value).toBe(0);
   });
 });
 

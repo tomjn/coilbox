@@ -103,10 +103,17 @@ export function generatedTerrainPixels(
   return {
     color: { data: terrain.image, width, height },
     height: { data: terrain.heightmap, width, height },
+    biomes: { ...terrain.biomes, width, height, planet: terrain.planet },
     extension: {
       margin: wide.margin,
       image: { data: wide.image, width: wide.width, height: wide.height },
       heights: { data: wide.heights, width: wide.width, height: wide.height },
+      biomes: {
+        ...wide.biomes,
+        width: wide.width,
+        height: wide.height,
+        planet: terrain.planet,
+      },
     },
   };
 }

@@ -511,6 +511,7 @@ export function GalaxyView({
   const terrainSpec = terrainSpecOf(galaxy);
   const terrainColor = terrainPixels?.color;
   const terrainExtension = terrainPixels?.extension;
+  const terrainBiomes = terrainPixels?.biomes;
   const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
     terrainSpec,
     terrainPixels?.height,
@@ -632,6 +633,7 @@ export function GalaxyView({
         !performanceMode,
         terrainExtension,
         ground.shading,
+        terrainBiomes,
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {
@@ -1575,6 +1577,7 @@ export function GalaxyView({
     terrainHeights,
     terrainColor,
     terrainExtension,
+    terrainBiomes,
     modelSources,
   ]);
 

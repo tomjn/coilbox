@@ -1,5 +1,12 @@
 import * as THREE from "three";
 import {
+  BIOME_SLOTS,
+  type BiomePattern,
+  type PlanetId,
+  planetOf,
+  type SeaLook,
+} from "../planets";
+import {
   GROUND_BODY,
   GROUND_HEAD,
   GROUND_LIT,
@@ -15,9 +22,9 @@ import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
  * - Light per pixel from the heightmap's normals, so ridges finer than the
  *   mesh catch the sun. The sun and the ambient share are the ones the vertex
  *   shading used, so level ground is still exactly the picture's colour.
- * - On a generated map, procedural texture read off the picture's colour:
- *   forest canopy, grass, dry ground, rock and scree, snow, sand, and a sea
- *   with ripples, a sun glint and foam along the shore. Each layer of texture
+ * - On a generated map, procedural texture by biome, from the weights the
+ *   generator wrote beside the picture: forest canopy, grass, dry ground, rock
+ *   and scree, snow, sand, and a sea with ripples, a sun glint and foam along the shore. Each layer of texture
  *   fades out once it is smaller than a few screen pixels, so it appears as
  *   the camera comes in and never shimmers from far away.
  *
@@ -28,7 +35,9 @@ import { SHADE_AMBIENT, TERRAIN_SUN } from "./terrain";
 export interface TerrainShading {
   /** {@link terrainNormalPixels} as a texture, or null for a flat sheet. */
   normals: THREE.Texture | null;
-  /** Procedural texture by biome. On for a generated map only. */
+  /** The generator's weights and its planet. Null for a hand-made map, which gets no detail. */
+  biomes: { a: THREE.Texture; b: THREE.Texture; planet: PlanetId } | null;
+  /** Draw the detail. Off in performance mode. */
   detail: boolean;
   /**
    * For a map drawn with land past its edge: the sheet the map fills. Past it
@@ -73,6 +82,12 @@ const FRAGMENT_HEAD = /* glsl */ `
 uniform sampler2D uTerrainNormals;
 uniform float uTerrainRelief;
 uniform float uTerrainDetail;
+uniform sampler2D uBiomeA;
+uniform sampler2D uBiomeB;
+uniform float uBiomePattern[8];
+uniform vec3 uBiomeSteep[2];
+uniform vec3 uBiomeClearing;
+uniform float uSeaLiquid;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
 uniform vec4 uTerrainFrame;
@@ -173,24 +188,6 @@ vec3 tField(vec2 p, float w0, int octaves, float footprint) {
   }
   return sum;
 }
-
-// How close a colour is to a reference, 1 when equal.
-float tNear(vec3 c, vec3 ref, float width) {
-  vec3 d = c - ref;
-  return exp(-dot(d, d) / (width * width));
-}
-`;
-
-// Biome colours from terrainGen.ts, in 0 to 1 sRGB.
-const BIOMES = /* glsl */ `
-const vec3 T_BEACH = vec3(214.0, 200.0, 150.0) / 255.0;
-const vec3 T_DRY = vec3(182.0, 168.0, 116.0) / 255.0;
-const vec3 T_GRASS = vec3(122.0, 154.0, 84.0) / 255.0;
-const vec3 T_FOREST = vec3(58.0, 98.0, 56.0) / 255.0;
-const vec3 T_TUNDRA = vec3(146.0, 146.0, 122.0) / 255.0;
-const vec3 T_ROCK = vec3(122.0, 106.0, 90.0) / 255.0;
-const vec3 T_SCREE = vec3(152.0, 146.0, 140.0) / 255.0;
-const vec3 T_SNOW = vec3(240.0, 240.0, 240.0) / 255.0;
 `;
 
 const FRAGMENT_BODY = /* glsl */ `
@@ -212,18 +209,33 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
   if (uTerrainDetail > 0.5) {
     vec2 p = vTerrainPos.xz;
     float footprint = max(length(dFdx(p)), length(dFdy(p))) + 1e-5;
-    // The picture in sRGB, to compare with the generator's colours.
-    vec3 s = pow(max(albedo, vec3(0.0)), vec3(1.0 / 2.2));
+    // The generator's weights for this pixel, eight slots in two samples.
+    vec4 wa = texture2D(uBiomeA, vTerrainUv);
+    vec4 wb = texture2D(uBiomeB, vTerrainUv);
+    float w[8];
+    w[0] = wa.x; w[1] = wa.y; w[2] = wa.z; w[3] = wa.w;
+    w[4] = wb.x; w[5] = wb.y; w[6] = wb.z; w[7] = wb.w;
     // Sea is height 0 and land at least 1 in 255, so this is the coastline.
     float coast = nh.a * 255.0;
     float sea = 1.0 - smoothstep(0.35, 0.65, coast);
 
-    float wForest = tNear(s, T_FOREST, 0.12);
-    float wGrass = tNear(s, T_GRASS, 0.14);
-    float wDry = max(tNear(s, T_DRY, 0.12), tNear(s, T_BEACH, 0.1));
-    float wTundra = tNear(s, T_TUNDRA, 0.1);
-    float wRock = max(tNear(s, T_ROCK, 0.12), tNear(s, T_SCREE, 0.1));
-    float wSnow = smoothstep(0.78, 0.9, min(s.r, min(s.g, s.b)));
+    // Each slot adds to the pattern it draws with: 0 forest, 1 grass, 2 dry,
+    // 3 tundra, 4 rock, 5 snow, and -1 for a slot the planet does not use.
+    float wForest = 0.0;
+    float wGrass = 0.0;
+    float wDry = 0.0;
+    float wTundra = 0.0;
+    float wRock = 0.0;
+    float wSnow = 0.0;
+    for (int k = 0; k < 8; k++) {
+      float pk = uBiomePattern[k];
+      wForest += abs(pk) < 0.5 ? w[k] : 0.0;
+      wGrass += abs(pk - 1.0) < 0.5 ? w[k] : 0.0;
+      wDry += abs(pk - 2.0) < 0.5 ? w[k] : 0.0;
+      wTundra += abs(pk - 3.0) < 0.5 ? w[k] : 0.0;
+      wRock += abs(pk - 4.0) < 0.5 ? w[k] : 0.0;
+      wSnow += abs(pk - 5.0) < 0.5 ? w[k] : 0.0;
+    }
     // Shares of the land, which the sea has none of.
     float total = wForest + wGrass + wDry + wTundra + wRock + wSnow + 1e-3;
     float land = (1.0 - sea) / total;
@@ -274,7 +286,7 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
         bump += wForest * keep * cell.yz * (dome * (1.0 - dome)) / size * (k == 0 ? 0.12 : 0.05);
       }
       // Clearings show grass between the trees.
-      albedo = mix(albedo, pow(T_GRASS, vec3(2.2)), wForest * thin * 0.5);
+      albedo = mix(albedo, uBiomeClearing, wForest * thin * 0.5);
     }
     // Grass: lighter and darker patches with a fine grain.
     {
@@ -301,25 +313,27 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
       vec3 stone = tField(p + 3.0, 0.5, 4, footprint);
       shadeMul += r * (stone.x * 0.6 + broad.x * 0.2);
       bump += r * stone.yz * 1.1;
-      albedo = mix(albedo, pow(mix(T_ROCK, T_SCREE, 0.5 + broad.x), vec3(2.2)), steep * (1.0 - wSnow) * 0.85);
+      albedo = mix(albedo, mix(uBiomeSteep[0], uBiomeSteep[1], 0.5 + broad.x), steep * (1.0 - wSnow) * 0.85);
     }
     // Snow: smooth, with soft drifts, and none on the steepest faces.
     {
       shadeMul += wSnow * broad.x * 0.12;
       bump += wSnow * broad.yz * 0.3;
-      albedo = mix(albedo, pow(T_ROCK, vec3(2.2)), wSnow * smoothstep(0.2, 0.32, 1.0 - n.y));
+      albedo = mix(albedo, uBiomeSteep[0], wSnow * smoothstep(0.2, 0.32, 1.0 - n.y));
     }
 
     // Sea: ripples, a glint of the sun, and foam where it meets the land.
     vec3 wave = sea > 0.01 ? tField(p + 11.0, 0.6, 3, footprint) : vec3(0.0);
     float foam = smoothstep(0.03, 0.2, coast) * (1.0 - smoothstep(0.3, 0.5, coast));
     foam *= smoothstep(-0.15, 0.2, fine.x);
+    // Only a liquid sea ripples, foams and glints.
+    foam *= uSeaLiquid;
     // Coasts past the edge are drawn at half the map's resolution, and foam
     // traces their steps, so it thins out there.
     foam *= 1.0 - smoothstep(0.0, 0.03, terrainPast);
     vec2 landBump = bump;
-    bump = mix(landBump, wave.yz * 0.05, sea);
-    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.1, sea);
+    bump = mix(landBump, wave.yz * 0.05 * uSeaLiquid, sea);
+    shadeMul = mix(shadeMul, 1.0 + wave.x * 0.1 * uSeaLiquid, sea);
 
     albedo *= max(shadeMul, 0.2);
     albedo = mix(albedo, vec3(0.85, 0.9, 0.92), foam * 0.75);
@@ -327,7 +341,7 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
 
     vec3 view = normalize(cameraPosition - vTerrainPos);
     vec3 h = normalize(view + uTerrainSun);
-    spec = pow(max(dot(n, h), 0.0), 40.0) * 0.08 * sea * (1.0 - foam);
+    spec = pow(max(dot(n, h), 0.0), 40.0) * 0.08 * sea * (1.0 - foam) * uSeaLiquid;
   }
 
   // Roads (groundShader.ts), when the sheet has them.
@@ -354,6 +368,19 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
 }
 `;
 
+/** The index the shader gives each pattern, in the order of its weights. */
+const PATTERN_INDEX: Record<BiomePattern, number> = {
+  forest: 0,
+  grass: 1,
+  dry: 2,
+  tundra: 3,
+  rock: 4,
+  snow: 5,
+};
+
+/** Seas that ripple, foam and glint. The rest are drawn as the picture has them. */
+const LIQUID_SEAS: readonly SeaLook[] = ["water", "acid"];
+
 /**
  * Add the terrain's lighting and detail to `material`, an unlit material
  * carrying the map picture. The material must not also use vertex shading.
@@ -371,14 +398,51 @@ export function applyTerrainShader(
   placeholder.needsUpdate = true;
   disposables.push(placeholder);
   // Detail tells sea from land by the height the normals carry, so without
-  // them it would read every pixel as sea.
-  const detail = shading.detail && shading.normals !== null;
+  // them it would read every pixel as sea. It reads the biome weights too.
+  const detail =
+    shading.detail && shading.biomes !== null && shading.normals !== null;
+  const planet = shading.biomes ? planetOf(shading.biomes.planet) : null;
+  const colour = (rgb: [number, number, number]) =>
+    new THREE.Color().setRGB(
+      rgb[0] / 255,
+      rgb[1] / 255,
+      rgb[2] / 255,
+      THREE.SRGBColorSpace,
+    );
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uTerrainNormals = {
       value: shading.normals ?? placeholder,
     };
     shader.uniforms.uTerrainRelief = { value: shading.normals ? 1 : 0 };
     shader.uniforms.uTerrainDetail = { value: detail ? 1 : 0 };
+    // Weights are bound only when the detail will read them.
+    shader.uniforms.uBiomeA = {
+      value: detail && shading.biomes ? shading.biomes.a : placeholder,
+    };
+    shader.uniforms.uBiomeB = {
+      value: detail && shading.biomes ? shading.biomes.b : placeholder,
+    };
+    shader.uniforms.uBiomePattern = {
+      value: Array.from({ length: BIOME_SLOTS }, (_, k) =>
+        planet && k < planet.biomes.length
+          ? PATTERN_INDEX[planet.biomes[k].pattern]
+          : -1,
+      ),
+    };
+    shader.uniforms.uBiomeSteep = {
+      value: (
+        planet?.steep ?? [
+          [0, 0, 0],
+          [0, 0, 0],
+        ]
+      ).map(colour),
+    };
+    shader.uniforms.uBiomeClearing = {
+      value: colour(planet?.clearing ?? [0, 0, 0]),
+    };
+    shader.uniforms.uSeaLiquid = {
+      value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
+    };
     const frame = shading.frame;
     shader.uniforms.uTerrainFrame = {
       value: frame
@@ -408,7 +472,7 @@ export function applyTerrainShader(
       "GROUND_BODY_HERE",
       shading.ground ? GROUND_BODY : "",
     ).replace("GROUND_LIT_HERE", shading.ground ? GROUND_LIT : "");
-    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${shading.ground ? GROUND_HEAD : ""}${BIOMES}${shader.fragmentShader.replace(
+    shader.fragmentShader = `${FRAGMENT_HEAD.replace("TERRAIN_NOISE_HERE", TERRAIN_NOISE)}${shading.ground ? GROUND_HEAD : ""}${shader.fragmentShader.replace(
       "#include <color_fragment>",
       `#include <color_fragment>\n${body}`,
     )}`;
