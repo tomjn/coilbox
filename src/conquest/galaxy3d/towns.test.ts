@@ -6,6 +6,7 @@ import {
   buildableAt,
   buildTownIndex,
   CAPITAL_RADIUS,
+  CITY_RADIUS,
   clipRoads,
   dryFarmColour,
   dryFarmShare,
@@ -16,6 +17,7 @@ import {
   fieldCell,
   leavingAngle,
   MAX_STREETS,
+  OUTPOST_RADIUS,
   planTowns,
   RIBBON_RADII,
   RIBBON_REACH,
@@ -26,7 +28,6 @@ import {
   roadEntries,
   STEEP_FIT,
   STEEP_SLOPE,
-  TOWN_RADIUS,
   TOWN_REACH,
   type TownSite,
   townCell,
@@ -48,9 +49,9 @@ const sites: TownSite[] = [
   },
   // A town with no roads, as on a Territories map.
   { x: 0, z: 30, capital: false, roads: [] },
-  // A town crowded by its neighbour.
-  { x: 0, z: -20, capital: false, roads: [] },
-  { x: 4, z: -20, capital: false, roads: [] },
+  // Two busy towns crowded by each other.
+  { x: 0, z: -20, capital: false, roads: [0, 1, 2, 3, 4] },
+  { x: 4, z: -20, capital: false, roads: [0, 1, 2, 3, 4] },
 ];
 const towns = planTowns(sites, 7);
 
@@ -114,10 +115,11 @@ describe("roadEntries", () => {
 });
 
 describe("planTowns", () => {
-  it("makes a capital bigger than a town, and keeps towns apart", () => {
+  it("makes a capital the biggest, a junction bigger than a place with no roads, and keeps towns apart", () => {
     expect(towns[0].radius).toBeGreaterThan(CAPITAL_RADIUS);
-    expect(towns[1].radius).toBeGreaterThan(TOWN_RADIUS);
-    expect(towns[2].radius).toBe(TOWN_RADIUS);
+    expect(towns[1].radius).toBeLessThanOrEqual(CITY_RADIUS);
+    expect(towns[1].radius).toBeGreaterThan(towns[2].radius);
+    expect(towns[2].radius).toBeGreaterThanOrEqual(OUTPOST_RADIUS);
     // Four units apart, so each keeps to 0.3 of that.
     expect(towns[3].radius).toBeCloseTo(1.2, 5);
     expect(towns[3].radius + towns[4].radius).toBeLessThan(4);
@@ -353,7 +355,7 @@ describe("townCell and fieldCell", () => {
     planTowns(
       [
         { x: -8, z: -6, capital: true, roads: [0, Math.PI / 3] },
-        { x: 9, z: 7, capital: false, roads: [] },
+        { x: 9, z: 7, capital: false, roads: [0, 1, 2, 3, 4] },
       ],
       3,
     ),

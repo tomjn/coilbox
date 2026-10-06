@@ -198,14 +198,21 @@ export interface TownSite {
 }
 
 /**
- * Design values, in world units. A town reaches {@link TOWN_RADIUS}, a
- * capital {@link CAPITAL_RADIUS}, and each road into a place adds
- * {@link RADIUS_PER_ROAD} up to four roads. None reaches further than a share
- * of the way to its nearest neighbour, so two towns never run together.
+ * Design values, in world units, and first guesses. A place with no roads
+ * and no luck is an outpost of {@link OUTPOST_RADIUS}, and the busiest
+ * junction a city of {@link CITY_RADIUS}. A capital reaches
+ * {@link CAPITAL_RADIUS} and each road into it adds {@link RADIUS_PER_ROAD},
+ * up to four roads. None reaches further than a share of the way to its
+ * nearest neighbour, so two towns never run together.
  */
-export const TOWN_RADIUS = 1.8;
-export const CAPITAL_RADIUS = 3;
-const RADIUS_PER_ROAD = 0.3;
+export const OUTPOST_RADIUS = 0.8;
+export const CITY_RADIUS = 3;
+export const CAPITAL_RADIUS = 3.6;
+const RADIUS_PER_ROAD = 0.2;
+/** A place with this many roads or more is as big as its roads can make it. */
+const BUSY_ROADS = 5;
+/** How much of a town's size comes from its roads. The rest is chance. */
+const ROAD_SHARE = 0.65;
 const NEIGHBOUR_SHARE = 0.3;
 const CAPITAL_NEIGHBOUR_SHARE = 0.38;
 /** The most a town is stretched along its roads. */
@@ -311,14 +318,18 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
         Math.hypot(other.x - site.x, other.z - site.z),
       );
     });
-    const want =
-      (site.capital ? CAPITAL_RADIUS : TOWN_RADIUS) +
-      RADIUS_PER_ROAD * Math.min(4, site.roads.length);
+    const own = unit(seed, node);
+    // Most places are small and a few are large, so the rank is squared.
+    const rank =
+      ROAD_SHARE * Math.min(1, site.roads.length / BUSY_ROADS) +
+      (1 - ROAD_SHARE) * unit(seed ^ 0x5bd1e995, node);
+    const want = site.capital
+      ? CAPITAL_RADIUS + RADIUS_PER_ROAD * Math.min(4, site.roads.length)
+      : OUTPOST_RADIUS + (CITY_RADIUS - OUTPOST_RADIUS) * rank * rank;
     const radius = Math.min(
       want,
       nearest * (site.capital ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE),
     );
-    const own = unit(seed, node);
     const { axis, strength } =
       site.roads.length > 0
         ? roadAxis(site.roads)
