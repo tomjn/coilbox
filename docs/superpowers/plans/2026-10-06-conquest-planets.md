@@ -17,6 +17,7 @@
 - A document with no `generated.planet` is Temperate.
 - The planet never draws from the generator's main random stream. It has a stream of its own.
 - Hand-made maps and the galaxy style are untouched.
+- Build every task before refining any. Use the starting values in this plan as given, take the first reasonable choice where the plan leaves one, and move on. No task adjusts how something looks. The user reviews the whole result and then says what to improve.
 - Prefer `OptionSelect` and picoframe components over native elements.
 - Paths below are relative to `src/conquest/` unless they start with `src/` or `docs/`.
 - Run one test file with `bun run test <name>`. Before the last commit run all seven CI commands from the repo's `CLAUDE.md`.
@@ -82,7 +83,7 @@ export function weightBytes(shares: Float64Array, out: Uint8Array, offset: numbe
 
 Temperate's slots, in order, with today's colours from `terrainGen.ts:665`: grass, dry, forest, tundra, rock, scree, snow, beach. Farm is true for grass and dry. `shore` is beach. Its rule is `biomeColour` (`terrainGen.ts:700`) written with `blend`. Its sea is today's `SEA_SHALLOW` and `SEA_DEEP`, look `water`, crossing `lane`. `steep` is rock then scree, and `clearing` is grass.
 
-The other six planets, with starting colours. These RGB values and climate numbers are my first picks, not measured from anything, and task 10 tunes them on screen.
+The other six planets, with starting colours. These RGB values and climate numbers are my first picks, not measured from anything. Use them as given. The user tunes them after seeing the whole build.
 
 | Planet | Slots (name, sRGB, pattern, farm) | Climate | Sea look, shallow, deep, crossing |
 |---|---|---|---|
@@ -247,7 +248,7 @@ Decisions:
 
 - The step runs after `landHeightByte` has filled the heightmap and before the climate, on land pixels only.
 - It uses its own stream, `mulberry32(hashString(\`craters:${seed >>> 0}\`))`.
-- 40 craters, each with a radius of 4 to 18 pixels. Both numbers are my first picks, tuned in task 10. A centre is redrawn until it is on land and at least its radius plus 2 pixels from every side of the array, with at most 20 tries a crater, after which that crater is skipped.
+- 40 craters, each with a radius of 4 to 18 pixels. Both numbers are my first picks. Use them as given. A centre is redrawn until it is on land and at least its radius plus 2 pixels from every side of the array, with at most 20 tries a crater, after which that crater is skipped.
 - Inside 0.8 of the radius the height drops, deepest at the centre. From 0.8 to 1.2 of the radius it rises into a rim. The profile is a polynomial in the squared distance over the squared radius, so it needs only multiply and divide.
 - Every land byte stays in 1 to 255. Sea pixels are never written.
 
@@ -637,7 +638,7 @@ it("falls back to Surprise me for a stored planet nobody defined", async () => {
 
 ---
 
-### Task 10: Check on screen, tune the colours, run the full suite
+### Task 10: Check on screen once, run the full suite
 
 **Files:**
 - Modify: `planets.ts` (colours, climate biases), `terrainGen.ts` (crater count and radius)
@@ -646,7 +647,7 @@ it("falls back to Surprise me for a stored planet nobody defined", async () => {
 
 - [ ] **Step 1: Start a dev app** following "Driving the app" in the repo's `CLAUDE.md`. If one is already running in this checkout, use it and confirm which app the Tauri MCP is driving before believing a screenshot.
 - [ ] **Step 2: Generate one Territories map per planet** from the drawer and screenshot each at a far zoom and a near zoom. Check: the ground and sea colours suit the planet, biomes are told apart at a glance, no foam or glint shows on ice, basin, maria or lava, crossings are solid where they should be, Volcanic and Acid have no crossings, Moon has craters, and fields appear only on Temperate and Desert.
-- [ ] **Step 3: Tune** the starting colours, the climate biases and the crater numbers until each planet reads as itself. Change only values in the six new planet records and the crater constants.
+- [ ] **Step 3: Record what is wrong and change nothing.** List anything that fails the checks in step 2. Fix a feature that does not work, such as foam on lava or a missing crossing. Leave colours, climate biases and crater numbers as they are, and report what looks off for the user to direct.
 - [ ] **Step 4: Open a map saved before this branch** and confirm it loads as Temperate with its locations where they were.
 - [ ] **Step 5: Write the planets section** of `docs/conquest.md`: what the picker does, the seven planets in a sentence each, and that Volcanic and Acid have one land mass.
 - [ ] **Step 6: Run all seven CI commands**: `bunx biome ci .`, `bun run typecheck`, `bun run test`, `scripts/mission-tests.sh`, `cargo fmt --all --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test --workspace`. Report each result as it is.
