@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTerrainSurface, type HeightGrid } from "./terrain";
+import type { BiomePixels } from "./terrainMesh";
 import {
   anyTexelNear,
   buildableAt,
@@ -10,7 +11,6 @@ import {
   FIELD_INNER,
   FLAT_SLOPE,
   farmableAt,
-  farmBiome,
   fieldCell,
   leavingAngle,
   MAX_STREETS,
@@ -564,26 +564,45 @@ describe("clipRoads", () => {
 });
 
 describe("farmableAt", () => {
-  // A picture 2 pixels wide over a sheet 20 world units square: grassland on
-  // the left, forest on the right.
-  const picture = {
-    data: new Uint8Array([122, 154, 84, 255, 58, 98, 56, 255]),
+  // Weights 2 pixels wide over a sheet 20 world units square. Texel 0 is all
+  // slot 0 (grass on Temperate), texel 1 all slot 2 (forest).
+  const weights = (
+    left: [number, number],
+    right: [number, number],
+    planet: "temperate" | "moon" = "temperate",
+  ): BiomePixels => ({
+    a: new Uint8Array([left[0], 0, left[1], 0, right[0], 0, right[1], 0]),
+    b: new Uint8Array(8),
     width: 2,
     height: 1,
-  };
-
-  it("lays fields on grassland and dry ground only", () => {
-    expect(farmBiome(122, 154, 84)).toBe(true);
-    expect(farmBiome(182, 168, 116)).toBe(true);
-    expect(farmBiome(58, 98, 56)).toBe(false);
-    expect(farmBiome(240, 240, 240)).toBe(false);
-    expect(farmBiome(214, 200, 150)).toBe(false);
+    planet,
   });
+  const picture = weights([255, 0], [0, 255]);
 
-  it("keeps fields to flat ground and off the forest", () => {
+  it("puts fields on farm slots and nowhere else", () => {
     const flat = farmableAt(picture, 20, 20, () => 1);
     expect(flat(-5, 0)).toBe(1);
     expect(flat(5, 0)).toBe(0);
+  });
+
+  it("puts no fields on a planet with no farm slot", () => {
+    const flat = farmableAt(
+      weights([255, 0], [0, 255], "moon"),
+      20,
+      20,
+      () => 1,
+    );
+    expect(flat(-5, 0)).toBe(0);
+    expect(flat(5, 0)).toBe(0);
+  });
+
+  it("decides a blended texel by the larger share", () => {
+    const farm = farmableAt(weights([128, 127], [127, 128]), 20, 20, () => 1);
+    expect(farm(-5, 0)).toBe(1);
+    expect(farm(5, 0)).toBe(0);
+  });
+
+  it("keeps fields to flat ground", () => {
     // Ground a house would be built on, but too sloping for a field.
     const sloping = farmableAt(picture, 20, 20, () => 0.8);
     expect(sloping(-5, 0)).toBe(0);

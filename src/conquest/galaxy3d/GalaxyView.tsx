@@ -39,7 +39,7 @@ import {
   VIEW_FOV_DEGREES,
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
-import { buildTerrainMesh, isColorPixels } from "./terrainMesh";
+import { buildTerrainMesh } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
 import type { Town } from "./towns";
@@ -617,9 +617,7 @@ export function GalaxyView({
           surface,
           ground,
           planned.towns,
-          terrainColor && isColorPixels(terrainColor)
-            ? terrainColor
-            : undefined,
+          terrainBiomes,
           !terrainColor,
         );
       }

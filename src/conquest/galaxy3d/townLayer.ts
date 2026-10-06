@@ -4,7 +4,7 @@ import type { GroundLayer } from "./groundLayer";
 import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
-import type { ColorPixels } from "./terrainMesh";
+import type { BiomePixels } from "./terrainMesh";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   anyTexelNear,
@@ -87,10 +87,10 @@ export function buildTownLayer(
   surface: TerrainSurface,
   ground: Pick<GroundLayer, "shading">,
   towns: Town[],
-  /** The map's picture, which says where fields can go. Left out, none do. */
-  picture?: ColorPixels,
+  /** The map's biome weights, which say where fields can go. Left out, none do. */
+  biomes?: BiomePixels,
   /**
-   * With no picture to read, put fields on any buildable ground, for a
+   * With no weights to read, put fields on any buildable ground, for a
    * hand-made map whose painted picture has no known palette.
    */
   fieldsAnywhere = false,
@@ -111,8 +111,8 @@ export function buildTownLayer(
     surface.worldDepth,
     undefined,
     buildable,
-    picture
-      ? farmableAt(picture, surface.worldWidth, surface.worldDepth, buildable)
+    biomes
+      ? farmableAt(biomes, surface.worldWidth, surface.worldDepth, buildable)
       : fieldsAnywhere
         ? (x, z) => Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15))
         : undefined,
