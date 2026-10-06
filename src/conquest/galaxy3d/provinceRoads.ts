@@ -174,20 +174,28 @@ export function thinRoads(
 
 /**
  * Route a road for every link {@link provinceRoadLinks} picks, over `grid`,
- * after the roads already marked on it. Road `j` takes state index
- * `first + j`. Sets `grid.region`.
+ * after the roads already marked on it, and one for each of `landLinks`:
+ * border links between provinces that do not touch, with dry land between.
+ * Those are not thinned, since nothing else joins the two. Road `j` takes
+ * state index `first + j`. Sets `grid.region`.
  */
 export function planProvinceRoads(
   galaxy: ProvinceDoc,
   grid: RouteGrid,
   first: number,
+  landLinks: readonly RoadLink[] = [],
 ): { links: RoadLink[]; roads: RoadLine[] } {
   const region = provinceRegions(galaxy.nodes, grid);
   grid.region = region;
   const touching = touchingRegions(region, grid.cols, grid.rows);
-  const links = provinceRoadLinks(galaxy, (a, b) =>
+  const touched = provinceRoadLinks(galaxy, (a, b) =>
     touching.has(pairKey(String(a), String(b))),
   );
+  const have = new Set(touched.map(({ a, b }) => pairKey(a, b)));
+  const links = [
+    ...touched,
+    ...landLinks.filter(({ a, b }) => !have.has(pairKey(a, b))),
+  ];
   const index = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
   const degrees = new Map<string, number>();
   for (const { a, b } of links) {

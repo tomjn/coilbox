@@ -125,6 +125,25 @@ describe("provinceRoadLinks", () => {
   });
 });
 
+describe("planProvinceRoads, links over dry land", () => {
+  it("routes a road for a link between provinces that do not touch", () => {
+    const g = grid();
+    const plain = planProvinceRoads(doc, g, 0);
+    expect(plain.links).not.toContainEqual({ a: "west", b: "far" });
+    const withLand = planProvinceRoads(doc, grid(), 0, [
+      { a: "west", b: "far" },
+      { a: "west", b: "mid" },
+    ]);
+    // The land link joins the others, and a pair already joined is not doubled.
+    expect(withLand.links).toEqual([...plain.links, { a: "west", b: "far" }]);
+    expect(withLand.roads).toHaveLength(plain.roads.length + 1);
+    const last = withLand.roads[withLand.roads.length - 1];
+    expect(last.index).toBe(plain.roads.length);
+    expect(last.line[0]).toEqual([15, 15]);
+    expect(last.line[last.line.length - 1]).toEqual([90, 90]);
+  });
+});
+
 describe("thinRoads", () => {
   const at = (id: string): [number, number] =>
     ({ a: [0, 0], b: [10, 0], c: [5, 2], d: [5, 30] })[id] as [number, number];

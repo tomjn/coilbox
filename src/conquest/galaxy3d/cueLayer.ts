@@ -207,6 +207,8 @@ export function buildCueLayer(
   const coast = coastOf(galaxy, surface, provinces?.index);
   /** The painted tracks to the shore of each crossing, as road state indices. */
   const trackIndices = new Map<string, number[]>();
+  /** Border links drawn as a road over dry land, by `pairKey`. */
+  const landLinks = new Set(plan.landLinks.map(({ a, b }) => pairKey(a, b)));
   if (painted) {
     painted.plan.tracks.forEach(({ a, b }, j) => {
       const key = pairKey(a, b);
@@ -278,6 +280,8 @@ export function buildCueLayer(
       }
       // Two linked provinces that do not touch have no border to draw the
       // link on, so it draws as a crossing does and the link stays visible.
+      // Over dry land it is a road instead, which the ground layer paints.
+      if (landLinks.has(pairKey(a, b))) continue;
     }
     addCrossing(a, b);
   }
@@ -469,7 +473,11 @@ export function buildCueLayer(
       // and border already say who owns what and where a run goes, so the
       // road shows only fog and the lift of a hovered or selected end.
       const between = provinceRoadIndex.get(pairKey(link.a, link.b));
-      if (painted && between !== undefined) {
+      if (
+        painted &&
+        between !== undefined &&
+        !landLinks.has(pairKey(link.a, link.b))
+      ) {
         painted.ground.setRoadStyle(
           between,
           roadStyle(
@@ -482,8 +490,11 @@ export function buildCueLayer(
         continue;
       }
       // A crossing's tracks to the shore are painted as roads, and take the
-      // state a road between the same two places would.
-      const tracks = trackIndices.get(pairKey(link.a, link.b));
+      // state a road between the same two places would. So does the road of
+      // a link over dry land, which has no border line to show its state.
+      const tracks =
+        trackIndices.get(pairKey(link.a, link.b)) ??
+        (between !== undefined ? [between] : undefined);
       if (!painted || !tracks) continue;
       const style = roadStyle(
         state,

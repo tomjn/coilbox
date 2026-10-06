@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { MapPoint } from "./provinces";
-import { seaCurve, seaRoute } from "./seaRoute";
+import { isDryLine, seaCurve, seaRoute } from "./seaRoute";
 
 /** Land west of x = 30 and east of x = 70, sea between. */
 const twoShores = (x: number) => x < 30 || x > 70;
@@ -103,5 +103,22 @@ describe("seaCurve", () => {
     expect(points[points.length - 1]).toEqual(b);
     // Every curve crosses the same land, so the gentlest wins.
     expect(Math.abs(offsetOf(points))).toBeLessThan(4);
+  });
+});
+
+describe("isDryLine", () => {
+  it("is true for a line with land along all of it", () => {
+    expect(isDryLine([5, 50], [25, 50], twoShores, 1)).toBe(true);
+    expect(seaRoute([5, 50], [25, 50], twoShores, 1)).toBeUndefined();
+  });
+
+  it("is false for a line that crosses water", () => {
+    expect(isDryLine([10, 50], [90, 50], twoShores, 1)).toBe(false);
+    expect(seaRoute([10, 50], [90, 50], twoShores, 1)).toBeDefined();
+  });
+
+  it("is false for a line that starts or ends at sea, or has no length", () => {
+    expect(isDryLine([50, 50], [90, 50], twoShores, 1)).toBe(false);
+    expect(isDryLine([10, 50], [10, 50], twoShores, 1)).toBe(false);
   });
 });

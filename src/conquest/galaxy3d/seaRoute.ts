@@ -53,7 +53,7 @@ export function seaRoute(
 ): SeaRoute | undefined {
   const length = distance(from, to);
   if (length === 0 || step <= 0) return undefined;
-  const count = Math.max(2, Math.ceil(length / step));
+  const count = sampleCount(length, step);
   const at = (t: number): MapPoint => lerp(from, to, t);
   const land = (t: number): boolean => {
     const [x, y] = at(t);
@@ -94,6 +94,32 @@ export function seaRoute(
     sea: seaCurve(landingA, landingB, isLand, step),
     jettyB: [landingB, to],
   };
+}
+
+/** Samples along a line of `length`, as many as {@link seaRoute} takes. */
+const sampleCount = (length: number, step: number): number =>
+  Math.max(2, Math.ceil(length / step));
+
+/**
+ * True when every sample on the straight line from `from` to `to` is land, so
+ * the line has no water to put a sea lane on. Samples the line as
+ * {@link seaRoute} does, so the two agree: a line that is dry here is one
+ * `seaRoute` finds no coast on.
+ */
+export function isDryLine(
+  from: MapPoint,
+  to: MapPoint,
+  isLand: (x: number, y: number) => boolean,
+  step: number,
+): boolean {
+  const length = distance(from, to);
+  if (length === 0 || step <= 0) return false;
+  const count = sampleCount(length, step);
+  for (let i = 0; i <= count; i++) {
+    const [x, y] = lerp(from, to, i / count);
+    if (!isLand(x, y)) return false;
+  }
+  return true;
 }
 
 /**
