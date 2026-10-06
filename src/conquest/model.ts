@@ -5,6 +5,7 @@ import type { MapRunKind } from "../runlite/mapRun";
 import type { Scenario } from "../scenario/model";
 import { expandRevealed } from "./fog";
 import { type PlacedModel, parsePlacedModels } from "./placedModels";
+import { isPlanetId, type PlanetId } from "./planets";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
 import { isLandLayout, type LandLayout } from "./terrainGen";
@@ -333,6 +334,9 @@ export interface GalaxyDoc {
     startPosition?: StartPosition;
     /** Real-star mode only: the catalogue radius in light years. */
     radiusLy?: number;
+    /** Land styles only: the planet the player chose, or `random` to pick one
+     * from the seed. Absent builds the Temperate map. */
+    planet?: PlanetId | "random";
   };
 }
 
@@ -621,6 +625,8 @@ function parseGenerated(value: unknown): GalaxyDoc["generated"] {
     fogOfWar: g.fogOfWar === true ? true : undefined,
     threatLevel: readThreatLevel(g.threatLevel) || undefined,
     startPosition: readStartPosition(g.startPosition),
+    planet:
+      g.planet === "random" || isPlanetId(g.planet) ? g.planet : undefined,
   };
 }
 

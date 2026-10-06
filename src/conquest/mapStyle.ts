@@ -147,6 +147,7 @@ export function regenerateGalaxy(
       fogOfWar: g.fogOfWar,
       threatLevel: g.threatLevel,
       startPosition: g.startPosition,
+      planet: g.planet,
       names: env.names,
       id: galaxy.id,
       title: galaxy.title,

@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { GalaxyDoc } from "./model";
+import { PLANETS, type PlanetId } from "./planets";
 import { hashString } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
 import { LAND_LAYOUTS, type TerrainShape } from "./terrainGen";
@@ -55,6 +56,8 @@ const SIZES = [
   ...LARGE_SIZES.map((s) => s.count),
 ];
 const SMALLEST = Math.min(...SIZES);
+/** Every planet but Temperate, whose land the shape cases above already pin. */
+const OTHER_PLANETS: PlanetId[] = PLANETS.filter((p) => p !== "temperate");
 
 /** FNV-1a over raw bytes, as `hashString` is over characters. */
 function hashBytes(bytes: Uint8Array | Uint8ClampedArray): string {
@@ -102,6 +105,23 @@ function render(doc: GalaxyDoc): string {
   return `${lines.join("\n")}\n`;
 }
 
+/** The `hashes.txt` line for one case: its pixels and its rendered document. */
+function hashLine(
+  name: string,
+  terrain: NonNullable<ReturnType<typeof generatedTerrain>>,
+  text: string,
+): string {
+  return [
+    name,
+    `land=${hashBytes(terrain.land)}`,
+    `heightmap=${hashBytes(terrain.heightmap)}`,
+    `image=${hashBytes(terrain.image)}`,
+    `biomesA=${hashBytes(terrain.biomes.a)}`,
+    `biomesB=${hashBytes(terrain.biomes.b)}`,
+    `doc=${hashString(text).toString(16).padStart(8, "0")}`,
+  ].join(" ");
+}
+
 const emitted: string[] = [];
 
 describe("territories golden maps", () => {
@@ -117,15 +137,7 @@ describe("territories golden maps", () => {
         const terrain = generatedTerrain(doc);
         if (!terrain) throw new Error("a generated map has generated terrain");
         const text = render(doc);
-        const line = [
-          name,
-          `land=${hashBytes(terrain.land)}`,
-          `heightmap=${hashBytes(terrain.heightmap)}`,
-          `image=${hashBytes(terrain.image)}`,
-          `biomesA=${hashBytes(terrain.biomes.a)}`,
-          `biomesB=${hashBytes(terrain.biomes.b)}`,
-          `doc=${hashString(text).toString(16).padStart(8, "0")}`,
-        ].join(" ");
+        const line = hashLine(name, terrain, text);
         emitted.push(line);
 
         if (nodeCount === SMALLEST) {
@@ -143,6 +155,25 @@ describe("territories golden maps", () => {
     }
   }
 
+  // One case per planet at the smallest size and the continent shape. Their
+  // lines are hashes only, with no document checked in beside them.
+  for (const planet of OTHER_PLANETS) {
+    const name = `continent-${SMALLEST}-seed1-${planet}`;
+    it(`${name} matches its checked-in hashes`, () => {
+      const doc = generateTerritories(
+        { ...base, layout: "continent", nodeCount: SMALLEST, planet },
+        "2026-01-01T00:00:00.000Z",
+      );
+      const terrain = generatedTerrain(doc);
+      if (!terrain) throw new Error("a generated map has generated terrain");
+      const line = hashLine(name, terrain, render(doc));
+      emitted.push(line);
+      if (!UPDATE) {
+        expect(readFileSync(HASHES, "utf8").split("\n")).toContain(line);
+      }
+    });
+  }
+
   it("has a checked-in hash for every case and no others", () => {
     const text = `${emitted.join("\n")}\n`;
     if (UPDATE) {
@@ -151,6 +182,8 @@ describe("territories golden maps", () => {
     }
 
     expect(text).toBe(readFileSync(HASHES, "utf8"));
-    expect(emitted).toHaveLength(SHAPES.length * SIZES.length);
+    expect(emitted).toHaveLength(
+      SHAPES.length * SIZES.length + OTHER_PLANETS.length,
+    );
   });
 });

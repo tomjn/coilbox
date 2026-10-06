@@ -126,6 +126,15 @@ describe("regenerateGalaxy and the map style", () => {
     });
   }
 
+  it("keeps the planet on a reroll", () => {
+    const doc = generateMap(
+      { ...base, skin: "territories", planet: "ice" },
+      NOW,
+    );
+    const re = regenerateGalaxy(doc, { maps }, 999, "t1");
+    expect(re?.generated?.planet).toBe("ice");
+  });
+
   it("keeps a centre start through a reroll", () => {
     const doc = generateMap({ ...base, startPosition: "centre" }, NOW);
     const re = regenerateGalaxy(doc, { maps }, 999, "t1");

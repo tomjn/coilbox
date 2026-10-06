@@ -61,6 +61,16 @@ function galaxy(overrides: Partial<GalaxyDoc> = {}): GalaxyDoc {
 }
 
 describe("parseGalaxyJson", () => {
+  it("keeps a known planet and drops an unknown one", () => {
+    const planetOf = (planet: string) =>
+      parseGalaxyJson(
+        JSON.stringify(galaxy({ generated: { seed: 1, planet } as never })),
+      )?.generated?.planet;
+    expect(planetOf("moon")).toBe("moon");
+    expect(planetOf("random")).toBe("random");
+    expect(planetOf("pluto")).toBeUndefined();
+  });
+
   it("round-trips a valid doc", () => {
     const doc = galaxy();
     expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);

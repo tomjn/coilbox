@@ -210,7 +210,7 @@ export function generateCities(
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
   const count = generatedNodeCount(opts);
-  const terrain = landTerrain(opts.seed, opts.layout, count, rng);
+  const terrain = landTerrain(opts.seed, opts.layout, count, rng, opts.planet);
   const land = divideLand(terrain, count, rng);
   const sites = citySites(terrain, land);
   const { roads, kinds } = chooseRoads(terrain, land, sites);
@@ -234,7 +234,11 @@ export function generateCities(
     ...doc,
     description: `A generated map of ${doc.nodes.length} cities.`,
     theme: { skin: "cities" },
-    generated: doc.generated && { ...doc.generated, skin: "cities" },
+    generated: doc.generated && {
+      ...doc.generated,
+      skin: "cities",
+      ...(opts.planet ? { planet: opts.planet } : {}),
+    },
     terrain: {
       image: GENERATED_CITIES_IMAGE,
       heightmap: GENERATED_CITIES_IMAGE,

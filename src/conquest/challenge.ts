@@ -24,6 +24,7 @@ import {
   readMapSkin,
 } from "./model";
 import type { FactionPreset } from "./names";
+import { isPlanetId, type PlanetId } from "./planets";
 import { MAX_NODE_COUNT } from "./size";
 import { readStartPosition, type StartPosition } from "./startPosition";
 import { LAND_LAYOUTS, type LandLayout } from "./terrainGen";
@@ -51,6 +52,8 @@ export interface ConquestChallengeSettings {
   skin: MapSkin;
   startingSystems?: number;
   fogOfWar?: boolean;
+  /** Land styles only. Absent builds the Temperate map, as every older code did. */
+  planet?: PlanetId | "random";
   /**
    * How hard the opposing factions press (see `./threat`). Absent reads as 0,
    * so a code shared before levels existed rebuilds the galaxy it always did.
@@ -113,7 +116,9 @@ export type ChallengeFaction = Pick<FactionPreset, "name" | "color" | "side">;
  * The layouts a code can name. The land layouts were added after codes were
  * first shared, with no version bump. A coilbox from before them reads a land
  * layout as `scatter`, and a coilbox from before the land styles reads the
- * style as `galaxy`, so such a code builds a scatter galaxy there.
+ * style as `galaxy`, so such a code builds a scatter galaxy there. The planet
+ * field came the same way: a coilbox from before planets ignores it and builds
+ * the Temperate map of the same seed.
  */
 const LAYOUTS: readonly ChallengeLayout[] = [
   "scatter",
@@ -148,6 +153,7 @@ export function challengeSettingsFromGalaxy(
     skin: g.skin ?? "galaxy",
     startingSystems: g.startingSystems,
     fogOfWar: g.fogOfWar,
+    ...(g.planet ? { planet: g.planet } : {}),
     threatLevel: readThreatLevel(g.threatLevel) || undefined,
     startPosition: readStartPosition(g.startPosition),
     nodeMaps: nodeMapsFrom(galaxy.nodes),
@@ -216,6 +222,9 @@ export function parseConquestChallengeSettings(
         ? clamp(Math.round(v.startingSystems), 1, 4)
         : undefined,
     fogOfWar: v.fogOfWar === true ? true : undefined,
+    ...(v.planet === "random" || isPlanetId(v.planet)
+      ? { planet: v.planet }
+      : {}),
     threatLevel: readThreatLevel(v.threatLevel) || undefined,
     startPosition: readStartPosition(v.startPosition),
     nodeMaps: parseNodeMaps(v.nodeMaps),
@@ -300,6 +309,7 @@ export function optionsFromChallenge(
     layout: settings.layout,
     radiusLy: settings.radiusLy,
     skin: settings.skin,
+    planet: settings.planet,
     startingSystems: settings.startingSystems,
     fogOfWar: settings.fogOfWar,
     threatLevel: settings.threatLevel,
