@@ -21,6 +21,7 @@ import {
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { OptionSelect } from "@/components/OptionSelect";
 import { PageHeader } from "@/components/PageHeader";
@@ -611,9 +612,9 @@ function HandmadeMapCard({
   state: ConquestState | undefined;
   resume?: boolean;
   /** Present for a conquest in progress: clears it, keeping the map. */
-  onAbandon?: () => void;
+  onAbandon?: () => void | Promise<void>;
   /** Present for an imported map with no conquest on it. */
-  onRemove?: () => void;
+  onRemove?: () => void | Promise<void>;
 }) {
   const drawer = useDrawer();
   const openShareChallenge = (conquest: ConquestState) =>
@@ -688,26 +689,38 @@ function HandmadeMapCard({
         </Button>
       )}
       {state && onAbandon ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Abandon ${map.title}`}
-          title="Abandon this campaign"
-          onClick={onAbandon}
+        <ConfirmPopover
+          triggerProps={{
+            variant: "ghost",
+            size: "icon",
+            "aria-label": `Abandon ${map.title}`,
+            title: "Abandon this campaign",
+          }}
+          heading={`Abandon the conquest on ${map.title}?`}
+          description={`This deletes the conquest for good, including its progress (${statusLabel}). The map stays in your list. It cannot be undone.`}
+          confirmLabel="Abandon conquest"
+          busyLabel="Abandoning…"
+          onConfirm={onAbandon}
         >
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
-        </Button>
+        </ConfirmPopover>
       ) : (
         onRemove && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Remove ${map.title}`}
-            title="Remove this map"
-            onClick={onRemove}
+          <ConfirmPopover
+            triggerProps={{
+              variant: "ghost",
+              size: "icon",
+              "aria-label": `Remove ${map.title}`,
+              title: "Remove this map",
+            }}
+            heading={`Remove ${map.title}?`}
+            description="This deletes the imported map from your computer. To play it again you would have to import it again. It cannot be undone."
+            confirmLabel="Remove map"
+            busyLabel="Removing…"
+            onConfirm={onRemove}
           >
             <Trash2 className="size-4 text-muted-foreground" aria-hidden />
-          </Button>
+          </ConfirmPopover>
         )
       )}
     </Card>
@@ -776,7 +789,7 @@ function LostMapCard({
   /** The game that carried the map when the conquest started. */
   carriedBy?: string;
   state: ConquestState;
-  onAbandon: () => void;
+  onAbandon: () => void | Promise<void>;
 }) {
   return (
     <Card className="flex-row items-center gap-3 rounded-lg border-border/50 p-3 shadow-none">
@@ -791,15 +804,21 @@ function LostMapCard({
             : `The map this conquest is played on is no longer installed. Your progress is saved (turn ${state.turn}). Import the map again to carry on.`}
         </p>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label={`Abandon ${title}`}
-        title="Abandon this campaign"
-        onClick={onAbandon}
+      <ConfirmPopover
+        triggerProps={{
+          variant: "ghost",
+          size: "icon",
+          "aria-label": `Abandon ${title}`,
+          title: "Abandon this campaign",
+        }}
+        heading={`Abandon the conquest on ${title}?`}
+        description={`This deletes the conquest for good, including its progress (turn ${state.turn}). It cannot be undone, and it cannot carry on if the map comes back.`}
+        confirmLabel="Abandon conquest"
+        busyLabel="Abandoning…"
+        onConfirm={onAbandon}
       >
         <Trash2 className="size-4 text-muted-foreground" aria-hidden />
-      </Button>
+      </ConfirmPopover>
     </Card>
   );
 }
@@ -913,7 +932,7 @@ function GalaxyCard({
    * separate control, since this card's own link already resumes it. */
   resume?: boolean;
   /** Present for in-progress cards: clears the run state, keeping the galaxy. */
-  onAbandon?: () => void;
+  onAbandon?: () => void | Promise<void>;
 }) {
   const { refresh } = useGalaxies();
   const drawer = useDrawer();
@@ -1037,30 +1056,42 @@ function GalaxyCard({
         </Button>
       )}
       {state && onAbandon ? (
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={`Abandon ${galaxy.title}`}
-          title="Abandon this campaign"
-          onClick={onAbandon}
+        <ConfirmPopover
+          triggerProps={{
+            variant: "ghost",
+            size: "icon",
+            "aria-label": `Abandon ${galaxy.title}`,
+            title: "Abandon this campaign",
+          }}
+          heading={`Abandon the conquest on ${galaxy.title}?`}
+          description={`This deletes the conquest for good, including its progress (${statusLabel}). The map stays in your list. It cannot be undone.`}
+          confirmLabel="Abandon conquest"
+          busyLabel="Abandoning…"
+          onConfirm={onAbandon}
         >
           <Trash2 className="size-4 text-muted-foreground" aria-hidden />
-        </Button>
+        </ConfirmPopover>
       ) : (
         !bundled &&
         !state && (
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label={`Delete ${galaxy.title}`}
-            onClick={async () => {
+          <ConfirmPopover
+            triggerProps={{
+              variant: "ghost",
+              size: "icon",
+              "aria-label": `Delete ${galaxy.title}`,
+            }}
+            heading={`Delete ${galaxy.title}?`}
+            description="This deletes the map from your computer. It cannot be undone."
+            confirmLabel="Delete map"
+            busyLabel="Deleting…"
+            onConfirm={async () => {
               await conquestDelete({ id: galaxy.id });
               await refreshGalaxies();
               refresh();
             }}
           >
             <Trash2 className="size-4 text-muted-foreground" aria-hidden />
-          </Button>
+          </ConfirmPopover>
         )
       )}
     </Card>

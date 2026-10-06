@@ -210,9 +210,15 @@ describe("a hand-made map on the Conquest hub", () => {
     ).toBe("/conquest/sample-two-shores");
   });
 
-  it("can be removed when it was imported", async () => {
+  it("is not removed by one click, only by confirming", async () => {
     renderIn(<ConquestListPage />);
     fireEvent.click(screen.getByRole("button", { name: "Remove Two Shores" }));
+    expect(screen.getByText("Remove Two Shores?")).toBeTruthy();
+    expect(h.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(h.remove).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Remove Two Shores" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove map" }));
     await waitFor(() => expect(h.refreshMaps).toHaveBeenCalled());
     expect(h.remove).toHaveBeenCalledWith("sample-two-shores");
   });
@@ -221,6 +227,7 @@ describe("a hand-made map on the Conquest hub", () => {
     h.remove.mockRejectedValue(new Error("the folder is in use"));
     renderIn(<ConquestListPage />);
     fireEvent.click(screen.getByRole("button", { name: "Remove Two Shores" }));
+    fireEvent.click(screen.getByRole("button", { name: "Remove map" }));
     expect(
       await screen.findByText(
         '"Two Shores" was not removed. the folder is in use',
@@ -254,18 +261,31 @@ describe("a hand-made map on the Conquest hub", () => {
     ).toBeTruthy();
   });
 
-  it("shows a conquest in progress and abandons it without removing the map", () => {
+  it("shows a conquest in progress and abandons it without removing the map", async () => {
     h.conquests = { "sample-two-shores": conquest() };
     renderIn(<ConquestListPage />);
     expect(screen.getByText("In progress")).toBeTruthy();
     expect(screen.getByText("Turn 3 · 50% held")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Remove/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Abandon Two Shores" }));
-    expect(h.saveFor).toHaveBeenCalledWith("sample-two-shores", undefined);
+    expect(h.saveFor).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Abandon the conquest on Two Shores?"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/deletes the conquest for good.*Turn 3 · 50% held/),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(h.saveFor).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Abandon Two Shores" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abandon conquest" }));
+    await waitFor(() =>
+      expect(h.saveFor).toHaveBeenCalledWith("sample-two-shores", undefined),
+    );
     expect(h.remove).not.toHaveBeenCalled();
   });
 
-  it("still shows a conquest whose map is no longer installed", () => {
+  it("still shows a conquest whose map is no longer installed", async () => {
     h.maps = [];
     h.conquests = { "sample-two-shores": conquest() };
     renderIn(<ConquestListPage />);
@@ -276,7 +296,11 @@ describe("a hand-made map on the Conquest hub", () => {
       ),
     ).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Abandon Two Shores" }));
-    expect(h.saveFor).toHaveBeenCalledWith("sample-two-shores", undefined);
+    expect(h.saveFor).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Abandon conquest" }));
+    await waitFor(() =>
+      expect(h.saveFor).toHaveBeenCalledWith("sample-two-shores", undefined),
+    );
   });
 });
 

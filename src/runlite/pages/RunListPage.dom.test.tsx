@@ -4,7 +4,13 @@
  * The readiness hook then reports "unreadable" with the reason, and the page has
  * to show it and not spin.
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -12,6 +18,8 @@ const readiness = vi.hoisted(() => ({
   current: {} as Record<string, unknown>,
   runsError: null as string | null,
   unreadableCount: 0,
+  runs: {} as Record<string, unknown>,
+  deleteRun: vi.fn(),
 }));
 
 vi.mock("@picoframe/frame", async (orig) => ({
@@ -34,11 +42,11 @@ vi.mock("../../deeplink/useImportParam", () => ({
 vi.mock("../../hub/imports", () => ({ useRecordHubImport: () => vi.fn() }));
 vi.mock("../runs", () => ({
   useRuns: () => ({
-    runs: {},
+    runs: readiness.runs,
     loading: false,
     error: readiness.runsError,
     unreadableCount: readiness.unreadableCount,
-    deleteRun: vi.fn(),
+    deleteRun: readiness.deleteRun,
   }),
 }));
 vi.mock("../useAwardFinishedRuns", () => ({
@@ -52,6 +60,8 @@ afterEach(() => {
   cleanup();
   readiness.runsError = null;
   readiness.unreadableCount = 0;
+  readiness.runs = {};
+  readiness.deleteRun.mockReset();
 });
 
 describe("RunListPage with a failed scan", () => {
@@ -133,5 +143,55 @@ describe("RunListPage with runs kept in the file that could not be read", () => 
   it("shows nothing when there are none", () => {
     renderReady();
     expect(screen.queryByText(/could not be read/)).toBeNull();
+  });
+});
+
+describe("Abandon on a warpath run", () => {
+  const RUN = {
+    name: "Cinder Reach",
+    settings: { game: { shortname: "BA" }, side: "Armada" },
+    progress: { status: "active", hull: 12, maxHull: 20 },
+    updatedAt: "2026-01-01T00:00:00Z",
+  };
+
+  function renderRun() {
+    readiness.current = {
+      hasGames: true,
+      state: "ready",
+      scanErrors: [],
+      scanFailure: null,
+    };
+    readiness.runs = { "run-1": RUN };
+    render(
+      <MemoryRouter>
+        <RunListPage />
+      </MemoryRouter>,
+    );
+  }
+
+  it("does not abandon on one click, and says what is lost", () => {
+    renderRun();
+    fireEvent.click(screen.getByRole("button", { name: "Abandon" }));
+    expect(readiness.deleteRun).not.toHaveBeenCalled();
+    expect(screen.getByText("Abandon Cinder Reach?")).toBeTruthy();
+    expect(
+      screen.getByText(/deletes the warpath for good.*health 12\/20/),
+    ).toBeTruthy();
+  });
+
+  it("does not abandon when cancelled", () => {
+    renderRun();
+    fireEvent.click(screen.getByRole("button", { name: "Abandon" }));
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(readiness.deleteRun).not.toHaveBeenCalled();
+  });
+
+  it("abandons when confirmed", async () => {
+    renderRun();
+    fireEvent.click(screen.getByRole("button", { name: "Abandon" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abandon warpath" }));
+    await waitFor(() =>
+      expect(readiness.deleteRun).toHaveBeenCalledWith("run-1"),
+    );
   });
 });
