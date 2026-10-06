@@ -918,12 +918,12 @@ function landHeightByte(
 }
 
 /**
- * The colour of land at pixel `x`, `y` with height `h` from 0 to 1. Wetter
- * near the coast, and warmer one way across the map by an amount the seed
- * picks, so some maps run from tundra to dry land and others stay temperate.
- * Height cools it further. The planet's bias is added to both, and its rule
- * turns them and the height into weight bytes, written to slot `o` of
- * `biomes`.
+ * Write the weight bytes of land at pixel `x`, `y` with height `h` from 0 to
+ * 1, and return nothing. Wetter near the coast, and warmer one way across the
+ * map by an amount the seed picks, so some maps run from tundra to dry land
+ * and others stay temperate. Height cools it further. The planet's bias is
+ * added to both, and its rule turns them and the height into weight bytes,
+ * written at byte offset `o` of `biomes.a` and `biomes.b`.
  */
 function climateWeights(
   planet: Planet,
@@ -940,7 +940,7 @@ function climateWeights(
 ): void {
   const near = 1 - Math.min(1, coastDist / (3 * 30));
   const wet = clamp01(
-    0.5 + (wetValue - 0.5) * 2.4 + 0.15 * near + planet.climate.wet,
+    clamp01(0.5 + (wetValue - 0.5) * 2.4 + 0.15 * near) + planet.climate.wet,
   );
   const across = ((x - S / 2) * warmth[0] + (y - S / 2) * warmth[1]) / S;
   const warm =

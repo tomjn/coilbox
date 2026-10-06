@@ -40,7 +40,7 @@ describe("planet terrain", () => {
 
   it("paints level inland ground in the palette mixed by the weights", () => {
     const S = 512;
-    let checked = 0;
+    const checked = new Map<string, number>();
     let wrong = 0;
     for (const seed of [11, 12, 13]) {
       for (const planet of PLANETS) {
@@ -62,12 +62,13 @@ describe("planet terrain", () => {
               t.image[i * 4 + 2] !== want[2]
             )
               wrong++;
-            checked++;
+            checked.set(planet, (checked.get(planet) ?? 0) + 1);
           }
         }
       }
     }
-    expect(checked).toBeGreaterThan(0);
+    for (const planet of PLANETS)
+      expect(checked.get(planet) ?? 0, planet).toBeGreaterThan(0);
     expect(wrong).toBe(0);
   }, 120_000);
 
