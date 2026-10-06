@@ -28,14 +28,27 @@ export const isPlanetId = (value: unknown): value is PlanetId =>
 /** How many ground types the terrain shader can mix. */
 export const BIOME_SLOTS = 8;
 
-/** Which of the shader's six existing patterns a slot draws with until piece 2. */
+/** The pattern the terrain shader draws a slot with. See `terrainShader.ts`. */
 export type BiomePattern =
   | "forest"
   | "grass"
-  | "dry"
-  | "tundra"
+  | "scrub"
+  | "sand"
+  | "dunes"
+  | "dust"
+  | "regolith"
   | "rock"
-  | "snow";
+  | "scree"
+  | "mesa"
+  | "salt"
+  | "basalt"
+  | "flows"
+  | "ash"
+  | "ice"
+  | "snow"
+  | "tundra"
+  | "cracked"
+  | "earth";
 
 export interface Biome {
   name: string;
@@ -103,13 +116,13 @@ const TEMPERATE: Planet = {
   label: "Temperate",
   biomes: [
     biome("grass", [122, 154, 84], "grass", true),
-    biome("dry", [182, 168, 116], "dry", true),
+    biome("dry", [182, 168, 116], "dunes", true),
     biome("forest", [58, 98, 56], "forest"),
     biome("tundra", [146, 146, 122], "tundra"),
     biome("rock", [122, 106, 90], "rock"),
-    biome("scree", [152, 146, 140], "rock"),
+    biome("scree", [152, 146, 140], "scree"),
     biome("snow", [240, 240, 240], "snow"),
-    biome("beach", [214, 200, 150], "dry"),
+    biome("beach", [214, 200, 150], "sand"),
   ],
   shore: 7,
   steep: [
@@ -148,12 +161,12 @@ const DESERT: Planet = {
   id: "desert",
   label: "Desert",
   biomes: [
-    biome("dunes", [214, 186, 128], "dry"),
-    biome("rock flats", [168, 138, 104], "rock"),
-    biome("mesa", [150, 96, 70], "rock"),
-    biome("scrub", [150, 148, 96], "grass", true),
-    biome("salt pan", [226, 220, 204], "snow"),
-    biome("beach", [222, 206, 160], "dry"),
+    biome("dunes", [214, 186, 128], "dunes"),
+    biome("rock flats", [168, 138, 104], "scree"),
+    biome("mesa", [150, 96, 70], "mesa"),
+    biome("scrub", [150, 148, 96], "scrub", true),
+    biome("salt pan", [226, 220, 204], "salt"),
+    biome("beach", [222, 206, 160], "sand"),
   ],
   shore: 5,
   steep: [
@@ -186,7 +199,7 @@ const ICE: Planet = {
   label: "Ice",
   biomes: [
     biome("snowfield", [238, 242, 246], "snow"),
-    biome("bare ice", [176, 208, 224], "snow"),
+    biome("bare ice", [176, 208, 224], "ice"),
     biome("tundra", [132, 138, 126], "tundra"),
     biome("rock", [104, 104, 110], "rock"),
   ],
@@ -220,9 +233,9 @@ const RED: Planet = {
   id: "red",
   label: "Red",
   biomes: [
-    biome("red dust", [170, 92, 62], "dry"),
-    biome("dark basalt", [84, 60, 54], "rock"),
-    biome("pale dunes", [204, 150, 112], "dry"),
+    biome("red dust", [170, 92, 62], "dust"),
+    biome("dark basalt", [84, 60, 54], "basalt"),
+    biome("pale dunes", [204, 150, 112], "dunes"),
     biome("rock", [128, 78, 60], "rock"),
   ],
   shore: 0,
@@ -253,8 +266,8 @@ const MOON: Planet = {
   id: "moon",
   label: "Moon",
   biomes: [
-    biome("regolith", [142, 142, 146], "dry"),
-    biome("bright highland", [196, 196, 200], "tundra"),
+    biome("regolith", [142, 142, 146], "regolith"),
+    biome("bright highland", [196, 196, 200], "regolith"),
     biome("rock", [108, 108, 114], "rock"),
   ],
   shore: 0,
@@ -283,10 +296,10 @@ const VOLCANIC: Planet = {
   id: "volcanic",
   label: "Volcanic",
   biomes: [
-    biome("dark basalt", [46, 40, 40], "rock"),
+    biome("dark basalt", [46, 40, 40], "basalt"),
     biome("brown rock", [88, 58, 42], "rock"),
-    biome("ash", [92, 80, 72], "dry"),
-    biome("cooled flows", [28, 24, 26], "rock"),
+    biome("ash", [92, 80, 72], "ash"),
+    biome("cooled flows", [28, 24, 26], "flows"),
   ],
   shore: 0,
   steep: [
@@ -307,8 +320,9 @@ const VOLCANIC: Planet = {
   },
   sea: {
     look: "lava",
-    shallow: [255, 150, 40],
-    deep: [208, 64, 18],
+    // The crust and the melt in its gaps, mixed. The shader draws them apart.
+    shallow: [150, 62, 26],
+    deep: [112, 44, 24],
     crossing: "none",
   },
   craters: false,
@@ -318,8 +332,8 @@ const ACID: Planet = {
   id: "acid",
   label: "Acid",
   biomes: [
-    biome("dull yellow ground", [156, 148, 96], "dry"),
-    biome("brown ground", [118, 98, 70], "tundra"),
+    biome("dull yellow ground", [156, 148, 96], "cracked"),
+    biome("brown ground", [118, 98, 70], "earth"),
     biome("brown forest", [84, 62, 44], "forest"),
     biome("rock", [110, 104, 92], "rock"),
   ],

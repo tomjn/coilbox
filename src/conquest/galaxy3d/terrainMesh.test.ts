@@ -236,8 +236,18 @@ describe("the sheet's biome weights", () => {
 
   it("gives each slot its pattern's index, and -1 to a slot with none", () => {
     const u = build(weights("moon"));
-    // Moon: dry, tundra, rock, then five unused slots.
-    expect(u.uBiomePattern.value).toEqual([2, 3, 4, -1, -1, -1, -1, -1]);
+    // Moon: regolith, regolith, rock, then five unused slots.
+    expect(u.uBiomePattern.value).toEqual([6, 6, 7, -1, -1, -1, -1, -1]);
+  });
+
+  it("gives a sea that is not liquid a pattern, and a liquid one none", () => {
+    // Dust for the dry basin and regolith for the maria, as their land has.
+    expect(build(weights("red")).uSeaPattern.value).toBe(5);
+    expect(build(weights("moon")).uSeaPattern.value).toBe(6);
+    expect(build(weights("volcanic")).uSeaPattern.value).toBe(19);
+    expect(build(weights("ice")).uSeaPattern.value).toBe(20);
+    expect(build(weights("temperate")).uSeaPattern.value).toBe(-1);
+    expect(build(weights("acid")).uSeaPattern.value).toBe(-1);
   });
 
   it("turns water effects off on a sea that is not liquid", () => {

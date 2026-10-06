@@ -108,6 +108,7 @@ export function generatedTerrainPixels(
       margin: wide.margin,
       image: { data: wide.image, width: wide.width, height: wide.height },
       heights: { data: wide.heights, width: wide.width, height: wide.height },
+      relief: { data: wide.relief, width: wide.width, height: wide.height },
       biomes: {
         ...wide.biomes,
         width: wide.width,

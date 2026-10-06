@@ -155,6 +155,13 @@ export interface GeneratedTerrain {
   land: Uint8Array;
   /** Greyscale height, one byte per pixel. Sea is 0, land is 1 to 255. */
   heightmap: Uint8Array;
+  /**
+   * The height before it is rounded down to `heightmap`'s byte, in the same
+   * units: sea is 0, land is 1 to 255, or 0 to 254 beside a sea that is
+   * ground. For lighting only, which shows a byte's steps as creases on a
+   * gentle slope. Nothing in play reads it.
+   */
+  relief: Float32Array;
   /** RGBA colour, four bytes per pixel. */
   image: Uint8ClampedArray;
   /**
@@ -728,6 +735,59 @@ export function seaRampOf(planet: Planet): Rgb[] {
   return ramp;
 }
 
+/** Seas that are ground, which the land beside them runs into with no shore. */
+const GROUND_SEAS: readonly string[] = ["basin", "maria"];
+/** Coast distance, in thirds of a pixel, by which a ground sea has its colour. */
+const GROUND_SHORE = 36;
+/** Pixels across the patches that make a ground sea's edge ragged. */
+const GROUND_SHORE_CELL = 14;
+
+/**
+ * How far the relief sits under the heightmap. Land starts at byte 1 so that
+ * it can be told from sea, which leaves a step at the coast for the light to
+ * pick out. A sea that is ground has no shore, so its land's relief starts
+ * from 0.
+ */
+function reliefShoreStep(planet: Planet): number {
+  return GROUND_SEAS.includes(planet.sea.look) ? 1 : 0;
+}
+
+/**
+ * The colour of sea `coastDist` thirds of a pixel from the coast, at pixel
+ * `x`, `y`, which may be past the map's edge. A sea that is ground has no
+ * shoreline: the land's shore colour runs out into it and gives way to the
+ * sea's along a ragged line, nearer the coast in some places than others,
+ * from a noise field seeded by `shoreSeed`.
+ */
+function seaColour(
+  planet: Planet,
+  ramp: Rgb[],
+  coastDist: number,
+  x: number,
+  y: number,
+  shoreSeed: number,
+): Rgb {
+  const sea = ramp[Math.min(SEA_DEPTH, coastDist)];
+  if (!GROUND_SEAS.includes(planet.sea.look) || coastDist >= GROUND_SHORE)
+    return sea;
+  const noise = fractalNoise(
+    (x + 0.5) / GROUND_SHORE_CELL,
+    (y + 0.5) / GROUND_SHORE_CELL,
+    shoreSeed,
+    3,
+  );
+  // The line sits from 0.15 to 0.85 of the way out, and is 0.3 wide.
+  const edge = clamp01((noise - 0.3) / 0.4) * 0.7;
+  const t = clamp01((coastDist / GROUND_SHORE - edge) / 0.3);
+  const mix = t * t * (3 - 2 * t);
+  const shore = planet.biomes[planet.shore].colour;
+  return [
+    shore[0] + (sea[0] - shore[0]) * mix,
+    shore[1] + (sea[1] - shore[1]) * mix,
+    shore[2] + (sea[2] - shore[2]) * mix,
+  ];
+}
+
 /**
  * The sRGB colour of a pixel's land from its weight bytes: the planet's
  * palette weighted by the bytes over 255. `o` is the pixel's byte offset in
@@ -897,10 +957,11 @@ function elevationAt(
 }
 
 /**
- * The heightmap byte for land `coastDist` thirds of a pixel from the coast,
- * from 1 to 255, given the range, hill and ridge noise there.
+ * The height of land `coastDist` thirds of a pixel from the coast, from 1 to
+ * 255, given the range, hill and ridge noise there. The heightmap byte is
+ * this rounded down.
  */
-function landHeightByte(
+function landHeight(
   coastDist: number,
   rangeValue: number,
   hillValue: number,
@@ -914,7 +975,7 @@ function landHeightByte(
   const ridge = r * r * r;
   const range = clamp01((rangeValue - 0.47) * 4);
   const h = clamp01(inland * (0.06 + 0.2 * hillValue + 0.75 * range * ridge));
-  return 1 + Math.floor(h * 254);
+  return 1 + h * 254;
 }
 
 const CRATER_COUNT = 40;
@@ -933,9 +994,15 @@ const CRATER_RIM = 20;
  * {@link CRATER_TRIES} tries is skipped. Inside 0.8 of the radius the floor
  * sinks, deepest at the centre. From 0.8 to 1.2 of the radius it rises into a
  * rim. Only land pixels away from the outermost rows and columns are written,
- * and they stay from 1 to 255.
+ * and they stay from 1 to 255. The byte takes the change rounded down, and
+ * `relief` takes it whole.
  */
-function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
+function stampCraters(
+  seed: number,
+  land: Uint8Array,
+  heightmap: Uint8Array,
+  relief: Float32Array,
+) {
   stampCraterField(
     `craters:${seed >>> 0}`,
     land,
@@ -946,7 +1013,11 @@ function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
       Math.floor(rng() * (CRATER_MAX_RADIUS - CRATER_MIN_RADIUS + 1)),
     craterDelta,
     (i, delta) => {
-      heightmap[i] = Math.max(1, Math.min(255, heightmap[i] + delta));
+      heightmap[i] = Math.max(
+        1,
+        Math.min(255, heightmap[i] + Math.floor(delta)),
+      );
+      relief[i] = Math.max(0, Math.min(255, relief[i] + delta));
     },
   );
 }
@@ -986,15 +1057,15 @@ function mariaRelief(seed: number, land: Uint8Array): Float64Array {
 }
 
 /**
- * Depth of a land crater profile, in height bytes, at `u`: the squared
+ * Depth of a land crater profile, in height bytes before rounding, at `u`: the squared
  * distance from the centre over the squared radius. Zero past 1.2 of the
  * radius.
  */
 function craterDelta(u: number): number {
-  if (u < 0.64) return Math.floor(-CRATER_DEPTH * (1 - u / 0.64));
+  if (u < 0.64) return -CRATER_DEPTH * (1 - u / 0.64);
   if (u < 1.44) {
     const s = (u - 0.64) / 0.8;
-    return Math.floor(CRATER_RIM * 4 * s * (1 - s));
+    return CRATER_RIM * 4 * s * (1 - s);
   }
   return 0;
 }
@@ -1121,6 +1192,7 @@ interface TerrainContext {
   warmth: Vec;
   warmSpread: number;
   seaLevel: number;
+  shoreSeed: number;
 }
 
 /** Build the land for a seed and a layout. */
@@ -1218,17 +1290,17 @@ function buildTerrain(opts: TerrainOptions): {
   const hillField = coarseNoise(S, S, 40, hillSeed, 3);
   const ridges = coarseNoise(S, S, 80, ridgeSeed, 5, 2);
   const heightmap = new Uint8Array(S * S);
+  const relief = new Float32Array(S * S);
+  const shoreStep = reliefShoreStep(planet);
   for (let i = 0; i < S * S; i++) {
     if (!land[i]) continue;
-    heightmap[i] = landHeightByte(
-      coastDistance[i],
-      ranges[i],
-      hillField[i],
-      ridges[i],
-    );
+    // The byte is rounded from the full value, not from the stored float.
+    const v = landHeight(coastDistance[i], ranges[i], hillField[i], ridges[i]);
+    relief[i] = v - shoreStep;
+    heightmap[i] = Math.floor(v);
   }
-  if (planet.craters) stampCraters(opts.seed, land, heightmap);
-  const relief = planet.craters ? mariaRelief(opts.seed, land) : null;
+  if (planet.craters) stampCraters(opts.seed, land, heightmap, relief);
+  const maria = planet.craters ? mariaRelief(opts.seed, land) : null;
 
   // Climate, for colour alone.
   const wetField = coarseNoise(S, S, 130, wetSeed, 3);
@@ -1257,7 +1329,10 @@ function buildTerrain(opts: TerrainOptions): {
   }
   const seaRamp = seaRampOf(planet);
   const beach = planet.biomes[planet.shore].colour;
-  const shallows = seaRamp[3];
+  // A stream of its own, so the shore changes no land and no climate.
+  const shoreSeed = noiseSeed(
+    mulberry32(hashString(`shore:${opts.seed >>> 0}`)),
+  );
   const image = new Uint8ClampedArray(S * S * 4);
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
@@ -1269,6 +1344,7 @@ function buildTerrain(opts: TerrainOptions): {
         // A pixel the coast runs through: land and sea mixed by how much of
         // the pixel lies above sea level.
         const lnd = land[i] ? landColour(planet, biomes, i * 4) : beach;
+        const shallows = seaColour(planet, seaRamp, 3, x, y, shoreSeed);
         rgb = [
           shallows[0] + (lnd[0] - shallows[0]) * cover,
           shallows[1] + (lnd[1] - shallows[1]) * cover,
@@ -1277,18 +1353,18 @@ function buildTerrain(opts: TerrainOptions): {
       } else if (land[i]) {
         rgb = landColour(planet, biomes, i * 4);
         // Lit from the north west: a slope rising to the south east is bright.
-        const nw = heightmap[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
+        const nw = relief[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
         const se =
-          heightmap[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
+          relief[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
         shade = 1 + (se - nw) * 0.03;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        rgb = seaRamp[Math.min(SEA_DEPTH, coastDistance[i])];
-        if (relief) {
+        rgb = seaColour(planet, seaRamp, coastDistance[i], x, y, shoreSeed);
+        if (maria) {
           // The maria are lit the same way, from their crater relief.
-          const nw = relief[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
+          const nw = maria[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
           const se =
-            relief[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
+            maria[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
           shade = 1 + (se - nw) * 0.03;
           shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
         }
@@ -1312,6 +1388,7 @@ function buildTerrain(opts: TerrainOptions): {
       heightScale: TERRAIN_HEIGHT_SCALE,
       land,
       heightmap,
+      relief,
       image,
       coastDistance,
     },
@@ -1332,6 +1409,7 @@ function buildTerrain(opts: TerrainOptions): {
       warmth,
       warmSpread,
       seaLevel,
+      shoreSeed,
     },
   };
 }
@@ -1389,6 +1467,8 @@ export interface TerrainMargin {
   image: Uint8ClampedArray;
   /** Height bytes, as the map's heightmap: sea 0, land 1 to 255. */
   heightmap: Uint8Array;
+  /** Heights before rounding, as the map's relief. */
+  relief: Float32Array;
   /** Biome weights, as the map's, at the margin's own width and height. */
   biomes: TerrainBiomes;
 }
@@ -1446,7 +1526,16 @@ export function generateTerrainWithMargin(
   marginPixels: number,
 ): { terrain: GeneratedTerrain; margin: TerrainMargin } {
   const { terrain, context } = buildTerrain(opts);
-  const { planet, plan, closed, seeds, warmth, warmSpread, seaLevel } = context;
+  const {
+    planet,
+    plan,
+    closed,
+    seeds,
+    warmth,
+    warmSpread,
+    seaLevel,
+    shoreSeed,
+  } = context;
   const seaRamp = seaRampOf(planet);
   const k = MARGIN_SCALE;
   const M = Math.ceil(marginPixels / MARGIN_ALIGN) * MARGIN_ALIGN;
@@ -1544,20 +1633,25 @@ export function generateTerrainWithMargin(
   // In thirds of a margin pixel, so k times as many thirds of a map pixel.
   const coast = coastDistanceOf(land, W, W);
   const heightmap = new Uint8Array(count);
+  const relief = new Float32Array(count);
+  const shoreStep = reliefShoreStep(planet);
   for (let j = 0; j < W; j++) {
     for (let i = 0; i < W; i++) {
       const o = j * W + i;
       if (inside[o]) {
         heightmap[o] = terrain.heightmap[mapPixel(j) * S + mapPixel(i)];
+        relief[o] = terrain.relief[mapPixel(j) * S + mapPixel(i)];
       } else if (land[o]) {
         const x = at(i);
         const y = at(j);
-        heightmap[o] = landHeightByte(
+        const v = landHeight(
           coast[o] * k,
           ranges(x, y),
           hills(x, y),
           ridges(x, y),
         );
+        relief[o] = v - shoreStep;
+        heightmap[o] = Math.floor(v);
       }
     }
   }
@@ -1597,13 +1691,12 @@ export function generateTerrainWithMargin(
         rgb = landColour(planet, biomes, o * 4);
         // Lit from the north west, as the map is. The neighbours are k map
         // pixels apart, so the difference is k times the map's.
-        const nw = heightmap[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
-        const se =
-          heightmap[Math.min(W - 1, j + 1) * W + Math.min(W - 1, i + 1)];
+        const nw = relief[Math.max(0, j - 1) * W + Math.max(0, i - 1)];
+        const se = relief[Math.min(W - 1, j + 1) * W + Math.min(W - 1, i + 1)];
         shade = 1 + ((se - nw) * 0.03) / k;
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
-        rgb = seaRamp[Math.min(SEA_DEPTH, coast[o] * k)];
+        rgb = seaColour(planet, seaRamp, coast[o] * k, at(i), at(j), shoreSeed);
       }
       image[o * 4] = rgb[0] * shade;
       image[o * 4 + 1] = rgb[1] * shade;
@@ -1620,6 +1713,7 @@ export function generateTerrainWithMargin(
       height: W,
       image,
       heightmap,
+      relief,
       biomes,
     },
   };
@@ -1636,6 +1730,8 @@ export interface ExtendedTerrain {
   image: Uint8ClampedArray;
   /** Heights from 0 to 1, as a heightmap byte over 255. */
   heights: Float32Array;
+  /** The same before rounding to a byte, for lighting. See {@link GeneratedTerrain.relief}. */
+  relief: Float32Array;
   /** Biome weights, as the map's. Blended bytes need not sum to 255. */
   biomes: TerrainBiomes;
 }
@@ -1648,7 +1744,7 @@ export interface ExtendedTerrain {
 export function extendTerrain(
   terrain: Pick<
     GeneratedTerrain,
-    "width" | "height" | "image" | "heightmap" | "biomes"
+    "width" | "height" | "image" | "heightmap" | "relief" | "biomes"
   >,
   margin: TerrainMargin,
 ): ExtendedTerrain {
@@ -1658,6 +1754,7 @@ export function extendTerrain(
   const h = terrain.height + 2 * M;
   const image = new Uint8ClampedArray(w * h * 4);
   const heights = new Float32Array(w * h);
+  const relief = new Float32Array(w * h);
   const biomes: TerrainBiomes = {
     a: new Uint8Array(w * h * 4),
     b: new Uint8Array(w * h * 4),
@@ -1677,6 +1774,7 @@ export function extendTerrain(
         const m = my * terrain.width + mx;
         image.set(terrain.image.subarray(m * 4, m * 4 + 4), o * 4);
         heights[o] = terrain.heightmap[m] / 255;
+        relief[o] = terrain.relief[m] / 255;
         biomes.a.set(terrain.biomes.a.subarray(m * 4, m * 4 + 4), o * 4);
         biomes.b.set(terrain.biomes.b.subarray(m * 4, m * 4 + 4), o * 4);
         continue;
@@ -1716,7 +1814,14 @@ export function extendTerrain(
           margin.heightmap[c],
           margin.heightmap[d],
         ) / 255;
+      relief[o] =
+        blend(
+          margin.relief[a],
+          margin.relief[b],
+          margin.relief[c],
+          margin.relief[d],
+        ) / 255;
     }
   }
-  return { margin: M, width: w, height: h, image, heights, biomes };
+  return { margin: M, width: w, height: h, image, heights, relief, biomes };
 }

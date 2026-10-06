@@ -212,6 +212,23 @@ describe("terrainNormalPixels", () => {
       expect(rgba(bytes, i)).toEqual([128, 255, 128, 128]);
   });
 
+  it("takes the slope from finer heights and the height from the grid", () => {
+    const flat: HeightGrid = {
+      data: new Float32Array(4).fill(0.5),
+      width: 2,
+      height: 2,
+    };
+    const s = createTerrainSurface(
+      { width: 100, height: 100, heightScale: 40 },
+      100,
+      flat,
+    );
+    const [r, g, , a] = rgba(terrainNormalPixels(s, flat, undefined, ramp), 1);
+    expect(r).toBeLessThan(128);
+    expect(g).toBeGreaterThan(128);
+    expect(a).toBe(128);
+  });
+
   it("tilts the normal away from the rise", () => {
     const s = createTerrainSurface(
       { width: 100, height: 100, heightScale: 40 },

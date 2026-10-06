@@ -116,6 +116,32 @@ describe("planet terrain", () => {
     }
   }, 60_000);
 
+  it("keeps the relief within its heightmap byte, and gives the sea none", () => {
+    for (const planet of PLANETS) {
+      const t = generateTerrain({ ...opts, planet });
+      // A crater's change is rounded down apart from the height's, so on a
+      // cratered planet the two drift by a part of a byte a crater.
+      const cratered = planetOf(planet).craters;
+      let wrong = 0;
+      for (let i = 0; i < t.land.length; i++) {
+        // Beside a sea that is ground the relief starts from 0, not 1.
+        const step = ["basin", "maria"].includes(planetOf(planet).sea.look)
+          ? 1
+          : 0;
+        const over = t.relief[i] + step - t.heightmap[i];
+        if (!t.land[i]) {
+          if (t.relief[i] !== 0) wrong++;
+        } else if (cratered) {
+          if (t.relief[i] < 0 || t.relief[i] > 255) wrong++;
+        } else if (over < 0 || over > 1) {
+          // A float can round a height a hair under a whole number up to it.
+          wrong++;
+        }
+      }
+      expect(wrong, planet).toBe(0);
+    }
+  }, 60_000);
+
   it("gives land weights that sum to 255 and sea none", () => {
     for (const planet of PLANETS) {
       const t = generateTerrain({ ...opts, planet });
@@ -130,7 +156,7 @@ describe("planet terrain", () => {
     }
   }, 60_000);
 
-  it("paints level inland ground in the palette mixed by the weights", () => {
+  it("paints inland ground in the palette mixed by the weights, shaded by its slope", () => {
     const S = 512;
     const checked = new Map<string, number>();
     let wrong = 0;
@@ -142,12 +168,14 @@ describe("planet terrain", () => {
           for (let x = 1; x < S - 1; x++) {
             const i = y * S + x;
             if (!t.land[i] || t.coastDistance[i] <= 6) continue;
-            if (t.heightmap[i - S - 1] !== t.heightmap[i + S + 1]) continue;
+            // Lit from the north west, by the heights before rounding.
+            const slope = t.relief[i + S + 1] - t.relief[i - S - 1];
+            const shade = Math.min(1.25, Math.max(0.75, 1 + slope * 0.03));
             const rgb = landColour(p, t.biomes, i * 4);
             const want = new Uint8ClampedArray(3);
-            want[0] = rgb[0];
-            want[1] = rgb[1];
-            want[2] = rgb[2];
+            want[0] = rgb[0] * shade;
+            want[1] = rgb[1] * shade;
+            want[2] = rgb[2] * shade;
             if (
               t.image[i * 4] !== want[0] ||
               t.image[i * 4 + 1] !== want[1] ||

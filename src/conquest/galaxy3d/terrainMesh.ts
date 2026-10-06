@@ -114,6 +114,11 @@ export interface TerrainExtension {
   image: ColorPixels;
   heights: HeightGrid;
   margin: number;
+  /**
+   * `heights` before they were rounded to a byte, for the light alone. The
+   * ground's shape stays `heights`.
+   */
+  relief?: HeightGrid;
   /** The generator's weights at this picture's size. */
   biomes?: BiomePixels;
 }
@@ -255,7 +260,7 @@ export function buildTerrainMesh(
         }
       : undefined;
     normals = new THREE.DataTexture(
-      terrainNormalPixels(surface, grid, span),
+      terrainNormalPixels(surface, grid, span, ext?.relief),
       grid.width,
       grid.height,
       THREE.RGBAFormat,
