@@ -88,7 +88,8 @@ uniform float uBiomePattern[8];
 uniform vec3 uBiomeSteep[2];
 uniform vec3 uBiomeClearing;
 uniform float uSeaLiquid;
-uniform float uSeaLava;
+uniform float uSeaGrain;
+uniform float uSeaDrift;
 uniform vec3 uTerrainSun;
 uniform float uTerrainAmbient;
 uniform vec4 uTerrainFrame;
@@ -335,9 +336,11 @@ if (terrainPast >= uTerrainHaze && uTerrainHaze > 0.0) {
     vec2 landBump = bump;
     // A sea that is not liquid is ground of a kind, with the grain dry
     // ground has.
-    float grain = 1.0 - uSeaLava;
-    vec2 seaBump = mix(fine.yz * 0.2 * grain, wave.yz * 0.05, uSeaLiquid);
-    float seaShade = mix((fine.x * 0.25 + broad.x * 0.2) * grain, wave.x * 0.1, uSeaLiquid);
+    // An ice sheet is smooth, with soft drifts and nothing for the sun to
+    // pick out. Lava has neither.
+    float dry = (fine.x * 0.25 + broad.x * 0.2) * uSeaGrain + broad.x * 0.12 * uSeaDrift;
+    vec2 seaBump = mix(fine.yz * 0.2 * uSeaGrain, wave.yz * 0.05, uSeaLiquid);
+    float seaShade = mix(dry, wave.x * 0.1, uSeaLiquid);
     bump = mix(landBump, seaBump, sea);
     shadeMul = mix(shadeMul, 1.0 + seaShade, sea);
 
@@ -449,9 +452,11 @@ export function applyTerrainShader(
     shader.uniforms.uSeaLiquid = {
       value: planet && !LIQUID_SEAS.includes(planet.sea.look) ? 0 : 1,
     };
-    shader.uniforms.uSeaLava = {
-      value: planet?.sea.look === "lava" ? 1 : 0,
+    const look = planet?.sea.look;
+    shader.uniforms.uSeaGrain = {
+      value: look === "basin" || look === "maria" ? 1 : 0,
     };
+    shader.uniforms.uSeaDrift = { value: look === "ice" ? 1 : 0 };
     const frame = shading.frame;
     shader.uniforms.uTerrainFrame = {
       value: frame
