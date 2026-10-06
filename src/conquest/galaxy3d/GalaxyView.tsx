@@ -610,6 +610,7 @@ export function GalaxyView({
           : undefined,
         drawTowns,
         crossingPlan?.landLinks,
+        terrainBiomes?.planet,
       );
       if (planned.towns) {
         towns = buildTownLayer(
