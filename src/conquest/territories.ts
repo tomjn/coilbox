@@ -6,7 +6,7 @@ import {
   repairConnectivity,
 } from "./generate";
 import type { GalaxyDoc, LinkKind } from "./model";
-import { resolvePlanet } from "./planets";
+import { type PlanetId, resolvePlanet } from "./planets";
 import { mulberry32, type Rng } from "./rng";
 import {
   coarseNoise,
@@ -811,6 +811,15 @@ export function generatedLandKey(doc: GalaxyDoc): string | null {
   return g
     ? JSON.stringify([g.seed, g.layout, g.planet, doc.nodes.length])
     : null;
+}
+
+/**
+ * The planet a generated document's land is built as. Null when the land is
+ * not generated. A map made before planets existed is Temperate.
+ */
+export function generatedPlanet(doc: GalaxyDoc): PlanetId | null {
+  const g = generatedLand(doc);
+  return g ? resolvePlanet(g.planet, g.seed) : null;
 }
 
 /** A document's generation settings, when its land is generated. */

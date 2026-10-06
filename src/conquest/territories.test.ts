@@ -15,6 +15,7 @@ import {
 import {
   divideLand,
   GENERATED_TERRITORIES_IMAGE,
+  generatedPlanet,
   generatedTerrain,
   generateTerritories,
   landTerrain,
@@ -46,6 +47,16 @@ describe("the planet of a generated territories map", () => {
     const doc = generateTerritories({ ...base, planet: "red" });
     expect(doc.generated?.planet).toBe("red");
     expect(generatedTerrain(doc)?.planet).toBe("red");
+  });
+
+  it("says which planet a document is on, and none for a galaxy", () => {
+    expect(generatedPlanet(generateTerritories(base))).toBe("temperate");
+    expect(
+      generatedPlanet(generateTerritories({ ...base, planet: "red" })),
+    ).toBe("red");
+    const random = generateTerritories({ ...base, planet: "random" });
+    expect(generatedPlanet(random)).toBe(generatedTerrain(random)?.planet);
+    expect(generatedPlanet(generateGalaxy(base))).toBeNull();
   });
 
   it("gives a Volcanic map of the largest size no crossings", () => {

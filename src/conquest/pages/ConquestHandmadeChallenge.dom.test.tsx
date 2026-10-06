@@ -81,6 +81,8 @@ vi.mock("../../challenge/ChallengeShare", () => ({
     </div>
   ),
 }));
+// The icon reads the scan target and the hub, which this page test has no use for.
+vi.mock("@/components/GameIcon", () => ({ GameIcon: () => null }));
 vi.mock("../../content/config", () => ({
   useUnitsyncGameHeaders: () => ({ headers: new Map() }),
   useUnitsyncScan: () => ({
