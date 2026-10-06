@@ -132,6 +132,7 @@ void main() {
 
 const fragmentShader = /* glsl */ `
 uniform vec3 uLane;
+uniform float uSolid;
 varying vec4 vColor;
 varying vec2 vLine;
 varying float vSea;
@@ -160,6 +161,9 @@ void main() {
       // Arrowheads pointing along the line.
       float lx = mod(x, 1.1) - 0.55;
       lane = cover(max(abs(lx + y * 1.3 - 0.18) * 0.61 - 0.06, y - 0.22), aa);
+    } else if (uSolid > 0.5) {
+      // A sea that is not liquid: a solid line of the dots' half width.
+      lane = cover(y - 0.13, aa);
     } else {
       lane = cover(length(vec2(mod(x, 0.9) - 0.45, y)) - 0.13, aa);
     }
@@ -188,11 +192,13 @@ void main() {
  * The material every crossing shares. `width` is the strip's width in world
  * units, the lane and the state drawn round it, and `lane` the lane's colour.
  * The mesh that uses it must call {@link updateCrossingMaterial} before each
- * draw, which `onBeforeRender` does.
+ * draw, which `onBeforeRender` does. With `solid`, a plain stretch over the
+ * sea draws as a solid line in place of the dots.
  */
 export function crossingMaterial(
   width: number,
   lane: THREE.Color,
+  solid = false,
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     vertexShader,
@@ -202,6 +208,7 @@ export function crossingMaterial(
       uWidth: { value: width },
       uMinPx: { value: 1 },
       uLane: { value: lane },
+      uSolid: { value: solid ? 1 : 0 },
     },
     transparent: true,
     depthWrite: false,

@@ -15,6 +15,7 @@ Conquests live under **Conquest** in the sidebar. You can generate one for any i
 | **Game** | Which installed game the battles use. Auto-selected when only one qualifies. |
 | **Map style** | **Galaxy** (stars in space), **Theatre** (a flat tactical chart), **Cities** (cities on generated land, joined by roads) or **Territories** (provinces on generated land masses). See [Map styles](#map-styles). |
 | **Shape** | How the map is laid out. Galaxy and Theatre offer **Scattered**, **Spiral**, **Clusters** and **Ring**. The Galaxy style calls the first two **Scattered disc** and **Spiral arms**, and also offers **Real stars**, the real systems around Sol at their true positions. Cities and Territories shape the land instead: **One continent** that runs off one to three sides of the map, a **Coast** with land on one side of a long shoreline, **Two continents** across a strait, an **Archipelago** of islands, an **Inland sea** with land all round it, or **Landlocked** land with lakes and no sea. Land may run off the edge of the map, and the strategic map draws a darker mirror image of the map beyond its edge. **Surprise me** picks one from the seed. Every shape stays fully connected. |
+| **Planet** | Cities and Territories only. Which world the land is on. See [Planets](#planets). **Surprise me** picks one from the seed. |
 | **Map size** | How many locations the map has: Small (12), Medium (18), Large (28), Sprawling (40), Vast (56), Immense (80). Two larger sizes unlock with the threat levels. With Real stars this field is **Radius from Sol** instead, and every real system inside the radius is on the map. |
 | **Opposition** | One to three enemy factions. Each gets its own capital, spread far from yours. |
 | **Threat level** | How hard the opposing factions press. Higher levels unlock by winning. |
@@ -56,6 +57,28 @@ Choose the style as **Map style** when generating. An authored map sets it throu
 Theatre changes only how the map looks. Cities and Territories also change the shape of the map, because the locations sit on land and are joined by roads, borders and sea crossings. The rules for taking a location are the same in all four.
 
 A challenge code carries the style, so whoever imports it plays the same map. A code made on a Cities or Territories map needs a Coilbox new enough to know those styles. An older one reads it as a Galaxy.
+
+### Planets
+
+A Cities or Territories map is built on one of seven planets. The planet decides the ground, the sea and whether the sea can be crossed. It does not change the rules.
+
+- **Temperate** has grassland, forest, desert, tundra and snowy mountains round a blue sea.
+- **Desert** has dunes, rock flats, mesas and scrub, with salt pans in its low basins and a little water.
+- **Ice** has snowfields, bare ice and tundra. Its sea is a frozen sheet.
+- **Red** has red dust and dark basalt. Its sea is a dry basin.
+- **Moon** has grey regolith and craters. Its sea is the dark maria.
+- **Volcanic** has dark basalt and ash round a sea of lava.
+- **Acid** has dull yellow and brown ground and brown forest round a green acid sea.
+
+Each kind of ground is drawn with its own surface as you zoom in: dune ridges, cracked salt, cratered regolith, blocks of basalt, a crust on the lava and cracks and ridges in the sea ice. Performance mode draws the plain colours without it.
+
+The planet also decides what its settlements look like. Temperate, Desert and Ice are settled in the open: towns of small roofs along curving streets, with sheds at the edge and taller blocks in the middle of a large one. Red, Moon, Volcanic and Acid have sealed outposts: domes and long modules joined by tubes, with landing pads, solar arrays and greenhouses beside them. Roads follow suit. A sealed planet has wheel ruts, graded ways and a transit tube into each capital where an open one has dirt tracks and surfaced roads. A place where many roads meet grows into a city, and one at the end of a single track stays an outpost.
+
+Towns farm the land round them where it can be farmed. Grassland gets a green patchwork with hedges. Desert's scrub gets dry country's farming: irrigated plots, fallow ones, olive groves and vineyards, with tracks between them. Nothing is farmed on dunes, on Temperate or on Desert.
+
+Nothing crosses lava or acid, so a Volcanic or Acid map is one land mass and offers four shapes: **One continent**, **Coast**, **Inland sea** and **Landlocked**. On the other planets a crossing joins the land masses. It is a shipping lane over water, and a solid track over ice, a dry basin or the maria.
+
+A map made before planets existed is Temperate. A challenge code carries the planet. A Coilbox from before planets ignores it and builds the Temperate map of the same seed, which for Volcanic and Acid can be a different land.
 
 ### Playing a hand-made map
 

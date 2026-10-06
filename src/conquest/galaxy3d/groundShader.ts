@@ -1,11 +1,13 @@
 import * as THREE from "three";
+import type { Settlement } from "../planets";
 
 /**
  * Roads painted into the terrain sheet, added to its shader by
  * `terrainShader.ts`. The road mask (`roadMask.ts`) says how far each point
  * lies from the nearest road and which road it is. From that the shader draws
  * a narrow track with a soft, worn edge and a slight cut into the ground, in
- * the road's surface, and over it the road's state: an owner's edge lines, a
+ * the road's surface as the planet has it (`Settlement.roads` in
+ * `planets.ts`), and over it the road's state: an owner's edge lines, a
  * glow along a road the player can attack along, a road already travelled
  * filled in. A road hidden by fog is not drawn at all.
  *
@@ -32,6 +34,8 @@ export interface GroundShading {
   roadReach: number;
   /** The sheet's half width and half depth, then its width and depth. */
   frame: THREE.Vector4;
+  /** The planet's roads (`Settlement.roads` in `planets.ts`). */
+  roads: Settlement["roads"];
 }
 
 /**
@@ -64,11 +68,11 @@ uniform vec2 uRoadMaskSize;
 uniform float uRoadReach;
 uniform vec4 uGroundFrame;
 
-// Track colours, linear, from the least used surface to the most: sRGB
-// (222, 206, 170), (196, 190, 178) and (104, 104, 106).
-const vec3 G_TRACK = vec3(0.730, 0.617, 0.402);
-const vec3 G_GRAVEL = vec3(0.552, 0.514, 0.445);
-const vec3 G_PAVED = vec3(0.138, 0.138, 0.144);
+// The planet's road surfaces, linear, from the least used to the most, and
+// whether they are a sealed planet's: wheel ruts, a graded way and a transit
+// tube, in place of a dirt track, a minor road and a surfaced main road.
+uniform vec3 uRoadTone[3];
+uniform float uRoadSealed;
 `;
 
 /**
@@ -114,7 +118,7 @@ vec4 gGlow = vec4(0.0);
       float d = gDist * uRoadReach;
       float surf = idx.g;
       // Half the track's width in world units: a dirt track is the narrowest.
-      float hw = mix(0.055, 0.085, surf);
+      float hw = mix(0.055, 0.085, surf) * (1.0 + 0.3 * uRoadSealed);
       // Close in, worn edges where the width wanders a little along the
       // road, and ruts and dust so the track is never one flat colour.
       float keepNear = tKeep(0.15, gFoot);
@@ -124,7 +128,10 @@ vec4 gGlow = vec4(0.0);
         wob = (tNoise(gp * 7.0).x - 0.5) * keepNear;
         grain = (tNoise(gp * 23.0 + 5.0).x - 0.5) * keepNear;
       }
-      hw *= 1.0 + 0.45 * wob;
+      // Only a dirt track's edge wanders. A laid road's is straight.
+      bool gTube = uRoadSealed > 0.5 && surf > 0.75;
+      bool gRuts = uRoadSealed > 0.5 && surf < 0.25;
+      hw *= 1.0 + 0.45 * wob * (1.0 - surf);
       // Never thinner than a pixel and a half, and fainter when held there,
       // so a far road reads as a fine line and not a band.
       float hwMin = 0.75 * gFoot;
@@ -133,13 +140,25 @@ vec4 gGlow = vec4(0.0);
       float cover = 1.0 - smoothstep(hwE - soft, hwE + soft, d);
       cover *= mix(1.0, 0.7, smoothstep(hw, hw * 2.5, hwMin)) * gFade;
 
-      vec3 track = surf < 0.5 ? mix(G_TRACK, G_GRAVEL, surf * 2.0) : mix(G_GRAVEL, G_PAVED, surf * 2.0 - 1.0);
-      track *= 1.0 + grain * 0.35;
+      vec3 track = surf < 0.5 ? mix(uRoadTone[0], uRoadTone[1], surf * 2.0) : mix(uRoadTone[1], uRoadTone[2], surf * 2.0 - 1.0);
+      track *= 1.0 + grain * 0.35 * (gTube ? 0.0 : 1.0);
+      if (gRuts) {
+        // Two wheel ruts pressed into the ground, which shows between them.
+        float rut = 1.0 - smoothstep(0.18 * hw, 0.4 * hw, abs(d - 0.6 * hw));
+        cover *= mix(0.7, 0.4 + 0.6 * rut, tKeep(hw, gFoot));
+        track = mix(albedo * 0.45, track, 0.5);
+      }
       // Worn ground beside the track, paler and drier than what grows there.
-      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover);
+      // Nothing grows beside a sealed planet's, so it has none.
+      float verge = (1.0 - smoothstep(hwE, hwE * 2.8 + gFoot, d)) * (1.0 - cover) * (1.0 - uRoadSealed);
       vec3 worn = mix(albedo, track * 0.85 + albedo * 0.15, 0.35);
       albedo = mix(albedo, worn, verge * 0.55 * tKeep(0.2, gFoot) * gFade);
       albedo = mix(albedo, track, cover * 0.95);
+      // A line down the middle of a surfaced road.
+      if (uRoadSealed < 0.5) {
+        float lineW = hw * 0.1;
+        albedo = mix(albedo, vec3(0.75, 0.72, 0.6), (1.0 - smoothstep(lineW, lineW + gFoot, d)) * smoothstep(0.75, 1.0, surf) * tKeep(hw * 0.6, gFoot) * 0.8);
+      }
 
       // A slight cut: the ground falls into the track at its edges, so one
       // side catches the sun and the other is in shade.
@@ -152,8 +171,16 @@ vec4 gGlow = vec4(0.0);
           texture2D(uRoadDistance, gUv + du).r - texture2D(uRoadDistance, gUv - du).r,
           texture2D(uRoadDistance, gUv + dv).r - texture2D(uRoadDistance, gUv - dv).r
         ) * uRoadReach / (2.0 * texelW);
-        float edge = smoothstep(hwE * 0.5, hwE, d) * (1.0 - smoothstep(hwE, hwE * 1.8, d));
-        n = normalize(n - vec3(grad.x, 0.0, grad.y) * edge * 0.6 * keepCut);
+        if (gTube) {
+          // A tube lies on the ground: round on top, with shade beside it
+          // on the side away from the sun.
+          n = normalize(n + vec3(grad.x, 0.0, grad.y) * (d / hwE) * cover * 0.9 * keepCut);
+          float away = clamp(-dot(normalize(grad + 1e-5), normalize(uTerrainSun.xz)), 0.0, 1.0);
+          albedo *= 1.0 - 0.4 * away * (1.0 - cover) * (1.0 - smoothstep(hwE, hwE * 2.4, d)) * keepCut;
+        } else {
+          float edge = smoothstep(hwE * 0.5, hwE, d) * (1.0 - smoothstep(hwE, hwE * 1.8, d));
+          n = normalize(n - vec3(grad.x, 0.0, grad.y) * edge * 0.6 * keepCut);
+        }
       }
 
       // The road's state, over the lit ground.
@@ -192,5 +219,17 @@ export function groundUniforms(
     uRoadMaskSize: { value: new THREE.Vector2(...ground.roadMaskSize) },
     uRoadReach: { value: ground.roadReach },
     uGroundFrame: { value: ground.frame },
+    uRoadTone: {
+      value: [ground.roads.track, ground.roads.minor, ground.roads.main].map(
+        (rgb) =>
+          new THREE.Color().setRGB(
+            rgb[0] / 255,
+            rgb[1] / 255,
+            rgb[2] / 255,
+            THREE.SRGBColorSpace,
+          ),
+      ),
+    },
+    uRoadSealed: { value: ground.roads.look === "sealed" ? 1 : 0 },
   };
 }

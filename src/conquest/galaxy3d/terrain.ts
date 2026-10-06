@@ -365,8 +365,12 @@ export function terrainNormalPixels(
     width: surface.worldWidth,
     depth: surface.worldDepth,
   },
+  /** Finer heights of the same size to take the slopes from. `grid`'s when
+   * left out. The height in alpha is always `grid`'s. */
+  slopes: HeightGrid = grid,
 ): Uint8Array {
-  const { width, height, data } = grid;
+  const { width, height } = grid;
+  const data = slopes.data;
   const out = new Uint8Array(width * height * 4);
   const toWorld = surface.heightScale * surface.scale;
   const stepX = span.width / Math.max(1, width - 1);
@@ -394,7 +398,7 @@ export function terrainNormalPixels(
       out[o] = byte(-slopeX / length);
       out[o + 1] = byte(1 / length);
       out[o + 2] = byte(-slopeZ / length);
-      out[o + 3] = Math.round(clamp01(data[y * width + x]) * 255);
+      out[o + 3] = Math.round(clamp01(grid.data[y * width + x]) * 255);
     }
   }
   return out;

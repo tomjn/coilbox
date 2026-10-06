@@ -7,6 +7,7 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
+import { planetOf } from "../planets";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
@@ -39,7 +40,7 @@ import {
   VIEW_FOV_DEGREES,
 } from "./terrain";
 import { type TerrainPixels, useTerrainHeights } from "./terrainLoad";
-import { buildTerrainMesh, isColorPixels } from "./terrainMesh";
+import { buildTerrainMesh } from "./terrainMesh";
 import { paintsTowns } from "./townGate";
 import { buildTownLayer, type TownLayer, townsOnRoads } from "./townLayer";
 import type { Town } from "./towns";
@@ -511,6 +512,7 @@ export function GalaxyView({
   const terrainSpec = terrainSpecOf(galaxy);
   const terrainColor = terrainPixels?.color;
   const terrainExtension = terrainPixels?.extension;
+  const terrainBiomes = terrainPixels?.biomes;
   const { ready: terrainReady, grid: terrainHeights } = useTerrainHeights(
     terrainSpec,
     terrainPixels?.height,
@@ -608,6 +610,7 @@ export function GalaxyView({
           : undefined,
         drawTowns,
         crossingPlan?.landLinks,
+        terrainBiomes?.planet,
       );
       if (planned.towns) {
         towns = buildTownLayer(
@@ -616,9 +619,7 @@ export function GalaxyView({
           surface,
           ground,
           planned.towns,
-          terrainColor && isColorPixels(terrainColor)
-            ? terrainColor
-            : undefined,
+          terrainBiomes,
           !terrainColor,
         );
       }
@@ -632,6 +633,7 @@ export function GalaxyView({
         !performanceMode,
         terrainExtension,
         ground.shading,
+        terrainBiomes,
       );
       // Scenery. It loads in the background and never holds the map up.
       if (galaxy.models?.length && !modelSources?.pending) {
@@ -838,6 +840,8 @@ export function GalaxyView({
                 : undefined,
             }),
             crossingPlan && ground ? { plan: crossingPlan, ground } : undefined,
+            terrainBiomes?.planet !== undefined &&
+              planetOf(terrainBiomes.planet).sea.crossing === "solid",
           )
         : undefined;
 
@@ -1575,6 +1579,7 @@ export function GalaxyView({
     terrainHeights,
     terrainColor,
     terrainExtension,
+    terrainBiomes,
     modelSources,
   ]);
 

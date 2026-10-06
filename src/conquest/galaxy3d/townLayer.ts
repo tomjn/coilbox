@@ -1,16 +1,19 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
+import { planetOf } from "../planets";
 import type { GroundLayer } from "./groundLayer";
 import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
 import type { TerrainSurface } from "./terrain";
-import type { ColorPixels } from "./terrainMesh";
+import type { BiomePixels } from "./terrainMesh";
 import { TOWN_STATE_ROWS, townMaterial } from "./townShader";
 import {
   anyTexelNear,
   buildableAt,
   buildTownIndex,
   clipRoads,
+  dryFarmColour,
+  dryFarmShare,
   farmableAt,
   fieldCell,
   planTowns,
@@ -87,11 +90,11 @@ export function buildTownLayer(
   surface: TerrainSurface,
   ground: Pick<GroundLayer, "shading">,
   towns: Town[],
-  /** The map's picture, which says where fields can go. Left out, none do. */
-  picture?: ColorPixels,
+  /** The map's biome weights, which say where fields can go. Left out, none do. */
+  biomes?: BiomePixels,
   /**
-   * With no picture to read, put fields on any buildable ground, for a
-   * hand-made map whose painted picture has no known palette.
+   * With no weights to read, put fields on any buildable ground, for a
+   * hand-made map, which has no biome weights to say where fields go.
    */
   fieldsAnywhere = false,
 ): TownLayer {
@@ -105,17 +108,34 @@ export function buildTownLayer(
     sea,
     SLOPE_STEP,
   );
+  // A map with no planet, which is a hand-made one, is settled as Temperate.
+  const settlement = planetOf(biomes?.planet ?? "temperate").settlement;
+  const flat = (x: number, z: number) =>
+    Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15));
+  // What lies round a town goes on farm ground for fields, and on any flat
+  // ground for a sealed outpost's works.
+  const outskirts =
+    settlement.outskirts === "none"
+      ? undefined
+      : settlement.outskirts === "works"
+        ? flat
+        : biomes
+          ? farmableAt(
+              biomes,
+              surface.worldWidth,
+              surface.worldDepth,
+              buildable,
+            )
+          : fieldsAnywhere
+            ? flat
+            : undefined;
   const index = buildTownIndex(
     towns,
     surface.worldWidth,
     surface.worldDepth,
     undefined,
     buildable,
-    picture
-      ? farmableAt(picture, surface.worldWidth, surface.worldDepth, buildable)
-      : fieldsAnywhere
-        ? (x, z) => Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15))
-        : undefined,
+    outskirts,
   );
   // The town in each texel is read exactly, and the ground's fitness blended.
   const indexTexture = new THREE.DataTexture(
@@ -186,7 +206,35 @@ export function buildTownLayer(
     town: patchGeometry((k, x, z, half) => townCells[k](x, z, half)),
     fields: patchGeometry((k, x, z, half) => fieldCells[k](x, z, half)),
   };
+  // Where the farm ground is dry, for the fields' look. None on a map with
+  // no weights.
+  const dry = new THREE.DataTexture(
+    biomes ? dryFarmShare(biomes) : new Uint8Array(1),
+    biomes?.width ?? 1,
+    biomes?.height ?? 1,
+    THREE.RedFormat,
+  );
+  dry.flipY = false;
+  dry.magFilter = THREE.LinearFilter;
+  dry.minFilter = THREE.LinearFilter;
+  dry.needsUpdate = true;
+  const dryRgb = (biomes && dryFarmColour(biomes.planet)) ?? [0, 0, 0];
+  const clearing = planetOf(biomes?.planet ?? "temperate").clearing;
   const shading = {
+    settlement,
+    garden: new THREE.Color().setRGB(
+      clearing[0] / 255,
+      clearing[1] / 255,
+      clearing[2] / 255,
+      THREE.SRGBColorSpace,
+    ),
+    dry,
+    dryGround: new THREE.Color().setRGB(
+      dryRgb[0] / 255,
+      dryRgb[1] / 255,
+      dryRgb[2] / 255,
+      THREE.SRGBColorSpace,
+    ),
     index: indexTexture,
     indexSize: [index.width, index.height] as [number, number],
     data,
@@ -195,7 +243,7 @@ export function buildTownLayer(
     roadReach: ground.shading.roadReach,
     frame: ground.shading.frame,
   };
-  disposables.push(indexTexture, data, stateTexture);
+  disposables.push(indexTexture, data, stateTexture, dry);
   // The fields first, under an owner's tint like the rest of the land, then
   // the town over the tint.
   for (const layer of ["fields", "town"] as const) {

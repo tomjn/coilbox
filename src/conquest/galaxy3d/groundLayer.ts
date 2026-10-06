@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
+import { type PlanetId, planetOf } from "../planets";
 import {
   type GroundShading,
   ROAD_MODE,
@@ -82,6 +83,11 @@ export function buildGroundLayer(
    * are roads as well. See `CrossingPlan.landLinks`.
    */
   landLinks: readonly RoadLink[] = [],
+  /**
+   * The planet, whose roads these are. Left out for a map with none, which
+   * is a hand-made one, and gets Temperate's.
+   */
+  planet: PlanetId = "temperate",
 ): GroundLayer {
   const grid = routeGrid(
     surface.width,
@@ -173,6 +179,7 @@ export function buildGroundLayer(
       roadMaskSize: [mask.width, mask.height],
       roadState,
       roadReach: ROAD_REACH,
+      roads: planetOf(planet).settlement.roads,
       frame: new THREE.Vector4(
         surface.worldWidth / 2,
         surface.worldDepth / 2,

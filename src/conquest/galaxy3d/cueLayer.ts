@@ -145,6 +145,8 @@ export function buildCueLayer(
       | "firstProvince"
     >;
   },
+  /** Draw the crossings over the sea as solid lines, for a sea that is not liquid. */
+  solidCrossings = false,
 ): CueLayer {
   const nodeIndex = new Map(galaxy.nodes.map((n, i) => [n.id, i]));
   /** A node id as a province's node index, or -1 for a point location. */
@@ -349,7 +351,7 @@ export function buildCueLayer(
     geo.setAttribute("aColor", crossingColors);
     geo.setAttribute("aStyle", crossingStyles);
     geo.setIndex(stripIndex);
-    const mat = crossingMaterial(CROSSING_WIDTH, PLAIN_COLOR);
+    const mat = crossingMaterial(CROSSING_WIDTH, PLAIN_COLOR, solidCrossings);
     disposables.push(geo, mat);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = "map-crossings";

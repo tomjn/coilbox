@@ -13,6 +13,7 @@ export const GENERATE_CHOICES_KEY = "conquest.generate.choices";
 export interface GenerateChoices {
   style: MapSkin;
   layout: string;
+  planet: string;
   size: string;
   radius: string;
   factions: string;
@@ -38,6 +39,7 @@ export function readGenerateChoices(stored: unknown): Partial<GenerateChoices> {
   }
   for (const key of [
     "layout",
+    "planet",
     "size",
     "radius",
     "factions",

@@ -1,48 +1,48 @@
-continent-12-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=6ddd3b68
-continent-18-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=177a6f58
-continent-28-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=d847cf15
-continent-40-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=10b215ab
-continent-56-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=9129276f
-continent-80-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=b74b1976
-continent-120-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=7c4ecd93
-continent-160-seed1 land=8caa1720 heightmap=41c51516 image=30d2ef06 doc=d1fba9ca
-coast-12-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=61db109a
-coast-18-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=cd680506
-coast-28-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=ec65182d
-coast-40-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=a1c3f022
-coast-56-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=c63a3e6a
-coast-80-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=f47df91c
-coast-120-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=ba962d07
-coast-160-seed1 land=b65af387 heightmap=e823c31d image=a7062408 doc=ad75c48c
-continents-12-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=16f9f7f2
-continents-18-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=79114a8f
-continents-28-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=bfcaf69d
-continents-40-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=31857fd1
-continents-56-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=8d5a8cd4
-continents-80-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=7f3d5dd3
-continents-120-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=983ccb8f
-continents-160-seed1 land=04e2c511 heightmap=04b5280b image=ff91feb7 doc=38a1295f
-archipelago-12-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=228dc039
-archipelago-18-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=c362c772
-archipelago-28-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=98cdac8f
-archipelago-40-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=b2ba8b96
-archipelago-56-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=4ea4f6da
-archipelago-80-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=388493e4
-archipelago-120-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=ffeb9f4a
-archipelago-160-seed1 land=2204c311 heightmap=751dce6d image=706e06e2 doc=430136b8
-inlandsea-12-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=f7b968a8
-inlandsea-18-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=ead6d3ee
-inlandsea-28-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=3a76480b
-inlandsea-40-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=2ae78a22
-inlandsea-56-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=fb1ccef1
-inlandsea-80-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=b490b712
-inlandsea-120-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=7b704300
-inlandsea-160-seed1 land=6f028c30 heightmap=c0a61be9 image=9868f533 doc=2755bd56
-landlocked-12-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=90ed8014
-landlocked-18-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=d92c71ec
-landlocked-28-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=516ccfe6
-landlocked-40-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=143c2aad
-landlocked-56-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=853547b2
-landlocked-80-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=338eb3a6
-landlocked-120-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=971f4305
-landlocked-160-seed1 land=baa9527e heightmap=f86227c9 image=b4e35189 doc=868655c9
+continent-12-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=6ddd3b68
+continent-18-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=177a6f58
+continent-28-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=d847cf15
+continent-40-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=10b215ab
+continent-56-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=9129276f
+continent-80-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=b74b1976
+continent-120-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=7c4ecd93
+continent-160-seed1 land=8caa1720 heightmap=41c51516 image=dc366d97 biomesA=306b6409 biomesB=a40d5a70 doc=d1fba9ca
+coast-12-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=61db109a
+coast-18-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=cd680506
+coast-28-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=ec65182d
+coast-40-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=a1c3f022
+coast-56-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=c63a3e6a
+coast-80-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=f47df91c
+coast-120-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=ba962d07
+coast-160-seed1 land=b65af387 heightmap=e823c31d image=b3a23ba1 biomesA=1a401817 biomesB=759fdda9 doc=ad75c48c
+continents-12-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=16f9f7f2
+continents-18-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=79114a8f
+continents-28-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=bfcaf69d
+continents-40-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=31857fd1
+continents-56-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=8d5a8cd4
+continents-80-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=7f3d5dd3
+continents-120-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=983ccb8f
+continents-160-seed1 land=04e2c511 heightmap=04b5280b image=08c184d4 biomesA=db331cc0 biomesB=f7847a52 doc=38a1295f
+archipelago-12-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=228dc039
+archipelago-18-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=c362c772
+archipelago-28-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=98cdac8f
+archipelago-40-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=b2ba8b96
+archipelago-56-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=4ea4f6da
+archipelago-80-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=388493e4
+archipelago-120-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=ffeb9f4a
+archipelago-160-seed1 land=2204c311 heightmap=751dce6d image=448ffeac biomesA=8d393348 biomesB=fcb6995c doc=430136b8
+inlandsea-12-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=f7b968a8
+inlandsea-18-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=ead6d3ee
+inlandsea-28-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=3a76480b
+inlandsea-40-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=2ae78a22
+inlandsea-56-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=fb1ccef1
+inlandsea-80-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=b490b712
+inlandsea-120-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=7b704300
+inlandsea-160-seed1 land=6f028c30 heightmap=c0a61be9 image=28b3a975 biomesA=2d262b23 biomesB=99a0d426 doc=2755bd56
+landlocked-12-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=90ed8014
+landlocked-18-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=d92c71ec
+landlocked-28-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=516ccfe6
+landlocked-40-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=143c2aad
+landlocked-56-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=853547b2
+landlocked-80-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=338eb3a6
+landlocked-120-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=971f4305
+landlocked-160-seed1 land=baa9527e heightmap=f86227c9 image=c273e1ba biomesA=a159b0d8 biomesB=07eebb65 doc=868655c9

@@ -1,3 +1,6 @@
+import { farmsDry, type PlanetId, planetOf } from "../planets";
+import type { BiomePixels } from "./terrainMesh";
+
 /**
  * Towns painted into a terrain map's ground: where each one stands, how big
  * it is and which way it runs, and the two small textures the terrain shader
@@ -195,14 +198,21 @@ export interface TownSite {
 }
 
 /**
- * Design values, in world units. A town reaches {@link TOWN_RADIUS}, a
- * capital {@link CAPITAL_RADIUS}, and each road into a place adds
- * {@link RADIUS_PER_ROAD} up to four roads. None reaches further than a share
- * of the way to its nearest neighbour, so two towns never run together.
+ * Design values, in world units, and first guesses. A place with no roads
+ * and no luck is an outpost of {@link OUTPOST_RADIUS}, and the busiest
+ * junction a city of {@link CITY_RADIUS}. A capital reaches
+ * {@link CAPITAL_RADIUS} and each road into it adds {@link RADIUS_PER_ROAD},
+ * up to four roads. None reaches further than a share of the way to its
+ * nearest neighbour, so two towns never run together.
  */
-export const TOWN_RADIUS = 1.8;
-export const CAPITAL_RADIUS = 3;
-const RADIUS_PER_ROAD = 0.3;
+export const OUTPOST_RADIUS = 0.8;
+export const CITY_RADIUS = 3;
+export const CAPITAL_RADIUS = 3.6;
+const RADIUS_PER_ROAD = 0.2;
+/** A place with this many roads or more is as big as its roads can make it. */
+const BUSY_ROADS = 5;
+/** How much of a town's size comes from its roads. The rest is chance. */
+const ROAD_SHARE = 0.65;
 const NEIGHBOUR_SHARE = 0.3;
 const CAPITAL_NEIGHBOUR_SHARE = 0.38;
 /** The most a town is stretched along its roads. */
@@ -308,14 +318,18 @@ export function planTowns(sites: TownSite[], seed: number): Town[] {
         Math.hypot(other.x - site.x, other.z - site.z),
       );
     });
-    const want =
-      (site.capital ? CAPITAL_RADIUS : TOWN_RADIUS) +
-      RADIUS_PER_ROAD * Math.min(4, site.roads.length);
+    const own = unit(seed, node);
+    // Most places are small and a few are large, so the rank is squared.
+    const rank =
+      ROAD_SHARE * Math.min(1, site.roads.length / BUSY_ROADS) +
+      (1 - ROAD_SHARE) * unit(seed ^ 0x5bd1e995, node);
+    const want = site.capital
+      ? CAPITAL_RADIUS + RADIUS_PER_ROAD * Math.min(4, site.roads.length)
+      : OUTPOST_RADIUS + (CITY_RADIUS - OUTPOST_RADIUS) * rank * rank;
     const radius = Math.min(
       want,
       nearest * (site.capital ? CAPITAL_NEIGHBOUR_SHARE : NEIGHBOUR_SHARE),
     );
-    const own = unit(seed, node);
     const { axis, strength } =
       site.roads.length > 0
         ? roadAxis(site.roads)
@@ -379,67 +393,74 @@ export function buildableAt(
 }
 
 /**
- * The generator's biome colours (`terrainGen.ts`) in sRGB, and whether
- * fields are laid on each: grassland and dry ground yes, forest, tundra,
- * rock, scree, sand and snow no.
- */
-const BIOMES: [number, number, number, boolean][] = [
-  [122, 154, 84, true],
-  [182, 168, 116, true],
-  [58, 98, 56, false],
-  [146, 146, 122, false],
-  [122, 106, 90, false],
-  [152, 146, 140, false],
-  [214, 200, 150, false],
-  [240, 240, 240, false],
-];
-
-/** Whether the biome nearest to a picture colour is one fields are laid on. */
-export function farmBiome(r: number, g: number, b: number): boolean {
-  let best = Number.POSITIVE_INFINITY;
-  let farm = false;
-  for (const [br, bg, bb, ok] of BIOMES) {
-    const d = (r - br) ** 2 + (g - bg) ** 2 + (b - bb) ** 2;
-    if (d < best) {
-      best = d;
-      farm = ok;
-    }
-  }
-  return farm;
-}
-
-/**
- * How fit the ground at world `x, z` is for fields, 0 to 1: grassland or dry
- * ground in the map's picture, which covers the sheet `worldWidth` by
- * `worldDepth`, and flat, by `buildable`. Fields want flatter ground than
- * houses, so only fully buildable ground counts.
+ * How fit the ground at world `x, z` is for fields, 0 to 1: farm ground in
+ * the generator's biome weights, which cover the sheet `worldWidth` by
+ * `worldDepth`, and flat, by `buildable`. A texel is farm ground when its farm
+ * slots hold half the weight or more. Fields want flatter ground than houses,
+ * so only fully buildable ground counts.
  */
 export function farmableAt(
-  picture: { data: ArrayLike<number>; width: number; height: number },
+  biomes: BiomePixels,
   worldWidth: number,
   worldDepth: number,
   buildable: (x: number, z: number) => number,
 ): (x: number, z: number) => number {
+  const farmSlots = planetOf(biomes.planet)
+    .biomes.map((biome, slot) => (biome.farm ? slot : -1))
+    .filter((slot) => slot >= 0);
   return (x, z) => {
     const i = Math.min(
-      picture.width - 1,
+      biomes.width - 1,
       Math.max(
         0,
-        Math.floor(((x + worldWidth / 2) / worldWidth) * picture.width),
+        Math.floor(((x + worldWidth / 2) / worldWidth) * biomes.width),
       ),
     );
     const j = Math.min(
-      picture.height - 1,
+      biomes.height - 1,
       Math.max(
         0,
-        Math.floor(((z + worldDepth / 2) / worldDepth) * picture.height),
+        Math.floor(((z + worldDepth / 2) / worldDepth) * biomes.height),
       ),
     );
-    const o = (j * picture.width + i) * 4;
-    const { data } = picture;
-    if (!farmBiome(data[o], data[o + 1], data[o + 2])) return 0;
+    const o = (j * biomes.width + i) * 4;
+    let farm = 0;
+    for (const slot of farmSlots) {
+      farm += slot < 4 ? biomes.a[o + slot] : biomes.b[o + slot - 4];
+    }
+    if (farm < 128) return 0;
     return Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15));
   };
+}
+
+/**
+ * The share of each texel's weight that lies in dry farm slots
+ * (`farmsDry` in `planets.ts`), a byte a texel, at the weights' own size.
+ * The field shader draws dry country's farming where it is high.
+ */
+export function dryFarmShare(biomes: BiomePixels): Uint8Array {
+  const slots = planetOf(biomes.planet)
+    .biomes.map((biome, slot) => (farmsDry(biome) ? slot : -1))
+    .filter((slot) => slot >= 0);
+  const out = new Uint8Array(biomes.width * biomes.height);
+  for (let i = 0; i < out.length; i++) {
+    let dry = 0;
+    for (const slot of slots) {
+      dry += slot < 4 ? biomes.a[i * 4 + slot] : biomes.b[i * 4 + slot - 4];
+    }
+    out[i] = Math.min(255, dry);
+  }
+  return out;
+}
+
+/**
+ * The colour of a planet's dry farm ground in sRGB, 0 to 255: its first dry
+ * farm slot's. Undefined when it has none.
+ */
+export function dryFarmColour(
+  planet: PlanetId,
+): [number, number, number] | undefined {
+  return planetOf(planet).biomes.find(farmsDry)?.colour;
 }
 
 /** Design values: towns build on slopes up to 1 in 5 and thin out by 1 in 2.5. */

@@ -124,6 +124,8 @@ import {
   useHandmadeMap,
   useHandmadeMaps,
 } from "../handmade/useHandmadeMaps";
+import type { LandPicture } from "../landJob";
+import { generateMapOffThread, landPreviewOffThread } from "../landJobs";
 import { generateMap, locationNoun, MAP_STYLE_OPTIONS } from "../mapStyle";
 import {
   type ConquestState,
@@ -132,17 +134,18 @@ import {
   type MapSkin,
 } from "../model";
 import { mergeConquestNames } from "../names";
+import { isPlanetId, PLANETS, planetOf } from "../planets";
 import {
   DEFAULT_RADIUS_LY,
   RADIUS_CHOICES,
   systemCountWithin,
 } from "../realstars";
-import type { GeneratedTerrain } from "../terrainGen";
-import { generatedTerrain } from "../territories";
+import { landLayoutsFor } from "../terrainGen";
 import { sizeOptions, startPositionUnlocked, unlockedLevel } from "../unlocks";
 import { useConquestUnlocks } from "../useUnlocks";
 import { GalaxyPreview2D } from "./components/GalaxyPreview2D";
 import { MapErrorList } from "./components/MapErrorList";
+import { PlanetSwatch } from "./components/PlanetSwatch";
 import { StartPositionSelect } from "./components/StartPositionSelect";
 import { ThreatLevelSelect } from "./components/ThreatLevelSelect";
 
@@ -1131,13 +1134,30 @@ const LAND_LAYOUT_OPTIONS = [
   { value: "inlandsea", label: "Inland sea" },
   { value: "landlocked", label: "Landlocked" },
 ];
-/** The shapes a style offers. */
-const layoutOptionsFor = (style: MapSkin) =>
-  style === "galaxy"
-    ? LAYOUT_OPTIONS
-    : isLandSkin(style)
-      ? LAND_LAYOUT_OPTIONS
-      : PLAIN_LAYOUT_OPTIONS;
+/** Surprise me, then each planet with a chip of its colours. */
+const PLANET_OPTIONS = [
+  {
+    value: "random",
+    label: "Surprise me",
+    icon: <PlanetSwatch planet="random" />,
+  },
+  ...PLANETS.map((id) => ({
+    value: id,
+    label: planetOf(id).label,
+    icon: <PlanetSwatch planet={id} />,
+  })),
+];
+/** The shapes a style offers. A land style on a planet whose sea cannot be
+ * crossed offers only the single-mass shapes. */
+const layoutOptionsFor = (style: MapSkin, planet: string) => {
+  if (style === "galaxy") return LAYOUT_OPTIONS;
+  if (!isLandSkin(style)) return PLAIN_LAYOUT_OPTIONS;
+  if (!isPlanetId(planet)) return LAND_LAYOUT_OPTIONS;
+  const offered: readonly string[] = landLayoutsFor(planet);
+  return LAND_LAYOUT_OPTIONS.filter(
+    (o) => o.value === "random" || offered.includes(o.value),
+  );
+};
 /** How long the form waits after the last change before it builds a land
  * preview. A choice, not a measurement: long enough that typing a seed builds
  * one map and not one per digit. */
@@ -1172,10 +1192,11 @@ function startingOptions(
 }
 
 /** A land preview, and the options it was built from, as text. */
-interface LandPreview {
+interface KeyedLandPreview {
   key: string;
-  doc: GalaxyDoc;
-  terrain: GeneratedTerrain | null;
+  /** Null when these options could not be built into a map. */
+  doc: GalaxyDoc | null;
+  picture: LandPicture | null;
 }
 
 /** Where the wizard keeps the game it was last used with. */
@@ -1324,7 +1345,12 @@ function GenerateGalaxyForm({
   // A remembered choice the form does not offer now, such as a size or level
   // this game has not unlocked, goes back to the default.
   const style: MapSkin = choices.style ?? "galaxy";
-  const layout = offeredOr(choices.layout, layoutOptionsFor(style), "random");
+  const planet = offeredOr(choices.planet, PLANET_OPTIONS, "random");
+  const layout = offeredOr(
+    choices.layout,
+    layoutOptionsFor(style, planet),
+    "random",
+  );
   const radius = offeredOr(
     choices.radius,
     RADIUS_OPTIONS,
@@ -1383,6 +1409,7 @@ function GenerateGalaxyForm({
       nodeCount,
       factionCount: Number(factions),
       layout: layout as GenerateOptions["layout"],
+      ...(land ? { planet: planet as GenerateOptions["planet"] } : {}),
       radiusLy: Number(radius),
       skin: style,
       startingSystems:
@@ -1402,6 +1429,8 @@ function GenerateGalaxyForm({
       nodeCount,
       factions,
       layout,
+      land,
+      planet,
       radius,
       realStars,
       style,
@@ -1425,33 +1454,39 @@ function GenerateGalaxyForm({
       return null;
     }
   }, [genOptions, land, canPreview]);
-  // Land is slower to build, so it waits until the form has been still for a
-  // moment. The last preview stays up, dimmed, until the new one replaces it.
+  // Land is slower to build, so it is built off the main thread once the form
+  // has been still for a moment. The last preview stays up, dimmed, until the
+  // new one replaces it.
   // Keyed on the options as text, so a preview is rebuilt when a value
   // changes and never because an equal object was made again.
-  const [landPreview, setLandPreview] = useState<LandPreview | null>(null);
+  const [landPreview, setLandPreview] = useState<KeyedLandPreview | null>(null);
   const landKey = useMemo(
     () => (land && canPreview ? JSON.stringify(genOptions("preview")) : null),
     [genOptions, land, canPreview],
   );
   useEffect(() => {
     if (landKey === null) return;
+    let cancelled = false;
     const timer = setTimeout(() => {
-      try {
-        const doc = generateMap(JSON.parse(landKey) as GenerateOptions);
-        setLandPreview({
-          key: landKey,
-          doc,
-          terrain: generatedTerrain(doc),
-        });
-      } catch {
-        setLandPreview(null);
-      }
+      landPreviewOffThread(JSON.parse(landKey) as GenerateOptions).then(
+        (built) => {
+          if (!cancelled) setLandPreview({ key: landKey, ...built });
+        },
+        () => {
+          if (!cancelled) {
+            setLandPreview({ key: landKey, doc: null, picture: null });
+          }
+        },
+      );
     }, LAND_PREVIEW_DELAY_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [landKey]);
   const preview = land ? (landPreview?.doc ?? null) : pointPreview;
   const previewStale = land && landPreview?.key !== landKey;
+  const previewFailed = land && !previewStale && landPreview?.doc === null;
   // Not knowing yet is not the same as having none: while the installed engines
   // are being read, the form waits rather than telling the player to install one.
   const blocked: ReactNode =
@@ -1519,7 +1554,7 @@ function GenerateGalaxyForm({
     setError(null);
     try {
       const id = `generated-${crypto.randomUUID()}`;
-      const doc = generateMap(genOptions(id));
+      const doc = await generateMapOffThread(genOptions(id));
       await conquestSave({ id, json: JSON.stringify(doc) });
       // A game reached from game detail is remembered too, not only one picked
       // in the select.
@@ -1527,6 +1562,7 @@ function GenerateGalaxyForm({
       setRemembered({
         style,
         layout,
+        planet,
         size,
         radius,
         factions,
@@ -1621,12 +1657,22 @@ function GenerateGalaxyForm({
                   />
                 )}
               </div>
+              {land && (
+                <div className="flex flex-col gap-1.5 text-sm">
+                  <span className="font-medium">Planet</span>
+                  <OptionSelect
+                    value={planet}
+                    onValueChange={(planet) => choose({ planet })}
+                    options={PLANET_OPTIONS}
+                  />
+                </div>
+              )}
               <div className="flex flex-col gap-1.5 text-sm">
                 <span className="font-medium">Shape</span>
                 <OptionSelect
                   value={layout}
                   onValueChange={(layout) => choose({ layout })}
-                  options={layoutOptionsFor(style)}
+                  options={layoutOptionsFor(style, planet)}
                 />
               </div>
               <div className="flex flex-col gap-1.5 text-sm">
@@ -1728,17 +1774,29 @@ function GenerateGalaxyForm({
                     <div className={previewStale ? "opacity-50" : undefined}>
                       <GalaxyPreview2D
                         galaxy={preview}
-                        terrain={land ? landPreview?.terrain : undefined}
+                        picture={land ? landPreview?.picture : undefined}
                       />
                     </div>
                   ) : null}
-                  {land && (previewStale || !preview) && (
-                    <span
-                      className="text-xs text-muted-foreground"
-                      role="status"
-                    >
-                      Building the preview…
+                  {previewFailed ? (
+                    <span className="text-xs text-muted-foreground">
+                      These choices could not be built into a map. Try another
+                      seed.
                     </span>
+                  ) : (
+                    land &&
+                    (previewStale || !preview) && (
+                      <span
+                        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                        role="status"
+                      >
+                        <Loader2
+                          className="size-3.5 motion-safe:animate-spin"
+                          aria-hidden
+                        />
+                        Building the preview…
+                      </span>
+                    )
                   )}
                   {preview &&
                     !previewStale &&
@@ -1760,6 +1818,12 @@ function GenerateGalaxyForm({
                 onClick={create}
                 disabled={busy || !selected || factsLoading || aiNote !== null}
               >
+                {busy && (
+                  <Loader2
+                    className="mr-1.5 size-4 motion-safe:animate-spin"
+                    aria-hidden
+                  />
+                )}
                 {busy ? "Generating…" : "Create map"}
               </Button>
             </>

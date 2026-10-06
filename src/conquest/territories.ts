@@ -6,6 +6,7 @@ import {
   repairConnectivity,
 } from "./generate";
 import type { GalaxyDoc, LinkKind } from "./model";
+import { resolvePlanet } from "./planets";
 import { mulberry32, type Rng } from "./rng";
 import {
   coarseNoise,
@@ -695,7 +696,7 @@ export function generateTerritories(
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
   const count = generatedNodeCount(opts);
-  const terrain = landTerrain(opts.seed, opts.layout, count, rng);
+  const terrain = landTerrain(opts.seed, opts.layout, count, rng, opts.planet);
   const provinces = generateProvinces(terrain, count, rng);
   const doc = assembleGalaxy(
     opts,
@@ -718,7 +719,11 @@ export function generateTerritories(
     ...doc,
     description: `A generated map of ${doc.nodes.length} provinces.`,
     theme: { skin: "territories" },
-    generated: doc.generated && { ...doc.generated, skin: "territories" },
+    generated: doc.generated && {
+      ...doc.generated,
+      skin: "territories",
+      ...(opts.planet ? { planet: opts.planet } : {}),
+    },
     nodes: doc.nodes.map((node, i) => ({
       ...node,
       outline: [provinces.outlines[i]],
@@ -748,9 +753,16 @@ export function landTerrain(
   layout: GenerateOptions["layout"],
   locations: number,
   rng: Rng,
+  planet?: GenerateOptions["planet"],
 ): GeneratedTerrain {
-  const shape = resolveLandLayout(layout, rng);
-  return generateTerrain({ seed, shape, maxMasses: locations });
+  const resolved = resolvePlanet(planet, seed);
+  const shape = resolveLandLayout(layout, rng, resolved);
+  return generateTerrain({
+    seed,
+    shape,
+    maxMasses: locations,
+    planet: resolved,
+  });
 }
 
 /**
@@ -762,7 +774,13 @@ export function landTerrain(
 export function generatedTerrain(doc: GalaxyDoc): GeneratedTerrain | null {
   const g = generatedLand(doc);
   return g
-    ? landTerrain(g.seed, g.layout, doc.nodes.length, mulberry32(g.seed))
+    ? landTerrain(
+        g.seed,
+        g.layout,
+        doc.nodes.length,
+        mulberry32(g.seed),
+        g.planet,
+      )
     : null;
 }
 
@@ -776,11 +794,23 @@ export function generatedTerrainWithMargin(
 ): { terrain: GeneratedTerrain; margin: TerrainMargin } | null {
   const g = generatedLand(doc);
   if (!g) return null;
-  const shape = resolveLandLayout(g.layout, mulberry32(g.seed));
+  const planet = resolvePlanet(g.planet, g.seed);
+  const shape = resolveLandLayout(g.layout, mulberry32(g.seed), planet);
   return generateTerrainWithMargin(
-    { seed: g.seed, shape, maxMasses: doc.nodes.length },
+    { seed: g.seed, shape, maxMasses: doc.nodes.length, planet },
     marginPixels,
   );
+}
+
+/**
+ * Everything a generated document's land is built from, as text. Two documents
+ * with the same key have the same land. Null when the land is not generated.
+ */
+export function generatedLandKey(doc: GalaxyDoc): string | null {
+  const g = generatedLand(doc);
+  return g
+    ? JSON.stringify([g.seed, g.layout, g.planet, doc.nodes.length])
+    : null;
 }
 
 /** A document's generation settings, when its land is generated. */

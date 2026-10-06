@@ -8,6 +8,7 @@ import {
   reconcileState,
   wrapGalaxyForExport,
 } from "./model";
+import { generatedTerrain, generateTerritories } from "./territories";
 
 function galaxy(overrides: Partial<GalaxyDoc> = {}): GalaxyDoc {
   return {
@@ -61,6 +62,44 @@ function galaxy(overrides: Partial<GalaxyDoc> = {}): GalaxyDoc {
 }
 
 describe("parseGalaxyJson", () => {
+  it("opens a save with a planet nobody defined as Temperate", () => {
+    const opts = {
+      seed: 5,
+      game: { shortname: "TG" },
+      maps: [{ name: "M", width: 8, height: 8 }],
+      nodeCount: 12,
+      factionCount: 2,
+    };
+    const plain = generateTerritories(opts, "t0");
+    const unknown = {
+      ...plain,
+      generated: { ...plain.generated, planet: "pluto" },
+    } as unknown as GalaxyDoc;
+    const want = generatedTerrain(plain);
+    const parsed = parseGalaxyJson(JSON.stringify(unknown));
+    if (!parsed || !want) throw new Error("expected a generated map");
+    // Through the parser the unknown planet is dropped.
+    const viaParser = generatedTerrain(parsed);
+    expect(viaParser?.planet).toBe("temperate");
+    expect(viaParser?.land).toEqual(want.land);
+    expect(viaParser?.heightmap).toEqual(want.heightmap);
+    // Without the parser, resolvePlanet is the last line of defence.
+    const direct = generatedTerrain(unknown);
+    expect(direct?.planet).toBe("temperate");
+    expect(direct?.land).toEqual(want.land);
+    expect(direct?.heightmap).toEqual(want.heightmap);
+  });
+
+  it("keeps a known planet and drops an unknown one", () => {
+    const planetOf = (planet: string) =>
+      parseGalaxyJson(
+        JSON.stringify(galaxy({ generated: { seed: 1, planet } as never })),
+      )?.generated?.planet;
+    expect(planetOf("moon")).toBe("moon");
+    expect(planetOf("random")).toBe("random");
+    expect(planetOf("pluto")).toBeUndefined();
+  });
+
   it("round-trips a valid doc", () => {
     const doc = galaxy();
     expect(parseGalaxyJson(JSON.stringify(doc))).toEqual(doc);

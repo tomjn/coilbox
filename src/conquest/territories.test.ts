@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateGalaxy } from "./generate";
 import { type GalaxyDoc, parseGalaxyJson } from "./model";
+import { resolvePlanet } from "./planets";
 import { mulberry32 } from "./rng";
 import { BASE_SIZES, LARGE_SIZES } from "./size";
 import {
@@ -35,6 +36,71 @@ const base: TerritoriesOptions = {
   nodeCount: 24,
   factionCount: 2,
 };
+
+describe("the planet of a generated territories map", () => {
+  it("writes no planet when none was asked for", () => {
+    expect("planet" in (generateTerritories(base).generated ?? {})).toBe(false);
+  });
+
+  it("builds the land of the planet it stores", () => {
+    const doc = generateTerritories({ ...base, planet: "red" });
+    expect(doc.generated?.planet).toBe("red");
+    expect(generatedTerrain(doc)?.planet).toBe("red");
+  });
+
+  it("gives a Volcanic map of the largest size no crossings", () => {
+    const count = Math.max(...LARGE_SIZES.map((s) => s.count));
+    const doc = generateTerritories({
+      ...base,
+      nodeCount: count,
+      planet: "volcanic",
+      layout: "random",
+    });
+    expect(
+      (doc.linkKinds ?? []).every(([, , kind]) => kind !== "crossing"),
+    ).toBe(true);
+    const next = new Map<string, string[]>();
+    for (const [a, b] of doc.links) {
+      next.set(a, [...(next.get(a) ?? []), b]);
+      next.set(b, [...(next.get(b) ?? []), a]);
+    }
+    const seen = new Set([doc.nodes[0].id]);
+    const queue = [doc.nodes[0].id];
+    while (queue.length > 0) {
+      for (const id of next.get(queue.pop() as string) ?? []) {
+        if (!seen.has(id)) {
+          seen.add(id);
+          queue.push(id);
+        }
+      }
+    }
+    expect(seen.size).toBe(doc.nodes.length);
+  });
+
+  it("does not let the way the planet was picked move the land", () => {
+    let seed = 0;
+    while (seed < 500 && resolvePlanet("random", seed) !== "desert") seed++;
+    expect(resolvePlanet("random", seed)).toBe("desert");
+    const random = generatedTerrain(
+      generateTerritories({ ...base, seed, planet: "random" }),
+    );
+    const named = generatedTerrain(
+      generateTerritories({ ...base, seed, planet: "desert" }),
+    );
+    expect(random?.planet).toBe("desert");
+    expect(random?.land).toEqual(named?.land);
+    expect(random?.heightmap).toEqual(named?.heightmap);
+    expect(random?.planet).toEqual(named?.planet);
+  });
+
+  it("does not let the planet choice move the land", () => {
+    const a = generatedTerrain(
+      generateTerritories({ ...base, planet: "desert" }),
+    );
+    const b = generatedTerrain(generateTerritories(base));
+    expect(a?.land).toEqual(b?.land);
+  });
+});
 
 const SHAPES: TerrainShape[] = [...LAND_LAYOUTS];
 

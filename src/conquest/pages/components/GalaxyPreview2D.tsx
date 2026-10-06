@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
+import type { LandPicture } from "../../landJob";
 import type { GalaxyDoc, LinkKind, MapSkin } from "../../model";
 import { NEUTRAL } from "../../model";
-import type { GeneratedTerrain } from "../../terrainGen";
 
 const NEUTRAL_COLOR = "#94a3b8";
 /** Shown under a land map until its picture is drawn, and where it cannot be. */
@@ -13,7 +13,7 @@ const SEA_COLOR = "#183a60";
  * and capitals in faction colours. The wizard regenerates this on every knob
  * change, which would be wasteful with the three.js view.
  *
- * A document with a terrain is drawn as land. `terrain` is the generator's own
+ * A document with a terrain is drawn as land. `picture` is the generator's own
  * picture of it, the one the strategic map is given, so the coast here is the
  * coast the player then plays on. Over it go the province outlines, tinted by
  * owner, and the links that are not a shared border: roads solid, crossings
@@ -29,12 +29,12 @@ export function previewLabel(skin: MapSkin | undefined): string {
 
 export function GalaxyPreview2D({
   galaxy,
-  terrain,
+  picture,
 }: {
   galaxy: GalaxyDoc;
   /** The pixels of a generated land map. Without them the land has no picture
    * and only the outlines, links and markers are drawn. */
-  terrain?: GeneratedTerrain | null;
+  picture?: LandPicture | null;
 }) {
   const land = galaxy.terrain;
   const view = useMemo(() => {
@@ -104,18 +104,18 @@ export function GalaxyPreview2D({
 
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
-    const ctx = terrain ? canvas.current?.getContext("2d") : null;
-    if (!terrain || !ctx) return;
+    const ctx = picture ? canvas.current?.getContext("2d") : null;
+    if (!picture || !ctx) return;
     ctx.putImageData(
       new ImageData(
-        new Uint8ClampedArray(terrain.image),
-        terrain.width,
-        terrain.height,
+        new Uint8ClampedArray(picture.image),
+        picture.width,
+        picture.height,
       ),
       0,
       0,
     );
-  }, [terrain]);
+  }, [picture]);
 
   const lane = land ? "#e2e8f0" : "#334155";
   const svg = (
@@ -177,11 +177,11 @@ export function GalaxyPreview2D({
         background: SEA_COLOR,
       }}
     >
-      {terrain && (
+      {picture && (
         <canvas
           ref={canvas}
-          width={terrain.width}
-          height={terrain.height}
+          width={picture.width}
+          height={picture.height}
           className="absolute inset-0 size-full"
           aria-hidden
         />

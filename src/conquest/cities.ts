@@ -4,6 +4,7 @@ import {
   generatedNodeCount,
 } from "./generate";
 import type { GalaxyDoc, LinkKind } from "./model";
+import { planetOf, resolvePlanet } from "./planets";
 import { mulberry32 } from "./rng";
 import type { GeneratedTerrain } from "./terrainGen";
 import { type DividedLand, divideLand, landTerrain } from "./territories";
@@ -18,7 +19,8 @@ import { type DividedLand, divideLand, landTerrain } from "./territories";
  * low ground near the coast, well inside the region. Two cities whose regions
  * share a border can be joined by a road, and a road is left out where it
  * would cross high mountains, cross the sea or pass another city, as long as
- * every city can still be reached. Land masses are joined by sea crossings.
+ * every city can still be reached. Land masses are joined by sea crossings,
+ * except on a planet whose sea nothing can cross, where no link is a crossing.
  * Capitals, factions, starting territory, difficulty and battle maps come from
  * the shared `assembleGalaxy`.
  *
@@ -110,12 +112,15 @@ function pixelsBetween(width: number, a: number, b: number): number[] {
  * candidate road. The candidates that read badly are dropped one at a time
  * while the cities stay connected: first a road that passes closer to a third
  * city than to either end, which would read as two roads, then one over high
- * mountains, highest first.
+ * mountains, highest first. Where `sealed` is set (the sea cannot be crossed)
+ * a road over water is dropped before any of those, the wettest first. One that
+ * cannot be dropped stays a plain road, and no land mass crossings are added.
  */
 function chooseRoads(
   terrain: GeneratedTerrain,
   land: DividedLand,
   sites: number[],
+  sealed: boolean,
 ): { roads: [number, number][]; kinds: LinkKind[] } {
   const { width, heightmap } = terrain;
   const xy = (p: number): Pt => {
@@ -146,6 +151,7 @@ function chooseRoads(
     return { pair: [a, b] as [number, number], top, wet, crowded };
   });
 
+  const crossings = sealed ? [] : land.crossings;
   const keep = candidates.map(() => true);
   const connectedWithout = (skip: number) => {
     const parent = sites.map((_, i) => i);
@@ -168,14 +174,17 @@ function chooseRoads(
     candidates.forEach((c, i) => {
       if (keep[i] && i !== skip) join(c.pair);
     });
-    for (const pair of land.crossings) join(pair);
+    for (const pair of crossings) join(pair);
     return groups === 1;
   };
+  const wetFirst = (c: { wet: number }) => sealed && c.wet > WET_ROAD;
   const order = candidates
     .map((c, i) => ({ c, i }))
-    .filter(({ c }) => c.crowded || c.top > MOUNTAIN_ROAD)
+    .filter(({ c }) => wetFirst(c) || c.crowded || c.top > MOUNTAIN_ROAD)
     .sort(
       (x, y) =>
+        Number(wetFirst(y.c)) - Number(wetFirst(x.c)) ||
+        (wetFirst(x.c) ? y.c.wet - x.c.wet : 0) ||
         Number(y.c.crowded) - Number(x.c.crowded) ||
         y.c.top - x.c.top ||
         x.i - y.i,
@@ -189,9 +198,9 @@ function chooseRoads(
   candidates.forEach((c, i) => {
     if (!keep[i]) return;
     roads.push(c.pair);
-    kinds.push(c.wet > WET_ROAD ? "crossing" : "road");
+    kinds.push(c.wet > WET_ROAD && !sealed ? "crossing" : "road");
   });
-  for (const pair of land.crossings) {
+  for (const pair of crossings) {
     roads.push(pair);
     kinds.push("crossing");
   }
@@ -210,10 +219,12 @@ export function generateCities(
 ): GalaxyDoc {
   const rng = mulberry32(opts.seed);
   const count = generatedNodeCount(opts);
-  const terrain = landTerrain(opts.seed, opts.layout, count, rng);
+  const terrain = landTerrain(opts.seed, opts.layout, count, rng, opts.planet);
   const land = divideLand(terrain, count, rng);
   const sites = citySites(terrain, land);
-  const { roads, kinds } = chooseRoads(terrain, land, sites);
+  const sealed =
+    planetOf(resolvePlanet(opts.planet, opts.seed)).sea.crossing === "none";
+  const { roads, kinds } = chooseRoads(terrain, land, sites, sealed);
   const scale = terrain.mapWidth / terrain.width;
   const doc = assembleGalaxy(
     opts,
@@ -234,7 +245,11 @@ export function generateCities(
     ...doc,
     description: `A generated map of ${doc.nodes.length} cities.`,
     theme: { skin: "cities" },
-    generated: doc.generated && { ...doc.generated, skin: "cities" },
+    generated: doc.generated && {
+      ...doc.generated,
+      skin: "cities",
+      ...(opts.planet ? { planet: opts.planet } : {}),
+    },
     terrain: {
       image: GENERATED_CITIES_IMAGE,
       heightmap: GENERATED_CITIES_IMAGE,

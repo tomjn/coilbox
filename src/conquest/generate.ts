@@ -21,6 +21,7 @@ import {
   resolveConquestNames,
   resolveLandNames,
 } from "./names";
+import type { PlanetId } from "./planets";
 import { DEFAULT_RADIUS_LY, systemsWithin } from "./realstars";
 import { hashString, mulberry32, pick, type Rng } from "./rng";
 import { MAX_NODE_COUNT } from "./size";
@@ -150,6 +151,9 @@ export interface GenerateOptions {
    * of their own, and `generateMap` in `./mapStyle` picks between them.
    */
   skin?: MapSkin;
+  /** Land styles only: the planet the land is built as, or `random` to pick
+   * one from the seed. Absent builds the Temperate map. */
+  planet?: PlanetId | "random";
   /**
    * Starting systems per faction (1..4): the capital plus that many minus one
    * nearest neighbours. Omitted keeps the capital plus *all* its neighbours.

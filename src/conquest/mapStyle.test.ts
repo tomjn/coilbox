@@ -126,6 +126,15 @@ describe("regenerateGalaxy and the map style", () => {
     });
   }
 
+  it("keeps the planet on a reroll", () => {
+    const doc = generateMap(
+      { ...base, skin: "territories", planet: "ice" },
+      NOW,
+    );
+    const re = regenerateGalaxy(doc, { maps }, 999, "t1");
+    expect(re?.generated?.planet).toBe("ice");
+  });
+
   it("keeps a centre start through a reroll", () => {
     const doc = generateMap({ ...base, startPosition: "centre" }, NOW);
     const re = regenerateGalaxy(doc, { maps }, 999, "t1");
@@ -224,6 +233,18 @@ describe("drawsAsGalaxy", () => {
 describe("generatedTerrainPixels", () => {
   it("is undefined for a map with no generated land", () => {
     expect(generatedTerrainPixels(generateMap(base, NOW))).toBeUndefined();
+  });
+
+  it("hands the view the weights and the planet", () => {
+    const px = generatedTerrainPixels(
+      generateTerritories({ ...base, planet: "ice" }),
+    );
+    expect(px?.biomes?.planet).toBe("ice");
+    expect(px?.biomes?.a.length).toBe(512 * 512 * 4);
+    const image = px?.extension?.image;
+    expect(px?.extension?.biomes?.a.length).toBe(
+      (image?.width ?? 0) * (image?.height ?? 0) * 4,
+    );
   });
 
   for (const skin of LAND) {

@@ -563,7 +563,7 @@ export function provinceStyle(input: ProvinceStyleInput): ProvinceStyle {
       showMarkers: false,
     };
   }
-  let opacity = input.neutral ? 0.22 : 0.42;
+  let opacity = input.neutral ? 0.14 : 0.26;
   let lighten = 0;
   // The player's own province is the one under incursion, and one they can
   // attack is never theirs, so the two accents do not meet in play. The
