@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import type { GalaxyDoc } from "../model";
+import { planetOf } from "../planets";
 import type { GroundLayer } from "./groundLayer";
 import type { RoadLine } from "./roadMask";
 import { sceneSeed } from "./roadNetwork";
@@ -107,17 +108,34 @@ export function buildTownLayer(
     sea,
     SLOPE_STEP,
   );
+  // A map with no planet, which is a hand-made one, is settled as Temperate.
+  const settlement = planetOf(biomes?.planet ?? "temperate").settlement;
+  const flat = (x: number, z: number) =>
+    Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15));
+  // What lies round a town goes on farm ground for fields, and on any flat
+  // ground for a sealed outpost's works.
+  const outskirts =
+    settlement.outskirts === "none"
+      ? undefined
+      : settlement.outskirts === "works"
+        ? flat
+        : biomes
+          ? farmableAt(
+              biomes,
+              surface.worldWidth,
+              surface.worldDepth,
+              buildable,
+            )
+          : fieldsAnywhere
+            ? flat
+            : undefined;
   const index = buildTownIndex(
     towns,
     surface.worldWidth,
     surface.worldDepth,
     undefined,
     buildable,
-    biomes
-      ? farmableAt(biomes, surface.worldWidth, surface.worldDepth, buildable)
-      : fieldsAnywhere
-        ? (x, z) => Math.min(1, Math.max(0, (buildable(x, z) - 0.85) / 0.15))
-        : undefined,
+    outskirts,
   );
   // The town in each texel is read exactly, and the ground's fitness blended.
   const indexTexture = new THREE.DataTexture(
@@ -201,7 +219,15 @@ export function buildTownLayer(
   dry.minFilter = THREE.LinearFilter;
   dry.needsUpdate = true;
   const dryRgb = (biomes && dryFarmColour(biomes.planet)) ?? [0, 0, 0];
+  const clearing = planetOf(biomes?.planet ?? "temperate").clearing;
   const shading = {
+    settlement,
+    garden: new THREE.Color().setRGB(
+      clearing[0] / 255,
+      clearing[1] / 255,
+      clearing[2] / 255,
+      THREE.SRGBColorSpace,
+    ),
     dry,
     dryGround: new THREE.Color().setRGB(
       dryRgb[0] / 255,
