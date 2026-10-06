@@ -197,12 +197,13 @@ const ICE: Planet = {
   ],
   clearing: [238, 242, 246],
   climate: { wet: 0, cold: 0.6 },
-  weights(h, wet, _cold, out) {
+  weights(h, wet, cold, out) {
     out.fill(0);
     const t = ramp(wet, 0.3, 0.4);
     out[0] = 1 - t;
     out[1] = t;
-    blend(out, 2, 1 - ramp(h, 0.2, 0.2));
+    // Tundra shows through where it is mildest and never takes over.
+    blend(out, 2, 1 - cold);
     blend(out, 3, ramp(h, 0.42, 0.15));
     blend(out, 0, ramp(h, 0.84, 0.08));
   },
