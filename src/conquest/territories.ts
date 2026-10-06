@@ -802,6 +802,17 @@ export function generatedTerrainWithMargin(
   );
 }
 
+/**
+ * Everything a generated document's land is built from, as text. Two documents
+ * with the same key have the same land. Null when the land is not generated.
+ */
+export function generatedLandKey(doc: GalaxyDoc): string | null {
+  const g = generatedLand(doc);
+  return g
+    ? JSON.stringify([g.seed, g.layout, g.planet, doc.nodes.length])
+    : null;
+}
+
 /** A document's generation settings, when its land is generated. */
 function generatedLand(doc: GalaxyDoc): GalaxyDoc["generated"] | null {
   const g = doc.generated;
