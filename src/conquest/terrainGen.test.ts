@@ -8,6 +8,7 @@ import {
   landColour,
   landLayoutsFor,
   resolveLandLayout,
+  seaRampOf,
 } from "./terrainGen";
 
 const opts = { seed: 11, shape: "continent" as const };
@@ -39,6 +40,55 @@ describe("planet terrain", () => {
       if ((moon.heightmap[i] === 0) !== (moon.land[i] === 0)) wrong++;
     expect(wrong).toBe(0);
   });
+
+  it("craters the Moon's maria in the picture and leaves its heights at sea level", () => {
+    const S = 512;
+    const moon = planetOf("moon");
+    const ramp = seaRampOf(moon);
+    const t = generateTerrain({
+      seed: 11,
+      shape: "continents",
+      planet: "moon",
+    });
+    let raised = 0;
+    let open = 0;
+    let shaded = 0;
+    for (let i = 0; i < S * S; i++) {
+      if (t.land[i]) continue;
+      if (t.heightmap[i] !== 0) raised++;
+      if (t.coastDistance[i] <= 6) continue;
+      open++;
+      const rgb = ramp[Math.min(108, t.coastDistance[i])];
+      const want = new Uint8ClampedArray(1);
+      want[0] = rgb[0];
+      if (t.image[i * 4] !== want[0]) shaded++;
+    }
+    expect(raised).toBe(0);
+    expect(open).toBeGreaterThan(0);
+    expect(shaded).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("does not shade the sea on a planet without craters", () => {
+    const S = 512;
+    for (const planet of ["temperate", "ice"] as const) {
+      const ramp = seaRampOf(planetOf(planet));
+      const t = generateTerrain({ seed: 11, shape: "continents", planet });
+      let open = 0;
+      let wrong = 0;
+      for (let i = 0; i < S * S; i++) {
+        if (t.land[i] || t.coastDistance[i] <= 6) continue;
+        open++;
+        const rgb = ramp[Math.min(108, t.coastDistance[i])];
+        const want = new Uint8ClampedArray(3);
+        want[0] = rgb[0];
+        want[1] = rgb[1];
+        want[2] = rgb[2];
+        for (let c = 0; c < 3; c++) if (t.image[i * 4 + c] !== want[c]) wrong++;
+      }
+      expect(open, planet).toBeGreaterThan(0);
+      expect(wrong, planet).toBe(0);
+    }
+  }, 60_000);
 
   it("leaves the Moon's edge rows and columns as they were", () => {
     const S = 512;

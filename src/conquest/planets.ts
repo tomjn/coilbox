@@ -272,8 +272,8 @@ const MOON: Planet = {
   },
   sea: {
     look: "maria",
-    shallow: [86, 88, 96],
-    deep: [58, 60, 68],
+    shallow: [88, 90, 96],
+    deep: [80, 82, 88],
     crossing: "solid",
   },
   craters: true,

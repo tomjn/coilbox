@@ -711,7 +711,7 @@ function labelRegions(
 const SEA_DEPTH = 108;
 const SEA_RAMPS = new Map<PlanetId, Rgb[]>();
 /** A planet's sea colours by distance from the coast, worked out once per planet. */
-function seaRampOf(planet: Planet): Rgb[] {
+export function seaRampOf(planet: Planet): Rgb[] {
   let ramp = SEA_RAMPS.get(planet.id);
   if (!ramp) {
     const { shallow, deep } = planet.sea;
@@ -936,7 +936,50 @@ const CRATER_RIM = 20;
  * and they stay from 1 to 255.
  */
 function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
-  const rng = mulberry32(hashString(`craters:${seed >>> 0}`));
+  stampCraterField(`craters:${seed >>> 0}`, land, 1, (i, delta) => {
+    heightmap[i] = Math.max(1, Math.min(255, heightmap[i] + delta));
+  });
+}
+
+/**
+ * Relief for the sea pixels of a cratered planet, and 0 on land. It uses the
+ * crater count, radii, tries and profile of {@link stampCraters}, with a
+ * stream of its own. The heightmap never sees it. It only shades the picture,
+ * so the maria read as cratered ground while the sea stays at byte 0.
+ */
+function mariaRelief(seed: number, land: Uint8Array): Float64Array {
+  const relief = new Float64Array(S * S);
+  stampCraterField(`mariacraters:${seed >>> 0}`, land, 0, (i, delta) => {
+    relief[i] += delta;
+  });
+  return relief;
+}
+
+/**
+ * Depth of a crater profile, in height bytes, at `u`: the squared distance
+ * from the centre over the squared radius. Zero past 1.2 of the radius.
+ */
+function craterDelta(u: number): number {
+  if (u < 0.64) return Math.floor(-CRATER_DEPTH * (1 - u / 0.64));
+  if (u < 1.44) {
+    const s = (u - 0.64) / 0.8;
+    return Math.floor(CRATER_RIM * 4 * s * (1 - s));
+  }
+  return 0;
+}
+
+/**
+ * Draw the craters from the stream named `stream` and hand each change to
+ * `apply` with the pixel index. A centre must be a pixel where `land` equals
+ * `onLand`, and only pixels of that kind are passed on.
+ */
+function stampCraterField(
+  stream: string,
+  land: Uint8Array,
+  onLand: 0 | 1,
+  apply: (i: number, delta: number) => void,
+) {
+  const rng = mulberry32(hashString(stream));
   for (let n = 0; n < CRATER_COUNT; n++) {
     const radius =
       CRATER_MIN_RADIUS +
@@ -947,7 +990,7 @@ function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
     for (let t = 0; t < CRATER_TRIES; t++) {
       const x = radius + 2 + Math.floor(rng() * room);
       const y = radius + 2 + Math.floor(rng() * room);
-      if (land[y * S + x]) {
+      if ((land[y * S + x] ? 1 : 0) === onLand) {
         cx = x;
         cy = y;
         break;
@@ -963,19 +1006,9 @@ function stampCraters(seed: number, land: Uint8Array, heightmap: Uint8Array) {
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
         const i = y * S + x;
-        if (!land[i]) continue;
+        if ((land[i] ? 1 : 0) !== onLand) continue;
         const u = ((x - cx) * (x - cx) + (y - cy) * (y - cy)) / r2;
-        let delta = 0;
-        if (u < 0.64) {
-          delta = -CRATER_DEPTH * (1 - u / 0.64);
-        } else if (u < 1.44) {
-          const s = (u - 0.64) / 0.8;
-          delta = CRATER_RIM * 4 * s * (1 - s);
-        }
-        heightmap[i] = Math.max(
-          1,
-          Math.min(255, heightmap[i] + Math.floor(delta)),
-        );
+        apply(i, craterDelta(u));
       }
     }
   }
@@ -1147,6 +1180,7 @@ function buildTerrain(opts: TerrainOptions): {
     );
   }
   if (planet.craters) stampCraters(opts.seed, land, heightmap);
+  const relief = planet.craters ? mariaRelief(opts.seed, land) : null;
 
   // Climate, for colour alone.
   const wetField = coarseNoise(S, S, 130, wetSeed, 3);
@@ -1202,6 +1236,14 @@ function buildTerrain(opts: TerrainOptions): {
         shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
       } else {
         rgb = seaRamp[Math.min(SEA_DEPTH, coastDistance[i])];
+        if (relief) {
+          // The maria are lit the same way, from their crater relief.
+          const nw = relief[(y > 0 ? y - 1 : 0) * S + (x > 0 ? x - 1 : 0)];
+          const se =
+            relief[(y < S - 1 ? y + 1 : y) * S + (x < S - 1 ? x + 1 : x)];
+          shade = 1 + (se - nw) * 0.03;
+          shade = shade < 0.75 ? 0.75 : shade > 1.25 ? 1.25 : shade;
+        }
       }
       // The clamped array rounds half to even on the way in.
       image[i * 4] = rgb[0] * shade;
