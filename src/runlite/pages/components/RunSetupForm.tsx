@@ -46,6 +46,11 @@ import { loadoutById, unlockedLoadouts, unlocksFor } from "../../meta";
 import type { RunLength, RunSkin } from "../../model";
 import { useRunMeta, useRuns } from "../../runs";
 import {
+  readSetupChoices,
+  SETUP_CHOICES_KEY,
+  type SetupChoices,
+} from "../../setupChoices";
+import {
   buildGraphFor,
   setupLimitNote,
   setupLimitWarning,
@@ -104,14 +109,27 @@ export function RunSetupForm({
     setGameName(name);
     setLastGame(name);
   };
+  // What the form remembers from the last run started. What the player changes
+  // in this session is in `picked`, because the stored setting only reaches the
+  // form again the next time it opens.
+  const [remembered, setRemembered] = useSetting<unknown>(
+    SETUP_CHOICES_KEY,
+    {},
+  );
+  const saved = readSetupChoices(remembered);
+  const [picked, setPicked] = useState<Partial<SetupChoices>>({});
+  const choices = { ...saved, ...picked };
+  const choose = (patch: Partial<SetupChoices>) => {
+    setPicked((p) => ({ ...p, ...patch }));
+    setRemembered({ ...saved, ...picked, ...patch });
+  };
   const [sideName, setSideName] = useState("");
-  const [length, setLength] = useState<RunLength>("standard");
-  const [difficulty, setDifficulty] = useState(2);
-  const [ascension, setAscension] = useState(0);
-  const [skin, setSkin] = useState<RunSkin>("galaxy");
+  const length = choices.length ?? "standard";
+  const difficulty = choices.difficulty ?? 2;
+  const skin: RunSkin = choices.skin ?? "galaxy";
   // The hand-made map picked in place of a generated style, by its id.
-  const [pickedMapId, setPickedMapId] = useState<string | null>(null);
-  const [pickedLoadoutId, setLoadoutId] = useState("standard");
+  const pickedMapId = choices.mapId ?? null;
+  const pickedLoadoutId = choices.loadout ?? "standard";
   const { headers: gameHeaders } = useUnitsyncGameHeaders(
     target?.enginePath,
     target?.dataDir,
@@ -141,6 +159,10 @@ export function RunSetupForm({
     ? pickedLoadoutId
     : "standard";
   const ascensionTier = unlocks.ascensionTier;
+  // A tier this game has not reached goes back to none.
+  const rememberedAscension = choices.ascension ?? 0;
+  const ascension =
+    rememberedAscension <= ascensionTier ? rememberedAscension : 0;
   // The hand-made maps for this game whose author marked a Warpath start and
   // goal. A map with neither is offered only in Conquest.
   // Read for this game alone, and the map style waits on it so a game that hides
@@ -204,9 +226,10 @@ export function RunSetupForm({
   });
   useEffect(() => {
     if (sides.length > 0 && !sides.some((s) => s.name === sideName)) {
-      setSideName(sides[0].name);
+      // The remembered side, when this game has one of that name.
+      setSideName((sides.find((s) => s.name === saved.side) ?? sides[0]).name);
     }
-  }, [sides, sideName]);
+  }, [sides, sideName, saved.side]);
 
   const side = sides.find((s) => s.name === sideName);
 
@@ -255,11 +278,20 @@ export function RunSetupForm({
     setStartError(null);
     // A game reached from game detail is remembered too, not only one picked here.
     setLastGame(game.name);
+    setRemembered({
+      skin,
+      mapId: pickedMapId,
+      side: sideName || undefined,
+      length,
+      difficulty,
+      ascension,
+      loadout: loadoutId,
+    });
     const opts: GenerateRunOpts = {
       seed: Math.floor(Math.random() * 1e9),
       length,
       difficulty,
-      ascension: Math.min(ascension, ascensionTier),
+      ascension,
       // The archive the player picked, by its full name, so every battle
       // launches it and not another archive sharing the shortname (#3465).
       game: {
@@ -335,7 +367,11 @@ export function RunSetupForm({
             <ToggleGroup
               type="single"
               value={sideName}
-              onValueChange={(v) => v && setSideName(v)}
+              onValueChange={(v) => {
+                if (!v) return;
+                setSideName(v);
+                choose({ side: v });
+              }}
               className="flex-wrap justify-start gap-2"
             >
               {sides.map((s) => (
@@ -372,7 +408,7 @@ export function RunSetupForm({
           <ToggleGroup
             type="single"
             value={loadoutId}
-            onValueChange={(v) => v && setLoadoutId(v)}
+            onValueChange={(v) => v && choose({ loadout: v })}
             className="flex-wrap justify-start gap-2"
           >
             {loadouts.map((l) => (
@@ -390,7 +426,7 @@ export function RunSetupForm({
           <ToggleGroup
             type="single"
             value={length}
-            onValueChange={(v) => v && setLength(v as RunLength)}
+            onValueChange={(v) => v && choose({ length: v as RunLength })}
             className="justify-start gap-2"
           >
             {(["quick", "standard", "long"] as const).map((l) => (
@@ -418,7 +454,7 @@ export function RunSetupForm({
           max={5}
           step={1}
           value={[difficulty]}
-          onValueChange={([v]) => setDifficulty(v)}
+          onValueChange={([v]) => choose({ difficulty: v })}
           className="py-2"
         />
       </Field>
@@ -438,10 +474,9 @@ export function RunSetupForm({
               value={handmadeMap ? `${HANDMADE_PREFIX}${handmadeMap.id}` : skin}
               onValueChange={(v) => {
                 if (v.startsWith(HANDMADE_PREFIX)) {
-                  setPickedMapId(v.slice(HANDMADE_PREFIX.length));
+                  choose({ mapId: v.slice(HANDMADE_PREFIX.length) });
                 } else {
-                  setPickedMapId(null);
-                  setSkin(v as RunSkin);
+                  choose({ mapId: null, skin: v as RunSkin });
                 }
               }}
               options={[
@@ -457,8 +492,8 @@ export function RunSetupForm({
         {ascensionTier > 0 && (
           <Field label="Ascension">
             <OptionSelect
-              value={String(Math.min(ascension, ascensionTier))}
-              onValueChange={(v) => setAscension(Number(v))}
+              value={String(ascension)}
+              onValueChange={(v) => choose({ ascension: Number(v) })}
               options={Array.from({ length: ascensionTier + 1 }, (_, i) => ({
                 value: String(i),
                 label: `Tier ${i}`,

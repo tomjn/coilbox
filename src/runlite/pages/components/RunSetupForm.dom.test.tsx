@@ -37,6 +37,10 @@ const hoisted = vi.hoisted(() => ({
   uninstalled: [] as string[],
   /** A distribution profile's game filter, or null for none. */
   matcher: null as ((name: string) => boolean) | null,
+  /** The sides every game lists. */
+  sides: [] as { name: string }[],
+  /** Hand-made maps with a Warpath start and goal, all for Zero-K. */
+  handmadeMaps: [] as { id: string; title: string }[],
 }));
 
 // The frame's `useSetting` is stood in for by the installed storage, so a value
@@ -115,7 +119,10 @@ vi.mock("../../../content/config", () => ({
     loading: false,
   }),
   useUnitsyncGameHeaders: () => ({ headers: new Map() }),
-  useUnitsyncGameInfo: () => ({ info: { sides: [] }, loading: false }),
+  useUnitsyncGameInfo: () => ({
+    info: { sides: hoisted.sides },
+    loading: false,
+  }),
   useUnitsyncUnitDataset: () => ({
     dataset: null,
     status: "ready",
@@ -138,7 +145,15 @@ vi.mock("../../../conquest/handmade/useHandmadeMaps", () => ({
   useHandmadeMaps: () => ({ maps: [], unreadable: [], error: null }),
   useGameMapFacts: () => ({
     loading: false,
-    facts: { maps: [], onlyOwnMaps: [] },
+    facts: {
+      maps: hoisted.handmadeMaps.map((m) => ({
+        ...m,
+        game: { shortname: "ZK" },
+        source: "imported",
+        warpath: true,
+      })),
+      onlyOwnMaps: [],
+    },
     error: undefined,
   }),
 }));
@@ -184,6 +199,8 @@ beforeEach(() => {
   installSettingsStorage(storage);
   hoisted.uninstalled = [];
   hoisted.matcher = null;
+  hoisted.sides = [];
+  hoisted.handmadeMaps = [];
   hoisted.loading = false;
   hoisted.error = null;
   hoisted.saved = [];
@@ -489,5 +506,147 @@ describe("RunSetupForm and the last game (issue #3637)", () => {
     });
     expect(storage.get(KEY)).toBe(JSON.stringify(ZK));
     hoisted.maps = [];
+  });
+});
+
+describe("RunSetupForm and the other choices (issue #3638)", () => {
+  const KEY = "warpath.setup.choices";
+  const ZK = "Zero-K v1.14.10.1";
+  const meta = {
+    ...emptyMeta,
+    games: {
+      zk: { ...emptyRecord, loadouts: ["air"], ascensionTier: 2 },
+      ba: { ...emptyRecord },
+    },
+  };
+  const styleSelect = () => {
+    const found = [...document.querySelectorAll("select")].find((s) =>
+      [...s.options].some((o) => o.value === "territories"),
+    );
+    if (!found) throw new Error("no map style select");
+    return found;
+  };
+  const ascensionSelect = () => {
+    const found = [...document.querySelectorAll("select")].find((s) =>
+      [...s.options].some((o) => o.value === "2" && o.textContent === "Tier 2"),
+    );
+    if (!found) throw new Error("no ascension select");
+    return found;
+  };
+  const isOn = (name: string | RegExp) =>
+    screen.getByRole("radio", { name }).getAttribute("aria-checked") === "true";
+  const stored = () => JSON.parse(storage.get(KEY) ?? "null");
+  const begin = async (): Promise<RogueliteRun> => {
+    hoisted.saved = [];
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /Begin warpath/ }));
+    });
+    return hoisted.saved[0].run as RogueliteRun;
+  };
+
+  beforeEach(() => {
+    hoisted.maps = [{ name: "Comet Catcher Remake", width: 16, height: 16 }];
+  });
+  afterEach(() => {
+    hoisted.maps = [];
+  });
+
+  it("opens on the defaults and saves nothing when nothing is remembered", () => {
+    hoisted.sides = [{ name: "Arm" }, { name: "Core" }];
+    show(meta);
+    expect(styleSelect().value).toBe("galaxy");
+    expect(isOn("Arm")).toBe(true);
+    expect(isOn("standard")).toBe(true);
+    expect(screen.getByText("Difficulty — level 2")).toBeTruthy();
+    expect(storage.get(KEY)).toBeNull();
+  });
+
+  it("remembers the choices the player makes and opens on them next time", () => {
+    hoisted.sides = [{ name: "Arm" }, { name: "Core" }];
+    show(meta);
+    pick(ZK);
+    fireEvent.change(styleSelect(), { target: { value: "territories" } });
+    fireEvent.click(screen.getByRole("radio", { name: "long" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Core" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Air superiority" }));
+    fireEvent.change(ascensionSelect(), { target: { value: "2" } });
+    expect(stored()).toEqual({
+      skin: "territories",
+      mapId: null,
+      length: "long",
+      side: "Core",
+      loadout: "air",
+      ascension: 2,
+    });
+    cleanup();
+    show(meta);
+    expect(styleSelect().value).toBe("territories");
+    expect(isOn("long")).toBe(true);
+    expect(isOn("Core")).toBe(true);
+    expect(isOn("Air superiority")).toBe(true);
+    expect(ascensionSelect().value).toBe("2");
+  });
+
+  it("remembers what a run was begun with, even when nothing was changed", async () => {
+    show(meta);
+    await begin();
+    expect(stored()).toEqual({
+      skin: "galaxy",
+      mapId: null,
+      length: "standard",
+      difficulty: 2,
+      ascension: 0,
+      loadout: "standard",
+    });
+  });
+
+  it("begins the run with the remembered choices", async () => {
+    storage.set(KEY, JSON.stringify({ skin: "theatre", length: "long" }));
+    show(meta);
+    const run = await begin();
+    expect(run.settings.skin).toBe("theatre");
+    expect(run.settings.length).toBe("long");
+  });
+
+  it("goes back to the default for a loadout, tier or side the game does not have", () => {
+    storage.set(
+      KEY,
+      JSON.stringify({ loadout: "air", ascension: 2, side: "Core" }),
+    );
+    hoisted.sides = [{ name: "Arm" }];
+    // Balanced Annihilation has no unlocks, and no side called Core.
+    show(meta);
+    expect(screen.queryByText("Loadout")).toBeNull();
+    expect(screen.queryByText("Ascension")).toBeNull();
+    expect(isOn("Arm")).toBe(true);
+    // Zero-K has the loadout and tier, and the stored values return.
+    pick(ZK);
+    expect(isOn("Air superiority")).toBe(true);
+    expect(ascensionSelect().value).toBe("2");
+  });
+
+  it("goes back to the generated styles for a hand-made map the game does not have", () => {
+    storage.set(KEY, JSON.stringify({ mapId: "two-shores" }));
+    show(meta);
+    expect(styleSelect().value).toBe("galaxy");
+    hoisted.handmadeMaps = [{ id: "two-shores", title: "Two Shores" }];
+    cleanup();
+    show(meta);
+    pick(ZK);
+    expect(styleSelect().value).toBe("handmade:two-shores");
+  });
+
+  it("ignores a stored value that is not a set of choices", () => {
+    for (const bad of [
+      "nonsense",
+      "[1]",
+      JSON.stringify({ skin: "nebula", length: "forever", difficulty: 9 }),
+    ]) {
+      storage.set(KEY, bad);
+      cleanup();
+      show(meta);
+      expect(styleSelect().value).toBe("galaxy");
+      expect(isOn("standard")).toBe(true);
+    }
   });
 });
