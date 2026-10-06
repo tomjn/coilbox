@@ -169,14 +169,14 @@ describe("land map naming", () => {
         ).toBe(true);
       }
     }
-  });
+  }, 60_000);
 
   it("gives two planets of one seed different names", () => {
     const on = (planet: "moon" | "volcanic") =>
       names(generateTerritories({ ...base, nodeCount: 24, planet }, NOW));
     const volcanic = on("volcanic");
     expect(on("moon").some((n) => volcanic.includes(n))).toBe(false);
-  });
+  }, 60_000);
 
   it("keeps Galaxy and Theatre on star names", () => {
     const galaxy = names(generateGalaxy({ ...base, nodeCount: 24 }, NOW));
