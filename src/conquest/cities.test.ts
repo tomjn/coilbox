@@ -73,6 +73,18 @@ function landOnEdge(land: Uint8Array, width: number, height: number): boolean {
   return false;
 }
 
+describe("the planet of a generated cities map", () => {
+  it("stores the planet and builds its land", () => {
+    const doc = generateCities({ ...base, planet: "red" }, NOW);
+    expect(doc.generated?.planet).toBe("red");
+    expect(generatedTerrain(doc)?.planet).toBe("red");
+  });
+
+  it("writes no planet when none was asked for", () => {
+    expect("planet" in (generateCities(base, NOW).generated ?? {})).toBe(false);
+  });
+});
+
 describe("generateCities", () => {
   for (const [i, nodeCount] of SIZES.entries()) {
     for (const [j, layout] of LAYOUTS.entries()) {

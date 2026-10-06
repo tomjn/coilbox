@@ -6,6 +6,7 @@ import {
   encodeConquestChallenge,
   galaxyFromChallenge,
   optionsFromChallenge,
+  parseConquestChallengeSettings,
   substitutedMapCount,
 } from "./challenge";
 import { type GenerateOptions, generateGalaxy } from "./generate";
@@ -559,32 +560,46 @@ describe("conquest challenge codec", () => {
     expect("planet" in decoded.settings).toBe(false);
   });
 
-  it("builds one continent from a Volcanic code that names an archipelago", () => {
+  for (const planet of ["volcanic", "acid"] as const) {
+    for (const layout of ["archipelago", "continents"] as const) {
+      it(`builds one continent from a ${planet} code that names ${layout}`, () => {
+        const galaxy = generateMap(
+          { ...base, skin: "territories", layout, planet },
+          "t0",
+        );
+        const decoded = decodeConquestChallenge(
+          encodeConquestChallenge(galaxy) as string,
+        );
+        if (!decoded.ok) throw new Error("expected a successful decode");
+        const build = () =>
+          galaxyFromChallenge(
+            decoded.settings,
+            { maps, names: undefined },
+            galaxy.id,
+            "t0",
+          );
+        const doc = build();
+        expect(doc).toEqual(build());
+        const terrain = generatedTerrain(doc);
+        if (!terrain) throw new Error("expected generated terrain");
+        expect(labelLandMasses(terrain).sizes).toHaveLength(1);
+      });
+    }
+  }
+
+  it("reads a code with an unknown planet as having none", () => {
     const galaxy = generateMap(
-      {
-        ...base,
-        skin: "territories",
-        layout: "archipelago",
-        planet: "volcanic",
-      },
+      { ...base, skin: "territories", layout: "continent", planet: "ice" },
       "t0",
     );
-    const decoded = decodeConquestChallenge(
-      encodeConquestChallenge(galaxy) as string,
-    );
-    if (!decoded.ok) throw new Error("expected a successful decode");
-    const build = () =>
-      galaxyFromChallenge(
-        decoded.settings,
-        { maps, names: undefined },
-        galaxy.id,
-        "t0",
-      );
-    const doc = build();
-    expect(doc).toEqual(build());
-    const terrain = generatedTerrain(doc);
-    if (!terrain) throw new Error("expected generated terrain");
-    expect(labelLandMasses(terrain).sizes).toHaveLength(1);
+    const settings = challengeSettingsFromGalaxy(galaxy);
+    const parsed = parseConquestChallengeSettings({
+      ...settings,
+      planet: "pluto",
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed?.planet).toBeUndefined();
+    expect("planet" in (parsed ?? {})).toBe(false);
   });
 
   it("rejects a code for a different challenge kind", async () => {
