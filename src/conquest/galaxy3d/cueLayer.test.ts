@@ -78,6 +78,7 @@ function build(
   doc: GalaxyDoc = galaxy,
   heights?: HeightGrid,
   paintTracks = false,
+  solidCrossings?: boolean,
 ) {
   const scene = new THREE.Scene();
   const surface = createTerrainSurface(
@@ -172,6 +173,7 @@ function build(
         commit: () => {},
       },
     },
+    solidCrossings,
   );
   layer.apply();
   const mesh = scene.getObjectByName("map-cues") as THREE.Mesh | undefined;
@@ -255,6 +257,15 @@ const FIRST_PROVINCE_ROAD = 50;
 const GREEN = 0x46e08a;
 
 describe("buildCueLayer lines", () => {
+  it("draws crossings solid when asked", () => {
+    const solid = build(galaxy, undefined, false, true);
+    const material = (b: ReturnType<typeof build>) =>
+      (b.scene.getObjectByName("map-crossings") as THREE.Mesh)
+        .material as THREE.ShaderMaterial;
+    expect(material(solid).uniforms.uSolid.value).toBe(1);
+    expect(material(build()).uniforms.uSolid.value).toBe(0);
+  });
+
   it("builds a line for each crossing, province border and blocked border", () => {
     const { layer } = build();
     expect(layer.lines.map((l) => `${l.type} ${l.a} ${l.b}`).sort()).toEqual([

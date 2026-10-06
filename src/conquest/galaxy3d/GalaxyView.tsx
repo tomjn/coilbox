@@ -7,6 +7,7 @@ import {
 } from "three/addons/renderers/CSS2DRenderer.js";
 import { drawingPixelRatio } from "../../lib/uiZoom";
 import type { GalaxyDoc, Incursion, NodeStar } from "../model";
+import { planetOf } from "../planets";
 import { buildBackdrop } from "./backdrop";
 import { bodyLabel, type VoidBody } from "./bodies";
 import { buildCityLayer } from "./cityLayer";
@@ -838,6 +839,8 @@ export function GalaxyView({
                 : undefined,
             }),
             crossingPlan && ground ? { plan: crossingPlan, ground } : undefined,
+            terrainBiomes?.planet !== undefined &&
+              planetOf(terrainBiomes.planet).sea.crossing === "solid",
           )
         : undefined;
 
