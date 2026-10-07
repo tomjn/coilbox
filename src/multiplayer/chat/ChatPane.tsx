@@ -40,6 +40,7 @@ import {
 import { FormattedText, type NameHighlight } from "./FormattedText";
 import { type Format, formatSelection, listContinuation } from "./formatting";
 import { applyMention, mentionMatches, mentionQuery } from "./mentionMenu";
+import { foldNotices, summariseNotices } from "./noticeRuns";
 import { PRESENCE_META, type Presence } from "./presence";
 import { completeNick, type TabCycle } from "./tabComplete";
 
@@ -116,14 +117,17 @@ const BUBBLE_MAX_WIDTH = "max-w-[min(85%,calc(80ch_+_1.5rem))]";
 const isNotice = (k: ChatMsg["kind"]) =>
   k === "join" || k === "leave" || k === "system";
 
+/** How many names one part of a folded run of notices spells out before it
+ * counts the rest. A reading choice, with the full list in the tooltip. */
+const NOTICE_NAMES_SHOWN = 4;
+
 /** `/me` action / emote messages render as a distinct `* user text` line. */
 const isAction = (k: ChatMsg["kind"]) => k === "saidEx";
 
 /**
  * Whether `b` should be grouped under `a`: same sender, close in time, neither a
  * notice nor an action. SPADS dumps command lists / stats tables as a burst of
- * separate messages, so grouping collapses the per-message name + timestamp into
- * one.
+ * separate messages, so grouping collapses the per-message name into one.
  */
 function grouped(a: ChatMsg, b: ChatMsg): boolean {
   if (isNotice(a.kind) || isNotice(b.kind)) return false;
@@ -225,6 +229,37 @@ export function ChatPane({
           },
         }
       : undefined;
+  // Runs of join and leave notices fold into one row each, so prev and next
+  // below are rows, not messages.
+  const rows = useMemo(() => foldNotices(messages), [messages]);
+  const tint = (name: string) => {
+    const raw = senderColor?.(name);
+    return raw ? readableTeamTextColor(raw, theme) : undefined;
+  };
+  /** One part of a folded run: "alice, bob and 3 others joined". */
+  const noticePart = (names: string[], verb: string): ReactNode => {
+    if (names.length === 0) return null;
+    // One more than the cap is spelled out too, since "and 1 other" is no
+    // shorter than the name it hides.
+    const shown =
+      names.length > NOTICE_NAMES_SHOWN + 1
+        ? names.slice(0, NOTICE_NAMES_SHOWN)
+        : names;
+    const hidden = names.length - shown.length;
+    return (
+      <span key={verb} title={hidden > 0 ? names.join(", ") : undefined}>
+        {shown.map((name, i) => (
+          <span key={name}>
+            {i > 0 && (i === shown.length - 1 && hidden === 0 ? " and " : ", ")}
+            <span className="font-medium" style={{ color: tint(name) }}>
+              {name}
+            </span>
+          </span>
+        ))}
+        {hidden > 0 && ` and ${hidden} others`} {verb}.{" "}
+      </span>
+    );
+  };
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   // Tab-completion: cycle state persists across Tabs; the input element and a
@@ -482,15 +517,13 @@ export function ChatPane({
                       No messages yet.
                     </p>
                   ))
-                : messages.map((m, i) => {
+                : rows.map(({ m, run }, i) => {
                     const key = `${m.from}-${m.at}-${i}`;
                     const own = currentUser != null && m.from === currentUser;
                     // Group a run of messages from one sender: name on the first
-                    // only, timestamp on the last only, tight spacing between.
-                    const prev = messages[i - 1];
-                    const next = messages[i + 1];
+                    // only, tight spacing between.
+                    const prev = rows[i - 1]?.m;
                     const prevSame = prev != null && grouped(prev, m);
-                    const nextSame = next != null && grouped(m, next);
                     // Spacing rides on the MessageScrollerItem (the flex child) so
                     // it survives the wrapper - the old `first:mt-0` broke once
                     // each message became the only child of its own item.
@@ -498,7 +531,17 @@ export function ChatPane({
                       i === 0 ? "mt-0" : prevSame ? "mt-0.5" : "mt-2";
 
                     let body: ReactNode;
-                    if (isNotice(m.kind)) {
+                    if (run) {
+                      const summary = summariseNotices(run);
+                      body = (
+                        <div className="px-1 py-0.5 text-left text-xs text-muted-foreground">
+                          {noticePart(summary.joined, "joined")}
+                          {noticePart(summary.rejoined, "rejoined")}
+                          {noticePart(summary.left, "left")}
+                          {noticePart(summary.passedThrough, "joined and left")}
+                        </div>
+                      );
+                    } else if (isNotice(m.kind)) {
                       const rawColor = senderColor?.(m.from);
                       const color = rawColor
                         ? readableTeamTextColor(rawColor, theme)
@@ -600,6 +643,9 @@ export function ChatPane({
                           <div
                             className={cn(
                               BUBBLE_MAX_WIDTH,
+                              // Holds the floated time when it wraps under the
+                              // last line.
+                              "flow-root",
                               own
                                 ? "rounded-2xl rounded-br-sm bg-primary px-3 py-1.5 text-sm text-primary-foreground"
                                 : "rounded-2xl rounded-bl-sm bg-muted px-3 py-1.5 text-sm",
@@ -628,13 +674,25 @@ export function ChatPane({
                                 highlight={nameHighlightFor(bot)}
                               />
                             </span>
+                            {/* The time sits inside the bubble at the end of
+                                the last line, and drops under it when the line
+                                is full. Floated so the text wraps around it,
+                                and not selectable so copying a message copies
+                                the message alone. */}
+                            {m.at > 0 && (
+                              <span
+                                className={cn(
+                                  "float-right mt-1 ml-3 select-none font-sans text-[10px] leading-4",
+                                  own
+                                    ? "text-primary-foreground/70"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {formatTime(m.at)}
+                              </span>
+                            )}
                           </div>
                           {messageAction?.(m)}
-                          {!nextSame && (
-                            <span className="px-1 pt-0.5 text-[10px] text-muted-foreground">
-                              {formatTime(m.at)}
-                            </span>
-                          )}
                         </div>
                       );
                     }
