@@ -83,6 +83,8 @@ pub const OPCODES: &[(&str, u32)] = &[
 
 /// Whether an opcode is one only Total Annihilation's own engine runs. Recoil
 /// stops the thread on any of them.
+// `tests/disasm.rs` builds this file by path and uses none of it but the table.
+#[allow(dead_code)]
 pub fn ta_only(name: &str) -> bool {
     matches!(
         name,
