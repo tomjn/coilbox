@@ -284,19 +284,7 @@ export function ParticipantsTable({
             <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Ally
             </TableHead>
-            <TableHead className="pb-2 pl-1 pr-2 pt-3 text-right">
-              {onClearAis && aiRows.length > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 px-2 text-[11px] uppercase tracking-wide text-muted-foreground"
-                  disabled={disabled}
-                  onClick={onClearAis}
-                >
-                  Clear AIs
-                </Button>
-              )}
-            </TableHead>
+            <TableHead className="pb-2 pl-1 pr-2 pt-3" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -573,6 +561,17 @@ export function ParticipantsTable({
               disabled={disabled}
             />
           </div>
+        )}
+        {onClearAis && aiRows.length > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={disabled}
+            onClick={onClearAis}
+          >
+            Clear AIs
+          </Button>
         )}
         {bonusSuggestions?.all && aiRows[0]?.ai && (
           <div className="basis-full">
