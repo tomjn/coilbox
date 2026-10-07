@@ -15,6 +15,7 @@ import type { ReactNode } from "react";
 import { HostedRoomProvider } from "../direct/HostedRoomProvider";
 import { isProfileHidden } from "../profile/hidden";
 import { RECORDS_GROUP } from "../recordsGroup";
+import FollowIndicator from "./follow/FollowIndicator";
 import { InviteLinkHost } from "./invite/InviteLinkHost";
 import LobbyStatusButton from "./LobbyStatusButton";
 import { BattleNavBadge, ChatNavBadge } from "./nav/navBadges";
@@ -238,6 +239,8 @@ const multiplayerPlugin: FramePlugin = {
     // One pill for the relay on this machine, whichever battle it carries.
     // Where the old pill for a relay left running sat, beside the in-game badge.
     { slot: "topbar.right", order: -9, Component: RelayIndicator },
+    // Who the player is following, if anyone, and the way to stop.
+    { slot: "topbar.right", order: -8, Component: FollowIndicator },
   ],
   // App-level: the live connection + its state mirror must outlive the Lobby route
   // so navigating away doesn't drop the UI's view of a still-open connection. The
