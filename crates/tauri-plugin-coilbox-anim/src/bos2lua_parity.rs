@@ -486,6 +486,48 @@ fn both_runtimes_fire_and_spray_alike() {
     }
 }
 
+/// The engine pops a started script's arguments off the caller and pushes
+/// them onto the new thread, which reverses them (`CobThread.cpp:225`). The
+/// Lua has to hand them over in that order too, or it stops matching its COB.
+#[test]
+fn a_started_script_gets_its_arguments_in_the_engine_s_order() {
+    let source = r#"
+        piece base, left, right;
+        Lift(first, second) {
+            move left to y-axis first now;
+            move right to y-axis second now;
+        }
+        Create() { start-script Lift([3], [7]); }
+    "#;
+    let (cob, lua, pieces) = both(source);
+    let events = [event(0, "Create", &[])];
+    let from_cob = crate::cobrun::run(&cob, &pieces, &events, 5, &[], &HashMap::new());
+    let from_lua = run_lua(
+        &lua,
+        "lift.lua",
+        &Unit::new(&pieces),
+        &events,
+        5,
+        &HashMap::new(),
+    );
+
+    assert_eq!(from_cob.error, None);
+    assert_eq!(from_lua.error, None);
+    let y =
+        |frame: &[f64], piece: &str| frame[pieces.iter().position(|p| p == piece).unwrap() * 6 + 1];
+    let (cob_frame, lua_frame) = (&from_cob.frames[4], &from_lua.frames[4]);
+    assert!(
+        y(cob_frame, "left") > y(cob_frame, "right"),
+        "{cob_frame:?}"
+    );
+    for piece in ["left", "right"] {
+        assert!(
+            (y(cob_frame, piece) - y(lua_frame, piece)).abs() < TOLERANCE,
+            "{piece}: {cob_frame:?} against {lua_frame:?}\n{lua}"
+        );
+    }
+}
+
 /// `TransportPickup(2)`, with the stand-in parked at (30, 0, 40).
 fn pickup_at(frame: u32) -> ScriptEvent {
     ScriptEvent {
