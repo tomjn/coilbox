@@ -161,6 +161,58 @@ it("joins the friend's battle once, on their connection", async () => {
   expect(screen.getByText("In Battle 5")).toBeTruthy();
 });
 
+it("joins a battle the friend hosts, as it does one they join", async () => {
+  mount();
+  act(() => setFollow({ serverKey: KEY, name: "amy" }));
+  await next([{ ...battle(5), host: "amy" }]);
+
+  expect(world.joinBattle).toHaveBeenCalledTimes(1);
+  expect(world.joinBattle.mock.calls[0][0]).toMatchObject({
+    battle: { id: 5 },
+  });
+});
+
+it("says it cannot follow into a passworded battle, and names the battle", async () => {
+  mount();
+  act(() => setFollow({ serverKey: KEY, name: "amy" }));
+  await next([{ ...battle(5, ["amy"]), passworded: true }]);
+
+  expect(world.joinBattle).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "Cannot follow amy" }),
+  ).toBeTruthy();
+  expect(screen.getByText("In Battle 5")).toBeTruthy();
+  expect(screen.getByRole("status").textContent).toMatch(/has a password/);
+  // Still following: the password can be entered, or the friend may move on.
+  expect(getFollow()).not.toBeNull();
+});
+
+it("goes back to Following once the player is in the battle", async () => {
+  mount();
+  act(() => setFollow({ serverKey: KEY, name: "amy" }));
+  await next([{ ...battle(5, ["amy"]), passworded: true }]);
+  await next([{ ...battle(5, ["amy", "me"]), passworded: true }], 5);
+
+  expect(screen.getByRole("button", { name: "Following amy" })).toBeTruthy();
+  expect(screen.queryByRole("status")).toBeNull();
+});
+
+it("joins a friend who is already in a game, as a join and nothing more", async () => {
+  mount();
+  act(() => setFollow({ serverKey: KEY, name: "amy" }));
+  await next([{ ...battle(5, ["amy"]), inProgress: true, maxPlayers: 1 }]);
+
+  // The one thing sent is the battle list's own join, which starts no engine.
+  expect(world.joinBattle).toHaveBeenCalledTimes(1);
+  expect(Object.keys(world.joinBattle.mock.calls[0][0]).sort()).toEqual([
+    "awaitLanding",
+    "battle",
+    "giveUp",
+    "leaveOther",
+    "serverKey",
+  ]);
+});
+
 it("opens the battle room when the join lands", async () => {
   world.joinBattle.mockImplementation(
     async (args: { awaitLanding: () => void }) => args.awaitLanding(),

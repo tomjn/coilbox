@@ -1,5 +1,5 @@
-import { Button } from "@picoframe/frame";
-import { Footprints } from "lucide-react";
+import { Button, cn } from "@picoframe/frame";
+import { Footprints, TriangleAlert } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -28,6 +28,7 @@ import {
   type FollowBlock,
   type FollowStop,
   FRESH_FOLLOW,
+  followBlock,
   followStep,
 } from "./followStep";
 import { type Follow, setFollow, useFollow } from "./followStore";
@@ -48,7 +49,7 @@ const BLOCKED: Record<Exclude<FollowBlock, "passworded">, string> = {
  * it when they do (issue #3696). What to do is `followStep`'s to decide. This
  * reads the friend's connection, hands it over and carries out the answer.
  */
-function useFollowDriver(follow: Follow | null) {
+function useFollowDriver(follow: Follow | null): FollowBlock | null {
   const serverKey = follow?.serverKey ?? null;
   const name = follow?.name ?? null;
   const connection = useConnection(serverKey);
@@ -119,7 +120,7 @@ function useFollowDriver(follow: Follow | null) {
         action.reason === "passworded"
           ? {
               title: `${name} is in a battle with a password`,
-              body: "Enter it from the Following button in the top bar.",
+              body: "Enter it from the follow button in the top bar.",
             }
           : {
               title: `Could not follow ${name} into their battle`,
@@ -163,7 +164,17 @@ function useFollowDriver(follow: Follow | null) {
       });
     }
   }, [mine, joinError, serverKey, name, navigate]);
+
+  return follow && ready ? followBlock(now) : null;
 }
+
+/** What the panel says about a battle the player could not be moved into. */
+const WHY_NOT: Record<FollowBlock, string> = {
+  passworded:
+    "It has a password, so you were not moved. Enter the password to join them.",
+  locked: "It is locked, so you were not moved. You join if it is unlocked.",
+  full: "It is full, so you were not moved. You join when there is space.",
+};
 
 /**
  * The top bar's sign that a friend is being followed, and the way to stop.
@@ -173,7 +184,7 @@ function useFollowDriver(follow: Follow | null) {
  */
 export default function FollowIndicator() {
   const follow = useFollow();
-  useFollowDriver(follow);
+  const blocked = useFollowDriver(follow);
   const connection = useConnection(follow?.serverKey);
   const servers = useProtocolServers();
   if (!follow) return null;
@@ -186,10 +197,19 @@ export default function FollowIndicator() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="flex items-center gap-1.5 rounded-full bg-sky-500/15 px-3 py-1 text-xs font-medium text-sky-600 hover:bg-sky-500/25 dark:text-sky-400"
+          className={cn(
+            "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium",
+            blocked
+              ? "bg-amber-500/15 text-amber-700 hover:bg-amber-500/25 dark:text-amber-400"
+              : "bg-sky-500/15 text-sky-600 hover:bg-sky-500/25 dark:text-sky-400",
+          )}
         >
-          <Footprints aria-hidden className="size-3.5" />
-          Following {name}
+          {blocked ? (
+            <TriangleAlert aria-hidden className="size-3.5" />
+          ) : (
+            <Footprints aria-hidden className="size-3.5" />
+          )}
+          {blocked ? `Cannot follow ${name}` : `Following ${name}`}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3">
@@ -206,6 +226,14 @@ export default function FollowIndicator() {
             ? `In ${battle.title || `battle ${battle.id}`}`
             : "Not in a battle"}
         </p>
+        {blocked && (
+          <p
+            role="status"
+            className="text-sm text-amber-700 dark:text-amber-400"
+          >
+            {WHY_NOT[blocked]}
+          </p>
+        )}
         <div className="flex items-center justify-end gap-2">
           {battle && state && (
             <FriendBattleButton

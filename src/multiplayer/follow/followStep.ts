@@ -70,6 +70,18 @@ function blockOf(
 }
 
 /**
+ * Why the player is not with the friend they follow, or null when they are, or
+ * when nothing stands in the way. The indicator says this for as long as it
+ * holds, where `followStep` reports it once.
+ */
+export function followBlock(
+  now: Pick<FollowNow, "target" | "mine" | "battle" | "running">,
+): FollowBlock | null {
+  if (now.target == null || now.mine === now.target || !now.battle) return null;
+  return blockOf(now.battle, now.running);
+}
+
+/**
  * One step of following a friend (issue #3696): given what was seen last time
  * and what is true now, what to do, and the memo for next time.
  *
