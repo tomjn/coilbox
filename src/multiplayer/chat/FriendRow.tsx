@@ -1,6 +1,6 @@
 import { cn } from "@picoframe/frame";
 import { UserCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { Children, type ReactNode } from "react";
 import type { FriendStatus } from "../friendsAcrossServers";
 import { PRESENCE_META } from "./presence";
 
@@ -58,6 +58,8 @@ export function FriendRow({
     ? `In ${battle.title || `battle ${battle.id}`}`
     : null;
   const subline = [serverLabel, battleLabel].filter(Boolean).join(" · ");
+  // Each hover action is 24px wide and they sit side by side from the right.
+  const actions = Children.toArray(children).length;
   return (
     <li className="group relative">
       <button
@@ -68,7 +70,7 @@ export function FriendRow({
           "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
           active ? "bg-muted font-medium" : "hover:bg-muted",
           disabled && "cursor-default hover:bg-transparent",
-          children != null && "pr-16",
+          actions > 0 && (actions > 2 ? "pr-[5.5rem]" : "pr-16"),
         )}
         onClick={onOpen}
       >

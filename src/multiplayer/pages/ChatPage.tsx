@@ -40,12 +40,14 @@ import { MemberList } from "../chat/MemberList";
 import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
 import { useConversationParam } from "../chat/useConversationParam";
+import { isFollowing, toggleFollow, useFollow } from "../follow/followStore";
 import {
   addFavourite,
   isFavourite,
   removeFavourite,
   useFavourites,
 } from "../friends";
+import { isFriendOn } from "../friendsAcrossServers";
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed } from "../navPredicates";
@@ -94,6 +96,7 @@ function ChatPage() {
   } = useMultiplayer();
   const servers = useProtocolServers();
   const [favourites, setFavourites] = useFavourites();
+  const follow = useFollow();
   const navigate = useNavigate();
   const [active, setActive] = useState<ActiveConversation | null>(null);
   const [showMembers, setShowMembers] = useState(false);
@@ -210,6 +213,15 @@ function ChatPage() {
             ignored: ignoredNow(username),
             onToggle: () => toggleIgnore(username),
           }}
+          follow={
+            username !== me &&
+            isFriendOn(favourites, activeServerKey, state, username)
+              ? {
+                  following: isFollowing(follow, activeServerKey, username),
+                  onToggle: () => toggleFollow(activeServerKey, username),
+                }
+              : undefined
+          }
         />
       );
     },
@@ -227,6 +239,9 @@ function ChatPage() {
       relationFor,
       ignoredNow,
       toggleIgnore,
+      favourites,
+      state,
+      follow,
     ],
   );
 

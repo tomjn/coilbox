@@ -2,6 +2,7 @@ import { Button, Input } from "@picoframe/frame";
 import {
   Ban,
   Fingerprint,
+  Footprints,
   Gavel,
   MoreVertical,
   Network,
@@ -60,6 +61,9 @@ interface MemberActionsMenuProps {
   };
   /** Whether `nick` is ignored, and the toggle. */
   ignore?: { ignored: boolean; onToggle: () => void };
+  /** Whether `nick` is being followed, and the toggle (issue #3696). Only
+   * handed in for a friend, since only a friend can be followed. */
+  follow?: { following: boolean; onToggle: () => void };
 }
 
 /** The forms that need extra input before firing. */
@@ -144,6 +148,7 @@ export function MemberActionsMenu({
   onLookUp,
   note,
   ignore,
+  follow,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormKind | null>(null);
@@ -293,6 +298,16 @@ export function MemberActionsMenu({
           </form>
         ) : (
           <div className="flex flex-col">
+            {follow && (
+              <MenuItem
+                icon={<Footprints className="size-4" />}
+                label={follow.following ? "Unfollow" : "Follow"}
+                onClick={() => {
+                  follow.onToggle();
+                  close();
+                }}
+              />
+            )}
             {note && (
               <MenuItem
                 icon={
@@ -321,7 +336,7 @@ export function MemberActionsMenu({
                 }}
               />
             )}
-            {(note || ignore) && (channelOps || serverMod) && (
+            {(follow || note || ignore) && (channelOps || serverMod) && (
               <hr className="my-1 border-border" />
             )}
             {channelOps && (

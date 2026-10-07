@@ -175,3 +175,40 @@ it("toggles ignore, and offers to undo it for somebody ignored", () => {
   fireEvent.click(screen.getByRole("button", { name: "Unignore" }));
   expect(onToggle).toHaveBeenCalledTimes(1);
 });
+
+// Follow is for friends, so the caller hands it in for a friend alone (issue
+// #3696).
+
+function followMenu(following?: boolean) {
+  const onToggle = vi.fn();
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={false}
+      serverMod={false}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+      ignore={{ ignored: false, onToggle: () => {} }}
+      follow={following === undefined ? undefined : { following, onToggle }}
+    />,
+  );
+  return onToggle;
+}
+
+it("offers Follow for a friend", () => {
+  const onToggle = followMenu(false);
+  fireEvent.click(screen.getByRole("button", { name: "Follow" }));
+  expect(onToggle).toHaveBeenCalledTimes(1);
+});
+
+it("offers Unfollow for the friend being followed", () => {
+  followMenu(true);
+  expect(screen.getByRole("button", { name: "Unfollow" })).toBeTruthy();
+});
+
+it("offers no Follow for somebody who is not a friend", () => {
+  followMenu(undefined);
+  expect(screen.queryByRole("button", { name: /follow/i })).toBeNull();
+});

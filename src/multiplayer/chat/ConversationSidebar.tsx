@@ -2,6 +2,7 @@ import { Button, cn } from "@picoframe/frame";
 import {
   Bot,
   Check,
+  Footprints,
   Hash,
   History,
   MessageSquare,
@@ -22,6 +23,7 @@ import {
   mpFriendRequest,
   mpUnfriend,
 } from "../bindings";
+import { isFollowing, toggleFollow, useFollow } from "../follow/followStore";
 import {
   addFavourite,
   favouritesFor,
@@ -119,6 +121,46 @@ function FriendAction({
       className="absolute right-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
     >
       {icon}
+    </button>
+  );
+}
+
+/**
+ * Follow or unfollow a friend from their row (issue #3696). Hover-revealed like
+ * the row's other actions, and shown all the time for the friend being
+ * followed. `className` places it beside whatever else the row has.
+ */
+function FollowAction({
+  serverKey,
+  name,
+  className,
+}: {
+  serverKey: string;
+  name: string;
+  className: string;
+}) {
+  const following = isFollowing(useFollow(), serverKey, name);
+  const label = following ? `Unfollow ${name}` : `Follow ${name}`;
+  return (
+    <button
+      type="button"
+      onClick={() => toggleFollow(serverKey, name)}
+      aria-label={label}
+      aria-pressed={following}
+      title={
+        following
+          ? label
+          : `${label}: join the battles they join and leave when they leave`
+      }
+      className={cn(
+        "absolute top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded hover:bg-muted-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100",
+        following
+          ? "text-sky-500 opacity-100"
+          : "text-muted-foreground opacity-0",
+        className,
+      )}
+    >
+      <Footprints className="size-4" />
     </button>
   );
 }
@@ -418,6 +460,11 @@ function ConnectionGroup({
                     active={isFavourite(favourites, serverKey, peer)}
                     onToggle={() => toggleFavourite(peer)}
                   />
+                  <FollowAction
+                    serverKey={serverKey}
+                    name={peer}
+                    className="right-[3.75rem]"
+                  />
                 </FriendRow>
               );
             })}
@@ -531,7 +578,16 @@ function AllFriendsSection({
               convId(active.desc) === `dm:${e.name}`
             }
             onOpen={() => onSelect(e.serverKey, { kind: "dm", peer: e.name })}
-          />
+          >
+            {/* Nobody can be followed on a server that is not connected. */}
+            {e.status !== "unknown" && (
+              <FollowAction
+                serverKey={e.serverKey}
+                name={e.name}
+                className="right-1"
+              />
+            )}
+          </FriendRow>
         ))}
       </ul>
     </Section>
