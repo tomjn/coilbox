@@ -647,7 +647,7 @@ impl Run {
                     sim.model.awaiting_build = false;
                     sim.model.building = true;
                     sim.model.spraying = true;
-                    sim.model.build_start(frame);
+                    sim.model.build_start(frame, events);
                 }
                 let queued_at = self.runners.len();
                 self.start_callin("StartBuilding", Vec::new())?;
@@ -2753,7 +2753,7 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 }
                 return Ok(answer.value);
             }
-            if let Some(answer) = unitvalue::relation(id, p1, sim.world.as_ref(), &sim.model) {
+            if let Some(answer) = unitvalue::relation(id, p1, sim.world.as_ref(), &sim.model, sim.frame) {
                 if let Some(note) = answer.note {
                     sim.model.note(note);
                 }

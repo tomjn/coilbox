@@ -604,7 +604,7 @@ impl Run {
                 self.model.awaiting_build = false;
                 self.model.building = true;
                 self.model.spraying = true;
-                self.model.build_start(frame);
+                self.model.build_start(frame, events);
                 let queued_at = self.threads.len();
                 self.start_callin("StartBuilding", &[])?;
                 self.tick_queued_call_ins(queued_at)?;
@@ -1687,7 +1687,9 @@ impl Run {
             }
             return answer.value;
         }
-        if let Some(answer) = unitvalue::relation(id, p1, self.world.as_ref(), &self.model) {
+        if let Some(answer) =
+            unitvalue::relation(id, p1, self.world.as_ref(), &self.model, self.frame)
+        {
             if let Some(note) = answer.note {
                 self.model.note(note);
             }

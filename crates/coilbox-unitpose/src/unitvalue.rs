@@ -378,7 +378,8 @@ pub fn world(
 /// [`UNIT_ID`], on team 0.
 ///
 /// The stand-in is an ally until the scenario aims or fires a weapon, and the
-/// enemy those weapons point at from then on. A unit that is not in the scene
+/// enemy those weapons point at from then on. While a factory is building it,
+/// what is left of it to build comes from [`crate::Model::build_percent_left`]. A unit that is not in the scene
 /// reads 0 for all three, which is the engine's answer for one that does not
 /// exist. `None` for any other id, and for the stand-in when no scene came.
 pub fn relation(
@@ -386,6 +387,7 @@ pub fn relation(
     p1: i32,
     world: Option<&crate::World>,
     model: &crate::Model,
+    frame: u32,
 ) -> Option<Answer> {
     let plain = |value: i32| Answer { value, note: None };
     if !matches!(id, UNIT_TEAM | UNIT_BUILD_PERCENT_LEFT | UNIT_ALLIED) {
@@ -408,12 +410,15 @@ pub fn relation(
         // unit's (`UnitScript.cpp:1130`), and the preview's unit is on team 0.
         UNIT_TEAM => plain(0),
         UNIT_ALLIED => plain(i32::from(!model.targeted)),
-        _ if model.building => Answer {
-            value: 0,
-            note: Some(
-                "This script asks how much of the unit being built is left to build, and the preview does not track how far a build has got, so it read 0."
-                    .to_string(),
-            ),
+        _ if model.building => match model.build_percent_left(frame) {
+            Some(left) => plain(left),
+            None => Answer {
+                value: 0,
+                note: Some(
+                    "This script asks how much of the unit being built is left to build, and the scenario never finishes the build, so it read 0."
+                        .to_string(),
+                ),
+            },
         },
         _ => plain(0),
     })
@@ -751,7 +756,7 @@ mod tests {
     }
 
     fn asked_of(id: i32, p1: i32, model: &crate::Model) -> Option<i32> {
-        relation(id, p1, Some(&scene(None)), model).map(|answer| answer.value)
+        relation(id, p1, Some(&scene(None)), model, 0).map(|answer| answer.value)
     }
 
     /// `UnitScript.cpp:1128-1147`, for the unit itself, the stand-in and a
@@ -811,20 +816,59 @@ mod tests {
             building: true,
             ..Default::default()
         };
-        let answer = relation(UNIT_BUILD_PERCENT_LEFT, 2, Some(&scene(None)), &model).unwrap();
+        let answer = relation(UNIT_BUILD_PERCENT_LEFT, 2, Some(&scene(None)), &model, 0).unwrap();
         assert_eq!(answer.value, 0);
         assert!(answer.note.is_some());
+    }
+
+    /// All of it is left on the frame the build starts and none on the frame
+    /// the scenario finishes it, counted down evenly between.
+    #[test]
+    fn a_build_under_way_counts_down_to_the_frame_the_scenario_finishes_it() {
+        let finish = |frame| crate::ScriptEvent {
+            frame,
+            callin: String::new(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine: Some(crate::EngineAction::FactoryFinish),
+        };
+        let mut model = crate::Model {
+            building: true,
+            ..Default::default()
+        };
+        // An earlier build's finish is not this one's.
+        model.build_start(100, &[finish(40), finish(300), finish(500)]);
+        let left = |frame| {
+            let answer = relation(
+                UNIT_BUILD_PERCENT_LEFT,
+                2,
+                Some(&scene(None)),
+                &model,
+                frame,
+            )
+            .unwrap();
+            assert_eq!(answer.note, None);
+            answer.value
+        };
+        assert_eq!(left(100), 100);
+        assert_eq!(left(150), 75);
+        assert_eq!(left(200), 50);
+        assert_eq!(left(300), 0);
+
+        model.building = false;
+        assert_eq!(model.build_percent_left(200), None);
     }
 
     #[test]
     fn says_nothing_about_another_unit_without_a_scene() {
         let model = crate::Model::default();
-        assert!(relation(UNIT_ALLIED, 2, None, &model).is_none());
+        assert!(relation(UNIT_ALLIED, 2, None, &model, 0).is_none());
         assert_eq!(
-            relation(UNIT_ALLIED, UNIT_ID, None, &model).map(|a| a.value),
+            relation(UNIT_ALLIED, UNIT_ID, None, &model, 0).map(|a| a.value),
             Some(1)
         );
-        assert!(relation(HEALTH, 2, Some(&scene(None)), &model).is_none());
+        assert!(relation(HEALTH, 2, Some(&scene(None)), &model, 0).is_none());
     }
 
     #[test]

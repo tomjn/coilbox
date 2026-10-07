@@ -1750,6 +1750,47 @@ mod engine_factory {
             .any(|w| w.contains("never set INBUILDSTANCE")));
     }
 
+    /// `get UNIT_BUILD_PERCENT_LEFT(2)` half way between the frame the build
+    /// starts and the frame the scenario finishes it, emitted as an sfx number
+    /// so the timeline shows what the script read.
+    #[test]
+    fn a_script_reads_how_much_of_the_buildee_is_left_to_build() {
+        let mut probe = push(73);
+        probe.extend(push(2));
+        probe.extend(push(0));
+        probe.extend(push(0));
+        probe.extend(push(0));
+        probe.extend([op("GET"), op("EMIT_SFX"), 2, op("RETURN")]);
+        let bytes = build(&[("Activate", activate_now()), ("Probe", probe)], PIECES, 0);
+        let mut start = action(0, EngineAction::FactoryBuild);
+        start.world = Some(coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([0.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        });
+        let events = vec![
+            callin(0, "Activate"),
+            start,
+            callin(2, "Probe"),
+            action(4, EngineAction::FactoryFinish),
+            callin(6, "Probe"),
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 8, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 50), [2]);
+        // Finished, so nothing is left.
+        assert_eq!(sfx_frames(&timeline, 0), [6]);
+    }
+
     /// Build stance seeded from the preview's Unit values panel counts too:
     /// building starts on the `factory-build` frame straight away.
     #[test]
