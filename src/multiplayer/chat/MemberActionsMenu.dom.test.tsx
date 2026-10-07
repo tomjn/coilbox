@@ -212,3 +212,35 @@ it("offers no Follow for somebody who is not a friend", () => {
   followMenu(undefined);
   expect(screen.queryByRole("button", { name: /follow/i })).toBeNull();
 });
+
+// Friend is offered wherever the menu is, and is not gated on anything.
+
+function friendMenu(isFriend: boolean) {
+  const onToggle = vi.fn();
+  render(<MemberActionsMenu nick="bob" friend={{ isFriend, onToggle }} />);
+  return onToggle;
+}
+
+it("offers Add friend for somebody who is not a friend", () => {
+  const onToggle = friendMenu(false);
+  fireEvent.click(screen.getByRole("button", { name: "Add friend" }));
+  expect(onToggle).toHaveBeenCalledTimes(1);
+});
+
+it("offers Remove friend for a friend", () => {
+  friendMenu(true);
+  expect(screen.getByRole("button", { name: "Remove friend" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Add friend" })).toBeNull();
+});
+
+it("draws the caller's own entries under the personal ones", () => {
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      friend={{ isFriend: false, onToggle: () => {} }}
+      extra={() => <button type="button">Kick</button>}
+    />,
+  );
+  const names = screen.getAllByRole("button").map((b) => b.textContent);
+  expect(names.indexOf("Kick")).toBeGreaterThan(names.indexOf("Add friend"));
+});

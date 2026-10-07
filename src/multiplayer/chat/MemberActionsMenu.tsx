@@ -12,6 +12,7 @@ import {
   StickyNote,
   UserCheck,
   UserMinus,
+  UserPlus,
   UserX,
   Volume2,
   VolumeX,
@@ -28,9 +29,11 @@ import { NoteForm } from "../NoteButton";
 
 /**
  * A per-member `⋮` menu. Everybody gets the personal actions the caller hands
- * in, a private note and ignore (issue #3695). Under those sit the
- * channel-operator (ChanServ) and server-moderator actions, which the caller
- * gates on privilege with `channelOps` and `serverMod`. Actions that need input
+ * in: follow, friend, a private note and ignore (issue #3695). Under those sit
+ * whatever the caller adds with `extra`, then the channel-operator (ChanServ)
+ * and server-moderator actions, which the caller gates on privilege with
+ * `channelOps` and `serverMod`. Outside a channel the caller leaves those and
+ * their `send` and `onLookUp` out. Actions that need input
  * (the note, mute/ban duration + reason, server kick reason) expand into an
  * inline form inside the same popover — no separate modal (see the project's
  * drawer/popover preference).
@@ -41,17 +44,17 @@ import { NoteForm } from "../NoteButton";
 interface MemberActionsMenuProps {
   nick: string;
   /** Bare channel name (no `#`). */
-  channel: string;
+  channel?: string;
   /** Show the ChanServ channel-op actions. */
-  channelOps: boolean;
+  channelOps?: boolean;
   /** Show the server-moderator actions. */
-  serverMod: boolean;
+  serverMod?: boolean;
   /** Whether `nick` is currently a channel operator (op vs deop label). */
-  targetIsOp: boolean;
-  send: (line: string) => void;
+  targetIsOp?: boolean;
+  send?: (line: string) => void;
   /** Open the Server admin page's player lookup section for `nick`
    * (issue #2777). Only offered alongside the other moderator actions. */
-  onLookUp: () => void;
+  onLookUp?: () => void;
   /** The private note about `nick` ("" for none) and how to save it. A saved
    * note marks the trigger, so it can be noticed without opening the menu. */
   note?: {
@@ -64,6 +67,11 @@ interface MemberActionsMenuProps {
   /** Whether `nick` is being followed, and the toggle (issue #3696). Only
    * handed in for a friend, since only a friend can be followed. */
   follow?: { following: boolean; onToggle: () => void };
+  /** Whether `nick` is a friend, and the toggle. Left out for our own row. */
+  friend?: { isFriend: boolean; onToggle: () => void };
+  /** Entries of the caller's own, such as a battle host's, drawn under the
+   * personal ones. Handed `close` so an entry can shut the menu. */
+  extra?: (close: () => void) => ReactNode;
 }
 
 /** The forms that need extra input before firing. */
@@ -113,7 +121,7 @@ const FORM_META: Record<
   },
 };
 
-function MenuItem({
+export function MenuItem({
   icon,
   label,
   onClick,
@@ -140,15 +148,17 @@ function MenuItem({
 
 export function MemberActionsMenu({
   nick,
-  channel,
-  channelOps,
-  serverMod,
-  targetIsOp,
+  channel = "",
+  channelOps = false,
+  serverMod = false,
+  targetIsOp = false,
   send,
   onLookUp,
   note,
   ignore,
   follow,
+  friend,
+  extra,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormKind | null>(null);
@@ -168,12 +178,12 @@ export function MemberActionsMenu({
     reset();
   };
   const run = (line: string) => {
-    send(line);
+    send?.(line);
     close();
   };
   const lookUp = () => {
     close();
-    onLookUp();
+    onLookUp?.();
   };
   const openForm = (kind: FormKind) => {
     setDuration(FORM_META[kind].defaultDuration);
@@ -308,6 +318,22 @@ export function MemberActionsMenu({
                 }}
               />
             )}
+            {friend && (
+              <MenuItem
+                icon={
+                  friend.isFriend ? (
+                    <UserMinus className="size-4" />
+                  ) : (
+                    <UserPlus className="size-4" />
+                  )
+                }
+                label={friend.isFriend ? "Remove friend" : "Add friend"}
+                onClick={() => {
+                  friend.onToggle();
+                  close();
+                }}
+              />
+            )}
             {note && (
               <MenuItem
                 icon={
@@ -336,9 +362,11 @@ export function MemberActionsMenu({
                 }}
               />
             )}
-            {(follow || note || ignore) && (channelOps || serverMod) && (
-              <hr className="my-1 border-border" />
-            )}
+            {(follow || friend || note || ignore) &&
+              (extra || channelOps || serverMod) && (
+                <hr className="my-1 border-border" />
+              )}
+            {extra?.(close)}
             {channelOps && (
               <>
                 <p className="px-2 pb-0.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
