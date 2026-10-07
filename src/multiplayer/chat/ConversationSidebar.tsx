@@ -33,6 +33,7 @@ import {
 } from "../friends";
 import { battleOf, mergeFriends } from "../friendsAcrossServers";
 import { isIgnored, useIgnored } from "../ignore";
+import { useNoteActions } from "../notes";
 import { protocolForKey } from "../protocol";
 import {
   serverNameFor,
@@ -49,10 +50,12 @@ import {
 } from "./conversation";
 import { FriendBattleButton } from "./FriendBattleButton";
 import { FriendRow } from "./FriendRow";
+import { MemberActionsMenu } from "./MemberActionsMenu";
 import { PartySection } from "./PartySection";
 import { userPresence } from "./presence";
 import { Section } from "./Section";
 import { UserPicker } from "./UserPicker";
+import { usePlayerActions } from "./usePlayerActions";
 
 function Badge({ n }: { n: number }) {
   if (n <= 0) return null;
@@ -199,6 +202,8 @@ function ConnectionGroup({
   const hasParties = protocol === "tachyon";
   const [ignored] = useIgnored();
   const [favourites, setFavourites] = useFavourites();
+  const playerActions = usePlayerActions(serverKey);
+  const { get: getNote, set: setNote } = useNoteActions(serverKey);
   const state = connection?.mirror.state;
   const me = state?.myUsername ?? null;
 
@@ -488,28 +493,42 @@ function ConnectionGroup({
             // Autohosts (SPADS bots) are DM'd to configure them. A bot glyph
             // marks them apart from human conversations at a glance.
             const bot = state?.users[peer]?.status.bot ?? false;
+            // Absent for a peer who has gone offline, where the note falls
+            // back to the name.
+            const userId = state?.users[peer]?.userId;
             return (
-              <li key={id} className="group relative">
-                <button
-                  type="button"
-                  className={cn(rowClass(id), "pr-9")}
-                  onClick={() => onSelect(serverKey, { kind: "dm", peer })}
-                >
-                  {bot ? (
-                    <Bot
-                      className="size-4 shrink-0 text-muted-foreground"
-                      aria-label="Bot"
-                    />
-                  ) : (
-                    <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
-                  )}
-                  <span className="truncate">{peer}</span>
-                  <Badge n={unreadBadge(id, msgs)} />
-                </button>
-                <FavStar
-                  name={peer}
-                  active={isFavourite(favourites, serverKey, peer)}
-                  onToggle={() => toggleFavourite(peer)}
+              <li key={id} className="group flex items-center gap-1">
+                {/* Holds the star, which is placed over the row's right edge. */}
+                <div className="relative min-w-0 flex-1">
+                  <button
+                    type="button"
+                    className={cn(rowClass(id), "pr-9")}
+                    onClick={() => onSelect(serverKey, { kind: "dm", peer })}
+                  >
+                    {bot ? (
+                      <Bot
+                        className="size-4 shrink-0 text-muted-foreground"
+                        aria-label="Bot"
+                      />
+                    ) : (
+                      <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <span className="truncate">{peer}</span>
+                    <Badge n={unreadBadge(id, msgs)} />
+                  </button>
+                  <FavStar
+                    name={peer}
+                    active={isFavourite(favourites, serverKey, peer)}
+                    onToggle={() => toggleFavourite(peer)}
+                  />
+                </div>
+                <MemberActionsMenu
+                  nick={peer}
+                  note={{
+                    text: getNote(userId, peer),
+                    onSave: (text) => setNote(userId, peer, text),
+                  }}
+                  {...playerActions(peer)}
                 />
               </li>
             );
