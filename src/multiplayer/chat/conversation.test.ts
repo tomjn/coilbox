@@ -4,6 +4,7 @@ import {
   backfilledCounts,
   conversationCounts,
   conversationHref,
+  conversationMembers,
   convId,
   resolveConversationRequest,
 } from "./conversation";
@@ -181,5 +182,31 @@ describe("resolveConversationRequest", () => {
       ok: true,
       descriptor: requested,
     });
+  });
+});
+
+describe("conversationMembers", () => {
+  const member = (name: string, ingame = false) => ({
+    name,
+    status: { ingame },
+  });
+
+  it("sorts by name whatever the case, with players in a game at the bottom", () => {
+    const state = {
+      channels: {
+        main: {
+          ...channel("main", []),
+          users: ["zed", "Bob", "alice", "Carol"],
+        },
+      },
+      users: {
+        zed: member("zed"),
+        Bob: member("Bob", true),
+        alice: member("alice", true),
+        Carol: member("Carol"),
+      },
+    } as unknown as LobbyState;
+    const names = conversationMembers(state, { kind: "channel", name: "main" });
+    expect(names.map((u) => u.name)).toEqual(["Carol", "zed", "alice", "Bob"]);
   });
 });
