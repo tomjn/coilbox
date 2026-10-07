@@ -120,3 +120,58 @@ it("does not offer the Server admin look-up to a channel op who is not a server 
     screen.queryByRole("button", { name: "Look up in Server admin" }),
   ).toBeNull();
 });
+
+// The personal actions everybody gets (issue #3695).
+
+function personalMenu(over: { text?: string; ignored?: boolean } = {}) {
+  const onSave = vi.fn();
+  const onToggle = vi.fn();
+  render(
+    <MemberActionsMenu
+      nick="bob"
+      channel="lobby"
+      channelOps={false}
+      serverMod={false}
+      targetIsOp={false}
+      send={send}
+      onLookUp={onLookUp}
+      note={{ text: over.text ?? "", onSave }}
+      ignore={{ ignored: over.ignored ?? false, onToggle }}
+    />,
+  );
+  return { onSave, onToggle };
+}
+
+it("offers a note and ignore with no moderation actions beside them", () => {
+  personalMenu();
+  expect(screen.getByRole("button", { name: "Add private note" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Ignore" })).toBeTruthy();
+  expect(screen.queryByText("Moderator")).toBeNull();
+  expect(screen.queryByText("Channel")).toBeNull();
+});
+
+it("saves a note from the menu", () => {
+  const { onSave } = personalMenu();
+  fireEvent.click(screen.getByRole("button", { name: "Add private note" }));
+  fireEvent.change(screen.getByLabelText("Note for bob"), {
+    target: { value: "good teammate" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(onSave).toHaveBeenCalledWith("good teammate");
+});
+
+it("says on the trigger that a member has a note", () => {
+  personalMenu({ text: "good teammate" });
+  expect(
+    screen.getByRole("button", { name: "Actions for bob, who has a note" }),
+  ).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "Edit private note" }),
+  ).toBeTruthy();
+});
+
+it("toggles ignore, and offers to undo it for somebody ignored", () => {
+  const { onToggle } = personalMenu({ ignored: true });
+  fireEvent.click(screen.getByRole("button", { name: "Unignore" }));
+  expect(onToggle).toHaveBeenCalledTimes(1);
+});

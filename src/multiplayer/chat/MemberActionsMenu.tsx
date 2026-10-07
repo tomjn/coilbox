@@ -8,7 +8,10 @@ import {
   Search,
   Shield,
   ShieldOff,
+  StickyNote,
+  UserCheck,
   UserMinus,
+  UserX,
   Volume2,
   VolumeX,
 } from "lucide-react";
@@ -20,13 +23,16 @@ import {
 } from "@/components/ui/popover";
 import { DaysField } from "../DaysField";
 import * as mod from "../moderation";
+import { NoteForm } from "../NoteButton";
 
 /**
- * A per-member `⋮` menu of channel-operator (ChanServ) and server-moderator
- * actions. Only rendered by callers who've already gated on privilege, so the
- * mere presence of the trigger implies access. Actions that need input (mute/ban
- * duration + reason, server kick reason) expand into an inline form inside the
- * same popover — no separate modal (see the project's drawer/popover preference).
+ * A per-member `⋮` menu. Everybody gets the personal actions the caller hands
+ * in, a private note and ignore (issue #3695). Under those sit the
+ * channel-operator (ChanServ) and server-moderator actions, which the caller
+ * gates on privilege with `channelOps` and `serverMod`. Actions that need input
+ * (the note, mute/ban duration + reason, server kick reason) expand into an
+ * inline form inside the same popover — no separate modal (see the project's
+ * drawer/popover preference).
  * Every action is a raw wire line handed to `send` (which the caller wires to
  * `mpSend`), except "Look up in Server admin" (issue #2777), which calls
  * `onLookUp` to open that page's player lookup section for `nick` instead.
@@ -45,6 +51,15 @@ interface MemberActionsMenuProps {
   /** Open the Server admin page's player lookup section for `nick`
    * (issue #2777). Only offered alongside the other moderator actions. */
   onLookUp: () => void;
+  /** The private note about `nick` ("" for none) and how to save it. A saved
+   * note marks the trigger, so it can be noticed without opening the menu. */
+  note?: {
+    text: string;
+    onSave: (text: string) => void;
+    statsSummary?: string | null;
+  };
+  /** Whether `nick` is ignored, and the toggle. */
+  ignore?: { ignored: boolean; onToggle: () => void };
 }
 
 /** The forms that need extra input before firing. */
@@ -127,14 +142,19 @@ export function MemberActionsMenu({
   targetIsOp,
   send,
   onLookUp,
+  note,
+  ignore,
 }: MemberActionsMenuProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<FormKind | null>(null);
+  const [noting, setNoting] = useState(false);
+  const hasNote = (note?.text.trim().length ?? 0) > 0;
   const [duration, setDuration] = useState("");
   const [reason, setReason] = useState("");
 
   const reset = () => {
     setForm(null);
+    setNoting(false);
     setDuration("");
     setReason("");
   };
@@ -180,14 +200,33 @@ export function MemberActionsMenu({
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label={`Moderation actions for ${nick}`}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          aria-label={
+            hasNote
+              ? `Actions for ${nick}, who has a note`
+              : `Actions for ${nick}`
+          }
+          title={hasNote ? note?.text : undefined}
+          className="relative inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           <MoreVertical className="size-4" />
+          {hasNote && (
+            <span
+              aria-hidden
+              className="absolute top-1 right-1 size-2 rounded-full bg-amber-500"
+            />
+          )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-52 p-1">
-        {form ? (
+      <PopoverContent align="end" className={noting ? "w-64 p-2" : "w-52 p-1"}>
+        {noting && note ? (
+          <NoteForm
+            name={nick}
+            note={note.text}
+            statsSummary={note.statsSummary}
+            onSave={note.onSave}
+            onDone={close}
+          />
+        ) : form ? (
           <form
             className="flex flex-col gap-2 p-1"
             onSubmit={(e) => {
@@ -254,6 +293,37 @@ export function MemberActionsMenu({
           </form>
         ) : (
           <div className="flex flex-col">
+            {note && (
+              <MenuItem
+                icon={
+                  <StickyNote
+                    className="size-4"
+                    fill={hasNote ? "currentColor" : "none"}
+                  />
+                }
+                label={hasNote ? "Edit private note" : "Add private note"}
+                onClick={() => setNoting(true)}
+              />
+            )}
+            {ignore && (
+              <MenuItem
+                icon={
+                  ignore.ignored ? (
+                    <UserCheck className="size-4" />
+                  ) : (
+                    <UserX className="size-4" />
+                  )
+                }
+                label={ignore.ignored ? "Unignore" : "Ignore"}
+                onClick={() => {
+                  ignore.onToggle();
+                  close();
+                }}
+              />
+            )}
+            {(note || ignore) && (channelOps || serverMod) && (
+              <hr className="my-1 border-border" />
+            )}
             {channelOps && (
               <>
                 <p className="px-2 pb-0.5 pt-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">

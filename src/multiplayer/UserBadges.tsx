@@ -98,17 +98,19 @@ export function RatingBadge({
   );
 }
 
-/** Colour tier for a rank (0-7): higher ranks get a warmer, brighter chevron. */
+/** Colour tier for a rank (0-7): higher ranks get a warmer, brighter chip. */
 function rankColor(rank: number): string {
-  if (rank >= 7) return "text-yellow-400";
-  if (rank >= 5) return "text-amber-500";
-  if (rank >= 3) return "text-sky-500";
-  return "text-muted-foreground";
+  if (rank >= 7) return "bg-yellow-400/15 text-yellow-400";
+  if (rank >= 5) return "bg-amber-500/15 text-amber-500";
+  if (rank >= 3) return "bg-sky-500/15 text-sky-500";
+  return "bg-muted text-muted-foreground";
 }
 
 /**
- * Rank insignia: `rank` overlapping up-chevrons (server rank is 0-7). Rank 0
- * (new / not-yet-received status) renders nothing to keep the common case clean.
+ * Rank insignia: one chevron and the rank's number in a chip (server rank is
+ * 0-7). One chevron per rank ran together into a squiggle at this size (issue
+ * #3695). Rank 0 (new / not-yet-received status) renders nothing to keep the
+ * common case clean.
  */
 export function RankBadge({
   rank,
@@ -122,23 +124,16 @@ export function RankBadge({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center",
+        "inline-flex h-4 shrink-0 items-center rounded-sm pr-1 pl-0.5 font-mono text-[10px] leading-none font-semibold tabular-nums",
         rankColor(n),
         className,
       )}
       role="img"
       aria-label={`Rank ${n} of 7`}
-      title={`Rank ${n}/7`}
+      title={`Rank ${n} of 7`}
     >
-      {Array.from({ length: n }, (_, i) => (
-        <ChevronUp
-          // Static insignia; index key is stable for a given rank.
-          // biome-ignore lint/suspicious/noArrayIndexKey: fixed-order glyphs
-          key={i}
-          className="size-3 -ml-1.5 first:ml-0"
-          strokeWidth={3}
-        />
-      ))}
+      <ChevronUp className="size-3" strokeWidth={3} aria-hidden />
+      {n}
     </span>
   );
 }

@@ -35,17 +35,10 @@ export function NoteButton({
   statsSummary?: string | null;
 }) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState(note);
   const hasNote = note.trim().length > 0;
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (v) setDraft(note);
-      }}
-    >
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -67,53 +60,84 @@ export function NoteButton({
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 p-2">
-        <form
-          className="flex flex-col gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSave(draft);
-            setOpen(false);
-          }}
-        >
-          <p className="px-1 text-sm font-medium">Note: {name}</p>
-          {statsSummary && (
-            <p className="px-1 text-xs text-muted-foreground">{statsSummary}</p>
-          )}
-          <Textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value.slice(0, NOTE_MAX_LENGTH))}
-            maxLength={NOTE_MAX_LENGTH}
-            placeholder="Private note, only visible to you…"
-            aria-label={`Note for ${name}`}
-            autoFocus
-            className="min-h-20 text-sm"
-          />
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] text-muted-foreground">
-              {draft.length}/{NOTE_MAX_LENGTH}
-            </span>
-            <div className="flex gap-2">
-              {hasNote && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7"
-                  onClick={() => {
-                    onSave("");
-                    setOpen(false);
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-              <Button type="submit" size="sm" className="h-7">
-                Save
-              </Button>
-            </div>
-          </div>
-        </form>
+        <NoteForm
+          name={name}
+          note={note}
+          statsSummary={statsSummary}
+          onSave={onSave}
+          onDone={() => setOpen(false)}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * The note editor on its own, for whatever popover holds it. It is mounted when
+ * that popover opens, so the draft starts from the saved note each time.
+ * `onDone` is called after a save or a clear.
+ */
+export function NoteForm({
+  name,
+  note,
+  onSave,
+  statsSummary,
+  onDone,
+}: {
+  name: string;
+  note: string;
+  onSave: (text: string) => void;
+  statsSummary?: string | null;
+  onDone: () => void;
+}) {
+  const [draft, setDraft] = useState(note);
+  const hasNote = note.trim().length > 0;
+  return (
+    <form
+      className="flex flex-col gap-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave(draft);
+        onDone();
+      }}
+    >
+      <p className="px-1 text-sm font-medium">Note: {name}</p>
+      {statsSummary && (
+        <p className="px-1 text-xs text-muted-foreground">{statsSummary}</p>
+      )}
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value.slice(0, NOTE_MAX_LENGTH))}
+        maxLength={NOTE_MAX_LENGTH}
+        placeholder="Private note, only visible to you…"
+        aria-label={`Note for ${name}`}
+        autoFocus
+        className="min-h-20 text-sm"
+      />
+      <div className="flex items-center justify-between px-1">
+        <span className="text-[11px] text-muted-foreground">
+          {draft.length}/{NOTE_MAX_LENGTH}
+        </span>
+        <div className="flex gap-2">
+          {hasNote && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              onClick={() => {
+                onSave("");
+                onDone();
+              }}
+            >
+              Clear
+            </Button>
+          )}
+          <Button type="submit" size="sm" className="h-7">
+            Save
+          </Button>
+        </div>
+      </div>
+    </form>
   );
 }

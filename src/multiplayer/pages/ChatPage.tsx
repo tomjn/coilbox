@@ -18,7 +18,7 @@ import {
 import { notify } from "@/notify/notify";
 import { battleRoomHref } from "../battle/battleRoomKey";
 import { leaveBattle } from "../battle/leaveBattle";
-import { type ChatMsg, mpLeaveChannel, mpSend } from "../bindings";
+import { type ChatMsg, mpLeaveChannel, mpSend, type User } from "../bindings";
 import { ChannelBrowser } from "../chat/ChannelBrowser";
 import { ChannelTopicMenu } from "../chat/ChannelTopicMenu";
 import { ChatPane } from "../chat/ChatPane";
@@ -176,20 +176,22 @@ function ChatPage() {
     );
   }, [activeServerKey, desc, hasChannels]);
 
-  // A per-member `⋮` moderation menu, shown only in a channel where we hold
-  // privileges (server mod, or this channel's founder/op) and never on our own row.
+  // A per-member `⋮` menu: a private note and ignore for everybody (issue
+  // #3695), with the moderation actions under them in a channel where we hold
+  // privileges (server mod, or this channel's founder/op) and never on our own
+  // row.
   const renderMemberActions = useCallback(
-    (username: string) => {
-      if (!hasChannels) return null;
-      if (desc?.kind !== "channel" || !activeServerKey) return null;
-      if (!iAmChannelOp && !iAmServerMod) return null;
-      if (username === me) return null;
+    (user: User) => {
+      if (!activeServerKey) return null;
+      const username = user.name;
+      const channel = desc?.kind === "channel" ? desc.name : null;
+      const moderates = hasChannels && channel != null && username !== me;
       return (
         <MemberActionsMenu
           nick={username}
-          channel={desc.name}
-          channelOps={iAmChannelOp}
-          serverMod={iAmServerMod}
+          channel={channel ?? ""}
+          channelOps={moderates && iAmChannelOp}
+          serverMod={moderates && iAmServerMod}
           targetIsOp={activeChannel?.operators.includes(username) ?? false}
           send={(line) => {
             void mpSend({ serverKey: activeServerKey, line }).catch(() => {});
@@ -198,6 +200,15 @@ function ChatPage() {
             navigate(
               `/admin?server=${encodeURIComponent(activeServerKey)}&player=${encodeURIComponent(username)}`,
             );
+          }}
+          note={{
+            text: getNote(user.userId, username),
+            onSave: (text) => setNote(user.userId, username, text),
+            statsSummary: relationSummary(relationFor(username)),
+          }}
+          ignore={{
+            ignored: ignoredNow(username),
+            onToggle: () => toggleIgnore(username),
           }}
         />
       );
@@ -211,6 +222,11 @@ function ChatPage() {
       navigate,
       me,
       activeChannel,
+      getNote,
+      setNote,
+      relationFor,
+      ignoredNow,
+      toggleIgnore,
     ],
   );
 
@@ -540,10 +556,7 @@ function ChatPage() {
           colorFor={senderColor}
           presenceFor={presenceFor}
           isIgnored={ignoredNow}
-          onToggleIgnore={toggleIgnore}
           noteFor={(u) => getNote(u.userId, u.name)}
-          onSetNote={(u, text) => setNote(u.userId, u.name, text)}
-          statsSummaryFor={(u) => relationSummary(relationFor(u.name))}
           renderActions={renderMemberActions}
         />
       )}
