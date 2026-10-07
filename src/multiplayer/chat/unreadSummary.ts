@@ -21,7 +21,9 @@ export interface HighlightConfig {
  * Count of unread "news" in a message list: messages after the `seen` index that
  * are not the user's own lines, optionally restricted to those matching `pred`.
  * Excluding own lines drops both messages the user sent and the server's echo of
- * their own JOIN — neither is news to them (mirrors `ConversationSidebar`).
+ * their own JOIN, neither of which is news to them. Somebody else joining or
+ * leaving is not news either: nobody said anything, and a busy channel does it
+ * all day.
  */
 export function unreadNews(
   msgs: ChatMsg[],
@@ -34,6 +36,7 @@ export function unreadNews(
   for (let i = from; i < msgs.length; i++) {
     const m = msgs[i];
     if (m.from === me) continue;
+    if (m.kind === "join" || m.kind === "leave") continue;
     if (pred && !pred(m)) continue;
     n++;
   }

@@ -55,6 +55,7 @@ import { PartySection } from "./PartySection";
 import { userPresence } from "./presence";
 import { Section } from "./Section";
 import { UserPicker } from "./UserPicker";
+import { unreadNews } from "./unreadSummary";
 import { usePlayerActions } from "./usePlayerActions";
 
 function Badge({ n }: { n: number }) {
@@ -179,12 +180,15 @@ function FollowAction({
 function ConnectionGroup({
   serverKey,
   showHeading,
+  divided,
   active,
   onSelect,
   onBrowse,
 }: {
   serverKey: string;
   showHeading: boolean;
+  /** Draw a rule above the heading, to part this server from the one above. */
+  divided: boolean;
   active: ActiveConversation | null;
   onSelect: (serverKey: string, d: ConversationDescriptor) => void;
   onBrowse: (serverKey: string) => void;
@@ -241,19 +245,13 @@ function ConnectionGroup({
     mpDeclineFriendRequest({ serverKey, username: name }).catch(() => {});
   }
 
-  // Unread count worth badging: messages arrived since last seen, minus the
-  // user's own lines. That excludes both messages they sent and the server's
-  // echo of their own JOIN (a Join msg with `from === me`), neither of which is
-  // a "new message" to them. Seen index is recovered from `unreadFor` so this
-  // reuses the store's read bookkeeping rather than duplicating it.
+  // Unread count worth badging: what `unreadNews` counts since last seen, which
+  // leaves out the user's own lines and people joining and leaving. Seen index
+  // is recovered from `unreadFor` so this reuses the store's read bookkeeping
+  // rather than duplicating it.
   function unreadBadge(id: string, msgs: ChatMsg[]): number {
     const total = msgs.length;
-    const seen = total - unreadFor(id, total, serverKey);
-    let n = 0;
-    for (let i = seen; i < total; i++) {
-      if (msgs[i].from !== me) n++;
-    }
-    return n;
+    return unreadNews(msgs, total - unreadFor(id, total, serverKey), me);
   }
   // Battle chat lives in a synthetic `__battle__<id>` channel, so it's surfaced
   // in its own section rather than among joined channels.
@@ -287,7 +285,12 @@ function ConnectionGroup({
   return (
     <>
       {showHeading && (
-        <div className="px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <div
+          className={cn(
+            "px-3 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground",
+            divided && "mt-2 border-t border-border",
+          )}
+        >
           {usernameFromKey(serverKey)} on {serverNameFor(serverKey, servers)}
         </div>
       )}
@@ -641,11 +644,12 @@ export function ConversationSidebar({
     <nav className="flex w-60 shrink-0 flex-col border-r border-border">
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
         <AllFriendsSection active={active} onSelect={onSelect} />
-        {liveKeys.map((serverKey) => (
+        {liveKeys.map((serverKey, i) => (
           <ConnectionGroup
             key={serverKey}
             serverKey={serverKey}
             showHeading={showHeadings}
+            divided={i > 0}
             active={active}
             onSelect={onSelect}
             onBrowse={onBrowse}
