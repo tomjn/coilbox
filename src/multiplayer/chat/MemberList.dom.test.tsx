@@ -118,3 +118,35 @@ it("shows a long username in full on hover", () => {
     "a-very-long-username",
   );
 });
+
+it("puts presence first, then the name, then rank and flag (issue #3695)", () => {
+  const container = document.createElement("div");
+  document.body.append(container);
+  const amy = { ...user("amy"), country: "GB" };
+  amy.status = { ...amy.status, rank: 3 };
+  render(
+    <MemberList
+      members={[amy]}
+      presenceFor={() => "inBattle"}
+      renderActions={(u) => <button type="button">Actions for {u.name}</button>}
+    />,
+    { container },
+  );
+  const row = screen.getByRole("listitem");
+  const order = [
+    screen.getByText("In battle"),
+    screen.getByTitle("amy"),
+    screen.getByRole("img", { name: "Rank 3 of 7" }),
+    screen.getByRole("img", { name: "Country: GB" }),
+    screen.getByRole("button", { name: "Actions for amy" }),
+  ];
+  for (const el of order) expect(row.contains(el)).toBe(true);
+  for (let i = 1; i < order.length; i++) {
+    expect(
+      order[i - 1].compareDocumentPosition(order[i]) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  }
+  // The label is for screen readers and the tooltip, not printed on the row.
+  expect(screen.getByText("In battle").className).toContain("sr-only");
+});
