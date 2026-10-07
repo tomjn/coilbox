@@ -200,8 +200,6 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     allowSelfSigned: false,
     protocol: "zerok",
     alpha: true,
-    notice:
-      "Our Zero-K support is incomplete. You can log in, and little else yet.",
   },
   // Last on purpose: it is the least likely destination for a Recoil or BAR player,
   // and the one nobody can register a new account on.
