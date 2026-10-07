@@ -3,10 +3,10 @@
 /**
  * A battle with a friend in it says so on its row, in words and an icon rather
  * than colour alone, so a player scanning the list can find where their friends
- * are.
+ * are. The badge counts them and its tooltip names them.
  */
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Battle } from "../bindings";
 import { BattleRow } from "./BattleRow";
@@ -47,13 +47,24 @@ function drawRow(friendsHere?: string) {
 afterEach(cleanup);
 
 describe("a battle row with friends in it", () => {
-  it("names the friends who are in it", () => {
+  it("counts the friends who are in it", () => {
     drawRow("amy, bob");
-    expect(screen.getByText("Friends here: amy, bob")).toBeTruthy();
+    expect(screen.getByText("2 friends in battle")).toBeTruthy();
+  });
+
+  it("does not count a lone friend", () => {
+    drawRow("amy");
+    expect(screen.getByText("Friend in battle")).toBeTruthy();
+  });
+
+  it("names the friends when the badge takes focus", async () => {
+    drawRow("amy, bob");
+    fireEvent.focus(screen.getByRole("button", { name: /friends in battle/ }));
+    expect((await screen.findAllByText("amy, bob")).length).toBeGreaterThan(0);
   });
 
   it("says nothing when no friend is in it", () => {
     drawRow(undefined);
-    expect(screen.queryByText(/Friends here/)).toBeNull();
+    expect(screen.queryByText(/in battle/)).toBeNull();
   });
 });

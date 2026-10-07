@@ -1,6 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { Link as LinkIcon, Lock, LogOut, UserCheck, Users } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { copyDeepLink } from "../../deeplink/copyLink";
 import { inviteLink } from "../../direct/invite";
 import type { LobbyProtocol } from "../../lobby-servers/config";
@@ -128,15 +134,6 @@ function BattleRowInner({
         {/* Tachyon's lobby list names no founder, so there is no host to name. */}
         {battle.host && ` · host ${battle.host}`}
       </p>
-      {friendsHere && (
-        <p
-          className="flex items-center gap-1 truncate text-xs text-sky-600 dark:text-sky-400"
-          title={`Friends here: ${friendsHere}`}
-        >
-          <UserCheck className="size-3 shrink-0" aria-hidden />
-          <span className="truncate">Friends here: {friendsHere}</span>
-        </p>
-      )}
     </div>
   );
 
@@ -165,6 +162,7 @@ function BattleRowInner({
           {details}
         </button>
       )}
+      {friendsHere && <FriendsBadge names={friendsHere} />}
       <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
         {started !== null && (
           <span className="mr-2">{startedAgo(started, now)}</span>
@@ -223,6 +221,31 @@ function BattleRowInner({
         </Button>
       )}
     </li>
+  );
+}
+
+/**
+ * Says a battle has friends in it, and how many. The names are in the tooltip.
+ * It sits beside the title's join button rather than inside it, so it can take
+ * focus of its own: a button cannot nest inside another button.
+ */
+function FriendsBadge({ names }: { names: string }) {
+  const count = names.split(", ").length;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="flex shrink-0 cursor-default items-center gap-1 rounded-full bg-sky-500/10 px-2 py-1 text-xs font-medium text-sky-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-sky-400"
+          >
+            <UserCheck className="size-3.5 shrink-0" aria-hidden />
+            {count === 1 ? "Friend in battle" : `${count} friends in battle`}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{names}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 
