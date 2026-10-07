@@ -83,14 +83,11 @@ export function GameOptionsPanel({
       className="rounded-lg border border-border/50 bg-card"
     >
       <div className="flex items-center gap-1 pr-3">
-        <CollapsibleTrigger className="group flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
-          <span className="flex min-w-0 items-baseline gap-3">
-            <span className="text-sm font-semibold">Game options</span>
-            <span className="truncate text-xs text-muted-foreground">
-              {summary}
-            </span>
+        <CollapsibleTrigger className="flex min-w-0 flex-1 items-baseline gap-3 rounded-lg px-4 py-3 text-left hover:bg-muted/30">
+          <span className="text-sm font-semibold">Game options</span>
+          <span className="truncate text-xs text-muted-foreground">
+            {summary}
           </span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         {resetGroup && !disabled && (
           <GroupReset
@@ -99,6 +96,16 @@ export function GameOptionsPanel({
             onConfirm={() => resetGroup(options)}
           />
         )}
+        {/* The arrow sits after the reset, so it is a trigger of its own: a
+            button cannot hold the reset button. The header beside it is the
+            one a keyboard or a screen reader uses. */}
+        <CollapsibleTrigger
+          tabIndex={-1}
+          aria-hidden
+          className="group shrink-0 rounded p-1 hover:bg-muted/30"
+        >
+          <ChevronDown className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
       </div>
 
       <CollapsibleContent>
