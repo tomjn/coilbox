@@ -96,6 +96,30 @@ fn push(value: u32) -> Vec<u32> {
     vec![op("PUSH_CONSTANT"), value]
 }
 
+/// The file says how many static variables it has, and a slot past that is not
+/// one, as in the engine.
+mod statics {
+    use super::*;
+
+    /// `static<slot> = [1]; move base to z-axis static<slot> now`
+    fn store_then_move(slot: u32, statics: usize) -> Timeline {
+        let mut code = push(ELMO);
+        code.extend([op("POP_STATIC"), slot, op("PUSH_STATIC"), slot]);
+        code.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        play(&build(&[("Create", code)], PIECES, statics), 2)
+    }
+
+    #[test]
+    fn keeps_as_many_as_the_file_declares() {
+        assert!(close(pose(&store_then_move(299, 300), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn a_slot_the_file_does_not_declare_holds_nothing() {
+        assert!(close(pose(&store_then_move(300, 300), 0, "base")[2], 0.0));
+    }
+}
+
 mod motion {
     use super::*;
 

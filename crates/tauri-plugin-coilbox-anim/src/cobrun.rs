@@ -202,6 +202,9 @@ struct Program {
     piece_names: Vec<String>,
     /// The sounds a TA:K file names, by the index `PLAY_SOUND` plays them by.
     sounds: Vec<String>,
+    /// How many static variables the file says it has. A slot past this is
+    /// not a variable, as in the engine (`CobThread.cpp:468-474`).
+    statics: usize,
 }
 
 impl Program {
@@ -218,6 +221,7 @@ impl Program {
             .map(|name| lookup.get(&name.to_lowercase()).copied())
             .collect();
         let offsets = decoded.offsets.clone();
+        let statics = decoded.header.num_static_vars as usize;
         let lengths = (0..offsets.len())
             .map(|i| {
                 offsets
@@ -238,6 +242,7 @@ impl Program {
             lengths,
             pieces,
             sounds: decoded.sounds,
+            statics,
             piece_names: decoded.pieces,
         })
     }
@@ -393,7 +398,9 @@ impl Thread {
 struct Run {
     program: Program,
     model: Model,
-    statics: Vec<i32>,
+    /// Static variables that have been written, by slot. Kept sparse because
+    /// the count comes from the file and nothing bounds it.
+    statics: HashMap<usize, i32>,
     threads: Vec<Thread>,
     /// Threads a running thread started. The engine queues these and adds them
     /// after the tick that made them, so a started script never runs inside the
@@ -452,7 +459,7 @@ impl Run {
         Ok(Self {
             program,
             model,
-            statics: vec![0; 256],
+            statics: HashMap::new(),
             threads: Vec::new(),
             queued: Vec::new(),
             frame: 0,
@@ -1098,14 +1105,14 @@ impl Run {
             }
             w if w == op("PUSH_STATIC") => {
                 let slot = self.word(i)? as usize;
-                let value = self.statics.get(slot).copied().unwrap_or(0);
+                let value = self.statics.get(&slot).copied().unwrap_or(0);
                 self.push(i, value);
             }
             w if w == op("POP_STATIC") => {
                 let slot = self.word(i)? as usize;
                 let value = self.pop(i);
-                if let Some(held) = self.statics.get_mut(slot) {
-                    *held = value;
+                if slot < self.program.statics {
+                    self.statics.insert(slot, value);
                 }
             }
             w if w == op("POP_STACK") => {
