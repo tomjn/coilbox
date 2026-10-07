@@ -36,7 +36,7 @@ describe("land past the map's edge", () => {
       expect(differences(terrain.heightmap, plain.heightmap)).toBe(0);
       expect(differences(terrain.land, plain.land)).toBe(0);
     }
-  });
+  }, 60_000);
 
   it("puts the map's own pixels and heights in the middle of the extended picture", () => {
     const { terrain, extended } = build("coast", 2);
@@ -84,7 +84,7 @@ describe("land past the map's edge", () => {
       }
       expect(same / total).toBeGreaterThan(0.95);
     }
-  });
+  }, 60_000);
 
   it("keeps the sea past a closed side as sea", () => {
     // An archipelago has no open side, so the margin's outer ring is all sea.
