@@ -53,6 +53,7 @@ import {
   type CreateLobbyArgs,
   CreateLobbyPopover,
 } from "../battles/CreateLobbyPopover";
+import { FriendBattles } from "../battles/FriendBattlesSection";
 import { friendsInBattles } from "../battles/friendsInBattles";
 import { HostBattleButton } from "../battles/HostBattleButton";
 import type { OpenBattleArgs } from "../battles/HostBattleForm";
@@ -120,6 +121,7 @@ function ServerBattles({
   hostTitle,
   pageControls,
   lanSection,
+  friendsSection,
   focusId,
 }: {
   serverKey: string;
@@ -139,6 +141,8 @@ function ServerBattles({
   pageControls?: ReactNode;
   /** The rooms on this network, drawn above the list in `page`. */
   lanSection?: ReactNode;
+  /** The battles with friends in them, drawn above the list in `page`. */
+  friendsSection?: ReactNode;
   /** The battle a notification sent the player to, on this connection. */
   focusId?: number;
 }) {
@@ -431,7 +435,12 @@ function ServerBattles({
 
       <div className="border-b border-border px-4 py-3">{lanSection}</div>
 
-      {list}
+      {/* One scroll for both, so a long Friends section cannot squeeze the
+          list out of the window. */}
+      <div className="min-h-0 flex-1 overflow-auto">
+        {friendsSection}
+        {list}
+      </div>
     </main>
   );
 }
@@ -578,6 +587,33 @@ function BattlesPage() {
   // The join or host waiting to land, shared by every connection's list and the
   // room flows below (see `PendingEntry`).
   const pending = useRef<PendingEntry>(null);
+
+  // The Friends section joins on whichever connection a battle belongs to, and
+  // that connection's list is what sends the player to the room on landing.
+  const awaitFriendLanding = useCallback(
+    (serverKey: string) => {
+      clearJoinError(serverKey);
+      pending.current = { serverKey, seeded: false };
+    },
+    [clearJoinError],
+  );
+  const giveUpFriendLanding = useCallback((serverKey: string) => {
+    if (pending.current?.serverKey === serverKey) pending.current = null;
+  }, []);
+  const friendBattlesByKey = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(lists).map(([key, list]) => [key, list.scoped]),
+      ),
+    [lists],
+  );
+  const friendsSection = (
+    <FriendBattles
+      battlesByKey={friendBattlesByKey}
+      awaitLanding={awaitFriendLanding}
+      giveUp={giveUpFriendLanding}
+    />
+  );
 
   // Start a room of our own: bind the port, dial it over loopback like any other
   // server, then open the battle in it. Landing in the battle room is the join
@@ -819,6 +855,7 @@ function BattlesPage() {
           </>
         }
         lanSection={lanSection}
+        friendsSection={friendsSection}
         focusId={focus?.serverKey === key ? focus.id : undefined}
       />
     );
@@ -856,6 +893,7 @@ function BattlesPage() {
       <div className="border-b border-border px-4 py-3">{lanSection}</div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+        {friendsSection}
         {liveKeys.map((key) => {
           const focused = key === activeKey;
           const hosting = key === hostTargetKey;
