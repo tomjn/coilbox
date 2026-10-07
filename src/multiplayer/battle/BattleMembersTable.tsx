@@ -28,6 +28,7 @@ import {
   orderedAis,
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
+import { usePlayerActions } from "../chat/usePlayerActions";
 import { NoteButton } from "../NoteButton";
 import { useConnection } from "../store";
 import { CountryFlag, RankBadge } from "../UserBadges";
@@ -166,7 +167,17 @@ export function BattleMembersTable({
   // the founder. `self` marks our own row, so the roster already names us.
   const me = rows.find((r) => r.self)?.name;
   const ownsABot = rows.some((r) => r.kind === "bot" && r.owner === me);
-  const showActions = selfHost || ownsABot || canKick || canBoss;
+  // Another human's row has a menu whoever is looking, for the friend, follow
+  // and ignore entries every player list offers.
+  const playerActions = usePlayerActions(serverKey);
+  const personalFor = (row: Row) =>
+    row.kind === "human" && !row.self ? playerActions(row.name) : null;
+  const showActions =
+    selfHost ||
+    ownsABot ||
+    canKick ||
+    canBoss ||
+    rows.some((r) => r.kind === "human" && !r.self);
 
   // The host controls other members: humans get force/kick, bots get
   // team/ally edits (UPDATEBOT) plus removal, MemberRow keeps a bot's colour
@@ -399,6 +410,7 @@ export function BattleMembersTable({
                   editable={row.self}
                   aiInvalid={aiInvalid}
                   control={control}
+                  personal={personalFor(row)}
                   sharedWith={sharedWith}
                   striped={index % 2 === 1}
                   showActions={showActions}
@@ -481,7 +493,11 @@ export function BattleMembersTable({
                     statsSummary={statsSummaryFor?.(row)}
                   />
                 )}
-                {control && <MemberActionsMenu row={row} control={control} />}
+                <MemberActionsMenu
+                  row={row}
+                  control={control}
+                  personal={personalFor(row)}
+                />
               </span>
             );
           })}
