@@ -42,6 +42,20 @@ export function battleOf(
   return battle ? { id: battle.id, title: battle.title } : null;
 }
 
+/** Whether `name` is a friend on one server: on that server's own friend list,
+ * or starred locally for it. */
+export function isFriendOn(
+  favourites: Record<string, string[]>,
+  serverKey: string,
+  state: Pick<LobbyState, "friends"> | null,
+  name: string,
+): boolean {
+  return (
+    (favourites[serverKey] ?? []).includes(name) ||
+    (state?.friends ?? []).includes(name)
+  );
+}
+
 /** Sort group: anyone present, then offline, then unknown. */
 function rank(status: FriendStatus): number {
   if (status === "unknown") return 2;
