@@ -100,6 +100,8 @@ export const initialMirror: LobbyMirror = {
 
 export type MirrorAction =
   | { type: "connecting" }
+  /** A connect failed before it opened, which no event reports. */
+  | { type: "connectFailed"; reason: string }
   | { type: "event"; ev: LobbyEvent }
   | { type: "snapshot"; state: LobbyState }
   | { type: "reset" }
@@ -117,6 +119,9 @@ export function mirrorReducer(
   switch (action.type) {
     case "connecting":
       return { ...initialMirror, connected: false };
+    case "connectFailed":
+      // A refused login has already said why, and more precisely.
+      return m.loginError || m.error ? m : { ...m, error: action.reason };
     case "snapshot":
       return { ...m, state: action.state };
     case "reset":

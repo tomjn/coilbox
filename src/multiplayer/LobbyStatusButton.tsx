@@ -341,7 +341,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
                     aria-describedby={nameId}
                     className="h-7 shrink-0 px-2 text-xs"
                   >
-                    {opening ? "Cancel" : "Log out"}
+                    {/* A login that dropped or never opened has nothing to
+                        log out of. Dismissing it also stops its reconnect. */}
+                    {opening ? "Cancel" : entry.live ? "Log out" : "Dismiss"}
                   </Button>
                 )}
               </li>
@@ -569,7 +571,9 @@ export function LoginPanel({ onNavigate }: { onNavigate: () => void }) {
           Login failed: {mirror.loginError}
         </p>
       ) : (
-        mirror.error && (
+        mirror.error &&
+        // A connect that just failed is already reported above, in `error`.
+        !error && (
           <p className="px-2 pt-1 text-xs text-destructive">
             Disconnected: {mirror.error}
           </p>

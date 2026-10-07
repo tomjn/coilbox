@@ -1517,6 +1517,12 @@ export function MultiplayerProvider({ children }: { children: ReactNode }) {
           closeConnection(serverKey);
           return;
         }
+        // A connect that fails while opening sends no `disconnected` event, so
+        // its entry would otherwise read as disconnected with no reason.
+        dispatchMirror(serverKey, {
+          type: "connectFailed",
+          reason: e instanceof Error ? e.message : String(e),
+        });
         throw e;
       } finally {
         connectingKeysRef.current.delete(serverKey);

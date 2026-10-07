@@ -232,16 +232,20 @@ describe("the login panel with two connections", () => {
     ]);
   });
 
-  it("lists a connection that dropped, with its reason, and closes it", async () => {
+  it("lists a connection that dropped, with its reason, and dismisses it", async () => {
     connectAs(
       connection(ALICE_KEY),
       connection(CAROL_KEY, { live: false, error: "connection reset" }),
     );
     draw();
     expect(rowFor("carol").textContent).toContain("connection reset");
+    // Nobody can log out of a login that is not connected.
+    expect(
+      within(rowFor("carol")).queryByRole("button", { name: "Log out" }),
+    ).toBeNull();
     await act(async () => {
       fireEvent.click(
-        within(rowFor("carol")).getByRole("button", { name: "Log out" }),
+        within(rowFor("carol")).getByRole("button", { name: "Dismiss" }),
       );
     });
     expect(calls).toEqual([`disconnect ${CAROL_KEY}`]);
