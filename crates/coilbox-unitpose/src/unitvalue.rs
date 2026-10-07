@@ -268,6 +268,9 @@ pub const UNIT_XZ: i32 = 9;
 pub const UNIT_Y: i32 = 10;
 pub const UNIT_HEIGHT: i32 = 11;
 pub const GROUND_HEIGHT: i32 = 16;
+/// The highest unit id there can be, which a script loops up to when it looks
+/// for units around it.
+pub const MAX_ID: i32 = 70;
 
 /// What a question about the scene was answered with, and what the preview
 /// wants said about it.
@@ -317,11 +320,19 @@ pub fn world(
     awaiting_build: bool,
 ) -> Option<Answer> {
     let plain = |value: i32| Answer { value, note: None };
-    if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT) {
+    if !matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT | MAX_ID) {
         return None;
     }
     if id == GROUND_HEIGHT {
         return Some(plain(0));
+    }
+    // The engine answers the size of its unit table less one
+    // (`UnitScript.cpp:1123`), and a script loops from nothing up to it asking
+    // about each id. The scene holds two units at most, so the highest id in
+    // it covers every unit there is and keeps that loop short.
+    if id == MAX_ID {
+        let stand_in = world.and_then(|world| world.stand_in.as_ref());
+        return Some(plain(stand_in.map_or(UNIT_ID, |s| s.id.max(UNIT_ID))));
     }
     let asks_itself = p1 <= 0 || p1 == UNIT_ID;
     if asks_itself && id != UNIT_HEIGHT {
@@ -374,7 +385,7 @@ fn excluded_from_asked(id: i32) -> bool {
         || id == PIECE_XZ
         || id == PIECE_Y
         || (LUA0..=LUA9).contains(&id)
-        || matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT)
+        || matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT | MAX_ID)
 }
 
 /// Note that a script read unit value `id`, unless it is one [`Timeline::asked`]
@@ -664,6 +675,17 @@ mod tests {
         assert_eq!(value(UNIT_XZ, 2, None), None);
     }
 
+    /// A script looking for units loops up to `MAX_ID`, so it has to reach the
+    /// stand-in, and with no scene there is only the unit itself.
+    #[test]
+    fn the_highest_id_is_the_highest_in_the_scene() {
+        assert_eq!(value(MAX_ID, 0, Some(&scene(None))), Some(2));
+        assert_eq!(value(MAX_ID, 0, None), Some(UNIT_ID));
+        let mut alone = scene(None);
+        alone.stand_in = None;
+        assert_eq!(value(MAX_ID, 0, Some(&alone)), Some(UNIT_ID));
+    }
+
     #[test]
     fn leaves_everything_else_to_the_caller() {
         assert!(world(HEALTH, 0, Some(&scene(None)), None, false).is_none());
@@ -672,7 +694,7 @@ mod tests {
     #[test]
     fn offers_no_control_for_a_question_about_the_world() {
         let mut asked = Vec::new();
-        for id in [UNIT_XZ, UNIT_Y, UNIT_HEIGHT, GROUND_HEIGHT] {
+        for id in [UNIT_XZ, UNIT_Y, UNIT_HEIGHT, GROUND_HEIGHT, MAX_ID] {
             note_asked(&mut asked, id);
         }
         assert!(asked.is_empty(), "{asked:?}");
