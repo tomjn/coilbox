@@ -272,6 +272,11 @@ pub const GROUND_HEIGHT: i32 = 16;
 /// for units around it.
 pub const MAX_ID: i32 = 70;
 
+/// Ids that ask what another unit is to this one, from `CobDefines.h`.
+pub const UNIT_TEAM: i32 = 72;
+pub const UNIT_BUILD_PERCENT_LEFT: i32 = 73;
+pub const UNIT_ALLIED: i32 = 74;
+
 /// What a question about the scene was answered with, and what the preview
 /// wants said about it.
 #[derive(Debug, Clone, PartialEq)]
@@ -365,6 +370,55 @@ pub fn world(
     }))
 }
 
+/// What another unit is to this one: its team, whether it is an ally and how
+/// much of it is still to build (`UnitScript.cpp:1128-1147`).
+///
+/// Unlike the questions [`world`] answers, the engine looks the id up as it is,
+/// so 0 is unit 0 here and not the unit asking. The preview's unit is
+/// [`UNIT_ID`], on team 0.
+///
+/// The stand-in is an ally until the scenario aims or fires a weapon, and the
+/// enemy those weapons point at from then on. A unit that is not in the scene
+/// reads 0 for all three, which is the engine's answer for one that does not
+/// exist. `None` for any other id, and for the stand-in when no scene came.
+pub fn relation(
+    id: i32,
+    p1: i32,
+    world: Option<&crate::World>,
+    model: &crate::Model,
+) -> Option<Answer> {
+    let plain = |value: i32| Answer { value, note: None };
+    if !matches!(id, UNIT_TEAM | UNIT_BUILD_PERCENT_LEFT | UNIT_ALLIED) {
+        return None;
+    }
+    if p1 == UNIT_ID {
+        return Some(plain(i32::from(id == UNIT_ALLIED)));
+    }
+    let world = world?;
+    let there = world
+        .stand_in
+        .as_ref()
+        .is_some_and(|stand_in| stand_in.id == p1)
+        && !model.awaiting_build;
+    if !there {
+        return Some(plain(0));
+    }
+    Some(match id {
+        // The engine answers with the asking unit's team, not the other
+        // unit's (`UnitScript.cpp:1130`), and the preview's unit is on team 0.
+        UNIT_TEAM => plain(0),
+        UNIT_ALLIED => plain(i32::from(!model.targeted)),
+        _ if model.building => Answer {
+            value: 0,
+            note: Some(
+                "This script asks how much of the unit being built is left to build, and the preview does not track how far a build has got, so it read 0."
+                    .to_string(),
+            ),
+        },
+        _ => plain(0),
+    })
+}
+
 /// Ids [`crate::Timeline::asked`] leaves out, because none of them is a
 /// question about the unit that a control could stand in for: the arithmetic
 /// call-outs, the shared values Spring stopped keeping, the running frame, the
@@ -385,7 +439,17 @@ fn excluded_from_asked(id: i32) -> bool {
         || id == PIECE_XZ
         || id == PIECE_Y
         || (LUA0..=LUA9).contains(&id)
-        || matches!(id, UNIT_XZ | UNIT_Y | UNIT_HEIGHT | GROUND_HEIGHT | MAX_ID)
+        || matches!(
+            id,
+            UNIT_XZ
+                | UNIT_Y
+                | UNIT_HEIGHT
+                | GROUND_HEIGHT
+                | MAX_ID
+                | UNIT_TEAM
+                | UNIT_BUILD_PERCENT_LEFT
+                | UNIT_ALLIED
+        )
 }
 
 /// Note that a script read unit value `id`, unless it is one [`Timeline::asked`]
@@ -686,6 +750,79 @@ mod tests {
         assert_eq!(value(MAX_ID, 0, Some(&alone)), Some(UNIT_ID));
     }
 
+    fn asked_of(id: i32, p1: i32, model: &crate::Model) -> Option<i32> {
+        relation(id, p1, Some(&scene(None)), model).map(|answer| answer.value)
+    }
+
+    /// `UnitScript.cpp:1128-1147`, for the unit itself, the stand-in and a
+    /// unit that is not there.
+    #[test]
+    fn says_what_another_unit_is_to_this_one() {
+        let model = crate::Model::default();
+        for (id, own, stand_in) in [
+            (UNIT_TEAM, 0, 0),
+            (UNIT_ALLIED, 1, 1),
+            (UNIT_BUILD_PERCENT_LEFT, 0, 0),
+        ] {
+            assert_eq!(asked_of(id, UNIT_ID, &model), Some(own));
+            assert_eq!(asked_of(id, 2, &model), Some(stand_in));
+            assert_eq!(asked_of(id, 7, &model), Some(0));
+            // Unit 0 is a unit of its own here, and the scene has none.
+            assert_eq!(asked_of(id, 0, &model), Some(0));
+        }
+    }
+
+    #[test]
+    fn the_stand_in_stops_being_an_ally_once_a_weapon_is_aimed_or_fired() {
+        let event = |callin: &str, engine| crate::ScriptEvent {
+            frame: 0,
+            callin: callin.into(),
+            args: Vec::new(),
+            ambient: false,
+            world: None,
+            engine,
+        };
+        for hostile in [
+            event("AimWeapon1", None),
+            event("aimprimary", None),
+            event("", Some(crate::EngineAction::Fire)),
+        ] {
+            let mut model = crate::Model::default();
+            model.see(&hostile);
+            assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(0), "{hostile:?}");
+            assert_eq!(asked_of(UNIT_ALLIED, UNIT_ID, &model), Some(1));
+        }
+        let mut model = crate::Model::default();
+        model.see(&event("TransportPickup", None));
+        model.see(&event("", Some(crate::EngineAction::Attach)));
+        assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(1));
+    }
+
+    /// A buildee the factory has not started on does not exist yet, and one it
+    /// is building has a share left that the preview cannot put a number on.
+    #[test]
+    fn a_unit_being_built_is_not_there_until_the_build_starts() {
+        let mut model = crate::Model::default();
+        model.awaiting_build = true;
+        assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(0));
+        model.awaiting_build = false;
+        model.building = true;
+        let answer = relation(UNIT_BUILD_PERCENT_LEFT, 2, Some(&scene(None)), &model).unwrap();
+        assert_eq!(answer.value, 0);
+        assert!(answer.note.is_some());
+    }
+
+    #[test]
+    fn says_nothing_about_another_unit_without_a_scene() {
+        let model = crate::Model::default();
+        assert!(relation(UNIT_ALLIED, 2, None, &model).is_none());
+        assert_eq!(
+            relation(UNIT_ALLIED, UNIT_ID, None, &model).map(|a| a.value),
+            Some(1)
+        );
+        assert!(relation(HEALTH, 2, Some(&scene(None)), &model).is_none());
+    }
+
     #[test]
     fn leaves_everything_else_to_the_caller() {
         assert!(world(HEALTH, 0, Some(&scene(None)), None, false).is_none());
@@ -694,7 +831,16 @@ mod tests {
     #[test]
     fn offers_no_control_for_a_question_about_the_world() {
         let mut asked = Vec::new();
-        for id in [UNIT_XZ, UNIT_Y, UNIT_HEIGHT, GROUND_HEIGHT, MAX_ID] {
+        for id in [
+            UNIT_XZ,
+            UNIT_Y,
+            UNIT_HEIGHT,
+            GROUND_HEIGHT,
+            MAX_ID,
+            UNIT_TEAM,
+            UNIT_BUILD_PERCENT_LEFT,
+            UNIT_ALLIED,
+        ] {
             note_asked(&mut asked, id);
         }
         assert!(asked.is_empty(), "{asked:?}");

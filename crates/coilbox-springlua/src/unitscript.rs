@@ -605,6 +605,7 @@ impl Run {
             if let Some(world) = &event.world {
                 self.sim.borrow_mut().world = Some(world.clone());
             }
+            self.sim.borrow_mut().model.see(event);
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
                 if action == EngineAction::Fire {
@@ -2747,6 +2748,12 @@ fn install_unit_value(lua: &Lua, sim: &Rc<RefCell<Sim>>) -> mlua::Result<()> {
                 sim.model.passenger.at(),
                 sim.model.awaiting_build,
             ) {
+                if let Some(note) = answer.note {
+                    sim.model.note(note);
+                }
+                return Ok(answer.value);
+            }
+            if let Some(answer) = unitvalue::relation(id, p1, sim.world.as_ref(), &sim.model) {
                 if let Some(note) = answer.note {
                     sim.model.note(note);
                 }

@@ -548,6 +548,7 @@ impl Run {
             if let Some(world) = &event.world {
                 self.world = Some(world.clone());
             }
+            self.model.see(event);
             if let Some(action) = event.engine {
                 self.tick_queued_call_ins(start)?;
                 if action == EngineAction::Fire {
@@ -1681,6 +1682,12 @@ impl Run {
             self.model.passenger.at(),
             self.model.awaiting_build,
         ) {
+            if let Some(note) = answer.note {
+                self.model.note(note);
+            }
+            return answer.value;
+        }
+        if let Some(answer) = unitvalue::relation(id, p1, self.world.as_ref(), &self.model) {
             if let Some(note) = answer.note {
                 self.model.note(note);
             }

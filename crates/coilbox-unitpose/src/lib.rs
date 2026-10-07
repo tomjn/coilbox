@@ -424,6 +424,9 @@ pub struct Model {
     /// Whether a factory is building, between the frame its script put it in
     /// build stance and an engine `factory-finish`.
     pub building: bool,
+    /// Whether the scenario has aimed or fired a weapon yet. The stand-in is an
+    /// ally until it has, and what the weapons point at from then on.
+    pub targeted: bool,
 }
 
 impl Model {
@@ -486,6 +489,18 @@ impl Model {
     pub fn note(&mut self, note: String) {
         if !self.warnings.contains(&note) {
             self.warnings.push(note);
+        }
+    }
+
+    /// Take note of an event the scenario is about to fire, before either
+    /// runtime acts on it.
+    pub fn see(&mut self, event: &ScriptEvent) {
+        let aims = event
+            .callin
+            .get(..3)
+            .is_some_and(|stem| stem.eq_ignore_ascii_case("aim"));
+        if aims || event.engine == Some(EngineAction::Fire) {
+            self.targeted = true;
         }
     }
 
