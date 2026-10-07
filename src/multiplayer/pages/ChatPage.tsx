@@ -546,6 +546,7 @@ function ChatPage() {
       {(desc?.kind === "channel" || desc?.kind === "battle") && showMembers && (
         <MemberList
           members={conv.members}
+          onClose={() => setShowMembers(false)}
           onSelect={(username) => {
             if (activeServerKey)
               setActive({

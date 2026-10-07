@@ -150,3 +150,10 @@ it("puts presence first, then the name, then rank and flag (issue #3695)", () =>
   // The label is for screen readers and the tooltip, not printed on the row.
   expect(screen.getByText("In battle").className).toContain("sr-only");
 });
+
+it("has a close button in the header when it can be closed", () => {
+  const onClose = vi.fn();
+  render(<MemberList members={[user("alice")]} onClose={onClose} />);
+  fireEvent.click(screen.getByRole("button", { name: "Close members" }));
+  expect(onClose).toHaveBeenCalledTimes(1);
+});

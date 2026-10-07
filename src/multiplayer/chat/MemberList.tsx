@@ -1,4 +1,5 @@
 import { cn, useSetting } from "@picoframe/frame";
+import { X } from "lucide-react";
 import {
   type ReactNode,
   type RefObject,
@@ -51,8 +52,11 @@ export function MemberList({
   isIgnored,
   noteFor,
   renderActions,
+  onClose,
 }: {
   members: User[];
+  /** Close the panel. The header has a close button when this is given. */
+  onClose?: () => void;
   onSelect?: (username: string) => void;
   /** Optional per-member accent colour (`#rrggbb`), e.g. a battle player's team
    * colour, shown as a swatch. Returns undefined when there's no colour. */
@@ -106,8 +110,19 @@ export function MemberList({
           } else setDragging(next);
         }}
       />
-      <div className="border-b border-border px-4 py-3 text-sm font-semibold">
+      <div className="flex items-center justify-between gap-2 border-b border-border py-1.5 pr-2 pl-4 text-sm font-semibold">
         Members ({members.length})
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close members"
+            title="Close members"
+            className="inline-flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
       </div>
       <TooltipProvider>
         <ul className="flex flex-col gap-0.5 overflow-auto p-2">
