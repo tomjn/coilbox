@@ -294,6 +294,9 @@ export function ParticipantsTable({
             // A non-leader row sharing a team: its team-level controls (colour,
             // side, ally) are hidden — the leader's row above carries them.
             const sharer = teamIdx !== undefined && leader.id !== p.id;
+            // An AI row is taller than its picker, which has the bonus under it.
+            // Its other cells sit at the top so every picker shares one line.
+            const top = p.kind === "ai" && "align-top";
             const sharedTitle = sharer
               ? `Shares a team with ${leader.name} — team settings come from the first member`
               : undefined;
@@ -303,7 +306,13 @@ export function ParticipantsTable({
                 className="border-border/40 hover:bg-transparent"
               >
                 <TableCell className="px-3 py-2">
-                  <div className="flex items-center gap-2.5">
+                  <div
+                    className={cn(
+                      "flex items-center gap-2.5",
+                      // The swatch lines up with the picker, not the whole cell.
+                      top && "items-start [&>:first-child]:mt-1",
+                    )}
+                  >
                     {sharer ? (
                       // A file-explorer-style branch in the team colour, marking
                       // this row as a member of the leader's team above it.
@@ -438,7 +447,7 @@ export function ParticipantsTable({
                 </TableCell>
 
                 {showFaction && (
-                  <TableCell className="px-2 py-2">
+                  <TableCell className={cn("px-2 py-2", !sharer && top)}>
                     {p.kind === "you" && p.spectator ? (
                       <span className="text-xs text-muted-foreground">–</span>
                     ) : sharer ? (
@@ -468,7 +477,7 @@ export function ParticipantsTable({
                   </TableCell>
                 )}
 
-                <TableCell className="px-2 py-2">
+                <TableCell className={cn("px-2 py-2", top)}>
                   {teamIdx === undefined ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : (
@@ -496,7 +505,7 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="px-2 py-2">
+                <TableCell className={cn("px-2 py-2", top)}>
                   {p.kind === "you" && p.spectator ? (
                     <span className="text-xs text-muted-foreground">–</span>
                   ) : sharer ? null : (
@@ -513,7 +522,7 @@ export function ParticipantsTable({
                   )}
                 </TableCell>
 
-                <TableCell className="py-2 pl-1 pr-2 text-right">
+                <TableCell className={cn("py-2 pl-1 pr-2 text-right", top)}>
                   {p.kind === "you" ? null : (
                     <Button
                       variant="ghost"
