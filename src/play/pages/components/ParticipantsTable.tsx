@@ -204,7 +204,7 @@ export function ParticipantsTable({
   // Offer allies up to the participant count so any FFA/teams split is reachable.
   const allyOptions = participants.map((_, i) => ({
     value: String(i),
-    label: `Ally ${allyLetter(i)}`,
+    label: allyLetter(i),
   }));
   // Offer team slots up to the active count: enough for full FFA, and picking a
   // taken number is how two rows come to share a team (shared unit control).
@@ -512,7 +512,8 @@ export function ParticipantsTable({
                     <OptionSelect
                       value={String(p.allyTeam)}
                       size="sm"
-                      className="w-24"
+                      className="w-16"
+                      ariaLabel={`${p.name} ally`}
                       disabled={disabled}
                       options={allyOptions}
                       onValueChange={(v) =>
