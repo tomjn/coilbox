@@ -18,6 +18,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
@@ -327,6 +328,56 @@ describe("the Battles page with two connections", () => {
     });
 
     expect(location).toBe(`/battle?server=${encodeURIComponent(KEY_B)}`);
+  });
+});
+
+describe("the Friends section (issue #3694)", () => {
+  function withFriendOnB() {
+    wire.states.set(KEY_A, lobbyState("AF", [battle(1, "Battle on A")], null));
+    wire.states.set(KEY_B, {
+      ...lobbyState("Zeta", [battle(7, "Battle on B")], null),
+      friends: ["Host"],
+    });
+  }
+
+  it("is absent when no battle has a friend in it", async () => {
+    await openPage();
+    expect(screen.queryByRole("button", { name: /^Friends/ })).toBeNull();
+  });
+
+  it("lists a friend's battle and names its connection", async () => {
+    withFriendOnB();
+    await openPage();
+    const section = screen
+      .getByRole("button", { name: /^Friends/ })
+      .closest("section") as HTMLElement;
+    // "Host" hosts a battle on both servers and is a friend on B alone.
+    expect(within(section).queryByText("Battle on A")).toBeNull();
+    expect(within(section).getByText("Battle on B")).toBeTruthy();
+    expect(within(section).getByText(/· Zeta on /)).toBeTruthy();
+    // It stays in its own connection's list too.
+    expect(screen.getAllByText("Battle on B")).toHaveLength(2);
+  });
+
+  it("joins on the connection the battle belongs to", async () => {
+    withFriendOnB();
+    await openPage();
+    const section = screen
+      .getByRole("button", { name: /^Friends/ })
+      .closest("section") as HTMLElement;
+    await act(async () => {
+      fireEvent.click(within(section).getByRole("button", { name: "Join" }));
+    });
+    expect(wire.calls).toEqual([`join ${KEY_B} 7`]);
+  });
+
+  it("collapses", async () => {
+    withFriendOnB();
+    await openPage();
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^Friends/ }));
+    });
+    expect(screen.getAllByText("Battle on B")).toHaveLength(1);
   });
 });
 

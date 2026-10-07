@@ -41,6 +41,7 @@ function BattleRowInner({
   linkable = true,
   inProgress = false,
   friendsHere,
+  connectionLabel,
   onJoin,
   onLeave,
   enginePath,
@@ -66,6 +67,8 @@ function BattleRowInner({
   /** The friends in this battle, as their names, or undefined for none. A
    * string so the memo holds while other battles change. */
   friendsHere?: string;
+  /** The connection this battle is on, for a list that mixes connections. */
+  connectionLabel?: string;
   onJoin: (b: Battle, key?: string) => void;
   onLeave: () => void;
   enginePath?: string;
@@ -133,6 +136,7 @@ function BattleRowInner({
         {battle.map} · {battle.modname}
         {/* Tachyon's lobby list names no founder, so there is no host to name. */}
         {battle.host && ` · host ${battle.host}`}
+        {connectionLabel && ` · ${connectionLabel}`}
       </p>
     </div>
   );
