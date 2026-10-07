@@ -69,7 +69,26 @@ pub const OPCODES: &[(&str, u32)] = &[
     ("SET", 0x10082000),
     ("ATTACH_UNIT", 0x10083000),
     ("DROP_UNIT", 0x10084000),
+    // What Total Annihilation's own interpreter runs and neither the reference
+    // compiler nor Recoil knows, read out of the decompiled `totala.exe`
+    // (`byte-tactics`, `src/units/cob.cpp`). No BOS keyword compiles to any
+    // of them. `PIECE_OP_0A` is TA Kingdoms' `dont-shadow`, which the
+    // reference compiler writes as `DONT_SHADE`'s value instead.
+    ("PIECE_OP_09", 0x10009000),
+    ("PIECE_OP_0A", 0x1000A000),
+    ("IS_CARRYING_UNIT", 0x10044000),
+    ("CARRIER_UNIT_ID", 0x10045000),
+    ("DISCARD_CALL", 0x10063000),
 ];
+
+/// Whether an opcode is one only Total Annihilation's own engine runs. Recoil
+/// stops the thread on any of them.
+pub fn ta_only(name: &str) -> bool {
+    matches!(
+        name,
+        "PIECE_OP_09" | "PIECE_OP_0A" | "IS_CARRYING_UNIT" | "CARRIER_UNIT_ID" | "DISCARD_CALL"
+    )
+}
 
 /// Opcode value for a mnemonic (case-sensitive; names are already upper-snake).
 // Used by the compiler codegen (in progress — see PORTING.md).

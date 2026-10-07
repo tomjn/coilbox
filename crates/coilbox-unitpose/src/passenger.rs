@@ -43,6 +43,11 @@ impl Passenger {
         }
     }
 
+    /// Whether the unit is carrying it now, on a piece or in the void.
+    pub fn held(&self) -> bool {
+        matches!(self, Self::Riding { .. } | Self::Void { .. })
+    }
+
     /// Carry it on `piece`, or in the void when there is none.
     ///
     /// It stays where it is until [`Passenger::after_frame`] moves it.

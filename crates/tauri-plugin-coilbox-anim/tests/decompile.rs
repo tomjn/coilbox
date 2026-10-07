@@ -131,6 +131,31 @@ fn unwritable_script_fails_to_recompile() {
     assert!(compile_bos(&decompiled.source, &fixtures()).is_err());
 }
 
+/// An instruction only Total Annihilation runs is read rather than refused,
+/// and the script it is in is kept as a listing that says why.
+#[test]
+fn a_total_annihilation_instruction_is_named_and_kept_as_a_listing() {
+    // CARRIER_UNIT_ID, POP_STACK, PUSH_CONSTANT 0, RETURN.
+    let words: [u32; 5] = [0x10045000, 0x10024000, 0x10021001, 0, 0x10065000];
+    let mut code = Vec::new();
+    for w in words {
+        code.extend_from_slice(&w.to_le_bytes());
+    }
+    let cob = cob_with_one_script("Create", &code, &["base"]);
+    let decompiled = decompile_cob(&cob).expect("decompile");
+    assert_eq!(decompiled.warnings.len(), 1, "{:?}", decompiled.warnings);
+    assert!(
+        decompiled.warnings[0].contains("only Total Annihilation"),
+        "{:?}",
+        decompiled.warnings
+    );
+    assert!(
+        decompiled.source.contains("CARRIER_UNIT_ID"),
+        "{}",
+        decompiled.source
+    );
+}
+
 /// COBBLER writes its own name into the stream after the first script's last
 /// `RETURN`. That is data, not code, so the script still reads as BOS.
 #[test]

@@ -2174,3 +2174,108 @@ mod probe {
         );
     }
 }
+
+/// The instructions only Total Annihilation's own interpreter runs, each as
+/// `CobScript::RunThread` runs it. Every script here ends by moving the base
+/// one elmo along z with whatever is on top of the stack, so a wrong number of
+/// values popped or pushed moves it somewhere else.
+mod total_annihilation {
+    use super::*;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn pickup(words: Vec<u32>) -> Timeline {
+        run(
+            &build(&[("TransportPickup", words)], PIECES, 0),
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene()),
+                engine: None,
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        )
+    }
+
+    fn move_base() -> [u32; 4] {
+        [op("MOVE_NOW"), 0, 2, op("RETURN")]
+    }
+
+    /// `move base to z-axis [1] * __is_carrying_unit(unitid) now`
+    fn asks_whether_it_carries(attach_first: bool) -> Timeline {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        if attach_first {
+            words.extend([op("PUSH_LOCAL_VAR"), 0]);
+            words.extend(push(1));
+            words.extend(push(0));
+            words.push(op("ATTACH_UNIT"));
+        }
+        words.extend([op("PUSH_LOCAL_VAR"), 0, op("IS_CARRYING_UNIT")]);
+        words.extend(push(ELMO));
+        words.push(op("MUL"));
+        words.extend(move_base());
+        pickup(words)
+    }
+
+    #[test]
+    fn knows_the_unit_it_is_carrying() {
+        let timeline = asks_whether_it_carries(true);
+        assert!(close(pose(&timeline, 0, "base")[2], 1.0));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("only Total Annihilation")));
+    }
+
+    #[test]
+    fn is_not_carrying_a_unit_it_has_not_picked_up() {
+        let timeline = asks_whether_it_carries(false);
+        assert!(close(pose(&timeline, 0, "base")[2], 0.0));
+    }
+
+    #[test]
+    fn nothing_carries_the_unit_in_the_preview() {
+        let mut words = push(ELMO);
+        words.extend([op("CARRIER_UNIT_ID"), op("ADD")]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn a_discarded_call_takes_its_arguments_and_runs_nothing() {
+        let mut words = push(ELMO);
+        words.extend(push(7));
+        words.extend(push(9));
+        words.extend([op("DISCARD_CALL"), 0, 2]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn the_two_piece_instructions_do_nothing() {
+        let mut words = push(ELMO);
+        words.extend(push(7));
+        words.extend(push(9));
+        words.extend([op("PIECE_OP_09"), 1, op("PIECE_OP_0A"), 1]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+}

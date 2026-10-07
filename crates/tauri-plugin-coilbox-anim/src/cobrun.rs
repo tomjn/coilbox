@@ -37,7 +37,7 @@ use coilbox_unitpose::{
 use serde::Serialize;
 
 use crate::cob;
-use crate::opcodes::opcode;
+use crate::opcodes::{mnemonic, opcode, ta_only};
 
 /// COB's fixed-point scale: 65536ths of an elmo for a distance, and 65536ths
 /// of a full circle for an angle.
@@ -1083,6 +1083,13 @@ impl Run {
     fn execute(&mut self, i: usize, word: u32) -> Result<(), String> {
         let op = |name: &str| opcode(name).expect("mnemonic is in the opcode table");
 
+        if mnemonic(word).is_some_and(ta_only) {
+            self.model.note(
+                "This script uses an instruction only Total Annihilation's own engine runs. The preview runs it as Total Annihilation does, and Recoil stops the thread there."
+                    .to_string(),
+            );
+        }
+
         match word {
             // Stack.
             w if w == op("PUSH_CONSTANT") => {
@@ -1434,6 +1441,36 @@ impl Run {
             w if w == op("DROP_UNIT") => {
                 let unit = self.pop(i);
                 self.model.drop_unit(self.frame, unit, self.world.as_ref());
+            }
+
+            // Total Annihilation's own, as `CobScript::RunThread` runs them
+            // (`byte-tactics`, `src/units/cob.cpp:576-587,772-782,898-904`).
+            // The unit in the preview carries the stand-in or nothing, and
+            // nothing carries it.
+            w if w == op("IS_CARRYING_UNIT") => {
+                let unit = self.pop(i);
+                let held = self.model.passenger.held()
+                    && self
+                        .world
+                        .as_ref()
+                        .and_then(|world| world.stand_in.as_ref())
+                        .is_some_and(|stand_in| stand_in.id == unit);
+                self.push(i, i32::from(held));
+            }
+            w if w == op("CARRIER_UNIT_ID") => self.push(i, 0),
+            w if w == op("DISCARD_CALL") => {
+                self.word(i)?;
+                for _ in 0..self.word(i)? {
+                    self.pop(i);
+                }
+            }
+            w if w == op("PIECE_OP_09") => {
+                self.word(i)?;
+                self.pop(i);
+                self.pop(i);
+            }
+            w if w == op("PIECE_OP_0A") => {
+                self.word(i)?;
             }
 
             // Renderer hints with one operand each, which the engine also
