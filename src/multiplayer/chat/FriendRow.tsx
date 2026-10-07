@@ -14,9 +14,9 @@ const UNKNOWN_META = {
  * and the all-servers list both use this row, so anything a friend's row gains
  * (such as Join and Watch buttons) is added here once.
  *
- * `children` are hover-revealed actions that position themselves absolutely over
- * the right of the row (`FriendAction`, `FavStar`). They need the row's wrapping
- * `<li>`, which this renders, and the extra right padding it adds when present.
+ * `children` are actions that position themselves absolutely over the right of
+ * the row (the `⋮` menu and Follow). They need the row's wrapping `<li>`, which
+ * this renders, and the extra right padding it adds when present.
  */
 export function FriendRow({
   name,
@@ -58,7 +58,7 @@ export function FriendRow({
     ? `In ${battle.title || `battle ${battle.id}`}`
     : null;
   const subline = [serverLabel, battleLabel].filter(Boolean).join(" · ");
-  // Each hover action is 24px wide and they sit side by side from the right.
+  // The menu is 32px wide and Follow 24px, side by side from the right.
   const actions = Children.toArray(children).length;
   return (
     <li className="group relative">
@@ -70,7 +70,7 @@ export function FriendRow({
           "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm",
           active ? "bg-muted font-medium" : "hover:bg-muted",
           disabled && "cursor-default hover:bg-transparent",
-          actions > 0 && (actions > 2 ? "pr-[5.5rem]" : "pr-16"),
+          actions > 0 && "pr-16",
         )}
         onClick={onOpen}
       >

@@ -169,6 +169,19 @@ describe("ConversationSidebar: grouped by connection", () => {
   });
 });
 
+describe("ConversationSidebar: a friend's row", () => {
+  it("has the member menu, and offers no friend request to a friend", () => {
+    wire.favourites = { [KEY_A]: ["bob"] };
+    wire.connections = { [KEY_A]: connectionFor(KEY_A) };
+    renderSidebar();
+
+    expect(
+      screen.getByRole("button", { name: "Actions for bob" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /friend request/ })).toBeNull();
+  });
+});
+
 describe("ConversationSidebar: friends across servers (#3380)", () => {
   const online = { status: { ingame: false, away: false } };
 

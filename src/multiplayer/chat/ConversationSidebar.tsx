@@ -10,27 +10,17 @@ import {
   Star,
   Swords,
   UserPlus,
-  UserX,
   X,
 } from "lucide-react";
-import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 import {
   type ChatMsg,
   type LobbyState,
   mpAcceptFriendRequest,
   mpDeclineFriendRequest,
-  mpFriendRequest,
-  mpUnfriend,
 } from "../bindings";
 import { isFollowing, toggleFollow, useFollow } from "../follow/followStore";
-import {
-  addFavourite,
-  favouritesFor,
-  isFavourite,
-  removeFavourite,
-  useFavourites,
-} from "../friends";
+import { favouritesFor, useFavourites } from "../friends";
 import { battleOf, mergeFriends } from "../friendsAcrossServers";
 import { isIgnored, useIgnored } from "../ignore";
 import { useNoteActions } from "../notes";
@@ -68,8 +58,8 @@ function Badge({ n }: { n: number }) {
 }
 
 /**
- * A star toggle that marks a DM peer as a client-local favourite. Filled when
- * favourited. It is absolutely positioned over the right of its row rather than
+ * A star toggle that makes a DM peer a friend, or stops them being one. Filled
+ * for a friend. It is absolutely positioned over the right of its row rather than
  * nested inside the row's button (nesting buttons is invalid), so its wrapping
  * `<li>` must be `relative`. Rows carry right padding so it can't overlap text.
  * The 24px hit area (glyph stays small) meets the WCAG target size, and an
@@ -98,33 +88,6 @@ function FavStar({
       )}
     >
       <Star className={cn("size-4", active && "fill-current text-amber-400")} />
-    </button>
-  );
-}
-
-/**
- * A hover-revealed row action sitting just left of the {@link FavStar} (so the two
- * don't overlap. Friend rows carry extra right padding for both). Used to send a
- * server friend request (local-only favourites) or to unfriend (server friends).
- */
-function FriendAction({
-  icon,
-  label,
-  onClick,
-}: {
-  icon: ReactNode;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      title={label}
-      className="absolute right-8 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground opacity-0 hover:bg-muted-foreground/10 hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-    >
-      {icon}
     </button>
   );
 }
@@ -170,6 +133,31 @@ function FollowAction({
 }
 
 /**
+ * A friend's `⋮` menu: follow, remove, a private note and ignore. A component
+ * of its own because the all-servers list has a row per server, and each needs
+ * that server's actions.
+ */
+function FriendMenu({ serverKey, name }: { serverKey: string; name: string }) {
+  const playerActions = usePlayerActions(serverKey);
+  const { get: getNote, set: setNote } = useNoteActions(serverKey);
+  // Absent for a friend who is offline, where the note falls back to the name.
+  const userId = useConnection(serverKey)?.mirror.state?.users[name]?.userId;
+  return (
+    // Over the right of the row, like the row's other actions.
+    <div className="absolute top-0 right-0">
+      <MemberActionsMenu
+        nick={name}
+        note={{
+          text: getNote(userId, name),
+          onSave: (text) => setNote(userId, name, text),
+        }}
+        {...playerActions(name)}
+      />
+    </div>
+  );
+}
+
+/**
  * One connection's Battle/Channels/Party/Friends/Direct-messages sections
  * (issue #2843), broken out of `ConversationSidebar` so the exact same body
  * runs once per live connection. With two or more connections open each copy
@@ -205,39 +193,26 @@ function ConnectionGroup({
   // like them, so the section is only there on a Tachyon connection.
   const hasParties = protocol === "tachyon";
   const [ignored] = useIgnored();
-  const [favourites, setFavourites] = useFavourites();
+  const [favourites] = useFavourites();
   const playerActions = usePlayerActions(serverKey);
   const { get: getNote, set: setNote } = useNoteActions(serverKey);
   const state = connection?.mirror.state;
   const me = state?.myUsername ?? null;
 
-  // Client-local favourites for this connection. Starring a peer here (or from
-  // the DM header) toggles it. Offline favourites still show so you can jump to a
-  // past conversation. Purely local, with no friend protocol behind it (#187).
+  // Friends starred on this client for this connection. Offline ones still
+  // show so you can jump to a past conversation.
   const favPeers = favouritesFor(favourites, serverKey);
-  function toggleFavourite(name: string) {
-    setFavourites(
-      isFavourite(favourites, serverKey, name)
-        ? removeFavourite(favourites, serverKey, name)
-        : addFavourite(favourites, serverKey, name),
-    );
-  }
 
-  // Server-side friends (#187) merged with the local favourites above: the Friends
-  // section shows their UNION, with server friends distinguished by a check badge
-  // and offering unfriend, while local-only favourites offer "add friend" (send a
-  // request). Incoming requests get Accept/Decline. All friend commands no-op on
-  // servers without support, so failures are swallowed and never disrupt the UI.
+  // Server-side friends (#187) merged with the starred ones above: the Friends
+  // section shows their UNION, with server friends distinguished by a check
+  // badge. Either kind is a friend, so neither row offers a friend request:
+  // adding a friend sends one, see `usePlayerActions`. Incoming requests get
+  // Accept/Decline. All friend commands no-op on servers without support, so
+  // failures are swallowed and never disrupt the UI.
   const serverFriends = state?.friends ?? [];
   const serverFriendSet = new Set(serverFriends);
   const friendRequests = state?.friendRequests ?? [];
   const friendNames = [...new Set([...favPeers, ...serverFriends])].sort();
-  function sendFriendRequest(name: string) {
-    mpFriendRequest({ serverKey, username: name }).catch(() => {});
-  }
-  function unfriend(name: string) {
-    mpUnfriend({ serverKey, username: name }).catch(() => {});
-  }
   function acceptRequest(name: string) {
     mpAcceptFriendRequest({ serverKey, username: name }).catch(() => {});
   }
@@ -450,28 +425,11 @@ function ConnectionGroup({
                   trailing={<Badge n={unreadBadge(id, msgs)} />}
                   onOpen={() => onSelect(serverKey, { kind: "dm", peer })}
                 >
-                  {isServerFriend ? (
-                    <FriendAction
-                      icon={<UserX className="size-4" />}
-                      label={`Remove ${peer} from friends`}
-                      onClick={() => unfriend(peer)}
-                    />
-                  ) : (
-                    <FriendAction
-                      icon={<UserPlus className="size-4" />}
-                      label={`Send ${peer} a friend request`}
-                      onClick={() => sendFriendRequest(peer)}
-                    />
-                  )}
-                  <FavStar
-                    name={peer}
-                    active={isFavourite(favourites, serverKey, peer)}
-                    onToggle={() => toggleFavourite(peer)}
-                  />
+                  <FriendMenu serverKey={serverKey} name={peer} />
                   <FollowAction
                     serverKey={serverKey}
                     name={peer}
-                    className="right-[3.75rem]"
+                    className="right-9"
                   />
                 </FriendRow>
               );
@@ -499,6 +457,7 @@ function ConnectionGroup({
             // Absent for a peer who has gone offline, where the note falls
             // back to the name.
             const userId = state?.users[peer]?.userId;
+            const actions = playerActions(peer);
             return (
               <li key={id} className="group flex items-center gap-1">
                 {/* Holds the star, which is placed over the row's right edge. */}
@@ -519,11 +478,13 @@ function ConnectionGroup({
                     <span className="truncate">{peer}</span>
                     <Badge n={unreadBadge(id, msgs)} />
                   </button>
-                  <FavStar
-                    name={peer}
-                    active={isFavourite(favourites, serverKey, peer)}
-                    onToggle={() => toggleFavourite(peer)}
-                  />
+                  {actions.friend && (
+                    <FavStar
+                      name={peer}
+                      active={actions.friend.isFriend}
+                      onToggle={actions.friend.onToggle}
+                    />
+                  )}
                 </div>
                 <MemberActionsMenu
                   nick={peer}
@@ -531,7 +492,7 @@ function ConnectionGroup({
                     text: getNote(userId, peer),
                     onSave: (text) => setNote(userId, peer, text),
                   }}
-                  {...playerActions(peer)}
+                  {...actions}
                 />
               </li>
             );
@@ -601,12 +562,15 @@ function AllFriendsSection({
             }
             onOpen={() => onSelect(e.serverKey, { kind: "dm", peer: e.name })}
           >
-            {/* Nobody can be followed on a server that is not connected. */}
+            {/* Nothing can be done on a server that is not connected. */}
+            {e.status !== "unknown" && (
+              <FriendMenu serverKey={e.serverKey} name={e.name} />
+            )}
             {e.status !== "unknown" && (
               <FollowAction
                 serverKey={e.serverKey}
                 name={e.name}
-                className="right-1"
+                className="right-9"
               />
             )}
           </FriendRow>

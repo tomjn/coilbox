@@ -41,12 +41,6 @@ import { userPresence } from "../chat/presence";
 import { useConversation } from "../chat/useConversation";
 import { useConversationParam } from "../chat/useConversationParam";
 import { usePlayerActions } from "../chat/usePlayerActions";
-import {
-  addFavourite,
-  isFavourite,
-  removeFavourite,
-  useFavourites,
-} from "../friends";
 import { useIgnoreActions } from "../ignore";
 import { canChannelModerate, chanServInfo } from "../moderation";
 import { useMpRevealed } from "../navPredicates";
@@ -94,7 +88,6 @@ function ChatPage() {
     openLoginPopover,
   } = useMultiplayer();
   const servers = useProtocolServers();
-  const [favourites, setFavourites] = useFavourites();
   const navigate = useNavigate();
   const [active, setActive] = useState<ActiveConversation | null>(null);
   const [showMembers, setShowMembers] = useState(false);
@@ -261,19 +254,10 @@ function ChatPage() {
   const titleIsBot = dmPeer != null && isBot(dmPeer);
   const titlePresence = dmPeer == null ? undefined : presenceFor(dmPeer);
 
-  // Client-local favourite toggle for the open DM peer (see friends.ts / #185).
-  const dmIsFavourite =
-    dmPeer != null && activeServerKey != null
-      ? isFavourite(favourites, activeServerKey, dmPeer)
-      : false;
-  function toggleDmFavourite() {
-    if (dmPeer == null || activeServerKey == null) return;
-    setFavourites(
-      isFavourite(favourites, activeServerKey, dmPeer)
-        ? removeFavourite(favourites, activeServerKey, dmPeer)
-        : addFavourite(favourites, activeServerKey, dmPeer),
-    );
-  }
+  // The friend toggle for the open DM peer, the same one their menu has. There
+  // is none for a conversation with ourselves.
+  const dmFriend = dmPeer != null ? playerActions(dmPeer).friend : undefined;
+  const dmIsFavourite = dmFriend?.isFriend ?? false;
 
   // Mark the open conversation read as its message count changes. Marked with
   // the conversation's own total rather than the length of the rendered list,
@@ -422,32 +406,34 @@ function ChatPage() {
           headerActions={
             desc.kind === "dm" ? (
               <TooltipProvider delayDuration={150}>
-                <IconTip
-                  label={
-                    dmIsFavourite
-                      ? `Remove ${desc.peer} from friends`
-                      : `Add ${desc.peer} to friends`
-                  }
-                >
-                  <Button
-                    variant="secondary"
-                    className="h-7 px-2"
-                    onClick={toggleDmFavourite}
-                    aria-label={
+                {dmFriend && (
+                  <IconTip
+                    label={
                       dmIsFavourite
                         ? `Remove ${desc.peer} from friends`
                         : `Add ${desc.peer} to friends`
                     }
-                    aria-pressed={dmIsFavourite}
                   >
-                    <Star
-                      className={cn(
-                        "size-4",
-                        dmIsFavourite && "fill-current text-amber-400",
-                      )}
-                    />
-                  </Button>
-                </IconTip>
+                    <Button
+                      variant="secondary"
+                      className="h-7 px-2"
+                      onClick={dmFriend.onToggle}
+                      aria-label={
+                        dmIsFavourite
+                          ? `Remove ${desc.peer} from friends`
+                          : `Add ${desc.peer} to friends`
+                      }
+                      aria-pressed={dmIsFavourite}
+                    >
+                      <Star
+                        className={cn(
+                          "size-4",
+                          dmIsFavourite && "fill-current text-amber-400",
+                        )}
+                      />
+                    </Button>
+                  </IconTip>
+                )}
                 <IconTip
                   label={
                     ignoredNow(desc.peer)
