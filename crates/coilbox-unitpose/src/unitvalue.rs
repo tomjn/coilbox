@@ -802,11 +802,15 @@ mod tests {
     /// is building has a share left that the preview cannot put a number on.
     #[test]
     fn a_unit_being_built_is_not_there_until_the_build_starts() {
-        let mut model = crate::Model::default();
-        model.awaiting_build = true;
-        assert_eq!(asked_of(UNIT_ALLIED, 2, &model), Some(0));
-        model.awaiting_build = false;
-        model.building = true;
+        let waiting = crate::Model {
+            awaiting_build: true,
+            ..Default::default()
+        };
+        assert_eq!(asked_of(UNIT_ALLIED, 2, &waiting), Some(0));
+        let model = crate::Model {
+            building: true,
+            ..Default::default()
+        };
         let answer = relation(UNIT_BUILD_PERCENT_LEFT, 2, Some(&scene(None)), &model).unwrap();
         assert_eq!(answer.value, 0);
         assert!(answer.note.is_some());
