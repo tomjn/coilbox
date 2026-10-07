@@ -526,6 +526,8 @@ export default function SkirmishPage() {
   };
   const removeParticipant = (id: string) =>
     setParticipants((ps) => ps.filter((p) => p.id !== id));
+  const clearAis = () =>
+    setParticipants((ps) => ps.filter((p) => p.kind !== "ai"));
   // Added before the game's AI list settles, the slot is left blank for the fill
   // pass rather than seeded from the engine's natives.
   const addAi = () =>
@@ -1216,6 +1218,7 @@ export default function SkirmishPage() {
             }
             onRemove={removeParticipant}
             onAddAi={addAi}
+            onClearAis={clearAis}
             onSetAiBonus={(id, percent) =>
               setParticipants((ps) => setAiBonus(ps, id, percent))
             }

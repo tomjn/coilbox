@@ -123,6 +123,7 @@ export function ParticipantsTable({
   onSetTeam,
   onRemove,
   onAddAi,
+  onClearAis,
   onSetAiBonus,
   onSetAllAiBonus,
   bonusSuggestions,
@@ -145,6 +146,9 @@ export function ParticipantsTable({
   onSetTeam: (id: string, team: number) => void;
   onRemove: (id: string) => void;
   onAddAi: () => void;
+  /** Remove every AI at once, leaving only the human row. Left out where a
+   * removal needs a decision per row, which hides the button. */
+  onClearAis?: () => void;
   /** Set one AI's resource bonus, 0 to 100 percent (0 clears it). */
   onSetAiBonus: (id: string, percent: number) => void;
   /** Set the same resource bonus on every AI. */
@@ -280,7 +284,19 @@ export function ParticipantsTable({
             <TableHead className="px-2 pb-2 pt-3 text-left font-medium text-muted-foreground">
               Ally
             </TableHead>
-            <TableHead className="pb-2 pl-1 pr-2 pt-3" />
+            <TableHead className="pb-2 pl-1 pr-2 pt-3 text-right">
+              {onClearAis && aiRows.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-[11px] uppercase tracking-wide text-muted-foreground"
+                  disabled={disabled}
+                  onClick={onClearAis}
+                >
+                  Clear AIs
+                </Button>
+              )}
+            </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

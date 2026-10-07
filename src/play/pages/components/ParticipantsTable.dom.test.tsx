@@ -91,6 +91,7 @@ function renderTable(
 ) {
   const onSetAiBonus = props.onSetAiBonus ?? vi.fn();
   const onSetAllAiBonus = props.onSetAllAiBonus ?? vi.fn();
+  const onClearAis = vi.fn();
   render(
     <MemoryRouter>
       <ParticipantsTable
@@ -103,13 +104,14 @@ function renderTable(
         onSetTeam={vi.fn()}
         onRemove={vi.fn()}
         onAddAi={vi.fn()}
+        onClearAis={onClearAis}
         onSetAiBonus={onSetAiBonus}
         onSetAllAiBonus={onSetAllAiBonus}
         bonusSuggestions={props.bonusSuggestions}
       />
     </MemoryRouter>,
   );
-  return { onSetAiBonus, onSetAllAiBonus };
+  return { onSetAiBonus, onSetAllAiBonus, onClearAis };
 }
 
 /** Move a bonus slider to `to` and press its confirm button. */
@@ -304,5 +306,26 @@ describe("suggested bonus", () => {
       name: "Use +20%",
     }) as HTMLButtonElement;
     expect(apply.disabled).toBe(true);
+  });
+});
+
+describe("clear AIs", () => {
+  it("removes every AI in one click", () => {
+    const { onClearAis } = renderTable([you, bot("Bot A"), bot("Bot B")]);
+    fireEvent.click(screen.getByRole("button", { name: "Clear AIs" }));
+    expect(onClearAis).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not offered when there are no AIs to clear", () => {
+    renderTable([you]);
+    expect(screen.queryByRole("button", { name: "Clear AIs" })).toBeNull();
+  });
+
+  it("is disabled while a game is running", () => {
+    renderTable([you, bot("Bot A")], { disabled: true });
+    const clear = screen.getByRole("button", {
+      name: "Clear AIs",
+    }) as HTMLButtonElement;
+    expect(clear.disabled).toBe(true);
   });
 });
