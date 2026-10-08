@@ -1,5 +1,6 @@
 import type { BaseBlueprint, BlueprintBuilding } from "../blueprint/model";
 import type { BattleRestrictions, SkirmishDraft } from "../play/drafts";
+import { type Participant, uniqueParticipantIds } from "../play/participants";
 import {
   ACTION_TYPES,
   CONDITION_TYPES,
@@ -1160,12 +1161,22 @@ function parseBattleRestrictions(
 export function parseSetup(
   value: Record<string, unknown>,
 ): SkirmishDraft | null {
+  // A roster saved while two rows could be given one id (see
+  // `uniqueParticipantIds`). Teams and triggers name a participant by id, so
+  // the first row keeps it and they go on meaning that row.
+  const parseParticipants = (raw: unknown): Participant[] => {
+    if (!Array.isArray(raw)) return [];
+    return raw.every(isRecord)
+      ? uniqueParticipantIds(raw as unknown as Participant[])
+      : raw;
+  };
+
   const mapName = str(value.mapName);
   const gameName = str(value.gameName);
   if (mapName === undefined || gameName === undefined) return null;
 
   const setup: SkirmishDraft = {
-    participants: Array.isArray(value.participants) ? value.participants : [],
+    participants: parseParticipants(value.participants),
     gameName,
     mapName,
     startPosType: num(value.startPosType) ?? 0,

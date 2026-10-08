@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ConfigOption } from "@/content/bindings";
 import { isBlackHex } from "@/lib/teamColor";
 import type { BattleConfig } from "./bindings";
@@ -19,6 +19,7 @@ import {
   setParticipantTeam,
   showsFactionColumn,
   toBattleConfig,
+  uniqueParticipantIds,
 } from "./participants";
 
 describe("showsFactionColumn", () => {
@@ -634,5 +635,46 @@ describe("AI bonus", () => {
       const team = teamOf(setAiBonus(set, "a", 0));
       expect("advantage" in team).toBe(false);
     });
+  });
+});
+
+describe("participant ids", () => {
+  const restored: Participant[] = [
+    you(PALETTE[0]),
+    ai("p1", PALETTE[1]),
+    ai("p2", PALETTE[2]),
+    ai("p3", PALETTE[3]),
+  ];
+
+  it("gives an AI added after a restart an id no restored row has", async () => {
+    // A fresh module graph is what a restart is: whatever the id source
+    // remembered is gone, and the saved draft still holds the ids it issued.
+    vi.resetModules();
+    await import("./drafts");
+    const fresh = await import("./participants");
+    let ps = restored;
+    for (let i = 0; i < 4; i++) {
+      const next = fresh.makeAiParticipant(ps);
+      expect(ps.map((p) => p.id)).not.toContain(next.id);
+      ps = [...ps, next];
+    }
+  });
+
+  it("starts a new setup with two different ids", () => {
+    const [a, b] = initialParticipants();
+    expect(a.id).not.toBe(b.id);
+  });
+
+  it("leaves a roster with no repeated id alone", () => {
+    expect(uniqueParticipantIds(restored)).toBe(restored);
+  });
+
+  it("gives a row that repeats an id a new one and keeps the first", () => {
+    const broken = [...restored, ai("p2", PALETTE[4]), ai("p2", PALETTE[5])];
+    const healed = uniqueParticipantIds(broken);
+    expect(new Set(healed.map((p) => p.id)).size).toBe(broken.length);
+    expect(healed.slice(0, 4)).toEqual(restored);
+    // Only the id moves: the row is still the one the player set up.
+    expect(healed[4]).toEqual({ ...broken[4], id: healed[4].id });
   });
 });

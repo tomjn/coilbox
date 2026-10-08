@@ -101,6 +101,7 @@ import {
   setAllAiBonus,
   setParticipantTeam,
   toBattleConfig,
+  uniqueParticipantIds,
   useLastAi,
   usePreferredTarget,
   useSkirmishAis,
@@ -174,7 +175,7 @@ export default function SkirmishPage() {
   } = usePreferredTarget();
   const enginePath = target?.enginePath;
   const dataDir = target?.dataDir;
-  const { running, launch } = usePlay();
+  const { running, relayed, launch, cancel } = usePlay();
   const { setProvenance } = useReplayUserState();
   const {
     debrief,
@@ -195,7 +196,9 @@ export default function SkirmishPage() {
   // survives navigation and restarts. The debounced effect below writes it back.
   const [draft, setDraft] = useSkirmishDraft();
   const [participants, setParticipants] = useState<Participant[]>(() =>
-    draft.participants.length > 0 ? draft.participants : initialParticipants(),
+    draft.participants.length > 0
+      ? uniqueParticipantIds(draft.participants)
+      : initialParticipants(),
   );
   const [gameName, setGameName] = useState(() => draft.gameName);
   const bonusSuggestions = useAiBonusSuggestions(participants, gameName);
@@ -781,7 +784,7 @@ export default function SkirmishPage() {
     prevArchive.current = games.find(
       (g) => g.name === next.gameName,
     )?.primaryArchive.name;
-    setParticipants(next.participants);
+    setParticipants(uniqueParticipantIds(next.participants));
     setGameName(next.gameName);
     setMapName(next.mapName);
     setStartPosType(next.startPosType);
@@ -1158,9 +1161,17 @@ export default function SkirmishPage() {
       )}
 
       {running && (
-        <p className="rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
-          Game running — settings are frozen until the engine exits.
-        </p>
+        <div className="flex items-center justify-between gap-3 rounded-md border border-border/50 bg-card p-3 text-sm text-muted-foreground">
+          <p>Game running — settings are frozen until the engine exits.</p>
+          {/* An engine that hangs on the way out never reports ending, and
+              the setup stays frozen with it. A relayed game is left to the top
+              bar, which asks first because ending it ends it for everybody. */}
+          {!relayed && (
+            <Button variant="outline" size="sm" onClick={cancel}>
+              End game
+            </Button>
+          )}
+        </div>
       )}
 
       {checkingResult && (
