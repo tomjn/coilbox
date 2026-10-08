@@ -94,6 +94,7 @@ import {
   type Connections,
   connectionsReducer,
   hasLiveLogin,
+  liveConnectionKeys,
   newRuntime,
   pendingAgreement as pickPendingAgreement,
   pendingDebriefing as pickPendingDebriefing,
@@ -153,6 +154,22 @@ export function serverNameFor(
 ): string {
   const server = serverForKey(serverKey, servers);
   return server?.name ?? serverAddressFromKey(serverKey);
+}
+
+/**
+ * "alice on Recoil Official" for a connection, or null unless more than one
+ * connection is live. With one there is nothing to tell apart, so a screen
+ * that belongs to a single connection stays as it was.
+ */
+export function connectionLabelIfSeveral(
+  serverKey: string | null,
+  connections: Connections,
+  servers: LobbyServer[],
+): string | null {
+  if (!serverKey || liveConnectionKeys(connections, null).length < 2) {
+    return null;
+  }
+  return `${usernameFromKey(serverKey)} on ${serverNameFor(serverKey, servers)}`;
 }
 
 /**
