@@ -98,6 +98,11 @@ export interface HealthInputs {
   hideSettings: string[];
   /** Every settings-section id present in the app — the set `hideSettings` can affect. */
   settingsIds: string[];
+  /**
+   * The profile's `icon` and why it was not applied at startup, with an empty
+   * `error` when it was. Null when the profile names no icon.
+   */
+  appIcon: { path: string; error: string } | null;
   /** Non-empty `icon` names configured on the profile's links. */
   linkIcons: string[];
   /** The curated icon names links resolve against; others fall back to a generic glyph. */
@@ -227,6 +232,30 @@ export function checkHideSettingsIds(
     hint: `${unknown
       .map((id) => `hideSettings id '${id}' matches nothing`)
       .join("; ")}. Section ids: ${settingsIds.join(", ")}.`,
+  };
+}
+
+/**
+ * Say whether the profile's `icon` became the app's icon. A file that is missing or
+ * is not a PNG leaves the Coilbox icon in place and says nothing, so this is the one
+ * place the reason shows. `null` when the profile names no icon.
+ */
+export function checkAppIcon(
+  appIcon: HealthInputs["appIcon"],
+): HealthCheck | null {
+  if (!appIcon) return null;
+  if (appIcon.error === "") {
+    return {
+      id: "appIcon",
+      status: "ok",
+      label: `App icon: ${appIcon.path}`,
+    };
+  }
+  return {
+    id: "appIcon",
+    status: "warn",
+    label: "The profile's `icon` was not applied",
+    hint: `${appIcon.error}. \`icon\` is a PNG file, by its path relative to the .coilbox folder.`,
   };
 }
 
@@ -711,6 +740,7 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
   for (const c of [
     checkHideIds(i.hide, i.hideableNavIds),
     checkHideSettingsIds(i.hideSettings, i.settingsIds),
+    checkAppIcon(i.appIcon),
     checkLinkIcons(i.linkIcons, i.validIconNames),
     checkHome(i.home),
     checkStart(i.start),
