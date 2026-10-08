@@ -26,7 +26,9 @@ vi.mock("./chat/mentionCue", () => ({
 }));
 
 import {
+  type Connections,
   connectBlockedReason,
+  connectionLabelIfSeveral,
   initialMirror,
   mirrorReducer,
   RECONNECT_DELAYS_MS,
@@ -589,5 +591,49 @@ describe("connectBlockedReason", () => {
         expect(lower).not.toContain(word);
       }
     }
+  });
+});
+
+describe("connectionLabelIfSeveral", () => {
+  const live = (...keys: string[]) =>
+    Object.fromEntries(
+      keys.map((k) => [k, { live: true }]),
+    ) as unknown as Connections;
+  const servers = [savedAt("lobby.example", "a", "Example")];
+
+  it("names the account and the server once two connections are live", () => {
+    expect(
+      connectionLabelIfSeveral(
+        "me@lobby.example:8200",
+        live("me@lobby.example:8200", "other@elsewhere:8200"),
+        servers,
+      ),
+    ).toBe("me on Example");
+  });
+
+  it("says nothing with one connection, where there is nothing to tell apart", () => {
+    expect(
+      connectionLabelIfSeveral(
+        "me@lobby.example:8200",
+        live("me@lobby.example:8200"),
+        servers,
+      ),
+    ).toBeNull();
+  });
+
+  it("does not count a connection that has dropped", () => {
+    const connections = {
+      ...live("me@lobby.example:8200"),
+      "other@elsewhere:8200": { live: false },
+    } as unknown as Connections;
+    expect(
+      connectionLabelIfSeveral("me@lobby.example:8200", connections, servers),
+    ).toBeNull();
+  });
+
+  it("says nothing without a connection to name", () => {
+    expect(
+      connectionLabelIfSeveral(null, live("a@x:1", "b@y:2"), servers),
+    ).toBeNull();
   });
 });

@@ -52,7 +52,11 @@ import { useMpRevealed } from "../navPredicates";
 import { useNoteActions } from "../notes";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
-import { useMultiplayer } from "../store";
+import {
+  connectionLabelIfSeveral,
+  useMultiplayer,
+  useProtocolServers,
+} from "../store";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
@@ -66,7 +70,8 @@ import { useMultiplayer } from "../store";
  */
 function BattleRoomPage() {
   const room = useBattleRoom(useBattleRoomKey());
-  const { disconnect } = useMultiplayer();
+  const { disconnect, connections } = useMultiplayer();
+  const servers = useProtocolServers();
   // The room's own connection, which is the one a battle in our own LAN room
   // is on, rather than whichever connection is focused.
   const disconnectRoom = () => disconnect(room.serverKey ?? undefined);
@@ -488,6 +493,11 @@ function BattleRoomPage() {
         // The addresses to hand out, from the moment the room is up. Only in
         // the battle inside our own room, which is the one `endsTheRoom` names.
         sharedRoom={endsTheRoom ? hostedRoom : null}
+        connectionLabel={connectionLabelIfSeveral(
+          room.serverKey,
+          connections,
+          servers,
+        )}
       />
 
       {/* Above everything else on the page: somebody is sitting on a spinner
