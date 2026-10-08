@@ -57,6 +57,14 @@ Once portable mode is on, Coilbox writes **its own** data and caches inside `.co
 
 > **Put the game *beside* `.coilbox/`, not inside it.** `.coilbox/` is Coilbox's private data/config folder. Your engine, game archive and maps go at the **top level of the app folder** (the folder holding the binary and `.coilbox/`), in the standard Spring subfolders — `games/`, `maps/`, `engine/` — **not** inside `.coilbox/`. The app folder itself is the content root: it looks like an ordinary `~/.spring`-style data directory that happens to also contain `coilbox` and `.coilbox/`. Nesting the game under `.coilbox/` mixes your read-only content in with Coilbox's managed `data/`/`cache/`, won't be picked up as a content root, and could be lost if Coilbox's data is reset. The one exception is `.coilbox/content/`, a read-only bundle that coilbox searches after the app folder. See [Bundle the engine, the game and maps](distributing.md#bundle-the-engine-the-game-and-maps).
 
+## Which games and maps a portable Coilbox sees
+
+A portable Coilbox sees only the content in its own folders: the app folder, `.coilbox/content/`, and any folder added in **Settings > Content Folders**. A game or map the player has elsewhere, in `~/.spring` or `Documents\My Games\Spring` for example, does not appear.
+
+Coilbox does this by starting the engine with `SPRING_ISOLATED` set to the engine's own folder. Without it the engine reads those per-user folders itself, whatever Coilbox asked for. The engine also writes its settings, logs and replays into its own folder instead of a per-user one.
+
+To use content from another folder, add that folder in **Settings > Content Folders**.
+
 ## Running Coilbox alongside skylobby
 
 This is the common starting point: you already play via skylobby and you want to try Coilbox without disturbing anything.

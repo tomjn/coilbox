@@ -267,6 +267,17 @@ pub fn spring_datadir(primary: &str) -> String {
     }
 }
 
+/// The env that stops an engine, or unitsync, reading the player's other Spring
+/// folders (`~/.spring`, `My Games\Spring`), for a portable coilbox. It still
+/// reads every folder in `SPRING_DATADIR`.
+///
+/// The folder named is the engine's own, never a content folder: it is the only
+/// place the engine's base content is, and isolation drops it unless it is the
+/// folder named.
+pub fn isolation_env(portable: bool, engine_dir: &std::path::Path) -> Option<(String, String)> {
+    portable.then(|| ("SPRING_ISOLATED".into(), engine_dir.display().to_string()))
+}
+
 fn join_extras(primary: &str, roots: &[String]) -> String {
     roots
         .iter()
@@ -305,6 +316,20 @@ mod datadirs {
     fn a_folder_the_engine_would_split_is_dropped() {
         let split = format!("/b{DATADIR_SEP}c");
         assert_eq!(join_extras("/a", &roots(&[&split, "/d"])), "/d");
+    }
+
+    #[test]
+    fn a_portable_coilbox_isolates_the_engine_to_its_own_folder() {
+        let engine = std::path::Path::new("/pkg/engine/105");
+        assert_eq!(
+            isolation_env(true, engine),
+            Some(("SPRING_ISOLATED".to_string(), "/pkg/engine/105".to_string()))
+        );
+    }
+
+    #[test]
+    fn an_installed_coilbox_leaves_the_engine_its_usual_folders() {
+        assert_eq!(isolation_env(false, std::path::Path::new("/e")), None);
     }
 }
 
