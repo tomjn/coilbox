@@ -204,14 +204,19 @@ fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
     } else {
         format!("{dir}{sep}{existing}")
     };
-    vec![
+    let mut envs = vec![
         ("SPRING_DATADIR".into(), datadir.to_string()),
         (
             "COILBOX_EXTRA_DATADIRS".into(),
             coilbox_proc::extra_datadirs(datadir),
         ),
         (var.to_string(), value),
-    ]
+    ];
+    envs.extend(coilbox_proc::isolation_env(
+        coilbox_portable::is_portable(),
+        engine_dir,
+    ));
+    envs
 }
 
 /// Run the worker to completion, reading stdout on a thread (so a large JSON

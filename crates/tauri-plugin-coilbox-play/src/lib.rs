@@ -179,6 +179,12 @@ fn launch_blocking(
         // hold pipes open or pop a console.
         .stdout(Stdio::null())
         .stderr(Stdio::null());
+    if let Some(engine_dir) = bin.parent() {
+        cmd.envs(coilbox_proc::isolation_env(
+            coilbox_portable::is_portable(),
+            engine_dir,
+        ));
+    }
 
     let child = cmd
         .spawn()
@@ -404,10 +410,20 @@ async fn play_infolog<R: Runtime>(
     let mut dirs = infolog::candidate_dirs(infolog::current_os(), &base, &data_dir);
     // The other content folders the engine was launched with. It writes to the
     // first folder it can, which is one of these when `data_dir` is read-only.
+    let mut roots = vec![std::path::PathBuf::from(&data_dir)];
     for extra in coilbox_proc::extra_datadirs(&data_dir).split(coilbox_proc::DATADIR_SEP) {
         let extra = std::path::PathBuf::from(extra);
         if !extra.as_os_str().is_empty() && !dirs.contains(&extra) {
-            dirs.push(extra);
+            dirs.push(extra.clone());
+        }
+        roots.push(extra);
+    }
+    // An engine can write to its own folder instead, and a portable coilbox
+    // makes every engine do so.
+    roots.retain(|r| !r.as_os_str().is_empty());
+    for dir in roots.iter().flat_map(|r| infolog::engine_dirs(r)) {
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
         }
     }
     let Some(path) = infolog::newest_log(&dirs) else {
