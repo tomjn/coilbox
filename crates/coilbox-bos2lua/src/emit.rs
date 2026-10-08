@@ -2738,10 +2738,43 @@ impl<'p, 'a> Writer<'p, 'a> {
             }
             StmtKind::Call(name, args) | StmtKind::Start(name, args) => {
                 let start = matches!(s.kind, StmtKind::Start(..));
-                let values: Vec<String> = args.iter().map(|a| self.num(a).text).collect();
+                let mut values: Vec<String> = args.iter().map(|a| self.num(a).text).collect();
                 let target = self.callee(name);
-                let text = self.call_line(&target, &values, start);
-                self.code(&text, t);
+                // The engine moves a started script's arguments by popping
+                // them off the caller and pushing them onto the new thread,
+                // which reverses them (`CobThread.cpp:225`). A call leaves
+                // them where they are.
+                let reversed = start && values.len() > 1;
+                if reversed {
+                    self.warn(
+                        "start-reversed",
+                        "The engine hands a script begun with start-script its arguments in reverse order, so the Lua passes them reversed too and behaves as the compiled script does. Total Annihilation passed them in the order written, so a script that was written for it and never corrected has had them swapped ever since.".to_string(),
+                    );
+                }
+                if reversed && args.iter().filter(|a| !pure(a)).count() > 1 {
+                    // Worked out in the order written, as the COB pushes them,
+                    // and only then handed over backwards.
+                    let mut names: Vec<String> =
+                        (1..=values.len()).map(|n| format!("arg{n}")).collect();
+                    self.line("do");
+                    self.indent += 1;
+                    self.line(&format!(
+                        "local {} = {}",
+                        names.join(", "),
+                        values.join(", ")
+                    ));
+                    names.reverse();
+                    let text = self.call_line(&target, &names, true);
+                    self.line(&text);
+                    self.indent -= 1;
+                    self.code("end", t);
+                } else {
+                    if reversed {
+                        values.reverse();
+                    }
+                    let text = self.call_line(&target, &values, start);
+                    self.code(&text, t);
+                }
             }
             StmtKind::Spin {
                 piece,

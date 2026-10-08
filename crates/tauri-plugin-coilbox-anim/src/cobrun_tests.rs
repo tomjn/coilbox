@@ -96,6 +96,30 @@ fn push(value: u32) -> Vec<u32> {
     vec![op("PUSH_CONSTANT"), value]
 }
 
+/// The file says how many static variables it has, and a slot past that is not
+/// one, as in the engine.
+mod statics {
+    use super::*;
+
+    /// `static<slot> = [1]; move base to z-axis static<slot> now`
+    fn store_then_move(slot: u32, statics: usize) -> Timeline {
+        let mut code = push(ELMO);
+        code.extend([op("POP_STATIC"), slot, op("PUSH_STATIC"), slot]);
+        code.extend([op("MOVE_NOW"), 0, 2, op("RETURN")]);
+        play(&build(&[("Create", code)], PIECES, statics), 2)
+    }
+
+    #[test]
+    fn keeps_as_many_as_the_file_declares() {
+        assert!(close(pose(&store_then_move(299, 300), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn a_slot_the_file_does_not_declare_holds_nothing() {
+        assert!(close(pose(&store_then_move(300, 300), 0, "base")[2], 0.0));
+    }
+}
+
 mod motion {
     use super::*;
 
@@ -1726,6 +1750,47 @@ mod engine_factory {
             .any(|w| w.contains("never set INBUILDSTANCE")));
     }
 
+    /// `get UNIT_BUILD_PERCENT_LEFT(2)` half way between the frame the build
+    /// starts and the frame the scenario finishes it, emitted as an sfx number
+    /// so the timeline shows what the script read.
+    #[test]
+    fn a_script_reads_how_much_of_the_buildee_is_left_to_build() {
+        let mut probe = push(73);
+        probe.extend(push(2));
+        probe.extend(push(0));
+        probe.extend(push(0));
+        probe.extend(push(0));
+        probe.extend([op("GET"), op("EMIT_SFX"), 2, op("RETURN")]);
+        let bytes = build(&[("Activate", activate_now()), ("Probe", probe)], PIECES, 0);
+        let mut start = action(0, EngineAction::FactoryBuild);
+        start.world = Some(coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([0.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        });
+        let events = vec![
+            callin(0, "Activate"),
+            start,
+            callin(2, "Probe"),
+            action(4, EngineAction::FactoryFinish),
+            callin(6, "Probe"),
+        ];
+        let timeline = run(&bytes, &model_pieces(), &events, 8, &[], &HashMap::new());
+
+        assert_eq!(timeline.error, None);
+        assert_eq!(build_start_frames(&timeline), [0]);
+        assert_eq!(sfx_frames(&timeline, 50), [2]);
+        // Finished, so nothing is left.
+        assert_eq!(sfx_frames(&timeline, 0), [6]);
+    }
+
     /// Build stance seeded from the preview's Unit values panel counts too:
     /// building starts on the `factory-build` frame straight away.
     #[test]
@@ -2148,5 +2213,110 @@ mod probe {
             "{:?}",
             probes.functions
         );
+    }
+}
+
+/// The instructions only Total Annihilation's own interpreter runs, each as
+/// `CobScript::RunThread` runs it. Every script here ends by moving the base
+/// one elmo along z with whatever is on top of the stack, so a wrong number of
+/// values popped or pushed moves it somewhere else.
+mod total_annihilation {
+    use super::*;
+
+    fn scene() -> coilbox_unitpose::World {
+        coilbox_unitpose::World {
+            stand_in: Some(coilbox_unitpose::StandIn {
+                id: 2,
+                pos: Some([30.0, 0.0, 40.0]),
+                radius: 5.0,
+                height: 6.0,
+            }),
+            own: coilbox_unitpose::Size {
+                radius: 10.0,
+                height: 12.0,
+            },
+        }
+    }
+
+    fn pickup(words: Vec<u32>) -> Timeline {
+        run(
+            &build(&[("TransportPickup", words)], PIECES, 0),
+            &model_pieces(),
+            &[ScriptEvent {
+                frame: 0,
+                callin: "TransportPickup".to_string(),
+                args: vec![2.0],
+                ambient: false,
+                world: Some(scene()),
+                engine: None,
+            }],
+            2,
+            &[],
+            &HashMap::new(),
+        )
+    }
+
+    fn move_base() -> [u32; 4] {
+        [op("MOVE_NOW"), 0, 2, op("RETURN")]
+    }
+
+    /// `move base to z-axis [1] * __is_carrying_unit(unitid) now`
+    fn asks_whether_it_carries(attach_first: bool) -> Timeline {
+        let mut words = vec![op("CREATE_LOCAL_VAR")];
+        if attach_first {
+            words.extend([op("PUSH_LOCAL_VAR"), 0]);
+            words.extend(push(1));
+            words.extend(push(0));
+            words.push(op("ATTACH_UNIT"));
+        }
+        words.extend([op("PUSH_LOCAL_VAR"), 0, op("IS_CARRYING_UNIT")]);
+        words.extend(push(ELMO));
+        words.push(op("MUL"));
+        words.extend(move_base());
+        pickup(words)
+    }
+
+    #[test]
+    fn knows_the_unit_it_is_carrying() {
+        let timeline = asks_whether_it_carries(true);
+        assert!(close(pose(&timeline, 0, "base")[2], 1.0));
+        assert!(timeline
+            .warnings
+            .iter()
+            .any(|w| w.contains("only Total Annihilation")));
+    }
+
+    #[test]
+    fn is_not_carrying_a_unit_it_has_not_picked_up() {
+        let timeline = asks_whether_it_carries(false);
+        assert!(close(pose(&timeline, 0, "base")[2], 0.0));
+    }
+
+    #[test]
+    fn nothing_carries_the_unit_in_the_preview() {
+        let mut words = push(ELMO);
+        words.extend([op("CARRIER_UNIT_ID"), op("ADD")]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn a_discarded_call_takes_its_arguments_and_runs_nothing() {
+        let mut words = push(ELMO);
+        words.extend(push(7));
+        words.extend(push(9));
+        words.extend([op("DISCARD_CALL"), 0, 2]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
+    }
+
+    #[test]
+    fn the_two_piece_instructions_do_nothing() {
+        let mut words = push(ELMO);
+        words.extend(push(7));
+        words.extend(push(9));
+        words.extend([op("PIECE_OP_09"), 1, op("PIECE_OP_0A"), 1]);
+        words.extend(move_base());
+        assert!(close(pose(&pickup(words), 0, "base")[2], 1.0));
     }
 }

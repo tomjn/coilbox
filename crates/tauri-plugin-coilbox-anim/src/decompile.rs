@@ -40,9 +40,10 @@ fn operand_count(op: &str) -> usize {
         "PUSH_CONSTANT" | "PUSH_LOCAL_VAR" | "PUSH_STATIC" | "POP_LOCAL_VAR" | "POP_STATIC"
         | "SHOW" | "HIDE" | "CACHE" | "DONT_CACHE" | "SHADE" | "DONT_SHADOW" | "EMIT_SFX"
         | "EXPLODE" | "PLAY_SOUND" | "JUMP" | "JUMP_NOT_EQUAL" | "SCALE" | "SCALE_NOW"
-        | "WAIT_FOR_SCALE" => 1,
+        | "WAIT_FOR_SCALE" | "PIECE_OP_09" | "PIECE_OP_0A" => 1,
         "MOVE" | "TURN" | "SPIN" | "STOP_SPIN" | "MOVE_NOW" | "TURN_NOW" | "WAIT_FOR_TURN"
-        | "WAIT_FOR_MOVE" | "START_SCRIPT" | "CALL_SCRIPT" | "REAL_CALL" | "LUA_CALL" => 2,
+        | "WAIT_FOR_MOVE" | "START_SCRIPT" | "CALL_SCRIPT" | "REAL_CALL" | "LUA_CALL"
+        | "DISCARD_CALL" => 2,
         _ => 0,
     }
 }
@@ -484,6 +485,10 @@ impl Body<'_> {
                         // a TA Kingdoms COB carries, and `compiler.rs` writes
                         // neither the table nor the operand.
                         return Err("PLAY_SOUND names a sound in a table BOS cannot write".into());
+                    } else if crate::opcodes::ta_only(other) {
+                        return Err(format!(
+                            "{other} is an instruction only Total Annihilation's own engine runs, which BOS cannot write and Recoil stops the thread on"
+                        ));
                     } else {
                         return Err(format!("{other} has no BOS statement"));
                     }

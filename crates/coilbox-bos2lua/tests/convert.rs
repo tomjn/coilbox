@@ -591,3 +591,22 @@ fn show_in_a_fire_function_becomes_show_flare() {
     assert!(lua.contains("Show(base)"), "{lua}");
     assert!(!lua.contains("Show(flare)"), "{lua}");
 }
+
+/// Two arguments that each move the shared random generator are still worked
+/// out in the order written, then handed over reversed.
+#[test]
+fn a_started_script_s_arguments_are_reversed_but_worked_out_in_order() {
+    let source = "piece base;\nLift(first, second) { sleep first; }\nCreate() { start-script Lift(rand(1, 2), rand(3, 4)); start-script Lift(5, 6); start-script Lift(7); }\n";
+    let conversion = convert_with(source, &HashMap::new(), MODERN_LINEAR);
+    let lua = conversion.lua;
+    assert!(lua.contains("local arg1, arg2 = "), "{lua}");
+    assert!(lua.contains("StartThread(Lift, arg2, arg1)"), "{lua}");
+    assert!(lua.contains("StartThread(Lift, 6, 5)"), "{lua}");
+    assert!(lua.contains("StartThread(Lift, 7)"), "{lua}");
+    let said = conversion
+        .warnings
+        .iter()
+        .filter(|w| w.message.contains("reverse order"))
+        .count();
+    assert_eq!(said, 1, "{:?}", conversion.warnings);
+}

@@ -424,6 +424,12 @@ pub struct Model {
     /// Whether a factory is building, between the frame its script put it in
     /// build stance and an engine `factory-finish`.
     pub building: bool,
+    /// Whether the scenario has aimed or fired a weapon yet. The stand-in is an
+    /// ally until it has, and what the weapons point at from then on.
+    pub targeted: bool,
+    /// The frame the build under way started on and the frame the scenario
+    /// finishes it, or no end when the scenario never does.
+    pub build_span: Option<(u32, Option<u32>)>,
 }
 
 impl Model {
@@ -486,6 +492,18 @@ impl Model {
     pub fn note(&mut self, note: String) {
         if !self.warnings.contains(&note) {
             self.warnings.push(note);
+        }
+    }
+
+    /// Take note of an event the scenario is about to fire, before either
+    /// runtime acts on it.
+    pub fn see(&mut self, event: &ScriptEvent) {
+        let aims = event
+            .callin
+            .get(..3)
+            .is_some_and(|stem| stem.eq_ignore_ascii_case("aim"));
+        if aims || event.engine == Some(EngineAction::Fire) {
+            self.targeted = true;
         }
     }
 
@@ -637,9 +655,28 @@ impl Model {
         self.events.push(ScriptOutput::Nano { frame, piece });
     }
 
-    /// Note the frame a factory started building.
-    pub fn build_start(&mut self, frame: u32) {
+    /// Note the frame a factory started building, and from the scenario's own
+    /// events the frame it will finish on.
+    pub fn build_start(&mut self, frame: u32, events: &[ScriptEvent]) {
+        let ends = events
+            .iter()
+            .filter(|event| event.engine == Some(EngineAction::FactoryFinish))
+            .map(|event| event.frame)
+            .filter(|end| *end > frame)
+            .min();
+        self.build_span = Some((frame, ends));
         self.events.push(ScriptOutput::BuildStart { frame });
+    }
+
+    /// How much of the unit being built is left to build on `frame`, out of
+    /// 100, as the engine counts it (`UnitScript.cpp:1144`): all of it on the
+    /// frame the build starts and none on the frame the scenario finishes it.
+    /// Nothing when no build is under way or the scenario never finishes it.
+    pub fn build_percent_left(&self, frame: u32) -> Option<i32> {
+        let (start, end) = self.build_span.filter(|_| self.building)?;
+        let end = end?;
+        let done = f64::from(frame.clamp(start, end) - start) / f64::from(end - start);
+        Some(((1.0 - done) * 100.0) as i32)
     }
 
     /// Attach a unit to `piece`, or to the void when there is none.

@@ -65,9 +65,33 @@ pub use decompile::Decompiled;
 ///
 /// On the same large-stack thread as the compiler, since each nested block in
 /// the script is one level of recursion.
+///
+/// The promise is checked rather than assumed: the source is compiled again,
+/// and a result that is not the file it came from is said in `warnings`. A
+/// compiler other than this one writes the same script its own way, leaving
+/// constants unfolded or ending a function differently, and nothing in the
+/// source can carry that.
 pub fn decompile_cob(bytes: &[u8]) -> Result<Decompiled, String> {
     let bytes = bytes.to_vec();
-    on_large_stack("cob2bos", move || decompile::decompile(&bytes))
+    let mut decompiled = on_large_stack("cob2bos", {
+        let bytes = bytes.clone();
+        move || decompile::decompile(&bytes)
+    })?;
+    // A script already left as a listing has said why this will not compile.
+    if decompiled.warnings.is_empty() {
+        match compile_bos(&decompiled.source, Path::new(".")) {
+            Ok(again) if again == bytes => {}
+            Ok(again) => decompiled.warnings.push(format!(
+                "Compiling this BOS does not give the original file back byte for byte ({} bytes against {}). Another compiler wrote the original its own way, so compare how the two play before replacing one with the other.",
+                again.len(),
+                bytes.len()
+            )),
+            Err(error) => decompiled.warnings.push(format!(
+                "This BOS does not compile, so it is not the original script: {error}"
+            )),
+        }
+    }
+    Ok(decompiled)
 }
 
 /// Run `work` on a dedicated large-stack thread so deeply nested input cannot
