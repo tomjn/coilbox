@@ -221,6 +221,11 @@ export interface Profile {
   version: number;
   /** Window + in-app title, e.g. "Splinter Faction - Coilbox". */
   title?: string;
+  /**
+   * The running app's icon in the dock or taskbar: a PNG, by its path relative to
+   * the `.coilbox` folder. Applied by the Rust plugin at startup, not from here.
+   */
+  icon?: string;
   /** App-frame chrome (breadcrumb/history/popover/fullscreen/menu/logos). */
   layout?: ProfileLayout;
   /** Nav item ids to hide from the sidebar/launcher, e.g. ["downloads.games"]. */
@@ -420,6 +425,8 @@ interface ProfileResult {
   source: string;
   /** Portable root (`<app_dir>/.coilbox`), or "" when not portable. */
   root: string;
+  /** Why the profile's `icon` was not applied, or "" when it was or there is none. */
+  iconError: string;
 }
 
 const profileLoadCmd = defineCommand<Record<string, never>, ProfileResult>(
@@ -522,6 +529,7 @@ const EMPTY_PROFILE: Profile = { version: 1 };
 let loaded: Profile = EMPTY_PROFILE;
 let loadedSource: ProfileSource = "default";
 let loadedRoot = "";
+let loadedIconError = "";
 let loadedError: string | null = null;
 /** A monospace source excerpt pinpointing a parse error, when one was locatable. */
 let loadedErrorSnippet: string | null = null;
@@ -552,6 +560,7 @@ export function loadProfile(): Promise<{
         }
         loadedSource = (res.source as ProfileSource) ?? "default";
         loadedRoot = res.root ?? "";
+        loadedIconError = res.iconError ?? "";
         return { profile: loaded, source: loadedSource };
       })
       .catch((e) => {
@@ -853,6 +862,15 @@ export function getOnboardingPlacement(): OnboardingPlacement {
  */
 export function getProfileRoot(): string {
   return loadedRoot;
+}
+
+/**
+ * Why the profile's `icon` was not applied at startup, or "" when it was or the
+ * profile names none. Surfaced by the health panel, because the only other sign
+ * of a bad icon file is the Coilbox icon still being there.
+ */
+export function getProfileIconError(): string {
+  return loadedIconError;
 }
 
 /**

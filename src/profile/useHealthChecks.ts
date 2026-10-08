@@ -31,6 +31,7 @@ import {
   getProfile,
   getProfileError,
   getProfileErrorSnippet,
+  getProfileIconError,
   getProfileRoot,
   getProfileSource,
 } from "./profile";
@@ -246,6 +247,10 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         hideableNavIds: HIDEABLE_NAV_IDS,
         hideSettings: profile.hideSettings ?? [],
         settingsIds,
+        appIcon:
+          typeof profile.icon === "string"
+            ? { path: profile.icon, error: getProfileIconError() }
+            : null,
         linkIcons,
         validIconNames: linkIconNames(),
         home: homeHealth(profile.home),

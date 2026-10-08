@@ -221,6 +221,28 @@ Overrides the OS window title **and** the in-app title. Defaults to `"Coilbox"`.
 { "version": 1, "title": "Splinter Faction - Coilbox" }
 ```
 
+### `icon` (string)
+
+Replaces the Coilbox icon on the running app: the dock icon on macOS, and the window and taskbar icon on Windows and Linux.
+
+```json
+{ "version": 1, "icon": "icon.png" }
+```
+
+The value is the path to a PNG file, **relative to the `.coilbox/` folder**. Paths can't escape `.coilbox/` (no `..` or absolute paths). Use a square image. Coilbox's own is 512 pixels a side.
+
+What it cannot change, because the operating system reads these from the app file and not from the running app:
+
+- the icon in Finder, Explorer, the Start menu and a pinned shortcut
+- the app name in the macOS menu bar and under the dock icon
+- the dock icon after the app quits, if the player keeps it in the dock
+
+The player sees the Coilbox icon for a moment at launch, before the profile is read. Some Linux desktops running Wayland take the taskbar icon from the app's `.desktop` file and ignore this one.
+
+macOS draws the image as it is, with no rounded mask, so give it the shape and margin you want in the dock.
+
+If the file is missing or is not a PNG, the Coilbox icon stays and **Settings > Distribution profile** says why.
+
 ### `mode` (string)
 
 Forces the colour scheme: `"light"`, `"dark"`, or `"system"`. Applied on every launch (it overrides a value the user may have set previously — including one carried over from a vanilla Coilbox install). The user can still switch it for the current session under Settings > Appearance; it reverts to the profile next launch. Omit to leave the colour scheme entirely under the user's control. Coilbox puts the user's own value aside the first launch a profile forces it and hands it back on the first launch that does not, so running a distribution and then an ordinary Coilbox install leaves the ordinary install the colour the user picked. A change made inside the branded run stays with that run.
