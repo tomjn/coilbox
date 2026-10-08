@@ -53,4 +53,16 @@ describe("MinimapPreview", () => {
     const marker = screen.getByTitle("Start position 1 (unclaimed)");
     expect(marker.style.background).toBe("");
   });
+
+  it("shows a spinner rather than a pulsing block while loading", () => {
+    const { container } = render(
+      <MinimapPreview loading startPositions={[]} alt="Test map" />,
+    );
+
+    const status = screen.getByRole("status", { name: "Loading minimap" });
+    expect(status.querySelector("svg")?.getAttribute("class")).toContain(
+      "animate-spin",
+    );
+    expect(container.innerHTML).not.toContain("animate-pulse");
+  });
 });

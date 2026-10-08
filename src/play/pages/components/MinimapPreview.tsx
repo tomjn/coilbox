@@ -1,4 +1,4 @@
-import { ImageOff } from "lucide-react";
+import { ImageOff, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
 import type { StartPos } from "@/content/bindings";
 
@@ -76,8 +76,15 @@ export function MinimapPreview({
   // square placeholder so the card doesn't collapse.
   const base = `relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card ${MAX_HEIGHT_CLASSES}`;
   const body = loading ? (
-    <div className="flex aspect-square w-full items-center justify-center">
-      <div className="size-32 animate-pulse rounded bg-muted" />
+    <div
+      role="status"
+      aria-label="Loading minimap"
+      className="flex aspect-square w-full items-center justify-center"
+    >
+      <Loader2
+        className="size-8 animate-spin text-muted-foreground motion-reduce:animate-none"
+        aria-hidden
+      />
     </div>
   ) : url ? (
     // Bound the size to the responsive max-height (`--mmh`) while preserving the
