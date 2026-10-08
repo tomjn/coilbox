@@ -1056,6 +1056,37 @@ describe("parseScenario — id counters", () => {
   });
 });
 
+/**
+ * A scenario saved while the roster could give two rows one id. Teams and
+ * triggers name a participant by id, so the first row keeps the id.
+ */
+describe("parseScenario — participants sharing an id", () => {
+  const setup = (participants: unknown) => ({
+    gameName: "BAR",
+    mapName: "Comet Catcher",
+    participants,
+  });
+
+  it("gives the later row an id of its own", () => {
+    const rows = [
+      { id: "p0", kind: "you", name: "You" },
+      { id: "p2", kind: "ai", name: "AI 1" },
+      { id: "p2", kind: "ai", name: "AI 2" },
+    ];
+    const read = parseScenario(doc({ setup: setup(rows) }))?.setup.participants;
+    expect(read?.map((p) => p.name)).toEqual(["You", "AI 1", "AI 2"]);
+    expect(read?.slice(0, 2).map((p) => p.id)).toEqual(["p0", "p2"]);
+    expect(new Set(read?.map((p) => p.id)).size).toBe(3);
+  });
+
+  it("passes a roster it cannot read as rows through untouched", () => {
+    const rows = [{ id: "p0" }, null, "p0"];
+    expect(
+      parseScenario(doc({ setup: setup(rows) }))?.setup.participants,
+    ).toEqual(rows);
+  });
+});
+
 describe("parseScenario — round trip", () => {
   it("re-parses its own output unchanged", () => {
     const first = parseScenario(
