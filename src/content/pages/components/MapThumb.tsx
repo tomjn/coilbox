@@ -1,6 +1,5 @@
 import { cn } from "@picoframe/frame";
-import { Map as MapIcon } from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Loader2, Map as MapIcon } from "lucide-react";
 
 /**
  * A minimap thumbnail. unitsync minimaps are always square (the map sampled into
@@ -28,7 +27,16 @@ export function MapThumb({
   return (
     <div className="flex aspect-square items-center justify-center overflow-hidden bg-muted">
       {loading ? (
-        <Skeleton className="size-full rounded-none bg-muted-foreground/10" />
+        <div
+          role="status"
+          aria-label="Loading minimap"
+          className="flex size-full items-center justify-center"
+        >
+          <Loader2
+            className="size-6 animate-spin text-muted-foreground motion-reduce:animate-none"
+            aria-hidden
+          />
+        </div>
       ) : url ? (
         <img
           src={url}
