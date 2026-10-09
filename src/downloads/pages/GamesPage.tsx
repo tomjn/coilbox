@@ -405,6 +405,9 @@ export default function GamesPage() {
               const item = identity ? itemFor(identity) : null;
               const status = item?.status ?? null;
               const isResolving = hubResolving.has(g.id);
+              // The hub knows the game and names nowhere to get it. An empty
+              // list is truthy, so it has to be asked for by length.
+              const noSource = g.downloads?.length === 0;
               // Read here rather than per row through `useQueuedDownload`: the
               // springfiles catalogue is hundreds of rows, and the queue is
               // already being read once for the whole page (issue #1863).
@@ -415,11 +418,17 @@ export default function GamesPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium">{g.name}</p>
-                      <p className="truncate font-mono text-xs text-muted-foreground">
-                        {g.downloads
-                          ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
-                          : g.filename}
-                      </p>
+                      {noSource ? (
+                        <p className="truncate text-xs text-muted-foreground">
+                          The hub lists no download for this game.
+                        </p>
+                      ) : (
+                        <p className="truncate font-mono text-xs text-muted-foreground">
+                          {g.downloads
+                            ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
+                            : g.filename}
+                        </p>
+                      )}
                     </div>
                     <Button
                       variant="outline"
@@ -428,6 +437,7 @@ export default function GamesPage() {
                       disabled={
                         !writePath ||
                         (!g.url && !g.downloads) ||
+                        noSource ||
                         isInstalled ||
                         isResolving ||
                         status === "queued" ||
@@ -435,31 +445,35 @@ export default function GamesPage() {
                         status === "done"
                       }
                       aria-label={
-                        isInstalled
-                          ? `${g.name} already downloaded`
-                          : `Download ${g.name}`
+                        noSource
+                          ? `No download for ${g.name}`
+                          : isInstalled
+                            ? `${g.name} already downloaded`
+                            : `Download ${g.name}`
                       }
                     >
-                      {isResolving || status === "active" ? (
+                      {noSource ? null : isResolving || status === "active" ? (
                         <Loader2 className="animate-spin" />
                       ) : isInstalled || status === "done" ? (
                         <CheckCircle2 className="text-emerald-500" />
                       ) : (
                         <Download />
                       )}
-                      {isInstalled
-                        ? "Already downloaded"
-                        : isResolving
-                          ? "Resolving…"
-                          : status === "active"
-                            ? "Downloading…"
-                            : status === "queued"
-                              ? "Queued"
-                              : status === "done"
-                                ? "Done"
-                                : active
-                                  ? "Add to queue"
-                                  : "Download"}
+                      {noSource
+                        ? "No download"
+                        : isInstalled
+                          ? "Already downloaded"
+                          : isResolving
+                            ? "Resolving…"
+                            : status === "active"
+                              ? "Downloading…"
+                              : status === "queued"
+                                ? "Queued"
+                                : status === "done"
+                                  ? "Done"
+                                  : active
+                                    ? "Add to queue"
+                                    : "Download"}
                     </Button>
                   </div>
                   <QueueProgress item={item} />
