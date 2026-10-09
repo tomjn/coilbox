@@ -31,8 +31,8 @@ import {
   useSuggestedMaps,
 } from "../content/branding";
 import { useUnitsyncScan } from "../content/config";
+import { installedContent } from "../content/installedContent";
 import { scanSettled } from "../content/scanSettled";
-import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRoots, useWriteRoot } from "../downloads/config";
 import {
   type EnqueueInput,
@@ -675,7 +675,7 @@ export function useMapInventory(): MapInventory {
   const refresh = useCallback(async () => {
     if (paths.length === 0) return;
     try {
-      const { maps } = await dlInstalledContent({ paths });
+      const { maps } = await installedContent({ paths });
       setFiles(new Set(maps));
     } catch {
       // Leave the last listing in place. A failed read is not a report that the

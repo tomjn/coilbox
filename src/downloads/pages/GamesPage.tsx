@@ -20,11 +20,8 @@ import { fetchHubGames, type HubGameDownload } from "@/hub/api";
 import { useHubUrl } from "@/hub/config";
 import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
-import {
-  dlGithubReleaseArchives,
-  dlInstalledContent,
-  dlSpringfilesList,
-} from "../bindings";
+import { installedContent } from "../../content/installedContent";
+import { dlGithubReleaseArchives, dlSpringfilesList } from "../bindings";
 import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   identityOf,
@@ -233,7 +230,7 @@ export default function GamesPage() {
       return;
     }
     try {
-      const { games } = await dlInstalledContent({ paths: rootPaths });
+      const { games } = await installedContent({ paths: rootPaths });
       setInstalled(new Set(games));
     } catch {
       setInstalled(new Set());

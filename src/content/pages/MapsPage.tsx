@@ -2,7 +2,6 @@ import { Button } from "@picoframe/frame";
 import { Play } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
-import { dlInstalledContent } from "../../downloads/bindings";
 import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
 import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
@@ -11,6 +10,7 @@ import {
   useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "../config";
+import { installedContent } from "../installedContent";
 import { mergeMapTiers } from "../mapTiers";
 import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -78,12 +78,13 @@ export default function MapsPage() {
   const suggested = useSuggestedMaps();
   const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const wantInstalled = !busy && maps.length === 0;
   useEffect(() => {
-    if (rootPaths.length === 0) return;
-    dlInstalledContent({ paths: rootPaths })
+    if (!wantInstalled || rootPaths.length === 0) return;
+    installedContent({ paths: rootPaths })
       .then(({ maps }) => setInstalled(new Set(maps)))
       .catch(() => setInstalled(new Set()));
-  }, [rootPaths]);
+  }, [wantInstalled, rootPaths]);
   const suggestions = useMemo(
     () => filterUninstalledMaps(suggested, installed, maps),
     [suggested, installed, maps],

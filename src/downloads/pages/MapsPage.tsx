@@ -13,6 +13,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { formatBytes } from "@/lib/format";
+import { installedContent } from "../../content/installedContent";
 import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
@@ -21,7 +22,6 @@ import {
   dlEvolutionRtsMaps,
   dlGithubReleaseArchives,
   dlHakoraMaps,
-  dlInstalledContent,
   dlSpringfilesList,
   type ReleaseArchive,
   type SpringFile,
@@ -258,7 +258,7 @@ export default function MapsPage() {
       return;
     }
     try {
-      const { maps } = await dlInstalledContent({ paths: rootPaths });
+      const { maps } = await installedContent({ paths: rootPaths });
       setInstalled(new Set(maps));
     } catch {
       setInstalled(new Set());

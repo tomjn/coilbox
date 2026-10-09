@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { primeScan, useScanTargetSelection } from "../content/config";
-import { dlInstalledContent } from "../downloads/bindings";
+import { installedContent } from "../content/installedContent";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
 import { useDownloadQueue } from "../downloads/DownloadQueueProvider";
 import type { ProgressSource } from "../downloads/pages/components/ProgressBar";
@@ -87,7 +87,7 @@ export function GameUpdatesProvider({ children }: { children: ReactNode }) {
       return;
     }
     try {
-      const { games } = await dlInstalledContent({ paths: rootPaths });
+      const { games } = await installedContent({ paths: rootPaths });
       setInstalledGames(new Set(games));
     } catch {
       setInstalledGames(new Set());

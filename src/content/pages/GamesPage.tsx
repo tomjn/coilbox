@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { dlInstalledContent } from "../../downloads/bindings";
 import { useContentRootPaths, useWriteRoot } from "../../downloads/config";
 import {
   filterUninstalledGames,
@@ -11,6 +10,7 @@ import {
   useUnitsyncGameHeaders,
   useUnitsyncScan,
 } from "../config";
+import { installedContent } from "../installedContent";
 import { usePlayGame } from "../usePlayGame";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -65,12 +65,13 @@ export default function GamesPage() {
   const entries = useBrandingCatalog();
   const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());
+  const wantInstalled = !busy && games.length === 0;
   useEffect(() => {
-    if (rootPaths.length === 0) return;
-    dlInstalledContent({ paths: rootPaths })
+    if (!wantInstalled || rootPaths.length === 0) return;
+    installedContent({ paths: rootPaths })
       .then(({ games }) => setInstalled(new Set(games)))
       .catch(() => setInstalled(new Set()));
-  }, [rootPaths]);
+  }, [wantInstalled, rootPaths]);
   const suggestions = useMemo(
     () => filterUninstalledGames(suggested, entries, installed, games),
     [suggested, entries, installed, games],
