@@ -188,6 +188,51 @@ struct CachedWindow {
     high: u16,
 }
 
+/// Bump when [`CachedMeta`] changes shape or the way it is read changes, so a
+/// record from an older build is read again instead of returning an old answer.
+const META_VERSION: u32 = 1;
+
+/// The grid and the world heights a height picture is stored with (issue #3724).
+///
+/// Read off the map's archive with the picture and kept under the same key, so a
+/// hit is the whole answer and needs no unitsync, which is what #3714 builds on.
+/// The window the picture is drawn in is the file beside it, [`CachedWindow`].
+#[derive(Serialize, Deserialize)]
+struct CachedMeta {
+    version: u32,
+    width: u32,
+    height: u32,
+    min_height: f32,
+    max_height: f32,
+}
+
+/// Cache file for a height picture's grid and bounds:
+/// `<cache_dir>/<key>-h<edge>.meta.json`. Not a picture, so the sweep leaves it
+/// alone, like the window.
+fn meta_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
+    let dir = cache_dir?;
+    let key = key?;
+    Some(dir.join(format!("{key}-h{}.meta.json", picture_edge())))
+}
+
+/// A stored record, or `None` when there is none, it does not parse, or it was
+/// written by another version.
+fn read_meta(file: &Path) -> Option<CachedMeta> {
+    let meta: CachedMeta = serde_json::from_slice(&std::fs::read(file).ok()?).ok()?;
+    (meta.version == META_VERSION).then_some(meta)
+}
+
+/// Best effort: an unwritable cache dir costs a re-read next time.
+fn write_meta(file: Option<&Path>, meta: &CachedMeta) {
+    let Some(file) = file else { return };
+    if let Some(dir) = file.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    if let Ok(json) = serde_json::to_vec(meta) {
+        let _ = std::fs::write(file, json);
+    }
+}
+
 /// A height picture and the window it is drawn in, from cache when both are
 /// there and from `compute` otherwise.
 ///
@@ -261,15 +306,35 @@ pub fn render(
             }
         }
     };
+    render_with(&us, map_name, cache_dir, asset_dir)
+}
+
+/// [`render`] against a library that is already loaded, which is the seam the
+/// tests use to count what a hit asks unitsync for.
+fn render_with(
+    us: &Unitsync,
+    map_name: &str,
+    cache_dir: Option<&Path>,
+    asset_dir: Option<&Path>,
+) -> HeightmapOutput {
     us.init(false, 0);
     let _ = us.drain_errors();
 
-    let bounds = us.height_bounds(map_name);
-    let key = map_cache_key(&us, None, map_name);
+    let key = map_cache_key(us, None, map_name);
     let cache = cache_file(cache_dir, key.as_deref());
     let window_cache = window_file(cache_dir, key.as_deref());
+    let meta_cache = meta_file(cache_dir, key.as_deref());
 
-    let dims = us.heightmap_size(map_name);
+    // The sizes and world heights come off the map's archive, so a map whose
+    // picture is cached has them stored beside it rather than read again.
+    let held = meta_cache.as_deref().and_then(read_meta);
+    let (bounds, dims) = match &held {
+        Some(meta) => (
+            Some((meta.min_height, meta.max_height)),
+            Some((meta.width, meta.height)),
+        ),
+        None => (us.height_bounds(map_name), us.heightmap_size(map_name)),
+    };
     // The sample read, done once and shared. Only an asset run needs it up front:
     // the display path reads it inside the cache miss below, so a map whose
     // picture is already cached still costs nothing when nobody wants an asset.
@@ -285,7 +350,7 @@ pub fn render(
             dims,
             raw.as_deref(),
             bounds,
-            &crate::archive::archive_name_for_map(&us, map_name),
+            &crate::archive::archive_name_for_map(us, map_name),
         ),
     };
 
@@ -313,6 +378,20 @@ pub fn render(
 
     let errors = us.drain_errors();
     us.uninit();
+
+    // Only a read that answered is kept, so a failure is read again next time.
+    if let (None, Ok((_, w, h, _)), Some((min_height, max_height))) = (&held, &result, bounds) {
+        write_meta(
+            meta_cache.as_deref(),
+            &CachedMeta {
+                version: META_VERSION,
+                width: *w,
+                height: *h,
+                min_height,
+                max_height,
+            },
+        );
+    }
 
     match result {
         Ok((image, w, h, window)) => {
@@ -572,5 +651,83 @@ mod tests {
         assert_eq!(again.0.as_slice(), b"fresh");
         assert_eq!(again.2, HeightWindow { low: 7, high: 9 });
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    // ---- a cached read asks unitsync for nothing (issue #3724)
+
+    use crate::ffi::stub::{calls, install, World};
+
+    fn stub_session(tag: &str) -> (Unitsync, PathBuf) {
+        let dir = cache_dir(tag);
+        install(World::with_map(&dir.join("maps")));
+        (Unitsync::stub(), dir.join("cache"))
+    }
+
+    /// Everything a height read asks the map for. A hit needs none of them,
+    /// because the sizes and the world heights are stored with the picture.
+    fn reads() -> [usize; 4] {
+        [
+            calls("GetInfoMapSize"),
+            calls("GetMapMinHeight"),
+            calls("GetMapMaxHeight"),
+            calls("GetInfoMap"),
+        ]
+    }
+
+    #[test]
+    fn a_cached_heightmap_does_not_read_the_map() {
+        let (us, cache) = stub_session("hit");
+        let fresh = render_with(&us, World::MAP, Some(&cache), None);
+        assert!(fresh.file.is_some(), "{:?}", fresh.errors);
+        assert_eq!(reads(), [1, 1, 1, 1]);
+
+        let cached = render_with(&us, World::MAP, Some(&cache), None);
+        assert_eq!(reads(), [1, 1, 1, 1], "a hit read the map again");
+        assert_eq!(calls("AddAllArchives"), 0);
+        assert_eq!(
+            serde_json::to_value(&fresh).unwrap(),
+            serde_json::to_value(&cached).unwrap()
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_changed_archive_is_read_again() {
+        let (us, cache) = stub_session("changed");
+        render_with(&us, World::MAP, Some(&cache), None);
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        std::fs::write(&archive, b"a map archive, now a different size").expect("rewrite");
+
+        render_with(&us, World::MAP, Some(&cache), None);
+        assert_eq!(
+            calls("GetInfoMap"),
+            2,
+            "a changed archive was served from cache"
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_record_from_an_older_version_is_read_again() {
+        let (us, cache) = stub_session("version");
+        render_with(&us, World::MAP, Some(&cache), None);
+        let record = std::fs::read_dir(&cache)
+            .expect("cache dir")
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.to_string_lossy().ends_with(".meta.json"))
+            .expect("the first read stored a record");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+        value["version"] = serde_json::json!(0);
+        std::fs::write(&record, value.to_string()).unwrap();
+
+        render_with(&us, World::MAP, Some(&cache), None);
+        assert_eq!(calls("GetMapMinHeight"), 2, "an old record was served");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 }
