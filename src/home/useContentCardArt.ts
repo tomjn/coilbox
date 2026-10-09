@@ -16,6 +16,7 @@ import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
 import { type MinimapResult, unitsyncMinimap } from "../content/bindings";
 import {
+  currentScan,
   useReplays,
   useScanTargetSelection,
   useUnitsyncGameHeaders,
@@ -71,6 +72,10 @@ async function minimapUrl(
   if (cached !== undefined) return cached;
   let url: string | null = null;
   try {
+    // The scan is what says where the map's archive and map file are, which is
+    // what lets the plugin answer from the cache with no worker (issue #3714).
+    // A card asked for at launch would otherwise go first and start one.
+    await currentScan(enginePath, dataDir).catch(() => undefined);
     const res = await unitsyncMinimap({
       enginePath,
       dataDir,
