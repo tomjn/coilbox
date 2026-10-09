@@ -67,7 +67,7 @@ import {
   subscribeContentArt,
   validateRememberedArt,
 } from "./contentArt";
-import { resetResolvedMinimaps, resolvePicks } from "./useContentCardArt";
+import { resolvePicks } from "./useContentCardArt";
 
 /* -------------------------------------------------------------------------- *
  * Fixtures, shaped from the real files on a machine that has played each mode.
@@ -1187,7 +1187,6 @@ function parseLikeProtocol(url: string): string[] | null {
 describe("resolvePicks", () => {
   beforeEach(() => {
     minimap.mockReset();
-    resetResolvedMinimaps();
     resetContentArt();
   });
 
@@ -1238,7 +1237,7 @@ describe("resolvePicks", () => {
       errors: [],
     });
     const pending = resolvePicks(
-      mapPicks([["play.skirmish", "Valles Marineris 2.6.1"]]),
+      mapPicks([["play.skirmish", "Waits For Scan"]]),
       "/engine",
       "/root",
       new Map(),
@@ -1257,7 +1256,7 @@ describe("resolvePicks", () => {
       errors: [],
     });
     const out = await resolvePicks(
-      mapPicks([["play.skirmish", "Valles Marineris 2.6.1"]]),
+      mapPicks([["play.skirmish", "Cached Render"]]),
       "/engine",
       "/root",
       new Map(),
@@ -1278,9 +1277,8 @@ describe("resolvePicks", () => {
     // parsing rules rather than eyeballed.
     for (const file of ["a b-3.png", "Ünïcode-3.png", "100%-3.png"]) {
       minimap.mockResolvedValue({ file, startPositions: [], errors: [] });
-      resetResolvedMinimaps();
       const out = await resolvePicks(
-        mapPicks([["play.skirmish", "M"]]),
+        mapPicks([["play.skirmish", `Escape ${file}`]]),
         "/engine",
         "/root",
         new Map(),
@@ -1300,8 +1298,8 @@ describe("resolvePicks", () => {
     });
     const out = await resolvePicks(
       mapPicks([
-        ["play.skirmish", "Valles Marineris 2.6.1"],
-        ["play.replays", "Valles Marineris 2.6.1"],
+        ["play.skirmish", "Shared Map"],
+        ["play.replays", "Shared Map"],
       ]),
       "/engine",
       "/root",
@@ -1325,7 +1323,7 @@ describe("resolvePicks", () => {
     expect(out.has("play.skirmish")).toBe(false);
   });
 
-  it("leaves a map out when the worker throws, and does not retry it", async () => {
+  it("leaves a map out when the worker throws, and asks again next time", async () => {
     minimap.mockRejectedValue(new Error("worker died"));
     const args = [
       mapPicks([["play.skirmish", "Broken"]]),
@@ -1335,7 +1333,7 @@ describe("resolvePicks", () => {
     ] as const;
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
     expect((await resolvePicks(...args)).has("play.skirmish")).toBe(false);
-    expect(minimap).toHaveBeenCalledTimes(1);
+    expect(minimap).toHaveBeenCalledTimes(2);
   });
 
   it("takes a game's header art from the batch the Games grid already fetched", async () => {
