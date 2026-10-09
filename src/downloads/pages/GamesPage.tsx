@@ -22,7 +22,6 @@ import { useHubUrl } from "@/hub/config";
 import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
 import { installedContent } from "../../content/installedContent";
-import { dlGithubReleaseArchives } from "../bindings";
 import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   identityOf,
@@ -30,6 +29,7 @@ import {
   useDownloadQueue,
 } from "../DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
+import { loadGithubReleases } from "../githubReleases";
 import { heldSpringfilesList, loadSpringfilesList } from "../mirrorIndex";
 import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
@@ -180,7 +180,7 @@ export default function GamesPage() {
         }
         const repo = src === "springfiles" ? undefined : repoForKey(repos, src);
         if (repo) {
-          const { archives } = await dlGithubReleaseArchives({ repo });
+          const archives = await loadGithubReleases(repo, refresh);
           // The latest release is the one published most recently, found by
           // its date and not by where GitHub put it in the list. A release
           // with no date, which is what a draft is, is never it.

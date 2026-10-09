@@ -2,7 +2,6 @@ import { Button, cn } from "@picoframe/frame";
 import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router";
-import { dlGithubReleaseArchives } from "../../../downloads/bindings";
 import type { WriteRoot } from "../../../downloads/config";
 import type { EnqueueInput } from "../../../downloads/DownloadQueueProvider";
 import {
@@ -11,6 +10,7 @@ import {
   mergeGameRepos,
   resolveGithubRepo,
 } from "../../../downloads/gameRepos";
+import { loadGithubReleases } from "../../../downloads/githubReleases";
 import { QueueProgress } from "../../../downloads/pages/components/ProgressBar";
 import { errMessage } from "../../../downloads/pages/components/states";
 import { useQueuedDownload } from "../../../downloads/useQueuedDownload";
@@ -99,7 +99,7 @@ async function suggestionRequest(
       // Games like SplinterFaction ship only via GitHub releases. `resolveGithubRepo`
       // never returns undefined - it throws a clear error instead (issue #525).
       const repo = resolveGithubRepo(repos, dl);
-      const { archives } = await dlGithubReleaseArchives({ repo });
+      const archives = await loadGithubReleases(repo);
       const pick = dl.asset
         ? archives.find((a) =>
             a.filename.toLowerCase().includes(dl.asset?.toLowerCase() ?? ""),

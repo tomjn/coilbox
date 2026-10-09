@@ -23,6 +23,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetHubGames } from "@/hub/gameIcons";
 import { DownloadQueueProvider } from "../DownloadQueueProvider";
+import { invalidateGithubReleases } from "../githubReleases";
 import { invalidateMirrorIndexes } from "../mirrorIndex";
 import GamesPage from "./GamesPage";
 
@@ -130,6 +131,7 @@ vi.mock("@picoframe/frame", () => ({
 
 beforeEach(() => {
   invalidateMirrorIndexes();
+  invalidateGithubReleases();
   (
     globalThis as unknown as { window: Record<string, unknown> }
   ).window.__TAURI_INTERNALS__ = { transformCallback: (cb: unknown) => cb };
