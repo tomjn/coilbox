@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  GAME_REPOS,
   type GameRepo,
   githubRepoForGame,
   mergeGameRepos,
@@ -131,5 +133,44 @@ describe("resolveGithubRepo (issue #525)", () => {
     expect(() => resolveGithubRepo([repo()], {})).toThrow(
       /No GitHub repo declared/,
     );
+  });
+});
+
+describe("the THIS source (issue #3740)", () => {
+  const THIS_REPO = "Recoil-Game-Archive/THIS";
+  // The name in the archive's `modinfo.lua`, with the version a battle adds.
+  const THIS_NAME = "THIS (Spring Necromancy Edition) 0.13.1";
+  const catalog: GameRepo[] = JSON.parse(
+    readFileSync(new URL("../../catalog.json", import.meta.url), "utf8"),
+  ).githubGameRepos;
+
+  it("is in the built-in list and the catalog, and they agree", () => {
+    const builtIn = GAME_REPOS.find((g) => g.key === "this");
+    expect(builtIn?.repo).toBe(THIS_REPO);
+    expect(catalog.find((g) => g.key === "this")).toEqual(builtIn);
+  });
+
+  it("is found from the game's own name", () => {
+    expect(githubRepoForGame(GAME_REPOS, THIS_NAME)).toBe(THIS_REPO);
+  });
+
+  it("does not claim a game that merely starts with the same four letters", () => {
+    expect(githubRepoForGame(GAME_REPOS, "This Is Another Game 1.0")).toBe(
+      undefined,
+    );
+    expect(githubRepoForGame(GAME_REPOS, "Thistle 2.0")).toBeUndefined();
+  });
+
+  it("does not match another game on the list, nor any of them it", () => {
+    const others = GAME_REPOS.filter((g) => g.key !== "this");
+    for (const other of others) {
+      // A name each other source would be asked about: its label, and its own
+      // name key when it has one.
+      for (const name of [other.label, other.nameKey].filter(Boolean)) {
+        expect(githubRepoForGame(GAME_REPOS, name), name).not.toBe(THIS_REPO);
+      }
+    }
+    // And the other way: no other source's key is a prefix of this game's name.
+    expect(githubRepoForGame(others, THIS_NAME)).toBeUndefined();
   });
 });
