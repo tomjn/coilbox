@@ -1,6 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
+import { gameArchivePath, mapHint } from "./scanHints";
 
 /**
  * Typed bindings to `plugin:coilbox-content|*` (crate `tauri-plugin-coilbox-content`,
@@ -1193,6 +1194,54 @@ export interface UnitEntry {
   fullName?: string;
 }
 
+/**
+ * What a read of a game takes. `archivePath` is the game's primary archive as a
+ * full path, and it is what lets the plugin answer from the cache without starting
+ * a worker (issue #3714). Callers leave it out. It is filled in from the content
+ * scan, and a game the scan has not placed is read by a worker as it always was.
+ */
+type GameReadArgs = {
+  enginePath: string;
+  dataDir: string;
+  gameArchive: string;
+  archivePath?: string;
+};
+
+/** What a read of a map takes. `archivePath` and `fileName` are what the map's
+ *  cache key is made from, filled in from the content scan like a game's. */
+type MapReadArgs = {
+  enginePath: string;
+  dataDir: string;
+  mapName: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
+type SkirmishAisArgs = {
+  enginePath: string;
+  dataDir: string;
+  gameArchive?: string;
+  archivePath?: string;
+};
+
+function withGameArchivePath<T extends GameReadArgs>(args: T): T {
+  if (args.archivePath !== undefined) return args;
+  const archivePath = gameArchivePath(
+    args.dataDir,
+    args.enginePath,
+    args.gameArchive,
+  );
+  return archivePath === undefined ? args : { ...args, archivePath };
+}
+
+function withMapHint<T extends MapReadArgs>(args: T): T {
+  if (args.archivePath !== undefined || args.fileName !== undefined) {
+    return args;
+  }
+  const hint = mapHint(args.dataDir, args.enginePath, args.mapName);
+  return hint === undefined ? args : { ...args, ...hint };
+}
+
 export interface GameInfoResult {
   sides: Side[];
   unitCount: number;
@@ -1210,10 +1259,12 @@ export interface GameInfoResult {
  * lazy, since it loads the whole game's archive set. `gameArchive` is the game's
  * primary archive name.
  */
-export const unitsyncGameInfo = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive: string },
-  GameInfoResult
->("coilbox-unitsync", "unitsync_game_info");
+export const unitsyncGameInfo = (args: GameReadArgs) =>
+  gameInfoCommand(withGameArchivePath(args));
+const gameInfoCommand = defineCommand<GameReadArgs, GameInfoResult>(
+  "coilbox-unitsync",
+  "unitsync_game_info",
+);
 
 /** One resolved start unit: its friendly name and/or build icon. */
 export interface UnitDisplay {
@@ -1289,14 +1340,11 @@ export interface UnitBuildpicsResult {
  * where the uploader can read it. Only the blueprint backfill asks for that
  * (#1636): a page drawing icons would be paying for a WebP encode nobody sends.
  */
-export const unitsyncUnitBuildpics = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    units: string[];
-    assets?: boolean;
-  },
+export const unitsyncUnitBuildpics = (args: UnitBuildpicsArgs) =>
+  unitBuildpicsCommand(withGameArchivePath(args));
+type UnitBuildpicsArgs = GameReadArgs & { units: string[]; assets?: boolean };
+const unitBuildpicsCommand = defineCommand<
+  UnitBuildpicsArgs,
   UnitBuildpicsResult
 >("coilbox-unitsync", "unitsync_unit_buildpics");
 
@@ -1323,15 +1371,13 @@ export interface FactionLogosResult {
  * lazy, since it mounts the game's archive set. `sides` are the side names (from
  * {@link unitsyncGameInfo}).
  */
-export const unitsyncFactionLogos = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    sides: string[];
-  },
-  FactionLogosResult
->("coilbox-unitsync", "unitsync_faction_logos");
+export const unitsyncFactionLogos = (args: FactionLogosArgs) =>
+  factionLogosCommand(withGameArchivePath(args));
+type FactionLogosArgs = GameReadArgs & { sides: string[] };
+const factionLogosCommand = defineCommand<FactionLogosArgs, FactionLogosResult>(
+  "coilbox-unitsync",
+  "unitsync_faction_logos",
+);
 
 /** One unit in the reusable unit dataset: its names plus the internal names of the
  * units it can build (`buildoptions`, lowercased). */
@@ -1425,10 +1471,12 @@ export interface UnitDatasetResult {
  * since it mounts the game's archive set. Powers the per-faction build-tree viewer
  * and unit include/exclude filters. `gameArchive` is the primary archive name.
  */
-export const unitsyncUnitDataset = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive: string },
-  UnitDatasetResult
->("coilbox-unitsync", "unitsync_unit_dataset");
+export const unitsyncUnitDataset = (args: GameReadArgs) =>
+  unitDatasetCommand(withGameArchivePath(args));
+const unitDatasetCommand = defineCommand<GameReadArgs, UnitDatasetResult>(
+  "coilbox-unitsync",
+  "unitsync_unit_dataset",
+);
 
 /**
  * Every key a game declares for every unit, read out of the game's own def
@@ -1780,15 +1828,13 @@ export interface UnitModelsResult {
  * archive mount however many objects it names, which on a game like Beyond All
  * Reason is a second or more saved per unit past the first.
  */
-export const unitsyncUnitModels = defineCommand<
-  {
-    enginePath: string;
-    dataDir: string;
-    gameArchive: string;
-    objects: string[];
-  },
-  UnitModelsResult
->("coilbox-unitsync", "unitsync_unit_models");
+export const unitsyncUnitModels = (args: UnitModelsArgs) =>
+  unitModelsCommand(withGameArchivePath(args));
+type UnitModelsArgs = GameReadArgs & { objects: string[] };
+const unitModelsCommand = defineCommand<UnitModelsArgs, UnitModelsResult>(
+  "coilbox-unitsync",
+  "unitsync_unit_models",
+);
 
 /** Why a unit produced no render asset. */
 export type RenderSkip =
@@ -2256,10 +2302,12 @@ export interface MapInfoResult {
 /**
  * Load a map's options + warnings — lazy, since it mounts the map's archive.
  */
-export const unitsyncMapInfo = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  MapInfoResult
->("coilbox-unitsync", "unitsync_map_info");
+export const unitsyncMapInfo = (args: MapReadArgs) =>
+  mapInfoCommand(withMapHint(args));
+const mapInfoCommand = defineCommand<MapReadArgs, MapInfoResult>(
+  "coilbox-unitsync",
+  "unitsync_map_info",
+);
 
 /** A skirmish AI available to play against: a native engine AI or a game Lua AI. */
 export interface SkirmishAi {
@@ -2282,10 +2330,16 @@ export interface SkirmishAisResult {
  * selected game's bundled Lua AIs when `gameArchive` is given. The list changes
  * per game (Lua AIs live inside each game's archive).
  */
-export const unitsyncSkirmishAis = defineCommand<
-  { enginePath: string; dataDir: string; gameArchive?: string },
-  SkirmishAisResult
->("coilbox-unitsync", "unitsync_skirmish_ais");
+export const unitsyncSkirmishAis = (args: SkirmishAisArgs) =>
+  skirmishAisCommand(
+    args.gameArchive
+      ? withGameArchivePath({ ...args, gameArchive: args.gameArchive })
+      : args,
+  );
+const skirmishAisCommand = defineCommand<SkirmishAisArgs, SkirmishAisResult>(
+  "coilbox-unitsync",
+  "unitsync_skirmish_ais",
+);
 
 export interface ScanResult {
   maps: MapItem[];
