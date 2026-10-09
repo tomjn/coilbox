@@ -18,6 +18,9 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_float, c_int, c_uint};
 use std::path::{Path, PathBuf};
 
+#[cfg(test)]
+pub(crate) mod stub;
+
 // --- C ABI signatures (reused across same-shaped symbols) -------------------
 
 type InitFn = unsafe extern "C" fn(bool, c_int) -> c_int;
@@ -64,7 +67,7 @@ type ReadVfsFileFn = unsafe extern "C" fn(c_int, *mut u8, c_int) -> c_int; // Re
 
 /// A map's visual appearance, parsed from `mapinfo.lua` (see [`Unitsync::map_appearance`]).
 /// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
-#[derive(Default)]
+#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MapAppearance {
     pub void_water: Option<bool>,
     pub void_ground: Option<bool>,

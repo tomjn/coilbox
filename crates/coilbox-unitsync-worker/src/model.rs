@@ -44,7 +44,7 @@ pub struct ConfigOption {
 }
 
 /// A team start position in map world coordinates (elmos).
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct StartPos {
     pub x: f32,
@@ -905,7 +905,7 @@ pub struct CustomParamsOutput {
 /// sample the same texture. An `.s3o` piece is always one batch, because the
 /// format binds one texture per model. A `.3do` piece is one batch per distinct
 /// texture its faces name, which is what makes both formats fit this shape.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelGroup {
     /// Which entry of [`UnitModelOutput::textures`] this batch samples. `None`
@@ -927,7 +927,7 @@ pub struct ModelGroup {
 /// One piece of the model tree, with its geometry already triangulated. Mirrors
 /// the `Piece` both reader crates expose: a name, a translation from the parent,
 /// and children. A piece with no groups is hierarchy only (a flare or aim point).
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelPiece {
     pub name: String,
@@ -939,7 +939,7 @@ pub struct ModelPiece {
 /// One texture the model asks for, and what became of it. `file` empty means
 /// nothing in the archive matched, which the viewer says on screen rather than
 /// drawing an untextured mesh that looks like a bug.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ModelTexture {
     /// The name as the model file gives it, and the key groups refer to.
@@ -965,7 +965,7 @@ pub struct ModelTexture {
 
 /// Output of `--unit-model`: one unit's model, read out of a game archive and
 /// flattened so the viewer draws `.s3o` and `.3do` the same way.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UnitModelOutput {
     /// `"s3o"` or `"3do"`. Empty when nothing was read.
