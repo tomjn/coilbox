@@ -1,6 +1,6 @@
 import { Button, useSetting } from "@picoframe/frame";
 import { Pause, Play, RotateCcw, Square } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -21,6 +21,11 @@ import {
 import { LevelRow } from "./LevelRow";
 import { isSoundId, SOUND_IDS, SOUNDS } from "./library";
 import { MusicSource } from "./MusicSource";
+import {
+  clearTurnedOffByHang,
+  getTurnedOffByHang,
+  subscribeTurnedOffByHang,
+} from "./music";
 import { previewEvent, stopPreview } from "./play";
 import {
   DEFAULT_SOUND_VOLUME,
@@ -88,6 +93,7 @@ export default function SoundSettings() {
           Music
         </h2>
         <MusicSource />
+        <MusicHangNotice />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -170,6 +176,21 @@ export default function SoundSettings() {
   );
 }
 
+/** Says why music is off when the last attempt to play it hung the app. */
+function MusicHangNotice() {
+  const turnedOff = useSyncExternalStore(
+    subscribeTurnedOffByHang,
+    getTurnedOffByHang,
+  );
+  if (!turnedOff) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      Music was turned off because the last attempt to play it stopped Coilbox
+      responding.
+    </p>
+  );
+}
+
 /**
  * Play and pause for the soundtrack. Separate from the group's mute, which is
  * about how loud everything under it is. Pausing stops a track, muting leaves
@@ -184,7 +205,12 @@ function MusicToggle() {
     <Button
       variant="outline"
       size="sm"
-      onClick={() => setPlaying(!playing)}
+      onClick={() => {
+        // Pressing play is a new attempt under the same guard, so the line
+        // about the last one goes.
+        clearTurnedOffByHang();
+        setPlaying(!playing);
+      }}
       aria-label={playing ? "Pause music" : "Play music"}
     >
       {playing ? <Pause /> : <Play />}
