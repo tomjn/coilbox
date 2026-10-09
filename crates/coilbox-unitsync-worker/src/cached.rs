@@ -16,7 +16,13 @@
 //! different key, so no entry: it cannot be answered from the old one.
 
 use crate::cachekey::{self, ArchiveStamp};
+use crate::model::{
+    FactionLogoEntry, FactionLogosOutput, UnitBuildpicsOutput, UnitDisplay, UnitModelFile,
+    UnitModelsOutput,
+};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// A cached info blob, exactly as the worker wrote it. Anything that is not a
@@ -73,6 +79,270 @@ pub fn skirmish_ais(dir: &Path, engine_lib: &Path, game: Option<&Path>) -> Optio
         None => None,
     };
     info_blob(dir, &cachekey::skirmish_key(&engine, game.as_ref()))
+}
+
+// ---- unit models
+
+/// Bump when [`ModelEntry`] changes shape, so a record from an older build is
+/// read again instead of returning an old answer.
+pub const ENTRY_VERSION: u32 = 1;
+
+/// What a unit's model came to, stored under the game's cache key (issue
+/// #3724).
+///
+/// The model is written as JSON named after the archive member it came from, and
+/// that name is only known once the archive is open. This is the lookup from the
+/// unit's `objectname` to it, so a second read finds the file without mounting
+/// anything. It also lists the texture files the model names, because a model
+/// whose texture was swept away would draw bare, and a hit checks they are all
+/// still there.
+///
+/// Named `.entry` beside the files it describes, under the same
+/// `v<MODEL_CACHE_VERSION>-<key>_` prefix, so the startup sweep that removes a dead
+/// key (`modelcache.rs`) removes these with it.
+#[derive(Serialize, Deserialize)]
+pub struct ModelEntry {
+    pub version: u32,
+    /// The `objectname` this answers, trimmed and lower case. Two names that
+    /// sanitise to one file name are told apart by it.
+    pub object: String,
+    pub file: String,
+    pub path: String,
+    pub format: String,
+    pub textures: Vec<String>,
+}
+
+pub fn entry_object(object: &str) -> String {
+    object.trim().to_lowercase()
+}
+
+pub fn entry_file(base: &str, object: &str) -> String {
+    cache_file_name(base, &format!("entry/{}", entry_object(object)), "entry")
+}
+
+/// The stored entry for `object`, if every file it names is still on disk.
+pub fn read_model_entry(cache_dir: &Path, base: &str, object: &str) -> Option<ModelEntry> {
+    let raw = std::fs::read(cache_dir.join(entry_file(base, object))).ok()?;
+    let entry: ModelEntry = serde_json::from_slice(&raw).ok()?;
+    let held = entry.version == ENTRY_VERSION
+        && entry.object == entry_object(object)
+        && std::iter::once(&entry.file)
+            .chain(&entry.textures)
+            .all(|file| cache_dir.join(file).is_file());
+    held.then_some(entry)
+}
+
+/// The cache file for one archive member:
+/// `v<MODEL_CACHE_VERSION>-<gamekey>_<sanitised path>.<ext>`. One flat segment,
+/// because the asset protocol's root for these serves a single folder. The
+/// extension is the one the file is written in, which is not the source's when
+/// it was transcoded, so the webview can pick a loader from it and the asset
+/// protocol can put a content type on it.
+///
+/// Every extension `to_webview_format` in the binary re-encodes is listed here. A file
+/// written as PNG under its source's name is served as an octet stream, and a
+/// webview that sniffs it anyway is doing us a favour rather than being asked.
+///
+/// The extension the archive gives is the artist's own case, and 1086 of the
+/// installed games' 1680 `.bmp` textures are spelled `.BMP`. Every one of those
+/// was written through raw while its lower-case neighbour was re-encoded, so the
+/// name is settled in lower case before anything is decided from it.
+///
+/// The `v<MODEL_CACHE_VERSION>-` prefix is spelled out in the clear rather than left
+/// folded into `base`'s hash, so the startup sweep (issue #1919) can tell a
+/// current file from an orphan by string comparison alone, with no archive to
+/// open and no hash to recompute.
+pub fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
+    let lower = member.to_lowercase();
+    let source_ext = source_ext.to_lowercase();
+    // `source_ext` comes from `rsplit_once('.')` on the archive member's own
+    // path, which can never hold a dot but can hold a `/`, `\` or `:`: a slash
+    // sends the write to a directory that does not exist, and a colon fails
+    // outright on Windows and picks an NTFS alternate data stream elsewhere.
+    // Sanitised the same way `safe` below sanitises the stem.
+    let ext = if !source_ext.is_empty() && source_ext.chars().all(|c| c.is_ascii_alphanumeric()) {
+        match source_ext.as_str() {
+            "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
+            other => other.to_string(),
+        }
+    } else {
+        "bin".to_string()
+    };
+    let safe: String = lower
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("v{}-{base}_{safe}.{ext}", cachekey::MODEL_CACHE_VERSION)
+}
+
+/// Every model in `objects`, as the worker would answer them, when each one has an
+/// entry under `game_archive`'s key (issue #3714).
+///
+/// All or nothing. A request with one object the cache does not hold goes to a
+/// worker whole, and the worker answers the ones it holds from disk itself and
+/// reads only the rest.
+pub fn unit_models(
+    dir: &Path,
+    game_archive: &Path,
+    objects: &[String],
+) -> Option<UnitModelsOutput> {
+    let base = cachekey::model_key(&ArchiveStamp::of(game_archive)?);
+    let mut models = BTreeMap::new();
+    for object in objects {
+        let entry = read_model_entry(dir, &base, object)?;
+        models.insert(
+            object.clone(),
+            UnitModelFile {
+                file: entry.file,
+                path: entry.path,
+                format: entry.format,
+            },
+        );
+    }
+    Some(UnitModelsOutput {
+        models,
+        ..Default::default()
+    })
+}
+
+// ---- build icons
+
+/// A unit's build icon record stem: `<gamekey>_<sanitized-unit>`.
+pub fn unit_stem(base: &str, unit: &str) -> String {
+    let safe: String = unit
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("{base}_{safe}")
+}
+
+/// A unit's cached build icon record. `Some(display)` = resolved (the display may
+/// be empty, i.e. "resolved to nothing", still a hit that skips the mount). `None`
+/// = cache miss. Present but unparseable files are treated as misses.
+pub fn read_buildpic_record(dir: &Path, base: &str, unit: &str) -> Option<UnitDisplay> {
+    let path = dir.join(format!("{}.json", unit_stem(base, unit)));
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+/// Whether the icon file a cached record names is still on disk. A cache clean
+/// removes the PNG and leaves the record, and a hit on that record would draw a
+/// broken picture, so it has to re-resolve. A record naming no file (nothing
+/// resolved, or the icon is inline) has nothing to miss.
+pub fn icon_file_present(display: &UnitDisplay, dir: &Path) -> bool {
+    display
+        .icon_file
+        .as_ref()
+        .is_none_or(|name| dir.join(name).exists())
+}
+
+/// The build icons for `units` in `game_archive` when every one has a record and
+/// its icon file, as the worker answers them without `--asset-dir`. Units that
+/// resolved to nothing are left out of the answer, exactly as the worker leaves
+/// them out.
+pub fn unit_buildpics(
+    dir: &Path,
+    game_archive: &Path,
+    units: &[String],
+) -> Option<UnitBuildpicsOutput> {
+    let base = cachekey::buildpic_key(&ArchiveStamp::of(game_archive)?);
+    let mut resolved = BTreeMap::new();
+    for unit in units {
+        let display = read_buildpic_record(dir, &base, unit)?;
+        if !icon_file_present(&display, dir) {
+            return None;
+        }
+        if !display.is_empty() {
+            resolved.insert(unit.clone(), display);
+        }
+    }
+    Some(UnitBuildpicsOutput {
+        units: resolved,
+        errors: Vec::new(),
+    })
+}
+
+// ---- faction logos
+
+/// A cached per-side faction logo record. Neither picture set means "resolved to
+/// nothing", a hit that still skips the mount (mirrors the build-pic cache's empty
+/// records). `file` is the normal answer and `data_uri` the fallback for a side
+/// whose PNG had nowhere to go, so the two are never both set.
+#[derive(Serialize, Deserialize, Default)]
+pub struct CachedLogo {
+    #[serde(default)]
+    pub file: Option<String>,
+    #[serde(default)]
+    pub data_uri: Option<String>,
+    pub max_dim: u32,
+}
+
+/// Per-side cache file stem: `<gamekey>_<sanitized-side>`.
+pub fn side_stem(base: &str, side: &str) -> String {
+    let safe: String = side
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    format!("{base}_{safe}")
+}
+
+/// A side's emblem file name: its cache record's stem, as a PNG.
+pub fn logo_file_name(base: &str, side: &str) -> String {
+    format!("{}.png", side_stem(base, side))
+}
+
+/// Read a side's cached record. `Some` = resolved (may be empty = "nothing here",
+/// still a hit). `None` = miss. Unparseable files are treated as misses.
+pub fn read_logo_record(dir: &Path, base: &str, side: &str) -> Option<CachedLogo> {
+    let path = dir.join(format!("{}.json", side_stem(base, side)));
+    let raw = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+/// Whether the PNG a cached record names is still on disk. A cache clean removes
+/// the picture and leaves the record, and a hit on that record would draw a broken
+/// emblem, so it has to re-resolve.
+pub fn logo_file_present(cached: &CachedLogo, dir: &Path) -> bool {
+    cached
+        .file
+        .as_ref()
+        .is_none_or(|name| dir.join(name).exists())
+}
+
+/// Append a resolved record to the output, skipping empty ones (the UI then falls
+/// through to its curated/bundled layers for that side).
+pub fn push_logo(out: &mut Vec<FactionLogoEntry>, side: &str, cached: CachedLogo) {
+    if cached.file.is_none() && cached.data_uri.is_none() {
+        return;
+    }
+    out.push(FactionLogoEntry {
+        side: side.to_string(),
+        file: cached.file,
+        data_uri: cached.data_uri,
+        max_dim: cached.max_dim,
+    });
+}
+
+/// The faction logos for `sides` in `game_archive` when every side has a record
+/// and its picture.
+pub fn faction_logos(
+    dir: &Path,
+    game_archive: &Path,
+    sides: &[String],
+) -> Option<FactionLogosOutput> {
+    let base = cachekey::faction_logo_key(&ArchiveStamp::of(game_archive)?);
+    let mut logos = Vec::new();
+    for side in sides {
+        let cached = read_logo_record(dir, &base, side)?;
+        if !logo_file_present(&cached, dir) {
+            return None;
+        }
+        push_logo(&mut logos, side, cached);
+    }
+    Some(FactionLogosOutput {
+        logos,
+        errors: Vec::new(),
+    })
 }
 
 #[cfg(test)]

@@ -18,8 +18,9 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+pub(crate) use coilbox_unitsync_worker::cached::{cache_file_name, read_model_entry as read_entry};
+use coilbox_unitsync_worker::cached::{entry_file, entry_object, ModelEntry, ENTRY_VERSION};
 use coilbox_unitsync_worker::cachekey;
-use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -1283,55 +1284,6 @@ fn resolve_texture(
     }
 }
 
-/// Bump when [`ModelEntry`] changes shape, so a record from an older build is
-/// read again instead of returning an old answer.
-const ENTRY_VERSION: u32 = 1;
-
-/// What a unit's model came to, stored under the game's cache key (issue
-/// #3724).
-///
-/// The model is written as JSON named after the archive member it came from, and
-/// that name is only known once the archive is open. This is the lookup from the
-/// unit's `objectname` to it, so a second read finds the file without mounting
-/// anything. It also lists the texture files the model names, because a model
-/// whose texture was swept away would draw bare, and a hit checks they are all
-/// still there.
-///
-/// Named `.entry` beside the files it describes, under the same
-/// `v<CACHE_VERSION>-<key>_` prefix, so the startup sweep that removes a dead
-/// key (`modelcache.rs`) removes these with it.
-#[derive(Serialize, Deserialize)]
-pub(crate) struct ModelEntry {
-    version: u32,
-    /// The `objectname` this answers, trimmed and lower case. Two names that
-    /// sanitise to one file name are told apart by it.
-    object: String,
-    pub(crate) file: String,
-    pub(crate) path: String,
-    pub(crate) format: String,
-    textures: Vec<String>,
-}
-
-fn entry_object(object: &str) -> String {
-    object.trim().to_lowercase()
-}
-
-fn entry_file(base: &str, object: &str) -> String {
-    cache_file_name(base, &format!("entry/{}", entry_object(object)), "entry")
-}
-
-/// The stored entry for `object`, if every file it names is still on disk.
-pub(crate) fn read_entry(cache_dir: &Path, base: &str, object: &str) -> Option<ModelEntry> {
-    let raw = std::fs::read(cache_dir.join(entry_file(base, object))).ok()?;
-    let entry: ModelEntry = serde_json::from_slice(&raw).ok()?;
-    let held = entry.version == ENTRY_VERSION
-        && entry.object == entry_object(object)
-        && std::iter::once(&entry.file)
-            .chain(&entry.textures)
-            .all(|file| cache_dir.join(file).is_file());
-    held.then_some(entry)
-}
-
 /// Record where `model` was written, so [`read_entry`] finds it. Skipped for a
 /// model that did not read, and for one with a texture that resolved to a member
 /// but failed to reach the cache dir: either is a read worth trying again, not
@@ -1519,49 +1471,6 @@ pub(crate) fn record_source(cache_dir: &Path, key: &str, archive: &Path, size: u
     let record = serde_json::json!({ "path": archive, "size": size, "mtime": mtime });
     let _ = std::fs::create_dir_all(cache_dir);
     let _ = std::fs::write(dest, record.to_string());
-}
-
-/// The cache file for one archive member:
-/// `v<CACHE_VERSION>-<gamekey>_<sanitised path>.<ext>`. One flat segment,
-/// because the asset protocol's root for these serves a single folder. The
-/// extension is the one the file is written in, which is not the source's when
-/// it was transcoded, so the webview can pick a loader from it and the asset
-/// protocol can put a content type on it.
-///
-/// Every extension [`to_webview_format`] re-encodes is listed here. A file
-/// written as PNG under its source's name is served as an octet stream, and a
-/// webview that sniffs it anyway is doing us a favour rather than being asked.
-///
-/// The extension the archive gives is the artist's own case, and 1086 of the
-/// installed games' 1680 `.bmp` textures are spelled `.BMP`. Every one of those
-/// was written through raw while its lower-case neighbour was re-encoded, so the
-/// name is settled in lower case before anything is decided from it.
-///
-/// The `v<CACHE_VERSION>-` prefix is spelled out in the clear rather than left
-/// folded into `base`'s hash, so the startup sweep (issue #1919) can tell a
-/// current file from an orphan by string comparison alone, with no archive to
-/// open and no hash to recompute.
-pub(crate) fn cache_file_name(base: &str, member: &str, source_ext: &str) -> String {
-    let lower = member.to_lowercase();
-    let source_ext = source_ext.to_lowercase();
-    // `source_ext` comes from `rsplit_once('.')` on the archive member's own
-    // path, which can never hold a dot but can hold a `/`, `\` or `:`: a slash
-    // sends the write to a directory that does not exist, and a colon fails
-    // outright on Windows and picks an NTFS alternate data stream elsewhere.
-    // Sanitised the same way `safe` below sanitises the stem.
-    let ext = if !source_ext.is_empty() && source_ext.chars().all(|c| c.is_ascii_alphanumeric()) {
-        match source_ext.as_str() {
-            "bmp" | "tga" | "tif" | "tiff" | "pcx" => "png".to_string(),
-            other => other.to_string(),
-        }
-    } else {
-        "bin".to_string()
-    };
-    let safe: String = lower
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("v{CACHE_VERSION}-{base}_{safe}.{ext}")
 }
 
 #[cfg(test)]

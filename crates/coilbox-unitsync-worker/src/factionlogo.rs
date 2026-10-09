@@ -16,6 +16,10 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{FactionLogoEntry, FactionLogosOutput};
+use coilbox_unitsync_worker::cached::{
+    logo_file_name, logo_file_present, push_logo as push_entry, read_logo_record as read_cache,
+    side_stem, CachedLogo,
+};
 use coilbox_unitsync_worker::cachekey;
 use std::path::Path;
 
@@ -37,19 +41,6 @@ pub fn emit_error(msg: String) {
         errors: vec![msg],
     };
     println!("{}", serde_json::to_string(&out).unwrap_or_default());
-}
-
-/// A cached per-side record. Neither picture set means "resolved to nothing", a
-/// hit that still skips the mount (mirrors the build-pic cache's empty records).
-/// `file` is the normal answer and `data_uri` the fallback for a side whose PNG
-/// had nowhere to go, so the two are never both set.
-#[derive(serde::Serialize, serde::Deserialize, Default)]
-struct CachedLogo {
-    #[serde(default)]
-    file: Option<String>,
-    #[serde(default)]
-    data_uri: Option<String>,
-    max_dim: u32,
 }
 
 /// One side's emblem as it comes out of the archive, before it is put anywhere.
@@ -205,21 +196,6 @@ fn store_logo(
     }
 }
 
-/// A side's emblem file name: its cache record's stem, as a PNG.
-fn logo_file_name(base: &str, side: &str) -> String {
-    format!("{}.png", side_stem(base, side))
-}
-
-/// Whether the PNG a cached record names is still on disk. A cache clean removes
-/// the picture and leaves the record, and a hit on that record would draw a
-/// broken emblem, so it has to re-resolve.
-fn logo_file_present(cached: &CachedLogo, dir: &Path) -> bool {
-    cached
-        .file
-        .as_ref()
-        .is_none_or(|name| dir.join(name).exists())
-}
-
 /// Set pure-white pixels fully transparent (the `Sidepics` BMP convention).
 fn chroma_key_white(img: &mut image::RgbaImage) {
     for px in img.pixels_mut() {
@@ -227,20 +203,6 @@ fn chroma_key_white(img: &mut image::RgbaImage) {
             px[3] = 0;
         }
     }
-}
-
-/// Append a resolved record to the output, skipping empty ones (the UI then falls
-/// through to its curated/bundled layers for that side).
-fn push_entry(out: &mut Vec<FactionLogoEntry>, side: &str, cached: CachedLogo) {
-    if cached.file.is_none() && cached.data_uri.is_none() {
-        return;
-    }
-    out.push(FactionLogoEntry {
-        side: side.to_string(),
-        file: cached.file,
-        data_uri: cached.data_uri,
-        max_dim: cached.max_dim,
-    });
 }
 
 /// Find an archive member whose path equals or ends with `/<target_lc>`
@@ -259,23 +221,6 @@ fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
     Some(cachekey::faction_logo_key(
         &crate::infocache::archive_stamp(us, archive_name)?,
     ))
-}
-
-/// Per-side cache file stem: `<gamekey>_<sanitized-side>`.
-fn side_stem(base: &str, side: &str) -> String {
-    let safe: String = side
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("{base}_{safe}")
-}
-
-/// Read a side's cached record. `Some` = resolved (may be empty = "nothing here",
-/// still a hit); `None` = miss. Unparseable files are treated as misses.
-fn read_cache(dir: &Path, base: &str, side: &str) -> Option<CachedLogo> {
-    let path = dir.join(format!("{}.json", side_stem(base, side)));
-    let raw = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&raw).ok()
 }
 
 /// Best-effort cache write. An empty record is still written so a re-run doesn't
@@ -378,6 +323,63 @@ mod tests {
         let mut out = Vec::new();
         push_entry(&mut out, "Aven", nothing);
         assert!(out.is_empty(), "a side with no emblem is simply absent");
+    }
+
+    /// Issue #3714: the plugin answers from the records this module wrote, given
+    /// only the game archive's path.
+    #[test]
+    fn the_plugin_names_the_emblems_the_worker_wrote_without_a_worker() {
+        let dir = temp_dir("plugin-hit");
+        let cache = dir.join("cache");
+        let archive = dir.join("game.sdz");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&archive, b"a game").unwrap();
+        let base = cachekey::faction_logo_key(&cachekey::ArchiveStamp::of(&archive).unwrap());
+
+        for (side, resolved) in [("Aven", Some(emblem())), ("Gear", None)] {
+            let cached = store_logo(Some((&cache, &base)), side, resolved);
+            write_cache(&cache, &base, side, &cached);
+        }
+
+        let sides = vec!["Aven".to_string(), "Gear".to_string()];
+        let answered = coilbox_unitsync_worker::cached::faction_logos(&cache, &archive, &sides)
+            .expect("a hit");
+        assert_eq!(answered.logos.len(), 1, "a side with no emblem is absent");
+        assert_eq!(answered.logos[0].side, "Aven");
+        assert_eq!(
+            answered.logos[0].file.as_deref(),
+            Some(format!("{base}_Aven.png").as_str())
+        );
+        assert_eq!(answered.logos[0].max_dim, 16);
+
+        // A side nobody has resolved, a cleaned picture and a changed archive all
+        // go to a worker.
+        let more = vec!["Aven".to_string(), "Other".to_string()];
+        assert!(coilbox_unitsync_worker::cached::faction_logos(&cache, &archive, &more).is_none());
+        std::fs::write(&archive, b"a longer game archive").unwrap();
+        assert!(coilbox_unitsync_worker::cached::faction_logos(&cache, &archive, &sides).is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_plugin_leaves_an_emblem_whose_file_was_cleaned_to_a_worker() {
+        let dir = temp_dir("plugin-cleaned");
+        let cache = dir.join("cache");
+        let archive = dir.join("game.sdz");
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(&archive, b"a game").unwrap();
+        let base = cachekey::faction_logo_key(&cachekey::ArchiveStamp::of(&archive).unwrap());
+        let cached = store_logo(Some((&cache, &base)), "Aven", Some(emblem()));
+        write_cache(&cache, &base, "Aven", &cached);
+        std::fs::remove_file(cache.join(cached.file.as_ref().unwrap())).unwrap();
+
+        assert!(coilbox_unitsync_worker::cached::faction_logos(
+            &cache,
+            &archive,
+            &["Aven".to_string()]
+        )
+        .is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// A cache clean takes the PNG and leaves the record, and answering from

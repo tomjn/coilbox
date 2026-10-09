@@ -13,6 +13,9 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{BuildpicSkip, UnitBuildpicAsset, UnitBuildpicsOutput, UnitDisplay};
+use coilbox_unitsync_worker::cached::{
+    icon_file_present, read_buildpic_record as read_cache, unit_stem,
+};
 use coilbox_unitsync_worker::cachekey;
 use std::path::Path;
 
@@ -557,17 +560,6 @@ fn icon_file_name(base: &str, unit: &str) -> String {
     format!("{}.png", unit_stem(base, unit))
 }
 
-/// Whether the icon file a cached record names is still on disk. A cache clean
-/// removes the PNG and leaves the record, and a hit on that record would draw a
-/// broken picture, so it has to re-resolve. A record naming no file (nothing
-/// resolved, or the icon is inline) has nothing to miss.
-fn icon_file_present(display: &UnitDisplay, dir: &Path) -> bool {
-    display
-        .icon_file
-        .as_ref()
-        .is_none_or(|name| dir.join(name).exists())
-}
-
 /// Whether a cached record already answers what this run is asking for.
 ///
 /// A record written before assets were wanted has no asset decision in it, and a
@@ -606,24 +598,6 @@ fn collect_display(
     if !display.is_empty() {
         map.insert(unit.to_string(), display);
     }
-}
-
-/// Per-unit cache file stem: `<gamekey>_<sanitized-unit>`.
-fn unit_stem(base: &str, unit: &str) -> String {
-    let safe: String = unit
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-    format!("{base}_{safe}")
-}
-
-/// Read a unit's cached record. `Some(display)` = resolved (the display may be
-/// empty, i.e. "resolved to nothing" — still a hit that skips the mount); `None` =
-/// cache miss. Present-but-unparseable files are treated as misses.
-fn read_cache(dir: &Path, base: &str, unit: &str) -> Option<UnitDisplay> {
-    let path = dir.join(format!("{}.json", unit_stem(base, unit)));
-    let raw = std::fs::read_to_string(path).ok()?;
-    serde_json::from_str(&raw).ok()
 }
 
 /// Best-effort cache write of the resolved record as JSON. An empty record is
@@ -886,6 +860,81 @@ mod tests {
         let at = |ext: &str| c.iter().position(|m| m.ends_with(ext)).expect(ext);
         assert!(c.contains(&"unitpics/alienaaa.pcx".to_string()));
         assert!(at(".png") < at(".pcx") && at(".pcx") < at(".bmp"));
+    }
+
+    /// Issue #3714: the plugin answers from the records this module wrote, given
+    /// only the game archive's path.
+    #[test]
+    fn the_plugin_names_the_icons_the_worker_wrote_without_a_worker() {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-buildpic-plugin-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = dir.join("cache");
+        let archive = dir.join("game.sdz");
+        std::fs::create_dir_all(&cache).unwrap();
+        std::fs::write(&archive, b"a game").unwrap();
+        let base = cachekey::buildpic_key(&cachekey::ArchiveStamp::of(&archive).unwrap());
+
+        let icon = icon_file_name(&base, "armcom");
+        std::fs::write(cache.join(&icon), b"png").unwrap();
+        write_cache(
+            &cache,
+            &base,
+            "armcom",
+            &UnitDisplay {
+                name: Some("Commander".into()),
+                icon_file: Some(icon.clone()),
+                ..Default::default()
+            },
+        );
+        write_cache(&cache, &base, "nothing", &UnitDisplay::default());
+
+        let units = vec!["armcom".to_string(), "nothing".to_string()];
+        let answered = coilbox_unitsync_worker::cached::unit_buildpics(&cache, &archive, &units)
+            .expect("a hit");
+        assert_eq!(answered.units.len(), 1, "a unit with nothing is absent");
+        let armcom = &answered.units["armcom"];
+        assert_eq!(armcom.name.as_deref(), Some("Commander"));
+        assert_eq!(armcom.icon_file.as_deref(), Some(icon.as_str()));
+
+        // A unit nobody has resolved, a cleaned icon and a changed archive all go
+        // to a worker.
+        let more = vec!["armcom".to_string(), "corcom".to_string()];
+        assert!(coilbox_unitsync_worker::cached::unit_buildpics(&cache, &archive, &more).is_none());
+        std::fs::write(&archive, b"a longer game archive").unwrap();
+        assert!(
+            coilbox_unitsync_worker::cached::unit_buildpics(&cache, &archive, &units).is_none()
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_plugin_leaves_an_icon_whose_file_was_cleaned_to_a_worker() {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-buildpic-clean-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cache = dir.join("cache");
+        let archive = dir.join("game.sdz");
+        std::fs::create_dir_all(&cache).unwrap();
+        std::fs::write(&archive, b"a game").unwrap();
+        let base = cachekey::buildpic_key(&cachekey::ArchiveStamp::of(&archive).unwrap());
+        write_cache(
+            &cache,
+            &base,
+            "armcom",
+            &UnitDisplay {
+                icon_file: Some(icon_file_name(&base, "armcom")),
+                ..Default::default()
+            },
+        );
+
+        assert!(coilbox_unitsync_worker::cached::unit_buildpics(
+            &cache,
+            &archive,
+            &["armcom".to_string()]
+        )
+        .is_none());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
