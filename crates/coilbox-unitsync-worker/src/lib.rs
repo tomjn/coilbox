@@ -30,6 +30,7 @@
 //! style).
 
 pub mod beforepost;
+pub mod cached;
 pub mod cachekey;
 /// The shapes the worker prints and the cache files hold. Declared here and not in
 /// the binary so the plugin can read a cached answer without starting a worker

@@ -228,6 +228,152 @@ mod tests {
         );
     }
 
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-infocache-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    /// Issue #3714: the plugin finds an entry the worker wrote, through the stub
+    /// library for the worker's side and through only the archive's path for the
+    /// plugin's. These are the entries already on every machine, written by the
+    /// code that is now in `write`.
+    #[test]
+    fn a_game_entry_the_worker_wrote_is_found_from_the_archive_path() {
+        use crate::ffi::stub::{install, World};
+        use crate::model::{GameInfoOutput, UnitDatasetOutput};
+
+        let dir = temp_dir("game-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let info = GameInfoOutput {
+            checksum: Some("0123abcd".into()),
+            unit_count: 7,
+            ..Default::default()
+        };
+        write(&cache, &game_key(&us, World::GAME).expect("a key"), &info);
+        let dataset = UnitDatasetOutput {
+            checksum: Some("0123abcd".into()),
+            ..Default::default()
+        };
+        write(
+            &cache,
+            &dataset_key(&us, World::GAME).expect("a key"),
+            &dataset,
+        );
+
+        let archive = content.join(World::GAME);
+        assert_eq!(
+            coilbox_unitsync_worker::cached::game_info(&cache, &archive),
+            Some(serde_json::to_value(&info).unwrap())
+        );
+        assert_eq!(
+            coilbox_unitsync_worker::cached::unit_dataset(&cache, &archive),
+            Some(serde_json::to_value(&dataset).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The case the real library is almost entirely made of: a map whose archive
+    /// path does not resolve, so the worker keys it on its name and file.
+    #[test]
+    fn a_name_keyed_map_entry_the_worker_wrote_is_found_from_the_scans_names() {
+        use crate::ffi::stub::{install, World};
+
+        let dir = temp_dir("map-entry");
+        let cache = dir.join("cache");
+        let mut world = World::with_map(&dir.join("content"));
+        world.archives.clear();
+        install(world);
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let out = MapInfoOutput {
+            checksum: Some("cafe0001".into()),
+            ..Default::default()
+        };
+        let key = map_key(&us, World::MAP).expect("a key");
+        assert!(key.starts_with('n'), "{key} is not a name based key");
+        write(&cache, &key, &out);
+
+        assert_eq!(
+            coilbox_unitsync_worker::cached::map_info(
+                &cache,
+                World::MAP,
+                None,
+                Some("maps/stubmap.smf")
+            ),
+            Some(serde_json::to_value(&out).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_path_keyed_map_entry_the_worker_wrote_is_found_from_the_archive_path() {
+        use crate::ffi::stub::{install, World};
+
+        let dir = temp_dir("map-path-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_map(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let out = MapInfoOutput {
+            checksum: Some("cafe0002".into()),
+            ..Default::default()
+        };
+        let key = map_key(&us, World::MAP).expect("a key");
+        assert!(!key.starts_with('n'), "{key} is a name based key");
+        write(&cache, &key, &out);
+
+        let archive = content.join(World::MAP_ARCHIVE);
+        assert_eq!(
+            coilbox_unitsync_worker::cached::map_info(
+                &cache,
+                World::MAP,
+                Some(&archive),
+                Some("maps/stubmap.smf")
+            ),
+            Some(serde_json::to_value(&out).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_skirmish_entry_the_worker_wrote_is_found_from_the_engine_and_game_paths() {
+        use crate::ffi::stub::{install, World};
+        use crate::model::SkirmishAiOutput;
+
+        let dir = temp_dir("skirmish-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+        let lib = content.join("libunitsync.so");
+        std::fs::write(&lib, b"an engine").expect("lib");
+
+        let out = SkirmishAiOutput::default();
+        write(
+            &cache,
+            &skirmish_key(&us, &lib, Some(World::GAME)).expect("a key"),
+            &out,
+        );
+        write(&cache, &skirmish_key(&us, &lib, None).expect("a key"), &out);
+
+        let game = content.join(World::GAME);
+        assert!(coilbox_unitsync_worker::cached::skirmish_ais(&cache, &lib, Some(&game)).is_some());
+        assert!(coilbox_unitsync_worker::cached::skirmish_ais(&cache, &lib, None).is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_missing_archive_has_no_identity() {
         let missing = std::env::temp_dir().join("coilbox-infocache-does-not-exist.sdz");
