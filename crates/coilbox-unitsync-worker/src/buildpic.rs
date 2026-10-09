@@ -13,21 +13,8 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{BuildpicSkip, UnitBuildpicAsset, UnitBuildpicsOutput, UnitDisplay};
+use coilbox_unitsync_worker::cachekey;
 use std::path::Path;
-
-/// Salts the buildpic cache key, independent of the header cache so this cache can
-/// be invalidated on its own. Bump when the icon encoding, cache format, or the
-/// name/buildpic *resolution logic* changes so pre-change records are re-resolved.
-/// v3: nested/scripted Lua defs + legacy `.fbi` name resolution.
-/// v4: uncompressed DDS decoding, and the reason an icon is missing (#1625), so
-/// records written before it re-resolve rather than staying silently blank.
-/// v5: the asset carries `origin` and `source_archive` (#1678), which a record
-/// written before it has no way to answer.
-/// v6: the icon is a PNG file named by the record rather than base64 inside it
-/// (#1694), and a record written before it holds the icon nowhere else.
-/// v7: `.pcx` is a candidate and decodes, so every unit a game like Expand and
-/// Exterminate ships one for is cached as having no build pic at all.
-const BUILDPIC_CACHE_VERSION: u32 = 7;
 
 /// Read up to this many bytes of a candidate texture before decoding (build pics
 /// are tiny; this is a generous safety bound).
@@ -603,22 +590,10 @@ fn cache_covers_assets(display: &UnitDisplay, asset_dir: Option<&Path>) -> bool 
 /// Cheap, stable per-game cache identity (path + size + mtime + version salt).
 /// `None` disables caching for this game. Mirrors `archive::game_cache_key`.
 fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let dir = us.archive_path(archive_name)?;
-    let path = Path::new(&dir).join(archive_name);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    BUILDPIC_CACHE_VERSION.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
+    Some(cachekey::buildpic_key(&crate::infocache::archive_stamp(
+        us,
+        archive_name,
+    )?))
 }
 
 /// Insert a resolved record into the output map, skipping fully-empty ones (the UI

@@ -18,6 +18,7 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+use coilbox_unitsync_worker::cachekey;
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -36,10 +37,9 @@ use std::rc::Rc;
 /// lets `tauri-plugin-coilbox-unitsync`'s startup sweep (`modelcache.rs`, issue
 /// #1919) tell a live file from an orphan without opening an archive: bump this
 /// and the sweep deletes everything written under the old number on its next
-/// launch. That module keeps its own copy of this number, since there is no
-/// library dependency between this sidecar and the plugin crate, so bump both
-/// together.
-pub(crate) const CACHE_VERSION: u32 = 3;
+/// launch. The number is defined in [`cachekey::MODEL_CACHE_VERSION`], which the
+/// plugin crate reads too, so the two cannot drift.
+pub(crate) const CACHE_VERSION: u32 = cachekey::MODEL_CACHE_VERSION;
 
 /// Models are a few megabytes at most: the largest in the games checked is a
 /// 3.2 MiB `.s3o`. Bound the read anyway.
@@ -1486,24 +1486,10 @@ pub(crate) fn cache_key_base(
     archive_name: &str,
     cache_dir: Option<&Path>,
 ) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let dir = us.archive_path(archive_name)?;
-    let path = Path::new(&dir).join(archive_name);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    CACHE_VERSION.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    let key = format!("{:016x}", h.finish());
+    let stamp = crate::infocache::archive_stamp(us, archive_name)?;
+    let key = cachekey::model_key(&stamp);
     if let Some(cache_dir) = cache_dir {
-        record_source(cache_dir, &key, &path, md.len(), mtime);
+        record_source(cache_dir, &key, stamp.path(), stamp.size(), stamp.mtime());
     }
     Some(key)
 }

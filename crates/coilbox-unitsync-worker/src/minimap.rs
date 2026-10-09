@@ -29,6 +29,7 @@ use crate::model::{MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimaps
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
 use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
+use coilbox_unitsync_worker::cachekey;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
 use std::io::Cursor;
@@ -57,50 +58,22 @@ const ASSET_MINIMAP_MIP: i32 = 1;
 /// its name, so a stale image can persist until a rescan. That is an acceptable
 /// trade for a cosmetic minimap that re-renders in about 80ms.
 pub(crate) fn map_cache_key(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
-    archive_identity(us, map_name).or_else(|| name_identity(us, index, map_name))
-}
-
-/// File identity of the map's own archive: path + size + mtime.
-///
-/// Only resolves when `GetArchivePath` recognises the name `GetMapArchiveName`
-/// gave us, which is not the general case: a map's archives come back under their
-/// versioned *human* names ("AcidicQuarry 5.17") while `GetArchivePath` looks up
-/// *file* names ("acidicquarry_5.17.sd7"). Kept as the preferred route because
-/// where it does resolve it catches an in-place edit that the name route cannot.
-fn archive_identity(us: &Unitsync, map_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let archive = us.map_archives(map_name).into_iter().next()?;
-    let dir = us.archive_path(&archive)?;
-    let path = Path::new(&dir).join(&archive);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
-}
-
-/// The map's versioned name plus the map file inside its archive.
-///
-/// Needs no path and no hashing, so it costs nothing on a cold library. It works
-/// because the versioned name carries the archive version: installing a new
-/// release of a map yields a new name, so the key changes with it. `GetMapChecksum`
-/// would be a stronger identity but hashes the whole archive, which on a 5.5 GB
-/// library takes minutes.
-fn name_identity(us: &Unitsync, index: Option<i32>, map_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
+    // The archive's own stamp only resolves when `GetArchivePath` recognises the
+    // name `GetMapArchiveName` gave us, which is not the general case: a map's
+    // archives come back under their versioned *human* names ("AcidicQuarry
+    // 5.17") while `GetArchivePath` looks up *file* names
+    // ("acidicquarry_5.17.sd7"). It stays the preferred route because where it
+    // does resolve it catches an in-place edit that the name route cannot.
+    if let Some(stamp) = crate::infocache::map_archive_stamp(us, map_name) {
+        return cachekey::thumb_key(Some(&stamp), map_name, None);
+    }
+    // The map's versioned name plus the map file inside its archive. It works
+    // because the versioned name carries the archive version: installing a new
+    // release of a map yields a new name, so the key changes with it.
+    // `GetMapChecksum` would be a stronger identity but hashes the whole archive,
+    // which on a 5.5 GB library takes minutes.
     let i = index.or_else(|| map_index(us, map_name))?;
-    let file = us.map_file_name(i)?;
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    map_name.hash(&mut h);
-    file.hash(&mut h);
-    Some(format!("n{:016x}", h.finish()))
+    cachekey::thumb_key(None, map_name, us.map_file_name(i).as_deref())
 }
 
 /// A map's index, for callers that only have its name. `GetMapFileName` is

@@ -29,6 +29,8 @@
 //! (135 commits since May 2026 says a sweeping rewrite is not this crate's
 //! style).
 
+pub mod cachekey;
+
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
 /// variant and one new match arm here, not a new flag added by hand in three

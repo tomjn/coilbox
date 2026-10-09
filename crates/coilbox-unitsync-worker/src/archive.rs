@@ -9,6 +9,7 @@ use crate::model::{
     GameHeadersOutput, MapSkyboxOutput,
 };
 use base64::Engine;
+use coilbox_unitsync_worker::cachekey;
 use std::collections::HashMap;
 use std::path::Path;
 
@@ -36,11 +37,6 @@ const HEADER_MAX_W: u32 = 1920;
 const HEADER_MAX_H: u32 = 1080;
 /// JPEG quality for downscaled header art.
 const HEADER_JPEG_QUALITY: u8 = 90;
-/// Salts the header cache key. Bump when the header-art encoding changes so stale
-/// entries (e.g. games rejected before downscaling existed) are invalidated and
-/// re-resolved rather than served from an outdated cache. Version 3 switched the
-/// hit file from base64 text to the raw JPEG the asset protocol serves.
-const HEADER_CACHE_VERSION: u32 = 3;
 /// How much of a candidate archive's `mapinfo.lua` is read when two archives
 /// hold one `.smf` and only the declared name tells them apart. The map's own
 /// `name` is at the top of the file, so this reaches it on any real map while
@@ -948,22 +944,10 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
 /// whole-archive checksum, so keying the whole games list is effectively free.
 /// `None` (archive path doesn't resolve, or stat fails) disables caching.
 fn game_cache_key(us: &Unitsync, archive_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let dir = us.archive_path(archive_name)?;
-    let path = Path::new(&dir).join(archive_name);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    HEADER_CACHE_VERSION.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
+    Some(cachekey::header_key(&crate::infocache::archive_stamp(
+        us,
+        archive_name,
+    )?))
 }
 
 /// Within an open archive, read the `loadpicture` member if given and decodable,

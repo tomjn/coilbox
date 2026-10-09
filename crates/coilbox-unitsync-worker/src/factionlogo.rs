@@ -16,13 +16,8 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{FactionLogoEntry, FactionLogosOutput};
+use coilbox_unitsync_worker::cachekey;
 use std::path::Path;
-
-/// Salts the faction-logo cache key. Bump when the encoding, chroma-key rule, or
-/// cache format changes so stale entries are ignored.
-/// v2: the emblem is a PNG file named by the record rather than base64 inside it
-/// (#1694), and a record written before it holds the picture nowhere else.
-const CACHE_VERSION: u32 = 2;
 
 /// Extensions probed for a side's emblem, in preference order. PNG first, since
 /// it keeps its own alpha. BMP and PCX are the white-keyed legacy cases.
@@ -261,22 +256,9 @@ fn find_member(list: &[(String, String)], target_lc: &str) -> Option<String> {
 /// Cheap, stable per-game cache identity (path + size + mtime + version salt).
 /// `None` disables caching. Mirrors `buildpic::cache_key_base`.
 fn cache_key_base(us: &Unitsync, archive_name: &str) -> Option<String> {
-    use std::hash::{Hash, Hasher};
-    let dir = us.archive_path(archive_name)?;
-    let path = Path::new(&dir).join(archive_name);
-    let md = std::fs::metadata(&path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    CACHE_VERSION.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
+    Some(cachekey::faction_logo_key(
+        &crate::infocache::archive_stamp(us, archive_name)?,
+    ))
 }
 
 /// Per-side cache file stem: `<gamekey>_<sanitized-side>`.
