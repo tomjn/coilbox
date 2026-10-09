@@ -424,8 +424,21 @@ impl Unitsync {
     /// and rewrites it in place, and a read that overlaps another worker's
     /// rewrite rescans archives for seconds (issue #1916).
     pub fn init(&self, is_server: bool, id: i32) -> i32 {
+        let asked = std::time::Instant::now();
         let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
-        unsafe { (self.init_fn)(is_server, id) }
+        let locked = std::time::Instant::now();
+        let ok = unsafe { (self.init_fn)(is_server, id) };
+        // How long this run queued behind another worker's `Init`, and how long
+        // its own took. Only when asked, and the plugin asks in dev builds only
+        // (issue #3713).
+        if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
+            eprintln!(
+                "[unitsync-timing] init_lock_wait={}ms init_call={}ms",
+                (locked - asked).as_millis(),
+                locked.elapsed().as_millis()
+            );
+        }
+        ok
     }
 
     /// `UnInit`, under the same lock as `init`, because it writes the archive

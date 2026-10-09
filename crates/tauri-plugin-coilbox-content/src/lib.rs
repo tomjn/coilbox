@@ -624,10 +624,39 @@ async fn content_candidates<R: Runtime>(
     CliResult::ok(json!({ "candidates": out }))
 }
 
+/// Logs one `[content-state-load] n=<count> ms=<wall time> t_end=<Unix ms>` line
+/// to stderr when dropped, so a call that returns early is counted too.
+#[cfg(debug_assertions)]
+struct DevStateLoadCall(std::time::Instant);
+
+#[cfg(debug_assertions)]
+fn dev_state_load_call() -> DevStateLoadCall {
+    DevStateLoadCall(std::time::Instant::now())
+}
+
+#[cfg(debug_assertions)]
+impl Drop for DevStateLoadCall {
+    fn drop(&mut self) {
+        static CALLS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let n = CALLS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let t_end = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0);
+        eprintln!(
+            "[content-state-load] n={n} ms={} t_end={t_end}",
+            self.0.elapsed().as_millis()
+        );
+    }
+}
+
 /// `content_state_load` — the persisted snapshot (the cross-plugin read API),
 /// re-validated against disk so a folder/engine deleted between runs is reflected.
 #[tauri::command]
 async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
+    // Dev builds only: count the calls and time each one (issue #3713).
+    #[cfg(debug_assertions)]
+    let _dev_call = dev_state_load_call();
     let path = match store_path(&app) {
         Ok(p) => p,
         Err(e) => return CliResult::err(e),

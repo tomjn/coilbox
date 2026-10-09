@@ -8,6 +8,8 @@
 //! set *after* launch is ignored), runs it under a timeout, and passes its JSON
 //! straight through inside the [`CliResult`] envelope.
 
+#[cfg(debug_assertions)]
+mod devstats;
 mod modelcache;
 mod renderindex;
 mod sidecar;
@@ -238,6 +240,10 @@ fn run_worker_blocking(
     for (k, v) in &envs {
         cmd.env(k, v);
     }
+    #[cfg(debug_assertions)]
+    cmd.env(devstats::TIMINGS_ENV, "1");
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
 
     let mut child = cmd
         .spawn()
@@ -271,6 +277,8 @@ fn run_worker_blocking(
 
     let out = out_handle.join().unwrap_or_default();
     let err = err_handle.join().unwrap_or_default();
+    #[cfg(debug_assertions)]
+    let err = dev_run.take_timings(err);
 
     #[cfg(debug_assertions)]
     if !err.trim().is_empty() {
@@ -326,6 +334,10 @@ fn run_worker_streaming(
     for (k, v) in &envs {
         cmd.env(k, v);
     }
+    #[cfg(debug_assertions)]
+    cmd.env(devstats::TIMINGS_ENV, "1");
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
 
     let mut child = cmd
         .spawn()
@@ -380,6 +392,8 @@ fn run_worker_streaming(
 
     let out = out_handle.join().unwrap_or_default();
     let err = err_handle.join().unwrap_or_default();
+    #[cfg(debug_assertions)]
+    let err = dev_run.take_timings(err);
 
     #[cfg(debug_assertions)]
     if !err.trim().is_empty() {

@@ -32,14 +32,22 @@ import "./index.css";
 const root = document.getElementById("root");
 if (!root) throw new Error("missing #root element");
 
+// Dev builds only: one mark after each boot read below, so its cost can be read
+// back with `performance.getEntriesByType("mark")` (issue #3713). A mark's
+// `startTime` counts from the webview's navigation start, so `start` is also how
+// long the modules took to load. Statically dropped from release builds.
+if (import.meta.env.DEV) performance.mark("coilbox:boot:start");
+
 // Hydrate the settings cache from app-data before first render, so useSetting
 // reads return persisted values synchronously on mount.
 const settingsStorage = await createTauriSettingsStorage();
+if (import.meta.env.DEV) performance.mark("coilbox:boot:settings");
 
 // Load the distribution profile (a bundler-supplied .coilbox/profile.json) before
 // first render so the title, theme, and welcome are applied without a flash of the
 // default. Absent profile => empty, so vanilla Coilbox is untouched.
 const { profile } = await loadProfile();
+if (import.meta.env.DEV) performance.mark("coilbox:boot:profile");
 const appTitle = profile.title ?? "Coilbox";
 
 // Paint the profile's boot background immediately (ending any white flash this
@@ -71,28 +79,33 @@ const logoImages = {
   center: await resolveProfileImage(profile.layout?.center?.image),
   right: await resolveProfileImage(profile.layout?.right?.image),
 };
+if (import.meta.env.DEV) performance.mark("coilbox:boot:layout-images");
 
 // Load the profile's custom markdown pages (.coilbox/pages/*.md) before finalizing
 // the plugin list, so their routes + nav items can be injected below. No-op (empty)
 // without a profile or a pages folder.
 await loadProfilePages();
+if (import.meta.env.DEV) performance.mark("coilbox:boot:pages");
 
 // Resolve the welcome's html/css `@.coilbox/...` file references to text before render
 // so BrandedWelcome has its content ready (like the splash/logo resolves above). No-op
 // when the profile has no welcome; inline fragments resolve to themselves.
 await resolveWelcome();
+if (import.meta.env.DEV) performance.mark("coilbox:boot:welcome");
 
 // Read the `@.coilbox/...` markup the profile's `home` zones reference, for the
 // same reason and by the same route: rendering is synchronous, so a distribution's
 // intro sentence has to be in memory before the home page draws. A no-op (no file
 // IO at all) for a profile with no `home` key.
 await loadHomeMarkup(profile.home);
+if (import.meta.env.DEV) performance.mark("coilbox:boot:home-markup");
 
 // Check the `home.background` file is there, for the reason directly above and
 // one more: an image that is not there paints nothing, which is what switching
 // the backdrop off looks like, so without this a typo in the path has no symptom
 // at all. A no-op for a profile that references no backdrop.
 await loadHomeBackground(profile.home);
+if (import.meta.env.DEV) performance.mark("coilbox:boot:home-background");
 
 // Hide any settings sections the profile lists (uses SettingsSection.useVisible,
 // injected centrally so no plugin needs to opt in). No-op without a profile.
@@ -163,6 +176,7 @@ const home: HomeOverride = { Component: HomeRoute };
 const splashOn =
   profile.splash != null && settingsStorage.get(SPLASH_ENABLED_KEY) !== "false";
 const splashSrc = splashOn ? await resolveSplashSrc() : null;
+if (import.meta.env.DEV) performance.mark("coilbox:boot:splash");
 
 // Dev-only: install the tauri-plugin-mcp webview bridge so the Tauri MCP server's
 // execute_js / query_page / type_text / wait_for / manage_storage tools work.
@@ -170,6 +184,7 @@ const splashSrc = splashOn ? await resolveSplashSrc() : null;
 if (import.meta.env.DEV) {
   const { setupTauriMcpBridge } = await import("./dev/setup-tauri-mcp");
   await setupTauriMcpBridge();
+  performance.mark("coilbox:boot:mcp-bridge");
 }
 
 // A single logged choke-point for otherwise-silent failures: an un-`.catch`ed
@@ -199,3 +214,4 @@ createRoot(root).render(
     )}
   </StrictMode>,
 );
+if (import.meta.env.DEV) performance.mark("coilbox:boot:render");
