@@ -23,6 +23,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetHubGames } from "@/hub/gameIcons";
 import { DownloadQueueProvider } from "../DownloadQueueProvider";
+import { invalidateMirrorIndexes } from "../mirrorIndex";
 import GamesPage from "./GamesPage";
 
 const dlDownload = vi.hoisted(() => vi.fn(async () => ({})));
@@ -128,6 +129,7 @@ vi.mock("@picoframe/frame", () => ({
 }));
 
 beforeEach(() => {
+  invalidateMirrorIndexes();
   (
     globalThis as unknown as { window: Record<string, unknown> }
   ).window.__TAURI_INTERNALS__ = { transformCallback: (cb: unknown) => cb };
