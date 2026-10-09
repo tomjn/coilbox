@@ -71,6 +71,14 @@ export const GAME_REPOS: GameRepo[] = [
     repo: "SplinterFaction/SplinterFaction",
     nameKey: "splinterfaction",
   },
+  // The game's whole name, `THIS (Spring Necromancy Edition)`, as `norm` leaves
+  // it. Just `this` would claim any game whose name starts with those letters.
+  {
+    key: "this",
+    label: "THIS",
+    repo: "Recoil-Game-Archive/THIS",
+    nameKey: "this(springnecromancyedition)",
+  },
 ];
 
 /** The `owner/name` repo for a source key in `repos`, or undefined. */

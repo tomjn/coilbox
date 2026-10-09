@@ -43,6 +43,12 @@
       "label": "SplinterFaction",
       "repo": "SplinterFaction/SplinterFaction",
       "nameKey": "splinterfaction"
+    },
+    {
+      "key": "this",
+      "label": "THIS",
+      "repo": "Recoil-Game-Archive/THIS",
+      "nameKey": "this(springnecromancyedition)"
     }
   ],
   "suggested": {
