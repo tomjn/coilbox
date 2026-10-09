@@ -120,7 +120,7 @@ import {
 } from "../uploadOutcomes";
 import { type AssetKey, assetsTheHubWants, type HaveResult } from "./have";
 import { localRenders, rememberLocalRender } from "./localRenders";
-import { RENDER_VERSION, renderUnit, type UnitRender } from "./renderTop";
+import type { UnitRender } from "./renderTop";
 import {
   hideUploadRun,
   showUploadRun,
@@ -128,7 +128,7 @@ import {
   uploadRunStopping,
 } from "./runningUploads";
 import { type AssetUpload, uploadAssetsToHub } from "./upload";
-import { RENDER_ANGLES, renderVariant } from "./vocabulary";
+import { RENDER_ANGLES, RENDER_VERSION, renderVariant } from "./vocabulary";
 
 /**
  * Every angle the vocabulary lists, which is four (issue #1951).
@@ -288,7 +288,7 @@ export const liveBackfillTools: BackfillTools = {
   models: unitsyncUnitModels,
   readModel: readCachedModel,
   encodeRender: unitsyncUnitRender,
-  draw: renderUnit,
+  draw: async (...args) => (await import("./renderTop")).renderUnit(...args),
   ask: assetsTheHubWants,
   upload: uploadAssetsToHub,
   held: localRenders,
