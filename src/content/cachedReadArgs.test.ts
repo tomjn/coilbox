@@ -14,12 +14,17 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 }));
 
 import {
+  unitsyncArchiveTree,
   unitsyncFactionLogos,
+  unitsyncGameHeaders,
   unitsyncGameInfo,
   unitsyncHeightmap,
   unitsyncMapInfo,
+  unitsyncMapMeta,
+  unitsyncMapSkybox,
   unitsyncMinimap,
   unitsyncSkirmishAis,
+  unitsyncThumbnails,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
   unitsyncUnitModels,
@@ -157,5 +162,80 @@ describe("a cached read carries what the scan knows", () => {
       archivePath: "/elsewhere/game.sdz",
     });
     expect(sent[0]?.args.archivePath).toBe("/elsewhere/game.sdz");
+  });
+});
+
+describe("a read of everything carries the scan's lists", () => {
+  const mapRef = {
+    name: "Aetherian Void 1.7",
+    fileName: "maps/aetherian_void.smf",
+  };
+  const gameRef = {
+    name: "Splinter Faction",
+    archivePath: "/games/SplinterFaction_0.1.86.sdz",
+  };
+
+  it("sends every map with the thumbnail and map meta reads", async () => {
+    await unitsyncThumbnails({ ...target, mip: 3 });
+    await unitsyncMapMeta(target);
+    expect(sent.map((s) => s.command)).toEqual([
+      "unitsync_thumbnails",
+      "unitsync_map_meta",
+    ]);
+    for (const call of sent) expect(call.args.maps).toEqual([mapRef]);
+    expect(sent[0]?.args.mip).toBe(3);
+  });
+
+  it("sends every game with the game headers read", async () => {
+    await unitsyncGameHeaders(target);
+    expect(sent[0]?.args.games).toEqual([gameRef]);
+  });
+
+  it("sends nothing extra before any scan has finished", async () => {
+    forgetScanHints();
+    await unitsyncThumbnails(target);
+    await unitsyncMapMeta(target);
+    await unitsyncGameHeaders(target);
+    for (const call of sent) {
+      expect(call.args.maps).toBeUndefined();
+      expect(call.args.games).toBeUndefined();
+    }
+  });
+
+  it("keeps a list the caller gave", async () => {
+    await unitsyncThumbnails({ ...target, maps: [{ name: "Mine" }] });
+    await unitsyncGameHeaders({
+      ...target,
+      games: [{ name: "Mine", archivePath: "/mine.sdz" }],
+    });
+    expect(sent[0]?.args.maps).toEqual([{ name: "Mine" }]);
+    expect(sent[1]?.args.games).toEqual([
+      { name: "Mine", archivePath: "/mine.sdz" },
+    ]);
+  });
+
+  it("sends a map's file name with its skybox read", async () => {
+    await unitsyncMapSkybox({ ...target, mapName: "Aetherian Void 1.7" });
+    expect(sent[0]?.args.fileName).toBe("maps/aetherian_void.smf");
+  });
+
+  it("sends a game's archive path with a tree read of its archive", async () => {
+    await unitsyncArchiveTree({
+      ...target,
+      archive: "SplinterFaction_0.1.86.sdz",
+    });
+    expect(sent[0]?.args.archivePath).toBe("/games/SplinterFaction_0.1.86.sdz");
+    expect(sent[0]?.args.fileName).toBeUndefined();
+  });
+
+  it("sends a map's file name with a tree read of the map", async () => {
+    await unitsyncArchiveTree({ ...target, archive: "Aetherian Void 1.7" });
+    expect(sent[0]?.args.fileName).toBe("maps/aetherian_void.smf");
+  });
+
+  it("sends nothing extra for a tree of something the scan did not list", async () => {
+    await unitsyncArchiveTree({ ...target, archive: "unknown.sdz" });
+    expect(sent[0]?.args.archivePath).toBeUndefined();
+    expect(sent[0]?.args.fileName).toBeUndefined();
   });
 });

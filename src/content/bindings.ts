@@ -1,7 +1,7 @@
 import { defineCommand } from "@picoframe/plugin-sdk";
 import type { Channel } from "@tauri-apps/api/core";
 import type { DownloadProgress } from "../downloads/bindings";
-import { gameArchivePath, mapHint } from "./scanHints";
+import { gameArchivePath, gameRefs, mapHint, mapRefs } from "./scanHints";
 
 /**
  * Typed bindings to `plugin:coilbox-content|*` (crate `tauri-plugin-coilbox-content`,
@@ -1217,6 +1217,18 @@ type MapReadArgs = {
   fileName?: string;
 };
 
+/** One map of the last scan, as the plugin needs it to find the map's saved
+ *  answer. At least one of `archivePath` and `fileName` is set. */
+export type MapRef = {
+  name: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
+/** One game of the last scan. `name` is the game's name and `archivePath` its
+ *  primary archive as a full path. */
+export type GameRef = { name: string; archivePath: string };
+
 type SkirmishAisArgs = {
   enginePath: string;
   dataDir: string;
@@ -1239,6 +1251,46 @@ function withMapHint<T extends MapReadArgs>(args: T): T {
     return args;
   }
   const hint = mapHint(args.dataDir, args.enginePath, args.mapName);
+  return hint === undefined ? args : { ...args, ...hint };
+}
+
+function withMapRefs<
+  T extends { enginePath: string; dataDir: string; maps?: MapRef[] },
+>(args: T): T {
+  if (args.maps !== undefined) return args;
+  const maps = mapRefs(args.dataDir, args.enginePath);
+  return maps === undefined ? args : { ...args, maps };
+}
+
+function withGameRefs<
+  T extends { enginePath: string; dataDir: string; games?: GameRef[] },
+>(args: T): T {
+  if (args.games !== undefined) return args;
+  const games = gameRefs(args.dataDir, args.enginePath);
+  return games === undefined ? args : { ...args, games };
+}
+
+/** A tree read names a game by its archive file name or a map by its name, so
+ *  try the game lookup first and then the map lookup. */
+function withArchiveTreeHint<
+  T extends {
+    enginePath: string;
+    dataDir: string;
+    archive: string;
+    archivePath?: string;
+    fileName?: string;
+  },
+>(args: T): T {
+  if (args.archivePath !== undefined || args.fileName !== undefined) {
+    return args;
+  }
+  const archivePath = gameArchivePath(
+    args.dataDir,
+    args.enginePath,
+    args.archive,
+  );
+  if (archivePath !== undefined) return { ...args, archivePath };
+  const hint = mapHint(args.dataDir, args.enginePath, args.archive);
   return hint === undefined ? args : { ...args, ...hint };
 }
 
@@ -2536,10 +2588,12 @@ export interface MapSkyboxResult {
  * for the 3D preview's sky. Lazy — a separate unitsync session. Absent for the
  * common case of a map with no skybox.
  */
-export const unitsyncMapSkybox = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  MapSkyboxResult
->("coilbox-unitsync", "unitsync_map_skybox");
+export const unitsyncMapSkybox = (args: MapReadArgs) =>
+  mapSkyboxCommand(withMapHint(args));
+const mapSkyboxCommand = defineCommand<MapReadArgs, MapSkyboxResult>(
+  "coilbox-unitsync",
+  "unitsync_map_skybox",
+);
 
 export interface ThumbnailsResult {
   thumbnails: {
@@ -2620,14 +2674,26 @@ export const unitsyncEngineConfigSet = defineCommand<
   EngineConfigWriteResult
 >("coilbox-unitsync", "unitsync_engine_config_set");
 
+type ThumbnailsArgs = {
+  enginePath: string;
+  dataDir: string;
+  mip?: number;
+  opId?: string;
+  maps?: MapRef[];
+};
+
 /**
  * Render a small minimap thumbnail for every map in one unitsync session (for the
  * Maps grid). `mip` selects resolution: `1024 >> mip` px (default 3 = 128px).
+ * `maps` lists every map of the last scan, filled in from it. The plugin answers
+ * from the disk cache only when every listed map has a saved answer.
  */
-export const unitsyncThumbnails = defineCommand<
-  { enginePath: string; dataDir: string; mip?: number; opId?: string },
-  ThumbnailsResult
->("coilbox-unitsync", "unitsync_thumbnails");
+export const unitsyncThumbnails = (args: ThumbnailsArgs) =>
+  thumbnailsCommand(withMapRefs(args));
+const thumbnailsCommand = defineCommand<ThumbnailsArgs, ThumbnailsResult>(
+  "coilbox-unitsync",
+  "unitsync_thumbnails",
+);
 
 /** One map's mapinfo metadata from the batch map-meta pass. */
 export interface MapMeta {
@@ -2641,15 +2707,25 @@ export interface MapMetaResult {
   errors: string[];
 }
 
+type MapMetaArgs = {
+  enginePath: string;
+  dataDir: string;
+  opId?: string;
+  maps?: MapRef[];
+};
+
 /**
  * Read every map's mapinfo metadata in one session. Kept out of the scan because
  * it opens each map's archive, and only the map detail page and the singleplayer
- * map card read it. Disk-cached per map by the worker.
+ * map card read it. Disk-cached per map by the worker. `maps` is filled in from
+ * the last scan like {@link unitsyncThumbnails}.
  */
-export const unitsyncMapMeta = defineCommand<
-  { enginePath: string; dataDir: string; opId?: string },
-  MapMetaResult
->("coilbox-unitsync", "unitsync_map_meta");
+export const unitsyncMapMeta = (args: MapMetaArgs) =>
+  mapMetaCommand(withMapRefs(args));
+const mapMetaCommand = defineCommand<MapMetaArgs, MapMetaResult>(
+  "coilbox-unitsync",
+  "unitsync_map_meta",
+);
 
 /** One member of an archive's file tree. */
 export interface ArchiveFileEntry {
@@ -2667,15 +2743,27 @@ export interface ArchiveTreeResult {
   errors: string[];
 }
 
+type ArchiveTreeArgs = {
+  enginePath: string;
+  dataDir: string;
+  archive: string;
+  archivePath?: string;
+  fileName?: string;
+};
+
 /**
  * List one archive's member tree (and resolve its on-disk path). Reads through
  * unitsync's VFS, so `.sd7`/`.sdz`/`.sdd` and rapid-pool `.sdp` packages all
- * work. `archive` is the archive name as unitsync knows it.
+ * work. `archive` is the archive name as unitsync knows it. When it is a game's
+ * primary archive or a map's name from the last scan, the archive path and map
+ * file name are filled in so the plugin can answer from the disk cache.
  */
-export const unitsyncArchiveTree = defineCommand<
-  { enginePath: string; dataDir: string; archive: string },
-  ArchiveTreeResult
->("coilbox-unitsync", "unitsync_archive_tree");
+export const unitsyncArchiveTree = (args: ArchiveTreeArgs) =>
+  archiveTreeCommand(withArchiveTreeHint(args));
+const archiveTreeCommand = defineCommand<ArchiveTreeArgs, ArchiveTreeResult>(
+  "coilbox-unitsync",
+  "unitsync_archive_tree",
+);
 
 export interface ArchiveFileResult {
   /** `"text"`, `"image"`, `"audio"`, or `"binary"`. */
@@ -2721,16 +2809,26 @@ export interface GameHeadersResult {
   errors: string[];
 }
 
+type GameHeadersArgs = {
+  enginePath: string;
+  dataDir: string;
+  games?: GameRef[];
+};
+
 /**
  * Resolve loading-screen art for every game in one unitsync session (for the
  * Games grid). Keyed on cheap file identity and disk-cached by the worker, so it
  * stays cheap on later launches. Games with no usable art come back with neither
- * a `file` nor a `dataUrl`, and the UI shows a gradient placeholder.
+ * a `file` nor a `dataUrl`, and the UI shows a gradient placeholder. `games`
+ * lists every game of the last scan, filled in from it. The plugin answers from
+ * the disk cache only when every listed game has a saved answer.
  */
-export const unitsyncGameHeaders = defineCommand<
-  { enginePath: string; dataDir: string },
-  GameHeadersResult
->("coilbox-unitsync", "unitsync_game_headers");
+export const unitsyncGameHeaders = (args: GameHeadersArgs) =>
+  gameHeadersCommand(withGameRefs(args));
+const gameHeadersCommand = defineCommand<GameHeadersArgs, GameHeadersResult>(
+  "coilbox-unitsync",
+  "unitsync_game_headers",
+);
 
 export interface LuaExecResult {
   /** The pretty-printed value the script returned (set on success). */
