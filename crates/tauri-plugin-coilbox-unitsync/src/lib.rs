@@ -2,15 +2,20 @@
 //! the bundled `coilbox-unitsync-worker` sidecar, which loads the engine's
 //! `libunitsync` out-of-process so a unitsync crash can't take the app down.
 //!
-//! The single `unitsync_scan` command resolves the worker and the engine's
-//! library, sets the child's loader-path + `SPRING_DATADIR` env at launch (so the
-//! dynamic loader can resolve unitsync's sibling libraries on macOS, where env
-//! set *after* launch is ignored), runs it under a timeout, and passes its JSON
-//! straight through inside the [`CliResult`] envelope.
+//! Each command resolves the worker and the engine's library, sets the child's
+//! loader-path + `SPRING_DATADIR` env at launch (so the dynamic loader can
+//! resolve unitsync's sibling libraries on macOS, where env set *after* launch
+//! is ignored), has it answered under a timeout, and passes its JSON straight
+//! through inside the [`CliResult`] envelope.
+//!
+//! A read is answered by a worker that stays running between reads, so the
+//! engine's `Init` is paid once and not once per read (issue #3722). `pool`
+//! keeps those. A few reads still start a worker of their own: see [`Via`].
 
 #[cfg(debug_assertions)]
 mod devstats;
 mod modelcache;
+mod pool;
 mod renderindex;
 mod sidecar;
 
@@ -221,8 +226,8 @@ fn loader_envs(engine_dir: &Path, datadir: &str) -> Vec<(String, String)> {
     envs
 }
 
-/// Run the worker to completion, reading stdout on a thread (so a large JSON
-/// dump can't deadlock against a full pipe) and killing it past the timeout. The
+/// Run a one-shot worker to completion, reading stdout on a thread (so a large
+/// JSON dump can't deadlock against a full pipe) and killing it past the timeout. The
 /// worker emits its JSON — including any in-band error list — on stdout even when
 /// it exits non-zero, so non-empty stdout is always preferred.
 fn run_worker_blocking(
@@ -248,6 +253,8 @@ fn run_worker_blocking(
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to start unitsync worker: {e}"))?;
+    #[cfg(debug_assertions)]
+    devstats::worker_started(child.id(), "one-shot");
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -342,6 +349,8 @@ fn run_worker_streaming(
     let mut child = cmd
         .spawn()
         .map_err(|e| format!("failed to start unitsync worker: {e}"))?;
+    #[cfg(debug_assertions)]
+    devstats::worker_started(child.id(), "one-shot");
 
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
@@ -507,9 +516,76 @@ fn answered(what: &str, hit: Option<serde_json::Value>) -> Option<CliResult> {
     Some(CliResult::ok(value))
 }
 
-/// Spawn the worker with the given args/env, parse its JSON stdout into a
-/// `CliResult`. `what` names the operation for error messages.
-async fn run_worker(
+/// Which worker answers a read.
+#[derive(Clone, Copy)]
+enum Via {
+    /// One that stays running, of the kind named. Nearly every read.
+    Running(pool::Kind),
+    /// One started for this read alone. For the reads a running worker refuses
+    /// (`serve.rs` in the worker says why): the engine config read and write,
+    /// which run no `Init` and so have nothing to save.
+    OneShot,
+}
+
+/// The value given for `flag` in a worker argument list.
+fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
+    let at = args.iter().position(|a| a == flag)?;
+    args.get(at + 1).map(String::as_str)
+}
+
+/// Have a running worker answer one read, and return what it printed.
+///
+/// The same contract as [`run_worker_blocking`]: the worker prints its JSON,
+/// including any error list in it, whatever its exit code, so output is
+/// preferred and only a read that printed nothing is an error.
+fn run_served_blocking(
+    bin: PathBuf,
+    args: Vec<String>,
+    #[cfg_attr(not(debug_assertions), allow(unused_mut))] mut envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: String,
+    cancel: Option<Arc<AtomicBool>>,
+    kind: pool::Kind,
+) -> Result<String, String> {
+    let (Some(lib), Some(datadir)) = (flag_value(&args, "--lib"), flag_value(&args, "--datadir"))
+    else {
+        return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+    };
+    #[cfg(debug_assertions)]
+    envs.push((devstats::TIMINGS_ENV.into(), "1".into()));
+    #[cfg(debug_assertions)]
+    let mut dev_run = devstats::WorkerRun::start(&what);
+
+    let served = pool::lane(&bin, lib, datadir, &envs, kind).run(&pool::Job {
+        args: &args,
+        timeout,
+        what: &what,
+        cancel: cancel.as_deref(),
+    })?;
+    #[cfg(debug_assertions)]
+    {
+        if let Some(pid) = served.started {
+            devstats::worker_started(pid, kind.name());
+        }
+        if let Some(init) = served.init {
+            dev_run.ran_init(init.lock_wait_ms, init.call_ms);
+        }
+    }
+
+    if served.output.iter().all(u8::is_ascii_whitespace) {
+        return Err(format!(
+            "unitsync worker produced no output (exit {})",
+            served.code
+        ));
+    }
+    String::from_utf8(served.output)
+        .map_err(|e| format!("unitsync worker output is not valid UTF-8: {e}"))
+}
+
+/// Have a worker answer one read and parse its JSON into a `CliResult`. `what`
+/// names the operation for error messages.
+async fn run_via(
+    via: Via,
     bin: PathBuf,
     args: Vec<String>,
     envs: Vec<(String, String)>,
@@ -518,8 +594,11 @@ async fn run_worker(
     cancel: Option<Arc<AtomicBool>>,
 ) -> CliResult {
     let what_owned = what.to_string();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        run_worker_blocking(bin, args, envs, timeout, what_owned, cancel)
+    let result = tauri::async_runtime::spawn_blocking(move || match via {
+        Via::Running(kind) => {
+            run_served_blocking(bin, args, envs, timeout, what_owned, cancel, kind)
+        }
+        Via::OneShot => run_worker_blocking(bin, args, envs, timeout, what_owned, cancel),
     })
     .await;
     match result {
@@ -530,6 +609,33 @@ async fn run_worker(
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("{what} task failed: {e}")),
     }
+}
+
+/// A read of one map, game or archive, answered by the engine's page worker.
+async fn run_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: &str,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running(pool::Kind::Page);
+    run_via(via, bin, args, envs, timeout, what, cancel).await
+}
+
+/// A walk of every map or every game, answered by the engine's library worker
+/// so a page read never queues behind it.
+async fn run_library_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    timeout: Duration,
+    what: &str,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running(pool::Kind::Library);
+    run_via(via, bin, args, envs, timeout, what, cancel).await
 }
 
 /// `unitsync_scan` — scan one content root with one engine's libunitsync,
@@ -544,7 +650,7 @@ async fn unitsync_scan(engine_path: String, data_dir: String, op_id: Option<Stri
     let args = build_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await;
+    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -709,7 +815,7 @@ async fn unitsync_thumbnails<R: Runtime>(
     );
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails", cancel).await;
+    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "thumbnails", cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -736,7 +842,7 @@ async fn unitsync_map_meta<R: Runtime>(
     let args = build_map_meta_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_worker(bin, args, envs, SCAN_TIMEOUT, "map metadata", cancel).await;
+    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "map metadata", cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -1483,7 +1589,7 @@ async fn unitsync_map_minimaps<R: Runtime>(
         asset_dir.as_deref(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let out = run_worker(bin, args, envs, SCAN_TIMEOUT, "map minimaps", None).await;
+    let out = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "map minimaps", None).await;
     if let Some(path) = maps_file {
         let _ = std::fs::remove_file(&path);
     }
@@ -1595,7 +1701,8 @@ async fn unitsync_engine_config(engine_path: String, data_dir: String) -> CliRes
     };
     let args = build_config_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config", None).await
+    let via = Via::OneShot;
+    run_via(via, bin, args, envs, SCAN_TIMEOUT, "engine config", None).await
 }
 
 /// `unitsync_engine_config_set` — write one curated engine setting back to the
@@ -1615,7 +1722,17 @@ async fn unitsync_engine_config_set(
     };
     let args = build_config_set_args(&libpath.to_string_lossy(), &data_dir, &key, &value);
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "engine config write", None).await
+    let via = Via::OneShot;
+    run_via(
+        via,
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "engine config write",
+        None,
+    )
+    .await
 }
 
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
@@ -1678,7 +1795,7 @@ async fn unitsync_game_headers<R: Runtime>(
     let cache_dir = header_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_game_headers_args(&libpath.to_string_lossy(), &data_dir, cache_dir.as_deref());
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await
+    run_library_worker(bin, args, envs, SCAN_TIMEOUT, "game headers", None).await
 }
 
 /// `unitsync_lua_exec` — run a Lua snippet through the engine's Lua parser with
@@ -1735,7 +1852,15 @@ pub fn defs_probe_blocking(
         &path.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_worker_blocking(bin, args, envs, LUA_TIMEOUT, "defs probe".into(), None);
+    let out = run_served_blocking(
+        bin,
+        args,
+        envs,
+        LUA_TIMEOUT,
+        "defs probe".into(),
+        None,
+        pool::Kind::Page,
+    );
     let _ = std::fs::remove_file(&path);
     out
 }
