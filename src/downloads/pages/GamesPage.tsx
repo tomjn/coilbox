@@ -12,6 +12,7 @@ import { Link } from "react-router";
 import { GameIcon } from "@/components/GameIcon";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useGithubGameRepos } from "@/content/branding";
 import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
@@ -101,6 +102,9 @@ interface GameItem {
   /** When the source says the archive was published, in milliseconds. A GitHub
    * release's publish date or a springfiles upload time. The hub gives none. */
   date?: number;
+  /** GitHub rows only: this archive is from the repo's latest release, so it
+   * is pinned to the top and tagged. */
+  latest?: boolean;
 }
 
 /**
@@ -170,15 +174,29 @@ export default function GamesPage() {
         const repo = src === "springfiles" ? undefined : repoForKey(repos, src);
         if (repo) {
           const { archives } = await dlGithubReleaseArchives({ repo });
+          // The latest release is the one published most recently, found by
+          // its date and not by where GitHub put it in the list. A release
+          // with no date, which is what a draft is, is never it.
+          let latest: { tag: string; date: number } | undefined;
+          for (const a of archives) {
+            const date = parseDate(a.publishedAt);
+            if (date !== undefined && (!latest || date > latest.date)) {
+              latest = { tag: a.tag, date };
+            }
+          }
           setGames(
-            archives.map((a) => ({
-              id: a.filename,
-              name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
-              filename: a.filename,
-              size: a.size,
-              url: a.url,
-              date: parseDate(a.publishedAt),
-            })),
+            archives.map((a) => {
+              const date = parseDate(a.publishedAt);
+              return {
+                id: a.filename,
+                name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
+                filename: a.filename,
+                size: a.size,
+                url: a.url,
+                date,
+                latest: date !== undefined && a.tag === latest?.tag,
+              };
+            }),
           );
         } else {
           const { results } = await dlSpringfilesList({ category: "game" });
@@ -317,6 +335,8 @@ export default function GamesPage() {
       ? filtered.filter((g) => !installed.has(g.filename.toLowerCase()))
       : [...filtered];
     arr.sort((a, b) => {
+      // The latest release leads whatever the sort, which orders the rest.
+      if (a.latest !== b.latest) return a.latest ? -1 : 1;
       switch (sort) {
         case "name-desc":
           return b.name.localeCompare(a.name);
@@ -484,7 +504,14 @@ export default function GamesPage() {
                         <GameIcon name={hubGameIconName(g.id, scannedGames)} />
                       )}
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{g.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium">
+                            {g.name}
+                          </p>
+                          {g.latest && (
+                            <Badge variant="secondary">Latest</Badge>
+                          )}
+                        </div>
                         {noSource ? (
                           <p className="truncate text-xs text-muted-foreground">
                             The hub lists no download for this game.

@@ -668,6 +668,27 @@ mod tests {
     }
 
     #[test]
+    fn release_archives_dates_a_prerelease_and_not_a_draft() {
+        // Some of these repos only ever publish prereleases, so one has to be
+        // able to be the latest. A draft has no publish date to be latest by.
+        let json = r#"[
+            {"tag_name":"draft","draft":true,"prerelease":false,"published_at":null,"assets":[
+                {"name":"game_draft.sdz","browser_download_url":"http://x/d","size":1}
+            ]},
+            {"tag_name":"rc","prerelease":true,"published_at":"2026-10-09T16:18:56Z","assets":[
+                {"name":"game_rc.sdz","browser_download_url":"http://x/rc","size":1}
+            ]}
+        ]"#;
+        let rels: Vec<GithubRelease> = serde_json::from_str(json).unwrap();
+        let archives = release_archives(rels);
+        assert_eq!(archives[0].published_at, None);
+        assert_eq!(
+            archives[1].published_at.as_deref(),
+            Some("2026-10-09T16:18:56Z")
+        );
+    }
+
+    #[test]
     fn release_archives_keeps_content_archives_and_dedupes() {
         // Two releases, newest first. Non-archive assets are dropped; the archive
         // re-uploaded in both releases collapses to the newest copy.

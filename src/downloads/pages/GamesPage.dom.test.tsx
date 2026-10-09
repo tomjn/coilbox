@@ -408,9 +408,10 @@ describe("the Games page's date sorts", () => {
     fireEvent.change(sortSelect(), { target: { value: "date-desc" } });
     expect(titles()).toEqual(["c_newest", "b_middle", "a_oldest", "d_undated"]);
 
-    // A row with no date stays at the bottom rather than leading the oldest.
+    // The latest release is pinned, so Oldest orders the rows below it. A row
+    // with no date stays at the bottom rather than leading the oldest.
     fireEvent.change(sortSelect(), { target: { value: "date-asc" } });
-    expect(titles()).toEqual(["a_oldest", "b_middle", "c_newest", "d_undated"]);
+    expect(titles()).toEqual(["c_newest", "a_oldest", "b_middle", "d_undated"]);
   });
 
   it("shows the date on a row that has one", async () => {
@@ -462,5 +463,128 @@ describe("the Games page's date sorts", () => {
 
     await waitFor(() => expect(sortSelect().value).toBe("name-asc"));
     expect(sortLabels()).not.toContain("Newest");
+  });
+});
+
+describe("the Games page's latest release", () => {
+  const archive = (
+    filename: string,
+    tag: string,
+    publishedAt: string | null,
+    size: number,
+  ) => ({
+    filename,
+    url: `https://github.example/${filename}`,
+    size,
+    tag,
+    publishedAt,
+  });
+
+  const rows = () => screen.getAllByRole("listitem");
+  const titles = () => rows().map((li) => li.querySelector("p")?.textContent);
+  const tagged = () =>
+    rows()
+      .filter((li) => li.textContent?.includes("Latest"))
+      .map((li) => li.querySelector("p")?.textContent);
+  const sortSelect = () =>
+    screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+
+  async function open(archives: ReturnType<typeof archive>[], first: string) {
+    const { dlGithubReleaseArchives } = await import("../bindings");
+    vi.mocked(dlGithubReleaseArchives).mockResolvedValue({ archives });
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+    const source = await screen.findByDisplayValue("springfiles");
+    fireEvent.change(source, { target: { value: "splinterfaction" } });
+    await screen.findByText(first);
+  }
+
+  // The newest release sorts into the middle by name and by size, and GitHub's
+  // own order is deliberately not newest first, so only the date can find it.
+  const THREE = [
+    archive("a_old.sdz", "v1", "2025-12-01T00:00:00Z", 30),
+    archive("m_newest.sdz", "v3", "2026-10-09T16:18:56Z", 20),
+    archive("z_middle.sdz", "v2", "2026-03-01T00:00:00Z", 10),
+  ];
+
+  it("keeps the newest release's archive first and tagged under every sort", async () => {
+    await open(THREE, "m_newest");
+    const below: Record<string, string[]> = {
+      "name-asc": ["a_old", "z_middle"],
+      "name-desc": ["z_middle", "a_old"],
+      "size-desc": ["a_old", "z_middle"],
+      "size-asc": ["z_middle", "a_old"],
+      "date-desc": ["z_middle", "a_old"],
+      "date-asc": ["a_old", "z_middle"],
+    };
+    // Every option the page offers, so a new sort cannot be added without one.
+    expect([...sortSelect().options].map((o) => o.value).sort()).toEqual(
+      Object.keys(below).sort(),
+    );
+    for (const [sort, rest] of Object.entries(below)) {
+      fireEvent.change(sortSelect(), { target: { value: sort } });
+      expect(titles(), sort).toEqual(["m_newest", ...rest]);
+      expect(tagged(), sort).toEqual(["m_newest"]);
+    }
+  });
+
+  it("pins and tags every archive of a latest release that holds two", async () => {
+    await open(
+      [
+        archive("a_old.sdz", "v1", "2025-12-01T00:00:00Z", 30),
+        archive("y_newest_maps.sdz", "v3", "2026-10-09T16:18:56Z", 20),
+        archive("x_newest_game.sdz", "v3", "2026-10-09T16:18:56Z", 20),
+      ],
+      "a_old",
+    );
+    expect(titles()).toEqual(["x_newest_game", "y_newest_maps", "a_old"]);
+    expect(tagged()).toEqual(["x_newest_game", "y_newest_maps"]);
+  });
+
+  it("does not count a release with no publish date, which is what a draft is", async () => {
+    await open(
+      [
+        archive("a_draft.sdz", "v9", null, 30),
+        archive("b_published.sdz", "v1", "2025-12-01T00:00:00Z", 20),
+      ],
+      "a_draft",
+    );
+    expect(titles()).toEqual(["b_published", "a_draft"]);
+    expect(tagged()).toEqual(["b_published"]);
+  });
+
+  it("hides the latest release like any other row when the filter does not match it", async () => {
+    await open(THREE, "m_newest");
+    fireEvent.change(screen.getByLabelText("Filter games"), {
+      target: { value: "old" },
+    });
+    expect(titles()).toEqual(["a_old"]);
+    expect(tagged()).toEqual([]);
+  });
+
+  it("tags nothing on springfiles, which is not one game's releases", async () => {
+    const { dlSpringfilesList } = await import("../bindings");
+    vi.mocked(dlSpringfilesList).mockResolvedValueOnce({
+      results: [
+        {
+          springname: "Some Game 1.0",
+          name: "Some Game",
+          filename: "some_game.sdz",
+          size: 10,
+          timestamp: "2026-09-14T14:09:53",
+          mirrors: ["https://springfiles.example/some_game.sdz"],
+        },
+      ],
+    } as never);
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+    await screen.findByText("Some Game");
+    expect(tagged()).toEqual([]);
   });
 });
