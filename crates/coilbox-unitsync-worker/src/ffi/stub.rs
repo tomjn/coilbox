@@ -35,6 +35,8 @@ pub(crate) struct World {
     /// `mapinfo.lua`, flattened: `teams/1/startPos/x` is a number.
     pub lua_numbers: BTreeMap<String, f32>,
     pub lua_bools: BTreeMap<String, bool>,
+    /// `GetDataDirectory`: where the library says its archive scanner looked.
+    pub data_dirs: Vec<PathBuf>,
 }
 
 impl World {
@@ -193,6 +195,17 @@ unsafe extern "C" fn init(_: bool, _: c_int) -> c_int {
 }
 unsafe extern "C" fn uninit() {
     with("UnInit", |_| ())
+}
+unsafe extern "C" fn data_dir_count() -> c_int {
+    with("GetDataDirectoryCount", |s| {
+        s.world.data_dirs.len() as c_int
+    })
+}
+unsafe extern "C" fn data_dir(i: c_int) -> *const c_char {
+    with("GetDataDirectory", |s| {
+        let dir = s.world.data_dirs[i as usize].to_string_lossy().into_owned();
+        text(s, &dir)
+    })
 }
 unsafe extern "C" fn next_error() -> *const c_char {
     std::ptr::null()
@@ -560,6 +573,8 @@ impl Unitsync {
             set_spring_config_int_fn: None,
             set_spring_config_float_fn: None,
             spring_config_file_fn: None,
+            data_dir_count_fn: Some(data_dir_count),
+            data_dir_fn: Some(data_dir),
         };
         us.map_file_name_fn = Some(map_file_name);
         us.minimap_fn = Some(minimap);
@@ -590,5 +605,11 @@ impl Unitsync {
         us.lp_int_key_float_val_fn = Some(lp_int_key_float_val);
         us.lp_str_key_bool_val_fn = Some(lp_str_key_bool_val);
         us
+    }
+
+    /// The same library as an engine build without `GetDataDirectory`.
+    pub(crate) fn forget_data_dirs(&mut self) {
+        self.data_dir_count_fn = None;
+        self.data_dir_fn = None;
     }
 }

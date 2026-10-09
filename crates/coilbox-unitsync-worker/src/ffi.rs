@@ -21,6 +21,11 @@ use std::path::{Path, PathBuf};
 #[cfg(test)]
 pub(crate) mod stub;
 
+/// Held while `Init` or `UnInit` runs, which is while the archive cache may be
+/// being rewritten. A running worker told to exit in the middle of a request
+/// takes this first, so it never stops partway through that rewrite.
+pub static CACHE_WRITE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 // --- C ABI signatures (reused across same-shaped symbols) -------------------
 
 type InitFn = unsafe extern "C" fn(bool, c_int) -> c_int;
@@ -266,6 +271,10 @@ pub struct Unitsync {
     set_spring_config_int_fn: Option<VoidByStrIntFn>,
     set_spring_config_float_fn: Option<VoidByStrFloatFn>,
     spring_config_file_fn: Option<StrFn>,
+    // The data directories `Init` settled on, which is where the archive
+    // scanner looked. Read by `session` to tell whether an `Init` still stands.
+    data_dir_count_fn: Option<CountFn>,
+    data_dir_fn: Option<StrByIntFn>,
 }
 
 unsafe fn req<T: Copy>(lib: &Library, name: &[u8]) -> Result<T, String> {
@@ -390,6 +399,8 @@ impl Unitsync {
             set_spring_config_int_fn: opt(&lib, b"SetSpringConfigInt\0"),
             set_spring_config_float_fn: opt(&lib, b"SetSpringConfigFloat\0"),
             spring_config_file_fn: opt(&lib, b"GetSpringConfigFile\0"),
+            data_dir_count_fn: opt(&lib, b"GetDataDirectoryCount\0"),
+            data_dir_fn: opt(&lib, b"GetDataDirectory\0"),
             init_lock: crate::initlock::path_for(libpath),
             _lib: lib,
         };
@@ -402,29 +413,103 @@ impl Unitsync {
     /// Held under the engine's init lock, because `Init` reads the archive cache
     /// and rewrites it in place, and a read that overlaps another worker's
     /// rewrite rescans archives for seconds (issue #1916).
+    ///
+    /// In a worker that stays running this is a real `Init` only when there is
+    /// none to reuse. See `session`.
     pub fn init(&self, is_server: bool, id: i32) -> i32 {
+        if crate::session::reuse(self) {
+            return 1;
+        }
+        for archive in crate::session::take_open_archives() {
+            self.close_archive(archive);
+        }
+        let before = crate::session::before_init();
+        let started = std::time::SystemTime::now();
         let asked = std::time::Instant::now();
         let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
         let locked = std::time::Instant::now();
-        let ok = unsafe { (self.init_fn)(is_server, id) };
-        // How long this run queued behind another worker's `Init`, and how long
-        // its own took. Only when asked, and the plugin asks in dev builds only
-        // (issue #3713).
-        if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
-            eprintln!(
-                "[unitsync-timing] init_lock_wait={}ms init_call={}ms",
-                (locked - asked).as_millis(),
-                locked.elapsed().as_millis()
-            );
+        let ok = {
+            let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+            unsafe { (self.init_fn)(is_server, id) }
+        };
+        let lock_wait_ms = (locked - asked).as_millis() as u64;
+        let call_ms = locked.elapsed().as_millis() as u64;
+        if crate::session::serving() {
+            // The plugin is told in the reply instead (issue #3722).
+            let timing = coilbox_unitsync_worker::protocol::InitTiming {
+                lock_wait_ms,
+                call_ms,
+            };
+            crate::session::after_init(self, ok != 0, before, started, timing);
+        } else if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
+            // How long this run queued behind another worker's `Init`, and how
+            // long its own took. Only when asked, and the plugin asks in dev
+            // builds only (issue #3713).
+            eprintln!("[unitsync-timing] init_lock_wait={lock_wait_ms}ms init_call={call_ms}ms");
         }
         ok
     }
 
     /// `UnInit`, under the same lock as `init`, because it writes the archive
     /// cache again when anything worked out a checksum.
+    ///
+    /// A worker that stays running keeps its `Init` for the next request, so
+    /// there this only puts the library back as a fresh `Init` leaves it.
     pub fn uninit(&self) {
+        if crate::session::serving() {
+            self.reset();
+            return;
+        }
         let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { (self.uninit_fn)() }
+    }
+
+    /// The real `UnInit` of a worker that stays running, for when it exits.
+    pub fn shutdown(&self) {
+        if !crate::session::ready() {
+            return;
+        }
+        self.reset();
+        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
+        unsafe { (self.uninit_fn)() }
+    }
+
+    /// Whether [`Unitsync::reset`] can empty the file system. Without that a
+    /// request would read through the archives the one before it mounted, so an
+    /// engine build that lacks the call gets an `Init` per request.
+    pub fn can_reset(&self) -> bool {
+        self.remove_all_archives_fn.is_some()
+    }
+
+    /// Put the library back as a fresh `Init` leaves it: no archive open, no Lua
+    /// parser, an empty file system and no error waiting to be read.
+    pub fn reset(&self) {
+        for archive in crate::session::take_open_archives() {
+            if let Some(f) = self.close_archive_fn {
+                unsafe { f(archive) }
+            }
+        }
+        if let Some(f) = self.lp_close_fn {
+            unsafe { f() }
+        }
+        self.remove_all_archives();
+        self.drain_errors();
+    }
+
+    /// The data directories `Init` settled on, or `None` on an engine build
+    /// that cannot say.
+    pub fn data_dirs(&self) -> Option<Vec<PathBuf>> {
+        let (count, dir) = (self.data_dir_count_fn?, self.data_dir_fn?);
+        let n = unsafe { count() };
+        Some(
+            (0..n)
+                .filter_map(|i| unsafe { cstr(dir(i)) })
+                .filter(|d| !d.is_empty())
+                .map(PathBuf::from)
+                .collect(),
+        )
     }
 
     /// Drain the asynchronous error queue (call `GetNextError` until it returns
@@ -745,6 +830,9 @@ impl Unitsync {
         let f = self.open_archive_fn?;
         let c = CString::new(name).ok()?;
         let h = unsafe { f(c.as_ptr()) };
+        if h != 0 {
+            crate::session::opened(h);
+        }
         (h != 0).then_some(h)
     }
 
@@ -811,6 +899,7 @@ impl Unitsync {
     }
 
     pub fn close_archive(&self, archive: i32) {
+        crate::session::closed(archive);
         if let Some(f) = self.close_archive_fn {
             unsafe { f(archive) }
         }
