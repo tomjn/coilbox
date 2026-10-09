@@ -661,14 +661,21 @@ async fn content_state_load<R: Runtime>(app: AppHandle<R>) -> CliResult {
         Ok(p) => p,
         Err(e) => return CliResult::err(e),
     };
-    let store = match load_store(&path) {
-        Ok(s) => s,
-        Err(e) => return CliResult::err(e),
-    };
-    let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
-    state.roots = ensure_portable_seed(state.roots);
-    publish_roots(&state);
-    CliResult::ok(json!({ "state": state }))
+    // Reading the store and scanning every root's engines is file work, so it
+    // runs off the async runtime.
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let store = load_store(&path)?;
+        let mut state = refresh_against_disk(store.snapshot.unwrap_or_default());
+        state.roots = ensure_portable_seed(state.roots);
+        publish_roots(&state);
+        Ok::<_, String>(state)
+    })
+    .await;
+    match result {
+        Ok(Ok(state)) => CliResult::ok(json!({ "state": state })),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("state load task failed: {e}")),
+    }
 }
 
 /// `content_rescan` — recompute roots/engines from scratch and persist.
