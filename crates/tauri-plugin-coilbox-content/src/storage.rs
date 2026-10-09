@@ -266,7 +266,14 @@ pub(crate) async fn content_delete_engine(path: String) -> CliResult {
         return CliResult::err(e);
     }
     let p = PathBuf::from(&path);
-    match tauri::async_runtime::spawn_blocking(move || delete_engine(&p)).await {
+    let delete = move || {
+        // A unitsync worker keeps this engine's library loaded while it runs,
+        // and Windows will not delete a loaded library: the delete would remove
+        // what it could and stop, leaving half an engine (issue #3722).
+        coilbox_proc::release_engine(&p);
+        delete_engine(&p)
+    };
+    match tauri::async_runtime::spawn_blocking(delete).await {
         Ok(Ok(bytes)) => CliResult::ok(json!({ "bytes": bytes })),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("delete engine task failed: {e}")),

@@ -1,17 +1,33 @@
-//! Dev-build count and wall time of unitsync worker runs (issue #3713).
+//! Dev-build counts and wall times of unitsync reads (issue #3713).
 //!
-//! Every worker run prints one line to stderr when it ends:
+//! A worker used to be one process, one `Init` and one read, so one line said
+//! all three. Workers now stay running (issue #3722), so each is counted on a
+//! line of its own, all on stderr:
 //!
 //! ```text
-//! [unitsync-worker-run] n=12 what="minimap" what_n=3 ms=274 t_end=1791559800123 init_lock_wait=0ms init_call=190ms
+//! [unitsync-worker-start] n=2 pid=4711 kind="page"
+//! [unitsync-worker-init] n=2 what="map skybox" init_lock_wait=0ms init_call=190ms
+//! [unitsync-worker-run] n=12 what="minimap" what_n=3 ms=274 t_end=1791559800123
 //! ```
 //!
-//! `n` counts every worker this process has started and `what_n` counts the
-//! ones for this command, so the last line of a session carries the totals.
-//! `ms` runs from just before the spawn to the worker's exit, and `t_end` is
-//! the Unix time in milliseconds at that exit. Whatever follows `t_end` is the
-//! worker's own account of where its time went, which it prints when
-//! [`TIMINGS_ENV`] is set.
+//! `unitsync-worker-start` is a worker process starting. `kind` is `page` or
+//! `library` for one that stays running and `one-shot` for one started for a
+//! single read. `n` counts them all.
+//!
+//! `unitsync-worker-init` is one call to the engine's `Init`, with the read that
+//! caused it and how long it took. `n` counts them all.
+//!
+//! `unitsync-worker-run` is one read a worker was asked for. `n` counts every
+//! read this process has asked for and `what_n` counts the ones for this
+//! command, so the last line of a session carries the totals. `ms` runs from
+//! the read being asked for, which includes any wait behind other reads, to its
+//! answer, and `t_end` is the Unix time in milliseconds at that answer. A read
+//! that ran `Init` carries the same timings as its init line. A one-shot
+//! worker's line ends with whatever else it printed when [`TIMINGS_ENV`] is set.
+//!
+//! `unitsync-worker-busy` is a read that stopped queueing for a running worker
+//! because the read ahead of it had held that worker too long. A one-shot
+//! worker answers it, and its start, `Init` and run lines follow as usual.
 //!
 //! The whole module is compiled only with `debug_assertions`, so a release
 //! build has none of it.
@@ -26,11 +42,34 @@ pub const TIMINGS_ENV: &str = "COILBOX_UNITSYNC_TIMINGS";
 /// The prefix of a timing line the worker prints.
 const TIMING_PREFIX: &str = "[unitsync-timing] ";
 
-/// Runs started so far, in total and per command.
+/// Worker processes started so far.
+static STARTS: Mutex<u64> = Mutex::new(0);
+
+/// Calls to the engine's `Init` so far.
+static INITS: Mutex<u64> = Mutex::new(0);
+
+/// Log one worker process starting.
+pub fn worker_started(pid: u32, kind: &str) {
+    let mut starts = STARTS.lock().unwrap_or_else(|e| e.into_inner());
+    *starts += 1;
+    eprintln!(
+        "[unitsync-worker-start] n={} pid={pid} kind={kind:?}",
+        *starts
+    );
+}
+
+/// Log one `Init`, with what the worker said of how long it took.
+fn init_ran(what: &str, timing: &str) {
+    let mut inits = INITS.lock().unwrap_or_else(|e| e.into_inner());
+    *inits += 1;
+    eprintln!("[unitsync-worker-init] n={} what={what:?} {timing}", *inits);
+}
+
+/// Reads asked for so far, in total and per command.
 static COUNTS: Mutex<(u64, BTreeMap<String, u64>)> = Mutex::new((0, BTreeMap::new()));
 
-/// One worker run. Logs its line when dropped, so every way out of the caller
-/// is counted: a clean exit, a timeout, a cancel and a failed spawn.
+/// One read asked of a worker. Logs its line when dropped, so every way out of
+/// the caller is counted: an answer, a timeout, a cancel and a failed spawn.
 pub struct WorkerRun {
     what: String,
     start: Instant,
@@ -46,12 +85,38 @@ impl WorkerRun {
         }
     }
 
-    /// Keep the worker's timing lines for this run's log line, and hand back
-    /// the rest of its stderr so they are not printed twice.
+    /// Keep a one-shot worker's timing lines for this read's log line, and hand
+    /// back the rest of its stderr so they are not printed twice.
     pub fn take_timings(&mut self, stderr: String) -> String {
         let (timings, rest) = split_timings(&stderr);
+        for timing in timings.iter().filter(|t| t.contains("init_call=")) {
+            init_ran(&self.what, timing);
+        }
         self.worker_timings = timings;
         rest
+    }
+
+    /// Note that a running worker called `Init` to answer this read.
+    pub fn ran_init(&mut self, lock_wait_ms: u64, call_ms: u64) {
+        let timing = format!("init_lock_wait={lock_wait_ms}ms init_call={call_ms}ms");
+        init_ran(&self.what, &timing);
+        self.worker_timings.push(timing);
+    }
+
+    /// This read stopped queueing for the running worker of `kind` and is being
+    /// handed to a one-shot worker, which logs the read itself. Says so, and
+    /// logs no line of its own:
+    ///
+    /// ```text
+    /// [unitsync-worker-busy] what="minimap" kind="page" waited=30004ms
+    /// ```
+    pub fn handed_on(self, kind: &str) {
+        eprintln!(
+            "[unitsync-worker-busy] what={:?} kind={kind:?} waited={}ms",
+            self.what,
+            self.start.elapsed().as_millis()
+        );
+        std::mem::forget(self);
     }
 }
 

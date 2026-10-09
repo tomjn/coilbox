@@ -9,6 +9,12 @@ license = "MIT"
 name = "coilbox-unitsync-worker"
 path = "src/main.rs"
 
+# A stand-in libunitsync the real worker can load, for tests/serve.rs. An
+# example because `cargo test` builds examples and no release build does.
+[[example]]
+name = "fake_unitsync"
+crate-type = ["cdylib"]
+
 [dependencies]
 # Runtime dlopen of the engine's libunitsync.* (NOT a link-time dependency — the
 # library lives in the user's engine install, not in our build).

@@ -36,6 +36,7 @@ pub mod cachekey;
 /// the binary so the plugin can read a cached answer without starting a worker
 /// (issue #3714).
 pub mod model;
+pub mod protocol;
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new
