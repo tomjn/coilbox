@@ -48,9 +48,12 @@ use std::time::{Duration, Instant};
 pub const IDLE_EXIT: Duration = crate::SCAN_TIMEOUT;
 
 /// How long a worker is given to exit once its input is closed, before it is
-/// killed. A clean exit runs `UnInit`, which queues for the engine's init lock
-/// for up to this long (`initlock::WAIT` in the worker) before going ahead.
-const EXIT_GRACE: Duration = Duration::from_secs(60);
+/// killed. A clean exit runs `UnInit`, which first queues for the engine's init
+/// lock for up to `INIT_LOCK_WAIT` and then rewrites the archive cache. That
+/// rewrite is one part of what an `Init` does, and `INIT_LOCK_WAIT` is sized to
+/// cover a cold `Init` with room to spare (`initlock.rs` in the worker), so a
+/// second one covers it. Killing sooner would cut the cache short mid-write.
+const EXIT_GRACE: Duration = protocol::INIT_LOCK_WAIT.saturating_mul(2);
 
 /// How often a worker whose output has closed is asked whether it has exited
 /// yet. It is in its exit path by then, so this runs a handful of times.
@@ -94,6 +97,22 @@ pub struct Job<'a> {
     /// Names the read in error messages.
     pub what: &'a str,
     pub cancel: Option<&'a AtomicBool>,
+    /// How long the read ahead of this one may have held the worker before this
+    /// one stops queueing. See [`Ran::Busy`].
+    pub patience: Duration,
+}
+
+/// What became of a read handed to a lane.
+#[derive(Debug)]
+pub enum Ran {
+    Served(Served),
+    /// The read at the front of the queue has held the worker for longer than
+    /// this one's patience, so this one was never sent. The caller starts a
+    /// worker for it alone, which is what every read did before workers stayed
+    /// running. A lane is there to save an `Init`, and a read stuck in it, or
+    /// code the user typed that never returns, must not cost every read behind
+    /// it the length of its timeout.
+    Busy,
 }
 
 /// A request a worker answered.
@@ -124,6 +143,8 @@ struct State {
     /// Requests in arrival order. The one at the front is being served.
     waiting: VecDeque<u64>,
     next_ticket: u64,
+    /// When the request at the front was given the worker.
+    serving_since: Option<Instant>,
     /// The worker, when no request has it.
     worker: Option<Worker>,
     idle_since: Option<Instant>,
@@ -150,6 +171,52 @@ enum Event {
     Closed(Option<String>),
 }
 
+/// What a lane is for: the worker binary, the engine's library, the content
+/// root, the environment, and the kind of read.
+type Key = (PathBuf, String, String, Vec<(String, String)>, Kind);
+
+fn lanes() -> MutexGuard<'static, HashMap<Key, Arc<Lane>>> {
+    static LANES: OnceLock<Mutex<HashMap<Key, Arc<Lane>>>> = OnceLock::new();
+    LANES
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+}
+
+/// Shut down every worker whose engine library is inside `dir`, and return once
+/// each has exited.
+///
+/// For whatever is about to delete or replace an engine folder. A worker keeps
+/// the engine's library loaded for as long as it runs, and Windows will not
+/// delete or overwrite a loaded library, so the folder would come out half
+/// removed.
+///
+/// A read in progress is left to finish first, since killing a worker in the
+/// middle of `Init` cuts the archive cache short. Nothing stops a read that
+/// arrives afterwards from starting a worker again, which is no different from
+/// a one-shot worker starting during a delete before workers stayed running.
+pub fn shut_down_under(dir: &Path) {
+    let inside: Vec<Arc<Lane>> = lanes()
+        .iter()
+        .filter(|(key, _)| is_under(Path::new(&key.1), dir))
+        .map(|(_, lane)| lane.clone())
+        .collect();
+    for lane in inside {
+        lane.shut_down();
+    }
+}
+
+/// Whether `path` is `dir` or inside it. Windows file names ignore case, so
+/// there the comparison does too.
+fn is_under(path: &Path, dir: &Path) -> bool {
+    if cfg!(windows) {
+        let lower = |p: &Path| PathBuf::from(p.to_string_lossy().to_lowercase());
+        lower(path).starts_with(lower(dir))
+    } else {
+        path.starts_with(dir)
+    }
+}
+
 /// The engine's worker of this kind, started on first use.
 pub fn lane(
     bin: &Path,
@@ -158,8 +225,6 @@ pub fn lane(
     envs: &[(String, String)],
     kind: Kind,
 ) -> Arc<Lane> {
-    type Key = (PathBuf, String, String, Vec<(String, String)>, Kind);
-    static LANES: OnceLock<Mutex<HashMap<Key, Arc<Lane>>>> = OnceLock::new();
     let key: Key = (
         bin.to_path_buf(),
         lib.to_string(),
@@ -167,10 +232,7 @@ pub fn lane(
         envs.to_vec(),
         kind,
     );
-    let mut lanes = LANES
-        .get_or_init(Default::default)
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
+    let mut lanes = lanes();
     lanes
         .entry(key)
         .or_insert_with(|| {
@@ -238,58 +300,104 @@ impl Lane {
     /// `Err` is a read that got no answer, with the reason: cancelled, timed
     /// out, or a worker that died or stopped making sense. Each of those leaves
     /// the lane without a worker, and the next call starts one.
-    pub fn run(self: &Arc<Self>, job: &Job) -> Result<Served, String> {
-        let mut turn = self.wait_for_turn(job)?;
+    pub fn run(self: &Arc<Self>, job: &Job) -> Result<Ran, String> {
+        let cancelled = || job.cancel.is_some_and(|c| c.load(Ordering::Relaxed));
+        let Some(mut turn) = self.wait_for_turn(job.cancel, job.patience) else {
+            if cancelled() {
+                return Err(format!("unitsync {} cancelled", job.what));
+            }
+            return Ok(Ran::Busy);
+        };
         // A worker that died while it sat idle, killed by hand say, is replaced
         // here without the request ever knowing.
-        let mut kept = turn.worker.take();
-        if kept.as_mut().is_some_and(|worker| !worker.is_alive()) {
-            kept = None;
+        if turn.worker.as_mut().is_some_and(|w| !w.is_alive()) {
+            turn.worker = None;
         }
-        let (mut worker, started) = match kept {
-            Some(worker) => (worker, None),
-            None => {
-                let worker = Worker::start(&self.spawn)?;
-                let pid = worker.child.id();
-                (worker, Some(pid))
-            }
-        };
+        let mut started = None;
+        if turn.worker.is_none() {
+            let worker = Worker::start(&self.spawn)?;
+            started = Some(worker.child.id());
+            turn.worker = Some(worker);
+        }
+        // Looked at once more before anything is sent. From here on the only way
+        // to stop the read is to kill the worker, and a request that has not
+        // been sent is no reason to.
+        if cancelled() {
+            return Err(format!("unitsync {} cancelled", job.what));
+        }
+        // Out of the turn while it is asked, so that an `Err` drops it, which
+        // kills it. Only a worker that answered is handed back.
+        let mut worker = turn.worker.take().expect("the turn has a worker");
         let (head, output) = worker.ask(job)?;
-        // Only a worker that answered is kept. Every `Err` above dropped it,
-        // which kills it.
         turn.worker = Some(worker);
-        Ok(Served {
+        Ok(Ran::Served(Served {
             code: head.code,
             output,
             init: head.init,
             started,
-        })
+        }))
+    }
+
+    /// Shut the worker down and return once it has exited. Queues like a read,
+    /// so one in progress finishes first. The next read starts a fresh worker.
+    pub fn shut_down(self: &Arc<Self>) {
+        let Some(mut turn) = self.wait_for_turn(None, Duration::MAX) else {
+            return;
+        };
+        if let Some(worker) = turn.worker.take() {
+            worker.shut_down();
+        }
     }
 
     /// Queue behind the requests already here, and return once this one is at
     /// the front, holding the worker.
-    fn wait_for_turn(self: &Arc<Self>, job: &Job) -> Result<Turn, String> {
+    ///
+    /// `None` when it stopped queueing: its cancel flag was set, or the request
+    /// at the front has held the worker for `patience` or longer.
+    fn wait_for_turn(
+        self: &Arc<Self>,
+        cancel: Option<&AtomicBool>,
+        patience: Duration,
+    ) -> Option<Turn> {
         let mut state = self.lock();
         let ticket = state.next_ticket;
         state.next_ticket += 1;
         state.waiting.push_back(ticket);
         loop {
-            if state.waiting.front() == Some(&ticket) {
-                return Ok(Turn {
+            let at_front = state.waiting.front() == Some(&ticket);
+            // Before the turn is taken, so a request cancelled before it starts
+            // never touches the worker.
+            let cancelled = cancel.is_some_and(|c| c.load(Ordering::Relaxed));
+            let held = state.serving_since.map(|since| since.elapsed());
+            let held_too_long = !at_front && held.is_some_and(|held| held >= patience);
+            if cancelled || held_too_long {
+                state.waiting.retain(|t| *t != ticket);
+                self.changed.notify_all();
+                return None;
+            }
+            if at_front {
+                state.serving_since = Some(Instant::now());
+                // Those behind now have something to time their patience against.
+                self.changed.notify_all();
+                return Some(Turn {
                     lane: self.clone(),
                     ticket,
                     worker: state.worker.take(),
                 });
             }
-            if job.cancel.is_some_and(|c| c.load(Ordering::Relaxed)) {
-                state.waiting.retain(|t| *t != ticket);
-                self.changed.notify_all();
-                return Err(format!("unitsync {} cancelled", job.what));
-            }
-            state = match job.cancel {
-                Some(_) => {
+            // Wake for whichever comes first: the cancel flag's next look, or
+            // the moment the request at the front has been there too long.
+            let until_too_long = held.and_then(|held| patience.checked_sub(held));
+            let wake = match (cancel, until_too_long) {
+                (Some(_), Some(left)) => Some(left.min(CANCEL_POLL)),
+                (Some(_), None) => Some(CANCEL_POLL),
+                (None, Some(left)) if patience != Duration::MAX => Some(left),
+                (None, _) => None,
+            };
+            state = match wake {
+                Some(wake) => {
                     self.changed
-                        .wait_timeout(state, CANCEL_POLL)
+                        .wait_timeout(state, wake)
                         .unwrap_or_else(|e| e.into_inner())
                         .0
                 }
@@ -344,6 +452,7 @@ impl Drop for Turn {
     fn drop(&mut self) {
         let mut state = self.lane.lock();
         state.waiting.retain(|t| *t != self.ticket);
+        state.serving_since = None;
         state.worker = self.worker.take();
         state.idle_since = Some(Instant::now());
         if state.worker.is_some() && !state.watched {
@@ -570,8 +679,11 @@ mod tests {
             let echo = format!("{pid} {said}");
             match how {
                 "echo" => reply(&mut out, request.id, &token, &echo),
+                // Takes 300ms to answer, or the milliseconds its third argument
+                // says.
                 "slow" => {
-                    std::thread::sleep(Duration::from_millis(300));
+                    let ms = request.args.get(2).and_then(|ms| ms.parse().ok());
+                    std::thread::sleep(Duration::from_millis(ms.unwrap_or(300)));
                     reply(&mut out, request.id, &token, &echo);
                 }
                 "noisy" => {
@@ -649,12 +761,56 @@ mod tests {
         cancel: Option<&AtomicBool>,
     ) -> Result<Served, String> {
         let args = vec![how.to_string(), said.to_string()];
+        // Willing to queue for as long as it takes, as these tests all are.
+        match run(lane, &args, timeout, cancel, Duration::MAX)? {
+            Ran::Served(served) => Ok(served),
+            Ran::Busy => Err("the lane was busy".into()),
+        }
+    }
+
+    fn run(
+        lane: &Arc<Lane>,
+        args: &[String],
+        timeout: Duration,
+        cancel: Option<&AtomicBool>,
+        patience: Duration,
+    ) -> Result<Ran, String> {
         lane.run(&Job {
-            args: &args,
+            args,
             timeout,
             what: "test read",
             cancel,
+            patience,
         })
+    }
+
+    /// A read on a thread of its own that takes `ms` to answer, and the moment
+    /// to carry on from: once the worker has it.
+    fn slow_read(lane: &Arc<Lane>, ms: u64) -> std::thread::JoinHandle<(u32, String)> {
+        let reading = {
+            let lane = lane.clone();
+            std::thread::spawn(move || {
+                let args = vec![
+                    "slow".to_string(),
+                    "the slow one".to_string(),
+                    ms.to_string(),
+                ];
+                match run(&lane, &args, LONG, None, Duration::MAX) {
+                    Ok(Ran::Served(served)) => {
+                        let text = String::from_utf8(served.output).expect("utf8");
+                        let (pid, said) = text.split_once(' ').expect("a pid and the echo");
+                        (pid.parse().expect("a pid"), said.to_string())
+                    }
+                    other => panic!("the slow read was not answered: {other:?}"),
+                }
+            })
+        };
+        let start = Instant::now();
+        while lane.lock().serving_since.is_none() {
+            assert!(start.elapsed() < Duration::from_secs(20));
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        reading
     }
 
     /// Ask the fake worker to do `how`, and split its `"<pid> <said>"` answer.
@@ -874,14 +1030,140 @@ mod tests {
 
     #[test]
     fn a_worker_in_use_is_not_shut_down_for_being_idle() {
-        let lane = fake_lane(Duration::from_millis(500));
+        let idle = Duration::from_millis(1500);
+        let lane = fake_lane(idle);
         let (first, _) = ask(&lane, "echo", "before").unwrap();
-        // Busy for longer than the idle period, with no gap to speak of.
-        for _ in 0..3 {
-            let (pid, said) = ask(&lane, "slow", "still here").unwrap();
-            assert_eq!(said, "still here");
-            assert_eq!(pid, first);
-        }
+        // One read that keeps the worker busy for longer than the idle period.
+        let (pid, _) = slow_read(&lane, 2500).join().unwrap();
+        assert_eq!(pid, first);
+        // Idle is counted from when the worker was handed back, not from when
+        // it was last handed out. Counted the wrong way it is 2.5s idle already
+        // and is shut down at once, so give that a third of a second to show.
+        // Counted the right way it has over a second left.
+        std::thread::sleep(Duration::from_millis(350));
+        assert!(
+            lane.lock().worker.as_mut().is_some_and(Worker::is_alive),
+            "the worker was shut down for being idle while it was in use"
+        );
+        let (pid, said) = ask(&lane, "echo", "still here").unwrap();
+        assert_eq!(said, "still here");
+        assert_eq!(pid, first);
+    }
+
+    #[test]
+    fn a_request_cancelled_before_it_starts_leaves_the_worker_alone() {
+        let lane = fake_lane(LONG);
+        let (first, _) = ask(&lane, "echo", "before").unwrap();
+        // Nothing is queued, so this one is at the front the moment it arrives.
+        let cancel = AtomicBool::new(true);
+        let err = ask_for(&lane, "hang", "never sent", LONG, Some(&cancel)).unwrap_err();
+        assert_eq!(err, "unitsync test read cancelled");
+        assert!(
+            lane.lock().worker.as_mut().is_some_and(Worker::is_alive),
+            "a request that was never sent is no reason to kill the worker"
+        );
+        let (pid, said) = ask(&lane, "echo", "after").unwrap();
+        assert_eq!(said, "after");
+        assert_eq!(pid, first);
+    }
+
+    #[test]
+    fn a_read_stops_queueing_once_the_one_ahead_has_held_the_worker_too_long() {
+        let lane = fake_lane(LONG);
+        let (first, _) = ask(&lane, "echo", "before").unwrap();
+        let slow = slow_read(&lane, 3000);
+        let args = vec!["echo".to_string(), "behind".to_string()];
+        let asked = Instant::now();
+        let ran = run(&lane, &args, LONG, None, Duration::from_millis(400)).unwrap();
+        let waited = asked.elapsed();
+        assert!(matches!(ran, Ran::Busy), "got: {ran:?}");
+        assert!(
+            waited >= Duration::from_millis(300),
+            "it gave the read ahead its patience first, and waited {waited:?}"
+        );
+        assert!(
+            waited < Duration::from_millis(2500),
+            "it did not wait for the read ahead to end, and waited {waited:?}"
+        );
+        // The read ahead was not disturbed, and neither was the worker.
+        let (pid, said) = slow.join().unwrap();
+        assert_eq!(said, "the slow one");
+        assert_eq!(pid, first);
+        let (pid, _) = ask(&lane, "echo", "after").unwrap();
+        assert_eq!(pid, first);
+    }
+
+    #[test]
+    fn a_read_with_no_patience_waits_behind_nothing() {
+        let lane = fake_lane(LONG);
+        let args = vec!["echo".to_string(), "a scan".to_string()];
+        // A free worker answers it.
+        let ran = run(&lane, &args, LONG, None, Duration::ZERO).unwrap();
+        assert!(matches!(ran, Ran::Served(_)), "got: {ran:?}");
+
+        let slow = slow_read(&lane, 1500);
+        let asked = Instant::now();
+        let ran = run(&lane, &args, LONG, None, Duration::ZERO).unwrap();
+        assert!(matches!(ran, Ran::Busy), "got: {ran:?}");
+        assert!(asked.elapsed() < Duration::from_millis(1000));
+        slow.join().unwrap();
+    }
+
+    #[test]
+    fn a_patient_read_waits_its_turn_behind_a_short_one() {
+        let lane = fake_lane(LONG);
+        let slow = slow_read(&lane, 300);
+        let args = vec!["echo".to_string(), "behind".to_string()];
+        let ran = run(&lane, &args, LONG, None, Duration::from_secs(20)).unwrap();
+        assert!(matches!(ran, Ran::Served(_)), "got: {ran:?}");
+        slow.join().unwrap();
+    }
+
+    #[test]
+    fn shutting_a_lane_down_ends_its_worker_and_the_next_read_starts_another() {
+        let lane = fake_lane(LONG);
+        let (first, _) = ask(&lane, "echo", "before").unwrap();
+        lane.shut_down();
+        assert!(
+            !coilbox_proc::is_running(first),
+            "the worker has exited by the time shut_down returns"
+        );
+        assert!(lane.lock().worker.is_none());
+        let (second, said) = ask(&lane, "echo", "after").unwrap();
+        assert_eq!(said, "after");
+        assert_ne!(first, second);
+    }
+
+    #[test]
+    fn shutting_a_lane_down_lets_the_read_in_progress_finish() {
+        let lane = fake_lane(LONG);
+        let slow = slow_read(&lane, 800);
+        let asked = Instant::now();
+        lane.shut_down();
+        assert!(
+            asked.elapsed() >= Duration::from_millis(500),
+            "shut_down queued behind the read"
+        );
+        let (pid, said) = slow.join().unwrap();
+        assert_eq!(said, "the slow one");
+        assert!(!coilbox_proc::is_running(pid));
+    }
+
+    #[test]
+    fn shutting_down_a_lane_with_no_worker_does_nothing() {
+        let lane = fake_lane(LONG);
+        lane.shut_down();
+        let (_, said) = ask(&lane, "echo", "after").unwrap();
+        assert_eq!(said, "after");
+    }
+
+    #[test]
+    fn a_library_is_under_its_engine_folder_and_no_other() {
+        let lib = Path::new("/content/engine/105.0/libunitsync.so");
+        assert!(is_under(lib, Path::new("/content/engine/105.0")));
+        assert!(is_under(lib, Path::new("/content/engine")));
+        assert!(!is_under(lib, Path::new("/content/engine/105")));
+        assert!(!is_under(lib, Path::new("/content/engine/106.0")));
     }
 
     #[test]
@@ -917,6 +1199,70 @@ mod tests {
         path
     }
 
+    /// What something about to delete an engine folder relies on: after
+    /// `shut_down_under` returns no worker for that engine is alive, the workers
+    /// of other engines are untouched, and the next read starts a fresh one.
+    ///
+    /// Through the real registry and the real worker binary. Neither engine
+    /// exists, so every read fails at loading the library, which is an answer
+    /// like any other and leaves the worker running.
+    #[test]
+    fn shutting_an_engine_s_workers_down_leaves_none_alive_and_spares_other_engines() {
+        let root =
+            std::env::temp_dir().join(format!("coilbox-pool-engines-{}", std::process::id()));
+        let datadir = root.to_string_lossy().into_owned();
+        let read = |engine: &str, kind: Kind| {
+            let lib = root.join("engine").join(engine).join("libunitsync.so");
+            let lib = lib.to_string_lossy().into_owned();
+            let args = vec![
+                "--lib".to_string(),
+                lib.clone(),
+                "--datadir".to_string(),
+                datadir.clone(),
+            ];
+            let lane = lane(&real_worker(), &lib, &datadir, &[], kind);
+            let Ok(Ran::Served(served)) = run(&lane, &args, LONG, None, Duration::MAX) else {
+                panic!("the read was not answered");
+            };
+            (served.started, lane)
+        };
+        let alive = |lane: &Arc<Lane>| lane.lock().worker.as_mut().is_some_and(Worker::is_alive);
+
+        let (page, page_lane) = read("one", Kind::Page);
+        let (library, library_lane) = read("one", Kind::Library);
+        let (other, other_lane) = read("two", Kind::Page);
+        let (page, library) = (page.expect("started"), library.expect("started"));
+        assert!(other.is_some());
+
+        shut_down_under(&root.join("engine").join("one"));
+
+        assert!(
+            !coilbox_proc::is_running(page),
+            "the page worker has exited"
+        );
+        assert!(
+            !coilbox_proc::is_running(library),
+            "the library worker has exited"
+        );
+        assert!(!alive(&page_lane) && !alive(&library_lane));
+        assert!(
+            alive(&other_lane),
+            "another engine's worker is left running"
+        );
+
+        let (restarted, _) = read("one", Kind::Page);
+        assert!(
+            restarted.is_some_and(|pid| pid != page),
+            "a fresh worker answered"
+        );
+        let (restarted, _) = read("two", Kind::Page);
+        assert!(restarted.is_none(), "the other engine kept its worker");
+
+        // A folder of engines takes all of them.
+        shut_down_under(&root.join("engine"));
+        assert!(!alive(&page_lane) && !alive(&other_lane));
+    }
+
     /// The real worker, end to end, without an engine: every read fails at
     /// loading the library, which is an answer like any other. What this checks
     /// is the loop around the reads.
@@ -948,14 +1294,9 @@ mod tests {
                 datadir.clone(),
             ];
             args.extend(extra.iter().map(|a| a.to_string()));
-            let served = lane
-                .run(&Job {
-                    args: &args,
-                    timeout: LONG,
-                    what: "test read",
-                    cancel: None,
-                })
-                .expect("an answer");
+            let Ok(Ran::Served(served)) = run(&lane, &args, LONG, None, Duration::MAX) else {
+                panic!("the read was not answered");
+            };
             let json: serde_json::Value =
                 serde_json::from_slice(&served.output).expect("the worker printed JSON");
             (served.started, json.to_string())

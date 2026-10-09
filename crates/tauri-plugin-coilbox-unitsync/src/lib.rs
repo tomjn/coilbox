@@ -519,13 +519,35 @@ fn answered(what: &str, hit: Option<serde_json::Value>) -> Option<CliResult> {
 /// Which worker answers a read.
 #[derive(Clone, Copy)]
 enum Via {
-    /// One that stays running, of the kind named. Nearly every read.
-    Running(pool::Kind),
-    /// One started for this read alone. For the reads a running worker refuses
-    /// (`serve.rs` in the worker says why): the engine config read and write,
-    /// which run no `Init` and so have nothing to save.
+    /// One that stays running, of the kind named, unless the read ahead of this
+    /// one has held it for `patience` or longer. Nearly every read.
+    Running {
+        kind: pool::Kind,
+        patience: Duration,
+    },
+    /// One started for this read alone. Two sorts of read:
+    ///
+    /// The engine config read and write, which a running worker refuses
+    /// (`serve.rs` in the worker says why) and which run no `Init`, so there is
+    /// nothing to save.
+    ///
+    /// The Lua console, the Lua REPL and the defs probe, which run code the
+    /// user wrote. A loop that never ends there holds its worker until the
+    /// timeout, and in a worker of its own that holds up nothing else.
     OneShot,
 }
+
+/// How long one read may hold a running worker before the reads queued behind
+/// it stop waiting and each start a worker of their own.
+///
+/// [`MINIMAP_TIMEOUT`], the time this file already gives a fast single read
+/// before calling it stuck. A read queued behind one that has run that long is
+/// behind a read that is stuck or as good as, and without this would wait out
+/// the whole of that read's timeout, up to [`SCAN_TIMEOUT`]. Over thirty
+/// uncached map pages the longest any read took from being asked for to being
+/// answered, its own wait in the queue included, was 13.4s, so ordinary reads
+/// stay well under it and still share one `Init`.
+const HELD_TOO_LONG: Duration = MINIMAP_TIMEOUT;
 
 /// The value given for `flag` in a worker argument list.
 fn flag_value<'a>(args: &'a [String], flag: &str) -> Option<&'a str> {
@@ -545,7 +567,7 @@ fn run_served_blocking(
     timeout: Duration,
     what: String,
     cancel: Option<Arc<AtomicBool>>,
-    kind: pool::Kind,
+    (kind, patience): (pool::Kind, Duration),
 ) -> Result<String, String> {
     let (Some(lib), Some(datadir)) = (flag_value(&args, "--lib"), flag_value(&args, "--datadir"))
     else {
@@ -556,12 +578,22 @@ fn run_served_blocking(
     #[cfg(debug_assertions)]
     let mut dev_run = devstats::WorkerRun::start(&what);
 
-    let served = pool::lane(&bin, lib, datadir, &envs, kind).run(&pool::Job {
+    let ran = pool::lane(&bin, lib, datadir, &envs, kind).run(&pool::Job {
         args: &args,
         timeout,
         what: &what,
         cancel: cancel.as_deref(),
+        patience,
     })?;
+    let served = match ran {
+        pool::Ran::Served(served) => served,
+        pool::Ran::Busy => {
+            // The one-shot run logs this read itself.
+            #[cfg(debug_assertions)]
+            dev_run.handed_on(kind.name());
+            return run_worker_blocking(bin, args, envs, timeout, what, cancel);
+        }
+    };
     #[cfg(debug_assertions)]
     {
         if let Some(pid) = served.started {
@@ -595,8 +627,9 @@ async fn run_via(
 ) -> CliResult {
     let what_owned = what.to_string();
     let result = tauri::async_runtime::spawn_blocking(move || match via {
-        Via::Running(kind) => {
-            run_served_blocking(bin, args, envs, timeout, what_owned, cancel, kind)
+        Via::Running { kind, patience } => {
+            let queue = (kind, patience);
+            run_served_blocking(bin, args, envs, timeout, what_owned, cancel, queue)
         }
         Via::OneShot => run_worker_blocking(bin, args, envs, timeout, what_owned, cancel),
     })
@@ -620,7 +653,10 @@ async fn run_worker(
     what: &str,
     cancel: Option<Arc<AtomicBool>>,
 ) -> CliResult {
-    let via = Via::Running(pool::Kind::Page);
+    let via = Via::Running {
+        kind: pool::Kind::Page,
+        patience: HELD_TOO_LONG,
+    };
     run_via(via, bin, args, envs, timeout, what, cancel).await
 }
 
@@ -634,8 +670,31 @@ async fn run_library_worker(
     what: &str,
     cancel: Option<Arc<AtomicBool>>,
 ) -> CliResult {
-    let via = Via::Running(pool::Kind::Library);
+    let via = Via::Running {
+        kind: pool::Kind::Library,
+        patience: HELD_TOO_LONG,
+    };
     run_via(via, bin, args, envs, timeout, what, cancel).await
+}
+
+/// The scan, answered by the engine's library worker when that is free and by a
+/// worker of its own when it is not.
+///
+/// The lists on screen wait on the scan, and the walks that share the library
+/// worker ran for 27.9s, 14.4s and 3.6s with coilbox's caches empty. So a scan
+/// waits behind none of them. Its patience is zero, which costs it one `Init`
+/// when the worker is busy, the same as it cost before workers stayed running.
+async fn run_scan_worker(
+    bin: PathBuf,
+    args: Vec<String>,
+    envs: Vec<(String, String)>,
+    cancel: Option<Arc<AtomicBool>>,
+) -> CliResult {
+    let via = Via::Running {
+        kind: pool::Kind::Library,
+        patience: Duration::ZERO,
+    };
+    run_via(via, bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await
 }
 
 /// `unitsync_scan` — scan one content root with one engine's libunitsync,
@@ -650,7 +709,7 @@ async fn unitsync_scan(engine_path: String, data_dir: String, op_id: Option<Stri
     let args = build_args(&libpath.to_string_lossy(), &data_dir);
     let envs = loader_envs(&engine_dir, &data_dir);
     let cancel = op_id.as_deref().map(register_cancel);
-    let res = run_library_worker(bin, args, envs, SCAN_TIMEOUT, "scan", cancel).await;
+    let res = run_scan_worker(bin, args, envs, cancel).await;
     if let Some(id) = op_id.as_deref() {
         unregister_cancel(id);
     }
@@ -1824,7 +1883,8 @@ async fn unitsync_lua_exec(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let result = run_worker(bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
+    let via = Via::OneShot;
+    let result = run_via(via, bin, args, envs, MINIMAP_TIMEOUT, "lua exec", None).await;
     let _ = std::fs::remove_file(&script);
     result
 }
@@ -1852,15 +1912,8 @@ pub fn defs_probe_blocking(
         &path.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, data_dir);
-    let out = run_served_blocking(
-        bin,
-        args,
-        envs,
-        LUA_TIMEOUT,
-        "defs probe".into(),
-        None,
-        pool::Kind::Page,
-    );
+    // One-shot, like the Lua console: see [`Via::OneShot`].
+    let out = run_worker_blocking(bin, args, envs, LUA_TIMEOUT, "defs probe".into(), None);
     let _ = std::fs::remove_file(&path);
     out
 }
@@ -1896,7 +1949,8 @@ async fn unitsync_lua_repl_exec(
         &script.to_string_lossy(),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    let result = run_worker(bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
+    let via = Via::OneShot;
+    let result = run_via(via, bin, args, envs, LUA_TIMEOUT, "lua repl", None).await;
     let _ = std::fs::remove_file(&script);
     result
 }
@@ -2004,6 +2058,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         // Swept here, at the one moment nothing can be mid-render, against each
         // key's own archive on disk rather than unitsync: see `modelcache`.
         .setup(|app, _api| {
+            // Whatever deletes or replaces an engine folder asks for its files
+            // to be let go of first, and the workers here are what hold them.
+            coilbox_proc::on_engine_release(pool::shut_down_under);
             if let Some(dir) = model_texture_dir(app) {
                 modelcache::sweep(&dir);
             }

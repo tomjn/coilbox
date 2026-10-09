@@ -25,6 +25,10 @@
 //! that ran `Init` carries the same timings as its init line. A one-shot
 //! worker's line ends with whatever else it printed when [`TIMINGS_ENV`] is set.
 //!
+//! `unitsync-worker-busy` is a read that stopped queueing for a running worker
+//! because the read ahead of it had held that worker too long. A one-shot
+//! worker answers it, and its start, `Init` and run lines follow as usual.
+//!
 //! The whole module is compiled only with `debug_assertions`, so a release
 //! build has none of it.
 
@@ -97,6 +101,22 @@ impl WorkerRun {
         let timing = format!("init_lock_wait={lock_wait_ms}ms init_call={call_ms}ms");
         init_ran(&self.what, &timing);
         self.worker_timings.push(timing);
+    }
+
+    /// This read stopped queueing for the running worker of `kind` and is being
+    /// handed to a one-shot worker, which logs the read itself. Says so, and
+    /// logs no line of its own:
+    ///
+    /// ```text
+    /// [unitsync-worker-busy] what="minimap" kind="page" waited=30004ms
+    /// ```
+    pub fn handed_on(self, kind: &str) {
+        eprintln!(
+            "[unitsync-worker-busy] what={:?} kind={kind:?} waited={}ms",
+            self.what,
+            self.start.elapsed().as_millis()
+        );
+        std::mem::forget(self);
     }
 }
 
