@@ -74,7 +74,17 @@ vi.mock("../downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
 vi.mock("../../content/bindings", () => ({
   contentRescan: vi.fn(async () => {}),
 }));
-vi.mock("../../content/config", () => ({ invalidateScans: vi.fn() }));
+// The Games page reads the content scan to name a hub row's icon. No row here
+// is a hub row, so the scan has nothing to say.
+const NO_SCAN = vi.hoisted(() => ({
+  target: { selected: null },
+  scan: { data: null },
+}));
+vi.mock("../../content/config", () => ({
+  invalidateScans: vi.fn(),
+  useScanTargetSelection: () => NO_SCAN.target,
+  useUnitsyncScan: () => NO_SCAN.scan,
+}));
 vi.mock("../../content/rapidPoolWarm", () => ({
   warmAllRoots: vi.fn(async () => {}),
 }));
