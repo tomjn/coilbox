@@ -1,10 +1,34 @@
-import { type ReactNode, useEffect, useState } from "react";
-import { BuildTreeEmbed } from "../content/pages/components/BuildTreeEmbed";
+import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { HomeSetupCard } from "../content/pages/components/SetupCard";
 import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
 import { MapPacksBanner } from "../downloads/pages/components/MapPacksBanner";
 import BrandedWelcome from "./BrandedWelcome";
+
+/**
+ * The build tree pulls in three.js and the graph library. Loading it on demand keeps
+ * both out of the first screen, which only needs `applyProfilePages`.
+ */
+const BuildTreeEmbed = lazy(() =>
+  import("../content/pages/components/BuildTreeEmbed").then((m) => ({
+    default: m.BuildTreeEmbed,
+  })),
+);
+
+function BuildTreeWidget({
+  arg,
+  mode,
+}: {
+  arg?: string;
+  mode: "graph" | "buttons";
+}) {
+  return (
+    <Suspense fallback={<Skeleton className="my-3 h-40 w-full rounded-lg" />}>
+      <BuildTreeEmbed arg={arg} mode={mode} />
+    </Suspense>
+  );
+}
 
 /**
  * The `@widget/<name>` registry (issue #274): a fixed allow-list of live Coilbox
@@ -40,8 +64,8 @@ export const WIDGET_REGISTRY: Record<string, (arg?: string) => ReactNode> = {
   onboarding: () => <HomeSetupCard />,
   welcome: () => <BrandedWelcome />,
   "map-pack": () => <MapPackWidget />,
-  "build-tree": (arg) => <BuildTreeEmbed arg={arg} mode="graph" />,
-  "faction-button": (arg) => <BuildTreeEmbed arg={arg} mode="buttons" />,
+  "build-tree": (arg) => <BuildTreeWidget arg={arg} mode="graph" />,
+  "faction-button": (arg) => <BuildTreeWidget arg={arg} mode="buttons" />,
 };
 
 /**
