@@ -147,6 +147,17 @@ fn main() {
     // because the process that did the copy may still be running out of it.
     portable_update::clear_staging();
 
+    // Dev builds only: when this process started, for timing a launch against
+    // the lines the plugins and the webview record later (issue #3713).
+    #[cfg(debug_assertions)]
+    eprintln!(
+        "[launch] process_start t={}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_millis())
+            .unwrap_or(0)
+    );
+
     #[cfg(target_os = "linux")]
     pin_gio_modules_to_bundle();
     #[cfg(target_os = "linux")]
