@@ -50,6 +50,11 @@
       "icons/icon.icns",
       "icons/icon-windows.ico"
     ],
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
     "macOS": {
       "signingIdentity": "-",
       "entitlements": "entitlements.plist",

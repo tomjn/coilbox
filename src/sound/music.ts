@@ -1,4 +1,9 @@
 import { assetUrl } from "@/lib/assetUrl";
+import {
+  readStoredSettingIfInstalled,
+  settingsWritten,
+  writeStoredSetting,
+} from "@/lib/storedSetting";
 import { getProfileSound } from "@/profile/profile";
 
 /**
@@ -27,6 +32,14 @@ export type Track =
   // stream and needs neither the asset protocol nor unitsync.
   | { kind: "bundled"; url: string; label: string };
 
+/**
+ * True only while the first playback attempt of a session is in flight. On some
+ * Linux systems the web process hangs inside the audio call and never comes back,
+ * so the marker is what the next launch finds to learn the last attempt never
+ * returned. It lives in settings because nothing else survives the hang.
+ */
+export const MUSIC_ATTEMPTING_KEY = "sound.music.attempting";
+
 let element: HTMLAudioElement | null = null;
 let queue: Track[] = [];
 let index = 0;
@@ -43,6 +56,13 @@ let wanted = false;
  * must not start the music up in a window you cannot see.
  */
 const suspendedFor = new Set<SuspendReason>();
+/** Whether a `play()` has resolved this session, after which the marker is not needed. */
+let attemptProven = false;
+/** How many attempts have set the marker and not yet ended. */
+let attemptsMarked = 0;
+/** Set when this launch found the marker left over from an attempt that hung. */
+let turnedOffByHang = false;
+const hangListeners = new Set<() => void>();
 
 /** Why the music is paused despite the player wanting it. */
 export type SuspendReason = "game" | "unfocused";
@@ -116,10 +136,77 @@ async function urlFor(track: Track, token: number): Promise<string | null> {
   return url;
 }
 
+/**
+ * Record on disk that an attempt is starting, and wait until it is there. Called
+ * before the first thing that can hang: creating the element, setting its `src`
+ * and calling `play()`. Awaiting the flush is what orders the write ahead of the
+ * risky call. Without it the write is only queued, and the hang could land first.
+ */
+async function markAttemptStarted(): Promise<boolean> {
+  if (attemptProven) return false;
+  attemptsMarked += 1;
+  writeStoredSetting(MUSIC_ATTEMPTING_KEY, true);
+  await settingsWritten();
+  return true;
+}
+
+/**
+ * Called when a marked attempt is over without a hang: `play()` came back, or
+ * the attempt was dropped before it got that far. Only a `play()` that resolved
+ * proves the audio path, because a refused one may never have reached it.
+ *
+ * The marker is cleared when the last marked attempt ends, not the first. Two
+ * can overlap, and clearing on the first would leave the second unguarded.
+ */
+function markAttemptOver(proven: boolean): void {
+  if (proven) attemptProven = true;
+  attemptsMarked -= 1;
+  if (attemptsMarked === 0) writeStoredSetting(MUSIC_ATTEMPTING_KEY, false);
+}
+
+/**
+ * Run once at boot, before any music is started. A marker still set means the
+ * previous attempt never returned, so music stays off for this launch and the
+ * marker is cleared. Returns whether that happened, so the caller can turn the
+ * stored play setting off as well.
+ *
+ * Closing the app normally in the instant `play()` is pending leaves the marker
+ * set too. The next launch then turns music off once, which is accepted rather
+ * than guarded against.
+ */
+export function recoverFromHungAttempt(): boolean {
+  if (!readStoredSettingIfInstalled(MUSIC_ATTEMPTING_KEY, false)) return false;
+  writeStoredSetting(MUSIC_ATTEMPTING_KEY, false);
+  turnedOffByHang = true;
+  wanted = false;
+  notifyHang();
+  return true;
+}
+
+/** Whether music was turned off this session because the last attempt hung. */
+export function getTurnedOffByHang(): boolean {
+  return turnedOffByHang;
+}
+
+export function subscribeTurnedOffByHang(listener: () => void): () => void {
+  hangListeners.add(listener);
+  return () => hangListeners.delete(listener);
+}
+
+/** The player pressed play again, which is a fresh attempt under the same guard. */
+export function clearTurnedOffByHang(): void {
+  if (!turnedOffByHang) return;
+  turnedOffByHang = false;
+  notifyHang();
+}
+
+function notifyHang(): void {
+  for (const listener of hangListeners) listener();
+}
+
 async function playCurrent(): Promise<void> {
-  const el = ensureElement();
   const track = queue[index];
-  if (!el || !track) return;
+  if (!track || (!element && typeof Audio === "undefined")) return;
   loadToken += 1;
   const token = loadToken;
   const url = await urlFor(track, token);
@@ -128,14 +215,25 @@ async function playCurrent(): Promise<void> {
   // lands mid-fetch is undone the moment the bytes arrive, and the music starts
   // playing with the button saying it is stopped.
   if (!url || token !== loadToken || !shouldPlay()) return;
+  const marked = await markAttemptStarted();
+  // The marker write took a round trip to the backend, long enough for the
+  // player to have paused or switched game again.
+  const el = token === loadToken && shouldPlay() ? ensureElement() : null;
+  if (!el) {
+    if (marked) markAttemptOver(false);
+    return;
+  }
   el.src = url;
   el.volume = level;
+  let played = false;
   try {
     await el.play();
+    played = true;
   } catch {
     // Autoplay can be refused before the player has interacted with the window.
     // The next call after a click succeeds, so there is nothing to recover here.
   }
+  if (marked) markAttemptOver(played);
   if (token !== loadToken || !shouldPlay()) el.pause();
 }
 
@@ -203,7 +301,9 @@ export function setMusicLevel(volume: number, muted: boolean): void {
 
 /** Start or stop the music, as the player asked. */
 export function setMusicWanted(value: boolean): void {
-  wanted = value;
+  // Held off after a hung attempt until the player presses play, whatever the
+  // stored setting or the profile says.
+  wanted = value && !turnedOffByHang;
   apply();
 }
 

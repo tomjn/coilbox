@@ -20,6 +20,7 @@ import { GameMusic } from "./GameMusic";
 import { isSoundId } from "./library";
 import {
   initMusic,
+  recoverFromHungAttempt,
   setMusicLevel,
   setMusicSuspended,
   setMusicWanted,
@@ -93,11 +94,19 @@ export function SoundProvider({ children }: { children: ReactNode }) {
  * browser, music from a window you cannot see is noise from nowhere.
  */
 function Music() {
-  const [wanted] = useSetting<boolean>(MUSIC_PLAYING_KEY, musicOnByDefault());
+  const [wanted, setWanted] = useSetting<boolean>(
+    MUSIC_PLAYING_KEY,
+    musicOnByDefault(),
+  );
   const [source] = useSetting<string>(
     MUSIC_SOURCE_KEY,
     defaultMusicSource(getProfileSound() !== null),
   );
+
+  // First, so nothing below starts music before a hung attempt is accounted for.
+  useEffect(() => {
+    if (recoverFromHungAttempt()) setWanted(false);
+  }, [setWanted]);
 
   useEffect(() => {
     // "off" has to clear the list as well as stop playing, or the Music group
