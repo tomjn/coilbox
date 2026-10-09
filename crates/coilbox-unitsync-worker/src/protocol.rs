@@ -34,6 +34,12 @@ pub const TOKEN_ENV: &str = "COILBOX_UNITSYNC_SERVE_TOKEN";
 /// What every frame's header line starts with.
 pub const MARKER: &str = "@coilbox-unitsync";
 
+/// How long a worker waits for another process's `Init` or `UnInit` before going
+/// ahead without the engine's init lock. `initlock.rs` in the worker says where
+/// the figure comes from. It lives here so the plugin, which waits for a
+/// worker's `UnInit` on the way out, reads the same value.
+pub const INIT_LOCK_WAIT: std::time::Duration = std::time::Duration::from_secs(60);
+
 /// One read asked of a running worker.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Request {

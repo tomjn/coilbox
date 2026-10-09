@@ -29,7 +29,7 @@ use std::time::{Duration, Instant};
 /// content, so this is that with room for a second cold one queued behind it.
 /// Going ahead unlocked is what every worker did before this lock existed, so a
 /// wedged holder costs the old behaviour rather than a stuck read.
-pub const WAIT: Duration = Duration::from_secs(60);
+pub const WAIT: Duration = coilbox_unitsync_worker::protocol::INIT_LOCK_WAIT;
 
 /// The lock file for the engine whose `libunitsync` is at `lib`.
 ///

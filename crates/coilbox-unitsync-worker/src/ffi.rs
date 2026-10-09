@@ -426,7 +426,7 @@ impl Unitsync {
         let before = crate::session::before_init();
         let started = std::time::SystemTime::now();
         let asked = std::time::Instant::now();
-        let _lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
+        let lock = crate::initlock::acquire(&self.init_lock, crate::initlock::WAIT);
         let locked = std::time::Instant::now();
         let ok = {
             let _writing = CACHE_WRITE.lock().unwrap_or_else(|e| e.into_inner());
@@ -434,6 +434,9 @@ impl Unitsync {
         };
         let lock_wait_ms = (locked - asked).as_millis() as u64;
         let call_ms = locked.elapsed().as_millis() as u64;
+        // Let the next process in before anything below runs. What follows walks
+        // every scanned folder, and none of it touches the archive cache.
+        drop(lock);
         if crate::session::serving() {
             // The plugin is told in the reply instead (issue #3722).
             let timing = coilbox_unitsync_worker::protocol::InitTiming {
