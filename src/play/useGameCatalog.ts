@@ -4,17 +4,16 @@ import {
   useGithubGameRepos,
   useSuggestedGames,
 } from "../content/branding";
-import { dlGithubReleaseArchives } from "../downloads/bindings";
 import {
   GAME_REPOS,
   mergeGameRepos,
   resolveGithubRepo,
 } from "../downloads/gameRepos";
+import {
+  heldGithubReleases,
+  loadGithubReleases,
+} from "../downloads/githubReleases";
 import type { GameCatalog } from "./gameOffer";
-
-/** Newest release archive per repo, kept for the session. A failed read is not
- *  kept, so the next mount asks again. */
-const newestByRepo = new Map<string, string>();
 
 /**
  * The lookup `resolveGameDownload` reads, with the newest GitHub release of
@@ -30,8 +29,9 @@ export function useGameCatalog(): GameCatalog {
     () => mergeGameRepos(catalogRepos, GAME_REPOS),
     [catalogRepos],
   );
-  const [archives, setArchives] =
-    useState<ReadonlyMap<string, string>>(newestByRepo);
+  const [archives, setArchives] = useState<ReadonlyMap<string, string>>(
+    new Map(),
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -43,13 +43,11 @@ export function useGameCatalog(): GameCatalog {
       } catch {
         continue;
       }
-      if (newestByRepo.has(repo)) continue;
-      dlGithubReleaseArchives({ repo })
-        .then(({ archives: found }) => {
+      loadGithubReleases(repo)
+        .then((found) => {
           const newest = found[0]?.filename;
-          if (!newest) return;
-          newestByRepo.set(repo, newest);
-          if (!cancelled) setArchives(new Map(newestByRepo));
+          if (!newest || cancelled) return;
+          setArchives((prev) => new Map(prev).set(repo, newest));
         })
         .catch(() => {});
     }
@@ -63,7 +61,8 @@ export function useGameCatalog(): GameCatalog {
       entries,
       suggested,
       repos,
-      newestArchive: (repo: string) => archives.get(repo),
+      newestArchive: (repo: string) =>
+        archives.get(repo) ?? heldGithubReleases(repo)?.[0]?.filename,
     }),
     [entries, suggested, repos, archives],
   );

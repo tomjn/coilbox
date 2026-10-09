@@ -19,11 +19,7 @@ import { useImportParam } from "../../deeplink/useImportParam";
 import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
-import {
-  dlGithubReleaseArchives,
-  type ReleaseArchive,
-  type SpringFile,
-} from "../bindings";
+import type { ReleaseArchive, SpringFile } from "../bindings";
 import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   type EnqueueInput,
@@ -31,6 +27,7 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import { loadGithubReleases } from "../githubReleases";
 import {
   heldEvolutionRtsMaps,
   heldHakoraMaps,
@@ -230,9 +227,7 @@ export default function MapsPage() {
       } else if (src in MAP_REPOS) {
         setLoading(true);
         setItems(null);
-        const { archives } = await dlGithubReleaseArchives({
-          repo: MAP_REPOS[src],
-        });
+        const archives = await loadGithubReleases(MAP_REPOS[src], refresh);
         setItems(
           archives.map((a) => ({
             springName: a.filename, // no springname; filename is unique

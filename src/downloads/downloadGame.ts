@@ -1,9 +1,5 @@
 import { loadGithubGameRepos } from "../content/branding";
-import {
-  dlDownloadFileRaw,
-  dlDownloadRaw,
-  dlGithubReleaseArchives,
-} from "./bindings";
+import { dlDownloadFileRaw, dlDownloadRaw } from "./bindings";
 import { withDownloadNotify } from "./downloadNotify";
 import {
   GAME_REPOS,
@@ -12,6 +8,7 @@ import {
   norm,
 } from "./gameRepos";
 import { type GameSource, gameSourceOrder } from "./gameSources";
+import { loadGithubReleases } from "./githubReleases";
 import { findInIndex, indexTick, loadSpringfilesList } from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
@@ -70,7 +67,7 @@ async function downloadGameAnySourceImpl(opts: {
       case "github": {
         const repo = githubRepoForGame(repos, gameName);
         if (!repo || !writePath) return null;
-        const { archives } = await dlGithubReleaseArchives({ repo });
+        const archives = await loadGithubReleases(repo);
         // No releases at all: this source genuinely has nothing, same as any
         // other step finding no candidate. Move on to the next source.
         if (archives.length === 0) return null;
