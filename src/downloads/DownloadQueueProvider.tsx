@@ -32,6 +32,7 @@ import {
   type RateSample,
   rateFrom,
 } from "./downloadRate";
+import { indexTick } from "./mirrorIndex";
 import { errMessage } from "./pages/components/states";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 import { laneOf, type QueueLane, startable } from "./queueLanes";
@@ -121,6 +122,11 @@ interface QueueItemMeta {
   rate: DownloadRate;
   /** When this item started downloading, for elapsed time. Null until it does. */
   startedAt: number | null;
+  /**
+   * The {@link indexTick} at which the item was queued, so a mirror index loaded
+   * since is trusted when the item looks itself up in it.
+   */
+  queuedAt?: number;
   /** Failure message (non-cancel errors only). */
   error: string | null;
 }
@@ -363,6 +369,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           await downloadGameAnySource({
             ...item.args,
             opId: item.id,
+            askedAt: item.queuedAt,
             onProgress,
           });
           invalidateScans();
@@ -380,6 +387,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           await downloadMapAnySource({
             ...item.args,
             opId: item.id,
+            askedAt: item.queuedAt,
             onProgress,
           });
           invalidateScans();
@@ -531,6 +539,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
       progress: null,
       rate: IDLE_RATE,
       startedAt: null,
+      queuedAt: indexTick(),
       error: null,
     } as QueueItem;
     // Push into the ref as well as state: two enqueues in the same tick both
