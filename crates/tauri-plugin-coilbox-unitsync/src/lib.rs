@@ -853,6 +853,13 @@ async fn unitsync_metalmap<R: Runtime>(
 
 /// `unitsync_thumbnails` — render a small minimap for every map in one session,
 /// for the Maps grid. `mip` defaults to 3 (128px).
+///
+/// `maps` lists every map of the last scan with what its cache key is made from.
+/// When each one has a saved thumbnail the plugin answers for those maps itself,
+/// and when any one does not a worker answers for the whole library, as it does
+/// when no list is given (issue #3736). A map in the library but not in the list
+/// is not in the plugin's answer, which is fine for a caller that draws the maps
+/// its scan lists.
 #[tauri::command]
 async fn unitsync_thumbnails<R: Runtime>(
     app: AppHandle<R>,
@@ -860,7 +867,17 @@ async fn unitsync_thumbnails<R: Runtime>(
     data_dir: String,
     mip: Option<i32>,
     op_id: Option<String>,
+    maps: Option<Vec<cached::MapRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "thumbnails",
+        thumb_cache_dir(&app)
+            .zip(maps.as_deref())
+            .and_then(|(dir, maps)| cached::thumbnails(&dir, mip.unwrap_or(3), maps))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -892,7 +909,17 @@ async fn unitsync_map_meta<R: Runtime>(
     engine_path: String,
     data_dir: String,
     op_id: Option<String>,
+    maps: Option<Vec<cached::MapRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "map metadata",
+        info_cache_dir(&app)
+            .zip(maps.as_deref())
+            .and_then(|(dir, maps)| cached::map_metas(&dir, maps))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1697,12 +1724,40 @@ async fn unitsync_map_info<R: Runtime>(
 /// sky. Returns `{ dataUrl?, errors }`; `dataUrl` is absent for the common case of
 /// a map with no skybox.
 #[tauri::command]
-async fn unitsync_map_skybox(engine_path: String, data_dir: String, map_name: String) -> CliResult {
+async fn unitsync_map_skybox<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
+) -> CliResult {
+    if let Some(hit) = answered(
+        "map skybox",
+        info_cache_dir(&app)
+            .and_then(|dir| {
+                cached::map_skybox(
+                    &dir,
+                    &map_name,
+                    archive_path.as_deref().map(Path::new),
+                    file_name.as_deref(),
+                )
+            })
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_map_skybox_args(&libpath.to_string_lossy(), &data_dir, &map_name);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_map_skybox_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &map_name,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, MINIMAP_TIMEOUT, "map skybox", None).await
 }
@@ -1796,17 +1851,45 @@ async fn unitsync_engine_config_set(
 
 /// `unitsync_archive_tree` — list the member tree of one archive (and resolve its
 /// on-disk path). `archive` is the archive name as unitsync knows it.
+///
+/// `archive_path` is the archive's own path where the scan placed it (a game), and
+/// `file_name` the map file where `archive` is a map's name. Either lets the
+/// plugin answer from a saved listing without starting a worker (issue #3736).
 #[tauri::command]
-async fn unitsync_archive_tree(
+async fn unitsync_archive_tree<R: Runtime>(
+    app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
     archive: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "archive tree",
+        info_cache_dir(&app)
+            .and_then(|dir| {
+                cached::archive_tree(
+                    &dir,
+                    &archive,
+                    archive_path.as_deref().map(Path::new),
+                    file_name.as_deref(),
+                )
+            })
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
-    let args = build_archive_tree_args(&libpath.to_string_lossy(), &data_dir, &archive);
+    let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
+    let args = build_archive_tree_args(
+        &libpath.to_string_lossy(),
+        &data_dir,
+        &archive,
+        cache_dir.as_deref(),
+    );
     let envs = loader_envs(&engine_dir, &data_dir);
     run_worker(bin, args, envs, SCAN_TIMEOUT, "archive tree", None).await
 }
@@ -1846,7 +1929,17 @@ async fn unitsync_game_headers<R: Runtime>(
     app: AppHandle<R>,
     engine_path: String,
     data_dir: String,
+    games: Option<Vec<cached::GameRef>>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "game headers",
+        header_cache_dir(&app)
+            .zip(games.as_deref())
+            .and_then(|(dir, games)| cached::game_headers(&dir, games))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),

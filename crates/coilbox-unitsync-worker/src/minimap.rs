@@ -175,6 +175,36 @@ fn cached_dims(
     Some((width, height))
 }
 
+/// A map's proportions for the thumbnail walk: from `file` or `compute` as
+/// [`cached_dims`] does, and when there are none, a marker saying so (issue
+/// #3736).
+///
+/// The plugin answers the walk from disk only when every map has its picture and
+/// its proportions saved. A map with no proportions has no file to find, so
+/// without a marker it would send the whole walk to a worker on every launch. The
+/// marker is left only when `clean` says reading them raised nothing, since an
+/// error can be a failure that a later run gets past.
+fn dims_or_marker(
+    file: Option<PathBuf>,
+    none_file: Option<PathBuf>,
+    compute: impl FnOnce() -> Option<(u32, u32)>,
+    clean: impl FnOnce() -> bool,
+) -> Option<(u32, u32)> {
+    if none_file.as_deref().is_some_and(Path::exists) {
+        return None;
+    }
+    let dims = cached_dims(file, compute);
+    if dims.is_none() && clean() {
+        if let Some(marker) = none_file.as_deref() {
+            if let Some(dir) = marker.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(marker, b"");
+        }
+    }
+    dims
+}
+
 /// Cache file for a map's detail. Not a picture, so `sweep_pictures` leaves it
 /// alone.
 fn detail_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
@@ -783,9 +813,24 @@ pub fn render_all(lib: &str, mip: i32, cache_dir: Option<&Path>) -> ThumbnailsOu
         }
         match render_one(&us, &name, mip, file, None) {
             Ok((image, _)) => {
-                let dims = cached_dims(dims_file(cache_dir, key.as_deref()), || {
-                    us.map_dimensions(&name)
-                });
+                let dims_errors = std::cell::RefCell::new(Vec::new());
+                let dims = dims_or_marker(
+                    dims_file(cache_dir, key.as_deref()),
+                    cache_dir
+                        .zip(key.as_deref())
+                        .map(|(dir, key)| cached::dims_none_file(dir, key)),
+                    || us.map_dimensions(&name),
+                    || {
+                        *dims_errors.borrow_mut() = us.drain_errors();
+                        dims_errors.borrow().is_empty()
+                    },
+                );
+                errors.extend(
+                    dims_errors
+                        .into_inner()
+                        .into_iter()
+                        .map(|e| format!("{name}: {e}")),
+                );
                 let (width_elmos, height_elmos) = dims_elmos(dims);
                 thumbnails.push(Thumbnail {
                     name,
@@ -1186,6 +1231,39 @@ mod tests {
         // Second read must not run the expensive call again.
         assert_eq!(cached_dims(file, compute), Some((384, 256)));
         assert_eq!(calls.get(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_map_with_no_proportions_is_marked_so_it_is_not_asked_again() {
+        let dir = temp_dir("dims-marker");
+        let file = dims_file(Some(dir.as_path()), Some("abc"));
+        let none = Some(cached::dims_none_file(&dir, "abc"));
+        let calls = Cell::new(0);
+        let compute = || {
+            calls.set(calls.get() + 1);
+            None
+        };
+
+        assert_eq!(
+            dims_or_marker(file.clone(), none.clone(), compute, || true),
+            None
+        );
+        assert_eq!(calls.get(), 1);
+        assert!(none.as_deref().unwrap().exists());
+        // The second walk trusts the marker and reads nothing.
+        assert_eq!(dims_or_marker(file, none, compute, || true), None);
+        assert_eq!(calls.get(), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_raised_errors_leaves_no_marker() {
+        let dir = temp_dir("dims-marker-errors");
+        let file = dims_file(Some(dir.as_path()), Some("abc"));
+        let none = Some(cached::dims_none_file(&dir, "abc"));
+        assert_eq!(dims_or_marker(file, none.clone(), || None, || false), None);
+        assert!(!none.as_deref().unwrap().exists());
         let _ = std::fs::remove_dir_all(&dir);
     }
 

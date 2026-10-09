@@ -565,6 +565,17 @@ function renderedUrl(
   return res.dataUrl ?? null;
 }
 
+/**
+ * Wait for the target's scan before a batch read that names the scan's maps or
+ * games, so the plugin has the list to answer from disk with (issue #3736). A
+ * page that asks first would otherwise go without it and start a worker for an
+ * answer already saved. A scan that fails is not this read's failure: it goes
+ * on without a list and a worker answers, as it did before.
+ */
+async function afterScan(enginePath: string, dataDir: string): Promise<void> {
+  await currentScan(enginePath, dataDir).catch(() => undefined);
+}
+
 /** A rendered map thumbnail plus its true proportions (for undistorted display). */
 export interface MapThumbData {
   url: string;
@@ -589,6 +600,7 @@ export async function primeThumbnails(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = thumbnailsCache.get(key);
   if (cached) return cached;
+  await afterScan(enginePath, dataDir);
   const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
   const map = new Map<string, MapThumbData>();
   for (const t of res.thumbnails) {
@@ -649,6 +661,7 @@ export async function primeMapMeta(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = mapMetaCache.get(key);
   if (cached) return cached;
+  await afterScan(enginePath, dataDir);
   const res = await unitsyncMapMeta({ enginePath, dataDir });
   const map = new Map<string, Record<string, string>>();
   for (const m of res.maps) map.set(m.name, m.info);
@@ -1611,6 +1624,7 @@ export async function primeGameHeaders(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = gameHeadersCache.get(key);
   if (cached) return cached;
+  await afterScan(enginePath, dataDir);
   const res = await unitsyncGameHeaders({ enginePath, dataDir });
   const map = new Map<string, string>();
   for (const h of res.headers) {

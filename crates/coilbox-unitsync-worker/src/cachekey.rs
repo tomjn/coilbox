@@ -108,6 +108,8 @@ pub const KIND_DATASET: &str = "unitdataset";
 pub const KIND_MAP: &str = "map";
 pub const KIND_MAP_META: &str = "mapmeta";
 const KIND_ARCHIVE_HASH: &str = "maphash";
+const KIND_MAP_SKYBOX: &str = "mapskybox";
+const KIND_ARCHIVE_TREE: &str = "archivetree";
 const KIND_SKIRMISH_ENGINE: &str = "skirmishai-engine";
 const KIND_SKIRMISH_GAME: &str = "skirmishai-game";
 
@@ -246,6 +248,28 @@ pub fn map_meta_key(
     map_identity(KIND_MAP_META, archive, map_name, file_name)
 }
 
+/// A map's skybox record (issue #3736), apart from the other map blobs. The same
+/// identity as they have: the archive's stamp where it resolves, otherwise the
+/// versioned name and the map file name.
+pub fn map_skybox_key(
+    archive: Option<&ArchiveStamp>,
+    map_name: &str,
+    file_name: Option<&str>,
+) -> Option<String> {
+    map_identity(KIND_MAP_SKYBOX, archive, map_name, file_name)
+}
+
+/// An archive's member tree (issue #3736). A game's archive resolves, so it is
+/// keyed on its stamp. A map is listed by its versioned name, which usually does
+/// not resolve, so it is keyed on that name and its map file name instead.
+pub fn archive_tree_key(
+    archive: Option<&ArchiveStamp>,
+    name: &str,
+    file_name: Option<&str>,
+) -> Option<String> {
+    map_identity(KIND_ARCHIVE_TREE, archive, name, file_name)
+}
+
 /// A skirmish AI list: the engine library's stamp, because the native AIs ship
 /// with the engine, and the game archive's when a game is given, because its Lua
 /// AIs ship with the game.
@@ -379,6 +403,56 @@ mod tests {
         assert_eq!(map_info_key(None, MAP_NAME, None), None);
         assert_eq!(map_meta_key(None, MAP_NAME, None), None);
         assert_eq!(thumb_key(None, MAP_NAME, None), None);
+    }
+
+    #[test]
+    fn a_record_written_under_an_older_cache_version_is_under_another_key() {
+        let map = map();
+        assert_ne!(
+            header_key(&game()),
+            stamp_hash(Some(HEADER_CACHE_VERSION - 1), None, &game())
+        );
+        assert_ne!(
+            map_meta_key(Some(&map), MAP_NAME, None).unwrap(),
+            stamp_hash(Some(INFO_CACHE_VERSION - 1), Some(KIND_MAP_META), &map)
+        );
+    }
+
+    #[test]
+    fn the_skybox_and_tree_keys_are_their_own_and_follow_the_map_identity() {
+        let map = map();
+        let skybox = map_skybox_key(Some(&map), MAP_NAME, Some(MAP_FILE)).unwrap();
+        let tree = archive_tree_key(Some(&map), MAP_NAME, Some(MAP_FILE)).unwrap();
+        for other in [
+            map_info_key(Some(&map), MAP_NAME, Some(MAP_FILE)).unwrap(),
+            map_meta_key(Some(&map), MAP_NAME, Some(MAP_FILE)).unwrap(),
+            thumb_key(Some(&map), MAP_NAME, Some(MAP_FILE)).unwrap(),
+        ] {
+            assert_ne!(skybox, other);
+            assert_ne!(tree, other);
+        }
+        assert_ne!(skybox, tree);
+
+        let by_name = map_skybox_key(None, MAP_NAME, Some(MAP_FILE)).unwrap();
+        assert!(
+            by_name.starts_with('n'),
+            "{by_name} is not a name based key"
+        );
+        assert!(archive_tree_key(None, MAP_NAME, Some(MAP_FILE))
+            .unwrap()
+            .starts_with('n'));
+        assert_eq!(map_skybox_key(None, MAP_NAME, None), None);
+        assert_eq!(archive_tree_key(None, MAP_NAME, None), None);
+
+        let touched = ArchiveStamp::new(map.path(), map.size(), map.mtime() + 1);
+        assert_ne!(
+            skybox,
+            map_skybox_key(Some(&touched), MAP_NAME, Some(MAP_FILE)).unwrap()
+        );
+        assert_ne!(
+            tree,
+            archive_tree_key(Some(&touched), MAP_NAME, Some(MAP_FILE)).unwrap()
+        );
     }
 
     #[test]

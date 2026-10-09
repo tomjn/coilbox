@@ -154,6 +154,30 @@ describe("useUnitRenders", () => {
     );
   });
 
+  it("asks the cache under the game's declared name, not its archive file name", async () => {
+    // A render is recorded under the name the game declares for itself, so
+    // asking with "test.sdz" matches no record and every visit draws again.
+    renderHook(() =>
+      useUnitRenders(
+        "/engine",
+        "/data",
+        "test.sdz",
+        "TG",
+        "armsolar",
+        "objects3d/thing.s3o",
+        1,
+        1,
+        null,
+        "Test Game test-1",
+      ),
+    );
+
+    await waitFor(() => expect(localAsks).toHaveLength(RENDER_ANGLES.length));
+    expect(localAsks.map((a) => a.sourceArchive)).toEqual(
+      RENDER_ANGLES.map(() => "Test Game test-1"),
+    );
+  });
+
   it("shows a cached render without drawing it again", async () => {
     held = ["top"];
 

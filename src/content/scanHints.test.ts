@@ -3,7 +3,10 @@ import type { ScanResult } from "./bindings";
 import {
   forgetScanHints,
   gameArchivePath,
+  gameRefs,
   mapHint,
+  mapInScan,
+  mapRefs,
   rememberScanHints,
 } from "./scanHints";
 
@@ -117,5 +120,94 @@ describe("what a scan hands the cached reads", () => {
     expect(
       gameArchivePath("/data", "/engine", "SplinterFaction_0.1.86.sdz"),
     ).toBeUndefined();
+  });
+});
+
+describe("the lists of every map and game", () => {
+  function listable(): ScanResult {
+    const next = scan();
+    next.games = next.games.slice(0, 1);
+    return next;
+  }
+
+  it("lists the maps in scan order, naming only the keys each has", () => {
+    rememberScanHints("/data", "/engine", scan());
+    expect(mapRefs("/data", "/engine")).toEqual([
+      { name: "Aetherian Void 1.7", fileName: "maps/aetherian_void.smf" },
+      {
+        name: "Resolved Map 1.0",
+        archivePath: "/maps/resolved_1.0.sd7",
+        fileName: "maps/resolved.smf",
+      },
+    ]);
+  });
+
+  it("lists the games in scan order", () => {
+    rememberScanHints("/data", "/engine", listable());
+    expect(gameRefs("/data", "/engine")).toEqual([
+      {
+        name: "Splinter Faction",
+        archivePath: "/games/SplinterFaction_0.1.86.sdz",
+      },
+    ]);
+  });
+
+  it("lists nothing for a target that was never scanned", () => {
+    expect(mapRefs("/data", "/engine")).toBeUndefined();
+    expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+
+  it("lists nothing when the scan found none", () => {
+    const empty = scan();
+    empty.maps = [];
+    empty.games = [];
+    rememberScanHints("/data", "/engine", empty);
+    expect(mapRefs("/data", "/engine")).toBeUndefined();
+    expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+
+  it("lists no maps when one has neither an archive path nor a file name", () => {
+    const next = scan();
+    next.maps.push({
+      name: "Nameless",
+      archives: [{ name: "Nameless" }],
+      info: {},
+    });
+    rememberScanHints("/data", "/engine", next);
+    expect(mapRefs("/data", "/engine")).toBeUndefined();
+  });
+
+  it("lists no games when one has no archive path", () => {
+    rememberScanHints("/data", "/engine", scan());
+    expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+
+  it("replaces the lists with a newer scan", () => {
+    rememberScanHints("/data", "/engine", listable());
+    const next = listable();
+    next.maps = next.maps.slice(0, 1);
+    next.games = [];
+    rememberScanHints("/data", "/engine", next);
+    expect(mapRefs("/data", "/engine")).toHaveLength(1);
+    expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+
+  it("forgets the lists with the target", () => {
+    rememberScanHints("/data", "/engine", listable());
+    forgetScanHints("/data", "/engine");
+    expect(mapRefs("/data", "/engine")).toBeUndefined();
+    expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+});
+
+describe("mapInScan", () => {
+  it("says nothing for a target that was never scanned", () => {
+    expect(mapInScan("/data", "/engine", "Aetherian Void 1.7")).toBeUndefined();
+  });
+
+  it("says whether the scan lists the map", () => {
+    rememberScanHints("/data", "/engine", scan());
+    expect(mapInScan("/data", "/engine", "Aetherian Void 1.7")).toBe(true);
+    expect(mapInScan("/data", "/engine", "Nope")).toBe(false);
   });
 });

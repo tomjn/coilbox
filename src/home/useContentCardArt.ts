@@ -22,6 +22,7 @@ import {
   useUnitsyncGameHeaders,
   useUnitsyncScan,
 } from "../content/config";
+import { mapInScan } from "../content/scanHints";
 import { unitsyncThumbUrl } from "../lib/assetUrl";
 import { useSkirmishDraft } from "../play/drafts";
 import { useScenarios } from "../scenario/scenarios";
@@ -76,6 +77,12 @@ async function minimapUrl(
     // what lets the plugin answer from the cache with no worker (issue #3714).
     // A card asked for at launch would otherwise go first and start one.
     await currentScan(enginePath, dataDir).catch(() => undefined);
+    // A map the scan does not list is not installed, and a worker started to
+    // learn that fails the same way on every launch (issue #3736).
+    if (mapInScan(dataDir, enginePath, mapName) === false) {
+      minimapUrls.set(key, null);
+      return null;
+    }
     const res = await unitsyncMinimap({
       enginePath,
       dataDir,
