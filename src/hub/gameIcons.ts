@@ -63,6 +63,21 @@ export function matchHubGame(
   return games.find((g) => resolver.byShortname(g.shortname).key === key);
 }
 
+/**
+ * The name to give `GameIcon` for a game known only by its hub shortname.
+ * {@link matchHubGame} finds the hub's entry from the shortname either way. An
+ * installed game is named by its title all the same, because the art behind the
+ * hub's logo (the branding catalog and the game's own loading screen) is looked
+ * up by name, and a shortname read as a name is not an installed game.
+ */
+export function hubGameIconName(
+  shortname: string,
+  installed: readonly GameItem[] | null,
+): string {
+  const id = createGameResolver(installed).byShortname(shortname);
+  return id.installed ? id.title : shortname;
+}
+
 /** What each hub's list read came to this session, keyed by hub address. */
 const requests = new Map<string, Promise<HubGame[]>>();
 /** The same answers once they have landed, so a page that opens later reads
