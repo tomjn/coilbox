@@ -39,7 +39,13 @@ import { HIDE_INSTALLED_KEY } from "./hideInstalled";
  * curated GitHub repos in the source select below. */
 const HUB_SOURCE = "hub";
 
-type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
+type SortKey =
+  | "name-asc"
+  | "name-desc"
+  | "size-desc"
+  | "size-asc"
+  | "date-desc"
+  | "date-asc";
 
 const SORT_OPTIONS = [
   { value: "name-asc", label: "Name A–Z" },
@@ -47,6 +53,22 @@ const SORT_OPTIONS = [
   { value: "size-desc", label: "Largest" },
   { value: "size-asc", label: "Smallest" },
 ];
+
+/** Offered only on a source whose rows carry a date. */
+const DATE_SORT_OPTIONS = [
+  { value: "date-desc", label: "Newest" },
+  { value: "date-asc", label: "Oldest" },
+];
+
+const isDateSort = (sort: SortKey) =>
+  sort === "date-desc" || sort === "date-asc";
+
+/** A source's date text as a time, or undefined when it has none or it does
+ * not parse. */
+function parseDate(text: string | null | undefined): number | undefined {
+  const time = text ? Date.parse(text) : Number.NaN;
+  return Number.isNaN(time) ? undefined : time;
+}
 
 /** "springfiles" for the built-in catalog, or a `GameRepo.key` from the unified
  * registry (issue #512, resolved at render time so it can't be a literal union). */
@@ -76,6 +98,9 @@ interface GameItem {
   url?: string;
   /** Hub rows only: the ordered sources to try (best first). */
   downloads?: HubGameDownload[];
+  /** When the source says the archive was published, in milliseconds. A GitHub
+   * release's publish date or a springfiles upload time. The hub gives none. */
+  date?: number;
 }
 
 /**
@@ -152,6 +177,7 @@ export default function GamesPage() {
               filename: a.filename,
               size: a.size,
               url: a.url,
+              date: parseDate(a.publishedAt),
             })),
           );
         } else {
@@ -163,6 +189,7 @@ export default function GamesPage() {
               filename: g.filename,
               size: g.size,
               url: g.mirrors[0],
+              date: parseDate(g.timestamp),
             })),
           );
         }
@@ -268,6 +295,15 @@ export default function GamesPage() {
     });
   }
 
+  // Whether the loaded source dates its rows, which is what offers the date
+  // sorts. A source that does not, the hub, drops back to the default order.
+  const hasDates = games?.some((g) => g.date !== undefined) ?? false;
+  useEffect(() => {
+    if (games && !hasDates) {
+      setSort((current) => (isDateSort(current) ? "name-asc" : current));
+    }
+  }, [games, hasDates]);
+
   const filtered = useMemo(() => {
     if (!games) return null;
     const q = filter.trim().toLowerCase();
@@ -288,6 +324,17 @@ export default function GamesPage() {
           return (b.size ?? 0) - (a.size ?? 0);
         case "size-asc":
           return (a.size ?? 0) - (b.size ?? 0);
+        case "date-desc":
+        case "date-asc": {
+          // A row with no date goes last whichever way the dates run.
+          if (a.date === undefined || b.date === undefined) {
+            return (
+              Number(a.date === undefined) - Number(b.date === undefined) ||
+              a.name.localeCompare(b.name)
+            );
+          }
+          return sort === "date-desc" ? b.date - a.date : a.date - b.date;
+        }
         default:
           return a.name.localeCompare(b.name);
       }
@@ -335,7 +382,13 @@ export default function GamesPage() {
             value={sort}
             onValueChange={(v) => setSort(v as SortKey)}
             className="w-36"
-            options={SORT_OPTIONS}
+            options={
+              // Kept while the next source loads, so a date sort that is still
+              // selected has its own option to show.
+              hasDates || (!games && isDateSort(sort))
+                ? [...SORT_OPTIONS, ...DATE_SORT_OPTIONS]
+                : SORT_OPTIONS
+            }
           />
           <label
             htmlFor="games-hide-installed"
@@ -441,6 +494,8 @@ export default function GamesPage() {
                             {g.downloads
                               ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
                               : g.filename}
+                            {g.date !== undefined &&
+                              ` · ${new Date(g.date).toLocaleDateString(undefined, { dateStyle: "medium" })}`}
                           </p>
                         )}
                       </div>

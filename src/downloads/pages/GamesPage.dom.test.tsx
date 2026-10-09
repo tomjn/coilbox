@@ -360,3 +360,107 @@ describe("the Games page's hub source", () => {
     );
   });
 });
+
+describe("the Games page's date sorts", () => {
+  const archive = (filename: string, publishedAt: string | null) => ({
+    filename,
+    url: `https://github.example/${filename}`,
+    size: 10,
+    tag: filename,
+    publishedAt,
+  });
+
+  /** The row titles, top to bottom. */
+  const titles = () =>
+    screen
+      .getAllByRole("listitem")
+      .map((li) => li.querySelector("p")?.textContent);
+
+  const sortSelect = () =>
+    screen.getAllByRole("combobox")[1] as HTMLSelectElement;
+  const sortLabels = () =>
+    [...sortSelect().options].map((option) => option.textContent);
+
+  async function openGithubSource() {
+    const { dlGithubReleaseArchives } = await import("../bindings");
+    // Out of date order, and out of name order, so neither can pass for the other.
+    vi.mocked(dlGithubReleaseArchives).mockResolvedValue({
+      archives: [
+        archive("b_middle.sdz", "2026-03-01T00:00:00Z"),
+        archive("c_newest.sdz", "2026-10-09T16:18:56Z"),
+        archive("a_oldest.sdz", "2025-12-01T00:00:00Z"),
+        archive("d_undated.sdz", null),
+      ],
+    });
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+    const source = await screen.findByDisplayValue("springfiles");
+    fireEvent.change(source, { target: { value: "splinterfaction" } });
+    await screen.findByText("c_newest");
+  }
+
+  it("puts the most recently published release first under Newest, and last under Oldest", async () => {
+    await openGithubSource();
+
+    fireEvent.change(sortSelect(), { target: { value: "date-desc" } });
+    expect(titles()).toEqual(["c_newest", "b_middle", "a_oldest", "d_undated"]);
+
+    // A row with no date stays at the bottom rather than leading the oldest.
+    fireEvent.change(sortSelect(), { target: { value: "date-asc" } });
+    expect(titles()).toEqual(["a_oldest", "b_middle", "c_newest", "d_undated"]);
+  });
+
+  it("shows the date on a row that has one", async () => {
+    await openGithubSource();
+    const row = (title: string) => screen.getByText(title).closest("li");
+    expect(row("c_newest")?.textContent).toContain("2026");
+    expect(row("d_undated")?.textContent).not.toContain("·");
+  });
+
+  it("does not offer the date sorts on the coilbox hub, which has no dates", async () => {
+    fetchHubGames.mockResolvedValue({
+      ok: true,
+      value: [
+        {
+          shortname: "BA",
+          title: "Balanced Annihilation",
+          description: null,
+          featured: true,
+          downloads: [{ kind: "rapid", value: "ba:stable" }],
+          logo: null,
+          card: null,
+          faction_count: 2,
+          unit_count: 400,
+          item_count: 12,
+        },
+      ],
+    });
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+    await pickHubSource();
+    await screen.findByText("Balanced Annihilation");
+    expect(sortLabels()).not.toContain("Newest");
+    expect(sortLabels()).not.toContain("Oldest");
+  });
+
+  it("falls back to Name A-Z when a date sort is selected and the next source has no dates", async () => {
+    await openGithubSource();
+    expect(sortLabels()).toContain("Newest");
+    fireEvent.change(sortSelect(), { target: { value: "date-desc" } });
+    expect(sortSelect().value).toBe("date-desc");
+
+    fetchHubGames.mockResolvedValue({ ok: true, value: [] });
+    fireEvent.change(screen.getAllByRole("combobox")[0], {
+      target: { value: "hub" },
+    });
+
+    await waitFor(() => expect(sortSelect().value).toBe("name-asc"));
+    expect(sortLabels()).not.toContain("Newest");
+  });
+});
