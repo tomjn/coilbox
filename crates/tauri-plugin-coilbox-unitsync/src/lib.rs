@@ -15,7 +15,7 @@ mod renderindex;
 mod sidecar;
 
 use base64::Engine;
-use coilbox_unitsync_worker::RenderSource;
+use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
     build_archive_extract_args, build_archive_file_args, build_archive_tree_args, build_args,
@@ -486,6 +486,18 @@ fn prepare(engine_path: &str) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     Ok((bin, libpath, engine_dir))
 }
 
+/// A read answered from the cache, or `None` when there is no answer there and a
+/// worker has to be asked (issue #3714). Dev builds log each one beside the
+/// worker runs, so a screen's cost can be counted from one log.
+fn answered(what: &str, hit: Option<serde_json::Value>) -> Option<CliResult> {
+    let value = hit?;
+    #[cfg(debug_assertions)]
+    devstats::cache_hit(what);
+    #[cfg(not(debug_assertions))]
+    let _ = what;
+    Some(CliResult::ok(value))
+}
+
 /// Spawn the worker with the given args/env, parse its JSON stdout into a
 /// `CliResult`. `what` names the operation for error messages.
 async fn run_worker(
@@ -698,7 +710,16 @@ async fn unitsync_game_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: String,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "game info",
+        info_cache_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::game_info(&dir, Path::new(path))),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -731,7 +752,20 @@ async fn unitsync_unit_buildpics<R: Runtime>(
     game_archive: String,
     units: Vec<String>,
     assets: Option<bool>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    // An asset run wants files only a worker writes, so it never reads the cache.
+    if assets != Some(true) {
+        if let Some(hit) = answered(
+            "unit buildpics",
+            buildpic_cache_dir(&app)
+                .zip(archive_path.as_deref())
+                .and_then(|(dir, path)| cached::unit_buildpics(&dir, Path::new(path), &units))
+                .and_then(|out| serde_json::to_value(out).ok()),
+        ) {
+            return hit;
+        }
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -770,7 +804,17 @@ async fn unitsync_faction_logos<R: Runtime>(
     data_dir: String,
     game_archive: String,
     sides: Vec<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "faction logos",
+        faction_logo_cache_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::faction_logos(&dir, Path::new(path), &sides))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -797,7 +841,16 @@ async fn unitsync_unit_dataset<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: String,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "unit dataset",
+        info_cache_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::unit_dataset(&dir, Path::new(path))),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -944,7 +997,17 @@ async fn unitsync_unit_models<R: Runtime>(
     data_dir: String,
     game_archive: String,
     objects: Vec<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "unit models",
+        model_texture_dir(&app)
+            .zip(archive_path.as_deref())
+            .and_then(|(dir, path)| cached::unit_models(&dir, Path::new(path), &objects))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1394,7 +1457,22 @@ async fn unitsync_map_info<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "map info",
+        info_cache_dir(&app).and_then(|dir| {
+            cached::map_info(
+                &dir,
+                &map_name,
+                archive_path.as_deref().map(Path::new),
+                file_name.as_deref(),
+            )
+        }),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -1435,11 +1513,27 @@ async fn unitsync_skirmish_ais<R: Runtime>(
     engine_path: String,
     data_dir: String,
     game_archive: Option<String>,
+    archive_path: Option<String>,
 ) -> CliResult {
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
+    // A game named without its archive's path has no key to look under, and
+    // reading the list against the wrong archive is what the worker refuses to
+    // remember too.
+    let game_named = game_archive.as_deref().is_some_and(|g| !g.is_empty());
+    let game_path = archive_path.as_deref().map(Path::new);
+    if !game_named || game_path.is_some() {
+        if let Some(hit) = answered(
+            "skirmish ais",
+            info_cache_dir(&app).and_then(|dir| {
+                cached::skirmish_ais(&dir, &libpath, game_path.filter(|_| game_named))
+            }),
+        ) {
+            return hit;
+        }
+    }
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_skirmish_ai_args(
         &libpath.to_string_lossy(),

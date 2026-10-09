@@ -37,13 +37,10 @@ use std::collections::BTreeMap;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-/// Duplicated from `coilbox_unitsync_worker::unitmodel::CACHE_VERSION`. There is
-/// no library dependency between this plugin and that sidecar binary (it is
-/// spawned as a process, not linked), so the number is kept here by hand.
-/// Bumping one without the other only ever costs a launch's worth of pruning,
-/// either a generation too early or a generation too late, never a live file:
-/// see `unitmodel::CACHE_VERSION`'s own doc for the other half of this note.
-const MODEL_CACHE_VERSION: u32 = 3;
+/// The worker's unit model cache version, read from the one definition both
+/// crates share. Bumping it orphans every file written under the old number, and
+/// this sweep then removes them.
+const MODEL_CACHE_VERSION: u32 = coilbox_unitsync_worker::cachekey::MODEL_CACHE_VERSION;
 
 /// What the worker's `unitmodel::record_source` writes for each cache key.
 #[derive(serde::Deserialize)]

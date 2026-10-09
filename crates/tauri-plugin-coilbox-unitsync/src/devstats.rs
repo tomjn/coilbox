@@ -75,6 +75,31 @@ impl Drop for WorkerRun {
     }
 }
 
+/// Reads answered from the cache without a worker, in total and per command.
+static HITS: Mutex<(u64, BTreeMap<String, u64>)> = Mutex::new((0, BTreeMap::new()));
+
+/// Log one read answered from the cache (issue #3714), in the same shape as the
+/// worker line so the two can be counted from one log:
+///
+/// ```text
+/// [unitsync-cache-hit] n=3 what="game info" what_n=1 t_end=1791559800123
+/// ```
+pub fn cache_hit(what: &str) {
+    let t_end = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let mut hits = HITS.lock().unwrap_or_else(|e| e.into_inner());
+    hits.0 += 1;
+    let n = hits.0;
+    let what_n = hits.1.entry(what.to_string()).or_insert(0);
+    *what_n += 1;
+    eprintln!(
+        "[unitsync-cache-hit] n={n} what={what:?} what_n={what_n} t_end={t_end}",
+        what_n = *what_n
+    );
+}
+
 /// Count one more run of `what`, returning the new total and the new count for
 /// this command.
 fn count(what: &str) -> (u64, u64) {
