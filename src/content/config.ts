@@ -588,6 +588,8 @@ export interface MapThumbData {
 
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
 const thumbnailsCache = new Map<string, Map<string, MapThumbData>>();
+/** Open renders, keyed like the cache, so the warm-up and a page share one. */
+const thumbnailsPending = new Map<string, Promise<Map<string, MapThumbData>>>();
 
 /**
  * Render (or read from cache) every map's thumbnail for a target, populating
@@ -603,15 +605,17 @@ export async function primeThumbnails(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = thumbnailsCache.get(key);
   if (cached) return cached;
-  await afterScan(enginePath, dataDir);
-  const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
-  const map = new Map<string, MapThumbData>();
-  for (const t of res.thumbnails) {
-    const url = renderedUrl(t, unitsyncThumbUrl);
-    if (url) map.set(t.name, { url, width: t.width, height: t.height });
-  }
-  thumbnailsCache.set(key, map);
-  return map;
+  return shareInFlight(thumbnailsPending, key, async () => {
+    await afterScan(enginePath, dataDir);
+    const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
+    const map = new Map<string, MapThumbData>();
+    for (const t of res.thumbnails) {
+      const url = renderedUrl(t, unitsyncThumbUrl);
+      if (url) map.set(t.name, { url, width: t.width, height: t.height });
+    }
+    thumbnailsCache.set(key, map);
+    return map;
+  });
 }
 
 /** Lazily render and cache thumbnails for every map (name -> thumbnail + dims). */
@@ -647,6 +651,11 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
 
 /** Session cache of batch map metadata, keyed by `dataDir::enginePath::epoch`. */
 const mapMetaCache = new Map<string, Map<string, Record<string, string>>>();
+/** Open reads, keyed like the cache. */
+const mapMetaPending = new Map<
+  string,
+  Promise<Map<string, Record<string, string>>>
+>();
 
 /**
  * Read (or serve from cache) every map's mapinfo metadata for a target, as
@@ -664,12 +673,14 @@ export async function primeMapMeta(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = mapMetaCache.get(key);
   if (cached) return cached;
-  await afterScan(enginePath, dataDir);
-  const res = await unitsyncMapMeta({ enginePath, dataDir });
-  const map = new Map<string, Record<string, string>>();
-  for (const m of res.maps) map.set(m.name, m.info);
-  mapMetaCache.set(key, map);
-  return map;
+  return shareInFlight(mapMetaPending, key, async () => {
+    await afterScan(enginePath, dataDir);
+    const res = await unitsyncMapMeta({ enginePath, dataDir });
+    const map = new Map<string, Record<string, string>>();
+    for (const m of res.maps) map.set(m.name, m.info);
+    mapMetaCache.set(key, map);
+    return map;
+  });
 }
 
 /** Lazily read and cache mapinfo metadata for every map (name -> info). */
@@ -1086,6 +1097,8 @@ export function useUnitsyncUnitModel(
 
 /** Session cache of unit build icons, keyed by dataDir::engine::game::units. */
 const buildpicsCache = new Map<string, UnitBuildpicsResult>();
+/** Open reads, keyed like the cache. */
+const buildpicsPending = new Map<string, Promise<UnitBuildpicsResult>>();
 
 /** Lazily resolve build icons for a game's start units. */
 export function useUnitsyncUnitBuildpics(
@@ -1113,12 +1126,14 @@ export function useUnitsyncUnitBuildpics(
       return;
     }
     let cancelled = false;
-    unitsyncUnitBuildpics({
-      enginePath,
-      dataDir,
-      gameArchive,
-      units: unitList,
-    })
+    shareInFlight(buildpicsPending, key, () =>
+      unitsyncUnitBuildpics({
+        enginePath,
+        dataDir,
+        gameArchive,
+        units: unitList,
+      }),
+    )
       .then((res) => {
         if (cancelled) return;
         buildpicsCache.set(key, res);
@@ -1159,13 +1174,15 @@ export async function gatherExportPics(
   }
   const missing = unitIds.filter((id) => !merged[id]);
   if (missing.length > 0) {
-    const res = await unitsyncUnitBuildpics({
-      enginePath,
-      dataDir,
-      gameArchive,
-      units: missing,
-    });
     const key = `${prefix}${missing.slice().sort().join(",")}`;
+    const res = await shareInFlight(buildpicsPending, key, () =>
+      unitsyncUnitBuildpics({
+        enginePath,
+        dataDir,
+        gameArchive,
+        units: missing,
+      }),
+    );
     buildpicsCache.set(key, res);
     for (const [id, display] of Object.entries(res.units)) merged[id] = display;
   }
@@ -1187,6 +1204,8 @@ export async function gatherExportPics(
 
 /** Session cache of map info, keyed by `dataDir::enginePath::mapName`. */
 const mapInfoCache = new Map<string, MapInfoResult>();
+/** Open reads, so two askers for one map wait on one worker. */
+const mapInfoPending = new Map<string, Promise<MapInfoResult>>();
 
 /**
  * Read one map's info through the same session cache `useUnitsyncMapInfo` fills,
@@ -1201,7 +1220,9 @@ export async function primeMapInfo(
   const key = `${dataDir}::${enginePath}::${mapName}`;
   const cached = mapInfoCache.get(key);
   if (cached) return cached;
-  const res = await unitsyncMapInfo({ enginePath, dataDir, mapName });
+  const res = await shareInFlight(mapInfoPending, key, () =>
+    unitsyncMapInfo({ enginePath, dataDir, mapName }),
+  );
   if (res.checksum) mapInfoCache.set(key, res);
   return res;
 }
@@ -1240,7 +1261,9 @@ export function useUnitsyncMapInfo(
     }
     let cancelled = false;
     setStatus("loading");
-    unitsyncMapInfo({ enginePath, dataDir, mapName })
+    shareInFlight(mapInfoPending, key, () =>
+      unitsyncMapInfo({ enginePath, dataDir, mapName }),
+    )
       .then((res) => {
         if (cancelled) return;
         setInfo(res);
@@ -1506,6 +1529,8 @@ export function useArchives(enginePath?: string, dataDir?: string) {
 
 /** Session cache of archive member trees, keyed by `dataDir::enginePath::archive`. */
 const archiveTreeCache = new Map<string, ArchiveTreeResult>();
+/** Open listings, keyed like the cache. */
+const archiveTreePending = new Map<string, Promise<ArchiveTreeResult>>();
 
 /** Lazily list one archive's member tree (one unitsync session per archive). */
 export function useUnitsyncArchiveTree(
@@ -1529,7 +1554,9 @@ export function useUnitsyncArchiveTree(
     }
     let cancelled = false;
     setLoading(true);
-    unitsyncArchiveTree({ enginePath, dataDir, archive })
+    shareInFlight(archiveTreePending, key, () =>
+      unitsyncArchiveTree({ enginePath, dataDir, archive }),
+    )
       .then((res) => {
         if (cancelled) return;
         archiveTreeCache.set(key, res);
@@ -1561,11 +1588,17 @@ export function invalidateArchiveTree(
   dataDir: string,
   archive: string,
 ): void {
-  archiveTreeCache.delete(`${dataDir}::${enginePath}::${archive}`);
+  const key = `${dataDir}::${enginePath}::${archive}`;
+  archiveTreeCache.delete(key);
+  // A listing still open was started before the change, so a caller after it
+  // must not be handed that one.
+  archiveTreePending.delete(key);
 }
 
 /** Session cache of member previews, keyed by `dataDir::enginePath::archive::file`. */
 const archiveFileCache = new Map<string, ArchiveFileResult>();
+/** Open reads, keyed like the cache. */
+const archiveFilePending = new Map<string, Promise<ArchiveFileResult>>();
 
 /** Lazily read one archive member for preview (fetches only when a file is set). */
 export function useUnitsyncArchiveFile(
@@ -1590,7 +1623,9 @@ export function useUnitsyncArchiveFile(
     }
     let cancelled = false;
     setLoading(true);
-    unitsyncArchiveFile({ enginePath, dataDir, archive, file })
+    shareInFlight(archiveFilePending, key, () =>
+      unitsyncArchiveFile({ enginePath, dataDir, archive, file }),
+    )
       .then((res) => {
         if (cancelled) return;
         archiveFileCache.set(key, res);
@@ -1612,6 +1647,8 @@ export function useUnitsyncArchiveFile(
 
 /** Session cache of batch game-header art, keyed by `dataDir::enginePath::epoch`. */
 const gameHeadersCache = new Map<string, Map<string, string>>();
+/** Open renders, keyed like the cache. */
+const gameHeadersPending = new Map<string, Promise<Map<string, string>>>();
 
 /**
  * Render (or read from cache) header art for every game of a target, populating
@@ -1627,15 +1664,17 @@ export async function primeGameHeaders(
   const key = `${dataDir}::${enginePath}::${epoch}`;
   const cached = gameHeadersCache.get(key);
   if (cached) return cached;
-  await afterScan(enginePath, dataDir);
-  const res = await unitsyncGameHeaders({ enginePath, dataDir });
-  const map = new Map<string, string>();
-  for (const h of res.headers) {
-    const url = renderedUrl(h, unitsyncHeaderUrl);
-    if (url) map.set(h.name, url);
-  }
-  gameHeadersCache.set(key, map);
-  return map;
+  return shareInFlight(gameHeadersPending, key, async () => {
+    await afterScan(enginePath, dataDir);
+    const res = await unitsyncGameHeaders({ enginePath, dataDir });
+    const map = new Map<string, string>();
+    for (const h of res.headers) {
+      const url = renderedUrl(h, unitsyncHeaderUrl);
+      if (url) map.set(h.name, url);
+    }
+    gameHeadersCache.set(key, map);
+    return map;
+  });
 }
 
 /** Lazily render and cache header art for every game (name -> URL). */
@@ -1692,6 +1731,35 @@ const minimapPending = new Map<string, Promise<MinimapResult>>();
 export const THUMB_MINIMAP_MIP = 3;
 
 /**
+ * Render (or read from cache) one map's minimap at one size. The hook below and
+ * the home page's card art both read through it, so they share one cache and one
+ * running render per map and size.
+ */
+export async function loadUnitsyncMinimap(
+  enginePath: string,
+  dataDir: string,
+  mapName: string,
+  mip = 0,
+): Promise<MinimapResult> {
+  const key = `${dataDir}::${enginePath}::${mapName}::${mip}`;
+  const cached = await liveCacheHit(minimapCache, key, (r) => r.file);
+  if (cached) return cached;
+  // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D
+  // preview needs, because the minimap is the diffuse texture draped over
+  // its terrain.
+  const res = await shareInFlight(minimapPending, key, () =>
+    unitsyncMinimap({ enginePath, dataDir, mapName, mip }),
+  );
+  // Only remember a render that produced an image. A map unitsync cannot
+  // see yet answers successfully with nothing, and caching that pins the
+  // blank box for the rest of the session: asking for a map mid-download,
+  // or before the rescan that follows it, would leave it without a
+  // minimap even after it had installed.
+  if (renderedUrl(res, unitsyncThumbUrl)) minimapCache.set(key, res);
+  return res;
+}
+
+/**
  * Lazily render and cache a map's minimap + start positions for the detail page.
  *
  * `mip` picks the resolution as `1024 >> mip`, defaulting to the full 1024px the
@@ -1726,7 +1794,6 @@ export function useUnitsyncMinimap(
       setAppearance(null);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}::${mip}`;
     const apply = (res: MinimapResult) => {
       const url = renderedUrl(res, unitsyncThumbUrl);
       setUrl(url);
@@ -1768,25 +1835,8 @@ export function useUnitsyncMinimap(
     setLoading(true);
     setError(null);
     (async () => {
-      const cached = await liveCacheHit(minimapCache, key, (r) => r.file);
+      const res = await loadUnitsyncMinimap(enginePath, dataDir, mapName, mip);
       if (cancelled) return;
-      if (cached) {
-        apply(cached);
-        return;
-      }
-      // mip 0 = 1024px, the engine's minimap ceiling. That is what the 3D
-      // preview needs, because the minimap is the diffuse texture draped over
-      // its terrain.
-      const res = await shareInFlight(minimapPending, key, () =>
-        unitsyncMinimap({ enginePath, dataDir, mapName, mip }),
-      );
-      if (cancelled) return;
-      // Only remember a render that produced an image. A map unitsync cannot
-      // see yet answers successfully with nothing, and caching that pins the
-      // blank box for the rest of the session: asking for a map mid-download,
-      // or before the rescan that follows it, would leave it without a
-      // minimap even after it had installed.
-      if (renderedUrl(res, unitsyncThumbUrl)) minimapCache.set(key, res);
       apply(res);
     })()
       .catch((e) => {
@@ -2130,6 +2180,8 @@ export function useSaves(rootPath?: string) {
 /** Session cache of decoded demos, keyed by `enginePath::replayPath` (the engine
  * part is empty when no engine is installed). */
 const demoInfoCache = new Map<string, DemoInfo>();
+/** Open decodes, keyed like the cache. */
+const demoInfoPending = new Map<string, Promise<{ info: DemoInfo }>>();
 
 /**
  * Lazily decode one replay (native header, start-script and trailer, with
@@ -2158,7 +2210,9 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    contentDemoInfo({ enginePath, replayPath })
+    shareInFlight(demoInfoPending, key, () =>
+      contentDemoInfo({ enginePath, replayPath }),
+    )
       .then((res) => {
         if (cancelled) return;
         demoInfoCache.set(key, res.info);

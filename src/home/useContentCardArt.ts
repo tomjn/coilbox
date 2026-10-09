@@ -14,9 +14,10 @@
 
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { useCampaignProgress, useCampaigns } from "../campaign/campaigns";
-import { type MinimapResult, unitsyncMinimap } from "../content/bindings";
+import type { MinimapResult } from "../content/bindings";
 import {
   currentScan,
+  loadUnitsyncMinimap,
   useReplays,
   useScanTargetSelection,
   useUnitsyncGameHeaders,
@@ -37,16 +38,8 @@ import {
   validateRememberedArt,
 } from "./contentArt";
 
-/** Session cache of resolved minimap URLs, keyed by root, engine and map. */
-const minimapUrls = new Map<string, string | null>();
-
 /** The mip the maps grid renders at, so both share one disk-cache entry. */
 const CARD_MIP = 3;
-
-/** Drop the resolved-minimap memo, so the next resolve re-renders. For tests. */
-export function resetResolvedMinimaps(): void {
-  minimapUrls.clear();
-}
 
 /** The worker's answer as one URL: the cached file where it reached disk. */
 function renderedUrl(res: MinimapResult): string | null {
@@ -55,23 +48,18 @@ function renderedUrl(res: MinimapResult): string | null {
 }
 
 /**
- * Resolve one map's minimap to a URL, once per target per session.
+ * Resolve one map's minimap to a URL.
  *
- * Rendered at {@link CARD_MIP} through the same command the map detail page
- * uses, so a map already rendered for the maps grid costs one worker launch and
- * no rendering at all. A map that is not installed, or whose archive will not
- * open, caches its failure as `null` so a broken map is not retried on every
- * home visit.
+ * Rendered at {@link CARD_MIP} through the loader the map detail page and the
+ * maps grid use, so a map they have rendered is served from their cache and one
+ * being rendered is waited for rather than started again. A map that is not
+ * installed, or whose archive will not open, resolves to `null`.
  */
 async function minimapUrl(
   enginePath: string,
   dataDir: string,
   mapName: string,
 ): Promise<string | null> {
-  const key = `${dataDir}::${enginePath}::${mapName}`;
-  const cached = minimapUrls.get(key);
-  if (cached !== undefined) return cached;
-  let url: string | null = null;
   try {
     // The scan is what says where the map's archive and map file are, which is
     // what lets the plugin answer from the cache with no worker (issue #3714).
@@ -79,22 +67,17 @@ async function minimapUrl(
     await currentScan(enginePath, dataDir).catch(() => undefined);
     // A map the scan does not list is not installed, and a worker started to
     // learn that fails the same way on every launch (issue #3736).
-    if (mapInScan(dataDir, enginePath, mapName) === false) {
-      minimapUrls.set(key, null);
-      return null;
-    }
-    const res = await unitsyncMinimap({
+    if (mapInScan(dataDir, enginePath, mapName) === false) return null;
+    const res = await loadUnitsyncMinimap(
       enginePath,
       dataDir,
       mapName,
-      mip: CARD_MIP,
-    });
-    url = renderedUrl(res);
+      CARD_MIP,
+    );
+    return renderedUrl(res);
   } catch {
-    url = null;
+    return null;
   }
-  minimapUrls.set(key, url);
-  return url;
 }
 
 /**
@@ -103,9 +86,8 @@ async function minimapUrl(
  * Maps are resolved one at a time rather than in parallel. Each one launches a
  * unitsync worker process that mounts an archive, and three of those at once on
  * a page the user is trying to read is worse than the art arriving a beat later.
- * Being sequential is also what makes {@link minimapUrl}'s memo enough to stop
- * two cards on the same map rendering it twice, so there is no second cache here
- * that could disagree with it.
+ * Two cards on the same map render it once, because the loader shares the
+ * running render and caches the result.
  *
  * A pick that resolves to nothing is left out of the result rather than mapped
  * to an empty string, because the chain reads an empty string as an answer and a
