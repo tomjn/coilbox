@@ -4,6 +4,7 @@
 //! as a [`CliResult`]. Adds rapid-repo browsing (HTTP + gzip) so the frontend can
 //! list downloadable content before downloading a tag.
 
+mod github_cache;
 mod progress;
 mod rapid;
 mod sidecar;
@@ -845,11 +846,49 @@ async fn dl_fetch_text(url: String) -> CliResult {
 }
 
 /// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
+/// A stored copy of the last answer is revalidated with its ETag, and a 304 uses
+/// that copy. A rate limit refusal comes back as an error that says so.
 async fn fetch_github(url: &str) -> Result<String, String> {
     let client = timed_client()?;
-    let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
+    let owned = url.to_string();
+    let stored = tauri::async_runtime::spawn_blocking(move || github_cache::read_blocking(&owned))
+        .await
+        .ok()
+        .flatten();
+    let mut req = client.get(url);
+    if let Some(entry) = &stored {
+        req = req.header(reqwest::header::IF_NONE_MATCH, &entry.etag);
+    }
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    match github_cache::verdict(resp.status(), resp.headers(), stored.is_some(), now) {
+        github_cache::Verdict::UseStored => {
+            return stored
+                .map(|e| e.body)
+                .ok_or_else(|| "no stored copy".into())
+        }
+        github_cache::Verdict::Refused(msg) => return Err(msg),
+        github_cache::Verdict::Read => {}
+    }
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
-    resp.text().await.map_err(|e| e.to_string())
+    let etag = resp
+        .headers()
+        .get(reqwest::header::ETAG)
+        .and_then(|v| v.to_str().ok())
+        .map(str::to_string);
+    let body = resp.text().await.map_err(|e| e.to_string())?;
+    if let Some(etag) = etag {
+        let entry = github_cache::Entry {
+            url: url.to_string(),
+            etag,
+            body: body.clone(),
+        };
+        let _ = tauri::async_runtime::spawn_blocking(move || github_cache::write_blocking(&entry))
+            .await;
+    }
+    Ok(body)
 }
 
 /// `dl_recoil_engines` — Recoil engine releases whose assets match the running
@@ -1461,6 +1500,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .setup(|app, _api| {
             use tauri::Manager;
             sidecar::set_resource_dir(app.path().resource_dir().ok());
+            github_cache::set_dir(coilbox_portable::cache_dir(app).ok());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
