@@ -9,12 +9,16 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { GameIcon } from "@/components/GameIcon";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { useGithubGameRepos } from "@/content/branding";
+import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { fetchHubGames, type HubGameDownload } from "@/hub/api";
 import { useHubUrl } from "@/hub/config";
+import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
 import {
   dlGithubReleaseArchives,
@@ -36,7 +40,13 @@ import { HIDE_INSTALLED_KEY } from "./hideInstalled";
  * curated GitHub repos in the source select below. */
 const HUB_SOURCE = "hub";
 
-type SortKey = "name-asc" | "name-desc" | "size-desc" | "size-asc";
+type SortKey =
+  | "name-asc"
+  | "name-desc"
+  | "size-desc"
+  | "size-asc"
+  | "date-desc"
+  | "date-asc";
 
 const SORT_OPTIONS = [
   { value: "name-asc", label: "Name A–Z" },
@@ -44,6 +54,22 @@ const SORT_OPTIONS = [
   { value: "size-desc", label: "Largest" },
   { value: "size-asc", label: "Smallest" },
 ];
+
+/** Offered only on a source whose rows carry a date. */
+const DATE_SORT_OPTIONS = [
+  { value: "date-desc", label: "Newest" },
+  { value: "date-asc", label: "Oldest" },
+];
+
+const isDateSort = (sort: SortKey) =>
+  sort === "date-desc" || sort === "date-asc";
+
+/** A source's date text as a time, or undefined when it has none or it does
+ * not parse. */
+function parseDate(text: string | null | undefined): number | undefined {
+  const time = text ? Date.parse(text) : Number.NaN;
+  return Number.isNaN(time) ? undefined : time;
+}
 
 /** "springfiles" for the built-in catalog, or a `GameRepo.key` from the unified
  * registry (issue #512, resolved at render time so it can't be a literal union). */
@@ -73,6 +99,12 @@ interface GameItem {
   url?: string;
   /** Hub rows only: the ordered sources to try (best first). */
   downloads?: HubGameDownload[];
+  /** When the source says the archive was published, in milliseconds. A GitHub
+   * release's publish date or a springfiles upload time. The hub gives none. */
+  date?: number;
+  /** GitHub rows only: this archive is from the repo's latest release, so it
+   * is pinned to the top and tagged. */
+  latest?: boolean;
 }
 
 /**
@@ -99,6 +131,13 @@ export default function GamesPage() {
     [catalogRepos],
   );
   const hubUrl = useHubUrl();
+  // The installed games, which a hub row's icon is named from.
+  const { selected: scanTarget } = useScanTargetSelection();
+  const { data: scan } = useUnitsyncScan(
+    scanTarget?.enginePath,
+    scanTarget?.rootPath,
+  );
+  const scannedGames = scan?.games ?? null;
   const [source, setSource] = useState<Source>("springfiles");
   const [games, setGames] = useState<GameItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -135,14 +174,29 @@ export default function GamesPage() {
         const repo = src === "springfiles" ? undefined : repoForKey(repos, src);
         if (repo) {
           const { archives } = await dlGithubReleaseArchives({ repo });
+          // The latest release is the one published most recently, found by
+          // its date and not by where GitHub put it in the list. A release
+          // with no date, which is what a draft is, is never it.
+          let latest: { tag: string; date: number } | undefined;
+          for (const a of archives) {
+            const date = parseDate(a.publishedAt);
+            if (date !== undefined && (!latest || date > latest.date)) {
+              latest = { tag: a.tag, date };
+            }
+          }
           setGames(
-            archives.map((a) => ({
-              id: a.filename,
-              name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
-              filename: a.filename,
-              size: a.size,
-              url: a.url,
-            })),
+            archives.map((a) => {
+              const date = parseDate(a.publishedAt);
+              return {
+                id: a.filename,
+                name: a.filename.replace(/\.(sd7|sdz)$/i, ""),
+                filename: a.filename,
+                size: a.size,
+                url: a.url,
+                date,
+                latest: date !== undefined && a.tag === latest?.tag,
+              };
+            }),
           );
         } else {
           const { results } = await dlSpringfilesList({ category: "game" });
@@ -153,6 +207,7 @@ export default function GamesPage() {
               filename: g.filename,
               size: g.size,
               url: g.mirrors[0],
+              date: parseDate(g.timestamp),
             })),
           );
         }
@@ -258,6 +313,15 @@ export default function GamesPage() {
     });
   }
 
+  // Whether the loaded source dates its rows, which is what offers the date
+  // sorts. A source that does not, the hub, drops back to the default order.
+  const hasDates = games?.some((g) => g.date !== undefined) ?? false;
+  useEffect(() => {
+    if (games && !hasDates) {
+      setSort((current) => (isDateSort(current) ? "name-asc" : current));
+    }
+  }, [games, hasDates]);
+
   const filtered = useMemo(() => {
     if (!games) return null;
     const q = filter.trim().toLowerCase();
@@ -271,6 +335,8 @@ export default function GamesPage() {
       ? filtered.filter((g) => !installed.has(g.filename.toLowerCase()))
       : [...filtered];
     arr.sort((a, b) => {
+      // The latest release leads whatever the sort, which orders the rest.
+      if (a.latest !== b.latest) return a.latest ? -1 : 1;
       switch (sort) {
         case "name-desc":
           return b.name.localeCompare(a.name);
@@ -278,6 +344,17 @@ export default function GamesPage() {
           return (b.size ?? 0) - (a.size ?? 0);
         case "size-asc":
           return (a.size ?? 0) - (b.size ?? 0);
+        case "date-desc":
+        case "date-asc": {
+          // A row with no date goes last whichever way the dates run.
+          if (a.date === undefined || b.date === undefined) {
+            return (
+              Number(a.date === undefined) - Number(b.date === undefined) ||
+              a.name.localeCompare(b.name)
+            );
+          }
+          return sort === "date-desc" ? b.date - a.date : a.date - b.date;
+        }
         default:
           return a.name.localeCompare(b.name);
       }
@@ -325,7 +402,13 @@ export default function GamesPage() {
             value={sort}
             onValueChange={(v) => setSort(v as SortKey)}
             className="w-36"
-            options={SORT_OPTIONS}
+            options={
+              // Kept while the next source loads, so a date sort that is still
+              // selected has its own option to show.
+              hasDates || (!games && isDateSort(sort))
+                ? [...SORT_OPTIONS, ...DATE_SORT_OPTIONS]
+                : SORT_OPTIONS
+            }
           />
           <label
             htmlFor="games-hide-installed"
@@ -416,19 +499,33 @@ export default function GamesPage() {
               return (
                 <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{g.name}</p>
-                      {noSource ? (
-                        <p className="truncate text-xs text-muted-foreground">
-                          The hub lists no download for this game.
-                        </p>
-                      ) : (
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          {g.downloads
-                            ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
-                            : g.filename}
-                        </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      {g.downloads && (
+                        <GameIcon name={hubGameIconName(g.id, scannedGames)} />
                       )}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-medium">
+                            {g.name}
+                          </p>
+                          {g.latest && (
+                            <Badge variant="secondary">Latest</Badge>
+                          )}
+                        </div>
+                        {noSource ? (
+                          <p className="truncate text-xs text-muted-foreground">
+                            The hub lists no download for this game.
+                          </p>
+                        ) : (
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {g.downloads
+                              ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
+                              : g.filename}
+                            {g.date !== undefined &&
+                              ` · ${new Date(g.date).toLocaleDateString(undefined, { dateStyle: "medium" })}`}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="outline"
