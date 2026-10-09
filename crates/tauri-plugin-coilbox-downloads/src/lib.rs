@@ -955,6 +955,15 @@ fn engine_dirs(engine_root: &std::path::Path) -> Vec<std::path::PathBuf> {
     dirs
 }
 
+/// The folders under `engine/` named after `version`, which is where a download
+/// of it extracts to: `engine/<version>` or `engine/<platform>/<version>`.
+fn installed_copies(engine_root: &std::path::Path, version: &str) -> Vec<std::path::PathBuf> {
+    engine_dirs(engine_root)
+        .into_iter()
+        .filter(|dir| dir.file_name().is_some_and(|name| name == version))
+        .collect()
+}
+
 /// Report a carry that could not be made, without failing the install.
 fn carry_failed(from: &std::path::Path, into: &std::path::Path, e: &std::io::Error) {
     eprintln!(
@@ -1170,6 +1179,10 @@ async fn install_recoil_engine(
     let tmp_for_extract = tmp.clone();
     let dest_for_extract = dest.clone();
     let extracted = tauri::async_runtime::spawn_blocking(move || {
+        // Installing a version that is already there writes over its files, and
+        // Windows will not overwrite a library a unitsync worker has loaded
+        // (issue #3722).
+        coilbox_proc::release_engine(&dest_for_extract);
         sevenz_rust2::decompress_file(&tmp_for_extract, &dest_for_extract)
             .map_err(|e| format!("failed to extract engine archive: {e}"))
     })
@@ -1327,6 +1340,18 @@ async fn dl_download_engine_spring(
         std::path::Path::new(&wp).join("engine")
     });
     let before = engine_root.as_deref().map(loose_file_names);
+    // pr-downloader extracts over a version that is already installed, and
+    // Windows will not overwrite a library a unitsync worker has loaded (issue
+    // #3722). So any copy of this version lets go first.
+    if let Some(root) = engine_root.clone() {
+        let version = version.clone();
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            for installed in installed_copies(&root, &version) {
+                coilbox_proc::release_engine(&installed);
+            }
+        })
+        .await;
+    }
     let (cancel, child_slot) = cancel_slots(&op_id);
     let res = run_sidecar_streaming(args, Vec::new(), on_progress, cancel, child_slot).await;
     if let Some(id) = &op_id {
