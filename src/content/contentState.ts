@@ -89,7 +89,7 @@ function snapshot(): ContentState | null {
  * changed it (rescan, add, remove, verify) without a second round-trip.
  */
 export function useContentState() {
-  const state = useSyncExternalStore(subscribe, snapshot);
+  const state = useSyncExternalStore(subscribe, snapshot, snapshot);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
