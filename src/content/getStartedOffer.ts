@@ -5,7 +5,6 @@ import {
   useEffect,
   useState,
 } from "react";
-import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths } from "../downloads/config";
 import { usePreferredTarget } from "../play/config";
 import { getGameMatcher } from "../profile/profile";
@@ -17,6 +16,7 @@ import {
   useSuggestedMaps,
 } from "./branding";
 import { useSetupStatus, useUnitsyncScan } from "./config";
+import { installedContent } from "./installedContent";
 import { getStartedCandidates } from "./pages/components/getStartedCandidates";
 import { scanSettled } from "./scanSettled";
 import { filterSuggestedGamesByFilter } from "./suggestedGames";
@@ -126,7 +126,7 @@ export function useCollectGetStartedOffer(): GetStartedOfferState {
   const refresh = useCallback(async () => {
     if (rootPaths.length === 0) return;
     try {
-      const { games, maps } = await dlInstalledContent({ paths: rootPaths });
+      const { games, maps } = await installedContent({ paths: rootPaths });
       setInstalled({ games: new Set(games), maps: new Set(maps) });
     } catch {
       // Leave the last known listing (or nothing) in place.

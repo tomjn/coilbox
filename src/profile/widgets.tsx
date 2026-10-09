@@ -1,7 +1,7 @@
 import { lazy, type ReactNode, Suspense, useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { installedContent } from "../content/installedContent";
 import { HomeSetupCard } from "../content/pages/components/SetupCard";
-import { dlInstalledContent } from "../downloads/bindings";
 import { useContentRootPaths, useWriteRootPath } from "../downloads/config";
 import { MapPacksBanner } from "../downloads/pages/components/MapPacksBanner";
 import BrandedWelcome from "./BrandedWelcome";
@@ -53,7 +53,7 @@ function MapPackWidget() {
       setMaps(new Set());
       return;
     }
-    dlInstalledContent({ paths: rootPaths })
+    installedContent({ paths: rootPaths })
       .then(({ maps }) => setMaps(new Set(maps)))
       .catch(() => setMaps(new Set()));
   }, [rootPaths]);

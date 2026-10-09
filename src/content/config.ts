@@ -69,6 +69,7 @@ import {
 import { liveCacheHit } from "./cachedFile";
 import { engineLabel, newestEngineId } from "./engineVersion";
 import { settleWithin, shareInFlight } from "./inFlight";
+import { invalidateInstalledContent } from "./installedContent";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { readCachedModel } from "./modelFile";
 import { forgetScanHints, rememberScanHints } from "./scanHints";
@@ -347,6 +348,7 @@ export async function primeScan(
   const key = `${dataDir}::${enginePath}`;
   if (force) {
     scanErrorCache.delete(key);
+    invalidateInstalledContent();
     // A forced rescan can surface content added since the last scan; bump the
     // target's epoch so the derived batch loaders (map thumbnails, game headers)
     // refetch instead of serving their now-stale session cache.
@@ -422,6 +424,7 @@ export function currentScan(
  * (typically on re-navigation after the download).
  */
 export function invalidateScans(): void {
+  invalidateInstalledContent();
   const keys = new Set([...scanCache.keys(), ...scanErrorCache.keys()]);
   scanCache.clear();
   scanErrorCache.clear();
