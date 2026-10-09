@@ -29,6 +29,9 @@ use crate::model::{MapMinimapRow, MapMinimapSkip, MapMinimapSkipped, MapMinimaps
 use crate::model::{MapOverlayAsset, MapOverlaySkip, MinimapOutput, StartPos};
 use crate::model::{Thumbnail, ThumbnailsOutput};
 use base64::Engine;
+use coilbox_unitsync_worker::cached::{
+    self, dims_elmos, mip_side, read_detail, CachedDetail, CachedDims, DETAIL_VERSION,
+};
 use coilbox_unitsync_worker::cachekey;
 use image::{DynamicImage, ImageFormat, RgbImage};
 use serde::{Deserialize, Serialize};
@@ -136,42 +139,12 @@ pub(crate) fn sweep_pictures(cache_dir: Option<&Path>, keep: &[PathBuf]) {
 /// Cache file for a map's minimap: `<cache_dir>/<key>-<mip>.png`. `None` (no
 /// cache dir, or no cache key) disables caching for that map.
 fn cache_file(cache_dir: Option<&Path>, key: Option<&str>, mip: i32) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-{mip}.png")))
+    Some(cached::minimap_file(cache_dir?, key?, mip))
 }
 
-/// A map's proportions, cached beside its minimap PNG.
-#[derive(Serialize, Deserialize)]
-struct CachedDims {
-    width: u32,
-    height: u32,
-}
-
-/// Cache file for a map's proportions: `<cache_dir>/<key>-dims.json`. Unlike the
-/// PNG this is mip-independent, because proportions don't vary with mip level.
+/// Cache file for a map's proportions.
 fn dims_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-dims.json")))
-}
-
-/// A map's size in elmos, from the same cached proportions the display path
-/// uses (issue #1629).
-///
-/// Kept as a derivation rather than another cached field so the two can never
-/// disagree, and so every `<key>-dims.json` already on disk answers this without
-/// a rescan. What is cached is metal infomap samples, and
-/// [`coilbox_assets::map_extent_elmos`] carries which of the map's several
-/// sample counts that is and what one of them is worth.
-fn dims_elmos(dims: Option<(u32, u32)>) -> (Option<u32>, Option<u32>) {
-    match dims {
-        Some((w, h)) => {
-            let (width, height) = coilbox_assets::map_extent_elmos(w, h);
-            (Some(width), Some(height))
-        }
-        None => (None, None),
-    }
+    Some(cached::dims_file(cache_dir?, key?))
 }
 
 /// A map's proportions, from cache when `file` holds them and from `compute`
@@ -202,44 +175,10 @@ fn cached_dims(
     Some((width, height))
 }
 
-/// Bump when [`CachedDetail`] changes shape or the way it is read changes, so a
-/// record from an older build is read again instead of returning an old answer.
-const DETAIL_VERSION: u32 = 1;
-
-/// Everything a map's page asks for beside its picture, stored under the same
-/// key (issue #3724).
-///
-/// The picture alone was cached, so every call still opened the map's archive to
-/// parse `mapinfo.lua` for these. Holding them with it makes a hit the whole
-/// answer, readable without unitsync, which is what #3714 needs to answer from
-/// the plugin with no worker at all.
-///
-/// The size is elmos, derived from the same cached proportions as the
-/// thumbnails, and is mip independent like they are.
-#[derive(Serialize, Deserialize)]
-struct CachedDetail {
-    version: u32,
-    width_elmos: Option<u32>,
-    height_elmos: Option<u32>,
-    start_positions: Vec<StartPos>,
-    wind: Option<(f32, f32)>,
-    tidal: Option<f32>,
-    appearance: crate::ffi::MapAppearance,
-}
-
-/// Cache file for a map's detail: `<cache_dir>/<key>-detail.json`. Not a
-/// picture, so `sweep_pictures` leaves it alone.
+/// Cache file for a map's detail. Not a picture, so `sweep_pictures` leaves it
+/// alone.
 fn detail_file(cache_dir: Option<&Path>, key: Option<&str>) -> Option<PathBuf> {
-    let dir = cache_dir?;
-    let key = key?;
-    Some(dir.join(format!("{key}-detail.json")))
-}
-
-/// A stored detail, or `None` when there is none, it does not parse, or it was
-/// written by another version.
-fn read_detail(file: &Path) -> Option<CachedDetail> {
-    let detail: CachedDetail = serde_json::from_slice(&std::fs::read(file).ok()?).ok()?;
-    (detail.version == DETAIL_VERSION).then_some(detail)
+    Some(cached::detail_file(cache_dir?, key?))
 }
 
 /// Best effort, like every other write here: an unwritable cache dir costs a
@@ -287,12 +226,6 @@ fn read_detail_from(
     (detail.wind, detail.tidal) = us.map_env();
     detail.appearance = us.map_appearance();
     (detail, true)
-}
-
-/// The side of the square texture unitsync returns at `mip`, which is what
-/// `GetMinimap` fills and how many words come back with it.
-fn mip_side(mip: i32) -> u32 {
-    1024u32 >> mip.clamp(0, 10) as u32
 }
 
 /// The texture as unitsync handed it over: RGB565 words, little endian, row
@@ -800,43 +733,10 @@ fn render_with(
         write_detail(detail_at.as_deref(), &detail);
     }
     us.uninit();
-    let (min_wind, max_wind) = match detail.wind {
-        Some((mn, mx)) => (Some(mn), Some(mx)),
-        None => (None, None),
-    };
-    let (width_elmos, height_elmos) = (detail.width_elmos, detail.height_elmos);
-    let (start_positions, tidal, app) = (detail.start_positions, detail.tidal, detail.appearance);
-
     let base = MinimapOutput {
-        width_elmos,
-        height_elmos,
         asset,
         asset_skipped,
-        start_positions,
-        min_wind,
-        max_wind,
-        tidal_strength: tidal,
-        void_water: app.void_water,
-        void_ground: app.void_ground,
-        void_alpha_min: app.void_alpha_min,
-        water_color: app.water_color,
-        water_alpha: app.water_alpha,
-        water_plane_color: app.water_plane_color,
-        water_absorb: app.water_absorb,
-        water_base_color: app.water_base_color,
-        water_min_color: app.water_min_color,
-        force_rendering: app.force_rendering,
-        sky_color: app.sky_color,
-        fog_color: app.fog_color,
-        cloud_color: app.cloud_color,
-        cloud_density: app.cloud_density,
-        sun_dir: app.sun_dir,
-        sun_color: app.sun_color,
-        ground_ambient_color: app.ground_ambient_color,
-        ground_diffuse_color: app.ground_diffuse_color,
-        ground_specular_color: app.ground_specular_color,
-        ground_shadow_density: app.ground_shadow_density,
-        ..Default::default()
+        ..detail.into_output()
     };
     match result {
         Ok((image, side)) => MinimapOutput {
@@ -1511,6 +1411,82 @@ mod tests {
         assert_eq!(fresh.void_water, Some(true));
         assert_eq!(fresh.water_color, Some([0.1, 0.2, 0.3]));
         assert_eq!(json(&fresh), json(&cached));
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    // ---- the plugin answers a cached minimap itself (issue #3714)
+
+    /// The key the plugin builds from what the content scan holds, which is the
+    /// map's archive path where it resolved and its map file's name.
+    fn plugin_key(cache: &Path, archive_resolves: bool) -> String {
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        cached::thumb_key_for(
+            World::MAP,
+            archive_resolves.then_some(archive.as_path()),
+            Some("maps/stubmap.smf"),
+        )
+        .expect("a key")
+    }
+
+    /// The same answer the worker gives, for a map keyed on its archive and for
+    /// the usual map keyed on its name.
+    #[test]
+    fn the_plugin_answers_a_cached_minimap_as_the_worker_does() {
+        for (tag, archive_resolves) in [("plugin-path", true), ("plugin-name", false)] {
+            let dir = temp_dir(tag);
+            let mut world = World::with_map(&dir.join("maps"));
+            if !archive_resolves {
+                world.archives.clear();
+            }
+            install(world);
+            let us = Unitsync::stub();
+            let cache = dir.join("cache");
+
+            let fresh = render_with(&us, World::MAP, 3, Some(&cache), None);
+            let worker_hit = render_with(&us, World::MAP, 3, Some(&cache), None);
+            let key = plugin_key(&cache, archive_resolves);
+            assert_eq!(key.starts_with('n'), !archive_resolves);
+            let plugin = cached::minimap(&cache, &key, 3).expect("a hit");
+
+            assert_eq!(json(&plugin), json(&worker_hit), "{tag}");
+            assert_eq!(json(&plugin), json(&fresh), "{tag}");
+            assert_eq!(plugin.start_positions.len(), 2);
+            let _ = std::fs::remove_dir_all(&dir);
+        }
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_changed_archive_to_a_worker() {
+        let (us, cache) = stub_session("plugin-changed");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let before = plugin_key(&cache, true);
+        assert!(cached::minimap(&cache, &before, 3).is_some());
+
+        let archive = cache
+            .parent()
+            .unwrap()
+            .join("maps")
+            .join(World::MAP_ARCHIVE);
+        std::fs::write(&archive, b"a map archive, now a different size").expect("rewrite");
+        let after = plugin_key(&cache, true);
+        assert_ne!(before, after);
+        assert!(cached::minimap(&cache, &after, 3).is_none());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_map_without_its_picture_or_detail_to_a_worker() {
+        let (us, cache) = stub_session("plugin-partial");
+        render_with(&us, World::MAP, 3, Some(&cache), None);
+        let key = plugin_key(&cache, true);
+        assert!(cached::minimap(&cache, &key, 2).is_none(), "another mip");
+
+        std::fs::remove_file(cached::detail_file(&cache, &key)).expect("remove detail");
+        assert!(cached::minimap(&cache, &key, 3).is_none());
         let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 

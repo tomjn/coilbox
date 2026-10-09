@@ -41,9 +41,9 @@ use image::{DynamicImage, ImageBuffer, Luma};
 use sha2::{Digest, Sha256};
 
 /// The one variant [`encode_height_picture`] produces, and the one
-/// [`encode_variant`] refuses. Spelled once so the row's `variant` and the class
-/// the bytes were encoded to cannot come apart.
-pub const HEIGHT_OVERLAY_VARIANT: &str = "overlay:height";
+/// [`encode_variant`] refuses. Defined in the library crate, because the height
+/// picture's cache file names are made from the class it names.
+pub use coilbox_unitsync_worker::cached::HEIGHT_OVERLAY_VARIANT;
 
 /// What the hub's `origin` column says about bytes read out of an archive as the
 /// archive stored them: every build pic and every map infomap layer.
