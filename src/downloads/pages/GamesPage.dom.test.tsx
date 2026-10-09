@@ -141,6 +141,45 @@ describe("the Games page's hub source", () => {
     expect(screen.getByText("via rapid")).toBeTruthy();
   });
 
+  it("offers no download for a hub game the hub lists no source for", async () => {
+    // An empty list, not a missing one: it is what the hub sends for a game it
+    // knows about and cannot point at, and an empty array is truthy.
+    fetchHubGames.mockResolvedValueOnce({
+      ok: true,
+      value: [
+        {
+          shortname: "byar",
+          title: "Beyond All Reason",
+          description: null,
+          featured: false,
+          downloads: [],
+          logo: null,
+          card: null,
+          faction_count: 2,
+          unit_count: 400,
+          item_count: 12,
+        },
+      ],
+    });
+
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+
+    await pickHubSource();
+
+    expect(
+      await screen.findByText("The hub lists no download for this game."),
+    ).toBeTruthy();
+    expect(screen.queryByText(/^via\s*$/)).toBeNull();
+    const button = screen.getByRole("button", {
+      name: "No download for Beyond All Reason",
+    }) as HTMLButtonElement;
+    expect(button.disabled).toBe(true);
+  });
+
   it("shows the hub's own reason when the catalog could not be read", async () => {
     fetchHubGames.mockResolvedValueOnce({
       ok: false,
