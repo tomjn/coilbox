@@ -1,13 +1,14 @@
-import {
-  dlDownloadFileRaw,
-  dlDownloadMapRaw,
-  dlEvolutionRtsMaps,
-  dlHakoraMaps,
-  dlSpringfilesList,
-} from "./bindings";
+import { dlDownloadFileRaw, dlDownloadMapRaw } from "./bindings";
 import { withDownloadNotify } from "./downloadNotify";
 import { norm } from "./gameRepos";
 import { type MapSource, mapSourceOrder } from "./mapSources";
+import {
+  findInIndex,
+  indexTick,
+  loadEvolutionRtsMaps,
+  loadHakoraMaps,
+  loadSpringfilesList,
+} from "./mirrorIndex";
 import { type ProgressSink, progressChannel } from "./progressChannel";
 
 const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -35,6 +36,10 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e));
  * game it belonged to. The price of removing it is that BAR-exclusive maps
  * carried by no other mirror can no longer be downloaded here at all.
  *
+ * The mirror indexes come from `mirrorIndex`, which holds each for the session.
+ * A map missing from a held index refetches it once, unless the held copy
+ * loaded after `askedAt`, when the download was asked for.
+ *
  * Progress arrives as a sink rather than a channel, because each attempt needs a
  * channel of its own: see `progressChannel` for what sharing one costs.
  */
@@ -44,8 +49,11 @@ async function downloadMapAnySourceImpl(opts: {
   /** Pass a stable id to make the active download cancellable via dlCancel. */
   opId?: string;
   onProgress: ProgressSink;
+  /** The `indexTick` when the download was asked for. Defaults to now. */
+  askedAt?: number;
 }): Promise<string> {
   const { mapName, writePath, opId, onProgress } = opts;
+  const askedAt = opts.askedAt ?? indexTick();
   const target = norm(mapName);
   const errors: string[] = [];
 
@@ -53,9 +61,13 @@ async function downloadMapAnySourceImpl(opts: {
     switch (source) {
       case "springfiles": {
         if (!writePath) return null;
-        const { results } = await dlSpringfilesList({ category: "map" });
-        const hit = results.find(
-          (f) => norm(f.springname) === target || norm(f.name) === target,
+        const hit = await findInIndex(
+          (refresh) => loadSpringfilesList("map", refresh),
+          ({ results }) =>
+            results.find(
+              (f) => norm(f.springname) === target || norm(f.name) === target,
+            ),
+          askedAt,
         );
         const url = hit?.mirrors?.[0];
         if (!hit || !url) return null;
@@ -70,8 +82,11 @@ async function downloadMapAnySourceImpl(opts: {
       }
       case "hakora": {
         if (!writePath) return null;
-        const { maps } = await dlHakoraMaps(undefined);
-        const hit = maps.find((m) => norm(m.filename) === target);
+        const hit = await findInIndex(
+          loadHakoraMaps,
+          ({ maps }) => maps.find((m) => norm(m.filename) === target),
+          askedAt,
+        );
         if (!hit) return null;
         await dlDownloadFileRaw({
           url: hit.url,
@@ -84,8 +99,11 @@ async function downloadMapAnySourceImpl(opts: {
       }
       case "evolutionrts": {
         if (!writePath) return null;
-        const { maps } = await dlEvolutionRtsMaps(undefined);
-        const hit = maps.find((m) => norm(m.filename) === target);
+        const hit = await findInIndex(
+          loadEvolutionRtsMaps,
+          ({ maps }) => maps.find((m) => norm(m.filename) === target),
+          askedAt,
+        );
         if (!hit) return null;
         await dlDownloadFileRaw({
           url: hit.url,

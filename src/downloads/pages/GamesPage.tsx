@@ -5,6 +5,7 @@ import {
   Download,
   Gamepad2,
   Loader2,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -21,7 +22,7 @@ import { useHubUrl } from "@/hub/config";
 import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
 import { installedContent } from "../../content/installedContent";
-import { dlGithubReleaseArchives, dlSpringfilesList } from "../bindings";
+import { dlGithubReleaseArchives } from "../bindings";
 import { useContentRootPaths, useWriteRoot } from "../config";
 import {
   identityOf,
@@ -29,6 +30,7 @@ import {
   useDownloadQueue,
 } from "../DownloadQueueProvider";
 import { GAME_REPOS, mergeGameRepos, repoForKey } from "../gameRepos";
+import { heldSpringfilesList, loadSpringfilesList } from "../mirrorIndex";
 import { QueueProgress } from "./components/ProgressBar";
 import { EmptyState, errMessage } from "./components/states";
 import { HIDE_INSTALLED_KEY } from "./hideInstalled";
@@ -147,10 +149,18 @@ export default function GamesPage() {
   );
 
   const load = useCallback(
-    async (src: Source) => {
-      setLoading(true);
+    async (src: Source, refresh = false) => {
       setError(null);
-      setGames(null);
+      // The springfiles list, when already held, is drawn at once with no
+      // loading state. Anything else clears the list and waits.
+      const heldList =
+        src === "springfiles" && !refresh
+          ? heldSpringfilesList("game")
+          : undefined;
+      if (!heldList) {
+        setLoading(true);
+        setGames(null);
+      }
       try {
         if (src === HUB_SOURCE) {
           const result = await fetchHubGames(hubUrl);
@@ -196,7 +206,8 @@ export default function GamesPage() {
             }),
           );
         } else {
-          const { results } = await dlSpringfilesList({ category: "game" });
+          const { results } =
+            heldList ?? (await loadSpringfilesList("game", refresh));
           setGames(
             results.map((g) => ({
               id: g.springname,
@@ -407,6 +418,19 @@ export default function GamesPage() {
                 : SORT_OPTIONS
             }
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load(source, true)}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh
+          </Button>
           <label
             htmlFor="games-hide-installed"
             className="flex items-center gap-2 text-sm text-muted-foreground"

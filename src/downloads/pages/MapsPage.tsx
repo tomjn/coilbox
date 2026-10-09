@@ -5,6 +5,7 @@ import {
   Download,
   Loader2,
   Map as MapIcon,
+  RefreshCw,
   Search,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,10 +20,7 @@ import { nextDrawerKey } from "../../general/drawerKey";
 import { useRecordHubImport } from "../../hub/imports";
 import { presetRoute } from "../../play/presets";
 import {
-  dlEvolutionRtsMaps,
   dlGithubReleaseArchives,
-  dlHakoraMaps,
-  dlSpringfilesList,
   type ReleaseArchive,
   type SpringFile,
 } from "../bindings";
@@ -33,6 +31,14 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../DownloadQueueProvider";
+import {
+  heldEvolutionRtsMaps,
+  heldHakoraMaps,
+  heldSpringfilesList,
+  loadEvolutionRtsMaps,
+  loadHakoraMaps,
+  loadSpringfilesList,
+} from "../mirrorIndex";
 import { parseApacheSize } from "../queueLanes";
 import { CachedThumb } from "./components/CachedThumb";
 import { MapPacksBanner } from "./components/MapPacksBanner";
@@ -179,13 +185,24 @@ export default function MapsPage() {
     if (importCode) void openPackImport(importCode);
   }, [importCode]);
 
-  const load = useCallback(async (src: Source) => {
-    setLoading(true);
+  const load = useCallback(async (src: Source, refresh = false) => {
     setError(null);
-    setItems(null);
+    // A list the mirror index already holds is drawn at once with no loading
+    // state. Anything else clears the list and waits.
+    const wait = async <T,>(
+      heldList: T | undefined,
+      read: () => Promise<T>,
+    ): Promise<T> => {
+      if (heldList && !refresh) return heldList;
+      setLoading(true);
+      setItems(null);
+      return read();
+    };
     try {
       if (src === "hakora") {
-        const { maps } = await dlHakoraMaps(undefined);
+        const { maps } = await wait(heldHakoraMaps(), () =>
+          loadHakoraMaps(refresh),
+        );
         setItems(
           maps.map((m) => ({
             springName: m.filename, // no springname on the mirror; filename is unique
@@ -197,7 +214,9 @@ export default function MapsPage() {
           })),
         );
       } else if (src === "evolutionrts") {
-        const { maps } = await dlEvolutionRtsMaps(undefined);
+        const { maps } = await wait(heldEvolutionRtsMaps(), () =>
+          loadEvolutionRtsMaps(refresh),
+        );
         setItems(
           maps.map((m) => ({
             springName: m.filename, // no springname on the mirror; filename is unique
@@ -209,6 +228,8 @@ export default function MapsPage() {
           })),
         );
       } else if (src in MAP_REPOS) {
+        setLoading(true);
+        setItems(null);
         const { archives } = await dlGithubReleaseArchives({
           repo: MAP_REPOS[src],
         });
@@ -223,7 +244,9 @@ export default function MapsPage() {
           })),
         );
       } else {
-        const { results } = await dlSpringfilesList({ category: "map" });
+        const { results } = await wait(heldSpringfilesList("map"), () =>
+          loadSpringfilesList("map", refresh),
+        );
         setItems(
           results.map((f) => ({
             springName: f.springname,
@@ -401,6 +424,19 @@ export default function MapsPage() {
             className="w-36"
             options={SORT_OPTIONS}
           />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => load(source, true)}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <RefreshCw className="size-4" />
+            )}
+            Refresh
+          </Button>
           <label
             htmlFor="maps-hide-installed"
             className="flex items-center gap-2 text-sm text-muted-foreground"

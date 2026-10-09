@@ -115,7 +115,11 @@ fn timed_client() -> Result<reqwest::Client, String> {
 
 /// Fetch a gzipped rapid index over HTTPS and inflate it to text.
 async fn fetch_gz(url: String) -> Result<String, String> {
-    let resp = reqwest::get(&url).await.map_err(|e| e.to_string())?;
+    let resp = timed_client()?
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     let mut decoder = flate2::read::GzDecoder::new(&bytes[..]);
@@ -553,10 +557,7 @@ async fn dl_download(
 /// Fetch a URL as text. springfiles/BAR serve plain (non-gzipped) JSON. The
 /// evolutionrts mirror answers 406 to a request with no `User-Agent`.
 async fn fetch_text(url: String) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("coilbox")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = timed_client()?;
     let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())
@@ -845,10 +846,7 @@ async fn dl_fetch_text(url: String) -> CliResult {
 
 /// GitHub's API rejects requests without a `User-Agent`; set one explicitly.
 async fn fetch_github(url: &str) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .user_agent("coilbox")
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = timed_client()?;
     let resp = client.get(url).send().await.map_err(|e| e.to_string())?;
     let resp = resp.error_for_status().map_err(|e| e.to_string())?;
     resp.text().await.map_err(|e| e.to_string())

@@ -33,6 +33,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 import { downloadMapAnySource } from "./downloadMap";
+import { indexTick, invalidateMirrorIndexes } from "./mirrorIndex";
 
 const run = (mapName: string) =>
   downloadMapAnySource({
@@ -42,6 +43,7 @@ const run = (mapName: string) =>
   });
 
 beforeEach(() => {
+  invalidateMirrorIndexes();
   vi.clearAllMocks();
   dlSpringfilesList.mockResolvedValue({ results: [] });
   dlHakoraMaps.mockResolvedValue({ maps: [] });
@@ -118,5 +120,58 @@ describe("downloadMapAnySource, no source has the map", () => {
     expect(String(err)).toContain("Nonexistent Map");
     expect(String(err)).toContain("no source could provide");
     expect(dlDownloadFileRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe("downloadMapAnySource, mirror index reuse (issue #3717)", () => {
+  const hakoraMap = (filename: string) => ({
+    filename,
+    url: `https://example.com/${filename}`,
+    size: "1M",
+  });
+
+  it("fetches the mirror index once for a pack of maps", async () => {
+    dlHakoraMaps.mockResolvedValue({
+      maps: ["a.sd7", "b.sd7", "c.sd7"].map(hakoraMap),
+    });
+    dlDownloadFileRaw.mockResolvedValue({ message: "ok", path: "" });
+
+    for (const name of ["a", "b", "c"]) {
+      await expect(run(name)).resolves.toBe("hakora");
+    }
+
+    expect(dlHakoraMaps).toHaveBeenCalledTimes(1);
+    expect(dlEvolutionRtsMaps).toHaveBeenCalledTimes(3);
+  });
+
+  it("refetches an index once for a map added since, then finds it", async () => {
+    // Held from an earlier download.
+    await expect(run("late")).rejects.toThrow();
+    dlHakoraMaps.mockClear();
+    dlHakoraMaps.mockResolvedValue({ maps: [hakoraMap("late.sd7")] });
+    dlDownloadFileRaw.mockResolvedValue({ message: "ok", path: "" });
+
+    await expect(run("late")).resolves.toBe("hakora");
+
+    expect(dlHakoraMaps).toHaveBeenCalledTimes(1);
+  });
+
+  it("refetches once for a pack of missing maps queued together", async () => {
+    await run("warm").catch(() => {});
+    dlHakoraMaps.mockClear();
+    dlSpringfilesList.mockClear();
+    const askedAt = indexTick();
+
+    for (const name of ["x", "y", "z"]) {
+      await downloadMapAnySource({
+        mapName: name,
+        writePath: "/data",
+        onProgress: () => {},
+        askedAt,
+      }).catch(() => {});
+    }
+
+    expect(dlHakoraMaps).toHaveBeenCalledTimes(1);
+    expect(dlSpringfilesList).toHaveBeenCalledTimes(1);
   });
 });
