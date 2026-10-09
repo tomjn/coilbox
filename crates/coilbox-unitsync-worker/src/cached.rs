@@ -367,6 +367,13 @@ pub struct CachedDims {
     pub height: u32,
 }
 
+/// The marker the worker leaves when it read a map cleanly and found no
+/// proportions: `<cache_dir>/<key>-dims.none`. Without it that map looks like one
+/// that has not been read yet, and would send every thumbnail call to a worker.
+pub fn dims_none_file(dir: &Path, key: &str) -> PathBuf {
+    dir.join(format!("{key}-dims.none"))
+}
+
 /// A map's proportions: `<cache_dir>/<key>-dims.json`. Unlike the PNG this is
 /// mip-independent, because proportions don't vary with mip level.
 pub fn dims_file(dir: &Path, key: &str) -> PathBuf {
@@ -657,21 +664,25 @@ pub fn thumbnails(dir: &Path, mip: i32, maps: &[MapRef]) -> Option<ThumbnailsOut
             map.archive_path.as_deref().map(Path::new),
             map.file_name.as_deref(),
         )?;
-        let dims: CachedDims =
-            serde_json::from_slice(&std::fs::read(dims_file(dir, &key)).ok()?).ok()?;
+        let dims: Option<CachedDims> = match std::fs::read(dims_file(dir, &key)) {
+            Ok(raw) => Some(serde_json::from_slice(&raw).ok()?),
+            Err(_) if dims_none_file(dir, &key).exists() => None,
+            Err(_) => return None,
+        };
         let picture = minimap_file(dir, &key, mip);
         if !picture_held(&picture) {
             return None;
         }
-        let (width_elmos, height_elmos) = dims_elmos(Some((dims.width, dims.height)));
+        let dims = dims.map(|d| (d.width, d.height));
+        let (width_elmos, height_elmos) = dims_elmos(dims);
         thumbnails.push(Thumbnail {
             name: map.name.clone(),
             file: picture
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned()),
             data_url: None,
-            width: Some(dims.width),
-            height: Some(dims.height),
+            width: dims.map(|(w, _)| w),
+            height: dims.map(|(_, h)| h),
             width_elmos,
             height_elmos,
         });
@@ -1120,6 +1131,21 @@ mod tests {
     }
 
     #[test]
+    fn a_picture_the_worker_found_no_proportions_for_is_still_an_answer() {
+        let dir = temp_dir("thumbs-no-dims-marker");
+        let maps = [named("Alpha 1.0", "maps/alpha.smf")];
+        leave_thumbnail(&dir, &maps[0], 3, None);
+        let key = thumb_key_for("Alpha 1.0", None, Some("maps/alpha.smf")).unwrap();
+        std::fs::write(dims_none_file(&dir, &key), b"").expect("marker");
+
+        let out = thumbnails(&dir, 3, &maps).expect("a hit");
+        let thumb = &out.thumbnails[0];
+        assert!(thumb.file.is_some());
+        assert_eq!((thumb.width, thumb.height), (None, None));
+        assert_eq!((thumb.width_elmos, thumb.height_elmos), (None, None));
+    }
+
+    #[test]
     fn an_empty_or_unkeyable_list_is_never_answered() {
         let dir = temp_dir("thumbs-edges");
         assert!(thumbnails(&dir, 3, &[]).is_none());
@@ -1185,6 +1211,16 @@ mod tests {
         assert_eq!(out.maps[1].name, "Beta 2.1");
         assert_eq!(out.maps[1].info["author"], "B");
         assert!(out.errors.is_empty());
+    }
+
+    #[test]
+    fn a_map_whose_metadata_read_empty_is_an_answer_when_the_worker_saved_it() {
+        let dir = temp_dir("meta-empty");
+        let maps = [named("Alpha 1.0", "maps/alpha.smf")];
+        // What the worker writes for a map that read cleanly and held nothing.
+        leave_meta(&dir, &maps[0], r#"{"name":"Alpha 1.0","info":{}}"#);
+        let out = map_metas(&dir, &maps).expect("a hit");
+        assert!(out.maps[0].info.is_empty());
     }
 
     #[test]
