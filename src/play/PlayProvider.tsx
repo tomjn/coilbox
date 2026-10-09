@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { refreshContentState } from "@/content/contentState";
 import { setMusicSuspended } from "@/sound/music";
 import { playEvent } from "@/sound/play";
 import {
@@ -128,6 +129,19 @@ export function usePlay(): PlayContextValue {
   return ctx;
 }
 
+/** Refresh the content state from disk and refuse an engine it no longer lists. */
+async function assertEngineInstalled(executable?: string): Promise<void> {
+  // A read that fails says nothing about the engine, so the launch goes ahead.
+  const state = await refreshContentState().catch(() => null);
+  if (!state || !executable) return;
+  const listed = state.roots.some((r) =>
+    r.engines.some((e) => e.executable === executable),
+  );
+  if (!listed) {
+    throw new Error(`The engine at ${executable} is no longer installed.`);
+  }
+}
+
 export function PlayProvider({ children }: { children: ReactNode }) {
   const [running, setRunning] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -177,6 +191,14 @@ export function PlayProvider({ children }: { children: ReactNode }) {
     ) => {
       if (runningRef.current) throw new Error("a game is already running");
       runningRef.current = true;
+      // The engine folder can be deleted while coilbox runs. Check the disk now
+      // rather than start a process that cannot exist.
+      try {
+        await assertEngineInstalled(ctx.engine);
+      } catch (e) {
+        runningRef.current = false;
+        throw e;
+      }
       const runId = crypto.randomUUID();
       activeRunIdRef.current = runId;
       const onEvent = new Channel<LaunchEvent>();

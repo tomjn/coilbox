@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { plugins } from "../app.plugins";
 import { campaignList } from "../campaign/bindings";
 import { parseCampaignJson } from "../campaign/model";
-import { contentBundleInspect, contentStateLoad } from "../content/bindings";
+import { contentBundleInspect } from "../content/bindings";
 import { useUnitsyncScan } from "../content/config";
+import { loadContentState } from "../content/contentState";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
 import { resolveHomeBackground } from "../home/background";
@@ -140,9 +141,7 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     (async () => {
       const portableRoot = getProfileRoot();
 
-      const state = await contentStateLoad(undefined)
-        .then((r) => r.state)
-        .catch(() => null);
+      const state = await loadContentState().catch(() => null);
       const roots = (state?.roots ?? []).map((r) => ({
         path: r.path,
         portable: r.portable,

@@ -14,6 +14,7 @@ import {
   primeScan,
   useScanTargetSelection,
 } from "../../config";
+import { setContentState } from "../../contentState";
 
 const msg = (e: unknown): string =>
   e instanceof Error ? e.message : String(e);
@@ -61,7 +62,9 @@ export function DeleteArchiveButton({
       invalidateScans();
       if (selected)
         primeScan(selected.enginePath, selected.rootPath, true).catch(() => {});
-      await contentRescan({ withCounts: true }).catch(() => {});
+      await contentRescan({ withCounts: true })
+        .then((r) => setContentState(r.state))
+        .catch(() => {});
       setOpen(false);
       onDeleted();
     } catch (e) {
