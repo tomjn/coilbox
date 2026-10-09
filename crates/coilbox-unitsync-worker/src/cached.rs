@@ -773,39 +773,77 @@ pub const TREE_VERSION: u32 = 1;
 /// Bump when [`CachedSkybox`] changes shape or the way a skybox is read changes.
 pub const SKYBOX_VERSION: u32 = 1;
 
-/// The archive file a record was read from, as it was when it was read.
+/// The archive a record was read from, as it was when it was read.
 ///
 /// A name keyed record cannot tell from its key that the archive behind the name
-/// was replaced, so the record carries the file it came from and the plugin
-/// stats that file itself. A record whose file has a different size or time, or
-/// is gone, is not an answer.
+/// was replaced, so the record carries the archive it came from and the plugin
+/// stats that archive itself. A record whose archive has changed, or is gone, is
+/// not an answer.
 ///
-/// A directory archive (`.sdd`) has no source. Its entry's modified time does not
-/// move when a file inside it is edited, so nothing here could tell its listing
-/// had gone stale, and a game or map being worked on is exactly that.
+/// A file archive is its size and modified time. A directory archive (`.sdd`) is
+/// walked, because its own modified time does not move when a file inside it is
+/// edited, and a game or map being worked on is exactly that. Its `size` is the
+/// bytes of every file in it, `entries` the number of files and folders, and
+/// `mtime` the latest modified time of any of them, folders included, so an
+/// edit, an addition, a removal and a rename each change one of the three. The
+/// walk does not follow links.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Source {
     pub path: String,
     pub size: u64,
     pub mtime: u64,
+    /// Files and folders in a directory archive. Zero for a file.
+    #[serde(default)]
+    pub entries: u64,
+}
+
+fn seconds(md: &std::fs::Metadata) -> u64 {
+    md.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs())
+}
+
+/// Add everything under `dir` to `source`, or `None` when something cannot be
+/// read, since a walk that missed part of the archive would hold for the wrong
+/// one.
+fn walk(dir: &Path, source: &mut Source) -> Option<()> {
+    for entry in std::fs::read_dir(dir).ok()? {
+        let entry = entry.ok()?;
+        let md = entry.metadata().ok()?;
+        source.entries += 1;
+        source.mtime = source.mtime.max(seconds(&md));
+        if md.is_dir() {
+            walk(&entry.path(), source)?;
+        } else {
+            source.size += md.len();
+        }
+    }
+    Some(())
 }
 
 impl Source {
-    /// The source of the archive file at `path`, or `None` for anything but a
-    /// regular file.
+    /// The source of the archive at `path`: a file, or a directory archive.
+    /// `None` for anything else, and for one that cannot be read.
     pub fn of(path: &Path) -> Option<Source> {
-        if !path.is_file() {
+        let md = std::fs::metadata(path).ok()?;
+        let mut source = Source {
+            path: path.to_string_lossy().into_owned(),
+            size: 0,
+            mtime: seconds(&md),
+            entries: 0,
+        };
+        if md.is_file() {
+            source.size = md.len();
+        } else if md.is_dir() {
+            walk(path, &mut source)?;
+        } else {
             return None;
         }
-        let stamp = ArchiveStamp::of(path)?;
-        Some(Source {
-            path: path.to_string_lossy().into_owned(),
-            size: stamp.size(),
-            mtime: stamp.mtime(),
-        })
+        Some(source)
     }
 
-    /// Whether the file is still the one the record was read from.
+    /// Whether the archive is still the one the record was read from.
     pub fn holds(&self) -> bool {
         Source::of(Path::new(&self.path)).is_some_and(|now| now == *self)
     }
@@ -1308,12 +1346,36 @@ mod tests {
     }
 
     #[test]
-    fn a_directory_archive_has_no_source() {
+    fn a_directory_archive_is_held_by_everything_inside_it() {
         let dir = temp_dir("source-dir");
         let sdd = dir.join("game.sdd");
-        std::fs::create_dir_all(&sdd).expect("dir");
-        assert!(Source::of(&sdd).is_none());
+        std::fs::create_dir_all(sdd.join("units")).expect("dir");
+        std::fs::write(sdd.join("modinfo.lua"), b"return {}").expect("file");
+        std::fs::write(sdd.join("units/a.lua"), b"a").expect("file");
+        let source = Source::of(&sdd).expect("a directory has a source");
+        assert!(source.holds());
         assert!(Source::of(&dir.join("missing.sdz")).is_none());
+
+        // A directory's own time does not move when a file deeper in it is
+        // edited, so the walk has to.
+        std::fs::write(sdd.join("units/a.lua"), b"edited, and longer").expect("edit");
+        assert!(!source.holds(), "an edited file is a different archive");
+    }
+
+    #[test]
+    fn a_file_added_to_or_removed_from_a_directory_archive_changes_its_source() {
+        let dir = temp_dir("source-dir-members");
+        let sdd = dir.join("game.sdd");
+        std::fs::create_dir_all(sdd.join("units")).expect("dir");
+        std::fs::write(sdd.join("units/a.lua"), b"a").expect("file");
+        let source = Source::of(&sdd).expect("a source");
+
+        std::fs::write(sdd.join("units/b.lua"), b"b").expect("add");
+        assert!(!source.holds());
+        let with_b = Source::of(&sdd).expect("a source");
+        assert!(with_b.holds());
+        std::fs::remove_file(sdd.join("units/b.lua")).expect("remove");
+        assert!(!with_b.holds());
     }
 
     #[test]
