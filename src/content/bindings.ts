@@ -2428,10 +2428,13 @@ export interface MinimapResult {
  * Render one map's minimap as a PNG data URL (lazy — a separate unitsync session
  * from the scan). `mip` selects resolution: `1024 >> mip` px per side (default 1).
  */
-export const unitsyncMinimap = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string; mip?: number },
-  MinimapResult
->("coilbox-unitsync", "unitsync_minimap");
+export const unitsyncMinimap = (args: MinimapArgs) =>
+  minimapCommand(withMapHint(args));
+type MinimapArgs = MapReadArgs & { mip?: number };
+const minimapCommand = defineCommand<MinimapArgs, MinimapResult>(
+  "coilbox-unitsync",
+  "unitsync_minimap",
+);
 
 export interface HeightmapResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Set whenever the
@@ -2467,10 +2470,12 @@ export interface HeightmapResult {
  * is where the preview mesh stops being able to show more, and it is the same
  * cap the hub's `overlay:height` asset is stored at.
  */
-export const unitsyncHeightmap = defineCommand<
-  { enginePath: string; dataDir: string; mapName: string },
-  HeightmapResult
->("coilbox-unitsync", "unitsync_heightmap");
+export const unitsyncHeightmap = (args: MapReadArgs) =>
+  heightmapCommand(withMapHint(args));
+const heightmapCommand = defineCommand<MapReadArgs, HeightmapResult>(
+  "coilbox-unitsync",
+  "unitsync_heightmap",
+);
 
 export interface HeightFieldResult {
   /** Cache file name, served over `coilbox://unitsyncthumb/`. Little endian

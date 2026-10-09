@@ -486,6 +486,15 @@ fn prepare(engine_path: &str) -> Result<(PathBuf, PathBuf, PathBuf), String> {
     Ok((bin, libpath, engine_dir))
 }
 
+/// The thumbnail cache key for a map, from what the content scan knows of it.
+fn thumb_key(
+    map_name: &str,
+    archive_path: Option<&str>,
+    file_name: Option<&str>,
+) -> Option<String> {
+    cached::thumb_key_for(map_name, archive_path.map(Path::new), file_name)
+}
+
 /// A read answered from the cache, or `None` when there is no answer there and a
 /// worker has to be asked (issue #3714). Dev builds log each one beside the
 /// worker runs, so a screen's cost can be counted from one log.
@@ -551,7 +560,22 @@ async fn unitsync_minimap<R: Runtime>(
     data_dir: String,
     map_name: String,
     mip: Option<i32>,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "minimap",
+        thumb_cache_dir(&app)
+            .zip(thumb_key(
+                &map_name,
+                archive_path.as_deref(),
+                file_name.as_deref(),
+            ))
+            .and_then(|(dir, key)| cached::minimap(&dir, &key, mip.unwrap_or(1)))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
@@ -579,7 +603,22 @@ async fn unitsync_heightmap<R: Runtime>(
     engine_path: String,
     data_dir: String,
     map_name: String,
+    archive_path: Option<String>,
+    file_name: Option<String>,
 ) -> CliResult {
+    if let Some(hit) = answered(
+        "heightmap",
+        thumb_cache_dir(&app)
+            .zip(thumb_key(
+                &map_name,
+                archive_path.as_deref(),
+                file_name.as_deref(),
+            ))
+            .and_then(|(dir, key)| cached::heightmap(&dir, &key))
+            .and_then(|out| serde_json::to_value(out).ok()),
+    ) {
+        return hit;
+    }
     let (bin, libpath, engine_dir) = match prepare(&engine_path) {
         Ok(v) => v,
         Err(e) => return CliResult::err(e),

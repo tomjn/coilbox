@@ -16,7 +16,9 @@ vi.mock("@picoframe/plugin-sdk", () => ({
 import {
   unitsyncFactionLogos,
   unitsyncGameInfo,
+  unitsyncHeightmap,
   unitsyncMapInfo,
+  unitsyncMinimap,
   unitsyncSkirmishAis,
   unitsyncUnitBuildpics,
   unitsyncUnitDataset,
@@ -90,6 +92,25 @@ describe("a cached read carries what the scan knows", () => {
       fileName: "maps/aetherian_void.smf",
     });
     expect(sent[0]?.args.archivePath).toBeUndefined();
+  });
+
+  it("sends a name keyed map's file name with its minimap and heightmap reads", async () => {
+    await unitsyncMinimap({ ...target, mapName: "Aetherian Void 1.7", mip: 0 });
+    await unitsyncHeightmap({ ...target, mapName: "Aetherian Void 1.7" });
+    expect(sent.map((s) => s.command)).toEqual([
+      "unitsync_minimap",
+      "unitsync_heightmap",
+    ]);
+    for (const call of sent) {
+      expect(call.args.fileName).toBe("maps/aetherian_void.smf");
+      expect(call.args.archivePath).toBeUndefined();
+    }
+    expect(sent[0]?.args.mip).toBe(0);
+  });
+
+  it("sends nothing extra for a map the scan did not list", async () => {
+    await unitsyncMinimap({ ...target, mapName: "Not Installed 1.0" });
+    expect(sent[0]?.args.fileName).toBeUndefined();
   });
 
   it("sends the game's archive path with a skirmish AI list for that game", async () => {
