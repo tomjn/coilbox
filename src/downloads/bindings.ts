@@ -93,6 +93,9 @@ export interface SpringFile {
   filename: string;
   category: string;
   size: number;
+  /** When the file was added, in the site's own time with no zone. Null on a
+   * few old rows. */
+  timestamp: string | null;
   mirrors: string[];
   /** Thumbnail/preview image URLs (may be empty, e.g. for games). */
   mapimages: string[];
@@ -172,6 +175,8 @@ export interface ReleaseArchive {
   url: string;
   size: number;
   tag: string;
+  /** When that release was published, or null when GitHub gave no date. */
+  publishedAt: string | null;
 }
 
 /** Content archives from an `owner/name` repo's recent GitHub releases, for the

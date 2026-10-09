@@ -62,6 +62,9 @@ pub struct SpringFile {
     /// Version string — populated for engines (e.g. `2025.01.6`), empty for maps.
     pub version: String,
     pub size: u64,
+    /// When the file was added, as springfiles writes it (`2026-09-14T14:09:53`,
+    /// no zone). `Option` because the site sends `null` for a few old rows.
+    pub timestamp: Option<String>,
     #[serde(deserialize_with = "de_string_vec")]
     pub mirrors: Vec<String>,
     /// Thumbnail/preview image URLs (present when queried with `images=on`).
@@ -266,6 +269,8 @@ pub struct GithubRelease {
     pub prerelease: bool,
     pub name: Option<String>,
     pub body: Option<String>,
+    /// When the release was published. `null` on a draft.
+    pub published_at: Option<String>,
     pub assets: Vec<GithubAsset>,
 }
 
@@ -358,6 +363,8 @@ pub struct ReleaseArchive {
     pub size: u64,
     /// The release tag the archive came from (shown as a subtitle).
     pub tag: String,
+    /// When that release was published, as GitHub writes it.
+    pub published_at: Option<String>,
 }
 
 /// Collect the `.sd7`/`.sdz` assets across `releases` (GitHub returns them newest
@@ -380,6 +387,7 @@ pub fn release_archives(releases: Vec<GithubRelease>) -> Vec<ReleaseArchive> {
                 url: a.browser_download_url,
                 size: a.size,
                 tag: rel.tag_name.clone(),
+                published_at: rel.published_at.clone(),
             });
         }
     }
@@ -448,6 +456,19 @@ mod tests {
         assert_eq!(v[0].springname, "Comet");
         assert_eq!(v[0].mirrors, vec!["http://m/comet.sd7"]);
         assert_eq!(v[0].mapimages.len(), 1);
+    }
+
+    #[test]
+    fn springfile_keeps_its_timestamp_and_tolerates_a_null_one() {
+        let json = r#"[
+            {"springname":"A","timestamp":"2026-09-14T14:09:53"},
+            {"springname":"B","timestamp":null},
+            {"springname":"C"}
+        ]"#;
+        let v: Vec<SpringFile> = serde_json::from_str(json).unwrap();
+        assert_eq!(v[0].timestamp.as_deref(), Some("2026-09-14T14:09:53"));
+        assert_eq!(v[1].timestamp, None);
+        assert_eq!(v[2].timestamp, None);
     }
 
     #[test]
@@ -651,11 +672,11 @@ mod tests {
         // Two releases, newest first. Non-archive assets are dropped; the archive
         // re-uploaded in both releases collapses to the newest copy.
         let json = r#"[
-            {"tag_name":"v2","prerelease":false,"assets":[
+            {"tag_name":"v2","prerelease":false,"published_at":"2026-10-09T16:18:56Z","assets":[
                 {"name":"game_v2.sdz","browser_download_url":"http://x/2","size":20},
                 {"name":"changelog.txt","browser_download_url":"http://x/c","size":1}
             ]},
-            {"tag_name":"v1","prerelease":true,"assets":[
+            {"tag_name":"v1","prerelease":true,"published_at":null,"assets":[
                 {"name":"game_v2.sdz","browser_download_url":"http://x/2old","size":19},
                 {"name":"game_v1.sd7","browser_download_url":"http://x/1","size":10}
             ]}
@@ -671,5 +692,8 @@ mod tests {
         // camelCase for the frontend.
         let out = serde_json::to_string(&archives[0]).unwrap();
         assert!(out.contains("\"url\":\"http://x/2\""));
+        // The publish date rides along, and a release with none says so.
+        assert!(out.contains("\"publishedAt\":\"2026-10-09T16:18:56Z\""));
+        assert_eq!(archives[1].published_at, None);
     }
 }
