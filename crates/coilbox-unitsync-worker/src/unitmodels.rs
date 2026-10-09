@@ -487,6 +487,74 @@ mod tests {
         );
     }
 
+    // ---- the plugin answers a cached batch itself (issue #3714)
+
+    fn archive_of(cache: &std::path::Path) -> std::path::PathBuf {
+        cache.parent().unwrap().join("games").join(World::GAME)
+    }
+
+    /// The records the worker wrote are the ones the plugin reads, from the
+    /// archive's path alone, and the answer is the one the worker gave.
+    #[test]
+    fn the_plugin_names_the_models_the_worker_wrote_without_a_worker() {
+        let (us, cache) = stub_session("plugin-hit");
+        let objects = vec!["ArmCom".to_string(), "armcom".to_string()];
+        let fresh = resolve(&us, World::GAME, &objects, &cache);
+        assert_eq!(fresh.models.len(), 2, "{:?}", fresh.skipped);
+
+        let answered =
+            coilbox_unitsync_worker::cached::unit_models(&cache, &archive_of(&cache), &objects)
+                .expect("a hit");
+        assert_eq!(
+            serde_json::to_value(&fresh).unwrap(),
+            serde_json::to_value(&answered).unwrap()
+        );
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_batch_with_an_unseen_unit_to_a_worker() {
+        let (us, cache) = stub_session("plugin-partial");
+        resolve(&us, World::GAME, &["armcom".to_string()], &cache);
+        let asked = vec!["armcom".to_string(), "corcom".to_string()];
+        assert!(
+            coilbox_unitsync_worker::cached::unit_models(&cache, &archive_of(&cache), &asked)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_changed_archive_to_a_worker() {
+        let (us, cache) = stub_session("plugin-changed");
+        let objects = vec!["armcom".to_string()];
+        resolve(&us, World::GAME, &objects, &cache);
+        let archive = archive_of(&cache);
+        assert!(coilbox_unitsync_worker::cached::unit_models(&cache, &archive, &objects).is_some());
+
+        std::fs::write(&archive, b"a game archive, now a different size").expect("rewrite");
+        assert!(coilbox_unitsync_worker::cached::unit_models(&cache, &archive, &objects).is_none());
+    }
+
+    #[test]
+    fn the_plugin_leaves_a_model_with_a_swept_texture_to_a_worker() {
+        let (us, cache) = stub_session("plugin-texture");
+        let objects = vec!["armcom".to_string()];
+        resolve(&us, World::GAME, &objects, &cache);
+        let texture = std::fs::read_dir(&cache)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .find(|p| p.to_string_lossy().ends_with(".png"))
+            .expect("the read stored a texture");
+        std::fs::remove_file(texture).unwrap();
+
+        assert!(coilbox_unitsync_worker::cached::unit_models(
+            &cache,
+            &archive_of(&cache),
+            &objects
+        )
+        .is_none());
+    }
+
     #[test]
     fn a_record_from_an_older_version_is_read_again() {
         let (us, cache) = stub_session("version");

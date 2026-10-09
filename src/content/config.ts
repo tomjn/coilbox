@@ -71,6 +71,7 @@ import { engineLabel, newestEngineId } from "./engineVersion";
 import { settleWithin, shareInFlight } from "./inFlight";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { readCachedModel } from "./modelFile";
+import { forgetScanHints, rememberScanHints } from "./scanHints";
 import { deriveSetup } from "./setup";
 import { unitIconDataUrl } from "./unitIcon";
 
@@ -368,6 +369,8 @@ export async function primeScan(
       // may have room.
       if (res.initFailure) throw new ScanInitFailure(res);
       scanCache.set(key, res);
+      // What a cached read of this library is looked up by (issue #3714).
+      rememberScanHints(dataDir, enginePath, res);
       // The one place every game modinfo this machine reads goes through, so it
       // is where the shortnames are picked up. They outlive the build they came
       // from, so an export pinned to a superseded build still knows its game's
@@ -383,7 +386,10 @@ export async function primeScan(
       // A rescan that failed leaves nothing to vouch for the answer before it,
       // so a page opened next must not be handed that answer. A cancel learned
       // nothing, so it keeps it (issue #3431).
-      if (!/cancelled/i.test(msg)) scanCache.delete(key);
+      if (!/cancelled/i.test(msg)) {
+        scanCache.delete(key);
+        forgetScanHints(dataDir, enginePath);
+      }
       throw e;
     } finally {
       inFlightScans.delete(key);
@@ -419,6 +425,7 @@ export function invalidateScans(): void {
   const keys = new Set([...scanCache.keys(), ...scanErrorCache.keys()]);
   scanCache.clear();
   scanErrorCache.clear();
+  forgetScanHints();
   for (const key of keys) bumpScanEpoch(key);
 }
 

@@ -14,6 +14,11 @@ vi.mock("@picoframe/plugin-sdk", () => ({
   onSidecarProgress: () => () => {},
 }));
 vi.mock("../content/bindings", () => ({ unitsyncMinimap: vi.fn() }));
+// A scan is what a minimap read waits for. The rest of the module stays real.
+vi.mock("../content/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../content/config")>()),
+  currentScan: vi.fn(async () => ({})),
+}));
 // The lobby store the resume collector reads attaches window listeners at module
 // top level, and the node environment has no window. Same stubs as
 // `continue.test.ts`, for the same reason.
@@ -29,6 +34,7 @@ import type {
   ProgressFile,
 } from "../campaign/model";
 import { unitsyncMinimap } from "../content/bindings";
+import { currentScan } from "../content/config";
 import { resolveCardArt } from "./art";
 import {
   assignPicks,
@@ -1182,6 +1188,31 @@ describe("resolvePicks", () => {
     minimap.mockReset();
     resetResolvedMinimaps();
     resetContentArt();
+  });
+
+  it("waits for the scan before asking for a minimap", async () => {
+    let finishScan: () => void = () => {};
+    vi.mocked(currentScan).mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishScan = () => resolve({} as never);
+      }),
+    );
+    minimap.mockResolvedValue({
+      file: "n1-3.png",
+      startPositions: [],
+      errors: [],
+    });
+    const pending = resolvePicks(
+      mapPicks([["play.skirmish", "Valles Marineris 2.6.1"]]),
+      "/engine",
+      "/root",
+      new Map(),
+    );
+    await Promise.resolve();
+    expect(minimap).not.toHaveBeenCalled();
+    finishScan();
+    await pending;
+    expect(minimap).toHaveBeenCalledTimes(1);
   });
 
   it("turns a cached render into a coilbox:// URL the protocol can parse", async () => {

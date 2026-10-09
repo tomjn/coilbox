@@ -13,72 +13,31 @@
 //! `INFO_CACHE_VERSION` when the cached struct shape changes.
 
 use crate::ffi::Unitsync;
+use coilbox_unitsync_worker::cachekey::{self, ArchiveStamp, INFO_CACHE_VERSION};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 
-/// Bump when the cached `GameInfoOutput` / `MapInfoOutput` / `UnitDatasetOutput`
-/// shape *or* the way its contents are produced changes, so stale entries from an
-/// older build are ignored. v4: game info gained the Lua-shim unit fallback. v5:
-/// the unit dataset gained the per-unit `mobile` flag. v6: the unit dataset
-/// gained the per-unit `objectName`. v7: unit lists no longer come back through
-/// unitsync's 100,000 byte string buffer, so a big game's cached list of one
-/// bogus unit has to be re-read. v8: the def-script shim now supplies
-/// `Game.mapName`, so a game whose cached list is empty because its defs raised
-/// on the missing field has to be re-read. v9: the unit dataset gained each
-/// unit's footprint. v10: the unit dataset gained each unit's `maxSlope` and
-/// whether it floats, which is what decides if a building will stand on a piece
-/// of ground. v11: the unit dataset gained each unit's `minWaterDepth`,
-/// `maxWaterDepth` and `waterline`, which is the other half of the same
-/// question. v12: the unit dataset gained each unit's declared stats, so a
-/// cached blob from before them would leave a game's whole encyclopedia blank
-/// with nothing to say why. v13: a game that names its units in a localisation
-/// file rather than in its unitdefs is now read (#1925), and a blob cached
-/// before that holds def keys where Beyond All Reason's unit names should be.
-/// v14: a read that failed outright used to be cached as though it were the
-/// answer (#1927), and an install that hit one has a blob saying the game is
-/// empty. Nothing but this bump gets rid of it, because the key is otherwise
-/// the archive's own identity and that has not changed. v15: the unit dataset
-/// gained each unit's morph targets (#2063), and a game already scanned would
-/// otherwise report no morphs for ever, since the cache is keyed on file
-/// identity and knows nothing about a shim change. v16: the unit-defs read
-/// gained the game's `language/en/units.json` names and descriptions (#2650),
-/// which a game scanned under v15 has no entry for at all. v17: that read now
-/// covers every `language/<code>/units.json` the game ships and is keyed by
-/// language code (#2672), so a v16 blob holds the old one-locale shape, which
-/// deserialises as no translations at all rather than as English. v18: a unit
-/// whose def hands its name lookup to another unit is now read under that
-/// unit's key (#2686), so a blob cached under v17 holds `armcomcon` where
-/// Armada Commander belongs. The payload's shape is unchanged, its contents are
-/// not, and the key is otherwise the archive's own identity. v19: the game info
-/// read now names its units out of the game's localisation file too, not just
-/// the unit dataset (#2690), so a Beyond All Reason blob cached under either v17
-/// or v18 holds a unit list with no names and four sides whose start units are
-/// def keys. v20: the unit dataset now reads every numbered build option rather
-/// than stopping at the first gap in the numbering, so a Tech Annihilation blob
-/// cached under v19 holds builders with most of their menu missing. v21: the
-/// unit-defs read now says what the game's post files changed (#3054), and a
-/// blob cached under v20 has no answer, so every copy made from it would go on
-/// taking the post-processed values. v22: the unit-defs read now carries the
-/// game's armour classes from `gamedata/armordefs.lua` (#2645), and a blob
-/// cached under v21 has none, which reads as a game with no armour classes at
-/// all rather than as a field that was never asked for.
-const INFO_CACHE_VERSION: u32 = 22;
+/// The stamp of an archive unitsync knows by file name: where `GetArchivePath`
+/// says it lives, statted. `None` when the name does not resolve or the file is
+/// gone, which disables caching for it.
+pub(crate) fn archive_stamp(us: &Unitsync, archive: &str) -> Option<ArchiveStamp> {
+    let dir = us.archive_path(archive)?;
+    ArchiveStamp::of(&Path::new(&dir).join(archive))
+}
 
 /// Cache identity for a game's info blob: its primary archive's path + size +
 /// mtime. `None` (archive doesn't resolve or stat fails) disables caching.
 pub fn game_key(us: &Unitsync, game_archive: &str) -> Option<String> {
-    let dir = us.archive_path(game_archive)?;
-    identity(&Path::new(&dir).join(game_archive), "game")
+    Some(cachekey::game_key(&archive_stamp(us, game_archive)?))
 }
 
 /// Cache identity for a game's reusable unit-dataset blob: its primary archive's
 /// path + size + mtime, in the `unitdataset` namespace (distinct from `game`, so
 /// the dataset and game-info blobs for the same archive never collide).
 pub fn dataset_key(us: &Unitsync, game_archive: &str) -> Option<String> {
-    let dir = us.archive_path(game_archive)?;
-    identity(&Path::new(&dir).join(game_archive), "unitdataset")
+    Some(cachekey::dataset_key(&archive_stamp(us, game_archive)?))
 }
 
 /// Cache identity for a game's full unit definitions: the game's sync checksum,
@@ -128,40 +87,38 @@ fn checksum_key(game_archive: &str, checksum: &str, kind: &str, prefix: char) ->
 /// `GetArchivePath` looks up file names ("acidicquarry_5.17.sd7"), so without it
 /// this returns `None` for most maps and the cache never engages.
 pub fn map_key(us: &Unitsync, map_name: &str) -> Option<String> {
-    map_identity(us, map_name, "map")
+    map_identity(us, map_name, cachekey::map_info_key)
 }
 
 /// Cache identity for a map's `mapinfo` metadata blob, in the `mapmeta` namespace
 /// so it never collides with the `map` options blob for the same archive.
 pub fn map_meta_key(us: &Unitsync, map_name: &str) -> Option<String> {
-    map_identity(us, map_name, "mapmeta")
+    map_identity(us, map_name, cachekey::map_meta_key)
+}
+
+/// The stamp of a map's own archive, where its path resolves.
+pub(crate) fn map_archive_stamp(us: &Unitsync, map_name: &str) -> Option<ArchiveStamp> {
+    let archive = us.map_archives(map_name).into_iter().next()?;
+    archive_stamp(us, &archive)
+}
+
+/// The map file inside a map's archive, which the name based key is made from.
+pub(crate) fn map_file_name(us: &Unitsync, map_name: &str) -> Option<String> {
+    us.map_file_name(crate::minimap::map_index(us, map_name)?)
 }
 
 /// Shared map identity: archive file identity where the path resolves, otherwise
-/// the versioned name.
-fn map_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
-    us.map_archives(map_name)
-        .into_iter()
-        .next()
-        .and_then(|archive| {
-            let dir = us.archive_path(&archive)?;
-            identity(&Path::new(&dir).join(&archive), kind)
-        })
-        .or_else(|| name_identity(us, map_name, kind))
-}
-
-/// Cache identity from the map's versioned name plus the map file inside its
-/// archive. Costs no stat and no hash of the archive itself. A new release of a
-/// map carries a new versioned name, so the key changes with it.
-fn name_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
-    let index = crate::minimap::map_index(us, map_name)?;
-    let file = us.map_file_name(index)?;
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    INFO_CACHE_VERSION.hash(&mut h);
-    kind.hash(&mut h);
-    map_name.hash(&mut h);
-    file.hash(&mut h);
-    Some(format!("n{:016x}", h.finish()))
+/// the versioned name. The map file's name is only looked up when the archive
+/// does not resolve, because finding it walks the map list.
+fn map_identity(
+    us: &Unitsync,
+    map_name: &str,
+    key: fn(Option<&ArchiveStamp>, &str, Option<&str>) -> Option<String>,
+) -> Option<String> {
+    match map_archive_stamp(us, map_name) {
+        Some(stamp) => key(Some(&stamp), map_name, None),
+        None => key(None, map_name, map_file_name(us, map_name).as_deref()),
+    }
 }
 
 /// Cache identity for a skirmish AI list: the engine library's file identity,
@@ -170,20 +127,12 @@ fn name_identity(us: &Unitsync, map_name: &str, kind: &str) -> Option<String> {
 /// game. `None` when the game is named but its archive will not resolve, so a
 /// list read against the wrong archive is never remembered.
 pub fn skirmish_key(us: &Unitsync, lib: &Path, game_archive: Option<&str>) -> Option<String> {
-    let engine = identity(lib, "skirmishai-engine")?;
+    let engine = ArchiveStamp::of(lib)?;
     let game = match game_archive.filter(|g| !g.is_empty()) {
-        Some(g) => {
-            let dir = us.archive_path(g)?;
-            identity(&Path::new(&dir).join(g), "skirmishai-game")?
-        }
-        None => String::new(),
+        Some(g) => Some(archive_stamp(us, g)?),
+        None => None,
     };
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    INFO_CACHE_VERSION.hash(&mut h);
-    "skirmishai".hash(&mut h);
-    engine.hash(&mut h);
-    game.hash(&mut h);
-    Some(format!("a{:016x}", h.finish()))
+    Some(cachekey::skirmish_key(&engine, game.as_ref()))
 }
 
 /// Cache identity for the sha256 of a map archive's own bytes, which is what the
@@ -194,26 +143,7 @@ pub fn skirmish_key(us: &Unitsync, lib: &Path, game_archive: Option<&str>) -> Op
 /// gigabytes on a full collection, and the answer only moves when the file does,
 /// so a sweep that finds nothing changed should cost no reads at all.
 pub fn archive_hash_key(path: &Path) -> Option<String> {
-    identity(path, "maphash")
-}
-
-/// Hash a resolved archive path's file identity into a stable cache key. `kind`
-/// separates the game and map namespaces so an archive can't collide across them.
-fn identity(path: &Path, kind: &str) -> Option<String> {
-    let md = std::fs::metadata(path).ok()?;
-    let mtime = md
-        .modified()
-        .ok()
-        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let mut h = std::collections::hash_map::DefaultHasher::new();
-    INFO_CACHE_VERSION.hash(&mut h);
-    kind.hash(&mut h);
-    path.hash(&mut h);
-    md.len().hash(&mut h);
-    mtime.hash(&mut h);
-    Some(format!("{:016x}", h.finish()))
+    Some(cachekey::archive_hash_key(&ArchiveStamp::of(path)?))
 }
 
 /// Read and deserialize a cached blob, or `None` on miss / parse error.
@@ -260,9 +190,10 @@ mod tests {
         let path = dir.join("shared.sdz");
         std::fs::write(&path, b"archive").expect("write archive");
 
-        let game = identity(&path, "game").expect("game key");
-        let map = identity(&path, "map").expect("map key");
-        let dataset = identity(&path, "unitdataset").expect("dataset key");
+        let stamp = ArchiveStamp::of(&path).expect("a stamp");
+        let game = cachekey::game_key(&stamp);
+        let map = cachekey::map_info_key(Some(&stamp), "m", None).expect("map key");
+        let dataset = cachekey::dataset_key(&stamp);
         assert_ne!(game, map);
         assert_ne!(game, dataset);
         assert_ne!(map, dataset);
@@ -297,9 +228,155 @@ mod tests {
         );
     }
 
+    fn temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-infocache-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    /// Issue #3714: the plugin finds an entry the worker wrote, through the stub
+    /// library for the worker's side and through only the archive's path for the
+    /// plugin's. These are the entries already on every machine, written by the
+    /// code that is now in `write`.
+    #[test]
+    fn a_game_entry_the_worker_wrote_is_found_from_the_archive_path() {
+        use crate::ffi::stub::{install, World};
+        use crate::model::{GameInfoOutput, UnitDatasetOutput};
+
+        let dir = temp_dir("game-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let info = GameInfoOutput {
+            checksum: Some("0123abcd".into()),
+            unit_count: 7,
+            ..Default::default()
+        };
+        write(&cache, &game_key(&us, World::GAME).expect("a key"), &info);
+        let dataset = UnitDatasetOutput {
+            checksum: Some("0123abcd".into()),
+            ..Default::default()
+        };
+        write(
+            &cache,
+            &dataset_key(&us, World::GAME).expect("a key"),
+            &dataset,
+        );
+
+        let archive = content.join(World::GAME);
+        assert_eq!(
+            coilbox_unitsync_worker::cached::game_info(&cache, &archive),
+            Some(serde_json::to_value(&info).unwrap())
+        );
+        assert_eq!(
+            coilbox_unitsync_worker::cached::unit_dataset(&cache, &archive),
+            Some(serde_json::to_value(&dataset).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The case the real library is almost entirely made of: a map whose archive
+    /// path does not resolve, so the worker keys it on its name and file.
+    #[test]
+    fn a_name_keyed_map_entry_the_worker_wrote_is_found_from_the_scans_names() {
+        use crate::ffi::stub::{install, World};
+
+        let dir = temp_dir("map-entry");
+        let cache = dir.join("cache");
+        let mut world = World::with_map(&dir.join("content"));
+        world.archives.clear();
+        install(world);
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let out = MapInfoOutput {
+            checksum: Some("cafe0001".into()),
+            ..Default::default()
+        };
+        let key = map_key(&us, World::MAP).expect("a key");
+        assert!(key.starts_with('n'), "{key} is not a name based key");
+        write(&cache, &key, &out);
+
+        assert_eq!(
+            coilbox_unitsync_worker::cached::map_info(
+                &cache,
+                World::MAP,
+                None,
+                Some("maps/stubmap.smf")
+            ),
+            Some(serde_json::to_value(&out).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_path_keyed_map_entry_the_worker_wrote_is_found_from_the_archive_path() {
+        use crate::ffi::stub::{install, World};
+
+        let dir = temp_dir("map-path-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_map(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+
+        let out = MapInfoOutput {
+            checksum: Some("cafe0002".into()),
+            ..Default::default()
+        };
+        let key = map_key(&us, World::MAP).expect("a key");
+        assert!(!key.starts_with('n'), "{key} is a name based key");
+        write(&cache, &key, &out);
+
+        let archive = content.join(World::MAP_ARCHIVE);
+        assert_eq!(
+            coilbox_unitsync_worker::cached::map_info(
+                &cache,
+                World::MAP,
+                Some(&archive),
+                Some("maps/stubmap.smf")
+            ),
+            Some(serde_json::to_value(&out).unwrap())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_skirmish_entry_the_worker_wrote_is_found_from_the_engine_and_game_paths() {
+        use crate::ffi::stub::{install, World};
+        use crate::model::SkirmishAiOutput;
+
+        let dir = temp_dir("skirmish-entry");
+        let content = dir.join("content");
+        let cache = dir.join("cache");
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+        us.init(false, 0);
+        let lib = content.join("libunitsync.so");
+        std::fs::write(&lib, b"an engine").expect("lib");
+
+        let out = SkirmishAiOutput::default();
+        write(
+            &cache,
+            &skirmish_key(&us, &lib, Some(World::GAME)).expect("a key"),
+            &out,
+        );
+        write(&cache, &skirmish_key(&us, &lib, None).expect("a key"), &out);
+
+        let game = content.join(World::GAME);
+        assert!(coilbox_unitsync_worker::cached::skirmish_ais(&cache, &lib, Some(&game)).is_some());
+        assert!(coilbox_unitsync_worker::cached::skirmish_ais(&cache, &lib, None).is_some());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn a_missing_archive_has_no_identity() {
         let missing = std::env::temp_dir().join("coilbox-infocache-does-not-exist.sdz");
-        assert!(identity(&missing, "map").is_none());
+        assert!(archive_hash_key(&missing).is_none());
     }
 }
