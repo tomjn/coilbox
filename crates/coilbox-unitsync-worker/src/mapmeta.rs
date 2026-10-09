@@ -49,7 +49,7 @@ fn read_all_in(us: &Unitsync, cache_dir: Option<&Path>) -> MapMetaOutput {
         let Some(name) = us.map_name(i) else {
             continue;
         };
-        let key = infocache::map_meta_key(&us, &name);
+        let key = infocache::map_meta_key(us, &name);
         let cached = cache_dir
             .zip(key.as_deref())
             .and_then(|(dir, key)| infocache::read::<MapMeta>(dir, key));
