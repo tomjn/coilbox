@@ -88,6 +88,12 @@ function unavailableRenders(message: string): Record<string, AngleRender> {
  * still draws every angle fresh each visit rather than persisting them, and
  * says so nowhere on screen because a missing shortname is not something a
  * player did wrong.
+ *
+ * `gameName` is the name the game declares for itself (`GameItem.name`), which
+ * is what a render is recorded against as its source archive. It is not
+ * `gameArchive`, the file name: asking the cache with the file name matches no
+ * record, so every visit drew all four angles again. Left out, the cache read
+ * checks the renderer version alone.
  */
 export function useUnitRenders(
   enginePath?: string,
@@ -99,6 +105,7 @@ export function useUnitRenders(
   footprintX?: number,
   footprintZ?: number,
   model?: UnitModelResult | null,
+  gameName?: string,
 ): Record<string, AngleRender> {
   const [renders, setRenders] = useState<Record<string, AngleRender>>(
     initialRenders(),
@@ -141,7 +148,7 @@ export function useUnitRenders(
               renderVariant(angle),
               RENDER_VERSION,
               [unitId],
-              gameArchive,
+              gameName,
             );
             return { angle, render: held.get(unitId) };
           }),
@@ -161,7 +168,15 @@ export function useUnitRenders(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, gameShortname, unitId, object]);
+  }, [
+    enginePath,
+    dataDir,
+    gameArchive,
+    gameName,
+    gameShortname,
+    unitId,
+    object,
+  ]);
 
   // Step 2: draw whatever the cache did not have, once the cache read has had
   // its say and the model (already loading for the hero above) has arrived.
