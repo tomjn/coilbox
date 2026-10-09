@@ -189,6 +189,10 @@ export default function MapDetailPage() {
   // true shape and `object-fill` stretches the square source back into it).
   const ratio = map.width && map.height ? map.width / map.height : 1;
 
+  // While the full minimap renders, show the list's thumbnail in the same box.
+  const previewUrl =
+    minimap.url ?? (minimap.loading ? thumbs.get(decoded)?.url : undefined);
+
   // Resolve the map's backing archive to its on-disk path and hand it to mapconv
   // decompile. The scan reports map archives by a versioned display name (no path),
   // so ask the archive-tree command — it turns that name into the real `.sd7`/
@@ -360,11 +364,11 @@ export default function MapDetailPage() {
         </div>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
           <div className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
-            {minimap.loading ? (
+            {minimap.loading && !previewUrl ? (
               <div className="flex size-64 max-w-full items-center justify-center">
                 <Skeleton className="size-32 rounded bg-muted" />
               </div>
-            ) : minimap.url ? (
+            ) : previewUrl ? (
               // Give the box a definite width derived from the 32rem height cap
               // (`width = ratio * 32rem` ⇒ `height = 32rem`), capped by `max-w-sm`
               // for wide maps (then `max-w` binds and the height shrinks instead —
@@ -380,7 +384,7 @@ export default function MapDetailPage() {
                 }}
               >
                 <img
-                  src={minimap.url}
+                  src={previewUrl}
                   alt={`Minimap of ${map.name}`}
                   className={`absolute inset-0 size-full object-fill${
                     overlay.overlayUrl ? " brightness-[0.55]" : ""

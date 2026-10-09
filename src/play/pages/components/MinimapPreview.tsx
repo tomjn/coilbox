@@ -18,6 +18,7 @@ const MAX_HEIGHT_CLASSES =
  */
 export function MinimapPreview({
   url,
+  thumbUrl,
   width,
   height,
   startPositions,
@@ -31,6 +32,8 @@ export function MinimapPreview({
   dim,
 }: {
   url?: string | null;
+  /** The list's small picture, drawn in the same box while `url` is loading. */
+  thumbUrl?: string | null;
   width?: number;
   height?: number;
   startPositions: StartPos[];
@@ -75,72 +78,74 @@ export function MinimapPreview({
   // which we stretch back to the true proportions). Loading/empty states show a
   // square placeholder so the card doesn't collapse.
   const base = `relative flex w-full items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card ${MAX_HEIGHT_CLASSES}`;
-  const body = loading ? (
-    <div
-      role="status"
-      aria-label="Loading minimap"
-      className="flex aspect-square w-full items-center justify-center"
-    >
-      <Loader2
-        className="size-8 animate-spin text-muted-foreground motion-reduce:animate-none"
-        aria-hidden
-      />
-    </div>
-  ) : url ? (
-    // Bound the size to the responsive max-height (`--mmh`) while preserving the
-    // aspect ratio: width = min(100%, ratio * maxHeight), height derived. This caps
-    // height without a height-clamp that would distort the (stretched) image.
-    <div
-      className="relative"
-      style={{
-        aspectRatio: `${ratio}`,
-        width: `min(100%, calc(${ratio} * var(--mmh)))`,
-      }}
-    >
-      <img
-        src={url}
-        alt={alt}
-        className={`absolute inset-0 size-full object-fill${
-          dim ? " brightness-[0.55]" : ""
-        }`}
-      />
-      {markers.map((m, i) => {
-        const claimed = m.color != null;
-        return (
-          <span
-            key={m.key}
-            className={`absolute flex size-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[9px] font-bold shadow ${
-              claimed
-                ? "border-2 border-black/60 text-black"
-                : "border-2 border-dashed border-white/80 bg-black/45 text-white"
-            }`}
-            style={{
-              left: `${m.left}%`,
-              top: `${m.top}%`,
-              ...(claimed ? { background: m.color } : {}),
-            }}
-            title={
-              claimed
-                ? `Start position ${i + 1}`
-                : `Start position ${i + 1} (unclaimed)`
-            }
-          >
-            {i + 1}
-          </span>
-        );
-      })}
-      {children}
-    </div>
-  ) : placeholder ? (
-    <div className="flex aspect-square w-full items-center justify-center p-3">
-      {placeholder}
-    </div>
-  ) : (
-    <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 text-muted-foreground">
-      <ImageOff className="size-6" />
-      <span className="text-xs">No minimap</span>
-    </div>
-  );
+  const shownUrl = url ?? (loading ? thumbUrl : null);
+  const body =
+    loading && !shownUrl ? (
+      <div
+        role="status"
+        aria-label="Loading minimap"
+        className="flex aspect-square w-full items-center justify-center"
+      >
+        <Loader2
+          className="size-8 animate-spin text-muted-foreground motion-reduce:animate-none"
+          aria-hidden
+        />
+      </div>
+    ) : shownUrl ? (
+      // Bound the size to the responsive max-height (`--mmh`) while preserving the
+      // aspect ratio: width = min(100%, ratio * maxHeight), height derived. This caps
+      // height without a height-clamp that would distort the (stretched) image.
+      <div
+        className="relative"
+        style={{
+          aspectRatio: `${ratio}`,
+          width: `min(100%, calc(${ratio} * var(--mmh)))`,
+        }}
+      >
+        <img
+          src={shownUrl}
+          alt={alt}
+          className={`absolute inset-0 size-full object-fill${
+            dim ? " brightness-[0.55]" : ""
+          }`}
+        />
+        {markers.map((m, i) => {
+          const claimed = m.color != null;
+          return (
+            <span
+              key={m.key}
+              className={`absolute flex size-4 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full text-[9px] font-bold shadow ${
+                claimed
+                  ? "border-2 border-black/60 text-black"
+                  : "border-2 border-dashed border-white/80 bg-black/45 text-white"
+              }`}
+              style={{
+                left: `${m.left}%`,
+                top: `${m.top}%`,
+                ...(claimed ? { background: m.color } : {}),
+              }}
+              title={
+                claimed
+                  ? `Start position ${i + 1}`
+                  : `Start position ${i + 1} (unclaimed)`
+              }
+            >
+              {i + 1}
+            </span>
+          );
+        })}
+        {children}
+      </div>
+    ) : placeholder ? (
+      <div className="flex aspect-square w-full items-center justify-center p-3">
+        {placeholder}
+      </div>
+    ) : (
+      <div className="flex aspect-square w-full flex-col items-center justify-center gap-1 text-muted-foreground">
+        <ImageOff className="size-6" />
+        <span className="text-xs">No minimap</span>
+      </div>
+    );
 
   // A shown placeholder — or an interactive overlay — owns its own controls, so the
   // box mustn't also be a button.
