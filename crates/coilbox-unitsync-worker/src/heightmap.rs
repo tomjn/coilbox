@@ -29,9 +29,7 @@ use crate::assetencode::{encode_height_picture, HeightWindow};
 use crate::ffi::Unitsync;
 use crate::minimap::{map_cache_key, rendered_image, sweep_pictures, RenderedImage, WEBP_MIME};
 use crate::model::{HeightmapOutput, MapOverlayAsset, MapOverlaySkip};
-use coilbox_unitsync_worker::cached::{
-    self, picture_edge, read_meta, CachedMeta, CachedWindow, META_VERSION,
-};
+use coilbox_unitsync_worker::cached::{self, read_meta, CachedMeta, CachedWindow, META_VERSION};
 use std::path::{Path, PathBuf};
 
 /// The samples as the bytes the map file holds: little endian `u16`, row major.
@@ -534,7 +532,7 @@ mod tests {
     fn names_the_cached_picture_after_the_edge_it_was_capped_at() {
         let file = cache_file(Some(Path::new("/cache")), Some("abc")).expect("cache file");
         assert_eq!(file, PathBuf::from(format!("/cache/abc-h{}.webp", 512)));
-        assert_eq!(picture_edge(), 512);
+        assert_eq!(cached::picture_edge(), 512);
     }
 
     #[test]
