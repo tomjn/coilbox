@@ -9,12 +9,15 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router";
+import { GameIcon } from "@/components/GameIcon";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useGithubGameRepos } from "@/content/branding";
+import { useScanTargetSelection, useUnitsyncScan } from "@/content/config";
 import { fetchHubGames, type HubGameDownload } from "@/hub/api";
 import { useHubUrl } from "@/hub/config";
+import { hubGameIconName } from "@/hub/gameIcons";
 import { hubGameDownloadRequest } from "@/hub/games/download";
 import {
   dlGithubReleaseArchives,
@@ -99,6 +102,13 @@ export default function GamesPage() {
     [catalogRepos],
   );
   const hubUrl = useHubUrl();
+  // The installed games, which a hub row's icon is named from.
+  const { selected: scanTarget } = useScanTargetSelection();
+  const { data: scan } = useUnitsyncScan(
+    scanTarget?.enginePath,
+    scanTarget?.rootPath,
+  );
+  const scannedGames = scan?.games ?? null;
   const [source, setSource] = useState<Source>("springfiles");
   const [games, setGames] = useState<GameItem[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -416,19 +426,24 @@ export default function GamesPage() {
               return (
                 <li key={g.id} className="flex flex-col gap-2 px-6 py-2.5">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{g.name}</p>
-                      {noSource ? (
-                        <p className="truncate text-xs text-muted-foreground">
-                          The hub lists no download for this game.
-                        </p>
-                      ) : (
-                        <p className="truncate font-mono text-xs text-muted-foreground">
-                          {g.downloads
-                            ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
-                            : g.filename}
-                        </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      {g.downloads && (
+                        <GameIcon name={hubGameIconName(g.id, scannedGames)} />
                       )}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{g.name}</p>
+                        {noSource ? (
+                          <p className="truncate text-xs text-muted-foreground">
+                            The hub lists no download for this game.
+                          </p>
+                        ) : (
+                          <p className="truncate font-mono text-xs text-muted-foreground">
+                            {g.downloads
+                              ? `via ${g.downloads.map((d) => d.kind).join(" → ")}`
+                              : g.filename}
+                          </p>
+                        )}
+                      </div>
                     </div>
                     <Button
                       variant="outline"

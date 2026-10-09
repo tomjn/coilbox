@@ -21,6 +21,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { resetHubGames } from "@/hub/gameIcons";
 import { DownloadQueueProvider } from "../DownloadQueueProvider";
 import GamesPage from "./GamesPage";
 
@@ -47,7 +48,35 @@ vi.mock("../config", () => ({
 }));
 
 vi.mock("@/hub/api", () => ({ fetchHubGames }));
-vi.mock("@/hub/config", () => ({ useHubUrl: () => "https://hub.example" }));
+vi.mock("@/hub/config", () => ({
+  useHubUrl: () => "https://hub.example",
+  useTrustedHubUrl: () => "https://hub.example",
+}));
+vi.mock("@/hub/assets/tier", () => ({
+  assetCdnBase: () => "https://assets.example/coilbox-assets/",
+}));
+
+// A hub row draws a `GameIcon`, which reads the content scan and the cached
+// art. One game is installed, so a row can be either kind.
+const SCAN = vi.hoisted(() => ({
+  target: { selected: { enginePath: "/e", rootPath: "/r" } },
+  scan: {
+    data: {
+      games: [
+        {
+          name: "Splinter Faction 0.1.86",
+          info: { shortname: "sf", version: "0.1.86" },
+        },
+      ],
+    },
+  },
+  headers: { headers: new Map() },
+}));
+vi.mock("@/content/config", () => ({
+  useScanTargetSelection: () => SCAN.target,
+  useUnitsyncScan: () => SCAN.scan,
+  useUnitsyncGameHeaders: () => SCAN.headers,
+}));
 
 // A stable empty array, not a fresh `[]` per call: the real hook (a plain
 // `useState`) only ever changes identity when the catalog load resolves, and
@@ -57,6 +86,12 @@ vi.mock("@/hub/config", () => ({ useHubUrl: () => "https://hub.example" }));
 const NO_REPOS = vi.hoisted(() => [] as never[]);
 vi.mock("@/content/branding", () => ({
   useGithubGameRepos: () => NO_REPOS,
+  resolveBranding: () => null,
+  useBrandingCatalog: () => NO_REPOS,
+  useBrandingImage: () => undefined,
+  // The cache hands back a local file for any address it is given.
+  useCachedImage: (urls?: string[]) =>
+    urls?.length ? `cache://${urls[0]}` : undefined,
 }));
 
 vi.mock("@/components/OptionSelect", () => ({
@@ -96,6 +131,11 @@ beforeEach(() => {
   (
     globalThis as unknown as { window: Record<string, unknown> }
   ).window.__TAURI_INTERNALS__ = { transformCallback: (cb: unknown) => cb };
+  // The icons read the hub's list a second time, through a cache that outlives
+  // a test. Left unanswered, that read finds no pictures.
+  resetHubGames();
+  fetchHubGames.mockReset();
+  fetchHubGames.mockResolvedValue({ ok: false, reason: "down" });
 });
 
 afterEach(() => {
@@ -178,6 +218,89 @@ describe("the Games page's hub source", () => {
       name: "No download for Beyond All Reason",
     }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+  });
+
+  it("gives every hub row an icon box of one size, holding a picture or a placeholder", async () => {
+    const logo = (shortname: string) =>
+      `https://assets.example/coilbox-assets/games/${shortname}/logo.png`;
+    const game = (shortname: string, title: string, hasLogo: boolean) => ({
+      shortname,
+      title,
+      description: null,
+      featured: false,
+      downloads: [{ kind: "rapid", value: `${shortname}:stable` }],
+      logo: hasLogo ? logo(shortname) : null,
+      card: null,
+      faction_count: 2,
+      unit_count: 400,
+      item_count: 12,
+    });
+    // Answers both reads: the page's list and the icons' own.
+    fetchHubGames.mockResolvedValue({
+      ok: true,
+      value: [
+        game("SF", "Splinter Faction", true),
+        game("ZK", "Zero-K", true),
+        game("byar", "Beyond All Reason", false),
+      ],
+    });
+
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+    await pickHubSource();
+    await screen.findByText("Zero-K");
+
+    const iconFor = (title: string) =>
+      screen
+        .getByText(title)
+        .closest("li")
+        ?.querySelector('[data-testid="game-icon"]') as HTMLElement;
+    // Installed, with a hub logo.
+    await waitFor(() =>
+      expect(
+        iconFor("Splinter Faction").querySelector("img")?.getAttribute("src"),
+      ).toBe(`cache://${logo("SF")}`),
+    );
+    // Not installed, so only its shortname can find the hub's entry.
+    expect(iconFor("Zero-K").querySelector("img")?.getAttribute("src")).toBe(
+      `cache://${logo("ZK")}`,
+    );
+    // No picture anywhere.
+    expect(iconFor("Beyond All Reason").dataset.state).toBe("placeholder");
+
+    const boxes = screen.getAllByTestId("game-icon");
+    expect(boxes).toHaveLength(3);
+    for (const box of boxes) {
+      expect(box.style.width).toBe(box.style.height);
+      expect(box.style.width).toBe(boxes[0].style.width);
+    }
+  });
+
+  it("draws no icon on a source that is not the hub", async () => {
+    const { dlSpringfilesList } = await import("../bindings");
+    vi.mocked(dlSpringfilesList).mockResolvedValueOnce({
+      results: [
+        {
+          springname: "Some Game 1.0",
+          name: "Some Game",
+          filename: "some_game.sdz",
+          size: 10,
+          mirrors: ["https://springfiles.example/some_game.sdz"],
+        },
+      ],
+    } as never);
+
+    render(
+      <DownloadQueueProvider>
+        <GamesPage />
+      </DownloadQueueProvider>,
+    );
+
+    expect(await screen.findByText("Some Game")).toBeTruthy();
+    expect(screen.queryByTestId("game-icon")).toBeNull();
   });
 
   it("shows the hub's own reason when the catalog could not be read", async () => {

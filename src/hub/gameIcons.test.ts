@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { GameItem } from "@/content/bindings";
+import { gameIconArt } from "@/content/gameIcon";
 import type { HubGame } from "./api";
-import { hubIconUrl, matchHubGame } from "./gameIcons";
+import { hubGameIconName, hubIconUrl, matchHubGame } from "./gameIcons";
 
 const HUB = "https://hub.example";
 const CDN = "https://assets.example/coilbox-assets/";
@@ -157,5 +158,28 @@ describe("matchHubGame", () => {
 
   it("is undefined while the list is not loaded", () => {
     expect(matchHubGame(null, "Splinter Faction", INSTALLED)).toBeUndefined();
+  });
+});
+
+describe("hubGameIconName", () => {
+  it("names an installed game by its title, and still finds its hub entry", () => {
+    const name = hubGameIconName("SF", INSTALLED);
+    expect(name).toBe("Splinter Faction");
+    expect(matchHubGame(GAMES, name, INSTALLED)?.shortname).toBe("SF");
+    // The title is what reaches the game's own art. The shortname does not.
+    expect(gameIconArt(name, INSTALLED, []).headerGame).toBe(
+      "Splinter Faction 0.1.86",
+    );
+    expect(gameIconArt("SF", INSTALLED, []).headerGame).toBeUndefined();
+  });
+
+  it("names a game that is not installed by its shortname", () => {
+    const name = hubGameIconName("ZK", INSTALLED);
+    expect(name).toBe("ZK");
+    expect(matchHubGame(GAMES, name, INSTALLED)?.shortname).toBe("ZK");
+  });
+
+  it("falls back to the shortname while the scan has no answer", () => {
+    expect(hubGameIconName("SF", null)).toBe("SF");
   });
 });
