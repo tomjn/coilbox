@@ -135,3 +135,17 @@ export function gameRefs(
 ): GameRef[] | undefined {
   return hints.get(targetKey(dataDir, enginePath))?.gameRefs;
 }
+
+/**
+ * Whether the last scan of this target lists the map, or `undefined` when the
+ * target has not been scanned and so nothing is known. A map the scan does not
+ * list is not installed, so there is no minimap to ask a worker for.
+ */
+export function mapInScan(
+  dataDir: string,
+  enginePath: string,
+  mapName: string,
+): boolean | undefined {
+  const target = hints.get(targetKey(dataDir, enginePath));
+  return target === undefined ? undefined : target.maps.has(mapName);
+}

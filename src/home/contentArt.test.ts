@@ -35,6 +35,7 @@ import type {
 } from "../campaign/model";
 import { unitsyncMinimap } from "../content/bindings";
 import { currentScan } from "../content/config";
+import { forgetScanHints, rememberScanHints } from "../content/scanHints";
 import { resolveCardArt } from "./art";
 import {
   assignPicks,
@@ -1188,6 +1189,40 @@ describe("resolvePicks", () => {
     minimap.mockReset();
     resetResolvedMinimaps();
     resetContentArt();
+  });
+
+  it("starts no worker for a map the scan does not list", async () => {
+    rememberScanHints("/root", "/engine", {
+      maps: [
+        {
+          name: "Installed Map 1.0",
+          archives: [],
+          info: {},
+          fileName: "a.smf",
+        },
+      ],
+      games: [],
+      errors: [],
+    });
+    minimap.mockResolvedValue({
+      file: "n1-3.png",
+      startPositions: [],
+      errors: [],
+    });
+    const resolved = await resolvePicks(
+      mapPicks([
+        ["play.skirmish", "Missing Map 2.0"],
+        ["play.conquest", "Installed Map 1.0"],
+      ]),
+      "/engine",
+      "/root",
+      new Map(),
+    );
+    expect(minimap).toHaveBeenCalledTimes(1);
+    expect(minimap.mock.calls[0][0].mapName).toBe("Installed Map 1.0");
+    expect(resolved.has("play.skirmish")).toBe(false);
+    expect(resolved.has("play.conquest")).toBe(true);
+    forgetScanHints();
   });
 
   it("waits for the scan before asking for a minimap", async () => {

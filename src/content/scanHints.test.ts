@@ -5,6 +5,7 @@ import {
   gameArchivePath,
   gameRefs,
   mapHint,
+  mapInScan,
   mapRefs,
   rememberScanHints,
 } from "./scanHints";
@@ -196,5 +197,17 @@ describe("the lists of every map and game", () => {
     forgetScanHints("/data", "/engine");
     expect(mapRefs("/data", "/engine")).toBeUndefined();
     expect(gameRefs("/data", "/engine")).toBeUndefined();
+  });
+});
+
+describe("mapInScan", () => {
+  it("says nothing for a target that was never scanned", () => {
+    expect(mapInScan("/data", "/engine", "Aetherian Void 1.7")).toBeUndefined();
+  });
+
+  it("says whether the scan lists the map", () => {
+    rememberScanHints("/data", "/engine", scan());
+    expect(mapInScan("/data", "/engine", "Aetherian Void 1.7")).toBe(true);
+    expect(mapInScan("/data", "/engine", "Nope")).toBe(false);
   });
 });
