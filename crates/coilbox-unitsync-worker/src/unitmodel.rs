@@ -18,6 +18,7 @@
 
 use crate::ffi::Unitsync;
 use crate::model::{ModelGroup, ModelPiece, ModelTexture, UnitModelOutput};
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -250,8 +251,30 @@ pub fn render(
             }
         }
     };
+    render_with(&us, game_archive, object_name, cache_dir)
+}
+
+/// [`render`] against a library that is already loaded, which is the seam the
+/// tests use to count what a hit asks unitsync for.
+pub(crate) fn render_with(
+    us: &Unitsync,
+    game_archive: &str,
+    object_name: &str,
+    cache_dir: Option<&Path>,
+) -> UnitModelOutput {
     us.init(false, 0);
     let mut errors = us.drain_errors();
+
+    // The key needs the archive's path and nothing mounted, so a model already
+    // written under it is the whole answer (issue #3724).
+    let key_base = cache_key_base(us, game_archive, cache_dir);
+    if let Some(out) = cache_dir
+        .zip(key_base.as_deref())
+        .and_then(|(dir, base)| read_cached_model(dir, base, object_name))
+    {
+        us.uninit();
+        return out;
+    }
 
     if !us.add_all_archives(game_archive) {
         errors.push("this engine's libunitsync can't load game archives".into());
@@ -263,7 +286,7 @@ pub fn render(
     }
     errors.extend(us.drain_errors());
 
-    let handle = crate::archive::resolve_open_path(&us, game_archive)
+    let handle = crate::archive::resolve_open_path(us, game_archive)
         .as_deref()
         .and_then(|p| us.open_archive(p));
     let Some(handle) = handle else {
@@ -282,13 +305,12 @@ pub fn render(
         .map(|(path, _)| (path.to_lowercase(), path))
         .collect();
 
-    let teamtex = read_teamtex(&us, handle, &list);
-    let palette = read_palette(&us);
-    let key_base = cache_key_base(&us, game_archive, cache_dir);
+    let teamtex = read_teamtex(us, handle, &list);
+    let palette = read_palette(us);
     let cache = cache_dir.zip(key_base.as_deref());
-    let fallbacks = fallback_archives(&us, game_archive);
+    let fallbacks = fallback_archives(us, game_archive);
     let mut out = read_model(
-        &us,
+        us,
         handle,
         &list,
         &teamtex,
@@ -300,13 +322,24 @@ pub fn render(
     );
 
     for archive in fallbacks {
-        archive.close(&us);
+        archive.close(us);
     }
     us.close_archive(handle);
     errors.extend(us.drain_errors());
     us.remove_all_archives();
     us.uninit();
 
+    // Stored before the session's errors go on, which describe this mount and
+    // not the model.
+    if let Some((dir, base)) = cache {
+        let _ = crate::unitmodels::write_model(
+            dir,
+            base,
+            object_name,
+            &out,
+            &mut std::collections::BTreeSet::new(),
+        );
+    }
     out.errors.splice(0..0, errors);
     out
 }
@@ -1248,6 +1281,106 @@ fn resolve_texture(
     if std::fs::write(&dest, payload.as_deref().unwrap_or(&bytes)).is_ok() {
         tex.file = file;
     }
+}
+
+/// Bump when [`ModelEntry`] changes shape, so a record from an older build is
+/// read again instead of returning an old answer.
+const ENTRY_VERSION: u32 = 1;
+
+/// What a unit's model came to, stored under the game's cache key (issue
+/// #3724).
+///
+/// The model is written as JSON named after the archive member it came from, and
+/// that name is only known once the archive is open. This is the lookup from the
+/// unit's `objectname` to it, so a second read finds the file without mounting
+/// anything. It also lists the texture files the model names, because a model
+/// whose texture was swept away would draw bare, and a hit checks they are all
+/// still there.
+///
+/// Named `.entry` beside the files it describes, under the same
+/// `v<CACHE_VERSION>-<key>_` prefix, so the startup sweep that removes a dead
+/// key (`modelcache.rs`) removes these with it.
+#[derive(Serialize, Deserialize)]
+pub(crate) struct ModelEntry {
+    version: u32,
+    /// The `objectname` this answers, trimmed and lower case. Two names that
+    /// sanitise to one file name are told apart by it.
+    object: String,
+    pub(crate) file: String,
+    pub(crate) path: String,
+    pub(crate) format: String,
+    textures: Vec<String>,
+}
+
+fn entry_object(object: &str) -> String {
+    object.trim().to_lowercase()
+}
+
+fn entry_file(base: &str, object: &str) -> String {
+    cache_file_name(base, &format!("entry/{}", entry_object(object)), "entry")
+}
+
+/// The stored entry for `object`, if every file it names is still on disk.
+pub(crate) fn read_entry(cache_dir: &Path, base: &str, object: &str) -> Option<ModelEntry> {
+    let raw = std::fs::read(cache_dir.join(entry_file(base, object))).ok()?;
+    let entry: ModelEntry = serde_json::from_slice(&raw).ok()?;
+    let held = entry.version == ENTRY_VERSION
+        && entry.object == entry_object(object)
+        && std::iter::once(&entry.file)
+            .chain(&entry.textures)
+            .all(|file| cache_dir.join(file).is_file());
+    held.then_some(entry)
+}
+
+/// Record where `model` was written, so [`read_entry`] finds it. Skipped for a
+/// model that did not read, and for one with a texture that resolved to a member
+/// but failed to reach the cache dir: either is a read worth trying again, not
+/// an answer.
+pub(crate) fn write_entry(
+    cache_dir: &Path,
+    base: &str,
+    object: &str,
+    model: &UnitModelOutput,
+    file: &str,
+) {
+    let textures = model.textures.iter().chain(model.texture2.iter());
+    if model.root.is_none()
+        || textures
+            .clone()
+            .any(|t| !t.source.is_empty() && t.file.is_empty())
+    {
+        return;
+    }
+    let entry = ModelEntry {
+        version: ENTRY_VERSION,
+        object: entry_object(object),
+        file: file.to_string(),
+        path: model.path.clone(),
+        format: model.format.clone(),
+        textures: textures
+            .filter(|t| !t.file.is_empty())
+            .map(|t| t.file.clone())
+            .collect(),
+    };
+    let Ok(json) = serde_json::to_vec(&entry) else {
+        return;
+    };
+    let name = entry_file(base, object);
+    let tmp = cache_dir.join(format!("{name}.{}.tmp", std::process::id()));
+    let written = std::fs::create_dir_all(cache_dir)
+        .and_then(|()| std::fs::write(&tmp, json))
+        .and_then(|()| std::fs::rename(&tmp, cache_dir.join(&name)));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
+/// A model read back whole, as [`render`] would have returned it. `None` when
+/// there is no entry, a file is missing, or the JSON does not parse as a model.
+fn read_cached_model(cache_dir: &Path, base: &str, object: &str) -> Option<UnitModelOutput> {
+    let entry = read_entry(cache_dir, base, object)?;
+    let raw = std::fs::read(cache_dir.join(entry.file)).ok()?;
+    serde_json::from_slice(&raw).ok()
 }
 
 /// Re-encode a texture the webview cannot decode, or `None` to write the bytes
@@ -2213,5 +2346,94 @@ mod tests {
 
         assert_eq!(out.textures.len(), 1);
         assert_eq!(out.root.expect("root").groups.len(), 1);
+    }
+
+    // ---- a cached model mounts nothing (issue #3724)
+
+    use crate::ffi::stub::{calls, install, World};
+
+    fn stub_session(tag: &str) -> (Unitsync, std::path::PathBuf) {
+        let dir = std::env::temp_dir().join(format!(
+            "coilbox-unitmodel-test-{}-{tag}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        install(World::with_game(&dir.join("games")));
+        (Unitsync::stub(), dir.join("cache"))
+    }
+
+    fn files_ending(dir: &std::path::Path, suffix: &str) -> Vec<std::path::PathBuf> {
+        std::fs::read_dir(dir)
+            .expect("cache dir")
+            .filter_map(|e| e.ok())
+            .map(|e| e.path())
+            .filter(|p| p.to_string_lossy().ends_with(suffix))
+            .collect()
+    }
+
+    #[test]
+    fn a_cached_model_does_not_mount_the_game() {
+        let (us, cache) = stub_session("hit");
+        let fresh = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert!(fresh.root.is_some(), "{:?}", fresh.errors);
+        assert_eq!(calls("AddAllArchives"), 1, "a miss mounts the game");
+        assert_eq!(calls("OpenArchive"), 1);
+
+        let cached = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 1, "a hit mounted the game");
+        assert_eq!(calls("OpenArchive"), 1, "a hit opened the archive");
+        assert_eq!(
+            serde_json::to_value(&fresh).unwrap(),
+            serde_json::to_value(&cached).unwrap()
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_changed_archive_is_read_again() {
+        let (us, cache) = stub_session("changed");
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let archive = cache.parent().unwrap().join("games").join(World::GAME);
+        std::fs::write(&archive, b"a game archive, now a different size").expect("rewrite");
+
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(
+            calls("AddAllArchives"),
+            2,
+            "a changed archive was served from cache"
+        );
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    #[test]
+    fn a_record_from_an_older_version_is_read_again() {
+        let (us, cache) = stub_session("version");
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let records = files_ending(&cache, ".entry");
+        assert_eq!(records.len(), 1, "the first read stored a record");
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(&records[0]).unwrap()).unwrap();
+        value["version"] = serde_json::json!(0);
+        std::fs::write(&records[0], value.to_string()).unwrap();
+
+        render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 2, "an old record was served");
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
+    }
+
+    /// The model names a texture file, so a hit whose texture was swept away
+    /// would draw a model with a missing skin and nothing to say why.
+    #[test]
+    fn a_model_whose_texture_file_is_gone_is_read_again() {
+        let (us, cache) = stub_session("texture");
+        let fresh = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        let texture = &fresh.textures[0].file;
+        assert!(!texture.is_empty());
+        std::fs::remove_file(cache.join(texture)).expect("drop the texture");
+
+        let again = render_with(&us, World::GAME, "ArmCom", Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 2, "served a model with no texture");
+        assert!(cache.join(&again.textures[0].file).is_file());
+        let _ = std::fs::remove_dir_all(cache.parent().unwrap());
     }
 }
