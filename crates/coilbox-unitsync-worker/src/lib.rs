@@ -29,7 +29,12 @@
 //! (135 commits since May 2026 says a sweeping rewrite is not this crate's
 //! style).
 
+pub mod beforepost;
 pub mod cachekey;
+/// The shapes the worker prints and the cache files hold. Declared here and not in
+/// the binary so the plugin can read a cached answer without starting a worker
+/// (issue #3714).
+pub mod model;
 
 /// One worker invocation, for whichever modes have migrated onto this shared
 /// contract. `to_args` matches on the variant, so adding a mode is one new

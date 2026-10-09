@@ -65,31 +65,7 @@ type ReadFileFn = unsafe extern "C" fn(c_int, c_int, *mut u8, c_int) -> c_int; /
 type FindFilesVfsFn = unsafe extern "C" fn(c_int, *mut c_char, c_int) -> c_int; // FindFilesVFS(idx, buf, size)
 type ReadVfsFileFn = unsafe extern "C" fn(c_int, *mut u8, c_int) -> c_int; // ReadFileVFS(file, buf, numBytes)
 
-/// A map's visual appearance, parsed from `mapinfo.lua` (see [`Unitsync::map_appearance`]).
-/// Colours are `[r, g, b]` in 0..1. Any field the map omits is `None`.
-#[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
-pub struct MapAppearance {
-    pub void_water: Option<bool>,
-    pub void_ground: Option<bool>,
-    pub void_alpha_min: Option<f32>,
-    pub water_color: Option<[f32; 3]>,
-    pub water_alpha: Option<f32>,
-    pub water_plane_color: Option<[f32; 3]>,
-    pub water_absorb: Option<[f32; 3]>,
-    pub water_base_color: Option<[f32; 3]>,
-    pub water_min_color: Option<[f32; 3]>,
-    pub force_rendering: Option<bool>,
-    pub sky_color: Option<[f32; 3]>,
-    pub fog_color: Option<[f32; 3]>,
-    pub cloud_color: Option<[f32; 3]>,
-    pub cloud_density: Option<f32>,
-    pub sun_dir: Option<[f32; 3]>,
-    pub sun_color: Option<[f32; 3]>,
-    pub ground_ambient_color: Option<[f32; 3]>,
-    pub ground_diffuse_color: Option<[f32; 3]>,
-    pub ground_specular_color: Option<[f32; 3]>,
-    pub ground_shadow_density: Option<f32>,
-}
+pub use coilbox_unitsync_worker::model::MapAppearance;
 
 /// The raw four-field read-back from a REPL wrapper script (see
 /// [`Unitsync::run_lua_repl`] and [`crate::lua::wrap_chunks`]). Each field is

@@ -15,7 +15,6 @@
 
 mod archive;
 mod assetencode;
-mod beforepost;
 mod buildpic;
 mod config;
 mod convert3do;
@@ -35,7 +34,6 @@ mod mapmeta;
 mod metalmap;
 mod metalspots;
 mod minimap;
-mod model;
 mod pcx;
 mod renderkey;
 mod seed;
@@ -50,6 +48,7 @@ mod unitrender;
 mod unitscriptfile;
 
 use coilbox_unitsync_worker::Mode;
+use coilbox_unitsync_worker::{beforepost, model};
 use ffi::Unitsync;
 use model::{Archive, ConfigOption, GameItem, MapItem, OptionListItem, ScanOutput};
 use std::collections::HashSet;
