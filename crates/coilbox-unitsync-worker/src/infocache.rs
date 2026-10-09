@@ -96,6 +96,23 @@ pub fn map_meta_key(us: &Unitsync, map_name: &str) -> Option<String> {
     map_identity(us, map_name, cachekey::map_meta_key)
 }
 
+/// Cache identity for a map's skybox record (issue #3736), the map identity in
+/// the `mapskybox` namespace.
+pub fn map_skybox_key(us: &Unitsync, map_name: &str) -> Option<String> {
+    map_identity(us, map_name, cachekey::map_skybox_key)
+}
+
+/// Cache identity for an archive's member tree (issue #3736). A game's archive
+/// resolves and is keyed on its stamp. A map listed by its versioned name does
+/// not, and is keyed on that name and its map file's name, as every other map
+/// record is.
+pub fn archive_tree_key(us: &Unitsync, archive: &str) -> Option<String> {
+    match archive_stamp(us, archive) {
+        Some(stamp) => cachekey::archive_tree_key(Some(&stamp), archive, None),
+        None => map_identity(us, archive, cachekey::archive_tree_key),
+    }
+}
+
 /// The stamp of a map's own archive, where its path resolves.
 pub(crate) fn map_archive_stamp(us: &Unitsync, map_name: &str) -> Option<ArchiveStamp> {
     let archive = us.map_archives(map_name).into_iter().next()?;

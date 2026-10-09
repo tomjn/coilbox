@@ -713,17 +713,25 @@ impl MapInfoArgs {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MapSkyboxArgs {
     pub map: String,
+    /// Where the answer is saved, so the next read of the map needs no worker
+    /// (issue #3736).
+    pub cache_dir: Option<String>,
 }
 
 impl MapSkyboxArgs {
-    /// Build the flags for `--map-skybox` mode: the map to read and the flag
-    /// itself.
+    /// Build the flags for `--map-skybox` mode: the map to read, the flag
+    /// itself, and the optional on-disk info-blob cache directory.
     pub fn to_args(&self) -> Vec<String> {
-        vec![
+        let mut args = vec![
             "--map-skybox".to_string(),
             "--map".to_string(),
             self.map.clone(),
-        ]
+        ];
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
+        args
     }
 
     /// Recover a `--map-skybox` invocation from a worker argv. As with the
@@ -734,16 +742,19 @@ impl MapSkyboxArgs {
     /// `--map` is required: there is nothing to read without one.
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut map = None;
+        let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
-            if a == "--map" {
-                map = it.next().cloned();
+            match a.as_str() {
+                "--map" => map = it.next().cloned(),
+                "--cache-dir" => cache_dir = it.next().cloned(),
+                _ => {}
             }
         }
         let Some(map) = map else {
             return Err("--map-skybox needs --map <name>".into());
         };
-        Ok(MapSkyboxArgs { map })
+        Ok(MapSkyboxArgs { map, cache_dir })
     }
 }
 
@@ -1735,6 +1746,9 @@ pub struct ArchiveArgs {
     pub file: Option<String>,
     pub extract: Option<String>,
     pub raw: bool,
+    /// Where a tree listing is saved, so the next listing of the archive needs
+    /// no worker (issue #3736). A preview or an extract does not use it.
+    pub cache_dir: Option<String>,
 }
 
 impl ArchiveArgs {
@@ -1753,6 +1767,10 @@ impl ArchiveArgs {
         if self.raw {
             args.push("--raw".to_string());
         }
+        if let Some(dir) = &self.cache_dir {
+            args.push("--cache-dir".to_string());
+            args.push(dir.clone());
+        }
         args
     }
 
@@ -1765,6 +1783,7 @@ impl ArchiveArgs {
         let mut file = None;
         let mut extract = None;
         let mut raw = false;
+        let mut cache_dir = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
@@ -1772,6 +1791,7 @@ impl ArchiveArgs {
                 "--file" => file = it.next().cloned(),
                 "--extract" => extract = it.next().cloned(),
                 "--raw" => raw = true,
+                "--cache-dir" => cache_dir = it.next().cloned(),
                 _ => {}
             }
         }
@@ -1780,6 +1800,7 @@ impl ArchiveArgs {
             file,
             extract,
             raw,
+            cache_dir,
         })
     }
 }
@@ -2315,6 +2336,7 @@ mod tests {
     fn map_skybox_args() -> MapSkyboxArgs {
         MapSkyboxArgs {
             map: "Map v1".into(),
+            cache_dir: Some("/cache/info".into()),
         }
     }
 
@@ -2964,6 +2986,7 @@ mod tests {
             file: Some("maps/x.smd".into()),
             extract: Some("/out/x.smd".into()),
             raw: false,
+            cache_dir: Some("/cache/info".into()),
         }
     }
 

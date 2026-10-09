@@ -1491,7 +1491,7 @@ pub struct EngineConfigWriteOutput {
 }
 
 /// One member of an archive's file tree.
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArchiveFileEntry {
     /// Slash-separated path within the archive.

@@ -4,11 +4,13 @@
 //! `.sdp` packages are read uniformly — each in its own one-shot `Init` session.
 
 use crate::ffi::Unitsync;
+use crate::infocache;
 use crate::model::{
     ArchiveExtractOutput, ArchiveFileEntry, ArchiveFileOutput, ArchiveTreeOutput, GameHeaderItem,
     GameHeadersOutput, MapSkyboxOutput,
 };
 use base64::Engine;
+use coilbox_unitsync_worker::cached::{self, read_header_cache, HeaderState};
 use coilbox_unitsync_worker::cachekey;
 use std::collections::HashMap;
 use std::path::Path;
@@ -44,28 +46,42 @@ const HEADER_JPEG_QUALITY: u8 = 90;
 const MAPINFO_CAP: usize = 64 * 1024;
 
 /// List every member of `archive` as `(path, size)`, plus its on-disk path.
-pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
-    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
-        Ok(u) => u,
-        Err(e) => {
-            return ArchiveTreeOutput {
-                errors: vec![e],
-                ..Default::default()
-            }
-        }
-    };
+pub fn tree(lib: &str, archive_name: &str, cache_dir: Option<&Path>) -> ArchiveTreeOutput {
+    match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(us) => tree_in(&us, archive_name, cache_dir),
+        Err(e) => ArchiveTreeOutput {
+            errors: vec![e],
+            ..Default::default()
+        },
+    }
+}
+
+/// [`tree`] over a library that is already loaded, which is what lets a test
+/// run it against the stand-in.
+fn tree_in(us: &Unitsync, archive_name: &str, cache_dir: Option<&Path>) -> ArchiveTreeOutput {
     us.init(false, 0);
     let mut errors = us.drain_errors();
 
-    let open_path = resolve_open_path(&us, archive_name);
+    // A tree the plugin could not find for lack of the scan's names may still be
+    // saved, and finding it here skips the mount and the checksum (issue #3736).
+    let key = infocache::archive_tree_key(us, archive_name);
+    let saved = cache_dir.zip(key.as_deref());
+    if let Some(hit) = saved.and_then(|(dir, key)| cached::current_tree(dir, key, archive_name)) {
+        us.uninit();
+        return hit;
+    }
+
+    let open_path = resolve_open_path(us, archive_name);
     // Resolution may probe several candidate archives; discard their diagnostics.
     let _ = us.drain_errors();
     let archive_path = open_path
         .as_deref()
-        .and_then(|p| absolute_archive_path(&us, p));
+        .and_then(|p| absolute_archive_path(us, p));
 
+    let mut opened = false;
     let files = match open_path.as_deref().and_then(|p| us.open_archive(p)) {
         Some(handle) => {
+            opened = true;
             let mut files: Vec<ArchiveFileEntry> = us
                 .list_archive_files(handle)
                 .into_iter()
@@ -89,6 +105,33 @@ pub fn tree(lib: &str, archive_name: &str) -> ArchiveTreeOutput {
 
     errors.extend(us.drain_errors());
     us.uninit();
+
+    // Only a listing that read cleanly is saved, and only with the file it came
+    // from, which the plugin checks before it believes the record.
+    let source = archive_path
+        .as_deref()
+        .and_then(|p| cached::Source::of(Path::new(p)));
+    if let (true, true, Some((dir, key)), Some(source)) = (opened, errors.is_empty(), saved, source)
+    {
+        infocache::write(
+            dir,
+            key,
+            &cached::CachedTree {
+                version: cached::TREE_VERSION,
+                archive: archive_name.to_string(),
+                source,
+                files: files
+                    .iter()
+                    .map(|f| ArchiveFileEntry {
+                        path: f.path.clone(),
+                        size: f.size,
+                    })
+                    .collect(),
+                archive_path: archive_path.clone(),
+                checksum: checksum.clone(),
+            },
+        );
+    }
 
     ArchiveTreeOutput {
         files,
@@ -876,7 +919,7 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
 
         if let Some((dir, key)) = cache {
             match read_header_cache(dir, key) {
-                CacheState::Hit(file) => {
+                HeaderState::Hit(file) => {
                     headers.push(GameHeaderItem {
                         name,
                         file: Some(file),
@@ -884,7 +927,7 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
                     });
                     continue;
                 }
-                CacheState::Negative => {
+                HeaderState::Negative => {
                     headers.push(GameHeaderItem {
                         name,
                         file: None,
@@ -892,7 +935,7 @@ pub fn game_headers(lib: &str, cache_dir: Option<&Path>) -> GameHeadersOutput {
                     });
                     continue;
                 }
-                CacheState::Miss => {}
+                HeaderState::Miss => {}
             }
         }
 
@@ -1052,30 +1095,6 @@ fn pick_index(len: usize) -> Option<usize> {
     Some((nanos % len as u128) as usize)
 }
 
-/// State of the header disk cache for one checksum.
-#[derive(Debug)]
-enum CacheState {
-    /// `<checksum>.jpg` exists, holding the resolved art. Carries its file name,
-    /// which is what the frontend appends to `coilbox://unitsyncheader/`.
-    Hit(String),
-    /// `<checksum>.none` marker exists, so the game has no usable art.
-    Negative,
-    /// Neither file exists, so the archive must be opened to resolve.
-    Miss,
-}
-
-/// Look up the header cache for `checksum` under `dir`.
-fn read_header_cache(dir: &Path, checksum: &str) -> CacheState {
-    let file = format!("{checksum}.jpg");
-    if dir.join(&file).is_file() {
-        return CacheState::Hit(file);
-    }
-    if dir.join(format!("{checksum}.none")).exists() {
-        return CacheState::Negative;
-    }
-    CacheState::Miss
-}
-
 /// Best-effort write of resolved header art to the cache, returning the file name
 /// to serve it under. `None` when the write failed, so the caller inlines instead.
 fn write_header_hit(dir: &Path, checksum: &str, jpeg: &[u8]) -> Option<String> {
@@ -1099,47 +1118,89 @@ const SKYBOX_CAP: usize = 32 * 1024 * 1024;
 /// so the Lua parser can read the skybox reference, then opens the map archive to
 /// read that member. `None` (no skybox, or the member is missing/oversized) is the
 /// common case and simply leaves the preview with its flat sky colour.
-pub fn map_skybox(lib: &str, map_name: &str) -> MapSkyboxOutput {
-    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
-        Ok(u) => u,
-        Err(e) => {
-            return MapSkyboxOutput {
-                errors: vec![e],
-                ..Default::default()
-            }
-        }
-    };
+pub fn map_skybox(lib: &str, map_name: &str, cache_dir: Option<&Path>) -> MapSkyboxOutput {
+    match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(us) => map_skybox_in(&us, map_name, cache_dir),
+        Err(e) => MapSkyboxOutput {
+            errors: vec![e],
+            ..Default::default()
+        },
+    }
+}
+
+/// [`map_skybox`] over a library that is already loaded.
+fn map_skybox_in(us: &Unitsync, map_name: &str, cache_dir: Option<&Path>) -> MapSkyboxOutput {
     us.init(false, 0);
     let mut errors = us.drain_errors();
 
+    // A skybox saved by an earlier read, for a caller that had no names to look
+    // it up by, skips the mount (issue #3736).
+    let key = infocache::map_skybox_key(us, map_name);
+    let saved = cache_dir.zip(key.as_deref());
+    if let Some(hit) = saved.and_then(|(dir, key)| cached::current_skybox(dir, key, map_name)) {
+        us.uninit();
+        return hit;
+    }
+
     // The Lua parser reads mapinfo.lua from the VFS, so mount the map first.
+    let mut mounted = false;
     let mut skybox_name = None;
     if let Some(first) = us.map_archives(map_name).into_iter().next() {
         us.add_all_archives(&first);
+        mounted = true;
         skybox_name = us.map_skybox_name();
     }
     // Mount/parse diagnostics are per-map noise, not a failure here.
     let _ = us.drain_errors();
 
+    // The map's archive is what the answer is read from. It is needed to read
+    // the skybox, and to record the file for a map that has none, which is
+    // nearly every map.
+    let open_path = if skybox_name.is_some() || (mounted && saved.is_some()) {
+        let path = resolve_open_path(us, map_name);
+        let _ = us.drain_errors();
+        path
+    } else {
+        None
+    };
+    let mut read_ok = skybox_name.is_none();
     let data_url = match skybox_name {
-        Some(name) => {
-            let open_path = resolve_open_path(&us, map_name);
-            let _ = us.drain_errors();
-            match open_path.as_deref().and_then(|p| us.open_archive(p)) {
-                Some(handle) => {
-                    let url = read_skybox_member(&us, handle, &name);
-                    us.close_archive(handle);
-                    url
-                }
-                None => None,
+        Some(name) => match open_path.as_deref().and_then(|p| us.open_archive(p)) {
+            Some(handle) => {
+                read_ok = true;
+                let url = read_skybox_member(us, handle, &name);
+                us.close_archive(handle);
+                url
             }
-        }
+            None => None,
+        },
         None => None,
     };
     let _ = us.drain_errors();
 
     errors.extend(us.drain_errors());
+    let source = open_path
+        .as_deref()
+        .and_then(|p| absolute_archive_path(us, p))
+        .and_then(|p| cached::Source::of(Path::new(&p)));
     us.uninit();
+
+    // "No skybox" is saved too. Only a read that got as far as the map's archive
+    // is, so a map unitsync could not find is asked again.
+    if let (true, true, true, Some((dir, key)), Some(source)) =
+        (mounted, read_ok, errors.is_empty(), saved, source)
+    {
+        infocache::write(
+            dir,
+            key,
+            &cached::CachedSkybox {
+                version: cached::SKYBOX_VERSION,
+                map: map_name.to_string(),
+                source,
+                data_url: data_url.clone(),
+            },
+        );
+    }
     MapSkyboxOutput { data_url, errors }
 }
 
@@ -1288,12 +1349,12 @@ mod header_tests {
         std::fs::create_dir_all(&dir).unwrap();
 
         // Miss when neither file exists.
-        assert!(matches!(read_header_cache(&dir, "aaaa"), CacheState::Miss));
+        assert!(matches!(read_header_cache(&dir, "aaaa"), HeaderState::Miss));
 
         // Positive hit, reported by the file name the asset protocol serves.
         std::fs::write(dir.join("bbbb.jpg"), b"jpeg bytes").unwrap();
         match read_header_cache(&dir, "bbbb") {
-            CacheState::Hit(file) => assert_eq!(file, "bbbb.jpg"),
+            HeaderState::Hit(file) => assert_eq!(file, "bbbb.jpg"),
             other => panic!("expected hit, got {other:?}"),
         }
 
@@ -1301,7 +1362,7 @@ mod header_tests {
         std::fs::write(dir.join("cccc.none"), "").unwrap();
         assert!(matches!(
             read_header_cache(&dir, "cccc"),
-            CacheState::Negative
+            HeaderState::Negative
         ));
 
         let _ = std::fs::remove_dir_all(&dir);
@@ -1566,5 +1627,154 @@ mod tests {
         let canonical = "Houses of Tripolis 1.3".to_lowercase();
         assert!(canonical.starts_with(&"Houses of Tripolis".to_lowercase()));
         assert!(!canonical.starts_with(&"Full Metal Plate".to_lowercase()));
+    }
+}
+
+/// What the worker saves from a tree or skybox read, and that the plugin's side
+/// finds it (issue #3736). Run against the stand-in library.
+#[cfg(test)]
+mod saved_read_tests {
+    use super::*;
+    use crate::ffi::stub::{calls, install, World};
+
+    fn temp(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("coilbox-saved-reads-{}-{tag}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        dir
+    }
+
+    #[test]
+    fn a_tree_read_is_saved_and_found_from_the_archive_path() {
+        let dir = temp("tree");
+        let (content, cache) = (dir.join("content"), dir.join("cache"));
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+
+        let out = tree_in(&us, World::GAME, Some(&cache));
+        assert!(out.errors.is_empty(), "{:?}", out.errors);
+        assert_eq!(out.files.len(), 2);
+        assert_eq!(calls("OpenArchive"), 1);
+
+        let archive = content.join(World::GAME);
+        let found = cached::archive_tree(&cache, World::GAME, Some(&archive), None)
+            .expect("the plugin finds what the worker saved");
+        assert_eq!(
+            serde_json::to_value(&found).unwrap(),
+            serde_json::to_value(&out).unwrap()
+        );
+
+        // A read that reaches a worker anyway still skips the archive.
+        let again = tree_in(&us, World::GAME, Some(&cache));
+        assert_eq!(calls("OpenArchive"), 1);
+        assert_eq!(
+            serde_json::to_value(&again).unwrap(),
+            serde_json::to_value(&out).unwrap()
+        );
+    }
+
+    #[test]
+    fn a_changed_archive_is_listed_again_and_saved_again() {
+        let dir = temp("tree-changed");
+        let (content, cache) = (dir.join("content"), dir.join("cache"));
+        install(World::with_game(&content));
+        let us = Unitsync::stub();
+        let archive = content.join(World::GAME);
+
+        tree_in(&us, World::GAME, Some(&cache));
+        std::fs::write(&archive, b"a game archive that grew").expect("rewrite");
+        assert!(cached::archive_tree(&cache, World::GAME, Some(&archive), None).is_none());
+
+        tree_in(&us, World::GAME, Some(&cache));
+        assert_eq!(calls("OpenArchive"), 2);
+        assert!(cached::archive_tree(&cache, World::GAME, Some(&archive), None).is_some());
+    }
+
+    #[test]
+    fn a_tree_that_failed_to_open_is_not_saved() {
+        let dir = temp("tree-failed");
+        let cache = dir.join("cache");
+        // Nothing resolves, so there is no archive to open.
+        install(World::default());
+        let us = Unitsync::stub();
+
+        let out = tree_in(&us, "nothing.sdz", Some(&cache));
+        assert!(!out.errors.is_empty());
+        assert!(!cache.exists() || std::fs::read_dir(&cache).unwrap().next().is_none());
+    }
+
+    #[test]
+    fn a_tree_is_not_saved_without_a_cache_directory() {
+        let dir = temp("tree-uncached");
+        install(World::with_game(&dir.join("content")));
+        let us = Unitsync::stub();
+        tree_in(&us, World::GAME, None);
+        tree_in(&us, World::GAME, None);
+        assert_eq!(calls("OpenArchive"), 2);
+    }
+
+    /// The library this machine has: the map's versioned name does not resolve to
+    /// an archive path, so its records are keyed on the name and the map file.
+    fn name_keyed_map(dir: &Path) -> World {
+        let mut world = World::with_map(&dir.join("content"));
+        // `resolve_open_path` finds the archive by the map's own name here.
+        std::fs::write(dir.join("content").join(World::MAP), b"a map archive").expect("archive");
+        world.archives = vec![World::MAP.into()];
+        world
+    }
+
+    #[test]
+    fn a_map_with_no_skybox_is_saved_as_having_none() {
+        let dir = temp("sky-none");
+        let cache = dir.join("cache");
+        install(name_keyed_map(&dir));
+        let us = Unitsync::stub();
+
+        let out = map_skybox_in(&us, World::MAP, Some(&cache));
+        assert!(out.data_url.is_none() && out.errors.is_empty());
+        assert_eq!(calls("AddAllArchives"), 1);
+
+        let found = cached::map_skybox(&cache, World::MAP, None, Some("maps/stubmap.smf"))
+            .expect("the plugin finds the saved no");
+        assert!(found.data_url.is_none() && found.errors.is_empty());
+
+        // A read that reaches a worker anyway mounts nothing.
+        map_skybox_in(&us, World::MAP, Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 1);
+    }
+
+    #[test]
+    fn a_rebuilt_map_archive_is_read_again() {
+        let dir = temp("sky-rebuilt");
+        let cache = dir.join("cache");
+        install(name_keyed_map(&dir));
+        let us = Unitsync::stub();
+
+        map_skybox_in(&us, World::MAP, Some(&cache));
+        std::fs::write(
+            dir.join("content").join(World::MAP),
+            b"a rebuilt map archive",
+        )
+        .expect("rewrite");
+        assert!(
+            cached::map_skybox(&cache, World::MAP, None, Some("maps/stubmap.smf")).is_none(),
+            "the name key is unchanged, so the record has to notice the file"
+        );
+
+        map_skybox_in(&us, World::MAP, Some(&cache));
+        assert_eq!(calls("AddAllArchives"), 2);
+        assert!(cached::map_skybox(&cache, World::MAP, None, Some("maps/stubmap.smf")).is_some());
+    }
+
+    #[test]
+    fn a_map_unitsync_does_not_know_is_not_saved() {
+        let dir = temp("sky-unknown");
+        let cache = dir.join("cache");
+        install(World::default());
+        let us = Unitsync::stub();
+
+        map_skybox_in(&us, "Not A Map 1.0", Some(&cache));
+        assert!(!cache.exists() || std::fs::read_dir(&cache).unwrap().next().is_none());
     }
 }

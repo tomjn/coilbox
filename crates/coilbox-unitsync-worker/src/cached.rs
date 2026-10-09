@@ -17,8 +17,10 @@
 
 use crate::cachekey::{self, ArchiveStamp};
 use crate::model::{
-    FactionLogoEntry, FactionLogosOutput, HeightWindow, HeightmapOutput, MapAppearance,
-    MinimapOutput, StartPos, UnitBuildpicsOutput, UnitDisplay, UnitModelFile, UnitModelsOutput,
+    ArchiveFileEntry, ArchiveTreeOutput, FactionLogoEntry, FactionLogosOutput, GameHeaderItem,
+    GameHeadersOutput, HeightWindow, HeightmapOutput, MapAppearance, MapMeta, MapMetaOutput,
+    MapSkyboxOutput, MinimapOutput, StartPos, Thumbnail, ThumbnailsOutput, UnitBuildpicsOutput,
+    UnitDisplay, UnitModelFile, UnitModelsOutput,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -609,6 +611,288 @@ pub fn thumb_key_for(
     )
 }
 
+// ---- batch reads over a list the caller names (issue #3736)
+
+/// One map of the last scan, as the caller names it: its name, and what the
+/// map's cache key is made from.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MapRef {
+    pub name: String,
+    #[serde(default)]
+    pub archive_path: Option<String>,
+    #[serde(default)]
+    pub file_name: Option<String>,
+}
+
+/// One game of the last scan: its display name, and its primary archive's path.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameRef {
+    pub name: String,
+    pub archive_path: String,
+}
+
+/// A stored blob read as `T`, or `None` when there is none or it does not parse.
+fn read_record<T: serde::de::DeserializeOwned>(dir: &Path, key: &str) -> Option<T> {
+    serde_json::from_slice(&std::fs::read(dir.join(format!("{key}.json"))).ok()?).ok()
+}
+
+/// Every thumbnail in `maps` at `mip`, as `--thumbnails` answers them, when each
+/// map has its picture and its proportions on disk.
+///
+/// All or nothing, like the reads above. The worker walks the whole library, so
+/// a caller that names only some of it gets an answer for only those, which is
+/// the right answer for a page that draws only those. A call with one map that
+/// has no picture, or no proportions (the worker only records those when it can
+/// read them), goes to a worker whole.
+pub fn thumbnails(dir: &Path, mip: i32, maps: &[MapRef]) -> Option<ThumbnailsOutput> {
+    if maps.is_empty() {
+        return None;
+    }
+    let mut thumbnails = Vec::with_capacity(maps.len());
+    for map in maps {
+        let key = thumb_key_for(
+            &map.name,
+            map.archive_path.as_deref().map(Path::new),
+            map.file_name.as_deref(),
+        )?;
+        let dims: CachedDims =
+            serde_json::from_slice(&std::fs::read(dims_file(dir, &key)).ok()?).ok()?;
+        let picture = minimap_file(dir, &key, mip);
+        if !picture_held(&picture) {
+            return None;
+        }
+        let (width_elmos, height_elmos) = dims_elmos(Some((dims.width, dims.height)));
+        thumbnails.push(Thumbnail {
+            name: map.name.clone(),
+            file: picture
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned()),
+            data_url: None,
+            width: Some(dims.width),
+            height: Some(dims.height),
+            width_elmos,
+            height_elmos,
+        });
+    }
+    Some(ThumbnailsOutput {
+        thumbnails,
+        errors: Vec::new(),
+    })
+}
+
+/// Every map's `mapinfo` metadata in `maps`, as `--map-meta` answers them, when
+/// each has a saved record. The worker records one only when the read gave it
+/// something, so a map that read empty sends the call to a worker whole.
+pub fn map_metas(dir: &Path, maps: &[MapRef]) -> Option<MapMetaOutput> {
+    if maps.is_empty() {
+        return None;
+    }
+    let mut metas = Vec::with_capacity(maps.len());
+    for map in maps {
+        let key = cachekey::map_meta_key(
+            map.archive_path
+                .as_deref()
+                .and_then(|p| ArchiveStamp::of(Path::new(p)))
+                .as_ref(),
+            &map.name,
+            map.file_name.as_deref(),
+        )?;
+        let meta: MapMeta = read_record(dir, &key)?;
+        if meta.name != map.name {
+            return None;
+        }
+        metas.push(meta);
+    }
+    Some(MapMetaOutput {
+        maps: metas,
+        errors: Vec::new(),
+    })
+}
+
+/// The state of one game's header art on disk.
+#[derive(Debug)]
+pub enum HeaderState {
+    /// `<key>.jpg` exists. Carries its file name, which is what the webview
+    /// appends to `coilbox://unitsyncheader/`.
+    Hit(String),
+    /// `<key>.none` exists, so the game has no usable art.
+    Negative,
+    /// Neither does, so the archive has to be opened to resolve it.
+    Miss,
+}
+
+/// Look up the header cache for `key` under `dir`.
+pub fn read_header_cache(dir: &Path, key: &str) -> HeaderState {
+    let file = format!("{key}.jpg");
+    if dir.join(&file).is_file() {
+        return HeaderState::Hit(file);
+    }
+    if dir.join(format!("{key}.none")).exists() {
+        return HeaderState::Negative;
+    }
+    HeaderState::Miss
+}
+
+/// Every game's header art in `games`, as `--game-headers` answers it, when each
+/// has either its art or the marker for none.
+///
+/// The art a game has is the one the worker picked and saved. A game with no
+/// `loadpicture` gets a random picture the first time it is read and keeps it,
+/// so two fresh reads can differ and this returns the saved one.
+pub fn game_headers(dir: &Path, games: &[GameRef]) -> Option<GameHeadersOutput> {
+    if games.is_empty() {
+        return None;
+    }
+    let mut headers = Vec::with_capacity(games.len());
+    for game in games {
+        let key = cachekey::header_key(&ArchiveStamp::of(Path::new(&game.archive_path))?);
+        let file = match read_header_cache(dir, &key) {
+            HeaderState::Hit(file) => Some(file),
+            HeaderState::Negative => None,
+            HeaderState::Miss => return None,
+        };
+        headers.push(GameHeaderItem {
+            name: game.name.clone(),
+            file,
+            data_url: None,
+        });
+    }
+    Some(GameHeadersOutput {
+        headers,
+        errors: Vec::new(),
+    })
+}
+
+// ---- archive trees and map skyboxes
+
+/// Bump when [`CachedTree`] changes shape or the way a tree is read changes.
+pub const TREE_VERSION: u32 = 1;
+
+/// Bump when [`CachedSkybox`] changes shape or the way a skybox is read changes.
+pub const SKYBOX_VERSION: u32 = 1;
+
+/// The archive file a record was read from, as it was when it was read.
+///
+/// A name keyed record cannot tell from its key that the archive behind the name
+/// was replaced, so the record carries the file it came from and the plugin
+/// stats that file itself. A record whose file has a different size or time, or
+/// is gone, is not an answer.
+///
+/// A directory archive (`.sdd`) has no source. Its entry's modified time does not
+/// move when a file inside it is edited, so nothing here could tell its listing
+/// had gone stale, and a game or map being worked on is exactly that.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Source {
+    pub path: String,
+    pub size: u64,
+    pub mtime: u64,
+}
+
+impl Source {
+    /// The source of the archive file at `path`, or `None` for anything but a
+    /// regular file.
+    pub fn of(path: &Path) -> Option<Source> {
+        if !path.is_file() {
+            return None;
+        }
+        let stamp = ArchiveStamp::of(path)?;
+        Some(Source {
+            path: path.to_string_lossy().into_owned(),
+            size: stamp.size(),
+            mtime: stamp.mtime(),
+        })
+    }
+
+    /// Whether the file is still the one the record was read from.
+    pub fn holds(&self) -> bool {
+        Source::of(Path::new(&self.path)).is_some_and(|now| now == *self)
+    }
+}
+
+/// An archive's member tree, saved by the worker (issue #3736).
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CachedTree {
+    pub version: u32,
+    /// The name the tree was asked for by, checked on a hit.
+    pub archive: String,
+    pub source: Source,
+    pub files: Vec<ArchiveFileEntry>,
+    pub archive_path: Option<String>,
+    pub checksum: Option<String>,
+}
+
+/// A map's skybox, saved by the worker (issue #3736). `data_url` is `None` for
+/// the map that has no skybox, which is nearly every map and is an answer.
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CachedSkybox {
+    pub version: u32,
+    pub map: String,
+    pub source: Source,
+    pub data_url: Option<String>,
+}
+
+/// An archive's member tree when a current record of it is saved. `archive_path`
+/// is the archive's own path where the scan placed it, `file_name` the map file
+/// where `archive` is a map's name.
+pub fn archive_tree(
+    dir: &Path,
+    archive: &str,
+    archive_path: Option<&Path>,
+    file_name: Option<&str>,
+) -> Option<ArchiveTreeOutput> {
+    let key = cachekey::archive_tree_key(
+        archive_path.and_then(ArchiveStamp::of).as_ref(),
+        archive,
+        file_name,
+    )?;
+    current_tree(dir, &key, archive)
+}
+
+/// The tree saved under `key`, when it is for `archive`, is of this version and
+/// its source file is unchanged. The worker asks this too, with the key it
+/// built from unitsync, so a read that did reach a worker still skips the mount.
+pub fn current_tree(dir: &Path, key: &str, archive: &str) -> Option<ArchiveTreeOutput> {
+    let tree: CachedTree = read_record(dir, key)?;
+    let current = tree.version == TREE_VERSION && tree.archive == archive && tree.source.holds();
+    current.then(|| ArchiveTreeOutput {
+        files: tree.files,
+        archive_path: tree.archive_path,
+        checksum: tree.checksum,
+        errors: Vec::new(),
+    })
+}
+
+/// A map's skybox answer when a current record of it is saved.
+pub fn map_skybox(
+    dir: &Path,
+    map_name: &str,
+    archive_path: Option<&Path>,
+    file_name: Option<&str>,
+) -> Option<MapSkyboxOutput> {
+    let key = cachekey::map_skybox_key(
+        archive_path.and_then(ArchiveStamp::of).as_ref(),
+        map_name,
+        file_name,
+    )?;
+    current_skybox(dir, &key, map_name)
+}
+
+/// The skybox saved under `key`, when it is for `map_name`, is of this version
+/// and its source file is unchanged.
+pub fn current_skybox(dir: &Path, key: &str, map_name: &str) -> Option<MapSkyboxOutput> {
+    let skybox: CachedSkybox = read_record(dir, key)?;
+    let current =
+        skybox.version == SKYBOX_VERSION && skybox.map == map_name && skybox.source.holds();
+    current.then(|| MapSkyboxOutput {
+        data_url: skybox.data_url,
+        errors: Vec::new(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -720,5 +1004,466 @@ mod tests {
             "x"
         );
         assert!(skirmish_ais(&dir, &lib, Some(&dir.join("gone.sdz"))).is_none());
+    }
+
+    // ---- batch reads over a named list (issue #3736)
+
+    fn named(name: &str, file: &str) -> MapRef {
+        MapRef {
+            name: name.into(),
+            archive_path: None,
+            file_name: Some(file.into()),
+        }
+    }
+
+    /// What the worker leaves for a map it rendered at `mip`: the picture and
+    /// the proportions, under the map's thumbnail key.
+    fn leave_thumbnail(dir: &Path, map: &MapRef, mip: i32, dims: Option<(u32, u32)>) {
+        let key = thumb_key_for(
+            &map.name,
+            map.archive_path.as_deref().map(Path::new),
+            map.file_name.as_deref(),
+        )
+        .expect("a key");
+        std::fs::write(minimap_file(dir, &key, mip), b"png").expect("picture");
+        if let Some((width, height)) = dims {
+            // Exactly the text the worker writes.
+            std::fs::write(
+                dims_file(dir, &key),
+                format!(r#"{{"width":{width},"height":{height}}}"#),
+            )
+            .expect("dims");
+        }
+    }
+
+    #[test]
+    fn thumbnails_are_answered_from_disk_when_every_map_has_one() {
+        let dir = temp_dir("thumbs-hit");
+        let maps = [
+            named("Alpha 1.0", "maps/alpha.smf"),
+            named("Beta 2.1", "maps/beta.smf"),
+        ];
+        leave_thumbnail(&dir, &maps[0], 3, Some((384, 256)));
+        leave_thumbnail(&dir, &maps[1], 3, Some((128, 128)));
+
+        let out = thumbnails(&dir, 3, &maps).expect("a hit");
+        assert_eq!(out.thumbnails.len(), 2);
+        assert!(out.errors.is_empty());
+        let alpha = &out.thumbnails[0];
+        assert_eq!(alpha.name, "Alpha 1.0");
+        assert!(alpha.file.as_deref().is_some_and(|f| f.ends_with("-3.png")));
+        assert!(alpha.data_url.is_none());
+        assert_eq!((alpha.width, alpha.height), (Some(384), Some(256)));
+        let (w, h) = coilbox_assets::map_extent_elmos(384, 256);
+        assert_eq!((alpha.width_elmos, alpha.height_elmos), (Some(w), Some(h)));
+        assert_eq!(out.thumbnails[1].name, "Beta 2.1");
+    }
+
+    #[test]
+    fn one_map_without_a_picture_sends_the_whole_call_to_a_worker() {
+        let dir = temp_dir("thumbs-missing");
+        let maps = [
+            named("Alpha 1.0", "maps/alpha.smf"),
+            named("Beta 2.1", "maps/beta.smf"),
+        ];
+        leave_thumbnail(&dir, &maps[0], 3, Some((384, 256)));
+        assert!(thumbnails(&dir, 3, &maps).is_none());
+        // A picture at another size is not this size's picture.
+        leave_thumbnail(&dir, &maps[1], 1, Some((128, 128)));
+        assert!(thumbnails(&dir, 3, &maps).is_none());
+    }
+
+    #[test]
+    fn a_picture_without_its_proportions_is_not_an_answer() {
+        let dir = temp_dir("thumbs-no-dims");
+        let maps = [named("Alpha 1.0", "maps/alpha.smf")];
+        leave_thumbnail(&dir, &maps[0], 3, None);
+        assert!(thumbnails(&dir, 3, &maps).is_none());
+    }
+
+    #[test]
+    fn an_empty_or_unkeyable_list_is_never_answered() {
+        let dir = temp_dir("thumbs-edges");
+        assert!(thumbnails(&dir, 3, &[]).is_none());
+        let keyless = MapRef {
+            name: "Alpha 1.0".into(),
+            archive_path: None,
+            file_name: None,
+        };
+        assert!(thumbnails(&dir, 3, &[keyless]).is_none());
+    }
+
+    #[test]
+    fn a_changed_map_archive_misses_its_thumbnail() {
+        let dir = temp_dir("thumbs-changed");
+        let archive = dir.join("alpha_1.0.sd7");
+        std::fs::write(&archive, b"a map").expect("archive");
+        let map = MapRef {
+            name: "Alpha 1.0".into(),
+            archive_path: Some(archive.to_string_lossy().into_owned()),
+            file_name: Some("maps/alpha.smf".into()),
+        };
+        leave_thumbnail(&dir, &map, 3, Some((384, 256)));
+        assert!(thumbnails(&dir, 3, std::slice::from_ref(&map)).is_some());
+
+        std::fs::write(&archive, b"a different, longer map").expect("rewrite");
+        assert!(thumbnails(&dir, 3, &[map]).is_none());
+    }
+
+    fn leave_meta(dir: &Path, map: &MapRef, json: &str) {
+        let key = cachekey::map_meta_key(
+            map.archive_path
+                .as_deref()
+                .and_then(|p| ArchiveStamp::of(Path::new(p)))
+                .as_ref(),
+            &map.name,
+            map.file_name.as_deref(),
+        )
+        .expect("a key");
+        write_blob(dir, &key, json);
+    }
+
+    #[test]
+    fn map_metadata_is_answered_from_the_records_the_worker_wrote() {
+        let dir = temp_dir("meta-hit");
+        let maps = [
+            named("Alpha 1.0", "maps/alpha.smf"),
+            named("Beta 2.1", "maps/beta.smf"),
+        ];
+        // The text the worker writes for a `MapMeta` today.
+        leave_meta(
+            &dir,
+            &maps[0],
+            r#"{"name":"Alpha 1.0","info":{"author":"A"}}"#,
+        );
+        leave_meta(
+            &dir,
+            &maps[1],
+            r#"{"name":"Beta 2.1","info":{"author":"B"}}"#,
+        );
+
+        let out = map_metas(&dir, &maps).expect("a hit");
+        assert_eq!(out.maps.len(), 2);
+        assert_eq!(out.maps[1].name, "Beta 2.1");
+        assert_eq!(out.maps[1].info["author"], "B");
+        assert!(out.errors.is_empty());
+    }
+
+    #[test]
+    fn one_map_without_metadata_sends_the_whole_call_to_a_worker() {
+        let dir = temp_dir("meta-missing");
+        let maps = [
+            named("Alpha 1.0", "maps/alpha.smf"),
+            named("Beta 2.1", "maps/beta.smf"),
+        ];
+        leave_meta(
+            &dir,
+            &maps[0],
+            r#"{"name":"Alpha 1.0","info":{"author":"A"}}"#,
+        );
+        assert!(map_metas(&dir, &maps).is_none());
+        leave_meta(&dir, &maps[1], "{ not json");
+        assert!(map_metas(&dir, &maps).is_none());
+        assert!(map_metas(&dir, &[]).is_none());
+    }
+
+    #[test]
+    fn a_record_under_a_maps_key_that_names_another_map_is_a_miss() {
+        let dir = temp_dir("meta-wrong-name");
+        let maps = [named("Alpha 1.0", "maps/alpha.smf")];
+        leave_meta(
+            &dir,
+            &maps[0],
+            r#"{"name":"Someone Else","info":{"a":"b"}}"#,
+        );
+        assert!(map_metas(&dir, &maps).is_none());
+    }
+
+    #[test]
+    fn a_changed_map_archive_misses_its_metadata() {
+        let dir = temp_dir("meta-changed");
+        let archive = dir.join("alpha_1.0.sd7");
+        std::fs::write(&archive, b"a map").expect("archive");
+        let map = MapRef {
+            name: "Alpha 1.0".into(),
+            archive_path: Some(archive.to_string_lossy().into_owned()),
+            file_name: Some("maps/alpha.smf".into()),
+        };
+        leave_meta(&dir, &map, r#"{"name":"Alpha 1.0","info":{"a":"b"}}"#);
+        assert!(map_metas(&dir, std::slice::from_ref(&map)).is_some());
+
+        std::fs::write(&archive, b"a different, longer map").expect("rewrite");
+        assert!(map_metas(&dir, &[map]).is_none());
+    }
+
+    fn game_in(dir: &Path, file: &str, name: &str) -> (GameRef, String) {
+        let archive = dir.join(file);
+        std::fs::write(&archive, format!("game {file}")).expect("archive");
+        let key = cachekey::header_key(&ArchiveStamp::of(&archive).expect("stamp"));
+        (
+            GameRef {
+                name: name.into(),
+                archive_path: archive.to_string_lossy().into_owned(),
+            },
+            key,
+        )
+    }
+
+    #[test]
+    fn game_headers_are_answered_from_the_art_and_markers_on_disk() {
+        let dir = temp_dir("headers-hit");
+        let (art, art_key) = game_in(&dir, "art.sdz", "Game With Art");
+        let (bare, bare_key) = game_in(&dir, "bare.sdz", "Game Without");
+        std::fs::write(dir.join(format!("{art_key}.jpg")), b"jpeg").expect("art");
+        std::fs::write(dir.join(format!("{bare_key}.none")), b"").expect("marker");
+
+        let out = game_headers(&dir, &[art, bare]).expect("a hit");
+        assert_eq!(out.headers.len(), 2);
+        assert_eq!(out.headers[0].name, "Game With Art");
+        assert_eq!(
+            out.headers[0].file.as_deref(),
+            Some(format!("{art_key}.jpg").as_str())
+        );
+        assert!(out.headers[0].data_url.is_none());
+        assert_eq!(out.headers[1].name, "Game Without");
+        assert!(out.headers[1].file.is_none() && out.headers[1].data_url.is_none());
+        assert!(out.errors.is_empty());
+    }
+
+    #[test]
+    fn one_game_not_yet_read_sends_the_whole_call_to_a_worker() {
+        let dir = temp_dir("headers-miss");
+        let (art, art_key) = game_in(&dir, "art.sdz", "Game With Art");
+        let (unread, _) = game_in(&dir, "unread.sdz", "Unread");
+        std::fs::write(dir.join(format!("{art_key}.jpg")), b"jpeg").expect("art");
+        assert!(game_headers(&dir, &[art, unread]).is_none());
+        assert!(game_headers(&dir, &[]).is_none());
+    }
+
+    #[test]
+    fn a_changed_game_archive_misses_its_header() {
+        let dir = temp_dir("headers-changed");
+        let (game, key) = game_in(&dir, "art.sdz", "Game With Art");
+        std::fs::write(dir.join(format!("{key}.jpg")), b"jpeg").expect("art");
+        assert!(game_headers(&dir, std::slice::from_ref(&game)).is_some());
+
+        std::fs::write(&game.archive_path, "a different, longer game").expect("rewrite");
+        assert!(game_headers(&dir, &[game]).is_none());
+    }
+
+    #[test]
+    fn a_game_whose_archive_is_gone_is_not_answered() {
+        let dir = temp_dir("headers-gone");
+        let game = GameRef {
+            name: "Gone".into(),
+            archive_path: dir.join("gone.sdz").to_string_lossy().into_owned(),
+        };
+        assert!(game_headers(&dir, &[game]).is_none());
+    }
+
+    // ---- archive trees and skyboxes (issue #3736)
+
+    fn a_tree(archive: &str, source: Source) -> CachedTree {
+        CachedTree {
+            version: TREE_VERSION,
+            archive: archive.into(),
+            source,
+            files: vec![
+                ArchiveFileEntry {
+                    path: "maps/a.smf".into(),
+                    size: 10,
+                },
+                ArchiveFileEntry {
+                    path: "mapinfo.lua".into(),
+                    size: 4,
+                },
+            ],
+            archive_path: Some("/somewhere/a.sd7".into()),
+            checksum: Some("0badf00d".into()),
+        }
+    }
+
+    fn save<T: Serialize>(dir: &Path, key: &str, record: &T) {
+        write_blob(dir, key, &serde_json::to_string(record).expect("json"));
+    }
+
+    fn a_map_archive(dir: &Path) -> (PathBuf, Source) {
+        let archive = dir.join("alpha_1.0.sd7");
+        std::fs::write(&archive, b"a map archive").expect("archive");
+        let source = Source::of(&archive).expect("a source");
+        (archive, source)
+    }
+
+    #[test]
+    fn a_source_is_the_file_it_was_read_from() {
+        let dir = temp_dir("source");
+        let (archive, source) = a_map_archive(&dir);
+        assert_eq!(source.size, 13);
+        assert!(source.holds());
+
+        std::fs::write(&archive, b"a longer map archive").expect("rewrite");
+        assert!(!source.holds(), "a different size is a different file");
+        std::fs::remove_file(&archive).expect("remove");
+        assert!(!source.holds(), "a file that is gone holds nothing");
+    }
+
+    #[test]
+    fn a_directory_archive_has_no_source() {
+        let dir = temp_dir("source-dir");
+        let sdd = dir.join("game.sdd");
+        std::fs::create_dir_all(&sdd).expect("dir");
+        assert!(Source::of(&sdd).is_none());
+        assert!(Source::of(&dir.join("missing.sdz")).is_none());
+    }
+
+    #[test]
+    fn a_game_s_tree_is_found_from_its_archive_path() {
+        let dir = temp_dir("tree-game");
+        let (archive, source) = a_map_archive(&dir);
+        let stamp = ArchiveStamp::of(&archive).expect("stamp");
+        let key = cachekey::archive_tree_key(Some(&stamp), "alpha_1.0.sd7", None).expect("key");
+        save(&dir, &key, &a_tree("alpha_1.0.sd7", source));
+
+        let out = archive_tree(&dir, "alpha_1.0.sd7", Some(&archive), None).expect("a hit");
+        assert_eq!(out.files.len(), 2);
+        assert_eq!(out.files[1].path, "mapinfo.lua");
+        assert_eq!(out.archive_path.as_deref(), Some("/somewhere/a.sd7"));
+        assert_eq!(out.checksum.as_deref(), Some("0badf00d"));
+        assert!(out.errors.is_empty());
+    }
+
+    #[test]
+    fn a_map_s_tree_is_found_from_its_name_and_file() {
+        let dir = temp_dir("tree-map");
+        let (_, source) = a_map_archive(&dir);
+        let key =
+            cachekey::archive_tree_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+        save(&dir, &key, &a_tree("Alpha 1.0", source));
+
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_some());
+        assert!(archive_tree(&dir, "Alpha 1.0", None, None).is_none());
+        assert!(archive_tree(&dir, "Alpha 1.1", None, Some("maps/alpha.smf")).is_none());
+    }
+
+    #[test]
+    fn a_changed_archive_misses_its_tree() {
+        let dir = temp_dir("tree-changed");
+        let (archive, source) = a_map_archive(&dir);
+        let stamp = ArchiveStamp::of(&archive).expect("stamp");
+        let key = cachekey::archive_tree_key(Some(&stamp), "alpha_1.0.sd7", None).expect("key");
+        save(&dir, &key, &a_tree("alpha_1.0.sd7", source));
+        assert!(archive_tree(&dir, "alpha_1.0.sd7", Some(&archive), None).is_some());
+
+        std::fs::write(&archive, b"a longer map archive").expect("rewrite");
+        assert!(archive_tree(&dir, "alpha_1.0.sd7", Some(&archive), None).is_none());
+    }
+
+    #[test]
+    fn a_replaced_archive_behind_a_name_misses_its_tree() {
+        let dir = temp_dir("tree-replaced");
+        let (archive, source) = a_map_archive(&dir);
+        let key =
+            cachekey::archive_tree_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+        save(&dir, &key, &a_tree("Alpha 1.0", source));
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_some());
+
+        // The name key does not change, the file it was read from does.
+        std::fs::write(&archive, b"a rebuilt map archive").expect("rewrite");
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+    }
+
+    #[test]
+    fn a_tree_from_another_version_or_for_another_archive_is_a_miss() {
+        let dir = temp_dir("tree-version");
+        let (_, source) = a_map_archive(&dir);
+        let key =
+            cachekey::archive_tree_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+
+        let mut old = a_tree("Alpha 1.0", source.clone());
+        old.version = TREE_VERSION - 1;
+        save(&dir, &key, &old);
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+
+        let mut newer = a_tree("Alpha 1.0", source.clone());
+        newer.version = TREE_VERSION + 1;
+        save(&dir, &key, &newer);
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+
+        save(&dir, &key, &a_tree("Someone Else", source));
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+
+        write_blob(&dir, &key, "{ not json");
+        assert!(archive_tree(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+    }
+
+    fn a_skybox(map: &str, source: Source, data_url: Option<&str>) -> CachedSkybox {
+        CachedSkybox {
+            version: SKYBOX_VERSION,
+            map: map.into(),
+            source,
+            data_url: data_url.map(String::from),
+        }
+    }
+
+    #[test]
+    fn a_map_with_no_skybox_is_a_saved_answer() {
+        let dir = temp_dir("sky-none");
+        let (_, source) = a_map_archive(&dir);
+        let key = cachekey::map_skybox_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+        save(&dir, &key, &a_skybox("Alpha 1.0", source, None));
+
+        let out = map_skybox(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).expect("a hit");
+        assert!(out.data_url.is_none());
+        assert!(out.errors.is_empty());
+    }
+
+    #[test]
+    fn a_saved_skybox_is_returned_whole() {
+        let dir = temp_dir("sky-some");
+        let (archive, source) = a_map_archive(&dir);
+        let stamp = ArchiveStamp::of(&archive).expect("stamp");
+        let key = cachekey::map_skybox_key(Some(&stamp), "Alpha 1.0", None).expect("key");
+        save(
+            &dir,
+            &key,
+            &a_skybox(
+                "Alpha 1.0",
+                source,
+                Some("data:application/octet-stream;base64,AAAA"),
+            ),
+        );
+
+        let out = map_skybox(&dir, "Alpha 1.0", Some(&archive), None).expect("a hit");
+        assert_eq!(
+            out.data_url.as_deref(),
+            Some("data:application/octet-stream;base64,AAAA")
+        );
+    }
+
+    #[test]
+    fn a_changed_map_archive_misses_its_skybox() {
+        let dir = temp_dir("sky-changed");
+        let (archive, source) = a_map_archive(&dir);
+        let key = cachekey::map_skybox_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+        save(&dir, &key, &a_skybox("Alpha 1.0", source, None));
+        assert!(map_skybox(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_some());
+
+        std::fs::write(&archive, b"a rebuilt map archive").expect("rewrite");
+        assert!(map_skybox(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+    }
+
+    #[test]
+    fn a_skybox_from_another_version_or_map_is_a_miss() {
+        let dir = temp_dir("sky-version");
+        let (_, source) = a_map_archive(&dir);
+        let key = cachekey::map_skybox_key(None, "Alpha 1.0", Some("maps/alpha.smf")).expect("key");
+
+        let mut old = a_skybox("Alpha 1.0", source.clone(), None);
+        old.version = SKYBOX_VERSION - 1;
+        save(&dir, &key, &old);
+        assert!(map_skybox(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
+
+        save(&dir, &key, &a_skybox("Someone Else", source, None));
+        assert!(map_skybox(&dir, "Alpha 1.0", None, Some("maps/alpha.smf")).is_none());
     }
 }

@@ -678,8 +678,9 @@ fn dispatch(args: &Args) -> i32 {
                 || archive::emit_file_error("worker panicked while reading archive member".into()),
             );
         }
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || archive::tree(&args.lib, &mode.archive),
+            || archive::tree(&args.lib, &mode.archive, cache_dir),
             print_ok,
             || archive::emit_tree_error("worker panicked while listing archive".into()),
         );
@@ -756,8 +757,9 @@ fn dispatch(args: &Args) -> i32 {
     // Map skybox: read one map's `atmosphere.skyBox` DDS cube map as raw bytes.
     // `--map` being required now lives in `MapSkyboxArgs::from_args`, not here.
     if let Some(Mode::MapSkybox(mode)) = &args.map_skybox {
+        let cache_dir = mode.cache_dir.as_deref().map(Path::new);
         return run_mode(
-            || archive::map_skybox(&args.lib, &mode.map),
+            || archive::map_skybox(&args.lib, &mode.map, cache_dir),
             print_ok,
             || archive::emit_skybox_error("worker panicked while reading map skybox".into()),
         );
@@ -1505,8 +1507,16 @@ fn absolutize(args: &mut Args) {
             }
         }
     }
-    // `Mode::MapSkybox` has no path field of its own: `--map` is a unitsync
-    // name, not a path, so there is nothing here for it to do.
+    // `Mode::MapSkybox` holds its own copy of `--cache-dir`, read separately
+    // from `raw` in `parse_args`, so it needs the same treatment. `--map` is a
+    // unitsync name, not a path, so it is left alone.
+    if let Some(Mode::MapSkybox(mode)) = args.map_skybox.as_mut() {
+        if let Some(dir) = &mut mode.cache_dir {
+            if let Some(abs) = absolute_path(dir) {
+                *dir = abs;
+            }
+        }
+    }
     // `Mode::Heightmap` holds its own copy of `--cache-dir`/`--asset-dir`,
     // read separately from `raw` in `parse_args`, so it needs the same
     // treatment. `--map` is a unitsync name, not a path, so it is left
@@ -1648,14 +1658,17 @@ fn absolutize(args: &mut Args) {
             }
         }
     }
-    // `Mode::Archive` holds its own copy of `--extract`'s destination path,
-    // read separately from `raw` in `parse_args`, so it needs the same
-    // treatment. `--archive` and `--file` name an archive and a member
+    // `Mode::Archive` holds its own copy of `--extract`'s destination path and
+    // `--cache-dir`, read separately from `raw` in `parse_args`, so it needs the
+    // same treatment. `--archive` and `--file` name an archive and a member
     // inside it, not paths on this machine, so they are left alone.
     if let Some(Mode::Archive(mode)) = args.archive.as_mut() {
-        if let Some(dest) = &mut mode.extract {
-            if let Some(abs) = absolute_path(dest) {
-                *dest = abs;
+        for path in [mode.extract.as_mut(), mode.cache_dir.as_mut()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(abs) = absolute_path(path) {
+                *path = abs;
             }
         }
     }
