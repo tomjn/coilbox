@@ -235,6 +235,46 @@ fn spawned_file(program: &OsStr) -> Option<&std::path::Path> {
     named_a_directory.then_some(path)
 }
 
+/// Lets go of whatever it holds open inside an engine folder, and returns once
+/// it has.
+type EngineHolder = Box<dyn Fn(&std::path::Path) + Send + Sync>;
+
+/// Everything that holds files open inside engine folders between uses. Today
+/// that is the unitsync plugin, whose workers keep an engine's `unitsync`
+/// library loaded while they run.
+///
+/// Here for the same reason [`CONTENT_ROOTS`] is: the plugin that deletes or
+/// replaces an engine folder and the plugin that holds it open do not depend on
+/// each other, and both depend on this crate.
+static ENGINE_HOLDERS: std::sync::RwLock<Vec<EngineHolder>> = std::sync::RwLock::new(Vec::new());
+
+/// Register something to call before an engine folder is deleted or replaced.
+pub fn on_engine_release(holder: impl Fn(&std::path::Path) + Send + Sync + 'static) {
+    ENGINE_HOLDERS
+        .write()
+        .unwrap_or_else(|e| e.into_inner())
+        .push(Box::new(holder));
+}
+
+/// Have every registered holder let go of the files under `dir`, an engine's
+/// folder or a folder of engines. Call it before deleting, overwriting or
+/// renaming anything in there.
+///
+/// It matters on Windows, which will not delete or overwrite a library a
+/// process has loaded: a recursive delete removes what it can and stops,
+/// leaving half an engine. It blocks until the holders have let go, which can
+/// take as long as a read they are in the middle of, so call it from a blocking
+/// task.
+pub fn release_engine(dir: &std::path::Path) {
+    for holder in ENGINE_HOLDERS
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+    {
+        holder(dir);
+    }
+}
+
 /// What the engine splits a `SPRING_DATADIR` list on (`cPD` in its
 /// `DataDirLocater.cpp`).
 pub const DATADIR_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -330,6 +370,34 @@ mod datadirs {
     #[test]
     fn an_installed_coilbox_leaves_the_engine_its_usual_folders() {
         assert_eq!(isolation_env(false, std::path::Path::new("/e")), None);
+    }
+}
+
+#[cfg(test)]
+mod engine_release {
+    use super::*;
+    use std::path::{Path, PathBuf};
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn every_holder_is_told_which_folder_to_let_go_of() {
+        let told: Arc<Mutex<Vec<(u8, PathBuf)>>> = Arc::default();
+        for holder in [1, 2] {
+            let told = told.clone();
+            on_engine_release(move |dir| {
+                // Other tests in this process may release folders of their own.
+                if dir.ends_with("engine-release-test") {
+                    told.lock().unwrap().push((holder, dir.to_path_buf()));
+                }
+            });
+        }
+        let dir = Path::new("/content/engine/engine-release-test");
+        release_engine(dir);
+        assert_eq!(
+            *told.lock().unwrap(),
+            vec![(1, dir.to_path_buf()), (2, dir.to_path_buf())],
+            "both were called, and before release_engine returned"
+        );
     }
 }
 
