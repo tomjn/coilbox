@@ -43,7 +43,7 @@ Giving your app its own socket is only half of it, because the session's MCP ser
 
 **Anchor any `pkill` to your own path.** `pkill -f "tauri dev"` matches every checkout on the machine, not yours. Use the absolute path of your own binary and your own vite.
 
-**A `tauri dev` app does not use the sidecar you just built.** `bun run sidecar:unitsync` writes `src-tauri/binaries/coilbox-unitsync-worker-<triple>`, which is what a bundled build uses. A dev app resolves `target/debug/coilbox-unitsync-worker`, refreshed only by `cargo build`. After changing the worker, do both, then check the flag directly rather than trusting the build's success message.
+**A `tauri dev` app runs the release sidecar, not a `cargo build` one.** A dev app resolves `target/debug/coilbox-unitsync-worker`, but that file is a copy of `src-tauri/binaries/coilbox-unitsync-worker-<triple>`, the release build `bun run sidecar:unitsync` writes. tauri-build copies it across whenever the app's build script reruns, which a changed sidecar triggers. After changing the worker, run `bun run sidecar:unitsync` and let the app rebuild. Restarting `bun tauri dev` does both, because it runs `sidecar:all` first. A bare `cargo build -p coilbox-unitsync-worker` writes a debug worker to the same path, which lasts only until that build script next reruns. Check the flag directly rather than trusting the build's success message.
 
 ## Worktrees and branches
 
