@@ -108,6 +108,9 @@ vi.mock("../../play/PlayProvider", () => ({
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
+vi.mock("./components/ReplayBuildOrders", () => ({
+  ReplayBuildOrders: () => <p>build orders section</p>,
+}));
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
 
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
@@ -162,6 +165,7 @@ describe("ReplayDetailPage", () => {
     INFO = LOADED_INFO;
     renderAt("a.sdfz");
     expect(screen.queryByText("match stats section")).not.toBeNull();
+    expect(screen.queryByText("build orders section")).not.toBeNull();
   });
 
   it("hides the match statistics section when the profile hides it", () => {
@@ -170,5 +174,6 @@ describe("ReplayDetailPage", () => {
     INFO = LOADED_INFO;
     renderAt("a.sdfz");
     expect(screen.queryByText("match stats section")).toBeNull();
+    expect(screen.queryByText("build orders section")).toBeNull();
   });
 });

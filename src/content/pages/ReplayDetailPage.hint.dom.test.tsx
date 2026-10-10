@@ -97,6 +97,9 @@ vi.mock("./components/MatchStatsSection", () => ({
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
+vi.mock("./components/ReplayBuildOrders", () => ({
+  ReplayBuildOrders: () => null,
+}));
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
 
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
