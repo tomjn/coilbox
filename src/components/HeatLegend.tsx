@@ -1,4 +1,4 @@
-import { heatGradientCss } from "@/lib/heatRamp";
+import { type HeatKind, heatGradientCss } from "@/lib/heatRamp";
 
 /**
  * The key to a heatmap: the ramp from least to most, and what "most" is.
@@ -14,7 +14,10 @@ import { heatGradientCss } from "@/lib/heatRamp";
 export function HeatLegend({
   label,
   peak,
+  kind,
 }: {
+  /** The layer's ramp, so the bar is in the colour the layer is drawn in. */
+  kind: HeatKind;
   /** What is being counted, such as "Buildings ordered". */
   label: string;
   /** What the brightest point stands for, in words. */
@@ -33,7 +36,7 @@ export function HeatLegend({
         >
           <span
             className="block size-full rounded-sm"
-            style={{ backgroundImage: heatGradientCss() }}
+            style={{ backgroundImage: heatGradientCss(kind) }}
           />
         </span>
         <span>Most</span>

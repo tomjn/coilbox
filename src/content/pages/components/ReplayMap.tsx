@@ -4,6 +4,7 @@ import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { buildHeatField } from "@/lib/heatField";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
@@ -451,16 +452,21 @@ export function ReplayMap({
   }, [marks, colours, emphasis.state]);
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeatField(canvas, field);
+    if (canvas && field)
+      drawHeatField(canvas, field, HEAT_KIND_OF_LAYER.density);
   }, [field]);
   useEffect(() => {
     const canvas = orderHeatRef.current;
-    if (canvas && orderField) drawHeatField(canvas, orderField);
+    if (canvas && orderField)
+      drawHeatField(canvas, orderField, HEAT_KIND_OF_LAYER.orderDensity);
   }, [orderField]);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
-  useHeatmapLayer(handle, orderField ?? field);
-  useHeatmapLayer(handle, ev.field);
+  // One 3D layer for each density, so two on at once are both on the terrain,
+  // each in its own ramp.
+  useHeatmapLayer(handle, field, HEAT_KIND_OF_LAYER.density);
+  useHeatmapLayer(handle, orderField, HEAT_KIND_OF_LAYER.orderDensity);
+  useHeatmapLayer(handle, ev.field, HEAT_KIND_OF_LAYER.deaths);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
@@ -839,12 +845,14 @@ export function ReplayMap({
               <HeatLegend
                 label="Where orders were aimed"
                 peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                kind={HEAT_KIND_OF_LAYER.orderDensity}
               />
             )}
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
                 peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                kind={HEAT_KIND_OF_LAYER.density}
               />
             )}
           </div>

@@ -2,6 +2,7 @@ import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
 import { Download, ImageDown, Loader2 } from "lucide-react";
 import { useState } from "react";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { notify } from "@/notify/notify";
 import { currentVersion } from "../../../updater/updater";
 import { contentWriteFile } from "../../bindings";
@@ -125,6 +126,7 @@ export function MapExportButtons({
           minimapUrl,
           world,
           field,
+          kind: HEAT_KIND_OF_LAYER[layer],
           words: {
             info,
             layer,

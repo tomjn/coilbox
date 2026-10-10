@@ -13,11 +13,14 @@ import { useEffect, useState } from "react";
 
 import type { HeatField } from "./heatField";
 import { createHeatmapLayer, type HeatmapLayer } from "./heatmapLayer";
+import type { HeatKind } from "./heatRamp";
 import type { MapScene3D } from "./mapScene";
 
 export function useHeatmapLayer(
   handle: MapScene3D | null,
   field: HeatField | null,
+  /** Whose ramp the layer is drawn in. */
+  kind: HeatKind,
   /** Fraction of the peak below which nothing is drawn. See `heatRamp.ts`. */
   threshold?: number,
 ): void {
@@ -34,6 +37,9 @@ export function useHeatmapLayer(
   }, [handle]);
 
   useEffect(() => {
-    layer?.draw(field, threshold === undefined ? undefined : { threshold });
-  }, [layer, field, threshold]);
+    layer?.draw(
+      field,
+      threshold === undefined ? { kind } : { kind, threshold },
+    );
+  }, [layer, field, kind, threshold]);
 }

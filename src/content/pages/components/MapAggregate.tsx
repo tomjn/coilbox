@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
 import type { StatRecord } from "../../bindings";
@@ -371,9 +372,10 @@ export function MapAggregate({
   const heatRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeatField(canvas, field);
-  }, [field]);
-  useHeatmapLayer(scene, field);
+    if (canvas && field)
+      drawHeatField(canvas, field, HEAT_KIND_OF_LAYER[layer || "buildings"]);
+  }, [field, layer]);
+  useHeatmapLayer(scene, field, HEAT_KIND_OF_LAYER[layer || "buildings"]);
 
   const sized = world.worldWidth > 0 && world.worldHeight > 0;
   const withOrders = replays.filter((r) => r.orders.total > 0).length;
@@ -943,6 +945,7 @@ function LayerNotes({
         <HeatLegend
           label={LEGEND_LABEL[layer]}
           peak={layerLegend(layer, drawn, normalise, timeWindow)}
+          kind={HEAT_KIND_OF_LAYER[layer]}
         />
       )}
     </div>

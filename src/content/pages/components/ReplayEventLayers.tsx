@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
 import {
   deathLegend,
@@ -60,7 +61,8 @@ export function EventLayerCanvases({
 
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeatField(canvas, field);
+    if (canvas && field)
+      drawHeatField(canvas, field, HEAT_KIND_OF_LAYER.deaths);
   }, [field]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the emphasis state stands for isLit and dimming
@@ -306,7 +308,7 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
       )}
 
       {deathLegendText && ev.field && ev.field.peak > 0 && (
-        <HeatLegend {...deathLegendText} />
+        <HeatLegend {...deathLegendText} kind={HEAT_KIND_OF_LAYER.deaths} />
       )}
     </>
   );
