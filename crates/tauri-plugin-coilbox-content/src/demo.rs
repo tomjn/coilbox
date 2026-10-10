@@ -17,6 +17,9 @@
 //! this decoder refuses (a future engine version, say), [`demo_info`] shells
 //! out to `demotool --teamstats` for the winner alone, if the tool happens to
 //! ship beside the engine.
+//!
+//! The demo stream itself, which is what each player did, is walked by
+//! [`stream`].
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -35,6 +38,8 @@ use crate::model::{
     AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, PlayerStats,
     ReplayFile, StartBox, TeamStatSample, TeamStatSeries,
 };
+
+pub(crate) mod stream;
 
 /// Folders under a write dir that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`), and some lobbies/users use `replays/`.
@@ -2976,6 +2981,213 @@ mod tests {
 
         let err = decode_trailer(&bytes).unwrap_err();
         assert!(err.contains("teamStatSize"), "got: {err}");
+    }
+
+    // ---- the demo stream, inside a whole file --------------------------------
+
+    use super::stream::fixture::Packets;
+    use crate::model::{ChatDest, StreamEventKind, PREGAME_FRAME};
+
+    /// A finished 1v1 with a demo stream in it: a start position, two frames,
+    /// and a line of chat.
+    fn fixture_with_stream(stream: Vec<u8>) -> DemoFixture {
+        DemoFixture {
+            stream,
+            winning_ally_teams: vec![1],
+            player_stats: vec![[163, 163, 416_476, 493, 277], [194, 230, 227_928, 364, 462]],
+            team_samples: vec![series(3), series(3)],
+            ..Default::default()
+        }
+    }
+
+    fn short_match() -> Packets {
+        Packets::default()
+            .start_pos(0, 0, 1, [724.0, 0.0, 800.0])
+            .keyframe(0)
+            .newframes(1)
+            .chat(1, 254, "gg")
+    }
+
+    /// The stream sits between the start script and the trailer, and the
+    /// header's sizes are the only thing that says where. A walk that started
+    /// a byte off would read the script's tail as a packet header.
+    #[test]
+    fn the_stream_is_found_between_the_script_and_the_trailer() {
+        let bytes = fixture_with_stream(short_match().bytes()).bytes();
+        let s = stream::decode_stream(&bytes).unwrap();
+
+        assert_eq!(s.stopped, None);
+        assert_eq!(s.undecoded, 0);
+        assert_eq!(s.packets, 4);
+        assert_eq!(s.last_frame, 1);
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.events[0].frame, PREGAME_FRAME);
+        assert_eq!(
+            s.events[1].kind,
+            StreamEventKind::Chat {
+                from: 1,
+                dest: ChatDest::Everyone,
+                text: "gg".into()
+            }
+        );
+        assert_eq!(s.events[1].frame, 1);
+    }
+
+    #[test]
+    fn a_gzipped_replay_walks_its_stream() {
+        let p = write_tmp(
+            "stream_gz.sdfz",
+            &fixture_with_stream(short_match().bytes()).gzipped(),
+        );
+        let s = stream::read_stream(&p).unwrap();
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.last_frame, 1);
+    }
+
+    /// The two robustness points in issue #1144. A stream whose framing breaks
+    /// stops the walk and is not an error, and the trailer behind it decodes
+    /// exactly as it would have, because it is found from the header and not
+    /// from where the walk stopped.
+    #[test]
+    fn a_broken_stream_stops_the_walk_and_leaves_the_trailer_readable() {
+        let mut stream = short_match().bytes();
+        let break_at = stream.len();
+        // A chunk header claiming far more than the file holds, then junk.
+        stream.extend_from_slice(&9.0f32.to_le_bytes());
+        stream.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        stream.extend_from_slice(&[0xAB; 40]);
+        let f = fixture_with_stream(stream);
+        let bytes = f.bytes();
+
+        let s = stream::decode_stream(&bytes).unwrap();
+        assert_eq!(s.events.len(), 2);
+        assert_eq!(s.stopped.expect("should have stopped").offset, break_at);
+
+        let t = decode_trailer(&bytes).unwrap();
+        assert_eq!(t.winning_ally_teams, vec![1]);
+        assert_eq!(t.teams[1].samples[2], sample(2));
+        assert_eq!(t.players.unwrap()[1].num_commands, 194);
+    }
+
+    /// A recording cut off part way through its stream still gives up the
+    /// packets that made it to disk, and says it stopped.
+    #[test]
+    fn a_file_that_ends_inside_its_stream_keeps_the_packets_it_has() {
+        let stream = short_match().bytes();
+        let stream_len = stream.len();
+        let mut f = fixture_with_stream(stream);
+        let trailer_len = f.bytes().len() - (f.header_size + f.script.len() + stream_len);
+        // Drop the whole trailer and the last 3 bytes of the chat packet.
+        f.truncate_by = trailer_len + 3;
+
+        let s = stream::decode_stream(&f.bytes()).unwrap();
+        assert_eq!(s.events.len(), 1, "the start position, not the chat");
+        assert_eq!(s.last_frame, 1);
+        assert!(s.stopped.is_some());
+
+        // Cut exactly at a packet boundary, the walk itself sees nothing
+        // wrong, so the missing bytes have to be reported from the header.
+        // The chat packet is an 8 byte chunk header and a 7 byte payload.
+        let chat_packet = 8 + 7;
+        f.truncate_by = trailer_len + chat_packet;
+        let s = stream::decode_stream(&f.bytes()).unwrap();
+        let stop = s.stopped.expect("should have stopped");
+        assert_eq!(stop.offset, stream_len - chat_packet);
+        assert!(stop.reason.contains("15 bytes before"), "{}", stop.reason);
+    }
+
+    #[test]
+    fn a_replay_with_no_stream_walks_to_nothing() {
+        let s = stream::decode_stream(&fixture_with_stream(Vec::new()).bytes()).unwrap();
+        assert_eq!(s.events, vec![]);
+        assert_eq!(s.last_frame, PREGAME_FRAME);
+        assert_eq!(s.stopped, None);
+    }
+
+    /// The stream refuses the same two header fields the trailer does. A
+    /// different version or header size moves where the stream starts.
+    #[test]
+    fn a_stream_behind_an_unknown_header_is_refused() {
+        let f = DemoFixture {
+            version: 6,
+            ..fixture_with_stream(short_match().bytes())
+        };
+        let err = stream::decode_stream(&f.bytes()).unwrap_err();
+        assert!(err.contains("version is 6, not 5"), "got: {err}");
+
+        let f = DemoFixture {
+            header_size: 360,
+            ..fixture_with_stream(short_match().bytes())
+        };
+        let err = stream::decode_stream(&f.bytes()).unwrap_err();
+        assert!(err.contains("headerSize is 360, not 352"), "got: {err}");
+
+        let err = stream::decode_stream(b"not a demo").unwrap_err();
+        assert!(err.contains("bad magic"), "got: {err}");
+    }
+
+    /// End-to-end over real replays, for the check a synthetic stream cannot
+    /// make: that the layouts agree with packets the engine wrote. Ignored by
+    /// default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_streams -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_streams() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let mut seen = 0;
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            // A zero length file is a recording in progress, not a replay yet.
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            seen += 1;
+            let s = stream::read_stream(&path).unwrap_or_else(|err| {
+                panic!("{}: {err}", path.display());
+            });
+            let mut counts: std::collections::BTreeMap<&str, usize> = Default::default();
+            for e in &s.events {
+                *counts
+                    .entry(match e.kind {
+                        StreamEventKind::PlayerName { .. } => "playerName",
+                        StreamEventKind::Chat { .. } => "chat",
+                        StreamEventKind::SystemMessage { .. } => "systemMessage",
+                        StreamEventKind::Command { .. } => "command",
+                        StreamEventKind::Select { .. } => "select",
+                        StreamEventKind::GameOver { .. } => "gameOver",
+                        StreamEventKind::StartPos { .. } => "startPos",
+                    })
+                    .or_default() += 1;
+            }
+            eprintln!(
+                "{}: packets={} lastFrame={} undecoded={} stopped={:?} {counts:?}",
+                path.file_name().unwrap().to_string_lossy(),
+                s.packets,
+                s.last_frame,
+                s.undecoded,
+                s.stopped,
+            );
+            // Every packet of a kind the walk reads fits the layout it reads
+            // it with, and the framing holds to the last byte.
+            assert_eq!(s.undecoded, 0, "{}", path.display());
+            assert_eq!(s.stopped, None, "{}", path.display());
+            // The stream's own clock reaches the header's match length, which
+            // is in whole seconds at 30 frames each. It can run past it: a
+            // client writes that field when the game ends (`CGame::GameEnd`)
+            // and keeps recording until the player leaves, which on the 2313
+            // second All That Glitters replay is 14 seconds later.
+            let info = decode_native(&path).unwrap();
+            let secs = s.last_frame / 30;
+            assert!(
+                secs >= info.duration_sec as i32,
+                "{}: stream ends at {secs}s, header says {}s",
+                path.display(),
+                info.duration_sec
+            );
+        }
+        assert!(seen > 0, "no replays in {dir}");
     }
 
     /// End-to-end over the real replays in `~/.spring/demos`, which is the check a

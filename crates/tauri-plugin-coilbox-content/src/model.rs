@@ -426,6 +426,157 @@ pub struct DemoTrailer {
     pub players: Option<Vec<PlayerStats>>,
 }
 
+/// The frame every event carries until the simulation starts. It is the
+/// engine's own `gs->frameNum` before the first `NETMSG_KEYFRAME`, so a start
+/// position or a line of lobby chat sits at -1 and the first order at 0 or later.
+pub const PREGAME_FRAME: i32 = -1;
+
+/// What a walk over a replay's demo stream found: what each player did, in the
+/// order the engine recorded it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoStream {
+    pub events: Vec<StreamEvent>,
+    /// The last simulation frame the stream reached, or [`PREGAME_FRAME`] when
+    /// the match never started. 30 frames are one second of match time.
+    ///
+    /// It can be later than the header's game time. A client writes that field
+    /// when the game ends and keeps recording until the player leaves.
+    pub last_frame: i32,
+    /// How many packets the walk stepped over, of every kind.
+    pub packets: u32,
+    /// Packets of a kind the walk reads whose bytes did not fit that kind's
+    /// layout. Each was skipped by its declared length and produced no event.
+    pub undecoded: u32,
+    /// Set when the walk stopped before the end of the stream. The events up to
+    /// that point are still good, and so is the trailer, which is found from
+    /// the header and not from where the walk got to.
+    pub stopped: Option<StreamStop>,
+}
+
+/// Where and why a stream walk stopped early.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamStop {
+    /// Bytes into the stream, counted from its first packet.
+    pub offset: usize,
+    pub reason: String,
+}
+
+/// One thing a player did, with the match time it happened at.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamEvent {
+    /// The simulation frame the event arrived in. [`PREGAME_FRAME`] before the
+    /// match starts.
+    pub frame: i32,
+    /// The packet's `modGameTime`, in seconds. It runs from before the match
+    /// starts and does not advance while the game is paused, so it orders the
+    /// pregame events that all share one frame. It is not match time.
+    pub time: f32,
+    #[serde(flatten)]
+    pub kind: StreamEventKind,
+}
+
+/// The messages the walk reads. `player` is the number the start script's
+/// `[playerN]` sections use, and 255 is the server.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum StreamEventKind {
+    /// `NETMSG_PLAYERNAME`. A player connected under this name.
+    #[serde(rename_all = "camelCase")]
+    PlayerName { player: u8, name: String },
+    /// `NETMSG_CHAT`.
+    #[serde(rename_all = "camelCase")]
+    Chat {
+        from: u8,
+        dest: ChatDest,
+        text: String,
+    },
+    /// `NETMSG_SYSTEMMSG`. A line the server said, such as a connection attempt.
+    #[serde(rename_all = "camelCase")]
+    SystemMessage { player: u8, text: String },
+    /// One packet of orders: `NETMSG_COMMAND`, `NETMSG_AICOMMAND`,
+    /// `NETMSG_AICOMMAND_TRACKED` or `NETMSG_AICOMMANDS`. One packet is one
+    /// action by the player, however many orders it carries.
+    #[serde(rename_all = "camelCase")]
+    Command {
+        player: u8,
+        origin: CommandOrigin,
+        /// The units the orders are for. Empty when the origin is
+        /// [`CommandOrigin::Selection`], where they go to whatever that player
+        /// last selected.
+        units: Vec<u16>,
+        /// True when `orders[i]` goes to `units[i]`. Otherwise every order goes
+        /// to every unit.
+        pairwise: bool,
+        orders: Vec<Order>,
+    },
+    /// `NETMSG_SELECT`. The player's selection is now exactly these units.
+    #[serde(rename_all = "camelCase")]
+    Select { player: u8, units: Vec<u16> },
+    /// `NETMSG_GAMEOVER`. Each player's client reports the result it saw, so a
+    /// match has several of these and they can disagree.
+    #[serde(rename_all = "camelCase")]
+    GameOver {
+        player: u8,
+        winning_ally_teams: Vec<u8>,
+    },
+    /// `NETMSG_STARTPOS`. Where a team asked to start, in world coordinates.
+    /// A team can send many, and the last one is the one that counted. The
+    /// server sends it for a team no player controls.
+    #[serde(rename_all = "camelCase")]
+    StartPos {
+        player: u8,
+        team: u8,
+        /// 0 not ready, 1 ready, 2 leave readiness as it was.
+        ready: u8,
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+}
+
+/// Who a chat line was addressed to.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ChatDest {
+    Player { player: u8 },
+    Allies,
+    Spectators,
+    Everyone,
+}
+
+/// What issued a packet of orders.
+///
+/// The message id alone does not say. Every `NETMSG_AICOMMAND` in the replays
+/// measured came from a player's own Lua widgets, not from an AI, so counting
+/// that message as AI activity would hand a human's orders to a bot.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum CommandOrigin {
+    /// The player ordered their current selection through the engine's own
+    /// interface.
+    Selection,
+    /// A Lua widget on the player's machine ordered named units.
+    Lua,
+    /// A skirmish AI hosted by `player` ordered a unit of its own team.
+    Ai { ai: u8, team: u8 },
+}
+
+/// One order as the engine's `Command` holds it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Order {
+    /// The command id. Negative means build, and the unit definition id is the
+    /// absolute value.
+    pub id: i32,
+    /// The engine's option bits: 4 meta, 8 internal, 16 right mouse, 32 shift,
+    /// 64 control, 128 alt.
+    pub options: u8,
+    pub params: Vec<f32>,
+}
+
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// Read the store from `path`, returning a default (empty) store if it's absent.
