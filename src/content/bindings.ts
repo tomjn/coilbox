@@ -759,6 +759,78 @@ export const contentDemoChat = defineCommand<
   { messages: ChatLine[]; incomplete: boolean }
 >("coilbox-content", "content_demo_chat");
 
+/** What issued an order. `lua` is a widget on the player's own machine acting
+ *  for that player, not a bot. `ai` is a skirmish AI the player's machine hosts. */
+export type CommandOrigin =
+  | { kind: "selection" }
+  | { kind: "lua" }
+  | { kind: "ai"; ai: number; team: number };
+
+/** Where in a builder's queue a build order went. */
+export type BuildSlot =
+  /** A placed building given without shift, which replaces the queue. */
+  | { kind: "replace" }
+  /** The end of the queue: a placed building given with shift, or a factory order. */
+  | { kind: "append" }
+  /** A factory order given with alt, which goes to the front. */
+  | { kind: "front" }
+  /** The engine's insert command by position. 0 is "build this next", and a
+   *  negative position counts back from the end. */
+  | { kind: "insertAt"; position: number }
+  /** The engine's insert command beside the queued command carrying `tag`. */
+  | { kind: "insertAtTag"; tag: number; after: boolean };
+
+/** One order to build a unit, as a player gave it. An order, not a building:
+ *  the replay does not say whether it was carried out. */
+export interface BuildOrder {
+  /** Simulation frame. 30 frames are one second of match time. */
+  frame: number;
+  /** The `[playerN]` number of whoever sent it. */
+  player: number;
+  /** The `[teamN]` index that player was on at the time, or the AI's team. */
+  team?: number;
+  origin: CommandOrigin;
+  /** The engine's unit definition id, which means something only inside the
+   *  build of the game the replay was played on. See `resolveBuildUnit`. */
+  unitDefId: number;
+  /** Where the building was placed, in elmos. Absent for a factory queue order. */
+  position?: { x: number; y: number; z: number };
+  /** 0 south, 1 east, 2 north, 3 west. Absent when the order does not say. */
+  facing?: number;
+  /** How many units the order asks for: 1 for a placed building, and 1, 5, 20
+   *  or 100 for a factory queue order. */
+  count: number;
+  slot: BuildSlot;
+  /** How many units were given the order. One order to several builders is
+   *  one order. */
+  builders: number;
+  /** The build command's option bits as the engine sent them. */
+  options: number;
+}
+
+export interface DemoBuildOrders {
+  /** Every build order, in the order the engine recorded them. */
+  orders: BuildOrder[];
+  /** A name for each player number in `orders` that has one. */
+  players: { player: number; name: string }[];
+  /** Factory queue orders that took units off a queue. Counted, not listed. */
+  removals: number;
+  /** The last simulation frame the replay reached. */
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Read every order to build something out of a replay (#1145). Needs no engine
+ * folder and no installed game: the unit definition ids come back as the
+ * engine recorded them. Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoBuildOrders = defineCommand<
+  { replayPath: string },
+  DemoBuildOrders
+>("coilbox-content", "content_demo_build_orders");
+
 /**
  * Write a "remixed" **copy** of a replay whose embedded `gametype` is
  * `targetGametype` (and, when `engineVersion` is set, whose header engine version
