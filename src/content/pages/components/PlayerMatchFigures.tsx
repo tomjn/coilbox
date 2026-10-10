@@ -22,6 +22,7 @@ import {
   type TrendPoint,
   trendSeries,
 } from "../../playerMatchFigures";
+import { SectionHelp } from "./SectionHelp";
 
 /**
  * A player's match figures as rates: the average per minute for each metric the
@@ -239,30 +240,55 @@ export function PlayerMatchFigures({
 
   return (
     <section className="rounded-lg border border-border/60 bg-card p-4">
-      <h2 className="mb-1 text-sm font-medium">Match figures</h2>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Each figure is the total for the army {playerName} controlled, divided
-        by the match's minutes, averaged over the games below. The average is
-        the mean of each game's own rate, with the median beside it. Allies on
-        one side each have their own figures. Only players who share control of
-        one army have the same figures.
-      </p>
+      <div className="mb-2 flex items-center gap-1">
+        <h2 className="text-sm font-medium">Match figures</h2>
+        <SectionHelp section="match figures">
+          <p>
+            Each figure is the total for the army {playerName} controlled,
+            divided by the match's minutes, averaged over the games counted. The
+            average is the mean of each game's own rate, with the median beside
+            it.
+          </p>
+          <p>
+            Allies on one side each have their own figures. Only players who
+            share control of one army have the same figures.
+            {data.sharedTeamGames > 0
+              ? ` In ${games(data.sharedTeamGames)} another player shared control of ${playerName}'s army.`
+              : ""}
+          </p>
+          {note && <p>{note}</p>}
+          <p>
+            A game with no recorded result is in All only. The store holds
+            end-of-match totals, so these figures cannot say how far ahead a
+            player was at a given minute.
+          </p>
+          {ratioTable.length > 0 && (
+            <>
+              <p>
+                A ratio is one figure over another for the same army, and is not
+                per minute. A game where the lower figure is zero has no ratio.
+                It is left out of the average and counted beside it.
+              </p>
+              <p>
+                The average is the mean of each game's own ratio, with the
+                median beside it. A game with very little in the lower figure
+                can pull the mean up.
+              </p>
+            </>
+          )}
+        </SectionHelp>
+      </div>
 
       {data.counted === 0 || metrics.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {metrics.length === 0
             ? "Match figures are not available yet."
             : `None of ${playerName}'s ${games(data.games)} has figures recorded, so there are no figures to show.`}
-          {note && metrics.length > 0 ? ` ${note}` : ""}
         </p>
       ) : (
         <>
           <p className="mb-2 text-xs text-muted-foreground">
-            Drawn from {data.counted} of {games(data.games)}.{" "}
-            {note ? `${note} ` : ""}
-            {data.sharedTeamGames > 0
-              ? `In ${games(data.sharedTeamGames)} another player shared control of ${playerName}'s army.`
-              : ""}
+            Drawn from {data.counted} of {games(data.games)}.
           </p>
           <div>
             <table className="w-full text-sm">
@@ -322,15 +348,6 @@ export function PlayerMatchFigures({
               )}
             </table>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A game with no recorded result is in All only. The store holds
-            end-of-match totals, so these figures cannot say how far ahead a
-            player was at a given minute.
-            {ratioTable.length > 0
-              ? " A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio, so it is left out of the average and counted beside it. The average is the mean of each game's own ratio with the median beside it, so a game with very little in the lower figure can pull the mean up."
-              : ""}
-          </p>
-
           {trendMetric && (
             <div className="mt-4">
               <div className="mb-2 flex flex-wrap items-center gap-2">

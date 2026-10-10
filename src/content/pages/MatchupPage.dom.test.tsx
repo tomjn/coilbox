@@ -3,7 +3,13 @@
  * The matchup page shows records as counts and links each game to its replay
  * (#1168).
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { StatPlayer, StatRecord } from "../bindings";
@@ -67,6 +73,23 @@ afterEach(() => {
   window.location.hash = "";
 });
 
+function show(me = "me") {
+  window.location.hash = `#/stats/foe/matchup?me=${me}`;
+  return render(
+    <HashRouter>
+      <Routes>
+        <Route path="/stats/:name/matchup" element={<MatchupPage />} />
+      </Routes>
+    </HashRouter>,
+  );
+}
+
+/** The page's help, opened. Call once per test. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the matchup" }));
+  return within(screen.getByRole("dialog"));
+};
+
 describe("MatchupPage", () => {
   it("shows counts, no percentage, and links each game to its replay", () => {
     window.location.hash = "#/stats/foe/matchup?me=me";
@@ -88,5 +111,24 @@ describe("MatchupPage", () => {
       .getAllByRole("link")
       .map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("#/play/replays/g3.sdfz");
+  });
+
+  it("keeps the explanation out of the page until the help is opened", () => {
+    show();
+    const moved = [
+      /on opposing teams, from the replays in your content folders/,
+      /Each square is one game, oldest first/,
+    ];
+    for (const said of moved) expect(screen.queryByText(said)).toBeNull();
+    const dialog = help();
+    for (const said of moved)
+      expect(dialog.getAllByText(said).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the record and each group's counts inline", () => {
+    const { container } = show();
+    expect(container.textContent).toContain("3 games against foe: 2 of 3 won");
+    expect(screen.getAllByText(/2 games · /).length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "By map" })).toBeTruthy();
   });
 });
