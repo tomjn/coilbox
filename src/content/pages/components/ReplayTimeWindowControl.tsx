@@ -20,10 +20,27 @@ export interface WindowCount {
   total: number;
 }
 
-function countText(count: WindowCount, noun: string): string {
-  if (count.total === 0) return `No ${noun}.`;
+/** What the window is about. Orders have a time they were given, and events
+ *  have a time they happened in the playback, and the two are not added up. */
+export type WindowSubject = "orders" | "events" | "both";
+
+const SUBJECT_TEXT: Record<WindowSubject, string> = {
+  orders: "Orders given",
+  events: "Events",
+  both: "Orders given and events",
+};
+
+const SUBJECT_NOTE: Record<WindowSubject, string> = {
+  orders: "The window is when an order was given, not when anything was built.",
+  events: "The window is when each event happened in the playback.",
+  both: "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback.",
+};
+
+function countText(count: WindowCount, noun: string, order = true): string {
+  if (count.total === 0)
+    return order ? `No ${noun}.` : `No ${noun} were recorded.`;
   if (count.inside === 0)
-    return `None of the ${count.total.toLocaleString()} ${noun} were given in this window.`;
+    return `None of the ${count.total.toLocaleString()} ${noun} ${order ? "were given" : "happened"} in this window.`;
   return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun} are in this window.`;
 }
 
@@ -47,6 +64,8 @@ export function ReplayTimeWindowControl({
   count,
   noun = "orders",
   also,
+  events = [],
+  subject = "orders",
 }: {
   domainSec: number;
   window: TimeWindow | null;
@@ -59,6 +78,11 @@ export function ReplayTimeWindowControl({
   noun?: string;
   /** A second kind of point to count, when two layers with different points are on. */
   also?: { count: WindowCount | null; noun: string };
+  /** The counts of layers drawn from events, each stated apart from the
+   *  orders because an event and an order are different things to count. */
+  events?: { noun: string; inside: number; total: number }[];
+  /** Which kinds of layer are on. Default orders. */
+  subject?: WindowSubject;
 }) {
   const [draft, setDraft] = useState<[number, number] | null>(null);
   const latest = useRef<[number, number] | null>(null);
@@ -181,16 +205,17 @@ export function ReplayTimeWindowControl({
 
       <p className="text-xs text-muted-foreground">
         {narrowed
-          ? `Orders given from ${axisTime(shown[0])} to ${axisTime(shown[1])}.`
+          ? `${SUBJECT_TEXT[subject]} from ${axisTime(shown[0])} to ${axisTime(shown[1])}.`
           : `The whole match, ${axisTime(0)} to ${axisTime(domainSec)}.`}
         {count && ` ${countText(count, noun)}`}
         {also?.count && ` ${countText(also.count, also.noun)}`}
+        {events.map((e) => ` ${countText(e, e.noun, false)}`)}
       </p>
       <p className="text-xs text-muted-foreground">
         {activity
           ? `Behind the range, ${activity.label.toLowerCase()} across all teams.`
           : "No match statistics are drawn behind the range."}{" "}
-        The window is when an order was given, not when anything was built.
+        {SUBJECT_NOTE[subject]}
       </p>
     </div>
   );
