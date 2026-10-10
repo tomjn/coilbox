@@ -83,7 +83,7 @@ describe("playerRateGames", () => {
     expect(r.counted).toBe(1);
     expect(r.leftOutNoTotals).toBe(2);
     expect(r.leftOutNoLength).toBe(2);
-    expect(leftOutNote(r)).toContain("2 with no team totals");
+    expect(leftOutNote(r)).toContain("2 with no figures");
     expect(leftOutNote(r)).toContain("2 with no usable length");
     for (const g of r.list)
       for (const v of Object.values(g.rates))
@@ -116,7 +116,7 @@ describe("playerRateGames", () => {
     expect(r.list.map((g) => g.filename)).toEqual(["real"]);
   });
 
-  it("gives every player on a shared team the whole total and says so", () => {
+  it("gives every player sharing one engine team the whole total and says so", () => {
     const g = game({
       filename: "coop",
       players: [seat("me", 0, true), seat("pal", 0, true)],
@@ -128,6 +128,26 @@ describe("playerRateGames", () => {
     expect(mine.sharedTeamGames).toBe(1);
     const solo = playerRateGames([game({ filename: "s" })], "me", [alpha]);
     expect(solo.sharedTeamGames).toBe(0);
+  });
+
+  it("does not count allies on separate engine teams as sharing", () => {
+    const g = game({
+      filename: "allies",
+      players: [
+        { ...seat("me", 0, true), allyTeam: 0 },
+        { ...seat("pal", 1, true), allyTeam: 0 },
+      ],
+      teamTotals: [
+        { team: 0, totals: { alpha: 1000 } },
+        { team: 1, totals: { alpha: 300 } },
+      ],
+    });
+    const mine = playerRateGames([g], "me", [alpha]);
+    const theirs = playerRateGames([g], "pal", [alpha]);
+    expect(mine.list[0].rates.alpha).toBe(100);
+    expect(theirs.list[0].rates.alpha).toBe(30);
+    expect(mine.sharedTeamGames).toBe(0);
+    expect(theirs.sharedTeamGames).toBe(0);
   });
 
   it("orders games by start time", () => {

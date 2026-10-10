@@ -17,9 +17,10 @@ import { formatTotal } from "./matchStats";
  * here, and the metrics on offer are whatever the registry flags `roster`,
  * because those are the only totals the store keeps.
  *
- * The other basis is one player's own team, for a library about "me": the
- * figure is that team's total and nothing else, whatever the metric counts.
- * It needs the team id the store records for each seat, so a replay the player
+ * The other basis is one player's own figures, for a library about "me": the
+ * totals of the army that player controls and nothing else, whatever the
+ * metric counts. Allies on one side have different figures. It needs the
+ * team id the store records for each seat, so a replay the player
  * was not in, and a record ingested before the store kept team ids, have no
  * figure on this basis. Team 0 is a real team, so "unknown" is never 0.
  */
@@ -52,10 +53,10 @@ export function libraryMetrics(metrics: Metric[]): Metric[] {
 
 /**
  * Whether a metric's row figure is the best team or the sum of all teams, or
- * the named player's own team when a player is given.
+ * the named player's own total when a player is given.
  */
 export function figureBasis(metric: Metric, player?: string): string {
-  if (player) return `${player}'s team`;
+  if (player) return `${player}'s own total`;
   return metric.unit === "metal" || metric.unit === "energy"
     ? "best team"
     : "match total";
@@ -78,7 +79,7 @@ export function playerTeam(
  * record that measured nothing has no totals, and that is not the same as a
  * total of zero.
  *
- * With `player`, the figure is that player's own team's total, and is
+ * With `player`, the figure is the total of the army that player controls, and is
  * undefined when the player was not in the match or their team is unknown.
  * Without it, the figure is for the whole match.
  */
