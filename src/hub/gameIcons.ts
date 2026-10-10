@@ -89,18 +89,32 @@ const answers = new Map<string, HubGame[]>();
  * caller. A failure is remembered as an empty list for the rest of the session,
  * so a hub that is down is asked once rather than on every page that opens.
  * Never rejects, and says nothing about a failure: the pages that use this have
- * a picture to show without it.
+ * a picture to show without it. The launch-time read passes `rememberFailure`
+ * false, so a failure it meets, such as no network, is dropped and the first
+ * page that needs the list asks again.
  */
-export function loadHubGames(hubUrl: string): Promise<HubGame[]> {
+export function loadHubGames(
+  hubUrl: string,
+  rememberFailure = true,
+): Promise<HubGame[]> {
   let request = requests.get(hubUrl);
   if (!request) {
-    request = fetchHubGames(hubUrl)
-      .then((result) => (result.ok ? result.value : []))
-      .catch(() => [])
+    const started: Promise<HubGame[]> = fetchHubGames(hubUrl)
+      .then((result) => (result.ok ? result.value : null))
+      .catch(() => null)
       .then((games) => {
-        answers.set(hubUrl, games);
-        return games;
+        if (games) {
+          answers.set(hubUrl, games);
+          return games;
+        }
+        if (rememberFailure) {
+          answers.set(hubUrl, []);
+        } else if (requests.get(hubUrl) === started) {
+          requests.delete(hubUrl);
+        }
+        return [];
       });
+    request = started;
     requests.set(hubUrl, request);
   }
   return request;
