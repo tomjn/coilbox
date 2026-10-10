@@ -36,12 +36,29 @@ const SUBJECT_NOTE: Record<WindowSubject, string> = {
   both: "For orders the window is when each was given, not when anything was built. For events it is when each happened in the playback.",
 };
 
-function countText(count: WindowCount, noun: string, order = true): string {
-  if (count.total === 0)
-    return order ? `No ${noun}.` : `No ${noun} were recorded.`;
-  if (count.inside === 0)
-    return `None of the ${count.total.toLocaleString()} ${noun} ${order ? "were given" : "happened"} in this window.`;
-  return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun} are in this window.`;
+/** A count as a short label, such as "2,897 of 2,897 building orders". */
+function countText(count: WindowCount, noun: string): string {
+  if (count.total === 0) return `No ${noun}.`;
+  return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun}.`;
+}
+
+/**
+ * What the window means, for the section's help entry: what it filters by, and
+ * what is drawn behind the range when there is nothing to draw. Mount it only when the control is shown.
+ */
+export function TimeWindowHelp({
+  activity,
+  subject,
+}: {
+  activity: ActivitySeries | null;
+  subject: WindowSubject;
+}) {
+  return (
+    <p>
+      {SUBJECT_NOTE[subject]}
+      {!activity && " No match statistics are drawn behind the range."}
+    </p>
+  );
 }
 
 const sameWindow = (a: TimeWindow | null, b: TimeWindow) =>
@@ -209,14 +226,13 @@ export function ReplayTimeWindowControl({
           : `The whole match, ${axisTime(0)} to ${axisTime(domainSec)}.`}
         {count && ` ${countText(count, noun)}`}
         {also?.count && ` ${countText(also.count, also.noun)}`}
-        {events.map((e) => ` ${countText(e, e.noun, false)}`)}
+        {events.map((e) => ` ${countText(e, e.noun)}`)}
       </p>
-      <p className="text-xs text-muted-foreground">
-        {activity
-          ? `Behind the range, ${activity.label.toLowerCase()} across all teams.`
-          : "No match statistics are drawn behind the range."}{" "}
-        {SUBJECT_NOTE[subject]}
-      </p>
+      {activity && (
+        <p className="text-xs text-muted-foreground">
+          {`Behind the range, ${activity.label.toLowerCase()} across all teams.`}
+        </p>
+      )}
     </div>
   );
 }

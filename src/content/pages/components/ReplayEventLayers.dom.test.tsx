@@ -14,6 +14,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
@@ -225,6 +226,11 @@ beforeAll(() => {
 });
 
 const toggle = (name: string) => screen.getByRole("button", { name });
+/** The map's help entry, opened. What the layers mean is said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the map" }));
+  return within(screen.getByRole("dialog"));
+};
 const layer = (name: string) =>
   document.querySelector(`[data-layer="${name}"]`);
 
@@ -255,8 +261,15 @@ describe("a replay with no analysis", () => {
       expect((toggle(name) as HTMLButtonElement).disabled).toBe(true);
     }
     expect(screen.getByTestId("event-block").textContent).toMatch(
-      /this replay has not been analysed/,
+      /This replay has not been analysed/,
     );
+    // The reason is on each switch that cannot be used, and the long
+    // explanation of what the layers draw from is in the help.
+    expect(toggle("Deaths").parentElement?.getAttribute("title")).toMatch(
+      /This replay has not been analysed/,
+    );
+    expect(screen.queryByText(/draw events from an analysis/)).toBeNull();
+    expect(help().getByText(/draw events from an analysis/)).toBeTruthy();
     fireEvent.click(toggle("Deaths"));
     expect(toggle("Deaths").dataset.state).toBe("off");
     expect(eventsRead).not.toHaveBeenCalled();
@@ -349,7 +362,8 @@ describe("deaths", () => {
     expect(layer("deaths")).toBeTruthy();
     expect(screen.queryByText(/orders within/)).toBeNull();
     expect(screen.getByText(/3 units died/)).toBeTruthy();
-    expect(screen.getByText(/1 had no attacker recorded/)).toBeTruthy();
+    expect(screen.queryByText(/no attacker recorded/)).toBeNull();
+    expect(help().getByText(/1 death has no attacker recorded/)).toBeTruthy();
   });
 
   it("says where its numbers come from and that they are events", async () => {
@@ -358,10 +372,12 @@ describe("deaths", () => {
     show();
     fireEvent.click(toggle("Deaths"));
     await screen.findByText("Where units died");
-    expect(screen.getByText(/playing the match back/)).toBeTruthy();
-    expect(screen.getByText(/These are events, not orders/)).toBeTruthy();
+    expect(screen.queryByText(/playing the match back/)).toBeNull();
+    const said = help();
+    expect(said.getByText(/playing the match back/)).toBeTruthy();
+    expect(said.getByText(/These are events, not orders/)).toBeTruthy();
     expect(
-      screen.getByText(/reproduced the recorded match exactly/),
+      said.getByText(/reproduced the recorded match exactly/),
     ).toBeTruthy();
   });
 
@@ -375,7 +391,7 @@ describe("deaths", () => {
       screen.getByRole("button", { name: /Start position of Alice/ }),
     );
     expect(screen.getByText(/Most is 2 deaths/)).toBeTruthy();
-    expect(screen.getByText(/Every player's deaths are counted/)).toBeTruthy();
+    expect(help().getByText(/Every player's deaths are counted/)).toBeTruthy();
   });
 
   it("says so, and draws nothing, when nothing died", async () => {
@@ -456,11 +472,13 @@ describe("metal cost", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText("Where metal was lost")).toBeTruthy();
+    expect(screen.queryByText(/where value was lost/)).toBeNull();
+    const said = help();
     expect(
-      screen.getByText(/where value was lost and not where units died/),
+      said.getByText(/where value was lost and not where units died/),
     ).toBeTruthy();
     // The third death is of a unit the game costs too, so none count nothing.
-    expect(screen.queryByText(/no stated cost/)).toBeNull();
+    expect(said.queryByText(/no stated cost/)).toBeNull();
   });
 
   it("warns when the costs come from another build", async () => {
@@ -493,8 +511,9 @@ describe("buildings finished", () => {
       gameId: "game-a",
       kinds: ["unit_finished"],
     });
+    expect(screen.queryByText(/finished unit that moves/)).toBeNull();
     expect(
-      screen.getByText(/1 finished unit that moves is not drawn/),
+      help().getByText(/1 finished unit that moves is not drawn/),
     ).toBeTruthy();
     expect(layer("finished")).toBeTruthy();
     // Each shape is a kind of building, as the orders' key lists them.
@@ -509,11 +528,14 @@ describe("buildings finished", () => {
     DATASET = { units: UNITS };
     show();
     fireEvent.click(toggle("Buildings finished"));
+    await screen.findByText(/2 buildings finished|1 building finished/);
     expect(
-      await screen.findByText(/An outline is one finished building/),
-    ).toBeTruthy();
+      screen.queryByText(/An outline is one finished building/),
+    ).toBeNull();
+    const said = help();
+    expect(said.getByText(/An outline is one finished building/)).toBeTruthy();
     expect(
-      screen.getByText(
+      said.getByText(
         /a fill alone is an order with no building finished there/,
       ),
     ).toBeTruthy();
@@ -559,18 +581,19 @@ describe("the time window with events", () => {
     EVENTS = DEATHS;
     show();
     fireEvent.click(toggle("Deaths"));
-    expect(
-      await screen.findByText(/3 of 3 deaths are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/3 of 3 deaths/)).toBeTruthy();
     expect(
       screen.getByText(/Events from|The whole match, 0:00 to 30:00/),
     ).toBeTruthy();
     expect(
-      screen.getByText(
+      screen.queryByText(/The window is when each event happened/),
+    ).toBeNull();
+    expect(
+      help().getByText(
         /The window is when each event happened in the playback\./,
       ),
     ).toBeTruthy();
-    expect(screen.queryByText(/orders are in this window/)).toBeNull();
+    expect(screen.queryByText(/of \d+ orders/)).toBeNull();
   });
 
   it("narrows the layer and its legend to the window", async () => {
@@ -578,12 +601,10 @@ describe("the time window with events", () => {
     EVENTS = DEATHS;
     show();
     fireEvent.click(toggle("Deaths"));
-    await screen.findByText(/3 of 3 deaths are in this window/);
+    await screen.findByText(/3 of 3 deaths/);
     press("First 5 minutes");
     // Both close deaths are before five minutes and the late one is not.
-    expect(
-      await screen.findByText(/2 of 3 deaths are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/2 of 3 deaths/)).toBeTruthy();
     expect(
       screen.getByText(
         /Most is 2 deaths within 128 elmos of one spot in this window/,
@@ -592,13 +613,9 @@ describe("the time window with events", () => {
     expect(screen.getByText(/Events from 0:00 to 5:00/)).toBeTruthy();
     // The late death is at 20 minutes, which is outside the last five.
     press("Last 5 minutes");
-    expect(
-      await screen.findByText(/None of the 3 deaths happened in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/0 of 3 deaths/)).toBeTruthy();
     press("Whole match");
-    expect(
-      await screen.findByText(/3 of 3 deaths are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/3 of 3 deaths/)).toBeTruthy();
   });
 
   it("says none happened, and draws nothing, for an empty window", async () => {
@@ -606,11 +623,9 @@ describe("the time window with events", () => {
     EVENTS = DEATHS.slice(0, 2);
     show();
     fireEvent.click(toggle("Deaths"));
-    await screen.findByText(/2 of 2 deaths are in this window/);
+    await screen.findByText(/2 of 2 deaths/);
     press("Last 5 minutes");
-    expect(
-      await screen.findByText(/None of the 2 deaths happened in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/0 of 2 deaths/)).toBeTruthy();
     expect(layer("deaths")).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
     expect(screen.queryByText(/No unit died/)).toBeNull();
@@ -632,13 +647,11 @@ describe("the time window with events", () => {
     show();
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Deaths"));
-    expect(
-      await screen.findByText(/2 of 2 orders are in this window/),
-    ).toBeTruthy();
-    expect(screen.getByText(/3 of 3 deaths are in this window/)).toBeTruthy();
+    expect(await screen.findByText(/2 of 2 orders/)).toBeTruthy();
+    expect(screen.getByText(/3 of 3 deaths/)).toBeTruthy();
     expect(screen.queryByText(/5 of 5/)).toBeNull();
     expect(
-      screen.getByText(
+      help().getByText(
         /For orders the window is when each was given, not when anything was built\. For events it is when each happened in the playback\./,
       ),
     ).toBeTruthy();
@@ -646,8 +659,8 @@ describe("the time window with events", () => {
     expect(
       await screen.findByText(/Orders given and events from 0:00 to 5:00/),
     ).toBeTruthy();
-    expect(screen.getByText(/2 of 2 orders are in this window/)).toBeTruthy();
-    expect(screen.getByText(/2 of 3 deaths are in this window/)).toBeTruthy();
+    expect(screen.getByText(/2 of 2 orders/)).toBeTruthy();
+    expect(screen.getByText(/2 of 3 deaths/)).toBeTruthy();
   });
 
   it("leaves the orders' own readout alone when only an order layer is on", async () => {
@@ -661,11 +674,12 @@ describe("the time window with events", () => {
     };
     show();
     fireEvent.click(toggle("Buildings ordered"));
+    expect(await screen.findByText(/1 of 1 orders/)).toBeTruthy();
     expect(
-      await screen.findByText(/1 of 1 orders are in this window/),
-    ).toBeTruthy();
+      screen.queryByText(/The window is when an order was given/),
+    ).toBeNull();
     expect(
-      screen.getByText(
+      help().getByText(
         /The window is when an order was given, not when anything was built\./,
       ),
     ).toBeTruthy();

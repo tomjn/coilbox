@@ -206,26 +206,27 @@ export function eventState(
   };
 }
 
-/** The layers' names, which the notices use. */
+/** The layers' names, which the map's help uses. */
 export const EVENT_LAYER_NAMES =
   "Deaths, Buildings finished and the two starting unit layers";
 
 /**
- * Why the event layers cannot be switched on, or null when they can. The
- * analysis wording is the analysis section's own.
+ * Why the event layers cannot be switched on, or null when they can. It is the
+ * reason alone, shown on the disabled switches and in one line beneath. That
+ * the layers draw events from an analysis is in the map's help.
  */
 export function eventBlock(state: EventState): string | null {
   switch (state.kind) {
     case "ready":
       return null;
     case "remix":
-      return `${EVENT_LAYER_NAMES} draw events from an analysis, and a remix has no analysis of its own. Analyse the original match.`;
+      return "A remix has no analysis of its own. Analyse the original match.";
     case "diverged":
-      return `${EVENT_LAYER_NAMES} draw events from an analysis. The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to draw.`;
+      return "The playback did not reproduce the recorded match, so what it recorded was thrown away and there is nothing to draw.";
     case "notAnalysed":
       return state.canAnalyse
-        ? `${EVENT_LAYER_NAMES} draw events from an analysis, and this replay has not been analysed.`
-        : `${EVENT_LAYER_NAMES} draw events from an analysis, and this replay has not been analysed. This copy of coilbox cannot analyse replays.`;
+        ? "This replay has not been analysed."
+        : "This replay has not been analysed. This copy of coilbox cannot analyse replays.";
   }
 }
 
