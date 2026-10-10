@@ -229,6 +229,23 @@ local function weapons_of(u, wdefs)
   return '[' .. table.concat(out, ',') .. ']', longest
 end
 
+-- The first of these fields the def declares, as a boolean, or nil when it
+-- declares none. The engine reads a flag from a boolean, a number (non-zero is
+-- true) or the strings "true" and "false", so those are the spellings taken.
+local function flag(t, ...)
+  for _, key in ipairs({...}) do
+    local v = t[key]
+    if type(v) == 'boolean' then return v end
+    if type(v) == 'number' and v == v then return v ~= 0 end
+    if type(v) == 'string' then
+      local s = string.lower(v)
+      if s == 'true' or s == '1' then return true end
+      if s == 'false' or s == '0' then return false end
+    end
+  end
+  return nil
+end
+
 -- One unit's stats as a JSON object, in the order a unit page reads them.
 local function stats_of(d, wdefs)
   local u = lowered(d)
@@ -236,6 +253,9 @@ local function stats_of(d, wdefs)
   local function put(key, value)
     local n = (value ~= nil) and json_number(value) or nil
     if n then parts[#parts + 1] = '"' .. key .. '":' .. n end
+  end
+  local function put_flag(key, value)
+    if value ~= nil then parts[#parts + 1] = '"' .. key .. '":' .. tostring(value) end
   end
   put('health', stat(u, 'health', 'maxdamage'))
   put('metalCost', stat(u, 'metalcost', 'buildcostmetal'))
@@ -258,6 +278,29 @@ local function stats_of(d, wdefs)
   -- `maxWeaponRange` out too, so it is the game's own number rather than ours.
   put('range', longest)
   if weapons then parts[#parts + 1] = '"weapons":' .. weapons end
+  -- What the unit makes, stores and senses, and whether it builds (issue #3848).
+  -- Each is the engine's own key (rts/Sim/Units/UnitDef.cpp) and a def that does
+  -- not declare it gets none, so the reader sees "not said" rather than zero.
+  -- A negative upkeep is income in the engine, which is why the upkeeps are
+  -- reported as written instead of being folded into a make.
+  put('metalMake', stat(u, 'metalmake'))
+  put('energyMake', stat(u, 'energymake'))
+  put('makesMetal', stat(u, 'makesmetal'))
+  put('extractsMetal', stat(u, 'extractsmetal'))
+  put('windGenerator', stat(u, 'windgenerator'))
+  put('tidalGenerator', stat(u, 'tidalgenerator'))
+  put('metalUpkeep', stat(u, 'metalupkeep', 'metaluse'))
+  put('energyUpkeep', stat(u, 'energyupkeep', 'energyuse'))
+  put('metalStorage', stat(u, 'metalstorage'))
+  put('energyStorage', stat(u, 'energystorage'))
+  put('radarDistance', stat(u, 'radardistance'))
+  put('sonarDistance', stat(u, 'sonardistance'))
+  put('radarDistanceJam', stat(u, 'radardistancejam'))
+  put('sonarDistanceJam', stat(u, 'sonardistancejam'))
+  put('seismicDistance', stat(u, 'seismicdistance'))
+  put('transportCapacity', stat(u, 'transportcapacity'))
+  put_flag('builder', flag(u, 'builder'))
+  put_flag('isFeature', flag(u, 'isfeature'))
   return '{' .. table.concat(parts, ',') .. '}'
 end
 
@@ -1781,6 +1824,88 @@ mod tests {
         let mut keys: Vec<&String> = units[0].stats.keys().collect();
         keys.sort();
         assert_eq!(keys, vec!["health", "sightDistance"]);
+    }
+
+    /// The fields a classifier reads (issue #3848), under the engine's own keys.
+    /// The radar jammer's radius is `radarDistanceJam` in a unitdef and there is
+    /// no `jammerRadius`, and a flag arrives as a boolean, a number or a string.
+    #[test]
+    fn what_a_unit_makes_stores_and_senses_is_read_under_the_engines_keys() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                a = {
+                  energymake = 25, metalmake = 1.5, makesmetal = 0.1, extractsmetal = 0.001,
+                  windgenerator = 30, tidalgenerator = 20,
+                  metalstorage = 100, energystorage = 200,
+                  radardistance = 1800, sonardistance = 600, radardistancejam = 300,
+                  sonardistancejam = 100, seismicdistance = 2000, transportcapacity = 8,
+                  builder = true, isFeature = 1,
+                },
+              },
+              weapondefs = {},
+            }"#,
+        );
+        let s = &units[0].stats;
+
+        assert_eq!(stat(&units[0], "energyMake"), Some(25.0));
+        assert_eq!(stat(&units[0], "metalMake"), Some(1.5));
+        assert_eq!(stat(&units[0], "makesMetal"), Some(0.1));
+        assert_eq!(stat(&units[0], "extractsMetal"), Some(0.001));
+        assert_eq!(stat(&units[0], "windGenerator"), Some(30.0));
+        assert_eq!(stat(&units[0], "tidalGenerator"), Some(20.0));
+        assert_eq!(stat(&units[0], "metalStorage"), Some(100.0));
+        assert_eq!(stat(&units[0], "energyStorage"), Some(200.0));
+        assert_eq!(stat(&units[0], "radarDistance"), Some(1800.0));
+        assert_eq!(stat(&units[0], "sonarDistance"), Some(600.0));
+        assert_eq!(stat(&units[0], "radarDistanceJam"), Some(300.0));
+        assert_eq!(stat(&units[0], "sonarDistanceJam"), Some(100.0));
+        assert_eq!(stat(&units[0], "seismicDistance"), Some(2000.0));
+        assert_eq!(stat(&units[0], "transportCapacity"), Some(8.0));
+        assert_eq!(s["builder"], serde_json::json!(true));
+        assert_eq!(s["isFeature"], serde_json::json!(true));
+    }
+
+    /// A negative upkeep is income in the engine, so it travels as written
+    /// rather than being clamped or folded into a make. `energyUse` is the
+    /// engine's older spelling of the same key.
+    #[test]
+    fn an_upkeep_keeps_its_sign_and_its_older_spelling() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                a = { energyupkeep = -20, metaluse = 3 },
+                b = { energyuse = -5 },
+              },
+              weapondefs = {},
+            }"#,
+        );
+
+        assert_eq!(stat(&units[0], "energyUpkeep"), Some(-20.0));
+        assert_eq!(stat(&units[0], "metalUpkeep"), Some(3.0));
+        assert_eq!(stat(&units[1], "energyUpkeep"), Some(-5.0));
+    }
+
+    /// A flag the def writes as false is a claim and travels as false. One it
+    /// does not write is absent, and a string is read the way the engine reads it.
+    #[test]
+    fn a_flag_is_false_when_declared_false_and_absent_when_not_declared() {
+        let units = extract(
+            r#"{
+              unitdefs = {
+                a = { builder = false },
+                b = { name = 'B' },
+                c = { builder = 'true' },
+                d = { builder = 0 },
+              },
+              weapondefs = {},
+            }"#,
+        );
+
+        assert_eq!(units[0].stats["builder"], serde_json::json!(false));
+        assert!(!units[1].stats.contains_key("builder"));
+        assert_eq!(units[2].stats["builder"], serde_json::json!(true));
+        assert_eq!(units[3].stats["builder"], serde_json::json!(false));
     }
 
     /// A def that says nothing measurable at all gets an empty table on its
