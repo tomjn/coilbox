@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { CheckField } from "@/components/Field";
 import {
   Select,
   SelectContent,
@@ -26,6 +27,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatDuration } from "@/lib/format";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
+import { useStoredColorMode } from "../../chartColorMode";
 import {
   allySeries,
   type ChartDisplay,
@@ -34,6 +36,7 @@ import {
   type ChartSeries,
   type ChartView,
   chartHeight,
+  colorSeries,
   createTileCache,
   defaultChartView,
   defaultMetric,
@@ -325,10 +328,25 @@ export function MatchStatsChart({
   const [display, setDisplay] = useState<ChartDisplay>("chart");
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
+  const [colorMode, setColorMode] = useStoredColorMode();
+  const { resolved: theme } = useTheme();
+
   const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
   const sides = useMemo(() => allySeries(trailer, info), [trailer, info]);
   const view = chosen ?? defaultChartView(players, sides);
-  const series = view === "teams" ? sides : players;
+  // Painted last, from the view's lines, so the colour a team wears depends on
+  // the match and the mode and never on which lines are showing.
+  const series = useMemo(
+    () =>
+      colorSeries(
+        view === "teams" ? sides : players,
+        trailer,
+        info,
+        colorMode,
+        theme,
+      ),
+    [view, sides, players, trailer, info, colorMode, theme],
+  );
 
   const rows = useMemo(
     () =>
@@ -391,6 +409,11 @@ export function MatchStatsChart({
           options={DISPLAYS}
           label="Shown as"
           onChange={setDisplay}
+        />
+        <CheckField
+          label="In-game colours"
+          checked={colorMode === "game"}
+          onChange={(on) => setColorMode(on ? "game" : "palette")}
         />
       </div>
 

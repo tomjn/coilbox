@@ -80,10 +80,10 @@ function deltaE(a: string, b: string, kind?: keyof typeof MACHADO): number {
  */
 const SURFACES: [string, Rgb][] = [
   ["light", [1, 1, 1]],
-  ...BASES.map(([name, hue, sat]) => [
+  ...(BASES.map(([name, hue, sat]) => [
     `dark ${name}`,
     hsl(hue, sat * 0.05, 0.1),
-  ]) as [string, Rgb][],
+  ]) as [string, Rgb][]),
 ];
 
 const pairs = CHART_PALETTE.flatMap((a, i) =>
@@ -111,13 +111,13 @@ describe("CHART_PALETTE", () => {
     expect(close).toEqual([]);
   });
 
-  it.each(["protan", "deutan"] as const)(
-    "keeps every pair apart under %s simulation",
-    (kind) => {
-      const close = pairs.filter(([a, b]) => deltaE(a, b, kind) < CVD_TARGET);
-      expect(close).toEqual([]);
-    },
-  );
+  it.each([
+    "protan",
+    "deutan",
+  ] as const)("keeps every pair apart under %s simulation", (kind) => {
+    const close = pairs.filter(([a, b]) => deltaE(a, b, kind) < CVD_TARGET);
+    expect(close).toEqual([]);
+  });
 
   it("covers all 22 presets", () => {
     expect(SURFACES).toHaveLength(BASES.length + 1);
