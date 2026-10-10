@@ -29,6 +29,7 @@ import {
 } from "@/play/gameAi";
 import { DifficultyPips } from "@/play/pages/components/DifficultyPips";
 import { NoteButton } from "../NoteButton";
+import type { NameMark } from "../nameMark";
 import { useConnection } from "../store";
 import { CountryFlag, RankBadge } from "../UserBadges";
 import { allyLetter, isAiUnavailable, type MemberRow as Row } from "./config";
@@ -72,6 +73,7 @@ export function BattleMembersTable({
   onTeam,
   onAlly,
   onColor,
+  markFor,
 }: {
   rows: Row[];
   sides: Side[];
@@ -150,6 +152,9 @@ export function BattleMembersTable({
   /** The connection this battle is on, whose players' launches flash their
    *  rows (issue #2844). */
   serverKey: string | null;
+  /** Who a name is to the player (themselves, a friend, in their party), from
+   * `useNameMark` on this battle's connection (issue #336). */
+  markFor?: (name: string) => NameMark | null;
 }) {
   const justWentIngame = useConnection(serverKey)?.justWentIngame ?? NO_NAMES;
   // The AI the host will add next; defaults to the first available.
@@ -397,6 +402,14 @@ export function BattleMembersTable({
                   key={`${row.kind}:${row.name}`}
                   row={row}
                   editable={row.self}
+                  // A bot is nobody to the player, whatever it is called.
+                  mark={
+                    row.self
+                      ? "you"
+                      : row.kind === "human"
+                        ? (markFor?.(row.name) ?? null)
+                        : null
+                  }
                   aiInvalid={aiInvalid}
                   control={control}
                   sharedWith={sharedWith}

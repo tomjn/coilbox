@@ -14,6 +14,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { User } from "../bindings";
+import { NameMarkIcon } from "../NameMarkIcon";
+import { NAME_MARK_CLASS, type NameMark } from "../nameMark";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { MemberListResizer } from "./MemberListResizer";
 import { clampWidth, DEFAULT_WIDTH } from "./memberListWidth";
@@ -50,6 +52,7 @@ export function MemberList({
   presenceFor,
   isIgnored,
   noteFor,
+  markFor,
   renderActions,
 }: {
   members: User[];
@@ -66,6 +69,9 @@ export function MemberList({
    * tooltip. Given the full `User` so callers can key it on account id rather
    * than name (issue #341). */
   noteFor?: (user: User) => string;
+  /** Who a member is to the player (themselves, a friend, in their party),
+   * which colours the name and puts a labelled glyph after it (issue #336). */
+  markFor?: (username: string) => NameMark | null;
   /** Optional trailing per-member control, the row's menu. Returns a node to
    * render at the end of the row, or null/undefined to render nothing for it. */
   renderActions?: (user: User) => ReactNode;
@@ -117,6 +123,7 @@ export function MemberList({
             const color = colorFor?.(u.name);
             const ignored = isIgnored?.(u.name) ?? false;
             const note = noteFor?.(u) ?? "";
+            const mark = markFor?.(u.name) ?? null;
             const row = (
               <span
                 className={cn(
@@ -153,11 +160,16 @@ export function MemberList({
                     <span aria-hidden className="size-2.5 shrink-0" />
                   ))}
                 <span
-                  className="truncate"
+                  className={cn(
+                    "truncate",
+                    mark && NAME_MARK_CLASS[mark],
+                    mark === "you" && "font-medium",
+                  )}
                   title={note ? `${u.name} - ${note}` : u.name}
                 >
                   {u.name}
                 </span>
+                {mark && <NameMarkIcon mark={mark} />}
                 <span className="ml-auto flex shrink-0 items-center gap-2">
                   <RankBadge rank={u.status.rank} />
                   <RatingBadge rating={u.rating} />

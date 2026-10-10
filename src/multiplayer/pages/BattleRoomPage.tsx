@@ -57,6 +57,7 @@ import {
   useMultiplayer,
   useProtocolServers,
 } from "../store";
+import { useNameMark } from "../useNameMark";
 
 /**
  * The battle room for a joined multiplayer battle. Reads the live battle from the
@@ -122,6 +123,7 @@ function BattleRoomPage() {
   const joins = usePendingJoins();
   // Private, client-side per-player notes (issue #341), scoped to this server.
   const { get: getNote, set: setNote } = useNoteActions(room.serverKey);
+  const markFor = useNameMark(room.serverKey);
   // "N games with this player…" line for the note popover, from the local
   // replay-stats database (#375) — purely a read, no server involvement.
   const relationFor = useStatsRelations(room.me);
@@ -550,6 +552,7 @@ function BattleRoomPage() {
         <div className="flex min-w-0 flex-1 flex-col gap-4 p-4">
           <BattleMembersTable
             serverKey={room.serverKey}
+            markFor={markFor}
             rows={room.rows}
             sides={room.sides}
             factionLogos={factionLogos}
@@ -580,6 +583,7 @@ function BattleRoomPage() {
           />
           <BattleChatCard
             serverKey={room.serverKey}
+            markFor={markFor}
             battle={battle}
             enginePath={room.enginePath}
             dataDir={room.dataDir}
