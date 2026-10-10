@@ -1,11 +1,13 @@
 import { useSetting } from "@picoframe/frame";
 import { Flame, Map as MapIcon, Swords, Trophy } from "lucide-react";
 import { useMemo } from "react";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
+import { findSet, resolveSet, useReplaySets } from "../replaySets";
 import {
   refightFilenames,
   scriptedModeFilenames,
@@ -31,10 +33,22 @@ export default function StatsPage() {
   const { state } = useContentState();
   const { selected } = useScanTargetSelection();
   const roots = useMemo(() => (state?.roots ?? []).map((r) => r.path), [state]);
-  const { records, summary, ingesting, error } = useReplayStats(
-    roots,
-    selected?.enginePath,
+  const {
+    records: allRecords,
+    summary,
+    ingesting,
+    error,
+  } = useReplayStats(roots, selected?.enginePath);
+  const { sets } = useReplaySets();
+  // Scope the whole page to one set. A saved pick whose set was deleted means
+  // every replay again.
+  const [storedSet, setStoredSet] = useSetting("content.statsSet", "");
+  const activeSet = findSet(sets, storedSet);
+  const scoped = useMemo(
+    () => (activeSet ? resolveSet(activeSet, allRecords) : null),
+    [activeSet, allRecords],
   );
+  const records = scoped ? scoped.present : allRecords;
   const { state: replayUserState } = useReplayUserState();
   const refights = useMemo(
     () => refightFilenames(replayUserState),
@@ -83,134 +97,167 @@ export default function StatsPage() {
 
       {error && <ErrorBanner message={error} />}
 
-      {ingesting && records.length === 0 ? (
+      {ingesting && allRecords.length === 0 ? (
         <SkeletonList />
-      ) : records.length === 0 ? (
+      ) : allRecords.length === 0 ? (
         <EmptyState label="No replays to build stats from yet. Watch a game, or place .sdfz files in your demos folder." />
-      ) : !profile ? (
-        <EmptyState label="No decodable players found in your replays." />
       ) : (
         <>
-          <div className="flex flex-wrap items-center gap-3">
-            <label
-              htmlFor="stats-player"
-              className="text-sm text-muted-foreground"
-            >
-              Player
-            </label>
-            <div className="w-56">
-              <PlayerPicker
-                id="stats-player"
-                value={activeName}
-                onValueChange={setStoredName}
-                players={players}
+          {sets.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-muted-foreground">Replays</span>
+              <OptionSelect
+                value={activeSet?.id ?? "all"}
+                onValueChange={(v) => setStoredSet(v === "all" ? "" : v)}
+                options={[
+                  { value: "all", label: "All replays" },
+                  ...sets.map((s) => ({
+                    value: s.id,
+                    label: `Set: ${s.name}`,
+                  })),
+                ]}
+                ariaLabel="Scope to a set"
+                className="w-56"
               />
+              {scoped && (
+                <span className="text-xs text-muted-foreground">
+                  {scoped.present.length} of {activeSet?.members.length} in your
+                  library
+                  {scoped.missing.length > 0
+                    ? `, ${scoped.missing.length} missing`
+                    : ""}
+                </span>
+              )}
             </div>
-            {summary && (
-              <span className="text-xs text-muted-foreground">
-                {summary.total} game{summary.total === 1 ? "" : "s"} indexed
-                {summary.failed > 0
-                  ? ` · ${summary.failed} could not be read`
-                  : ""}
-                {ingesting ? " · updating…" : ""}
-              </span>
-            )}
-          </div>
+          )}
+          {records.length === 0 ? (
+            <EmptyState label="None of the replays in this set are in your library." />
+          ) : !profile ? (
+            <EmptyState label="No decodable players found in your replays." />
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-3">
+                <label
+                  htmlFor="stats-player"
+                  className="text-sm text-muted-foreground"
+                >
+                  Player
+                </label>
+                <div className="w-56">
+                  <PlayerPicker
+                    id="stats-player"
+                    value={activeName}
+                    onValueChange={setStoredName}
+                    players={players}
+                  />
+                </div>
+                {summary && (
+                  <span className="text-xs text-muted-foreground">
+                    {summary.total} game{summary.total === 1 ? "" : "s"} indexed
+                    {summary.failed > 0
+                      ? ` · ${summary.failed} could not be read`
+                      : ""}
+                    {ingesting ? " · updating…" : ""}
+                  </span>
+                )}
+              </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard
-              icon={<Swords className="size-3.5" />}
-              label="Games"
-              value={String(profile.games)}
-              sub={
-                profile.decided < profile.games
-                  ? `${profile.decided} with a known result`
-                  : undefined
-              }
-            />
-            <StatCard
-              icon={<Trophy className="size-3.5" />}
-              label="Win rate"
-              value={winRatePct == null ? "—" : `${winRatePct}%`}
-              sub={
-                profile.decided > 0
-                  ? `${profile.wins}W · ${profile.losses}L`
-                  : "no decided games"
-              }
-            />
-            <StatCard
-              icon={<Flame className="size-3.5" />}
-              label="Streak"
-              value={streakLabel}
-            />
-            <StatCard
-              icon={<Trophy className="size-3.5" />}
-              label="Best win run"
-              value={String(profile.longestWinStreak)}
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatCard
+                  icon={<Swords className="size-3.5" />}
+                  label="Games"
+                  value={String(profile.games)}
+                  sub={
+                    profile.decided < profile.games
+                      ? `${profile.decided} with a known result`
+                      : undefined
+                  }
+                />
+                <StatCard
+                  icon={<Trophy className="size-3.5" />}
+                  label="Win rate"
+                  value={winRatePct == null ? "—" : `${winRatePct}%`}
+                  sub={
+                    profile.decided > 0
+                      ? `${profile.wins}W · ${profile.losses}L`
+                      : "no decided games"
+                  }
+                />
+                <StatCard
+                  icon={<Flame className="size-3.5" />}
+                  label="Streak"
+                  value={streakLabel}
+                />
+                <StatCard
+                  icon={<Trophy className="size-3.5" />}
+                  label="Best win run"
+                  value={String(profile.longestWinStreak)}
+                />
+              </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <section className="rounded-lg border border-border/60 bg-card p-4">
-              <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
-                <MapIcon className="size-4 text-muted-foreground" />
-                Favourite maps
-              </h2>
-              {profile.favouriteMaps.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No maps recorded.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/40">
-                  {profile.favouriteMaps.slice(0, 8).map((m) => (
-                    <TallyRow
-                      key={m.key}
-                      label={m.key}
-                      games={m.games}
-                      wins={m.wins}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <section className="rounded-lg border border-border/60 bg-card p-4">
+                  <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
+                    <MapIcon className="size-4 text-muted-foreground" />
+                    Favourite maps
+                  </h2>
+                  {profile.favouriteMaps.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No maps recorded.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-border/40">
+                      {profile.favouriteMaps.slice(0, 8).map((m) => (
+                        <TallyRow
+                          key={m.key}
+                          label={m.key}
+                          games={m.games}
+                          wins={m.wins}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
 
-            <section className="rounded-lg border border-border/60 bg-card p-4">
-              <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
-                <Swords className="size-4 text-muted-foreground" />
-                Factions
-              </h2>
-              {profile.factions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No factions recorded.
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/40">
-                  {profile.factions.map((f) => (
-                    <TallyRow
-                      key={f.key}
-                      label={f.key}
-                      games={f.games}
-                      wins={f.wins}
-                    />
-                  ))}
-                </ul>
-              )}
-            </section>
-          </div>
+                <section className="rounded-lg border border-border/60 bg-card p-4">
+                  <h2 className="mb-1 flex items-center gap-2 text-sm font-medium">
+                    <Swords className="size-4 text-muted-foreground" />
+                    Factions
+                  </h2>
+                  {profile.factions.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No factions recorded.
+                    </p>
+                  ) : (
+                    <ul className="divide-y divide-border/40">
+                      {profile.factions.map((f) => (
+                        <TallyRow
+                          key={f.key}
+                          label={f.key}
+                          games={f.games}
+                          wins={f.wins}
+                        />
+                      ))}
+                    </ul>
+                  )}
+                </section>
+              </div>
 
-          <AiRecordSection
-            records={records}
-            playerName={activeName}
-            refights={refights}
-            scripted={scripted}
-          />
+              <AiRecordSection
+                records={records}
+                playerName={activeName}
+                refights={refights}
+                scripted={scripted}
+              />
 
-          <AchievementsSection
-            records={records}
-            playerName={activeName}
-            refights={refights}
-            scripted={scripted}
-          />
+              <AchievementsSection
+                records={records}
+                playerName={activeName}
+                refights={refights}
+                scripted={scripted}
+              />
+            </>
+          )}
         </>
       )}
     </div>

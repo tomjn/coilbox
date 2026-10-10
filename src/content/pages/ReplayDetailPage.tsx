@@ -50,6 +50,7 @@ import {
 } from "../replayEngine";
 import { forgetReplay } from "../replayList";
 import { provenanceLink } from "../replayProvenanceLink";
+import { useReplaySets } from "../replaySets";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
@@ -60,6 +61,7 @@ import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { ReplayChat } from "./components/ReplayChat";
+import { ReplaySetPicker } from "./components/ReplaySetPicker";
 import { SeatItem } from "./components/SeatEmphasis";
 import {
   DependencyBlocked,
@@ -649,8 +651,15 @@ function MissingContentNotice({
 }
 
 /** Watched flag + free-form tags for this replay (persisted locally by filename). */
-function ReplayNotes({ filename }: { filename: string }) {
+function ReplayNotes({
+  filename,
+  gameId,
+}: {
+  filename: string;
+  gameId?: string;
+}) {
   const userState = useReplayUserState();
+  const replaySets = useReplaySets();
   const us = userState.get(filename);
   const tags = us.tags ?? [];
   const [draft, setDraft] = useState("");
@@ -709,6 +718,23 @@ function ReplayNotes({ filename }: { filename: string }) {
             onBlur={addTag}
             placeholder="Add tag…"
             className="h-7 w-28"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {replaySets.sets
+            .filter((s) => s.members.some((m) => m.filename === filename))
+            .map((s) => (
+              <span
+                key={s.id}
+                className="rounded bg-primary/15 px-1.5 py-0.5 text-xs text-primary"
+              >
+                {s.name}
+              </span>
+            ))}
+          <ReplaySetPicker
+            api={replaySets}
+            member={{ filename, gameId }}
+            label="Sets"
           />
         </div>
       </div>
@@ -1024,7 +1050,7 @@ export default function ReplayDetailPage() {
             )}
           </SeriesEmphasisProvider>
 
-          <ReplayNotes filename={filename} />
+          <ReplayNotes filename={filename} gameId={info.gameId} />
 
           {selected && replay && <ReplayChat replayPath={replay.path} />}
 

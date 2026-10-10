@@ -12,7 +12,7 @@ import {
   Tag,
   X,
 } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ContinueBadge } from "@/components/ContinueBadge";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -52,6 +52,7 @@ import {
   metricSortValue,
   parseMetricSort,
 } from "../replayMatchFigures";
+import { findSet, resolveSet, useReplaySets } from "../replaySets";
 import { useReplayUserState } from "../replayUserState";
 import { useMetricRegistry } from "../useMetricRegistry";
 import { useReplaysRoot } from "../useReplaysRoot";
@@ -59,6 +60,8 @@ import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
 import { GatherReplaysButton } from "./components/GatherReplaysButton";
 import { MapThumb } from "./components/MapThumb";
+import { ReplaySetPicker } from "./components/ReplaySetPicker";
+import { ReplaySetsManager } from "./components/ReplaySetsManager";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 /** A fixed sort from the list below, or a `metric:<key>:<direction>` value. */
@@ -209,6 +212,11 @@ export default function ReplaysPage() {
     "content.replayFilters.minLength",
     "0",
   );
+  // The id of the set the list is narrowed to, "" for none.
+  const [setFilterId, setSetFilterId] = useSetting(
+    "content.replayFilters.set",
+    "",
+  );
 
   // What happened in the match comes from the stats store, joined to a row by
   // file. A distribution that hides match statistics gets none of it, and the
@@ -267,6 +275,25 @@ export default function ReplaysPage() {
   );
 
   const userState = useReplayUserState();
+  const replaySets = useReplaySets();
+  // A saved pick whose set was since deleted shows everything.
+  const activeSet = findSet(replaySets.sets, setFilterId);
+  // The game id comes from the stat record, so it is absent while statistics
+  // are hidden or the replay is not ingested yet. The filename still matches.
+  const gameIdOf = useCallback(
+    (r: { path: string; filename: string }) => statsByPath(r)?.gameId,
+    [statsByPath],
+  );
+  const resolveForList = (set: Parameters<typeof resolveSet>[0]) =>
+    resolveSet(set, replays, gameIdOf);
+  const activeResolved = useMemo(
+    () => (activeSet ? resolveSet(activeSet, replays, gameIdOf) : null),
+    [activeSet, replays, gameIdOf],
+  );
+  const inActiveSet = useMemo(
+    () => new Set(activeResolved?.present.map((r) => r.path)),
+    [activeResolved],
+  );
   const tagOptions = useMemo(
     () => [
       { value: "", label: "All tags" },
@@ -308,6 +335,7 @@ export default function ReplaysPage() {
       if (!showShort && isShortReplay(r.durationSec)) return false;
       if (!isOverMinimum(r.durationSec, Number(minLength))) return false;
       if (tagFilter && !(us.tags ?? []).includes(tagFilter)) return false;
+      if (activeSet && !inActiveSet.has(r.path)) return false;
       if (originFilter !== "all" && replayOrigin(us) !== originFilter)
         return false;
       return true;
@@ -323,6 +351,8 @@ export default function ReplaysPage() {
     tagFilter,
     originFilter,
     userState,
+    activeSet,
+    inActiveSet,
   ]);
 
   const sorted = useMemo(() => {
@@ -389,6 +419,16 @@ export default function ReplaysPage() {
               old engine in Finder loses those games. This puts them all in one
               place first (issue #971). */}
           <GatherReplaysButton rootPath={replaysRoot} onGathered={refresh} />
+          <ReplaySetsManager
+            api={replaySets}
+            resolve={resolveForList}
+            shown={sorted.map((r) => ({
+              filename: r.filename,
+              gameId: gameIdOf(r),
+            }))}
+            activeId={activeSet?.id ?? ""}
+            onFilter={setSetFilterId}
+          />
         </div>
 
         {!busy && replays.length > 0 && (
@@ -451,6 +491,21 @@ export default function ReplaysPage() {
                     <Clock className="size-4" /> Short replays
                   </Button>
                 )}
+                {activeSet && activeResolved && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSetFilterId("")}
+                    className="gap-1.5"
+                    title="Show every replay again"
+                  >
+                    Set: {activeSet.name}
+                    {activeResolved.missing.length > 0
+                      ? ` (${activeResolved.missing.length} not in library)`
+                      : ""}
+                    <X className="size-3.5" />
+                  </Button>
+                )}
                 {tagOptions.length > 1 && (
                   <div className="flex items-center gap-1.5 text-muted-foreground">
                     <Tag className="size-4" />
@@ -493,7 +548,9 @@ export default function ReplaysPage() {
             label={
               mapFilter
                 ? `No replays on “${mapFilter}”.`
-                : `No replays match “${filter.trim()}”.`
+                : activeSet && !filter.trim()
+                  ? `No replays in “${activeSet.name}” match the filters.`
+                  : `No replays match “${filter.trim()}”.`
             }
           />
         ) : (
@@ -623,6 +680,11 @@ export default function ReplaysPage() {
                         </TooltipContent>
                       </Tooltip>
                     )}
+                    <ReplaySetPicker
+                      api={replaySets}
+                      label=""
+                      member={{ filename: r.filename, gameId: gameIdOf(r) }}
+                    />
                     <Button
                       variant="ghost"
                       size="icon"
