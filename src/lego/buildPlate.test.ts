@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildFrontMarker,
   buildGround,
@@ -141,9 +141,40 @@ describe("groundSteps", () => {
   });
 });
 
+/** Spies on every dispose a group's meshes and grids will be asked for. */
+function disposeSpies(group: THREE.Group) {
+  const meshes = group.children.filter(
+    (child): child is THREE.Mesh => child instanceof THREE.Mesh,
+  );
+  const grids = group.children.filter(
+    (child): child is THREE.GridHelper => child instanceof THREE.GridHelper,
+  );
+  return {
+    meshes,
+    geometries: meshes.map((mesh) => vi.spyOn(mesh.geometry, "dispose")),
+    materials: meshes.map((mesh) =>
+      vi.spyOn(mesh.material as THREE.Material, "dispose"),
+    ),
+    grids: grids.map((grid) => vi.spyOn(grid, "dispose")),
+  };
+}
+
 describe("disposeGround", () => {
-  it("does not throw on freshly built ground", () => {
-    expect(() => disposeGround(buildGround())).not.toThrow();
+  it("frees every geometry, material and grid it built", () => {
+    const ground = buildGround();
+    const spies = disposeSpies(ground);
+    expect(spies.meshes.length).toBeGreaterThan(0);
+    expect(spies.grids.length).toBeGreaterThan(0);
+
+    disposeGround(ground);
+
+    for (const spy of [
+      ...spies.geometries,
+      ...spies.materials,
+      ...spies.grids,
+    ]) {
+      expect(spy).toHaveBeenCalled();
+    }
   });
 });
 
@@ -190,7 +221,15 @@ describe("buildFrontMarker", () => {
 });
 
 describe("disposeFrontMarker", () => {
-  it("does not throw on a freshly built marker", () => {
-    expect(() => disposeFrontMarker(buildFrontMarker())).not.toThrow();
+  it("frees every geometry and material it built", () => {
+    const marker = buildFrontMarker();
+    const spies = disposeSpies(marker);
+    expect(spies.meshes.length).toBeGreaterThan(0);
+
+    disposeFrontMarker(marker);
+
+    for (const spy of [...spies.geometries, ...spies.materials]) {
+      expect(spy).toHaveBeenCalled();
+    }
   });
 });

@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { GROUND_ELMOS } from "./buildPlate";
 import {
   BACKDROPS,
@@ -96,7 +96,14 @@ describe("buildTerrain", () => {
     expect(hits).toEqual([]);
   });
 
-  it("does not throw when freed", () => {
-    expect(() => disposeTerrain(buildTerrain())).not.toThrow();
+  it("frees its geometry and material when freed", () => {
+    const mesh = buildTerrain();
+    const geometry = vi.spyOn(mesh.geometry, "dispose");
+    const material = vi.spyOn(mesh.material as THREE.Material, "dispose");
+
+    disposeTerrain(mesh);
+
+    expect(geometry).toHaveBeenCalled();
+    expect(material).toHaveBeenCalled();
   });
 });

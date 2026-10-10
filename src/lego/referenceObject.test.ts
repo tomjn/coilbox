@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { UnitModelGroup, UnitModelResult } from "../content/bindings";
 import model from "./reference/armsolar.json";
 import {
@@ -164,7 +164,19 @@ describe("buildGameReferenceUnit", () => {
 });
 
 describe("disposeReferenceUnit", () => {
-  it("does not throw on a freshly built unit", () => {
-    expect(() => disposeReferenceUnit(buildReferenceUnit())).not.toThrow();
+  it("frees every geometry and material it built", () => {
+    const group = buildReferenceUnit();
+    const meshes = group.children.filter(
+      (child): child is THREE.Mesh => child instanceof THREE.Mesh,
+    );
+    expect(meshes.length).toBeGreaterThan(0);
+    const spies = meshes.flatMap((mesh) => [
+      vi.spyOn(mesh.geometry, "dispose"),
+      vi.spyOn(mesh.material as THREE.Material, "dispose"),
+    ]);
+
+    disposeReferenceUnit(group);
+
+    for (const spy of spies) expect(spy).toHaveBeenCalled();
   });
 });
