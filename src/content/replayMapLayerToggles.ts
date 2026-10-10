@@ -18,6 +18,7 @@ export const MAP_LAYERS = [
   "orderDensity",
   "bases",
   "deaths",
+  "damage",
   "finished",
   "startUnitDeaths",
   "startUnitPaths",
@@ -29,6 +30,7 @@ export type MapLayer = (typeof MAP_LAYERS)[number];
  *  no analysis cannot switch on. */
 export const EVENT_MAP_LAYERS: readonly MapLayer[] = [
   "deaths",
+  "damage",
   "finished",
   "startUnitDeaths",
   "startUnitPaths",
@@ -49,6 +51,21 @@ export function holdEventLayers(
 export type MapLayerToggles = Record<MapLayer, boolean>;
 
 /**
+ * Deaths and damage are drawn in one ramp, because a fourth ramp that a
+ * reader with red and green colour blindness can tell from the other three
+ * does not exist: `heatRamp.ts` says why. So only one of the two is on at a
+ * time, and switching one on switches the other off.
+ */
+export function oneOfDeathsAndDamage(
+  next: readonly string[],
+  before: MapLayerToggles,
+): string[] {
+  if (!next.includes("deaths") || !next.includes("damage")) return [...next];
+  const drop = before.damage ? "damage" : "deaths";
+  return next.filter((layer) => layer !== drop);
+}
+
+/**
  * What is on before anybody has chosen. The start boxes were always drawn, and
  * start positions come with the replay's details at no further cost. The two
  * layers drawn from build orders are off, because reading those walks the
@@ -62,6 +79,7 @@ export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   orderDensity: false,
   bases: false,
   deaths: false,
+  damage: false,
   finished: false,
   startUnitDeaths: false,
   startUnitPaths: false,

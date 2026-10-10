@@ -32,6 +32,23 @@ const EDGE = "rgba(9, 13, 22, 0.9)";
 const CROSS = "M-1 -1 L1 1 M1 -1 L-1 1";
 const RING = "M0.8 0 A0.8 0.8 0 1 1 -0.8 0 A0.8 0.8 0 1 1 0.8 0";
 
+/** An upgrade on a path: a filled diamond, in the same box. It is a different
+ *  shape from both end marks and half their size, because it is no end. */
+const DIAMOND = "M0 -1 L1 0 L0 1 L-1 0 Z";
+const UPGRADE_SIZE = 0.008;
+
+function UpgradeIcon() {
+  return (
+    <svg
+      viewBox="-1.4 -1.4 2.8 2.8"
+      className="inline size-2.5 fill-current align-[-1px]"
+      aria-hidden="true"
+    >
+      <path d={DIAMOND} />
+    </svg>
+  );
+}
+
 function EndIcon({ cause }: { cause: StartUnitEnd["cause"] }) {
   return (
     <svg
@@ -65,7 +82,7 @@ export function StartUnitCanvas({
   const emphasis = useSeriesEmphasis();
   const ref = useRef<HTMLCanvasElement | null>(null);
   const names = useMemo(() => playerLabels(info), [info]);
-  const { startPaths, startEnds } = ev;
+  const { startPaths, startEnds, startUpgrades } = ev;
 
   const lines = useMemo(
     () =>
@@ -85,6 +102,14 @@ export function StartUnitCanvas({
         return at ? [{ ...end, ...at }] : [];
       }),
     [startEnds, world],
+  );
+  const upgrades = useMemo(
+    () =>
+      startUpgrades.flatMap((upgrade) => {
+        const at = placeTrack([upgrade], world)[0];
+        return at ? [{ ...upgrade, ...at }] : [];
+      }),
+    [startUpgrades, world],
   );
   const height =
     world.worldWidth > 0
@@ -141,6 +166,26 @@ export function StartUnitCanvas({
       ctx.stroke();
     }
 
+    const diamond = new Path2D(DIAMOND);
+    const upgradeSize = w * UPGRADE_SIZE;
+    for (const upgrade of byLit(upgrades)) {
+      ctx.setTransform(
+        upgradeSize,
+        0,
+        0,
+        upgradeSize,
+        upgrade.left * w,
+        upgrade.top * h,
+      );
+      ctx.globalAlpha = alpha(upgrade.team);
+      ctx.fillStyle = colour(upgrade.team);
+      ctx.fill(diamond);
+      ctx.lineWidth = 0.4;
+      ctx.strokeStyle = EDGE;
+      ctx.stroke(diamond);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
     const size = w * END_SIZE;
     for (const end of byLit(ends)) {
       const path = new Path2D(end.cause === "destroyed" ? CROSS : RING);
@@ -155,7 +200,7 @@ export function StartUnitCanvas({
       ctx.setTransform(1, 0, 0, 1, 0, 0);
     }
     ctx.globalAlpha = 1;
-  }, [lines, ends, colours, emphasis.state]);
+  }, [lines, ends, upgrades, colours, emphasis.state]);
 
   if (lines.length === 0 && ends.length === 0) return null;
   return (
@@ -249,12 +294,26 @@ export function StartUnitNotes({
 
   const removed = startEnds.filter((e) => e.cause === "removed").length;
   const inWindow = ev.windowed ? " in this window" : "";
+  const upgraded = ev.startUpgrades.length;
 
   return (
     <div className="flex flex-col gap-2" data-testid="start-units">
       <p className="text-xs text-muted-foreground">
         {plural(tracks.length, "starting unit", "starting units")} recorded.
+        {ev.startPathsOn && upgraded > 0 && (
+          <>
+            {" "}
+            <UpgradeIcon /> {plural(upgraded, "upgrade", "upgrades")}
+            {inWindow}.
+          </>
+        )}
       </p>
+      {!ev.replacementsRecorded && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          This analysis is from an older logger, so a path may stop where the
+          unit was upgraded.
+        </p>
+      )}
 
       {ev.startPathsOn && startPaths.length === 0 && (
         <p className="text-xs text-muted-foreground">
@@ -337,15 +396,26 @@ export function StartUnitHelp({ ev }: { ev: EventLayers }) {
             ` ${still.toLocaleString()} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
         </p>
       )}
+      {ev.startPathsOn && ev.replacementsRecorded && (
+        <p>
+          <UpgradeIcon /> is where a game swapped a starting unit for another
+          unit, which is how some games upgrade one. The line carries on as the
+          new unit, and the swap is not a loss. Two units are joined only when
+          the game's own script destroyed the old one with no attacker and made
+          the new one for the same player, with no builder, on exactly the same
+          spot, on the same frame or the one before. A game that destroys a
+          starting unit and spawns an unrelated unit on that spot at that moment
+          would be drawn as an upgrade.
+        </p>
+      )}
       {ev.startDeathsOn && startEnds.length > 0 && (
         <p>
           <EndIcon cause="destroyed" /> is a starting unit that was destroyed.
           {removed > 0 && (
             <>
               {" "}
-              <EndIcon cause="removed" /> is one the game's own script took
-              away, which is how a game swaps a unit for its upgrade. The log
-              cannot follow it into the unit that replaced it.
+              <EndIcon cause="removed" /> is one the game's own script took away
+              with nothing recorded in its place.
             </>
           )}
         </p>

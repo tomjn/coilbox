@@ -26,16 +26,25 @@ export const START_UNIT_KINDS = [
   "unit_destroyed",
   "unit_given",
   "start_unit_position",
+  "start_unit_replaced",
 ];
 
 /** The first logger that flags starting units and writes their positions. */
 export const START_UNIT_LOGGER_VERSION = 2;
 
 /**
+ * The first logger that says when a starting unit was swapped for another, so
+ * a path can carry on through an upgrade. An older log ends the path there.
+ */
+export const REPLACED_LOGGER_VERSION = 4;
+
+/**
  * The weapon id the engine reports for a unit a Lua script destroyed: minus
  * `CSolidObject::DAMAGE_KILLED_LUA`, which is 21 in the engine's
  * `rts/Sim/Objects/SolidObject.h`. A game that swaps a unit for its upgrade
- * destroys the old one this way.
+ * destroys the old one this way, and the logger then writes a
+ * `start_unit_replaced` line naming the unit that took over. A removal with no
+ * such line is the game taking the unit away and putting nothing in its place.
  */
 export const KILLED_BY_SCRIPT_WEAPON = -21;
 
@@ -49,16 +58,23 @@ export interface TrackPoint {
 export interface TrackEnd extends TrackPoint {
   /**
    * `destroyed` for a death, and `removed` for a unit the game's own script
-   * took away with no attacker, which is what an upgrade looks like in the log.
+   * took away with no attacker and did not replace. A unit that was replaced
+   * has not ended: its track carries on as the unit that took over.
    */
   cause: "destroyed" | "removed";
   /** The team whose unit destroyed it, when the log names one. */
   attackerTeam?: number;
 }
 
-/** One starting unit: whose it was, where it was over time and how it ended. */
+/**
+ * One starting unit, through every unit the game swapped it for: whose it was,
+ * where it was over time and how it ended.
+ */
 export interface StartUnitTrack {
+  /** The unit the team started with. */
   unit: number;
+  /** Where and when the game swapped it for another unit, in order. */
+  upgrades: TrackPoint[];
   /** The team that started with it, which is whose colour it is drawn in. */
   team: number;
   /** Whether it was given to or captured by another team at any point. */
@@ -88,8 +104,16 @@ function point(event: LogEvent): TrackPoint | undefined {
  * it, then its destroyed line. The logger leaves a position out when the unit
  * has not moved, so two points far apart in time are a unit that stood still
  * and then walked, never a gap in the record.
+ *
+ * A `start_unit_replaced` line joins two units into one track. The logger
+ * writes it when a script destroyed a starting unit and a unit made by no
+ * builder stood in exactly its place, which is how some games upgrade one. The
+ * old unit's destroyed line is then no end, and the new unit's lines carry the
+ * track on. Nothing here decides that two units are one: the line does.
  */
 export function startUnitTracks(events: readonly LogEvent[]): StartUnitTrack[] {
+  const all: StartUnitTrack[] = [];
+  // By the id of the unit a track is following now.
   const tracks = new Map<number, StartUnitTrack>();
   for (const event of events) {
     const unit = num(event.unit);
@@ -98,13 +122,37 @@ export function startUnitTracks(events: readonly LogEvent[]): StartUnitTrack[] {
     if (event.kind === "unit_created") {
       const team = num(event.team);
       if (event.startUnit !== true || team === undefined || !at) continue;
-      tracks.set(unit, {
+      // A unit that took over a track on this frame is already followed.
+      const followed = tracks.get(unit);
+      if (followed && !followed.end) continue;
+      const made: StartUnitTrack = {
         unit,
+        upgrades: [],
         team,
         changedTeam: false,
         points: [at],
         end: null,
-      });
+      };
+      all.push(made);
+      tracks.set(unit, made);
+      continue;
+    }
+    if (event.kind === "start_unit_replaced") {
+      const by = num(event.by);
+      const frame = num(event.frame);
+      const old = tracks.get(unit);
+      if (by === undefined || frame === undefined || !old) continue;
+      // A game that destroys the old unit first has already ended the track,
+      // on this frame, as a removal.
+      if (old.end && !(old.end.cause === "removed" && old.end.frame === frame))
+        continue;
+      old.end = null;
+      const last = old.points[old.points.length - 1];
+      const where = at ?? { frame, x: last.x, z: last.z };
+      old.upgrades.push(where);
+      old.points.push(where);
+      tracks.delete(unit);
+      tracks.set(by, old);
       continue;
     }
     const track = tracks.get(unit);
@@ -130,9 +178,25 @@ export function startUnitTracks(events: readonly LogEvent[]): StartUnitTrack[] {
       };
     }
   }
-  for (const track of tracks.values())
-    track.points.sort((a, b) => a.frame - b.frame);
-  return [...tracks.values()];
+  for (const track of all) track.points.sort((a, b) => a.frame - b.frame);
+  return all;
+}
+
+/** A track's upgrades with whose they were, ready to draw. */
+export interface StartUnitUpgrade extends TrackPoint {
+  unit: number;
+  team: number;
+}
+
+/** Every upgrade of every track, in the order they happened. */
+export function startUnitUpgrades(
+  tracks: readonly StartUnitTrack[],
+): StartUnitUpgrade[] {
+  const out: StartUnitUpgrade[] = [];
+  for (const track of tracks)
+    for (const upgrade of track.upgrades)
+      out.push({ ...upgrade, unit: track.unit, team: track.team });
+  return out.sort((a, b) => a.frame - b.frame);
 }
 
 /**

@@ -208,7 +208,7 @@ export function eventState(
 
 /** The layers' names, which the map's help uses. */
 export const EVENT_LAYER_NAMES =
-  "Deaths, Buildings finished and the two starting unit layers";
+  "Deaths, Damage dealt, Buildings finished and the two starting unit layers";
 
 /**
  * Why the event layers cannot be switched on, or null when they can. It is the

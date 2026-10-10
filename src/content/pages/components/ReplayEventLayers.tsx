@@ -4,6 +4,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
+import { damageLegend } from "../../replayDamage";
 import {
   deathLegend,
   EVENT_LAYER_NAMES,
@@ -58,7 +59,14 @@ export function EventLayerCanvases({
   const emphasis = useSeriesEmphasis();
   const heatRef = useRef<HTMLCanvasElement | null>(null);
   const marksRef = useRef<HTMLCanvasElement | null>(null);
-  const { field, finishedMarks } = ev;
+  const damageRef = useRef<HTMLCanvasElement | null>(null);
+  const { field, finishedMarks, damageField } = ev;
+
+  useEffect(() => {
+    const canvas = damageRef.current;
+    if (canvas && damageField)
+      drawHeatField(canvas, damageField, HEAT_KIND_OF_LAYER.damage);
+  }, [damageField]);
 
   useEffect(() => {
     const canvas = heatRef.current;
@@ -124,6 +132,13 @@ export function EventLayerCanvases({
           className="pointer-events-none absolute inset-0 size-full"
         />
       )}
+      {damageField && damageField.peak > 0 && (
+        <canvas
+          ref={damageRef}
+          data-layer="damage"
+          className="pointer-events-none absolute inset-0 size-full"
+        />
+      )}
       {finishedMarks && finishedMarks.length > 0 && (
         <canvas
           ref={marksRef}
@@ -180,10 +195,12 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
   const reading =
     (ev.deathsOn && ev.deathRead.status === "loading") ||
     (ev.finishedOn && ev.finishedRead.status === "loading") ||
+    (ev.damageOn && ev.damageRead.status === "loading") ||
     ev.startRead.status === "loading";
   const failed =
     (ev.deathsOn && ev.deathRead.status === "failed") ||
     (ev.finishedOn && ev.finishedRead.status === "failed") ||
+    (ev.damageOn && ev.damageRead.status === "failed") ||
     ev.startRead.status === "failed";
 
   if (ev.block) {
@@ -290,6 +307,10 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
         </>
       )}
 
+      {ev.damageOn && ev.damageRead.status === "done" && (
+        <DamageNotes ev={ev} />
+      )}
+
       {ev.finishedOn && ev.finishedRead.status === "done" && !finished
         ? unitsNote(
             "which finished units are buildings, so this layer needs the game installed",
@@ -319,6 +340,68 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
         <HeatLegend {...deathLegendText} kind={HEAT_KIND_OF_LAYER.deaths} />
       )}
     </>
+  );
+}
+
+/** What the damage layer says under the map: its mode, its warnings and its
+ *  legend. What it counts is in {@link EventLayerHelp}. */
+function DamageNotes({ ev }: { ev: EventLayers }) {
+  if (!ev.damageRecorded)
+    return (
+      <p className="text-xs text-muted-foreground" data-testid="damage">
+        This analysis was recorded before coilbox logged damage, so there is
+        nothing to draw. Analyse the replay again to record it.{" "}
+        <button
+          type="button"
+          className="rounded-sm underline hover:no-underline focus-visible:ring-1 focus-visible:ring-ring"
+          onClick={goToAnalysis}
+        >
+          Go to the analysis section
+        </button>
+      </p>
+    );
+  if (ev.damageSums.landed === 0)
+    return (
+      <p className="text-xs text-muted-foreground" data-testid="damage">
+        No damage was recorded{ev.windowed ? " in this window" : ""}.
+      </p>
+    );
+  if (!ev.damageFits)
+    return (
+      <p
+        className="text-xs text-amber-600 dark:text-amber-400"
+        data-testid="damage"
+      >
+        The damage was recorded on a map of another size than the one installed,
+        so it cannot be placed.
+      </p>
+    );
+  return (
+    <div className="flex flex-col gap-2" data-testid="damage">
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        size="sm"
+        aria-label="Which end of the damage is drawn"
+        value={ev.damageMode}
+        onValueChange={(v) => {
+          if (v === "at" || v === "origin") ev.setDamageMode(v);
+        }}
+      >
+        <ToggleGroupItem value="at">Where it landed</ToggleGroupItem>
+        <ToggleGroupItem value="origin">Where it came from</ToggleGroupItem>
+      </ToggleGroup>
+      {ev.damageField && ev.damageField.peak > 0 ? (
+        <HeatLegend
+          {...damageLegend(ev.damageField, ev.damageMode, ev.windowed)}
+          kind={HEAT_KIND_OF_LAYER.damage}
+        />
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          None of it has an attacker, so it came from nowhere on the map.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -357,6 +440,9 @@ export function EventLayerHelp({ ev }: { ev: EventLayers }) {
             ` ${(ev.deaths.length - ev.costed).toLocaleString()} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
         </p>
       )}
+      {ev.damageOn && ev.damageRead.status === "done" && ev.damageRecorded && (
+        <DamageHelp ev={ev} />
+      )}
       {finished && (
         <p>
           An outline is one finished building, in its player's colour. Beside
@@ -372,6 +458,44 @@ export function EventLayerHelp({ ev }: { ev: EventLayers }) {
             ` ${plural(finished.offMap, "building stands", "buildings stand")} off the map and ${finished.offMap === 1 ? "is" : "are"} not drawn.`}
         </p>
       )}
+    </>
+  );
+}
+
+/** What the damage layer counts and leaves out, for the map's help entry. */
+function DamageHelp({ ev }: { ev: EventLayers }) {
+  const sums = ev.damageSums;
+  const whole = (n: number) => Math.round(n).toLocaleString();
+  const seconds = Math.round(ev.damageFrames / 30);
+  return (
+    <>
+      <p>
+        Damage dealt is every hit on a unit that took health off it, added up
+        where the unit stood, or where its attacker stood. A hit larger than the
+        health its target had left counts for what was left. Paralysis and
+        healing are not counted. Every player's damage is on it, whoever is
+        highlighted, and it is drawn in the deaths layer's colours, so only one
+        of the two shows at a time.
+      </p>
+      <p>
+        The analysis adds damage up as the match plays and keeps totals for each{" "}
+        {seconds} seconds and each square of the map's grid, not a line for each
+        hit. So the time window keeps or drops whole stretches of {seconds}{" "}
+        seconds, by when each begins. {whole(sums.landed)} damage landed
+        {ev.windowed ? " in this window" : ""}.
+        {sums.unattacked > 0 &&
+          ` ${whole(sums.unattacked)} of it had no attacker, such as a fall or a script, and has no place to come from.`}
+        {sums.own > 0 &&
+          ` ${whole(sums.own)} of it a player did to their own units.`}
+        {sums.offMap > 0 &&
+          ` ${whole(sums.offMap)} of it landed on a unit off the map and is not drawn.`}
+      </p>
+      <p>
+        These sums differ from the damage figures in the match chart. The
+        engine's own total counts each hit as the health its target was already
+        missing, up to the size of the hit, so the first hit on an undamaged
+        unit adds nothing to it.
+      </p>
     </>
   );
 }

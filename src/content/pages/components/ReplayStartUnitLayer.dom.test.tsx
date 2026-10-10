@@ -232,6 +232,42 @@ const MATCH = [
   },
 ];
 
+/**
+ * The same match as a logger that follows a replacement writes it: Alice's
+ * unit is swapped for unit 500 at 2:00, which walks on and is alive at the end.
+ */
+const UPGRADED = [
+  ...MATCH.slice(0, 5),
+  {
+    kind: "unit_created",
+    frame: 120 * SEC,
+    unit: 500,
+    def: 32,
+    team: 0,
+    x: 700,
+    y: 0,
+    z: 2900,
+  },
+  {
+    kind: "start_unit_replaced",
+    frame: 120 * SEC,
+    unit: 13532,
+    by: 500,
+    team: 0,
+    x: 700,
+    z: 2900,
+  },
+  ...MATCH.slice(5),
+  {
+    kind: "start_unit_position",
+    frame: 500 * SEC,
+    unit: 500,
+    team: 0,
+    x: 1500,
+    z: 2500,
+  },
+];
+
 function show(info: DemoInfo = INFO) {
   return render(
     <SeriesEmphasisProvider>
@@ -302,7 +338,7 @@ describe("a replay with no analysis", () => {
       /This replay has not been analysed/,
     );
     expect(help()).toMatch(
-      /Deaths, Buildings finished and the two starting unit layers draw events from an analysis/,
+      /Deaths, Damage dealt, Buildings finished and the two starting unit layers draw events from an analysis/,
     );
     expect(eventsRead).not.toHaveBeenCalled();
     expect(layer()).toBeNull();
@@ -341,7 +377,7 @@ describe("an analysis from before starting units were logged", () => {
 });
 
 describe("starting unit paths", () => {
-  it("reads the four kinds a track is built from, once the layer is on", async () => {
+  it("reads the five kinds a track is built from, once the layer is on", async () => {
     analysed();
     EVENTS = MATCH;
     show();
@@ -356,8 +392,51 @@ describe("starting unit paths", () => {
         "unit_destroyed",
         "unit_given",
         "start_unit_position",
+        "start_unit_replaced",
       ],
     });
+  });
+
+  it("carries a path on through an upgrade, and does not list the upgrade as a loss", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = UPGRADED;
+    show();
+    fireEvent.click(toggle("Starting unit paths"));
+    fireEvent.click(toggle("Starting unit deaths"));
+    await screen.findByTestId("start-units");
+    // One line for each player, though Alice had two units.
+    expect(labels()).toEqual([
+      ["0", "Alice"],
+      ["1", "Bob"],
+    ]);
+    expect(notes()).toMatch(/2 starting units recorded\./);
+    expect(notes()).toMatch(/1 upgrade\./);
+    expect(notes()).toMatch(/1 starting unit was lost/);
+    const items = [
+      ...document.querySelectorAll('[data-testid="start-units"] li'),
+    ].map((li) => li.textContent?.trim());
+    expect(items).toEqual(["Bob: destroyed at 8:00 by Alice"]);
+    expect(notes()).not.toMatch(/older logger/);
+    const said = help();
+    expect(said).toMatch(/swapped a starting unit for another unit/);
+    expect(said).toMatch(/on exactly the same spot/);
+    // Alice's unit was upgraded at 2:00 and is still alive in the last five
+    // minutes, so her line is still there.
+    fireEvent.click(screen.getByRole("button", { name: "Last 5 minutes" }));
+    await waitFor(() =>
+      expect(labels().map((l) => l[1])).toEqual(["Alice", "Bob"]),
+    );
+  });
+
+  it("warns that an older analysis may stop a path at an upgrade", async () => {
+    analysed({ loggerVersion: 3 });
+    EVENTS = MATCH;
+    show();
+    fireEvent.click(toggle("Starting unit paths"));
+    await screen.findByTestId("start-units");
+    expect(notes()).toMatch(
+      /older logger, so a path may stop where the unit was upgraded/,
+    );
   });
 
   it("draws one line per starting unit and labels where each ends with its player", async () => {
@@ -444,17 +523,16 @@ describe("starting unit deaths", () => {
     expect(labels()).toEqual([]);
   });
 
-  it("explains the mark for a unit the game replaced, and that the log cannot follow it", async () => {
+  it("explains the mark for a unit the game took away and did not replace", async () => {
     analysed();
     EVENTS = MATCH;
     show();
     fireEvent.click(toggle("Starting unit deaths"));
     await screen.findByTestId("start-units");
-    expect(notes()).not.toMatch(/swaps a unit for its upgrade/);
     const said = help();
     expect(said).toMatch(/is a starting unit that was destroyed/);
     expect(said).toMatch(
-      /the game's own script took away, which is how a game swaps a unit for its upgrade\. The log cannot follow it into the unit that replaced it/,
+      /the game's own script took away with nothing recorded in its place/,
     );
   });
 
