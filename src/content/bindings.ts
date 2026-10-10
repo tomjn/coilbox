@@ -923,7 +923,7 @@ export interface ReplayLogHeader {
   format: number;
   /**
    * `Game.gameName` during the run, which is the analysis game's name and not
-   * the game the replay was recorded on. That one is `ReplayAnalysisReport.baseGame`.
+   * the game the replay was recorded on. That one is `StoredReplayAnalysis.game`.
    */
   game: string;
   gameVersion: string;
@@ -1018,81 +1018,233 @@ export interface ReplayDisagreement {
   difference?: number;
 }
 
-/** How the engine run behind an analysis ended. */
-export interface ReplayEngineExit {
-  /** The exit status, when the engine exited by itself. */
-  code: number | null;
-  /** The signal that ended it, on macOS and Linux. */
-  signal: number | null;
-  /** The run reached `timeoutSecs` and was killed. */
-  timedOut: boolean;
-  cancelled: boolean;
-  wallSeconds: number;
+/** How far a running analysis has got. */
+export type ReplayAnalysisPhase = "starting" | "loading" | "playing";
+
+/** The analysis that is running. */
+export interface ReplayAnalysisRunningJob {
+  id: number;
+  gameId: string;
+  /** The replay's file name. */
+  name: string;
+  replayPath: string;
+  matchSeconds: number;
+  startedAtMs: number;
+  phase: ReplayAnalysisPhase;
+  /**
+   * The frame of the last event the logger wrote. It stands still through a
+   * stretch of the match in which no unit is made or lost.
+   */
+  frame: number;
+  /**
+   * The match's last frame, from the whole seconds in the replay's header, so
+   * `frame` can end up to a second past it.
+   */
+  lastFrame: number;
+  /** A cancel has been asked for and the run is on its way out. */
+  cancelling: boolean;
+}
+
+/** An analysis waiting its turn. */
+export interface ReplayAnalysisQueuedJob {
+  id: number;
+  gameId: string;
+  name: string;
+  replayPath: string;
 }
 
 /**
- * - `reproduced`: the run saw the match the replay recorded, and its events are good.
- * - `diverged`: the run finished and saw a different match. No events come back.
- * - `incomplete`: the logger started and the run stopped before the game ended.
- * - `loggerNotLoaded`: the logger never wrote its header.
+ * The last run of a match that failed this session. A failure is not a fact
+ * about the replay, so it is never stored.
+ *
+ * - `tookTooLong`: the run reached `limitSeconds` and was killed. Not a
+ *   divergence: it never got as far as being compared.
+ * - `engineFailed`: the engine stopped before the match ended.
+ * - `couldNotRun`: the run could not be started, or its result not stored.
  */
-export type ReplayAnalysisStatus =
-  | "reproduced"
-  | "diverged"
-  | "incomplete"
-  | "loggerNotLoaded";
-
-/** Everything an analysis run found out except the events themselves. */
-export interface ReplayAnalysisReport {
-  status: ReplayAnalysisStatus;
-  /** The game the replay was recorded on. */
-  baseGame: string;
-  /** The match's length, to set against `exit.wallSeconds`. */
-  matchSeconds: number;
-  exit: ReplayEngineExit;
-  /** Null when the logger did not load. */
-  header: ReplayLogHeader | null;
-  counts: ReplayEventCounts;
-  malformedLines: number;
-  truncated: boolean;
-  /** Empty when the run reproduced the match, or never got far enough to compare. */
-  disagreements: ReplayDisagreement[];
-  /**
-   * What the engine said, for a run that did not reproduce: the lines it marked
-   * fatal, or its last lines when it marked none.
-   */
+export interface ReplayAnalysisFailure {
+  gameId: string;
+  name: string;
+  reason: "tookTooLong" | "engineFailed" | "couldNotRun";
+  /** The detail: an error, or how the engine exited. */
+  message: string;
+  limitSeconds?: number;
+  /** What the engine said: its fatal lines, or its last lines. */
   logExcerpt: string[];
 }
 
-/**
- * Play a replay back headless under coilbox's analysis game and return what the
- * replay logger recorded (#1183, #1155, #1184).
- *
- * This runs the engine for the length of the call, seconds to minutes, so call
- * it only when the player asked for it. `replayPath` is a `ReplayFile.path`.
- * `enginePath` is the `Engine.path` of the engine the replay was recorded
- * with, and `dataDir` the content folder to play from. Both the game and the map
- * the replay names have to be installed. `timeoutSecs` is how long the engine
- * may run before it is killed.
- *
- * `events` is null unless `report.status` is `reproduced`. It rejects for a
- * replay that never recorded a game over, because there is then nothing to
- * check a run against.
- */
-export const contentAnalyseReplay = defineCommand<
-  {
-    replayPath: string;
-    enginePath: string;
-    dataDir: string;
-    timeoutSecs: number;
-  },
-  { report: ReplayAnalysisReport; events: ReplayLogLine[] | null }
->("coilbox-content", "content_analyse_replay");
+/** The analysis queue, which belongs to the app and outlives any page. */
+export interface ReplayAnalysisQueue {
+  running: ReplayAnalysisRunningJob | null;
+  /** In the order they will run. */
+  queued: ReplayAnalysisQueuedJob[];
+  /** Nothing is running because a game is. The queue starts again when it ends. */
+  waitingForGame: boolean;
+  failures: ReplayAnalysisFailure[];
+  /**
+   * Counts up each time a run changes the store, so a listener knows to ask
+   * {@link contentReplayAnalyses} again.
+   */
+  stored: number;
+}
 
-/** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
+/**
+ * The Tauri event every window is sent when the analysis queue changes. Its
+ * payload is a {@link ReplayAnalysisQueue}. A page asks
+ * {@link contentAnalysisQueue} once when it opens and then listens for this.
+ */
+export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
+
+/**
+ * Ask for a replay to be analysed: played back headless under coilbox's
+ * analysis game, with the result stored (#1157). This is the only command that
+ * leads to an engine being run for an analysis. Call it through
+ * `src/content/replayAnalysis.ts`, which is where the `analytics.run` profile
+ * key is checked, and only because a person pressed the button for that
+ * replay.
+ *
+ * `replayPath` is a `ReplayFile.path`. `enginePath` and `dataDir` are the
+ * `PlayTarget.enginePath` and `PlayTarget.dataDir` a replay launch would use.
+ * `force` asks for a run of a match that already has a current analysis.
+ *
+ * It rejects, with the reason, for a replay that cannot be analysed: a remix,
+ * one with no recorded game over, or an engine folder with no headless engine.
+ * There is no time limit to pass: the queue allows the match's own length plus
+ * time for the engine to start.
+ */
+export const contentAnalysisEnqueue = defineCommand<
+  { replayPath: string; enginePath: string; dataDir: string; force?: boolean },
+  {
+    outcome: "queued" | "alreadyQueued" | "alreadyAnalysed";
+    queue: ReplayAnalysisQueue;
+  }
+>("coilbox-content", "content_analysis_enqueue");
+
+/**
+ * Whether a replay can be analysed at all, read from the replay itself.
+ * `cannot` is null when it can. Whether its engine, game and map are installed
+ * is a separate question.
+ *
+ * - `remix`: a remix keeps its original's recorded result, so there is nothing
+ *   of its own to check a run against.
+ * - `noGameOver`: the match was quit before a game over was recorded.
+ * - `noGameId`: the header holds no id to file a result under.
+ * - `unreadable`: the file does not read as a replay.
+ */
+export const contentAnalysisCheck = defineCommand<
+  { replayPath: string },
+  {
+    cannot: "remix" | "noGameId" | "noGameOver" | "unreadable" | null;
+    gameId: string | null;
+    matchSeconds: number;
+  }
+>("coilbox-content", "content_analysis_check");
+
+/** The analysis queue as it is now. */
+export const contentAnalysisQueue = defineCommand<
+  undefined,
+  { queue: ReplayAnalysisQueue }
+>("coilbox-content", "content_analysis_queue");
+
+/**
+ * Cancel one analysis by its id, queued or running, or every one when no id is
+ * given. A running one has its engine killed and nothing of it is stored.
+ */
+export const contentAnalysisCancel = defineCommand<
+  { id?: number },
+  { cancelled: boolean }
+>("coilbox-content", "content_analysis_cancel");
+
+/** Forget a match's last failed run, once it has been read. */
+export const contentAnalysisDismiss = defineCommand<
+  { gameId: string },
+  { ok: boolean }
+>("coilbox-content", "content_analysis_dismiss");
+
+/**
+ * What a stored analysis means to a reader today (#1158).
+ *
+ * - `current`: events from the logger this build ships.
+ * - `outdated`: events from an earlier logger. They still read. A view that
+ *   needs something the earlier logger did not record offers a new run.
+ * - `diverged`: a run finished and did not reproduce the match. No events.
+ */
+export type ReplayAnalysisState = "current" | "outdated" | "diverged";
+
+/**
+ * What is stored for one analysed match: what produced it, when, and how many
+ * events of each kind it holds. Never the events themselves.
+ */
+export interface StoredReplayAnalysis {
+  state: ReplayAnalysisState;
+  /** The stored file's size on disk, compressed. */
+  sizeBytes: number;
+  kind: "analysis";
+  storeFormat: number;
+  outcome: "reproduced" | "diverged";
+  /** The replay's game id, which is what `StatRecord.gameId` and `DemoInfo.gameId` hold. */
+  gameId: string;
+  /** The logger's line format, and which logger wrote the events. */
+  loggerFormat: number;
+  loggerVersion: number;
+  /** The engine the run used, as it named itself. */
+  engine: string;
+  /** The game the replay was recorded on, name and version. */
+  game: string;
+  map: string;
+  analysedAtMs: number;
+  /** The match's length, and how long the engine took to play it back. */
+  matchSeconds: number;
+  wallSeconds: number;
+  counts: ReplayEventCounts;
+  /** The figures the run and the replay disagreed on. Empty unless `diverged`. */
+  disagreements: ReplayDisagreement[];
+}
+
+/**
+ * Every stored analysis, to join to replay records by `gameId`. This is how
+ * the library knows which replays have event data: the answer changes when an
+ * analysis is run or deleted, so it is asked for and never stored in a
+ * `StatRecord`.
+ *
+ * A remix carries its original's game id and has no analysis of its own, so
+ * leave records with `remixed` set out of the join.
+ */
+export const contentReplayAnalyses = defineCommand<
+  undefined,
+  { analyses: StoredReplayAnalysis[] }
+>("coilbox-content", "content_replay_analyses");
+
+/** What is stored for one match, or null. Carries the counts per kind. */
+export const contentReplayAnalysis = defineCommand<
+  { gameId: string },
+  { analysis: StoredReplayAnalysis | null }
+>("coilbox-content", "content_replay_analysis");
+
+/**
+ * A match's stored events, in the order the logger wrote them. `kinds` keeps
+ * only lines of those kinds. `offset` and `limit` take a window of what was
+ * kept, and `total` is how many lines matched in all. A match can hold tens
+ * of thousands of lines, so ask for the kinds a view draws.
+ */
+export const contentReplayAnalysisEvents = defineCommand<
+  { gameId: string; kinds?: string[]; offset?: number; limit?: number },
+  { events: ReplayLogLine[]; total: number }
+>("coilbox-content", "content_replay_analysis_events");
+
+/** Delete what is stored for one match, leaving the replay alone. */
+export const contentReplayAnalysisDelete = defineCommand<
+  { gameId: string },
+  { deleted: boolean }
+>("coilbox-content", "content_replay_analysis_delete");
+
+/**
+ * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
+ * `content_list_replays`. Its stored analysis goes with it.
+ */
 export const contentDeleteReplay = defineCommand<
   { path: string },
-  { ok: boolean }
+  { ok: boolean; analysisDeleted: boolean }
 >("coilbox-content", "content_delete_replay");
 
 /** What a bulk replay delete removed, or would remove. */
@@ -1103,6 +1255,9 @@ export interface ReplayDeleteSummary {
   bytes: number;
   /** One sentence per path left alone, saying why. */
   skipped: string[];
+  /** How many of the replays had a stored analysis, which goes with them. */
+  analyses: number;
+  analysisBytes: number;
 }
 
 /**

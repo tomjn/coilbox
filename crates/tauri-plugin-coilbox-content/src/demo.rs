@@ -337,6 +337,10 @@ pub struct DeleteSummary {
     pub bytes: u64,
     /// One sentence per path left alone, saying why.
     pub skipped: Vec<String>,
+    /// How many of the deleted replays had a stored analysis, which goes with
+    /// them, and what those files free. Not counted in `deleted` or `bytes`.
+    pub analyses: u64,
+    pub analysis_bytes: u64,
 }
 
 /// Delete a batch of replays, returning how many went and what they freed.
@@ -347,11 +351,17 @@ pub struct DeleteSummary {
 ///
 /// `apply` false sizes the batch without deleting, so the caller can show what
 /// would go before it goes.
-pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
+///
+/// `analyses` is the folder stored analyses are kept in. A replay's analysis
+/// is found by the game id in its header and goes when the replay does. A
+/// remix has none of its own, so deleting one leaves its original's alone.
+pub fn delete_replays(paths: &[PathBuf], apply: bool, analyses: Option<&Path>) -> DeleteSummary {
     let mut out = DeleteSummary {
         applied: apply,
         ..Default::default()
     };
+    // The matches whose analysis a dry run has already counted.
+    let mut counted = std::collections::HashSet::new();
     for path in paths {
         let name = path
             .file_name()
@@ -365,6 +375,11 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
             out.skipped.push(format!("{name}: not found"));
             continue;
         };
+        // Read before the replay goes, because the key is inside it.
+        let analysis = analyses.and_then(|dir| {
+            let (game_id, size) = analysis::store::stored_for_replay(dir, path)?;
+            Some((dir, game_id, size))
+        });
         if apply {
             if let Err(e) = std::fs::remove_file(path) {
                 out.skipped.push(format!("{name}: {e}"));
@@ -373,6 +388,24 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool) -> DeleteSummary {
         }
         out.deleted += 1;
         out.bytes += md.len();
+        if let Some((dir, game_id, size)) = analysis {
+            if apply {
+                match analysis::store::delete(dir, &game_id) {
+                    // Two paths in one batch can be the same match. The file
+                    // went with the first of them.
+                    Ok(false) => continue,
+                    Ok(true) => {}
+                    Err(e) => {
+                        out.skipped.push(format!("{name}: {e}"));
+                        continue;
+                    }
+                }
+            } else if !counted.insert(game_id) {
+                continue;
+            }
+            out.analyses += 1;
+            out.analysis_bytes += size;
+        }
     }
     out
 }
@@ -2103,27 +2136,45 @@ pub(crate) async fn content_rewrite_demo(
 
 /// `content_delete_replay`, delete one replay file. `path` must be a `.sdfz`/`.sdf`
 /// path from `content_list_replays` (guarded against deleting anything else).
+/// The replay's stored analysis goes with it, and `analysisDeleted` says
+/// whether there was one.
 #[tauri::command]
-pub(crate) async fn content_delete_replay(path: String) -> CliResult {
+pub(crate) async fn content_delete_replay<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+) -> CliResult {
     let p = PathBuf::from(&path);
     if !is_replay_path(&p) {
         return CliResult::err("not a replay file".to_string());
     }
-    match std::fs::remove_file(&p) {
-        Ok(()) => CliResult::ok(json!({ "ok": true })),
-        Err(e) => CliResult::err(format!("delete failed: {e}")),
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    let summary = delete_replays(&[p], true, analyses.as_deref());
+    if summary.deleted == 0 {
+        let reason = summary.skipped.first().cloned().unwrap_or_default();
+        return CliResult::err(format!("delete failed: {reason}"));
     }
+    CliResult::ok(json!({ "ok": true, "analysisDeleted": summary.analyses > 0 }))
 }
 
 /// `content_delete_replays`: delete a batch of replays, for the storage screen's
 /// bulk cleanup (issue #386). Each path is guarded the same way
 /// `content_delete_replay` guards its one, and a path that fails is skipped with a
 /// reason rather than aborting the batch. `apply=false` sizes the batch without
-/// deleting. See [`delete_replays`].
+/// deleting. The summary counts the stored analyses that go with the replays.
+/// See [`delete_replays`].
 #[tauri::command]
-pub(crate) async fn content_delete_replays(paths: Vec<String>, apply: bool) -> CliResult {
+pub(crate) async fn content_delete_replays<R: Runtime>(
+    app: AppHandle<R>,
+    paths: Vec<String>,
+    apply: bool,
+) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    match tauri::async_runtime::spawn_blocking(move || delete_replays(&paths, apply)).await {
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    match tauri::async_runtime::spawn_blocking(move || {
+        delete_replays(&paths, apply, analyses.as_deref())
+    })
+    .await
+    {
         Ok(summary) => CliResult::ok(json!({ "summary": summary })),
         Err(e) => CliResult::err(format!("delete replays task failed: {e}")),
     }
@@ -2224,6 +2275,8 @@ mod tests {
         pub(super) team_stat_period: i32,
         pub(super) game_time: i32,
         pub(super) wallclock: i32,
+        /// The 16 bytes of the header's game id.
+        pub(super) game_id: [u8; 16],
         /// Bytes chopped off the end once everything is written, for a file that
         /// stops before the trailer the header promised.
         pub(super) truncate_by: usize,
@@ -2245,6 +2298,7 @@ mod tests {
                 team_stat_period: 15,
                 game_time: 2356,
                 wallclock: 2531,
+                game_id: std::array::from_fn(|k| 0xA0 + k as u8),
                 truncate_by: 0,
             }
         }
@@ -2263,9 +2317,7 @@ mod tests {
             put_i32(&mut h, OFF_HEADER_SIZE, self.header_size as i32);
             let ver = self.engine_version.as_bytes();
             h[OFF_VERSION_STRING..OFF_VERSION_STRING + ver.len()].copy_from_slice(ver);
-            for (k, b) in (0..16).zip(0xA0u8..) {
-                h[OFF_GAME_ID + k] = b;
-            }
+            h[OFF_GAME_ID..OFF_GAME_ID + 16].copy_from_slice(&self.game_id);
             put_u64(&mut h, OFF_UNIX_TIME, 1_777_320_845);
             put_i32(&mut h, OFF_SCRIPT_SIZE, self.script.len() as i32);
             put_i32(&mut h, OFF_DEMO_STREAM_SIZE, self.stream.len() as i32);
@@ -3936,7 +3988,7 @@ mod tests {
         std::fs::write(&a, b"1234").unwrap();
         std::fs::write(&b, b"123").unwrap();
 
-        let summary = delete_replays(&[a.clone(), b.clone()], false);
+        let summary = delete_replays(&[a.clone(), b.clone()], false, None);
         assert!(!summary.applied);
         assert_eq!(summary.deleted, 2);
         assert_eq!(summary.bytes, 7);
@@ -3955,7 +4007,11 @@ mod tests {
         std::fs::write(&replay, b"12345").unwrap();
         std::fs::write(&other, b"config").unwrap();
 
-        let summary = delete_replays(&[replay.clone(), other.clone(), dir.join("gone.sdf")], true);
+        let summary = delete_replays(
+            &[replay.clone(), other.clone(), dir.join("gone.sdf")],
+            true,
+            None,
+        );
         assert!(summary.applied);
         assert_eq!(summary.deleted, 1);
         assert_eq!(summary.bytes, 5);

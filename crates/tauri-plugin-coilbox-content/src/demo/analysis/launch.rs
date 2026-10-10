@@ -38,8 +38,8 @@
 //! interrupt aborts it, and a demo it was recording is left empty.
 
 use std::path::{Path, PathBuf};
-use std::process::{ExitStatus, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::process::{Child, ExitStatus, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
@@ -92,6 +92,62 @@ impl EngineExit {
     }
 }
 
+/// The hold something outside a run has on it: the way to stop it.
+///
+/// The engine is spawned, polled and killed under one lock, and a cancel is
+/// recorded under the same lock. So once [`RunControl::cancel`] has returned,
+/// the engine this run started is dead and reaped, and the run will not start
+/// one. That is what lets the app call it on its way out and know no headless
+/// engine is left simulating at full speed with nothing to stop it.
+#[derive(Default)]
+pub struct RunControl {
+    state: Mutex<ControlState>,
+}
+
+#[derive(Default)]
+struct ControlState {
+    child: Option<Child>,
+    cancelled: bool,
+    /// A cancel found the engine running and killed it.
+    killed: bool,
+}
+
+impl RunControl {
+    /// Stop the run: kill its engine if it has one and wait for it to be gone,
+    /// and refuse it one if it has not started it yet.
+    pub fn cancel(&self) {
+        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.cancelled = true;
+        if let Some(child) = state.child.as_mut() {
+            // An engine that has already exited by itself was not ended by
+            // this, and its run is judged on what it wrote.
+            if matches!(child.try_wait(), Ok(None)) {
+                let _ = child.kill();
+                let _ = child.wait();
+                state.killed = true;
+            }
+        }
+    }
+
+    /// Whether the run has been cancelled, for a test's stand-in engine to
+    /// stop on.
+    #[cfg(test)]
+    pub(super) fn was_cancelled(&self) -> bool {
+        self.state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .cancelled
+    }
+
+    /// The process id of the engine the run is running, for a test to look
+    /// for afterwards.
+    #[cfg(test)]
+    pub(super) fn engine_pid(&self) -> Option<u32> {
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state.child.as_ref().map(Child::id)
+    }
+}
+
 /// What one run needs.
 pub struct Launch<'a> {
     /// The `spring-headless` binary.
@@ -108,6 +164,8 @@ pub struct Launch<'a> {
     pub log: &'a Path,
     /// How long the run may take before it is killed.
     pub timeout: Duration,
+    /// Called each time the engine is checked, for as long as it runs.
+    pub on_poll: &'a dyn Fn(),
 }
 
 /// The engine's arguments, apart from the binary.
@@ -138,9 +196,10 @@ pub fn data_dir_list(data_dirs: &[PathBuf]) -> String {
 
 /// Run the engine headless on a replay and wait for it.
 ///
-/// Blocks until the engine exits, the time limit passes or `cancel` is set, and
-/// kills the engine in the last two cases. Call it from a blocking task.
-pub fn run_headless(launch: &Launch, cancel: &AtomicBool) -> Result<EngineExit, String> {
+/// Blocks until the engine exits, the time limit passes or `control` is
+/// cancelled, and kills the engine in the last two cases. Call it from a
+/// blocking task.
+pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit, String> {
     let engine_dir = launch
         .engine
         .parent()
@@ -169,22 +228,44 @@ pub fn run_headless(launch: &Launch, cancel: &AtomicBool) -> Result<EngineExit, 
     .stderr(Stdio::from(log_err));
 
     let started = Instant::now();
-    let mut child = cmd
-        .spawn()
-        .map_err(|e| format!("failed to launch engine: {e}"))?;
+    {
+        // Spawned under the lock a cancel takes, so a cancel either comes
+        // first and nothing is spawned, or finds the engine and kills it.
+        let mut state = control.state.lock().unwrap_or_else(|e| e.into_inner());
+        if state.cancelled {
+            return Ok(EngineExit {
+                code: None,
+                signal: None,
+                timed_out: false,
+                cancelled: true,
+                wall_seconds: 0.0,
+            });
+        }
+        state.child = Some(
+            cmd.spawn()
+                .map_err(|e| format!("failed to launch engine: {e}"))?,
+        );
+    }
 
     loop {
-        if let Some(status) = child.try_wait().map_err(|e| e.to_string())? {
-            return Ok(EngineExit::new(&status, started, false, false));
+        {
+            let mut state = control.state.lock().unwrap_or_else(|e| e.into_inner());
+            let killed = state.killed;
+            let child = state.child.as_mut().expect("the engine this run spawned");
+            let mut timed_out = false;
+            let mut status = child.try_wait().map_err(|e| e.to_string())?;
+            if status.is_none() && started.elapsed() >= launch.timeout {
+                // Already gone is fine: it exited between the two checks.
+                let _ = child.kill();
+                status = Some(child.wait().map_err(|e| e.to_string())?);
+                timed_out = true;
+            }
+            if let Some(status) = status {
+                state.child = None;
+                return Ok(EngineExit::new(&status, started, timed_out, killed));
+            }
         }
-        let cancelled = cancel.load(Ordering::Relaxed);
-        let timed_out = started.elapsed() >= launch.timeout;
-        if cancelled || timed_out {
-            // Already gone is fine: it exited between the two checks.
-            let _ = child.kill();
-            let status = child.wait().map_err(|e| e.to_string())?;
-            return Ok(EngineExit::new(&status, started, timed_out, cancelled));
-        }
+        (launch.on_poll)();
         std::thread::sleep(POLL_INTERVAL);
     }
 }
@@ -220,6 +301,10 @@ pub(super) mod tests {
     fn run(body: &str, timeout: Duration, cancel: bool) -> Run {
         let dir = tempfile::tempdir().unwrap();
         let engine = fake_engine(dir.path(), body);
+        let control = RunControl::default();
+        if cancel {
+            control.cancel();
+        }
         let exit = run_headless(
             &Launch {
                 engine: &engine,
@@ -229,8 +314,9 @@ pub(super) mod tests {
                 data_dirs: &[dir.path().join("data"), PathBuf::from("/content/root")],
                 log: &dir.path().join("engine.log"),
                 timeout,
+                on_poll: &|| {},
             },
-            &AtomicBool::new(cancel),
+            &control,
         )
         .unwrap();
         Run { dir, exit }
@@ -299,12 +385,90 @@ pub(super) mod tests {
         assert!(run.log().contains("started"));
     }
 
+    /// A run cancelled before it got as far as starting the engine starts
+    /// none. The fake engine would leave a file if it ran.
     #[test]
-    fn a_cancelled_run_is_killed_and_says_so() {
-        let run = run("exec sleep 600", LONG, true);
+    fn a_run_cancelled_before_it_starts_spawns_no_engine() {
+        let run = run("touch \"$(dirname \"$0\")/ran\"", LONG, true);
 
         assert!(run.exit.cancelled);
         assert!(!run.exit.timed_out);
+        assert!(!run.dir.path().join("engine").join("ran").exists());
+    }
+
+    /// The promise the app's exit rests on: when `cancel` returns, the engine
+    /// is dead. The process is looked for by its id, which is still this
+    /// run's to ask about because nothing has waited on it but the cancel.
+    #[test]
+    fn cancelling_a_running_engine_kills_it_before_cancel_returns() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = fake_engine(dir.path(), "echo started; exec sleep 600");
+        let control = std::sync::Arc::new(RunControl::default());
+        let pid = std::sync::Arc::new(Mutex::new(None));
+        let started = Instant::now();
+
+        let exit = std::thread::scope(|scope| {
+            let run = scope.spawn(|| {
+                run_headless(
+                    &Launch {
+                        engine: &engine,
+                        demo: &dir.path().join("replay.sdfz"),
+                        write_dir: &dir.path().join("write"),
+                        config: &dir.path().join("engine.cfg"),
+                        data_dirs: &[],
+                        log: &dir.path().join("engine.log"),
+                        timeout: LONG,
+                        on_poll: &|| {},
+                    },
+                    &control,
+                )
+            });
+            // Wait for the engine to be there to kill.
+            while control.engine_pid().is_none() {
+                assert!(started.elapsed() < LONG, "the engine never started");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            *pid.lock().unwrap() = control.engine_pid();
+            let alive = pid.lock().unwrap().unwrap();
+            assert!(coilbox_proc::is_running(alive));
+
+            control.cancel();
+
+            // No sleep between the cancel and the look.
+            assert!(
+                !coilbox_proc::is_running(alive),
+                "the engine outlived the cancel"
+            );
+            run.join().unwrap().unwrap()
+        });
+
+        assert!(exit.cancelled);
+        assert!(!exit.timed_out);
+        assert_eq!(exit.signal, Some(libc_sigkill()));
+        // Killed, not left to finish its ten minutes.
+        assert!(started.elapsed() < Duration::from_secs(30));
+    }
+
+    /// The one thing between an analysis and a player's settings. Without
+    /// `--config` the engine rewrites `springsettings.cfg` in every data
+    /// directory it is shown, which is how one was emptied.
+    #[test]
+    fn the_engine_is_always_given_a_config_file_of_its_own() {
+        let args = engine_args(
+            Path::new("/engines/1"),
+            Path::new("/scratch/write"),
+            Path::new("/scratch/engine.cfg"),
+            Path::new("/scratch/replay.sdfz"),
+        );
+
+        let at = args
+            .iter()
+            .position(|arg| arg == "--config")
+            .expect("--config is gone from the analysis launch");
+        assert_eq!(args[at + 1], "/scratch/engine.cfg");
+        let write = args.iter().position(|arg| arg == "--write-dir").unwrap();
+        assert_eq!(args[write + 1], "/scratch/write");
+        assert!(args.iter().any(|arg| arg == "--isolation"));
     }
 
     #[test]
@@ -319,8 +483,9 @@ pub(super) mod tests {
                 data_dirs: &[],
                 log: &dir.path().join("engine.log"),
                 timeout: LONG,
+                on_poll: &|| {},
             },
-            &AtomicBool::new(false),
+            &RunControl::default(),
         );
 
         assert!(result.unwrap_err().contains("failed to launch engine"));

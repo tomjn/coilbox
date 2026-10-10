@@ -17,6 +17,14 @@ use serde::{Deserialize, Serialize};
 /// number when a line loses or changes a field, never for an addition.
 pub const FORMAT_VERSION: u32 = 1;
 
+/// Which logger this coilbox ships, counted up from 1. Raised whenever the
+/// gadget starts recording something it did not before: a new kind of line, or
+/// a new field on an old one. The gadget does not write it. It is stamped on a
+/// stored analysis, so a file from before the change can be told from one made
+/// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
+/// the gadget gains a kind and this was not raised with it.
+pub const LOGGER_VERSION: u32 = 1;
+
 /// The first line: what the gadget saw the run as.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 #[serde(rename_all = "camelCase", default)]
@@ -128,8 +136,8 @@ pub enum LogLine {
 /// How many lines of each kind a log holds. This is what a run is judged on: a
 /// logger that never loaded writes nothing and raises nothing, so the counts
 /// are the only thing that tells it from a quiet match.
-#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", default)]
 pub struct EventCounts {
     pub header: usize,
     pub game_start: usize,
@@ -238,6 +246,42 @@ pub(super) mod tests {
         );
         assert_eq!(log.malformed, 0);
         assert!(!log.truncated);
+    }
+
+    /// Ties [`LOGGER_VERSION`] to the gadget. A stored analysis is called
+    /// outdated by that number alone, so a gadget that gains a kind without it
+    /// being raised would leave old files looking current.
+    #[test]
+    fn the_logger_writes_the_kinds_this_version_stands_for() {
+        // A line's kind is either written out in the line, or handed to the
+        // function that builds a unit's line.
+        let logger = super::super::game::LOGGER;
+        let mut kinds: Vec<&str> = ["\"kind\":\"", "unitLine(\""]
+            .iter()
+            .flat_map(|marker| logger.split(marker).skip(1))
+            .filter_map(|rest| rest.split('"').next())
+            .filter(|kind| {
+                !kind.is_empty() && kind.bytes().all(|b| b.is_ascii_lowercase() || b == b'_')
+            })
+            .collect();
+        kinds.sort_unstable();
+        kinds.dedup();
+
+        assert_eq!(
+            (LOGGER_VERSION, kinds),
+            (
+                1,
+                vec![
+                    "game_over",
+                    "game_start",
+                    "header",
+                    "unit_created",
+                    "unit_destroyed",
+                    "unit_finished"
+                ]
+            ),
+            "the gadget writes a different set of kinds: raise LOGGER_VERSION and update this list"
+        );
     }
 
     #[test]

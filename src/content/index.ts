@@ -19,6 +19,7 @@ import {
 import { cachedBlueprint } from "../blueprint/store";
 import { gateAdvanced, useAdvancedMode } from "../general/advanced";
 import { gateProfileHidden, isProfileHidden } from "../profile/hidden";
+import AnalysisQueueBadge from "./AnalysisQueueBadge";
 import ContentStartupProvider from "./ContentStartupProvider";
 import { engineConfigPage } from "./pages/EngineConfigPage";
 import EngineProfilesSection from "./pages/EngineProfilesSection";
@@ -87,6 +88,9 @@ const contentPlugin: FramePlugin = {
   // Runs once at app launch (before any route opens) to warm the unitsync scan
   // and map thumbnails, so the Maps/Games pages show data instantly.
   Provider: ContentStartupProvider,
+  // Replay analyses that are running or queued, on every page (#1157). Beside
+  // the download queue, which is the same kind of thing.
+  slots: [{ slot: "topbar.right", order: 2.25, Component: AnalysisQueueBadge }],
   nav: [
     {
       id: "library",

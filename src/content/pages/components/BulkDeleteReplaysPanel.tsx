@@ -234,6 +234,15 @@ export function BulkDeleteReplaysPanel({
                     {formatBytes(preview.bytes) ?? "0 B"} is freed. The files go
                     from disk and coilbox cannot bring them back.
                   </p>
+                  {preview.analyses > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {preview.analyses === 1
+                        ? "1 of them has a stored analysis"
+                        : `${preview.analyses} of them have a stored analysis`}
+                      , which is deleted too and frees another{" "}
+                      {formatBytes(preview.analysisBytes) ?? "0 B"}.
+                    </p>
+                  )}
                   {preview.skipped.length > 0 && (
                     <p className="text-xs text-muted-foreground">
                       {preview.skipped.length} cannot be deleted and will be

@@ -1157,7 +1157,15 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::content_demo_chat,
             demo::content_demo_build_orders,
             demo::content_rewrite_demo,
-            demo::analysis::content_analyse_replay,
+            demo::analysis::queue::content_analysis_check,
+            demo::analysis::queue::content_analysis_enqueue,
+            demo::analysis::queue::content_analysis_queue,
+            demo::analysis::queue::content_analysis_cancel,
+            demo::analysis::queue::content_analysis_dismiss,
+            demo::analysis::store::content_replay_analyses,
+            demo::analysis::store::content_replay_analysis,
+            demo::analysis::store::content_replay_analysis_events,
+            demo::analysis::store::content_replay_analysis_delete,
             demo::content_delete_replay,
             demo::content_delete_replays,
             archives::content_delete_archive,
@@ -1206,14 +1214,19 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             if let Ok(sp) = store_path(app) {
                 std::thread::spawn(move || verify_unverified_engines(&sp));
             }
+            // Without its folders there is no queue, and the commands say so.
+            let _ = demo::analysis::queue::manage(app.app_handle());
             Ok(())
         })
         // Stop the replay watcher (#462) cleanly when the app is shutting
         // down, rather than leaving its background thread to be torn down by
         // process exit.
-        .on_event(|_app, event| {
+        .on_event(|app, event| {
             if let tauri::RunEvent::Exit = event {
                 stats_watcher::stop();
+                // A replay analysis is a headless engine at full speed, and
+                // nothing else would stop it once coilbox has gone.
+                demo::analysis::queue::shutdown(app);
             }
         })
         .build()
