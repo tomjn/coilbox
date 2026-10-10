@@ -99,6 +99,7 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 | `#/library/blueprints/:id`                | A single layout's detail page                  |
 | `#/play/replays/:name`                    | A single replay's detail page                  |
 | `#/stats/:name`                           | A player's dossier (head-to-head stats)        |
+| `#/stats/:name/matchup`                   | Your games against that player, grouped by map, faction pairing and game length. `?me=` names your player, and without it the page picks the dossier's player |
 | `#/chatlogs`                              | Saved chat history (DMs and channels), read from disk with no live connection |
 | `#/hub/:id`                               | A single shared Coilbox hub item's page        |
 | `#/library/archives/:name`                | A single archive (advanced)                    |
