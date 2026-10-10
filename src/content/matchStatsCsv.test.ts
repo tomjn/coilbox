@@ -106,6 +106,23 @@ describe("matchStatsCsv", () => {
   });
   const lines = out.split("\r\n");
 
+  it("has a column only for the lines it is given, so a line unchecked in the roster is not in the file", () => {
+    // The chart hands over the lines it draws, and rows still carry every line.
+    const drawn = matchStatsCsv({
+      info,
+      metric,
+      mode: "cumulative",
+      view: "players",
+      series: [series[1]],
+      rows,
+    }).split("\r\n");
+    expect(
+      drawn[0].startsWith('match_time_sec,"Bob, the ""Builder""",game_id'),
+    ).toBe(true);
+    expect(drawn[1].startsWith("0,,0123abcd")).toBe(true);
+    expect(drawn.join("")).not.toContain("Alice");
+  });
+
   it("has a header, one row per sample, and ends with a line break", () => {
     expect(lines).toHaveLength(4);
     expect(lines[3]).toBe("");

@@ -1,4 +1,4 @@
-import { useTheme } from "@picoframe/frame";
+import { Button, useTheme } from "@picoframe/frame";
 import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
@@ -49,9 +49,11 @@ import {
   formatRate,
   metricGroups,
   modeRows,
+  partlyHidden,
   playerTeam,
   secondsPerFrame,
   seriesTeams,
+  shownSeries,
   spreadLabels,
   teamSeries,
   tooltipRows,
@@ -394,12 +396,32 @@ export function MatchStatsChart({
     [view, sides, players, trailer, info, colorMode, theme],
   );
 
+  // Every team the chart measures, whether its line is showing or not.
+  const chartedTeams = useMemo(
+    () => players.flatMap((s) => seriesTeams(s, info)).sort((a, b) => a - b),
+    [players, info],
+  );
+  const emphasis = useSeriesEmphasis();
+  const { hidden } = emphasis.state;
+  // The roster's unchecked teams come out here, after the painting above, so a
+  // line keeps its colour whatever else is showing. Everything below draws from
+  // `drawn`. `series` is only there to say how many lines the match has.
+  const drawn = useMemo(
+    () => shownSeries(series, info, chartedTeams, hidden),
+    [series, info, chartedTeams, hidden],
+  );
+  const noneDrawn = drawn.length === 0;
+  const partial = useMemo(
+    () => partlyHidden(drawn, info, chartedTeams, hidden),
+    [drawn, info, chartedTeams, hidden],
+  );
+
   const rows = useMemo(
     () =>
-      metric
-        ? modeRows(series, metric.key, secondsPerFrame(trailer), mode)
+      metric && !noneDrawn
+        ? modeRows(drawn, metric.key, secondsPerFrame(trailer), mode)
         : [],
-    [series, metric, trailer, mode],
+    [drawn, noneDrawn, metric, trailer, mode],
   );
   const formatValue = mode === "perMinute" ? formatRate : formatChartValue;
   // One cache for the life of this chart. Every tile is `modeRows` over the same
@@ -410,40 +432,38 @@ export function MatchStatsChart({
     () =>
       tileCache({
         metrics,
-        series,
+        series: drawn,
         secPerFrame: secondsPerFrame(trailer),
         mode,
         view,
       }),
-    [tileCache, metrics, series, trailer, mode, view],
+    [tileCache, metrics, drawn, trailer, mode, view],
   );
   // The same rows the plot draws, printed. Nothing is asked of the trailer a
   // second time, so the two can't answer different questions.
   const table = useMemo(
-    () => (metric ? valueTable(series, rows, { metric, mode, view }) : null),
-    [series, rows, metric, mode, view],
+    () =>
+      metric && !noneDrawn
+        ? valueTable(drawn, rows, { metric, mode, view })
+        : null,
+    [drawn, noneDrawn, rows, metric, mode, view],
   );
 
   // Which engine teams each line stands for, so a line, a roster seat and a
   // legend entry can all be compared by the same numbers.
   const teamsOf = useMemo(
-    () => new Map(series.map((s) => [s.id, seriesTeams(s, info)])),
-    [series, info],
+    () => new Map(drawn.map((s) => [s.id, seriesTeams(s, info)])),
+    [drawn, info],
   );
   // "Me" is the library's player when they sat in this match and have a line.
   // Only the Players view can show one person's line, so the control and the
   // resting emphasis both go away on Teams.
   const primary = usePrimaryPlayer();
   const meTeam = primary ? playerTeam(info, primary) : undefined;
-  const chartedTeams = useMemo(
-    () => players.flatMap((s) => seriesTeams(s, info)).sort((a, b) => a - b),
-    [players, info],
-  );
   const canHighlightMe =
     view === "players" && meTeam !== undefined && chartedTeams.includes(meTeam);
   const resting = canHighlightMe && highlightMe ? [meTeam] : null;
   const restingKey = resting?.join(",") ?? "";
-  const emphasis = useSeriesEmphasis();
   const { setPlot } = emphasis.store;
   // Hands the roster, and later the map, what this chart draws and who is the
   // resting emphasis. Cleared on the way out so a gone chart leaves no toggles.
@@ -453,11 +473,12 @@ export function MatchStatsChart({
     return () => setPlot({ charted: [], resting: null });
   }, [setPlot, chartedTeams, restingKey]);
 
-  if (!metric || !table || series.length === 0 || rows.length === 0)
-    return null;
+  if (!metric || series.length === 0) return null;
+  // With every line unchecked the controls stay, so there is a way back.
+  if (!noneDrawn && (!table || rows.length === 0)) return null;
 
   const litLine = (id: string) => emphasis.isLit(teamsOf.get(id));
-  const legendEntries: LegendEntry[] = series.map((s) => ({
+  const legendEntries: LegendEntry[] = drawn.map((s) => ({
     id: s.id,
     label: s.label,
     color: s.color,
@@ -466,7 +487,7 @@ export function MatchStatsChart({
 
   // Four or fewer lines get their names at their end points, and the legend's
   // colour-matching job disappears with them.
-  const labelled = series.length <= END_LABEL_MAX_SERIES;
+  const labelled = drawn.length <= END_LABEL_MAX_SERIES;
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3">
@@ -507,152 +528,178 @@ export function MatchStatsChart({
         )}
         <div className="ml-auto">
           <MatchStatsExportButton
-            input={{ info, metric, mode, view, series, rows }}
+            input={{ info, metric, mode, view, series: drawn, rows }}
+            hiddenCount={series.length - drawn.length}
           />
         </div>
       </div>
 
-      {/* The picker and what it enlarges. Beside each other where there is room
-       * for both, and the picker under the plot where there isn't. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
-        <MatchStatsPicker
-          groups={tiles}
-          value={metric.key}
-          plotHeight={chartHeight(series.length)}
-          onChange={setKey}
-        />
-        <div className="order-first min-w-0 flex-1 lg:order-last">
-          {display === "table" ? (
-            <MatchStatsTable table={table} />
-          ) : (
-            <ResponsiveContainer
-              width="100%"
-              height={chartHeight(series.length)}
-            >
-              <LineChart
-                data={rows}
-                margin={{
-                  top: 8,
-                  right: labelled ? END_LABEL_GUTTER : 8,
-                  bottom: 0,
-                  left: 0,
-                }}
-              >
-                {/* Horizontal only. A vertical grid over a time axis adds lines
-                 * without adding a reading. */}
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="currentColor"
-                  opacity={0.12}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="timeSec"
-                  type="number"
-                  domain={[0, "dataMax"]}
-                  tickFormatter={axisTime}
-                  tick={axisTick}
-                  tickLine={false}
-                  axisLine={false}
-                  minTickGap={32}
-                />
-                {/* Anchored at zero. A chart of resources that starts at 40,000 tells
-                 * a lie about the first ten minutes. */}
-                <YAxis
-                  domain={[0, "auto"]}
-                  tickFormatter={formatValue}
-                  tick={axisTick}
-                  tickLine={false}
-                  axisLine={false}
-                  width={52}
-                />
-                <Tooltip
-                  content={
-                    <SeriesTooltip series={series} format={formatValue} />
-                  }
-                  cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
-                  isAnimationActive={false}
-                />
-                {!labelled && (
-                  <Legend
-                    wrapperStyle={{ fontSize: 12 }}
-                    content={<SeriesLegend entries={legendEntries} />}
-                  />
-                )}
-                {/* The halo, the lines (dimmed or not) and the invisible hit
-                 * lines the pointer lands on, stacked by z-index. Only the
-                 * real lines report to the tooltip. */}
-                {series
-                  .filter((s) => litLine(s.id))
-                  .map((s) => (
-                    <Line
-                      key={`halo-${s.id}`}
-                      type="monotone"
-                      dataKey={s.id}
-                      stroke={s.color}
-                      strokeWidth={HALO_WIDTH}
-                      strokeOpacity={HALO_OPACITY}
-                      zIndex={Z_LINE}
-                      strokeLinecap="round"
-                      dot={false}
-                      activeDot={false}
-                      legendType="none"
-                      tooltipType="none"
-                      isAnimationActive={false}
-                    />
-                  ))}
-                {series.map((s) => {
-                  const lit = litLine(s.id);
-                  return (
-                    <Line
-                      key={s.id}
-                      type="monotone"
-                      dataKey={s.id}
-                      name={s.label}
-                      stroke={s.color}
-                      strokeWidth={lit ? LIT_LINE_WIDTH : LINE_WIDTH}
-                      strokeOpacity={emphasis.dimming && !lit ? DIM_OPACITY : 1}
-                      zIndex={lit ? Z_LIT : Z_LINE}
-                      dot={false}
-                      activeDot={{ r: 3 }}
-                      isAnimationActive={false}
-                    />
-                  );
-                })}
-                {series.map((s) => {
-                  const teams = teamsOf.get(s.id) ?? [];
-                  return (
-                    <Line
-                      key={`hit-${s.id}`}
-                      type="monotone"
-                      dataKey={s.id}
-                      stroke="transparent"
-                      strokeWidth={HIT_WIDTH}
-                      zIndex={Z_HIT}
-                      dot={false}
-                      activeDot={false}
-                      legendType="none"
-                      tooltipType="none"
-                      isAnimationActive={false}
-                      style={{ cursor: "pointer" }}
-                      onMouseEnter={() => emphasis.hover(teams)}
-                      onMouseLeave={() => emphasis.hover(null)}
-                      onClick={() => emphasis.toggleSelected(teams)}
-                    />
-                  );
-                })}
-                {labelled && (
-                  <EndLabels
-                    points={endPoints(series, rows)}
-                    isLit={litLine}
-                    dimming={emphasis.dimming}
-                  />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          )}
+      {view === "teams" && partial.length > 0 && (
+        // A side's line is every member added up. Unchecking one member of a
+        // side leaves the side's line as it was, and this says so.
+        <p className="text-xs text-muted-foreground">
+          Teams view counts every player on a side. Unchecked players are still
+          in the total for {partial.map((s) => s.label).join(", ")}.
+        </p>
+      )}
+
+      {noneDrawn || !table ? (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-dashed p-4 text-sm">
+          Every line is unchecked in the roster.
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => emphasis.setShown(chartedTeams, true)}
+          >
+            Show all
+          </Button>
         </div>
-      </div>
+      ) : (
+        /* The picker and what it enlarges. Beside each other where there is room
+         * for both, and the picker under the plot where there isn't. */
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start">
+          <MatchStatsPicker
+            groups={tiles}
+            value={metric.key}
+            plotHeight={chartHeight(drawn.length)}
+            onChange={setKey}
+          />
+          <div className="order-first min-w-0 flex-1 lg:order-last">
+            {display === "table" ? (
+              <MatchStatsTable table={table} />
+            ) : (
+              <ResponsiveContainer
+                width="100%"
+                height={chartHeight(drawn.length)}
+              >
+                <LineChart
+                  data={rows}
+                  margin={{
+                    top: 8,
+                    right: labelled ? END_LABEL_GUTTER : 8,
+                    bottom: 0,
+                    left: 0,
+                  }}
+                >
+                  {/* Horizontal only. A vertical grid over a time axis adds lines
+                   * without adding a reading. */}
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="currentColor"
+                    opacity={0.12}
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="timeSec"
+                    type="number"
+                    domain={[0, "dataMax"]}
+                    tickFormatter={axisTime}
+                    tick={axisTick}
+                    tickLine={false}
+                    axisLine={false}
+                    minTickGap={32}
+                  />
+                  {/* Anchored at zero. A chart of resources that starts at 40,000 tells
+                   * a lie about the first ten minutes. */}
+                  <YAxis
+                    domain={[0, "auto"]}
+                    tickFormatter={formatValue}
+                    tick={axisTick}
+                    tickLine={false}
+                    axisLine={false}
+                    width={52}
+                  />
+                  <Tooltip
+                    content={
+                      <SeriesTooltip series={drawn} format={formatValue} />
+                    }
+                    cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
+                    isAnimationActive={false}
+                  />
+                  {!labelled && (
+                    <Legend
+                      wrapperStyle={{ fontSize: 12 }}
+                      content={<SeriesLegend entries={legendEntries} />}
+                    />
+                  )}
+                  {/* The halo, the lines (dimmed or not) and the invisible hit
+                   * lines the pointer lands on, stacked by z-index. Only the
+                   * real lines report to the tooltip. */}
+                  {drawn
+                    .filter((s) => litLine(s.id))
+                    .map((s) => (
+                      <Line
+                        key={`halo-${s.id}`}
+                        type="monotone"
+                        dataKey={s.id}
+                        stroke={s.color}
+                        strokeWidth={HALO_WIDTH}
+                        strokeOpacity={HALO_OPACITY}
+                        zIndex={Z_LINE}
+                        strokeLinecap="round"
+                        dot={false}
+                        activeDot={false}
+                        legendType="none"
+                        tooltipType="none"
+                        isAnimationActive={false}
+                      />
+                    ))}
+                  {drawn.map((s) => {
+                    const lit = litLine(s.id);
+                    return (
+                      <Line
+                        key={s.id}
+                        type="monotone"
+                        dataKey={s.id}
+                        name={s.label}
+                        stroke={s.color}
+                        strokeWidth={lit ? LIT_LINE_WIDTH : LINE_WIDTH}
+                        strokeOpacity={
+                          emphasis.dimming && !lit ? DIM_OPACITY : 1
+                        }
+                        zIndex={lit ? Z_LIT : Z_LINE}
+                        dot={false}
+                        activeDot={{ r: 3 }}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
+                  {drawn.map((s) => {
+                    const teams = teamsOf.get(s.id) ?? [];
+                    return (
+                      <Line
+                        key={`hit-${s.id}`}
+                        type="monotone"
+                        dataKey={s.id}
+                        stroke="transparent"
+                        strokeWidth={HIT_WIDTH}
+                        zIndex={Z_HIT}
+                        dot={false}
+                        activeDot={false}
+                        legendType="none"
+                        tooltipType="none"
+                        isAnimationActive={false}
+                        style={{ cursor: "pointer" }}
+                        onMouseEnter={() => emphasis.hover(teams)}
+                        onMouseLeave={() => emphasis.hover(null)}
+                        onClick={() => emphasis.toggleSelected(teams)}
+                      />
+                    );
+                  })}
+                  {labelled && (
+                    <EndLabels
+                      points={endPoints(drawn, rows)}
+                      isLit={litLine}
+                      dimming={emphasis.dimming}
+                    />
+                  )}
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
