@@ -715,25 +715,35 @@ export function useUnitsyncGameInfo(
 ) {
   const [info, setInfo] = useState<GameInfoResult | null>(null);
   const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  // The key `info` and `status` belong to. A result is only returned while this
+  // matches the current key, so a changed key never shows the old one's result.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && gameArchive
+      ? `${dataDir}::${enginePath}::${gameArchive}`
+      : undefined;
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
   useEffect(() => {
-    if (!enginePath || !dataDir || !gameArchive) {
+    if (!enginePath || !dataDir || !gameArchive || !key) {
       setInfo(null);
       setStatus("idle");
+      setLoadedKey(undefined);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${gameArchive}`;
     const cached = gameInfoCache.get(key);
     if (cached) {
       setInfo(cached);
       setStatus("ready");
+      setLoadedKey(key);
       return;
     }
     let cancelled = false;
+    setInfo(null);
     setStatus("loading");
+    setLoadedKey(key);
     shareInFlight(gameInfoPending, key, () =>
       unitsyncGameInfo({ enginePath, dataDir, gameArchive }),
     )
@@ -758,9 +768,20 @@ export function useUnitsyncGameInfo(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, nonce]);
+  }, [enginePath, dataDir, gameArchive, key, nonce]);
 
-  return { info, status, reload, loading: status === "loading" };
+  const current = loadedKey === key;
+  const shownStatus: UnitsyncInfoStatus = current
+    ? status
+    : key
+      ? "loading"
+      : "idle";
+  return {
+    info: current ? info : null,
+    status: shownStatus,
+    reload,
+    loading: shownStatus === "loading",
+  };
 }
 
 /**
@@ -794,25 +815,34 @@ export function useUnitsyncUnitDataset(
 ) {
   const [dataset, setDataset] = useState<UnitDatasetResult | null>(null);
   const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
+  // The key `dataset` and `status` belong to, as in `useUnitsyncGameInfo`.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && gameArchive
+      ? `${dataDir}::${enginePath}::${gameArchive}`
+      : undefined;
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
   useEffect(() => {
-    if (!enginePath || !dataDir || !gameArchive) {
+    if (!enginePath || !dataDir || !gameArchive || !key) {
       setDataset(null);
       setStatus("idle");
+      setLoadedKey(undefined);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${gameArchive}`;
     const cached = unitDatasetCache.get(key);
     if (cached) {
       setDataset(cached);
       setStatus("ready");
+      setLoadedKey(key);
       return;
     }
     let cancelled = false;
+    setDataset(null);
     setStatus("loading");
+    setLoadedKey(key);
     shareInFlight(unitDatasetPending, key, () =>
       unitsyncUnitDataset({ enginePath, dataDir, gameArchive }),
     )
@@ -844,9 +874,20 @@ export function useUnitsyncUnitDataset(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, nonce]);
+  }, [enginePath, dataDir, gameArchive, key, nonce]);
 
-  return { dataset, status, reload, loading: status === "loading" };
+  const current = loadedKey === key;
+  const shownStatus: UnitsyncInfoStatus = current
+    ? status
+    : key
+      ? "loading"
+      : "idle";
+  return {
+    dataset: current ? dataset : null,
+    status: shownStatus,
+    reload,
+    loading: shownStatus === "loading",
+  };
 }
 
 /**
@@ -991,6 +1032,13 @@ export function useUnitsyncUnitModel(
   const [failed, setFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // The key the state above belongs to, so a changed key shows nothing of the
+  // old one from the render it changes in.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && gameArchive && object
+      ? `${dataDir}::${enginePath}::${gameArchive}::${object}`
+      : undefined;
 
   // A retry reads again rather than answering from the session cache, which
   // also remembers a model the game had none of.
@@ -1006,13 +1054,13 @@ export function useUnitsyncUnitModel(
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is only here so a retry runs the read again
   useEffect(() => {
     setError(null);
-    if (!enginePath || !dataDir || !gameArchive || !object) {
+    setLoadedKey(key);
+    if (!enginePath || !dataDir || !gameArchive || !object || !key) {
       setModel(null);
       setLoading(false);
       setFailed(false);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${gameArchive}::${object}`;
     const cached = unitModelCache.get(key);
     if (cached !== undefined) {
       setModel(cached);
@@ -1041,8 +1089,11 @@ export function useUnitsyncUnitModel(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, object, attempt]);
+  }, [enginePath, dataDir, gameArchive, object, key, attempt]);
 
+  if (loadedKey !== key) {
+    return { model: null, loading: !!key, failed: false, error: null, retry };
+  }
   return { model, loading, failed, error, retry };
 }
 
@@ -1058,22 +1109,28 @@ export function useUnitsyncUnitBuildpics(
   gameArchive?: string,
   units?: string[],
 ) {
-  const [data, setData] = useState<UnitBuildpicsResult | null>(null);
+  const [loaded, setLoaded] = useState<{
+    key: string;
+    data: UnitBuildpicsResult;
+  } | null>(null);
   // Stable, order-independent key for the requested unit set. The effect derives
   // the unit list back from this string so it depends only on stable values
   // (arrays are unstable references that would refetch every render).
   const unitsKey = (units ?? []).slice().sort().join(",");
+  const key =
+    enginePath && dataDir && gameArchive && unitsKey !== ""
+      ? `${dataDir}::${enginePath}::${gameArchive}::${unitsKey}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !gameArchive || unitsKey === "") {
-      setData(null);
+    if (!enginePath || !dataDir || !gameArchive || !key) {
+      setLoaded(null);
       return;
     }
     const unitList = unitsKey.split(",");
-    const key = `${dataDir}::${enginePath}::${gameArchive}::${unitsKey}`;
     const cached = buildpicsCache.get(key);
     if (cached) {
-      setData(cached);
+      setLoaded({ key, data: cached });
       return;
     }
     let cancelled = false;
@@ -1088,15 +1145,16 @@ export function useUnitsyncUnitBuildpics(
       .then((res) => {
         if (cancelled) return;
         buildpicsCache.set(key, res);
-        setData(res);
+        setLoaded({ key, data: res });
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, unitsKey]);
+  }, [enginePath, dataDir, gameArchive, unitsKey, key]);
 
-  return data;
+  // Icons read for another game or unit set are not this one's.
+  return loaded && loaded.key === key ? loaded.data : null;
 }
 
 /**
@@ -1191,27 +1249,38 @@ export function useUnitsyncMapInfo(
   // map. A caller acting on the options (rather than just displaying them) has to
   // be able to tell, which is why this is returned rather than kept private.
   const [loadedMap, setLoadedMap] = useState<string | undefined>(undefined);
+  // The engine and data folder `loadedMap` was read under. A changed map or
+  // target returns no info from the render it changes in, not from the effect.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && mapName
+      ? `${dataDir}::${enginePath}::${mapName}`
+      : undefined;
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: nonce is a manual retry trigger that re-runs the fetch, not read in the body
   useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
+    if (!enginePath || !dataDir || !mapName || !key) {
       setInfo(null);
       setStatus("idle");
       setLoadedMap(undefined);
+      setLoadedKey(undefined);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${mapName}`;
     const cached = mapInfoCache.get(key);
     if (cached) {
       setInfo(cached);
       setStatus("ready");
       setLoadedMap(mapName);
+      setLoadedKey(key);
       return;
     }
     let cancelled = false;
+    setInfo(null);
     setStatus("loading");
+    setLoadedMap(undefined);
+    setLoadedKey(key);
     shareInFlight(mapInfoPending, key, () =>
       unitsyncMapInfo({ enginePath, dataDir, mapName }),
     )
@@ -1238,9 +1307,21 @@ export function useUnitsyncMapInfo(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName, nonce]);
+  }, [enginePath, dataDir, mapName, key, nonce]);
 
-  return { info, status, loadedMap, reload, loading: status === "loading" };
+  const current = loadedKey === key;
+  const shownStatus: UnitsyncInfoStatus = current
+    ? status
+    : key
+      ? "loading"
+      : "idle";
+  return {
+    info: current ? info : null,
+    status: shownStatus,
+    loadedMap: current ? loadedMap : undefined,
+    reload,
+    loading: shownStatus === "loading",
+  };
 }
 
 /** Session cache of engine config reads, keyed by `dataDir::enginePath`. */
