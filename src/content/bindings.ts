@@ -316,6 +316,13 @@ export interface ReplayFile {
   skillMax?: number;
   /** True when this file is a coilbox remix (rewritten to run on a local build). */
   remixed?: boolean;
+  /** A remix whose header names one game and whose first packet another, so
+   * the engine plays it on the game it was recorded with. Made by a coilbox
+   * older than the fix for issue #3861. */
+  staleRemix?: boolean;
+  /** A zero byte file: a recording that did not finish, or one still being
+   * written. The engine writes a replay only when its game ends. */
+  unfinished?: boolean;
 }
 
 /**
@@ -556,6 +563,8 @@ export interface DemoInfo {
   ais: ReplayAi[];
   /** True when this file is a coilbox remix (rewritten to run on a local build). */
   remixed?: boolean;
+  /** See `ReplayFile.staleRemix`. */
+  staleRemix?: boolean;
   /** For a remix, the gametype it was originally recorded on. */
   sourceGametype?: string;
   /** For a remix, the filename of the original replay it was made from. */
@@ -1273,10 +1282,12 @@ export const contentReplayAnalysisDelete = defineCommand<
 
 /**
  * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
- * `content_list_replays`. Its stored analysis goes with it.
+ * `content_list_replays`. Its stored analysis goes with it. With
+ * `onlyUnfinished` a file that is no longer empty is left alone. The backend
+ * refuses an empty file while a game coilbox launched is running.
  */
 export const contentDeleteReplay = defineCommand<
-  { path: string },
+  { path: string; onlyUnfinished?: boolean },
   { ok: boolean; analysisDeleted: boolean }
 >("coilbox-content", "content_delete_replay");
 
@@ -1299,7 +1310,7 @@ export interface ReplayDeleteSummary {
  * reason instead of failing the batch. `apply` false sizes it without deleting.
  */
 export const contentDeleteReplays = defineCommand<
-  { paths: string[]; apply: boolean },
+  { paths: string[]; apply: boolean; onlyUnfinished?: boolean },
   { summary: ReplayDeleteSummary }
 >("coilbox-content", "content_delete_replays");
 

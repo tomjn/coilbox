@@ -42,6 +42,7 @@ use crate::model::{
 
 pub(crate) mod analysis;
 mod build_orders;
+pub(crate) mod retarget;
 pub(crate) mod stream;
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -100,7 +101,7 @@ fn list_replays(root: &Path) -> Vec<ReplayFile> {
 
 /// Bumped when [`ReplaySummary`] changes shape. A store written under another
 /// version is read as empty and rebuilt.
-const SUMMARY_STORE_VERSION: u32 = 2;
+const SUMMARY_STORE_VERSION: u32 = 3;
 
 /// What the list shows for one replay, from the cheap native decode (header and
 /// start-script, no demotool, no winner).
@@ -115,6 +116,7 @@ struct ReplaySummary {
     skill_avg: Option<f32>,
     skill_max: Option<f32>,
     remixed: bool,
+    stale_remix: bool,
     game_id: Option<String>,
 }
 
@@ -169,6 +171,7 @@ fn summarise(info: &DemoInfo) -> ReplaySummary {
         skill_avg,
         skill_max,
         remixed: info.remixed,
+        stale_remix: info.stale_remix,
         game_id: info
             .game_id
             .as_deref()
@@ -246,6 +249,8 @@ fn replay_file(e: DemoFileEntry, summary: Option<ReplaySummary>) -> ReplayFile {
         skill_avg: s.and_then(|s| s.skill_avg),
         skill_max: s.and_then(|s| s.skill_max),
         remixed: s.is_some_and(|s| s.remixed),
+        stale_remix: s.is_some_and(|s| s.stale_remix),
+        unfinished: e.size_bytes == 0,
         game_id: s.and_then(|s| s.game_id.clone()),
     }
 }
@@ -435,6 +440,84 @@ pub fn delete_replays(
         out.analyses += 1;
         out.analysis_bytes += size;
     }
+    out
+}
+
+/// The content folders the app has published.
+fn library_roots() -> Vec<PathBuf> {
+    coilbox_proc::content_roots()
+        .into_iter()
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// Whether `path` is a replay inside one of the folders the Replays list reads
+/// under `roots`: each root's own `demos` and `replays`, and the same folders in
+/// each engine installed under it (see [`demo_search_dirs`]). Compared by real
+/// path, so a `..` or a link cannot step outside them.
+pub fn is_listed_replay(path: &Path, roots: &[PathBuf]) -> bool {
+    if !is_replay_path(path) {
+        return false;
+    }
+    let Some(parent) = path.parent().and_then(|p| std::fs::canonicalize(p).ok()) else {
+        return false;
+    };
+    roots
+        .iter()
+        .flat_map(|root| demo_search_dirs(root))
+        .flat_map(|base| DEMO_DIRS.iter().map(move |dir| base.join(dir)))
+        .filter_map(|dir| std::fs::canonicalize(dir).ok())
+        .any(|dir| dir == parent)
+}
+
+/// [`delete_replays`] for what a person asked to delete from the app.
+///
+/// A path outside the folders the list reads is refused, so these commands
+/// cannot be pointed at a replay somewhere else on disk. With `only_unfinished`
+/// a file that is no longer empty is left alone, so a recording that finished
+/// between the preview and the delete is not lost.
+///
+/// An empty file is refused while `game_running`, because the engine writes
+/// nothing until its game ends and a running game's file looks exactly like
+/// one left by a crash. A game started outside coilbox cannot be seen from
+/// here, which is why the page warns about it.
+pub fn delete_listed_replays(
+    paths: &[PathBuf],
+    apply: bool,
+    analyses: Option<&Path>,
+    library: &[(PathBuf, String)],
+    roots: &[PathBuf],
+    only_unfinished: bool,
+    game_running: bool,
+) -> DeleteSummary {
+    let mut refused = Vec::new();
+    let mut allowed = Vec::new();
+    for path in paths {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        if is_replay_path(path) && !is_listed_replay(path, roots) {
+            refused.push(format!("{name}: not in a folder the Replays list reads"));
+            continue;
+        }
+        let len = std::fs::metadata(path).map(|m| m.len()).ok();
+        if only_unfinished && len.is_some_and(|len| len > 0) {
+            refused.push(format!(
+                "{name}: no longer empty, so the recording finished"
+            ));
+            continue;
+        }
+        if game_running && len == Some(0) {
+            refused.push(format!(
+                "{name}: a game is running, and this empty file may be its recording"
+            ));
+            continue;
+        }
+        allowed.push(path.clone());
+    }
+    let mut out = delete_replays(&allowed, apply, analyses, library);
+    out.skipped.extend(refused);
     out
 }
 
@@ -651,6 +734,7 @@ fn decode(
         .map(metrics::match_totals);
     let player_stats = trailer.and_then(|t| t.players);
     let mut info = build_demo_info(raw, &game, winners, player_stats);
+    info.stale_remix = is_stale_remix(demo, &info);
     if with_start_positions {
         // A stream this decoder cannot read costs the positions and nothing
         // else, the way a refused trailer costs the statistics.
@@ -670,7 +754,18 @@ fn decode(
 fn decode_native(demo: &Path) -> Result<DemoInfo, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    Ok(build_demo_info(raw, &game, None, None))
+    let mut info = build_demo_info(raw, &game, None, None);
+    info.stale_remix = is_stale_remix(demo, &info);
+    Ok(info)
+}
+
+/// A remix whose first packet names another game than its header. The engine
+/// plays such a file on the packet's game. Only a remix is looked at, so an
+/// ordinary replay costs nothing extra.
+fn is_stale_remix(demo: &Path, info: &DemoInfo) -> bool {
+    info.remixed
+        && retarget::packet_game_of(demo)
+            .is_some_and(|packet| !packet.trim().eq_ignore_ascii_case(info.game_type.trim()))
 }
 
 struct RawDemo {
@@ -1124,11 +1219,11 @@ fn read_team_stat_sample(raw: &[u8]) -> TeamStatSample {
 /// `new_gametype` (and, when given, the header engine `versionString` becomes
 /// `new_engine_version`), returning the path of the new file.
 ///
-/// The engine binds a replay to a game purely by the `gametype` name string (no
-/// archive checksum lives in the header — the game is resolved by name at
-/// playback), so swapping that string redirects the replay onto whatever local
-/// archive carries the new name. The demo stream is copied verbatim; only the
-/// `scriptSize` header field (and optionally `versionString`) changes.
+/// The engine binds a replay to a game by the `gametype` name string, which it
+/// reads from the first packet of the demo stream and not from the header. So
+/// both are rewritten (see [`retarget`]), and the header's `scriptSize` and
+/// `demoStreamSize` move with them. Every later packet and the trailer are
+/// copied as they are. Optionally the header `versionString` changes too.
 ///
 /// **The source is never modified or overwritten.** The destination is derived
 /// here — callers cannot supply it — is guaranteed to be a different, not-yet-
@@ -1170,20 +1265,13 @@ pub fn rewrite_demo(
         .and_then(|n| n.to_str())
         .unwrap_or("")
         .to_string();
-    let swapped = replace_gametype(&script, new_gametype)?;
-    let new_script = inject_remix_marker(&swapped, &source_gametype, &origin).into_bytes();
 
-    // Rebuild: header | new script | demo stream (unchanged tail).
-    let mut out = Vec::with_capacity(header_size + new_script.len() + (bytes.len() - script_end));
-    out.extend_from_slice(&bytes[..header_size]);
-    out.extend_from_slice(&new_script);
-    out.extend_from_slice(&bytes[script_end..]);
-
-    // Only scriptSize changes; every other header field is a size/count that the
-    // shifted tail preserves.
-    let new_size =
-        i32::try_from(new_script.len()).map_err(|_| "rewritten start-script too large")?;
-    put_i32_at(&mut out, OFF_SCRIPT_SIZE, new_size);
+    // Both places a replay names its game are rewritten, because the engine loads
+    // the game from the first packet of the stream and not from the header
+    // (issue #3861). The packet's script gets the new gametype and no marker.
+    let mut out = retarget::retarget_with(&bytes, new_gametype, |swapped| {
+        Ok(inject_remix_marker(&swapped, &source_gametype, &origin))
+    })?;
     if let Some(ver) = new_engine_version {
         put_cstr_at(&mut out, OFF_VERSION_STRING, 256, ver);
     }
@@ -1707,6 +1795,7 @@ fn build_demo_info(
         players,
         ais,
         remixed: marker.remixed,
+        stale_remix: false,
         source_gametype: marker.source,
         origin_filename: marker.origin,
         mod_options,
@@ -2189,6 +2278,7 @@ pub(crate) async fn content_rewrite_demo(
 pub(crate) async fn content_delete_replay<R: Runtime>(
     app: AppHandle<R>,
     path: String,
+    only_unfinished: Option<bool>,
 ) -> CliResult {
     let p = PathBuf::from(&path);
     if !is_replay_path(&p) {
@@ -2204,7 +2294,15 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         Ok(library) => library,
         Err(e) => return CliResult::err(format!("delete replay task failed: {e}")),
     };
-    let summary = delete_replays(&[p], true, analyses.as_deref(), &library);
+    let summary = delete_listed_replays(
+        &[p],
+        true,
+        analyses.as_deref(),
+        &library,
+        &library_roots(),
+        only_unfinished.unwrap_or(false),
+        coilbox_proc::game_running(),
+    );
     if summary.deleted == 0 {
         let reason = summary.skipped.first().cloned().unwrap_or_default();
         return CliResult::err(format!("delete failed: {reason}"));
@@ -2223,12 +2321,21 @@ pub(crate) async fn content_delete_replays<R: Runtime>(
     app: AppHandle<R>,
     paths: Vec<String>,
     apply: bool,
+    only_unfinished: Option<bool>,
 ) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     let analyses = analysis::store::app_store_dir(&app).ok();
     match tauri::async_runtime::spawn_blocking(move || {
         let library = library_game_ids(&app);
-        delete_replays(&paths, apply, analyses.as_deref(), &library)
+        delete_listed_replays(
+            &paths,
+            apply,
+            analyses.as_deref(),
+            &library,
+            &library_roots(),
+            only_unfinished.unwrap_or(false),
+            coilbox_proc::game_running(),
+        )
     })
     .await
     {
@@ -2496,6 +2603,7 @@ mod tests {
     fn build_demo(script: &str, gzip: bool) -> Vec<u8> {
         let f = DemoFixture {
             script: script.into(),
+            stream: retarget::tests::stream_with_game_data(script, &[]),
             team_samples: vec![Vec::new(), Vec::new()],
             ..Default::default()
         };
@@ -4081,6 +4189,142 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// A root with an empty replay in its own `demos`, one in an installed
+    /// engine's `demos` (the owner's two September files), and a real replay.
+    fn unfinished_fixture() -> (tempfile::TempDir, PathBuf, [PathBuf; 3]) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("root");
+        let engine = root.join("engine").join("macos_arm64").join("2.0");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::create_dir_all(engine.join("demos")).unwrap();
+        std::fs::write(engine.join("spring-headless"), b"x").unwrap();
+        let shared = root.join("demos").join("shared.sdfz");
+        let inside = engine.join("demos").join("engine.sdfz");
+        let real = root.join("demos").join("real.sdfz");
+        std::fs::write(&shared, b"").unwrap();
+        std::fs::write(&inside, b"").unwrap();
+        std::fs::write(&real, build_demo(SCRIPT, true)).unwrap();
+        (tmp, root, [shared, inside, real])
+    }
+
+    #[test]
+    fn an_empty_replay_is_listed_as_unfinished_wherever_it_is_found() {
+        let (_tmp, root, _) = unfinished_fixture();
+        let list = list_replays(&root);
+        let flags: HashMap<&str, bool> = list
+            .iter()
+            .map(|r| (r.filename.as_str(), r.unfinished))
+            .collect();
+        assert_eq!(flags.len(), 3);
+        assert!(flags["shared.sdfz"]);
+        assert!(flags["engine.sdfz"]);
+        assert!(!flags["real.sdfz"]);
+    }
+
+    #[test]
+    fn an_empty_replay_nothing_is_writing_is_deleted_from_either_folder() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+        let roots = [root];
+
+        let dry = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            false,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(dry.deleted, 2);
+        assert!(shared.is_file() && inside.is_file());
+
+        let done = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(
+            (done.deleted, done.bytes, done.skipped.len()),
+            (dry.deleted, dry.bytes, 0)
+        );
+        assert!(!shared.exists() && !inside.exists());
+        assert!(real.is_file());
+    }
+
+    /// The engine writes nothing until its game ends, so a running game's file is
+    /// indistinguishable from a dead one.
+    #[test]
+    fn an_empty_replay_is_left_alone_while_a_game_is_running() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            &[],
+            &[root],
+            true,
+            true,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(out.skipped[0].contains("a game is running"));
+        assert!(shared.is_file() && inside.is_file() && real.is_file());
+    }
+
+    /// A recording that finished between the preview and the delete is a real
+    /// replay now.
+    #[test]
+    fn a_replay_that_finished_since_the_preview_is_not_taken_as_unfinished() {
+        let (_tmp, root, [_, _, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(
+            std::slice::from_ref(&real),
+            true,
+            None,
+            &[],
+            &[root],
+            true,
+            false,
+        );
+        assert_eq!(out.deleted, 0);
+        assert!(out.skipped[0].contains("no longer empty"));
+        assert!(real.is_file());
+    }
+
+    #[test]
+    fn a_replay_outside_the_listed_folders_is_refused() {
+        let (tmp, root, _) = unfinished_fixture();
+        let elsewhere = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let stray = elsewhere.join("stray.sdfz");
+        std::fs::write(&stray, b"").unwrap();
+        // A spelling that reaches the same stray file through a listed folder.
+        let sneaky = root
+            .join("demos")
+            .join("..")
+            .join("..")
+            .join("elsewhere")
+            .join("stray.sdfz");
+
+        let out = delete_listed_replays(
+            &[stray.clone(), sneaky],
+            true,
+            None,
+            &[],
+            &[root],
+            false,
+            false,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(stray.is_file());
+    }
+
     /// A root with two engines that both recorded, plus one replay of the root's
     /// own. Names are distinct unless a caller plants a clash.
     fn gather_fixture(name: &str) -> PathBuf {
@@ -4703,13 +4947,16 @@ mod tests {
 
     #[test]
     fn rewrite_redirects_gametype_and_never_touches_source() {
-        // header + script + a fake demo-stream tail we expect to survive verbatim.
-        let mut demo = build_demo(SCRIPT, false);
+        // A fake later packet we expect to survive verbatim.
         let tail: &[u8] = b"\x00\x01\x02DEMO-STREAM-TAIL\xff\xfe";
-        demo.extend_from_slice(tail);
-        // Everything past the start script is copied byte for byte: this
-        // fixture's empty team-statistics counts, then the tail.
-        let verbatim = demo[352 + SCRIPT.len()..].to_vec();
+        let demo = DemoFixture {
+            script: SCRIPT.into(),
+            stream: retarget::tests::stream_with_game_data(SCRIPT, tail),
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        }
+        .bytes();
         let src = write_tmp("jb_src.sdf", &demo);
         let before = std::fs::read(&src).unwrap();
 
@@ -4739,7 +4986,20 @@ mod tests {
         assert!(script.contains("source=Beyond All Reason test-30018;"));
         assert!(script.contains("origin=jb_src.sdf;"));
         assert!(script.contains("mapname=Valles Marineris 2.6.1")); // map untouched
-        assert_eq!(&out[hs + ss..], &verbatim[..]); // stream tail byte-identical
+
+        // The packet the engine loads the game from names the new game too, and
+        // carries no marker (issue #3861).
+        assert_eq!(
+            retarget::packet_game_of(&dst).as_deref(),
+            Some("Beyond All Reason LOCAL-GIT")
+        );
+        // Every later packet and the trailer are copied as they are.
+        assert_eq!(&out[out.len() - 2..], &before[before.len() - 2..]);
+        assert!(out.windows(tail.len()).any(|w| w == tail));
+        assert_eq!(
+            decode_trailer(&out).unwrap(),
+            decode_trailer(&before).unwrap()
+        );
 
         // Re-reading detects the remix, its source gametype, and its origin file.
         let game = find_game(&parse_tdf(script));
@@ -4796,6 +5056,185 @@ mod tests {
         assert_eq!(raw.engine_version, "2025.06.19");
         assert!(raw.script.contains("gametype=Some Game 1.0;"));
         let _ = std::fs::remove_file(&dst);
+    }
+
+    /// The trailer is found from `demoStreamSize`, so a remix that wrote a packet
+    /// of another length and left the size alone would decode other bytes.
+    #[test]
+    fn a_remix_keeps_its_stream_size_and_trailer_right_whatever_the_new_name_length() {
+        let f = DemoFixture {
+            script: SCRIPT.into(),
+            stream: retarget::tests::stream_with_game_data(SCRIPT, b"later packets"),
+            winning_ally_teams: vec![1],
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let original = f.bytes();
+        let src = write_tmp("remix_sizes.sdf", &original);
+
+        for name in [
+            "G",
+            "A game with a very much longer name than the first 99.9",
+        ] {
+            let dst = rewrite_demo(&src, name, None).unwrap();
+            let out = std::fs::read(&dst).unwrap();
+            let header = i32_at(&out, OFF_HEADER_SIZE).unwrap() as usize;
+            let script = i32_at(&out, OFF_SCRIPT_SIZE).unwrap() as usize;
+            let stream = i32_at(&out, OFF_DEMO_STREAM_SIZE).unwrap() as usize;
+            let trailer_at = header + script + stream;
+            assert_eq!(
+                &out[trailer_at..trailer_at + 1],
+                &[1],
+                "the winner is where the header says the trailer starts"
+            );
+            assert_eq!(
+                decode_trailer(&out).unwrap(),
+                decode_trailer(&original).unwrap()
+            );
+            let _ = std::fs::remove_file(&dst);
+        }
+    }
+
+    /// A remix made before issue #3861 has the original game in its first
+    /// packet. The engine plays it on that game, so the list says so.
+    #[test]
+    fn a_remix_whose_packet_names_another_game_than_its_header_is_flagged() {
+        let header_script = inject_remix_marker(
+            &replace_gametype(SCRIPT, "Balanced Annihilation V15.9.8").unwrap(),
+            "Beyond All Reason test-30018",
+            "orig.sdfz",
+        );
+        let old = DemoFixture {
+            script: header_script,
+            stream: retarget::tests::stream_with_game_data(SCRIPT, &[]),
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let path = write_tmp("old_remix.sdf", &old.bytes());
+        let info = decode_native(&path).unwrap();
+        assert!(info.remixed);
+        assert!(info.stale_remix);
+        assert_eq!(info.game_type, "Balanced Annihilation V15.9.8");
+        assert_eq!(
+            info.source_gametype.as_deref(),
+            Some("Beyond All Reason test-30018")
+        );
+    }
+
+    #[test]
+    fn a_remix_made_now_and_an_ordinary_replay_are_not_flagged() {
+        let src = write_tmp("fresh_remix_src.sdf", &build_demo(SCRIPT, false));
+        let dst = rewrite_demo(&src, "Some Game 1.0", None).unwrap();
+        let info = decode_native(&dst).unwrap();
+        assert!(info.remixed);
+        assert!(!info.stale_remix);
+        assert!(!decode_native(&src).unwrap().stale_remix);
+        let _ = std::fs::remove_file(&dst);
+    }
+
+    /// A remix has to name the game the engine will load, or it is no remix.
+    #[test]
+    fn a_replay_with_no_game_data_packet_cannot_be_remixed() {
+        let f = DemoFixture {
+            script: SCRIPT.into(),
+            team_samples: vec![Vec::new(), Vec::new()],
+            ..Default::default()
+        };
+        let src = write_tmp("no_packet.sdf", &f.bytes());
+        assert!(rewrite_demo(&src, "Some Game 1.0", None).is_err());
+    }
+
+    /// Remixes an older coilbox made, read and never written. Set
+    /// `COILBOX_OLD_REMIXES` to their paths, separated the way `PATH` is.
+    #[test]
+    #[ignore = "needs remixes made before issue #3861"]
+    fn a_remix_an_older_coilbox_made_is_flagged() {
+        let Some(paths) = std::env::var_os("COILBOX_OLD_REMIXES") else {
+            eprintln!("did nothing: set COILBOX_OLD_REMIXES to run it");
+            return;
+        };
+        for path in std::env::split_paths(&paths) {
+            let info = decode_native(&path).unwrap();
+            eprintln!(
+                "{}: header {:?}, packet {:?}, stale {}",
+                path.display(),
+                info.game_type,
+                retarget::packet_game_of(&path),
+                info.stale_remix
+            );
+            assert!(info.remixed && info.stale_remix, "{}", path.display());
+        }
+    }
+
+    /// A real engine loading a real remix, to see which game it says it loaded.
+    ///
+    /// Reads what to run from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_REMIX_REPLAY`: a replay.
+    /// - `COILBOX_REMIX_GAMETYPE`: the name of an installed game to remix it to.
+    /// - `COILBOX_REMIX_ENGINE_DIR`: a copy of an engine folder in scratch.
+    /// - `COILBOX_REMIX_DATA_DIRS`: scratch data folders holding that game and
+    ///   the replay's map, separated the way `SPRING_DATADIR` is.
+    /// - `COILBOX_REMIX_TIMEOUT_SECS`: how long the engine may run.
+    ///
+    /// The replay is copied into a temporary folder and the remix written
+    /// beside the copy. The engine gets a write folder and a `--config` file
+    /// in that folder too, so nothing of the player's is read or written.
+    #[test]
+    #[ignore = "needs an engine copy, two installed games, a map and a replay"]
+    fn a_real_engine_plays_a_remix_on_the_game_it_was_remixed_to() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(gametype), Some(engine_dir), Some(data_dirs), Some(timeout)) = (
+            var("COILBOX_REMIX_REPLAY"),
+            var("COILBOX_REMIX_GAMETYPE"),
+            var("COILBOX_REMIX_ENGINE_DIR"),
+            var("COILBOX_REMIX_DATA_DIRS"),
+            var("COILBOX_REMIX_TIMEOUT_SECS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_REMIX_REPLAY, COILBOX_REMIX_GAMETYPE, \
+                 COILBOX_REMIX_ENGINE_DIR, COILBOX_REMIX_DATA_DIRS and \
+                 COILBOX_REMIX_TIMEOUT_SECS to run it"
+            );
+            return;
+        };
+        let scratch = tempfile::tempdir().unwrap();
+        let copy = scratch.path().join("replay.sdfz");
+        std::fs::copy(&replay, &copy).unwrap();
+        let remix = rewrite_demo(&copy, &gametype, None).unwrap();
+        let engine_dir = PathBuf::from(engine_dir);
+        let data_dirs: Vec<PathBuf> = data_dirs
+            .split(coilbox_proc::DATADIR_SEP)
+            .map(PathBuf::from)
+            .collect();
+        let log = scratch.path().join("engine.log");
+
+        analysis::launch::run_headless(
+            &analysis::launch::Launch {
+                engine: &analysis::launch::headless_binary(&engine_dir),
+                demo: &remix,
+                write_dir: &scratch.path().join("write"),
+                config: &scratch.path().join("engine.cfg"),
+                pid_file: &scratch.path().join(analysis::launch::PID_FILE),
+                data_dirs: &data_dirs,
+                log: &log,
+                timeout: Duration::from_secs(timeout.parse().expect("seconds")),
+                on_poll: &|| {},
+            },
+            &analysis::launch::RunControl::default(),
+        )
+        .expect("the run");
+
+        let output = std::fs::read_to_string(&log).unwrap_or_default();
+        let line = output
+            .lines()
+            .find(|l| l.contains("using game"))
+            .unwrap_or_else(|| panic!("the engine never named a game:\n{output}"));
+        eprintln!("{line}");
+        assert!(
+            line.contains(&format!("using game \"{gametype}\"")),
+            "{line}"
+        );
     }
 
     // ---- the chat log, from the stream walk ------------------------------------

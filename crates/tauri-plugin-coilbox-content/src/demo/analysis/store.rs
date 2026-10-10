@@ -926,6 +926,7 @@ pub(super) mod tests {
     fn replay(game_id: [u8; 16]) -> Vec<u8> {
         DemoFixture {
             script: SCRIPT.into(),
+            stream: super::super::super::retarget::tests::stream_with_game_data(SCRIPT, &[]),
             game_id,
             ..Default::default()
         }

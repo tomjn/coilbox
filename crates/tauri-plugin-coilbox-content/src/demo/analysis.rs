@@ -10,7 +10,7 @@
 //!
 //! 1. Refuse a replay with no recorded outcome. See [`divergence`].
 //! 2. Write the analysis game into a scratch data directory. See [`game`].
-//! 3. Write a copy of the replay pointed at that game. See [`retarget`].
+//! 3. Write a copy of the replay pointed at that game. See [`super::retarget`].
 //! 4. Run the engine headless on the copy. See [`launch`].
 //! 5. Read the logger's file. See [`log`].
 //! 6. Compare what the run saw with what the replay recorded, and hand the
@@ -31,7 +31,6 @@ pub mod game;
 pub mod launch;
 pub mod log;
 pub mod queue;
-pub mod retarget;
 pub mod store;
 
 use divergence::Disagreement;
@@ -347,7 +346,7 @@ fn analyse_with(
     let engine_log = scratch.dir.join("engine.log");
 
     game::write_game(&data, &base_game, logger)?;
-    retarget::write_retargeted(&request.replay, &demo, &game::gametype())?;
+    super::retarget::write_retargeted(&request.replay, &demo, &game::gametype())?;
 
     // The scratch folder first, so nothing in a content folder can stand in
     // for the analysis game.
@@ -436,11 +435,11 @@ pub(crate) fn now_ms() -> u64 {
 
 #[cfg(all(test, unix))]
 mod tests {
+    use super::super::retarget::tests::{hash_of, stream_with_game_data};
     use super::super::tests::DemoFixture;
     use super::divergence::tests::{fixture_trailer, FIXTURE_SECONDS};
     use super::launch::tests::fake_engine;
     use super::log::tests::FIXTURE;
-    use super::retarget::tests::{hash_of, stream_with_game_data};
     use super::*;
 
     const SCRIPT: &str = "[game]\n{\n\

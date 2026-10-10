@@ -1958,6 +1958,10 @@ mod tests {
         fn finished() -> DemoFixture {
             DemoFixture {
                 script: SCRIPT.into(),
+                stream: super::super::super::super::retarget::tests::stream_with_game_data(
+                    SCRIPT,
+                    &[],
+                ),
                 winning_ally_teams: vec![0],
                 team_samples: fixture_trailer()
                     .teams
