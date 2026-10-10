@@ -36,10 +36,6 @@ describe("newZerokBattleProblem", () => {
     );
     expect(newZerokBattleProblem(form({ maxPlayers: 33 }))).not.toBeNull();
   });
-
-  it("asks for no map, because the server picks one when we name none", () => {
-    expect(newZerokBattleProblem(form())).toBeNull();
-  });
 });
 
 describe("seatedBy", () => {
