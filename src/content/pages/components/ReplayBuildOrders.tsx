@@ -1,6 +1,7 @@
-import { Button } from "@picoframe/frame";
+import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, Hammer, Loader2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { Field } from "@/components/Field";
 import {
   Collapsible,
   CollapsibleContent,
@@ -29,6 +30,12 @@ import {
   slotNote,
   type UnitSource,
 } from "../../replayBuildOrders";
+import {
+  collapseOrders,
+  orderedCost,
+  ordersUpTo,
+  parseCutMinutes,
+} from "../../replayOpening";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
@@ -79,16 +86,133 @@ function SourceNote({
   );
 }
 
+/** What a unit is called in a row: its full name, else its internal one, else
+ *  the id the replay recorded. */
+function unitLabel(
+  unit: UnitDatasetEntry | undefined,
+  unitDefId: number,
+): string {
+  return unit ? unit.fullName || unit.name : `Unit ${unitDefId}`;
+}
+
+/**
+ * A seat's orders folded into a short sequence, and what they add up to. The
+ * stretch is the whole list unless the reader cut it at a minute.
+ */
+function SeatOpening({
+  seat,
+  units,
+  pics,
+  cutMinutes,
+  differentBuild,
+}: {
+  seat: BuildOrderSeat;
+  units: UnitDatasetEntry[] | null;
+  pics: UnitBuildpicsResult | null;
+  cutMinutes: number | null;
+  differentBuild: boolean;
+}) {
+  const [shown, setShown] = useState(PAGE);
+  const inStretch = ordersUpTo(seat.orders, cutMinutes);
+  const entries = collapseOrders(inStretch);
+  const left = entries.length - shown;
+  // Costs need the game's definitions. Without them there is nothing to add.
+  const cost = units ? orderedCost(inStretch, units) : null;
+  return (
+    <div className="flex flex-col gap-1 border-t border-border/50 p-3 text-sm">
+      <h3 className="text-xs font-medium">
+        {cutMinutes === null ? "Opening" : `Opening, first ${cutMinutes} min`}
+      </h3>
+      {entries.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No orders were given in this stretch.
+        </p>
+      ) : (
+        <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+          {entries.slice(0, shown).map((entry, i) => {
+            const unit = resolveBuildUnit(entry.unitDefId, units);
+            const note = slotNote(entry.first);
+            return (
+              // Entries are never reordered, and two can be identical.
+              // biome-ignore lint/suspicious/noArrayIndexKey: a fixed list with no other identity
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-12 shrink-0 tabular-nums text-xs text-muted-foreground">
+                  {buildOrderTime(entry.frame)}
+                </span>
+                {unit && (
+                  <UnitIcon
+                    display={pics?.units[unit.name]}
+                    pending={pics === null}
+                    size="sm"
+                  />
+                )}
+                <span className="min-w-0 truncate">
+                  {unitLabel(unit, entry.unitDefId)}
+                </span>
+                {entry.count > 1 && (
+                  <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                    ×{entry.count}
+                  </span>
+                )}
+                {entry.first.origin.kind === "lua" && (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    from a widget
+                  </span>
+                )}
+                {note && (
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {note}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {left > 0 && (
+        <div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShown((n) => n + PAGE)}
+          >
+            Show {Math.min(PAGE, left)} more of {left} entries
+          </Button>
+        </div>
+      )}
+      {cost && (
+        <p className="text-xs text-muted-foreground">
+          Cost of what was ordered, not of what was built:{" "}
+          {cost.metal.toLocaleString()} metal and {cost.energy.toLocaleString()}{" "}
+          energy.
+          {cost.unpriced > 0 &&
+            ` ${cost.unpriced} ${cost.unpriced === 1 ? "unit" : "units"} could not be priced and ${cost.unpriced === 1 ? "is" : "are"} left out.`}
+          {differentBuild && (
+            <span className="text-amber-600 dark:text-amber-400">
+              {" "}
+              These costs come from a different build and may be wrong.
+            </span>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function SeatOrders({
   seat,
   units,
   pics,
   defaultOpen,
+  cutMinutes,
+  differentBuild,
 }: {
   seat: BuildOrderSeat;
   units: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
   defaultOpen: boolean;
+  cutMinutes: number | null;
+  differentBuild: boolean;
 }) {
   const [shown, setShown] = useState(PAGE);
   const { pointTo } = useSeriesEmphasis();
@@ -113,7 +237,17 @@ function SeatOrders({
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <ol className="flex max-h-96 flex-col gap-1 overflow-y-auto border-t border-border/50 p-3 text-sm">
+        <SeatOpening
+          seat={seat}
+          units={units}
+          pics={pics}
+          cutMinutes={cutMinutes}
+          differentBuild={differentBuild}
+        />
+        <h3 className="border-t border-border/50 px-3 pt-3 text-xs font-medium">
+          All orders
+        </h3>
+        <ol className="flex max-h-96 flex-col gap-1 overflow-y-auto p-3 text-sm">
           {seat.orders.slice(0, shown).map((order, i) => {
             const unit = resolveBuildUnit(order.unitDefId, units);
             const note = slotNote(order);
@@ -191,6 +325,7 @@ export function ReplayBuildOrders({
     status: "loading" | "failed" | "done";
     result: DemoBuildOrders | null;
   } | null>(null);
+  const [cut, setCut] = useState("");
   const latestPath = useRef(replayPath);
   latestPath.current = replayPath;
 
@@ -292,6 +427,19 @@ export function ReplayBuildOrders({
               unitsFailed={archive !== undefined && units === null}
             />
           )}
+          <Field
+            label="Opening length in minutes"
+            hint="Each player's opening is their orders folded into a sequence, with repeats shown as a count. Leave this empty to fold the whole match."
+            className="max-w-sm"
+          >
+            <Input
+              inputMode="decimal"
+              value={cut}
+              onChange={(e) => setCut(e.target.value)}
+              className="h-8 w-24"
+              autoComplete="off"
+            />
+          </Field>
           {seats.map((seat) => (
             <SeatOrders
               key={seat.key}
@@ -299,6 +447,8 @@ export function ReplayBuildOrders({
               units={units}
               pics={pics}
               defaultOpen={seats.length === 1}
+              cutMinutes={parseCutMinutes(cut)}
+              differentBuild={source?.kind === "differentBuild"}
             />
           ))}
           {result.removals > 0 && (
