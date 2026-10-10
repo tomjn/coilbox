@@ -64,6 +64,7 @@ const { MatchStatsSection } = await import("./components/MatchStatsSection");
 const { ReplayAnalysisEvents } = await import(
   "./components/ReplayAnalysisEvents"
 );
+const { resetReplayEventReadsForTests } = await import("../replayEventRead");
 const { useReplayCommandRates, resetReplayCommandRates } = await import(
   "../useReplayCommandRates"
 );
@@ -272,6 +273,7 @@ describe("ReplayAnalysisEvents", () => {
     ({ gameId, players: [], ais: [] }) as unknown as DemoInfo;
 
   beforeEach(() => {
+    resetReplayEventReadsForTests();
     seedReplayAnalysisForTests({ analyses: [stored("one"), stored("two")] });
   });
   afterEach(resetReplayAnalysisForTests);

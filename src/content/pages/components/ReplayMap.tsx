@@ -12,6 +12,7 @@ import type { DemoInfo, StartBox } from "../../bindings";
 import { useStoredColorMode } from "../../chartColorMode";
 import { FRAMES_PER_SECOND } from "../../chatClock";
 import { playerTeam } from "../../matchStats";
+import { windowSubject } from "../../replayEventLayers";
 import {
   type BuildMark,
   buildingHeatPoints,
@@ -28,7 +29,12 @@ import {
   startDots,
   teamColours,
 } from "../../replayMapLayers";
-import { layersOn, useStoredMapLayers } from "../../replayMapLayerToggles";
+import {
+  EVENT_MAP_LAYERS,
+  holdEventLayers,
+  layersOn,
+  useStoredMapLayers,
+} from "../../replayMapLayerToggles";
 import {
   orderHeatPoints,
   sourceCounts,
@@ -47,10 +53,12 @@ import { UNIT_CATEGORIES } from "../../unitCategory";
 import { useMatchStats } from "../../useMatchStats";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
+import { useReplayEventLayers } from "../../useReplayEventLayers";
 import { useReplayTimeWindow } from "../../useReplayTimeWindow";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplayBaseCrops } from "./ReplayBaseCrops";
+import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
@@ -333,6 +341,17 @@ export function ReplayMap({
     }),
     [inWindow, result],
   );
+  // The layers drawn from the analysis's events (#1160), read through the same
+  // window. They read nothing until one is on.
+  const ev = useReplayEventLayers({
+    info,
+    layersShown,
+    toggles: stored,
+    world,
+    sized,
+    timeWindow,
+    domainSec,
+  });
   const activity = useMemo(
     () =>
       activitySeries(
@@ -414,6 +433,7 @@ export function ReplayMap({
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   useHeatmapLayer(handle, orderField ?? field);
+  useHeatmapLayer(handle, ev.field);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
@@ -497,6 +517,12 @@ export function ReplayMap({
                 className="pointer-events-none absolute inset-0 size-full"
               />
             )}
+            <EventLayerCanvases
+              ev={ev}
+              colours={colours}
+              worldWidth={world.worldWidth}
+              worldHeight={world.worldHeight}
+            />
             {on.starts &&
               dots.map((dot) => <StartDotButton key={dot.team} dot={dot} />)}
           </div>
@@ -515,8 +541,12 @@ export function ReplayMap({
               spacing={1}
               aria-label="Map layers"
               className="w-full flex-wrap"
-              value={layersOn(stored)}
-              onValueChange={setLayers}
+              value={layersOn(stored).filter(
+                (l) => !ev.block || !EVENT_MAP_LAYERS.includes(l),
+              )}
+              onValueChange={(next) =>
+                setLayers(ev.block ? holdEventLayers(next, stored) : next)
+              }
             >
               <ToggleGroupItem value="startBoxes">Start boxes</ToggleGroupItem>
               <ToggleGroupItem value="starts">Start positions</ToggleGroupItem>
@@ -530,13 +560,19 @@ export function ReplayMap({
                 Order density
               </ToggleGroupItem>
               <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
+              <ToggleGroupItem value="deaths" disabled={!!ev.block}>
+                Deaths
+              </ToggleGroupItem>
+              <ToggleGroupItem value="finished" disabled={!!ev.block}>
+                Buildings finished
+              </ToggleGroupItem>
             </ToggleGroup>
             <ReplaySourceNote
               source="stream"
               detail="Start boxes come from the match setup."
             />
 
-            {windowed && (
+            {(windowed || ev.active) && (
               <ReplayTimeWindowControl
                 domainSec={domainSec}
                 window={timeWindow}
@@ -545,11 +581,13 @@ export function ReplayMap({
                 // With the order layer on as well there are two kinds of point
                 // to count, and each is counted under its own name.
                 count={
-                  on.orderDensity && !buildLayer
-                    ? orderCount
-                    : result
-                      ? placedCount
-                      : null
+                  !windowed
+                    ? null
+                    : on.orderDensity && !buildLayer
+                      ? orderCount
+                      : result
+                        ? placedCount
+                        : null
                 }
                 noun={
                   on.orderDensity
@@ -566,8 +604,11 @@ export function ReplayMap({
                       }
                     : undefined
                 }
+                events={ev.counts}
+                subject={windowSubject(windowed, ev.active)}
               />
             )}
+            <EventLayerNotes ev={ev} />
 
             {on.startBoxes && !hasBoxes && (
               <p className="text-xs text-muted-foreground">

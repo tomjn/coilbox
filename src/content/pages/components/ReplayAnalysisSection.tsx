@@ -19,6 +19,7 @@ import {
   type StoredReplayAnalysis,
 } from "../../bindings";
 import {
+  ANALYSIS_SECTION_ID,
   analysisBlockers,
   analysisPercent,
   analysisProgressLabel,
@@ -298,7 +299,11 @@ function AnalysisBody({
   );
 
   return (
-    <section className="flex flex-col gap-2" aria-label="Analysis">
+    <section
+      id={ANALYSIS_SECTION_ID}
+      className="flex flex-col gap-2"
+      aria-label="Analysis"
+    >
       <h2 className="text-sm font-medium">Analysis</h2>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3 text-sm">
         {running ? (

@@ -54,6 +54,7 @@ vi.mock("../../config", () => ({
 }));
 
 const { ReplayAnalysisEvents } = await import("./ReplayAnalysisEvents");
+const { resetReplayEventReadsForTests } = await import("../../replayEventRead");
 const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
   await import("../../replayAnalysis");
 
@@ -140,6 +141,7 @@ const A = "/replays/a.sdfz";
 const B = "/replays/b.sdfz";
 
 beforeEach(() => {
+  resetReplayEventReadsForTests();
   read.mockReset();
   read.mockResolvedValue({ events: EVENTS, total: EVENTS.length });
   write.mockReset();

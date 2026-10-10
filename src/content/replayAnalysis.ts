@@ -30,6 +30,9 @@ import {
  * refuses. Analyses that are already stored are still read.
  */
 
+/** The analysis section's element id, so another section can point at it. */
+export const ANALYSIS_SECTION_ID = "replay-analysis";
+
 /** Whether this distribution hides the analysis run. */
 export function analysisRunHidden(): boolean {
   return isProfileHidden("analytics.run");
