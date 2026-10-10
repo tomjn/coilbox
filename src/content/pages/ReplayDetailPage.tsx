@@ -7,7 +7,6 @@ import {
   ImageOff,
   Loader2,
   Trash2,
-  Trophy,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -26,13 +25,7 @@ import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { useReplayTarget } from "../../play/config";
 import { isProfileHidden } from "../../profile/hidden";
-import type {
-  AllyTeamInfo,
-  DemoInfo,
-  ReplayAi,
-  ReplayPlayer,
-  StartBox,
-} from "../bindings";
+import type { AllyTeamInfo, StartBox } from "../bindings";
 import { contentDeleteReplay } from "../bindings";
 import {
   invalidateMapPreview,
@@ -61,8 +54,8 @@ import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
 import { ReplayChat } from "./components/ReplayChat";
+import { ReplayRoster, swatch } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
-import { SeatItem } from "./components/SeatEmphasis";
 import {
   DependencyBlocked,
   DetailLoading,
@@ -81,227 +74,6 @@ function playedAt(ms: number): string {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-/** `rgbColor` (0..1) → a CSS colour for the team swatch. */
-function swatch(rgb?: [number, number, number]): string | undefined {
-  if (!rgb) return undefined;
-  const [r, g, b] = rgb.map((v) =>
-    Math.round(Math.max(0, Math.min(1, v)) * 255),
-  );
-  return `rgb(${r}, ${g}, ${b})`;
-}
-
-/**
- * A seat's actions per minute, with the rest of the trailer's counters behind
- * it on hover.
- *
- * Rendered only when the decoder had statistics to give: a match the engine
- * recorded none for has no `apm`, and the row leaves the figure off rather
- * than showing a placeholder (issue #1190). The absence itself is explained
- * once, by the Match statistics section below rather than here (#1199).
- */
-function Apm({ p }: { p: ReplayPlayer }) {
-  if (p.apm === undefined) return null;
-  const s = p.stats;
-  const detail = s
-    ? [
-        `${s.numCommands} orders given`,
-        `${s.unitCommands} reached a unit`,
-        `${s.mouseClicks} mouse clicks`,
-        `${s.keyPresses} key presses`,
-        `${s.mousePixels} pixels of mouse travel`,
-      ].join(", ")
-    : undefined;
-  return (
-    <span
-      className="shrink-0 text-xs text-muted-foreground tabular-nums"
-      title={detail}
-    >
-      {Math.round(p.apm)} APM
-    </span>
-  );
-}
-
-/** How a seat's side finished, or undefined where the file doesn't say. */
-type SeatOutcome = "won" | "lost" | undefined;
-
-/**
- * The result beside a seat, as a word and a mark. Colour never carries it
- * alone (#1142): "Won" and "Lost" are text, the trophy only repeats the win.
- */
-function SeatResult({ result }: { result: SeatOutcome }) {
-  if (!result) return null;
-  return result === "won" ? (
-    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
-      <Trophy className="size-3.5" aria-hidden />
-      Won
-    </span>
-  ) : (
-    <span className="shrink-0 text-xs text-muted-foreground">Lost</span>
-  );
-}
-
-function PlayerRow({ p, result }: { p: ReplayPlayer; result: SeatOutcome }) {
-  return (
-    <SeatItem team={p.team} name={p.name}>
-      <span
-        className="inline-block size-3 shrink-0 rounded-sm border border-border/60"
-        style={{ backgroundColor: swatch(p.rgbColor) ?? "transparent" }}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate text-sm">
-        {/* Spectators aren't in the stats database (see stats.rs), so only
-         * seated players link through to the dossier (#375). */}
-        {p.spectator ? (
-          p.name
-        ) : (
-          <Link
-            to={`/stats/${encodeURIComponent(p.name)}`}
-            className="hover:underline"
-            title={p.name}
-          >
-            {p.name}
-          </Link>
-        )}
-        {p.countryCode ? (
-          <span className="ml-1 text-xs text-muted-foreground">
-            {p.countryCode}
-          </span>
-        ) : null}
-      </span>
-      {p.side && (
-        <span className="shrink-0 text-xs text-muted-foreground">{p.side}</span>
-      )}
-      <Apm p={p} />
-      <SeatResult result={result} />
-    </SeatItem>
-  );
-}
-
-/**
- * One skirmish AI's seat. Named by its `shortName` (the identity: `BARb`,
- * `SurvivalAI`), since the recorded `name` is usually just a slot label. No
- * dossier link: a bot has no stats profile, and its name repeats across
- * unrelated matches.
- */
-function AiRow({ a, result }: { a: ReplayAi; result: SeatOutcome }) {
-  const label = a.shortName || a.name || "AI";
-  const full = [a.name, a.shortName, a.version].filter(Boolean).join(" · ");
-  return (
-    <SeatItem team={a.team} name={label}>
-      <span
-        className="inline-block size-3 shrink-0 rounded-sm border border-border/60"
-        style={{ backgroundColor: swatch(a.rgbColor) ?? "transparent" }}
-        aria-hidden
-      />
-      <span className="min-w-0 flex-1 truncate text-sm" title={full}>
-        {label}
-      </span>
-      <Badge
-        variant="ghost"
-        className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
-      >
-        Bot
-      </Badge>
-      {a.side && (
-        <span className="shrink-0 text-xs text-muted-foreground">{a.side}</span>
-      )}
-      <SeatResult result={result} />
-    </SeatItem>
-  );
-}
-
-/**
- * One seat in the roster. A `[playerN]` and an `[aiN]` both hold a team, so both
- * belong in their ally team's card.
- */
-type Seat =
-  | { kind: "player"; player: ReplayPlayer }
-  | { kind: "ai"; ai: ReplayAi };
-
-/** Players and bots grouped by ally-team, winning team highlighted, spectators last. */
-function Players({ info }: { info: DemoInfo }) {
-  const teams = new Map<number, Seat[]>();
-  const spectators: ReplayPlayer[] = [];
-  const push = (key: number, seat: Seat) => {
-    const arr = teams.get(key);
-    if (arr) arr.push(seat);
-    else teams.set(key, [seat]);
-  };
-  for (const p of info.players) {
-    if (p.spectator) spectators.push(p);
-    else push(p.allyTeam ?? -1, { kind: "player", player: p });
-  }
-  for (const a of info.ais ?? []) {
-    push(a.allyTeam ?? -1, { kind: "ai", ai: a });
-  }
-  const allyTeamIds = [...teams.keys()].sort((a, b) => a - b);
-
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Players</h2>
-      <div className="grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-3">
-        {allyTeamIds.map((id) => {
-          const won = info.winnersKnown && info.winningAllyTeams.includes(id);
-          const result: SeatOutcome =
-            !info.winnersKnown || info.winningAllyTeams.length === 0
-              ? undefined
-              : won
-                ? "won"
-                : "lost";
-          return (
-            <div
-              key={id}
-              className={`rounded-lg border p-3 ${
-                won
-                  ? "border-amber-500/50 bg-amber-500/5"
-                  : "border-border/50 bg-card"
-              }`}
-            >
-              <div className="mb-1 flex items-center gap-1.5">
-                <h3 className="text-xs font-semibold text-muted-foreground">
-                  {id === -1 ? "Unassigned" : teamLabel(id)}
-                </h3>
-                {won && (
-                  <Badge
-                    variant="ghost"
-                    className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-                  >
-                    <Trophy className="size-3" /> Winner
-                  </Badge>
-                )}
-              </div>
-              <ul className="flex flex-col divide-y divide-border/40">
-                {teams.get(id)?.map((seat, i) =>
-                  seat.kind === "player" ? (
-                    <PlayerRow
-                      key={`${id}-p-${seat.player.name}`}
-                      p={seat.player}
-                      result={result}
-                    />
-                  ) : (
-                    <AiRow
-                      // Two bots can share a shortName and a name, so the seat's
-                      // team is what tells them apart.
-                      key={`${id}-a-${seat.ai.team ?? i}`}
-                      a={seat.ai}
-                      result={result}
-                    />
-                  ),
-                )}
-              </ul>
-            </div>
-          );
-        })}
-      </div>
-      {spectators.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Spectators: {spectators.map((s) => s.name).join(", ")}
-        </p>
-      )}
-    </section>
-  );
 }
 
 /**
@@ -1040,7 +812,7 @@ export default function ReplayDetailPage() {
           {/* One emphasised series for the roster and the chart (#1139). Keyed
            * by replay so a selection can't follow you to the next one. */}
           <SeriesEmphasisProvider key={filename}>
-            <Players info={info} />
+            <ReplayRoster info={info} replayPath={replay?.path} />
 
             {/* Directly under the roster (#1200). The roster is where a player
              * is already reading per-seat numbers, and the chart answers the

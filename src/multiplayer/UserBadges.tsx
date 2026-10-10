@@ -75,14 +75,18 @@ export function CountryFlag({
 export function RatingBadge({
   rating,
   className,
+  detail,
 }: {
   rating: Rating | undefined;
   className?: string;
+  /** Plain words added after the summary, for a surface with a caveat to carry. */
+  detail?: string;
 }) {
   const parts = ratingParts(rating);
-  const summary = ratingSummary(rating);
   const first = parts[0];
-  if (!first || !summary) return null;
+  const base = ratingSummary(rating);
+  if (!first || !base) return null;
+  const summary = detail ? `${base}. ${detail}` : base;
   return (
     <span
       className={cn(

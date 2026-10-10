@@ -7,7 +7,6 @@ import {
   Trophy,
   Users,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import { formatDuration } from "@/lib/format";
 import type {
   DemoInfo,
@@ -15,10 +14,9 @@ import type {
   Metric,
   MetricGroup,
 } from "../../bindings";
-import { contentReplayTrailer } from "../../bindings";
 import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
-import { metricRegistry } from "../../useMetricRegistry";
+import { useMatchStats } from "../../useMatchStats";
 import { MatchStatsChart } from "./MatchStatsChart";
 import { StatCard } from "./StatWidgets";
 
@@ -33,52 +31,6 @@ import { StatCard } from "./StatWidgets";
  * Which totals get a tile is the registry's `headline` flag, read at runtime.
  * Nothing in this file names a metric.
  */
-
-const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
-/** Decoded trailers, kept for the session: decoding re-reads the whole file. */
-const trailerCache = new Map<string, DemoTrailer>();
-
-function useMatchStats(replayPath: string) {
-  // The replay `settled` belongs to, so another replay shows nothing of it.
-  const [settled, setSettled] = useState<{
-    path: string;
-    data: { trailer: DemoTrailer; metrics: Metric[] } | null;
-    error: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const cached = trailerCache.get(replayPath);
-    const trailer = cached
-      ? Promise.resolve(cached)
-      : contentReplayTrailer({ replayPath }).then((r) => r.trailer);
-    Promise.all([trailer, metricRegistry()])
-      .then(([t, metrics]) => {
-        if (cancelled) return;
-        trailerCache.set(replayPath, t);
-        setSettled({
-          path: replayPath,
-          data: { trailer: t, metrics },
-          error: null,
-        });
-      })
-      .catch((e) => {
-        if (!cancelled)
-          setSettled({ path: replayPath, data: null, error: errMessage(e) });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [replayPath]);
-
-  const current = settled?.path === replayPath;
-  return {
-    data: current ? settled.data : null,
-    loading: !current,
-    error: current ? settled.error : null,
-  };
-}
 
 /** A metric's icon comes from its group, so the next metric arrives with one. */
 const groupIcon: Record<MetricGroup, React.ReactNode> = {
