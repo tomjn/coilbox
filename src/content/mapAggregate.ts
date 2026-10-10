@@ -471,6 +471,9 @@ export function aggregateLayer(
     normalise: Normalise;
     window: MatchWindow;
     categories?: (gameType: string) => DefCategories | undefined;
+    /** Count the matches and events and build no field, for a layer that is
+     *  not being drawn and still has a count beside its toggle. */
+    countsOnly?: boolean;
   },
 ): LayerAggregate {
   const { width, height } = heatGridSize(
@@ -510,6 +513,14 @@ export function aggregateLayer(
     if (total === 0) continue;
 
     let scale: number;
+    if (options.countsOnly) {
+      // A match with an event in the window has a peak above zero, so no
+      // mode needs its field to know it counts. A rate needs minutes too.
+      if (options.normalise === "rate" && !(range.minutes > 0)) continue;
+      contributing++;
+      events += total;
+      continue;
+    }
     if (options.normalise === "share") scale = 1 / total;
     else if (options.normalise === "rate") {
       if (!(range.minutes > 0)) continue;
@@ -540,7 +551,7 @@ export function aggregateLayer(
     events += total;
   }
 
-  if (contributing === 0)
+  if (contributing === 0 || options.countsOnly)
     return {
       field: null,
       available,
@@ -587,6 +598,13 @@ export const LAYER_LABEL: Record<HeatLayerId, string> = {
 /** A count of matches in words. */
 export const matchCount = (n: number) =>
   `${n.toLocaleString()} ${n === 1 ? "match" : "matches"}`;
+
+/** How many events a layer holds, in its own noun: "172 orders to place a
+ *  building". */
+export function layerEvents(layer: HeatLayerId, events: number): string {
+  const [one, many] = NOUN[layer];
+  return `${events.toLocaleString()} ${events === 1 ? one : many}`;
+}
 
 /** A fraction as a percentage a person can read: one decimal under ten. */
 function percent(fraction: number): string {

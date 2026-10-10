@@ -369,6 +369,28 @@ describe("how many matches are behind each layer", () => {
     expect(table[1]).toBe("defence");
   });
 
+  it("counts the same matches and events without building a field", () => {
+    for (const layer of ["orders", "buildings", "defence", "deaths"] as const)
+      for (const normalise of ["share", "peak", "rate"] as const) {
+        const full = aggregateLayer(all, layer, WORLD, {
+          ...options,
+          normalise,
+        });
+        const counted = aggregateLayer(all, layer, WORLD, {
+          ...options,
+          normalise,
+          countsOnly: true,
+        });
+        expect(counted.field).toBeNull();
+        expect(counted).toMatchObject({
+          available: full.available,
+          contributing: full.contributing,
+          unclassified: full.unclassified,
+          events: full.events,
+        });
+      }
+  });
+
   it("is empty with no matches", () => {
     const got = aggregateLayer([], "orders", WORLD, options);
     expect(got).toMatchObject({ field: null, available: 0, contributing: 0 });

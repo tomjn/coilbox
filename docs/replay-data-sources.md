@@ -251,8 +251,37 @@ This table lists each part of the interface, the source it shows, and what makes
 | Dossier rates, ratio and trend | The same store | Games with no totals, no team id or no usable length are left out and counted on the page |
 | Matchup view | The store, using start script teams and sides, trailer winners and header length | A game where you were not on opposing teams is not counted |
 | Stats page and achievements | The store, using start script players, sides and AIs, and trailer winners | A remix or refight rerun is left out. A game with no result is not a win |
+| A map's page, how this map is played | Every match on the map by its exact name, counted once however many files hold it. Each replay's stream is walked once and kept as counts on the map's grid by minute. Start positions are a dot a team a match. Building density, order density and the two kinds of building are stream orders. Deaths are from the event log. Each match is scaled before the matches are averaged, and the legend says what the brightest spot holds under that scaling | Orders are not buildings. A layer is drawn from the matches that have it, and the number beside the layer says how many: every match with a stream for orders, only an analysed match for deaths. Defences and economy leave out a match whose exact game build is not installed. Another version of the map is another map and is not added in. A remix is left out, and so is a match under a minute unless asked for |
 
 The store is one JSON file written whole, and it never holds a series.
+
+### The picture of every match on a map
+
+A map's page in the library has a section called "How this map is played". It adds every match on that map into one picture: where teams started, where buildings were ordered, where orders were aimed and, for analysed matches, where units died.
+
+One match is an anecdote, so the section always says how many matches it is drawn from, and the number differs by layer. Every match with a readable stream has orders. Only a match you analysed, whose playback reproduced it, has deaths. The number beside each layer's name is the count of matches with something on that layer in the window of match time you chose.
+
+Each match is scaled before the matches are averaged, so one long game does not become the whole picture. There are three ways to scale, and they answer different questions.
+
+| Scaling | What each match is scaled to | What the brightest spot means |
+| --- | --- | --- |
+| Share of each match, the default | Its events add up to one | The average share of a match's events that fell near that spot. "On average 12% of a match's orders to place a building within 320 elmos of one spot" |
+| Each match's busiest spot | Its own brightest point is one | The place that was busiest in the most matches. It is not a count |
+| Per minute of match | Divided by its minutes in the window | Events a minute near that spot, averaged over the matches |
+
+The share is the default because it answers the mapper's question, which is where the building in a typical match goes. Under it a short quiet match weighs as much as a long busy one. That is why matches under a minute are left out unless you ask for them: a ten second test with four orders would otherwise count as much as a full game.
+
+The window of match time runs on each match's own clock. The first five minutes is the first five of every match. The last five is each match's own last five. A stretch between two minutes misses a match that ended before it, and the section says how many matches have anything in the window. The window is in whole minutes.
+
+The filters narrow which matches are in the picture: the number of players, the game and its version, how the sides were arranged, whether the match was analysed, a range of days, and a set of replays.
+
+What counts as one match and one map:
+
+- A match is counted once however many files hold it. A remix is a copy of a match pointed at another game, and is left out. Two plain files with the same game id are one match.
+- The map is matched by its exact name, which carries its version. Two versions of a map are two maps here and are never added together.
+- Defences and economy need to know what each building is for. A unit definition id means a unit in one build of one game, so a match is only classified against an installed game with exactly the name and version the replay records. A match on any other build is left out of those two layers and counted in the note under them.
+
+Reading a replay costs a walk of its whole stream, the first time. The counts are then kept in the app's cache folder, one small file a replay, and the next visit reads those. On one Mac, in an unoptimised build, the largest replay in a library of 18 (3.1 MB on disk, 105,824 orders with a place) took 364 ms to walk and 7 ms to read back from its kept file, which was 177 KB. All 18 took 1.3 seconds to walk between them and their kept files came to 651 KB. The cost grows with the number of replays, and nothing here measures a large library. A kept file is thrown away when the replay file changes size or modified time, and the folder can be cleared from the storage settings at any time.
 
 ## Why two numbers may not match
 

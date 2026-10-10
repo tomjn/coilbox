@@ -15,6 +15,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { useAdvancedMode } from "@/general/advanced";
+import type { MapScene3D } from "@/lib/mapScene";
 import { notify } from "@/notify/notify";
 import { isProfileHidden } from "@/profile/hidden";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
@@ -46,6 +47,7 @@ import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
+import { MapAggregate } from "./components/MapAggregate";
 import { mapSizeLabel } from "./components/MapThumb";
 import { OptionsList } from "./components/OptionsList";
 import { StatCard } from "./components/StatWidgets";
@@ -72,6 +74,8 @@ export default function MapDetailPage() {
   const playMap = usePlayMap();
   const advanced = useAdvancedMode();
   const [decompiling, setDecompiling] = useState(false);
+  // The 3D preview's scene, which the picture of every match drapes over.
+  const [scene, setScene] = useState<MapScene3D | null>(null);
   const { selected } = useScanTargetSelection();
   const { data, loading, error, run } = useUnitsyncScan(
     selected?.enginePath,
@@ -123,6 +127,9 @@ export default function MapDetailPage() {
   // Per-map record (#460): a distribution profile can hide stats entirely, in
   // which case the roots stay empty so `useReplayStats` never ingests.
   const statsHidden = isProfileHidden("multiplayer.stats");
+  // The picture of every match on this map (#1161). It is built from the same
+  // records, so hiding the stats hides it too.
+  const insightShown = !statsHidden && !isProfileHidden("analytics.mapInsight");
   const { state: contentState } = useContentState();
   const statsRoots = useMemo(
     () => (statsHidden ? [] : (contentState?.roots ?? []).map((r) => r.path)),
@@ -184,6 +191,17 @@ export default function MapDetailPage() {
           top: (p.z / worldH) * 100,
         }))
       : [];
+
+  // The size the 3D preview gives the map: the heightmap has one sample more
+  // than it has squares, and a square is 8 elmos.
+  const world = {
+    worldWidth: heightmap.data?.width
+      ? (heightmap.data.width - 1) * 8
+      : (map.width ?? 0) * 16,
+    worldHeight: heightmap.data?.height
+      ? (heightmap.data.height - 1) * 8
+      : (map.height ?? 0) * 16,
+  };
 
   // Aspect ratio of the map (unitsync minimaps are square, so the box carries the
   // true shape and `object-fill` stretches the square source back into it).
@@ -420,20 +438,24 @@ export default function MapDetailPage() {
               skyboxSrc={skybox.dataUrl}
               minHeight={heightmap.data.minHeight ?? 0}
               maxHeight={heightmap.data.maxHeight ?? 0}
-              worldWidth={
-                heightmap.data.width
-                  ? (heightmap.data.width - 1) * 8
-                  : (map.width ?? 1) * 16
-              }
-              worldHeight={
-                heightmap.data.height
-                  ? (heightmap.data.height - 1) * 8
-                  : (map.height ?? 1) * 16
-              }
+              worldWidth={world.worldWidth || 16}
+              worldHeight={world.worldHeight || 16}
+              onScene={insightShown ? setScene : undefined}
             />
           )}
         </div>
       </section>
+
+      {insightShown && (
+        <MapAggregate
+          mapName={map.name}
+          world={world}
+          minimapUrl={minimap.url ?? undefined}
+          records={statRecords}
+          ingesting={statsIngesting}
+          scene={scene}
+        />
+      )}
 
       <MapEligibilitySection mapName={map.name} />
 

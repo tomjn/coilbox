@@ -37,7 +37,7 @@ export const ANALYTICS_HIDE_IDS: string[] = [
  * Remove a key from here in the same change that gates its surface: the test
  * in `hidden.test.ts` fails if a key is listed here and also gated.
  */
-export const UNWIRED_ANALYTICS_IDS: string[] = ["analytics.mapInsight"];
+export const UNWIRED_ANALYTICS_IDS: string[] = [];
 
 /**
  * Nav ids that opt into profile hiding via `isProfileHidden(id)`. Hiding is opt-in
