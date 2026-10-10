@@ -457,6 +457,8 @@ export default function MapDetailPage() {
           records={statRecords}
           ingesting={statsIngesting}
           scene={scene}
+          declared={minimap.startPositions}
+          refights={refights}
         />
       )}
 
