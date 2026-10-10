@@ -31,9 +31,6 @@ import { ReplaySourceNote } from "./ReplaySourceNote";
  */
 const CROP_MARK_SIZE = 3;
 
-const plural = (n: number, one: string, many: string) =>
-  `${n.toLocaleString()} ${n === 1 ? one : many}`;
-
 /** One player's view: the minimap cut to the crop, their orders as marks, and
  *  where their start really is. A button, so it can be pointed at, tabbed to
  *  and pressed, and the rest of the page lights the same player. */
@@ -42,20 +39,17 @@ function CropCard({
   world,
   minimapUrl,
   windowed,
-  unitsKnown,
 }: {
   crop: BaseCrop;
   world: MapWorld;
   minimapUrl: string;
   windowed: boolean;
-  unitsKnown: boolean;
 }) {
   const { isLit, dimming, pointTo, focusOn, toggleSelected } =
     useSeriesEmphasis();
   const teams = [crop.team];
   const lit = isLit(teams);
   const image = cropImageBox(crop.window, world);
-  const barElmos = Math.round(crop.window.side / 4);
   const name = crop.names.length > 0 ? crop.names.join(", ") : "Unnamed player";
   const faded = dimming && !lit;
   return (
@@ -131,18 +125,12 @@ function CropCard({
             backgroundColor: crop.colour,
           }}
         />
+        {/* What the bar measures is said once, above the views. */}
         <span
-          className="pointer-events-none absolute bottom-1 left-1 flex flex-col text-[10px] leading-none text-white"
-          style={{ width: "25%", textShadow: "0 0 2px rgba(9, 13, 22, 1)" }}
-        >
-          <span data-crop-scale-label className="whitespace-nowrap">
-            {barElmos.toLocaleString()} elmos
-          </span>
-          <span
-            data-crop-scale-bar
-            className="mt-0.5 block h-1 w-full border-x-2 border-b-2 border-white"
-          />
-        </span>
+          data-crop-scale-bar
+          className="pointer-events-none absolute bottom-1 left-1 block h-1 border-x-2 border-b-2 border-white shadow-[0_0_2px_rgba(9,13,22,1)]"
+          style={{ width: "25%" }}
+        />
       </span>
       <span className="flex flex-col text-xs leading-tight">
         <span className="font-medium">
@@ -154,23 +142,18 @@ function CropCard({
             Opened with {crop.opening}
           </span>
         )}
-        {crop.ordered === 0 ? (
-          <span className="text-muted-foreground">
-            {windowed
-              ? "No buildings ordered in this window"
-              : "No buildings ordered"}
-          </span>
-        ) : (
-          <span className="text-muted-foreground">
-            {plural(crop.ordered, "building", "buildings")} ordered
-            {unitsKnown ? "" : ", game not installed"}
-          </span>
-        )}
-        {crop.outside > 0 && (
-          <span data-crop-outside className="text-muted-foreground">
-            {crop.outside.toLocaleString()} of them outside this view
-          </span>
-        )}
+        <span className="text-muted-foreground">
+          {crop.ordered === 0
+            ? windowed
+              ? "None ordered in this window"
+              : "None ordered"
+            : `${crop.ordered.toLocaleString()} ordered`}
+          {crop.outside > 0 && (
+            <span data-crop-outside>
+              , {crop.outside.toLocaleString()} outside this view
+            </span>
+          )}
+        </span>
       </span>
     </button>
   );
@@ -211,7 +194,9 @@ function ShapeKey({ crops }: { crops: readonly BaseCrop[] }) {
  * `orders` are the build orders inside the map's time window, already
  * filtered, and the crops draw the ones with a position. Every crop is the same
  * size in elmos, on the same minimap image the map above uses, with marks
- * drawn from the same shapes and colours. Allies sit together. Mount it under a
+ * drawn from the same shapes and colours. Allies sit together. It takes the
+ * width it is given and wraps, so mount it across the section and not in the
+ * minimap's column. Mount it under a
  * `SeriesEmphasisProvider`: a crop lights its player on the chart, the roster
  * and the map, and they light the crop.
  */
@@ -274,12 +259,21 @@ export function ReplayBaseCrops({
         source="stream"
         detail="Each view shows the buildings a player ordered, not the buildings that were built."
       />
-      <p className="text-xs text-muted-foreground">
+      {/* What every view shares is said here once, so a view's own caption is
+          its player, their opening and two counts. */}
+      <p className="max-w-prose text-xs text-muted-foreground">
         {windowText} Every view is {side.toLocaleString()} elmos across, the
         same for every player, and is centred on that player's start unless the
-        start is near the edge of the map. An order that was cancelled or never
-        carried out is drawn like any other.
+        start is near the edge of the map. The bar at the bottom left of a view
+        is {Math.round(side / 4).toLocaleString()} elmos. A mark is one order to
+        place a building, in its player's colour, and the dot with a white edge
+        is the player's start. An order that was cancelled or never carried out
+        is drawn like any other. Under each view is how many buildings that
+        player ordered, and how many of those fall outside the view.
+        {units === null &&
+          " This replay's game is not installed, so every mark is the same shape."}
       </p>
+      <ShapeKey crops={crops} />
       {groups.map((group) => (
         <div key={group.ally ?? "none"} className="flex flex-col gap-1">
           {groups.length > 1 && (
@@ -291,7 +285,7 @@ export function ReplayBaseCrops({
           )}
           <div
             data-crop-group={group.ally ?? "none"}
-            className="grid grid-cols-[repeat(auto-fill,minmax(6.5rem,1fr))] gap-2"
+            className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2"
           >
             {group.crops.map((crop) => (
               <CropCard
@@ -300,13 +294,11 @@ export function ReplayBaseCrops({
                 world={world}
                 minimapUrl={minimapUrl}
                 windowed={timeWindow !== null}
-                unitsKnown={units !== null}
               />
             ))}
           </div>
         </div>
       ))}
-      <ShapeKey crops={crops} />
     </section>
   );
 }

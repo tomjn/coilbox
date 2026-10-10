@@ -291,20 +291,20 @@ describe("one crop for each player", () => {
 });
 
 describe("the scale", () => {
-  it("states the crop's side in elmos, the same for every player, and a scale bar on each", async () => {
+  it("states the crop's side and the bar's length once, above the views, and draws a bar on each", async () => {
     ORDERS = PLACED;
     show();
     await open();
     expect(screen.getByText(/Every view is 1,024 elmos across/)).toBeTruthy();
+    // The bar is a quarter of the crop's width, which is 256 of 1024 elmos.
+    expect(
+      screen.getAllByText(/The bar at the bottom left of a view is 256 elmos/),
+    ).toHaveLength(1);
     const bars = document.querySelectorAll("[data-crop-scale-bar]");
     expect(bars).toHaveLength(2);
-    const labels = [...document.querySelectorAll("[data-crop-scale-label]")];
-    expect(labels.map((l) => l.textContent)).toEqual([
-      "256 elmos",
-      "256 elmos",
-    ]);
-    // The bar is a quarter of the crop's width, which is 256 of 1024 elmos.
-    expect((bars[0].parentElement as HTMLElement).style.width).toBe("25%");
+    expect((bars[0] as HTMLElement).style.width).toBe("25%");
+    // No view repeats it.
+    expect(card(0)?.textContent).not.toContain("elmos");
   });
 
   it("cuts the minimap itself to the crop, scaled and offset to match", async () => {
@@ -371,10 +371,16 @@ describe("where things sit inside a crop", () => {
     ORDERS = PLACED;
     show();
     await open();
-    expect(card(0)?.textContent).toContain("4 buildings ordered");
+    expect(card(0)?.textContent).toContain("4 ordered, 1 outside this view");
     expect(card(0)?.querySelector("[data-crop-outside]")?.textContent).toBe(
-      "1 of them outside this view",
+      ", 1 outside this view",
     );
+    // What the two counts are is said once, above the views.
+    expect(
+      screen.getAllByText(
+        /Under each view is how many buildings that player ordered, and how many of those fall outside the view/,
+      ),
+    ).toHaveLength(1);
     expect(card(1)?.querySelector("[data-crop-outside]")).toBeNull();
   });
 });
@@ -402,21 +408,18 @@ describe("the time window", () => {
       [59.765625, 29.296875],
       [69.53125, 29.296875],
     ]);
-    expect(card(0)?.textContent).toContain("3 buildings ordered");
-    expect(card(0)?.textContent).toContain("1 of them outside this view");
+    expect(card(0)?.textContent).toContain("3 ordered, 1 outside this view");
   });
 
   it("says a player ordered nothing in an empty window, and draws their start", async () => {
     ORDERS = PLACED;
     show();
     await open();
-    expect(card(1)?.textContent).toContain("No buildings ordered");
+    expect(card(1)?.textContent).toContain("None ordered");
     expect(card(1)?.textContent).not.toContain("in this window");
     press("Last 5 minutes");
     await screen.findByText(/Showing orders given from 25:00 to 30:00/);
-    expect(card(0)?.textContent).toContain(
-      "No buildings ordered in this window",
-    );
+    expect(card(0)?.textContent).toContain("None ordered in this window");
     expect(card(0)?.querySelector("[data-crop-start]")).toBeTruthy();
     expect(marks(0)).toEqual([]);
   });
@@ -449,9 +452,13 @@ describe("when there is little to show", () => {
     show();
     await open();
     expect(card(0)?.textContent).not.toContain("Opened with");
-    expect(card(0)?.textContent).toContain(
-      "4 buildings ordered, game not installed",
-    );
+    expect(card(0)?.textContent).toContain("4 ordered");
+    expect(card(0)?.textContent).not.toContain("not installed");
+    expect(
+      screen.getAllByText(
+        /This replay's game is not installed, so every mark is the same shape/,
+      ),
+    ).toHaveLength(1);
     // Every mark is one shape, and there is no key to say what a shape means.
     const shapes = new Set(
       [...(card(0)?.querySelectorAll("[data-crop-mark]") ?? [])].map((p) =>
