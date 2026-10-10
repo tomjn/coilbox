@@ -4282,7 +4282,15 @@ mod tests {
     fn a_replay_that_finished_since_the_preview_is_not_taken_as_unfinished() {
         let (_tmp, root, [_, _, real]) = unfinished_fixture();
 
-        let out = delete_listed_replays(&[real.clone()], true, None, &[], &[root], true, false);
+        let out = delete_listed_replays(
+            std::slice::from_ref(&real),
+            true,
+            None,
+            &[],
+            &[root],
+            true,
+            false,
+        );
         assert_eq!(out.deleted, 0);
         assert!(out.skipped[0].contains("no longer empty"));
         assert!(real.is_file());
