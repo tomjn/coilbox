@@ -20,9 +20,9 @@ import { usePlay } from "@/play/PlayProvider";
 import { SaveAsPresetButton } from "@/play/pages/components/SaveAsPresetButton";
 import { tagAndIngestFreshReplay } from "../../../play/tagReplayProvenance";
 import type { DemoInfo } from "../../bindings";
-import { contentListReplays } from "../../bindings";
 import { demoInfoToSkirmishDraft } from "../../demoToSkirmish";
 import { useRefightSetup } from "../../refight";
+import { loadReplays } from "../../replayList";
 import { useReplayUserState } from "../../replayUserState";
 import { ScanFailed } from "./states";
 
@@ -178,7 +178,7 @@ function RefightForm({
     setError(null);
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;

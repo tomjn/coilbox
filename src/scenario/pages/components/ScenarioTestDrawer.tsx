@@ -29,8 +29,8 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { contentListReplays } from "@/content/bindings";
 import { primeScan, useUnitsyncScan } from "@/content/config";
+import { loadReplays } from "@/content/replayList";
 import { useGameUnits } from "@/content/useGameUnits";
 import { playInfolog } from "@/play/bindings";
 import {
@@ -259,7 +259,7 @@ export function ScenarioTestDrawer({
     let beforePaths: Set<string> | null = null;
     if (!testing) {
       try {
-        const { replays } = await contentListReplays({ root: target.dataDir });
+        const replays = await loadReplays(target.dataDir, true);
         beforePaths = new Set(replays.map((r) => r.path));
       } catch {
         beforePaths = null;

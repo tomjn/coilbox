@@ -18,11 +18,11 @@ import { formatBytes } from "@/lib/format";
 import { notify } from "@/notify/notify";
 import {
   contentDeleteReplays,
-  contentListReplays,
   type ReplayDeleteSummary,
   type ReplayFile,
 } from "../../bindings";
 import { SHORT_REPLAY_SECONDS } from "../../replayFilterVisibility";
+import { loadReplays } from "../../replayList";
 import { useReplayUserState } from "../../replayUserState";
 import {
   hasCleanupFilter,
@@ -75,9 +75,9 @@ export function BulkDeleteReplaysPanel({
     let live = true;
     setReplays(null);
     setError(null);
-    contentListReplays({ root: rootPath })
+    loadReplays(rootPath)
       .then((r) => {
-        if (live) setReplays(r.replays);
+        if (live) setReplays(r);
       })
       .catch((e) => {
         if (live) setError(msg(e));
@@ -135,8 +135,7 @@ export function BulkDeleteReplaysPanel({
         });
       }
       setConfirming(false);
-      const { replays } = await contentListReplays({ root: rootPath });
-      setReplays(replays);
+      setReplays(await loadReplays(rootPath, true));
       onDeleted();
     } catch (e) {
       setError(msg(e));

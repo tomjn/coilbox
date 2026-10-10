@@ -1,9 +1,9 @@
 import {
   contentDemoInfo,
-  contentListReplays,
   type DemoInfo,
   type ReplayFile,
 } from "../content/bindings";
+import { loadReplays } from "../content/replayList";
 import { sleep } from "../lib/helpers";
 import type { PlayTarget } from "./config";
 import { ingestFinishedReplay } from "./ingestFinishedReplay";
@@ -12,7 +12,7 @@ import { ingestFinishedReplay } from "./ingestFinishedReplay";
  * Automatic win/loss detection from a run's replay. Most of this is pure,
  * kept apart from Tauri-calling orchestration so it's directly unit-testable
  * (see `detect.test.ts`). `findNewReplay` and `detectBattleResult` do call
- * `contentListReplays` and `contentDemoInfo`, and live here because the same
+ * `loadReplays` and `contentDemoInfo`, and live here because the same
  * poll loop and retry constants used to be copied into all four callers
  * (campaign, conquest, runlite, and the skirmish provenance tagger). See
  * issue #2439.
@@ -51,7 +51,7 @@ export async function findNewReplay(
   beforePaths: ReadonlySet<string>,
 ): Promise<ReplayFile | null> {
   for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
-    const { replays } = await contentListReplays({ root: dataDir });
+    const replays = await loadReplays(dataDir, true);
     const newest = pickNewestReplay(diffNewReplays(beforePaths, replays));
     if (newest) return newest;
     if (attempt < RETRY_COUNT) await sleep(RETRY_DELAY_MS);
