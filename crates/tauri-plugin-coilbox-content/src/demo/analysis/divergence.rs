@@ -50,7 +50,7 @@
 //! places the end within one statistics period. Both are compared exactly, which
 //! pins the frame to the second.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::log::{EventLog, LogLine, LoggedTeam};
 use crate::model::{DemoTrailer, TeamStatSample};
@@ -60,21 +60,21 @@ use crate::model::{DemoTrailer, TeamStatSample};
 const FRAMES_PER_SECOND: i32 = 30;
 
 /// One figure the run and the replay disagree on.
-#[derive(Serialize, Clone, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Disagreement {
     /// Which figure: `winners`, `gameSeconds`, `teams`, `desyncWarnings`, or a
     /// statistic's name such as `metalProduced`.
     pub figure: String,
     /// The team the figure belongs to, when it is a team's.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub team: Option<i32>,
     /// What the replay recorded.
     pub recorded: String,
     /// What the run observed.
     pub observed: String,
     /// Observed minus recorded, for a figure that is a number.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub difference: Option<f64>,
 }
 

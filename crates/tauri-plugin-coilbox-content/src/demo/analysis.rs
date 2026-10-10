@@ -34,6 +34,7 @@ pub mod game;
 pub mod launch;
 pub mod log;
 pub mod retarget;
+pub mod store;
 
 use divergence::Disagreement;
 use launch::EngineExit;
@@ -307,6 +308,10 @@ pub(crate) async fn content_analyse_replay<R: Runtime>(
         Ok(dir) => dir.join(SCRATCH_DIR),
         Err(e) => return CliResult::err(e),
     };
+    let analyses = match store::app_store_dir(&app) {
+        Ok(dir) => dir,
+        Err(e) => return CliResult::err(e),
+    };
     let mut data_dirs = vec![PathBuf::from(&data_dir)];
     data_dirs.extend(
         coilbox_proc::extra_datadirs(&data_dir)
@@ -322,7 +327,15 @@ pub(crate) async fn content_analyse_replay<R: Runtime>(
         timeout: Duration::from_secs(timeout_secs),
     };
     let run = tauri::async_runtime::spawn_blocking(move || {
-        analyse_replay(&request, &AtomicBool::new(false))
+        let game_id = store::replay_key(&request.replay)?;
+        if store::is_current(&analyses, &game_id) {
+            return Err("this replay is already analysed".to_string());
+        }
+        let run = analyse_replay(&request, &AtomicBool::new(false))?;
+        if let Some(provenance) = store::Provenance::of(&game_id, &run, now_ms()) {
+            store::write(&analyses, &provenance, run.events.as_deref())?;
+        }
+        Ok(run)
     })
     .await;
     match run {
@@ -330,6 +343,14 @@ pub(crate) async fn content_analyse_replay<R: Runtime>(
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
     }
+}
+
+/// The wall clock, in milliseconds since the Unix epoch.
+pub(crate) fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
 }
 
 #[cfg(all(test, unix))]

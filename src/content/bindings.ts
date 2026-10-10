@@ -1089,10 +1089,90 @@ export const contentAnalyseReplay = defineCommand<
   { report: ReplayAnalysisReport; events: ReplayLogLine[] | null }
 >("coilbox-content", "content_analyse_replay");
 
-/** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
+/**
+ * What a stored analysis means to a reader today (#1158).
+ *
+ * - `current`: events from the logger this build ships.
+ * - `outdated`: events from an earlier logger. They still read. A view that
+ *   needs something the earlier logger did not record offers a new run.
+ * - `diverged`: a run finished and did not reproduce the match. No events.
+ */
+export type ReplayAnalysisState = "current" | "outdated" | "diverged";
+
+/**
+ * What is stored for one analysed match: what produced it, when, and how many
+ * events of each kind it holds. Never the events themselves.
+ */
+export interface StoredReplayAnalysis {
+  state: ReplayAnalysisState;
+  /** The stored file's size on disk, compressed. */
+  sizeBytes: number;
+  kind: "analysis";
+  storeFormat: number;
+  outcome: "reproduced" | "diverged";
+  /** The replay's game id, which is what `StatRecord.gameId` and `DemoInfo.gameId` hold. */
+  gameId: string;
+  /** The logger's line format, and which logger wrote the events. */
+  loggerFormat: number;
+  loggerVersion: number;
+  /** The engine the run used, as it named itself. */
+  engine: string;
+  /** The game the replay was recorded on, name and version. */
+  game: string;
+  map: string;
+  analysedAtMs: number;
+  /** The match's length, and how long the engine took to play it back. */
+  matchSeconds: number;
+  wallSeconds: number;
+  counts: ReplayEventCounts;
+  /** The figures the run and the replay disagreed on. Empty unless `diverged`. */
+  disagreements: ReplayDisagreement[];
+}
+
+/**
+ * Every stored analysis, to join to replay records by `gameId`. This is how
+ * the library knows which replays have event data: the answer changes when an
+ * analysis is run or deleted, so it is asked for and never stored in a
+ * `StatRecord`.
+ *
+ * A remix carries its original's game id and has no analysis of its own, so
+ * leave records with `remixed` set out of the join.
+ */
+export const contentReplayAnalyses = defineCommand<
+  undefined,
+  { analyses: StoredReplayAnalysis[] }
+>("coilbox-content", "content_replay_analyses");
+
+/** What is stored for one match, or null. Carries the counts per kind. */
+export const contentReplayAnalysis = defineCommand<
+  { gameId: string },
+  { analysis: StoredReplayAnalysis | null }
+>("coilbox-content", "content_replay_analysis");
+
+/**
+ * A match's stored events, in the order the logger wrote them. `kinds` keeps
+ * only lines of those kinds. `offset` and `limit` take a window of what was
+ * kept, and `total` is how many lines matched in all. A match can hold tens
+ * of thousands of lines, so ask for the kinds a view draws.
+ */
+export const contentReplayAnalysisEvents = defineCommand<
+  { gameId: string; kinds?: string[]; offset?: number; limit?: number },
+  { events: ReplayLogLine[]; total: number }
+>("coilbox-content", "content_replay_analysis_events");
+
+/** Delete what is stored for one match, leaving the replay alone. */
+export const contentReplayAnalysisDelete = defineCommand<
+  { gameId: string },
+  { deleted: boolean }
+>("coilbox-content", "content_replay_analysis_delete");
+
+/**
+ * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
+ * `content_list_replays`. Its stored analysis goes with it.
+ */
 export const contentDeleteReplay = defineCommand<
   { path: string },
-  { ok: boolean }
+  { ok: boolean; analysisDeleted: boolean }
 >("coilbox-content", "content_delete_replay");
 
 /** What a bulk replay delete removed, or would remove. */
@@ -1103,6 +1183,9 @@ export interface ReplayDeleteSummary {
   bytes: number;
   /** One sentence per path left alone, saying why. */
   skipped: string[];
+  /** How many of the replays had a stored analysis, which goes with them. */
+  analyses: number;
+  analysisBytes: number;
 }
 
 /**
