@@ -343,6 +343,25 @@ pub(crate) fn stats_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Stri
         .join("stats.json"))
 }
 
+/// Load the store, ingest into it and save it. The file is only rewritten when
+/// the pass changed something, or the stored schema was behind and the pass
+/// stamped it current. A pass that skipped every file leaves the file alone, so
+/// opening a view that ingests does not rewrite the whole store each time.
+fn ingest_and_save(
+    path: &Path,
+    roots: &[PathBuf],
+    engine_dir: &Path,
+    dry_run: bool,
+) -> Result<(IngestSummary, StatsStore), String> {
+    let mut store = load(path)?;
+    let was_behind = store.schema_version < STATS_SCHEMA_VERSION;
+    let summary = ingest(roots, engine_dir, &mut store);
+    if !dry_run && (was_behind || summary.added > 0 || summary.updated > 0) {
+        save(path, &store)?;
+    }
+    Ok((summary, store))
+}
+
 /// `content_stats_ingest`, incrementally parse every replay under `roots` into the
 /// local stats database, decoding only files new or changed since the last pass
 /// (idempotent, keyed by filename). The winner comes from each replay's own
@@ -365,14 +384,9 @@ pub(crate) async fn content_stats_ingest<R: Runtime>(
     let dry_run = dry_run.unwrap_or(false);
     let res = tauri::async_runtime::spawn_blocking(move || {
         with_store_lock(|| {
-            let mut store = load(&sp)?;
             let root_paths: Vec<PathBuf> = roots.iter().map(PathBuf::from).collect();
             let engine_dir = PathBuf::from(&engine_path);
-            let summary = ingest(&root_paths, &engine_dir, &mut store);
-            if !dry_run {
-                save(&sp, &store)?;
-            }
-            Ok::<_, String>((summary, store))
+            ingest_and_save(&sp, &root_paths, &engine_dir, dry_run)
         })
     })
     .await;
@@ -924,6 +938,62 @@ mod tests {
         // Unchanged: still carries the pre-ingest (unreal) shape, since the fast
         // path never re-decoded it.
         assert_eq!(store.records[0].map_name, "Current");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_and_save_leaves_the_file_alone_when_nothing_changed() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_no_rewrite");
+        let _ = std::fs::remove_dir_all(&dir);
+        write_test_demo(&dir, "a.sdfz");
+        let store_path = dir.join("stats.json");
+        let engine = Path::new("/no/such/engine");
+
+        let (first, _) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(first.added, 1);
+
+        // Move the file's modified time into the past, so a rewrite shows as a
+        // newer time without the test having to wait for the clock.
+        let past = SystemTime::now() - std::time::Duration::from_secs(3600);
+        let file = std::fs::File::options()
+            .write(true)
+            .open(&store_path)
+            .unwrap();
+        file.set_modified(past).unwrap();
+        drop(file);
+        let before = std::fs::metadata(&store_path).unwrap().modified().unwrap();
+        let bytes = std::fs::read(&store_path).unwrap();
+
+        let (second, store) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(second.skipped, 1);
+        assert_eq!(second.added + second.updated, 0);
+        assert_eq!(store.records.len(), 1);
+        assert_eq!(
+            std::fs::metadata(&store_path).unwrap().modified().unwrap(),
+            before
+        );
+        assert_eq!(std::fs::read(&store_path).unwrap(), bytes);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ingest_and_save_writes_when_a_replay_is_new() {
+        let dir = std::env::temp_dir().join("coilbox_stats_ingest_rewrite");
+        let _ = std::fs::remove_dir_all(&dir);
+        write_test_demo(&dir, "a.sdfz");
+        let store_path = dir.join("stats.json");
+        let engine = Path::new("/no/such/engine");
+        ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+
+        write_test_demo(&dir, "b.sdfz");
+        let (summary, _) =
+            ingest_and_save(&store_path, std::slice::from_ref(&dir), engine, false).unwrap();
+        assert_eq!(summary.added, 1);
+        assert_eq!(load(&store_path).unwrap().records.len(), 2);
 
         let _ = std::fs::remove_dir_all(&dir);
     }
