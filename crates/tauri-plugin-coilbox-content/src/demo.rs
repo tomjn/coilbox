@@ -100,7 +100,7 @@ fn list_replays(root: &Path) -> Vec<ReplayFile> {
 
 /// Bumped when [`ReplaySummary`] changes shape. A store written under another
 /// version is read as empty and rebuilt.
-const SUMMARY_STORE_VERSION: u32 = 1;
+const SUMMARY_STORE_VERSION: u32 = 2;
 
 /// What the list shows for one replay, from the cheap native decode (header and
 /// start-script, no demotool, no winner).
@@ -115,6 +115,7 @@ struct ReplaySummary {
     skill_avg: Option<f32>,
     skill_max: Option<f32>,
     remixed: bool,
+    game_id: Option<String>,
 }
 
 /// One replay file's stored summary and the signature it was decoded under. A
@@ -168,6 +169,11 @@ fn summarise(info: &DemoInfo) -> ReplaySummary {
         skill_avg,
         skill_max,
         remixed: info.remixed,
+        game_id: info
+            .game_id
+            .as_deref()
+            .filter(|_| !info.remixed)
+            .and_then(|id| analysis::store::valid_game_id(id).ok()),
     }
 }
 
@@ -240,6 +246,7 @@ fn replay_file(e: DemoFileEntry, summary: Option<ReplaySummary>) -> ReplayFile {
         skill_avg: s.and_then(|s| s.skill_avg),
         skill_max: s.and_then(|s| s.skill_max),
         remixed: s.is_some_and(|s| s.remixed),
+        game_id: s.and_then(|s| s.game_id.clone()),
     }
 }
 
@@ -353,15 +360,29 @@ pub struct DeleteSummary {
 /// would go before it goes.
 ///
 /// `analyses` is the folder stored analyses are kept in. A replay's analysis
-/// is found by the game id in its header and goes when the replay does. A
-/// remix has none of its own, so deleting one leaves its original's alone.
-pub fn delete_replays(paths: &[PathBuf], apply: bool, analyses: Option<&Path>) -> DeleteSummary {
+/// is found by the game id in its header.
+///
+/// `library` is every replay in the library as its canonical path and game id
+/// (see [`library_game_ids`]). An analysis goes only when no replay in it with
+/// that game id is left once the batch is gone, so deleting one of two copies
+/// of a match keeps the analysis the other still uses. A remix has no analysis
+/// of its own and does not keep its original's, since the page shows none for
+/// it. The dry run and the real run answer from the same rule, so the counts
+/// match.
+pub fn delete_replays(
+    paths: &[PathBuf],
+    apply: bool,
+    analyses: Option<&Path>,
+    library: &[(PathBuf, String)],
+) -> DeleteSummary {
     let mut out = DeleteSummary {
         applied: apply,
         ..Default::default()
     };
-    // The matches whose analysis a dry run has already counted.
-    let mut counted = std::collections::HashSet::new();
+    // The matches whose analysis may go, with its size, and the files that went
+    // or would go.
+    let mut candidates: std::collections::BTreeMap<String, u64> = Default::default();
+    let mut gone: std::collections::HashSet<PathBuf> = Default::default();
     for path in paths {
         let name = path
             .file_name()
@@ -376,10 +397,8 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool, analyses: Option<&Path>) -
             continue;
         };
         // Read before the replay goes, because the key is inside it.
-        let analysis = analyses.and_then(|dir| {
-            let (game_id, size) = analysis::store::stored_for_replay(dir, path)?;
-            Some((dir, game_id, size))
-        });
+        let analysis = analyses.and_then(|dir| analysis::store::stored_for_replay(dir, path));
+        let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
         if apply {
             if let Err(e) = std::fs::remove_file(path) {
                 out.skipped.push(format!("{name}: {e}"));
@@ -388,23 +407,51 @@ pub fn delete_replays(paths: &[PathBuf], apply: bool, analyses: Option<&Path>) -
         }
         out.deleted += 1;
         out.bytes += md.len();
-        if let Some((dir, game_id, size)) = analysis {
-            if apply {
-                match analysis::store::delete(dir, &game_id) {
-                    // Two paths in one batch can be the same match. The file
-                    // went with the first of them.
-                    Ok(false) => continue,
-                    Ok(true) => {}
-                    Err(e) => {
-                        out.skipped.push(format!("{name}: {e}"));
-                        continue;
-                    }
+        gone.insert(canonical);
+        if let Some((game_id, size)) = analysis {
+            candidates.insert(game_id, size);
+        }
+    }
+    let Some(dir) = analyses else {
+        return out;
+    };
+    for (game_id, size) in candidates {
+        if library
+            .iter()
+            .any(|(path, id)| *id == game_id && !gone.contains(path))
+        {
+            continue;
+        }
+        if apply {
+            match analysis::store::delete(dir, &game_id) {
+                Ok(true) => {}
+                Ok(false) => continue,
+                Err(e) => {
+                    out.skipped.push(format!("analysis {game_id}: {e}"));
+                    continue;
                 }
-            } else if !counted.insert(game_id) {
-                continue;
             }
-            out.analyses += 1;
-            out.analysis_bytes += size;
+        }
+        out.analyses += 1;
+        out.analysis_bytes += size;
+    }
+    out
+}
+
+/// Every replay in the library, from the content folders the app has
+/// published, as its canonical path and game id. Replays without a usable id,
+/// and remixes, are left out. The listing reuses each folder's stored
+/// summaries, so only new or changed files are decoded.
+fn library_game_ids<R: Runtime>(app: &AppHandle<R>) -> Vec<(PathBuf, String)> {
+    let mut out = Vec::new();
+    for root in coilbox_proc::content_roots() {
+        let root = PathBuf::from(root);
+        let store = summary_store_path(app, &root);
+        for replay in list_replays_stored(&root, store.as_deref()).0 {
+            if let Some(id) = replay.game_id {
+                let path = PathBuf::from(&replay.path);
+                out.push((std::fs::canonicalize(&path).unwrap_or(path), id));
+            }
         }
     }
     out
@@ -2148,7 +2195,16 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         return CliResult::err("not a replay file".to_string());
     }
     let analyses = analysis::store::app_store_dir(&app).ok();
-    let summary = delete_replays(&[p], true, analyses.as_deref());
+    let library = match tauri::async_runtime::spawn_blocking({
+        let app = app.clone();
+        move || library_game_ids(&app)
+    })
+    .await
+    {
+        Ok(library) => library,
+        Err(e) => return CliResult::err(format!("delete replay task failed: {e}")),
+    };
+    let summary = delete_replays(&[p], true, analyses.as_deref(), &library);
     if summary.deleted == 0 {
         let reason = summary.skipped.first().cloned().unwrap_or_default();
         return CliResult::err(format!("delete failed: {reason}"));
@@ -2171,7 +2227,8 @@ pub(crate) async fn content_delete_replays<R: Runtime>(
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     let analyses = analysis::store::app_store_dir(&app).ok();
     match tauri::async_runtime::spawn_blocking(move || {
-        delete_replays(&paths, apply, analyses.as_deref())
+        let library = library_game_ids(&app);
+        delete_replays(&paths, apply, analyses.as_deref(), &library)
     })
     .await
     {
@@ -3988,7 +4045,7 @@ mod tests {
         std::fs::write(&a, b"1234").unwrap();
         std::fs::write(&b, b"123").unwrap();
 
-        let summary = delete_replays(&[a.clone(), b.clone()], false, None);
+        let summary = delete_replays(&[a.clone(), b.clone()], false, None, &[]);
         assert!(!summary.applied);
         assert_eq!(summary.deleted, 2);
         assert_eq!(summary.bytes, 7);
@@ -4011,6 +4068,7 @@ mod tests {
             &[replay.clone(), other.clone(), dir.join("gone.sdf")],
             true,
             None,
+            &[],
         );
         assert!(summary.applied);
         assert_eq!(summary.deleted, 1);

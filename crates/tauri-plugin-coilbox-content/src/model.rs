@@ -151,6 +151,12 @@ pub struct ReplayFile {
     /// True when this file carries coilbox's remix marker — a copy rewritten to run
     /// on a different local build, not an engine-recorded demo.
     pub remixed: bool,
+    /// The match's game id, for a replay that has a usable one and is not a
+    /// remix. A remix carries its original's id but has no analysis of its own,
+    /// so it does not hold the original's analysis in place. Not sent to the
+    /// frontend.
+    #[serde(skip)]
+    pub game_id: Option<String>,
 }
 
 /// One chat or system line from a demo's network stream.

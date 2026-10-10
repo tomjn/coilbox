@@ -346,6 +346,7 @@ fn analyse_with(
             demo: &demo,
             write_dir: &write_dir,
             config: &scratch.dir.join("engine.cfg"),
+            pid_file: &scratch.dir.join(launch::PID_FILE),
             data_dirs: &data_dirs,
             log: &engine_log,
             timeout: request.timeout,

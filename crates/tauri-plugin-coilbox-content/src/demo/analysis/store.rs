@@ -858,12 +858,12 @@ pub(super) mod tests {
         let size = store(&analyses, ID, AnalysisStatus::Reproduced);
         let paths = [analysed.clone(), plain.clone()];
 
-        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses));
+        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses), &[]);
         assert_eq!((preview.deleted, preview.analyses), (2, 1));
         assert_eq!(preview.analysis_bytes, size);
         assert!(analysed.is_file() && is_current(&analyses, ID));
 
-        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses));
+        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), &[]);
         assert_eq!((applied.deleted, applied.analyses), (2, 1));
         assert_eq!(applied.analysis_bytes, size);
         assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
@@ -886,6 +886,7 @@ pub(super) mod tests {
             std::slice::from_ref(&remix),
             true,
             Some(&analyses),
+            &[],
         );
 
         assert_eq!((summary.deleted, summary.analyses), (1, 0));
@@ -904,11 +905,87 @@ pub(super) mod tests {
         }
         store(&analyses, ID, AnalysisStatus::Reproduced);
 
-        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses));
+        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses), &[]);
         assert_eq!((preview.deleted, preview.analyses), (2, 1));
-        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses));
+        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), &[]);
         assert_eq!((applied.deleted, applied.analyses), (2, 1));
         assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
+    }
+
+    /// The library as `delete_replays` is given it: every listed replay with a
+    /// game id, which a remix does not have.
+    fn library_of(root: &Path) -> Vec<(PathBuf, String)> {
+        super::super::super::list_replays_stored(root, None)
+            .0
+            .into_iter()
+            .filter_map(|r| {
+                let path = PathBuf::from(&r.path);
+                Some((std::fs::canonicalize(path).ok()?, r.game_id?))
+            })
+            .collect()
+    }
+
+    /// Deleting one of two copies keeps the analysis the other uses. Deleting
+    /// the other takes it. The preview and the real run report the same counts
+    /// in both passes.
+    #[test]
+    fn deleting_one_of_two_copies_keeps_the_analysis_until_the_last_goes() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = dir.path().join("analyses");
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        let first = root.join("demos").join("a.sdfz");
+        let second = root.join("demos").join("b.sdfz");
+        std::fs::write(&first, replay(fixture_id())).unwrap();
+        std::fs::write(&second, replay(fixture_id())).unwrap();
+        let size = store(&analyses, ID, AnalysisStatus::Reproduced);
+        let delete = super::super::super::delete_replays;
+
+        let one = [first.clone()];
+        let preview = delete(&one, false, Some(&analyses), &library_of(&root));
+        assert_eq!((preview.deleted, preview.analyses), (1, 0));
+        let applied = delete(&one, true, Some(&analyses), &library_of(&root));
+        assert_eq!((applied.deleted, applied.analyses), (1, 0));
+        assert!(!first.exists() && second.is_file());
+        assert!(is_current(&analyses, ID), "the other copy still uses it");
+
+        let two = [second.clone()];
+        let preview = delete(&two, false, Some(&analyses), &library_of(&root));
+        assert_eq!((preview.deleted, preview.analyses), (1, 1));
+        assert_eq!(preview.analysis_bytes, size);
+        assert!(is_current(&analyses, ID));
+        let applied = delete(&two, true, Some(&analyses), &library_of(&root));
+        assert_eq!((applied.deleted, applied.analyses), (1, 1));
+        assert_eq!(applied.analysis_bytes, size);
+        assert_eq!(names(&analyses), Vec::<String>::new());
+    }
+
+    /// A remix is not counted as a surviving file of the match. The page shows
+    /// no analysis for it, so keeping the original's alive for it would keep a
+    /// file nobody can see.
+    #[test]
+    fn a_surviving_remix_does_not_keep_its_originals_analysis() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = dir.path().join("analyses");
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        let original = root.join("demos").join("match.sdfz");
+        std::fs::write(&original, replay(fixture_id())).unwrap();
+        let remix = super::super::super::rewrite_demo(&original, "Other Game 2.0", None).unwrap();
+        assert!(remix.is_file());
+        store(&analyses, ID, AnalysisStatus::Reproduced);
+
+        let library = library_of(&root);
+        assert_eq!(library.len(), 1, "only the original has a usable id");
+        let summary = super::super::super::delete_replays(
+            std::slice::from_ref(&original),
+            true,
+            Some(&analyses),
+            &library,
+        );
+
+        assert_eq!((summary.deleted, summary.analyses), (1, 1));
+        assert_eq!(names(&analyses), Vec::<String>::new());
     }
 
     /// Gathering moves a replay out of an engine's folder. The key is in the

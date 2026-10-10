@@ -83,6 +83,78 @@ pub fn command_that_outlives_us<S: AsRef<OsStr>>(program: S) -> Command {
     cmd
 }
 
+/// Asks the kernel to kill the child outright if coilbox dies without a chance
+/// to clean up (a crash, `kill -9`, a force quit, `tauri dev` restarting the
+/// app).
+///
+/// Linux only, through `PR_SET_PDEATHSIG`. macOS has no equivalent, so a child
+/// started there outlives a coilbox killed outright and has to be found at the
+/// next start, which is what [`kill_if_command_line_has`] is for. Windows
+/// children die with coilbox through the job object in `src-tauri/src/win_job.rs`.
+///
+/// The kernel ties the signal to the thread that spawned the child, not the
+/// process, so call this only where that thread stays alive for as long as the
+/// child does. A thread that waits on its own child does.
+pub fn die_with_parent(cmd: &mut Command) -> &mut Command {
+    #[cfg(target_os = "linux")]
+    {
+        use std::os::unix::process::CommandExt;
+        let parent = std::process::id() as libc::pid_t;
+        // Only calls async-signal-safe functions, as `pre_exec` requires.
+        unsafe {
+            cmd.pre_exec(move || {
+                if libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                // The parent may have died between the fork and the call above,
+                // in which case no signal is ever sent.
+                if libc::getppid() != parent {
+                    return Err(std::io::Error::from_raw_os_error(libc::ESRCH));
+                }
+                Ok(())
+            });
+        }
+    }
+    cmd
+}
+
+/// The command line of process `pid`, arguments included, or `None` when there
+/// is no such process. Unix only.
+#[cfg(unix)]
+pub fn command_line(pid: u32) -> Option<String> {
+    let out = Command::new("ps")
+        .args(["-ww", "-o", "command=", "-p", &pid.to_string()])
+        .output()
+        .ok()?;
+    let line = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (out.status.success() && !line.is_empty()).then_some(line)
+}
+
+/// Kills process `pid` with SIGKILL, but only when it is running and its
+/// command line contains every one of `needles`. Returns whether it sent the
+/// signal.
+///
+/// For a process left by a coilbox that no longer exists. A pid is reused by
+/// the OS, so a pid on its own is not safe to signal. A path only that run
+/// used is, which is why the caller names one. Always false off unix.
+pub fn kill_if_command_line_has(pid: u32, needles: &[&str]) -> bool {
+    #[cfg(unix)]
+    {
+        let Some(line) = command_line(pid) else {
+            return false;
+        };
+        if !needles.iter().all(|n| line.contains(n)) {
+            return false;
+        }
+        unsafe { libc::kill(pid as libc::pid_t, libc::SIGKILL) == 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (pid, needles);
+        false
+    }
+}
+
 /// Whether process `pid` is still running.
 ///
 /// For a process this one did not spawn and therefore holds no `Child` for:
@@ -320,6 +392,11 @@ pub fn set_content_roots(roots: Vec<String>) {
     *CONTENT_ROOTS.write().unwrap() = roots;
 }
 
+/// The content folders last published with [`set_content_roots`].
+pub fn content_roots() -> Vec<String> {
+    CONTENT_ROOTS.read().unwrap().clone()
+}
+
 /// The published content folders other than `primary`, as a `SPRING_DATADIR`
 /// style list. Empty when there are none.
 pub fn extra_datadirs(primary: &str) -> String {
@@ -499,6 +576,39 @@ mod free_space_tests {
         let dir = tempfile::tempdir().unwrap();
         assert!(super::free_space(dir.path()).unwrap() > 0);
         assert!(super::free_space(&dir.path().join("not-there")).is_err());
+    }
+}
+
+#[cfg(all(test, unix))]
+mod leftover_tests {
+    use super::*;
+
+    /// A long sleep with an argument nothing else on the machine has.
+    fn sleeper(marker: &str) -> std::process::Child {
+        Command::new("sleep").arg(marker).spawn().unwrap()
+    }
+
+    #[test]
+    fn a_process_is_killed_only_when_its_command_line_has_every_needle() {
+        let mut child = sleeper("4242.5");
+        let pid = child.id();
+
+        assert!(!kill_if_command_line_has(pid, &["4242.5", "not-there"]));
+        assert!(child.try_wait().unwrap().is_none(), "still running");
+
+        assert!(kill_if_command_line_has(pid, &["sleep", "4242.5"]));
+        assert!(!child.wait().unwrap().success());
+    }
+
+    #[test]
+    fn a_pid_with_no_process_is_left_alone() {
+        let mut child = sleeper("4242.6");
+        let pid = child.id();
+        child.kill().unwrap();
+        child.wait().unwrap();
+
+        assert_eq!(command_line(pid), None);
+        assert!(!kill_if_command_line_has(pid, &[""]));
     }
 }
 
