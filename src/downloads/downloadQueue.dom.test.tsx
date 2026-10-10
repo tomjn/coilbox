@@ -80,7 +80,11 @@ vi.mock("./downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
 vi.mock("../content/bindings", () => ({
   contentRescan: vi.fn(async () => {}),
 }));
-vi.mock("../content/config", () => ({ invalidateScans: vi.fn() }));
+vi.mock("../content/config", () => ({
+  forgetScans: vi.fn(),
+  invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
+}));
 vi.mock("../content/rapidPoolWarm", () => ({
   warmAllRoots: vi.fn(async () => {}),
 }));
@@ -782,5 +786,79 @@ describe("the indicator's popover", () => {
     expect(screen.getAllByRole("img", { name: "Map" })).toHaveLength(3);
     expect(screen.getAllByRole("img", { name: "Game" })).toHaveLength(1);
     expect(screen.getByText("2.0 MB")).toBeTruthy();
+  });
+});
+
+describe("rescanning after a run of downloads", () => {
+  // The rule: every finished download forgets the scans at once, and the lists
+  // on screen rescan when its lane has nothing else queued or running.
+  it("forgets the scans per map and rescans once for a pack of three", async () => {
+    const { forgetScans, rescanMounted } = await import("../content/config");
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      for (const name of ["Isis", "Comet Catcher", "Tabula"])
+        result.current.enqueue(mapRequest(name));
+    });
+
+    for (const index of [0, 1]) {
+      const run = await nextPending(index);
+      await act(async () => {
+        run.finish();
+      });
+      await waitFor(() => expect(forgetScans).toHaveBeenCalledTimes(index + 1));
+      expect(rescanMounted).not.toHaveBeenCalled();
+    }
+
+    const last = await nextPending(2);
+    await act(async () => {
+      last.finish();
+    });
+    await waitFor(() => expect(forgetScans).toHaveBeenCalledTimes(3));
+    expect(rescanMounted).toHaveBeenCalledTimes(1);
+  });
+
+  it("still rescans when the last of the run fails", async () => {
+    const { forgetScans, rescanMounted } = await import("../content/config");
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    act(() => {
+      result.current.enqueue(mapRequest("Isis"));
+      result.current.enqueue(mapRequest("Comet Catcher"));
+    });
+
+    const first = await nextPending(0);
+    await act(async () => {
+      first.finish();
+    });
+    const second = await nextPending(1);
+    expect(rescanMounted).not.toHaveBeenCalled();
+    await act(async () => {
+      second.fail("no mirror had it");
+    });
+
+    await waitFor(() => expect(rescanMounted).toHaveBeenCalledTimes(1));
+    expect(forgetScans).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not rescan for a download that added nothing", async () => {
+    const { forgetScans, rescanMounted } = await import("../content/config");
+    const { result } = renderHook(() => useDownloadQueue(), { wrapper });
+
+    let settled: { status: string } | null = null;
+    act(() => {
+      const id = result.current.enqueue(mapRequest("Isis"));
+      void result.current.waitFor(id).then((i) => {
+        settled = i;
+      });
+    });
+    const run = await nextPending(0);
+    await act(async () => {
+      run.fail("no mirror had it");
+    });
+
+    await waitFor(() => expect(settled).not.toBeNull());
+    expect(forgetScans).not.toHaveBeenCalled();
+    expect(rescanMounted).not.toHaveBeenCalled();
   });
 });

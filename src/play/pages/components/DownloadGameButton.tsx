@@ -2,7 +2,6 @@ import { Button } from "@picoframe/frame";
 import { Download, Loader2 } from "lucide-react";
 import { useState } from "react";
 import type { GameRef } from "../../../conquest/model";
-import { invalidateScans } from "../../../content/config";
 import { type GameDownload, gameRequirement } from "../../gameOffer";
 import { useLaunchContent } from "../../LaunchContentProvider";
 
@@ -38,10 +37,8 @@ export function DownloadGameButton({
         requirements: [gameRequirement(game, download)],
         title: `Download ${download.label}`,
       });
-      if (check.ready) {
-        invalidateScans();
-        await onReady();
-      }
+      // The queue forgot the scans when the download finished.
+      if (check.ready) await onReady();
     } finally {
       setBusy(false);
     }

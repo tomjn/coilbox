@@ -129,7 +129,9 @@ vi.mock("@/content/rapidPoolWarm", () => ({
 }));
 
 vi.mock("@/content/config", () => ({
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
   useContentTargets: () => ({
     targets: useMachine().engines.map((engineVersion) => ({ engineVersion })),
     loading: false,

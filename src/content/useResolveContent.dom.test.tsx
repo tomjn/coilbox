@@ -31,6 +31,7 @@ import {
 import { useResolveContent } from "./useResolveContent";
 
 const downloadGameAnySource = vi.hoisted(() => vi.fn());
+const scanRun = vi.hoisted(() => vi.fn());
 const { installEngine } = vi.hoisted(() => ({
   installEngine: vi.fn(async (download: () => Promise<unknown>) => {
     await download();
@@ -66,9 +67,11 @@ vi.mock("./config", () => ({
     loading: false,
     error: null,
     cancelled: false,
-    run: vi.fn(),
+    run: scanRun,
   }),
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
 }));
 vi.mock("./rapidPoolWarm", () => ({ warmAllRoots: vi.fn(async () => {}) }));
 
@@ -141,6 +144,32 @@ describe("useResolveContent's errorFor", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useResolveContent after a download", () => {
+  const requirement = exactGameRequirement("Beyond All Reason");
+
+  it("asks for the shared rescan and forces no scan of its own", async () => {
+    const { forgetScans, rescanMounted } = await import("./config");
+    downloadGameAnySource.mockResolvedValueOnce(undefined);
+    const { result } = renderHook(
+      () => ({
+        first: useResolveContent([requirement], undefined, false),
+        second: useResolveContent([requirement], undefined, false),
+      }),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.first.download(requirement);
+    });
+
+    // Once from each consumer and once from the queue. They are one scan,
+    // which `scanRefresh.dom.test.tsx` counts against the real scan cache.
+    await waitFor(() => expect(rescanMounted).toHaveBeenCalledTimes(3));
+    expect(forgetScans).toHaveBeenCalledTimes(1);
+    expect(scanRun).not.toHaveBeenCalled();
   });
 });
 

@@ -277,6 +277,93 @@ const inFlightScans = new Map<
   { promise: Promise<ScanResult>; opId: string }
 >();
 
+/**
+ * Scans that were running when the library changed on disk, keyed like the scan
+ * cache. Such a scan may have listed the folders before the change, so its
+ * answer is handed to nobody and the scan runs again.
+ */
+const staleScans = new Set<string>();
+
+/**
+ * The last scan kept for each target. Unlike `scanCache` it survives the
+ * library changing, so the batch loaders hold what they have until the next
+ * scan lands and read again only then.
+ */
+const landedScans = new Map<string, ScanResult>();
+/** The targets whose last scan failed, until one lands. */
+const failedScans = new Set<string>();
+const landedListeners = new Set<() => void>();
+
+/**
+ * What a batch read of a target was made against: the last scan kept for it,
+ * or, while its scans fail, the epoch they failed in. A failing target has no
+ * newer scan to wait for, so there the epoch is what says the library may have
+ * changed.
+ */
+type ScanToken = ScanResult | string | undefined;
+
+function scanToken(key: string): ScanToken {
+  return failedScans.has(key)
+    ? `failed:${scanEpochs.get(key) ?? 0}`
+    : landedScans.get(key);
+}
+
+/**
+ * The target's {@link scanToken}, changing each time a batch read should be
+ * made again. Holding it counts as a list on screen, so the target is rescanned
+ * when the library changes.
+ */
+function useScanToken(enginePath?: string, dataDir?: string): ScanToken {
+  const key = enginePath && dataDir ? `${dataDir}::${enginePath}` : "";
+  useEffect(() => {
+    if (!enginePath || !dataDir) return;
+    return watchScans(enginePath, dataDir, () => {});
+  }, [enginePath, dataDir]);
+  return useSyncExternalStore(
+    (cb) => {
+      landedListeners.add(cb);
+      epochListeners.add(cb);
+      return () => {
+        landedListeners.delete(cb);
+        epochListeners.delete(cb);
+      };
+    },
+    () => scanToken(key),
+  );
+}
+
+/**
+ * Told about every scan of a target as it starts, or `null` when what the
+ * target's lists show has been deleted from.
+ */
+type ScanWatcher = (scan: Promise<ScanResult> | null) => void;
+
+/** The mounted scan hooks of each target, keyed like the scan cache. */
+const scanWatchers = new Map<
+  string,
+  { enginePath: string; dataDir: string; watchers: Set<ScanWatcher> }
+>();
+
+function watchScans(
+  enginePath: string,
+  dataDir: string,
+  watcher: ScanWatcher,
+): () => void {
+  const key = `${dataDir}::${enginePath}`;
+  let entry = scanWatchers.get(key);
+  if (!entry) {
+    entry = { enginePath, dataDir, watchers: new Set() };
+    scanWatchers.set(key, entry);
+  }
+  entry.watchers.add(watcher);
+  const watched = entry;
+  return () => {
+    watched.watchers.delete(watcher);
+    if (watched.watchers.size === 0 && scanWatchers.get(key) === watched)
+      scanWatchers.delete(key);
+  };
+}
+
 /** Cancel the in-flight scan for a target, if one is running. */
 export function cancelScan(enginePath?: string, dataDir?: string) {
   if (!enginePath || !dataDir) return;
@@ -299,9 +386,8 @@ export async function primeScan(
   if (force) {
     scanErrorCache.delete(key);
     invalidateInstalledContent();
-    // A forced rescan can surface content added since the last scan; bump the
-    // target's epoch so the derived batch loaders (map thumbnails, game headers)
-    // refetch instead of serving their now-stale session cache.
+    // A forced rescan can surface content added since the last scan, so the
+    // readers that follow the target's epoch read again.
     bumpScanEpoch(key);
   }
   const cached = scanCache.get(key);
@@ -312,51 +398,79 @@ export async function primeScan(
   const inFlight = inFlightScans.get(key);
   if (inFlight) return inFlight.promise;
 
-  const opId = crypto.randomUUID();
-  const promise = (async () => {
+  const running = { promise: undefined as never, opId: "" } as {
+    promise: Promise<ScanResult>;
+    opId: string;
+  };
+  running.promise = (async () => {
+    let cancelled = false;
     try {
-      const res = await unitsyncScan({ enginePath, dataDir, opId });
-      // Cached nowhere, not even as a failure: an `Init` that fails does so
-      // fast, so the next open can afford to ask again, and by then the disk
-      // may have room.
-      if (res.initFailure) throw new ScanInitFailure(res);
-      scanCache.set(key, res);
-      writeLastScan(enginePath, dataDir, res);
-      // What a cached read of this library is looked up by (issue #3714).
-      rememberScanHints(dataDir, enginePath, res);
-      // The one place every game modinfo this machine reads goes through, so it
-      // is where the shortnames are picked up. They outlive the build they came
-      // from, so an export pinned to a superseded build still knows its game's
-      // shortname (issue #1364).
-      rememberShortnames(res.games);
-      return res;
+      // One scan, and one more for as long as the library changed under the
+      // last. Whoever waits gets the answer of the scan nothing overtook.
+      for (;;) {
+        staleScans.delete(key);
+        running.opId = crypto.randomUUID();
+        let res: ScanResult;
+        try {
+          res = await unitsyncScan({ enginePath, dataDir, opId: running.opId });
+          // Cached nowhere, not even as a failure: an `Init` that fails does
+          // so fast, so the next open can afford to ask again, and by then the
+          // disk may have room.
+          if (res.initFailure) throw new ScanInitFailure(res);
+        } catch (e) {
+          cancelled = /cancelled/i.test(
+            e instanceof Error ? e.message : `${e}`,
+          );
+          // A cancel is the user stopping the scan, so nothing restarts it.
+          if (staleScans.has(key) && !cancelled) continue;
+          throw e;
+        }
+        if (staleScans.has(key)) continue;
+        scanCache.set(key, res);
+        landedScans.set(key, res);
+        failedScans.delete(key);
+        for (const l of landedListeners) l();
+        writeLastScan(enginePath, dataDir, res);
+        // What a cached read of this library is looked up by (issue #3714).
+        rememberScanHints(dataDir, enginePath, res);
+        // The one place every game modinfo this machine reads goes through, so
+        // it is where the shortnames are picked up. They outlive the build they
+        // came from, so an export pinned to a superseded build still knows its
+        // game's shortname (issue #1364).
+        rememberShortnames(res.games);
+        return res;
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // A user cancellation isn't a target failure — don't poison the error
-      // cache, or the next open would resurface "cancelled" as a scan error.
-      if (!(e instanceof ScanInitFailure) && !/cancelled/i.test(msg))
+      // A cancel is not a failure of the target, so it is not kept as one, or
+      // the next open would show "cancelled" as a scan error.
+      if (!(e instanceof ScanInitFailure) && !cancelled)
         scanErrorCache.set(key, msg);
       // A rescan that failed leaves nothing to vouch for the answer before it,
       // so a page opened next must not be handed that answer. A cancel learned
       // nothing, so it keeps it (issue #3431).
-      if (!/cancelled/i.test(msg)) {
+      if (!cancelled) {
         scanCache.delete(key);
         forgetScanHints(dataDir, enginePath);
+        failedScans.add(key);
+        for (const l of landedListeners) l();
       }
       throw e;
     } finally {
       inFlightScans.delete(key);
+      staleScans.delete(key);
     }
   })();
-  inFlightScans.set(key, { promise, opId });
-  return promise;
+  inFlightScans.set(key, running);
+  const watched = scanWatchers.get(key);
+  if (watched) for (const w of [...watched.watchers]) w(running.promise);
+  return running.promise;
 }
 
 /**
  * The newest scan of a target: the one running now, else the cached one, else
- * a fresh one. A forced rescan bumps the epoch before its answer is cached, so
- * a reader woken by the epoch waits for that answer here rather than taking
- * the one it replaces.
+ * a fresh one. A reader woken while a rescan runs waits for that answer here
+ * and does not take the one it replaces.
  */
 export function currentScan(
   enginePath: string,
@@ -370,24 +484,57 @@ export function currentScan(
  * Drop every cached unitsync scan so the next open re-scans from disk. Called
  * after a content download so a freshly-installed game/map shows up (e.g. in the
  * singleplayer picker) without a manual rescan. Also bumps each known target's
- * epoch so the derived batch loaders (thumbnails, headers) refetch. Lazy by
- * design: an already-mounted picker refreshes when it next reads the cache
- * (typically on re-navigation after the download).
+ * epoch for the readers that follow it. A scan running now may have missed the
+ * change, so it runs again before it answers. Nothing else rescans here: the
+ * next read does, or {@link rescanMounted}.
  */
-export function invalidateScans(): void {
+export function forgetScans(): void {
   invalidateInstalledContent();
-  const keys = new Set([...scanCache.keys(), ...scanErrorCache.keys()]);
+  const keys = new Set([
+    ...scanCache.keys(),
+    ...scanErrorCache.keys(),
+    ...failedScans,
+  ]);
   scanCache.clear();
   scanErrorCache.clear();
   forgetScanHints();
+  for (const key of inFlightScans.keys()) staleScans.add(key);
   for (const key of keys) bumpScanEpoch(key);
 }
 
+/**
+ * Scan again for every target a mounted list is showing, one scan a target, so
+ * the list updates where it is. A target with a fresh answer is left alone, and
+ * so is one being scanned, since a scan the change overtook runs again itself.
+ */
+export function rescanMounted(): void {
+  for (const [key, { enginePath, dataDir }] of scanWatchers) {
+    if (scanCache.has(key) || inFlightScans.has(key)) continue;
+    primeScan(enginePath, dataDir).catch(() => {});
+  }
+}
+
+/**
+ * The library changed on disk: forget every scan and rescan for the lists on
+ * screen. `removed` is for a delete. A mounted list then drops what it shows
+ * until the rescan answers, where after an install it keeps showing it.
+ */
+export function invalidateScans(removed = false): void {
+  forgetScans();
+  if (removed) {
+    for (const { watchers } of scanWatchers.values())
+      for (const w of [...watchers]) w(null);
+  }
+  rescanMounted();
+}
+
 /* -------------------------------------------------------------------------- *
- * Content epoch — a per-target counter bumped on each forced rescan. The batch
- * loaders (map thumbnails, game headers) fold it into their cache key + effect
- * deps so a rescan refetches content added since the last scan instead of serving
- * a stale session cache.
+ * Content epoch. A per-target counter bumped on each forced rescan and each
+ * time the scans are forgotten. Readers outside this file fold it into their
+ * cache key and effect deps, so they read again once the library may have
+ * changed. The batch loaders here follow the scan answer itself instead (see
+ * `batchForScan`), so they wait for the new scan and keep what they hold until
+ * it lands.
  * -------------------------------------------------------------------------- */
 
 const scanEpochs = new Map<string, number>();
@@ -482,6 +629,52 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
     cancelScan(enginePath, dataDir);
   }, [enginePath, dataDir]);
 
+  // Take the answer of every scan of this target, whoever started it, so a
+  // list updates where it is after a download, a delete or another screen's
+  // rescan. `loading` is left alone, so the list is not swapped for a skeleton
+  // while a scan nobody here asked for runs.
+  useEffect(() => {
+    if (!enginePath || !dataDir) return;
+    let live = true;
+    const take: ScanWatcher = (scan) => {
+      if (!scan) {
+        setData(null);
+        return;
+      }
+      scan.then(
+        (found) => {
+          if (!live) return;
+          setData(found);
+          setUnvouched(null);
+          setError(null);
+          setCancelled(false);
+        },
+        (e) => {
+          if (!live) return;
+          const msg = e instanceof Error ? e.message : String(e);
+          // As in `runWithReason`: a cancel keeps the answer before it, and
+          // every hook of the target says it was cancelled, not only the one
+          // whose page stopped it.
+          if (/cancelled/i.test(msg)) {
+            setCancelled(true);
+            return;
+          }
+          if (e instanceof ScanInitFailure) setUnvouched(e.result);
+          setData(null);
+          setError(msg);
+        },
+      );
+    };
+    const stop = watchScans(enginePath, dataDir, take);
+    // A scan already running when this mounted is one it was not told about.
+    const running = inFlightScans.get(`${dataDir}::${enginePath}`);
+    if (running) take(running.promise);
+    return () => {
+      live = false;
+      stop();
+    };
+  }, [enginePath, dataDir]);
+
   // When a target becomes available, show its content immediately: serve the
   // cached result, or auto-scan on first open. `run(false)` does exactly that.
   useEffect(() => {
@@ -525,9 +718,46 @@ function renderedUrl(
  * page that asks first would otherwise go without it and start a worker for an
  * answer already saved. A scan that fails is not this read's failure: it goes
  * on without a list and a worker answers, as it did before.
+ *
+ * The answer is kept beside the scan it was read for and is good for as long
+ * as that scan is the newest. A newer scan means the library may have changed,
+ * so the whole answer is read again in one call. It is one call and not one per
+ * new archive because a worker reads the whole library whenever the plugin
+ * cannot answer every archive named from disk (issue #3721).
  */
-async function afterScan(enginePath: string, dataDir: string): Promise<void> {
-  await currentScan(enginePath, dataDir).catch(() => undefined);
+async function batchForScan<T>(
+  cache: Map<string, { token: ScanToken; value: T }>,
+  pending: Map<string, Promise<T>>,
+  enginePath: string,
+  dataDir: string,
+  read: () => Promise<T>,
+): Promise<T> {
+  const key = `${dataDir}::${enginePath}`;
+  const scan = await currentScan(enginePath, dataDir).catch(() => undefined);
+  const token = scan ?? scanToken(key);
+  const held = cache.get(key);
+  if (held && held.token === token) return held.value;
+  // Keyed on the token too, so a caller after a rescan does not join a read
+  // that was opened before it.
+  const open = typeof token === "string" ? token : scanSerial(token);
+  return shareInFlight(pending, `${key}::${open}`, async () => {
+    const value = await read();
+    cache.set(key, { token, value });
+    return value;
+  });
+}
+
+/** A number for each scan answer, so an open read can be keyed on its scan. */
+const scanSerials = new WeakMap<ScanResult, number>();
+let lastScanSerial = 0;
+function scanSerial(scan: ScanResult | undefined): number {
+  if (!scan) return 0;
+  let serial = scanSerials.get(scan);
+  if (serial === undefined) {
+    serial = ++lastScanSerial;
+    scanSerials.set(scan, serial);
+  }
+  return serial;
 }
 
 /** A rendered map thumbnail plus its true proportions (for undistorted display). */
@@ -538,7 +768,10 @@ export interface MapThumbData {
 }
 
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
-const thumbnailsCache = new Map<string, Map<string, MapThumbData>>();
+const thumbnailsCache = new Map<
+  string,
+  { token: ScanToken; value: Map<string, MapThumbData> }
+>();
 /** Open renders, keyed like the cache, so the warm-up and a page share one. */
 const thumbnailsPending = new Map<string, Promise<Map<string, MapThumbData>>>();
 
@@ -551,30 +784,31 @@ const thumbnailsPending = new Map<string, Promise<Map<string, MapThumbData>>>();
 export async function primeThumbnails(
   enginePath: string,
   dataDir: string,
-  epoch = 0,
 ): Promise<Map<string, MapThumbData>> {
-  const key = `${dataDir}::${enginePath}::${epoch}`;
-  const cached = thumbnailsCache.get(key);
-  if (cached) return cached;
-  return shareInFlight(thumbnailsPending, key, async () => {
-    await afterScan(enginePath, dataDir);
-    const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
-    const map = new Map<string, MapThumbData>();
-    for (const t of res.thumbnails) {
-      const url = renderedUrl(t, unitsyncThumbUrl);
-      if (url) map.set(t.name, { url, width: t.width, height: t.height });
-    }
-    thumbnailsCache.set(key, map);
-    return map;
-  });
+  return batchForScan(
+    thumbnailsCache,
+    thumbnailsPending,
+    enginePath,
+    dataDir,
+    async () => {
+      const res = await unitsyncThumbnails({ enginePath, dataDir, mip: 3 });
+      const map = new Map<string, MapThumbData>();
+      for (const t of res.thumbnails) {
+        const url = renderedUrl(t, unitsyncThumbUrl);
+        if (url) map.set(t.name, { url, width: t.width, height: t.height });
+      }
+      return map;
+    },
+  );
 }
 
 /** Lazily render and cache thumbnails for every map (name -> thumbnail + dims). */
 export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
-  const epoch = useScanEpoch(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [thumbs, setThumbs] = useState<Map<string, MapThumbData>>(new Map());
   const [loading, setLoading] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a newer scan is what re-runs the read, not read in the body
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setThumbs(new Map());
@@ -582,7 +816,7 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
     }
     let cancelled = false;
     setLoading(true);
-    primeThumbnails(enginePath, dataDir, epoch)
+    primeThumbnails(enginePath, dataDir)
       .then((map) => {
         if (!cancelled) setThumbs(map);
       })
@@ -595,13 +829,16 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, epoch]);
+  }, [enginePath, dataDir, scan]);
 
   return { thumbs, loading };
 }
 
-/** Session cache of batch map metadata, keyed by `dataDir::enginePath::epoch`. */
-const mapMetaCache = new Map<string, Map<string, Record<string, string>>>();
+/** Session cache of batch map metadata, keyed by `dataDir::enginePath`. */
+const mapMetaCache = new Map<
+  string,
+  { token: ScanToken; value: Map<string, Record<string, string>> }
+>();
 /** Open reads, keyed like the cache. */
 const mapMetaPending = new Map<
   string,
@@ -619,29 +856,30 @@ const mapMetaPending = new Map<
 export async function primeMapMeta(
   enginePath: string,
   dataDir: string,
-  epoch = 0,
 ): Promise<Map<string, Record<string, string>>> {
-  const key = `${dataDir}::${enginePath}::${epoch}`;
-  const cached = mapMetaCache.get(key);
-  if (cached) return cached;
-  return shareInFlight(mapMetaPending, key, async () => {
-    await afterScan(enginePath, dataDir);
-    const res = await unitsyncMapMeta({ enginePath, dataDir });
-    const map = new Map<string, Record<string, string>>();
-    for (const m of res.maps) map.set(m.name, m.info);
-    mapMetaCache.set(key, map);
-    return map;
-  });
+  return batchForScan(
+    mapMetaCache,
+    mapMetaPending,
+    enginePath,
+    dataDir,
+    async () => {
+      const res = await unitsyncMapMeta({ enginePath, dataDir });
+      const map = new Map<string, Record<string, string>>();
+      for (const m of res.maps) map.set(m.name, m.info);
+      return map;
+    },
+  );
 }
 
 /** Lazily read and cache mapinfo metadata for every map (name -> info). */
 export function useUnitsyncMapMeta(enginePath?: string, dataDir?: string) {
-  const epoch = useScanEpoch(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [meta, setMeta] = useState<Map<string, Record<string, string>>>(
     new Map(),
   );
   const [loading, setLoading] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a newer scan is what re-runs the read, not read in the body
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setMeta(new Map());
@@ -649,7 +887,7 @@ export function useUnitsyncMapMeta(enginePath?: string, dataDir?: string) {
     }
     let cancelled = false;
     setLoading(true);
-    primeMapMeta(enginePath, dataDir, epoch)
+    primeMapMeta(enginePath, dataDir)
       .then((map) => {
         if (!cancelled) setMeta(map);
       })
@@ -662,7 +900,7 @@ export function useUnitsyncMapMeta(enginePath?: string, dataDir?: string) {
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, epoch]);
+  }, [enginePath, dataDir, scan]);
 
   return { meta, loading };
 }
@@ -1703,8 +1941,11 @@ export function useUnitsyncArchiveFile(
   };
 }
 
-/** Session cache of batch game-header art, keyed by `dataDir::enginePath::epoch`. */
-const gameHeadersCache = new Map<string, Map<string, string>>();
+/** Session cache of batch game-header art, keyed by `dataDir::enginePath`. */
+const gameHeadersCache = new Map<
+  string,
+  { token: ScanToken; value: Map<string, string> }
+>();
 /** Open renders, keyed like the cache. */
 const gameHeadersPending = new Map<string, Promise<Map<string, string>>>();
 
@@ -1717,30 +1958,31 @@ const gameHeadersPending = new Map<string, Promise<Map<string, string>>>();
 export async function primeGameHeaders(
   enginePath: string,
   dataDir: string,
-  epoch = 0,
 ): Promise<Map<string, string>> {
-  const key = `${dataDir}::${enginePath}::${epoch}`;
-  const cached = gameHeadersCache.get(key);
-  if (cached) return cached;
-  return shareInFlight(gameHeadersPending, key, async () => {
-    await afterScan(enginePath, dataDir);
-    const res = await unitsyncGameHeaders({ enginePath, dataDir });
-    const map = new Map<string, string>();
-    for (const h of res.headers) {
-      const url = renderedUrl(h, unitsyncHeaderUrl);
-      if (url) map.set(h.name, url);
-    }
-    gameHeadersCache.set(key, map);
-    return map;
-  });
+  return batchForScan(
+    gameHeadersCache,
+    gameHeadersPending,
+    enginePath,
+    dataDir,
+    async () => {
+      const res = await unitsyncGameHeaders({ enginePath, dataDir });
+      const map = new Map<string, string>();
+      for (const h of res.headers) {
+        const url = renderedUrl(h, unitsyncHeaderUrl);
+        if (url) map.set(h.name, url);
+      }
+      return map;
+    },
+  );
 }
 
 /** Lazily render and cache header art for every game (name -> URL). */
 export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
-  const epoch = useScanEpoch(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [headers, setHeaders] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a newer scan is what re-runs the read, not read in the body
   useEffect(() => {
     if (!enginePath || !dataDir) {
       setHeaders(new Map());
@@ -1748,7 +1990,7 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
     }
     let cancelled = false;
     setLoading(true);
-    primeGameHeaders(enginePath, dataDir, epoch)
+    primeGameHeaders(enginePath, dataDir)
       .then((map) => {
         if (!cancelled) setHeaders(map);
       })
@@ -1761,7 +2003,7 @@ export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, epoch]);
+  }, [enginePath, dataDir, scan]);
 
   return { headers, loading };
 }

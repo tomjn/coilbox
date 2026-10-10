@@ -14,7 +14,7 @@ import {
   heldSpringfilesEngines,
   loadEngineCatalog,
 } from "../downloads/engineLists";
-import { useContentTargets, useUnitsyncScan } from "./config";
+import { rescanMounted, useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
   type EngineReading,
@@ -67,8 +67,8 @@ export interface ResolveContentState {
  * Resolve a set of content requirements against the given engine/data-root
  * target (typically `usePreferredTarget()`'s target), offering downloads for
  * anything missing via the app-wide queue. Re-scans after every queue
- * completion so a just-downloaded item clears from `missing` without a manual
- * refresh.
+ * completion that added content, so a just-downloaded item clears from
+ * `missing` without a manual refresh.
  *
  * `targetLoading` is the caller's own target read still being in flight. Pass
  * it, or a caller that reaches here before its engine is known reads as a
@@ -136,8 +136,11 @@ export function useResolveContent(
     };
   }, [hasEngineReq, engineKeys]);
 
+  // The queue forgot the scans when the download finished. Every mounted
+  // consumer asks here, and they share the one rescan a target gets. The scan
+  // hook takes its answer without being asked to run.
   useDownloadComplete(() => {
-    scan.run(true);
+    rescanMounted();
     contentTargets.refresh();
   });
 
