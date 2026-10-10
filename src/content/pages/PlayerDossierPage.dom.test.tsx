@@ -5,7 +5,13 @@
  * page must show the parameter as it comes. A second decode threw on a bare
  * `%` and showed the wrong name for `%25` (#3422).
  */
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Metric, MetricRatio, StatRecord } from "../bindings";
@@ -123,6 +129,12 @@ describe("PlayerDossierPage", () => {
   });
 });
 
+/** The figures section's help, opened. Call once per test. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About match figures" }));
+  return within(screen.getByRole("dialog"));
+};
+
 describe("PlayerDossierPage match figures", () => {
   it("shows rates split by result, with the games each is drawn from", () => {
     RECORDS = [
@@ -133,7 +145,7 @@ describe("PlayerDossierPage match figures", () => {
     renderAnn();
     expect(screen.getByText("Match figures")).not.toBeNull();
     expect(screen.getByText(/Drawn from 2 of 3 games/)).not.toBeNull();
-    expect(screen.getByText(/1 with no figures recorded/)).not.toBeNull();
+    expect(help().getByText(/1 with no figures recorded/)).not.toBeNull();
     // 6000 over 10 minutes.
     expect(screen.getAllByText("600").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 game$/).length).toBeGreaterThan(0);
@@ -189,8 +201,42 @@ describe("PlayerDossierPage match figures", () => {
     ];
     renderAnn();
     expect(
-      screen.getByText(/In 1 game another player shared control of Ann's army/),
+      help().getByText(/In 1 game another player shared control of Ann's army/),
     ).not.toBeNull();
+  });
+
+  it("keeps the explanation out of the section until the help is opened", () => {
+    RECORDS = [
+      played("a", 1, true, true),
+      played("b", 2, false, true),
+      played("c", 3, true, false),
+    ];
+    renderAnn();
+    const moved = [
+      /divided by the match's minutes/,
+      /mean of each game's own rate/,
+      /Only players who share control of one army/,
+      /A game with no recorded result is in All only/,
+      /cannot say how far ahead a player was/,
+      /Left out:/,
+    ];
+    for (const said of moved) expect(screen.queryByText(said)).toBeNull();
+    const dialog = help();
+    for (const said of moved)
+      expect(dialog.getAllByText(said).length).toBeGreaterThan(0);
+  });
+
+  it("keeps the game count and the empty state inline", () => {
+    RECORDS = [played("a", 1, true, true), played("b", 2, false, false)];
+    renderAnn();
+    expect(screen.getByText("Drawn from 1 of 2 games.")).not.toBeNull();
+    cleanup();
+    RECORDS = [played("a", 1, true, false)];
+    renderAnn();
+    expect(
+      screen.getByText(/None of Ann's 1 game has figures recorded/),
+    ).not.toBeNull();
+    expect(screen.queryByText(/Left out:/)).toBeNull();
   });
 
   it("is hidden when the profile hides match statistics", () => {

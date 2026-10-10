@@ -26,6 +26,18 @@ export interface SplitRow {
   split: OrderedSplit;
 }
 
+/** What the cost table means, for the build orders section's help entry. */
+export function OpeningSplitHelp() {
+  return (
+    <p>
+      The cost table is the cost of what was ordered, not of what was built.
+      Other is builders, factories, sensors and transports. Unclassified is
+      units whose definition does not say what they are for, which includes
+      anything whose income the game sets outside the unit definition.
+    </p>
+  );
+}
+
 /**
  * Every player's ordered cost by kind of unit in one table, so openings can be
  * compared without opening each list. Metal sits over energy in each cell: no
@@ -47,12 +59,6 @@ export function ReplayOpeningSplit({
           ? "Cost by kind of unit"
           : `Cost by kind of unit, to minute ${cutMinutes}`}
       </h3>
-      <p className="text-xs text-muted-foreground">
-        Cost of what was ordered, not of what was built. Other is builders,
-        factories, sensors and transports. Unclassified is units whose
-        definition does not say what they are for, which includes anything whose
-        income the game sets outside the unit definition.
-      </p>
       {differentBuild && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
           These costs come from a different build and may be wrong.

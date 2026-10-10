@@ -16,6 +16,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
@@ -192,6 +193,11 @@ beforeAll(() => {
 });
 
 const toggle = (name: string) => screen.getByRole("button", { name });
+/** The map's help entry, opened. The explanation of the layers is said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the map" }));
+  return within(screen.getByRole("dialog"));
+};
 const dots = () =>
   [...document.querySelectorAll<HTMLElement>("button[data-team]")].map(
     (dot) => ({
@@ -254,13 +260,24 @@ describe("what is on when the page opens", () => {
     expect(dot?.style.backgroundColor).toMatch(/rgb\(0, 0, 255\)|blue|#00f/i);
   });
 
-  it("says which source the layers come from, and what a start position is", () => {
+  it("carries no explanation in the page, and says it in the help", () => {
     show();
+    for (const said of [
+      /orders and messages recorded during the match/i,
+      /set before the game/i,
+      /allowed to start/i,
+    ]) {
+      expect(screen.queryByText(said)).toBeNull();
+    }
+    const said = help();
     expect(
-      screen.getByText(/orders and messages recorded during the match/i),
+      said.getAllByText(/orders and messages recorded during the match/i),
+    ).toHaveLength(1);
+    expect(
+      said.getByText(/Start boxes come from the match setup/),
     ).toBeTruthy();
-    expect(screen.getByText(/set before the game/i)).toBeTruthy();
-    expect(screen.getByText(/allowed to start/i)).toBeTruthy();
+    expect(said.getByText(/set before the game/i)).toBeTruthy();
+    expect(said.getByText(/allowed to start/i)).toBeTruthy();
   });
 });
 
@@ -323,13 +340,17 @@ describe("buildings ordered", () => {
     DATASET = { units: UNITS };
     show();
     fireEvent.click(toggle("Buildings ordered"));
+    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
+    expect(screen.queryByText(/not what was built/i)).toBeNull();
+    expect(screen.queryByText(/factory queue order/i)).toBeNull();
+    expect(screen.queryByText(/A mark is one order/)).toBeNull();
+    const said = help();
+    expect(said.getByText(/not what was built/i)).toBeTruthy();
+    expect(said.getByText(/cancelled or never carried out/i)).toBeTruthy();
     expect(
-      await screen.findByText(/3 orders to place a building/i),
+      said.getByText(/1 factory queue order has no position/i),
     ).toBeTruthy();
-    expect(screen.getByText(/not what was built/i)).toBeTruthy();
-    expect(
-      screen.getByText(/1 factory queue order has no position/i),
-    ).toBeTruthy();
+    expect(said.getByText(/A mark is one order/)).toBeTruthy();
     expect(document.querySelector('[data-layer="buildings"]')).toBeTruthy();
     // The shapes drawn are the ones the key lists.
     expect(screen.getByText("Economy")).toBeTruthy();
@@ -427,8 +448,10 @@ describe("order density", () => {
     POINTS = ORDER_POINTS;
     show();
     fireEvent.click(toggle("Order density"));
-    const note = await screen.findByText(/roughly where attention went/i);
-    const text = note.textContent ?? "";
+    await screen.findByText("Where orders were aimed");
+    expect(screen.queryByText(/roughly where attention went/i)).toBeNull();
+    const text = help().getByText(/roughly where attention went/i).parentElement
+      ?.textContent as string;
     // One of four is off the map, so three are on it.
     expect(text).toMatch(/3 orders are on it/);
     expect(text).toMatch(/2 of them were sent by widgets/);
@@ -490,9 +513,7 @@ describe("the time window", () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
-    expect(
-      await screen.findByText(/3 of 3 orders are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
     expect(
       screen
         .getByRole("button", { name: "Whole match" })
@@ -507,18 +528,14 @@ describe("the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders are in this window/);
-    expect(screen.getByText(/3 orders to place a building/)).toBeTruthy();
+    await screen.findByText(/3 of 3 orders/);
     expect(
       screen.getByText(/Most is 2 orders within 128 elmos of one spot\./),
     ).toBeTruthy();
 
     // The first five minutes hold the pregame order and the one at 30 seconds.
     press("First 5 minutes");
-    expect(
-      await screen.findByText(/2 of 3 orders are in this window/),
-    ).toBeTruthy();
-    expect(screen.getByText(/2 orders to place a building/)).toBeTruthy();
+    expect(await screen.findByText(/2 of 3 orders/)).toBeTruthy();
     expect(screen.getByText(/Orders given from 0:00 to 5:00/)).toBeTruthy();
     // The legend's peak is the window's own.
     expect(
@@ -534,24 +551,20 @@ describe("the time window", () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Buildings ordered"));
-    await screen.findByText(/3 of 3 orders are in this window/);
+    await screen.findByText(/3 of 3 orders/);
     const [start] = screen.getAllByRole("slider");
     act(() => start.focus());
     fireEvent.keyDown(start, { key: "ArrowRight" });
-    expect(
-      await screen.findByText(/2 of 3 orders are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/2 of 3 orders/)).toBeTruthy();
   });
 
   it("says none of the orders, and not that no building was ordered, for an empty window", async () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders are in this window/);
+    await screen.findByText(/3 of 3 orders/);
     press("Last 5 minutes");
-    expect(
-      await screen.findByText(/None of the 3 orders were given in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/0 of 3 orders/)).toBeTruthy();
     expect(screen.queryByText(/no buildings were ordered/i)).toBeNull();
     expect(screen.queryByText("Least")).toBeNull();
     expect(document.querySelector('[data-layer="density"]')).toBeNull();
@@ -561,13 +574,11 @@ describe("the time window", () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders are in this window/);
+    await screen.findByText(/3 of 3 orders/);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders are in this window/);
+    await screen.findByText(/2 of 3 orders/);
     press("Whole match");
-    expect(
-      await screen.findByText(/3 of 3 orders are in this window/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/3 of 3 orders/)).toBeTruthy();
     expect(
       screen.getByText(/Most is 2 orders within 128 elmos of one spot\./),
     ).toBeTruthy();
@@ -588,9 +599,9 @@ describe("the time window", () => {
       </SeriesEmphasisProvider>,
     );
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders are in this window/);
+    await screen.findByText(/3 of 3 orders/);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders are in this window/);
+    await screen.findByText(/2 of 3 orders/);
     view.rerender(
       <SeriesEmphasisProvider>
         <ReplayMap {...props} replayPath="/replays/b.sdfz" />
@@ -609,9 +620,9 @@ describe("the time window", () => {
     ORDERS = EARLY;
     show(LONG);
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 of 3 orders are in this window/);
+    await screen.findByText(/3 of 3 orders/);
     press("First 5 minutes");
-    await screen.findByText(/2 of 3 orders are in this window/);
+    await screen.findByText(/2 of 3 orders/);
     cleanup();
     resetReplayBuildOrders();
     show(LONG);
@@ -653,11 +664,7 @@ describe("order density in the time window", () => {
     show(LONG);
     expect(screen.queryByTestId("time-window")).toBeNull();
     fireEvent.click(toggle("Order density"));
-    expect(
-      await screen.findByText(
-        /4 of 4 orders with a place on the map are in this window/,
-      ),
-    ).toBeTruthy();
+    expect(await screen.findByText(/4 of 4 orders on the map/)).toBeTruthy();
     expect(ordersRead).not.toHaveBeenCalled();
   });
 
@@ -665,17 +672,14 @@ describe("order density in the time window", () => {
     POINTS = POINTS_OVER_TIME;
     show(LONG);
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders with a place/);
+    await screen.findByText(/4 of 4 orders on the map/);
     expect(screen.getByText(/Most is 2 orders within/)).toBeTruthy();
 
     press("First 5 minutes");
-    expect(
-      await screen.findByText(
-        /2 of 4 orders with a place on the map are in this window/,
-      ),
-    ).toBeTruthy();
+    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
     // Two orders are in the first five minutes, 1 of them from a widget.
-    const note = screen.getByText(/roughly where attention went/i);
+    const note = help().getByText(/roughly where attention went/i)
+      .parentElement as HTMLElement;
     expect(note.textContent).toMatch(/2 orders in this window are on it/);
     expect(note.textContent).toMatch(/1 of them were sent by widgets/);
     expect(note.textContent).toMatch(/cannot narrow/);
@@ -686,9 +690,7 @@ describe("order density in the time window", () => {
     ).toBeTruthy();
 
     press("Last 5 minutes");
-    expect(
-      await screen.findByText(/2 of 4 orders with a place on the map/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
     expect(
       screen.getByText(
         /Most is 2 orders within \d+ elmos of one spot in this window/,
@@ -706,8 +708,8 @@ describe("order density in the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Bases"));
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders with a place on the map/);
-    expect(screen.getByText(/3 of 3 orders to place a building/)).toBeTruthy();
+    await screen.findByText(/4 of 4 orders on the map/);
+    expect(screen.getByText(/3 of 3 building orders/)).toBeTruthy();
   });
 
   it("counts each layer's points under its own name when both are on", async () => {
@@ -720,15 +722,11 @@ describe("order density in the time window", () => {
     show(LONG);
     fireEvent.click(toggle("Building density"));
     fireEvent.click(toggle("Order density"));
-    await screen.findByText(/4 of 4 orders with a place on the map/);
-    expect(screen.getByText(/3 of 3 orders to place a building/)).toBeTruthy();
+    await screen.findByText(/4 of 4 orders on the map/);
+    expect(screen.getByText(/3 of 3 building orders/)).toBeTruthy();
     press("Last 5 minutes");
-    expect(
-      await screen.findByText(/2 of 4 orders with a place on the map/),
-    ).toBeTruthy();
-    expect(
-      screen.getByText(/None of the 3 orders to place a building/),
-    ).toBeTruthy();
+    expect(await screen.findByText(/2 of 4 orders on the map/)).toBeTruthy();
+    expect(screen.getByText(/0 of 3 building orders/)).toBeTruthy();
   });
 });
 
@@ -737,12 +735,10 @@ describe("one read for the page", () => {
     ORDERS = PLACED;
     show(INFO, <ReplayBuildOrders replayPath="/replays/a.sdfz" info={INFO} />);
     fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
-    await screen.findByText(
-      /orders each player gave, not what was built\. An order that was cancelled or never carried out is listed/i,
-    );
+    await screen.findByText(/Opening length in minutes/i);
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Building density"));
-    await screen.findByText(/3 orders to place a building/i);
+    await screen.findByText(/3 of 3 orders/);
     expect(ordersRead).toHaveBeenCalledTimes(1);
   });
 });
@@ -795,5 +791,72 @@ describe("the profile gate", () => {
     HIDE = ["analytics.spatialLayers"];
     show();
     expect(boxes()).toHaveLength(2);
+  });
+});
+
+describe("what stays in the page and what moves to the help", () => {
+  it("keeps the warning, the reason, the counts and the key beside the controls", async () => {
+    ORDERS = PLACED;
+    GAMES = [game("Some Game 2.0")];
+    DATASET = { units: UNITS };
+    POINTS = packOrders([{ x: 1024, z: 2048, source: 0 }], { unitAimed: 5 });
+    show();
+    fireEvent.click(toggle("Buildings ordered"));
+    fireEvent.click(toggle("Order density"));
+    // The warning that the shapes may be wrong.
+    expect(
+      await screen.findByText(/Shapes come from Some Game 2\.0/i),
+    ).toBeTruthy();
+    // The reason a layer is off, on the layer and in one line.
+    expect(toggle("Deaths").parentElement?.getAttribute("title")).toMatch(
+      /This replay has not been analysed/,
+    );
+    expect(screen.getByTestId("event-block").textContent).toMatch(
+      /This replay has not been analysed/,
+    );
+    // The window's counts, as short labels.
+    expect(await screen.findByText(/3 of 3 building orders/)).toBeTruthy();
+    expect(screen.getByText(/1 of 1 orders on the map/)).toBeTruthy();
+    // The key to the shapes, and each legend's peak.
+    expect(screen.getByText("Economy")).toBeTruthy();
+    expect(screen.getByText(/Most is 1 order within/)).toBeTruthy();
+  });
+
+  it("keeps an empty state in the page", async () => {
+    POINTS = packOrders([]);
+    show();
+    fireEvent.click(toggle("Order density"));
+    expect(
+      (await screen.findAllByText(/no orders with a place on the map/i)).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("has none of the explanation in the page until the help is opened", async () => {
+    ORDERS = PLACED;
+    GAMES = [game("Some Game 1.0")];
+    DATASET = { units: UNITS };
+    POINTS = packOrders([{ x: 1024, z: 2048, source: 0 }], { unitAimed: 5 });
+    show();
+    fireEvent.click(toggle("Buildings ordered"));
+    fireEvent.click(toggle("Order density"));
+    fireEvent.click(toggle("Bases"));
+    await screen.findByText(/3 of 3 building orders/);
+    const moved = [
+      /orders and messages recorded/i,
+      /allowed to start/i,
+      /set before the game/i,
+      /not what was built/i,
+      /factory queue order/i,
+      /A mark is one order/,
+      /roughly where attention went/i,
+      /Colours compare places on this map/,
+      /not when anything was built/i,
+      /draw events from an analysis/,
+      /Every view is/,
+    ];
+    for (const said of moved) expect(screen.queryByText(said)).toBeNull();
+    const dialog = help();
+    for (const said of moved)
+      expect(dialog.getAllByText(said).length).toBeGreaterThan(0);
   });
 });

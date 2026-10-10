@@ -21,7 +21,6 @@ import { teamLabel } from "../../replaySideLabel";
 import type { TimeWindow } from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplaySourceNote } from "./ReplaySourceNote";
 
 /**
  * A mark's half width as a percentage of a crop's width. On a square map this
@@ -187,6 +186,39 @@ function ShapeKey({ crops }: { crops: readonly BaseCrop[] }) {
 }
 
 /**
+ * What the base views mean, for the map's help entry. It says once what every
+ * view shares, so a view's own caption is its player, their opening and two
+ * counts. Mount it only when the views are shown.
+ */
+export function BaseCropsHelp({
+  world,
+  timeWindow,
+  domainSec,
+}: {
+  world: MapWorld;
+  timeWindow: TimeWindow | null;
+  domainSec: number;
+}) {
+  const windowText = timeWindow
+    ? `Showing orders given from ${formatDuration(timeWindow.startSec)} to ${formatDuration(Math.min(timeWindow.endSec, domainSec))}.`
+    : "Showing orders given across the whole match.";
+  const side = Math.round(cropSide(world));
+  return (
+    <p>
+      Each base view shows the buildings a player ordered, not the buildings
+      that were built. {windowText} Every view is {side.toLocaleString()} elmos
+      across, the same for every player, and is centred on that player's start
+      unless the start is near the edge of the map. The bar at the bottom left
+      of a view is {Math.round(side / 4).toLocaleString()} elmos. A mark is one
+      order to place a building, in its player's colour, and the dot with a
+      white edge is the player's start. An order that was cancelled or never
+      carried out is drawn like any other. Under each view is how many buildings
+      that player ordered, and how many of those fall outside the view.
+    </p>
+  );
+}
+
+/**
  * A crop of the map round each player's start, side by side, so openings
  * compare as pictures of a base (#1177): who walled, who spread, who put a
  * factory somewhere odd.
@@ -208,7 +240,6 @@ export function ReplayBaseCrops({
   units,
   minimapUrl,
   timeWindow,
-  domainSec,
 }: {
   info: DemoInfo;
   dots: readonly StartDot[];
@@ -219,7 +250,6 @@ export function ReplayBaseCrops({
   units: UnitDatasetEntry[] | null;
   minimapUrl: string;
   timeWindow: TimeWindow | null;
-  domainSec: number;
 }) {
   const crops = useMemo(
     () => (orders ? baseCrops(dots, orders, world, units, info) : []),
@@ -244,35 +274,17 @@ export function ReplayBaseCrops({
     );
   if (!orders) return null;
 
-  const windowText = timeWindow
-    ? `Showing orders given from ${formatDuration(timeWindow.startSec)} to ${formatDuration(Math.min(timeWindow.endSec, domainSec))}.`
-    : "Showing orders given across the whole match.";
-  const side = Math.round(cropSide(world));
-
   return (
     <section
       aria-label="Bases"
       data-testid="base-crops"
       className="flex flex-col gap-2"
     >
-      <ReplaySourceNote
-        source="stream"
-        detail="Each view shows the buildings a player ordered, not the buildings that were built."
-      />
-      {/* What every view shares is said here once, so a view's own caption is
-          its player, their opening and two counts. */}
-      <p className="max-w-prose text-xs text-muted-foreground">
-        {windowText} Every view is {side.toLocaleString()} elmos across, the
-        same for every player, and is centred on that player's start unless the
-        start is near the edge of the map. The bar at the bottom left of a view
-        is {Math.round(side / 4).toLocaleString()} elmos. A mark is one order to
-        place a building, in its player's colour, and the dot with a white edge
-        is the player's start. An order that was cancelled or never carried out
-        is drawn like any other. Under each view is how many buildings that
-        player ordered, and how many of those fall outside the view.
-        {units === null &&
-          " This replay's game is not installed, so every mark is the same shape."}
-      </p>
+      {units === null && (
+        <p className="text-xs text-muted-foreground">
+          This replay's game is not installed, so every mark is the same shape.
+        </p>
+      )}
       <ShapeKey crops={crops} />
       {groups.map((group) => (
         <div key={group.ally ?? "none"} className="flex flex-col gap-1">

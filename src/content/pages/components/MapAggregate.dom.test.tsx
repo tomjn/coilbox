@@ -12,6 +12,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -215,6 +216,14 @@ function show(
 }
 
 const text = (id: string) => screen.getByTestId(id).textContent ?? "";
+/** Opens the section's one help popover and reads inside it. Call it once a
+ *  test: a second click would close it. */
+function help() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "About how this map is played" }),
+  );
+  return within(screen.getByRole("dialog"));
+}
 const settled = () =>
   waitFor(() => expect(text("aggregate-summary")).not.toMatch(/Reading/));
 
@@ -348,10 +357,13 @@ describe("the picture of every match on a map", () => {
     expect(text("layer-deaths")).toBe("Deaths · 1");
     fireEvent.click(screen.getByTestId("layer-deaths"));
     expect(text("layer-events")).toBe("7 deaths, from 1 match.");
-    expect(text("layer-notes")).toMatch(/2 deaths name no attacker/);
-    expect(text("layer-notes")).toMatch(
-      /1 death was recorded at exactly the map's corner.*is left out/,
-    );
+    const said = help();
+    expect(said.getByText(/2 deaths name no attacker/)).toBeTruthy();
+    expect(
+      said.getByText(
+        /1 death was recorded at exactly the map's corner.*is left out/,
+      ),
+    ).toBeTruthy();
   });
 
   it("leaves matches under a minute out until asked, and says so", async () => {
@@ -363,10 +375,9 @@ describe("the picture of every match on a map", () => {
     show(records);
     await settled();
     expect(text("aggregate-summary")).toMatch(/^2 matches of the 3 /);
-    expect(text("map-aggregate")).toMatch(
-      /1 match under a minute is left out too/,
-    );
+    expect(help().getByText(/1 match under a minute is left out/)).toBeTruthy();
     expect(asked).toHaveBeenCalledTimes(2);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
     fireEvent.click(screen.getByText("Matches under a minute"));
     await waitFor(() => expect(text("layer-orders")).toBe("Order density · 3"));
@@ -399,9 +410,9 @@ describe("the picture of every match on a map", () => {
     show(records);
     await settled();
     expect(text("aggregate-summary")).toMatch(/^All 2 matches /);
-    expect(text("map-aggregate")).toMatch(
-      /2 remixes are left out, so each match counts once/,
-    );
+    expect(
+      help().getByText(/2 remixes are left out, so each match counts once/),
+    ).toBeTruthy();
     expect(asked).toHaveBeenCalledTimes(2);
   });
 
@@ -516,17 +527,21 @@ describe("versions of the map", () => {
     await settled();
     expect(text("versions-picture")).toBe("Across 3 versions of this map");
     expect(text("versions-records")).toBe("Across 3 versions of this map");
-    expect(text("starts-basis")).toMatch(
-      /every start is placed on Some Map 1\.0, this page's map/,
-    );
+    expect(
+      help().getByText(
+        /every start is placed on Some Map 1\.0, this page's map/,
+      ),
+    ).toBeTruthy();
   });
 
   it("says the grouping is by name and not by archive", async () => {
     show(versions());
     await settled();
-    expect(text("grouping-note")).toMatch(
-      /grouped by the map's name with a trailing version taken off, and not by the map's archive/,
-    );
+    expect(
+      help().getByText(
+        /grouped by the map's name with a trailing version taken off, and not by the map's archive/,
+      ),
+    ).toBeTruthy();
   });
 
   it("follows the versions that are switched off, in every count", async () => {
@@ -592,9 +607,11 @@ describe("versions of the map", () => {
   it("says a version that is not installed has no size to compare", async () => {
     show(versions());
     await settled();
-    expect(text("version-sizes-note")).toMatch(
-      /not installed has no size to compare, because a replay does not record the size/,
-    );
+    expect(
+      help().getByText(
+        /not installed has no size to compare, because a replay does not record the size/,
+      ),
+    ).toBeTruthy();
   });
 
   it("leaves another map's matches out and the list off when there is one name", async () => {
@@ -625,5 +642,104 @@ describe("versions of the map", () => {
     expect(text("layer-orders")).toBe("Order density · 1");
     fireEvent.click(screen.getByText("Clear filters"));
     expect(boxes("game-versions")).toEqual(["true", "true"]);
+  });
+});
+
+describe("the section's explanation", () => {
+  it("keeps explanation out of the page until the help is opened", async () => {
+    show(twoMatches());
+    await settled();
+    const gone = [
+      /grouped by the map's name/,
+      /how many matches it is drawn from/,
+      /Each match counts the same/,
+      /A dot is where one team's start was set/,
+      /Colours compare places on this map/,
+      /Nothing here tests whether a difference/,
+      /Team 1 is the team with the lower number/,
+      /Every player counts in the faction record/,
+      /From the orders and messages recorded during the match/,
+    ];
+    for (const pattern of gone) expect(screen.queryByText(pattern)).toBeNull();
+    const said = help();
+    for (const pattern of gone) expect(said.getByText(pattern)).toBeTruthy();
+    expect(
+      said.getByText(/orders given, which is what players meant to do/),
+    ).toBeTruthy();
+  });
+
+  it("gives the deaths layer the playback source and says where deaths come from", async () => {
+    show(twoMatches());
+    await settled();
+    fireEvent.click(screen.getByTestId("layer-deaths"));
+    const said = help();
+    expect(said.getByText(/From playing the match back/)).toBeTruthy();
+    expect(said.getByText(/run from a replay's own page/)).toBeTruthy();
+    expect(screen.queryByText(/run from a replay's own page/)).not.toBeNull();
+  });
+
+  it("keeps the counts, the warnings and the empty states in the page", async () => {
+    const records = [
+      ...twoMatches(),
+      record({ filename: "a.remix.sdfz", gameId: "aa", remixed: true }),
+    ];
+    GRIDS["/demos/b.sdfz"] = new Error("read demo: gone");
+    show(records);
+    await settled();
+    expect(text("starts-note")).toBe("2 starts from 1 match.");
+    expect(text("layer-events")).toBe(
+      "4 orders to place a building, from 1 match.",
+    );
+    expect(text("layer-orders")).toBe("Order density · 1");
+    expect(text("map-aggregate")).toMatch(
+      /1 replay could not be read and is not in the picture/,
+    );
+    fireEvent.click(screen.getByTestId("layer-deaths"));
+    expect(text("no-analysis")).toBe(
+      "No match on this map in the picture has been analysed, so there are no deaths to draw.",
+    );
+    expect(text("map-aggregate")).not.toMatch(/remix/);
+  });
+
+  it("keeps the different build warning and a short layout warning in the page", async () => {
+    UNITS = {
+      "Some Game 1.0": [
+        { mobile: false, buildOptions: [], stats: { weapons: [{}] } },
+      ],
+    };
+    show(twoMatches());
+    await settled();
+    fireEvent.click(screen.getByTestId("layer-defence"));
+    await waitFor(() =>
+      expect(text("category-note")).toMatch(
+        /^1 match was played on a game or version that is not installed/,
+      ),
+    );
+    expect(text("category-note")).not.toMatch(/What a building is for/);
+    expect(
+      help().getByText(/What a building is for is read from/),
+    ).toBeTruthy();
+  });
+
+  it("says in the page that a version can differ in layout", async () => {
+    GRIDS = {
+      "/demos/a.sdfz": { gameId: "aa" },
+      "/demos/b.sdfz": { gameId: "bb" },
+    };
+    show([
+      record({ filename: "a.sdfz", gameId: "aa" }),
+      record({ filename: "b.sdfz", gameId: "bb", mapName: "Some Map 1.1" }),
+    ]);
+    await settled();
+    expect(text("version-layout-warning")).toMatch(/may be in the wrong place/);
+    expect(screen.queryByText(/a version that moved things/)).toBeNull();
+    expect(help().getByText(/a version that moved things/)).toBeTruthy();
+  });
+
+  it("says why there is nothing, with the remix count, when the map has no match", () => {
+    show([record({ filename: "r.sdfz", gameId: "rr", remixed: true })]);
+    expect(text("map-aggregate")).toMatch(
+      /No match on this map is in your library yet\. 1 remix is here/,
+    );
   });
 });

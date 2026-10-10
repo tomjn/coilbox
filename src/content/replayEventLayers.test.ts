@@ -298,7 +298,7 @@ describe("what the analysis lets the map do", () => {
   it("says the replay has not been analysed", () => {
     const state = eventState({ gameId: "g" }, undefined, false);
     expect(state).toEqual({ kind: "notAnalysed", canAnalyse: true });
-    expect(eventBlock(state)).toMatch(/this replay has not been analysed/);
+    expect(eventBlock(state)).toMatch(/This replay has not been analysed/);
   });
 
   it("does not point at a run a distribution has hidden", () => {
@@ -322,7 +322,7 @@ describe("what the analysis lets the map do", () => {
   it("says a remix has no analysis of its own, even beside its original's", () => {
     const state = eventState({ gameId: "g", remixed: true }, stored({}), false);
     expect(state.kind).toBe("remix");
-    expect(eventBlock(state)).toMatch(/remix has no analysis of its own/);
+    expect(eventBlock(state)).toMatch(/A remix has no analysis of its own/);
   });
 });
 

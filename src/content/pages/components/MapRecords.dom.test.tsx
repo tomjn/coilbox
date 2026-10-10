@@ -11,6 +11,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -213,6 +214,14 @@ function show(
 }
 
 const text = (id: string) => screen.getByTestId(id).textContent ?? "";
+/** Opens the section's one help popover and reads inside it. Call it once a
+ *  test: a second click would close it. */
+function help() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "About how this map is played" }),
+  );
+  return within(screen.getByRole("dialog"));
+}
 const settled = () =>
   waitFor(() =>
     expect(text("aggregate-summary")).not.toMatch(/Reading replays/),
@@ -270,8 +279,9 @@ describe("start positions", () => {
       "not taken",
       "3 taken, won 1 of 2",
     ]);
-    expect(text("starts-basis")).toMatch(/within 1,000 elmos of a position/);
-    expect(text("starts-basis")).toMatch(/team of one/);
+    const said = help();
+    expect(said.getByText(/within 1,000 elmos of a position/)).toBeTruthy();
+    expect(said.getByText(/team of one/)).toBeTruthy();
     expect(text("map-records")).not.toMatch(/%/);
   });
 
@@ -314,8 +324,9 @@ describe("start positions", () => {
       "Around 7,000, 1,000",
       "2",
     ]);
-    expect(text("starts-basis")).toMatch(/within 256 elmos of one another/);
-    expect(text("starts-basis")).toMatch(/Nothing measured says that suits/);
+    const said = help();
+    expect(said.getByText(/within 256 elmos of one another/)).toBeTruthy();
+    expect(said.getByText(/Nothing measured says that suits/)).toBeTruthy();
     expect(screen.getByTestId("start-mark-1")).toBeTruthy();
   });
 
@@ -344,8 +355,9 @@ describe("start positions", () => {
     await settled();
     await waitFor(() => screen.getByTestId("start-table"));
     expect(screen.queryByText("As team 1")).toBeNull();
-    expect(text("starts-basis")).toMatch(/every player is a team of one/);
-    expect(text("starts-basis")).toMatch(/not controlled for how many players/);
+    const said = help();
+    expect(said.getByText(/every player is a team of one/)).toBeTruthy();
+    expect(said.getByText(/not controlled for how many players/)).toBeTruthy();
   });
 
   it("does not split by team when the matches are mixed arrangements", async () => {
@@ -367,7 +379,7 @@ describe("start positions", () => {
     await settled();
     await waitFor(() => screen.getByTestId("start-table"));
     expect(screen.queryByText("As team 1")).toBeNull();
-    expect(text("starts-basis")).toMatch(/not all one arrangement/);
+    expect(help().getByText(/not all one arrangement/)).toBeTruthy();
   });
 
   it("counts what could not be joined, and why", async () => {
@@ -389,9 +401,8 @@ describe("start positions", () => {
     const none = record({ filename: "none.sdfz", gameId: "none" });
     show([duel("a", 0), old, none]);
     await settled();
-    await waitFor(() => screen.getByTestId("starts-left-out"));
-    expect(text("starts-left-out")).toBe(
-      "Left out: 1 match saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again. 1 match with no start recorded.",
+    expect(help().getByTestId("starts-left-out").textContent).toBe(
+      "Left out of the start positions: 1 match saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again. 1 match with no start recorded.",
     );
     // The match that could be joined is counted, and the old one is not.
     expect(cells("start-row-1")[3]).toBe("1");
@@ -406,8 +417,11 @@ describe("what the library knows about the map", () => {
       /^3 matches played, 2 with a recorded result\./,
     );
     expect(text("team-record")).toMatch(
-      /Team 1 won 1 of 2, team 2 won 1 of 2, in 2 matches of two teams with a result\. 1 more has no result\./,
+      /Team 1 won 1 of 2, team 2 won 1 of 2, in 2 matches of two teams with a result\./,
     );
+    expect(
+      help().getByText(/1 more match of two teams has no result/),
+    ).toBeTruthy();
   });
 
   it("sets the map's length beside the rest of the library, each with its count", async () => {
@@ -435,9 +449,9 @@ describe("what the library knows about the map", () => {
       "10:00",
       "23:20",
     ]);
-    expect(text("length-record")).toMatch(
-      /Nothing here tests whether a difference/,
-    );
+    expect(
+      help().getByText(/Nothing here tests whether a difference/),
+    ).toBeTruthy();
   });
 
   it("counts which factions won with every player, and says it is confounded", async () => {
@@ -476,9 +490,9 @@ describe("what the library knows about the map", () => {
       ["Alpha", "3", "won 2 of 3"],
       ["Beta", "3", "won 1 of 3"],
     ]);
-    expect(text("faction-record")).toMatch(
-      /not separated from the team it was on/,
-    );
+    expect(
+      help().getByText(/not separated from the team it was on/),
+    ).toBeTruthy();
   });
 
   it("follows the filters, so a narrower set changes every figure", async () => {
@@ -528,7 +542,7 @@ describe("what the library knows about the map", () => {
     await settled();
     expect(text("records-played")).toMatch(/^2 matches played/);
     expect(text("aggregate-summary")).toMatch(/All 2 matches/);
-    expect(document.body.textContent).toMatch(/1 refight is left out/);
+    expect(help().getByText(/1 refight is left out/)).toBeTruthy();
   });
 });
 
@@ -680,8 +694,67 @@ describe("names for start positions", () => {
 
   it("says the names are the player's own and kept for this exact map", async () => {
     await open();
-    expect(text("starts-basis")).toMatch(
-      /Names are yours, kept on this computer for Some Map 1\.0 by its exact name/,
+    expect(
+      help().getByText(
+        /Names are yours, kept on this computer for Some Map 1\.0 by its exact name/,
+      ),
+    ).toBeTruthy();
+  });
+});
+
+describe("the records' explanation", () => {
+  it("is not in the page until the help is opened", async () => {
+    show(threeDuels());
+    await settled();
+    await waitFor(() => screen.getByTestId("start-row-1"));
+    const gone = [
+      /A match with no recorded result is in no win or loss/,
+      /Team 1 is the team with the lower number/,
+      /Nothing here tests whether a difference/,
+      /Taken is the number of starts at the place/,
+      /Every player counts in the faction record/,
+      /kept until you delete it/,
+    ];
+    for (const pattern of gone) expect(screen.queryByText(pattern)).toBeNull();
+    const said = help();
+    for (const pattern of gone) expect(said.getByText(pattern)).toBeTruthy();
+  });
+
+  it("keeps the counts, the tables and the empty states in the page", async () => {
+    GRIDS["/demos/none.sdfz"] = { gameId: "none", starts: [] };
+    show([
+      record({
+        filename: "none.sdfz",
+        gameId: "none",
+        players: [{ name: "One", team: 0, allyTeam: 0, spectator: false }],
+      }),
+    ]);
+    await settled();
+    expect(text("records-played")).toBe(
+      "1 match played, 0 with a recorded result.",
     );
+    expect(text("team-record")).toMatch(/None of these matches is two teams/);
+    expect(text("starts-none")).toBe(
+      "No start position is counted for these matches.",
+    );
+    expect(text("faction-record")).toMatch(
+      /No faction is recorded for these matches/,
+    );
+    expect(cells("length-here")[1]).toBe("1");
+    expect(screen.queryByTestId("starts-left-out")).toBeNull();
+  });
+
+  it("keeps the lead line of the saved names that match no place, and the delete control", async () => {
+    SETTINGS["content.mapPositionNames"] = {
+      [MAP]: [{ key: "c1:1", name: "Lost lake", x: 300, z: 300 }],
+    };
+    show(threeDuels());
+    await settled();
+    await waitFor(() => screen.getByTestId("orphan-names"));
+    expect(text("orphan-names")).toMatch(
+      /Saved names that match no place in the matches above\./,
+    );
+    expect(text("orphan-names")).not.toMatch(/kept until you delete/);
+    expect(screen.getByLabelText("Delete the name Lost lake")).toBeTruthy();
   });
 });

@@ -11,6 +11,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type {
@@ -210,6 +211,12 @@ const expectMarks = (team: number, want: number[][]) => {
   });
 };
 
+/** The map's help entry, opened. What the views share is said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the map" }));
+  return within(screen.getByRole("dialog"));
+};
+
 async function open() {
   fireEvent.click(toggle("Bases"));
   await screen.findByTestId("base-crops");
@@ -251,15 +258,18 @@ describe("one crop for each player", () => {
     expect(card(0)?.textContent).toContain("Opened with Metal Extractor ×3");
     expect(card(1)?.textContent).toContain("Bob");
     expect(card(1)?.textContent).not.toContain("Opened with");
+    // The views carry no explanation of their own. The map's help has it.
     expect(
-      screen.getByText(
+      screen.queryByText(/the buildings a player ordered, not the buildings/),
+    ).toBeNull();
+    expect(screen.queryByText(/orders and messages recorded/i)).toBeNull();
+    const said = help();
+    expect(
+      said.getByText(
         /the buildings a player ordered, not the buildings that were built/,
       ),
     ).toBeTruthy();
-    // One source note under the layers, and one for the crops.
-    expect(screen.getAllByText(/orders and messages recorded/i)).toHaveLength(
-      2,
-    );
+    expect(said.getAllByText(/orders and messages recorded/i)).toHaveLength(1);
     expect(ordersRead).toHaveBeenCalledTimes(1);
   });
 
@@ -295,10 +305,12 @@ describe("the scale", () => {
     ORDERS = PLACED;
     show();
     await open();
-    expect(screen.getByText(/Every view is 1,024 elmos across/)).toBeTruthy();
+    expect(screen.queryByText(/Every view is/)).toBeNull();
+    const said = help();
+    expect(said.getByText(/Every view is 1,024 elmos across/)).toBeTruthy();
     // The bar is a quarter of the crop's width, which is 256 of 1024 elmos.
     expect(
-      screen.getAllByText(/The bar at the bottom left of a view is 256 elmos/),
+      said.getAllByText(/The bar at the bottom left of a view is 256 elmos/),
     ).toHaveLength(1);
     const bars = document.querySelectorAll("[data-crop-scale-bar]");
     expect(bars).toHaveLength(2);
@@ -377,7 +389,7 @@ describe("where things sit inside a crop", () => {
     );
     // What the two counts are is said once, above the views.
     expect(
-      screen.getAllByText(
+      help().getAllByText(
         /Under each view is how many buildings that player ordered, and how many of those fall outside the view/,
       ),
     ).toHaveLength(1);
@@ -391,7 +403,7 @@ describe("the time window", () => {
     show();
     await open();
     expect(
-      screen.getByText(/Showing orders given across the whole match/),
+      help().getByText(/Showing orders given across the whole match/),
     ).toBeTruthy();
     expect(marks(0)).toHaveLength(3);
   });
@@ -402,7 +414,7 @@ describe("the time window", () => {
     await open();
     press("First 5 minutes");
     expect(
-      await screen.findByText(/Showing orders given from 0:00 to 5:00/),
+      await help().findByText(/Showing orders given from 0:00 to 5:00/),
     ).toBeTruthy();
     expectMarks(0, [
       [59.765625, 29.296875],
@@ -418,7 +430,7 @@ describe("the time window", () => {
     expect(card(1)?.textContent).toContain("None ordered");
     expect(card(1)?.textContent).not.toContain("in this window");
     press("Last 5 minutes");
-    await screen.findByText(/Showing orders given from 25:00 to 30:00/);
+    await help().findByText(/Showing orders given from 25:00 to 30:00/);
     expect(card(0)?.textContent).toContain("None ordered in this window");
     expect(card(0)?.querySelector("[data-crop-start]")).toBeTruthy();
     expect(marks(0)).toEqual([]);

@@ -125,6 +125,13 @@ describe("ClearUnfinishedButton", () => {
     expect(
       screen.getByText(/Deleting that file loses the replay/),
     ).toBeTruthy();
+    // What an unfinished recording is lives on the button's tooltip, once.
+    expect(screen.queryByText(/These files are empty/)).toBeNull();
+    expect(
+      screen
+        .getByRole("button", { name: /clear unfinished/i })
+        .getAttribute("title"),
+    ).toMatch(/did not finish recording/);
 
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(onCleared).toHaveBeenCalled());

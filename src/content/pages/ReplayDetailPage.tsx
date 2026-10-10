@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -94,12 +94,15 @@ function ReplayMapPreview({
   mapName,
   info,
   replayPath,
+  heading,
 }: {
   enginePath: string;
   dataDir: string;
   mapName: string;
   info: DemoInfo;
   replayPath: string | undefined;
+  /** The section's heading, which the map's help entry sits beside. */
+  heading: ReactNode;
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
   const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
@@ -109,9 +112,12 @@ function ReplayMapPreview({
 
   if (busy) {
     return (
-      <div className="flex h-48 items-center justify-center rounded-lg border border-border/50 bg-card">
-        <Loader2 className="size-5 animate-spin text-muted-foreground" />
-      </div>
+      <>
+        {heading}
+        <div className="flex h-48 items-center justify-center rounded-lg border border-border/50 bg-card">
+          <Loader2 className="size-5 animate-spin text-muted-foreground" />
+        </div>
+      </>
     );
   }
 
@@ -121,6 +127,7 @@ function ReplayMapPreview({
         info={info}
         replayPath={replayPath}
         mapName={mapName}
+        heading={heading}
         minimapUrl={minimap.url}
         heightmap={heightmap.data}
         preview={
@@ -143,13 +150,16 @@ function ReplayMapPreview({
   // Map not installed / not renderable: the download control for this sits
   // in the missing-content notice near the top of the page.
   return (
-    <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
-      <ImageOff className="size-6 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">
-        <span className="font-medium text-foreground">{mapName}</span> isn't
-        installed, so its preview can't be rendered.
-      </p>
-    </div>
+    <>
+      {heading}
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-8 text-center">
+        <ImageOff className="size-6 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
+          <span className="font-medium text-foreground">{mapName}</span> isn't
+          installed, so its preview can't be rendered.
+        </p>
+      </div>
+    </>
   );
 }
 
@@ -861,9 +871,13 @@ export default function ReplayDetailPage() {
             <ReplayNotes filename={filename} gameId={info.gameId} />
 
             <section className="flex flex-col gap-2">
-              <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
               {selected && info.mapName ? (
                 <ReplayMapPreview
+                  heading={
+                    <h2 className="text-sm font-medium">
+                      Map · {info.mapName}
+                    </h2>
+                  }
                   key={previewNonce}
                   enginePath={selected.enginePath}
                   dataDir={selected.rootPath}
@@ -872,11 +886,14 @@ export default function ReplayDetailPage() {
                   replayPath={replay?.path}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  {info.mapName
-                    ? "Install an engine to preview this map."
-                    : "No map recorded for this replay."}
-                </p>
+                <>
+                  <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
+                  <p className="text-sm text-muted-foreground">
+                    {info.mapName
+                      ? "Install an engine to preview this map."
+                      : "No map recorded for this replay."}
+                  </p>
+                </>
               )}
             </section>
           </SeriesEmphasisProvider>

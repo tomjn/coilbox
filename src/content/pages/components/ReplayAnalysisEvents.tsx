@@ -54,6 +54,7 @@ import {
   type UnitSource,
 } from "../../replayBuildOrders";
 import { readReplayEvents } from "../../replayEventRead";
+import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
 
@@ -398,23 +399,23 @@ export function ReplayAnalysisEvents({
   return (
     <section className="flex flex-col gap-2">
       <Collapsible open={open} onOpenChange={setOpen}>
-        <CollapsibleTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="group justify-start gap-1.5"
-          >
-            <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
-            <span className="font-medium">Recorded events</span>
-            <span className="text-xs text-muted-foreground">
-              {total.toLocaleString()} {total === 1 ? "event" : "events"}
-            </span>
-          </Button>
-        </CollapsibleTrigger>
+        <div className="flex items-center gap-1">
+          <CollapsibleTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="group justify-start gap-1.5"
+            >
+              <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90" />
+              <span className="font-medium">Recorded events</span>
+              <span className="text-xs text-muted-foreground">
+                {total.toLocaleString()} {total === 1 ? "event" : "events"}
+              </span>
+            </Button>
+          </CollapsibleTrigger>
+          <SectionHelp section="the events" source="log" />
+        </div>
         <CollapsibleContent className="flex flex-col gap-2 pt-2">
-          <p className="text-xs text-muted-foreground">
-            These are events from playing the match back, not orders.
-          </p>
           {readable.state === "outdated" && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               This analysis was recorded by an older logger and may lack newer

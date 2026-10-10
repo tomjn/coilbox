@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatLine } from "../../bindings";
@@ -128,6 +129,15 @@ describe("ReplayChat", () => {
       messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
     });
     await screen.findByRole("button", { name: /show chat log/i });
-    expect(screen.getAllByText(REPLAY_SOURCE_NOTES.stream)).toHaveLength(2);
+    // Neither section carries its source in the page. Each help does.
+    expect(screen.queryByText(REPLAY_SOURCE_NOTES.stream)).toBeNull();
+    for (const name of ["About the timeline", "About the chat log"]) {
+      fireEvent.click(screen.getByRole("button", { name }));
+      expect(
+        within(screen.getAllByRole("dialog").at(-1) as HTMLElement).getByText(
+          REPLAY_SOURCE_NOTES.stream,
+        ),
+      ).toBeTruthy();
+    }
   });
 });
