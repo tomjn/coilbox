@@ -13,6 +13,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   MapCountLayer,
@@ -195,7 +196,11 @@ function twoMatches(): StatRecord[] {
   ];
 }
 
-function show(records: StatRecord[], ingesting = false) {
+function show(
+  records: StatRecord[],
+  ingesting = false,
+  extra: Partial<ComponentProps<typeof MapAggregate>> = {},
+) {
   return render(
     <MapAggregate
       mapName={MAP}
@@ -204,6 +209,7 @@ function show(records: StatRecord[], ingesting = false) {
       records={records}
       ingesting={ingesting}
       scene={null}
+      {...extra}
     />,
   );
 }
@@ -411,7 +417,7 @@ describe("the picture of every match on a map", () => {
   });
 
   it("says there is nothing yet for a map with no match", () => {
-    show([record({ filename: "x.sdfz", mapName: "Some Map 1.1" })]);
+    show([record({ filename: "x.sdfz", mapName: "Some Map Redux" })]);
     expect(text("map-aggregate")).toMatch(
       /No match on this map is in your library yet/,
     );
@@ -464,5 +470,160 @@ describe("scoping the picture to a set", () => {
     show(twoMatches());
     await settled();
     expect(screen.queryByLabelText("Scope to a set")).toBeNull();
+  });
+});
+
+describe("versions of the map", () => {
+  /** One match on each of three names: this page's map, a later version of
+   *  it, and a third. The first two have a start each. */
+  function versions(): StatRecord[] {
+    const grid = (x: number) => ({
+      starts: [{ team: 0, x, z: 2000 }],
+      orders: layer([[50 * 256 + 50, 0, 10]]),
+    });
+    GRIDS = {
+      "/demos/a.sdfz": { gameId: "aa", ...grid(1000) },
+      "/demos/b.sdfz": { gameId: "bb", ...grid(3000) },
+      "/demos/c.sdfz": { gameId: "cc", ...grid(5000) },
+      "/demos/d.sdfz": { gameId: "dd", ...grid(6000) },
+    };
+    return [
+      record({ filename: "a.sdfz", gameId: "aa" }),
+      record({ filename: "b.sdfz", gameId: "bb", mapName: "Some Map 1.1" }),
+      record({ filename: "c.sdfz", gameId: "cc", mapName: "Some Map 1.1" }),
+      record({ filename: "d.sdfz", gameId: "dd", mapName: "Some Map v2" }),
+    ];
+  }
+  const boxes = (id: string) =>
+    [...screen.getByTestId(id).querySelectorAll("button[role=checkbox]")].map(
+      (b) => b.getAttribute("aria-checked"),
+    );
+
+  it("lists each version with its count, marks the page's own and has them all in", async () => {
+    show(versions());
+    await settled();
+    const list = screen.getByTestId("map-versions");
+    expect(list.textContent).toMatch(/Some Map 1\.01 match, this page's map/);
+    expect(list.textContent).toMatch(/Some Map 1\.12 matches/);
+    expect(list.textContent).toMatch(/Some Map v21 match/);
+    expect(boxes("map-versions")).toEqual(["true", "true", "true"]);
+    expect(text("aggregate-summary")).toMatch(/^All 4 matches /);
+    expect(text("layer-starts")).toBe("Start positions · 4");
+  });
+
+  it("says over the picture and over the records how many versions they span", async () => {
+    show(versions());
+    await settled();
+    expect(text("versions-picture")).toBe("Across 3 versions of this map");
+    expect(text("versions-records")).toBe("Across 3 versions of this map");
+    expect(text("starts-basis")).toMatch(
+      /every start is placed on Some Map 1\.0, this page's map/,
+    );
+  });
+
+  it("says the grouping is by name and not by archive", async () => {
+    show(versions());
+    await settled();
+    expect(text("grouping-note")).toMatch(
+      /grouped by the map's name with a trailing version taken off, and not by the map's archive/,
+    );
+  });
+
+  it("follows the versions that are switched off, in every count", async () => {
+    show(versions());
+    await settled();
+    const [, v11] = screen
+      .getByTestId("map-versions")
+      .querySelectorAll("button[role=checkbox]");
+    fireEvent.click(v11);
+    await settled();
+    expect(boxes("map-versions")).toEqual(["true", "false", "true"]);
+    expect(text("aggregate-summary")).toMatch(
+      /^2 matches of the 4 on this map in your library are in this picture\./,
+    );
+    expect(text("layer-starts")).toBe("Start positions · 2");
+    expect(text("layer-orders")).toBe("Order density · 2");
+    expect(text("versions-picture")).toBe("Across 2 versions of this map");
+    expect(text("records-played")).toMatch(/^2 matches played/);
+    // The switched off version still shows what it would add.
+    expect(text("map-versions")).toMatch(/Some Map 1\.12 matches/);
+  });
+
+  it("drops the line when one version is left, and puts them all back on clear", async () => {
+    show(versions());
+    await settled();
+    const [a, b, c] = screen
+      .getByTestId("map-versions")
+      .querySelectorAll("button[role=checkbox]");
+    fireEvent.click(b);
+    fireEvent.click(c);
+    await settled();
+    expect(screen.queryByTestId("versions-picture")).toBeNull();
+    expect(screen.queryByTestId("versions-records")).toBeNull();
+    fireEvent.click(a);
+    expect(text("map-aggregate")).toMatch(/No match on this map passes/);
+    fireEvent.click(screen.getByText("Clear filters"));
+    expect(boxes("map-versions")).toEqual(["true", "true", "true"]);
+  });
+
+  it("leaves out a version known to be another size, says why, and takes it back when asked", async () => {
+    show(versions(), false, {
+      mapSizes: {
+        "Some Map 1.0": { width: 16, height: 16 },
+        "Some Map 1.1": { width: 16, height: 16 },
+        "Some Map v2": { width: 32, height: 16 },
+      },
+    });
+    await settled();
+    expect(boxes("map-versions")).toEqual(["true", "true", "false"]);
+    expect(text("map-versions")).toMatch(
+      /Some Map v21 match, a different size from this page's map, so it is left out/,
+    );
+    expect(text("layer-starts")).toBe("Start positions · 3");
+    fireEvent.click(
+      screen
+        .getByTestId("map-versions")
+        .querySelectorAll("button[role=checkbox]")[2],
+    );
+    await settled();
+    expect(text("layer-starts")).toBe("Start positions · 4");
+  });
+
+  it("says a version that is not installed has no size to compare", async () => {
+    show(versions());
+    await settled();
+    expect(text("version-sizes-note")).toMatch(
+      /not installed has no size to compare, because a replay does not record the size/,
+    );
+  });
+
+  it("leaves another map's matches out and the list off when there is one name", async () => {
+    show([
+      record({ filename: "a.sdfz", gameId: "aa" }),
+      record({ filename: "x.sdfz", gameId: "xx", mapName: "Some Map Redux" }),
+    ]);
+    await settled();
+    expect(screen.queryByTestId("map-versions")).toBeNull();
+    expect(screen.queryByTestId("versions-picture")).toBeNull();
+    expect(text("aggregate-summary")).toMatch(/^The 1 match on this map/);
+  });
+
+  it("switches games and versions the same way, with a count each", async () => {
+    show(twoMatches());
+    await settled();
+    expect(text("game-versions")).toMatch(/Some Game 1\.01 match/);
+    expect(text("game-versions")).toMatch(/Some Game 2\.01 match/);
+    expect(boxes("game-versions")).toEqual(["true", "true"]);
+    fireEvent.click(
+      screen
+        .getByTestId("game-versions")
+        .querySelectorAll("button[role=checkbox]")[1],
+    );
+    await settled();
+    expect(boxes("game-versions")).toEqual(["true", "false"]);
+    expect(text("aggregate-summary")).toMatch(/^1 match of the 2 /);
+    expect(text("layer-orders")).toBe("Order density · 1");
+    fireEvent.click(screen.getByText("Clear filters"));
+    expect(boxes("game-versions")).toEqual(["true", "true"]);
   });
 });

@@ -42,6 +42,7 @@ import {
 import { isDeletableArchive } from "../format";
 import { useMapEligibility } from "../mapEligibility";
 import { mergeMapTiers } from "../mapTiers";
+import { type MapSize, sameMapFamily } from "../mapVersions";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
@@ -172,6 +173,17 @@ export default function MapDetailPage() {
   // Proportions and mapinfo arrive after the scan now, so fold in whichever of
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
+
+  // The size of every installed version of this map, so the section can leave
+  // out one whose coordinates would not fit this map. Not installed means no size.
+  const mapSizes: Record<string, MapSize> = {};
+  for (const m of mergeMapTiers(
+    data.maps.filter((x) => sameMapFamily(x.name, decoded)),
+    thumbs,
+    meta,
+  ))
+    if (m.width && m.height)
+      mapSizes[m.name] = { width: m.width, height: m.height };
 
   const otherInfo = Object.entries(map.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
@@ -459,6 +471,7 @@ export default function MapDetailPage() {
           scene={scene}
           declared={minimap.startPositions}
           refights={refights}
+          mapSizes={mapSizes}
         />
       )}
 

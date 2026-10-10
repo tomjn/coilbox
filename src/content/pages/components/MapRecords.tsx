@@ -19,6 +19,7 @@ import {
   teamRecord,
   withResult,
 } from "../../mapRecords";
+import { VersionSpan } from "./VersionList";
 
 const plural = (n: number, one: string, many: string) =>
   `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -65,7 +66,13 @@ export function MapRecords({
   joined,
   records,
   reading,
+  versions,
+  mapName,
 }: {
+  /** How many versions of the map the matches were recorded under. */
+  versions: number;
+  /** The page's map, whose declared positions starts are placed on. */
+  mapName: string;
   shown: AggregateMatch[];
   /** Matches on every other map, under the same filters. */
   elsewhere: AggregateMatch[];
@@ -86,6 +93,7 @@ export function MapRecords({
   return (
     <div className="flex flex-col gap-4" data-testid="map-records">
       <div className="flex flex-col gap-1">
+        <VersionSpan versions={versions} testId="versions-records" />
         <h3 className="text-sm font-medium">
           What your library knows about it
         </h3>
@@ -245,6 +253,8 @@ export function MapRecords({
           {arrangementNote(format)} Taken is the number of starts at the place,
           and the result column counts only those in a match with a recorded
           result.
+          {versions > 1 &&
+            ` With more than one version in, every start is placed on ${mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance.`}
           {records.tolerance !== null &&
             ` A start within ${elmos(records.tolerance)} of a position the map declares is counted at it. That is half the distance between the two closest declared positions, so a start is never near two.`}
           {records.scale !== null &&

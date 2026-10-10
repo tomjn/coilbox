@@ -38,7 +38,7 @@ vi.mock("../config", () => ({
   useUnitsyncScan: () => ({
     data: {
       games: [],
-      maps: [MAP, "Other Map"].map((name) => ({
+      maps: [MAP, "Other Map", "Some Map 1.1"].map((name) => ({
         name,
         archives: [archive],
         info: {},
@@ -84,6 +84,7 @@ vi.mock("./components/MapAggregate", () => ({
     mapName: string;
     world: { worldWidth: number; worldHeight: number };
     declared?: { x: number; z: number }[];
+    mapSizes?: Record<string, unknown>;
   }) => {
     useEffect(() => {
       mounts++;
@@ -92,6 +93,7 @@ vi.mock("./components/MapAggregate", () => ({
       <div data-testid="map-aggregate">
         {props.mapName} {props.world.worldWidth}x{props.world.worldHeight}
         <span data-testid="declared">{JSON.stringify(props.declared)}</span>
+        <span data-testid="sizes">{JSON.stringify(props.mapSizes)}</span>
       </div>
     );
   },
@@ -135,6 +137,14 @@ describe("the picture of every match on a map's page", () => {
     expect(
       JSON.parse(screen.getByTestId("declared").textContent ?? ""),
     ).toEqual(STARTS);
+  });
+
+  it("hands the section the size of every installed version of the map and no other map's", () => {
+    renderPage();
+    expect(JSON.parse(screen.getByTestId("sizes").textContent ?? "")).toEqual({
+      "Some Map 1.0": { width: 8, height: 4 },
+      "Some Map 1.1": { width: 8, height: 4 },
+    });
   });
 
   it("starts again for another map, so one map's filters are not the next one's", () => {
