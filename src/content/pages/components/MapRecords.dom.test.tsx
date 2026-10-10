@@ -499,6 +499,7 @@ describe("what the library knows about the map", () => {
     show(threeDuels());
     await settled();
     await waitFor(() => screen.getByTestId("start-row-1"));
+    fireEvent.click(screen.getByRole("button", { name: /Played from/ }));
     fireEvent.change(screen.getByLabelText("Played from"), {
       target: { value: "2026-07-01" },
     });
@@ -517,6 +518,7 @@ describe("what the library knows about the map", () => {
   it("shows the empty state, and no records, when the filters leave nothing", async () => {
     show(threeDuels());
     await settled();
+    fireEvent.click(screen.getByRole("button", { name: /Played from/ }));
     fireEvent.change(screen.getByLabelText("Played from"), {
       target: { value: "2030-01-01" },
     });

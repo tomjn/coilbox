@@ -389,6 +389,7 @@ describe("the picture of every match on a map", () => {
     records[1].startTimeMs = new Date(2026, 6, 20, 12).getTime();
     show(records);
     await settled();
+    fireEvent.click(screen.getByRole("button", { name: /Played until/ }));
     fireEvent.change(screen.getByLabelText("Played until"), {
       target: { value: "2026-06-30" },
     });
@@ -399,6 +400,32 @@ describe("the picture of every match on a map", () => {
     );
     fireEvent.click(screen.getByText("Clear filters"));
     expect(text("layer-buildings")).toBe("Building density · 2");
+  });
+
+  it("shows no date until one is chosen, and clearing removes the filter", async () => {
+    const records = twoMatches();
+    records[1].startTimeMs = new Date(2026, 6, 20, 12).getTime();
+    show(records);
+    await settled();
+    const filters = screen.getByTestId("aggregate-filters");
+    expect(within(filters).getAllByText("Any date")).toHaveLength(2);
+    expect(filters.querySelector('input[type="date"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /Played until/ }));
+    const until = screen.getByLabelText("Played until") as HTMLInputElement;
+    expect(document.activeElement).toBe(until);
+    fireEvent.change(until, { target: { value: "2026-06-30" } });
+    expect(until.value).toBe("2026-06-30");
+    expect(within(filters).getAllByText("Any date")).toHaveLength(1);
+    expect(text("aggregate-summary")).toMatch(/^1 match of the 2 /);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear played until" }));
+    expect(filters.querySelector('input[type="date"]')).toBeNull();
+    expect(within(filters).getAllByText("Any date")).toHaveLength(2);
+    expect(document.activeElement).toBe(
+      screen.getByRole("button", { name: /Played until/ }),
+    );
+    expect(text("aggregate-summary")).toMatch(/^All 2 matches /);
   });
 
   it("counts a match once and leaves its remixes out", async () => {
@@ -439,6 +466,7 @@ describe("the picture of every match on a map", () => {
   it("says so when the filters leave no match", async () => {
     show(twoMatches());
     await settled();
+    fireEvent.click(screen.getByRole("button", { name: /Played until/ }));
     fireEvent.change(screen.getByLabelText("Played until"), {
       target: { value: "2020-01-01" },
     });
