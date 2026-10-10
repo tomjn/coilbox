@@ -27,8 +27,8 @@ use std::path::Path;
 
 use super::{read_all_maybe_gzip, DemoHeader, DEMO_VERSION, HEADER_V5_SIZE, MAGIC, MIN_HEADER};
 use crate::model::{
-    ChatDest, CommandOrigin, DemoStream, Order, StreamEvent, StreamEventKind, StreamStop,
-    PREGAME_FRAME,
+    ChatDest, CommandOrigin, DemoStream, LeaveReason, Order, StreamEvent, StreamEventKind,
+    StreamStop, TeamAction, PREGAME_FRAME,
 };
 
 /// `DemoStreamChunkHeader`: `f32 modGameTime`, `u32 length`.
@@ -41,12 +41,22 @@ const NETMSG_PLAYERNAME: u8 = 6;
 const NETMSG_CHAT: u8 = 7;
 const NETMSG_COMMAND: u8 = 11;
 const NETMSG_SELECT: u8 = 12;
+const NETMSG_PAUSE: u8 = 13;
 const NETMSG_AICOMMAND: u8 = 14;
 const NETMSG_AICOMMANDS: u8 = 15;
 const NETMSG_GAMEOVER: u8 = 30;
 const NETMSG_SYSTEMMSG: u8 = 35;
 const NETMSG_STARTPOS: u8 = 36;
+const NETMSG_PLAYERLEFT: u8 = 39;
+const NETMSG_TEAM: u8 = 51;
+const NETMSG_CREATE_NEWPLAYER: u8 = 75;
 const NETMSG_AICOMMAND_TRACKED: u8 = 76;
+
+// The `TEAMMSG_*` sub actions of `NETMSG_TEAM`.
+const TEAMMSG_GIVEAWAY: u8 = 1;
+const TEAMMSG_RESIGN: u8 = 2;
+const TEAMMSG_JOIN_TEAM: u8 = 3;
+const TEAMMSG_TEAM_DIED: u8 = 4;
 
 /// `MAX_AIS` in `rts/Sim/Misc/GlobalConstants.h`. In the AI id field of a
 /// command it means no AI at all: the order came from a Lua widget.
@@ -211,6 +221,10 @@ fn decoder(id: u8) -> Option<Decode> {
         NETMSG_GAMEOVER => game_over,
         NETMSG_SYSTEMMSG => system_message,
         NETMSG_STARTPOS => start_pos,
+        NETMSG_PAUSE => pause,
+        NETMSG_PLAYERLEFT => player_left,
+        NETMSG_TEAM => team,
+        NETMSG_CREATE_NEWPLAYER => new_player,
         _ => return None,
     })
 }
@@ -508,6 +522,68 @@ fn start_pos(payload: &[u8]) -> Option<StreamEventKind> {
     })
 }
 
+/// `SendPause`: `u8 player, u8 paused`, with no size field. Unconfirmed against a real replay, as none here holds a pause.
+fn pause(payload: &[u8]) -> Option<StreamEventKind> {
+    let mut r = Reader::fixed(payload, 3)?;
+    Some(StreamEventKind::Pause {
+        player: r.u8()?,
+        paused: r.u8()? != 0,
+    })
+}
+
+/// `SendPlayerLeft`: `u8 player, u8 bIntended`, with no size field.
+fn player_left(payload: &[u8]) -> Option<StreamEventKind> {
+    let mut r = Reader::fixed(payload, 3)?;
+    Some(StreamEventKind::PlayerLeft {
+        player: r.u8()?,
+        reason: match r.u8()? {
+            0 => LeaveReason::LostConnection,
+            1 => LeaveReason::Left,
+            2 => LeaveReason::Kicked,
+            code => LeaveReason::Other { code },
+        },
+    })
+}
+
+/// The `SendGiveAwayEverything`, `SendResign`, `SendJoinTeam` and
+/// `SendTeamDied` family: `u8 player, u8 action, u8 param1, u8 param2`, with no
+/// size field. The two parameters are always on the wire and an action that
+/// needs fewer sends zero for the rest.
+fn team(payload: &[u8]) -> Option<StreamEventKind> {
+    let mut r = Reader::fixed(payload, 5)?;
+    let player = r.u8()?;
+    let (action, param1, param2) = (r.u8()?, r.u8()?, r.u8()?);
+    Some(StreamEventKind::Team {
+        player,
+        action: match action {
+            TEAMMSG_GIVEAWAY => TeamAction::GiveAway {
+                to_team: param1,
+                from_team: param2,
+            },
+            TEAMMSG_RESIGN => TeamAction::Resign,
+            TEAMMSG_JOIN_TEAM => TeamAction::JoinTeam { team: param1 },
+            TEAMMSG_TEAM_DIED => TeamAction::TeamDied { team: param1 },
+            action => TeamAction::Other {
+                action,
+                param1,
+                param2,
+            },
+        },
+    })
+}
+
+/// `SendCreateNewPlayer`: `u16 size, u8 player, u8 spectator, u8 team, string
+/// name`.
+fn new_player(payload: &[u8]) -> Option<StreamEventKind> {
+    let mut r = Reader::sized16(payload)?;
+    Some(StreamEventKind::NewPlayer {
+        player: r.u8()?,
+        spectator: r.u8()? != 0,
+        team: r.u8()?,
+        name: r.cstr()?,
+    })
+}
+
 /// A synthetic demo stream, built byte by byte for the same reason
 /// `DemoFixture` is: a layout read at the wrong offset returns values, not an
 /// error, so only a stream whose every byte a test chose proves an offset.
@@ -702,6 +778,25 @@ pub(crate) mod fixture {
                 p.extend_from_slice(&v.to_le_bytes());
             }
             self.raw(&p)
+        }
+
+        pub(crate) fn pause(self, player: u8, paused: u8) -> Self {
+            self.raw(&[NETMSG_PAUSE, player, paused])
+        }
+
+        pub(crate) fn player_left(self, player: u8, intended: u8) -> Self {
+            self.raw(&[NETMSG_PLAYERLEFT, player, intended])
+        }
+
+        pub(crate) fn team(self, player: u8, action: u8, param1: u8, param2: u8) -> Self {
+            self.raw(&[NETMSG_TEAM, player, action, param1, param2])
+        }
+
+        pub(crate) fn new_player(self, player: u8, spectator: u8, team: u8, name: &str) -> Self {
+            let mut b = vec![player, spectator, team];
+            b.extend_from_slice(name.as_bytes());
+            b.push(0);
+            self.sized16(NETMSG_CREATE_NEWPLAYER, &b)
         }
     }
 }
@@ -1029,6 +1124,147 @@ mod tests {
         );
     }
 
+    #[test]
+    fn a_pause_says_who_and_which_way() {
+        let s = walked(Packets::default().pause(4, 1).pause(4, 0));
+        let pause = |paused| StreamEventKind::Pause { player: 4, paused };
+        assert_eq!(kinds(&s), vec![pause(true), pause(false)]);
+    }
+
+    #[test]
+    fn a_player_leaving_carries_why() {
+        let s = walked(
+            Packets::default()
+                .player_left(3, 0)
+                .player_left(5, 1)
+                .player_left(7, 2)
+                .player_left(8, 9),
+        );
+        let left = |player, reason| StreamEventKind::PlayerLeft { player, reason };
+        assert_eq!(
+            kinds(&s),
+            vec![
+                left(3, LeaveReason::LostConnection),
+                left(5, LeaveReason::Left),
+                left(7, LeaveReason::Kicked),
+                left(8, LeaveReason::Other { code: 9 }),
+            ]
+        );
+    }
+
+    /// Each sub action puts its parameters in a different place, so every one
+    /// uses distinct values and an unknown action keeps both of its.
+    #[test]
+    fn a_team_message_names_what_its_parameters_mean() {
+        let s = walked(
+            Packets::default()
+                .team(2, 1, 6, 2)
+                .team(2, 2, 0, 0)
+                .team(9, 3, 4, 0)
+                .team(9, 4, 5, 0)
+                .team(1, 77, 8, 9),
+        );
+        let team = |player, action| StreamEventKind::Team { player, action };
+        assert_eq!(
+            kinds(&s),
+            vec![
+                team(
+                    2,
+                    TeamAction::GiveAway {
+                        to_team: 6,
+                        from_team: 2
+                    }
+                ),
+                team(2, TeamAction::Resign),
+                team(9, TeamAction::JoinTeam { team: 4 }),
+                team(9, TeamAction::TeamDied { team: 5 }),
+                team(
+                    1,
+                    TeamAction::Other {
+                        action: 77,
+                        param1: 8,
+                        param2: 9
+                    }
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_late_joiner_is_read_with_their_name_and_seat() {
+        let s = walked(
+            Packets::default()
+                .keyframe(900)
+                .new_player(12, 1, 3, "Latecomer")
+                .new_player(13, 0, 4, "Other"),
+        );
+        let joined = |player, spectator, team, name: &str| StreamEventKind::NewPlayer {
+            player,
+            spectator,
+            team,
+            name: name.into(),
+        };
+        assert_eq!(
+            kinds(&s),
+            vec![
+                joined(12, true, 3, "Latecomer"),
+                joined(13, false, 4, "Other")
+            ]
+        );
+        assert_eq!(s.events[0].frame, 900);
+    }
+
+    /// The new events reach a frontend only through commands that filter, but
+    /// their shape is still the contract the timeline will read.
+    #[test]
+    fn the_timeline_events_serialise_flat_with_a_kind_on_each_nested_value() {
+        let s = walked(
+            Packets::default()
+                .pause(1, 1)
+                .player_left(2, 2)
+                .team(3, 1, 4, 5)
+                .team(3, 2, 0, 0)
+                .new_player(6, 1, 7, "n"),
+        );
+        let v = serde_json::to_value(&s.events).unwrap();
+        let body = |i: usize| {
+            let mut e = v[i].clone();
+            let o = e.as_object_mut().unwrap();
+            o.remove("frame");
+            o.remove("time");
+            e
+        };
+        assert_eq!(
+            body(0),
+            serde_json::json!({ "type": "pause", "player": 1, "paused": true })
+        );
+        assert_eq!(
+            body(1),
+            serde_json::json!({
+                "type": "playerLeft", "player": 2, "reason": { "kind": "kicked" }
+            })
+        );
+        assert_eq!(
+            body(2),
+            serde_json::json!({
+                "type": "team", "player": 3,
+                "action": { "kind": "giveAway", "toTeam": 4, "fromTeam": 5 }
+            })
+        );
+        assert_eq!(
+            body(3),
+            serde_json::json!({
+                "type": "team", "player": 3, "action": { "kind": "resign" }
+            })
+        );
+        assert_eq!(
+            body(4),
+            serde_json::json!({
+                "type": "newPlayer", "player": 6, "spectator": true, "team": 7, "name": "n"
+            })
+        );
+    }
+
     /// A packet of a kind the walk reads, whose bytes do not fit that kind, is
     /// refused on its own. The framing still says where the next one starts.
     #[test]
@@ -1053,6 +1289,14 @@ mod tests {
                 .raw(&[NETMSG_CHAT, 6, 1, 254, b'h', b'i'])
                 // A selection with half a unit id.
                 .raw(&[NETMSG_SELECT, 5, 0, 0, 9])
+                // A pause, a leave and a team message each a byte long.
+                .raw(&[NETMSG_PAUSE, 1, 1, 0])
+                .raw(&[NETMSG_PLAYERLEFT, 1])
+                .raw(&[NETMSG_TEAM, 1, 1, 2, 3, 4])
+                // A new player whose name has no terminator, and one whose size
+                // field disagrees with the packet.
+                .raw(&[NETMSG_CREATE_NEWPLAYER, 8, 0, 4, 0, 1, b'x', b'y'])
+                .raw(&[NETMSG_CREATE_NEWPLAYER, 20, 0, 4, 0, 1, b'x', 0])
                 // A keyframe with half a frame number.
                 .raw(&[NETMSG_KEYFRAME, 1, 2])
                 // A chunk with no payload at all.
@@ -1060,8 +1304,8 @@ mod tests {
                 .chat(1, 254, "still here")
                 .bytes(),
         );
-        assert_eq!(s.undecoded, 7);
-        assert_eq!(s.packets, 8);
+        assert_eq!(s.undecoded, 12);
+        assert_eq!(s.packets, 13);
         assert_eq!(s.stopped, None);
         assert_eq!(s.events.len(), 1);
         assert_eq!(s.last_frame, PREGAME_FRAME);

@@ -547,6 +547,58 @@ pub enum StreamEventKind {
         y: f32,
         z: f32,
     },
+    /// `NETMSG_PAUSE`. `player` paused or unpaused the game.
+    #[serde(rename_all = "camelCase")]
+    Pause { player: u8, paused: bool },
+    /// `NETMSG_PLAYERLEFT`. `player` dropped out of the game.
+    #[serde(rename_all = "camelCase")]
+    PlayerLeft { player: u8, reason: LeaveReason },
+    /// `NETMSG_TEAM`. `player` did something that changes who controls a team.
+    #[serde(rename_all = "camelCase")]
+    Team { player: u8, action: TeamAction },
+    /// `NETMSG_CREATE_NEWPLAYER`. A player who is not in the start script
+    /// joined mid game, and this is the only place their name is.
+    #[serde(rename_all = "camelCase")]
+    NewPlayer {
+        player: u8,
+        spectator: bool,
+        team: u8,
+        name: String,
+    },
+}
+
+/// Why a player left, from `NETMSG_PLAYERLEFT`'s `bIntended` byte.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum LeaveReason {
+    LostConnection,
+    Left,
+    Kicked,
+    /// A value the engine does not define, carried as sent.
+    Other {
+        code: u8,
+    },
+}
+
+/// The sub action of a `NETMSG_TEAM` packet, from the `TEAMMSG_*` enum.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum TeamAction {
+    /// `TEAMMSG_GIVEAWAY`. Everything `from_team` owns goes to `to_team`.
+    #[serde(rename_all = "camelCase")]
+    GiveAway { to_team: u8, from_team: u8 },
+    /// `TEAMMSG_RESIGN`. The player stops playing. The packet carries no team.
+    Resign,
+    /// `TEAMMSG_JOIN_TEAM`. The player asks to join `team`.
+    #[serde(rename_all = "camelCase")]
+    JoinTeam { team: u8 },
+    /// `TEAMMSG_TEAM_DIED`. The player reports `team` has died. Every player
+    /// sends one, so a team's death arrives once per player.
+    #[serde(rename_all = "camelCase")]
+    TeamDied { team: u8 },
+    /// An action the engine does not define, carried as sent.
+    #[serde(rename_all = "camelCase")]
+    Other { action: u8, param1: u8, param2: u8 },
 }
 
 /// Who a chat line was addressed to.
