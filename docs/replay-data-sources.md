@@ -297,12 +297,45 @@ This table lists each part of the interface, the source it shows, and what makes
 | --- | --- | --- |
 | Replays page figure cells and sorts | The library store's copy of trailer totals. Seven metrics, rounded to whole numbers | The replay has no samples, or with "My figures" the player was not in the match or the record has no team id. It has no figure and sorts last in both directions |
 | Dossier rates, ratio and trend | The same store | Games with no totals, no team id or no usable length are left out and counted on the page |
+| Dossier units ordered | Each of the player's games walked once for its build orders and kept as totals by player and unit number. Units, the metal they cost and the kind of unit come from the unit list of the build each game was played on. Finished and died come from the event log | Orders are not units built. A game with no unit list for its build is left out and counted, and so is one whose own orders do not fit its list. Finished and died are only from analysed games, and the section says how many |
 | Matchup view | The store, using start script teams and sides, trailer winners and header length | A game where you were not on opposing teams is not counted |
 | Stats page and achievements | The store, using start script players, sides and AIs, and trailer winners | A remix or refight rerun is left out. A game with no result is not a win |
 | A map's page, how this map is played | Every match on the map by its name with a trailing version taken off (`Talus v1.0` and `Talus v1.1` are one map), counted once however many files hold it. Each version is listed with a count and can be left out, and so can each game version. Each replay's stream is walked once and kept as counts on the map's grid by minute. Start positions are a dot a team a match. Building density, order density and the two kinds of building are stream orders. Deaths are from the event log. Each match is scaled before the matches are averaged, and the legend says what the brightest spot holds under that scaling | Orders are not buildings. A layer is drawn from the matches that have it, and the number beside the layer says how many: every match with a stream for orders, only an analysed match for deaths. Defences and economy leave out a match whose exact game build is not installed. A replay records the map's name and nothing else, so the grouping is by name and not by archive, and a version's layout may differ from the page's map. A version known to be another size is left out until asked for, and one that is not installed has no size to compare. A remix is left out, and so is a match under a minute unless asked for |
 | A map's page, records for the map | The same matches as the picture, under the same filters. Start positions come from the stream and results from the trailer, joined by engine team id and then side, so a position is counted as won when the side that held it won. Length is the header's length. Factions are the start script's sides for every player | A record saved before team ids were kept has none and is left out of the position counts, and the page says how many. A match with no result is a start taken and in no win or loss. A position's record in a team game is confounded by the team it was on and who was beside it, and so is a faction's. The other maps' lengths are counted under the same filters. With more than one version in, every start is placed on the page's map. Positions can be named: the names are the player's own, kept on this computer under the map's exact name, and positions given one name are one row |
 
 The store is one JSON file written whole, and it never holds a series.
+
+### Which units a player orders
+
+A player's dossier has a section called "Units ordered". It adds up the build orders that player gave over every game the dossier counts, which is every game they played in that is not a remix or a refight. It is the same set of games the rest of the dossier uses, and a win is counted the same way.
+
+The table has a row for each unit:
+
+- Games is the number of games the player ordered the unit in.
+- Units is how many those orders asked for. A placed building is one. A factory order is 1, 5, 20 or 100, by the modifier keys held.
+- Metal is the units times the unit's metal cost, priced game by game from that game's own unit list.
+- Won is the games the player won out of those with a recorded result, such as "3 of 7". It describes the games the unit was ordered in. It does not say the unit won them, because what a player orders depends on how the game is already going.
+- Finished and Died are filled only for a unit the player ordered in an analysed game.
+
+Above the table one bar splits the metal ordered by kind of unit, using the classifier described under "What is not game specific".
+
+These are orders and not units built. A replay does not say whether an order was carried out. An order that was cancelled still counts, and a unit taken off a factory queue is not subtracted. A skirmish AI's orders reach the stream through the player hosting it, and they are kept apart and not counted as that player's.
+
+A unit number means a unit in one build of one game, so each game is named against its own list or not at all, and two builds are never read against one list. The order of trust is the replay page's:
+
+1. The engine's own list, kept when the game was analysed on the build it was played on.
+2. A packaged archive installed under the exact name and version the replay records.
+3. A list kept from when the replay was read against such a game, which also stands in for a loose game folder.
+
+A game with none of these is left out whole. The replay page falls back to another installed version with a warning. A sum over many games has nowhere to put that warning for each game, so it does not fall back.
+
+A game is also left out whole when any build order in it, from any player, does not fit its list: a placed order that names a unit that moves, a factory order that names one that does not, or a number past the end of the list. A list the game's own orders contradict is not the one it was played on, so the orders that do fit could be named wrong as well. The engine's own list is not checked this way, and a number past its end is one order left out. The section says how many games are left out, and its help says how many for each reason and how many of the player's orders were in them.
+
+Rows from different builds of one game are joined on the unit's key, which is what the game's files call it. Two games that use the same key are kept apart, and the game is named beside the unit when the rows come from more than one.
+
+Finished and died come from the event log, so only an analysed game has them, and the section says how many analysed games they are drawn from. Finished is the `unit_finished` lines for the player's team. Died is the `unit_destroyed` lines for a unit that had been finished, so a build that was cancelled or shot down before it finished is neither. Both are counted for a unit only in games where the player ordered it, with the units ordered in those same games beside them. The figures are the team's: two players who share control of a team both get them, and a unit given away counts for the team that had it when the line was written. The numbers in an analysis are those of the game the analysis ran on, so they are named by the engine's list from that run. An analysis from before the recorder kept that list cannot be named, and the help says how many games that leaves out.
+
+Reading a replay costs a walk of its whole stream, the first time. The totals are then kept in the app's cache folder, one small file a replay, and the next visit reads those. The dossier asks for every game in one call. On one Mac, in an unoptimised build, 18 replays took 519 ms to walk between them, the slowest 132 ms, and each read back from its kept file in under a millisecond. The kept files were between 314 and 1,874 bytes and came to 11,903 bytes. Nothing here measures a large library. A kept file is thrown away when the replay file changes size or modified time, the finished and died figures are read again when the game's analysis changes, and the folder can be cleared from the storage settings at any time.
 
 ### The picture of every match on a map
 
@@ -449,6 +482,7 @@ All paths are under `crates/tauri-plugin-coilbox-content/src/`.
 | Header, start script, trailer, the replay info | `demo.rs` |
 | The stream walk and its message decoders | `demo/stream.rs` |
 | Build orders | `demo/build_orders.rs` |
+| Build orders totalled by player and unit, for the dossier | `demo/unit_orders.rs` |
 | The analysis run, its game, the retargeted copy, the launch, the divergence check | `demo/analysis.rs` and `demo/analysis/` |
 | The event store and the queue | `demo/analysis/store.rs` and `demo/analysis/queue.rs` |
 | The metric registry and the ratios | `metrics.rs` |
