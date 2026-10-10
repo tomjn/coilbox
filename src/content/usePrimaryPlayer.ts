@@ -1,9 +1,28 @@
 import { useSetting } from "@picoframe/frame";
 import { useMemo } from "react";
 import { isProfileHidden } from "../profile/hidden";
+import type { StatRecord } from "./bindings";
 import { useStoredStatsRecords } from "./config";
 import { refightFilenames, useReplayUserState } from "./replayUserState";
 import { allPlayers, guessPrimaryPlayer } from "./stats";
+
+/**
+ * The primary player in a set of records: the one chosen in settings if they
+ * appear, otherwise the one with the most games, or empty when there is none.
+ * Split from the hook so a page that already holds the records can ask without
+ * reading the store a second time.
+ */
+export function pickPrimaryPlayer(
+  records: StatRecord[],
+  refights: ReadonlySet<string>,
+  stored: string,
+): string {
+  return (
+    allPlayers(records, refights).find((p) => p.name === stored)?.name ??
+    guessPrimaryPlayer(records, refights) ??
+    ""
+  );
+}
 
 /**
  * Who the library is about, as the dossier and the map and game pages decide it:
@@ -25,10 +44,7 @@ export function usePrimaryPlayer(): string {
   );
   const [stored] = useSetting("content.statsPlayer", "");
   return useMemo(
-    () =>
-      allPlayers(records, refights).find((p) => p.name === stored)?.name ??
-      guessPrimaryPlayer(records, refights) ??
-      "",
+    () => pickPrimaryPlayer(records, refights, stored),
     [records, refights, stored],
   );
 }

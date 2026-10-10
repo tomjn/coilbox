@@ -10,6 +10,7 @@ import {
   Rocket,
   Swords,
   Tag,
+  User,
   X,
 } from "lucide-react";
 import { useCallback, useMemo } from "react";
@@ -53,8 +54,9 @@ import {
   parseMetricSort,
 } from "../replayMatchFigures";
 import { findSet, resolveSet, useReplaySets } from "../replaySets";
-import { useReplayUserState } from "../replayUserState";
+import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { useMetricRegistry } from "../useMetricRegistry";
+import { pickPrimaryPlayer } from "../usePrimaryPlayer";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { BrowserToolbar } from "./components/BrowserToolbar";
 import { FilterBar } from "./components/FilterBar";
@@ -217,6 +219,13 @@ export default function ReplaysPage() {
     "content.replayFilters.set",
     "",
   );
+  // Whether the figures and metric sorts are for the primary player's own team
+  // rather than the whole match.
+  const [mineOnly, setMineOnly] = useSetting(
+    "content.replayFilters.mine",
+    false,
+  );
+  const [statsPlayer] = useSetting("content.statsPlayer", "");
 
   // What happened in the match comes from the stats store, joined to a row by
   // file. A distribution that hides match statistics gets none of it, and the
@@ -233,6 +242,22 @@ export default function ReplaysPage() {
   );
   const registry = useMetricRegistry(!statsHidden);
   const metrics = useMemo(() => libraryMetrics(registry), [registry]);
+  const userState = useReplayUserState();
+  // Who "mine" means, decided as the dossier decides it. The list ingests, so
+  // it reads the records it already holds. Empty until they arrive.
+  const primary = useMemo(
+    () =>
+      pickPrimaryPlayer(
+        statRecords,
+        refightFilenames(userState.state),
+        statsPlayer,
+      ),
+    [statRecords, userState.state, statsPlayer],
+  );
+  const mineBasis = metrics.length > 0 && primary !== "";
+  // The player the figures are for, or undefined for the whole match. A saved
+  // "mine" with nobody to be mine for shows the whole match.
+  const basisPlayer = mineOnly && mineBasis ? primary : undefined;
   const statsByPath = useMemo(() => {
     const byPath = new Map<string, StatRecord>();
     const byName = new Map<string, StatRecord>();
@@ -274,7 +299,6 @@ export default function ReplaysPage() {
     [registry, sortMetric],
   );
 
-  const userState = useReplayUserState();
   const replaySets = useReplaySets();
   // A saved pick whose set was since deleted shows everything.
   const activeSet = findSet(replaySets.sets, setFilterId);
@@ -360,8 +384,8 @@ export default function ReplaysPage() {
     arr.sort((a, b) => {
       if (sortMetric && metricSort) {
         return compareFigures(
-          matchFigure(statsByPath(a), sortMetric),
-          matchFigure(statsByPath(b), sortMetric),
+          matchFigure(statsByPath(a), sortMetric, basisPlayer),
+          matchFigure(statsByPath(b), sortMetric, basisPlayer),
           metricSort.dir,
         );
       }
@@ -388,7 +412,14 @@ export default function ReplaysPage() {
       }
     });
     return arr;
-  }, [filtered, effectiveSort, sortMetric, metricSort, statsByPath]);
+  }, [
+    filtered,
+    effectiveSort,
+    sortMetric,
+    metricSort,
+    statsByPath,
+    basisPlayer,
+  ]);
 
   // Busy only while actually loading or before the first load completes for the
   // selected target — NOT when a load finished and simply found no replays (that
@@ -455,6 +486,18 @@ export default function ReplaysPage() {
                     title="Clear the map filter"
                   >
                     Map: {mapFilter} <X className="size-3.5" />
+                  </Button>
+                )}
+                {mineBasis && (
+                  <Button
+                    variant={mineOnly ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setMineOnly(!mineOnly)}
+                    aria-pressed={mineOnly}
+                    className="gap-1.5"
+                    title={`Show and sort the figures for ${primary}'s team instead of the whole match`}
+                  >
+                    <User className="size-4" /> My team
                   </Button>
                 )}
                 {filterVisibility.watched && (
@@ -649,12 +692,14 @@ export default function ReplaysPage() {
                                 {m.label}
                               </div>
                               <div className="font-mono text-sm text-foreground">
-                                {formatFigure(matchFigure(stat, m))}
+                                {formatFigure(
+                                  matchFigure(stat, m, basisPlayer),
+                                )}
                               </div>
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {m.label}, {figureBasis(m)}
+                            {m.label}, {figureBasis(m, basisPlayer)}
                           </TooltipContent>
                         </Tooltip>
                       );

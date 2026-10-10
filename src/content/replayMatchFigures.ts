@@ -16,6 +16,12 @@ import { formatTotal } from "./matchStats";
  * The rule reads the metric's `unit` from the registry. No metric is named
  * here, and the metrics on offer are whatever the registry flags `roster`,
  * because those are the only totals the store keeps.
+ *
+ * The other basis is one player's own team, for a library about "me": the
+ * figure is that team's total and nothing else, whatever the metric counts.
+ * It needs the team id the store records for each seat, so a replay the player
+ * was not in, and a record ingested before the store kept team ids, have no
+ * figure on this basis. Team 0 is a real team, so "unknown" is never 0.
  */
 
 export type SortDirection = "asc" | "desc";
@@ -44,23 +50,52 @@ export function libraryMetrics(metrics: Metric[]): Metric[] {
   return metrics.filter((m) => m.roster && m.surfaced);
 }
 
-/** Whether a metric's row figure is the best team or the sum of all teams. */
-export function figureBasis(metric: Metric): "best team" | "match total" {
+/**
+ * Whether a metric's row figure is the best team or the sum of all teams, or
+ * the named player's own team when a player is given.
+ */
+export function figureBasis(metric: Metric, player?: string): string {
+  if (player) return `${player}'s team`;
   return metric.unit === "metal" || metric.unit === "energy"
     ? "best team"
     : "match total";
 }
 
 /**
- * One metric's figure for a whole match, or undefined when the match has none.
- * A record that measured nothing has no totals, and that is not the same as a
+ * The team a named player played for in a match, or undefined when the record
+ * does not say: they were not in it, they only watched, or the record predates
+ * team ids and has not been re-ingested.
+ */
+export function playerTeam(
+  record: StatRecord | undefined,
+  name: string,
+): number | undefined {
+  return record?.players.find((p) => !p.spectator && p.name === name)?.team;
+}
+
+/**
+ * One metric's figure for a match, or undefined when the match has none. A
+ * record that measured nothing has no totals, and that is not the same as a
  * total of zero.
+ *
+ * With `player`, the figure is that player's own team's total, and is
+ * undefined when the player was not in the match or their team is unknown.
+ * Without it, the figure is for the whole match.
  */
 export function matchFigure(
   record: StatRecord | undefined,
   metric: Metric,
+  player?: string,
 ): number | undefined {
   if (!record?.statsKnown) return undefined;
+  if (player) {
+    const team = playerTeam(record, player);
+    if (team === undefined) return undefined;
+    const v = record.teamTotals.find((t) => t.team === team)?.totals[
+      metric.key
+    ];
+    return typeof v === "number" ? v : undefined;
+  }
   const perTeam: number[] = [];
   for (const team of record.teamTotals) {
     const v = team.totals[metric.key];
