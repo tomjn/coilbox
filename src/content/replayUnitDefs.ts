@@ -182,9 +182,10 @@ export function listDate(link: Pick<UnitDefLink, "takenAtMs">): string {
 }
 
 /**
- * Where a stored list came from, as a sentence. The engine's list says so, a
- * packaged archive's needs no caveat, and a loose folder's says it was true of
- * the folder that day.
+ * Where a stored list came from, as one short sentence for the page. The
+ * engine's list says so, a packaged archive's needs no caveat, and a loose
+ * folder's says the folder can change. The explanation of why that matters is
+ * in the section's help, not here.
  */
 export function storedListSentence(
   link: UnitDefLink,
@@ -195,7 +196,7 @@ export function storedListSentence(
     return `${subject} come from the unit list the engine wrote when this replay was analysed on ${date}, on ${link.game}.`;
   }
   if (link.origin === "folder") {
-    return `${subject} come from the unit list recorded when this replay was read on ${date}, from ${link.game}. That game was a loose folder, which can change under the same name, so the list is what the folder held that day.`;
+    return `${subject} come from the unit list recorded when this replay was read on ${date}, from ${link.game}, a loose game folder that can change under that name.`;
   }
   return `${subject} come from the unit list recorded when this replay was read on ${date}, from ${link.game}.`;
 }

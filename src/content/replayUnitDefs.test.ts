@@ -199,13 +199,14 @@ describe("storedListSentence", () => {
     );
   });
 
-  it("says a loose folder's list is what the folder held that day", () => {
-    const text = storedListSentence(
-      link({ origin: "folder", game: "SplinterFaction $VERSION" }),
+  it("says a list from a loose folder came from one, in the same sentence", () => {
+    expect(
+      storedListSentence(
+        link({ origin: "folder", game: "SplinterFaction $VERSION" }),
+      ),
+    ).toBe(
+      `Unit names come from the unit list recorded when this replay was read on ${date}, from SplinterFaction $VERSION, a loose game folder that can change under that name.`,
     );
-    expect(text).toContain(`read on ${date}, from SplinterFaction $VERSION.`);
-    expect(text).toContain("loose folder");
-    expect(text).toContain("what the folder held that day");
   });
 
   it("says the engine wrote its own list, and names the game it ran", () => {

@@ -200,7 +200,7 @@ async function open(gameType: string, gameId: string | undefined) {
     </SeriesEmphasisProvider>,
   );
   fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
-  await screen.findByText(/orders each player gave/i);
+  await screen.findByText(/Opening length in minutes/i);
 }
 
 describe("build orders read against a kept unit list", () => {
@@ -258,7 +258,9 @@ describe("build orders read against a kept unit list", () => {
     expect((await screen.findAllByText("Land Factory")).length).toBeGreaterThan(
       0,
     );
-    expect(screen.getByText(/loose folder, which can change/i)).toBeTruthy();
+    expect(
+      screen.getByText(/a loose game folder that can change under that name/i),
+    ).toBeTruthy();
     expect(screen.queryByText("Whatever It Holds Now")).toBeNull();
     expect(HANDED).toEqual([]);
   });
@@ -319,7 +321,9 @@ describe("keeping the list a replay was read against", () => {
     await waitFor(() => expect(HANDED).toHaveLength(1));
     expect(HANDED[0].archive).toBe("SplinterFaction.sdd");
     expect(
-      await screen.findByText(/loose folder, which can change/i),
+      await screen.findByText(
+        /a loose game folder that can change under that name/i,
+      ),
     ).toBeTruthy();
     expect(screen.getAllByText("Land Factory").length).toBeGreaterThan(0);
   });
@@ -347,11 +351,16 @@ describe("keeping the list a replay was read against", () => {
     expect(
       await screen.findByText(/2 of 2 build orders do not fit this unit list/),
     ).toBeTruthy();
+    expect(screen.getByText(/so names and costs\s+may be wrong/)).toBeTruthy();
+    // The breakdown is in the section's help, not under the warning.
     expect(
-      screen.getByText(/1 placed order names a unit that moves/),
-    ).toBeTruthy();
+      screen.queryByText(/placed order names a unit that moves/),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About build orders" }));
     expect(
-      screen.getByText(/1 order names an id past the end of the list/),
+      await screen.findByText(
+        /Here 1 placed order names a unit that moves, 1 order names an id past the end of the list\./,
+      ),
     ).toBeTruthy();
     expect(HANDED).toEqual([]);
   });

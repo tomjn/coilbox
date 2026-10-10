@@ -36,7 +36,7 @@ import { OpeningSplitHelp, ReplayOpeningSplit } from "./ReplayOpeningSplit";
 import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
-import { OrderFitNote, StoredListNote } from "./UnitListNotes";
+import { OrderFitNote, StoredListNote, UnitListHelp } from "./UnitListNotes";
 
 /** How many of a seat's orders are drawn at first, and added per press. A long
  *  match has hundreds per player, and all of them at once is thousands of rows. */
@@ -381,6 +381,7 @@ export function ReplayBuildOrders({
                 with repeats shown as a count.
               </p>
               {units && <OpeningSplitHelp />}
+              <UnitListHelp fit={fit} />
               {result && result.removals > 0 && (
                 <p>
                   {result.removals}{" "}
