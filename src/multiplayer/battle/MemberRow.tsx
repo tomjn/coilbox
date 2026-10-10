@@ -25,7 +25,9 @@ import {
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { NameMarkIcon } from "../NameMarkIcon";
 import { NoteButton } from "../NoteButton";
+import { NAME_MARK_CLASS, type NameMark } from "../nameMark";
 import { CountryFlag, RankBadge, RatingBadge } from "../UserBadges";
 import { BonusButton } from "./BonusButton";
 import { allyLetter, type MemberRow as Row } from "./config";
@@ -92,6 +94,7 @@ export function MemberRow({
   teamOptions,
   allyOptions,
   aiOptions,
+  mark,
   note,
   onSetNote,
   statsSummary,
@@ -143,6 +146,10 @@ export function MemberRow({
   allyOptions: { value: string; label: string }[];
   /** The game's addable AIs, for a bot row's in-place AI picker (issue #532). */
   aiOptions?: { value: string; label: string; description?: string }[];
+  /** Who this row is to the player (themselves, a friend, in their party),
+   * which colours the name and puts a labelled glyph after it (issue #336).
+   * The team colour stays on the swatch, so the two never share a pixel. */
+  mark?: NameMark | null;
   /** Current private note on this player ("" for none), and its setter. Humans
    * only, and never on our own row — see `notes.ts` (issue #341). */
   note?: string;
@@ -275,11 +282,16 @@ export function MemberRow({
                   <Crown className="size-3.5 text-amber-500" />
                 )}
                 <span
-                  className={cn("truncate", row.self && "font-medium")}
+                  className={cn(
+                    "truncate",
+                    mark && NAME_MARK_CLASS[mark],
+                    row.self && "font-medium",
+                  )}
                   title={note || undefined}
                 >
                   {row.name}
                 </span>
+                {mark && <NameMarkIcon mark={mark} />}
                 <RatingBadge rating={row.rating} />
               </div>
               {canChangeAi && (

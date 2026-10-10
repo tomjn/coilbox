@@ -28,6 +28,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { ChatMsg } from "../bindings";
+import { NameMarkIcon } from "../NameMarkIcon";
+import { NAME_MARK_CLASS, type NameMark } from "../nameMark";
 import { composeDraft } from "./compose";
 import { EmojiPicker } from "./EmojiPicker";
 import { type EmojiEntry, loadEmoji, shortcodeIndex } from "./emoji";
@@ -152,6 +154,11 @@ export interface ChatPaneProps {
   /** Optional per-sender accent colour (`#rrggbb`), e.g. a battle player's team
    * colour. Returns undefined when the sender has no colour (channels/DMs). */
   senderColor?: (from: string) => string | undefined;
+  /** Who a sender is to the player (themselves, a friend, in their party),
+   * shown as a labelled glyph after the name (issue #336). The name takes the
+   * mark's colour only when it has no team colour, so in a battle the name
+   * still says which side somebody is on and the glyph says who they are. */
+  markFor?: (from: string) => NameMark | null;
   /** Whether a sender is a bot account (SPADS autohosts included), marked with a
    * bot glyph before the name. Returns false for humans / unknown senders. */
   isBot?: (from: string) => boolean;
@@ -199,6 +206,7 @@ export function ChatPane({
   onSend,
   headerActions,
   senderColor,
+  markFor,
   isBot,
   isHighlighted,
   variant = "full",
@@ -210,6 +218,11 @@ export function ChatPane({
   battleMemberNames,
 }: ChatPaneProps) {
   const { resolved: theme } = useTheme();
+  /** A sender's team colour as readable text, or undefined outside a battle. */
+  const teamColour = (from: string) => {
+    const raw = senderColor?.(from);
+    return raw ? readableTeamTextColor(raw, theme) : undefined;
+  };
   // Highlight the battle's own players inside a bot's message (issue #3189),
   // e.g. an autohost vote line naming who it's talking about. Each matched
   // name is drawn in that player's own readable colour (issue #3197), the
@@ -499,10 +512,8 @@ export function ChatPane({
 
                     let body: ReactNode;
                     if (isNotice(m.kind)) {
-                      const rawColor = senderColor?.(m.from);
-                      const color = rawColor
-                        ? readableTeamTextColor(rawColor, theme)
-                        : undefined;
+                      const mark = markFor?.(m.from) ?? null;
+                      const color = teamColour(m.from);
                       // Left-aligned like every other line (issue #3188) rather
                       // than centred, which put a join/leave notice a long way
                       // from the messages around it in a wide chat.
@@ -513,11 +524,20 @@ export function ChatPane({
                           ) : (
                             <>
                               <span
-                                className="font-medium"
+                                className={cn(
+                                  "font-medium",
+                                  !color && mark && NAME_MARK_CLASS[mark],
+                                )}
                                 style={color ? { color } : undefined}
                               >
                                 {m.from}
                               </span>
+                              {mark && (
+                                <NameMarkIcon
+                                  mark={mark}
+                                  className="ml-1 inline size-3 align-text-bottom"
+                                />
+                              )}
                               {m.kind === "join"
                                 ? " joined"
                                 : ` left${m.text ? `: ${m.text}` : ""}`}
@@ -530,10 +550,8 @@ export function ChatPane({
                       // sender tinted. Reads the same whoever sent it (no
                       // own/other bubble). Bots keep their glyph + monospace here
                       // too (SPADS autohosts also emit `/me` lines).
-                      const rawColor = senderColor?.(m.from);
-                      const color = rawColor
-                        ? readableTeamTextColor(rawColor, theme)
-                        : undefined;
+                      const mark = markFor?.(m.from) ?? null;
+                      const color = teamColour(m.from);
                       const bot = isBot?.(m.from) ?? false;
                       body = (
                         <div className="px-1 text-sm italic text-muted-foreground [overflow-wrap:anywhere]">
@@ -545,7 +563,10 @@ export function ChatPane({
                               it was part of. The glyph is aligned on its own
                               instead, which leaves the name where the text is. */}
                           <span
-                            className="font-medium not-italic"
+                            className={cn(
+                              "font-medium not-italic",
+                              !color && mark && NAME_MARK_CLASS[mark],
+                            )}
                             style={color ? { color } : undefined}
                           >
                             {bot && (
@@ -555,6 +576,12 @@ export function ChatPane({
                               />
                             )}
                             {m.from}
+                            {mark && (
+                              <NameMarkIcon
+                                mark={mark}
+                                className="ml-1 inline align-text-bottom"
+                              />
+                            )}
                           </span>{" "}
                           <span className={cn(bot && "font-mono")}>
                             <FormattedText
@@ -565,10 +592,8 @@ export function ChatPane({
                         </div>
                       );
                     } else {
-                      const rawColor = senderColor?.(m.from);
-                      const color = rawColor
-                        ? readableTeamTextColor(rawColor, theme)
-                        : undefined;
+                      const color = teamColour(m.from);
+                      const mark = markFor?.(m.from) ?? null;
                       const bot = isBot?.(m.from) ?? false;
                       const highlighted = isHighlighted?.(m) ?? false;
                       body = (
@@ -585,6 +610,7 @@ export function ChatPane({
                                 bot
                                   ? "font-semibold text-foreground"
                                   : "font-medium text-muted-foreground",
+                                !color && mark && NAME_MARK_CLASS[mark],
                               )}
                               style={color ? { color } : undefined}
                             >
@@ -595,6 +621,7 @@ export function ChatPane({
                                 />
                               )}
                               {m.from}
+                              {mark && <NameMarkIcon mark={mark} />}
                             </span>
                           )}
                           <div

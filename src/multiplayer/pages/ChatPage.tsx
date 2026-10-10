@@ -56,6 +56,7 @@ import { protocolForKey } from "../protocol";
 import { useStatsRelations } from "../statsRelation";
 import { relationSummary } from "../statsRelationSummary";
 import { useConnection, useMultiplayer, useProtocolServers } from "../store";
+import { useNameMark } from "../useNameMark";
 
 /**
  * Wrap an icon-only header button with a hover/focus tooltip so its purpose is
@@ -108,6 +109,7 @@ function ChatPage() {
   const connection = useConnection(activeServerKey);
   const state = connection?.mirror.state ?? null;
   const me = state?.myUsername ?? null;
+  const markFor = useNameMark(activeServerKey);
 
   // Named channels, and with them every ChanServ and moderator command below, exist
   // only on TASServer. On Tachyon the chat surface is direct messages plus battle
@@ -428,6 +430,7 @@ function ChatPage() {
           messages={conv.messages}
           currentUser={me}
           senderColor={senderColor}
+          markFor={markFor}
           isBot={isBot}
           isHighlighted={isHighlighted}
           completions={completions}
@@ -570,6 +573,7 @@ function ChatPage() {
           }}
           colorFor={senderColor}
           presenceFor={presenceFor}
+          markFor={markFor}
           isIgnored={ignoredNow}
           noteFor={(u) => getNote(u.userId, u.name)}
           renderActions={renderMemberActions}
