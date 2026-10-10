@@ -44,6 +44,7 @@ vi.mock("../../config", () => ({
 
 const { ReplayBuildOrders } = await import("./ReplayBuildOrders");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
+const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
 const game = (name: string, archive: string): GameItem => ({
   name,
@@ -126,6 +127,16 @@ describe("ReplayBuildOrders", () => {
     );
     expect(screen.queryByText(/orders each player gave/i)).toBeNull();
     expect(ASKED.every((a) => a === undefined)).toBe(true);
+  });
+
+  it("says the section is built from recorded orders before anything is read", () => {
+    RESULT = opening;
+    render(
+      <SeriesEmphasisProvider>
+        <ReplayBuildOrders replayPath="/replays/a.sdfz" info={info("X 1")} />
+      </SeriesEmphasisProvider>,
+    );
+    expect(screen.getByText(REPLAY_SOURCE_NOTES.stream)).toBeTruthy();
   });
 
   it("names units from the installed game the replay records", async () => {
