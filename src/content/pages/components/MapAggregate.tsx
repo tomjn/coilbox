@@ -63,6 +63,7 @@ import {
 } from "../../startNames";
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
 import { useStartNames } from "../../useStartNames";
+import { DateFilter } from "./DateFilter";
 import { MapExportButtons } from "./MapExportButtons";
 import { MapRecords, MapRecordsHelp, PlaceNumber } from "./MapRecords";
 import { SectionHelp } from "./SectionHelp";
@@ -609,20 +610,16 @@ export function MapAggregate({
             ]}
           />
         )}
-        <Field label="Played from" className="w-40 text-xs">
-          <Input
-            type="date"
-            value={filters.from}
-            onChange={(e) => set({ from: e.target.value })}
-          />
-        </Field>
-        <Field label="Played until" className="w-40 text-xs">
-          <Input
-            type="date"
-            value={filters.to}
-            onChange={(e) => set({ to: e.target.value })}
-          />
-        </Field>
+        <DateFilter
+          label="Played from"
+          value={filters.from}
+          onChange={(from) => set({ from })}
+        />
+        <DateFilter
+          label="Played until"
+          value={filters.to}
+          onChange={(to) => set({ to })}
+        />
         {choices.short > 0 && (
           <Toggle
             size="sm"
