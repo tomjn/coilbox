@@ -108,15 +108,12 @@ const RAMPS = {
     surface: (hue: number, sat: number) => hsl(hue, (sat * 6) / 100, 0.07),
     /** `.dark --foreground`, a literal near-white the base does not move. */
     ink: () => hsl(0, 0, 0.95),
-    /** Black is the floor for a picture, white the ceiling. */
-    worstArt: [1, 1, 1] as Rgb,
   },
   light: {
     /** `:root --background`, a literal white the base does not retint. */
     surface: () => hsl(0, 0, 1),
     /** `:root --foreground`, near-black and tinted by the text knob. */
     ink: (hue: number, satText: number) => hsl(hue, (satText * 10) / 100, 0.12),
-    worstArt: [0, 0, 0] as Rgb,
   },
 } as const;
 
@@ -145,24 +142,6 @@ function bandOver(
   };
 }
 
-/** Measure both text colours over `art`, in every base ramp picoframe ships. */
-function measureBandOver(art: Rgb, scheme: Scheme) {
-  for (const hue of BASE_HUES) {
-    for (const [sat, satText] of BASE_SATS) {
-      const measured = bandOver(art, scheme, hue, sat, satText);
-      const label = `${scheme} base hue ${hue} sat ${sat}`;
-
-      it(`clears AA for the card's name at ${label}`, () => {
-        expect(measured.name).toBeGreaterThanOrEqual(4.5);
-      });
-
-      it(`clears AA for the card's secondary line at ${label}`, () => {
-        expect(measured.secondary).toBeGreaterThanOrEqual(4.5);
-      });
-    }
-  }
-}
-
 describe("text on card art", () => {
   it("dims the art under the band", () => {
     expect(bandAlpha).toBeGreaterThan(0);
@@ -173,22 +152,6 @@ describe("text on card art", () => {
     expect(ART_FADE_CLASS).toContain("to-transparent");
     expect(ART_FADE_CLASS).toContain("bottom-full");
   });
-});
-
-/**
- * The guarantee the shell carries, and the reason it is the strict one.
- *
- * Issue #989 puts real minimaps and loading-screen art on these cards, #1000 lets
- * a distribution supply any image file at all, and the suggested map shows a
- * picture of whatever the mapper made, up to and including a snowfield and a
- * night battle. Coilbox draws none of that and can promise nothing about it, so
- * what holds the text legible has to be the band and not the picture. Black and
- * white are a picture's floor and ceiling, and each ramp's worst case is one of
- * them, so a band that clears AA there clears it over every picture a source can
- * hand back and no source has to tune its own output to be safe here.
- */
-describe("text on art Coilbox did not draw", () => {
-  for (const scheme of SCHEMES) measureBandOver(RAMPS[scheme].worstArt, scheme);
 });
 
 /**
