@@ -31,6 +31,7 @@ import {
   valueRows,
 } from "../../replayLivingValue";
 import { SPLIT_BUCKETS, type SplitBucket } from "../../replayOpening";
+import { SPLIT_COLOURS } from "../../splitColours";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { SectionHelp } from "./SectionHelp";
@@ -57,29 +58,6 @@ const LABEL: Record<SplitBucket, string> = {
   offence: "Offence",
   other: "Builders, factories, sensors and transports",
   unclassified: "Unclassified",
-};
-
-/**
- * The kinds' colours: the first four slots of the data visualisation palette
- * in their fixed order, each mode's own steps, checked with its validator for
- * colour blind separation and contrast on that mode's surface. Unclassified is
- * the palette's muted grey, since it is the absence of a kind.
- */
-const COLOURS: Record<"light" | "dark", Record<SplitBucket, string>> = {
-  light: {
-    economy: "#2a78d6",
-    defence: "#eb6834",
-    offence: "#1baf7a",
-    other: "#eda100",
-    unclassified: "#898781",
-  },
-  dark: {
-    economy: "#3987e5",
-    defence: "#d95926",
-    offence: "#199e70",
-    other: "#c98500",
-    unclassified: "#898781",
-  },
 };
 
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
@@ -190,7 +168,7 @@ function OpenValueChart({
   const units = useReplayUnits(info, true, "events");
   const emphasis = useSeriesEmphasis();
   const { resolved: theme } = useTheme();
-  const colours = COLOURS[theme === "light" ? "light" : "dark"];
+  const colours = SPLIT_COLOURS[theme === "light" ? "light" : "dark"];
 
   const { gameId, analysedAtMs: atMs } = state;
   useEffect(() => {

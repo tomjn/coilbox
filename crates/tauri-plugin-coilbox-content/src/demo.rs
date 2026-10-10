@@ -47,6 +47,7 @@ pub mod map_grids;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
+pub mod unit_orders;
 
 /// Folders under a write dir that hold client demos. The engine writes to
 /// `demos/` (`DemoRecorder.cpp`), and some lobbies/users use `replays/`.

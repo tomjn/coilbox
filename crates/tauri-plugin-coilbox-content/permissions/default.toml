@@ -26,6 +26,7 @@ permissions = [
   "allow-content-demo-build-orders",
   "allow-content-demo-order-points",
   "allow-content-replay-map-grids",
+  "allow-content-replay-unit-orders",
   "allow-content-demo-command-rates",
   "allow-content-rewrite-demo",
   "allow-content-analysis-check",
