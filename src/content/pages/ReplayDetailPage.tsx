@@ -22,10 +22,9 @@ import { notify } from "@/notify/notify";
 import { useWriteRoot, useWriteRootPath } from "../../downloads/config";
 import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
-import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { useReplayTarget } from "../../play/config";
 import { isProfileHidden } from "../../profile/hidden";
-import type { AllyTeamInfo, StartBox } from "../bindings";
+import type { DemoInfo } from "../bindings";
 import { contentDeleteReplay } from "../bindings";
 import {
   invalidateMapPreview,
@@ -45,7 +44,7 @@ import {
 import { forgetReplay } from "../replayList";
 import { provenanceLink } from "../replayProvenanceLink";
 import { useReplaySets } from "../replaySets";
-import { teamLabel, teamResultLabel } from "../replaySideLabel";
+import { teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
@@ -59,7 +58,8 @@ import { ReplayAnalysisEvents } from "./components/ReplayAnalysisEvents";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
-import { ReplayRoster, swatch } from "./components/ReplayRoster";
+import { ReplayMap } from "./components/ReplayMap";
+import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
@@ -92,12 +92,14 @@ function ReplayMapPreview({
   enginePath,
   dataDir,
   mapName,
-  allyTeams,
+  info,
+  replayPath,
 }: {
   enginePath: string;
   dataDir: string;
   mapName: string;
-  allyTeams: AllyTeamInfo[];
+  info: DemoInfo;
+  replayPath: string | undefined;
 }) {
   const minimap = useUnitsyncMinimap(enginePath, dataDir, mapName);
   const heightmap = useUnitsyncHeightmap(enginePath, dataDir, mapName);
@@ -114,81 +116,27 @@ function ReplayMapPreview({
   }
 
   if (minimap.url) {
-    const aspect =
-      heightmap.data?.width && heightmap.data?.height
-        ? `${heightmap.data.width} / ${heightmap.data.height}`
-        : "1 / 1";
-    const boxes = (allyTeams ?? []).filter((a) => a.startBox);
     return (
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
-        <div className="flex w-full max-w-sm shrink-0 flex-col gap-1.5">
-          <div className="relative flex items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
-            <div className="relative inline-flex max-h-full max-w-full">
-              <img
-                src={minimap.url}
-                alt={`Minimap of ${mapName}`}
-                style={{ aspectRatio: aspect }}
-                className="block max-h-full max-w-full object-fill"
-              />
-              {boxes.map((a) => {
-                const b = a.startBox as StartBox;
-                const c = swatch(a.color) ?? "rgb(148, 163, 184)";
-                return (
-                  <span
-                    key={a.id}
-                    className="absolute flex items-start justify-start"
-                    style={{
-                      left: `${b.left * 100}%`,
-                      top: `${b.top * 100}%`,
-                      width: `${(b.right - b.left) * 100}%`,
-                      height: `${(b.bottom - b.top) * 100}%`,
-                      border: `1.5px solid ${c}`,
-                      backgroundColor: c
-                        .replace("rgb", "rgba")
-                        .replace(")", ", 0.22)"),
-                    }}
-                    title={`${teamLabel(a.id)} start box`}
-                  >
-                    <span
-                      className="m-0.5 rounded px-1 text-[10px] font-medium leading-tight text-white"
-                      style={{
-                        backgroundColor: c
-                          .replace("rgb", "rgba")
-                          .replace(")", ", 0.85)"),
-                      }}
-                    >
-                      {a.id + 1}
-                    </span>
-                  </span>
-                );
-              })}
-            </div>
-          </div>
-          {boxes.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              Start boxes per team.
-            </p>
-          )}
-        </div>
-        {heightmap.data && heightmap.url && (
-          <MapPreview3D
-            className="w-full min-w-0 lg:flex-1"
-            heightSrc={heightmap.url}
-            heightRange={heightmap.range}
-            textureSrc={minimap.url}
-            appearance={minimap.appearance}
-            skyboxSrc={skybox.dataUrl}
-            minHeight={heightmap.data.minHeight ?? 0}
-            maxHeight={heightmap.data.maxHeight ?? 0}
-            worldWidth={
-              heightmap.data.width ? (heightmap.data.width - 1) * 8 : 1
-            }
-            worldHeight={
-              heightmap.data.height ? (heightmap.data.height - 1) * 8 : 1
-            }
-          />
-        )}
-      </div>
+      <ReplayMap
+        info={info}
+        replayPath={replayPath}
+        mapName={mapName}
+        minimapUrl={minimap.url}
+        heightmap={heightmap.data}
+        preview={
+          heightmap.data && heightmap.url
+            ? {
+                heightSrc: heightmap.url,
+                heightRange: heightmap.range,
+                textureSrc: minimap.url,
+                appearance: minimap.appearance,
+                skyboxSrc: skybox.dataUrl,
+                minHeight: heightmap.data.minHeight ?? 0,
+                maxHeight: heightmap.data.maxHeight ?? 0,
+              }
+            : null
+        }
+      />
     );
   }
 
@@ -856,8 +804,10 @@ export default function ReplayDetailPage() {
             </dl>
           </section>
 
-          {/* One emphasised series for the roster and the chart (#1139). Keyed
-           * by replay so a selection can't follow you to the next one. */}
+          {/* One emphasised series for the roster, the chart and the map's start
+           * dots (#1139, #1152). Keyed by replay so a selection can't follow
+           * you to the next one. It reaches down to the map, so the sections
+           * between are inside it too and read nothing from it. */}
           <SeriesEmphasisProvider key={filename}>
             <ReplayRoster info={info} replayPath={replay?.path} />
 
@@ -870,65 +820,66 @@ export default function ReplayDetailPage() {
             {replay && !isProfileHidden("analytics.matchStats") && (
               <ReplayBuildOrders info={info} replayPath={replay.path} />
             )}
-          </SeriesEmphasisProvider>
 
-          {/* Opt in, one replay at a time (#1157). The section gates itself on
-           * `analytics.run`, and still shows an analysis that is already stored. */}
-          {replay && (
-            <ReplayAnalysisSection
-              replayPath={replay.path}
-              info={info}
-              target={resolved?.matched ? resolved.target : null}
-              missingGame={missingGame}
-              missingMap={missingMap}
-              dependencyBlock={dependencyBlock}
-              installedGames={answered?.games ?? []}
-              downloads={
-                <MissingContentNotice
-                  gameType={info.gameType}
-                  mapName={info.mapName}
-                  missingGame={missingGame}
-                  missingMap={missingMap}
-                  engine={engine}
-                  onMapDownloaded={onMapDownloaded}
-                />
-              }
-            />
-          )}
-
-          {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
-          {replay && !isProfileHidden("analytics.matchStats") && (
-            <ReplayAnalysisEvents info={info} replayPath={replay.path} />
-          )}
-
-          {/* Read from the replay file, so it needs no engine. */}
-          {replay && (
-            <ReplayChat
-              replayPath={replay.path}
-              durationSec={info.durationSec}
-            />
-          )}
-
-          <ReplayNotes filename={filename} gameId={info.gameId} />
-
-          <section className="flex flex-col gap-2">
-            <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
-            {selected && info.mapName ? (
-              <ReplayMapPreview
-                key={previewNonce}
-                enginePath={selected.enginePath}
-                dataDir={selected.rootPath}
-                mapName={info.mapName}
-                allyTeams={info.allyTeams}
+            {/* Opt in, one replay at a time (#1157). The section gates itself on
+             * `analytics.run`, and still shows an analysis that is already stored. */}
+            {replay && (
+              <ReplayAnalysisSection
+                replayPath={replay.path}
+                info={info}
+                target={resolved?.matched ? resolved.target : null}
+                missingGame={missingGame}
+                missingMap={missingMap}
+                dependencyBlock={dependencyBlock}
+                installedGames={answered?.games ?? []}
+                downloads={
+                  <MissingContentNotice
+                    gameType={info.gameType}
+                    mapName={info.mapName}
+                    missingGame={missingGame}
+                    missingMap={missingMap}
+                    engine={engine}
+                    onMapDownloaded={onMapDownloaded}
+                  />
+                }
               />
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {info.mapName
-                  ? "Install an engine to preview this map."
-                  : "No map recorded for this replay."}
-              </p>
             )}
-          </section>
+
+            {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
+            {replay && !isProfileHidden("analytics.matchStats") && (
+              <ReplayAnalysisEvents info={info} replayPath={replay.path} />
+            )}
+
+            {/* Read from the replay file, so it needs no engine. */}
+            {replay && (
+              <ReplayChat
+                replayPath={replay.path}
+                durationSec={info.durationSec}
+              />
+            )}
+
+            <ReplayNotes filename={filename} gameId={info.gameId} />
+
+            <section className="flex flex-col gap-2">
+              <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
+              {selected && info.mapName ? (
+                <ReplayMapPreview
+                  key={previewNonce}
+                  enginePath={selected.enginePath}
+                  dataDir={selected.rootPath}
+                  mapName={info.mapName}
+                  info={info}
+                  replayPath={replay?.path}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {info.mapName
+                    ? "Install an engine to preview this map."
+                    : "No map recorded for this replay."}
+                </p>
+              )}
+            </section>
+          </SeriesEmphasisProvider>
         </>
       ) : null}
     </div>

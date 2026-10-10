@@ -100,6 +100,12 @@ function seen(hex: string, kind?: Vision): Triple {
   ) as Triple;
 }
 
+/** OKLab lightness x100 of a `#rrggbb` colour, as `kind` sees it. What a
+ *  sequential ramp is checked on: its steps must be ordered in this. */
+export function lightness(hex: string, kind?: Vision): number {
+  return 100 * oklab(seen(hex, kind))[0];
+}
+
 /** OKLab Delta E x100 between two `#rrggbb` colours, as `kind` sees them. */
 export function deltaE(a: string, b: string, kind?: Vision): number {
   const x = oklab(seen(a, kind));

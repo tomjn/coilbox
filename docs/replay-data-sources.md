@@ -91,7 +91,8 @@ From these, the interface builds:
 - the chat log and the chat timeline
 - the timeline's typed marks, which are pauses, resignations, players leaving, give aways, eliminated teams and late joiners
 - each player's build orders, the folded opening, the cost of what was ordered, and the split of that cost by kind of unit
-- each team's start position, which is on the decoded replay info and not drawn anywhere yet
+- each team's start position, drawn as a dot on the replay's map
+- where buildings were ordered, drawn on the replay's map as a mark for each order and as a density
 
 ### What it costs
 
@@ -224,11 +225,13 @@ This table lists each part of the interface, the source it shows, and what makes
 | Build orders | Stream | An order that was cancelled or refused is listed. A damaged stream may be missing later orders |
 | Folded opening and cost of what was ordered | Stream, priced through unitsync against an installed game | Game not installed, or another build installed. Orders are not purchases |
 | Cost by kind of unit | The same, with each unit classified by coilbox from its definition | Units the classifier cannot place are shown as unclassified |
-| Start positions | Stream. They are decoded onto the replay info and no part of the page draws them yet | A team that never readied |
+| Map layer, start positions | Stream. A dot for each team where its start was set before the game, in the colour of that player's line on the match chart | A team that never readied has no dot. The engine can move a start into its start box, so the commander may have appeared a short way off |
+| Map layer, buildings ordered | Stream. A mark for each order to place a building, in its player's colour. The shape is the kind of building, classified by coilbox through unitsync against an installed game | An order that was cancelled or refused is a mark like any other. Factory queue orders have no position and are not drawn. With the game not installed every mark is one shape. With another build installed a shape may be wrong |
+| Map layer, building density | Stream. The same orders added up into a heatmap, drawn on the minimap and on the 3D preview. Colours are relative to the busiest spot on that map, and the legend states how many orders that spot holds | It shows where buildings were ordered, not where every order was given. Move, attack and other orders are not in it yet |
 | Chat log and chat timeline | Stream | A damaged stream, with a note |
 | Timeline typed marks | Stream | The pause layout has not been checked against a real replay |
 | Analysis section and recorded events | Event log | Not analysed, or the playback did not reproduce the match |
-| Map preview and start boxes | The installed map, with start boxes from the start script | No engine or map is installed |
+| Map preview and the start boxes layer | The installed map, with start boxes from the start script | No engine or map is installed. A match with fixed or random starts has no boxes |
 
 ### Across the library
 

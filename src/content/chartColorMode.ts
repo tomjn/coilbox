@@ -7,7 +7,7 @@
  * editor's `presentationOpen` does.
  */
 
-import { useState } from "react";
+import { useSyncExternalStore } from "react";
 import type { ChartColorMode } from "./matchStats";
 
 const KEY = "coilbox.matchStats.colorMode";
@@ -22,24 +22,41 @@ export function storedColorMode(raw: string | null): ChartColorMode | null {
   return raw === "game" || raw === "palette" ? raw : null;
 }
 
+function readStored(): ChartColorMode | null {
+  try {
+    return storedColorMode(localStorage.getItem(KEY));
+  } catch {
+    // Storage unavailable (private mode or quota). The chart picks per match.
+    return null;
+  }
+}
+
+/** Everything on the page that is painted from the mode, so the map's dots
+ *  repaint with the chart's lines when the chart's toggle is used (#1152). */
+const listeners = new Set<() => void>();
+let current: ChartColorMode | null | undefined;
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function snapshot(): ChartColorMode | null {
+  if (current === undefined) current = readStored();
+  return current;
+}
+
 /** The remembered mode (null until chosen), and a setter that remembers it. */
 export function useStoredColorMode(): [
   ChartColorMode | null,
   (mode: ChartColorMode) => void,
 ] {
-  const [mode, setMode] = useState<ChartColorMode | null>(() => {
-    try {
-      return storedColorMode(localStorage.getItem(KEY));
-    } catch {
-      // Storage unavailable (private mode or quota). The chart picks per match.
-      return null;
-    }
-  });
-
+  const mode = useSyncExternalStore(subscribe, snapshot);
   return [
     mode,
     (next) => {
-      setMode(next);
+      current = next;
+      for (const listener of listeners) listener();
       try {
         localStorage.setItem(KEY, next);
       } catch {}

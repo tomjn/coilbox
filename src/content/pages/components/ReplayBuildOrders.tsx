@@ -1,31 +1,22 @@
 import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, Hammer, Loader2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Field } from "@/components/Field";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import {
-  contentDemoBuildOrders,
-  type DemoBuildOrders,
-  type DemoInfo,
-  type UnitBuildpicsResult,
-  type UnitDatasetEntry,
+import type {
+  DemoInfo,
+  UnitBuildpicsResult,
+  UnitDatasetEntry,
 } from "../../bindings";
-import {
-  useScanTargetSelection,
-  useUnitsyncScan,
-  useUnitsyncUnitBuildpics,
-  useUnitsyncUnitDataset,
-} from "../../config";
+import { useUnitsyncUnitBuildpics } from "../../config";
 import {
   type BuildOrderSeat,
   buildOrderSeats,
   buildOrderTime,
-  pickUnitSource,
-  recordedGame,
   resolveBuildUnit,
   slotNote,
   type UnitSource,
@@ -37,6 +28,8 @@ import {
   ordersUpTo,
   parseCutMinutes,
 } from "../../replayOpening";
+import { useReplayBuildOrders } from "../../useReplayBuildOrders";
+import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplayOpeningSplit } from "./ReplayOpeningSplit";
 import { ReplaySourceNote } from "./ReplaySourceNote";
@@ -322,54 +315,16 @@ export function ReplayBuildOrders({
   replayPath: string;
   info: DemoInfo;
 }) {
-  // The replay a read belongs to, so another replay shows nothing of it.
-  const [read, setRead] = useState<{
-    path: string;
-    status: "loading" | "failed" | "done";
-    result: DemoBuildOrders | null;
-  } | null>(null);
+  const { result, loading, failed, load } = useReplayBuildOrders(replayPath);
   const [cut, setCut] = useState("");
-  const latestPath = useRef(replayPath);
-  latestPath.current = replayPath;
-
-  const current = read?.path === replayPath ? read : null;
-  const result = current?.result ?? null;
-  const loading = current?.status === "loading";
-  const failed = current?.status === "failed";
-
-  const load = async () => {
-    const path = replayPath;
-    setRead({ path, status: "loading", result: null });
-    try {
-      const res = await contentDemoBuildOrders({ replayPath: path });
-      if (latestPath.current !== path) return;
-      setRead({ path, status: "done", result: res });
-    } catch {
-      if (latestPath.current !== path) return;
-      setRead({ path, status: "failed", result: null });
-    }
-  };
 
   // Which installed game can name the ids, from the live scan the page's
   // missing-game notice reads. Nothing is asked of unitsync until there are
   // orders to name.
-  const { selected } = useScanTargetSelection();
-  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
-  const recorded = recordedGame(info);
-  const source =
-    result && result.orders.length > 0 && scan.data && !scan.loading
-      ? pickUnitSource(recorded, scan.data.games)
-      : null;
-  const archive =
-    source && source.kind !== "notInstalled"
-      ? source.game.primaryArchive.name
-      : undefined;
-  const { dataset, status } = useUnitsyncUnitDataset(
-    selected?.enginePath,
-    selected?.rootPath,
-    archive,
+  const { selected, recorded, source, archive, status, units } = useReplayUnits(
+    info,
+    result !== null && result.orders.length > 0,
   );
-  const units = archive && dataset ? dataset.units : null;
   const named = result
     ? [
         ...new Set(

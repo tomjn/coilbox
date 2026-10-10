@@ -223,7 +223,7 @@ function seriesColor(rgb: [number, number, number] | undefined, team: number) {
 }
 
 /** Every seat that played, by the team it held: people first, then the bots. */
-function seatsByTeam(info: DemoInfo) {
+export function seatsByTeam(info: DemoInfo) {
   const seats = new Map<
     number,
     { name: string; rgbColor?: [number, number, number] }[]
