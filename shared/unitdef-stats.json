@@ -71,11 +71,6 @@
       "unit": null,
       "note": "A boolean. Whether the unit can build, repair and reclaim at all, which the engine defaults to false. Written true or false only where the def declares it."
     },
-    "isFeature": {
-      "from": ["isFeature"],
-      "unit": null,
-      "note": "A boolean. A unit def the engine turns into a map feature, which is how some games make walls."
-    },
     "weapons": {
       "from": ["weapons[]"],
       "unit": null,

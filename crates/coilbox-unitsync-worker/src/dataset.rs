@@ -300,7 +300,6 @@ local function stats_of(d, wdefs)
   put('seismicDistance', stat(u, 'seismicdistance'))
   put('transportCapacity', stat(u, 'transportcapacity'))
   put_flag('builder', flag(u, 'builder'))
-  put_flag('isFeature', flag(u, 'isfeature'))
   return '{' .. table.concat(parts, ',') .. '}'
 end
 
@@ -1840,7 +1839,7 @@ mod tests {
                   metalstorage = 100, energystorage = 200,
                   radardistance = 1800, sonardistance = 600, radardistancejam = 300,
                   sonardistancejam = 100, seismicdistance = 2000, transportcapacity = 8,
-                  builder = true, isFeature = 1,
+                  builder = true,
                 },
               },
               weapondefs = {},
@@ -1863,7 +1862,6 @@ mod tests {
         assert_eq!(stat(&units[0], "seismicDistance"), Some(2000.0));
         assert_eq!(stat(&units[0], "transportCapacity"), Some(8.0));
         assert_eq!(s["builder"], serde_json::json!(true));
-        assert_eq!(s["isFeature"], serde_json::json!(true));
     }
 
     /// A negative upkeep is income in the engine, so it travels as written
