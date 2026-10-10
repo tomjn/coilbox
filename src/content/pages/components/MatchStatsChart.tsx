@@ -551,8 +551,8 @@ export function MatchStatsChart({
         // A side's line is every member added up. Unchecking one member of a
         // side leaves the side's line as it was, and this says so.
         <p className="text-xs text-muted-foreground">
-          Teams view counts every player on a side. Unchecked players are still
-          in the total for {partial.map((s) => s.label).join(", ")}.
+          Unchecked players still count in the total for{" "}
+          {partial.map((s) => s.label).join(", ")}.
         </p>
       )}
 

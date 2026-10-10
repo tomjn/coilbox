@@ -180,9 +180,12 @@ describe("ReplayAnalysisEvents", () => {
     expect(read).toHaveBeenCalledTimes(1);
     expect(read).toHaveBeenCalledWith({ gameId: "game-a" });
     expect(bodyRows()).toHaveLength(5);
-    expect(
-      screen.getByText(/events from playing the match back, not orders/i),
-    ).toBeTruthy();
+    // What the events are is in the help, and the page does not say it.
+    expect(screen.queryByText(/These are events, not orders/i)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About the events" }));
+    const said = within(screen.getByRole("dialog"));
+    expect(said.getByText(/playing the match back/i)).toBeTruthy();
+    expect(said.getByText(/These are events, not orders/i)).toBeTruthy();
   });
 
   it("shows a kind the build has no name for, with its fields", async () => {

@@ -735,9 +735,7 @@ describe("one read for the page", () => {
     ORDERS = PLACED;
     show(INFO, <ReplayBuildOrders replayPath="/replays/a.sdfz" info={INFO} />);
     fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
-    await screen.findByText(
-      /orders each player gave, not what was built\. An order that was cancelled or never carried out is listed/i,
-    );
+    await screen.findByText(/Opening length in minutes/i);
     fireEvent.click(toggle("Buildings ordered"));
     fireEvent.click(toggle("Building density"));
     await screen.findByText(/3 of 3 orders/);

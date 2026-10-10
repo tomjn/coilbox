@@ -18,7 +18,7 @@ import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
 import { useMatchStats } from "../../useMatchStats";
 import { MatchStatsChart } from "./MatchStatsChart";
-import { ReplaySourceNote } from "./ReplaySourceNote";
+import { SectionHelp } from "./SectionHelp";
 import { StatCard } from "./StatWidgets";
 
 /**
@@ -127,17 +127,8 @@ export function MatchStatsSection({
         <NoStatistics detail="The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written." />
       );
     }
-    const period = data.trailer.teamStatPeriodSec;
     return (
       <>
-        <ReplaySourceNote
-          source="trailer"
-          detail={
-            period > 0
-              ? `Figures are sampled every ${period} seconds.`
-              : undefined
-          }
-        />
         <Headlines info={info} trailer={data.trailer} metrics={data.metrics} />
         {/* The chart owns its own controls, so the per-minute view (#1137), the
          * players/sides view (#1138) and the value table (#1140) go in there
@@ -152,9 +143,23 @@ export function MatchStatsSection({
     );
   }
 
+  const period = data?.trailer.teamStatPeriodSec ?? 0;
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Match statistics</h2>
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">Match statistics</h2>
+        {data && hasStatistics(data.trailer) && (
+          <SectionHelp
+            section="match statistics"
+            source="trailer"
+            detail={
+              period > 0
+                ? `Figures are sampled every ${period} seconds.`
+                : undefined
+            }
+          />
+        )}
+      </div>
       {body()}
     </section>
   );

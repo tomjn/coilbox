@@ -21,6 +21,7 @@ import {
 import { type ChartSeries, formatRate, seriesTeams } from "../../matchStats";
 import { useReplayCommandRates } from "../../useReplayCommandRates";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { SectionHelp } from "./SectionHelp";
 
 /**
  * Commands per minute, as its own small chart under the match chart (#1149).
@@ -135,7 +136,6 @@ export function CommandRateChart({
             </ToggleGroupItem>
           ))}
         </ToggleGroup>
-        <p className="text-xs text-muted-foreground">{SENDER_NOTE[source]}</p>
         {shown.length === 0 ? (
           <p className="text-xs text-muted-foreground">
             None of the lines on the chart above gave orders of this kind.
@@ -194,29 +194,41 @@ export function CommandRateChart({
             </LineChart>
           </ResponsiveContainer>
         )}
-        <p className="text-xs text-muted-foreground">
-          Orders given in each {rates.periodSec} second stretch, shown as a rate
-          per minute.
-          {rates.periodIsDefault &&
-            " The replay named no period, so the engine's default is used."}{" "}
-          One order is one command. This is not the same count as the trailer's,
-          so neither checks the other.
-          {rates.trailing > 0 &&
-            ` ${rates.trailing.toLocaleString()} orders in the last part-period are left out.`}
-          {rates.pregame > 0 &&
-            ` ${rates.pregame.toLocaleString()} orders before the game started are left out.`}
-          {rates.unattributed > 0 &&
-            ` ${rates.unattributed.toLocaleString()} orders from players with no team are left out.`}
-          {rates.incomplete &&
-            " This replay could not be read to the end, so later orders may be missing."}
-        </p>
+        {rates.incomplete && (
+          <p className="text-xs text-muted-foreground">
+            This replay could not be read to the end, so later orders may be
+            missing.
+          </p>
+        )}
       </>
     );
   };
 
+  const explained = !!rates && present.length > 0 && rates.buckets > 0;
   return (
     <div className="flex flex-col gap-2 border-t border-border/50 pt-3">
-      <h3 className="text-sm font-medium">Commands per minute</h3>
+      <div className="flex items-center gap-1">
+        <h3 className="text-sm font-medium">Commands per minute</h3>
+        {explained && (
+          <SectionHelp section="commands per minute" source="stream">
+            <p>{SENDER_NOTE[source]}</p>
+            <p>
+              Orders given in each {rates.periodSec} second stretch, shown as a
+              rate per minute.
+              {rates.periodIsDefault &&
+                " The replay named no period, so the engine's default is used."}{" "}
+              One order is one command. This is not the same count as the
+              trailer's, so neither checks the other.
+              {rates.trailing > 0 &&
+                ` ${rates.trailing.toLocaleString()} orders in the last part-period are left out.`}
+              {rates.pregame > 0 &&
+                ` ${rates.pregame.toLocaleString()} orders before the game started are left out.`}
+              {rates.unattributed > 0 &&
+                ` ${rates.unattributed.toLocaleString()} orders from players with no team are left out.`}
+            </p>
+          </SectionHelp>
+        )}
+      </div>
       {body()}
     </div>
   );

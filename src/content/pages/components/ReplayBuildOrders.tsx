@@ -31,8 +31,8 @@ import {
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplayOpeningSplit } from "./ReplayOpeningSplit";
-import { ReplaySourceNote } from "./ReplaySourceNote";
+import { OpeningSplitHelp, ReplayOpeningSplit } from "./ReplayOpeningSplit";
+import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
 
@@ -178,9 +178,8 @@ function SeatOpening({
       )}
       {cost && (
         <p className="text-xs text-muted-foreground">
-          Cost of what was ordered, not of what was built:{" "}
-          {cost.metal.toLocaleString()} metal and {cost.energy.toLocaleString()}{" "}
-          energy.
+          Ordered cost: {cost.metal.toLocaleString()} metal and{" "}
+          {cost.energy.toLocaleString()} energy.
           {cost.unpriced > 0 &&
             ` ${cost.unpriced} ${cost.unpriced === 1 ? "unit" : "units"} could not be priced and ${cost.unpriced === 1 ? "is" : "are"} left out.`}
           {differentBuild && (
@@ -345,8 +344,35 @@ export function ReplayBuildOrders({
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Build orders</h2>
-      <ReplaySourceNote source="stream" />
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">Build orders</h2>
+        <SectionHelp section="build orders" source="stream">
+          {seats.length > 0 && (
+            <>
+              <p>
+                These are the orders each player gave, not what was built. An
+                order that was cancelled or never carried out is listed like any
+                other.
+              </p>
+              <p>
+                Each player's opening is their orders folded into a sequence,
+                with repeats shown as a count.
+              </p>
+              {units && <OpeningSplitHelp />}
+              {result && result.removals > 0 && (
+                <p>
+                  {result.removals}{" "}
+                  {result.removals === 1
+                    ? "order that took"
+                    : "orders that took"}{" "}
+                  units off a factory queue{" "}
+                  {result.removals === 1 ? "is" : "are"} not listed.
+                </p>
+              )}
+            </>
+          )}
+        </SectionHelp>
+      </div>
       {result === null ? (
         <div>
           <Button
@@ -373,10 +399,6 @@ export function ReplayBuildOrders({
         </p>
       ) : (
         <>
-          <p className="text-xs text-muted-foreground">
-            These are the orders each player gave, not what was built. An order
-            that was cancelled or never carried out is listed like any other.
-          </p>
           {archive && status === "loading" ? (
             <p className="text-xs text-muted-foreground">Reading unit names…</p>
           ) : (
@@ -388,7 +410,7 @@ export function ReplayBuildOrders({
           )}
           <Field
             label="Opening length in minutes"
-            hint="Each player's opening is their orders folded into a sequence, with repeats shown as a count. Leave this empty to fold the whole match."
+            hint="Leave this empty to fold the whole match."
             className="max-w-sm"
           >
             <Input
@@ -424,14 +446,6 @@ export function ReplayBuildOrders({
               differentBuild={source?.kind === "differentBuild"}
             />
           ))}
-          {result.removals > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {result.removals}{" "}
-              {result.removals === 1 ? "order that took" : "orders that took"}{" "}
-              units off a factory queue {result.removals === 1 ? "is" : "are"}{" "}
-              not listed.
-            </p>
-          )}
         </>
       )}
       {result?.incomplete && (

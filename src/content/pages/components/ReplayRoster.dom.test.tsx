@@ -488,16 +488,30 @@ describe("with nothing to show", () => {
     expect(screen.getByRole("img", { name: /rating 25/i })).toBeTruthy();
     // Nothing was asked of the replay file either.
     expect(trailerRead).not.toHaveBeenCalled();
-    // So the roster claims the setup as its only source.
-    expect(screen.getByText(REPLAY_SOURCE_NOTES.setup)).toBeTruthy();
-    expect(screen.queryByText(REPLAY_SOURCE_NOTES.players)).toBeNull();
+    // So the roster claims the setup as its only source, in its help.
+    expect(screen.queryByText(REPLAY_SOURCE_NOTES.setup)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About the players" }));
+    const said = within(screen.getByRole("dialog"));
+    expect(said.getByText(REPLAY_SOURCE_NOTES.setup)).toBeTruthy();
+    expect(said.queryByText(REPLAY_SOURCE_NOTES.players)).toBeNull();
   });
 
   it("says where the roster and the statistics section get their figures", async () => {
     mount(twoVTwo());
-    await screen.findByText(REPLAY_SOURCE_NOTES.players);
+    await screen.findByText("Ann");
+    // Neither section carries its source in the page.
+    expect(screen.queryByText(REPLAY_SOURCE_NOTES.players)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About the players" }));
     expect(
-      await screen.findByText(
+      within(screen.getByRole("dialog")).getByText(REPLAY_SOURCE_NOTES.players),
+    ).toBeTruthy();
+    cleanup();
+    mount(twoVTwo());
+    fireEvent.click(
+      await screen.findByRole("button", { name: "About match statistics" }),
+    );
+    expect(
+      within(screen.getByRole("dialog")).getByText(
         `${REPLAY_SOURCE_NOTES.trailer} Figures are sampled every 15 seconds.`,
       ),
     ).toBeTruthy();
