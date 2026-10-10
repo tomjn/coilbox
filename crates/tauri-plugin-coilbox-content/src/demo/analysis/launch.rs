@@ -158,6 +158,10 @@ pub struct Launch<'a> {
     pub write_dir: &'a Path,
     /// The engine's only configuration file, in scratch. It need not exist.
     pub config: &'a Path,
+    /// Where to record the engine's process id once it is running, so that a
+    /// later start can find it if this coilbox is killed outright. See
+    /// [`kill_leftover_engine`].
+    pub pid_file: &'a Path,
     /// The folders the engine reads games and maps from, highest priority first.
     pub data_dirs: &'a [PathBuf],
     /// Where the engine's output goes, both streams.
@@ -194,6 +198,32 @@ pub fn data_dir_list(data_dirs: &[PathBuf]) -> String {
         .join(&coilbox_proc::DATADIR_SEP.to_string())
 }
 
+/// Kills the engine a dead coilbox left running in `scratch`, if it is still
+/// there. Returns whether it sent the kill.
+///
+/// Reads the pid file [`run_headless`] wrote. A pid alone is never enough,
+/// because the OS reuses them, so the process must also be running the binary
+/// the file names with this scratch folder in its arguments. A person playing
+/// a game on the same engine binary has a different command line and is left
+/// alone. Only unix can check that, so elsewhere this does nothing: on Windows
+/// the job object ends the engine with coilbox.
+pub fn kill_leftover_engine(scratch: &Path) -> bool {
+    let Ok(record) = std::fs::read_to_string(scratch.join(PID_FILE)) else {
+        return false;
+    };
+    let mut lines = record.lines();
+    let (Some(pid), Some(engine)) = (
+        lines.next().and_then(|p| p.parse::<u32>().ok()),
+        lines.next(),
+    ) else {
+        return false;
+    };
+    coilbox_proc::kill_if_command_line_has(pid, &[engine, &scratch.to_string_lossy()])
+}
+
+/// The pid file's name in a run's scratch folder.
+pub const PID_FILE: &str = "engine.pid";
+
 /// Run the engine headless on a replay and wait for it.
 ///
 /// Blocks until the engine exits, the time limit passes or `control` is
@@ -227,6 +257,10 @@ pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit,
     .stdout(Stdio::from(log))
     .stderr(Stdio::from(log_err));
 
+    // Only effective on Linux, and only because this thread is also the one that
+    // waits for the engine below.
+    coilbox_proc::die_with_parent(&mut cmd);
+
     let started = Instant::now();
     {
         // Spawned under the lock a cancel takes, so a cancel either comes
@@ -241,10 +275,18 @@ pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit,
                 wall_seconds: 0.0,
             });
         }
-        state.child = Some(
-            cmd.spawn()
-                .map_err(|e| format!("failed to launch engine: {e}"))?,
+        let child = cmd
+            .spawn()
+            .map_err(|e| format!("failed to launch engine: {e}"))?;
+        // Best effort. Without it only the engine's own end of the replay
+        // stops an engine left by a killed coilbox. The scratch folder was
+        // made a moment ago, so a failure here means the disk is in trouble
+        // and the run is about to fail anyway.
+        let _ = std::fs::write(
+            launch.pid_file,
+            format!("{}\n{}\n", child.id(), launch.engine.display()),
         );
+        state.child = Some(child);
     }
 
     loop {
@@ -311,6 +353,7 @@ pub(super) mod tests {
                 demo: &dir.path().join("replay.sdfz"),
                 write_dir: &dir.path().join("write"),
                 config: &dir.path().join("engine.cfg"),
+                pid_file: &dir.path().join(PID_FILE),
                 data_dirs: &[dir.path().join("data"), PathBuf::from("/content/root")],
                 log: &dir.path().join("engine.log"),
                 timeout,
@@ -338,6 +381,18 @@ pub(super) mod tests {
         assert_eq!(run.exit.code, Some(0));
         assert!(!run.exit.timed_out && !run.exit.cancelled);
         assert!(run.dir.path().join("write").is_dir());
+    }
+
+    /// The record a later start reads to find an engine a killed coilbox left.
+    /// The script prints its own id, which is the id in the file.
+    #[test]
+    fn the_engines_process_id_and_binary_are_recorded_in_scratch() {
+        let run = run("echo $$", LONG, false);
+        let record = std::fs::read_to_string(run.dir.path().join(PID_FILE)).unwrap();
+        let mut lines = record.lines();
+
+        assert_eq!(lines.next(), Some(run.log().trim()));
+        assert!(lines.next().unwrap().ends_with("spring-headless"));
     }
 
     #[test]
@@ -415,6 +470,7 @@ pub(super) mod tests {
                         demo: &dir.path().join("replay.sdfz"),
                         write_dir: &dir.path().join("write"),
                         config: &dir.path().join("engine.cfg"),
+                        pid_file: &dir.path().join(PID_FILE),
                         data_dirs: &[],
                         log: &dir.path().join("engine.log"),
                         timeout: LONG,
@@ -480,6 +536,7 @@ pub(super) mod tests {
                 demo: &dir.path().join("replay.sdfz"),
                 write_dir: &dir.path().join("write"),
                 config: &dir.path().join("engine.cfg"),
+                pid_file: &dir.path().join(PID_FILE),
                 data_dirs: &[],
                 log: &dir.path().join("engine.log"),
                 timeout: LONG,

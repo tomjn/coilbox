@@ -97,6 +97,9 @@ impl Engine for HeadlessEngine {
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String> {
+        // An engine left by a coilbox that was killed would be competing with
+        // this run for the machine.
+        sweep_scratch(&self.scratch_root);
         analyse_replay(
             &AnalysisRequest {
                 replay: job.replay.clone(),
@@ -649,16 +652,21 @@ fn on_poll(shared: &Shared, job_id: u64, control: &RunControl, progress: RunProg
     }
 }
 
-/// Remove scratch folders left by a coilbox that died mid run.
+/// Clear up after a coilbox that died mid run: kill its engine if it is still
+/// going, then remove its scratch folder. Returns how many engines it killed.
 ///
 /// A run's folder is named after the process that made it. One whose process
-/// is gone has nothing using it, unless that coilbox was killed outright and
-/// its engine is still going, in which case the engine loses a folder it was
-/// only writing a log to.
-pub fn sweep_scratch(scratch_root: &Path) {
+/// is gone has nothing using it, except an engine that carried on when
+/// coilbox was killed outright. [`launch::kill_leftover_engine`] finds that
+/// engine through the pid file in the folder and checks the process before
+/// signalling it. Run at startup and before each run, so a leftover engine
+/// lives until the next start of coilbox on macOS, and not at all past the
+/// moment of death on Linux (see [`coilbox_proc::die_with_parent`]).
+pub fn sweep_scratch(scratch_root: &Path) -> usize {
     let Ok(entries) = std::fs::read_dir(scratch_root) else {
-        return;
+        return 0;
     };
+    let mut killed = 0;
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
         let pid = name
@@ -667,10 +675,14 @@ pub fn sweep_scratch(scratch_root: &Path) {
             .and_then(|pid| pid.parse::<u32>().ok());
         if let Some(pid) = pid {
             if pid != std::process::id() && !coilbox_proc::is_running(pid) {
+                if super::launch::kill_leftover_engine(&entry.path()) {
+                    killed += 1;
+                }
                 let _ = std::fs::remove_dir_all(entry.path());
             }
         }
     }
+    killed
 }
 
 /// Make the app's queue and hand it to Tauri. Called once, at plugin setup.
@@ -679,7 +691,9 @@ pub(crate) fn manage<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let analyses = store::app_store_dir(app)?;
     {
         let scratch_root = scratch_root.clone();
-        std::thread::spawn(move || sweep_scratch(&scratch_root));
+        std::thread::spawn(move || {
+            sweep_scratch(&scratch_root);
+        });
     }
     let handle = app.clone();
     app.manage(AnalysisQueue::new(
@@ -1491,6 +1505,98 @@ mod tests {
         assert!(!dir.path().join(format!("run-{dead}-0")).exists());
         assert!(dir.path().join(format!("run-{ours}-0")).is_dir());
         assert!(dir.path().join("something-else").is_dir());
+    }
+
+    /// The id of a process that has exited and been waited on, so it names
+    /// nothing.
+    fn dead_pid() -> u32 {
+        let mut gone = coilbox_proc::command(std::env::current_exe().unwrap())
+            .arg("--list")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let dead = gone.id();
+        gone.wait().unwrap();
+        dead
+    }
+
+    /// A long running stand in for the engine that has `scratch` in its
+    /// arguments and records itself the way a real run does.
+    fn stand_in_engine(scratch: &Path) -> std::process::Child {
+        std::fs::create_dir_all(scratch).unwrap();
+        let child = std::process::Command::new("/bin/sh")
+            .args(["-c", "while :; do sleep 1; done", "stand-in"])
+            .arg(scratch)
+            // Its `sleep` outlives the shell when that is killed, and would
+            // hold the test runner's output open.
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        std::fs::write(
+            scratch.join(super::super::launch::PID_FILE),
+            format!("{}\n/bin/sh\n", child.id()),
+        )
+        .unwrap();
+        child
+    }
+
+    /// The coilbox that started the engine is gone and the engine is not. The
+    /// sweep kills it and removes its folder.
+    #[cfg(unix)]
+    #[test]
+    fn the_sweep_kills_an_engine_left_by_a_dead_coilbox_and_removes_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let scratch = dir.path().join(format!("run-{}-0", dead_pid()));
+        let mut engine = stand_in_engine(&scratch);
+        assert!(engine.try_wait().unwrap().is_none());
+
+        assert_eq!(sweep_scratch(dir.path()), 1);
+
+        let status = engine.wait().unwrap();
+        assert!(!status.success(), "the engine was killed: {status:?}");
+        assert!(!scratch.exists());
+    }
+
+    /// A pid in a pid file that now belongs to something else, such as a game
+    /// the player is running, is not signalled.
+    #[cfg(unix)]
+    #[test]
+    fn the_sweep_leaves_a_process_that_is_not_that_runs_engine() {
+        let dir = tempfile::tempdir().unwrap();
+        let scratch = dir.path().join(format!("run-{}-0", dead_pid()));
+        // Same binary, same pid in the file, a different folder in its arguments.
+        let elsewhere = dir.path().join("somebody-elses-game");
+        let mut bystander = stand_in_engine(&elsewhere);
+        std::fs::create_dir_all(&scratch).unwrap();
+        std::fs::write(
+            scratch.join(super::super::launch::PID_FILE),
+            format!("{}\n/bin/sh\n", bystander.id()),
+        )
+        .unwrap();
+
+        assert_eq!(sweep_scratch(dir.path()), 0);
+
+        assert!(bystander.try_wait().unwrap().is_none(), "left running");
+        assert!(!scratch.exists(), "the folder is still removed");
+        bystander.kill().unwrap();
+        bystander.wait().unwrap();
+    }
+
+    /// A live coilbox's engine is never touched, whatever its folder holds.
+    #[cfg(unix)]
+    #[test]
+    fn the_sweep_leaves_the_engine_of_a_live_coilbox() {
+        let dir = tempfile::tempdir().unwrap();
+        let scratch = dir.path().join(format!("run-{}-0", std::process::id()));
+        let mut engine = stand_in_engine(&scratch);
+
+        assert_eq!(sweep_scratch(dir.path()), 0);
+
+        assert!(engine.try_wait().unwrap().is_none());
+        assert!(scratch.is_dir());
+        engine.kill().unwrap();
+        engine.wait().unwrap();
     }
 
     /// Changes are announced from the worker and from whoever asked, at once.
