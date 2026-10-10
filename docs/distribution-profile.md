@@ -285,7 +285,7 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `career.overview`    | Records > Career      |
 | `campaign.builder`   | Campaign Builder > Builder |
 | `analytics.matchStats` | The match statistics on a replay's page (the chart, build orders and recorded events, and the roster's totals and APM), the Replays page figures and the player dossier's match figures |
-| `analytics.spatialLayers` | The layers on a replay's map: start positions, buildings ordered and building density, with their toggles. The start boxes stay |
+| `analytics.spatialLayers` | The layers on a replay's map: start positions, buildings ordered, building density and order density, with their toggles. The start boxes stay |
 | `analytics.mapInsight` | The map insight view (not built yet, no effect today) |
 | `analytics.run` | The button that runs the engine over a replay to analyse it, and everything that steers a run. An analysis that is already stored still shows |
 
