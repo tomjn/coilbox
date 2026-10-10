@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { AlertCircle, FolderPlus, Loader2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { CheckField } from "@/components/Field";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDefaultWriteRoot } from "../../downloads/config";
@@ -312,6 +313,12 @@ export default function FoldersSection() {
             </span>
           </span>
         </label>
+        <CheckField
+          label="Fetch download lists in the background"
+          hint="Load map, game and engine lists after launch. Turn this off on a metered connection."
+          checked={prefs.fetchListsInBackground !== false}
+          onChange={(v) => setPrefs({ ...prefs, fetchListsInBackground: v })}
+        />
       </section>
     </div>
   );

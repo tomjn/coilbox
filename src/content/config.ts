@@ -83,6 +83,8 @@ export type { SetupStatus } from "./setup";
 export interface ContentPrefs {
   /** Rescan automatically the first time the Content pages open. */
   autoScanOnStartup: boolean;
+  /** Fetch the download indexes, engine lists and hub games list after launch. */
+  fetchListsInBackground: boolean;
   /** Also probe Steam/Zero-K install locations during detection. */
   probeZeroK: boolean;
   /** Snapshot the current engine config to an "Auto-backup" profile before a restore. */
@@ -91,6 +93,7 @@ export interface ContentPrefs {
 
 export const defaultPrefs: ContentPrefs = {
   autoScanOnStartup: true,
+  fetchListsInBackground: true,
   probeZeroK: false,
   autoBackupEngineConfig: false,
 };
