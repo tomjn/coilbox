@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { BASES, contrast, hsl, type Rgb } from "../lib/contrast.testhelper";
 import type { LobbyAccount, LobbyServer } from "../lobby-servers/config";
 import type { ResumeCandidate } from "./continue";
 
@@ -461,72 +462,6 @@ describe("the rail on the page", () => {
  * test is cheaper to read than an import that has to be chased.
  */
 
-type Rgb = [number, number, number];
-
-/** CSS `hsl()` to sRGB channels, all 0 to 1 except the hue. */
-function hsl(h: number, s: number, l: number): Rgb {
-  const c = (1 - Math.abs(2 * l - 1)) * Math.min(Math.max(s, 0), 1);
-  const sector = ((((h % 360) + 360) % 360) / 60) % 6;
-  const x = c * (1 - Math.abs((sector % 2) - 1));
-  const rgb: Rgb =
-    sector < 1
-      ? [c, x, 0]
-      : sector < 2
-        ? [x, c, 0]
-        : sector < 3
-          ? [0, c, x]
-          : sector < 4
-            ? [0, x, c]
-            : sector < 5
-              ? [x, 0, c]
-              : [c, 0, x];
-  const m = l - c / 2;
-  return rgb.map((v) => v + m) as Rgb;
-}
-
-/** WCAG 2.2 relative luminance. */
-function luminance([r, g, b]: Rgb): number {
-  const lin = (v: number) =>
-    v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** WCAG 2.2 contrast ratio between two colours. */
-function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-/**
- * Every base preset, as `[name, --base-hue, --base-sat, --base-sat-text]`,
- * transcribed from `@picoframe/frame/src/theme.css`. The text knob defaults to
- * the surface knob, which is what the subtle tier leaves it at.
- */
-const BASES: [string, number, number, number?][] = [
-  ["zinc", 240, 1],
-  ["slate", 215, 1.6],
-  ["gray", 220, 0.5],
-  ["stone", 30, 1.5],
-  ["neutral", 0, 0],
-  ["rose", 345, 2.4],
-  ["red", 2, 2.4],
-  ["amber", 40, 2.4],
-  ["green", 150, 2.2],
-  ["teal", 185, 2.2],
-  ["blue", 214, 2.6],
-  ["indigo", 250, 2.4],
-  ["violet", 276, 2.4],
-  ["purple", 280, 7, 2],
-  ["sky", 208, 6, 2],
-  ["navy", 225, 11, 2],
-  ["fuchsia", 330, 6, 2],
-  ["orange", 25, 6, 2],
-  ["lime", 95, 5.5, 2],
-  ["emerald", 160, 6.5, 2],
-  ["yellow", 50, 6, 2],
-  ["crimson", 350, 6.5, 2],
-];
-
 /** `--card` and `--card-foreground` for one base in one scheme. */
 function cardTokens(
   hue: number,
@@ -558,7 +493,7 @@ describe("secondary text on a rail card", () => {
 
   for (const dark of [false, true]) {
     for (const [name, hue, sat, satText] of BASES) {
-      const { card, ink } = cardTokens(hue, sat, satText ?? sat, dark);
+      const { card, ink } = cardTokens(hue, sat, satText, dark);
       const scheme = dark ? "dark" : "light";
 
       it(`clears AA for the title and action on ${name} in ${scheme}`, () => {
