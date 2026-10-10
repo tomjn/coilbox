@@ -36,16 +36,34 @@ import {
   windowLabel,
 } from "../../mapAggregate";
 import { joinStarts, type Point, placeRecords } from "../../mapRecords";
+import {
+  countBy,
+  includedVersions,
+  type MapSize,
+  mapVersions,
+  versionsSpanned,
+} from "../../mapVersions";
 import { useStoredAnalyses } from "../../replayAnalysis";
 import { type MapWorld, mapFraction } from "../../replayMapLayers";
 import { findSet, resolveSet, useReplaySets } from "../../replaySets";
+import {
+  resolveNames,
+  type StartRow,
+  type StoredName,
+  startRows,
+  withNames,
+  withoutName,
+} from "../../startNames";
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
+import { useStartNames } from "../../useStartNames";
 import { MapRecords, PlaceNumber } from "./MapRecords";
 import { ReplaySourceNote } from "./ReplaySourceNote";
+import { VersionList, VersionSpan } from "./VersionList";
 
 const ANY = "any";
 const NO_POSITIONS: readonly Point[] = [];
 const NO_REFIGHTS: ReadonlySet<string> = new Set();
+const NO_SIZES: Readonly<Record<string, MapSize>> = {};
 
 /** The windows offered by name. Each is a stretch of every match's own clock. */
 const WINDOWS: { value: string; label: string; window: MatchWindow | null }[] =
@@ -118,6 +136,7 @@ export function MapAggregate({
   scene,
   declared = NO_POSITIONS,
   refights = NO_REFIGHTS,
+  mapSizes = NO_SIZES,
 }: {
   mapName: string;
   world: MapWorld;
@@ -131,18 +150,49 @@ export function MapAggregate({
   declared?: readonly Point[];
   /** File names marked as refights, which the library does not count. */
   refights?: ReadonlySet<string>;
+  /** The size of every installed map named like this one, by name, in the
+   *  units the map list reports. A version that is not installed has none,
+   *  because a replay does not record the size of the map it was played on. */
+  mapSizes?: Readonly<Record<string, MapSize>>;
 }) {
   const analyses = useStoredAnalyses();
   const { sets } = useReplaySets();
-  const all = useMemo(
+  // Every version of the map. Which of them are in is chosen below.
+  const family = useMemo(
     () => mapMatches(records, mapName, analyses, refights),
     [records, mapName, analyses, refights],
+  );
+  const sizesKey = JSON.stringify(mapSizes);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sizesKey stands for mapSizes, whose identity changes every render
+  const versions = useMemo(
+    () => mapVersions(family.matches, mapName, mapSizes),
+    [family, mapName, sizesKey],
+  );
+  // A choice is the player's own and lasts until the page is left, as the
+  // filters do. Without one a version is in unless it is another size.
+  const [versionChoice, setVersionChoice] = useState<
+    ReadonlyMap<string, boolean>
+  >(() => new Map());
+  const included = useMemo(
+    () => includedVersions(versions, versionChoice),
+    [versions, versionChoice],
+  );
+  const all = useMemo(
+    () => ({
+      ...family,
+      matches: family.matches.filter((m) => included.has(m.record.mapName)),
+    }),
+    [family, included],
   );
   const rest = useMemo(
     () => matchesElsewhere(records, mapName, analyses, refights),
     [records, mapName, analyses, refights],
   );
   const choices = useMemo(() => filterChoices(all.matches), [all]);
+  const games = useMemo(
+    () => countBy(all.matches, (m) => m.record.gameType),
+    [all],
+  );
 
   const [filters, setFilters] = useState<AggregateFilters>(NO_FILTERS);
   // The set the picture is scoped to, kept as the stats page keeps its own.
@@ -165,7 +215,7 @@ export function MapAggregate({
     () => filterMatches(all.matches, filters, scope),
     [all, filters, scope],
   );
-  const filtered = shown.length !== all.matches.length;
+  const filtered = shown.length !== family.matches.length;
   // The rest of the library under the same filters, for the length to be set
   // beside. A set's members are looked up among those matches too.
   const elsewhere = useMemo(
@@ -261,13 +311,40 @@ export function MapAggregate({
     () => placeRecords(joined.starts, declared, world),
     [joined, declared, world],
   );
+  // The player's names for the positions above, and the rows they join.
+  const { stored, save } = useStartNames(mapName);
+  const resolved = useMemo(
+    () =>
+      resolveNames(
+        stored,
+        startRecords.places.map((p) => p.place),
+        startRecords.scale,
+      ),
+    [stored, startRecords],
+  );
+  const rows = useMemo(
+    () =>
+      startRows(
+        startRecords.places,
+        new Map([...resolved.byPlace].map(([key, e]) => [key, e.name])),
+      ),
+    [startRecords, resolved],
+  );
+  const rename = (row: StartRow, name: string) =>
+    save(withNames(stored, resolved, row.places, name));
+  const forget = (entry: StoredName) => save(withoutName(stored, entry));
+  // A mark takes the number and name of the row its position is in.
   const marks = useMemo(
     () =>
-      startRecords.places.flatMap((p) => {
-        const at = mapFraction(p.place, world);
-        return at ? [{ ...at, n: p.place.number, key: p.place.key }] : [];
-      }),
-    [startRecords, world],
+      rows.flatMap((row) =>
+        row.places.flatMap((place) => {
+          const at = mapFraction(place, world);
+          return at
+            ? [{ ...at, n: row.number, name: row.name, key: place.key }]
+            : [];
+        }),
+      ),
+    [rows, world],
   );
 
   const heatRef = useRef<HTMLCanvasElement | null>(null);
@@ -284,7 +361,17 @@ export function MapAggregate({
   const set = (patch: Partial<AggregateFilters>) =>
     setFilters((f) => ({ ...f, ...patch }));
   const anyFilter =
-    JSON.stringify(filters) !== JSON.stringify(NO_FILTERS) || !!activeSet;
+    JSON.stringify(filters) !== JSON.stringify(NO_FILTERS) ||
+    !!activeSet ||
+    versionChoice.size > 0;
+  const toggleVersion = (name: string, on: boolean) =>
+    setVersionChoice((before) => new Map(before).set(name, on));
+  const toggleGame = (name: string, on: boolean) =>
+    set({
+      excludedGames: on
+        ? filters.excludedGames.filter((g) => g !== name)
+        : [...filters.excludedGames, name],
+    });
 
   if (ingesting && records.length === 0)
     return (
@@ -294,7 +381,7 @@ export function MapAggregate({
       </section>
     );
 
-  if (all.matches.length === 0)
+  if (family.matches.length === 0)
     return (
       <section className="flex flex-col gap-2" data-testid="map-aggregate">
         <h2 className="text-sm font-medium">How this map is played</h2>
@@ -302,24 +389,25 @@ export function MapAggregate({
           No match on this map is in your library yet. A picture of where
           players start, build and send their units is drawn here once there is
           one.
-          {all.remixes > 0 &&
-            ` ${plural(all.remixes, "remix is", "remixes are")} here, and a remix is a copy of another match and not a match of its own.`}
+          {family.remixes > 0 &&
+            ` ${plural(family.remixes, "remix is", "remixes are")} here, and a remix is a copy of another match and not a match of its own.`}
         </p>
       </section>
     );
 
   const leftOut = [
-    all.remixes > 0 ? plural(all.remixes, "remix", "remixes") : null,
-    all.refights > 0 ? plural(all.refights, "refight", "refights") : null,
-    all.duplicates > 0
+    family.remixes > 0 ? plural(family.remixes, "remix", "remixes") : null,
+    family.refights > 0 ? plural(family.refights, "refight", "refights") : null,
+    family.duplicates > 0
       ? plural(
-          all.duplicates,
+          family.duplicates,
           "second file of a match already counted",
           "second files of matches already counted",
         )
       : null,
   ].filter(Boolean);
-  const mentioned = all.remixes + all.duplicates + all.refights;
+  const mentioned = family.remixes + family.duplicates + family.refights;
+  const spanned = versionsSpanned(shown);
 
   return (
     <section className="flex flex-col gap-3" data-testid="map-aggregate">
@@ -330,7 +418,7 @@ export function MapAggregate({
           data-testid="aggregate-summary"
         >
           {filtered
-            ? `${matchCount(shown.length)} of the ${all.matches.length.toLocaleString()} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
+            ? `${matchCount(shown.length)} of the ${family.matches.length.toLocaleString()} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
             : `${shown.length === 1 ? "The 1 match" : `All ${shown.length.toLocaleString()} matches`} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`}{" "}
           {read.reading
             ? `Reading replays: ${read.done.toLocaleString()} of ${read.total.toLocaleString()}.`
@@ -338,9 +426,16 @@ export function MapAggregate({
           {diverged > 0 &&
             ` ${plural(diverged, "was", "were")} analysed and the playback did not reproduce the match, so ${diverged === 1 ? "it has" : "they have"} no events.`}
         </p>
-        <p className="text-xs text-muted-foreground">
-          This is the map by its exact name, so another version of it is another
-          map and is not added in.
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="grouping-note"
+        >
+          Matches are grouped by the map's name with a trailing version taken
+          off, and not by the map's archive. A replay records the map's name and
+          nothing that says which archive it was played on, so two archives with
+          one name cannot be told apart.
+          {versions.length > 1 &&
+            " A version can differ in layout. Its starts and counts are drawn on this page's map as the replay recorded them, so a version that moved things puts them in the wrong place."}
           {leftOut.length > 0 &&
             ` ${leftOut.join(" and ")} ${mentioned === 1 ? "is" : "are"} left out, so each match counts once.`}
           {!filters.includeShort &&
@@ -354,6 +449,50 @@ export function MapAggregate({
           </p>
         )}
       </div>
+
+      {versions.length > 1 && (
+        <>
+          <VersionList
+            label="Versions of this map"
+            testId="map-versions"
+            onToggle={toggleVersion}
+            items={versions.map((v) => ({
+              name: v.name,
+              matches: v.matches,
+              included: included.has(v.name),
+              note:
+                v.name === mapName
+                  ? "this page's map"
+                  : v.verdict === "different"
+                    ? included.has(v.name)
+                      ? "a different size from this page's map"
+                      : "a different size from this page's map, so it is left out"
+                    : undefined,
+            }))}
+          />
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="version-sizes-note"
+          >
+            A version is left out only when it is installed and its size differs
+            from this page's map. A version that is not installed has no size to
+            compare, because a replay does not record the size of the map it was
+            played on.
+          </p>
+        </>
+      )}
+      {games.length > 1 && (
+        <VersionList
+          label="Games and versions"
+          testId="game-versions"
+          onToggle={toggleGame}
+          items={games.map((g) => ({
+            name: g.name,
+            matches: g.matches,
+            included: !filters.excludedGames.includes(g.name),
+          }))}
+        />
+      )}
 
       <div
         className="flex flex-wrap items-end gap-2"
@@ -376,19 +515,6 @@ export function MapAggregate({
                 value: String(n),
                 label: `${n} players`,
               })),
-            ]}
-          />
-        )}
-        {choices.games.length > 1 && (
-          <OptionSelect
-            size="sm"
-            className="w-56"
-            ariaLabel="Game and version"
-            value={filters.game ?? ANY}
-            onValueChange={(v) => set({ game: v === ANY ? null : v })}
-            options={[
-              { value: ANY, label: "Any game or version" },
-              ...choices.games.map((g) => ({ value: g, label: g })),
             ]}
           />
         )}
@@ -468,6 +594,7 @@ export function MapAggregate({
             onClick={() => {
               setFilters(NO_FILTERS);
               setSetId("");
+              setVersionChoice(new Map());
             }}
           >
             Clear filters
@@ -481,6 +608,7 @@ export function MapAggregate({
         </p>
       ) : (
         <>
+          <VersionSpan versions={spanned} testId="versions-picture" />
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
             <div className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
               <div
@@ -524,13 +652,19 @@ export function MapAggregate({
                       key={m.key}
                       data-layer="start-places"
                       data-testid={`start-mark-${m.n}`}
-                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      title={m.name ?? undefined}
+                      className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center${m.name ? "" : " pointer-events-none"}`}
                       style={{
                         left: `${m.left * 100}%`,
                         top: `${m.top * 100}%`,
                       }}
                     >
                       <PlaceNumber n={m.n} />
+                      {m.name && (
+                        <span className="absolute left-full ml-1 max-w-24 overflow-hidden text-ellipsis whitespace-nowrap rounded bg-black/70 px-1 text-[10px] text-white">
+                          {m.name}
+                        </span>
+                      )}
                     </span>
                   ))}
               </div>
@@ -665,10 +799,16 @@ export function MapAggregate({
             </div>
           </div>
           <MapRecords
+            versions={spanned}
+            mapName={mapName}
             shown={shown}
             elsewhere={elsewhere}
             joined={joined}
             records={startRecords}
+            rows={rows}
+            orphans={resolved.orphans}
+            onRename={rename}
+            onDeleteName={forget}
             reading={read.reading}
           />
         </>

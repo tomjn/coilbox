@@ -25,6 +25,7 @@ import type {
   StoredReplayAnalysis,
   UnitDatasetEntry,
 } from "./bindings";
+import { sameMapFamily } from "./mapVersions";
 import { isShortReplay } from "./replayFilterVisibility";
 import type { MapWorld } from "./replayMapLayers";
 import { column } from "./replayOrderPoints";
@@ -172,8 +173,10 @@ const NO_REFIGHTS: ReadonlySet<string> = new Set();
 /**
  * The matches on one map, from the library's records.
  *
- * The map is matched by its exact name, which carries its version, so two
- * versions of a map are two maps here (#1164 is where that is revisited).
+ * The map is matched by its name with a trailing version taken off, so every
+ * version of it is here, each match carrying the full name it was recorded
+ * under (`mapVersions.ts` says what counts as a version). Which versions are in
+ * the picture is the page's choice, made over this list.
  *
  * One match is counted once however many files hold it. A remix carries its
  * original's game id and is left out by its own mark. Two plain files with one
@@ -190,7 +193,7 @@ export function mapMatches(
   refights: ReadonlySet<string> = NO_REFIGHTS,
 ): MapMatches {
   return collectMatches(
-    records.filter((r) => r.mapName === mapName),
+    records.filter((r) => sameMapFamily(r.mapName, mapName)),
     analyses,
     refights,
   );
@@ -199,6 +202,7 @@ export function mapMatches(
 /**
  * The matches on every other map, counted by the same rules as `mapMatches`,
  * so a map's figures have the rest of the library to be set beside (#1162).
+ * Every version of this map is left out, not only the exact name.
  */
 export function matchesElsewhere(
   records: readonly StatRecord[],
@@ -207,7 +211,7 @@ export function matchesElsewhere(
   refights: ReadonlySet<string> = NO_REFIGHTS,
 ): MapMatches {
   return collectMatches(
-    records.filter((r) => r.mapName !== mapName),
+    records.filter((r) => !sameMapFamily(r.mapName, mapName)),
     analyses,
     refights,
   );
@@ -263,8 +267,8 @@ function collectMatches(
 export interface AggregateFilters {
   /** Exactly this many players, or null for any. */
   playerCount: number | null;
-  /** The game and version as the replay names it, or null for any. */
-  game: string | null;
+  /** Games and versions, as the replay names them, that are left out. */
+  excludedGames: readonly string[];
   format: MatchFormat | null;
   /** `yes` keeps matches with event data, `no` keeps the ones without. */
   analysed: "any" | "yes" | "no";
@@ -278,7 +282,7 @@ export interface AggregateFilters {
 
 export const NO_FILTERS: AggregateFilters = {
   playerCount: null,
-  game: null,
+  excludedGames: [],
   format: null,
   analysed: "any",
   from: "",
@@ -311,7 +315,7 @@ export function filterMatches(
     if (!filters.includeShort && isShortReplay(r.durationSec)) return false;
     if (filters.playerCount !== null && m.playerCount !== filters.playerCount)
       return false;
-    if (filters.game !== null && r.gameType !== filters.game) return false;
+    if (filters.excludedGames.includes(r.gameType)) return false;
     if (filters.format !== null && m.format !== filters.format) return false;
     if (filters.analysed === "yes" && m.analysis !== "events") return false;
     if (filters.analysed === "no" && m.analysis === "events") return false;
@@ -329,10 +333,6 @@ export function filterChoices(matches: readonly AggregateMatch[]) {
     playerCounts: sorted(
       matches.map((m) => m.playerCount),
       (a, b) => a - b,
-    ),
-    games: sorted(
-      matches.map((m) => m.record.gameType),
-      (a, b) => a.localeCompare(b, undefined, { numeric: true }),
     ),
     formats: sorted(
       matches.map((m) => m.format),

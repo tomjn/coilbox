@@ -14,6 +14,7 @@ import {
   layerLegend,
   MAP_GRID_RESOLUTION,
   mapMatches,
+  matchesElsewhere,
   matchesWithStarts,
   matchFormat,
   NO_FILTERS,
@@ -436,9 +437,10 @@ describe("which files are matches on the map", () => {
     record({ filename: "c.sdfz" }),
     record({ filename: "d.sdfz" }),
     record({ filename: "other.sdfz", gameId: "cc", mapName: "Some Map 1.1" }),
+    record({ filename: "far.sdfz", gameId: "dd", mapName: "Some Map Redux" }),
   ];
 
-  it("counts a match once, leaves remixes out, and does not merge map versions", () => {
+  it("counts a match once, leaves remixes out, and takes in every version of the map", () => {
     const got = mapMatches(records, "Some Map 1.0", new Map());
     // a-copy sorts before a, so it is the file that stands for match aa.
     expect(got.matches.map((m) => m.record.filename).sort()).toEqual([
@@ -446,9 +448,15 @@ describe("which files are matches on the map", () => {
       "b.sdfz",
       "c.sdfz",
       "d.sdfz",
+      "other.sdfz",
     ]);
     expect(got.remixes).toBe(2);
     expect(got.duplicates).toBe(1);
+  });
+
+  it("leaves every version of the map out of the rest of the library", () => {
+    const rest = matchesElsewhere(records, "Some Map 1.0", new Map());
+    expect(rest.matches.map((m) => m.record.filename)).toEqual(["far.sdfz"]);
   });
 
   it("joins the stored analyses by game id", () => {
@@ -465,6 +473,7 @@ describe("which files are matches on the map", () => {
       "b.sdfz": "diverged",
       "c.sdfz": "none",
       "d.sdfz": "none",
+      "other.sdfz": "none",
     });
   });
 
@@ -546,10 +555,22 @@ describe("the filters", () => {
     ).toEqual(["teams.sdfz"]);
   });
 
-  it("keeps a game and version", () => {
+  it("leaves out the games and versions that are switched off", () => {
     expect(
-      names(filterMatches(matches, { ...NO_FILTERS, game: "Some Game 1.0" })),
+      names(
+        filterMatches(matches, {
+          ...NO_FILTERS,
+          excludedGames: ["Some Game 2.0"],
+        }),
+      ),
     ).toEqual(["duel.sdfz"]);
+    expect(
+      filterMatches(matches, {
+        ...NO_FILTERS,
+        includeShort: true,
+        excludedGames: ["Some Game 1.0", "Some Game 2.0"],
+      }),
+    ).toEqual([]);
   });
 
   it("keeps an arrangement of sides", () => {
@@ -595,7 +616,6 @@ describe("the filters", () => {
   it("offers what the matches hold", () => {
     expect(filterChoices(matches)).toEqual({
       playerCounts: [2, 4],
-      games: ["Some Game 1.0", "Some Game 2.0"],
       formats: ["duel", "teams"],
       short: 1,
     });

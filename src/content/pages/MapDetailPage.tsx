@@ -42,9 +42,11 @@ import {
 import { isDeletableArchive } from "../format";
 import { useMapEligibility } from "../mapEligibility";
 import { mergeMapTiers } from "../mapTiers";
+import { type MapSize, sameMapFamily } from "../mapVersions";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
+import { useStartNames } from "../useStartNames";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { MapAggregate } from "./components/MapAggregate";
@@ -139,6 +141,9 @@ export default function MapDetailPage() {
     statsRoots,
     selected?.enginePath,
   );
+  // The player's names for this map's start positions, which the markers on
+  // the preview use for the positions the map declares.
+  const { stored: startNames } = useStartNames(decoded);
   const { state: replayUserState } = useReplayUserState();
   const refights = useMemo(
     () => refightFilenames(replayUserState),
@@ -172,6 +177,17 @@ export default function MapDetailPage() {
   // Proportions and mapinfo arrive after the scan now, so fold in whichever of
   // those tiers has landed.
   const [map] = mergeMapTiers([scanned], thumbs, meta);
+
+  // The size of every installed version of this map, so the section can leave
+  // out one whose coordinates would not fit this map. Not installed means no size.
+  const mapSizes: Record<string, MapSize> = {};
+  for (const m of mergeMapTiers(
+    data.maps.filter((x) => sameMapFamily(x.name, decoded)),
+    thumbs,
+    meta,
+  ))
+    if (m.width && m.height)
+      mapSizes[m.name] = { width: m.width, height: m.height };
 
   const otherInfo = Object.entries(map.info).filter(
     ([k]) => !HEADLINE_KEYS.has(k),
@@ -416,7 +432,10 @@ export default function MapDetailPage() {
                     key={m.key}
                     className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
                     style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                    title={`Start position ${i + 1}`}
+                    title={
+                      startNames.find((e) => e.key === `d${i + 1}`)?.name ??
+                      `Start position ${i + 1}`
+                    }
                   />
                 ))}
               </div>
@@ -459,6 +478,7 @@ export default function MapDetailPage() {
           scene={scene}
           declared={minimap.startPositions}
           refights={refights}
+          mapSizes={mapSizes}
         />
       )}
 
