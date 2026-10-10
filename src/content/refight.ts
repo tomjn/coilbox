@@ -2,7 +2,11 @@ import { useMemo, useState } from "react";
 import { usePreferredTarget, useSkirmishAis } from "@/play/config";
 import { compareGameVersions } from "@/play/installedGames";
 import type { DemoInfo } from "./bindings";
-import { useUnitsyncGameInfo, useUnitsyncScan } from "./config";
+import {
+  useUnitsyncGameInfo,
+  useUnitsyncMapInfo,
+  useUnitsyncScan,
+} from "./config";
 import {
   gameMatchesShortId,
   gameNamesMatch,
@@ -88,6 +92,14 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
 
   const gameInfo = useUnitsyncGameInfo(enginePath, dataDir, gameArchive);
   const { ais } = useSkirmishAis(enginePath, dataDir, gameArchive);
+  // Only a match that recorded map options needs the map's option list, so a
+  // replay on a map with none never has the map's archive read for it.
+  const recordedMapOptions = Object.keys(info?.mapOptions ?? {}).length > 0;
+  const mapInfo = useUnitsyncMapInfo(
+    enginePath,
+    dataDir,
+    recordedMapOptions ? installedMap?.name : undefined,
+  );
 
   return {
     target,
@@ -109,7 +121,10 @@ export function useRefightSetup(info: DemoInfo | null | undefined) {
     options: gameInfo.info?.options ?? [],
     /** Whether that option list is still being read. A save taken before it
      * lands would keep the whole recorded block, which is the bug. */
-    optionsLoading: gameInfo.loading,
+    optionsLoading: gameInfo.loading || mapInfo.loading,
+    /** The map's declared options, for the same job on what the match recorded
+     * under `[mapoptions]` (#1886). Covered by `optionsLoading` as well. */
+    mapOptions: mapInfo.info?.options ?? [],
     ais,
   };
 }

@@ -42,6 +42,7 @@ function demoInfo(overrides: Partial<DemoInfo> = {}): DemoInfo {
     ],
     ais: [],
     modOptions: { zombies: "disabled" },
+    mapOptions: {},
     ...overrides,
   };
 }
@@ -51,6 +52,9 @@ const sides = [{ name: "Armada" }, { name: "Cortex" }];
 /** No option list, as when the target game's info hasn't loaded yet. */
 const options: ConfigOption[] = [];
 
+/** No map option list either, which keeps whatever the match recorded. */
+const mapOptions: ConfigOption[] = [];
+
 describe("demoInfoToSkirmishDraft", () => {
   it("converts every seated player into an AI opponent, dropping spectators", () => {
     const draft = demoInfoToSkirmishDraft({
@@ -58,6 +62,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft).not.toBeNull();
     expect(draft?.participants).toHaveLength(3); // you + Alice + Bob
@@ -85,6 +90,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.mapName).toBe("Comet Catcher");
     expect(draft?.gameName).toBe("Beyond All Reason test-30018");
@@ -106,6 +112,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      mapOptions,
       options: [
         { key: "maxunits", name: "Max units", type: "number", default: "1000" },
         {
@@ -127,6 +134,7 @@ describe("demoInfoToSkirmishDraft", () => {
       }),
       ais,
       sides,
+      mapOptions,
       options: [
         { key: "maxunits", name: "Max units", type: "number", default: "1000" },
       ],
@@ -140,6 +148,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     for (const p of draft?.participants.filter((p) => p.kind === "ai") ?? []) {
       expect(p.ai?.shortName).toBe("E323AI");
@@ -152,6 +161,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
       ai: { kind: "native", shortName: "E323AI", name: "E323AI" },
     });
     for (const p of draft?.participants.filter((p) => p.kind === "ai") ?? []) {
@@ -174,6 +184,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.participants[1]?.side).toBe("__random__");
   });
@@ -188,6 +199,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides: [],
       options,
+      mapOptions,
     });
     expect(draft?.participants[1]?.side).toBe("Legion");
   });
@@ -199,6 +211,7 @@ describe("demoInfoToSkirmishDraft", () => {
         ais,
         sides,
         options,
+        mapOptions,
       }),
     ).toBeNull();
     expect(
@@ -207,6 +220,7 @@ describe("demoInfoToSkirmishDraft", () => {
         ais,
         sides,
         options,
+        mapOptions,
       }),
     ).toBeNull();
   });
@@ -230,6 +244,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.participants).toHaveLength(3); // you + Alice + the bot
     expect(draft?.participants[2]).toMatchObject({
@@ -252,6 +267,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.participants[2]?.name).toBe("SurvivalAI");
     expect(draft?.participants[2]?.ai?.shortName).toBe("E323AI");
@@ -269,6 +285,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.participants).toHaveLength(3); // you + two bots
     expect(draft?.participants.map((p) => p.allyTeam)).toEqual([0, 0, 1]);
@@ -282,6 +299,7 @@ describe("demoInfoToSkirmishDraft", () => {
       ais,
       sides,
       options,
+      mapOptions,
     });
     expect(draft?.participants[1]?.name).toBe("Player 1");
   });

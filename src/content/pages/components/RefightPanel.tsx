@@ -92,6 +92,7 @@ function RefightForm({
     sides,
     options,
     optionsLoading,
+    mapOptions,
     ais,
   } = useRefightSetup(info);
   const { running, launch } = usePlay();
@@ -114,7 +115,14 @@ function RefightForm({
   }, [aiKey, ais]);
 
   const getDraft = (): SkirmishDraft | null =>
-    demoInfoToSkirmishDraft({ info, ais, sides, options, ai: chosenAi });
+    demoInfoToSkirmishDraft({
+      info,
+      ais,
+      sides,
+      options,
+      mapOptions,
+      ai: chosenAi,
+    });
 
   if (scanLoading) {
     return (
@@ -191,6 +199,7 @@ function RefightForm({
         gameType: draft.gameName,
         startPosType: draft.startPosType,
         modOptions: draft.modOptionValues,
+        mapOptions: draft.mapOptionValues,
         // The replay's own options win. This only supplies the target game's
         // defaults for anything the replay did not record.
         optionSchema: await gameOptionSchema(
