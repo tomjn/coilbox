@@ -15,9 +15,10 @@ import type {
   Metric,
   MetricGroup,
 } from "../../bindings";
-import { contentMetricRegistry, contentReplayTrailer } from "../../bindings";
+import { contentReplayTrailer } from "../../bindings";
 import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
+import { metricRegistry } from "../../useMetricRegistry";
 import { MatchStatsChart } from "./MatchStatsChart";
 import { StatCard } from "./StatWidgets";
 
@@ -37,19 +38,6 @@ const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** Decoded trailers, kept for the session: decoding re-reads the whole file. */
 const trailerCache = new Map<string, DemoTrailer>();
-
-/** The registry is static, so every surface shares one fetch of it. */
-let registryPromise: Promise<Metric[]> | null = null;
-function metricRegistry(): Promise<Metric[]> {
-  registryPromise ??= contentMetricRegistry(undefined)
-    .then((r) => r.metrics)
-    .catch((e) => {
-      // Don't keep a failure: the next section to open should ask again.
-      registryPromise = null;
-      throw e;
-    });
-  return registryPromise;
-}
 
 function useMatchStats(replayPath: string) {
   const [data, setData] = useState<{
