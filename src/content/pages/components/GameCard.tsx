@@ -24,6 +24,7 @@ export function GameCard({
   artUrl,
   loading,
   onPlay,
+  playDisabled,
 }: {
   game: GameItem;
   /** Resolved header art (from the batch loader); absent shows the gradient. */
@@ -31,6 +32,8 @@ export function GameCard({
   /** Art batch still in flight and this game has none yet — show a shimmer. */
   loading?: boolean;
   onPlay: () => void;
+  /** The list is a saved scan not yet checked, so the game may be gone. */
+  playDisabled?: boolean;
 }) {
   const brand = useBrandingEntry(game);
   const brandBanner = useBrandingImage(brand?.banner, true);
@@ -52,6 +55,7 @@ export function GameCard({
           aria-label="Play"
           className="pointer-events-auto relative z-10 shrink-0"
           onClick={onPlay}
+          disabled={playDisabled}
         >
           <Play className="size-4 fill-current" />
         </Button>

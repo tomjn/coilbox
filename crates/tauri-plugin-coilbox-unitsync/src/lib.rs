@@ -14,6 +14,7 @@
 
 #[cfg(debug_assertions)]
 mod devstats;
+mod lastscan;
 mod modelcache;
 mod pool;
 mod renderindex;
@@ -102,6 +103,9 @@ const HEADER_CACHE_SUBDIR: &str = "coilbox-unitsync-headers";
 const BUILDPIC_CACHE_SUBDIR: &str = "coilbox-unitsync-buildpics";
 const FACTION_LOGO_CACHE_SUBDIR: &str = "coilbox-unitsync-faction-logos";
 const INFO_CACHE_SUBDIR: &str = "coilbox-unitsync-info";
+
+/// Subdirectory of the app cache dir holding the last good scan of each target.
+const LAST_SCAN_SUBDIR: &str = "coilbox-unitsync-last-scan";
 
 /// Subdirectory of the app cache dir holding textures copied out of a game
 /// archive for the unit-model viewer, raw and undecoded.
@@ -714,6 +718,42 @@ async fn unitsync_scan(engine_path: String, data_dir: String, op_id: Option<Stri
         unregister_cancel(id);
     }
     res
+}
+
+/// `unitsync_last_scan_write` keeps a good scan on disk as the next launch's first
+/// paint. The caller writes only a scan that succeeded, so a failed one never
+/// replaces a good one.
+#[tauri::command]
+async fn unitsync_last_scan_write<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+    scan: serde_json::Value,
+) -> CliResult {
+    let Some(dir) = coilbox_portable::cache_dir(&app)
+        .ok()
+        .map(|d| d.join(LAST_SCAN_SUBDIR))
+    else {
+        return CliResult::err("no cache directory on this platform".to_string());
+    };
+    match lastscan::save(&dir, &engine_path, &data_dir, &scan) {
+        Ok(()) => CliResult::ok(serde_json::Value::Null),
+        Err(e) => CliResult::err(e),
+    }
+}
+
+/// `unitsync_last_scan_read` returns the saved scan for a target, or null when
+/// there is none, it is unreadable, or it is from another format version.
+#[tauri::command]
+async fn unitsync_last_scan_read<R: Runtime>(
+    app: AppHandle<R>,
+    engine_path: String,
+    data_dir: String,
+) -> CliResult {
+    let saved = coilbox_portable::cache_dir(&app)
+        .ok()
+        .and_then(|d| lastscan::load(&d.join(LAST_SCAN_SUBDIR), &engine_path, &data_dir));
+    CliResult::ok(saved.unwrap_or(serde_json::Value::Null))
 }
 
 /// `unitsync_minimap` — render one map's minimap as a PNG data URL. `mip` selects
@@ -2161,6 +2201,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         })
         .invoke_handler(tauri::generate_handler![
             unitsync_scan,
+            unitsync_last_scan_write,
+            unitsync_last_scan_read,
             unitsync_minimap,
             unitsync_heightmap,
             unitsync_height_field,

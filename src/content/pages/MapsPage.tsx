@@ -7,10 +7,10 @@ import { filterUninstalledMaps, useSuggestedMaps } from "../branding";
 import {
   useScanTargetSelection,
   useUnitsyncMapMeta,
-  useUnitsyncScan,
   useUnitsyncThumbnails,
 } from "../config";
 import { installedContent } from "../installedContent";
+import { useScanWithLastKnown } from "../lastKnownScan";
 import { mergeMapTiers } from "../mapTiers";
 import { usePlayMap } from "../usePlayMap";
 import { BrowserToolbar } from "./components/BrowserToolbar";
@@ -21,6 +21,7 @@ import {
   Diagnostics,
   EmptyState,
   ErrorBanner,
+  SavedListStatus,
   ScanFailed,
   SkeletonList,
 } from "./components/states";
@@ -45,8 +46,18 @@ const mapArea = (m: { width?: number; height?: number }) =>
 export default function MapsPage() {
   const { targets, selected, selectedKey, setSelectedKey } =
     useScanTargetSelection();
-  const { data, unvouched, loading, error, cancelled, run, cancel } =
-    useUnitsyncScan(selected?.enginePath, selected?.rootPath);
+  const {
+    data,
+    unvouched,
+    result,
+    unchecked,
+    status,
+    loading,
+    error,
+    cancelled,
+    run,
+    cancel,
+  } = useScanWithLastKnown(selected?.enginePath, selected?.rootPath);
   const { thumbs, loading: thumbsLoading } = useUnitsyncThumbnails(
     selected?.enginePath,
     selected?.rootPath,
@@ -62,9 +73,9 @@ export default function MapsPage() {
   // has the archive open, so the size label and the area sorts fill in alongside
   // the minimaps rather than holding up the list.
   // A failed Init leaves data null and the engine's reason in error. The raw
-  // result stays in unvouched, which this page still lists from.
-  const result = data ?? unvouched;
-  const scanFailure = unvouched ? error : null;
+  // result stays in unvouched, which this page still lists from, unless there
+  // is a saved list to show instead (unchecked).
+  const scanFailure = unvouched && !unchecked ? error : null;
   const maps = useMemo(() => {
     const unique = Array.from(
       new Map((result?.maps ?? []).map((m) => [m.name, m])).values(),
@@ -131,7 +142,11 @@ export default function MapsPage() {
         onCancel={cancel}
       />
 
-      {!busy && maps.length > 0 && (
+      {unchecked && (
+        <SavedListStatus checking={status === "checking"} reason={error} />
+      )}
+
+      {(!busy || unchecked) && maps.length > 0 && (
         <FilterBar
           search={filter}
           onSearch={setFilter}
@@ -146,10 +161,10 @@ export default function MapsPage() {
         />
       )}
 
-      {error && !scanFailure && <ErrorBanner message={error} />}
+      {error && !scanFailure && !unchecked && <ErrorBanner message={error} />}
       {result?.errors?.length ? <Diagnostics errors={result.errors} /> : null}
 
-      {targets.length === 0 ? null : busy ? (
+      {targets.length === 0 ? null : busy && !unchecked ? (
         <SkeletonList />
       ) : cancelled && maps.length === 0 ? (
         <EmptyState label="Scan cancelled. Press Rescan to load maps." />
@@ -207,6 +222,7 @@ export default function MapsPage() {
                   <Button
                     size="sm"
                     aria-label="Play"
+                    disabled={unchecked}
                     className="pointer-events-auto relative z-10 shrink-0"
                     onClick={() => playMap(m.name)}
                   >
