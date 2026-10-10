@@ -35,6 +35,9 @@ type LogoMap = Record<string, FactionLogoSrc>;
  * session, so a resolved map is safe to reuse across every picker/display. */
 const logoMapCache = new Map<string, LogoMap>();
 
+/** Returned while the map for the current key is still being resolved. */
+const NO_LOGOS: LogoMap = {};
+
 /** Case-insensitive lookup in a record whose keys may be any-case side names. */
 function pickCI<T>(
   rec: Record<string, T> | undefined,
@@ -66,19 +69,22 @@ export function useFactionLogos(ctx: FactionLogoCtx): LogoMap {
   // The catalog's per-side art can vary the outcome even for the same game key.
   const catalogKey = JSON.stringify(entry?.factionLogos ?? null);
 
-  const [map, setMap] = useState<LogoMap>(
-    () => logoMapCache.get(cacheKey) ?? {},
-  );
+  // The key `map` belongs to. A map is only returned while this matches the
+  // current key, so a changed game never shows the old one's emblems.
+  const [loaded, setLoaded] = useState<{ key: string; map: LogoMap }>(() => ({
+    key: cacheKey,
+    map: logoMapCache.get(cacheKey) ?? NO_LOGOS,
+  }));
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: cacheKey and catalogKey are derived from every input (engine/data/archive/sides/catalog); depending on the raw values would re-run each render since sideNames is a fresh array.
   useEffect(() => {
     if (!sideNames.length) {
-      setMap({});
+      setLoaded({ key: cacheKey, map: NO_LOGOS });
       return;
     }
     const cached = logoMapCache.get(cacheKey);
     if (cached) {
-      setMap(cached);
+      setLoaded({ key: cacheKey, map: cached });
       return;
     }
     let cancelled = false;
@@ -133,14 +139,14 @@ export function useFactionLogos(ctx: FactionLogoCtx): LogoMap {
       }
 
       logoMapCache.set(cacheKey, result);
-      if (!cancelled) setMap(result);
+      if (!cancelled) setLoaded({ key: cacheKey, map: result });
     })();
     return () => {
       cancelled = true;
     };
   }, [cacheKey, catalogKey]);
 
-  return map;
+  return loaded.key === cacheKey ? loaded.map : NO_LOGOS;
 }
 
 /** Convenience: resolve one side's emblem (indexes {@link useFactionLogos}). */

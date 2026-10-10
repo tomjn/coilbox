@@ -1572,19 +1572,28 @@ export function useUnitsyncArchiveTree(
 ) {
   const [tree, setTree] = useState<ArchiveTreeResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // The key `tree` belongs to, so a changed archive shows nothing of the old one.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && archive
+      ? `${dataDir}::${enginePath}::${archive}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !archive) {
+    if (!enginePath || !dataDir || !archive || !key) {
       setTree(null);
+      setLoadedKey(undefined);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${archive}`;
     const cached = archiveTreeCache.get(key);
     if (cached) {
       setTree(cached);
+      setLoadedKey(key);
       return;
     }
     let cancelled = false;
+    setTree(null);
+    setLoadedKey(key);
     setLoading(true);
     shareInFlight(archiveTreePending, key, () =>
       unitsyncArchiveTree({ enginePath, dataDir, archive }),
@@ -1603,9 +1612,13 @@ export function useUnitsyncArchiveTree(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, archive]);
+  }, [enginePath, dataDir, archive, key]);
 
-  return { tree, loading };
+  const current = loadedKey === key;
+  return {
+    tree: current ? tree : null,
+    loading: current ? loading : !!key,
+  };
 }
 
 /**
@@ -1641,19 +1654,28 @@ export function useUnitsyncArchiveFile(
 ) {
   const [data, setData] = useState<ArchiveFileResult | null>(null);
   const [loading, setLoading] = useState(false);
+  // The key `data` belongs to, as in `useUnitsyncArchiveTree`.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && archive && file
+      ? `${dataDir}::${enginePath}::${archive}::${file}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !archive || !file) {
+    if (!enginePath || !dataDir || !archive || !file || !key) {
       setData(null);
+      setLoadedKey(undefined);
       return;
     }
-    const key = `${dataDir}::${enginePath}::${archive}::${file}`;
     const cached = archiveFileCache.get(key);
     if (cached) {
       setData(cached);
+      setLoadedKey(key);
       return;
     }
     let cancelled = false;
+    setData(null);
+    setLoadedKey(key);
     setLoading(true);
     shareInFlight(archiveFilePending, key, () =>
       unitsyncArchiveFile({ enginePath, dataDir, archive, file }),
@@ -1672,9 +1694,13 @@ export function useUnitsyncArchiveFile(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, archive, file]);
+  }, [enginePath, dataDir, archive, file, key]);
 
-  return { data, loading };
+  const current = loadedKey === key;
+  return {
+    data: current ? data : null,
+    loading: current ? loading : !!key,
+  };
 }
 
 /** Session cache of batch game-header art, keyed by `dataDir::enginePath::epoch`. */
@@ -1817,9 +1843,17 @@ export function useUnitsyncMinimap(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recordAppearance = useRecordMapAppearance();
+  // The key the state above belongs to, so a changed map or size shows nothing
+  // of the old one from the render it changes in.
+  const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  const key =
+    enginePath && dataDir && mapName
+      ? `${dataDir}::${enginePath}::${mapName}::${mip}`
+      : undefined;
 
   useEffect(() => {
-    if (!enginePath || !dataDir || !mapName) {
+    setLoadedKey(key);
+    if (!enginePath || !dataDir || !mapName || !key) {
       setUrl(null);
       setStartPositions([]);
       setEnv({});
@@ -1864,6 +1898,10 @@ export function useUnitsyncMinimap(
       if (!url && res.errors?.length) setError(res.errors.join("; "));
     };
     let cancelled = false;
+    setUrl(null);
+    setStartPositions([]);
+    setEnv({});
+    setAppearance(null);
     setLoading(true);
     setError(null);
     (async () => {
@@ -1880,8 +1918,18 @@ export function useUnitsyncMinimap(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, mapName, mip, recordAppearance]);
+  }, [enginePath, dataDir, mapName, mip, key, recordAppearance]);
 
+  if (loadedKey !== key) {
+    return {
+      url: null,
+      startPositions: [] as StartPos[],
+      env: {} as typeof env,
+      appearance: null,
+      loading: !!key,
+      error: null,
+    };
+  }
   return { url, startPositions, env, appearance, loading, error };
 }
 
