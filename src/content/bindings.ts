@@ -428,6 +428,24 @@ export interface Metric {
   surfaced: boolean;
 }
 
+/**
+ * One metric divided by another, declared in the registry beside the metrics
+ * (`RATIOS` in `metrics.rs`). It has no unit and is not a rate, so never say
+ * "per minute" about it. A match whose `denominator` is zero has no ratio:
+ * that is neither infinity nor zero. Both halves are `roster` metrics, the ones
+ * the stats store keeps totals for.
+ */
+export interface MetricRatio {
+  /** What the ratio is called. It is never a metric key. */
+  key: string;
+  /** What to call it in the interface. */
+  label: string;
+  /** The metric on top. */
+  numerator: MetricKey;
+  /** The metric underneath. */
+  denominator: MetricKey;
+}
+
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
   /** The `[playerN]` number, which a chat line's or a timeline event's
@@ -597,7 +615,7 @@ export const contentReplayTrailer = defineCommand<
  */
 export const contentMetricRegistry = defineCommand<
   undefined,
-  { metrics: Metric[] }
+  { metrics: Metric[]; ratios: MetricRatio[] }
 >("coilbox-content", "content_metric_registry");
 
 /** One player as recorded in a stats-database game (flattened from the demo). */

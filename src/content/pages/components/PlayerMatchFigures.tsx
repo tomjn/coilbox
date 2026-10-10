@@ -9,14 +9,16 @@ import {
   YAxis,
 } from "recharts";
 import { OptionSelect } from "@/components/OptionSelect";
-import type { Metric, StatRecord } from "../../bindings";
+import type { Metric, MetricRatio, StatRecord } from "../../bindings";
 import { formatRate } from "../../matchStats";
 import {
   formatRateValue,
   leftOutNote,
   playerRateGames,
   type RateSummary,
+  type RatioSummary,
   rateRows,
+  ratioRows,
   type TrendPoint,
   trendSeries,
 } from "../../playerMatchFigures";
@@ -53,12 +55,36 @@ function Cell({ s }: { s: RateSummary }) {
   );
 }
 
+/** A ratio's cell: the mean, then the median, the games it is drawn from, and the games with no ratio. */
+function RatioCell({
+  s,
+  lowerFigure,
+}: {
+  s: RatioSummary;
+  lowerFigure: string;
+}) {
+  return (
+    <td className="px-2 py-1.5 text-right align-top">
+      <div className="tabular-nums">{formatRateValue(s.mean)}</div>
+      <div className="text-[11px] text-muted-foreground tabular-nums">
+        {s.games > 0 ? `median ${formatRateValue(s.median)} · ` : ""}
+        {games(s.games)}
+        {s.noDenominator > 0
+          ? ` · ${s.noDenominator} with no ${lowerFigure}`
+          : ""}
+      </div>
+    </td>
+  );
+}
+
 function TrendTooltip({
   active,
   payload,
+  describe,
 }: {
   active?: boolean;
   payload?: { payload?: TrendPoint }[];
+  describe: (value: number) => string;
 }) {
   const p = active ? payload?.[0]?.payload : undefined;
   if (!p) return null;
@@ -67,13 +93,22 @@ function TrendTooltip({
   return (
     <div className="rounded-md border border-border/60 bg-popover p-2 text-xs shadow-md">
       <p className="font-medium">{shortDate(p.startTimeMs)}</p>
-      <p className="tabular-nums">{formatRate(p.value)} per minute</p>
+      <p className="tabular-nums">{describe(p.value)}</p>
       <p className="text-muted-foreground">{result}</p>
     </div>
   );
 }
 
-function Trend({ points, label }: { points: TrendPoint[]; label: string }) {
+function Trend({
+  points,
+  label,
+  describe,
+}: {
+  points: TrendPoint[];
+  label: string;
+  /** A value with its unit, "2.5 per minute" or "1.2 units lost per unit killed". */
+  describe: (value: number) => string;
+}) {
   if (points.length === 0) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -84,7 +119,7 @@ function Trend({ points, label }: { points: TrendPoint[]; label: string }) {
   if (points.length === 1) {
     return (
       <p className="text-sm text-muted-foreground">
-        One game so far: {formatRate(points[0].value)} per minute on{" "}
+        One game so far: {describe(points[0].value)} on{" "}
         {shortDate(points[0].startTimeMs)}. A line needs at least two games.
       </p>
     );
@@ -121,7 +156,7 @@ function Trend({ points, label }: { points: TrendPoint[]; label: string }) {
             width={52}
           />
           <Tooltip
-            content={<TrendTooltip />}
+            content={<TrendTooltip describe={describe} />}
             cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
             isAnimationActive={false}
           />
@@ -145,25 +180,56 @@ export function PlayerMatchFigures({
   playerName,
   refightFilenames,
   metrics,
+  ratios = [],
 }: {
   records: StatRecord[];
   playerName: string;
   refightFilenames: ReadonlySet<string>;
   /** The metrics the store keeps totals for: the registry's roster set. */
   metrics: Metric[];
+  /** The registry's ratios. One whose halves are not in `metrics` is not shown. */
+  ratios?: MetricRatio[];
 }) {
+  const shownRatios = useMemo(
+    () =>
+      ratios.filter(
+        (r) =>
+          metrics.some((m) => m.key === r.numerator) &&
+          metrics.some((m) => m.key === r.denominator),
+      ),
+    [ratios, metrics],
+  );
+  const labelOf = (key: string) =>
+    metrics.find((m) => m.key === key)?.label.toLowerCase() ?? "";
   const data = useMemo(
-    () => playerRateGames(records, playerName, metrics, refightFilenames),
-    [records, playerName, metrics, refightFilenames],
+    () =>
+      playerRateGames(
+        records,
+        playerName,
+        metrics,
+        refightFilenames,
+        shownRatios,
+      ),
+    [records, playerName, metrics, refightFilenames, shownRatios],
   );
   const rows = useMemo(() => rateRows(data.list, metrics), [data, metrics]);
+  const ratioTable = useMemo(
+    () => ratioRows(data.list, shownRatios),
+    [data, shownRatios],
+  );
   // The registry's headline metric opens the trend, and the reader can pick any
   // other. The registry decides which, so no metric is named here.
   const [picked, setPicked] = useState("");
   const trendMetric =
     metrics.find((m) => m.key === picked) ??
+    shownRatios.find((r) => r.key === picked) ??
     metrics.find((m) => m.headline) ??
     metrics[0];
+  const trendIsRatio = shownRatios.some((r) => r.key === trendMetric?.key);
+  const describeTrend = (value: number) =>
+    trendIsRatio
+      ? `${formatRate(value)} ${trendMetric?.label.toLowerCase()}`
+      : `${formatRate(value)} per minute`;
   const points = useMemo(
     () => (trendMetric ? trendSeries(data.list, trendMetric.key) : []),
     [data, trendMetric],
@@ -173,7 +239,7 @@ export function PlayerMatchFigures({
 
   return (
     <section className="rounded-lg border border-border/60 bg-card p-4">
-      <h2 className="mb-1 text-sm font-medium">Match figures per minute</h2>
+      <h2 className="mb-1 text-sm font-medium">Match figures</h2>
       <p className="mb-3 text-xs text-muted-foreground">
         Each figure is the total for the army {playerName} controlled, divided
         by the match's minutes, averaged over the games below. The average is
@@ -225,19 +291,52 @@ export function PlayerMatchFigures({
                   </tr>
                 ))}
               </tbody>
+              {ratioTable.length > 0 && (
+                <tbody className="divide-y divide-border/40">
+                  <tr>
+                    <th
+                      scope="colgroup"
+                      colSpan={4}
+                      className="px-2 pt-3 pb-1 text-left text-xs font-medium text-muted-foreground"
+                    >
+                      {basis}, ratios with no unit
+                    </th>
+                  </tr>
+                  {ratioTable.map((r) => {
+                    const lower = labelOf(r.ratio.denominator);
+                    return (
+                      <tr key={r.ratio.key}>
+                        <th
+                          scope="row"
+                          className="px-2 py-1.5 text-left align-top font-normal"
+                        >
+                          {r.ratio.label}
+                        </th>
+                        <RatioCell s={r.all} lowerFigure={lower} />
+                        <RatioCell s={r.wins} lowerFigure={lower} />
+                        <RatioCell s={r.losses} lowerFigure={lower} />
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              )}
             </table>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             A game with no recorded result is in All only. The store holds
             end-of-match totals, so these figures cannot say how far ahead a
             player was at a given minute.
+            {ratioTable.length > 0
+              ? " A ratio is one figure over another for the same army, and is not per minute. A game where the lower figure is zero has no ratio, so it is left out of the average and counted beside it. The average is the mean of each game's own ratio with the median beside it, so a game with very little in the lower figure can pull the mean up."
+              : ""}
           </p>
 
           {trendMetric && (
             <div className="mt-4">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <h3 className="text-xs font-medium text-muted-foreground">
-                  Trend, {basis}, per minute
+                  Trend, {basis},{" "}
+                  {trendIsRatio ? "ratio with no unit" : "per minute"}
                 </h3>
                 <OptionSelect
                   size="sm"
@@ -245,16 +344,23 @@ export function PlayerMatchFigures({
                   ariaLabel="Trend metric"
                   value={trendMetric.key}
                   onValueChange={setPicked}
-                  options={metrics.map((m) => ({
-                    value: m.key,
-                    label: m.label,
-                  }))}
+                  options={[
+                    ...metrics.map((m) => ({ value: m.key, label: m.label })),
+                    ...shownRatios.map((r) => ({
+                      value: r.key,
+                      label: r.label,
+                    })),
+                  ]}
                 />
                 <span className="text-xs text-muted-foreground">
                   {games(points.length)}, oldest to newest
                 </span>
               </div>
-              <Trend points={points} label={trendMetric.label} />
+              <Trend
+                points={points}
+                label={trendMetric.label}
+                describe={describeTrend}
+              />
             </div>
           )}
         </>

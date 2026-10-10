@@ -29,7 +29,7 @@ import {
   relationTo,
   replaysFor,
 } from "../stats";
-import { useMetricRegistry } from "../useMetricRegistry";
+import { useMetricRegistry, useRatioRegistry } from "../useMetricRegistry";
 import { PlayerMatchFigures } from "./components/PlayerMatchFigures";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
@@ -101,6 +101,7 @@ export default function PlayerDossierPage() {
   // A distribution that hides match statistics gets none of the figures.
   const statsHidden = isProfileHidden("analytics.matchStats");
   const registry = useMetricRegistry(!statsHidden);
+  const ratios = useRatioRegistry(!statsHidden);
   const metrics = useMemo(() => libraryMetrics(registry), [registry]);
 
   const players = useMemo(
@@ -270,6 +271,7 @@ export default function PlayerDossierPage() {
               playerName={playerName}
               refightFilenames={refights}
               metrics={metrics}
+              ratios={ratios}
             />
           )}
 

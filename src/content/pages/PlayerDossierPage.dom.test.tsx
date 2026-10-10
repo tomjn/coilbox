@@ -8,7 +8,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { Metric, StatRecord } from "../bindings";
+import type { Metric, MetricRatio, StatRecord } from "../bindings";
 
 vi.mock("@picoframe/frame", async () => ({
   ...(await vi.importActual<Record<string, unknown>>("@picoframe/frame")),
@@ -26,12 +26,22 @@ const METRICS = ["alpha", "beta"].map((key, i) => ({
   surfaced: true,
 })) as Metric[];
 
+const RATIOS = [
+  {
+    key: "gamma",
+    label: "Alpha per beta",
+    numerator: "alpha",
+    denominator: "beta",
+  },
+] as unknown as MetricRatio[];
+
 vi.mock("../../profile/profile", async (orig) => ({
   ...(await orig<typeof import("../../profile/profile")>()),
   getProfile: () => ({ version: 1, hide: HIDE }),
 }));
 vi.mock("../useMetricRegistry", () => ({
   useMetricRegistry: (enabled = true) => (enabled ? METRICS : []),
+  useRatioRegistry: (enabled = true) => (enabled ? RATIOS : []),
 }));
 vi.mock("../config", () => ({
   useContentState: () => ({ state: { roots: [] } }),
@@ -121,7 +131,7 @@ describe("PlayerDossierPage match figures", () => {
       played("c", 3, true, false),
     ];
     renderAnn();
-    expect(screen.getByText("Match figures per minute")).not.toBeNull();
+    expect(screen.getByText("Match figures")).not.toBeNull();
     expect(screen.getByText(/Drawn from 2 of 3 games/)).not.toBeNull();
     expect(screen.getByText(/1 with no figures recorded/)).not.toBeNull();
     // 6000 over 10 minutes.
@@ -158,7 +168,7 @@ describe("PlayerDossierPage match figures", () => {
     ];
     renderAnn();
     const section = screen
-      .getByText("Match figures per minute")
+      .getByText("Match figures")
       .closest("section") as HTMLElement;
     expect(within(section).getAllByText("600").length).toBeGreaterThan(0);
     expect(within(section).queryByText("60")).toBeNull();
@@ -187,6 +197,77 @@ describe("PlayerDossierPage match figures", () => {
     HIDE = ["analytics.matchStats"];
     RECORDS = [played("a", 1, true, true)];
     renderAnn();
-    expect(screen.queryByText("Match figures per minute")).toBeNull();
+    expect(screen.queryByText("Match figures")).toBeNull();
+  });
+});
+
+describe("PlayerDossierPage ratio", () => {
+  const withTotals = (
+    filename: string,
+    startTimeMs: number,
+    won: boolean,
+    alpha: number,
+    beta: number,
+  ): StatRecord =>
+    ({
+      ...played(filename, startTimeMs, won, true),
+      teamTotals: [{ team: 0, totals: { alpha, beta } }],
+    }) as unknown as StatRecord;
+
+  const ratioRow = () =>
+    screen.getByText("Alpha per beta").closest("tr") as HTMLElement;
+
+  it("shows the ratio with its own game count, split by result, and never per minute", () => {
+    RECORDS = [
+      withTotals("a", 1, true, 10, 5),
+      withTotals("b", 2, true, 30, 10),
+      withTotals("c", 3, false, 8, 2),
+    ];
+    renderAnn();
+    const row = within(ratioRow());
+    // Wins 2 and 3 average to 2.5, losses are 4, and all three average to 3.
+    expect(row.getAllByText("3").length).toBeGreaterThan(0);
+    expect(row.getAllByText("2.5").length).toBeGreaterThan(0);
+    expect(row.getAllByText("4").length).toBeGreaterThan(0);
+    expect(row.getByText(/median 3 · 3 games/)).not.toBeNull();
+    expect(row.getByText(/median 2.5 · 2 games/)).not.toBeNull();
+    expect(row.getByText(/median 4 · 1 game$/)).not.toBeNull();
+    expect(ratioRow().textContent).not.toMatch(/per minute/i);
+    expect(
+      screen.getByText("Ann's own figures, ratios with no unit"),
+    ).not.toBeNull();
+  });
+
+  it("leaves a game with nothing underneath out of the average and counts it", () => {
+    RECORDS = [
+      withTotals("a", 1, true, 10, 5),
+      withTotals("b", 2, true, 30, 0),
+    ];
+    renderAnn();
+    const row = within(ratioRow());
+    expect(
+      row.getAllByText(/median 2 · 1 game · 1 with no metric beta/)[0],
+    ).not.toBeNull();
+    expect(ratioRow().textContent).not.toMatch(/Infinity|NaN/);
+  });
+
+  it("reads as a dash with a count when no game has anything underneath", () => {
+    RECORDS = [
+      withTotals("a", 1, true, 10, 0),
+      withTotals("b", 2, false, 4, 0),
+    ];
+    renderAnn();
+    const row = within(ratioRow());
+    expect(row.getAllByText("—").length).toBeGreaterThan(0);
+    expect(row.getByText(/^0 games · 2 with no metric beta$/)).not.toBeNull();
+    expect(ratioRow().textContent).not.toMatch(/Infinity|NaN/);
+  });
+
+  it("is offered in the trend picker", () => {
+    RECORDS = [withTotals("a", 1, true, 10, 5), withTotals("b", 2, true, 8, 2)];
+    renderAnn();
+    expect(
+      screen.getByRole("combobox", { name: "Trend metric" }),
+    ).not.toBeNull();
   });
 });

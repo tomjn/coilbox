@@ -1,4 +1,4 @@
-import type { Metric, StatRecord } from "./bindings";
+import type { Metric, MetricRatio, StatRecord } from "./bindings";
 import { formatRate } from "./matchStats";
 import { matchFigure } from "./replayMatchFigures";
 import { gamesFor, isGenuineMatch } from "./stats";
@@ -20,6 +20,17 @@ import { gamesFor, isGenuineMatch } from "./stats";
  *   Total over total minutes would let one long game outweigh several short
  *   ones, which is the complaint the rates exist to answer.
  *
+ * A ratio (`MetricRatio`, declared by the registry) is one metric over another
+ * for the same army and game. It has no unit and does not depend on the
+ * match's length. A game whose lower figure is zero has no ratio, which is not
+ * infinity and not zero. It is left out of the ratio's average and counted
+ * beside it (`RatioSummary.noDenominator`). The average is again the mean of
+ * each game's own ratio with the median beside it, for consistency with the
+ * rates. It is not the ratio of the totals: that would be one more figure that
+ * reads like the others and is not, and a game with one kill and ten losses
+ * pulls the mean up where it moves the median little, which is why the median
+ * is shown.
+ *
  * An army is not a side. Allies on one side each control their own army, so
  * their figures differ. Where players share control of one army, each of them
  * has its whole total, and the total is not divided between them.
@@ -34,6 +45,10 @@ export interface RateGame {
   minutes: number;
   /** Per minute rate by metric key. A metric the record has no total for is absent. */
   rates: Record<string, number>;
+  /** Ratio by ratio key. Absent when the game has no figure for either half, and when the lower figure is zero. */
+  ratios: Record<string, number>;
+  /** Keys of the ratios the game has both figures for but no ratio, because the lower figure is zero. */
+  noDenominator: string[];
 }
 
 export interface PlayerRateGames {
@@ -65,6 +80,7 @@ export function playerRateGames(
   name: string,
   metrics: Metric[],
   refightFilenames: ReadonlySet<string> = new Set(),
+  ratios: MetricRatio[] = [],
 ): PlayerRateGames {
   const genuine = records.filter((r) => isGenuineMatch(r, refightFilenames));
   const played = gamesFor(genuine, name);
@@ -93,12 +109,24 @@ export function playerRateGames(
     }
     out.counted += 1;
     if (teamIsShared(g.record, name)) out.sharedTeamGames += 1;
+    const figure = new Map(figures);
+    const gameRatios: Record<string, number> = {};
+    const noDenominator: string[] = [];
+    for (const r of ratios) {
+      const top = figure.get(r.numerator);
+      const bottom = figure.get(r.denominator);
+      if (top === undefined || bottom === undefined) continue;
+      if (bottom === 0) noDenominator.push(r.key);
+      else gameRatios[r.key] = top / bottom;
+    }
     out.list.push({
       filename: g.record.filename,
       startTimeMs: g.record.startTimeMs,
       won: g.won,
       minutes,
       rates: Object.fromEntries(figures.map(([k, v]) => [k, v / minutes])),
+      ratios: gameRatios,
+      noDenominator,
     });
   }
   return out;
@@ -153,6 +181,48 @@ export function rateRows(games: RateGame[], metrics: Metric[]): RateRow[] {
   }));
 }
 
+/** The mean of each game's own ratio, with the median and the games it is drawn from. */
+export interface RatioSummary extends RateSummary {
+  /** Games with both figures where the lower one is zero. They have no ratio and are not in `games`. */
+  noDenominator: number;
+}
+
+export function summariseRatio(
+  games: RateGame[],
+  ratioKey: string,
+): RatioSummary {
+  return {
+    ...summariseRate(
+      games.map((g) => ({ ...g, rates: g.ratios })),
+      ratioKey,
+    ),
+    noDenominator: games.filter((g) => g.noDenominator.includes(ratioKey))
+      .length,
+  };
+}
+
+/** One ratio over all counted games, and split by the result. */
+export interface RatioRow {
+  ratio: MetricRatio;
+  all: RatioSummary;
+  wins: RatioSummary;
+  losses: RatioSummary;
+}
+
+export function ratioRows(
+  games: RateGame[],
+  ratios: MetricRatio[],
+): RatioRow[] {
+  const won = games.filter((g) => g.won === true);
+  const lost = games.filter((g) => g.won === false);
+  return ratios.map((ratio) => ({
+    ratio,
+    all: summariseRatio(games, ratio.key),
+    wins: summariseRatio(won, ratio.key),
+    losses: summariseRatio(lost, ratio.key),
+  }));
+}
+
 /** One game on the trend line. */
 export interface TrendPoint {
   filename: string;
@@ -161,17 +231,23 @@ export interface TrendPoint {
   won?: boolean;
 }
 
-/** One metric's per game rate in date order. Games without that figure are left out. */
-export function trendSeries(
-  games: RateGame[],
-  metricKey: string,
-): TrendPoint[] {
+/**
+ * One metric's per game rate, or one ratio's per game value, in date order.
+ * Metric keys and ratio keys never collide. Games without that figure are left
+ * out.
+ */
+export function trendSeries(games: RateGame[], key: string): TrendPoint[] {
+  const figureOf = (g: RateGame): number | undefined =>
+    g.rates[key] ?? g.ratios[key];
   return games
-    .filter((g) => g.rates[metricKey] !== undefined)
-    .map((g) => ({
+    .flatMap((g) => {
+      const value = figureOf(g);
+      return value === undefined ? [] : [{ g, value }];
+    })
+    .map(({ g, value }) => ({
       filename: g.filename,
       startTimeMs: g.startTimeMs,
-      value: g.rates[metricKey],
+      value,
       won: g.won,
     }))
     .sort((a, b) => a.startTimeMs - b.startTimeMs);

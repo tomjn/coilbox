@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
-import type { Metric, MetricKey, StatPlayer, StatRecord } from "./bindings";
+import type {
+  Metric,
+  MetricKey,
+  MetricRatio,
+  StatPlayer,
+  StatRecord,
+} from "./bindings";
 import {
   formatRateValue,
   leftOutNote,
   median,
   playerRateGames,
   rateRows,
+  ratioRows,
   trendSeries,
 } from "./playerMatchFigures";
 
@@ -239,5 +246,127 @@ describe("median", () => {
     expect(median([3, 1, 2])).toBe(2);
     expect(median([4, 1, 2, 3])).toBe(2.5);
     expect(median([])).toBeNull();
+  });
+});
+
+describe("ratios", () => {
+  const ratio: MetricRatio = {
+    key: "gamma",
+    label: "Alpha per beta",
+    numerator: "alpha" as MetricKey,
+    denominator: "beta" as MetricKey,
+  };
+  const withTotals = (
+    filename: string,
+    startTimeMs: number,
+    alphaTotal: number,
+    betaTotal: number,
+    won = true,
+  ) =>
+    game({
+      filename,
+      startTimeMs,
+      players: [seat("me", 0, won)],
+      teamTotals: [{ team: 0, totals: { alpha: alphaTotal, beta: betaTotal } }],
+    });
+  const rowsFor = (records: StatRecord[]) => {
+    const data = playerRateGames(records, "me", [alpha, beta], new Set(), [
+      ratio,
+    ]);
+    return { data, row: ratioRows(data.list, [ratio])[0] };
+  };
+
+  it("divides one figure by the other for each game and averages the games", () => {
+    // The match's length does not enter into it: 10 over 5 and 30 over 10.
+    const { data, row } = rowsFor([
+      withTotals("a", 1, 10, 5),
+      withTotals("b", 2, 30, 10),
+    ]);
+    expect(data.list.map((g) => g.ratios.gamma)).toEqual([2, 3]);
+    expect(row.all.mean).toBe(2.5);
+    expect(row.all.median).toBe(2.5);
+    expect(row.all.games).toBe(2);
+    expect(row.all.noDenominator).toBe(0);
+  });
+
+  it("is the mean of each game's ratio, not the ratio of the totals", () => {
+    // 1 over 1 and 100 over 10: the mean is 5.5, the ratio of totals is 101 over 11.
+    const { row } = rowsFor([
+      withTotals("a", 1, 1, 1),
+      withTotals("b", 2, 100, 10),
+    ]);
+    expect(row.all.mean).toBe(5.5);
+    expect(row.all.mean).not.toBeCloseTo(101 / 11);
+  });
+
+  it("gives a game with nothing underneath no ratio, and counts it", () => {
+    const { data, row } = rowsFor([
+      withTotals("a", 1, 10, 5),
+      withTotals("b", 2, 30, 0),
+    ]);
+    expect(data.list[1].ratios.gamma).toBeUndefined();
+    expect(data.list[1].noDenominator).toEqual(["gamma"]);
+    expect(row.all.games).toBe(1);
+    expect(row.all.noDenominator).toBe(1);
+    expect(row.all.mean).toBe(2);
+    expect(Number.isFinite(row.all.mean)).toBe(true);
+  });
+
+  it("has no mean, and not a zero, when no game has anything underneath", () => {
+    const { row } = rowsFor([
+      withTotals("a", 1, 10, 0),
+      withTotals("b", 2, 4, 0),
+    ]);
+    expect(row.all.mean).toBeNull();
+    expect(row.all.median).toBeNull();
+    expect(row.all.games).toBe(0);
+    expect(row.all.noDenominator).toBe(2);
+  });
+
+  it("keeps a real zero on top as a ratio of zero", () => {
+    const { row } = rowsFor([withTotals("a", 1, 0, 5)]);
+    expect(row.all.mean).toBe(0);
+    expect(row.all.games).toBe(1);
+  });
+
+  it("is not counted for a game that lacks either figure", () => {
+    const g = game({
+      filename: "a",
+      teamTotals: [{ team: 0, totals: { alpha: 10 } }],
+    });
+    const { data, row } = rowsFor([g]);
+    expect(data.list[0].ratios).toEqual({});
+    expect(data.list[0].noDenominator).toEqual([]);
+    expect(row.all.games).toBe(0);
+    expect(row.all.noDenominator).toBe(0);
+  });
+
+  it("splits by result with each side counting its own games", () => {
+    const { row } = rowsFor([
+      withTotals("a", 1, 10, 5, true),
+      withTotals("b", 2, 30, 0, false),
+      withTotals("c", 3, 8, 2, false),
+    ]);
+    expect(row.wins.mean).toBe(2);
+    expect(row.losses.mean).toBe(4);
+    expect(row.losses.noDenominator).toBe(1);
+    expect(row.wins.noDenominator).toBe(0);
+  });
+
+  it("goes on the trend by its own key, in date order", () => {
+    const { data } = rowsFor([
+      withTotals("b", 2, 30, 10),
+      withTotals("a", 1, 10, 5),
+    ]);
+    expect(trendSeries(data.list, "gamma").map((p) => p.value)).toEqual([2, 3]);
+  });
+
+  it("changes nothing for a registry with no ratios", () => {
+    const data = playerRateGames([withTotals("a", 1, 10, 5)], "me", [
+      alpha,
+      beta,
+    ]);
+    expect(data.list[0].ratios).toEqual({});
+    expect(data.list[0].rates.alpha).toBe(1);
   });
 });
