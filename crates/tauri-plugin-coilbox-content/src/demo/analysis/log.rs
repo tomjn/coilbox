@@ -1,0 +1,399 @@
+//! Reading the replay logger's file (issues #1154 and #1159).
+//!
+//! The logger, `lua/replay-logger/luarules/gadgets/coilbox_replay_logger.lua`,
+//! writes one JSON object per line and flushes each one. Every line has a
+//! `kind`. The format is meant to grow: a later logger adds kinds for damage,
+//! army value and projectiles, and fields to the kinds here. So this reader
+//! keeps a kind it does not know as [`LogLine::Unknown`] rather than failing,
+//! and ignores a field it does not know.
+//!
+//! A file that stops part way through is expected, because an engine that is
+//! killed or crashes leaves one. Every line up to the last whole one reads, and
+//! [`EventLog::truncated`] says the last one did not.
+
+use serde::{Deserialize, Serialize};
+
+/// The format this reader was written against. The logger raises its own
+/// number when a line loses or changes a field, never for an addition.
+pub const FORMAT_VERSION: u32 = 1;
+
+/// The first line: what the gadget saw the run as.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LogHeader {
+    pub format: u32,
+    /// `Game.gameName`, which under the analysis game is the analysis game's
+    /// name and not the one the replay was recorded on.
+    pub game: String,
+    pub game_version: String,
+    pub game_short_name: String,
+    pub map: String,
+    pub engine: String,
+    /// The map's size in world units, which is what turns a position into a
+    /// place on a map picture.
+    pub map_size_x: f32,
+    pub map_size_z: f32,
+    pub gaia_team: i32,
+}
+
+/// A unit being created, finished or destroyed.
+///
+/// `def` is a unit definition id as that run's engine numbered them. `x`, `y`
+/// and `z` are world coordinates, where the unit was on that frame.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitEvent {
+    pub frame: i32,
+    pub unit: i32,
+    pub def: i32,
+    pub team: i32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    /// The unit that built it. On `unit_created` only, and absent for a unit
+    /// nothing built.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub builder: Option<i32>,
+    /// What destroyed it. On `unit_destroyed` only, and absent for a death with
+    /// no attacker, which is how the engine reports a cancelled build or a self
+    /// destruct.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker_def: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attacker_team: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub weapon: Option<i32>,
+}
+
+/// One team's last statistics sample as Lua read it when the game ended, with
+/// the number of samples the team had. The fields are the engine's own
+/// `TeamStatistics`, the same ones the replay's trailer holds.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LoggedTeam {
+    pub team: i32,
+    pub samples: usize,
+    /// The frame the game ended on. Lua reports the current frame for a team's
+    /// newest sample, where the trailer holds the frame its next sample was due.
+    pub frame: i32,
+    pub metal_used: f32,
+    pub energy_used: f32,
+    pub metal_produced: f32,
+    pub energy_produced: f32,
+    pub metal_excess: f32,
+    pub energy_excess: f32,
+    pub metal_received: f32,
+    pub energy_received: f32,
+    pub metal_sent: f32,
+    pub energy_sent: f32,
+    pub damage_dealt: f32,
+    pub damage_received: f32,
+    pub units_produced: i32,
+    pub units_died: i32,
+    pub units_received: i32,
+    pub units_sent: i32,
+    pub units_captured: i32,
+    pub units_out_captured: i32,
+    pub units_killed: i32,
+}
+
+/// The last line: who won, on which frame, and every team's totals.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct LoggedGameOver {
+    pub frame: i32,
+    pub winners: Vec<u32>,
+    pub teams: Vec<LoggedTeam>,
+}
+
+/// One line of the log.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum LogLine {
+    Header(LogHeader),
+    GameStart {
+        frame: i32,
+    },
+    UnitCreated(UnitEvent),
+    UnitFinished(UnitEvent),
+    UnitDestroyed(UnitEvent),
+    GameOver(LoggedGameOver),
+    /// A kind a later logger writes and this reader does not know.
+    #[serde(other)]
+    Unknown,
+}
+
+/// How many lines of each kind a log holds. This is what a run is judged on: a
+/// logger that never loaded writes nothing and raises nothing, so the counts
+/// are the only thing that tells it from a quiet match.
+#[derive(Serialize, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EventCounts {
+    pub header: usize,
+    pub game_start: usize,
+    pub unit_created: usize,
+    pub unit_finished: usize,
+    pub unit_destroyed: usize,
+    pub game_over: usize,
+    /// Lines of a kind this reader does not know.
+    pub unknown: usize,
+}
+
+/// A parsed log.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct EventLog {
+    /// Every line that read, in file order, the header and game over included.
+    pub lines: Vec<LogLine>,
+    /// Whole lines that are not a JSON object with a `kind`. A healthy log has
+    /// none.
+    pub malformed: usize,
+    /// The file ended part way through a line, which is what an interrupted run
+    /// leaves. Everything before it still read.
+    pub truncated: bool,
+}
+
+impl EventLog {
+    pub fn header(&self) -> Option<&LogHeader> {
+        self.lines.iter().find_map(|line| match line {
+            LogLine::Header(header) => Some(header),
+            _ => None,
+        })
+    }
+
+    pub fn game_over(&self) -> Option<&LoggedGameOver> {
+        self.lines.iter().find_map(|line| match line {
+            LogLine::GameOver(over) => Some(over),
+            _ => None,
+        })
+    }
+
+    pub fn counts(&self) -> EventCounts {
+        let mut counts = EventCounts::default();
+        for line in &self.lines {
+            match line {
+                LogLine::Header(_) => counts.header += 1,
+                LogLine::GameStart { .. } => counts.game_start += 1,
+                LogLine::UnitCreated(_) => counts.unit_created += 1,
+                LogLine::UnitFinished(_) => counts.unit_finished += 1,
+                LogLine::UnitDestroyed(_) => counts.unit_destroyed += 1,
+                LogLine::GameOver(_) => counts.game_over += 1,
+                LogLine::Unknown => counts.unknown += 1,
+            }
+        }
+        counts
+    }
+}
+
+/// Parse the logger's file.
+///
+/// The logger ends every line with a newline, so text after the last newline is
+/// a line that was being written when the run stopped.
+pub fn parse_log(text: &str) -> EventLog {
+    let mut log = EventLog::default();
+    let (whole, rest) = match text.rfind('\n') {
+        Some(end) => (&text[..end], &text[end + 1..]),
+        None => ("", text),
+    };
+    log.truncated = !rest.trim().is_empty();
+    for line in whole.split('\n') {
+        let line = line.trim_end_matches('\r');
+        if line.trim().is_empty() {
+            continue;
+        }
+        match serde_json::from_str::<LogLine>(line) {
+            Ok(parsed) => log.lines.push(parsed),
+            Err(_) => log.malformed += 1,
+        }
+    }
+    log
+}
+
+#[cfg(test)]
+pub(super) mod tests {
+    use super::*;
+
+    /// What the logger's own fixture match writes. `lua/replay-logger/tests/
+    /// logger_test.lua` fails if the logger stops producing exactly this, and
+    /// the tests here fail if the reader stops understanding it.
+    pub(in super::super) const FIXTURE: &str =
+        include_str!("../../../../../lua/replay-logger/tests/fixtures/match.jsonl");
+
+    #[test]
+    fn the_fixture_match_reads_with_the_counts_the_logger_test_asserts() {
+        let log = parse_log(FIXTURE);
+
+        assert_eq!(
+            log.counts(),
+            EventCounts {
+                header: 1,
+                game_start: 1,
+                unit_created: 6,
+                unit_finished: 5,
+                unit_destroyed: 4,
+                game_over: 1,
+                unknown: 0,
+            }
+        );
+        assert_eq!(log.malformed, 0);
+        assert!(!log.truncated);
+    }
+
+    #[test]
+    fn the_header_says_what_the_gadget_saw() {
+        let log = parse_log(FIXTURE);
+        let header = log.header().expect("header");
+
+        assert_eq!(header.format, FORMAT_VERSION);
+        assert_eq!(header.game, "Test Game");
+        assert_eq!(header.game_version, "1.0");
+        assert_eq!(header.game_short_name, "TG");
+        assert_eq!(header.map, "Test Map");
+        assert_eq!(header.engine, "2026.01.0 test");
+        assert_eq!((header.map_size_x, header.map_size_z), (4096.0, 2048.0));
+        assert_eq!(header.gaia_team, 2);
+    }
+
+    #[test]
+    fn a_destroyed_unit_carries_where_it_died_and_what_killed_it() {
+        let log = parse_log(FIXTURE);
+        let destroyed: Vec<&UnitEvent> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::UnitDestroyed(event) => Some(event),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            destroyed[1],
+            &UnitEvent {
+                frame: 900,
+                unit: 5,
+                def: 50,
+                team: 1,
+                x: 2000.0,
+                y: 7.5,
+                z: 1000.0,
+                builder: None,
+                attacker: Some(3),
+                attacker_def: Some(40),
+                attacker_team: Some(0),
+                weapon: Some(7),
+            }
+        );
+        // A cancelled build: a death nothing caused.
+        assert_eq!(destroyed[0].attacker, None);
+        assert_eq!(destroyed[0].attacker_team, None);
+    }
+
+    #[test]
+    fn a_created_unit_names_its_builder_when_it_has_one() {
+        let log = parse_log(FIXTURE);
+        let created: Vec<&UnitEvent> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::UnitCreated(event) => Some(event),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(created[0].builder, None);
+        assert_eq!(created[2].builder, Some(1));
+        assert_eq!(
+            (created[0].x, created[0].y, created[0].z),
+            (100.0, 5.3, 200.0)
+        );
+    }
+
+    /// The totals are 32 bit floats in the engine and in the trailer. The
+    /// logger writes enough digits for each to read back as the same float.
+    #[test]
+    fn the_game_over_totals_read_back_as_the_floats_the_engine_held() {
+        let log = parse_log(FIXTURE);
+        let over = log.game_over().expect("game over");
+
+        assert_eq!(over.frame, 1501);
+        assert_eq!(over.winners, vec![0]);
+        assert_eq!(over.teams.len(), 2);
+        let team = &over.teams[0];
+        assert_eq!((team.team, team.samples, team.frame), (0, 3, 1501));
+        assert_eq!(team.metal_used, 1234.5677_f32);
+        assert_eq!(team.metal_excess, 0.3_f32);
+        assert_eq!(team.energy_produced, 9000.5);
+        assert_eq!(
+            (team.units_produced, team.units_died, team.units_killed),
+            (3, 1, 2)
+        );
+        assert_eq!(over.teams[1].damage_received, 4100.0);
+    }
+
+    #[test]
+    fn a_kind_a_later_logger_adds_is_kept_as_unknown_and_stops_nothing() {
+        let text = "{\"kind\":\"header\",\"format\":1}\n\
+            {\"kind\":\"unit_damaged\",\"frame\":10,\"unit\":1,\"damage\":50}\n\
+            {\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\"x\":1.0,\"y\":2.0,\"z\":3.0}\n";
+        let log = parse_log(text);
+
+        assert_eq!(log.counts().unknown, 1);
+        assert_eq!(log.counts().unit_created, 1);
+        assert_eq!(log.malformed, 0);
+    }
+
+    #[test]
+    fn a_field_a_later_logger_adds_is_ignored() {
+        let text = "{\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\
+            \"x\":1.0,\"y\":2.0,\"z\":3.0,\"cost\":120,\"commander\":true}\n";
+        let log = parse_log(text);
+
+        assert_eq!(log.counts().unit_created, 1);
+        assert_eq!(log.malformed, 0);
+    }
+
+    /// The reason for one object per line: a run that is killed leaves a file
+    /// that reads up to the line it stopped in.
+    #[test]
+    fn a_file_cut_off_mid_line_reads_up_to_the_last_whole_line() {
+        let cut = FIXTURE.rfind("\"winners\"").expect("the game over line");
+        let log = parse_log(&FIXTURE[..cut]);
+
+        assert!(log.truncated);
+        assert_eq!(log.malformed, 0);
+        assert_eq!(log.counts().unit_destroyed, 4);
+        assert!(log.game_over().is_none());
+        assert!(log.header().is_some());
+    }
+
+    #[test]
+    fn a_whole_line_that_is_not_json_is_counted_and_skipped() {
+        let log = parse_log("{\"kind\":\"header\",\"format\":1}\nnot json\n{\"no\":\"kind\"}\n");
+
+        assert_eq!(log.malformed, 2);
+        assert_eq!(log.counts().header, 1);
+        assert!(!log.truncated);
+    }
+
+    /// A run that never started the logger leaves no file, or an empty one, and
+    /// that has to read as nothing rather than as an error.
+    #[test]
+    fn an_empty_file_is_a_log_with_nothing_in_it() {
+        let log = parse_log("");
+
+        assert_eq!(log.counts(), EventCounts::default());
+        assert!(log.header().is_none());
+        assert!(!log.truncated);
+    }
+
+    #[test]
+    fn a_line_serialises_back_under_the_same_kind() {
+        let log = parse_log(FIXTURE);
+        let json = serde_json::to_value(&log.lines[2]).unwrap();
+
+        assert_eq!(json["kind"], "unit_created");
+        assert_eq!(json["def"], 12);
+        assert!(json.get("builder").is_none());
+    }
+}

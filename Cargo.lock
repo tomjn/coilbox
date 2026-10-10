@@ -6371,6 +6371,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-coilbox-scenario",
  "tempfile",
  "zip 8.6.0",
 ]

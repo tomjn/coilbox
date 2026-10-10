@@ -23,6 +23,9 @@ coilbox-proc = { path = "../coilbox-proc" }
 coilbox-gamebackup = { path = "../coilbox-gamebackup" }
 # Reads and edits an `.fbi` unit definition's objectname (issue #2630).
 coilbox-tdf = { path = "../coilbox-tdf" }
+# The writer the scenario test mutator uses for a generated game, which the
+# replay analysis game is written with too (issue #1183).
+tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 flate2 = "1"
 notify = "8"
 zip = { workspace = true }
