@@ -6,7 +6,6 @@ import {
   Eye,
   ImageOff,
   Loader2,
-  MessageSquare,
   Trash2,
   Trophy,
   X,
@@ -34,11 +33,7 @@ import type {
   ReplayPlayer,
   StartBox,
 } from "../bindings";
-import {
-  type ChatLine,
-  contentDeleteReplay,
-  contentDemoChat,
-} from "../bindings";
+import { contentDeleteReplay } from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
@@ -64,6 +59,7 @@ import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
+import { ReplayChat } from "./components/ReplayChat";
 import { SeatItem } from "./components/SeatEmphasis";
 import {
   DependencyBlocked,
@@ -720,82 +716,6 @@ function ReplayNotes({ filename }: { filename: string }) {
   );
 }
 
-/** The replay's in-demo chat log, loaded on demand (runs `demotool --dump`). */
-function ReplayChat({
-  enginePath,
-  replayPath,
-}: {
-  enginePath: string;
-  replayPath: string;
-}) {
-  const [messages, setMessages] = useState<ChatLine[] | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await contentDemoChat({ enginePath, replayPath });
-      setMessages(res.messages);
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Chat log</h2>
-      {messages === null ? (
-        <div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={load}
-            disabled={loading}
-            className="gap-1.5"
-          >
-            {loading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <MessageSquare className="size-4" />
-            )}
-            {loading ? "Reading chat…" : "Show chat log"}
-          </Button>
-          {error && <ErrorBanner message={error} />}
-        </div>
-      ) : messages.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No chat was recorded in this replay.
-        </p>
-      ) : (
-        <ul className="flex max-h-96 flex-col gap-1 overflow-y-auto rounded-lg border border-border/50 bg-card p-3 text-sm">
-          {messages.map((m, i) => {
-            const key = `${i}-${m.text}`;
-            return (
-              <li key={key} className="break-words">
-                <span
-                  className={`mr-1.5 font-semibold ${m.system ? "text-muted-foreground" : ""}`}
-                >
-                  {m.system
-                    ? "*"
-                    : (m.playerName ??
-                      (m.player != null ? `Player ${m.player}` : "?"))}
-                </span>
-                <span className={m.system ? "text-muted-foreground" : ""}>
-                  {m.text}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /** Delete a replay after a confirm (irreversible), then hand back to `onDeleted`. */
 function DeleteReplayButton({
   replayPath,
@@ -1106,12 +1026,7 @@ export default function ReplayDetailPage() {
 
           <ReplayNotes filename={filename} />
 
-          {selected && replay && (
-            <ReplayChat
-              enginePath={selected.enginePath}
-              replayPath={replay.path}
-            />
-          )}
+          {selected && replay && <ReplayChat replayPath={replay.path} />}
 
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
