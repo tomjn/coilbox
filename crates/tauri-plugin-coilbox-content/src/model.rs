@@ -761,6 +761,108 @@ pub struct DemoBuildOrders {
     pub incomplete: bool,
 }
 
+/// What sent an order, without the ids [`CommandOrigin`] carries. The stream
+/// walk can tell all three apart, and they are three different things: the
+/// player's own click, a widget acting for them, and a skirmish AI.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[serde(rename_all = "camelCase")]
+pub enum OrderSource {
+    Selection,
+    Lua,
+    Ai,
+}
+
+impl From<&CommandOrigin> for OrderSource {
+    fn from(origin: &CommandOrigin) -> Self {
+        match origin {
+            CommandOrigin::Selection => OrderSource::Selection,
+            CommandOrigin::Lua => OrderSource::Lua,
+            CommandOrigin::Ai { .. } => OrderSource::Ai,
+        }
+    }
+}
+
+/// Every order in a replay that points at a place on the map, packed (#1152).
+///
+/// There can be ninety thousand of them, so they are not objects and not a JSON
+/// array. Each field is one column, as little endian bytes in standard base64,
+/// and the columns are parallel: entry `i` of each is the same order. `count`
+/// is how many entries each holds.
+///
+/// - `x`, `z`: `f32`, in elmos from the map's north west corner.
+/// - `frame`: `i32`, the simulation frame, 30 to a second. -1 is before the
+///   game started.
+/// - `team`: `i16`, the engine team, or -1 when the stream does not say.
+/// - `player`: `u8`, the player number, 255 being the server.
+/// - `kind`: `u8`, an [`OrderKind`] as its number.
+/// - `source`: `u8`, 0 the player's own selection, 1 a widget, 2 an AI.
+///
+/// The rest are counts of the orders that left no entry, by why.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoOrderPoints {
+    pub count: u32,
+    pub x: String,
+    pub z: String,
+    pub frame: String,
+    pub team: String,
+    pub player: String,
+    pub kind: String,
+    pub source: String,
+    /// Orders aimed at a unit or a feature, which the stream gives an id for and
+    /// not a place.
+    pub unit_aimed: u32,
+    /// Orders with no target at all: a stop, a wait, a fire state, a factory
+    /// queue entry.
+    pub no_target: u32,
+    /// Orders with an id the engine does not define, which a game or a widget
+    /// registered. What their parameters mean is not known, so none is read.
+    pub custom: u32,
+    /// Orders with an id the engine defines and parameters that fit none of
+    /// that command's forms.
+    pub malformed: u32,
+    /// The last simulation frame the replay reached.
+    pub last_frame: i32,
+    /// True when the stream walk stopped before the end, so later orders are
+    /// missing.
+    pub incomplete: bool,
+}
+
+/// One team's commands in each bucket of match time, from one kind of sender.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSeries {
+    /// The engine team. Players sharing a team are added together.
+    pub team: i32,
+    pub source: OrderSource,
+    /// Orders given in each bucket. Bucket `i` covers the `i`th stretch of
+    /// `period_sec` seconds from frame 0.
+    pub counts: Vec<u32>,
+}
+
+/// How many orders each team gave in each stretch of the match (#1149).
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoCommandRates {
+    /// How long a bucket is. The replay's own team statistics period.
+    pub period_sec: u32,
+    /// True when the header named no period and the engine's default is used.
+    pub period_is_default: bool,
+    /// How many whole buckets there are. A match rarely ends on a boundary, and
+    /// the stretch after the last one is left out: its count over its own,
+    /// shorter, length is a noisy rate.
+    pub buckets: u32,
+    pub series: Vec<CommandSeries>,
+    /// Orders given before the game started.
+    pub pregame: u32,
+    /// Orders in the stretch after the last whole bucket.
+    pub trailing: u32,
+    /// Orders from a player with no team, such as a spectator.
+    pub unattributed: u32,
+    pub last_frame: i32,
+    pub incomplete: bool,
+}
+
 /// The name behind a player number in [`DemoBuildOrders::orders`].
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]

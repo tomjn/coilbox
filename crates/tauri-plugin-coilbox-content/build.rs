@@ -24,6 +24,8 @@ const COMMANDS: &[&str] = &[
     "content_stats_watch_stop",
     "content_demo_chat",
     "content_demo_build_orders",
+    "content_demo_order_points",
+    "content_demo_command_rates",
     "content_rewrite_demo",
     "content_analysis_check",
     "content_analysis_enqueue",

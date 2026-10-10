@@ -38,7 +38,7 @@ const SUBJECT_NOTE: Record<WindowSubject, string> = {
 
 function countText(count: WindowCount, noun: string, order = true): string {
   if (count.total === 0)
-    return order ? `No ${noun} to place.` : `No ${noun} were recorded.`;
+    return order ? `No ${noun}.` : `No ${noun} were recorded.`;
   if (count.inside === 0)
     return `None of the ${count.total.toLocaleString()} ${noun} ${order ? "were given" : "happened"} in this window.`;
   return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun} are in this window.`;
@@ -63,6 +63,7 @@ export function ReplayTimeWindowControl({
   activity,
   count,
   noun = "orders",
+  also,
   events = [],
   subject = "orders",
 }: {
@@ -75,6 +76,8 @@ export function ReplayTimeWindowControl({
   count: WindowCount | null;
   /** What the layer's points are called. */
   noun?: string;
+  /** A second kind of point to count, when two layers with different points are on. */
+  also?: { count: WindowCount | null; noun: string };
   /** The counts of layers drawn from events, each stated apart from the
    *  orders because an event and an order are different things to count. */
   events?: { noun: string; inside: number; total: number }[];
@@ -205,6 +208,7 @@ export function ReplayTimeWindowControl({
           ? `${SUBJECT_TEXT[subject]} from ${axisTime(shown[0])} to ${axisTime(shown[1])}.`
           : `The whole match, ${axisTime(0)} to ${axisTime(domainSec)}.`}
         {count && ` ${countText(count, noun)}`}
+        {also?.count && ` ${countText(also.count, also.noun)}`}
         {events.map((e) => ` ${countText(e, e.noun, false)}`)}
       </p>
       <p className="text-xs text-muted-foreground">

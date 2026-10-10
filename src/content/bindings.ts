@@ -916,6 +916,93 @@ export const contentDemoBuildOrders = defineCommand<
 >("coilbox-content", "content_demo_build_orders");
 
 /**
+ * Every order in a replay that points at a place on the map, packed (#1152).
+ *
+ * Not objects and not a JSON array: each field is one column of little endian
+ * bytes in standard base64, and the columns are parallel, so entry `i` of each
+ * is one order. Decode with `decodeOrderPoints` in `replayOrderPoints.ts`.
+ * `count` is how many entries each column holds.
+ */
+export interface DemoOrderPoints {
+  count: number;
+  /** `f32`, elmos from the map's north west corner. */
+  x: string;
+  /** `f32`. */
+  z: string;
+  /** `i32`, a simulation frame (30 to a second). -1 is before the game began. */
+  frame: string;
+  /** `i16`, the engine team, or -1 when the stream does not say. */
+  team: string;
+  /** `u8`, the player number. 255 is the server. */
+  player: string;
+  /** `u8`: 0 move, 1 attack or fight, 2 build, 3 support, 4 other positioned. */
+  kind: string;
+  /** `u8`: 0 the player's own selection, 1 a widget, 2 a skirmish AI. */
+  source: string;
+  /** Orders aimed at a unit or a feature. The stream has an id and no place. */
+  unitAimed: number;
+  /** Orders with no target: a stop, a wait, a fire state, a factory queue entry. */
+  noTarget: number;
+  /** Orders with an id the engine does not define. None is read for a place. */
+  custom: number;
+  /** Orders with an id the engine defines and parameters that fit none of its forms. */
+  malformed: number;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Read every positioned order out of a replay, packed. Needs no engine folder.
+ * Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoOrderPoints = defineCommand<
+  { replayPath: string },
+  DemoOrderPoints
+>("coilbox-content", "content_demo_order_points");
+
+/** Who sent a run of orders. A widget is the player's Lua acting for them. */
+export type OrderSource = "selection" | "lua" | "ai";
+
+/** One team's order count in each bucket of match time, from one sender. */
+export interface CommandSeries {
+  /** The engine team. Players sharing a team are already added together. */
+  team: number;
+  source: OrderSource;
+  /** Bucket `i` covers `periodSec` seconds from `i * periodSec`. */
+  counts: number[];
+}
+
+/** How many orders each team gave in each period of a replay (#1149). */
+export interface DemoCommandRates {
+  /** The bucket length: the replay's own team statistics period. */
+  periodSec: number;
+  /** True when the header named no period and the engine's default was used. */
+  periodIsDefault: boolean;
+  /** Whole buckets. The stretch after the last is left out. */
+  buckets: number;
+  series: CommandSeries[];
+  /** Orders given before the game started. */
+  pregame: number;
+  /** Orders in the stretch after the last whole bucket. */
+  trailing: number;
+  /** Orders from a player with no team, such as a spectator. */
+  unattributed: number;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+}
+
+/**
+ * Count the orders each team gave in each statistics period of a replay. Needs
+ * no engine folder. Read on demand, it walks the whole demo stream.
+ */
+export const contentDemoCommandRates = defineCommand<
+  { replayPath: string },
+  DemoCommandRates
+>("coilbox-content", "content_demo_command_rates");
+
+/**
  * Write a "remixed" **copy** of a replay whose embedded `gametype` is
  * `targetGametype` (and, when `engineVersion` is set, whose header engine version
  * is restamped), so the engine loads a different local game build when the copy

@@ -25,6 +25,8 @@ const bindings = vi.hoisted(() => ({
   contentDemoChat: vi.fn(),
   contentReplayTrailer: vi.fn(),
   contentReplayAnalysisEvents: vi.fn(),
+  contentDemoCommandRates: vi.fn(),
+  contentDemoOrderPoints: vi.fn(),
 }));
 
 vi.mock("../bindings", async (importOriginal) => ({
@@ -63,6 +65,13 @@ const { ReplayAnalysisEvents } = await import(
   "./components/ReplayAnalysisEvents"
 );
 const { resetReplayEventReadsForTests } = await import("../replayEventRead");
+const { useReplayCommandRates, resetReplayCommandRates } = await import(
+  "../useReplayCommandRates"
+);
+const { useReplayOrderPoints, resetReplayOrderPoints } = await import(
+  "../replayOrderPoints"
+);
+const { packOrders } = await import("../orderPointsFixture");
 const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
   await import("../replayAnalysis");
 
@@ -299,5 +308,61 @@ describe("ReplayAnalysisEvents", () => {
     await act(async () => first.resolve(eventsOf(3000)));
     expect(screen.queryByText("1:40")).toBeNull();
     expect(screen.getByText("0:30")).toBeTruthy();
+  });
+});
+
+describe("the reads that walk the order stream", () => {
+  afterEach(() => {
+    resetReplayCommandRates();
+    resetReplayOrderPoints();
+  });
+
+  it("shows no commands per period under another replay's path, and keeps the second's answer over a late first", async () => {
+    const first = deferred<{ tag: string }>();
+    const second = deferred<{ tag: string }>();
+    bindings.contentDemoCommandRates.mockReturnValueOnce(first.promise);
+    bindings.contentDemoCommandRates.mockReturnValueOnce(second.promise);
+    const renders: ReturnType<typeof useReplayCommandRates>[] = [];
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string }) => {
+        const value = useReplayCommandRates(path);
+        renders.push(value);
+        return value;
+      },
+      { initialProps: { path: a } },
+    );
+    act(() => result.current.load());
+    await act(async () => first.resolve({ tag: "A" }));
+    expect(result.current.result).toEqual({ tag: "A" });
+
+    const before = renders.length;
+    rerender({ path: b });
+    for (const render of renders.slice(before)) {
+      expect(render.result).toBeNull();
+      expect(render.status).toBe("idle");
+    }
+    act(() => result.current.load());
+    // A late answer for the first replay, asked for again, cannot land.
+    await act(async () => second.resolve({ tag: "B" }));
+    expect(result.current.result).toEqual({ tag: "B" });
+  });
+
+  it("reads the order positions once per page and never shows them under the next replay", async () => {
+    bindings.contentDemoOrderPoints.mockResolvedValue(
+      packOrders([{ x: 1, z: 2 }]),
+    );
+    const { result, rerender } = renderHook(
+      ({ path }: { path: string }) => useReplayOrderPoints(path),
+      { initialProps: { path: a } },
+    );
+    expect(bindings.contentDemoOrderPoints).not.toHaveBeenCalled();
+    act(() => result.current.load());
+    act(() => result.current.load());
+    await waitFor(() => expect(result.current.result?.count).toBe(1));
+    expect(bindings.contentDemoOrderPoints).toHaveBeenCalledTimes(1);
+
+    rerender({ path: b });
+    expect(result.current.result).toBeNull();
+    expect(result.current.status).toBe("idle");
   });
 });

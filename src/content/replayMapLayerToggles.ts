@@ -15,6 +15,7 @@ export const MAP_LAYERS = [
   "starts",
   "buildings",
   "density",
+  "orderDensity",
   "bases",
   "deaths",
   "finished",
@@ -44,13 +45,14 @@ export type MapLayerToggles = Record<MapLayer, boolean>;
  * What is on before anybody has chosen. The start boxes were always drawn, and
  * start positions come with the replay's details at no further cost. The two
  * layers drawn from build orders are off, because reading those walks the
- * whole demo stream.
+ * whole demo stream, and so is the order density, which walks it again.
  */
 export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   startBoxes: true,
   starts: true,
   buildings: false,
   density: false,
+  orderDensity: false,
   bases: false,
   deaths: false,
   finished: false,

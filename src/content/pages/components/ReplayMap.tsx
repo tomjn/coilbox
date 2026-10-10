@@ -35,11 +35,18 @@ import {
   layersOn,
   useStoredMapLayers,
 } from "../../replayMapLayerToggles";
+import {
+  orderHeatPoints,
+  sourceCounts,
+  useReplayOrderPoints,
+} from "../../replayOrderPoints";
 import { teamLabel } from "../../replaySideLabel";
 import { timelineDomain } from "../../replayTimeline";
 import {
   activitySeries,
+  countInRange,
   filterByFrame,
+  windowPoints,
   windowRange,
 } from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
@@ -236,6 +243,7 @@ export function ReplayMap({
     starts: layersShown && stored.starts,
     buildings: layersShown && stored.buildings,
     density: layersShown && stored.density,
+    orderDensity: layersShown && stored.orderDensity,
     bases: layersShown && stored.bases,
   };
 
@@ -263,6 +271,16 @@ export function ReplayMap({
     if (wantOrders && ordersStatus === "idle") loadOrders();
   }, [wantOrders, ordersStatus, loadOrders]);
   const result = orders.result;
+
+  // Every positioned order is a second read of the stream, asked for the same
+  // way: when the layer that draws it is on, including one left on last visit.
+  const orderPoints = useReplayOrderPoints(replayPath ?? "");
+  const wantPoints = !!replayPath && on.orderDensity;
+  const { status: pointsStatus, load: loadPoints } = orderPoints;
+  useEffect(() => {
+    if (wantPoints && pointsStatus === "idle") loadPoints();
+  }, [wantPoints, pointsStatus, loadPoints]);
+  const allOrders = orderPoints.result;
 
   const units = useReplayUnits(
     info,
@@ -293,12 +311,16 @@ export function ReplayMap({
 
   // The time window (#1153). The layers that have a time to filter by are read
   // through it, and the ones that are set before the game are not.
-  const windowed = on.buildings || on.density || on.bases;
+  const buildLayer = on.buildings || on.density || on.bases;
+  const windowed = buildLayer || on.orderDensity;
   const domainSec = Math.ceil(
     timelineDomain(
-      [{ second: result ? result.lastFrame / FRAMES_PER_SECOND : null }],
+      [
+        { second: result ? result.lastFrame / FRAMES_PER_SECOND : null },
+        { second: allOrders ? allOrders.lastFrame / FRAMES_PER_SECOND : null },
+      ],
       info.durationSec,
-      result?.incomplete ?? false,
+      (result?.incomplete ?? false) || (allOrders?.incomplete ?? false),
     ),
   );
   const [timeWindow, setTimeWindow] = useReplayTimeWindow(
@@ -352,9 +374,41 @@ export function ReplayMap({
     [inWindow, sized, world, on.density],
   );
 
+  // The same window, as the frames it covers, for the layer that has a frame
+  // beside every point.
+  const range = useMemo(
+    () => windowRange(timeWindow, domainSec),
+    [timeWindow, domainSec],
+  );
+  const orderField = useMemo(
+    () =>
+      allOrders && sized && on.orderDensity
+        ? buildHeatField(
+            windowPoints(orderHeatPoints(allOrders), allOrders.frame, range),
+            world,
+          )
+        : null,
+    [allOrders, sized, world, on.orderDensity, range],
+  );
+  const bySender = useMemo(
+    () => (allOrders ? sourceCounts(allOrders, range) : null),
+    [allOrders, range],
+  );
+  const orderCount = useMemo(
+    () =>
+      allOrders
+        ? {
+            inside: countInRange(allOrders.frame, range),
+            total: allOrders.count,
+          }
+        : null,
+    [allOrders, range],
+  );
+
   const emphasis = useSeriesEmphasis();
   const marksRef = useRef<HTMLCanvasElement | null>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
+  const orderHeatRef = useRef<HTMLCanvasElement | null>(null);
   const marks = on.buildings ? (built?.marks ?? null) : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the emphasis state stands for isLit and dimming
   useEffect(() => {
@@ -372,9 +426,13 @@ export function ReplayMap({
     const canvas = heatRef.current;
     if (canvas && field) drawHeat(canvas, field);
   }, [field]);
+  useEffect(() => {
+    const canvas = orderHeatRef.current;
+    if (canvas && orderField) drawHeat(canvas, orderField);
+  }, [orderField]);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
-  useHeatmapLayer(handle, field);
+  useHeatmapLayer(handle, orderField ?? field);
   useHeatmapLayer(handle, ev.field);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
@@ -407,6 +465,13 @@ export function ReplayMap({
               <canvas
                 ref={heatRef}
                 data-layer="density"
+                className="pointer-events-none absolute inset-0 size-full"
+              />
+            )}
+            {orderField && orderField.peak > 0 && (
+              <canvas
+                ref={orderHeatRef}
+                data-layer="orderDensity"
                 className="pointer-events-none absolute inset-0 size-full"
               />
             )}
@@ -491,6 +556,9 @@ export function ReplayMap({
               <ToggleGroupItem value="density">
                 Building density
               </ToggleGroupItem>
+              <ToggleGroupItem value="orderDensity">
+                Order density
+              </ToggleGroupItem>
               <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
               <ToggleGroupItem value="deaths" disabled={!!ev.block}>
                 Deaths
@@ -510,7 +578,32 @@ export function ReplayMap({
                 window={timeWindow}
                 onChange={setTimeWindow}
                 activity={activity}
-                count={windowed && result ? placedCount : null}
+                // With the order layer on as well there are two kinds of point
+                // to count, and each is counted under its own name.
+                count={
+                  !windowed
+                    ? null
+                    : on.orderDensity && !buildLayer
+                      ? orderCount
+                      : result
+                        ? placedCount
+                        : null
+                }
+                noun={
+                  on.orderDensity
+                    ? buildLayer
+                      ? "orders to place a building"
+                      : "orders with a place on the map"
+                    : undefined
+                }
+                also={
+                  on.orderDensity && buildLayer
+                    ? {
+                        count: orderCount,
+                        noun: "orders with a place on the map",
+                      }
+                    : undefined
+                }
                 events={ev.counts}
                 subject={windowSubject(windowed, ev.active)}
               />
@@ -576,6 +669,49 @@ export function ReplayMap({
               </p>
             )}
 
+            {wantPoints && orderPoints.loading && (
+              <p className="text-xs text-muted-foreground">Reading orders…</p>
+            )}
+            {wantPoints && orderPoints.failed && (
+              <p className="text-xs text-destructive">
+                The orders could not be read from this replay.
+              </p>
+            )}
+            {wantPoints && allOrders && allOrders.count === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No orders with a place on the map were given in this replay.
+              </p>
+            )}
+            {wantPoints && allOrders && allOrders.count > 0 && bySender && (
+              <p className="text-xs text-muted-foreground">
+                Where orders were aimed, which is roughly where attention went.{" "}
+                {(orderField?.counted ?? 0).toLocaleString()} orders
+                {timeWindow ? " in this window" : ""} are on it, from the
+                player's own selection, widgets acting for them and AIs alike
+                {bySender.lua > 0 &&
+                  `, and ${bySender.lua.toLocaleString()} of them were sent by widgets`}
+                . Orders aimed at a unit are not on it, as the replay holds the
+                unit and not its position:{" "}
+                {allOrders.unitAimed.toLocaleString()}{" "}
+                {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
+                at a unit
+                {timeWindow
+                  ? " in the whole match, which the window cannot narrow"
+                  : ""}
+                .
+                {allOrders.custom > 0 &&
+                  ` ${allOrders.custom.toLocaleString()} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
+                {(orderField?.dropped ?? 0) > 0 &&
+                  ` ${(orderField?.dropped ?? 0).toLocaleString()} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
+              </p>
+            )}
+            {wantPoints && allOrders?.incomplete && (
+              <p className="text-xs text-muted-foreground">
+                This replay could not be read to the end, so later orders may be
+                missing.
+              </p>
+            )}
+
             {on.buildings && placed > 0 && (
               <>
                 <p className="text-xs text-muted-foreground">
@@ -609,6 +745,12 @@ export function ReplayMap({
               </>
             )}
 
+            {orderField && orderField.peak > 0 && (
+              <HeatLegend
+                label="Where orders were aimed"
+                peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+              />
+            )}
             {on.bases && (
               <ReplayBaseCrops
                 info={info}
