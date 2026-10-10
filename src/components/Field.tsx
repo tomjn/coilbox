@@ -54,11 +54,13 @@ export function CheckField({
   hint,
   checked,
   onChange,
+  disabled,
 }: {
   label: string;
   hint?: string;
   checked: boolean;
   onChange: (v: boolean) => void;
+  disabled?: boolean;
 }) {
   return (
     // biome-ignore lint/a11y/noLabelWithoutControl: wraps the <Checkbox> control (implicit label association)
@@ -66,6 +68,7 @@ export function CheckField({
       <Checkbox
         checked={checked}
         onCheckedChange={(v) => onChange(v === true)}
+        disabled={disabled}
         className="mt-0.5"
       />
       <span className="flex flex-col gap-0.5">
