@@ -7,6 +7,14 @@
  * table and sorts it the same way, so id `n` is entry `n - 1` of the unit
  * dataset. That holds for the build of the game the replay was played on and
  * for no other: a build with one unit more or fewer moves every id after it.
+ *
+ * It does not always hold even for that build (#3847). Unitsync runs a game's
+ * definitions with no mod options and no match, and the engine ran them with
+ * the match's. Beyond All Reason adds units for several mod options and for a
+ * Scavengers or Raptors AI. The engine also gives no id to a definition it
+ * refuses, and unitsync still lists it. The engine's own list, which an
+ * analysis run records, has none of these problems. `orderFit` in
+ * `replayUnitDefs.ts` is the check for the rest.
  */
 
 import { formatDuration } from "@/lib/format";
@@ -17,6 +25,7 @@ import type {
   GameItem,
   UnitDatasetEntry,
 } from "./bindings";
+import type { StoredUnitList } from "./replayUnitDefs";
 import { gameNamesMatch, sameGameFamily } from "./resolveContent";
 
 /** Simulation frames per second of match time. */
@@ -48,31 +57,74 @@ export type UnitSource =
    *  replay names its game and holds no checksum of it, so this is a match on
    *  the name alone. */
   | { kind: "installed"; game: GameItem }
-  /** That build is not installed and another version of the game is. Its ids
-   *  can differ, so a name read from it may be the wrong unit. */
+  /** A unit list kept for this replay (#1176): the engine's own from an
+   *  analysis run, or the one recorded when the replay was first read against
+   *  its installed game. `pictures` is an installed game of the same family to
+   *  ask for build pictures by unit key, or null when none is installed. */
+  | { kind: "stored"; list: StoredUnitList; pictures: GameItem | null }
+  /** That build is not installed, no list was kept, and another version of
+   *  the game is installed. Its ids can differ, so a name read from it may be
+   *  the wrong unit. */
   | { kind: "differentBuild"; game: GameItem }
-  /** No version of the game is installed, so no id can be named. */
+  /** No version of the game is installed and no list was kept while one was,
+   *  so no id can be named. */
   | { kind: "notInstalled" };
 
 /**
- * Pick the installed game to read unit names from. `games` is the live
- * unitsync scan, the same list the replay page's missing-game notice reads.
+ * Whether an installed game is a loose folder. A folder can change under its
+ * name, which a packaged archive cannot, so a name match on one says nothing
+ * about which definitions it holds today.
+ */
+export function isLooseFolder(game: GameItem): boolean {
+  return /\.sdd$/i.test(game.primaryArchive.name);
+}
+
+/**
+ * Pick where to read a replay's unit names from. `games` is the live unitsync
+ * scan, the same list the replay page's missing-game notice reads. `stored` is
+ * the list kept for this replay, if any.
+ *
+ * In order: the engine's own list, which is the numbering the match used. Then
+ * a packaged archive installed under the replay's exact name. Then a kept list,
+ * which also stands in for an exact match that is a loose folder, because the
+ * list is what the folder held when the replay was read and the folder is
+ * whatever it holds now. Then another installed version, with a warning.
  */
 export function pickUnitSource(
   recorded: string,
   games: GameItem[],
+  stored?: StoredUnitList | null,
 ): UnitSource {
   const exact = games.find((g) => gameNamesMatch(g.name, recorded));
-  if (exact) return { kind: "installed", game: exact };
   // The highest name of the family, which for a game that numbers its
   // versions is the newest. No version is known to be closer than another.
   const family = games
     .filter((g) => sameGameFamily(g.name, recorded))
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
   const other = family.at(-1);
+  if (
+    stored &&
+    (stored.link.origin === "engine" || !exact || isLooseFolder(exact))
+  ) {
+    return { kind: "stored", list: stored, pictures: exact ?? other ?? null };
+  }
+  if (exact) return { kind: "installed", game: exact };
   return other
     ? { kind: "differentBuild", game: other }
     : { kind: "notInstalled" };
+}
+
+/** The installed game a source reads its units from through unitsync, or null
+ *  for a source that has no need to. */
+export function liveGame(source: UnitSource | null): GameItem | null {
+  return source?.kind === "installed" || source?.kind === "differentBuild"
+    ? source.game
+    : null;
+}
+
+/** The installed game to ask for build pictures, by unit key. */
+export function pictureGame(source: UnitSource | null): GameItem | null {
+  return source?.kind === "stored" ? source.pictures : liveGame(source);
 }
 
 /**

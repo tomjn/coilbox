@@ -3,11 +3,15 @@ import type { BuildOrder, GameItem, UnitDatasetEntry } from "./bindings";
 import {
   buildOrderSeats,
   buildOrderTime,
+  isLooseFolder,
+  liveGame,
   pickUnitSource,
+  pictureGame,
   recordedGame,
   resolveBuildUnit,
   slotNote,
 } from "./replayBuildOrders";
+import type { StoredUnitList } from "./replayUnitDefs";
 
 const game = (name: string, archive: string): GameItem => ({
   name,
@@ -92,6 +96,104 @@ describe("pickUnitSource", () => {
     expect(pickUnitSource("SplinterFaction 0.1.88", [])).toEqual({
       kind: "notInstalled",
     });
+  });
+});
+
+describe("pickUnitSource with a list kept for the replay", () => {
+  const installed = [
+    game("Metal Factions v2.58", "metal_factions-v2.58.sdz"),
+    game("SplinterFaction $VERSION", "SplinterFaction.sdd"),
+    game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz"),
+    game("SplinterFaction 0.1.89", "SplinterFaction_0.1.89.sdz"),
+  ];
+  const list = (
+    origin: StoredUnitList["link"]["origin"],
+    game: string,
+  ): StoredUnitList => ({
+    link: {
+      digest: `sha256:${"a".repeat(64)}`,
+      origin,
+      game,
+      takenAtMs: 1_700_000_000_000,
+    },
+    units,
+  });
+
+  it("names a replay whose game is gone, which is what the list is kept for", () => {
+    const kept = list("archive", "SplinterFaction 0.1.84");
+    expect(pickUnitSource("SplinterFaction 0.1.84", [], kept)).toEqual({
+      kind: "stored",
+      list: kept,
+      pictures: null,
+    });
+  });
+
+  it("comes ahead of a different installed build, which lends its pictures", () => {
+    const kept = list("archive", "SplinterFaction 0.1.84");
+    expect(pickUnitSource("SplinterFaction 0.1.84", installed, kept)).toEqual({
+      kind: "stored",
+      list: kept,
+      pictures: installed[3],
+    });
+  });
+
+  it("gives way to a packaged archive installed under the replay's exact name", () => {
+    const kept = list("archive", "SplinterFaction 0.1.88");
+    expect(pickUnitSource("SplinterFaction 0.1.88", installed, kept)).toEqual({
+      kind: "installed",
+      game: installed[2],
+    });
+  });
+
+  it("stands in for an exact match that is a loose folder", () => {
+    // The folder is whatever it holds today. The list is what it held when
+    // the replay was read.
+    const kept = list("folder", "SplinterFaction $VERSION");
+    expect(pickUnitSource("SplinterFaction $VERSION", installed, kept)).toEqual(
+      { kind: "stored", list: kept, pictures: installed[1] },
+    );
+    // With no list yet, the folder is read, and that read is what gets kept.
+    expect(pickUnitSource("SplinterFaction $VERSION", installed)).toEqual({
+      kind: "installed",
+      game: installed[1],
+    });
+  });
+
+  it("puts the engine's own list ahead of everything", () => {
+    const kept = list("engine", "SplinterFaction 0.1.88");
+    expect(pickUnitSource("SplinterFaction 0.1.88", installed, kept)).toEqual({
+      kind: "stored",
+      list: kept,
+      pictures: installed[2],
+    });
+  });
+
+  it("changes nothing for a replay with no list", () => {
+    expect(pickUnitSource("SplinterFaction 0.1.84", installed, null)).toEqual({
+      kind: "differentBuild",
+      game: installed[3],
+    });
+    expect(pickUnitSource("Zero-K v1.0", installed, null)).toEqual({
+      kind: "notInstalled",
+    });
+  });
+
+  it("tells a loose folder from a packaged archive by its archive name", () => {
+    expect(installed.map(isLooseFolder)).toEqual([false, true, false, false]);
+    expect(isLooseFolder(game("Dev", "Dev.SDD"))).toBe(true);
+    expect(isLooseFolder(game("Rapid", "06860629e67e11ef.sdp"))).toBe(false);
+  });
+
+  it("asks unitsync for units only when the source is an installed game", () => {
+    const kept = list("archive", "SplinterFaction 0.1.84");
+    const stored = pickUnitSource("SplinterFaction 0.1.84", installed, kept);
+    expect(liveGame(stored)).toBeNull();
+    expect(pictureGame(stored)).toBe(installed[3]);
+    const other = pickUnitSource("SplinterFaction 0.1.84", installed);
+    expect(liveGame(other)).toBe(installed[3]);
+    expect(pictureGame(other)).toBe(installed[3]);
+    expect(liveGame({ kind: "notInstalled" })).toBeNull();
+    expect(pictureGame(null)).toBeNull();
   });
 });
 

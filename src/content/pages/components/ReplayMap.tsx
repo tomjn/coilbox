@@ -63,6 +63,7 @@ import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
+import { StoredListNote } from "./UnitListNotes";
 
 /** How many pixels wide the marks are drawn at, before the page scales the
  *  canvas to the map's box. Twice the box's widest, so marks stay sharp on a
@@ -757,6 +758,9 @@ export function ReplayMap({
                       ? `${units.recorded || "This replay's game"} is not installed, so nothing says what each building is for and every mark is the same shape.`
                       : "The units of this replay's game could not be read, so every mark is the same shape."}
                   </p>
+                )}
+                {categorised && (
+                  <StoredListNote source={units.source} subject="Shapes" />
                 )}
                 {categorised && units.source?.kind === "differentBuild" && (
                   <p className="text-xs text-amber-600 dark:text-amber-400">

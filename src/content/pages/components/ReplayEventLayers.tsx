@@ -15,6 +15,7 @@ import { UNIT_CATEGORIES } from "../../unitCategory";
 import type { EventLayers } from "../../useReplayEventLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplaySourceNote } from "./ReplaySourceNote";
+import { StoredListNote } from "./UnitListNotes";
 
 /** How much of a mark shows when another player is the emphasised one. The
  *  order marks use the same. */
@@ -283,6 +284,9 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
                     ` ${(ev.deaths.length - ev.costed).toLocaleString()} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
                 </p>
               )}
+              {ev.weighted && (
+                <StoredListNote source={units.source} subject="Costs" />
+              )}
               {ev.weighted &&
                 differentBuild &&
                 units.source?.kind === "differentBuild" && (
@@ -319,6 +323,10 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
               ` ${plural(finished.offMap, "building stands", "buildings stand")} off the map and ${finished.offMap === 1 ? "is" : "are"} not drawn.`}
           </p>
           {finished.marks.length > 0 && <OutlineKey ev={ev} />}
+          <StoredListNote
+            source={units.source}
+            subject="Shapes and the choice of buildings"
+          />
           {differentBuild && units.source?.kind === "differentBuild" && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               This replay was played on {units.recorded}, which is not

@@ -36,11 +36,19 @@ export function kindLabel(kind: string): string {
 
 /**
  * The kinds a log holds, from the provenance's counts. `unknown` counts lines
- * of kinds this build has no name for, so it names nothing.
+ * of kinds this build has no name for, so it names nothing. `unitDef` counts
+ * the engine's unit definitions, which are kept in the unit definition store
+ * and are not events.
  */
 export function kindsFromCounts(counts: ReplayEventCounts): string[] {
   return Object.entries(counts)
-    .filter(([name, n]) => name !== "unknown" && typeof n === "number" && n > 0)
+    .filter(
+      ([name, n]) =>
+        name !== "unknown" &&
+        name !== "unitDef" &&
+        typeof n === "number" &&
+        n > 0,
+    )
     .map(([name]) => snakeCase(name));
 }
 

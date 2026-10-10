@@ -21,6 +21,7 @@ import {
   contentOpenPath,
   contentScanRoot,
   contentStorageOverview,
+  contentUnitDefSetsUsage,
   type StorageOverview,
 } from "../bindings";
 import { useContentState, usePreferredEngine } from "../config";
@@ -203,7 +204,50 @@ export default function StorageSection() {
           <ReclaimCachesButton />
         </div>
       </section>
+
+      <ReplayUnitLists />
     </div>
+  );
+}
+
+/**
+ * What the unit lists kept for replays cost (#1176). They are not a cache:
+ * a list is what lets a replay still name its units once its game has been
+ * updated or removed, so there is nothing here to clear. A list goes when the
+ * last replay that uses it is deleted.
+ */
+function ReplayUnitLists() {
+  const [usage, setUsage] = useState<{
+    sets: number;
+    replays: number;
+    bytes: number;
+  } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    contentUnitDefSetsUsage(undefined)
+      .then((found) => {
+        if (live) setUsage(found);
+      })
+      // The line is left out. Nothing else on the screen depends on it.
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  if (!usage) return null;
+  return (
+    <section className="space-y-1">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Replay unit lists
+      </h2>
+      <p className="text-xs text-muted-foreground">
+        {usage.sets === 0
+          ? "No unit lists are kept yet. One is kept the first time a replay's build orders are read against its installed game, or when a replay is analysed."
+          : `${usage.sets.toLocaleString()} unit ${usage.sets === 1 ? "list is" : "lists are"} kept for ${usage.replays.toLocaleString()} ${usage.replays === 1 ? "replay" : "replays"}, using ${formatBytes(usage.bytes)}. They let a replay name its units after its game is updated or removed, and each goes when the last replay that uses it is deleted.`}
+      </p>
+    </section>
   );
 }
 
