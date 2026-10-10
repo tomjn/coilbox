@@ -25,6 +25,7 @@ permissions = [
   "allow-content-demo-chat",
   "allow-content-demo-build-orders",
   "allow-content-rewrite-demo",
+  "allow-content-analyse-replay",
   "allow-content-delete-replay",
   "allow-content-delete-replays",
   "allow-content-delete-archive",

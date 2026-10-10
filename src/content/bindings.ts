@@ -855,6 +855,178 @@ export const contentRewriteDemo = defineCommand<
   { path: string }
 >("coilbox-content", "content_rewrite_demo");
 
+/** The replay logger's first line: what the gadget saw the run as. */
+export interface ReplayLogHeader {
+  /** The line format. A reader that knows a lower one should offer a new run. */
+  format: number;
+  /**
+   * `Game.gameName` during the run, which is the analysis game's name and not
+   * the game the replay was recorded on. That one is `ReplayAnalysisReport.baseGame`.
+   */
+  game: string;
+  gameVersion: string;
+  gameShortName: string;
+  map: string;
+  engine: string;
+  /** The map's size in world units, which places an event's `x` and `z` on a map. */
+  mapSizeX: number;
+  mapSizeZ: number;
+  gaiaTeam: number;
+}
+
+/**
+ * A unit being created, finished or destroyed. `def` is a unit definition id as
+ * that run's engine numbered them. `x`, `y` and `z` are world coordinates.
+ */
+export interface ReplayUnitEvent {
+  frame: number;
+  unit: number;
+  def: number;
+  team: number;
+  x: number;
+  y: number;
+  z: number;
+  /** On `unit_created`, the unit that built it. Absent when nothing did. */
+  builder?: number;
+  /**
+   * On `unit_destroyed`, what destroyed it. All four are absent for a death
+   * with no attacker, such as a cancelled build.
+   */
+  attacker?: number;
+  attackerDef?: number;
+  attackerTeam?: number;
+  weapon?: number;
+}
+
+/**
+ * One team's totals when the game ended, as the engine reported them to Lua.
+ * The figures are `TeamStatSample`'s. `frame` is the frame the game ended on.
+ */
+export interface ReplayLoggedTeam extends TeamStatSample {
+  team: number;
+  /** How many statistics samples the team had. */
+  samples: number;
+}
+
+/**
+ * One line of an analysed replay's event log. A later logger adds kinds, which
+ * arrive as `unknown`, so switch on `kind` with a default.
+ */
+export type ReplayLogLine =
+  | ({ kind: "header" } & ReplayLogHeader)
+  | { kind: "game_start"; frame: number }
+  | ({ kind: "unit_created" } & ReplayUnitEvent)
+  | ({ kind: "unit_finished" } & ReplayUnitEvent)
+  | ({ kind: "unit_destroyed" } & ReplayUnitEvent)
+  | {
+      kind: "game_over";
+      frame: number;
+      winners: number[];
+      teams: ReplayLoggedTeam[];
+    }
+  | { kind: "unknown" };
+
+/** How many lines of each kind a run's log held. */
+export interface ReplayEventCounts {
+  header: number;
+  gameStart: number;
+  unitCreated: number;
+  unitFinished: number;
+  unitDestroyed: number;
+  gameOver: number;
+  /** Lines of a kind this build does not know. */
+  unknown: number;
+}
+
+/** One figure an analysis run and its replay disagree on. */
+export interface ReplayDisagreement {
+  /**
+   * `winners`, `gameSeconds`, `teams`, `samples`, `desyncWarnings`,
+   * `unitCreatedLines`, `unitDestroyedLines`, or a `TeamStatSample` key such as
+   * `metalProduced`.
+   */
+  figure: string;
+  /** The team the figure belongs to, when it is a team's. */
+  team?: number;
+  /** What the replay recorded. */
+  recorded: string;
+  /** What the run observed. */
+  observed: string;
+  /** Observed minus recorded, for a figure that is a number. */
+  difference?: number;
+}
+
+/** How the engine run behind an analysis ended. */
+export interface ReplayEngineExit {
+  /** The exit status, when the engine exited by itself. */
+  code: number | null;
+  /** The signal that ended it, on macOS and Linux. */
+  signal: number | null;
+  /** The run reached `timeoutSecs` and was killed. */
+  timedOut: boolean;
+  cancelled: boolean;
+  wallSeconds: number;
+}
+
+/**
+ * - `reproduced`: the run saw the match the replay recorded, and its events are good.
+ * - `diverged`: the run finished and saw a different match. No events come back.
+ * - `incomplete`: the logger started and the run stopped before the game ended.
+ * - `loggerNotLoaded`: the logger never wrote its header.
+ */
+export type ReplayAnalysisStatus =
+  | "reproduced"
+  | "diverged"
+  | "incomplete"
+  | "loggerNotLoaded";
+
+/** Everything an analysis run found out except the events themselves. */
+export interface ReplayAnalysisReport {
+  status: ReplayAnalysisStatus;
+  /** The game the replay was recorded on. */
+  baseGame: string;
+  /** The match's length, to set against `exit.wallSeconds`. */
+  matchSeconds: number;
+  exit: ReplayEngineExit;
+  /** Null when the logger did not load. */
+  header: ReplayLogHeader | null;
+  counts: ReplayEventCounts;
+  malformedLines: number;
+  truncated: boolean;
+  /** Empty when the run reproduced the match, or never got far enough to compare. */
+  disagreements: ReplayDisagreement[];
+  /**
+   * What the engine said, for a run that did not reproduce: the lines it marked
+   * fatal, or its last lines when it marked none.
+   */
+  logExcerpt: string[];
+}
+
+/**
+ * Play a replay back headless under coilbox's analysis game and return what the
+ * replay logger recorded (#1183, #1155, #1184).
+ *
+ * This runs the engine for the length of the call, seconds to minutes, so call
+ * it only when the player asked for it. `replayPath` is a `ReplayFile.path`.
+ * `enginePath` is the `Engine.path` of the engine the replay was recorded
+ * with, and `dataDir` the content folder to play from. Both the game and the map
+ * the replay names have to be installed. `timeoutSecs` is how long the engine
+ * may run before it is killed.
+ *
+ * `events` is null unless `report.status` is `reproduced`. It rejects for a
+ * replay that never recorded a game over, because there is then nothing to
+ * check a run against.
+ */
+export const contentAnalyseReplay = defineCommand<
+  {
+    replayPath: string;
+    enginePath: string;
+    dataDir: string;
+    timeoutSecs: number;
+  },
+  { report: ReplayAnalysisReport; events: ReplayLogLine[] | null }
+>("coilbox-content", "content_analyse_replay");
+
 /** Delete a replay file. `path` must be a `.sdfz`/`.sdf` from `content_list_replays`. */
 export const contentDeleteReplay = defineCommand<
   { path: string },

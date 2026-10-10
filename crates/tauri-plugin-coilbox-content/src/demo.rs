@@ -39,6 +39,7 @@ use crate::model::{
     PlayerStats, ReplayFile, StartBox, StreamEventKind, TeamStatSample, TeamStatSeries,
 };
 
+pub(crate) mod analysis;
 mod build_orders;
 pub(crate) mod stream;
 
@@ -2070,32 +2071,32 @@ mod tests {
     /// The default is the smallest valid v5 file: a header, a start script, and
     /// an empty trailer, which is what the engine leaves behind when a recording
     /// is aborted. Every other case sets one field and changes nothing else.
-    struct DemoFixture {
-        version: i32,
+    pub(super) struct DemoFixture {
+        pub(super) version: i32,
         /// Also where the start script begins, so a header that grew moves every
         /// offset behind it.
-        header_size: usize,
-        engine_version: String,
-        script: String,
+        pub(super) header_size: usize,
+        pub(super) engine_version: String,
+        pub(super) script: String,
         /// Stands in for the recorded packet stream, which nothing here decodes.
-        stream: Vec<u8>,
+        pub(super) stream: Vec<u8>,
         /// One ally-team id per byte.
-        winning_ally_teams: Vec<u8>,
+        pub(super) winning_ally_teams: Vec<u8>,
         /// Per player, the five `i32` in their true on-disk order: `numCommands`,
         /// `unitCommands`, `mousePixels`, `mouseClicks`, `keyPresses`.
         /// `PlayerStatistics` derives from `TeamControllerStatistics`, so the base
         /// members come first and this is not the order the header file declares.
-        player_stats: Vec<[i32; 5]>,
-        player_stat_elem_size: usize,
+        pub(super) player_stats: Vec<[i32; 5]>,
+        pub(super) player_stat_elem_size: usize,
         /// Per team, its samples in recording order.
-        team_samples: Vec<Vec<TeamStatSample>>,
-        team_stat_elem_size: usize,
-        team_stat_period: i32,
-        game_time: i32,
-        wallclock: i32,
+        pub(super) team_samples: Vec<Vec<TeamStatSample>>,
+        pub(super) team_stat_elem_size: usize,
+        pub(super) team_stat_period: i32,
+        pub(super) game_time: i32,
+        pub(super) wallclock: i32,
         /// Bytes chopped off the end once everything is written, for a file that
         /// stops before the trailer the header promised.
-        truncate_by: usize,
+        pub(super) truncate_by: usize,
     }
 
     impl Default for DemoFixture {
@@ -2125,7 +2126,7 @@ mod tests {
     const SAMPLE_PADDING: u8 = 0xEE;
 
     impl DemoFixture {
-        fn bytes(&self) -> Vec<u8> {
+        pub(super) fn bytes(&self) -> Vec<u8> {
             let mut h = vec![0u8; self.header_size];
             h[..MAGIC.len()].copy_from_slice(MAGIC);
             put_i32(&mut h, 16, self.version);
@@ -2243,7 +2244,7 @@ mod tests {
             b
         }
 
-        fn gzipped(&self) -> Vec<u8> {
+        pub(super) fn gzipped(&self) -> Vec<u8> {
             let mut enc = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
             enc.write_all(&self.bytes()).unwrap();
             enc.finish().unwrap()
