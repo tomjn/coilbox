@@ -81,7 +81,9 @@ const NO_SCAN = vi.hoisted(() => ({
   scan: { data: null },
 }));
 vi.mock("../../content/config", () => ({
+  forgetScans: vi.fn(),
   invalidateScans: vi.fn(),
+  rescanMounted: vi.fn(),
   useScanTargetSelection: () => NO_SCAN.target,
   useUnitsyncScan: () => NO_SCAN.scan,
 }));

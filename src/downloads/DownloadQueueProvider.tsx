@@ -12,7 +12,7 @@ import {
   contentBundleCancel,
   contentBundleInstallEngine,
 } from "../content/bindings";
-import { invalidateScans } from "../content/config";
+import { forgetScans, rescanMounted } from "../content/config";
 import { warmAllRoots } from "../content/rapidPoolWarm";
 import {
   type DownloadProgress,
@@ -347,6 +347,26 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
     }, PRUNE_MS);
   }, []);
 
+  // The lanes with a finished download no list on screen has rescanned for.
+  const rescanOwed = useRef(new Set<QueueLane>());
+  // A download added to the library. The scans are forgotten now, so anything
+  // that reads one next scans again. The lists on screen rescan once the lane
+  // has nothing left to add (see `run`), so a run of maps costs one scan and
+  // not one each.
+  const libraryChanged = useCallback((item: QueueItem) => {
+    forgetScans();
+    rescanOwed.current.add(laneOf(item));
+  }, []);
+  // Rescan for the lists on screen if the lane owes one and nothing else in it
+  // is queued or running. `leaving` is the item on its way out of the lane.
+  const rescanIfLaneDone = useCallback((leaving: QueueItem) => {
+    const lane = laneOf(leaving);
+    const more = itemsRef.current.some(
+      (i) => i.id !== leaving.id && isPending(i) && laneOf(i) === lane,
+    );
+    if (!more && rescanOwed.current.delete(lane)) rescanMounted();
+  }, []);
+
   // Fire the backend start command for an item and apply its kind's side
   // effects. Every backend call gets a channel of its own from the sink, since a
   // channel serves one command and no more (see `progressChannel`).
@@ -372,7 +392,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             askedAt: item.queuedAt,
             onProgress,
           });
-          invalidateScans();
+          libraryChanged(item);
           warmAllRoots().catch(() => {});
           return;
         case "map":
@@ -381,7 +401,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             opId: item.id,
             onProgress: progressChannel(onProgress),
           });
-          invalidateScans();
+          libraryChanged(item);
           return;
         case "mapAnySource":
           await downloadMapAnySource({
@@ -390,7 +410,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             askedAt: item.queuedAt,
             onProgress,
           });
-          invalidateScans();
+          libraryChanged(item);
           return;
         case "file":
           await dlDownloadFile({
@@ -398,7 +418,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             opId: item.id,
             onProgress: progressChannel(onProgress),
           });
-          invalidateScans();
+          libraryChanged(item);
           return;
         case "engineRecoil":
           await installEngine(() =>
@@ -429,7 +449,7 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           return;
       }
     },
-    [],
+    [libraryChanged],
   );
 
   const run = useCallback(
@@ -483,12 +503,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         settled = { ...item, ...meta } as QueueItem;
       } finally {
         busyLanesRef.current.delete(laneOf(item));
+        // Whether this one finished or not, it may be the last of a run whose
+        // earlier downloads did.
+        rescanIfLaneDone(item);
         samplesRef.current.delete(item.id);
         settle(settled);
         prune(item.id);
       }
     },
-    [patch, prune, settle, start],
+    [patch, prune, rescanIfLaneDone, settle, start],
   );
 
   // Promote the next queued item in every lane with nothing running.
@@ -582,9 +605,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
         setItems((list) => list.filter((i) => i.id !== id));
         // A dropped item never reaches `run`, so settle its waiters here.
         settle({ ...item, status: "canceled", progress: null } as QueueItem);
+        rescanIfLaneDone(item);
       }
     },
-    [settle],
+    [rescanIfLaneDone, settle],
   );
 
   const report = useCallback(
