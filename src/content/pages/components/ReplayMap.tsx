@@ -61,6 +61,7 @@ import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
+import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
 
 /** How many pixels wide the marks are drawn at, before the page scales the
@@ -440,10 +441,16 @@ export function ReplayMap({
       : MARKS_WIDTH,
   ];
 
+  // The minimap and the 3D preview sit side by side. Everything said about the
+  // layers goes under both, across the section, so a wide page is used and the
+  // base views have room to sit in a row.
   return (
-    <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-      <div className="flex w-full max-w-sm shrink-0 flex-col gap-2">
-        <div className="relative flex items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div
+          data-map-column
+          className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card"
+        >
           <div className="relative inline-flex max-h-full max-w-full">
             <img
               src={minimapUrl}
@@ -513,56 +520,78 @@ export function ReplayMap({
               worldWidth={world.worldWidth}
               worldHeight={world.worldHeight}
             />
+            <StartUnitCanvas
+              ev={ev}
+              info={info}
+              colours={colours}
+              world={world}
+            />
             {on.starts &&
               dots.map((dot) => <StartDotButton key={dot.team} dot={dot} />)}
           </div>
         </div>
-
-        {!layersShown && boxes.length > 0 && (
-          <p className="text-xs text-muted-foreground">Start boxes per team.</p>
+        {preview && (
+          <MapPreview3D
+            {...preview}
+            className="w-full min-w-0 lg:flex-1"
+            worldWidth={world.worldWidth || 1}
+            worldHeight={world.worldHeight || 1}
+            onScene={setHandle}
+          />
         )}
+      </div>
 
-        {layersShown && (
-          <>
-            <ToggleGroup
-              type="multiple"
-              variant="outline"
-              size="sm"
-              spacing={1}
-              aria-label="Map layers"
-              className="w-full flex-wrap"
-              value={layersOn(stored).filter(
-                (l) => !ev.block || !EVENT_MAP_LAYERS.includes(l),
-              )}
-              onValueChange={(next) =>
-                setLayers(ev.block ? holdEventLayers(next, stored) : next)
-              }
-            >
-              <ToggleGroupItem value="startBoxes">Start boxes</ToggleGroupItem>
-              <ToggleGroupItem value="starts">Start positions</ToggleGroupItem>
-              <ToggleGroupItem value="buildings">
-                Buildings ordered
-              </ToggleGroupItem>
-              <ToggleGroupItem value="density">
-                Building density
-              </ToggleGroupItem>
-              <ToggleGroupItem value="orderDensity">
-                Order density
-              </ToggleGroupItem>
-              <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
-              <ToggleGroupItem value="deaths" disabled={!!ev.block}>
-                Deaths
-              </ToggleGroupItem>
-              <ToggleGroupItem value="finished" disabled={!!ev.block}>
-                Buildings finished
-              </ToggleGroupItem>
-            </ToggleGroup>
-            <ReplaySourceNote
-              source="stream"
-              detail="Start boxes come from the match setup."
-            />
+      {!layersShown && boxes.length > 0 && (
+        <p className="text-xs text-muted-foreground">Start boxes per team.</p>
+      )}
 
-            {(windowed || ev.active) && (
+      {layersShown && (
+        <div data-map-controls className="flex flex-col gap-2">
+          <ToggleGroup
+            type="multiple"
+            variant="outline"
+            size="sm"
+            spacing={1}
+            aria-label="Map layers"
+            className="w-full flex-wrap"
+            value={layersOn(stored).filter(
+              (l) => !ev.block || !EVENT_MAP_LAYERS.includes(l),
+            )}
+            onValueChange={(next) =>
+              setLayers(ev.block ? holdEventLayers(next, stored) : next)
+            }
+          >
+            <ToggleGroupItem value="startBoxes">Start boxes</ToggleGroupItem>
+            <ToggleGroupItem value="starts">Start positions</ToggleGroupItem>
+            <ToggleGroupItem value="buildings">
+              Buildings ordered
+            </ToggleGroupItem>
+            <ToggleGroupItem value="density">Building density</ToggleGroupItem>
+            <ToggleGroupItem value="orderDensity">
+              Order density
+            </ToggleGroupItem>
+            <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
+            <ToggleGroupItem value="deaths" disabled={!!ev.block}>
+              Deaths
+            </ToggleGroupItem>
+            <ToggleGroupItem value="finished" disabled={!!ev.block}>
+              Buildings finished
+            </ToggleGroupItem>
+            <ToggleGroupItem value="startUnitDeaths" disabled={!!ev.block}>
+              Starting unit deaths
+            </ToggleGroupItem>
+            <ToggleGroupItem value="startUnitPaths" disabled={!!ev.block}>
+              Starting unit paths
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <ReplaySourceNote
+            source="stream"
+            detail="Start boxes come from the match setup."
+          />
+
+          {(windowed || ev.active) && (
+            // Straight under the maps it filters, and wide enough to drag.
+            <div data-map-window className="w-full max-w-3xl">
               <ReplayTimeWindowControl
                 domainSec={domainSec}
                 window={timeWindow}
@@ -597,8 +626,12 @@ export function ReplayMap({
                 events={ev.counts}
                 subject={windowSubject(windowed, ev.active)}
               />
-            )}
+            </div>
+          )}
+          {/* Prose is held to a width that reads. The base views below are not. */}
+          <div data-map-notes className="flex max-w-prose flex-col gap-2">
             <EventLayerNotes ev={ev} />
+            <StartUnitNotes ev={ev} info={info} />
 
             {on.startBoxes && !hasBoxes && (
               <p className="text-xs text-muted-foreground">
@@ -741,36 +774,26 @@ export function ReplayMap({
                 peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
               />
             )}
-            {on.bases && (
-              <ReplayBaseCrops
-                info={info}
-                dots={dots}
-                orders={inWindow}
-                world={world}
-                units={units.units}
-                minimapUrl={minimapUrl}
-                timeWindow={timeWindow}
-                domainSec={domainSec}
-              />
-            )}
-
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
                 peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
               />
             )}
-          </>
-        )}
-      </div>
-      {preview && (
-        <MapPreview3D
-          {...preview}
-          className="w-full min-w-0 lg:flex-1"
-          worldWidth={world.worldWidth || 1}
-          worldHeight={world.worldHeight || 1}
-          onScene={setHandle}
-        />
+          </div>
+          {on.bases && (
+            <ReplayBaseCrops
+              info={info}
+              dots={dots}
+              orders={inWindow}
+              world={world}
+              units={units.units}
+              minimapUrl={minimapUrl}
+              timeWindow={timeWindow}
+              domainSec={domainSec}
+            />
+          )}
+        </div>
       )}
     </div>
   );

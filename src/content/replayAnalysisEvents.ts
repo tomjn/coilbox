@@ -90,6 +90,10 @@ export function teamLabel(
   return labels.get(team) ?? NEUTRAL_LABEL;
 }
 
+/** The fields of an event that hold an engine team: the unit's owner, what
+ *  destroyed it, and the team a unit that changed hands left. */
+const TEAM_FIELDS = ["team", "attackerTeam", "from"];
+
 export interface PlayerOption {
   value: string;
   label: string;
@@ -106,7 +110,7 @@ export function playerOptions(
 ): PlayerOption[] {
   const teams = new Set<number>();
   for (const event of events) {
-    for (const name of ["team", "attackerTeam"]) {
+    for (const name of TEAM_FIELDS) {
       const team = numberField(event, name);
       if (team !== undefined) teams.add(team);
     }
@@ -133,13 +137,11 @@ function matchesPlayer(
       ? !labels.has(team)
       : player === `team:${team}`;
   };
-  // A player's filter includes the units they destroyed, so it answers "what
-  // happened to this player and what did they do". The Player column still
-  // names the owner of the unit, and the details name the attacker.
-  return (
-    matches(numberField(event, "team")) ||
-    matches(numberField(event, "attackerTeam"))
-  );
+  // A player's filter includes the units they destroyed and the units they
+  // gave away or had captured, so it answers "what happened to this player and
+  // what did they do". The Player column still names the owner of the unit,
+  // and the details name the attacker and the player it came from.
+  return TEAM_FIELDS.some((name) => matches(numberField(event, name)));
 }
 
 /** Events of one kind and/or one player. `ALL_KINDS` and `ALL_PLAYERS` keep all. */
@@ -183,7 +185,8 @@ function fieldText(value: unknown): string {
 
 /**
  * The rest of an event as `name value` pairs. A position reads as one value in
- * world units, an attacker's team as the player's label, and anything else as
+ * world units, an attacker's team and the team a unit left as the player's
+ * label, and anything else as
  * its own name and value, so a field a later logger adds still shows.
  */
 export function eventDetails(
@@ -204,6 +207,10 @@ export function eventDetails(
     if (hasPosition && (name === "x" || name === "y" || name === "z")) continue;
     if (name === "attackerTeam" && typeof value === "number") {
       out.push({ name: "attacker", text: teamLabel(value, labels) });
+      continue;
+    }
+    if (name === "from" && typeof value === "number") {
+      out.push({ name: "from", text: teamLabel(value, labels) });
       continue;
     }
     out.push({ name, text: fieldText(value) });

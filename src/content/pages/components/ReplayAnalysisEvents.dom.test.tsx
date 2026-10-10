@@ -74,6 +74,8 @@ const stored = (
       unitCreated: 2,
       unitFinished: 0,
       unitDestroyed: 1,
+      unitGiven: 0,
+      startUnitPosition: 0,
       gameOver: 0,
       unknown: 0,
     },

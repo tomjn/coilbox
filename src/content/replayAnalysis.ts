@@ -327,6 +327,11 @@ const FIGURE_WORDS: Record<string, string> = {
   gameOver: "The game over",
   unitCreatedLines: "Units made",
   unitDestroyedLines: "Units lost",
+  unitsReceivedLines: "Units given to the team, as the log counted them",
+  unitsSentLines: "Units the team gave away, as the log counted them",
+  unitsCapturedLines: "Units the team captured, as the log counted them",
+  unitsOutCapturedLines:
+    "Units captured from the team, as the log counted them",
 };
 
 /** A camel case name as words, for a figure nothing has a label for. */

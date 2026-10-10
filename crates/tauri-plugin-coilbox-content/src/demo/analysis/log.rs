@@ -23,7 +23,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 1;
+pub const LOGGER_VERSION: u32 = 2;
 
 /// The first line: what the gadget saw the run as.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -42,9 +42,12 @@ pub struct LogHeader {
     pub map_size_x: f32,
     pub map_size_z: f32,
     pub gaia_team: i32,
+    /// How many frames lie between two `start_unit_position` lines for one
+    /// unit. 0 from a logger that wrote none.
+    pub position_frames: i32,
 }
 
-/// A unit being created, finished or destroyed.
+/// A unit being created, finished, destroyed or handed to another team.
 ///
 /// `def` is a unit definition id as that run's engine numbered them. `x`, `y`
 /// and `z` are world coordinates, where the unit was on that frame.
@@ -58,6 +61,19 @@ pub struct UnitEvent {
     pub x: f32,
     pub y: f32,
     pub z: f32,
+    /// Present and true on a unit its team started with: one created for a
+    /// team other than Gaia, by no builder, on the frame that team's first unit
+    /// was created. The engine has no idea of a commander, so this is not one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub start_unit: Option<bool>,
+    /// The team the unit left. On `unit_given` only, where `team` is the team
+    /// it went to.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<i32>,
+    /// Present and true on a `unit_given` the engine counted as a capture, and
+    /// absent on a gift.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub captured: Option<bool>,
     /// The unit that built it. On `unit_created` only, and absent for a unit
     /// nothing built.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -73,6 +89,21 @@ pub struct UnitEvent {
     pub attacker_team: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weapon: Option<i32>,
+}
+
+/// Where a living start unit was. Written every [`LogHeader::position_frames`]
+/// frames, and left out when the unit has not moved since the last one. Its
+/// `unit_created` line is its first position and its `unit_destroyed` line its
+/// last.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StartUnitPosition {
+    pub frame: i32,
+    pub unit: i32,
+    /// The team the unit belonged to on that frame.
+    pub team: i32,
+    pub x: f32,
+    pub z: f32,
 }
 
 /// One team's last statistics sample as Lua read it when the game ended, with
@@ -127,6 +158,8 @@ pub enum LogLine {
     UnitCreated(UnitEvent),
     UnitFinished(UnitEvent),
     UnitDestroyed(UnitEvent),
+    UnitGiven(UnitEvent),
+    StartUnitPosition(StartUnitPosition),
     GameOver(LoggedGameOver),
     /// A kind a later logger writes and this reader does not know.
     #[serde(other)]
@@ -144,6 +177,8 @@ pub struct EventCounts {
     pub unit_created: usize,
     pub unit_finished: usize,
     pub unit_destroyed: usize,
+    pub unit_given: usize,
+    pub start_unit_position: usize,
     pub game_over: usize,
     /// Lines of a kind this reader does not know.
     pub unknown: usize,
@@ -186,6 +221,8 @@ impl EventLog {
                 LogLine::UnitCreated(_) => counts.unit_created += 1,
                 LogLine::UnitFinished(_) => counts.unit_finished += 1,
                 LogLine::UnitDestroyed(_) => counts.unit_destroyed += 1,
+                LogLine::UnitGiven(_) => counts.unit_given += 1,
+                LogLine::StartUnitPosition(_) => counts.start_unit_position += 1,
                 LogLine::GameOver(_) => counts.game_over += 1,
                 LogLine::Unknown => counts.unknown += 1,
             }
@@ -237,9 +274,11 @@ pub(super) mod tests {
             EventCounts {
                 header: 1,
                 game_start: 1,
-                unit_created: 6,
-                unit_finished: 5,
+                unit_created: 7,
+                unit_finished: 6,
                 unit_destroyed: 4,
+                unit_given: 2,
+                start_unit_position: 2,
                 game_over: 1,
                 unknown: 0,
             }
@@ -270,14 +309,16 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                1,
+                2,
                 vec![
                     "game_over",
                     "game_start",
                     "header",
+                    "start_unit_position",
                     "unit_created",
                     "unit_destroyed",
-                    "unit_finished"
+                    "unit_finished",
+                    "unit_given"
                 ]
             ),
             "the gadget writes a different set of kinds: raise LOGGER_VERSION and update this list"
@@ -297,6 +338,7 @@ pub(super) mod tests {
         assert_eq!(header.engine, "2026.01.0 test");
         assert_eq!((header.map_size_x, header.map_size_z), (4096.0, 2048.0));
         assert_eq!(header.gaia_team, 2);
+        assert_eq!(header.position_frames, 60);
     }
 
     #[test]
@@ -321,6 +363,9 @@ pub(super) mod tests {
                 x: 2000.0,
                 y: 7.5,
                 z: 1000.0,
+                start_unit: None,
+                from: None,
+                captured: None,
                 builder: None,
                 attacker: Some(3),
                 attacker_def: Some(40),
@@ -370,9 +415,108 @@ pub(super) mod tests {
         assert_eq!(team.energy_produced, 9000.5);
         assert_eq!(
             (team.units_produced, team.units_died, team.units_killed),
-            (3, 1, 2)
+            (4, 1, 2)
         );
         assert_eq!(over.teams[1].damage_received, 4100.0);
+    }
+
+    #[test]
+    fn a_unit_its_team_started_with_says_so_and_no_other_unit_does() {
+        let log = parse_log(FIXTURE);
+        let flagged: Vec<(i32, i32)> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::UnitCreated(event) if event.start_unit == Some(true) => {
+                    Some((event.unit, event.team))
+                }
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(flagged, vec![(1, 0), (2, 1)]);
+        let last = log.lines.iter().rev().find_map(|line| match line {
+            LogLine::UnitDestroyed(event) => Some(event),
+            _ => None,
+        });
+        assert_eq!(last.map(|e| (e.unit, e.start_unit)), Some((2, Some(true))));
+    }
+
+    #[test]
+    fn a_unit_that_changed_team_names_both_teams_and_whether_it_was_captured() {
+        let log = parse_log(FIXTURE);
+        let given: Vec<&UnitEvent> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::UnitGiven(event) => Some(event),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(given.len(), 2);
+        assert_eq!((given[0].frame, given[0].unit, given[0].def), (1050, 6, 52));
+        assert_eq!(
+            (given[0].team, given[0].from, given[0].captured),
+            (1, Some(0), None)
+        );
+        assert_eq!(
+            (given[1].team, given[1].from, given[1].captured),
+            (0, Some(1), Some(true))
+        );
+        assert_eq!((given[0].x, given[0].z), (300.0, 300.0));
+    }
+
+    #[test]
+    fn a_start_units_position_carries_the_frame_the_team_and_the_place() {
+        let log = parse_log(FIXTURE);
+        let positions: Vec<&StartUnitPosition> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::StartUnitPosition(position) => Some(position),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(
+            positions,
+            vec![
+                &StartUnitPosition {
+                    frame: 120,
+                    unit: 1,
+                    team: 0,
+                    x: 130.0,
+                    z: 215.0,
+                },
+                &StartUnitPosition {
+                    frame: 660,
+                    unit: 2,
+                    team: 1,
+                    x: 3850.0,
+                    z: 1790.0,
+                },
+            ]
+        );
+    }
+
+    /// The store writes each line back out, so a new kind or field has to
+    /// survive that or a stored file would lose it.
+    #[test]
+    fn the_new_lines_serialise_back_as_the_logger_wrote_them() {
+        for line in FIXTURE.lines().filter(|line| {
+            line.contains("unit_given")
+                || line.contains("start_unit_position")
+                || line.contains("startUnit")
+        }) {
+            let parsed: LogLine = serde_json::from_str(line).unwrap();
+            let original: serde_json::Value = serde_json::from_str(line).unwrap();
+            // Through text, as the store does. A value built directly would
+            // widen each 32 bit coordinate into digits the logger never wrote.
+            let written: serde_json::Value =
+                serde_json::from_str(&serde_json::to_string(&parsed).unwrap()).unwrap();
+            assert_eq!(written, original, "{line}");
+        }
     }
 
     #[test]
@@ -390,7 +534,7 @@ pub(super) mod tests {
     #[test]
     fn a_field_a_later_logger_adds_is_ignored() {
         let text = "{\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\
-            \"x\":1.0,\"y\":2.0,\"z\":3.0,\"cost\":120,\"commander\":true}\n";
+            \"x\":1.0,\"y\":2.0,\"z\":3.0,\"cost\":120,\"veteran\":true}\n";
         let log = parse_log(text);
 
         assert_eq!(log.counts().unit_created, 1);

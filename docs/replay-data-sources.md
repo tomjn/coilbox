@@ -155,9 +155,22 @@ For each run coilbox does the following.
 6. Compares what the run saw with the replay's trailer, and keeps the events only if they agree.
 7. Deletes the scratch folder, whatever happened.
 
-The replay itself is never written. The gadget records a header line, a game start line, a line for each unit created, finished and destroyed with its position and, for a loss, the attacker and weapon, and a game over line with every team's final totals.
+The replay itself is never written. The gadget records these kinds of line.
 
-The replay's map draws two layers from these lines, deaths and buildings finished. Only the kinds a layer needs are read, and only when that layer is switched on. The log does not say which unit is a commander and does not record where units were between their creation and their death, so a layer of commander deaths or of commander paths cannot be drawn from it yet.
+| Kind | What it holds |
+| --- | --- |
+| `header` | The game, map and engine as the run saw them, the map's size, the Gaia team, and how many frames lie between two positions of a starting unit |
+| `game_start` | The frame the game started on |
+| `unit_created`, `unit_finished`, `unit_destroyed` | The frame, the unit, its definition id, its team and where it was. A created unit names its builder. A destroyed unit names the attacker's unit, definition and team and the weapon, when the engine names them |
+| `unit_given` | A unit that changed team, written once it has: the team it went to, the team it left, and whether the engine counted it as a capture or a gift |
+| `start_unit_position` | Where a living starting unit was, every 60 frames, left out when it has not moved since the last one |
+| `game_over` | The winners and every team's final totals |
+
+A unit line also says when the unit is a starting unit. The engine has no idea of a commander: its unit definitions' `isCommander` always answers false, the engine spawns nothing itself, and the start unit a side declares is a name the game is free to ignore. Splinter Faction declares `fedcommander` and spawns `fedcommander_up1`, some hundreds of frames into the match. So the gadget flags the one thing the engine can say for any game: a unit created for a team other than Gaia, by no builder, on the frame that team's first unit was created. In most games that is the commander, and the interface says "starting unit". A team whose first unit was given to it has none. A game that swaps a unit for another when it upgrades ends the starting unit there, because the engine reports one unit destroyed and another created, and nothing in the log ties the two together.
+
+Positions are every 60 frames because a path is drawn at the grain of the map's heat field, 256 cells on the longer side. The fastest starting unit of three games moves 2 elmos a frame, so 60 frames is 120 elmos, which is 3.75 cells on a map 8192 elmos long. On a 248 second Metal Factions match of three AIs the positions were 163 lines of 344, and 14,227 bytes of 36,256. As arithmetic and not a measurement, 16 starting units that never stood still for 40 minutes would be 19,200 lines.
+
+The replay's map draws four layers from these lines: deaths, buildings finished, starting unit deaths and starting unit paths. Only the kinds a layer needs are read, and only when that layer is switched on. The value of living units by kind, under the match chart, is added up from the finished, destroyed and given lines. The gadget samples nothing for it.
 
 A run starts only when you press the button on the replay page, and a distribution can hide the button with `analytics.run`. Runs go through a queue the app owns, so leaving the page changes nothing. A game you start always wins. A running analysis is stopped and put back at the front of the queue.
 
@@ -241,6 +254,9 @@ This table lists each part of the interface, the source it shows, and what makes
 | Analysis section and recorded events | Event log | Not analysed, or the playback did not reproduce the match |
 | Map layer, deaths | Event log. Every unit the playback destroyed, added up into a heatmap on the minimap and on the 3D preview, for all players together. Colours are relative to the busiest spot, and the legend states how many deaths that spot holds. With the game installed a second mode counts each death as its unit's metal cost, which shows where value was lost and not where units died | The layer cannot be switched on until the replay is analysed, and a replay whose playback did not reproduce the match, or a remix, has no events. A death with no attacker, such as a cancelled build, counts like the rest. The cost mode reads costs through unitsync against an installed game, so another build installed can give wrong costs, and a unit with no stated cost counts nothing |
 | Map layer, buildings finished | Event log. An outline for each unit the playback finished that is a building, in its player's colour and in the shape of its kind. Beside the buildings ordered layer, which is filled, a fill with an outline round it is an order that was carried out | Needs the game installed, because the log holds a unit definition id and only the game says which is a building. Finished units that move are left out, since their position is where they left a factory. An order with no outline may have been cancelled or never carried out, and an outline with no order is a building no order in the window placed. The window filters each layer by its own time, when an order was given and when a building finished |
+| Map layer, starting unit deaths | Event log. A mark where each starting unit ended, in its player's colour, and a list of them with the time and who destroyed it. A cross is a unit destroyed. A ring is a unit the game's own script took away with no attacker, which is what an upgrade looks like in the log | Needs an analysis from logger version 2 or later. An older one holds no starting units and says so. A starting unit is not always a commander. A unit a game replaces when it upgrades ends there, and the unit that replaced it is not followed |
+| Map layer, starting unit paths | Event log. A line for each starting unit through the positions recorded for it, in the colour of the player who started with it, with a dot where the line begins and the player's name where it ends. The time window keeps the part of the line inside it | The same. A position is recorded every 60 frames and only when the unit has moved, so a line cuts a corner of up to 2 seconds of travel. A unit that changed hands keeps its first player's colour |
+| Value of living units by kind | Event log for which units were alive and whose, and the installed game through unitsync for what each costs and what it is for. One small chart for each line on the match chart, all on one scale, sampled on the trailer's own period, with metal and energy as two views | Needs an analysis and the game installed. With another build installed the costs and kinds may be wrong. A unit counts from when it is finished, so one being built counts nothing. An analysis from before logger version 2 did not record a unit changing hands |
 | Map preview and the start boxes layer | The installed map, with start boxes from the start script | No engine or map is installed. A match with fixed or random starts has no boxes |
 
 ### Across the library
@@ -381,7 +397,9 @@ A metric is an entry in `metrics.rs`. The chart's dropdown, the sparkline grid, 
 
 ### Adding an event kind
 
-A reader must skip a kind it does not know and ignore a field it does not know. The Rust reader keeps an unknown kind as unknown and stops nothing. When the gadget starts recording a new kind or a new field, raise `LOGGER_VERSION` in `demo/analysis/log.rs`. Stored analyses carry the version, and an older one shows as outdated. The test `the_logger_writes_the_kinds_this_version_stands_for` fails when the gadget's set of kinds changes and the version did not.
+A reader must skip a kind it does not know and ignore a field it does not know. The Rust reader counts an unknown kind as unknown and stops nothing, but it does not keep what the line held: the store writes each line back out from what the reader understood. So a new kind needs a variant in `LogLine`, and a new field needs a field on its struct, or a stored analysis loses them. `the_new_lines_serialise_back_as_the_logger_wrote_them` is the test to copy.
+
+When a new line has a count the replay's trailer also holds, compare the two in `demo/analysis/divergence.rs`. Units given, sent, captured and lost to capture are checked that way, so a log missing one of those lines is not kept. When the gadget starts recording a new kind or a new field, raise `LOGGER_VERSION` in `demo/analysis/log.rs`. Stored analyses carry the version, and an older one shows as outdated. The test `the_logger_writes_the_kinds_this_version_stands_for` fails when the gadget's set of kinds changes and the version did not.
 
 The logger's line format number is separate. Raise it only when a line loses or changes a field a reader depends on, never for an addition.
 

@@ -1190,7 +1190,7 @@ mod tests {
             store::read_events(&world.analyses(), ID, None, 0, None)
                 .unwrap()
                 .total,
-            18
+            24
         );
     }
 

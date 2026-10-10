@@ -19,13 +19,20 @@ export const MAP_LAYERS = [
   "bases",
   "deaths",
   "finished",
+  "startUnitDeaths",
+  "startUnitPaths",
 ] as const;
 
 export type MapLayer = (typeof MAP_LAYERS)[number];
 
 /** The layers drawn from an analysis's event log (#1160), which a replay with
  *  no analysis cannot switch on. */
-export const EVENT_MAP_LAYERS: readonly MapLayer[] = ["deaths", "finished"];
+export const EVENT_MAP_LAYERS: readonly MapLayer[] = [
+  "deaths",
+  "finished",
+  "startUnitDeaths",
+  "startUnitPaths",
+];
 
 /**
  * The toggle group's list with the event layers the reader chose on another
@@ -56,6 +63,8 @@ export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   bases: false,
   deaths: false,
   finished: false,
+  startUnitDeaths: false,
+  startUnitPaths: false,
 };
 
 /** Parse a stored value. Anything missing or not a boolean takes its default. */

@@ -580,12 +580,14 @@ mod tests {
                 run.report.counts.unit_created,
                 run.report.counts.unit_finished,
                 run.report.counts.unit_destroyed,
+                run.report.counts.unit_given,
+                run.report.counts.start_unit_position,
                 run.report.counts.game_over
             ),
-            (1, 6, 5, 4, 1)
+            (1, 7, 6, 4, 2, 2, 1)
         );
         assert_eq!(run.report.header.as_ref().unwrap().game, "Test Game");
-        assert_eq!(run.events.as_ref().unwrap().len(), 18);
+        assert_eq!(run.events.as_ref().unwrap().len(), 24);
         assert!(run.report.log_excerpt.is_empty());
     }
 
@@ -951,6 +953,12 @@ mod tests {
     /// - `COILBOX_ANALYSIS_LOGGER`: a gadget to run in place of the logger, for
     ///   proving the divergence check catches one that changes the match. The
     ///   run is then expected to diverge.
+    /// - `COILBOX_ANALYSIS_LOGGER_READS`: set when the substitute gadget only
+    ///   reads, so the run is expected to reproduce. For measuring an earlier
+    ///   logger against this one.
+    /// - `COILBOX_ANALYSIS_KEEP`: a folder to leave the run's lines in, as
+    ///   `events.jsonl`, and the file the store would write, so both can be
+    ///   measured. Nothing is kept from a run that diverged.
     ///
     /// The scratch folder is a temporary directory, never the app's own cache.
     #[test]
@@ -969,8 +977,11 @@ mod tests {
             );
             return;
         };
-        let perturbed = var("COILBOX_ANALYSIS_LOGGER")
+        let substitute = var("COILBOX_ANALYSIS_LOGGER")
             .map(|path| std::fs::read_to_string(path).expect("the substitute gadget"));
+        let perturbed = substitute
+            .as_ref()
+            .filter(|_| var("COILBOX_ANALYSIS_LOGGER_READS").is_none());
         let replay = PathBuf::from(replay);
         let before = hash_of(&replay);
         let scratch = tempfile::tempdir().unwrap();
@@ -1000,7 +1011,7 @@ mod tests {
             },
             &RunControl::default(),
             &|_| {},
-            perturbed.as_deref().unwrap_or(game::LOGGER),
+            substitute.as_deref().unwrap_or(game::LOGGER),
         )
         .expect("the run");
 
@@ -1030,16 +1041,36 @@ mod tests {
             assert!(run.events.is_none());
         } else {
             assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+            let counts = run.report.counts;
             assert_eq!(
-                run.events.expect("events").len(),
-                run.report.counts.header
-                    + run.report.counts.game_start
-                    + run.report.counts.unit_created
-                    + run.report.counts.unit_finished
-                    + run.report.counts.unit_destroyed
-                    + run.report.counts.game_over
-                    + run.report.counts.unknown
+                run.events.as_ref().expect("events").len(),
+                counts.header
+                    + counts.game_start
+                    + counts.unit_created
+                    + counts.unit_finished
+                    + counts.unit_destroyed
+                    + counts.unit_given
+                    + counts.start_unit_position
+                    + counts.game_over
+                    + counts.unknown
             );
+            if let Some(keep) = var("COILBOX_ANALYSIS_KEEP").map(PathBuf::from) {
+                let events = run.events.as_deref().expect("events");
+                std::fs::create_dir_all(&keep).unwrap();
+                let lines: String = events
+                    .iter()
+                    .map(|line| serde_json::to_string(line).unwrap() + "\n")
+                    .collect();
+                std::fs::write(keep.join("events.jsonl"), &lines).unwrap();
+                let provenance = store::Provenance::of("0123456789abcdef0123456789abcdef", &run, 0)
+                    .expect("a run that reproduced is stored");
+                let stored = store::write(&keep, &provenance, Some(events)).expect("the store");
+                eprintln!(
+                    "kept {} lines, {} bytes of JSON, {stored} bytes stored",
+                    events.len(),
+                    lines.len()
+                );
+            }
         }
     }
 }

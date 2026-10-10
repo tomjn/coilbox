@@ -18,14 +18,17 @@
 -- Every line has a "kind". A reader skips a kind it does not know and ignores a
 -- field it does not know, which is what lets a later version add both.
 --
---   header          format, game, gameVersion, gameShortName, map, engine,
---                   mapSizeX, mapSizeZ, gaiaTeam
---   game_start      frame
---   unit_created    frame, unit, def, team, x, y, z, builder
---   unit_finished   frame, unit, def, team, x, y, z
---   unit_destroyed  frame, unit, def, team, x, y, z, attacker, attackerDef,
---                   attackerTeam, weapon
---   game_over       frame, winners, teams
+--   header               format, game, gameVersion, gameShortName, map,
+--                        engine, mapSizeX, mapSizeZ, gaiaTeam, positionFrames
+--   game_start           frame
+--   unit_created         frame, unit, def, team, x, y, z, startUnit, builder
+--   unit_finished        frame, unit, def, team, x, y, z, startUnit
+--   unit_destroyed       frame, unit, def, team, x, y, z, startUnit, attacker,
+--                        attackerDef, attackerTeam, weapon
+--   unit_given           frame, unit, def, team, x, y, z, startUnit, from,
+--                        captured
+--   start_unit_position  frame, unit, team, x, z
+--   game_over            frame, winners, teams
 --
 -- The game over line is the last one. The engine is told to quit as soon as it
 -- is on disk.
@@ -34,6 +37,26 @@
 -- four attacker fields are left out when the engine names none. Each entry of
 -- "teams" is that team's last statistics sample as Spring.GetTeamStatsHistory
 -- reports it, plus "samples", the number of samples the team has.
+--
+-- "startUnit" is true on a unit its team started with, and left out on every
+-- other unit. The engine has no idea of a commander: UnitDefs.isCommander
+-- always answers false, the engine spawns nothing, and the start unit a side
+-- declares is a name the game is free to ignore. So this is the one thing the
+-- engine can say whatever the game: a unit created for a team other than Gaia,
+-- by no builder, on the frame that team's first unit was created. A team whose
+-- first unit was given to it has none. A game that swaps a unit for another
+-- when it upgrades ends the start unit there, because the engine reports that
+-- as one unit destroyed and another created.
+--
+-- "unit_given" is written once a unit has changed team, for a gift and a
+-- capture alike. "team" is the team it now belongs to and "from" the one it
+-- left. "captured" is true when the engine counted it as a capture, and left
+-- out for a gift.
+--
+-- "start_unit_position" is where a living start unit was, every
+-- "positionFrames" frames, left out when it has not moved since the last
+-- position written for it. Its created line is the first position and its
+-- destroyed line the last.
 
 -- Raised when a line gains or loses a field a reader depends on. Adding a kind
 -- or an optional field does not raise it.
@@ -46,6 +69,18 @@ local MESSAGE = "coilbox_replay_log"
 local LOG_FILE = "coilbox-replay-events.jsonl"
 
 local LOG_SECTION = "coilbox-replay-logger"
+
+-- How many frames lie between two positions of a start unit. A path is drawn on
+-- a map at the grain of the heat field, 256 cells on the map's longer side, so
+-- two positions in a row should be no more than a few cells apart. The fastest
+-- of three games' start units is Splinter Faction's commander, at 2 elmos a
+-- frame (maxvelocity = 2). Metal Factions' is 1.57 and Beyond All Reason's
+-- 1.25. The smaller of the two maps measured is Comet Catcher Prime, 8192 elmos
+-- on its longer side, so 32 elmos a cell. Sixty frames is 120 elmos at 2 a
+-- frame, which is 3.75 cells there. Gex's 150 frames would be 9.4. The largest
+-- step measured over sixty frames was 94.2 elmos, a Metal Factions commander
+-- at its full 1.57.
+local POSITION_FRAMES = 60
 
 function gadget:GetInfo()
 	return {
@@ -108,6 +143,25 @@ if gadgetHandler:IsSyncedCode() then
 
 	local GetGameFrame = Spring.GetGameFrame
 	local GetUnitPosition = Spring.GetUnitPosition
+	local GetTeamUnitStats = Spring.GetTeamUnitStats
+
+	local GAIA = Spring.GetGaiaTeamID()
+
+	-- Everything below is this gadget's own bookkeeping, held in Lua and never
+	-- handed to the engine.
+
+	-- team -> the frame its first unit was created on, or false for a team whose
+	-- first unit was given to it.
+	local firstFrame = {}
+	-- Living start units: unit -> the team it belongs to now.
+	local startTeam = {}
+	-- The same units in the order they were created, so positions are written in
+	-- an order that does not depend on how a table happens to be laid out.
+	local startUnits = {}
+	-- unit -> the last position written for it, as it was written.
+	local lastPlace = {}
+	-- team -> how many captures the engine had counted for it when last asked.
+	local captures = {}
 
 	local function send(line)
 		SendToUnsynced(MESSAGE, line)
@@ -115,13 +169,25 @@ if gadgetHandler:IsSyncedCode() then
 
 	local function unitLine(kind, unitID, unitDefID, unitTeam)
 		local x, y, z = GetUnitPosition(unitID)
-		return '{"kind":"' .. kind .. '","frame":' .. number(GetGameFrame())
+		local line = '{"kind":"' .. kind .. '","frame":' .. number(GetGameFrame())
 			.. ',"unit":' .. number(unitID)
 			.. ',"def":' .. number(unitDefID)
 			.. ',"team":' .. number(unitTeam)
 			.. ',"x":' .. coordinate(x or 0)
 			.. ',"y":' .. coordinate(y or 0)
 			.. ',"z":' .. coordinate(z or 0)
+		if startTeam[unitID] then
+			line = line .. ',"startUnit":true'
+		end
+		return line
+	end
+
+	local function place(unitID)
+		local x, _, z = GetUnitPosition(unitID)
+		if not x then
+			return nil
+		end
+		return '"x":' .. coordinate(x) .. ',"z":' .. coordinate(z)
 	end
 
 	function gadget:GameStart()
@@ -129,6 +195,16 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
+		local frame = GetGameFrame()
+		if firstFrame[unitTeam] == nil then
+			firstFrame[unitTeam] = frame
+		end
+		if firstFrame[unitTeam] == frame and not builderID and unitTeam ~= GAIA then
+			startTeam[unitID] = unitTeam
+			startUnits[#startUnits + 1] = unitID
+			lastPlace[unitID] = place(unitID)
+		end
+
 		local line = unitLine("unit_created", unitID, unitDefID, unitTeam)
 		if builderID then
 			line = line .. ',"builder":' .. number(builderID)
@@ -140,8 +216,60 @@ if gadgetHandler:IsSyncedCode() then
 		send(unitLine("unit_finished", unitID, unitDefID, unitTeam) .. "}")
 	end
 
+	-- The engine calls UnitTaken before a unit changes team and UnitGiven after,
+	-- for a gift and a capture alike, and tells neither apart. What differs is
+	-- which of the new team's counters it raised, so that is what is read.
+	function gadget:UnitGiven(unitID, unitDefID, newTeam, oldTeam)
+		if firstFrame[newTeam] == nil then
+			firstFrame[newTeam] = false
+		end
+		if startTeam[unitID] then
+			startTeam[unitID] = newTeam
+		end
+
+		local line = unitLine("unit_given", unitID, unitDefID, newTeam) .. ',"from":' .. number(oldTeam)
+		local _, _, captured = GetTeamUnitStats(newTeam)
+		if captured and captured ~= (captures[newTeam] or 0) then
+			line = line .. ',"captured":true'
+		end
+		captures[newTeam] = captured or captures[newTeam]
+		send(line .. "}")
+	end
+
+	function gadget:GameFrame(frame)
+		if frame % POSITION_FRAMES ~= 0 then
+			return
+		end
+		for index = 1, #startUnits do
+			local unitID = startUnits[index]
+			local now = place(unitID)
+			if now and now ~= lastPlace[unitID] then
+				lastPlace[unitID] = now
+				send('{"kind":"start_unit_position","frame":' .. number(frame)
+					.. ',"unit":' .. number(unitID)
+					.. ',"team":' .. number(startTeam[unitID])
+					.. "," .. now .. "}")
+			end
+		end
+	end
+
+	local function forget(unitID)
+		if not startTeam[unitID] then
+			return
+		end
+		startTeam[unitID] = nil
+		lastPlace[unitID] = nil
+		for index = 1, #startUnits do
+			if startUnits[index] == unitID then
+				table.remove(startUnits, index)
+				return
+			end
+		end
+	end
+
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam, attackerID, attackerDefID, attackerTeam, weaponDefID)
 		local line = unitLine("unit_destroyed", unitID, unitDefID, unitTeam)
+		forget(unitID)
 		if attackerID then
 			line = line .. ',"attacker":' .. number(attackerID)
 		end
@@ -236,6 +364,7 @@ else
 			.. ',"mapSizeX":' .. number(Game.mapSizeX or 0)
 			.. ',"mapSizeZ":' .. number(Game.mapSizeZ or 0)
 			.. ',"gaiaTeam":' .. number(Spring.GetGaiaTeamID() or -1)
+			.. ',"positionFrames":' .. number(POSITION_FRAMES)
 			.. "}"
 	end
 

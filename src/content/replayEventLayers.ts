@@ -1,6 +1,7 @@
 /**
  * The replay map's layers drawn from an analysed replay's event log (#1160):
- * where units died, and where buildings were finished.
+ * where units died, and where buildings were finished. The two about starting
+ * units are in `replayStartUnits.ts`.
  *
  * Arithmetic on plain values, so the placing and the wording can be tested with
  * numbers. These are events from playing the match back, which is a different
@@ -8,9 +9,6 @@
  * for, and an event is what the simulation did. Positions are in engine world
  * units, placed on the map by `mapFraction` and `buildHeatField` exactly as the
  * order layers are.
- *
- * Two layers the issue asks for are not here, because the log cannot say. It has
- * no commander flag and no unit positions over time. See the pull request.
  */
 
 import type { HeatPoints } from "@/lib/heatField";
@@ -178,7 +176,14 @@ export function finishedBuildings(
 
 /** What the replay's analysis lets the event layers do. */
 export type EventState =
-  | { kind: "ready"; outdated: boolean; gameId: string; analysedAtMs: number }
+  | {
+      kind: "ready";
+      outdated: boolean;
+      gameId: string;
+      analysedAtMs: number;
+      /** Which logger recorded the events, for a layer a later one made possible. */
+      loggerVersion: number;
+    }
   | { kind: "notAnalysed"; canAnalyse: boolean }
   | { kind: "diverged" }
   | { kind: "remix" };
@@ -197,11 +202,13 @@ export function eventState(
     outdated: stored.state === "outdated",
     gameId: info.gameId,
     analysedAtMs: stored.analysedAtMs,
+    loggerVersion: stored.loggerVersion,
   };
 }
 
 /** The layers' names, which the notices use. */
-export const EVENT_LAYER_NAMES = "Deaths and Buildings finished";
+export const EVENT_LAYER_NAMES =
+  "Deaths, Buildings finished and the two starting unit layers";
 
 /**
  * Why the event layers cannot be switched on, or null when they can. The

@@ -15,8 +15,9 @@
 //!   the winners, every team's sample count, and every team's nineteen totals.
 //! - What the logger counted against what the trailer says it should have
 //!   counted: a `unit_created` line per unit a team produced and a
-//!   `unit_destroyed` line per unit a team lost. This is the check on the
-//!   logger itself, and it is the one a log with events missing fails.
+//!   `unit_destroyed` line per unit a team lost, and a `unit_given` line per
+//!   unit a team was given, gave, captured or had captured. This is the check
+//!   on the logger itself, and it is the one a log with events missing fails.
 //! - The engine's own verdict. A replay carries the checksum every player's
 //!   simulation had as the match was played, and the engine compares its own
 //!   against each one as it plays back, logging `[DESYNC WARNING]` for a frame
@@ -33,6 +34,13 @@
 //! log that run wrote was the same as an unperturbed run's, byte for byte. So
 //! the check answers for what coilbox records, which is where it is trusted,
 //! and not for every value the simulation holds.
+//!
+//! When the logger gained start units, positions and units that change team,
+//! one of its new reads was made a write: a start unit moved 8 elmos, once.
+//! The engine caught it on both matches, with 366 desync warnings on the
+//! Splinter Faction one and 100 on a 248 second Metal Factions one recorded
+//! with a gift and a capture in it. A logger with no `unit_given` lines failed
+//! that second match on the four counts alone.
 //!
 //! Everything is compared for equality. No tolerance is applied, because none
 //! was needed: on the runs measured for this issue every figure matched to the
@@ -304,6 +312,48 @@ pub fn compare(
                 _ => None,
             }),
         );
+        // One `unit_given` line per unit that changed team. The engine raises
+        // these four counters in `CUnit::ChangeTeam` and nowhere else, one for
+        // the team that gained the unit and one for the team that lost it.
+        fn captured(event: &super::log::UnitEvent) -> bool {
+            event.captured == Some(true)
+        }
+        found.count(
+            "unitsReceivedLines",
+            Some(team),
+            last.units_received.into(),
+            lines(|line| match line {
+                LogLine::UnitGiven(event) if !captured(event) => Some(event.team),
+                _ => None,
+            }),
+        );
+        found.count(
+            "unitsSentLines",
+            Some(team),
+            last.units_sent.into(),
+            lines(|line| match line {
+                LogLine::UnitGiven(event) if !captured(event) => event.from,
+                _ => None,
+            }),
+        );
+        found.count(
+            "unitsCapturedLines",
+            Some(team),
+            last.units_captured.into(),
+            lines(|line| match line {
+                LogLine::UnitGiven(event) if captured(event) => Some(event.team),
+                _ => None,
+            }),
+        );
+        found.count(
+            "unitsOutCapturedLines",
+            Some(team),
+            last.units_out_captured.into(),
+            lines(|line| match line {
+                LogLine::UnitGiven(event) if captured(event) => event.from,
+                _ => None,
+            }),
+        );
     }
     found.0
 }
@@ -341,8 +391,10 @@ pub(super) mod tests {
                             energy_produced: 9000.5,
                             metal_excess: 0.3,
                             damage_dealt: 4100.0,
-                            units_produced: 3,
+                            units_produced: 4,
                             units_died: 1,
+                            units_sent: 1,
+                            units_captured: 1,
                             units_killed: 2,
                             ..Default::default()
                         },
@@ -361,6 +413,8 @@ pub(super) mod tests {
                             damage_received: 4100.0,
                             units_produced: 2,
                             units_died: 2,
+                            units_received: 1,
+                            units_out_captured: 1,
                             ..Default::default()
                         },
                     ],
@@ -479,6 +533,45 @@ pub(super) mod tests {
             0,
         ));
         assert_eq!((d.figure.as_str(), d.team), ("unitCreatedLines", Some(0)));
+    }
+
+    /// A gift the log calls a capture moves two counts on each of the two
+    /// teams, so the engine's four counters pin both the line and its flag.
+    #[test]
+    fn a_gift_logged_as_a_capture_is_caught_on_both_teams() {
+        let wrong = FIXTURE.replace("\"from\":0}", "\"from\":0,\"captured\":true}");
+        assert_ne!(wrong, FIXTURE);
+
+        let found = compare(&fixture_trailer(), FIXTURE_SECONDS, &parse_log(&wrong), 0);
+        let figures: Vec<_> = found.iter().map(|d| (d.figure.as_str(), d.team)).collect();
+        assert_eq!(
+            figures,
+            vec![
+                ("unitsSentLines", Some(0)),
+                ("unitsOutCapturedLines", Some(0)),
+                ("unitsReceivedLines", Some(1)),
+                ("unitsCapturedLines", Some(1)),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_log_missing_a_unit_that_changed_team_is_caught() {
+        let missing: String = FIXTURE
+            .lines()
+            .filter(|line| !(line.contains("unit_given") && line.contains("\"captured\"")))
+            .map(|line| format!("{line}\n"))
+            .collect();
+
+        let found = compare(&fixture_trailer(), FIXTURE_SECONDS, &parse_log(&missing), 0);
+        let figures: Vec<_> = found.iter().map(|d| (d.figure.as_str(), d.team)).collect();
+        assert_eq!(
+            figures,
+            vec![
+                ("unitsCapturedLines", Some(0)),
+                ("unitsOutCapturedLines", Some(1)),
+            ]
+        );
     }
 
     #[test]
