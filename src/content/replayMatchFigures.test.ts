@@ -54,10 +54,10 @@ describe("matchFigure", () => {
     expect(figureBasis(fight)).toBe("match total");
   });
 
-  it("takes the best team for an economy metric", () => {
+  it("takes the best single army for an economy metric", () => {
     const r = record({ teamTotals: teams(100, 250) });
     expect(matchFigure(r, economy)).toBe(250);
-    expect(figureBasis(economy)).toBe("best team");
+    expect(figureBasis(economy)).toBe("best single army");
   });
 
   it("is unknown, not zero, for a replay that measured nothing", () => {
