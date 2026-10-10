@@ -212,7 +212,7 @@ export default function DecompilePage() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="@container flex h-full flex-col">
       <header className="border-b border-border px-6 py-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
           <PackageOpen size={18} /> Decompile map
@@ -239,11 +239,11 @@ export default function DecompilePage() {
         </Alert>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 @3xl:grid-cols-[28rem_minmax(0,1fr)] @3xl:grid-rows-1">
         {/* Left: form. The whole column is a drop target while dragging. */}
         <div
           className={cn(
-            "min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5 transition-colors",
+            "min-h-0 space-y-5 overflow-auto border-b border-border px-6 py-5 @3xl:border-r @3xl:border-b-0 transition-colors",
             dragging && "bg-primary/5 ring-2 ring-inset ring-primary/60",
           )}
         >

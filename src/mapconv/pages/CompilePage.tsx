@@ -347,7 +347,7 @@ export default function CompilePage() {
   const advancedCount = countAdvanced(advanced);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="@container flex h-full flex-col">
       <header className="border-b border-border px-6 py-4">
         <h1 className="flex items-center gap-2 text-lg font-semibold leading-none">
           <Hammer size={18} /> Compile map
@@ -375,9 +375,9 @@ export default function CompilePage() {
         </Alert>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-[28rem_minmax(0,1fr)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 @3xl:grid-cols-[28rem_minmax(0,1fr)] @3xl:grid-rows-1">
         {/* Left: form */}
-        <div className="min-h-0 space-y-5 overflow-auto border-r border-border px-6 py-5">
+        <div className="min-h-0 space-y-5 overflow-auto border-b border-border px-6 py-5 @3xl:border-r @3xl:border-b-0">
           <PathField
             label="Main texture (-t)"
             hint="required · the map's diffuse colour image · sets the map size · siblings auto-fill below"
