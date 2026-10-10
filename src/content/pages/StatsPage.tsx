@@ -209,6 +209,7 @@ export default function StatsPage() {
             records={records}
             playerName={activeName}
             refights={refights}
+            scripted={scripted}
           />
         </>
       )}

@@ -156,6 +156,39 @@ export function aiRecordFor(
   return total;
 }
 
+/** A game `me` won against AI, for the achievements evaluator. */
+export interface AiWinFact {
+  startTimeMs: number;
+  /** The AIs beaten, by `shortName` (as `aiRecordFor` keys them), once each. */
+  ais: string[];
+}
+
+/**
+ * `me`'s wins against AI, chronological, filtered exactly as `aiRecordFor` is.
+ * A sibling of `playerGameFacts` rather than part of it, because that keeps AIs
+ * out of the per-player history. Records with no AIs give no facts.
+ */
+export function aiWinFacts(
+  records: StatRecord[],
+  me: string,
+  refights: ReadonlySet<string>,
+  scripted: ReadonlySet<string>,
+): AiWinFact[] {
+  const out: AiWinFact[] = [];
+  for (const record of records) {
+    if (!isGenuineMatch(record, refights) || scripted.has(record.filename)) {
+      continue;
+    }
+    const game = aiGameFor(record, me);
+    if (game?.result !== "win") continue;
+    out.push({
+      startTimeMs: record.startTimeMs,
+      ais: [...new Set(game.opponents.map((a) => a.shortName))],
+    });
+  }
+  return out.sort((a, b) => a.startTimeMs - b.startTimeMs);
+}
+
 function tallyResult(
   into: { wins: number; losses: number; undecided: number },
   result: AiGameResult,
