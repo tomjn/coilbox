@@ -340,6 +340,12 @@ export interface LobbyAccount {
    * `lastLogin` when nothing is flagged.
    */
   openAtQuit?: boolean;
+  /**
+   * The player ticked "Connect on startup" on this login, so it connects at
+   * every launch whether or not it was open when coilbox last closed, and
+   * whatever the app-wide `multiplayer.autoConnect` says (issue #3731).
+   */
+  connectOnStartup?: boolean;
 }
 export interface AccountsConfig {
   accounts: LobbyAccount[];
@@ -483,8 +489,12 @@ export function rememberedLogins(
 }
 
 /**
- * The accounts to auto-connect at startup, or an empty array when auto-connect
- * is off. See {@link rememberedLogins} for which accounts that is. Pure so the
+ * The accounts to auto-connect at startup. Every login ticked {@link
+ * LobbyAccount.connectOnStartup} connects whatever `enabled` says, one per
+ * host as {@link dedupeByHost} picks. With `enabled` (the app-wide
+ * auto-connect) on, the {@link rememberedLogins} connect as well, except one
+ * whose host a ticked login already holds: the player chose that login by
+ * hand, so it wins over one that only happened to be open. Pure so the
  * boot-seed decision is unit-testable without a live store.
  */
 export function autoConnectTargets(
@@ -493,7 +503,22 @@ export function autoConnectTargets(
   accounts: LobbyAccount[],
   servers: LobbyServer[],
 ): { account: LobbyAccount; server: LobbyServer }[] {
-  return enabled ? rememberedLogins(accounts, lastLogin, servers) : [];
+  const ticked = dedupeByHost(
+    accounts.flatMap((account) => {
+      if (!account.connectOnStartup) return [];
+      const server = servers.find((s) => s.id === account.serverId);
+      return server ? [{ account, server }] : [];
+    }),
+    lastLogin,
+  );
+  if (!enabled) return ticked;
+  const tickedHosts = new Set(ticked.map((t) => hostIdentity(t.server.host)));
+  return [
+    ...ticked,
+    ...rememberedLogins(accounts, lastLogin, servers).filter(
+      (t) => !tickedHosts.has(hostIdentity(t.server.host)),
+    ),
+  ];
 }
 
 /**
