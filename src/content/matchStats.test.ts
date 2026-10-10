@@ -132,6 +132,7 @@ function info(over: Partial<DemoInfo> = {}): DemoInfo {
     players: [],
     ais: [],
     modOptions: {},
+    mapOptions: {},
     ...over,
   };
 }

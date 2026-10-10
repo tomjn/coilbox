@@ -66,6 +66,7 @@ function demoInfo(overrides: Partial<DemoInfo> = {}): DemoInfo {
     players: [],
     ais: [],
     modOptions: {},
+    mapOptions: {},
     ...overrides,
   };
 }

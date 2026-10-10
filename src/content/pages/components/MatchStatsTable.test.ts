@@ -105,6 +105,7 @@ const info: DemoInfo = {
   ],
   ais: [],
   modOptions: {},
+  mapOptions: {},
 };
 
 function markup(mode: "cumulative" | "perMinute" = "cumulative"): string {

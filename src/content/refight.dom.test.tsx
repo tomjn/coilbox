@@ -29,6 +29,7 @@ vi.mock("./config", () => ({
     cancelled: false,
   }),
   useUnitsyncGameInfo: () => ({ info: null, loading: false }),
+  useUnitsyncMapInfo: () => ({ info: null, loading: false }),
 }));
 
 const { useRefightSetup } = await import("./refight");

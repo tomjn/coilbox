@@ -103,6 +103,7 @@ const fromDraft = (d: SkirmishDraft) =>
     gameType: d.gameName,
     startPosType: d.startPosType,
     modOptions: d.modOptionValues,
+    mapOptions: d.mapOptionValues,
     optionSchema: SCHEMA,
     mapOptionSchema: MAP_SCHEMA,
   });
@@ -155,21 +156,59 @@ describe("the same game and the same choices, launched different ways", () => {
       players: [{ name: "Player", allyTeam: 0, spectator: false }],
       ais: [],
       modOptions: skirmish.modOptions ?? {},
+      mapOptions: skirmish.mapOptions ?? {},
     } as unknown as DemoInfo;
     const refought = demoInfoToSkirmishDraft({
       info: replay,
       ais: [],
       sides: [],
       options: SCHEMA,
+      mapOptions: MAP_SCHEMA,
     });
     if (!refought) throw new Error("the replay had nobody to refight");
 
     // The draft keeps only what the match changed (#1838), so what a preset
     // made from it would store is the player's one choice and nothing else.
     expect(refought.modOptionValues).toEqual(CHOSEN);
+    expect(refought.mapOptionValues).toBeUndefined();
     // Refighting is still exact: filling from the same option list puts every
     // default back, so the script the engine gets is the one it recorded.
     expect(fromDraft(refought).modOptions).toEqual(skirmish.modOptions);
+    expect(fromDraft(refought).mapOptions).toEqual(skirmish.mapOptions);
+  });
+
+  it("refights a match on the map options it was hosted with", () => {
+    // The bug (#1886): the replay's `[mapoptions]` was never read, so a match
+    // hosted with the extractor radius raised was refought on the map's 100.
+    const recorded = { fog: "1", extractorradius: "150" };
+    const replay = {
+      mapName: MAP,
+      gameType: GAME,
+      startPosType: 0,
+      players: [{ name: "Player", allyTeam: 0, spectator: false }],
+      ais: [],
+      modOptions: {},
+      mapOptions: recorded,
+    } as unknown as DemoInfo;
+    const refight = (mapOptions: ConfigOption[]) => {
+      const d = demoInfoToSkirmishDraft({
+        info: replay,
+        ais: [],
+        sides: [],
+        options: SCHEMA,
+        mapOptions,
+      });
+      if (!d) throw new Error("the replay had nobody to refight");
+      return d;
+    };
+
+    // With the map's option list, only the changed value is kept.
+    expect(refight(MAP_SCHEMA).mapOptionValues).toEqual({
+      extractorradius: "150",
+    });
+    expect(fromDraft(refight(MAP_SCHEMA)).mapOptions).toEqual(recorded);
+    // Without it everything recorded is kept, and the script is the same.
+    expect(fromDraft(refight([])).mapOptions).toEqual(recorded);
   });
 
   it("agrees between a skirmish and a scenario built on the same setup", async () => {
