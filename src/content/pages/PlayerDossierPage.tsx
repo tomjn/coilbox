@@ -13,11 +13,13 @@ import {
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
 import { Badge } from "@/components/ui/badge";
+import { isProfileHidden } from "../../profile/hidden";
 import {
   useContentState,
   useReplayStats,
   useScanTargetSelection,
 } from "../config";
+import { libraryMetrics } from "../replayMatchFigures";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import {
   allPlayers,
@@ -27,6 +29,8 @@ import {
   relationTo,
   replaysFor,
 } from "../stats";
+import { useMetricRegistry } from "../useMetricRegistry";
+import { PlayerMatchFigures } from "./components/PlayerMatchFigures";
 import { StatCard, TallyRow } from "./components/StatWidgets";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
@@ -93,6 +97,11 @@ export default function PlayerDossierPage() {
     () => refightFilenames(replayUserState),
     [replayUserState],
   );
+
+  // A distribution that hides match statistics gets none of the figures.
+  const statsHidden = isProfileHidden("analytics.matchStats");
+  const registry = useMetricRegistry(!statsHidden);
+  const metrics = useMemo(() => libraryMetrics(registry), [registry]);
 
   const players = useMemo(
     () => allPlayers(records, refights),
@@ -253,6 +262,15 @@ export default function PlayerDossierPage() {
                 </div>
               )}
             </section>
+          )}
+
+          {!statsHidden && (
+            <PlayerMatchFigures
+              records={records}
+              playerName={playerName}
+              refightFilenames={refights}
+              metrics={metrics}
+            />
           )}
 
           <div className="grid gap-4 sm:grid-cols-2">
