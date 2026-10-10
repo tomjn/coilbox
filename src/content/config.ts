@@ -2537,6 +2537,34 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
  * -------------------------------------------------------------------------- */
 
 /**
+ * The stored stats records, read without ingesting. For a view that only needs
+ * to look people up in the library, such as the replay page's chart: an ingest
+ * walks every root and rewrites the whole stats file. Empty when `enabled` is
+ * false, and until a page that ingests has filled the store.
+ */
+export function useStoredStatsRecords(enabled: boolean): StatRecord[] {
+  const [records, setRecords] = useState<StatRecord[]>([]);
+  useEffect(() => {
+    if (!enabled) {
+      setRecords([]);
+      return;
+    }
+    let cancelled = false;
+    contentStatsQuery(undefined)
+      .then((q) => {
+        if (!cancelled) setRecords(q.records);
+      })
+      .catch(() => {
+        // Leave the records empty. The chart just has no "me" to highlight.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+  return records;
+}
+
+/**
  * Load the local stats database for the whole library: it ingests every root's
  * new/changed demos (idempotent, off the UI thread) then holds the record set.
  * `enginePath` locates demotool for the winner read; when absent the native decode
