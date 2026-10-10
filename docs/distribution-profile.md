@@ -284,10 +284,16 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 | `runlite.list`       | Play > Warpath        |
 | `career.overview`    | Records > Career      |
 | `campaign.builder`   | Campaign Builder > Builder |
+| `analytics.matchStats` | The match statistics section on a replay's page |
+| `analytics.spatialLayers` | The spatial layers on a replay's map (not built yet, no effect today) |
+| `analytics.mapInsight` | The map insight view (not built yet, no effect today) |
+| `analytics.run` | The button that runs the engine over a replay to analyse it (not built yet, no effect today) |
 
 ```json
 { "version": 1, "hide": ["downloads.games", "library.games"] }
 ```
+
+> The four `analytics.*` ids hide parts of a page, not nav items, so a distribution can switch the replay analytics off piece by piece. `analytics.run` is separate from the rest because it is the only part that costs anything: it spends CPU time running the engine over a replay. Hiding `analytics.matchStats` removes the statistics section from replay detail today. The other three ids are accepted now and start working when their features ship, so a profile written today needs no change later.
 
 > Adding a new hideable nav item is a one-line change in that plugin's `index.ts`
 > (`useVisible: () => !isProfileHidden("<id>")`), so this list can grow on request.
