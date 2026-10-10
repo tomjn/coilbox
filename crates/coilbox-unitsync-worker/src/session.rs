@@ -45,9 +45,12 @@
 //!   its members when it is mounted. unitsync names the archives a game mounts
 //!   by their versioned names and not their files, so a set is told apart by
 //!   asking each folder archive the walk found for its name.
+//! - The mount raised no error. A mount that failed part way holds part of the
+//!   set, and a later read that did not mount would not hear why.
 //! - The read did not panic.
 //!
-//! The next request uses it only when it says it reads the same game, and the
+//! The next request uses it only when it says it reads the same game, the game's
+//! archive has the path, size and modified time it had at the mount, and the
 //! walk above found nothing changed, since a change is a new `Init` and `Init`
 //! empties the file system. Any other request starts from an empty file system:
 //! `reset` empties it before the request runs, and a mount of anything else
@@ -62,6 +65,7 @@
 //! tests each bring their own stand-in library.
 
 use crate::ffi::Unitsync;
+use coilbox_unitsync_worker::cachekey::ArchiveStamp;
 use coilbox_unitsync_worker::protocol::InitTiming;
 use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
@@ -100,6 +104,11 @@ struct Session {
     /// Whether what is mounted may be left for the next request, if it is still
     /// the only thing mounted and the request in hand reads that game.
     keepable: bool,
+    /// The game archive's path, size and modified time when a mount that may
+    /// be kept was made.
+    kept_stamp: Option<ArchiveStamp>,
+    /// Errors a mount raised, waiting for the read to ask for them.
+    held_errors: Vec<String>,
 }
 
 /// What `Unitsync::add_all_archives` has to do for one mount.
@@ -161,10 +170,17 @@ pub fn keeping() -> bool {
 }
 
 /// What mounting `archive` takes, asked just before it is mounted.
-pub fn before_mount(archive: &str) -> Mount {
+///
+/// `stamp` is what the archive is on disk at this moment. A mount is used again
+/// only while that is what it was when the mount was made. The walk in
+/// [`reuse`] ran before the read worked out its cache key, and an archive
+/// replaced between the two would otherwise have the old file's answer written
+/// under the new file's key.
+pub fn before_mount(archive: &str, stamp: Option<&ArchiveStamp>) -> Mount {
     with(|s| {
         let first = !std::mem::replace(&mut s.asked_to_mount, true);
-        if holds(s) && s.mounted_now[0] == archive {
+        let same_file = stamp.is_some() && s.kept_stamp.as_ref() == stamp;
+        if holds(s) && s.mounted_now[0] == archive && same_file {
             Mount::Held
         } else if first && !s.mounted_now.is_empty() {
             Mount::AfterEmptying
@@ -181,14 +197,26 @@ pub fn wants_kept(archive: &str) -> bool {
     with(|s| s.mounted_now.is_empty() && s.reading.as_deref() == Some(archive)).unwrap_or(false)
 }
 
-/// Note a mount of `archive` that took `ms`. `keepable` when [`wants_kept`]
-/// said so and every archive in the set is a file.
-pub fn mounted(archive: &str, keepable: bool, ms: u64) {
+/// Note a mount of `archive` that took `ms`. `keep` is the archive's stamp when
+/// the mount may be kept: [`wants_kept`] said so, the mount raised no error and
+/// every archive in the set is a file.
+pub fn mounted(archive: &str, keep: Option<ArchiveStamp>, ms: u64) {
     with(|s| {
-        s.keepable = keepable && s.mounted_now.is_empty();
+        s.keepable = keep.is_some() && s.mounted_now.is_empty();
+        s.kept_stamp = keep.filter(|_| s.keepable);
         s.mounted_now.push(archive.to_string());
         s.mounts.push(ms);
     });
+}
+
+/// Keep errors a mount raised for the next `Unitsync::drain_errors`.
+pub fn hold_errors(errors: Vec<String>) {
+    with(|s| s.held_errors.extend(errors));
+}
+
+/// The errors [`hold_errors`] kept, which are then forgotten.
+pub fn take_held_errors() -> Vec<String> {
+    with(|s| std::mem::take(&mut s.held_errors)).unwrap_or_default()
 }
 
 /// Note that the file system has been emptied.
@@ -196,6 +224,7 @@ pub fn unmounted() {
     with(|s| {
         s.mounted_now.clear();
         s.keepable = false;
+        s.kept_stamp = None;
     });
 }
 
@@ -629,6 +658,8 @@ mod tests {
     /// A game that is a folder, and a zipped one that depends on a folder.
     const FOLDER: &str = "dev.sdd";
     const ON_A_FOLDER: &str = "mutator-1.0.sdz";
+    /// A game whose mount raises an error.
+    const BROKEN: &str = "broken-1.0.sdz";
 
     /// A worker that stays running, with four games installed.
     ///
@@ -637,10 +668,12 @@ mod tests {
     fn serving_games(tag: &str) -> (Serving, PathBuf) {
         let dir = temp(tag);
         let games = dir.join("games");
-        std::fs::write(games.join(ALPHA), b"alpha").unwrap();
+        for file in [ALPHA, BRAVO, ON_A_FOLDER, BROKEN] {
+            std::fs::write(games.join(file), b"a game").unwrap();
+            age(&games.join(file));
+        }
         std::fs::create_dir_all(games.join(FOLDER)).unwrap();
         std::fs::write(games.join(FOLDER).join("modinfo.lua"), b"return {}").unwrap();
-        age(&games.join(ALPHA));
         age(&games.join(FOLDER).join("modinfo.lua"));
         age(&games.join(FOLDER));
         age(&dir.join("maps"));
@@ -651,7 +684,13 @@ mod tests {
         };
         stub::install(World {
             data_dirs: vec![dir.clone()],
+            archive_dir: games.clone(),
+            archives: [ALPHA, BRAVO, FOLDER, ON_A_FOLDER, BROKEN]
+                .map(str::to_string)
+                .to_vec(),
+            mount_fails: vec![BROKEN.to_string()],
             games: vec![
+                game(BROKEN, &["Broken 1.0", "A dependency that is missing"]),
                 game(ALPHA, &["Alpha 1.0", "Spring content v1"]),
                 game(BRAVO, &["Bravo 2.0"]),
                 game(FOLDER, &["Dev $VERSION", "Spring content v1"]),
@@ -791,6 +830,63 @@ mod tests {
         assert_eq!(stub::mounted(), [BRAVO]);
         us.remove_all_archives();
         assert!(stub::mounted().is_empty(), "and that one is not kept");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_mount_that_failed_is_made_again_and_every_read_hears_the_error() {
+        let (us, dir) = serving_games("failed");
+        for read in 0..2 {
+            us.init_game(BROKEN);
+            us.drain_errors();
+            us.add_all_archives(BROKEN);
+            // Where the game modes look for what the mount complained of.
+            let errors = us.drain_errors();
+            assert_eq!(
+                errors,
+                ["[AddArchiveWithDeps] failed loading archive"],
+                "read {read}"
+            );
+            us.remove_all_archives();
+            assert!(stub::mounted().is_empty(), "half a set is not kept");
+            us.uninit();
+            us.reset();
+        }
+        assert_eq!(stub::calls("AddAllArchives"), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_archive_replaced_after_the_walk_is_mounted_again() {
+        let (us, dir) = serving_games("replaced");
+        read_of(&us, ALPHA);
+        // The next read starts, and the walk finds nothing changed.
+        us.init_game(ALPHA);
+        assert_eq!(stub::calls("Init"), 1);
+        // The archive is replaced before the read works out its cache key, so
+        // the key is the new file's.
+        std::fs::write(dir.join("games").join(ALPHA), b"a rebuilt game").unwrap();
+        us.add_all_archives(ALPHA);
+        assert_eq!(
+            stub::calls("AddAllArchives"),
+            2,
+            "the answer comes from a mount made after the key, as it did before mounts were kept"
+        );
+        assert_eq!(stub::mounted(), [ALPHA]);
+        us.remove_all_archives();
+        us.uninit();
+        us.reset();
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_game_whose_archive_cannot_be_found_on_disk_is_mounted_for_every_read() {
+        let (us, dir) = serving_games("unfound");
+        std::fs::remove_file(dir.join("games").join(BRAVO)).unwrap();
+        age(&dir.join("games"));
+        read_of(&us, BRAVO);
+        read_of(&us, BRAVO);
+        assert_eq!(stub::calls("AddAllArchives"), 2);
         let _ = std::fs::remove_dir_all(&dir);
     }
 

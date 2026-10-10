@@ -42,6 +42,9 @@ pub(crate) struct World {
     /// archives it mounts, its own first. `GetPrimaryModArchiveList` gives those
     /// names, and so does `GetMapArchiveName` when asked about the file.
     pub games: Vec<(String, Vec<String>)>,
+    /// Archives `AddAllArchives` raises an error for, as the engine does when
+    /// one of the set will not open.
+    pub mount_fails: Vec<String>,
 }
 
 impl World {
@@ -159,6 +162,8 @@ struct State {
     mounted: Vec<String>,
     /// The archive set `GetPrimaryModArchiveCount` last loaded.
     game_listed: Vec<String>,
+    /// The error queue `GetNextError` reads from.
+    errors: std::collections::VecDeque<String>,
 }
 
 thread_local! {
@@ -249,7 +254,10 @@ unsafe extern "C" fn data_dir(i: c_int) -> *const c_char {
     })
 }
 unsafe extern "C" fn next_error() -> *const c_char {
-    std::ptr::null()
+    with("GetNextError", |s| match s.errors.pop_front() {
+        Some(error) => text(s, &error),
+        None => std::ptr::null(),
+    })
 }
 unsafe extern "C" fn map_count() -> c_int {
     with("GetMapCount", |_| 1)
@@ -354,7 +362,14 @@ unsafe extern "C" fn max_height(_: *const c_char) -> c_float {
 }
 unsafe extern "C" fn add_all_archives(name: *const c_char) {
     let name = arg(name);
-    with("AddAllArchives", |s| s.mounted.push(name))
+    with("AddAllArchives", |s| {
+        if s.world.mount_fails.contains(&name) {
+            s.errors
+                .push_back("[AddArchiveWithDeps] failed loading archive".into());
+        }
+        // The archives ahead of the one that failed stay mounted.
+        s.mounted.push(name)
+    })
 }
 unsafe extern "C" fn remove_all_archives() {
     with("RemoveAllArchives", |s| s.mounted.clear())

@@ -549,7 +549,7 @@ impl Unitsync {
     /// Drain the asynchronous error queue (call `GetNextError` until it returns
     /// null/empty).
     pub fn drain_errors(&self) -> Vec<String> {
-        let mut errs = Vec::new();
+        let mut errs = crate::session::take_held_errors();
         loop {
             match unsafe { cstr((self.get_next_error_fn)()) } {
                 Some(s) if !s.is_empty() => errs.push(s),
@@ -1057,7 +1057,14 @@ impl Unitsync {
         let (Some(f), Ok(c)) = (self.add_all_archives_fn, CString::new(archive)) else {
             return false;
         };
-        match crate::session::before_mount(archive) {
+        let serving = crate::session::serving();
+        // What the archive is on disk now. A kept mount is used only while this
+        // is what it was when the mount was made, so the file a read keys its
+        // cache entry on is the file its answer came out of.
+        let stamp = serving
+            .then(|| crate::infocache::archive_stamp(self, archive))
+            .flatten();
+        match crate::session::before_mount(archive, stamp.as_ref()) {
             crate::session::Mount::Held => return true,
             crate::session::Mount::AfterEmptying => self.empty_file_system(),
             crate::session::Mount::Add => {}
@@ -1065,10 +1072,23 @@ impl Unitsync {
         let asked = std::time::Instant::now();
         unsafe { f(c.as_ptr()) };
         let ms = asked.elapsed().as_millis() as u64;
-        if crate::session::serving() {
-            // The plugin is told in the reply, as it is for `Init`.
-            let files_only = crate::session::wants_kept(archive) && self.mounts_only_files(archive);
-            crate::session::mounted(archive, files_only, ms);
+        if serving {
+            // A mount that raised an error is a file system with part of the
+            // set in it. The engine adds the archives one at a time and stops at
+            // the first that fails. Kept, it would be read again by a request
+            // that never called `AddAllArchives` and so never heard the error.
+            // The errors are handed back by the next `drain_errors`, which is
+            // where the read looks for them.
+            let failed = self.drain_errors();
+            let keep = failed.is_empty()
+                && stamp.is_some()
+                && crate::session::wants_kept(archive)
+                && self.mounts_only_files(archive);
+            // Whatever the question above raised is not the read's to report.
+            let _ = self.drain_errors();
+            crate::session::hold_errors(failed);
+            // The plugin is told the time in the reply, as it is for `Init`.
+            crate::session::mounted(archive, stamp.filter(|_| keep), ms);
         } else if std::env::var_os("COILBOX_UNITSYNC_TIMINGS").is_some() {
             eprintln!("[unitsync-timing] mount={ms}ms");
         }
