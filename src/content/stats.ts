@@ -1,4 +1,5 @@
 import type { StatRecord } from "./bindings";
+import { GAME_LENGTH_BOUNDARIES_SEC } from "./gameLength";
 
 /**
  * Pure aggregations over the local stats record set (see `stats.rs`). Each stats
@@ -454,5 +455,147 @@ export function relationTo(
     winsAgainst,
     lastPlayedMs,
     commonMaps: tally(shared, (g) => g.record.mapName),
+  };
+}
+
+/** One game `me` played against `other`, with both factions. */
+export interface MatchupGame {
+  record: StatRecord;
+  /** `me`'s faction, or "Unknown". */
+  myFaction: string;
+  /** `other`'s faction, or "Unknown". */
+  theirFaction: string;
+  /** True/false when decided, undefined when the result is unknown. */
+  won?: boolean;
+}
+
+/** `me`'s record against `other` within one map, faction pairing or length band. */
+export interface MatchupGroup extends ScopedRecord {
+  key: string;
+  /** The games in this group, most recent first. */
+  matches: MatchupGame[];
+}
+
+/**
+ * `me` against `other`, grouped (#1168). Only games where they were on
+ * opposing ally teams are in `overall` and the groups. Games on the same team
+ * and games with an unknown ally team are counted apart, so the view can say
+ * how many shared games it left out.
+ */
+export interface Matchup {
+  me: string;
+  other: string;
+  overall: ScopedRecord;
+  /** Shared games where both were on the same ally team. Not in any group. */
+  gamesTogether: number;
+  /** Shared games where an ally team is unknown. Not in any group. */
+  gamesSideUnknown: number;
+  /** Most-played first. */
+  byMap: MatchupGroup[];
+  /** `me`'s faction against `other`'s, most-played first. */
+  byFactions: MatchupGroup[];
+  /** Shortest band first. Bands with no games are left out. */
+  byLength: MatchupGroup[];
+  /** Every opposed game, most recent first. */
+  matches: MatchupGame[];
+}
+
+/** The label for the band a game of `durationSec` falls in. */
+export function lengthBandLabel(durationSec: number): string {
+  const [thirty, hour, twoHours] = GAME_LENGTH_BOUNDARIES_SEC;
+  if (durationSec > twoHours) return "Over 2 hours";
+  if (durationSec > hour) return "1 to 2 hours";
+  if (durationSec > thirty) return "30 minutes to 1 hour";
+  return "Up to 30 minutes";
+}
+
+const LENGTH_BAND_ORDER = [
+  "Up to 30 minutes",
+  "30 minutes to 1 hour",
+  "1 to 2 hours",
+  "Over 2 hours",
+];
+
+function matchupGroups(
+  games: MatchupGame[],
+  keyOf: (g: MatchupGame) => string,
+  order: (a: MatchupGroup, b: MatchupGroup) => number,
+): MatchupGroup[] {
+  const byKey = new Map<string, MatchupGame[]>();
+  for (const g of games) {
+    const key = keyOf(g);
+    const list = byKey.get(key);
+    if (list) list.push(g);
+    else byKey.set(key, [g]);
+  }
+  return [...byKey.entries()]
+    .map(([key, list]) => ({
+      key,
+      ...scopedRecord(list.map(asPlayerGame)),
+      matches: [...list].reverse(),
+    }))
+    .sort(order);
+}
+
+function asPlayerGame(g: MatchupGame): PlayerGame {
+  return { record: g.record, side: g.myFaction, won: g.won };
+}
+
+const mostPlayed = (a: MatchupGroup, b: MatchupGroup) =>
+  b.games - a.games || a.key.localeCompare(b.key);
+
+/**
+ * `me`'s record against `other`, grouped by map, faction pairing and game
+ * length (#1168). `refightFilenames` excludes remix/refight reruns (#466),
+ * as in `relationTo`.
+ */
+export function matchupAgainst(
+  records: StatRecord[],
+  me: string,
+  other: string,
+  refightFilenames: ReadonlySet<string> = new Set(),
+): Matchup {
+  const opposed: MatchupGame[] = [];
+  let gamesTogether = 0;
+  let gamesSideUnknown = 0;
+
+  for (const record of excludeSyntheticReruns(records, refightFilenames)) {
+    const mine = record.players.find((p) => !p.spectator && p.name === me);
+    const theirs = record.players.find((p) => !p.spectator && p.name === other);
+    if (!mine || !theirs) continue;
+    if (mine.allyTeam == null || theirs.allyTeam == null) {
+      gamesSideUnknown += 1;
+    } else if (mine.allyTeam === theirs.allyTeam) {
+      gamesTogether += 1;
+    } else {
+      opposed.push({
+        record,
+        myFaction: mine.side || "Unknown",
+        theirFaction: theirs.side || "Unknown",
+        won: record.winnersKnown ? (mine.won ?? undefined) : undefined,
+      });
+    }
+  }
+  opposed.sort((a, b) => a.record.startTimeMs - b.record.startTimeMs);
+
+  return {
+    me,
+    other,
+    overall: scopedRecord(opposed.map(asPlayerGame)),
+    gamesTogether,
+    gamesSideUnknown,
+    byMap: matchupGroups(opposed, (g) => g.record.mapName, mostPlayed),
+    byFactions: matchupGroups(
+      opposed,
+      (g) => `${g.myFaction} vs ${g.theirFaction}`,
+      mostPlayed,
+    ),
+    byLength: matchupGroups(
+      opposed,
+      (g) => lengthBandLabel(g.record.durationSec),
+      (a, b) =>
+        LENGTH_BAND_ORDER.indexOf(a.key) - LENGTH_BAND_ORDER.indexOf(b.key),
+    ),
+    matches: [...opposed].reverse(),
   };
 }

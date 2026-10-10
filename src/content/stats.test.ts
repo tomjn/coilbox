@@ -7,6 +7,7 @@ import {
   guessPrimaryPlayer,
   isGenuineMatch,
   mapRecordFor,
+  matchupAgainst,
   profileFor,
   relationTo,
   replaysFor,
@@ -318,6 +319,142 @@ describe("relationTo", () => {
       lastPlayedMs: 0,
       commonMaps: [],
     });
+  });
+});
+
+/** A game of a given length, `me` (ally team 0) against `foe` (ally team 1). */
+function versus(
+  map: string,
+  durationSec: number,
+  meWon: boolean | undefined,
+  mySide = "Armada",
+  foeSide = "Cortex",
+): StatRecord {
+  return {
+    ...rec(
+      map,
+      [
+        p("me", meWon, mySide, false, 0),
+        p("foe", meWon === undefined ? undefined : !meWon, foeSide, false, 1),
+      ],
+      { winnersKnown: meWon !== undefined },
+    ),
+    durationSec,
+  };
+}
+
+describe("matchupAgainst (#1168)", () => {
+  it("counts only opposed games, and says how many it left out", () => {
+    const records = [
+      versus("A", 600, true),
+      rec("B", [
+        p("me", true, "Armada", false, 0),
+        p("foe", true, "Cortex", false, 0),
+      ]),
+      rec("C", [p("me", true, "Armada"), p("foe", true, "Cortex")]),
+      rec("D", [p("me", true)]),
+    ];
+    const m = matchupAgainst(records, "me", "foe");
+    expect(m.overall).toMatchObject({ games: 1, wins: 1, losses: 0 });
+    expect(m.gamesTogether).toBe(1);
+    expect(m.gamesSideUnknown).toBe(1);
+    expect(m.matches).toHaveLength(1);
+  });
+
+  it("groups by map, most played first, with wins and losses", () => {
+    const records = [
+      versus("Comet", 600, true),
+      versus("Comet", 600, false),
+      versus("Comet", 600, true),
+      versus("Tundra", 600, false),
+    ];
+    const { byMap } = matchupAgainst(records, "me", "foe");
+    expect(byMap.map((g) => g.key)).toEqual(["Comet", "Tundra"]);
+    expect(byMap[0]).toMatchObject({
+      games: 3,
+      decided: 3,
+      wins: 2,
+      losses: 1,
+    });
+    expect(byMap[1]).toMatchObject({ games: 1, wins: 0, losses: 1 });
+  });
+
+  it("keys a faction pairing as me against them", () => {
+    const records = [
+      versus("A", 600, true, "Armada", "Cortex"),
+      versus("A", 600, false, "Cortex", "Armada"),
+      versus("A", 600, true, "Armada", "Cortex"),
+    ];
+    const { byFactions } = matchupAgainst(records, "me", "foe");
+    expect(byFactions.map((g) => [g.key, g.games])).toEqual([
+      ["Armada vs Cortex", 2],
+      ["Cortex vs Armada", 1],
+    ]);
+  });
+
+  it("names a missing faction Unknown", () => {
+    const records = [versus("A", 600, true, "", "Cortex")];
+    const { byFactions } = matchupAgainst(records, "me", "foe");
+    expect(byFactions[0].key).toBe("Unknown vs Cortex");
+  });
+
+  it("puts a game on a boundary in the shorter band", () => {
+    const records = [
+      versus("A", 1800, true),
+      versus("A", 1801, true),
+      versus("A", 3600, true),
+      versus("A", 3601, true),
+      versus("A", 7200, true),
+      versus("A", 7201, true),
+    ];
+    const { byLength } = matchupAgainst(records, "me", "foe");
+    expect(byLength.map((g) => [g.key, g.games])).toEqual([
+      ["Up to 30 minutes", 1],
+      ["30 minutes to 1 hour", 2],
+      ["1 to 2 hours", 2],
+      ["Over 2 hours", 1],
+    ]);
+  });
+
+  it("leaves out length bands with no games", () => {
+    const m = matchupAgainst([versus("A", 7300, true)], "me", "foe");
+    expect(m.byLength.map((g) => g.key)).toEqual(["Over 2 hours"]);
+  });
+
+  it("keeps an undecided game as a game, not a loss", () => {
+    const records = [versus("A", 600, true), versus("A", 600, undefined)];
+    const { overall, byMap } = matchupAgainst(records, "me", "foe");
+    expect(overall).toMatchObject({ games: 2, decided: 1, wins: 1, losses: 0 });
+    expect(byMap[0]).toMatchObject({ games: 2, decided: 1 });
+  });
+
+  it("lists matches most recent first and reports the last played time", () => {
+    const first = versus("A", 600, true);
+    const second = versus("B", 600, false);
+    const m = matchupAgainst([first, second], "me", "foe");
+    expect(m.matches.map((g) => g.record.filename)).toEqual([
+      second.filename,
+      first.filename,
+    ]);
+    expect(m.overall.lastPlayedMs).toBe(second.startTimeMs);
+  });
+
+  it("excludes refight reruns", () => {
+    const rerun = versus("A", 600, true);
+    const m = matchupAgainst(
+      [rerun, versus("A", 600, false)],
+      "me",
+      "foe",
+      new Set([rerun.filename]),
+    );
+    expect(m.overall.games).toBe(1);
+  });
+
+  it("is empty with no shared games", () => {
+    const m = matchupAgainst([rec("A", [p("me", true)])], "me", "foe");
+    expect(m.overall.games).toBe(0);
+    expect(m.byMap).toEqual([]);
+    expect(m.byLength).toEqual([]);
   });
 });
 
