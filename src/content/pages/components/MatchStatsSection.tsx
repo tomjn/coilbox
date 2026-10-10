@@ -18,6 +18,7 @@ import { hasStatistics, headlineTotals, seatCount } from "../../matchStats";
 import { teamResultLabel } from "../../replaySideLabel";
 import { useMatchStats } from "../../useMatchStats";
 import { MatchStatsChart } from "./MatchStatsChart";
+import { ReplaySourceNote } from "./ReplaySourceNote";
 import { StatCard } from "./StatWidgets";
 
 /**
@@ -126,8 +127,17 @@ export function MatchStatsSection({
         <NoStatistics detail="The engine wrote none for it. Either the recording was abandoned, or the match ended without its statistics ever being written." />
       );
     }
+    const period = data.trailer.teamStatPeriodSec;
     return (
       <>
+        <ReplaySourceNote
+          source="trailer"
+          detail={
+            period > 0
+              ? `Figures are sampled every ${period} seconds.`
+              : undefined
+          }
+        />
         <Headlines info={info} trailer={data.trailer} metrics={data.metrics} />
         {/* The chart owns its own controls, so the per-minute view (#1137), the
          * players/sides view (#1138) and the value table (#1140) go in there

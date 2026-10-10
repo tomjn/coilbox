@@ -39,6 +39,7 @@ import {
 } from "../../replayOpening";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { ReplayOpeningSplit } from "./ReplayOpeningSplit";
+import { ReplaySourceNote } from "./ReplaySourceNote";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
 
@@ -390,6 +391,7 @@ export function ReplayBuildOrders({
   return (
     <section className="flex flex-col gap-2">
       <h2 className="text-sm font-medium">Build orders</h2>
+      <ReplaySourceNote source="stream" />
       {result === null ? (
         <div>
           <Button
