@@ -18,6 +18,7 @@ import {
   type OrderSource,
 } from "./bindings";
 import { createReplayRead } from "./replayRead";
+import { type FrameRange, WHOLE_MATCH } from "./replayTimeWindow";
 
 /** The values of `DemoOrderPoints.source`. */
 export const SOURCE_CODE: Record<OrderSource, number> = {
@@ -112,10 +113,15 @@ export function orderHeatPoints(points: OrderPoints): HeatPoints {
   return { positions };
 }
 
-/** How many of the orders each sender gave. */
-export function sourceCounts(points: OrderPoints): Record<OrderSource, number> {
+/** How many of the orders each sender gave, inside a range of frames when one
+ *  is given. */
+export function sourceCounts(
+  points: OrderPoints,
+  range: FrameRange = WHOLE_MATCH,
+): Record<OrderSource, number> {
   const counts = { selection: 0, lua: 0, ai: 0 };
   for (let i = 0; i < points.count; i++) {
+    if (points.frame[i] < range.from || points.frame[i] > range.to) continue;
     const s = points.source[i];
     if (s === SOURCE_CODE.selection) counts.selection++;
     else if (s === SOURCE_CODE.lua) counts.lua++;
