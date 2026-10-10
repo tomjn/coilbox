@@ -33,10 +33,12 @@ import {
 import {
   collapseOrders,
   orderedCost,
+  orderedSplit,
   ordersUpTo,
   parseCutMinutes,
 } from "../../replayOpening";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { ReplayOpeningSplit } from "./ReplayOpeningSplit";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
 
@@ -440,6 +442,20 @@ export function ReplayBuildOrders({
               autoComplete="off"
             />
           </Field>
+          {units && (
+            <ReplayOpeningSplit
+              rows={seats.map((seat) => ({
+                key: seat.key,
+                name: seat.name,
+                split: orderedSplit(
+                  ordersUpTo(seat.orders, parseCutMinutes(cut)),
+                  units,
+                ),
+              }))}
+              cutMinutes={parseCutMinutes(cut)}
+              differentBuild={source?.kind === "differentBuild"}
+            />
+          )}
           {seats.map((seat) => (
             <SeatOrders
               key={seat.key}

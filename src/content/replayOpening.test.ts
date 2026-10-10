@@ -3,8 +3,10 @@ import type { BuildOrder, UnitDatasetEntry } from "./bindings";
 import {
   collapseOrders,
   orderedCost,
+  orderedSplit,
   ordersUpTo,
   parseCutMinutes,
+  splitBucket,
 } from "./replayOpening";
 
 const order = (over: Partial<BuildOrder>): BuildOrder => ({
@@ -183,5 +185,99 @@ describe("orderedCost", () => {
   it("prices nothing without a dataset", () => {
     const cost = orderedCost([order({ unitDefId: 1, count: 3 })], null);
     expect(cost).toEqual({ metal: 0, energy: 0, priced: 0, unpriced: 3 });
+  });
+});
+
+describe("orderedSplit", () => {
+  const gun = { damage: 5, range: 100 };
+  const units: UnitDatasetEntry[] = [
+    {
+      name: "mex",
+      stats: { metalCost: 50, energyCost: 500, extractsMetal: 1 },
+    },
+    {
+      name: "tower",
+      stats: { metalCost: 100, energyCost: 10, weapons: [gun] },
+    },
+    {
+      name: "tank",
+      mobile: true,
+      stats: { metalCost: 200, energyCost: 20, weapons: [gun] },
+    },
+    {
+      name: "lab",
+      buildOptions: ["tank"],
+      stats: { metalCost: 300, energyCost: 30, builder: true },
+    },
+    { name: "blob", stats: { metalCost: 7, energyCost: 70 } },
+    { name: "free", stats: { health: 10 } },
+  ];
+
+  it("puts each order's cost in the column of its unit's kind", () => {
+    const split = orderedSplit(
+      [
+        order({ unitDefId: 1 }),
+        order({ unitDefId: 2 }),
+        order({ unitDefId: 3 }),
+        order({ unitDefId: 4 }),
+        order({ unitDefId: 5 }),
+      ],
+      units,
+    );
+    expect(split.buckets).toEqual({
+      economy: { metal: 50, energy: 500 },
+      defence: { metal: 100, energy: 10 },
+      offence: { metal: 200, energy: 20 },
+      other: { metal: 300, energy: 30 },
+      unclassified: { metal: 7, energy: 70 },
+    });
+    expect(split.unpriced).toBe(0);
+  });
+
+  it("multiplies by the order's count and keeps the unpriced total", () => {
+    const split = orderedSplit(
+      [
+        order({ unitDefId: 3, count: 5 }),
+        order({ unitDefId: 6, count: 2 }),
+        order({ unitDefId: 99 }),
+      ],
+      units,
+    );
+    expect(split.buckets.offence).toEqual({ metal: 1000, energy: 100 });
+    expect(split.unpriced).toBe(3);
+  });
+
+  it("adds up to the plain cost for the same orders", () => {
+    const orders = [
+      order({ unitDefId: 1, count: 3 }),
+      order({ unitDefId: 2 }),
+      order({ unitDefId: 4, count: 20 }),
+      order({ unitDefId: 5 }),
+      order({ unitDefId: 6 }),
+    ];
+    const split = orderedSplit(orders, units);
+    const cost = orderedCost(orders, units);
+    const buckets = Object.values(split.buckets);
+    expect(buckets.reduce((n, b) => n + b.metal, 0)).toBe(cost.metal);
+    expect(buckets.reduce((n, b) => n + b.energy, 0)).toBe(cost.energy);
+    expect(split.unpriced).toBe(cost.unpriced);
+  });
+
+  it("splits nothing without a dataset", () => {
+    const split = orderedSplit([order({ unitDefId: 1, count: 2 })], null);
+    expect(split.unpriced).toBe(2);
+    expect(split.buckets.economy).toEqual({ metal: 0, energy: 0 });
+  });
+
+  it("counts a builder, factory, sensor or transport as other", () => {
+    for (const kind of [
+      "builder",
+      "factory",
+      "intelligence",
+      "transport",
+    ] as const) {
+      expect(splitBucket(kind)).toBe("other");
+    }
+    expect(splitBucket("unclassified")).toBe("unclassified");
   });
 });

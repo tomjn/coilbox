@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
   BuildOrder,
@@ -137,7 +143,7 @@ describe("ReplayBuildOrders", () => {
     expect(ASKED).toContain("SplinterFaction_0.1.88.sdz");
 
     // One player, so the list is open.
-    expect(screen.getByText("Alice")).toBeTruthy();
+    expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
     expect(screen.getByText("3 orders")).toBeTruthy();
     const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
     expect(rows[0]).toContain("0:34");
@@ -309,9 +315,73 @@ describe("ReplayBuildOrders", () => {
       GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
       DATASET = { units: PRICED };
       await open(run, "SplinterFaction 0.1.84");
+      // Once on the player's cost line and once above the split table.
       expect(
-        screen.getByText(/costs come from a different build and may be wrong/i),
-      ).toBeTruthy();
+        screen.getAllByText(
+          /costs come from a different build and may be wrong/i,
+        ),
+      ).toHaveLength(2);
+    });
+
+    it("splits the cost by kind of unit in a table of players", async () => {
+      GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+      DATASET = {
+        units: [
+          { name: "condenser", stats: { metalCost: 5, energyCost: 6 } },
+          {
+            name: "f1landfac",
+            buildOptions: ["fedengineer"],
+            stats: { metalCost: 100, energyCost: 1000, builder: true },
+          },
+          {
+            name: "fedengineer",
+            stats: { metalCost: 10, energyCost: 50, energyMake: 3 },
+          },
+        ],
+      };
+      await open(
+        orders(
+          [
+            order({ unitDefId: 2, count: 2 }),
+            order({ unitDefId: 3, count: 5 }),
+            order({ unitDefId: 1, player: 1, team: 1 }),
+            order({ unitDefId: 99, player: 1, team: 1, count: 4 }),
+          ],
+          {
+            players: [
+              { player: 0, name: "Alice" },
+              { player: 1, name: "Bob" },
+            ],
+          },
+        ),
+      );
+      const table = screen.getByRole("table");
+      const rows = within(table).getAllByRole("row");
+      const cells = (i: number) =>
+        within(rows[i])
+          .getAllByRole("cell")
+          .map((c) => c.textContent);
+      // Economy, defence, offence, other, unclassified, not priced.
+      expect(cells(1)).toEqual([
+        "50 metal250 energy",
+        "0 metal0 energy",
+        "0 metal0 energy",
+        "200 metal2,000 energy",
+        "0 metal0 energy",
+        "0 units",
+      ]);
+      expect(cells(2)).toEqual([
+        "0 metal0 energy",
+        "0 metal0 energy",
+        "0 metal0 energy",
+        "0 metal0 energy",
+        "5 metal6 energy",
+        "4 units",
+      ]);
+      expect(within(table).getByText("Unclassified")).toBeTruthy();
+      expect(
+        screen.getAllByText(/not of what was built/i).length,
+      ).toBeGreaterThan(0);
     });
 
     it("shows the collapsed ids and no totals when the game is not installed", async () => {

@@ -34,6 +34,55 @@
       "unit": "elmos",
       "note": "The longest range among the unit's weapons. Derived rather than declared, because a unitdef has no range of its own, and derived the way the engine derives maxWeaponRange. A unit with no weapon that declares a range has no key."
     },
+    "metalMake": { "from": ["metalMake"], "unit": "metal per second" },
+    "energyMake": { "from": ["energyMake"], "unit": "energy per second" },
+    "makesMetal": {
+      "from": ["makesMetal"],
+      "unit": "metal per second",
+      "note": "Metal made from energy by a metal maker. The engine only pays it while the unit's positive upkeep is met."
+    },
+    "extractsMetal": {
+      "from": ["extractsMetal"],
+      "unit": null,
+      "note": "A metal extractor's share of the metal under it. Any value above zero makes the engine treat the unit as an extractor."
+    },
+    "windGenerator": {
+      "from": ["windGenerator"],
+      "unit": "energy per second",
+      "note": "The cap on what the unit takes from the wind."
+    },
+    "tidalGenerator": {
+      "from": ["tidalGenerator"],
+      "unit": "energy per second",
+      "note": "Multiplied by the map's tidal strength."
+    },
+    "metalUpkeep": {
+      "from": ["metalUpkeep", "metalUse"],
+      "unit": "metal per second",
+      "note": "As written. A negative upkeep is income in the engine: rts/Sim/Units/Unit.cpp adds the negative part to the team's resources while the unit is activated, and many games make conditional income this way."
+    },
+    "energyUpkeep": {
+      "from": ["energyUpkeep", "energyUse"],
+      "unit": "energy per second",
+      "note": "As written, with the same rule for a negative value as metalUpkeep."
+    },
+    "metalStorage": { "from": ["metalStorage"], "unit": "metal" },
+    "energyStorage": { "from": ["energyStorage"], "unit": "energy" },
+    "radarDistance": { "from": ["radarDistance"], "unit": "elmos" },
+    "sonarDistance": { "from": ["sonarDistance"], "unit": "elmos" },
+    "radarDistanceJam": {
+      "from": ["radarDistanceJam"],
+      "unit": "elmos",
+      "note": "The engine's key for a radar jammer's radius. There is no jammerRadius key in a unitdef."
+    },
+    "sonarDistanceJam": { "from": ["sonarDistanceJam"], "unit": "elmos" },
+    "seismicDistance": { "from": ["seismicDistance"], "unit": "elmos" },
+    "transportCapacity": { "from": ["transportCapacity"], "unit": "units" },
+    "builder": {
+      "from": ["builder"],
+      "unit": null,
+      "note": "A boolean. Whether the unit can build, repair and reclaim at all, which the engine defaults to false. Written true or false only where the def declares it."
+    },
     "weapons": {
       "from": ["weapons[]"],
       "unit": null,
