@@ -131,10 +131,14 @@ fn answer_all(
             code,
             init: session::take_init(),
         };
+        // Not busy before the reply goes out. The reader has no way to tell the
+        // answer is done, and a client that closes the input on seeing the
+        // reply would otherwise find the worker busy and cut it off before
+        // its `UnInit`.
+        gate.lock().unwrap_or_else(|e| e.into_inner()).busy = false;
         // Written from the thread that calls unitsync, so nothing the library
         // prints can land inside a frame.
         let sent = protocol::write_reply(out, token, &head, &payload);
-        gate.lock().unwrap_or_else(|e| e.into_inner()).busy = false;
         if sent.is_err() {
             break;
         }
