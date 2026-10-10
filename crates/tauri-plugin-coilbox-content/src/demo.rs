@@ -42,6 +42,7 @@ use crate::model::{
 
 pub(crate) mod analysis;
 mod build_orders;
+pub(crate) mod def_sets;
 pub mod map_grids;
 mod orders;
 pub(crate) mod retarget;
@@ -390,6 +391,8 @@ pub fn delete_replays(
     // or would go.
     let mut candidates: std::collections::BTreeMap<String, u64> = Default::default();
     let mut gone: std::collections::HashSet<PathBuf> = Default::default();
+    // Every match a deleted replay belonged to, whether or not it was analysed.
+    let mut matches: std::collections::BTreeSet<String> = Default::default();
     for path in paths {
         let name = path
             .file_name()
@@ -405,6 +408,7 @@ pub fn delete_replays(
         };
         // Read before the replay goes, because the key is inside it.
         let analysis = analyses.and_then(|dir| analysis::store::stored_for_replay(dir, path));
+        let key = analyses.and_then(|_| analysis::store::replay_key(path).ok());
         let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
         if apply {
             if let Err(e) = std::fs::remove_file(path) {
@@ -418,10 +422,28 @@ pub fn delete_replays(
         if let Some((game_id, size)) = analysis {
             candidates.insert(game_id, size);
         }
+        matches.extend(key);
     }
     let Some(dir) = analyses else {
         return out;
     };
+    // The unit definitions recorded for a match go by the same rule as its
+    // analysis: when no replay of that match is left. A list no replay links to
+    // any more goes with the last link. Nothing is counted for them, because a
+    // list is small and may be shared with replays that stay.
+    if apply {
+        let orphaned: Vec<String> = matches
+            .into_iter()
+            .filter(|game_id| {
+                !library
+                    .iter()
+                    .any(|(path, id)| id == game_id && !gone.contains(path))
+            })
+            .collect();
+        if let Err(e) = def_sets::unlink(&def_sets::dir_beside(dir), &orphaned) {
+            out.skipped.push(format!("unit definitions: {e}"));
+        }
+    }
     for (game_id, size) in candidates {
         if library
             .iter()

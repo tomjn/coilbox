@@ -27,6 +27,9 @@ coilbox-tdf = { path = "../coilbox-tdf" }
 # replay analysis game is written with too (issue #1183).
 tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
 flate2 = "1"
+# Names a stored unit definition list by its content (issue #1176), as the map
+# catalog and the asset vocabulary name theirs.
+sha2 = { workspace = true }
 notify = "8"
 zip = { workspace = true }
 base64 = { workspace = true }
