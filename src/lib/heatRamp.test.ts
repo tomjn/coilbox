@@ -74,6 +74,8 @@ describe("the ramps together", () => {
     expect(HEAT_KIND_OF_LAYER.density).toBe("buildings");
     expect(HEAT_KIND_OF_LAYER.orderDensity).toBe("orders");
     expect(HEAT_KIND_OF_LAYER.deaths).toBe("deaths");
+    // Damage has no ramp of its own and is never drawn with deaths.
+    expect(HEAT_KIND_OF_LAYER.damage).toBe("deaths");
     // The replay's layer and the map page's layer of the same thing agree.
     expect(HEAT_KIND_OF_LAYER.orders).toBe(HEAT_KIND_OF_LAYER.orderDensity);
     expect(HEAT_KIND_OF_LAYER.buildings).toBe(HEAT_KIND_OF_LAYER.density);
@@ -81,7 +83,7 @@ describe("the ramps together", () => {
 
   it("draw a legend bar in the layer's own ramp", () => {
     expect(heatGradientCss("orders")).not.toBe(heatGradientCss("buildings"));
-    expect(heatGradientCss("orders")).toContain("rgba(10, 90, 80, 0.30) 0%");
+    expect(heatGradientCss("orders")).toContain("rgba(0, 120, 143, 0.30) 0%");
     expect(heatGradientCss("deaths")).toContain("rgba(122, 59, 0, 0.30) 0%");
   });
 
