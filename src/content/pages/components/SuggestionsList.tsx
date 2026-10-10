@@ -23,7 +23,6 @@ import {
   useBrandingImage,
   useGithubGameRepos,
 } from "../../branding";
-import { invalidateScans } from "../../config";
 
 type Suggestion = SuggestedGame | SuggestedMap;
 
@@ -122,8 +121,8 @@ async function suggestionRequest(
 /**
  * A grid of pre-curated download suggestions (games or maps) shown on the
  * first-run/empty content screens. Reuses the downloads-plugin commands, progress
- * channel and `ProgressBar`. On a successful download it clears the unitsync scan
- * cache and calls `onComplete` so the host screen's own state refreshes, while a
+ * channel and `ProgressBar`. On a successful download, for which the queue has
+ * already forgotten the unitsync scans, it calls `onComplete` so the host screen's own state refreshes, while a
  * downloaded item stays in its slot marked done (issue #526) so the rest of
  * `items` (whatever the caller passed in) stays selectable for the visit.
  */
@@ -158,8 +157,8 @@ export function SuggestionsList({
   function onDownloaded(item: Suggestion) {
     setResult({ ok: true, message: `${item.title} downloaded.` });
     setDoneIds((prev) => new Set(prev).add(item.id));
-    // A newly-downloaded game/map must appear without a manual rescan.
-    invalidateScans();
+    // The queue forgot the scans when the download finished, so the new game
+    // or map appears without a manual rescan.
     onComplete?.();
   }
 
