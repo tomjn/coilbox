@@ -42,6 +42,7 @@ use crate::model::{
 
 pub(crate) mod analysis;
 mod build_orders;
+mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
 
@@ -774,6 +775,8 @@ struct RawDemo {
     unix_time: u64,
     game_time: u32,
     wallclock: u32,
+    /// The header's team statistics period in seconds, 0 when it names none.
+    team_stat_period_sec: u32,
     /// Whether the recorded game reached a game over.
     ///
     /// The engine writes the player and team statistics chunks, and the header
@@ -812,6 +815,7 @@ fn read_header_and_script(demo: &Path) -> Result<RawDemo, String> {
         unix_time: u64_at(&buf, OFF_UNIX_TIME)?,
         game_time: i32_at(&buf, OFF_GAME_TIME)?.max(0) as u32,
         wallclock: i32_at(&buf, OFF_WALLCLOCK)?.max(0) as u32,
+        team_stat_period_sec: i32_at(&buf, OFF_TEAM_STAT_PERIOD).unwrap_or(0).max(0) as u32,
         game_over: i32_at(&buf, OFF_NUM_TEAMS)? > 0,
         script: String::from_utf8_lossy(&buf[header_size..need]).into_owned(),
     })
@@ -2243,6 +2247,37 @@ pub(crate) async fn content_demo_build_orders(replay_path: String) -> CliResult 
         Ok(Ok(orders)) => CliResult::ok(json!(orders)),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo build orders task failed: {e}")),
+    }
+}
+
+/// `content_demo_order_points`, every order in a replay that points at a place
+/// on the map, packed into parallel columns (#1152). See [`DemoOrderPoints`]
+/// for the layout, and `orders.rs` for which commands have a position. `replayPath`
+/// is an absolute demo path. Read on demand (it walks the whole demo stream),
+/// not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_order_points(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || orders::demo_order_points(&demo_path)).await
+    {
+        Ok(Ok(points)) => CliResult::ok(json!(points)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo order points task failed: {e}")),
+    }
+}
+
+/// `content_demo_command_rates`, how many orders each team gave in each period
+/// of a replay, by who sent them (#1149). The period is the replay's own team
+/// statistics period. `replayPath` is an absolute demo path. Read on demand (it
+/// walks the whole demo stream), not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_command_rates(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || orders::demo_command_rates(&demo_path)).await
+    {
+        Ok(Ok(rates)) => CliResult::ok(json!(rates)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo command rates task failed: {e}")),
     }
 }
 
@@ -4858,6 +4893,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                team_stat_period_sec: 0,
                 game_over: true,
                 script: SCRIPT.to_string(),
             },
@@ -4882,6 +4918,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                team_stat_period_sec: 0,
                 game_over: true,
                 script: SCRIPT.to_string(),
             },
@@ -4914,6 +4951,7 @@ mod tests {
                 unix_time: 0,
                 game_time: 0,
                 wallclock: 0,
+                team_stat_period_sec: 0,
                 game_over: true,
                 script: script.to_string(),
             },

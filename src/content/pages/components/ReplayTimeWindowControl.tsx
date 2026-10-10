@@ -21,7 +21,7 @@ export interface WindowCount {
 }
 
 function countText(count: WindowCount, noun: string): string {
-  if (count.total === 0) return `No ${noun} to place.`;
+  if (count.total === 0) return `No ${noun}.`;
   if (count.inside === 0)
     return `None of the ${count.total.toLocaleString()} ${noun} were given in this window.`;
   return `${count.inside.toLocaleString()} of ${count.total.toLocaleString()} ${noun} are in this window.`;
@@ -46,6 +46,7 @@ export function ReplayTimeWindowControl({
   activity,
   count,
   noun = "orders",
+  also,
 }: {
   domainSec: number;
   window: TimeWindow | null;
@@ -56,6 +57,8 @@ export function ReplayTimeWindowControl({
   count: WindowCount | null;
   /** What the layer's points are called. */
   noun?: string;
+  /** A second kind of point to count, when two layers with different points are on. */
+  also?: { count: WindowCount | null; noun: string };
 }) {
   const [draft, setDraft] = useState<[number, number] | null>(null);
   const latest = useRef<[number, number] | null>(null);
@@ -181,6 +184,7 @@ export function ReplayTimeWindowControl({
           ? `Orders given from ${axisTime(shown[0])} to ${axisTime(shown[1])}.`
           : `The whole match, ${axisTime(0)} to ${axisTime(domainSec)}.`}
         {count && ` ${countText(count, noun)}`}
+        {also?.count && ` ${countText(also.count, also.noun)}`}
       </p>
       <p className="text-xs text-muted-foreground">
         {activity

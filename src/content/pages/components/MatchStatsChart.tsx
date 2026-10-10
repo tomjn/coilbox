@@ -61,6 +61,7 @@ import {
 } from "../../matchStats";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { CommandRateChart } from "./CommandRateChart";
 import { MatchStatsExportButton } from "./MatchStatsExportButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
@@ -355,10 +356,13 @@ export function MatchStatsChart({
   info,
   trailer,
   metrics,
+  replayPath,
 }: {
   info: DemoInfo;
   trailer: DemoTrailer;
   metrics: Metric[];
+  /** Where to read commands per minute from. Left out, the chart has none. */
+  replayPath?: string;
 }) {
   const opening = defaultMetric(metrics);
   const [key, setKey] = useState(opening?.key ?? "");
@@ -707,6 +711,15 @@ export function MatchStatsChart({
             )}
           </div>
         </div>
+      )}
+
+      {replayPath && !noneDrawn && (
+        <CommandRateChart
+          info={info}
+          replayPath={replayPath}
+          series={drawn}
+          endSec={rows[rows.length - 1]?.timeSec ?? 0}
+        />
       )}
     </div>
   );
