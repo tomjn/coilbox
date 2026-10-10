@@ -189,6 +189,9 @@ fn launch_blocking(
     let child = cmd
         .spawn()
         .map_err(|e| format!("failed to launch engine: {e}"))?;
+    // For as long as this launch is in flight, so a replay analysis stands
+    // aside for the game and does not start under it.
+    let _playing = coilbox_proc::game_started();
     reg.lock().unwrap().insert(run_id.clone(), child);
     let _ = on_event.send(LaunchEvent::Started);
 
@@ -540,6 +543,10 @@ mod tests {
             pid_of(&reg, "some-other-run"),
             None,
             "a run id nothing launched under is not the running one"
+        );
+        assert!(
+            coilbox_proc::game_running(),
+            "a replay analysis has to be able to see that a game is being played"
         );
 
         launching

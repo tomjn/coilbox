@@ -275,6 +275,36 @@ pub fn release_engine(dir: &std::path::Path) {
     }
 }
 
+/// How many games the player is in right now.
+static GAMES_RUNNING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Held for as long as a game the player launched is running. See
+/// [`game_started`].
+pub struct GameRunning(());
+
+impl Drop for GameRunning {
+    fn drop(&mut self) {
+        GAMES_RUNNING.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Say that a game the player is in has started. It counts as running until
+/// what this returns is dropped.
+///
+/// Here for the same reason [`CONTENT_ROOTS`] is. The play plugin launches
+/// games and the content plugin runs replay analyses, a headless engine at
+/// full speed, and neither depends on the other. An analysis must not run
+/// under a game somebody is playing, so the one tells the other through this.
+pub fn game_started() -> GameRunning {
+    GAMES_RUNNING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    GameRunning(())
+}
+
+/// Whether a game the player launched is running.
+pub fn game_running() -> bool {
+    GAMES_RUNNING.load(std::sync::atomic::Ordering::SeqCst) > 0
+}
+
 /// What the engine splits a `SPRING_DATADIR` list on (`cPD` in its
 /// `DataDirLocater.cpp`).
 pub const DATADIR_SEP: char = if cfg!(windows) { ';' } else { ':' };
@@ -327,6 +357,25 @@ fn join_extras(primary: &str, roots: &[String]) -> String {
         .map(String::as_str)
         .collect::<Vec<_>>()
         .join(&DATADIR_SEP.to_string())
+}
+
+#[cfg(test)]
+mod game_running {
+    use super::*;
+
+    /// The only test in this crate that says a game started, so the count is
+    /// its own.
+    #[test]
+    fn a_game_counts_as_running_until_what_it_was_given_is_dropped() {
+        assert!(!game_running());
+        let first = game_started();
+        let second = game_started();
+        assert!(game_running());
+        drop(first);
+        assert!(game_running(), "one of two games ending is not both");
+        drop(second);
+        assert!(!game_running());
+    }
 }
 
 #[cfg(test)]

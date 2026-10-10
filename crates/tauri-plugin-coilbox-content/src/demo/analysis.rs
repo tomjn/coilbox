@@ -21,23 +21,21 @@
 //! content folder or beside the replay.
 
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
-use picoframe_core::CliResult;
 use serde::Serialize;
-use serde_json::json;
-use tauri::{AppHandle, Runtime};
 
 pub mod divergence;
 pub mod game;
 pub mod launch;
 pub mod log;
+pub mod queue;
 pub mod retarget;
 pub mod store;
 
 use divergence::Disagreement;
-use launch::EngineExit;
+use launch::{EngineExit, RunControl};
 use log::{EventCounts, LogHeader, LogLine};
 
 /// The folder under the app's cache directory that runs make their scratch
@@ -168,18 +166,144 @@ fn excerpt(output: &str) -> Vec<String> {
     lines.into_iter().map(str::to_string).collect()
 }
 
+/// How far a run has got.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RunPhase {
+    /// The engine is starting and the logger has written nothing.
+    Starting,
+    /// The logger has loaded and the match has not begun.
+    Loading,
+    /// The match is being played back.
+    Playing,
+}
+
+/// Where a run is, read from the logger's file as it grows.
+///
+/// `frame` is the frame of the last event the logger wrote, so it is where the
+/// playback had got to when something last happened, and it stands still
+/// through a stretch of the match in which no unit is made or lost.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunProgress {
+    pub phase: RunPhase,
+    pub frame: i32,
+    /// The match's last frame, from the length in the replay's header. The
+    /// header holds whole seconds, so the real last frame can be up to a
+    /// second past it.
+    pub last_frame: i32,
+}
+
+/// How much of the end of the logger's file is read to find its last line. A
+/// unit's line in the logger's fixture is under 200 bytes.
+const PROGRESS_TAIL_BYTES: u64 = 4096;
+
+/// Reads a run's progress from the logger's file, again only when the file has
+/// grown.
+struct ProgressProbe {
+    events: PathBuf,
+    seen: std::cell::Cell<u64>,
+    progress: std::cell::Cell<RunProgress>,
+}
+
+impl ProgressProbe {
+    fn new(events: PathBuf, match_seconds: u32) -> Self {
+        ProgressProbe {
+            events,
+            seen: std::cell::Cell::new(0),
+            progress: std::cell::Cell::new(RunProgress {
+                phase: RunPhase::Starting,
+                frame: 0,
+                last_frame: match_seconds as i32 * divergence::FRAMES_PER_SECOND,
+            }),
+        }
+    }
+
+    fn read(&self) -> RunProgress {
+        let mut progress = self.progress.get();
+        let Ok(len) = std::fs::metadata(&self.events).map(|m| m.len()) else {
+            return progress;
+        };
+        if len == self.seen.get() {
+            return progress;
+        }
+        self.seen.set(len);
+        if let Some(found) = tail_progress(&self.events, len) {
+            // The header is the only line with no frame.
+            match found {
+                Some(frame) => {
+                    progress.phase = RunPhase::Playing;
+                    progress.frame = frame;
+                }
+                None if progress.phase == RunPhase::Starting => {
+                    progress.phase = RunPhase::Loading;
+                }
+                None => {}
+            }
+            self.progress.set(progress);
+        }
+        progress
+    }
+}
+
+/// The frame on the last whole line of the logger's file. The outer `None` is
+/// a file with no whole line in its tail, and the inner one a last line with
+/// no frame.
+fn tail_progress(events: &Path, len: u64) -> Option<Option<i32>> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(events).ok()?;
+    file.seek(SeekFrom::Start(len.saturating_sub(PROGRESS_TAIL_BYTES)))
+        .ok()?;
+    let mut tail = Vec::new();
+    file.read_to_end(&mut tail).ok()?;
+    let tail = String::from_utf8_lossy(&tail);
+    // Text after the last newline is a line still being written.
+    let whole = &tail[..tail.rfind('\n')?];
+    let last = whole.rsplit('\n').next()?;
+    let line: serde_json::Value = serde_json::from_str(last).ok()?;
+    Some(
+        line.get("frame")
+            .and_then(|frame| frame.as_i64())
+            .map(|frame| frame as i32),
+    )
+}
+
+/// How long the engine is allowed to load before the match begins.
+///
+/// An allowance, not a measurement. What has been measured is one Mac: 9 to
+/// 11 seconds for the engine to load a match, and 23.4 seconds more to scan
+/// every archive when its cache is cold. Nothing has been measured on a slow
+/// machine or a large game, so this is several times that sum. Too short kills
+/// a run that was going to finish. Too long only delays giving up on an engine
+/// that has hung, which a person can cancel in the meantime.
+const START_UP_ALLOWANCE: Duration = Duration::from_secs(300);
+
+/// How long a run of a match may take before it is killed.
+///
+/// The rule: the match's own length, plus [`START_UP_ALLOWANCE`]. The logger
+/// asks the server to play as fast as the machine can, and the server never
+/// plays slower than the match was played, so a run that has taken longer than
+/// the match did is not going to finish.
+pub fn run_timeout(match_seconds: u32) -> Duration {
+    Duration::from_secs(u64::from(match_seconds)) + START_UP_ALLOWANCE
+}
+
 /// Analyse one replay. Blocks for as long as the engine runs, so call it from a
-/// blocking task. Setting `cancel` kills the engine and ends the run.
+/// blocking task. Cancelling `control` kills the engine and ends the run.
+/// `on_poll` is called a few times a second while the engine runs, with how far
+/// the playback has got.
 pub fn analyse_replay(
     request: &AnalysisRequest,
-    cancel: &AtomicBool,
+    control: &RunControl,
+    on_poll: &dyn Fn(RunProgress),
 ) -> Result<AnalysisRun, String> {
-    analyse_with(request, cancel, game::LOGGER)
+    analyse_with(request, control, on_poll, game::LOGGER)
 }
 
 fn analyse_with(
     request: &AnalysisRequest,
-    cancel: &AtomicBool,
+    control: &RunControl,
+    on_poll: &dyn Fn(RunProgress),
     logger: &str,
 ) -> Result<AnalysisRun, String> {
     let trailer = super::read_trailer(&request.replay)?;
@@ -215,6 +339,7 @@ fn analyse_with(
     // for the analysis game.
     let mut data_dirs = vec![data];
     data_dirs.extend(request.data_dirs.iter().cloned());
+    let probe = ProgressProbe::new(write_dir.join(game::EVENTS_FILE), raw.game_time);
     let exit = launch::run_headless(
         &launch::Launch {
             engine: &engine,
@@ -224,8 +349,9 @@ fn analyse_with(
             data_dirs: &data_dirs,
             log: &engine_log,
             timeout: request.timeout,
+            on_poll: &|| on_poll(probe.read()),
         },
-        cancel,
+        control,
     )?;
 
     // A file that is not there is a logger that never started, and reads as an
@@ -281,68 +407,6 @@ fn analyse_with(
         },
         events: reproduced.then_some(parsed.lines),
     })
-}
-
-/// `content_analyse_replay`: play a replay back headless under the analysis
-/// game and report what the logger recorded.
-///
-/// `replayPath` is a `ReplayFile.path`. `enginePath` is the `Engine.path` of the
-/// engine the replay was recorded with, and `dataDir` the content folder it
-/// plays from. Every other content folder coilbox knows is offered to the
-/// engine too. `timeoutSecs` is how long the engine may run before it is
-/// killed.
-///
-/// Answers `{ report, events }`. `events` is the logger's lines when
-/// `report.status` is `reproduced`, and null otherwise: a run that diverged is
-/// a record of a game nobody played. It runs the engine for the length of the
-/// call, which is seconds to minutes.
-#[tauri::command]
-pub(crate) async fn content_analyse_replay<R: Runtime>(
-    app: AppHandle<R>,
-    replay_path: String,
-    engine_path: String,
-    data_dir: String,
-    timeout_secs: u64,
-) -> CliResult {
-    let scratch_root = match coilbox_portable::cache_dir(&app) {
-        Ok(dir) => dir.join(SCRATCH_DIR),
-        Err(e) => return CliResult::err(e),
-    };
-    let analyses = match store::app_store_dir(&app) {
-        Ok(dir) => dir,
-        Err(e) => return CliResult::err(e),
-    };
-    let mut data_dirs = vec![PathBuf::from(&data_dir)];
-    data_dirs.extend(
-        coilbox_proc::extra_datadirs(&data_dir)
-            .split(coilbox_proc::DATADIR_SEP)
-            .filter(|dir| !dir.is_empty())
-            .map(PathBuf::from),
-    );
-    let request = AnalysisRequest {
-        replay: PathBuf::from(replay_path),
-        engine_dir: PathBuf::from(engine_path),
-        data_dirs,
-        scratch_root,
-        timeout: Duration::from_secs(timeout_secs),
-    };
-    let run = tauri::async_runtime::spawn_blocking(move || {
-        let game_id = store::replay_key(&request.replay)?;
-        if store::is_current(&analyses, &game_id) {
-            return Err("this replay is already analysed".to_string());
-        }
-        let run = analyse_replay(&request, &AtomicBool::new(false))?;
-        if let Some(provenance) = store::Provenance::of(&game_id, &run, now_ms()) {
-            store::write(&analyses, &provenance, run.events.as_deref())?;
-        }
-        Ok(run)
-    })
-    .await;
-    match run {
-        Ok(Ok(run)) => CliResult::ok(json!({ "report": run.report, "events": run.events })),
-        Ok(Err(e)) => CliResult::err(e),
-        Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
-    }
 }
 
 /// The wall clock, in milliseconds since the Unix epoch.
@@ -424,7 +488,8 @@ mod tests {
                     scratch_root: self.scratch_root(),
                     timeout,
                 },
-                &AtomicBool::new(false),
+                &RunControl::default(),
+                &|_| {},
             )
         }
 
@@ -701,11 +766,108 @@ mod tests {
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
             },
-            &AtomicBool::new(false),
+            &RunControl::default(),
+            &|_| {},
         );
 
         assert!(result.unwrap_err().contains("no headless engine"));
         assert!(!world.scratch_root().exists());
+    }
+
+    /// Progress is read from the logger's file while the engine runs, so the
+    /// fake engine writes that file in three steps with a pause after each.
+    #[test]
+    fn progress_follows_the_logger_from_starting_to_the_last_event() {
+        let world = World::new(replay_bytes());
+        let lines: Vec<&str> = FIXTURE.lines().collect();
+        let first_frame = serde_json::from_str::<serde_json::Value>(lines[2]).unwrap()["frame"]
+            .as_i64()
+            .unwrap() as i32;
+        let body = format!(
+            "{FIND_ARGS}\nout=\"$write/{file}\"\nsleep 1\n\
+             cat > \"$out\" <<'COILBOX_ONE'\n{header}\nCOILBOX_ONE\nsleep 1\n\
+             cat >> \"$out\" <<'COILBOX_TWO'\n{early}\nCOILBOX_TWO\nsleep 1\n\
+             cat >> \"$out\" <<'COILBOX_THREE'\n{rest}\nCOILBOX_THREE\n",
+            file = game::EVENTS_FILE,
+            header = lines[0],
+            early = lines[1..3].join("\n"),
+            rest = lines[3..].join("\n"),
+        );
+        fake_engine(world.dir.path(), &body);
+        let seen = std::sync::Mutex::new(Vec::new());
+
+        let run = analyse_replay(
+            &AnalysisRequest {
+                replay: world.replay.clone(),
+                engine_dir: world.dir.path().join("engine"),
+                data_dirs: Vec::new(),
+                scratch_root: world.scratch_root(),
+                timeout: LONG,
+            },
+            &RunControl::default(),
+            &|progress| {
+                let mut seen = seen.lock().unwrap();
+                if seen.last() != Some(&progress) {
+                    seen.push(progress);
+                }
+            },
+        )
+        .unwrap();
+
+        assert_eq!(run.report.status, AnalysisStatus::Reproduced);
+        let seen = seen.into_inner().unwrap();
+        let last_frame = FIXTURE_SECONDS as i32 * 30;
+        let at = |phase, frame| RunProgress {
+            phase,
+            frame,
+            last_frame,
+        };
+        assert_eq!(
+            seen[..3],
+            [
+                at(RunPhase::Starting, 0),
+                at(RunPhase::Loading, 0),
+                at(RunPhase::Playing, first_frame),
+            ]
+        );
+        // The engine exits as it writes the rest, so a fourth reading is rare.
+        // When there is one it is further on.
+        assert!(seen[3..]
+            .iter()
+            .all(|p| p.phase == RunPhase::Playing && p.frame > first_frame));
+    }
+
+    /// A line still being written is not read as the last one.
+    #[test]
+    fn a_half_written_line_does_not_move_the_progress() {
+        let dir = tempfile::tempdir().unwrap();
+        let events = dir.path().join("events.jsonl");
+        let probe = ProgressProbe::new(events.clone(), 10);
+        assert_eq!(probe.read().phase, RunPhase::Starting);
+
+        std::fs::write(&events, "{\"kind\":\"header\",\"format\":1}\n").unwrap();
+        assert_eq!(probe.read().phase, RunPhase::Loading);
+
+        let whole =
+            "{\"kind\":\"header\",\"format\":1}\n{\"kind\":\"unit_created\",\"frame\":120}\n";
+        std::fs::write(
+            &events,
+            format!("{whole}{{\"kind\":\"unit_created\",\"frame\":99"),
+        )
+        .unwrap();
+        let progress = probe.read();
+        assert_eq!((progress.phase, progress.frame), (RunPhase::Playing, 120));
+        assert_eq!(progress.last_frame, 300);
+    }
+
+    /// The rule, pinned: the match's own length plus the start-up allowance.
+    #[test]
+    fn a_run_is_allowed_the_matchs_length_and_time_to_start() {
+        assert_eq!(run_timeout(0), START_UP_ALLOWANCE);
+        assert_eq!(
+            run_timeout(769),
+            Duration::from_secs(769) + START_UP_ALLOWANCE
+        );
     }
 
     #[test]
@@ -781,7 +943,8 @@ mod tests {
                 scratch_root: scratch.path().to_path_buf(),
                 timeout: Duration::from_secs(timeout.parse().expect("seconds")),
             },
-            &AtomicBool::new(false),
+            &RunControl::default(),
+            &|_| {},
             perturbed.as_deref().unwrap_or(game::LOGGER),
         )
         .expect("the run");

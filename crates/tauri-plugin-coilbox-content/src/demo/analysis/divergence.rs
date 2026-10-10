@@ -57,7 +57,7 @@ use crate::model::{DemoTrailer, TeamStatSample};
 
 /// `GAME_SPEED` in `rts/Sim/Misc/GlobalConstants.h`: simulation frames a
 /// second. A constant of the engine, not a setting.
-const FRAMES_PER_SECOND: i32 = 30;
+pub(super) const FRAMES_PER_SECOND: i32 = 30;
 
 /// One figure the run and the replay disagree on.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
