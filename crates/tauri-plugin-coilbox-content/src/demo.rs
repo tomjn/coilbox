@@ -250,6 +250,7 @@ fn replay_file(e: DemoFileEntry, summary: Option<ReplaySummary>) -> ReplayFile {
         skill_max: s.and_then(|s| s.skill_max),
         remixed: s.is_some_and(|s| s.remixed),
         stale_remix: s.is_some_and(|s| s.stale_remix),
+        unfinished: e.size_bytes == 0,
         game_id: s.and_then(|s| s.game_id.clone()),
     }
 }
@@ -439,6 +440,84 @@ pub fn delete_replays(
         out.analyses += 1;
         out.analysis_bytes += size;
     }
+    out
+}
+
+/// The content folders the app has published.
+fn library_roots() -> Vec<PathBuf> {
+    coilbox_proc::content_roots()
+        .into_iter()
+        .map(PathBuf::from)
+        .collect()
+}
+
+/// Whether `path` is a replay inside one of the folders the Replays list reads
+/// under `roots`: each root's own `demos` and `replays`, and the same folders in
+/// each engine installed under it (see [`demo_search_dirs`]). Compared by real
+/// path, so a `..` or a link cannot step outside them.
+pub fn is_listed_replay(path: &Path, roots: &[PathBuf]) -> bool {
+    if !is_replay_path(path) {
+        return false;
+    }
+    let Some(parent) = path.parent().and_then(|p| std::fs::canonicalize(p).ok()) else {
+        return false;
+    };
+    roots
+        .iter()
+        .flat_map(|root| demo_search_dirs(root))
+        .flat_map(|base| DEMO_DIRS.iter().map(move |dir| base.join(dir)))
+        .filter_map(|dir| std::fs::canonicalize(dir).ok())
+        .any(|dir| dir == parent)
+}
+
+/// [`delete_replays`] for what a person asked to delete from the app.
+///
+/// A path outside the folders the list reads is refused, so these commands
+/// cannot be pointed at a replay somewhere else on disk. With `only_unfinished`
+/// a file that is no longer empty is left alone, so a recording that finished
+/// between the preview and the delete is not lost.
+///
+/// An empty file is refused while `game_running`, because the engine writes
+/// nothing until its game ends and a running game's file looks exactly like
+/// one left by a crash. A game started outside coilbox cannot be seen from
+/// here, which is why the page warns about it.
+pub fn delete_listed_replays(
+    paths: &[PathBuf],
+    apply: bool,
+    analyses: Option<&Path>,
+    library: &[(PathBuf, String)],
+    roots: &[PathBuf],
+    only_unfinished: bool,
+    game_running: bool,
+) -> DeleteSummary {
+    let mut refused = Vec::new();
+    let mut allowed = Vec::new();
+    for path in paths {
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| path.to_string_lossy().into_owned());
+        if is_replay_path(path) && !is_listed_replay(path, roots) {
+            refused.push(format!("{name}: not in a folder the Replays list reads"));
+            continue;
+        }
+        let len = std::fs::metadata(path).map(|m| m.len()).ok();
+        if only_unfinished && len.is_some_and(|len| len > 0) {
+            refused.push(format!(
+                "{name}: no longer empty, so the recording finished"
+            ));
+            continue;
+        }
+        if game_running && len == Some(0) {
+            refused.push(format!(
+                "{name}: a game is running, and this empty file may be its recording"
+            ));
+            continue;
+        }
+        allowed.push(path.clone());
+    }
+    let mut out = delete_replays(&allowed, apply, analyses, library);
+    out.skipped.extend(refused);
     out
 }
 
@@ -2199,6 +2278,7 @@ pub(crate) async fn content_rewrite_demo(
 pub(crate) async fn content_delete_replay<R: Runtime>(
     app: AppHandle<R>,
     path: String,
+    only_unfinished: Option<bool>,
 ) -> CliResult {
     let p = PathBuf::from(&path);
     if !is_replay_path(&p) {
@@ -2214,7 +2294,15 @@ pub(crate) async fn content_delete_replay<R: Runtime>(
         Ok(library) => library,
         Err(e) => return CliResult::err(format!("delete replay task failed: {e}")),
     };
-    let summary = delete_replays(&[p], true, analyses.as_deref(), &library);
+    let summary = delete_listed_replays(
+        &[p],
+        true,
+        analyses.as_deref(),
+        &library,
+        &library_roots(),
+        only_unfinished.unwrap_or(false),
+        coilbox_proc::game_running(),
+    );
     if summary.deleted == 0 {
         let reason = summary.skipped.first().cloned().unwrap_or_default();
         return CliResult::err(format!("delete failed: {reason}"));
@@ -2233,12 +2321,21 @@ pub(crate) async fn content_delete_replays<R: Runtime>(
     app: AppHandle<R>,
     paths: Vec<String>,
     apply: bool,
+    only_unfinished: Option<bool>,
 ) -> CliResult {
     let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
     let analyses = analysis::store::app_store_dir(&app).ok();
     match tauri::async_runtime::spawn_blocking(move || {
         let library = library_game_ids(&app);
-        delete_replays(&paths, apply, analyses.as_deref(), &library)
+        delete_listed_replays(
+            &paths,
+            apply,
+            analyses.as_deref(),
+            &library,
+            &library_roots(),
+            only_unfinished.unwrap_or(false),
+            coilbox_proc::game_running(),
+        )
     })
     .await
     {
@@ -4092,6 +4189,134 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    /// A root with an empty replay in its own `demos`, one in an installed
+    /// engine's `demos` (the owner's two September files), and a real replay.
+    fn unfinished_fixture() -> (tempfile::TempDir, PathBuf, [PathBuf; 3]) {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("root");
+        let engine = root.join("engine").join("macos_arm64").join("2.0");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        std::fs::create_dir_all(engine.join("demos")).unwrap();
+        std::fs::write(engine.join("spring-headless"), b"x").unwrap();
+        let shared = root.join("demos").join("shared.sdfz");
+        let inside = engine.join("demos").join("engine.sdfz");
+        let real = root.join("demos").join("real.sdfz");
+        std::fs::write(&shared, b"").unwrap();
+        std::fs::write(&inside, b"").unwrap();
+        std::fs::write(&real, build_demo(SCRIPT, true)).unwrap();
+        (tmp, root, [shared, inside, real])
+    }
+
+    #[test]
+    fn an_empty_replay_is_listed_as_unfinished_wherever_it_is_found() {
+        let (_tmp, root, _) = unfinished_fixture();
+        let list = list_replays(&root);
+        let flags: HashMap<&str, bool> = list
+            .iter()
+            .map(|r| (r.filename.as_str(), r.unfinished))
+            .collect();
+        assert_eq!(flags.len(), 3);
+        assert!(flags["shared.sdfz"]);
+        assert!(flags["engine.sdfz"]);
+        assert!(!flags["real.sdfz"]);
+    }
+
+    #[test]
+    fn an_empty_replay_nothing_is_writing_is_deleted_from_either_folder() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+        let roots = [root];
+
+        let dry = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            false,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(dry.deleted, 2);
+        assert!(shared.is_file() && inside.is_file());
+
+        let done = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            &[],
+            &roots,
+            true,
+            false,
+        );
+        assert_eq!(
+            (done.deleted, done.bytes, done.skipped.len()),
+            (dry.deleted, dry.bytes, 0)
+        );
+        assert!(!shared.exists() && !inside.exists());
+        assert!(real.is_file());
+    }
+
+    /// The engine writes nothing until its game ends, so a running game's file is
+    /// indistinguishable from a dead one.
+    #[test]
+    fn an_empty_replay_is_left_alone_while_a_game_is_running() {
+        let (_tmp, root, [shared, inside, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(
+            &[shared.clone(), inside.clone()],
+            true,
+            None,
+            &[],
+            &[root],
+            true,
+            true,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(out.skipped[0].contains("a game is running"));
+        assert!(shared.is_file() && inside.is_file() && real.is_file());
+    }
+
+    /// A recording that finished between the preview and the delete is a real
+    /// replay now.
+    #[test]
+    fn a_replay_that_finished_since_the_preview_is_not_taken_as_unfinished() {
+        let (_tmp, root, [_, _, real]) = unfinished_fixture();
+
+        let out = delete_listed_replays(&[real.clone()], true, None, &[], &[root], true, false);
+        assert_eq!(out.deleted, 0);
+        assert!(out.skipped[0].contains("no longer empty"));
+        assert!(real.is_file());
+    }
+
+    #[test]
+    fn a_replay_outside_the_listed_folders_is_refused() {
+        let (tmp, root, _) = unfinished_fixture();
+        let elsewhere = tmp.path().join("elsewhere");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        let stray = elsewhere.join("stray.sdfz");
+        std::fs::write(&stray, b"").unwrap();
+        // A spelling that reaches the same stray file through a listed folder.
+        let sneaky = root
+            .join("demos")
+            .join("..")
+            .join("..")
+            .join("elsewhere")
+            .join("stray.sdfz");
+
+        let out = delete_listed_replays(
+            &[stray.clone(), sneaky],
+            true,
+            None,
+            &[],
+            &[root],
+            false,
+            false,
+        );
+        assert_eq!(out.deleted, 0);
+        assert_eq!(out.skipped.len(), 2);
+        assert!(stray.is_file());
+    }
+
     /// A root with two engines that both recorded, plus one replay of the root's
     /// own. Names are distinct unless a caller plants a clash.
     fn gather_fixture(name: &str) -> PathBuf {
@@ -4909,6 +5134,28 @@ mod tests {
         };
         let src = write_tmp("no_packet.sdf", &f.bytes());
         assert!(rewrite_demo(&src, "Some Game 1.0", None).is_err());
+    }
+
+    /// Remixes an older coilbox made, read and never written. Set
+    /// `COILBOX_OLD_REMIXES` to their paths, separated the way `PATH` is.
+    #[test]
+    #[ignore = "needs remixes made before issue #3861"]
+    fn a_remix_an_older_coilbox_made_is_flagged() {
+        let Some(paths) = std::env::var_os("COILBOX_OLD_REMIXES") else {
+            eprintln!("did nothing: set COILBOX_OLD_REMIXES to run it");
+            return;
+        };
+        for path in std::env::split_paths(&paths) {
+            let info = decode_native(&path).unwrap();
+            eprintln!(
+                "{}: header {:?}, packet {:?}, stale {}",
+                path.display(),
+                info.game_type,
+                retarget::packet_game_of(&path),
+                info.stale_remix
+            );
+            assert!(info.remixed && info.stale_remix, "{}", path.display());
+        }
     }
 
     /// A real engine loading a real remix, to see which game it says it loaded.

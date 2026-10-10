@@ -51,6 +51,7 @@ import { gameNamesMatch } from "../resolveContent";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
+import { UNFINISHED_WARNING } from "./components/ClearUnfinishedButton";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
@@ -60,6 +61,7 @@ import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayRoster, swatch } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
+import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
   DetailLoading,
@@ -522,9 +524,13 @@ function ReplayNotes({
 function DeleteReplayButton({
   replayPath,
   onDeleted,
+  unfinished = false,
 }: {
   replayPath: string;
   onDeleted: () => void;
+  /** An empty file: the warning says what a running game would lose, and the
+   * backend leaves the file alone if it has filled in since the page opened. */
+  unfinished?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -536,6 +542,7 @@ function DeleteReplayButton({
     try {
       const { analysisDeleted } = await contentDeleteReplay({
         path: replayPath,
+        ...(unfinished ? { onlyUnfinished: true } : {}),
       });
       if (analysisDeleted) void refreshStoredAnalyses();
       forgetReplay(replayPath);
@@ -563,6 +570,11 @@ function DeleteReplayButton({
             be undone. If this replay has been analysed, its stored analysis is
             deleted with it.
           </p>
+          {unfinished && (
+            <p className="text-xs text-muted-foreground">
+              {UNFINISHED_WARNING}
+            </p>
+          )}
         </div>
         <div className="flex justify-end gap-2">
           <Button
@@ -603,9 +615,12 @@ export default function ReplayDetailPage() {
   const replaysRoot = useReplaysRoot(selected?.rootPath);
   const { replays, loading: listLoading, refresh } = useReplays(replaysRoot);
   const replay = replays.find((r) => r.filename === filename);
+  // An empty file has no header to read. It is not an error, so it is not
+  // decoded (issue #3868).
+  const unfinished = replay?.unfinished === true;
   const { info, loading, error } = useDemoInfo(
     selected?.enginePath,
-    replay?.path,
+    unfinished ? undefined : replay?.path,
   );
   // Drives the engine-mismatch "may not sync" hint under the header.
   const { resolved } = useReplayTarget(info?.engineVersion ?? "");
@@ -753,7 +768,7 @@ export default function ReplayDetailPage() {
               </p>
             )}
         </div>
-        {replay && info && (
+        {replay && (info || unfinished) && (
           // Destructive + secondary actions first, and the primary CTA (Watch)
           // last so it lands in the top-right corner. Once the row wraps there
           // is no corner left to sit in, and the block lines up with the title's
@@ -763,9 +778,10 @@ export default function ReplayDetailPage() {
             <DeleteReplayButton
               replayPath={replay.path}
               onDeleted={onDeleted}
+              unfinished={unfinished}
             />
             {/* No remixing a remix — its detail links back to the original instead. */}
-            {selected && !info.remixed && (
+            {selected && info && !info.remixed && (
               <RemixPanel
                 replayPath={replay.path}
                 recordedGameType={info.gameType}
@@ -775,16 +791,29 @@ export default function ReplayDetailPage() {
                 onRemixed={onRemixed}
               />
             )}
-            <RefightPanel info={info} filename={filename} />
-            <WatchButton
-              replayPath={replay.path}
-              engineVersion={info.engineVersion}
-              watch={engine.watch}
-              dependencyBlock={dependencyBlock}
-            />
+            {info && <RefightPanel info={info} filename={filename} />}
+            {info && (
+              <WatchButton
+                replayPath={replay.path}
+                engineVersion={info.engineVersion}
+                watch={engine.watch}
+                dependencyBlock={dependencyBlock}
+              />
+            )}
           </div>
         )}
       </header>
+
+      {unfinished && (
+        <section className="flex max-w-xl flex-col gap-1 rounded-lg border border-border/50 bg-card p-3">
+          <h2 className="text-sm font-medium">Recording did not finish</h2>
+          <p className="text-xs text-muted-foreground">
+            This file is empty and nothing in it can be played. A game that was
+            closed, killed or crashed before it ended leaves a file like this.
+          </p>
+          <p className="text-xs text-muted-foreground">{UNFINISHED_WARNING}</p>
+        </section>
+      )}
 
       {error && <ErrorBanner message={error} />}
 
@@ -794,6 +823,16 @@ export default function ReplayDetailPage() {
         <>
           {engine.notice.kind === "unchecked" && (
             <UncheckedEngineNotice version={engine.notice.version} />
+          )}
+          {info.staleRemix && (
+            <StaleRemixNotice
+              gameType={info.gameType}
+              sourceGametype={info.sourceGametype}
+              originFilename={info.originFilename}
+              originInLibrary={replays.some(
+                (r) => r.filename === info.originFilename,
+              )}
+            />
           )}
           {dependencyBlock && <DependencyBlocked reason={dependencyBlock} />}
           <MissingContentNotice

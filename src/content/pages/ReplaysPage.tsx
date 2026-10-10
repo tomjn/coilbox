@@ -59,6 +59,7 @@ import { useMetricRegistry } from "../useMetricRegistry";
 import { pickPrimaryPlayer } from "../usePrimaryPlayer";
 import { useReplaysRoot } from "../useReplaysRoot";
 import { BrowserToolbar } from "./components/BrowserToolbar";
+import { ClearUnfinishedButton } from "./components/ClearUnfinishedButton";
 import { FilterBar } from "./components/FilterBar";
 import { GatherReplaysButton } from "./components/GatherReplaysButton";
 import { MapThumb } from "./components/MapThumb";
@@ -450,6 +451,7 @@ export default function ReplaysPage() {
               old engine in Finder loses those games. This puts them all in one
               place first (issue #971). */}
           <GatherReplaysButton rootPath={replaysRoot} onGathered={refresh} />
+          <ClearUnfinishedButton replays={replays} onCleared={refresh} />
           <ReplaySetsManager
             api={replaySets}
             resolve={resolveForList}
@@ -646,6 +648,24 @@ export default function ReplaysPage() {
                             title="A coilbox remix — rewritten to run on a local build"
                           >
                             <Code2 className="size-2.5" /> Remix
+                          </Badge>
+                        )}
+                        {r.unfinished && (
+                          <Badge
+                            variant="ghost"
+                            className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                            title="The file is empty. The game that was recording it did not finish, or is still running."
+                          >
+                            Recording did not finish
+                          </Badge>
+                        )}
+                        {r.staleRemix && (
+                          <Badge
+                            variant="ghost"
+                            className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                            title="An older coilbox made this remix. It plays on the game it was recorded with. Open it to remake it from the original."
+                          >
+                            Plays original game
                           </Badge>
                         )}
                         <OriginBadge origin={replayOrigin(us)} />

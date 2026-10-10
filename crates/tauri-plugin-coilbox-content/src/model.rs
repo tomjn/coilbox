@@ -151,6 +151,11 @@ pub struct ReplayFile {
     /// True when this file carries coilbox's remix marker — a copy rewritten to run
     /// on a different local build, not an engine-recorded demo.
     pub remixed: bool,
+    /// True for a zero byte file. The engine holds a whole recording in memory
+    /// and writes the file when the game ends (`CDemoRecorder::WriteDemoFile`),
+    /// so a game that was killed or crashed leaves one behind, and a game that is
+    /// still running has one too. Nothing in the file says which it is.
+    pub unfinished: bool,
     /// True for a remix whose header names one game and whose first packet
     /// names another, so the engine plays it on the game it was recorded with.
     /// Only coilbox before the fix for issue #3861 made these.
