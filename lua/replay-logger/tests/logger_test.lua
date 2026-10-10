@@ -19,7 +19,8 @@ local support = dofile((arg[0]:match("^(.*)/[^/]+$") or ".") .. "/support.lua")
 local check, newEngine, ofKind, decoded = support.check, support.newEngine, support.ofKind, support.decoded
 
 --------------------------------------------------------------------------------
--- The fixture match: two players and Gaia, six units made, four destroyed.
+-- The fixture match: two players and Gaia, seven units made, four destroyed, one
+-- handed over and captured back.
 --------------------------------------------------------------------------------
 
 -- 0.3 and 1234.5677 as the 32 bit floats the engine holds them as. Lua here
@@ -39,9 +40,9 @@ local STATS = {
 			metalReceived = 0, energyReceived = 0,
 			metalSent = 0, energySent = 0,
 			damageDealt = 4100, damageReceived = 0,
-			unitsProduced = 3, unitsDied = 1,
-			unitsReceived = 0, unitsSent = 0,
-			unitsCaptured = 0, unitsOutCaptured = 0,
+			unitsProduced = 4, unitsDied = 1,
+			unitsReceived = 0, unitsSent = 1,
+			unitsCaptured = 1, unitsOutCaptured = 0,
 			unitsKilled = 2,
 		},
 	},
@@ -56,8 +57,8 @@ local STATS = {
 			metalSent = 0, energySent = 0,
 			damageDealt = 0, damageReceived = 4100,
 			unitsProduced = 2, unitsDied = 2,
-			unitsReceived = 0, unitsSent = 0,
-			unitsCaptured = 0, unitsOutCaptured = 0,
+			unitsReceived = 1, unitsSent = 0,
+			unitsCaptured = 0, unitsOutCaptured = 1,
 			unitsKilled = 0,
 		},
 	},
@@ -78,37 +79,51 @@ local function fixtureMatch(options)
 	local commander1 = engine.create(31, 1, 3900.5, 10, 1800)
 	engine.finish(commander1)
 
-	engine.frame = 90
+	engine.runTo(90)
 	local tank = engine.create(40, 0, 160, 5, 260, commander0)
-	engine.frame = 300
+	-- Walks off, and is somewhere new by the next position at frame 120.
+	engine.move(commander0, 130, 5, 215.04)
+	engine.runTo(300)
 	engine.finish(tank)
 
 	-- Started and never finished: cancelled, which the engine reports as a
 	-- death with no attacker.
-	engine.frame = 450
+	engine.runTo(450)
 	local cancelled = engine.create(41, 0, 220, 5, 260, commander0)
-	engine.frame = 500
+	engine.runTo(500)
 	engine.destroy(cancelled)
 
-	engine.frame = 600
+	engine.runTo(600)
 	local scout = engine.create(50, 1, 3800, 10, 1750, commander1)
-	engine.frame = 700
+	engine.move(commander1, 3850, 10, 1790)
+	engine.runTo(700)
 	engine.finish(scout)
 	engine.move(scout, 2000, 7.5, 1000.04)
-	engine.frame = 900
+	engine.runTo(900)
 	engine.destroy(scout, tank, 7)
 
-	engine.frame = 1200
+	-- Built by one player, given to the other, and captured back.
+	engine.runTo(1000)
+	local tower = engine.create(52, 0, 300, 5, 300, commander0)
+	engine.finish(tower)
+	engine.runTo(1050)
+	engine.give(tower, 1)
+	engine.runTo(1100)
+	engine.give(tower, 0, true)
+
+	engine.runTo(1200)
 	local critter = engine.create(60, 2, 2048, 0, 1024)
 	engine.finish(critter)
 	engine.destroy(critter, tank, 7)
 
-	engine.frame = 1500
+	engine.runTo(1500)
 	engine.destroy(commander1, tank, 7)
-	engine.frame = 1501
+	engine.runTo(1501)
 	engine.synced:GameOver({ 0 })
 
-	engine.ids = { commander0 = commander0, commander1 = commander1, tank = tank, scout = scout }
+	engine.ids = {
+		commander0 = commander0, commander1 = commander1, tank = tank, scout = scout, tower = tower,
+	}
 	return engine
 end
 
@@ -124,16 +139,20 @@ do
 		#engine.opened == 1 and engine.opened[1][1] == "coilbox-replay-events.jsonl" and engine.opened[1][2] == "w")
 	check("the header is the first line", lines[1].kind == "header")
 	check("there is exactly one header", #ofKind(engine, "header") == 1)
-	check("every unit made is one unit_created line", #ofKind(engine, "unit_created") == 6,
+	check("every unit made is one unit_created line", #ofKind(engine, "unit_created") == 7,
 		tostring(#ofKind(engine, "unit_created")))
-	check("every unit finished is one unit_finished line", #ofKind(engine, "unit_finished") == 5,
+	check("every unit finished is one unit_finished line", #ofKind(engine, "unit_finished") == 6,
 		tostring(#ofKind(engine, "unit_finished")))
+	check("every change of team is one unit_given line", #ofKind(engine, "unit_given") == 2,
+		tostring(#ofKind(engine, "unit_given")))
+	check("each start unit that moved has one position, and one that stood still has none",
+		#ofKind(engine, "start_unit_position") == 2, tostring(#ofKind(engine, "start_unit_position")))
 	check("every unit destroyed is one unit_destroyed line", #ofKind(engine, "unit_destroyed") == 4,
 		tostring(#ofKind(engine, "unit_destroyed")))
 	check("there is exactly one game_start and one game_over",
 		#ofKind(engine, "game_start") == 1 and #ofKind(engine, "game_over") == 1)
 	check("the game over line is the last one", lines[#lines].kind == "game_over")
-	check("nothing else was written", #lines == 1 + 1 + 6 + 5 + 4 + 1, tostring(#lines))
+	check("nothing else was written", #lines == 1 + 1 + 7 + 6 + 4 + 2 + 2 + 1, tostring(#lines))
 end
 
 --------------------------------------------------------------------------------
@@ -151,6 +170,7 @@ do
 		header.map == "Test Map" and header.mapSizeX == 4096 and header.mapSizeZ == 2048)
 	check("the header names the engine", header.engine == "2026.01.0 test")
 	check("the header names the Gaia team", header.gaiaTeam == 2)
+	check("the header says how many frames lie between two positions", header.positionFrames == 60)
 end
 
 do
@@ -198,6 +218,151 @@ do
 end
 
 --------------------------------------------------------------------------------
+-- The units a team started with.
+--------------------------------------------------------------------------------
+
+do
+	local engine = fixtureMatch()
+	local created = ofKind(engine, "unit_created")
+	local finished = ofKind(engine, "unit_finished")
+	local destroyed = ofKind(engine, "unit_destroyed")
+
+	check("a unit a team started with says so on every line about it",
+		created[1].startUnit == true and created[2].startUnit == true and finished[1].startUnit == true
+			and destroyed[4].unit == engine.ids.commander1 and destroyed[4].startUnit == true)
+
+	local flagged = 0
+	for _, line in ipairs(decoded(engine)) do
+		if line.startUnit and line.kind == "unit_created" then
+			flagged = flagged + 1
+		end
+	end
+	check("one start unit for each of the two players and none for Gaia", flagged == 2, tostring(flagged))
+	check("a unit something built is not a start unit", created[3].startUnit == nil)
+	check("a unit made later by no builder is not one either", created[7].team == 2 and created[7].startUnit == nil)
+	check("the flag is left out, not written as false",
+		not engine.raw:find('"startUnit":false', 1, true))
+end
+
+do
+	-- A game that spawns its start units some way into the match, after a team
+	-- has picked a side, which is what Splinter Faction does.
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	engine.runTo(450)
+	local late = engine.create(12, 0, 10, 0, 10)
+	local also = engine.create(13, 0, 20, 0, 20)
+	engine.runTo(451)
+	local next = engine.create(14, 0, 30, 0, 30)
+	local created = ofKind(engine, "unit_created")
+
+	check("a start unit is one made on the frame its team's first unit was, whenever that is",
+		created[1].unit == late and created[1].startUnit == true)
+	check("every unit a team is given on that frame is one", created[2].unit == also and created[2].startUnit == true)
+	check("a unit made a frame later is not", created[3].unit == next and created[3].startUnit == nil)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	local mine = engine.create(12, 0, 10, 0, 10)
+	engine.give(mine, 1)
+	local made = engine.create(13, 1, 20, 0, 20)
+	local created = ofKind(engine, "unit_created")
+
+	check("a team whose first unit was given to it has no start unit",
+		created[2].unit == made and created[2].startUnit == nil)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1, 2 }, gaiaTeam = 2 })
+	engine.create(60, 2, 10, 0, 10)
+	check("Gaia has no start unit", ofKind(engine, "unit_created")[1].startUnit == nil)
+end
+
+--------------------------------------------------------------------------------
+-- A unit that changed team.
+--------------------------------------------------------------------------------
+
+do
+	local engine = fixtureMatch()
+	local given = ofKind(engine, "unit_given")
+
+	check("a gift names the unit, its def, the frame and where it was",
+		given[1].unit == engine.ids.tower and given[1].def == 52 and given[1].frame == 1050
+			and given[1].x == 300 and given[1].z == 300)
+	check("a gift names the team it went to and the team it left", given[1].team == 1 and given[1].from == 0)
+	check("a gift is not a capture", given[1].captured == nil)
+	check("a capture says so", given[2].team == 0 and given[2].from == 1 and given[2].captured == true)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	local a = engine.create(12, 0, 10, 0, 10)
+	local b = engine.create(31, 1, 20, 0, 20)
+	local c = engine.create(40, 1, 30, 0, 30, b)
+	engine.give(c, 0, true)
+	engine.give(b, 0)
+	engine.give(a, 1, true)
+	local given = ofKind(engine, "unit_given")
+
+	check("a gift after a capture to the same team is still a gift",
+		given[1].captured == true and given[2].captured == nil and given[3].captured == true)
+	check("one line for each change of team, and none for the engine's UnitTaken", #given == 3)
+end
+
+--------------------------------------------------------------------------------
+-- Where a start unit went.
+--------------------------------------------------------------------------------
+
+do
+	local engine = fixtureMatch()
+	local positions = ofKind(engine, "start_unit_position")
+
+	check("a position is written on the first sampled frame after the unit moved",
+		positions[1].unit == engine.ids.commander0 and positions[1].frame == 120
+			and positions[1].x == 130 and positions[1].z == 215,
+		positions[1].frame .. " " .. positions[1].x .. "," .. positions[1].z)
+	check("a position names the team and carries no height or def",
+		positions[1].team == 0 and positions[1].y == nil and positions[1].def == nil)
+	check("the other player's is written the same way",
+		positions[2].unit == engine.ids.commander1 and positions[2].frame == 660 and positions[2].team == 1)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	local start = engine.create(12, 0, 10, 0, 10)
+	local other = engine.create(40, 0, 50, 0, 50, start)
+	engine.runTo(600)
+	check("a start unit that never moved writes no position", #ofKind(engine, "start_unit_position") == 0)
+
+	engine.move(other, 500, 0, 500)
+	engine.runTo(720)
+	check("a unit that is not a start unit never has one", #ofKind(engine, "start_unit_position") == 0)
+
+	engine.move(start, 11, 0, 10)
+	engine.runTo(779)
+	check("nothing is written between two sampled frames", #ofKind(engine, "start_unit_position") == 0)
+	engine.runTo(840)
+	check("and one position on the next", #ofKind(engine, "start_unit_position") == 1)
+	engine.runTo(1200)
+	check("standing still again writes nothing more", #ofKind(engine, "start_unit_position") == 1)
+
+	engine.move(start, 11.04, 0, 10.04)
+	engine.runTo(1260)
+	check("a move too small to change what is written is not a move", #ofKind(engine, "start_unit_position") == 1)
+
+	engine.give(start, 1)
+	engine.move(start, 40, 0, 40)
+	engine.runTo(1320)
+	local positions = ofKind(engine, "start_unit_position")
+	check("a start unit that changed team is still one, under its new team",
+		#positions == 2 and positions[2].team == 1 and ofKind(engine, "unit_given")[1].startUnit == true)
+
+	engine.destroy(start)
+	engine.runTo(1500)
+	check("a destroyed start unit has no more positions", #ofKind(engine, "start_unit_position") == 2)
+end
+
+--------------------------------------------------------------------------------
 -- The game over line, which is what coilbox checks the run against.
 --------------------------------------------------------------------------------
 
@@ -214,7 +379,7 @@ do
 	check("a team's totals are its newest sample", team0.samples == 3 and team1.samples == 2)
 	check("the newest sample reports the frame the game ended on", team0.frame == 1501)
 	check("whole totals come through whole",
-		team0.metalProduced == 1500 and team0.unitsProduced == 3 and team0.unitsDied == 1
+		team0.metalProduced == 1500 and team0.unitsProduced == 4 and team0.unitsDied == 1
 			and team0.unitsKilled == 2 and team1.damageReceived == 4100)
 	check("a fractional total comes through", team0.energyProduced == 9000.5)
 
@@ -313,6 +478,7 @@ do
 		GetTeamStatsHistory = true,
 		GetGaiaTeamID = true,
 		GetTeamList = true,
+		GetTeamUnitStats = true,
 	}
 	local strangers = {}
 	for name in synced:gmatch("Spring%.([%w_]+)") do

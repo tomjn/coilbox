@@ -87,6 +87,8 @@ function M.newEngine(options)
 		frame = 0,
 		-- unitID -> { defID, team, x, y, z }
 		units = {},
+		-- team -> how many units the engine has counted it capturing.
+		captured = {},
 		nextUnitID = 1,
 		-- What the unsynced half wrote, one entry per line, and how many times it
 		-- flushed.
@@ -151,6 +153,11 @@ function M.newEngine(options)
 		end,
 		GetTeamList = function()
 			return options.teams or { 0, 1 }
+		end,
+		-- killed, died, capturedBy, capturedFrom, received, sent, in the engine's
+		-- order. Only the captures are kept here.
+		GetTeamUnitStats = function(teamID)
+			return 0, 0, engine.captured[teamID] or 0, 0, 0, 0
 		end,
 		-- One argument answers how many samples a team has, two answer the
 		-- sample at that index in a list, the way the engine's own does. The
@@ -265,6 +272,30 @@ function M.newEngine(options)
 	function engine.move(unitID, x, y, z)
 		local unit = engine.units[unitID]
 		unit.x, unit.y, unit.z = x, y, z
+	end
+
+	--- Hand a unit to another team, as a gift or, with `captured`, a capture. The
+	-- engine raises the new team's counter before it calls UnitGiven, and calls
+	-- UnitTaken first while the unit is still the old team's.
+	function engine.give(unitID, newTeam, captured)
+		local unit = engine.units[unitID]
+		local oldTeam = unit.team
+		if engine.synced.UnitTaken then
+			engine.synced:UnitTaken(unitID, unit.defID, oldTeam, newTeam)
+		end
+		unit.team = newTeam
+		if captured then
+			engine.captured[newTeam] = (engine.captured[newTeam] or 0) + 1
+		end
+		engine.synced:UnitGiven(unitID, unit.defID, newTeam, oldTeam)
+	end
+
+	--- Simulate every frame up to and including `frame`.
+	function engine.runTo(frame)
+		while engine.frame < frame do
+			engine.frame = engine.frame + 1
+			engine.synced:GameFrame(engine.frame)
+		end
 	end
 
 	--- Destroy a unit. `attackerID` is nothing for a unit that died of something
