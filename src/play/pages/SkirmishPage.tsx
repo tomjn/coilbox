@@ -945,9 +945,9 @@ export default function SkirmishPage() {
   return (
     <div className="flex flex-col gap-5 p-4">
       <TooltipProvider>
-        <header className="flex items-center justify-between gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <h1 className="text-lg font-semibold">Singleplayer</h1>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             {you && (
               <label
                 htmlFor="spectate-you"
