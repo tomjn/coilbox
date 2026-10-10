@@ -1608,8 +1608,11 @@ export interface UnitDatasetEntry {
   /**
    * Everything else the unitdef declares that is worth reading next to the
    * unit: `health`, `metalCost`, `energyCost`, `buildTime`, `sightDistance`,
-   * `maxVelocity`, `range`, and a `weapons` array of one object per weapon.
-   * `shared/unitdef-stats.json` writes the list down.
+   * `maxVelocity`, `range`, and a `weapons` array of one object per weapon,
+   * plus what a unit makes, stores and senses and whether it builds (the
+   * engine's own keys, such as `energyMake`, `extractsMetal`, `energyStorage`,
+   * `radarDistance` and `builder`). `classifyUnit` in `unitCategory.ts` reads
+   * those. `shared/unitdef-stats.json` writes the list down.
    *
    * Untyped on purpose. The hub stores these as schemaless JSON and renders
    * what arrives, so a stat added to the worker's Lua shim reaches a unit page
