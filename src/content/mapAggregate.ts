@@ -28,6 +28,7 @@ import type {
 import { isShortReplay } from "./replayFilterVisibility";
 import type { MapWorld } from "./replayMapLayers";
 import { column } from "./replayOrderPoints";
+import { isGenuineMatch } from "./stats";
 import { classifyUnit, type UnitCategory } from "./unitCategory";
 
 /** Cells along the longer side. `GRID_RESOLUTION` in `map_grids.rs` is the
@@ -161,7 +162,12 @@ export interface MapMatches {
   remixes: number;
   /** Files left out because another file of the same match is already in. */
   duplicates: number;
+  /** Files left out because they were marked as a refight, which is a rerun
+   *  of a setup and not a match, as the library's other counts say. */
+  refights: number;
 }
+
+const NO_REFIGHTS: ReadonlySet<string> = new Set();
 
 /**
  * The matches on one map, from the library's records.
@@ -173,20 +179,61 @@ export interface MapMatches {
  * original's game id and is left out by its own mark. Two plain files with one
  * game id are one match, and the first by file name stands for it. A record
  * with no game id cannot be compared and is kept.
+ *
+ * A file marked as a refight is left out, as `isGenuineMatch` leaves it out of
+ * the stats page and the dossier. `refights` is the set of those file names.
  */
 export function mapMatches(
   records: readonly StatRecord[],
   mapName: string,
   analyses: ReadonlyMap<string, Pick<StoredReplayAnalysis, "state">>,
+  refights: ReadonlySet<string> = NO_REFIGHTS,
 ): MapMatches {
-  const out: MapMatches = { matches: [], remixes: 0, duplicates: 0 };
+  return collectMatches(
+    records.filter((r) => r.mapName === mapName),
+    analyses,
+    refights,
+  );
+}
+
+/**
+ * The matches on every other map, counted by the same rules as `mapMatches`,
+ * so a map's figures have the rest of the library to be set beside (#1162).
+ */
+export function matchesElsewhere(
+  records: readonly StatRecord[],
+  mapName: string,
+  analyses: ReadonlyMap<string, Pick<StoredReplayAnalysis, "state">>,
+  refights: ReadonlySet<string> = NO_REFIGHTS,
+): MapMatches {
+  return collectMatches(
+    records.filter((r) => r.mapName !== mapName),
+    analyses,
+    refights,
+  );
+}
+
+function collectMatches(
+  onMap: readonly StatRecord[],
+  analyses: ReadonlyMap<string, Pick<StoredReplayAnalysis, "state">>,
+  refights: ReadonlySet<string>,
+): MapMatches {
+  const out: MapMatches = {
+    matches: [],
+    remixes: 0,
+    duplicates: 0,
+    refights: 0,
+  };
   const seen = new Set<string>();
-  const onMap = records
-    .filter((r) => r.mapName === mapName)
-    .sort((a, b) => a.filename.localeCompare(b.filename));
-  for (const record of onMap) {
+  for (const record of [...onMap].sort((a, b) =>
+    a.filename.localeCompare(b.filename),
+  )) {
     if (record.remixed) {
       out.remixes++;
+      continue;
+    }
+    if (!isGenuineMatch(record, refights)) {
+      out.refights++;
       continue;
     }
     if (record.gameId) {
