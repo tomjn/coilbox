@@ -15,7 +15,7 @@ import { GAME_LENGTH_BOUNDARIES_SEC } from "./gameLength";
  */
 
 /** One player's game from their point of view. */
-interface PlayerGame {
+export interface PlayerGame {
   record: StatRecord;
   /** The side (faction) the player used, when known. */
   side?: string;
@@ -58,7 +58,7 @@ function excludeSyntheticReruns(
 }
 
 /** Every non-spectator appearance of `name`, chronological (oldest first). */
-function gamesFor(records: StatRecord[], name: string): PlayerGame[] {
+export function gamesFor(records: StatRecord[], name: string): PlayerGame[] {
   const out: PlayerGame[] = [];
   for (const record of records) {
     const me = record.players.find((p) => !p.spectator && p.name === name);
