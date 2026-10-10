@@ -122,7 +122,26 @@ function Apm({ p }: { p: ReplayPlayer }) {
   );
 }
 
-function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
+/** How a seat's side finished, or undefined where the file doesn't say. */
+type SeatOutcome = "won" | "lost" | undefined;
+
+/**
+ * The result beside a seat, as a word and a mark. Colour never carries it
+ * alone (#1142): "Won" and "Lost" are text, the trophy only repeats the win.
+ */
+function SeatResult({ result }: { result: SeatOutcome }) {
+  if (!result) return null;
+  return result === "won" ? (
+    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-amber-600 dark:text-amber-400">
+      <Trophy className="size-3.5" aria-hidden />
+      Won
+    </span>
+  ) : (
+    <span className="shrink-0 text-xs text-muted-foreground">Lost</span>
+  );
+}
+
+function PlayerRow({ p, result }: { p: ReplayPlayer; result: SeatOutcome }) {
   return (
     <li className="flex items-center gap-2 py-1">
       <span
@@ -154,12 +173,7 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
         <span className="shrink-0 text-xs text-muted-foreground">{p.side}</span>
       )}
       <Apm p={p} />
-      {won && (
-        <Trophy
-          className="size-3.5 shrink-0 text-amber-500"
-          aria-label="On the winning team"
-        />
-      )}
+      <SeatResult result={result} />
     </li>
   );
 }
@@ -170,7 +184,7 @@ function PlayerRow({ p, won }: { p: ReplayPlayer; won: boolean }) {
  * dossier link: a bot has no stats profile, and its name repeats across
  * unrelated matches.
  */
-function AiRow({ a, won }: { a: ReplayAi; won: boolean }) {
+function AiRow({ a, result }: { a: ReplayAi; result: SeatOutcome }) {
   const label = a.shortName || a.name || "AI";
   const full = [a.name, a.shortName, a.version].filter(Boolean).join(" · ");
   return (
@@ -192,12 +206,7 @@ function AiRow({ a, won }: { a: ReplayAi; won: boolean }) {
       {a.side && (
         <span className="shrink-0 text-xs text-muted-foreground">{a.side}</span>
       )}
-      {won && (
-        <Trophy
-          className="size-3.5 shrink-0 text-amber-500"
-          aria-label="On the winning team"
-        />
-      )}
+      <SeatResult result={result} />
     </li>
   );
 }
@@ -234,6 +243,12 @@ function Players({ info }: { info: DemoInfo }) {
       <div className="grid grid-cols-[repeat(auto-fit,minmax(18rem,1fr))] gap-3">
         {allyTeamIds.map((id) => {
           const won = info.winnersKnown && info.winningAllyTeams.includes(id);
+          const result: SeatOutcome =
+            !info.winnersKnown || info.winningAllyTeams.length === 0
+              ? undefined
+              : won
+                ? "won"
+                : "lost";
           return (
             <div
               key={id}
@@ -262,7 +277,7 @@ function Players({ info }: { info: DemoInfo }) {
                     <PlayerRow
                       key={`${id}-p-${seat.player.name}`}
                       p={seat.player}
-                      won={won}
+                      result={result}
                     />
                   ) : (
                     <AiRow
@@ -270,7 +285,7 @@ function Players({ info }: { info: DemoInfo }) {
                       // team is what tells them apart.
                       key={`${id}-a-${seat.ai.team ?? i}`}
                       a={seat.ai}
-                      won={won}
+                      result={result}
                     />
                   ),
                 )}
