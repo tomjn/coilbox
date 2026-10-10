@@ -7,6 +7,7 @@ import {
   formatFigure,
   isOverMinimum,
   libraryMetrics,
+  MIN_LENGTH_OPTIONS,
   matchFigure,
   metricSortValue,
   parseMetricSort,
@@ -137,6 +138,17 @@ describe("which metrics a row offers", () => {
     expect(columnMetrics(metrics, undefined).map((m) => m.key)).toEqual(["a"]);
     expect(columnMetrics(metrics, "b").map((m) => m.key)).toEqual(["a", "b"]);
     expect(columnMetrics(metrics, "c").map((m) => m.key)).toEqual(["a"]);
+  });
+});
+
+describe("MIN_LENGTH_OPTIONS", () => {
+  it("offers no minimum, then each shared length boundary", () => {
+    expect(MIN_LENGTH_OPTIONS).toEqual([
+      { value: "0", label: "Any length" },
+      { value: "1800", label: "Over 30 minutes" },
+      { value: "3600", label: "Over 1 hour" },
+      { value: "7200", label: "Over 2 hours" },
+    ]);
   });
 });
 

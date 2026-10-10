@@ -1,4 +1,5 @@
 import type { Metric, StatRecord } from "./bindings";
+import { GAME_LENGTH_BOUNDARIES_SEC } from "./gameLength";
 import { formatTotal } from "./matchStats";
 
 /**
@@ -104,12 +105,24 @@ export function columnMetrics(
   return available.filter((m) => m.headline || m.key === sortedKey);
 }
 
-/** The minimum game lengths on offer, in seconds. 0 is no minimum. */
+/** "30 minutes", "1 hour", "2 hours" for a boundary in seconds. */
+function lengthLabel(sec: number): string {
+  const hours = sec / 3600;
+  if (Number.isInteger(hours))
+    return `${hours} ${hours === 1 ? "hour" : "hours"}`;
+  return `${sec / 60} minutes`;
+}
+
+/**
+ * The minimum game lengths on offer, in seconds. 0 is no minimum. The rest are
+ * the bands the matchup view groups by, read from the one list they share.
+ */
 export const MIN_LENGTH_OPTIONS = [
   { value: "0", label: "Any length" },
-  { value: "1800", label: "Over 30 minutes" },
-  { value: "3600", label: "Over 1 hour" },
-  { value: "7200", label: "Over 2 hours" },
+  ...GAME_LENGTH_BOUNDARIES_SEC.map((sec) => ({
+    value: String(sec),
+    label: `Over ${lengthLabel(sec)}`,
+  })),
 ];
 
 /** Whether a replay is longer than the minimum. An unknown length never is. */

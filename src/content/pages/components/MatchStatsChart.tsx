@@ -59,6 +59,7 @@ import {
 } from "../../matchStats";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { MatchStatsExportButton } from "./MatchStatsExportButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
 import { type LegendEntry, SeriesLegend } from "./SeriesLegend";
@@ -504,6 +505,11 @@ export function MatchStatsChart({
             onChange={setHighlightMe}
           />
         )}
+        <div className="ml-auto">
+          <MatchStatsExportButton
+            input={{ info, metric, mode, view, series, rows }}
+          />
+        </div>
       </div>
 
       {/* The picker and what it enlarges. Beside each other where there is room
