@@ -25,10 +25,11 @@ import {
  * A player's match figures as rates: the average per minute for each metric the
  * store keeps totals for, the same split by result, and a trend over time (#1166).
  *
- * Everything is the player's own team's total from the stats store. Nothing
- * opens a replay. Every figure shows the number of games it is drawn from and
- * none is hidden below a size, because the codebase has no rule for when a
- * sample is big enough.
+ * Everything is the totals of the army the player controlled, from the stats
+ * store. That is the player's own, so two allies on one side ("Team 1" on the
+ * replay page) have different figures. Nothing opens a replay. Every figure
+ * shows the number of games it is drawn from and none is hidden below a size,
+ * because the codebase has no rule for when a sample is big enough.
  */
 
 const axisTick = { fontSize: 11, fill: "currentColor", opacity: 0.65 };
@@ -168,23 +169,24 @@ export function PlayerMatchFigures({
     [data, trendMetric],
   );
   const note = leftOutNote(data);
-  const basis = `${playerName}'s team`;
+  const basis = `${playerName}'s own figures`;
 
   return (
     <section className="rounded-lg border border-border/60 bg-card p-4">
       <h2 className="mb-1 text-sm font-medium">Match figures per minute</h2>
       <p className="mb-3 text-xs text-muted-foreground">
-        Each figure is {basis} total divided by the match's minutes, averaged
-        over the games below. The average is the mean of each game's own rate,
-        with the median beside it. Where a team has more than one player, every
-        player on it has the whole total.
+        Each figure is the total for the army {playerName} controlled, divided
+        by the match's minutes, averaged over the games below. The average is
+        the mean of each game's own rate, with the median beside it. Allies on
+        one side each have their own figures. Only players who share control of
+        one army have the same figures.
       </p>
 
       {data.counted === 0 || metrics.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {metrics.length === 0
             ? "Match figures are not available yet."
-            : `None of ${playerName}'s ${games(data.games)} has team totals recorded, so there are no figures to show.`}
+            : `None of ${playerName}'s ${games(data.games)} has figures recorded, so there are no figures to show.`}
           {note && metrics.length > 0 ? ` ${note}` : ""}
         </p>
       ) : (
@@ -193,7 +195,7 @@ export function PlayerMatchFigures({
             Drawn from {data.counted} of {games(data.games)}.{" "}
             {note ? `${note} ` : ""}
             {data.sharedTeamGames > 0
-              ? `In ${games(data.sharedTeamGames)} the team had other players.`
+              ? `In ${games(data.sharedTeamGames)} another player shared control of ${playerName}'s army.`
               : ""}
           </p>
           <div>

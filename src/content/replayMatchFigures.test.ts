@@ -94,12 +94,12 @@ describe("matchFigure for a named player", () => {
       players: players as unknown as StatRecord["players"],
     });
 
-  it("is the player's own team, whatever the metric counts", () => {
+  it("is the player's own army, whatever the metric counts", () => {
     const r = played(seat("Ann", 0), seat("Ben", 1));
     expect(matchFigure(r, fight, "Ann")).toBe(100);
     expect(matchFigure(r, economy, "Ann")).toBe(100);
     expect(matchFigure(r, fight, "Ben")).toBe(250);
-    expect(figureBasis(fight, "Ann")).toBe("Ann's team");
+    expect(figureBasis(fight, "Ann")).toBe("Ann's own total");
   });
 
   it("treats team 0 as a team", () => {
