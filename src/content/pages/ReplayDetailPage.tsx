@@ -826,9 +826,15 @@ export default function ReplayDetailPage() {
             )}
           </SeriesEmphasisProvider>
 
-          <ReplayNotes filename={filename} gameId={info.gameId} />
+          {/* Read from the replay file, so it needs no engine. */}
+          {replay && (
+            <ReplayChat
+              replayPath={replay.path}
+              durationSec={info.durationSec}
+            />
+          )}
 
-          {selected && replay && <ReplayChat replayPath={replay.path} />}
+          <ReplayNotes filename={filename} gameId={info.gameId} />
 
           <section className="flex flex-col gap-2">
             <h2 className="text-sm font-medium">Map · {info.mapName}</h2>
