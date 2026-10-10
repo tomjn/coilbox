@@ -100,12 +100,12 @@ use MetricUnit::{Count, Damage, Energy, Metal};
 
 /// Every metric, in the order the engine writes the fields.
 ///
-/// The roster set is deliberately six columns wide, because the table already
+/// The roster set is deliberately seven columns wide, because the table already
 /// carries a name, a faction, a rating and an actions-per-minute figure, and in
-/// a 16-player match every extra column costs a scroll. The six are the two
+/// a 16-player match every extra column costs a scroll. The seven are the two
 /// economy totals players argue about, the damage pair (which separates the side
-/// that attacked from the side that was attacked), and what each seat built and
-/// destroyed. Everything else is one click away in the sparkline grid.
+/// that attacked from the side that was attacked), and what each seat built,
+/// lost and destroyed. Everything else is one click away in the sparkline grid.
 ///
 /// The two headline figures are damage dealt and units built, summed across
 /// teams: the size of the fight, and the size of the game.
@@ -141,7 +141,7 @@ pub const METRICS: &[Metric] = &[
         Count,
         ROSTER | HEADLINE,
     ),
-    metric("unitsDied", "Units lost", Units, Count, CHART),
+    metric("unitsDied", "Units lost", Units, Count, ROSTER),
     metric("unitsReceived", "Units received", Units, Count, HIDDEN),
     metric("unitsSent", "Units given away", Units, Count, HIDDEN),
     metric("unitsCaptured", "Units captured", Units, Count, HIDDEN),
@@ -316,7 +316,7 @@ mod tests {
     }
 
     #[test]
-    fn the_roster_carries_six_columns() {
+    fn the_roster_carries_seven_columns() {
         let roster: Vec<&str> = METRICS.iter().filter(|m| m.roster).map(|m| m.key).collect();
         assert_eq!(
             roster,
@@ -326,6 +326,7 @@ mod tests {
                 "damageDealt",
                 "damageReceived",
                 "unitsProduced",
+                "unitsDied",
                 "unitsKilled",
             ]
         );
