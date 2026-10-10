@@ -34,6 +34,16 @@ vi.mock("../../bindings", async () => {
   return { ...actual, contentWriteFile: (a: unknown) => write(a) };
 });
 
+const render_ = vi.fn();
+const savePng = vi.fn();
+vi.mock("../../mapImageExport", () => ({
+  renderMapImage: (a: unknown) => render_(a),
+  savePngBytes: (...a: unknown[]) => savePng(...a),
+}));
+vi.mock("../../../updater/updater", () => ({
+  currentVersion: async () => "9.9.9",
+}));
+
 const { MapExportButtons } = await import("./MapExportButtons");
 
 const info: MapExportBasis = {
@@ -118,6 +128,12 @@ const view = (patch: Partial<Parameters<typeof MapExportButtons>[0]> = {}) =>
       records={records}
       rows={rows}
       split={false}
+      layerSentence="Where buildings were ordered"
+      minimapUrl="coilbox://localhost/unitsyncthumb/a.png"
+      world={{ worldWidth: 200, worldHeight: 200 }}
+      dots={[{ left: 0.5, top: 0.5 }]}
+      places={[{ left: 0.25, top: 0.25, n: 1, name: "Front" }]}
+      showStarts
       {...patch}
     />,
   );
@@ -127,6 +143,8 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+const pictureButton = () =>
+  screen.getByRole("button", { name: /export picture/i });
 const layerButton = () =>
   screen.getByRole("button", { name: /export layer csv/i });
 const startsButton = () =>
@@ -213,5 +231,74 @@ describe("MapExportButtons", () => {
     expect((startsButton() as HTMLButtonElement).disabled).toBe(true);
     expect(startsButton().getAttribute("title")).toMatch(/no start position/i);
     expect((layerButton() as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  const withField = () => {
+    const out = drawn();
+    Object.assign(out, {
+      field: { peak: 1, width: 2, height: 2, radius: 100 },
+    });
+    return out;
+  };
+
+  it("makes the picture with the provenance and writes it where it was saved", async () => {
+    save.mockResolvedValue("/tmp/picture.png");
+    render_.mockResolvedValue(new Uint8Array([1, 2]));
+    view({ drawn: withField() });
+    fireEvent.click(pictureButton());
+    await waitFor(() => expect(savePng).toHaveBeenCalled());
+    expect(savePng).toHaveBeenCalledWith(
+      "/tmp/picture.png",
+      new Uint8Array([1, 2]),
+    );
+    const asked = render_.mock.calls[0][0];
+    expect(asked.minimapUrl).toBe("coilbox://localhost/unitsyncthumb/a.png");
+    expect(asked.words.appVersion).toBe("9.9.9");
+    expect(asked.words.info.mapName).toBe("Tabula");
+    expect(asked.words.info.exportedUtc).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(asked.words.marks).toBe(true);
+    expect(asked.places).toHaveLength(1);
+    expect(save.mock.calls[0][0].defaultPath).toBe(
+      "tabula-building-density.png",
+    );
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ level: "success" }),
+    );
+  });
+
+  it("leaves the marks out of the picture when the section hides them", async () => {
+    save.mockResolvedValue("/tmp/picture.png");
+    render_.mockResolvedValue(new Uint8Array([1]));
+    view({ drawn: withField(), showStarts: false });
+    fireEvent.click(pictureButton());
+    await waitFor(() => expect(render_).toHaveBeenCalled());
+    const asked = render_.mock.calls[0][0];
+    expect(asked.dots).toEqual([]);
+    expect(asked.places).toEqual([]);
+    expect(asked.words.marks).toBe(false);
+  });
+
+  it("says when the picture could not be made, and writes nothing", async () => {
+    save.mockResolvedValue("/tmp/picture.png");
+    render_.mockRejectedValue(new Error("tainted"));
+    view({ drawn: withField() });
+    fireEvent.click(pictureButton());
+    await waitFor(() =>
+      expect(notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: "error",
+          title: "Export failed: tainted",
+        }),
+      ),
+    );
+    expect(savePng).not.toHaveBeenCalled();
+  });
+
+  it("is disabled with the reason when the layer has no field to draw", () => {
+    view({ drawn: drawn() });
+    expect((pictureButton() as HTMLButtonElement).disabled).toBe(true);
+    expect(pictureButton().getAttribute("title")).toMatch(
+      /nothing in the picture/i,
+    );
   });
 });

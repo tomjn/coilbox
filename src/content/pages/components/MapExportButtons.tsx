@@ -1,30 +1,35 @@
 import { Button } from "@picoframe/frame";
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, Loader2 } from "lucide-react";
+import { Download, ImageDown, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { notify } from "@/notify/notify";
+import { currentVersion } from "../../../updater/updater";
 import { contentWriteFile } from "../../bindings";
-import type {
-  HeatLayerId,
-  LayerAggregate,
-  MatchWindow,
-  Normalise,
+import {
+  type HeatLayerId,
+  type LayerAggregate,
+  layerLegend,
+  type MatchWindow,
+  type Normalise,
 } from "../../mapAggregate";
 import {
   layerCsv,
   layerCsvFileName,
+  layerImageFileName,
   type MapExportBasis,
   stampExport,
   startsCsv,
   startsCsvFileName,
 } from "../../mapAggregateExport";
+import type { MarkPlace } from "../../mapImage";
+import { renderMapImage, savePngBytes } from "../../mapImageExport";
 import type { StartRecords } from "../../mapRecords";
 import type { StartRow } from "../../startNames";
 
-type Kind = "layer" | "starts";
+type Kind = "image" | "layer" | "starts";
 
 /**
- * The exports of "How this map is played" (#1165): the
+ * The exports of "How this map is played" (#1165): the picture as a PNG, the
  * layer on screen as a CSV of its cells, and the start positions as a second
  * CSV. Each is disabled with its reason as the tooltip when there is nothing to
  * write. Closing the save dialog is a decision and says nothing.
@@ -35,15 +40,23 @@ type Kind = "layer" | "starts";
 export function MapExportButtons({
   info: basis,
   layer,
+  layerSentence,
   drawn,
   normalise,
   window,
   records,
   rows,
   split,
+  minimapUrl,
+  world,
+  dots,
+  places,
+  showStarts,
 }: {
   info: MapExportBasis;
   layer: HeatLayerId | "";
+  /** What the layer counts, as the legend names it. */
+  layerSentence: string;
   drawn: LayerAggregate | null;
   normalise: Normalise;
   window: MatchWindow;
@@ -51,15 +64,21 @@ export function MapExportButtons({
   rows: readonly StartRow[];
   /** Whether the start table is split by team. */
   split: boolean;
+  minimapUrl: string | undefined;
+  world: { worldWidth: number; worldHeight: number };
+  dots: readonly MarkPlace[];
+  places: readonly MarkPlace[];
+  showStarts: boolean;
 }) {
   const [busy, setBusy] = useState<Kind | null>(null);
   const stamped = () => stampExport(basis, new Date());
 
-  const layerReason = !layer
-    ? "Choose a density layer first."
-    : !drawn?.grid
-      ? "Nothing in the picture has anything on this layer, so there is nothing to write."
-      : null;
+  const field = drawn?.field && drawn.field.peak > 0 ? drawn.field : null;
+  const nothing =
+    "Nothing in the picture has anything on this layer, so there is nothing to write.";
+  const choose = "Choose a density layer first.";
+  const layerReason = !layer ? choose : !drawn?.grid ? nothing : null;
+  const imageReason = !layer ? choose : !field ? nothing : null;
   const startsReason =
     rows.length === 0
       ? "No start position is counted for these matches."
@@ -90,6 +109,41 @@ export function MapExportButtons({
   }
 
   const csv = { name: "CSV", extensions: ["csv"] };
+
+  const exportImage = () => {
+    if (!layer || !drawn || !field) return;
+    const info = stamped();
+    return run(
+      "image",
+      "Export the picture",
+      layerImageFileName(info, layer),
+      { name: "PNG image", extensions: ["png"] },
+      "Picture exported.",
+      async (dest) => {
+        const appVersion = await currentVersion().catch(() => null);
+        const bytes = await renderMapImage({
+          minimapUrl,
+          world,
+          field,
+          words: {
+            info,
+            layer,
+            layerSentence,
+            legend: layerLegend(layer, drawn, normalise, window),
+            normalise,
+            window,
+            contributing: drawn.contributing,
+            events: drawn.events,
+            appVersion,
+            marks: showStarts && (dots.length > 0 || places.length > 0),
+          },
+          dots: showStarts ? dots : [],
+          places: showStarts ? places : [],
+        });
+        await savePngBytes(dest, bytes);
+      },
+    );
+  };
 
   const exportLayer = () => {
     if (!layer || !drawn?.grid) return;
@@ -144,6 +198,21 @@ export function MapExportButtons({
 
   return (
     <div className="flex flex-wrap items-center gap-2" data-testid="map-export">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        disabled={busy !== null || imageReason !== null}
+        title={
+          imageReason ??
+          "Saves the map with this layer on it, the legend, and the map, replays, versions, window and filters written under it."
+        }
+        onClick={exportImage}
+      >
+        {icon("image", ImageDown)}
+        Export picture
+      </Button>
       <Button
         type="button"
         variant="outline"

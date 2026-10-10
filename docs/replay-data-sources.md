@@ -318,6 +318,12 @@ Export start positions CSV writes the positions in the records under the picture
 | `team_1_*`, `team_2_*` | Taken, with result and won for each team, only when the matches in the picture are all 1v1 or all two sides, as the table splits them |
 | the provenance columns above, `declared_tolerance_elmos`, `grouping_distance_elmos` | How a start was placed at a position. Empty when the map has no such figure |
 
+Export picture saves a PNG of what is on screen with its provenance written under the map. The map is at the top, with the layer over it and the start marks if they are on. A white panel under it, which does not change with the app's theme, holds the colour bar, the legend's sentence, and in words the map, the number of replays and how many have something on the layer, the time window, the scaling, the map and game versions, the filters, and "Made with coilbox" with the app's version and the day of the export. The day is there because the picture is made from a library that grows, so the same filters give another picture later. Text is wrapped to the panel and never drawn over the map. Only the start marks are, and a position's name sits on its own dark label.
+
+The map is as wide as the minimap along its longer side, up to 2048 pixels, and never enlarged, so a 1024 pixel minimap gives a map 1024 pixels across. The shorter side follows the map's shape. The image is at least 720 pixels wide, with a thin map centred on the panel.
+
+The minimap is read with `fetch` and drawn from a bitmap made from the bytes. An `<img>` of the page's `coilbox://` address draws fine, but a canvas it was drawn on refuses to be saved. The PNG is written with the unit builder's save command, which writes bytes to an absolute path and does not care what the file is.
+
 ### The records under a map's picture
 
 Under the picture the section counts what the library knows about the map, over the same matches and the same filters, so a filter changes both together. A refight is left out here as it is left out of the stats page.

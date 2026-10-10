@@ -821,6 +821,7 @@ export function MapAggregate({
               <MapExportButtons
                 info={exportBasis}
                 layer={layer}
+                layerSentence={layer ? LEGEND_LABEL[layer] : ""}
                 drawn={drawn}
                 normalise={normalise}
                 window={timeWindow}
@@ -830,6 +831,11 @@ export function MapAggregate({
                   sharedFormat(shown) === "duel" ||
                   sharedFormat(shown) === "teams"
                 }
+                minimapUrl={minimapUrl}
+                world={world}
+                dots={dots}
+                places={marks}
+                showStarts={showStarts}
               />
             </div>
           </div>
