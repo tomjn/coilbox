@@ -42,6 +42,7 @@ use crate::model::{
 
 pub(crate) mod analysis;
 mod build_orders;
+pub mod map_grids;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
@@ -2264,6 +2265,73 @@ pub(crate) async fn content_demo_order_points(replay_path: String) -> CliResult 
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo order points task failed: {e}")),
     }
+}
+
+/// `content_replay_map_grids`, each replay in `paths` reduced to counts on its
+/// map's grid, for a picture of many replays of one map (#1161). `worldWidth`
+/// and `worldHeight` are the map's size in elmos, which a replay does not hold.
+/// See [`map_grids`] for the layers and for the kept files.
+///
+/// A path must be a replay in a folder the Replays list reads, as the delete
+/// commands require, and one that is not is answered in `failed` beside any
+/// that would not read. Replays are reduced one at a time. A caller that wants
+/// to show progress asks for one path a call.
+#[tauri::command]
+pub(crate) async fn content_replay_map_grids<R: Runtime>(
+    app: AppHandle<R>,
+    paths: Vec<String>,
+    world_width: u32,
+    world_height: u32,
+) -> CliResult {
+    let Some(grid) = map_grids::Grid::for_world(world_width, world_height) else {
+        return CliResult::err("the map has no size".to_string());
+    };
+    let cache = coilbox_portable::cache_dir(&app)
+        .ok()
+        .map(|dir| dir.join(map_grids::CACHE_DIR));
+    let analyses = analysis::store::app_store_dir(&app).ok();
+    match tauri::async_runtime::spawn_blocking(move || {
+        let roots = library_roots();
+        if let Some(cache) = &cache {
+            sweep_map_grids_once(cache, &roots);
+        }
+        let mut replays = Vec::new();
+        let mut failed = Vec::new();
+        for path in paths {
+            let demo = PathBuf::from(&path);
+            let read = if is_listed_replay(&demo, &roots) {
+                map_grids::replay_grids(&demo, &grid, cache.as_deref(), analyses.as_deref())
+            } else {
+                Err("not in a folder the Replays list reads".to_string())
+            };
+            match read {
+                Ok(grids) => replays.push(grids),
+                Err(error) => failed.push(json!({ "path": path, "error": error })),
+            }
+        }
+        (replays, failed)
+    })
+    .await
+    {
+        Ok((replays, failed)) => {
+            CliResult::ok(json!({ "grid": grid, "replays": replays, "failed": failed }))
+        }
+        Err(e) => CliResult::err(format!("replay map grids task failed: {e}")),
+    }
+}
+
+/// Drop the kept grids of replays that have left the library, once for each
+/// run of the app. It needs a listing of every replay folder, which is too
+/// much to do on every call and enough to do once.
+fn sweep_map_grids_once(cache: &Path, roots: &[PathBuf]) {
+    static SWEPT: std::sync::Once = std::sync::Once::new();
+    SWEPT.call_once(|| {
+        let live = roots
+            .iter()
+            .flat_map(|root| demo_file_entries(root))
+            .map(|entry| entry.path);
+        map_grids::sweep(cache, live);
+    });
 }
 
 /// `content_demo_command_rates`, how many orders each team gave in each period

@@ -134,7 +134,10 @@ pub fn read_start_positions(
 const FIRST_READ: usize = 256 * 1024;
 
 /// The reduction behind [`read_start_positions`], over a walked stream.
-fn start_positions(stream: &DemoStream, is_team: impl Fn(i32) -> bool) -> Vec<TeamStartPosition> {
+pub(super) fn start_positions(
+    stream: &DemoStream,
+    is_team: impl Fn(i32) -> bool,
+) -> Vec<TeamStartPosition> {
     let mut by_team: BTreeMap<i32, TeamStartPosition> = BTreeMap::new();
     for e in &stream.events {
         let StreamEventKind::StartPos {

@@ -441,6 +441,33 @@ fn reduce(
     out
 }
 
+/// The positioned orders of a walked stream as plain columns, for a caller
+/// that bins them and sends no points anywhere (`map_grids`).
+pub(super) struct Positioned {
+    pub(super) x: Vec<f32>,
+    pub(super) z: Vec<f32>,
+    pub(super) frame: Vec<i32>,
+    pub(super) unit_aimed: u32,
+    pub(super) custom: u32,
+}
+
+pub(super) fn positioned_orders(
+    stream: &DemoStream,
+    names: std::collections::HashMap<u32, String>,
+    teams: std::collections::HashMap<u32, i32>,
+) -> Positioned {
+    // The bucket length only shapes the rates, which this caller drops.
+    let period_frames = DEFAULT_STATS_PERIOD_SEC as i32 * GAME_SPEED;
+    let r = reduce(stream, names, teams, period_frames);
+    Positioned {
+        x: r.x,
+        z: r.z,
+        frame: r.frame,
+        unit_aimed: r.unit_aimed,
+        custom: r.custom,
+    }
+}
+
 fn pack<T>(values: &[T], bytes: impl Fn(&T) -> Vec<u8>) -> String {
     STANDARD.encode(values.iter().flat_map(bytes).collect::<Vec<u8>>())
 }
