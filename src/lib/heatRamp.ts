@@ -135,7 +135,7 @@ export function paintHeatField(
 
 /** The ramp as a CSS gradient, least on the left, for a legend. */
 export function heatGradientCss(): string {
-  const stops = HEAT_RAMP.map((hex, i) => {
+  const stops = HEAT_RAMP.map((_, i) => {
     const t = i / (HEAT_RAMP.length - 1);
     const alpha = HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * t;
     const [r, g, b] = heatColour(t);

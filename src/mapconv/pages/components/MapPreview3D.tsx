@@ -703,7 +703,8 @@ uniform float detailStrength;`,
           };
         disposables.push(material);
         materialRef.current = material;
-        scene.add(new THREE.Mesh(geo, material));
+        const terrain = new THREE.Mesh(geo, material);
+        scene.add(terrain);
 
         // Translucent water plane at world height 0 (== scene y 0). Subdivided so
         // the animation loop below can ripple its surface.
@@ -1150,6 +1151,7 @@ uniform vec2 wPlane;`,
             scale: s,
             planeWidth: planeW,
             planeDepth: planeH,
+            terrain,
           });
         }
         setBuilt(true);
