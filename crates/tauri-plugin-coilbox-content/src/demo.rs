@@ -85,7 +85,8 @@ const PLAYER_STAT_ELEM_SIZE: usize = 20;
 
 /// List a root's replays with nothing kept between calls, newest first. Every
 /// file is decoded. The command uses [`list_replays_stored`] instead.
-pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
+#[cfg(test)]
+fn list_replays(root: &Path) -> Vec<ReplayFile> {
     list_replays_stored(root, None).0
 }
 
