@@ -1,6 +1,6 @@
 import { Button } from "@picoframe/frame";
 import { Loader2, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatDuration } from "@/lib/format";
 import { type ChatDest, type ChatLine, contentDemoChat } from "../../bindings";
 import { ErrorBanner } from "./states";
@@ -78,22 +78,37 @@ export function ChatLines({ messages }: { messages: ChatLine[] }) {
 
 /** The replay's in-demo chat log, loaded on demand. */
 export function ReplayChat({ replayPath }: { replayPath: string }) {
-  const [messages, setMessages] = useState<ChatLine[] | null>(null);
-  const [incomplete, setIncomplete] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
+  // The replay a read belongs to, so another replay shows nothing of it.
+  const [read, setRead] = useState<{
+    path: string;
+    status: "loading" | "failed" | "done";
+    messages: ChatLine[] | null;
+    incomplete: boolean;
+  } | null>(null);
+  const latestPath = useRef(replayPath);
+  latestPath.current = replayPath;
+
+  const current = read?.path === replayPath ? read : null;
+  const messages = current?.messages ?? null;
+  const incomplete = current?.incomplete ?? false;
+  const loading = current?.status === "loading";
+  const failed = current?.status === "failed";
 
   const load = async () => {
-    setLoading(true);
-    setFailed(false);
+    const path = replayPath;
+    setRead({ path, status: "loading", messages: null, incomplete: false });
     try {
-      const res = await contentDemoChat({ replayPath });
-      setMessages(res.messages);
-      setIncomplete(res.incomplete);
+      const res = await contentDemoChat({ replayPath: path });
+      if (latestPath.current !== path) return;
+      setRead({
+        path,
+        status: "done",
+        messages: res.messages,
+        incomplete: res.incomplete,
+      });
     } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
+      if (latestPath.current !== path) return;
+      setRead({ path, status: "failed", messages: null, incomplete: false });
     }
   };
 
