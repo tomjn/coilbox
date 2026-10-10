@@ -18,7 +18,9 @@ import type { HeatField } from "./heatField";
  * One hue family, violet through magenta to pink, getting lighter as density
  * rises. `heatRamp.test.ts` measures that each stop is lighter than the one
  * before, for normal vision and for protan and deutan simulation, so the order
- * survives without the hue.
+ * survives without the hue. The steps are uneven for a protan reader, who sees
+ * less of the red in magenta: OKLab lightness x100 runs 42.2, 47.3, 50.8, 59.6,
+ * 76.8, against 40.7, 49.3, 56.8, 66.8, 81.4 for normal vision.
  *
  * Magenta because it is the colour a map is least likely to be: terrain is
  * greens, browns, greys and whites, and water is blue. It is not a red to green
@@ -28,11 +30,11 @@ import type { HeatField } from "./heatField";
  * never over the card, so the theme does not change what is behind it.
  */
 export const HEAT_RAMP: readonly string[] = [
-  "#3d1466",
-  "#6b1c8f",
-  "#a1229d",
-  "#d83a9e",
-  "#ff6fb5",
+  "#551ea6",
+  "#8628b8",
+  "#b436b6",
+  "#e25aae",
+  "#ffa0cc",
 ];
 
 /**
@@ -42,8 +44,21 @@ export const HEAT_RAMP: readonly string[] = [
  * hotspot covers it. Both ends are display choices with no measurement behind
  * them. The top stops short of 1 so the relief under a hotspot is still there.
  */
-export const HEAT_ALPHA_MIN = 0.12;
-export const HEAT_ALPHA_MAX = 0.88;
+export const HEAT_ALPHA_MIN = 0.3;
+export const HEAT_ALPHA_MAX = 0.9;
+
+/**
+ * The power a cell's fraction of the peak is raised to before it is coloured.
+ *
+ * A match has one spot far busier than the rest, usually a block of identical
+ * buildings, and drawn in proportion everything else sits in the faintest
+ * tenth of the ramp. Seen on real replays that was a picture of one dot. The
+ * square root spreads the low end out, so a base ordered at a quarter of the
+ * peak's rate is drawn half way up the ramp. The order of the colours is
+ * unchanged, and the legend says least to most and gives no scale between.
+ * A display choice: 0.5 is the usual value and nothing here measured it.
+ */
+export const HEAT_GAMMA = 0.5;
 
 /**
  * The fraction of the peak under which a cell is not drawn at all.
@@ -75,8 +90,8 @@ const STOPS: Rgb[] = HEAT_RAMP.map((hex) => [
   Number.parseInt(hex.slice(5, 7), 16),
 ]);
 
-/** The ramp's colour at `t`, 0 for least and 1 for most. */
-export function heatColour(t: number): Rgb {
+/** The ramp's colour along its length, 0 for the first stop and 1 for the last. */
+function rampAt(t: number): Rgb {
   const clamped = Math.min(1, Math.max(0, t));
   const at = clamped * (STOPS.length - 1);
   const lo = Math.floor(at);
@@ -91,13 +106,22 @@ export function heatColour(t: number): Rgb {
   ];
 }
 
-/** How opaque a cell at `t` of the peak is, 0 to 1. 0 under the threshold. */
+/** How far up the ramp a cell at fraction `t` of the peak is drawn. */
+const drawnAt = (t: number) => Math.min(1, Math.max(0, t)) ** HEAT_GAMMA;
+
+/** The colour of a cell at fraction `t` of the peak. */
+export function heatColour(t: number): Rgb {
+  return rampAt(drawnAt(t));
+}
+
+/** How opaque a cell at fraction `t` of the peak is, 0 to 1. 0 under the
+ *  threshold. */
 export function heatAlpha(
   t: number,
   threshold = DEFAULT_HEAT_THRESHOLD,
 ): number {
   if (!(t > 0) || t < threshold) return 0;
-  return HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * Math.min(1, t);
+  return HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * drawnAt(t);
 }
 
 /**
@@ -138,7 +162,7 @@ export function heatGradientCss(): string {
   const stops = HEAT_RAMP.map((_, i) => {
     const t = i / (HEAT_RAMP.length - 1);
     const alpha = HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * t;
-    const [r, g, b] = heatColour(t);
+    const [r, g, b] = rampAt(t);
     return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)}) ${Math.round(t * 100)}%`;
   });
   return `linear-gradient(to right, ${stops.join(", ")})`;
