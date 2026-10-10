@@ -528,7 +528,15 @@ export function MatchStatsChart({
         )}
         <div className="ml-auto">
           <MatchStatsExportButton
-            input={{ info, metric, mode, view, series: drawn, rows }}
+            input={{
+              info,
+              metric,
+              mode,
+              view,
+              series: drawn,
+              allSeries: series,
+              rows,
+            }}
             hiddenCount={series.length - drawn.length}
           />
         </div>

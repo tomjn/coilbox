@@ -1,5 +1,11 @@
 import type { DemoInfo, Metric } from "./bindings";
-import type { ChartMode, ChartRow, ChartSeries, ChartView } from "./matchStats";
+import {
+  type ChartMode,
+  type ChartRow,
+  type ChartSeries,
+  type ChartView,
+  seriesTeams,
+} from "./matchStats";
 
 /**
  * The match statistics chart as CSV (#1172).
@@ -63,6 +69,11 @@ export interface MatchStatsCsvInput {
   view: ChartView;
   /** The view's lines, in the order the chart draws them. */
   series: ChartSeries[];
+  /**
+   * Every line of the view, drawn or not. Header names are made unique over
+   * these, so they do not depend on the roster's checkboxes. Defaults to `series`.
+   */
+  allSeries?: ChartSeries[];
   /** {@link modeRows} over `series`, for the same metric and mode. */
   rows: ChartRow[];
 }
@@ -80,12 +91,51 @@ function provenance({ info, metric, mode, view }: MatchStatsCsvInput) {
   ] as const;
 }
 
+/**
+ * The header text of each line in `series`, in order, before quoting.
+ *
+ * A label that another line shares, or that a fixed column already uses, gets
+ * the engine teams it stands for added: `Alice (team 2)`, or `Red (teams 1, 3)`
+ * for a side. Collisions are judged over `every` line of the view, not only the
+ * ones drawn, so a player's header does not change when a namesake is unchecked
+ * in the roster. A label that collides with nothing is left as it is.
+ */
+function columnNames(
+  info: DemoInfo,
+  series: ChartSeries[],
+  every: ChartSeries[],
+  fixed: readonly string[],
+): string[] {
+  const count = new Map<string, number>();
+  for (const s of every) count.set(s.label, (count.get(s.label) ?? 0) + 1);
+  const taken = new Set(fixed);
+  return series.map((s) => {
+    let name = s.label;
+    if ((count.get(name) ?? 0) > 1 || taken.has(name)) {
+      const teams = seriesTeams(s, info);
+      const note =
+        teams.length === 0
+          ? s.id
+          : `${teams.length === 1 ? "team" : "teams"} ${teams.join(", ")}`;
+      name = `${name} (${note})`;
+    }
+    // A name someone chose can still equal a disambiguated one. The line's id is
+    // unique within the chart, so it settles the tie.
+    if (taken.has(name)) name = `${name} [${s.id}]`;
+    taken.add(name);
+    return name;
+  });
+}
+
 export function matchStatsCsv(input: MatchStatsCsvInput): string {
   const { series, rows } = input;
   const extra = provenance(input);
+  const fixed = ["match_time_sec", ...extra.map(([name]) => name)];
   const header = [
     "match_time_sec",
-    ...series.map((s) => csvText(s.label)),
+    ...columnNames(input.info, series, input.allSeries ?? series, fixed).map(
+      csvText,
+    ),
     ...extra.map(([name]) => name),
   ];
   const tail = extra.map(([, value]) => csvText(value));
