@@ -40,7 +40,6 @@ export const ANALYTICS_HIDE_IDS: string[] = [
 export const UNWIRED_ANALYTICS_IDS: string[] = [
   "analytics.spatialLayers",
   "analytics.mapInsight",
-  "analytics.run",
 ];
 
 /**

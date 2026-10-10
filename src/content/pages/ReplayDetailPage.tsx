@@ -37,6 +37,7 @@ import {
   useUnitsyncMinimap,
   useUnitsyncScan,
 } from "../config";
+import { refreshStoredAnalyses } from "../replayAnalysis";
 import {
   type ReplayEngineNotice,
   replayDependencyBlock,
@@ -53,6 +54,7 @@ import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
+import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayRoster, swatch } from "./components/ReplayRoster";
@@ -531,7 +533,10 @@ function DeleteReplayButton({
     setPending(true);
     setError(null);
     try {
-      await contentDeleteReplay({ path: replayPath });
+      const { analysisDeleted } = await contentDeleteReplay({
+        path: replayPath,
+      });
+      if (analysisDeleted) void refreshStoredAnalyses();
       forgetReplay(replayPath);
       setOpen(false);
       onDeleted();
@@ -554,7 +559,8 @@ function DeleteReplayButton({
           <h3 className="text-sm font-medium">Delete this replay?</h3>
           <p className="text-xs text-muted-foreground">
             The file is permanently removed from your demos folder — this can't
-            be undone.
+            be undone. If this replay has been analysed, its stored analysis is
+            deleted with it.
           </p>
         </div>
         <div className="flex justify-end gap-2">
@@ -825,6 +831,19 @@ export default function ReplayDetailPage() {
               <ReplayBuildOrders info={info} replayPath={replay.path} />
             )}
           </SeriesEmphasisProvider>
+
+          {/* Opt in, one replay at a time (#1157). The section gates itself on
+           * `analytics.run`, and still shows an analysis that is already stored. */}
+          {replay && (
+            <ReplayAnalysisSection
+              replayPath={replay.path}
+              info={info}
+              target={resolved?.matched ? resolved.target : null}
+              missingGame={missingGame}
+              missingMap={missingMap}
+              dependencyBlock={dependencyBlock}
+            />
+          )}
 
           {/* Read from the replay file, so it needs no engine. */}
           {replay && (

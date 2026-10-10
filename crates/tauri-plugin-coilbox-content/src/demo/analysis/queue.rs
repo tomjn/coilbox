@@ -699,26 +699,69 @@ pub(crate) fn shutdown<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// What a replay needs to be before it is queued, read from the replay itself.
-/// An error is the reason it cannot be analysed, in words a page can show.
+/// Why a replay cannot be analysed, whatever is installed.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CannotAnalyse {
+    /// It is a remix. See [`store::replay_key`].
+    Remix,
+    /// Its header holds no game id to file a result under.
+    NoGameId,
+    /// It never recorded a game over, so there is nothing to check a run of
+    /// it against.
+    NoGameOver,
+    /// The file does not read as a replay.
+    Unreadable,
+}
+
+impl CannotAnalyse {
+    fn message(self) -> &'static str {
+        match self {
+            CannotAnalyse::Remix => {
+                "this replay is a remix, and the result it recorded belongs to the original match"
+            }
+            CannotAnalyse::NoGameId => {
+                "this replay has no game id, so an analysis of it has nothing to be filed under"
+            }
+            CannotAnalyse::NoGameOver => {
+                "this replay never recorded a game over, so there is nothing to check a run of it against"
+            }
+            CannotAnalyse::Unreadable => "this file does not read as a replay",
+        }
+    }
+}
+
+/// What the replay itself says about being analysed: its key and its length,
+/// or why it cannot be. Reads the replay and nothing else, so a page can ask
+/// before it offers the button.
+pub fn check_replay(replay: &Path) -> Result<(String, u32), CannotAnalyse> {
+    let raw =
+        super::super::read_header_and_script(replay).map_err(|_| CannotAnalyse::Unreadable)?;
+    let game = super::super::find_game(&super::super::parse_tdf(&raw.script));
+    if super::super::read_remix_marker(&game).remixed {
+        return Err(CannotAnalyse::Remix);
+    }
+    let game_id = store::valid_game_id(&raw.game_id).map_err(|_| CannotAnalyse::NoGameId)?;
+    let finished = super::super::read_trailer(replay)
+        .is_ok_and(|trailer| divergence::has_recorded_outcome(&trailer));
+    if !finished {
+        return Err(CannotAnalyse::NoGameOver);
+    }
+    Ok((game_id, raw.game_time))
+}
+
+/// A job for a replay, or the reason it cannot be analysed in words a page
+/// can show.
 pub fn job_for(
     replay: &Path,
     engine_dir: &Path,
     data_dirs: Vec<PathBuf>,
     force: bool,
 ) -> Result<JobSpec, String> {
-    let game_id = store::replay_key(replay)?;
-    let trailer = super::super::read_trailer(replay)?;
-    if !divergence::has_recorded_outcome(&trailer) {
-        return Err(
-            "this replay never recorded a game over, so there is nothing to check a run of it against"
-                .into(),
-        );
-    }
+    let (game_id, match_seconds) = check_replay(replay).map_err(|why| why.message().to_string())?;
     if !super::launch::headless_binary(engine_dir).is_file() {
         return Err(format!("no headless engine in {}", engine_dir.display()));
     }
-    let raw = super::super::read_header_and_script(replay)?;
     Ok(JobSpec {
         replay: replay.to_path_buf(),
         engine_dir: engine_dir.to_path_buf(),
@@ -728,7 +771,7 @@ pub fn job_for(
             .file_name()
             .map(|name| name.to_string_lossy().into_owned())
             .unwrap_or_default(),
-        match_seconds: raw.game_time,
+        match_seconds,
         force,
     })
 }
@@ -782,6 +825,25 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     match asked {
         Ok(Ok((outcome, queue))) => CliResult::ok(json!({ "outcome": outcome, "queue": queue })),
         Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
+    }
+}
+
+/// `content_analysis_check`: whether a replay can be analysed at all, read
+/// from the replay and nothing else, so a page can say why not beside a
+/// disabled button. Answers `{ cannot, gameId, matchSeconds }`. `cannot` is
+/// null for a replay that can be, and otherwise `remix`, `noGameId`,
+/// `noGameOver` or `unreadable`. Whether its engine, game and map are
+/// installed is a separate question, which the page already answers.
+#[tauri::command]
+pub(crate) async fn content_analysis_check(replay_path: String) -> CliResult {
+    let checked =
+        tauri::async_runtime::spawn_blocking(move || check_replay(Path::new(&replay_path))).await;
+    match checked {
+        Ok(Ok((game_id, match_seconds))) => CliResult::ok(
+            json!({ "cannot": null, "gameId": game_id, "matchSeconds": match_seconds }),
+        ),
+        Ok(Err(why)) => CliResult::ok(json!({ "cannot": why, "gameId": null, "matchSeconds": 0 })),
         Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
     }
 }
@@ -1750,6 +1812,16 @@ mod tests {
             let err =
                 job_for(&replay, &dir.path().join("no-engine"), Vec::new(), false).unwrap_err();
             assert!(err.contains("no headless engine"), "{err}");
+
+            let junk = dir.path().join("junk.sdfz");
+            std::fs::write(&junk, b"not a replay").unwrap();
+            assert_eq!(check_replay(&junk), Err(CannotAnalyse::Unreadable));
+            assert_eq!(check_replay(&remix), Err(CannotAnalyse::Remix));
+            assert_eq!(check_replay(&replay), Ok((super::ID.to_string(), 50)));
+            assert_eq!(
+                serde_json::to_value(CannotAnalyse::NoGameOver).unwrap(),
+                "noGameOver"
+            );
         }
     }
 }

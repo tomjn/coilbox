@@ -25,6 +25,7 @@ permissions = [
   "allow-content-demo-chat",
   "allow-content-demo-build-orders",
   "allow-content-rewrite-demo",
+  "allow-content-analysis-check",
   "allow-content-analysis-enqueue",
   "allow-content-analysis-queue",
   "allow-content-analysis-cancel",

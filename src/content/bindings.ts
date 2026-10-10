@@ -1120,6 +1120,26 @@ export const contentAnalysisEnqueue = defineCommand<
   }
 >("coilbox-content", "content_analysis_enqueue");
 
+/**
+ * Whether a replay can be analysed at all, read from the replay itself.
+ * `cannot` is null when it can. Whether its engine, game and map are installed
+ * is a separate question.
+ *
+ * - `remix`: a remix keeps its original's recorded result, so there is nothing
+ *   of its own to check a run against.
+ * - `noGameOver`: the match was quit before a game over was recorded.
+ * - `noGameId`: the header holds no id to file a result under.
+ * - `unreadable`: the file does not read as a replay.
+ */
+export const contentAnalysisCheck = defineCommand<
+  { replayPath: string },
+  {
+    cannot: "remix" | "noGameId" | "noGameOver" | "unreadable" | null;
+    gameId: string | null;
+    matchSeconds: number;
+  }
+>("coilbox-content", "content_analysis_check");
+
 /** The analysis queue as it is now. */
 export const contentAnalysisQueue = defineCommand<
   undefined,

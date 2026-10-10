@@ -1157,6 +1157,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::content_demo_chat,
             demo::content_demo_build_orders,
             demo::content_rewrite_demo,
+            demo::analysis::queue::content_analysis_check,
             demo::analysis::queue::content_analysis_enqueue,
             demo::analysis::queue::content_analysis_queue,
             demo::analysis::queue::content_analysis_cancel,
