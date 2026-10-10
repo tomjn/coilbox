@@ -130,7 +130,7 @@ export function EventLayerCanvases({
   );
 }
 
-function goToAnalysis() {
+export function goToAnalysis() {
   document
     .getElementById(ANALYSIS_SECTION_ID)
     ?.scrollIntoView?.({ behavior: "smooth", block: "start" });
@@ -172,10 +172,12 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
   const { state, units } = ev;
   const reading =
     (ev.deathsOn && ev.deathRead.status === "loading") ||
-    (ev.finishedOn && ev.finishedRead.status === "loading");
+    (ev.finishedOn && ev.finishedRead.status === "loading") ||
+    ev.startRead.status === "loading";
   const failed =
     (ev.deathsOn && ev.deathRead.status === "failed") ||
-    (ev.finishedOn && ev.finishedRead.status === "failed");
+    (ev.finishedOn && ev.finishedRead.status === "failed") ||
+    ev.startRead.status === "failed";
 
   if (ev.block) {
     const canPoint =

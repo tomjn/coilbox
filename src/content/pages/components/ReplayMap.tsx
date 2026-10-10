@@ -61,6 +61,7 @@ import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
+import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
 
 /** How many pixels wide the marks are drawn at, before the page scales the
@@ -513,6 +514,12 @@ export function ReplayMap({
               worldWidth={world.worldWidth}
               worldHeight={world.worldHeight}
             />
+            <StartUnitCanvas
+              ev={ev}
+              info={info}
+              colours={colours}
+              world={world}
+            />
             {on.starts &&
               dots.map((dot) => <StartDotButton key={dot.team} dot={dot} />)}
           </div>
@@ -555,6 +562,12 @@ export function ReplayMap({
               </ToggleGroupItem>
               <ToggleGroupItem value="finished" disabled={!!ev.block}>
                 Buildings finished
+              </ToggleGroupItem>
+              <ToggleGroupItem value="startUnitDeaths" disabled={!!ev.block}>
+                Starting unit deaths
+              </ToggleGroupItem>
+              <ToggleGroupItem value="startUnitPaths" disabled={!!ev.block}>
+                Starting unit paths
               </ToggleGroupItem>
             </ToggleGroup>
             <ReplaySourceNote
@@ -599,6 +612,7 @@ export function ReplayMap({
               />
             )}
             <EventLayerNotes ev={ev} />
+            <StartUnitNotes ev={ev} info={info} />
 
             {on.startBoxes && !hasBoxes && (
               <p className="text-xs text-muted-foreground">

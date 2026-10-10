@@ -230,6 +230,30 @@ describe("eventDetails", () => {
     ]);
   });
 
+  it("names the player a unit that changed hands came from", () => {
+    const given = {
+      kind: "unit_given",
+      frame: 1,
+      team: 0,
+      def: 4,
+      unit: 7,
+      from: 2,
+      captured: true,
+    };
+    expect(eventDetails(given, labels)).toEqual([
+      { name: "unit", text: "7" },
+      { name: "from", text: "Bot" },
+      { name: "captured", text: "true" },
+    ]);
+    expect(playerOptions([given], labels).map((o) => o.value)).toEqual([
+      "team:0",
+      "team:2",
+    ]);
+    expect(
+      filterEvents([given], { kind: ALL_KINDS, player: "team:2" }, labels),
+    ).toEqual([given]);
+  });
+
   it("shows a field it has never heard of under its own name", () => {
     const d = eventDetails(
       { kind: "damage", frame: 1, amount: 12.5, tags: ["a"], note: "hit" },

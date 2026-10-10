@@ -19,6 +19,13 @@ import {
 import { readReplayEvents } from "./replayEventRead";
 import type { MapWorld } from "./replayMapLayers";
 import {
+  START_UNIT_KINDS,
+  START_UNIT_LOGGER_VERSION,
+  startUnitEnds,
+  startUnitTracks,
+  trackInRange,
+} from "./replayStartUnits";
+import {
   countInRange,
   filterByFrame,
   type TimeWindow,
@@ -72,8 +79,9 @@ export interface EventLayerCount {
 export type EventLayers = ReturnType<typeof useReplayEventLayers>;
 
 /**
- * The replay map's two layers drawn from the analysis's event log (#1160):
- * where units died, and where buildings were finished.
+ * The replay map's layers drawn from the analysis's event log (#1160): where
+ * units died, where buildings were finished, and where each team's starting
+ * units went and ended.
  *
  * Nothing is read until a layer is on and the replay has an analysis that
  * can be read, and then only the kinds that layer draws. The time window is
@@ -92,7 +100,12 @@ export function useReplayEventLayers({
 }: {
   info: DemoInfo;
   layersShown: boolean;
-  toggles: { deaths: boolean; finished: boolean };
+  toggles: {
+    deaths: boolean;
+    finished: boolean;
+    startUnitDeaths: boolean;
+    startUnitPaths: boolean;
+  };
   world: MapWorld;
   sized: boolean;
   timeWindow: TimeWindow | null;
@@ -106,9 +119,13 @@ export function useReplayEventLayers({
   const ready = layersShown && state.kind === "ready";
   const deathsOn = ready && toggles.deaths;
   const finishedOn = ready && toggles.finished;
+  const startDeathsOn = ready && toggles.startUnitDeaths;
+  const startPathsOn = ready && toggles.startUnitPaths;
+  const startOn = startDeathsOn || startPathsOn;
 
   const deathRead = useEventRead(state, DEATH_KINDS, deathsOn);
   const finishedRead = useEventRead(state, FINISHED_KINDS, finishedOn);
+  const startRead = useEventRead(state, START_UNIT_KINDS, startOn);
   const units = useReplayUnits(info, deathsOn || finishedOn);
 
   const [costMode, setCostMode] = useState(false);
@@ -162,6 +179,29 @@ export function useReplayEventLayers({
     [finishedAll, range],
   );
 
+  // An analysis from before the logger flagged starting units holds none, which
+  // is a different answer from a match that had none.
+  const startUnitsRecorded =
+    state.kind === "ready" && state.loggerVersion >= START_UNIT_LOGGER_VERSION;
+  const tracks = useMemo(
+    () => startUnitTracks(startRead.events),
+    [startRead.events],
+  );
+  const startEndsAll = useMemo(() => startUnitEnds(tracks), [tracks]);
+  const startEnds = useMemo(
+    () => (startDeathsOn ? filterByFrame(startEndsAll, range) : []),
+    [startDeathsOn, startEndsAll, range],
+  );
+  const startPaths = useMemo(
+    () =>
+      startPathsOn
+        ? tracks
+            .map((track) => ({ track, points: trackInRange(track, range) }))
+            .filter((path) => path.points.length > 0)
+        : [],
+    [startPathsOn, tracks, range],
+  );
+
   // What the time window counts for these layers, each in its own noun.
   const counts: EventLayerCount[] = [];
   if (deathsOn && deathRead.status === "done")
@@ -177,14 +217,32 @@ export function useReplayEventLayers({
       total: finishedAll.marks.length,
     });
 
+  if (startDeathsOn && startRead.status === "done" && startUnitsRecorded)
+    counts.push({
+      noun: "starting units lost",
+      inside: startEnds.length,
+      total: startEndsAll.length,
+    });
+
   return {
     state,
     /** Why the layers cannot be turned on, or null. */
     block,
     deathsOn,
     finishedOn,
-    /** Whether either layer is drawing, which is when the window applies. */
-    active: deathsOn || finishedOn,
+    startDeathsOn,
+    startPathsOn,
+    startRead,
+    /** Whether the analysis is from a logger that flags starting units. */
+    startUnitsRecorded,
+    /** Every starting unit in the log, whatever the window. */
+    tracks,
+    /** The starting units that ended inside the window. */
+    startEnds,
+    /** Each starting unit's path inside the window. */
+    startPaths,
+    /** Whether any layer is drawing, which is when the window applies. */
+    active: deathsOn || finishedOn || startOn,
     deathRead,
     finishedRead,
     units,
