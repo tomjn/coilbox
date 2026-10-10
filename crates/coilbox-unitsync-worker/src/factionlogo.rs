@@ -70,7 +70,7 @@ pub fn render(
             }
         }
     };
-    us.init(false, 0);
+    us.init_game(game_archive);
     errors.extend(us.drain_errors());
 
     let key_base = cache_key_base(&us, game_archive);

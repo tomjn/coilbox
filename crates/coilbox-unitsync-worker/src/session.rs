@@ -29,6 +29,35 @@
 //! archive is not held open while the worker idles, which on Windows would stop
 //! it being deleted.
 //!
+//! # The one mount that is kept, and for how long
+//!
+//! A game's page asks for its info, its units, its build pictures and its
+//! faction logos, and each of those mounts the same archive set. On a zipped
+//! game that mount took 31 to 95 ms a time (issue #3728), so the second read
+//! of a game straight after the first is answered from the first one's mount.
+//!
+//! A mount is kept only when all of this holds:
+//!
+//! - The read said which game it reads, with `Unitsync::init_game`, and mounted
+//!   that game's archive set into an empty file system and nothing else.
+//! - Every archive in the set is a file. The scanner walk above sees a file
+//!   archive replaced, and does not look inside a folder archive, which lists
+//!   its members when it is mounted. unitsync names the archives a game mounts
+//!   by their versioned names and not their files, so a set is told apart by
+//!   asking each folder archive the walk found for its name.
+//! - The read did not panic.
+//!
+//! The next request uses it only when it says it reads the same game, and the
+//! walk above found nothing changed, since a change is a new `Init` and `Init`
+//! empties the file system. Any other request starts from an empty file system:
+//! `reset` empties it before the request runs, and a mount of anything else
+//! empties it first.
+//!
+//! It is kept only while another read is waiting for the worker. The plugin
+//! sends `protocol::RELEASE_FLAG` the moment nothing is, and the file system is
+//! emptied. So the rule above still stands: the worker never idles with an
+//! archive open.
+//!
 //! The state is per thread: a worker has one thread that talks to unitsync, and
 //! tests each bring their own stand-in library.
 
@@ -53,10 +82,35 @@ struct Session {
     /// What it would have found there. `None` when that is not known, which
     /// makes the next request call `Init` again.
     found: Option<u64>,
+    /// The file name of every folder archive the scanner found during that
+    /// `Init`.
+    folders: Vec<String>,
     /// Archives opened through `OpenArchive` and not closed yet.
     open_archives: Vec<i32>,
     /// The `Init` calls made since [`take_init`] was last asked.
     inits: Vec<InitTiming>,
+    /// How long each mount took, since [`take_mounts`] was last asked.
+    mounts: Vec<u64>,
+    /// The game the request in hand said it reads, from `Unitsync::init_game`.
+    reading: Option<String>,
+    /// Whether the request in hand has asked for a mount yet.
+    asked_to_mount: bool,
+    /// Every archive set mounted since the file system was last emptied.
+    mounted_now: Vec<String>,
+    /// Whether what is mounted may be left for the next request, if it is still
+    /// the only thing mounted and the request in hand reads that game.
+    keepable: bool,
+}
+
+/// What `Unitsync::add_all_archives` has to do for one mount.
+pub enum Mount {
+    /// Nothing. The file system holds exactly this archive set already.
+    Held,
+    /// Empty the file system first. It holds something this request did not
+    /// mount, and a request reads only what it mounted itself.
+    AfterEmptying,
+    /// Add it to what is there.
+    Add,
 }
 
 thread_local! {
@@ -88,11 +142,86 @@ pub fn take_init() -> Option<InitTiming> {
     with(|s| std::mem::take(&mut s.inits).pop()).flatten()
 }
 
+/// Note which game the request about to start reads, or that it reads none.
+pub fn read_game(game_archive: Option<&str>) {
+    with(|s| {
+        s.reading = game_archive.map(str::to_string);
+        s.asked_to_mount = false;
+    });
+}
+
+fn holds(s: &Session) -> bool {
+    s.keepable && s.mounted_now.len() == 1 && s.reading.as_deref() == Some(&s.mounted_now[0])
+}
+
+/// Whether the file system holds the archive set of the game the request in
+/// hand reads and nothing else, so emptying it can wait for the next request.
+pub fn keeping() -> bool {
+    with(|s| holds(s)).unwrap_or(false)
+}
+
+/// What mounting `archive` takes, asked just before it is mounted.
+pub fn before_mount(archive: &str) -> Mount {
+    with(|s| {
+        let first = !std::mem::replace(&mut s.asked_to_mount, true);
+        if holds(s) && s.mounted_now[0] == archive {
+            Mount::Held
+        } else if first && !s.mounted_now.is_empty() {
+            Mount::AfterEmptying
+        } else {
+            Mount::Add
+        }
+    })
+    .unwrap_or(Mount::Add)
+}
+
+/// Whether a mount of `archive` about to be made is one worth keeping: the file
+/// system is empty and it is the game the request said it reads.
+pub fn wants_kept(archive: &str) -> bool {
+    with(|s| s.mounted_now.is_empty() && s.reading.as_deref() == Some(archive)).unwrap_or(false)
+}
+
+/// Note a mount of `archive` that took `ms`. `keepable` when [`wants_kept`]
+/// said so and every archive in the set is a file.
+pub fn mounted(archive: &str, keepable: bool, ms: u64) {
+    with(|s| {
+        s.keepable = keepable && s.mounted_now.is_empty();
+        s.mounted_now.push(archive.to_string());
+        s.mounts.push(ms);
+    });
+}
+
+/// Note that the file system has been emptied.
+pub fn unmounted() {
+    with(|s| {
+        s.mounted_now.clear();
+        s.keepable = false;
+    });
+}
+
+/// Whether `archive` is a folder on disk and not a file.
+pub fn is_folder_archive(archive: &str) -> bool {
+    is_sdd(Path::new(archive))
+}
+
+/// The file name of every folder archive the scanner found.
+pub fn folder_archives() -> Vec<String> {
+    with(|s| s.folders.clone()).unwrap_or_default()
+}
+
+/// How long each mount a request ran took, in milliseconds.
+pub fn take_mounts() -> Vec<u64> {
+    with(|s| std::mem::take(&mut s.mounts)).unwrap_or_default()
+}
+
 /// Stop trusting the current `Init`, so the next request calls it again. For a
 /// request that panicked partway through a read, where what unitsync is left
 /// holding is anyone's guess.
 pub fn give_up() {
-    with(|s| s.found = None);
+    with(|s| {
+        s.found = None;
+        s.keepable = false;
+    });
 }
 
 pub fn opened(archive: i32) {
@@ -173,6 +302,7 @@ pub fn after_init(
                 .is_none_or(|newest| newest < whole_second(started))
                 .then_some(after.hash),
         };
+        s.folders = after.folders;
         s.dirs = dirs;
         s.roots = roots;
     });
@@ -207,6 +337,8 @@ pub struct Found {
     pub hash: u64,
     /// The newest modified time among them.
     pub newest: Option<SystemTime>,
+    /// The file name of every folder archive among them.
+    pub folders: Vec<String>,
 }
 
 /// Visit what `CArchiveScanner::ScanDir` visits under each root of each data
@@ -221,6 +353,7 @@ pub fn walk(dirs: &[PathBuf], roots: &[String]) -> Found {
     let mut found = Found {
         hash: 0,
         newest: None,
+        folders: Vec::new(),
     };
     for dir in dirs {
         for root in roots {
@@ -240,6 +373,9 @@ pub fn walk(dirs: &[PathBuf], roots: &[String]) -> Found {
                         note(&mut found, &path);
                     } else if is_sdd(&path) {
                         note(&mut found, &path);
+                        found
+                            .folders
+                            .extend(entry.file_name().to_str().map(str::to_string));
                         // The scanner also reads when these two last changed.
                         note(&mut found, &path.join("modinfo.lua"));
                         note(&mut found, &path.join("mapinfo.lua"));
@@ -486,6 +622,220 @@ mod tests {
         );
         assert_eq!(stub::calls("Init"), 1);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    const ALPHA: &str = "alpha-1.0.sdz";
+    const BRAVO: &str = "bravo-2.0.sd7";
+    /// A game that is a folder, and a zipped one that depends on a folder.
+    const FOLDER: &str = "dev.sdd";
+    const ON_A_FOLDER: &str = "mutator-1.0.sdz";
+
+    /// A worker that stays running, with four games installed.
+    ///
+    /// The library names what a game mounts the way the engine does, by
+    /// versioned name and not by file, so nothing in a set ends in `.sdd`.
+    fn serving_games(tag: &str) -> (Serving, PathBuf) {
+        let dir = temp(tag);
+        let games = dir.join("games");
+        std::fs::write(games.join(ALPHA), b"alpha").unwrap();
+        std::fs::create_dir_all(games.join(FOLDER)).unwrap();
+        std::fs::write(games.join(FOLDER).join("modinfo.lua"), b"return {}").unwrap();
+        age(&games.join(ALPHA));
+        age(&games.join(FOLDER).join("modinfo.lua"));
+        age(&games.join(FOLDER));
+        age(&dir.join("maps"));
+        age(&games);
+        let game = |file: &str, names: &[&str]| {
+            let names = names.iter().map(|n| n.to_string()).collect::<Vec<_>>();
+            (file.to_string(), names)
+        };
+        stub::install(World {
+            data_dirs: vec![dir.clone()],
+            games: vec![
+                game(ALPHA, &["Alpha 1.0", "Spring content v1"]),
+                game(BRAVO, &["Bravo 2.0"]),
+                game(FOLDER, &["Dev $VERSION", "Spring content v1"]),
+                game(ON_A_FOLDER, &["Mutator 1.0", "Dev $VERSION"]),
+            ],
+            ..World::default()
+        });
+        begin();
+        (Serving(Unitsync::stub()), dir)
+    }
+
+    /// One request that reads `game` the way the game modes do, and what the
+    /// file system held while it read.
+    fn read_of(us: &Unitsync, game: &str) -> Vec<String> {
+        us.init_game(game);
+        us.add_all_archives(game);
+        let seen = stub::mounted();
+        us.remove_all_archives();
+        us.uninit();
+        // What `serve` does once the answer is collected.
+        us.reset();
+        seen
+    }
+
+    /// One request that mounts nothing, and what the file system held for it.
+    fn read_of_nothing(us: &Unitsync) -> Vec<String> {
+        us.init(false, 0);
+        let seen = stub::mounted();
+        us.uninit();
+        us.reset();
+        seen
+    }
+
+    #[test]
+    fn a_second_read_of_a_game_uses_the_mount_the_first_left() {
+        let (us, dir) = serving_games("keep");
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(take_mounts().len(), 1);
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(stub::calls("AddAllArchives"), 1, "three reads, one mount");
+        assert!(take_mounts().is_empty(), "the later reads report no mount");
+        assert_eq!(stub::calls("Init"), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_of_another_game_never_sees_the_one_before() {
+        let (us, dir) = serving_games("other");
+        read_of(&us, ALPHA);
+        assert_eq!(read_of(&us, BRAVO), [BRAVO]);
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(stub::calls("AddAllArchives"), 3);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_names_no_game_starts_from_an_empty_file_system() {
+        let (us, dir) = serving_games("none");
+        read_of(&us, ALPHA);
+        assert!(read_of_nothing(&us).is_empty());
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(
+            stub::calls("AddAllArchives"),
+            2,
+            "the read in between cost the mount"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_mount_is_kept_until_the_worker_is_told_nothing_is_waiting() {
+        let (us, dir) = serving_games("release");
+        read_of(&us, ALPHA);
+        assert_eq!(stub::mounted(), [ALPHA], "kept for a read already queued");
+        us.release();
+        assert!(stub::mounted().is_empty(), "and not while the worker idles");
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(stub::calls("AddAllArchives"), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_archive_that_changed_on_disk_is_a_new_init_and_a_new_mount() {
+        let (us, dir) = serving_games("changed");
+        read_of(&us, ALPHA);
+        // The game is replaced by a build of the same name.
+        std::fs::write(dir.join("games").join(ALPHA), b"alpha, rebuilt").unwrap();
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(
+            stub::calls("Init"),
+            2,
+            "the scanner has to see the new file"
+        );
+        assert_eq!(stub::calls("AddAllArchives"), 2, "and so does the mount");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_game_in_a_folder_is_mounted_for_every_read() {
+        let (us, dir) = serving_games("folder");
+        for game in [FOLDER, ON_A_FOLDER] {
+            let before = stub::calls("AddAllArchives");
+            assert_eq!(read_of(&us, game), [game]);
+            assert!(
+                stub::mounted().is_empty(),
+                "{game} is not left mounted, because a file added to a folder would not show"
+            );
+            assert_eq!(read_of(&us, game), [game]);
+            assert_eq!(stub::calls("AddAllArchives"), before + 2, "{game}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_mounts_more_than_its_game_leaves_nothing_mounted() {
+        let (us, dir) = serving_games("more");
+        us.init_game(ALPHA);
+        us.add_all_archives(ALPHA);
+        us.add_all_archives("a map.sd7");
+        assert_eq!(stub::mounted(), [ALPHA, "a map.sd7"]);
+        us.remove_all_archives();
+        assert!(stub::mounted().is_empty());
+        us.uninit();
+        us.reset();
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_mounts_a_game_it_did_not_name_gets_that_game_alone() {
+        let (us, dir) = serving_games("unnamed");
+        read_of(&us, ALPHA);
+        // It says it reads the game that is mounted, then mounts another.
+        us.init_game(ALPHA);
+        us.add_all_archives(BRAVO);
+        assert_eq!(stub::mounted(), [BRAVO]);
+        us.remove_all_archives();
+        assert!(stub::mounted().is_empty(), "and that one is not kept");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_read_that_was_given_up_on_leaves_nothing_mounted() {
+        let (us, dir) = serving_games("panic");
+        us.init_game(ALPHA);
+        us.add_all_archives(ALPHA);
+        // The read panics here, and `guarded` in `main` gives up on it.
+        give_up();
+        us.reset();
+        assert!(stub::mounted().is_empty());
+        assert_eq!(read_of(&us, ALPHA), [ALPHA]);
+        assert_eq!(stub::calls("Init"), 2);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_worker_on_its_way_out_empties_the_file_system_before_uninit() {
+        let (us, dir) = serving_games("exit");
+        read_of(&us, ALPHA);
+        us.shutdown();
+        assert!(stub::mounted().is_empty());
+        assert_eq!(stub::calls("UnInit"), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_one_shot_worker_mounts_and_unmounts_for_itself() {
+        SESSION.with(|s| *s.borrow_mut() = None);
+        stub::install(World {
+            games: vec![(ALPHA.to_string(), vec!["Alpha 1.0".to_string()])],
+            ..World::default()
+        });
+        let us = Unitsync::stub();
+        for _ in 0..2 {
+            us.init_game(ALPHA);
+            us.add_all_archives(ALPHA);
+            assert_eq!(stub::mounted(), [ALPHA]);
+            us.remove_all_archives();
+            assert!(stub::mounted().is_empty());
+            us.uninit();
+        }
+        assert_eq!(stub::calls("AddAllArchives"), 2);
+        assert_eq!(stub::calls("Init"), 2);
     }
 
     #[test]

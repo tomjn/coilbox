@@ -606,6 +606,7 @@ fn run_served_blocking(
         if let Some(init) = served.init {
             dev_run.ran_init(init.lock_wait_ms, init.call_ms);
         }
+        dev_run.ran_mounts(&served.mount_ms);
     }
 
     if served.output.iter().all(u8::is_ascii_whitespace) {

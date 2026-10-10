@@ -22,7 +22,9 @@
 //! command, so the last line of a session carries the totals. `ms` runs from
 //! the read being asked for, which includes any wait behind other reads, to its
 //! answer, and `t_end` is the Unix time in milliseconds at that answer. A read
-//! that ran `Init` carries the same timings as its init line. A one-shot
+//! that ran `Init` carries the same timings as its init line. A read a running
+//! worker answered ends with `mounts`, the number of times it mounted an archive
+//! set, and `mount`, how long those took together (issue #3728). A one-shot
 //! worker's line ends with whatever else it printed when [`TIMINGS_ENV`] is set.
 //!
 //! `unitsync-worker-busy` is a read that stopped queueing for a running worker
@@ -101,6 +103,17 @@ impl WorkerRun {
         let timing = format!("init_lock_wait={lock_wait_ms}ms init_call={call_ms}ms");
         init_ran(&self.what, &timing);
         self.worker_timings.push(timing);
+    }
+
+    /// Note the mounts a running worker made to answer this read: how many, and
+    /// how long they took in all (issue #3728). A read that mounted nothing
+    /// says so, which is how a mount that was reused is counted.
+    pub fn ran_mounts(&mut self, mount_ms: &[u64]) {
+        self.worker_timings.push(format!(
+            "mounts={} mount={}ms",
+            mount_ms.len(),
+            mount_ms.iter().sum::<u64>()
+        ));
     }
 
     /// This read stopped queueing for the running worker of `kind` and is being

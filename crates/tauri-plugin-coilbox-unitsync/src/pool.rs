@@ -123,6 +123,8 @@ pub struct Served {
     pub output: Vec<u8>,
     /// Set when the worker ran `Init` to answer this.
     pub init: Option<InitTiming>,
+    /// How long each mount of an archive set took, in milliseconds.
+    pub mount_ms: Vec<u64>,
     /// Set when this request started the worker process, to its pid.
     pub started: Option<u32>,
 }
@@ -150,6 +152,23 @@ struct State {
     idle_since: Option<Instant>,
     /// Whether a thread is watching for the worker to go idle.
     watched: bool,
+}
+
+impl State {
+    /// Tell the worker nothing is waiting for it, when nothing is, so it lets
+    /// go of the game it kept mounted for the next read (issue #3728).
+    ///
+    /// A worker keeps a mount only from one read to a read already queued behind
+    /// it. Without this it would sit idle holding a game's archives open, which
+    /// on Windows stops them being deleted or replaced.
+    fn release_if_unwanted(&mut self) {
+        if !self.waiting.is_empty() {
+            return;
+        }
+        if let Some(worker) = self.worker.as_mut() {
+            worker.release();
+        }
+    }
 }
 
 struct Worker {
@@ -334,6 +353,7 @@ impl Lane {
             code: head.code,
             output,
             init: head.init,
+            mount_ms: head.mount_ms,
             started,
         }))
     }
@@ -372,6 +392,9 @@ impl Lane {
             let held_too_long = !at_front && held.is_some_and(|held| held >= patience);
             if cancelled || held_too_long {
                 state.waiting.retain(|t| *t != ticket);
+                // The read before this one saw it waiting and left the worker
+                // its mount.
+                state.release_if_unwanted();
                 self.changed.notify_all();
                 return None;
             }
@@ -454,6 +477,7 @@ impl Drop for Turn {
         state.waiting.retain(|t| *t != self.ticket);
         state.serving_since = None;
         state.worker = self.worker.take();
+        state.release_if_unwanted();
         state.idle_since = Some(Instant::now());
         if state.worker.is_some() && !state.watched {
             state.watched = true;
@@ -574,6 +598,19 @@ impl Worker {
         }
     }
 
+    /// Send the request that is not a read, [`protocol::RELEASE_FLAG`]. It gets
+    /// no reply, so there is nothing to wait for. A worker that has died does
+    /// not take it, and the next read finds that out and starts another.
+    fn release(&mut self) {
+        let request = Request {
+            id: 0,
+            args: vec![protocol::RELEASE_FLAG.to_string()],
+        };
+        if let Some(stdin) = self.stdin.as_mut() {
+            let _ = protocol::write_request(stdin, &request);
+        }
+    }
+
     /// The error for a worker whose output has closed: what it did, how it
     /// ended, and what it wrote to its standard error on the way.
     fn gone(&mut self, what: &str, how: &str) -> String {
@@ -670,15 +707,21 @@ mod tests {
                 id,
                 code: 0,
                 init: None,
+                mount_ms: Vec::new(),
             };
             protocol::write_reply(out, token, &head, text.as_bytes()).unwrap();
         };
+        let mut releases = 0;
         while let Ok(Some(request)) = protocol::read_request(&mut input) {
             let how = request.args.first().map(String::as_str).unwrap_or("");
             let said = request.args.get(1).cloned().unwrap_or_default();
             let echo = format!("{pid} {said}");
             match how {
                 "echo" => reply(&mut out, request.id, &token, &echo),
+                // Not a read, and not answered.
+                protocol::RELEASE_FLAG => releases += 1,
+                // How many times it has been told nothing is waiting.
+                "releases" => reply(&mut out, request.id, &token, &format!("{pid} {releases}")),
                 // Takes 300ms to answer, or the milliseconds its third argument
                 // says.
                 "slow" => {
@@ -1016,6 +1059,46 @@ mod tests {
         assert_eq!(pid, first, "the read in progress was not disturbed");
         let (pid, _) = ask(&lane, "echo", "after").unwrap();
         assert_eq!(pid, first);
+    }
+
+    /// How many times the fake worker has been told nothing is waiting for it.
+    /// Asking is a read with nothing behind it, which the worker is told once
+    /// it has answered, so the answer does not count the question.
+    fn releases(lane: &Arc<Lane>) -> usize {
+        let (_, said) = ask(lane, "releases", "").unwrap();
+        said.parse().expect("a count")
+    }
+
+    #[test]
+    fn a_read_with_nothing_behind_it_is_followed_by_a_release() {
+        let lane = fake_lane(LONG);
+        ask(&lane, "echo", "one").unwrap();
+        assert_eq!(releases(&lane), 1);
+        ask(&lane, "echo", "two").unwrap();
+        // The two reads, and the question in between.
+        assert_eq!(releases(&lane), 3);
+    }
+
+    #[test]
+    fn a_read_with_another_waiting_behind_it_is_not_followed_by_a_release() {
+        let lane = fake_lane(LONG);
+        let slow = slow_read(&lane, 300);
+        // Queued while the slow read has the worker, so the worker goes from
+        // one to the other without being told to let go in between.
+        ask(&lane, "echo", "behind").unwrap();
+        slow.join().unwrap();
+        assert_eq!(releases(&lane), 1, "once, after the second of the two");
+    }
+
+    #[test]
+    fn a_read_that_gives_up_queueing_does_not_leave_the_worker_unreleased() {
+        let lane = fake_lane(LONG);
+        let slow = slow_read(&lane, 300);
+        let cancel = AtomicBool::new(true);
+        ask_for(&lane, "echo", "never sent", LONG, Some(&cancel)).unwrap_err();
+        slow.join().unwrap();
+        // Whichever of the two left the queue last told the worker.
+        assert_eq!(releases(&lane), 1);
     }
 
     #[test]

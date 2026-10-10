@@ -37,6 +37,11 @@ pub(crate) struct World {
     pub lua_bools: BTreeMap<String, bool>,
     /// `GetDataDirectory`: where the library says its archive scanner looked.
     pub data_dirs: Vec<PathBuf>,
+    /// The games the scanner found. Each is its archive's file name, which is
+    /// what `GetPrimaryModArchive` gives, and the versioned names of the
+    /// archives it mounts, its own first. `GetPrimaryModArchiveList` gives those
+    /// names, and so does `GetMapArchiveName` when asked about the file.
+    pub games: Vec<(String, Vec<String>)>,
 }
 
 impl World {
@@ -149,6 +154,11 @@ struct State {
     minimap: Vec<u16>,
     map_query: String,
     lua_path: Vec<String>,
+    /// What the file system holds: every `AddAllArchives` since it was last
+    /// emptied.
+    mounted: Vec<String>,
+    /// The archive set `GetPrimaryModArchiveCount` last loaded.
+    game_listed: Vec<String>,
 }
 
 thread_local! {
@@ -171,6 +181,12 @@ pub(crate) fn calls(symbol: &str) -> usize {
     STATE.with(|s| s.borrow().calls.get(symbol).copied().unwrap_or(0))
 }
 
+/// What the file system holds: every archive set mounted since it was last
+/// emptied, in order.
+pub(crate) fn mounted() -> Vec<String> {
+    STATE.with(|s| s.borrow().mounted.clone())
+}
+
 fn with<R>(symbol: &'static str, f: impl FnOnce(&mut State) -> R) -> R {
     STATE.with(|s| {
         let mut s = s.borrow_mut();
@@ -191,7 +207,32 @@ unsafe fn arg(p: *const c_char) -> String {
 }
 
 unsafe extern "C" fn init(_: bool, _: c_int) -> c_int {
-    with("Init", |_| 1)
+    // `Init` frees the file system and builds an empty one.
+    with("Init", |s| {
+        s.mounted.clear();
+        1
+    })
+}
+unsafe extern "C" fn game_count() -> c_int {
+    with("GetPrimaryModCount", |s| s.world.games.len() as c_int)
+}
+unsafe extern "C" fn game_archive(i: c_int) -> *const c_char {
+    with("GetPrimaryModArchive", |s| {
+        let name = s.world.games[i as usize].0.clone();
+        text(s, &name)
+    })
+}
+unsafe extern "C" fn game_archive_count(i: c_int) -> c_int {
+    with("GetPrimaryModArchiveCount", |s| {
+        s.game_listed = s.world.games[i as usize].1.clone();
+        s.game_listed.len() as c_int
+    })
+}
+unsafe extern "C" fn game_archive_list(i: c_int) -> *const c_char {
+    with("GetPrimaryModArchiveList", |s| {
+        let name = s.game_listed[i as usize].clone();
+        text(s, &name)
+    })
 }
 unsafe extern "C" fn uninit() {
     with("UnInit", |_| ())
@@ -229,21 +270,22 @@ unsafe extern "C" fn map_archive_count(name: *const c_char) -> c_int {
     let name = arg(name);
     with("GetMapArchiveCount", |s| {
         s.map_query = name;
-        1
+        let game = s.world.games.iter().find(|g| g.0 == s.map_query);
+        game.map_or(1, |g| g.1.len() as c_int)
     })
 }
-unsafe extern "C" fn map_archive_name(_: c_int) -> *const c_char {
+unsafe extern "C" fn map_archive_name(i: c_int) -> *const c_char {
     with("GetMapArchiveName", |s| {
-        let name = if s.map_query == s.world.map_name {
+        let game = s.world.games.iter().find(|g| g.0 == s.map_query);
+        let name = if let Some(game) = game {
+            game.1[i as usize].clone()
+        } else if s.map_query == s.world.map_name {
             s.world.map_archive.clone()
         } else {
             s.map_query.clone()
         };
         text(s, &name)
     })
-}
-unsafe extern "C" fn zero() -> c_int {
-    0
 }
 unsafe extern "C" fn zero_by_int(_: c_int) -> c_int {
     0
@@ -310,11 +352,12 @@ unsafe extern "C" fn min_height(_: *const c_char) -> c_float {
 unsafe extern "C" fn max_height(_: *const c_char) -> c_float {
     with("GetMapMaxHeight", |s| s.world.height_bounds.1)
 }
-unsafe extern "C" fn add_all_archives(_: *const c_char) {
-    with("AddAllArchives", |_| ())
+unsafe extern "C" fn add_all_archives(name: *const c_char) {
+    let name = arg(name);
+    with("AddAllArchives", |s| s.mounted.push(name))
 }
 unsafe extern "C" fn remove_all_archives() {
-    with("RemoveAllArchives", |_| ())
+    with("RemoveAllArchives", |s| s.mounted.clear())
 }
 unsafe extern "C" fn open_archive(_: *const c_char) -> c_int {
     with("OpenArchive", |_| 1)
@@ -486,10 +529,10 @@ impl Unitsync {
             map_name_fn: map_name,
             map_archive_count_fn: map_archive_count,
             map_archive_name_fn: map_archive_name,
-            mod_count_fn: zero,
-            mod_archive_fn: null_by_int,
-            mod_archive_count_fn: zero_by_int,
-            mod_archive_list_fn: null_by_int,
+            mod_count_fn: game_count,
+            mod_archive_fn: game_archive,
+            mod_archive_count_fn: game_archive_count,
+            mod_archive_list_fn: game_archive_list,
             mod_info_count_fn: zero_by_int,
             info_key_fn: null_by_int,
             info_value_string_fn: null_by_int,

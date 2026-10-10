@@ -263,7 +263,7 @@ pub(crate) fn render_with(
     object_name: &str,
     cache_dir: Option<&Path>,
 ) -> UnitModelOutput {
-    us.init(false, 0);
+    us.init_game(game_archive);
     let mut errors = us.drain_errors();
 
     // The key needs the archive's path and nothing mounted, so a model already
