@@ -27,6 +27,7 @@ export function FilterBar({
   shown,
   noun,
   trailing,
+  sortClassName = "w-36",
 }: {
   search: string;
   onSearch: (v: string) => void;
@@ -42,6 +43,8 @@ export function FilterBar({
    * row — for a filter that, like sort, always applies rather than only when
    * some row happens to match it (see the toggle row below this one). */
   trailing?: ReactNode;
+  /** Width of the sort dropdown, for a page whose options have longer labels. */
+  sortClassName?: string;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -60,7 +63,7 @@ export function FilterBar({
         />
       </div>
       <Select value={sort} onValueChange={onSort}>
-        <SelectTrigger className="w-36">
+        <SelectTrigger className={sortClassName}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
