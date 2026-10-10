@@ -153,26 +153,38 @@ pub struct ReplayFile {
     pub remixed: bool,
 }
 
-/// One chat/system line from a demo's network stream (via `demotool --dump`).
-#[derive(Serialize)]
+/// One chat or system line from a demo's network stream.
+#[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ChatLine {
-    /// The speaking player's number, when the line names one.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub player: Option<u32>,
-    /// The player's name resolved from the start-script, when known.
+    /// The simulation frame the line arrived in, [`PREGAME_FRAME`] before the
+    /// match started. 30 frames are one second of match time.
+    pub frame: i32,
+    /// The packet's `modGameTime`, in seconds. It orders pregame lines, which
+    /// share one frame, and is not match time.
+    pub time: f32,
+    /// The speaking player's number. 255 is the server.
+    pub player: u8,
+    /// The player's name, from the start script or a name packet in the
+    /// stream. Absent when neither names this number.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub player_name: Option<String>,
+    /// Who a player's line was addressed to. Absent for system lines.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dest: Option<ChatDest>,
     pub text: String,
-    /// True for engine `SYSTEMMSG` lines (vs a player `CHAT` line).
+    /// True for engine `SYSTEMMSG` lines (vs a player chat line).
     pub system: bool,
 }
 
-/// A demo's chat log (its `NETMSG_CHAT`/`NETMSG_SYSTEMMSG` lines).
-#[derive(Serialize, Default)]
+/// A demo's chat log, in the order the engine recorded it.
+#[derive(Serialize, Default, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DemoChat {
     pub messages: Vec<ChatLine>,
+    /// True when the stream walk stopped before the end, so lines after that
+    /// point are missing. The lines before it are good.
+    pub incomplete: bool,
 }
 
 /// One player (or spectator) from a demo's start-script, with the side/ally-team
