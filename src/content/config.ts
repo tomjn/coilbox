@@ -21,7 +21,6 @@ import {
   contentKeybindsWrite,
   contentListReplays,
   contentListSaves,
-  contentStateLoad,
   contentStatsIngest,
   contentStatsQuery,
   contentStatsWatchStart,
@@ -67,6 +66,7 @@ import {
   unitsyncUnitModels,
 } from "./bindings";
 import { liveCacheHit } from "./cachedFile";
+import { useContentState } from "./contentState";
 import { engineLabel, newestEngineId } from "./engineVersion";
 import { settleWithin, shareInFlight } from "./inFlight";
 import { invalidateInstalledContent } from "./installedContent";
@@ -99,59 +99,7 @@ export function useContentPrefs() {
   return useSetting<ContentPrefs>("content.prefs", defaultPrefs);
 }
 
-/** Every mounted {@link useContentState}, re-read by {@link announceContentState}. */
-const contentStateListeners = new Set<() => void>();
-
-/**
- * Tell every screen holding a read of the content state to read it again.
- *
- * Called once an engine install has rescanned. Each `useContentState` reads the
- * state when it mounts and not again, so before this an engine set up from the
- * home page stayed invisible to the start card beside it until the player
- * navigated away and back. It needs no provider, so a hook that is rendered
- * outside the download queue still hears it.
- */
-export function announceContentState(): void {
-  for (const fn of contentStateListeners) fn();
-}
-
-/**
- * Load + hold the persisted content state, shared by the Folders and Engines
- * pages. `setState` lets callers apply the result of a mutating command (rescan,
- * add, remove, verify) without a second round-trip.
- */
-export function useContentState() {
-  const [state, setState] = useState<ContentState | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { state } = await contentStateLoad(undefined);
-      setState(state);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    const listener = () => void refresh();
-    contentStateListeners.add(listener);
-    return () => {
-      contentStateListeners.delete(listener);
-    };
-  }, [refresh]);
-
-  return { state, setState, loading, error, refresh };
-}
+export { useContentState };
 
 /* -------------------------------------------------------------------------- *
  * First-run setup guidance — what's missing for a playable setup.

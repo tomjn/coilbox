@@ -1,11 +1,11 @@
 import { Button, Input, useSetting } from "@picoframe/frame";
 import { FolderDown, Plus, Server, Swords, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { Field } from "@/components/Field";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Switch } from "@/components/ui/switch";
-import { type ContentRoot, contentStateLoad } from "../../content/bindings";
+import { useContentState } from "../../content/contentState";
 import { AUTO_DOWNLOAD_ON_JOIN_KEY } from "../../multiplayer/battle/autoDownload";
 import { useDownloadsConfig } from "../config";
 
@@ -28,21 +28,17 @@ import { useDownloadsConfig } from "../config";
  */
 export default function DownloadsSettings() {
   const [cfg, setCfg] = useDownloadsConfig();
-  const [roots, setRoots] = useState<ContentRoot[]>([]);
+  const { state } = useContentState();
+  // The bundled content folder is read-only to coilbox, so it is never
+  // offered as somewhere to download to.
+  const roots = useMemo(
+    () => state?.roots.filter((r) => !r.bundled) ?? [],
+    [state],
+  );
   const [autoOnJoin, setAutoOnJoin] = useSetting<boolean>(
     AUTO_DOWNLOAD_ON_JOIN_KEY,
     true,
   );
-
-  useEffect(() => {
-    contentStateLoad(undefined)
-      // The bundled content folder is read-only to coilbox, so it is never
-      // offered as somewhere to download to.
-      .then(({ state }) => setRoots(state.roots.filter((r) => !r.bundled)))
-      .catch(() => {
-        // best-effort: the picker just shows no roots if content state is unavailable
-      });
-  }, []);
 
   const addRepo = () =>
     setCfg({

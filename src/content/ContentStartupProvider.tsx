@@ -2,7 +2,7 @@ import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
 import { BundledEngineSetup } from "./BundledEngineSetup";
-import { contentRescan, contentStateLoad } from "./bindings";
+import { contentRescan } from "./bindings";
 import {
   primeMapMeta,
   primeScan,
@@ -11,6 +11,7 @@ import {
   targetsFromState,
   useContentPrefs,
 } from "./config";
+import { loadContentState, setContentState } from "./contentState";
 import { warmAllRoots } from "./rapidPoolWarm";
 
 /**
@@ -38,7 +39,7 @@ export default function ContentStartupProvider({
 
   const warmUp = useCallback(async () => {
     try {
-      let { state } = await contentStateLoad(undefined);
+      let state = await loadContentState();
       // First run with no prior snapshot: detect standard data roots first, so
       // there's a target to scan (the same step the Folders section does).
       if (state.lastScanAt == null) {
@@ -46,6 +47,7 @@ export default function ContentStartupProvider({
           withCounts: true,
           includeZerok: prefs.probeZeroK,
         }));
+        setContentState(state);
       }
       const targets = targetsFromState(state);
       const target =
@@ -80,8 +82,8 @@ export default function ContentStartupProvider({
   // a value the user (or a prior run of this effect) already set.
   useEffect(() => {
     if (dlConfig.writeRootId) return;
-    contentStateLoad(undefined)
-      .then(({ state }) => {
+    loadContentState()
+      .then((state) => {
         // Never the bundled content folder, which coilbox does not write into.
         const first = state.roots.find((r) => !r.bundled);
         if (first) setDlConfig({ ...dlConfig, writeRootId: first.id });

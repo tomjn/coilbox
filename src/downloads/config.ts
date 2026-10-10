@@ -1,7 +1,7 @@
 import { useSetting } from "@picoframe/frame";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ContentState } from "../content/bindings";
-import { contentStateLoad } from "../content/bindings";
+import { loadContentState, useContentState } from "../content/contentState";
 import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
@@ -52,18 +52,14 @@ export function useContentRootPaths(): string[] {
  * as {@link useWriteRoot}'s `loading` (issue #1099).
  */
 export function useContentRoots(): { paths: string[]; loading: boolean } {
-  const [roots, setRoots] = useState<{ paths: string[]; loading: boolean }>({
-    paths: [],
-    loading: true,
-  });
-  useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) =>
-        setRoots({ paths: state.roots.map((r) => r.path), loading: false }),
-      )
-      .catch(() => setRoots({ paths: [], loading: false }));
-  }, []);
-  return roots;
+  const { state, error } = useContentState();
+  return useMemo(
+    () => ({
+      paths: state?.roots.map((r) => r.path) ?? [],
+      loading: state === null && error === null,
+    }),
+    [state, error],
+  );
 }
 
 /**
@@ -95,8 +91,8 @@ export function useDefaultWriteRoot(): (state: ContentState) => void {
  */
 export function useRegisterEngineDirs(): void {
   useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) => {
+    loadContentState()
+      .then((state) => {
         const dirs = Array.from(
           new Set(state.roots.flatMap((r) => r.engines.map((e) => e.path))),
         );
@@ -143,26 +139,36 @@ export function useWriteRoot(): WriteRoot {
   // render (the effect keys on the writeRootId primitive, not the cfg object).
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
-  const [root, setRoot] = useState<WriteRoot>({ loading: true });
+  const { state, error } = useContentState();
+  const chosen = useMemo(
+    () =>
+      state
+        ? healWriteRoot(
+            state.roots,
+            cfg.writeRootId,
+            packageDirOf(getProfileRoot()),
+          )
+        : undefined,
+    [state, cfg.writeRootId],
+  );
+  // Persist the correction so downstream readers of `writeRootId` agree and the
+  // stale id doesn't linger. One-shot: once the id matches, this stops firing.
+  // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
   useEffect(() => {
-    contentStateLoad(undefined)
-      .then(({ state }) => {
-        const packageDir = packageDirOf(getProfileRoot());
-        const chosen = healWriteRoot(state.roots, cfg.writeRootId, packageDir);
-        setRoot({ path: chosen?.path, loading: false });
-        // Persist the correction so downstream readers of `writeRootId` agree and the
-        // stale id doesn't linger. One-shot: once the id matches, this stops firing.
-        // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
-        if (chosen && chosen.id !== cfg.writeRootId) {
-          setCfg({ ...cfgRef.current, writeRootId: chosen.id });
-        }
-      })
-      .catch(() => setRoot({ loading: false }));
-    // A later re-read (the heal above, or a settings change) does not go back to
-    // loading. The previous answer stands until the new one lands, which is what
-    // every caller already saw and is a definite answer either way.
-  }, [cfg.writeRootId, setCfg]);
-  return root;
+    if (chosen && chosen.id !== cfg.writeRootId) {
+      setCfg({ ...cfgRef.current, writeRootId: chosen.id });
+    }
+  }, [chosen, cfg.writeRootId, setCfg]);
+  // A later re-read (the heal above, or a settings change) does not go back to
+  // loading. The previous answer stands until the new one lands, which is what
+  // every caller already saw and is a definite answer either way.
+  return useMemo(
+    () => ({
+      path: chosen?.path,
+      loading: state === null && error === null,
+    }),
+    [chosen, state, error],
+  );
 }
 
 /**
