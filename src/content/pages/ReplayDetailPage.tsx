@@ -1015,7 +1015,7 @@ export default function ReplayDetailPage() {
           // is no corner left to sit in, and the block lines up with the title's
           // own left edge instead, which is what reads as the heading's actions
           // rather than a band floating between two sections.
-          <div className="flex shrink-0 flex-wrap items-start gap-2">
+          <div className="flex max-w-full shrink-0 flex-wrap items-start gap-2">
             <DeleteReplayButton
               replayPath={replay.path}
               onDeleted={onDeleted}
