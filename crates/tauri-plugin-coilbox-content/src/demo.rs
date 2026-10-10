@@ -1548,7 +1548,7 @@ fn build_demo_info(
             skill: p.get("skill").map(str::to_string),
             skill_uncertainty: p
                 .get("skilluncertainty")
-                .and_then(|v| v.trim().parse::<f32>().ok())
+                .and_then(|v| v.trim().parse::<f64>().ok())
                 .filter(|v| v.is_finite()),
             country_code: p.get("countrycode").map(str::to_string),
             stats,

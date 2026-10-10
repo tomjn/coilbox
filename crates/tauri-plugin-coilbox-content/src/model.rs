@@ -213,7 +213,7 @@ pub struct PlayerInfo {
     /// The `skilluncertainty` the lobby wrote beside `skill`, as the number the
     /// script holds. `None` when the key is absent or is not a number.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub skill_uncertainty: Option<f32>,
+    pub skill_uncertainty: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub country_code: Option<String>,
     /// This seat's five counters from the trailer. Absent when the recording
