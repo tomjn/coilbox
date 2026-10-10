@@ -185,6 +185,58 @@ pub struct DemoChat {
     /// True when the stream walk stopped before the end, so lines after that
     /// point are missing. The lines before it are good.
     pub incomplete: bool,
+    /// Resignations, departures, pauses and the like, from the same walk as
+    /// `messages`, so the timeline needs no second read of the file.
+    pub events: Vec<TimelineEvent>,
+}
+
+/// Something that happened to the match or its players, worth a mark on the
+/// replay's timeline. It is built from the typed stream events, never from the
+/// engine's English system text.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TimelineEvent {
+    /// The simulation frame it arrived in. 30 frames are one second.
+    pub frame: i32,
+    /// The packet's `modGameTime` in seconds. Orders events that share a frame.
+    pub time: f32,
+    /// The player it concerns, by `[playerN]` number. For
+    /// [`TimelineEventKind::TeamDied`] it is the player who reported the death.
+    pub player: u8,
+    /// That player's name, from the start script or the stream, as it stood
+    /// when the event arrived.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub player_name: Option<String>,
+    #[serde(flatten)]
+    pub kind: TimelineEventKind,
+}
+
+/// What a [`TimelineEvent`] is. `JoinTeam` is left out: it is how a match
+/// starts, not something that happened in it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TimelineEventKind {
+    /// The player stopped playing.
+    Resigned,
+    /// A team died. Every player reports a death, so only the first report
+    /// for a team is kept, and `player` on the event is that reporter. `players`
+    /// are the names of whoever controlled the team, empty for a team no named
+    /// player controlled, such as a bot's.
+    #[serde(rename_all = "camelCase")]
+    TeamDied { team: u8, players: Vec<String> },
+    /// The player dropped out of the game.
+    PlayerLeft { reason: LeaveReason },
+    /// The player paused (`true`) or unpaused the game.
+    Paused { paused: bool },
+    /// A player not in the start script joined mid game.
+    #[serde(rename_all = "camelCase")]
+    Joined { spectator: bool, team: u8 },
+    /// Everything `from_team` owned went to `to_team`.
+    #[serde(rename_all = "camelCase")]
+    GiveAway { to_team: u8, from_team: u8 },
+    /// A team action the engine does not define, carried as sent.
+    #[serde(rename_all = "camelCase")]
+    Other { action: u8, param1: u8, param2: u8 },
 }
 
 /// One player (or spectator) from a demo's start-script, with the side/ally-team
@@ -192,6 +244,9 @@ pub struct DemoChat {
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerInfo {
+    /// The `[playerN]` number, which is what a chat line's or a timeline
+    /// event's `player` holds.
+    pub player: i32,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub team: Option<i32>,

@@ -4,6 +4,10 @@ import type { ChatLine } from "../../bindings";
 import {
   axisTicks,
   binMarks,
+  describeEvent,
+  EVENT_KINDS,
+  type EventKind,
+  type EventMark,
   MARK_KINDS,
   type MarkKind,
   type TimelineBin,
@@ -20,6 +24,9 @@ const READOUT_LINES = 5;
 /** Mark height in pixels, from one line to the busiest column of its row. */
 const MARK_MIN = 6;
 const MARK_MAX = 20;
+/** Event diamond size in pixels, from one event to the busiest column of its row. */
+const EVENT_MIN = 8;
+const EVENT_MAX = 14;
 
 const KIND_LABEL: Record<MarkKind, string> = {
   everyone: "Everyone",
@@ -29,9 +36,27 @@ const KIND_LABEL: Record<MarkKind, string> = {
   system: "System",
 };
 
+const EVENT_LABEL: Record<EventKind, string> = {
+  joined: "Joined late",
+  paused: "Pauses",
+  resigned: "Resigned",
+  giveAway: "Gave away",
+  left: "Left",
+  teamDied: "Eliminated",
+  other: "Other events",
+};
+
+/** What the strip is pointing at: a column of chat or a column of events. */
+type Active =
+  | { of: "chat"; bin: TimelineBin<TimelineMark> }
+  | { of: "event"; bin: TimelineBin<EventMark> };
+
 const axisTime = (sec: number) => formatDuration(Math.round(sec));
 
-function binTime(bin: TimelineBin, totalSec: number): string {
+function binTime(
+  bin: TimelineBin<TimelineMark | EventMark>,
+  totalSec: number,
+): string {
   if (bin.slot === "pregame") return "Before the game";
   const from = Math.floor((bin.slot / BIN_COUNT) * totalSec);
   const to = Math.floor(((bin.slot + 1) / BIN_COUNT) * totalSec);
@@ -43,27 +68,42 @@ function binLabel(bin: TimelineBin, totalSec: number): string {
   return `${KIND_LABEL[bin.kind]}, ${binTime(bin, totalSec)}, ${n} ${n === 1 ? "line" : "lines"}`;
 }
 
+function eventBinLabel(bin: TimelineBin<EventMark>, totalSec: number): string {
+  const n = bin.marks.length;
+  return `Event, ${EVENT_LABEL[bin.kind]}, ${binTime(bin, totalSec)}, ${n} ${n === 1 ? "event" : "events"}`;
+}
+
 /**
- * The replay's chat and system lines along the match, one row per kind of line.
- * Lines that fall in the same column of a row stack into one taller mark. Rows
- * are told apart by their label, and a system line is hollow where a person's
- * is filled, so nothing rests on colour.
+ * The replay's chat and system lines along the match, one row per kind of line,
+ * and under them its events, one row per kind of event. Marks that fall in the
+ * same column of a row stack into one bigger mark. Rows are told apart by their
+ * label. A system line is hollow where a person's is filled, and an event is a
+ * diamond where a line is a bar, so nothing rests on colour. Selecting a line
+ * opens it in the chat log. An event has nowhere to open, so it only reads out.
  */
 export function ReplayTimeline({
   marks,
+  events = [],
   totalSec,
   describe,
   onOpenLine,
 }: {
   marks: TimelineMark[];
+  events?: EventMark[];
   totalSec: number;
   describe: (line: ChatLine) => string;
   onOpenLine: (index: number) => void;
 }) {
-  const [active, setActive] = useState<TimelineBin | null>(null);
+  const [active, setActive] = useState<Active | null>(null);
   const bins = binMarks(marks, totalSec, BIN_COUNT);
-  const hasPregame = marks.some((m) => m.second === null);
+  const eventBins = binMarks(events, totalSec, BIN_COUNT);
+  const hasPregame =
+    marks.some((m) => m.second === null) ||
+    events.some((m) => m.second === null);
   const kinds = MARK_KINDS.filter((k) => marks.some((m) => m.kind === k));
+  const eventKinds = EVENT_KINDS.filter((k) =>
+    events.some((m) => m.kind === k),
+  );
   const ticks = axisTicks(totalSec);
   const columns = hasPregame
     ? "grid-cols-[5.5rem_3.5rem_minmax(0,1fr)]"
@@ -78,8 +118,8 @@ export function ReplayTimeline({
         type="button"
         aria-label={binLabel(bin, totalSec)}
         onClick={() => onOpenLine(bin.marks[0].index)}
-        onPointerEnter={() => setActive(bin)}
-        onFocus={() => setActive(bin)}
+        onPointerEnter={() => setActive({ of: "chat", bin })}
+        onFocus={() => setActive({ of: "chat", bin })}
         className="absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
         style={style}
       >
@@ -91,6 +131,35 @@ export function ReplayTimeline({
               : "bg-foreground/70"
           }`}
           style={{ height }}
+        />
+      </button>
+    );
+  };
+
+  const eventCell = (
+    bin: TimelineBin<EventMark>,
+    max: number,
+    style: React.CSSProperties,
+  ) => {
+    const n = bin.marks.length;
+    const size = Math.round(
+      EVENT_MIN + ((EVENT_MAX - EVENT_MIN) * (n - 1)) / Math.max(1, max - 1),
+    );
+    return (
+      <button
+        key={`${bin.kind}/${bin.slot}`}
+        type="button"
+        aria-label={eventBinLabel(bin, totalSec)}
+        onClick={() => setActive({ of: "event", bin })}
+        onPointerEnter={() => setActive({ of: "event", bin })}
+        onFocus={() => setActive({ of: "event", bin })}
+        className="absolute inset-y-0 flex items-center justify-center rounded-sm outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+        style={style}
+      >
+        <span
+          aria-hidden
+          className="block rotate-45 bg-foreground/70"
+          style={{ width: size, height: size }}
         />
       </button>
     );
@@ -126,6 +195,34 @@ export function ReplayTimeline({
             </div>
           );
         })}
+        {eventKinds.map((kind) => {
+          const row = eventBins.filter((b) => b.kind === kind);
+          const max = Math.max(...row.map((b) => b.marks.length));
+          const pre = row.find((b) => b.slot === "pregame");
+          return (
+            <div key={kind} className="contents">
+              <span className="self-center pr-2 text-muted-foreground">
+                {EVENT_LABEL[kind]}
+              </span>
+              {hasPregame && (
+                <div className="relative h-6 border-r border-border/60">
+                  {pre &&
+                    eventCell(pre, max, { left: 0, right: 0, width: "auto" })}
+                </div>
+              )}
+              <div className="relative h-6">
+                {row
+                  .filter((b) => b.slot !== "pregame")
+                  .map((b) =>
+                    eventCell(b, max, {
+                      left: `${(Number(b.slot) / BIN_COUNT) * 100}%`,
+                      width: `${100 / BIN_COUNT}%`,
+                    }),
+                  )}
+              </div>
+            </div>
+          );
+        })}
         <span />
         {hasPregame && (
           <span className="pt-1 text-center text-muted-foreground">Before</span>
@@ -146,23 +243,36 @@ export function ReplayTimeline({
         {active ? (
           <>
             <p className="font-medium">
-              {KIND_LABEL[active.kind]}, {binTime(active, totalSec)}
+              {active.of === "chat"
+                ? KIND_LABEL[active.bin.kind]
+                : `Event, ${EVENT_LABEL[active.bin.kind]}`}
+              , {binTime(active.bin, totalSec)}
             </p>
             <ul className="text-muted-foreground">
-              {active.marks.slice(0, READOUT_LINES).map((m) => (
-                <li key={m.index} className="break-words">
-                  {describe(m.line)}
-                </li>
-              ))}
-              {active.marks.length > READOUT_LINES && (
-                <li>and {active.marks.length - READOUT_LINES} more</li>
+              {active.of === "chat"
+                ? active.bin.marks.slice(0, READOUT_LINES).map((m) => (
+                    <li key={m.index} className="break-words">
+                      {describe(m.line)}
+                    </li>
+                  ))
+                : active.bin.marks.slice(0, READOUT_LINES).map((m) => (
+                    <li
+                      key={`${m.event.frame}/${m.event.time}/${m.event.player}/${m.event.type}`}
+                      className="break-words"
+                    >
+                      {m.second === null ? "Pre-game" : axisTime(m.second)}{" "}
+                      {describeEvent(m.event)}
+                    </li>
+                  ))}
+              {active.bin.marks.length > READOUT_LINES && (
+                <li>and {active.bin.marks.length - READOUT_LINES} more</li>
               )}
             </ul>
           </>
         ) : (
           <p className="text-muted-foreground">
-            Point at or focus a mark to read it. Select one to open the chat log
-            at that line.
+            Point at or focus a mark to read it. Select a chat mark to open the
+            chat log at that line.
           </p>
         )}
       </div>

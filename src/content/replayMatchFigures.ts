@@ -51,14 +51,17 @@ export function libraryMetrics(metrics: Metric[]): Metric[] {
   return metrics.filter((m) => m.roster && m.surfaced);
 }
 
+const BEST_ARMY = "best single army";
+
 /**
- * Whether a metric's row figure is the best team or the sum of all teams, or
- * the named player's own total when a player is given.
+ * Whether a metric's row figure is the best single army or the sum of all of
+ * them, or the named player's own total when a player is given. An army is what
+ * one engine team controls, which is not a side.
  */
 export function figureBasis(metric: Metric, player?: string): string {
   if (player) return `${player}'s own total`;
   return metric.unit === "metal" || metric.unit === "energy"
-    ? "best team"
+    ? BEST_ARMY
     : "match total";
 }
 
@@ -103,7 +106,7 @@ export function matchFigure(
     if (typeof v === "number") perTeam.push(v);
   }
   if (perTeam.length === 0) return undefined;
-  return figureBasis(metric) === "best team"
+  return figureBasis(metric) === BEST_ARMY
     ? Math.max(...perTeam)
     : perTeam.reduce((a, b) => a + b, 0);
 }

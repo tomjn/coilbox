@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
-import { contentMetricRegistry, type Metric } from "./bindings";
+import {
+  contentMetricRegistry,
+  type Metric,
+  type MetricRatio,
+} from "./bindings";
 
 /** The registry is static, so every surface shares one fetch of it. */
-let registryPromise: Promise<Metric[]> | null = null;
+let registryPromise: Promise<{
+  metrics: Metric[];
+  ratios: MetricRatio[];
+}> | null = null;
+
+function registry() {
+  registryPromise ??= contentMetricRegistry(undefined).catch((e) => {
+    // Don't keep a failure: the next surface to ask should ask again.
+    registryPromise = null;
+    throw e;
+  });
+  return registryPromise;
+}
 
 export function metricRegistry(): Promise<Metric[]> {
-  registryPromise ??= contentMetricRegistry(undefined)
-    .then((r) => r.metrics)
-    .catch((e) => {
-      // Don't keep a failure: the next surface to ask should ask again.
-      registryPromise = null;
-      throw e;
-    });
-  return registryPromise;
+  return registry().then((r) => r.metrics);
 }
 
 /**
@@ -34,4 +43,22 @@ export function useMetricRegistry(enabled = true): Metric[] {
     };
   }, [enabled]);
   return metrics;
+}
+
+/** The registry's ratios, from the same fetch. Empty until they arrive. */
+export function useRatioRegistry(enabled = true): MetricRatio[] {
+  const [ratios, setRatios] = useState<MetricRatio[]>([]);
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+    registry()
+      .then((r) => {
+        if (!cancelled) setRatios(r.ratios);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
+  return ratios;
 }
