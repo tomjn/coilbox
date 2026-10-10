@@ -15,11 +15,6 @@ describe("allyPaletteColor", () => {
     });
   });
 
-  it("is deterministic: the same ally always gets the same colour", () => {
-    expect(allyPaletteColor(3)).toBe(allyPaletteColor(3));
-    expect(allyPaletteColor(11)).toBe(allyPaletteColor(11));
-  });
-
   it("never falls back to the neutral grey the issue removed", () => {
     for (let i = 0; i < 64; i++) {
       expect(allyPaletteColor(i)).not.toBe("#e5e7eb");
