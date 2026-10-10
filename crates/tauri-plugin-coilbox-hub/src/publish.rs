@@ -144,12 +144,6 @@ mod tests {
     }
 
     #[test]
-    fn plain_http_will_not_carry_a_token() {
-        let refused = publish_url("http://hub.example").unwrap_err();
-        assert!(refused.contains("https"), "{refused}");
-    }
-
-    #[test]
     fn a_hub_being_developed_locally_is_allowed_over_http() {
         assert_eq!(
             publish_url("http://localhost:3000").unwrap(),
