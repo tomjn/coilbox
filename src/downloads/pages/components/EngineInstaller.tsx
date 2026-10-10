@@ -5,13 +5,13 @@ import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { formatBytes } from "@/lib/format";
-import { dlRecoilEngines, dlSpringfilesEngines } from "../../bindings";
 import { useWriteRoot } from "../../config";
 import {
   type EnqueueInput,
   identityOf,
   useDownloadQueue,
 } from "../../DownloadQueueProvider";
+import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
 import {
   type EngineSource,
   emptyEngineListMessage,
@@ -64,7 +64,7 @@ export function EngineInstaller() {
     setItems(null);
     try {
       if (src === "recoil") {
-        const res = await dlRecoilEngines(undefined);
+        const res = await loadRecoilEngines();
         setPlatform(res.platform);
         setItems(
           res.releases.map((r) => ({
@@ -76,7 +76,7 @@ export function EngineInstaller() {
           })),
         );
       } else {
-        const res = await dlSpringfilesEngines(undefined);
+        const res = await loadSpringfilesEngines();
         setPlatform(res.platform);
         setListsThisPlatform(res.listsThisPlatform);
         setItems(
