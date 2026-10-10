@@ -1,5 +1,10 @@
+import { CHART_PALETTE } from "@/lib/chartPalette";
 import { formatDuration } from "@/lib/format";
-import { isBlackHex } from "@/lib/teamColor";
+import {
+  isBlackHex,
+  NON_TEXT_CONTRAST,
+  readableTeamTextColor,
+} from "@/lib/teamColor";
 import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
   DemoInfo,
@@ -415,6 +420,103 @@ export function allySeries(
     samples: mergeSamples(members.map((m) => m.samples)),
   }));
   return [...merged, ...loose];
+}
+
+/**
+ * Whose colours a chart line wears: coilbox's own palette, or what the game
+ * assigned in its start script (#1142).
+ */
+export type ChartColorMode = "palette" | "game";
+
+/**
+ * Whether the start script's colours say anything. A lobby can write one
+ * placeholder colour for every seat and broadcast the real assignment in game,
+ * and charting sixteen identical lines is worse than not using them, so colours
+ * that are all the same count as absent. Fewer than two seats can't disagree.
+ */
+function gameColoursPresent(info: DemoInfo): boolean {
+  const seen = new Set<string>();
+  let seats = 0;
+  for (const held of seatsByTeam(info).values())
+    for (const seat of held) {
+      seats++;
+      seen.add(seat.rgbColor ? rgbToHex(seat.rgbColor) : "");
+    }
+  return seats < 2 || seen.size > 1;
+}
+
+const SERIES_ID = /^(team|ally)(\d+)$/;
+
+/**
+ * The one place a chart line gets its colour. Everything that draws a series
+ * (plot, legend, tooltip, table, tiles) reads `color` off what this returns,
+ * so a later feature that emphasises a series layers on this rather than
+ * choosing colours of its own.
+ *
+ * In `palette` mode each team owns a slot of {@link CHART_PALETTE}, numbered
+ * across every team the engine measured and not across the lines on screen. A
+ * team keeps its slot when the view changes or a line is switched off, so
+ * nobody else is repainted. A side takes the slot of its first member.
+ *
+ * Past the palette's size there are not enough colours for teams, so every team
+ * takes its ally side's slot and the sides are numbered instead. A match with
+ * more sides than slots has to reuse a slot, and the tooltip and the roster
+ * carry identity there.
+ *
+ * In `game` mode a line keeps the game's colour (as {@link teamSeries} and
+ * {@link allySeries} resolved it), unless the script's colours are all one
+ * value, when the palette stands in. Either way the colour is corrected in
+ * lightness only, until it reaches {@link NON_TEXT_CONTRAST} on the card.
+ */
+export function colorSeries(
+  series: ChartSeries[],
+  trailer: DemoTrailer,
+  info: DemoInfo,
+  mode: ChartColorMode,
+  theme: "dark" | "light",
+): ChartSeries[] {
+  const side = allyByTeam(info);
+  const teams = trailer.teams
+    .filter((t) => t.samples.length > 0)
+    .map((t) => t.team)
+    .sort((a, b) => a - b);
+  // Known sides in order, then each team no seat is recorded for, as allySeries.
+  const sideKey = (t: number) => (side.has(t) ? `a${side.get(t)}` : `t${t}`);
+  const allies = [...new Set(teams.flatMap((t) => side.get(t) ?? []))].sort(
+    (a, b) => a - b,
+  );
+  const sides = [
+    ...allies.map((a) => `a${a}`),
+    ...teams.filter((t) => !side.has(t)).map((t) => `t${t}`),
+  ];
+  const n = CHART_PALETTE.length;
+  const overflow = teams.length > n;
+
+  const slotOf = (id: string): number => {
+    const found = SERIES_ID.exec(id);
+    if (!found) return 0;
+    const num = Number(found[2]);
+    const first =
+      found[1] === "team"
+        ? num
+        : (teams.find((t) => side.get(t) === num) ?? num);
+    const key = found[1] === "team" ? sideKey(num) : `a${num}`;
+    return overflow
+      ? Math.max(sides.indexOf(key), 0) % n
+      : Math.max(teams.indexOf(first), 0);
+  };
+
+  const useGame = mode === "game" && gameColoursPresent(info);
+  return series.map((s) => {
+    const base = useGame ? s.color : CHART_PALETTE[slotOf(s.id)];
+    return {
+      ...s,
+      color:
+        mode === "game"
+          ? readableTeamTextColor(base, theme, "anyCard", NON_TEXT_CONTRAST)
+          : base,
+    };
+  });
 }
 
 /** Whether the chart draws a line per seat or a line per side. */

@@ -155,6 +155,9 @@ export function pickTeamColorHex(opts: {
  */
 const AA_CONTRAST = 4.5;
 
+/** WCAG 2.2 SC 1.4.11 floor for graphical objects such as chart lines. */
+export const NON_TEXT_CONTRAST = 3;
+
 /**
  * The app's own background under this theme, matching picoframe's default
  * `--background` in `theme.css` (light is white, dark is `hsl(240 6% 7%)`).
@@ -179,12 +182,27 @@ const THEME_CARD_HEX: Record<"dark" | "light", string> = {
   dark: hslToHex(240, 0.05, 0.1),
 };
 
+/**
+ * The brightest `--card` any picoframe base preset gives, per theme. Dark cards
+ * are `hsl(base-hue, base-sat * 5%, 10%)`, so they differ by preset and a colour
+ * lightened only as far as the default card can fall short on another preset
+ * (2.81:1 on emerald for a navy line, measured). Emerald's, `hsl(160 32.5% 10%)`,
+ * is the brightest, and correcting against it clears every preset because a
+ * lightened colour only gains contrast on a darker surface.
+ * `matchStatsColors.test.ts` measures this against all of them.
+ */
+const THEME_CARD_ANY_HEX: Record<"dark" | "light", string> = {
+  light: "#ffffff",
+  dark: hslToHex(160, 0.325, 0.1),
+};
+
 /** Which surface a label sits on, each with its own background per theme. */
-type Surface = "background" | "card";
+type Surface = "background" | "card" | "anyCard";
 
 const SURFACE_HEX: Record<Surface, Record<"dark" | "light", string>> = {
   background: THEME_BACKGROUND_HEX,
   card: THEME_CARD_HEX,
+  anyCard: THEME_CARD_ANY_HEX,
 };
 
 /** sRGB 0..255 channel -> linearised channel, for WCAG relative luminance. */
@@ -230,27 +248,31 @@ const readableCache = new Map<string, string>();
  * `surface` picks which background to measure against and defaults to
  * `"background"`, the page itself, matching every caller before the match
  * stats chart (#3202) needed `"card"` for its `bg-card` container.
+ *
+ * `minContrast` defaults to AA for text. A chart line is a graphical object,
+ * not text, so it passes {@link NON_TEXT_CONTRAST} (#1142).
  */
 export function readableTeamTextColor(
   rawHex: string,
   theme: "dark" | "light",
   surface: Surface = "background",
+  minContrast: number = AA_CONTRAST,
 ): string {
   const hex = normalizeHex(rawHex);
   if (!hex) return rawHex;
-  const cacheKey = `${surface}:${theme}:${hex}`;
+  const cacheKey = `${surface}:${theme}:${minContrast}:${hex}`;
   const cached = readableCache.get(cacheKey);
   if (cached) return cached;
 
   const bg = SURFACE_HEX[surface][theme];
   let result = hex;
-  if (contrastRatio(hex, bg) < AA_CONTRAST) {
+  if (contrastRatio(hex, bg) < minContrast) {
     const [h, s, l] = hexToHsl(hex);
     if (theme === "dark") {
       result = "#ffffff";
       for (let candidateL = l; candidateL <= 1; candidateL += LIGHTNESS_STEP) {
         const candidate = hslToHex(h, s, candidateL);
-        if (contrastRatio(candidate, bg) >= AA_CONTRAST) {
+        if (contrastRatio(candidate, bg) >= minContrast) {
           result = candidate;
           break;
         }
@@ -259,7 +281,7 @@ export function readableTeamTextColor(
       result = "#000000";
       for (let candidateL = l; candidateL >= 0; candidateL -= LIGHTNESS_STEP) {
         const candidate = hslToHex(h, s, candidateL);
-        if (contrastRatio(candidate, bg) >= AA_CONTRAST) {
+        if (contrastRatio(candidate, bg) >= minContrast) {
           result = candidate;
           break;
         }
