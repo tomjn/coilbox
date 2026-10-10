@@ -445,6 +445,35 @@ function gameColoursPresent(info: DemoInfo): boolean {
   return seats < 2 || seen.size > 1;
 }
 
+/**
+ * The engine teams a chart line stands for: one for a player's line, every
+ * member for a side's. Emphasis is kept in these numbers rather than in line
+ * ids, so a line, a roster seat and a map dot all name the same thing whichever
+ * view the chart is on.
+ */
+export function seriesTeams(
+  series: Pick<ChartSeries, "id">,
+  info: DemoInfo,
+): number[] {
+  const found = SERIES_ID.exec(series.id);
+  if (!found) return [];
+  const num = Number(found[2]);
+  if (found[1] === "team") return [num];
+  return [...allyByTeam(info)]
+    .filter(([, ally]) => ally === num)
+    .map(([team]) => team)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * The team a named player held, for finding "me" in a replay. Matches the way
+ * the dossier does (`gamesFor` in `stats.ts`): a seated player with that name,
+ * never a spectator or a bot.
+ */
+export function playerTeam(info: DemoInfo, name: string): number | undefined {
+  return info.players.find((p) => !p.spectator && p.name === name)?.team;
+}
+
 const SERIES_ID = /^(team|ally)(\d+)$/;
 
 /**
