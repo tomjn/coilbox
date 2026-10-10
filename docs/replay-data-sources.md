@@ -131,13 +131,44 @@ Rules coilbox applies to build orders, each checked against the engine source.
 
 Unit numbers in the stream are definition ids. The engine numbers a game's definitions from 1 in sorted key order, and unitsync reads the same table sorted the same way, so id n is entry n minus 1 of the unit list. On the seven replays checked against the installed Splinter Faction checkout, all 110 orders were consistent with that offset. With no offset, 10 were inconsistent and 7 were out of range.
 
-Which game's list names the ids is decided by name and version.
+### Which unit list names the ids
 
-- The replay's game is installed. Names show, and the section says they were matched by name and version.
-- Another version of the same game is installed. Names show with a warning that they come from a different build and may be wrong. One unit added or removed moves every id after it.
-- No version is installed. Each order shows its id and the section says why.
+A unit list comes from one of four places. Coilbox takes the first that applies.
 
-Unitsync reads a game's definitions with default mod options. The engine ran them with the match's. A game whose mod options add or remove units would number them differently. No such game was available to check.
+1. The engine's own list, when the replay has been analysed. The replay logger writes the engine's unit definitions at the start of an analysis run, so this is the numbering the match really used, with its mod options, its AIs and its map applied. It always names an analysis's events. It names the replay's build orders when the run used the game the replay records, and not when it had to use another version.
+2. A packaged archive (`.sdz`, `.sd7`, or a rapid package) installed under the exact name and version the replay records, read through unitsync. The section says the names were matched by name and version.
+3. A list coilbox kept for this replay. The section says when it was recorded and from which game. A kept list also stands in for an exact match that is a loose folder (`.sdd`), and then the section says so, because a folder can change under the same name and the list is what it held the day the replay was read.
+4. Another installed version of the same game, with a warning that names come from a different build and may be wrong. One unit added or removed moves every id after it.
+
+With none of these, each order shows its id and the section says the game is not installed.
+
+### The kept unit lists
+
+Coilbox keeps the unit list a replay was read against, so the replay still names its units after the game is updated or removed.
+
+- What a list holds. For each definition id in order: the unit's key, its name, its metal and energy cost, whether it moves, whether it builds, whether it has a build menu, whether it has a weapon, and the numbers that say what it makes, stores, senses and carries. That is what the replay page reads. It holds no picture, model or footprint. A build picture is asked of an installed game of the same family by the unit's key, and a unit with none gets the neutral placeholder.
+- Where lists are. `content/replay-unit-def-sets/` under coilbox's data folder, beside the analyses. Each distinct list is one gzipped file named after the sha256 of its content, so replays that share a list share a file. `links.json` records, for each replay's game id, which lists were recorded for it, from where and when. Splinter Faction's 154 definitions take 3,404 bytes. Metal Factions' 716, with a link file for one replay, take 13,212.
+- When one is kept. When a replay is analysed and the run reproduced the match. And when a replay's build orders are read against a game installed under its exact name, the replay has build orders, and every one of them fits the list. A replay with no build orders gets none from unitsync.
+- Which wins. The engine's list, then a packaged archive's, then a loose folder's. A list already recorded is never replaced by a different one from the same kind of read, except that a new analysis replaces the last one's.
+- A remix carries its original's game id and its original's unit ids, so it reads its original's list.
+- When one goes. With the last replay of its match, by the rule an analysis goes by. Deleting an analysis removes the engine's list for that replay. The Storage screen says how many lists are kept and what they cost.
+
+### When unitsync's list is not the engine's
+
+Unitsync runs a game's definition scripts with no mod options and no match. The engine ran them with the match's. For most games that makes no difference. For some it does, and then unitsync's list numbers the units differently from the match, for the right build of the right game. This was measured on 10 October 2026.
+
+- Mod options. In Beyond All Reason test-30922, 9 of the 145 on, off and list settings tried change the unit list. With no options there are 564 definitions. `experimentalextraunits` or `scavunitsforplayers` makes 918, `experimentallegionfaction` 809, `ruins` enabled or any `zombies` setting 1,828, and `forceallunits` 1,955. Zero-K v1.14.8.0 gains one definition with `campaign_chassis`. No setting changed the list in the other 29 installed games, the three Splinter Faction builds and Metal Factions v2.58 among them. Number options were not tried.
+- The AIs in the match. Beyond All Reason's definition scripts read the team list and add units when a Scavengers or Raptors AI is playing. Read in its source and not measured.
+- Definitions the engine refuses. The engine gives no id to a definition with no health, a negative cost, no build time, a negative speed, or a movement class the game does not define, and the next definition takes its id. Unitsync still lists it. XTA 9.65 has 15 such definitions, which the engine's own log names. Total Annihilation Prime 1.05 has 10 candidates and Jauria RTS 0.6.7 has 1, found by reading their definitions and not confirmed on an engine.
+- Key case is not a cause. The engine lowercases every definition key before it sorts them, and so does the unit list. None of the 31 installed games has a key that is not already lowercase.
+
+On the two matches checked directly, the engine's own list equalled unitsync's entry for entry: 154 of 154 for Splinter Faction and 716 of 716 for Metal Factions, in name, order, cost and whether each unit moves.
+
+What protects a replay from a wrong list:
+
+- An analysed replay uses the engine's list, which has none of these problems.
+- For any other replay the page checks the list against the replay's own build orders. A placed order should name a unit that does not move, a factory order one that does, and no id should be past the end of the list. When some orders do not fit, the build order section says how many and that names and costs may be wrong, and no list is kept from that read. On a 10 player Beyond All Reason replay read against a later build, 1,413 of 3,605 orders did not fit.
+- The check can pass on a wrong list, when the ids that moved are not ones the players ordered. A replay with no build orders cannot be checked at all. Reading unitsync's list with the match's own mod options and AIs is not built.
 
 ## The event log
 
@@ -164,6 +195,7 @@ The replay itself is never written. The gadget records these kinds of line.
 | `unit_created`, `unit_finished`, `unit_destroyed` | The frame, the unit, its definition id, its team and where it was. A created unit names its builder. A destroyed unit names the attacker's unit, definition and team and the weapon, when the engine names them |
 | `unit_given` | A unit that changed team, written once it has: the team it went to, the team it left, and whether the engine counted it as a capture or a gift |
 | `start_unit_position` | Where a living starting unit was, every 60 frames, left out when it has not moved since the last one |
+| `unit_def` | One of the engine's unit definitions, one line for each in id order, straight after the header: its key, name, costs, whether it moves, builds, has a build menu or a weapon, and what it makes, stores, senses and carries. Kept in the unit list store and not in the replay's analysis file. Written since logger version 3 |
 | `game_over` | The winners and every team's final totals |
 
 A unit line also says when the unit is a starting unit. The engine has no idea of a commander: its unit definitions' `isCommander` always answers false, the engine spawns nothing itself, and the start unit a side declares is a name the game is free to ignore. Splinter Faction declares `fedcommander` and spawns `fedcommander_up1`, some hundreds of frames into the match. So the gadget flags the one thing the engine can say for any game: a unit created for a team other than Gaia, by no builder, on the frame that team's first unit was created. In most games that is the commander, and the interface says "starting unit". A team whose first unit was given to it has none. A game that swaps a unit for another when it upgrades ends the starting unit there, because the engine reports one unit destroyed and another created, and nothing in the log ties the two together.
@@ -367,7 +399,7 @@ A position in a free for all or a duel has no pair of sides to split by, and the
 These are the reasons the code and the pull requests established.
 
 - Orders are not buildings. A cost of what was ordered is not what was spent, because cancelled orders count and queue removals are not subtracted. The trailer's "metal used" is the engine's own count.
-- A unit's name and cost come from the installed build of the game, matched by name. A different installed build can name the wrong unit. 518 million metal once appeared under Defence on a Splinter Faction 0.1.77 replay, because that game's definitions give its lootboxes, drop pods and scanner probe a cost of 518,181,504 and the replay's ids landed on them in the installed build. The page showed its "different build" warning.
+- A unit's name and cost come from a unit list: the engine's own for an analysed replay, and otherwise the installed build of the game matched by name, or a list kept from when it was. A different installed build can name the wrong unit, and so can the right build when the match's mod options changed its unit list. 518 million metal once appeared under Defence on a Splinter Faction 0.1.77 replay, because that game's definitions give its lootboxes, drop pods and scanner probe a cost of 518,181,504 and the replay's ids landed on them in the installed build. The page showed its "different build" warning.
 - A figure for a player in the library is their own army's. The store keys totals by engine team, which is the army one player controls. The replay page uses "Team 1" and "Team 2" for a side. Allies on one side each have their own army and their own figure.
 - A library row for a whole match uses the best single army for metal and energy, and the sum of all armies for damage and unit counts. The "My figures" switch uses the player's own army for every metric.
 - The trailer is sampled every 15 seconds on the replays checked, and the header holds the match length in whole seconds. The last point on the chart is the last sample, not the last frame.
@@ -473,4 +505,4 @@ The work was built from these. Reading them first saves time.
 - knorke's demonaut, from 2010. It plays a replay with a logger attached and draws a minimap with events on it. It contributed the spatial half, including heatmaps by frame range and the same picture built from many replays of one map. Its unbuilt to do list is a good backlog. This page has no link for it because neither the design notes nor any pull request give one.
 - Arkounay's bar-stats, a local app that reads your own replay folder. It contributed the shape of the match page, the decision to refuse a trailer whose sizes it does not recognise, indexing in two phases, treating an empty replay as a match in progress, and building test replays byte by byte. No link, for the same reason.
 - bar-replay-analyzer, which answers where things died today by running the engine. The design notes name it and give no link.
-- Gex, at [varunda/gex](https://github.com/varunda/gex), under the MIT licence. It is the most complete example of the event log. Its parser walks the same stream messages and a 909 line Lua widget under a headless engine records unit creation, deaths with attacker and weapon, damage, transports, projectiles, commander positions every 5 seconds, all unit positions every 30 seconds, and an army, defence, utility and economy value split every 15 seconds. It contributed the value split, the speed technique of setting the maximum and minimum speed to 9999 to turn a 6 minute duel into a 22 second analysis, and storing a unit definition set once per distinct set so a replay of a game version that is no longer installed can still be read. Coilbox has not built the value split or the definition snapshot.
+- Gex, at [varunda/gex](https://github.com/varunda/gex), under the MIT licence. It is the most complete example of the event log. Its parser walks the same stream messages and a 909 line Lua widget under a headless engine records unit creation, deaths with attacker and weapon, damage, transports, projectiles, commander positions every 5 seconds, all unit positions every 30 seconds, and an army, defence, utility and economy value split every 15 seconds. It contributed the value split, the speed technique of setting the maximum and minimum speed to 9999 to turn a 6 minute duel into a 22 second analysis, and storing a unit definition set once per distinct set so a replay of a game version that is no longer installed can still be read. Coilbox keeps the definition set too, and takes it from the engine during an analysis where Gex does.
