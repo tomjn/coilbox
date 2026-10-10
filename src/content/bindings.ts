@@ -1576,6 +1576,79 @@ export const contentUnitDefSetsUsage = defineCommand<
   { sets: number; replays: number; bytes: number }
 >("coilbox-content", "content_unit_def_sets_usage");
 
+/** What one seat ordered of one unit definition in a replay (#1167). */
+export interface UnitDefOrders {
+  /** The unit definition id, as the recorded game's engine numbered it. */
+  def: number;
+  /** Orders that placed a building: the ones with a position. */
+  placed: number;
+  /** Orders to a factory queue: the ones with none. */
+  queued: number;
+  /** Units asked for, the sum of each order's count. */
+  units: number;
+}
+
+/** One seat's build orders in a replay, totalled by unit definition. */
+export interface UnitOrderSeat {
+  /** The player number the orders arrived from. */
+  player: number;
+  /** The player's name. Absent for an AI's seat, and where none is recorded. */
+  name?: string;
+  /** The team of the skirmish AI the orders were for. Absent for a player. */
+  aiTeam?: number;
+  defs: UnitDefOrders[];
+}
+
+/** What a team finished and lost of one unit definition in an analysis. */
+export interface UnitDefEvents {
+  /** The unit definition id, as the analysis run's engine numbered it. */
+  def: number;
+  /** Units the team finished building. */
+  finished: number;
+  /** Finished units destroyed while the team had them. */
+  died: number;
+}
+
+/** One replay's build orders reduced to totals (#1167). */
+export interface ReplayUnitOrders {
+  path: string;
+  /** Absent for a remix, which carries its original's id. */
+  gameId?: string;
+  remixed: boolean;
+  /** The game and version whose build numbered the ids in `seats`. */
+  gameType: string;
+  lastFrame: number;
+  /** True when the walk stopped early, so later orders are missing. */
+  incomplete: boolean;
+  /** Factory queue orders that took units off a queue. Not in `seats`. */
+  removals: number;
+  seats: UnitOrderSeat[];
+  /** By team. Absent when the match has no stored analysis with events. */
+  events?: { team: number; defs: UnitDefEvents[] }[];
+  /** The kept unit list that names the ids in `seats`, if one is kept. */
+  streamList?: UnitDefLink;
+  /** The kept unit list that names the ids in `events`, if one is kept. */
+  eventsList?: UnitDefLink;
+  /** Whether the orders came from a kept file and not from walking the replay. */
+  fromCache: boolean;
+}
+
+/**
+ * Reduce replays to what each seat ordered of each unit definition, with the
+ * kept unit lists that name the ids, each once in `sets` by digest. A path
+ * must be a replay in a folder the Replays list reads. One that is not, or
+ * will not read, comes back in `failed`. Each replay is walked once and kept
+ * on disk, so a second call reads no replay.
+ */
+export const contentReplayUnitOrders = defineCommand<
+  { paths: string[] },
+  {
+    replays: ReplayUnitOrders[];
+    sets: Record<string, StoredUnitDef[]>;
+    failed: { path: string; error: string }[];
+  }
+>("coilbox-content", "content_replay_unit_orders");
+
 /**
  * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
  * `content_list_replays`. Its stored analysis goes with it. With

@@ -21,8 +21,8 @@ use tauri::{AppHandle, Runtime};
 /// The `coilbox-unitsync-*` names mirror the `*_CACHE_SUBDIR` constants in the
 /// `tauri-plugin-coilbox-unitsync` crate; the `coilbox-branding*` names mirror
 /// this crate's `branding` module (`branding_catalog` / `branding_image`). Keep
-/// them in sync if either side renames a dir. The last is the counts
-/// `demo::map_grids` keeps for each replay.
+/// them in sync if either side renames a dir. The last two are the counts
+/// `demo::map_grids` and the totals `demo::unit_orders` keep for each replay.
 pub(crate) const CACHE_SUBDIRS: &[(&str, &str)] = &[
     ("coilbox-unitsync-thumbs", "Map thumbnails"),
     ("coilbox-unitsync-headers", "Game headers"),
@@ -33,6 +33,7 @@ pub(crate) const CACHE_SUBDIRS: &[(&str, &str)] = &[
     ("coilbox-branding", "Branding catalog"),
     ("coilbox-branding-images", "Branding images"),
     (crate::demo::map_grids::CACHE_DIR, "Replay map pictures"),
+    (crate::demo::unit_orders::CACHE_DIR, "Replay unit totals"),
 ];
 
 /// Size (and, when applied, clearance) of one cache dir.

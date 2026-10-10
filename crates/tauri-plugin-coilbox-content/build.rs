@@ -26,6 +26,7 @@ const COMMANDS: &[&str] = &[
     "content_demo_build_orders",
     "content_demo_order_points",
     "content_replay_map_grids",
+    "content_replay_unit_orders",
     "content_demo_command_rates",
     "content_rewrite_demo",
     "content_analysis_check",

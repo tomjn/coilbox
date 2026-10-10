@@ -54,6 +54,21 @@ vi.mock("../config", () => ({
   useReplayStats: () => ({ records: RECORDS, ingesting: false, error: null }),
   useScanTargetSelection: () => ({ selected: null }),
 }));
+// The units section reads replays through Rust. Here it has nothing to read.
+vi.mock("../useUnitUsage", async () => {
+  const { foldUnitUsage } =
+    await vi.importActual<typeof import("../unitUsage")>("../unitUsage");
+  return {
+    useUnitUsage: (games: never[], name: string) => ({
+      usage: foldUnitUsage(games, name, new Map(), new Set(), () => ({
+        stream: { kind: "none" },
+        events: null,
+      })),
+      reading: false,
+      error: null,
+    }),
+  };
+});
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({ state: null }),
   refightFilenames: () => new Set<string>(),
@@ -244,6 +259,15 @@ describe("PlayerDossierPage match figures", () => {
     RECORDS = [played("a", 1, true, true)];
     renderAnn();
     expect(screen.queryByText("Match figures")).toBeNull();
+    expect(screen.queryByText("Units ordered")).toBeNull();
+  });
+
+  it("shows the units section beside the figures when nothing hides it", () => {
+    RECORDS = [played("a", 1, true, true)];
+    renderAnn();
+    expect(
+      screen.getByRole("heading", { name: "Units ordered" }),
+    ).not.toBeNull();
   });
 });
 
