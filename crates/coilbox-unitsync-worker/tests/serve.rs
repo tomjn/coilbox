@@ -409,6 +409,48 @@ fn a_read_that_names_no_game_after_a_game_read_finds_the_file_system_emptied() {
     assert!(emptied_before > emptied, "{log:?}");
 }
 
+/// A unit page reads the unit's model and then the render keys of the same
+/// game. The second finds the first's mount.
+#[test]
+fn a_unit_models_read_then_a_render_keys_read_of_one_game_mount_once() {
+    let (world, mut worker) = serving_a_game("models-then-keys");
+    let units = world.dir.join("units.json");
+    std::fs::write(&units, br#"["armcom"]"#).expect("unit list");
+    let cache = world.dir.join("models");
+    std::fs::create_dir_all(&cache).expect("model cache");
+    let units = units.to_string_lossy().into_owned();
+    let cache = cache.to_string_lossy().into_owned();
+    let models = [
+        "--unit-models",
+        "--game",
+        GAME,
+        "--units-file",
+        &units,
+        "--cache-dir",
+        &cache,
+    ];
+    let first = worker.ask(&models);
+    assert_eq!(first.mount_ms.len(), 1, "the models read mounts");
+    let keys_units = world.dir.join("keys.json");
+    std::fs::write(
+        &keys_units,
+        br#"[{"unit":"armcom","object":"armcom","footprintX":2,"footprintZ":2}]"#,
+    )
+    .expect("key list");
+    let keys_units = keys_units.to_string_lossy().into_owned();
+    let keys = worker.ask(&[
+        "--unit-render-keys",
+        "--game",
+        GAME,
+        "--units-file",
+        &keys_units,
+        "--renderer-version",
+        "1",
+    ]);
+    assert!(keys.mount_ms.is_empty(), "the keys read uses that mount");
+    assert_eq!(world.calls("AddAllArchives"), 1, "{:?}", world.log());
+}
+
 #[test]
 fn input_closing_straight_after_a_release_still_reaches_uninit() {
     let (world, mut worker) = serving_a_game("game-release-close");
