@@ -4,19 +4,6 @@
 use coilbox_lobby_protocol::{parse_line, reduce, LobbyState, ServerMessage};
 
 #[test]
-fn said_with_spaces_survives_parse() {
-    let msg = parse_line("SAID main bob hello   world, spaces    kept  intact");
-    assert_eq!(
-        msg,
-        ServerMessage::Said {
-            channel: "main".into(),
-            username: "bob".into(),
-            message: "hello   world, spaces    kept  intact".into(),
-        }
-    );
-}
-
-#[test]
 fn said_with_spaces_stored_verbatim() {
     let mut state = LobbyState::new();
     reduce(&mut state, parse_line("JOIN main"));
