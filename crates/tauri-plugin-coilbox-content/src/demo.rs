@@ -35,9 +35,8 @@ use tauri::{AppHandle, Runtime};
 
 use crate::metrics::{self, TeamTotals};
 use crate::model::{
-    AiInfo, AllyTeamInfo, ChatDest, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer,
-    PlayerInfo, PlayerStats, ReplayFile, StartBox, StreamEvent, StreamEventKind, TeamStatSample,
-    TeamStatSeries,
+    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer, PlayerInfo,
+    PlayerStats, ReplayFile, StartBox, StreamEventKind, TeamStatSample, TeamStatSeries,
 };
 
 pub(crate) mod stream;
@@ -1706,6 +1705,10 @@ pub fn demo_chat(demo: &Path) -> Result<DemoChat, String> {
 
 /// The chat and system lines of a walked stream, with every other event dropped.
 /// A match is tens of thousands of events and only these are wanted.
+///
+/// A late joiner's name applies from the frame they joined. A player number can
+/// be reused, so the map is changed as the walk goes and a line takes the name
+/// its sender held when it was said.
 fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> DemoChat {
     for e in &stream.events {
         if let StreamEventKind::PlayerName { player, name } = &e.kind {
@@ -1714,8 +1717,18 @@ fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> Dem
                 .or_insert_with(|| name.clone());
         }
     }
-    let line =
-        |e: &StreamEvent, player: u8, dest: Option<ChatDest>, text: &String, system| ChatLine {
+    let mut messages = Vec::new();
+    for e in &stream.events {
+        let (player, dest, text, system) = match &e.kind {
+            StreamEventKind::NewPlayer { player, name, .. } => {
+                names.insert(u32::from(*player), name.clone());
+                continue;
+            }
+            StreamEventKind::Chat { from, dest, text } => (*from, Some(*dest), text, false),
+            StreamEventKind::SystemMessage { player, text } => (*player, None, text, true),
+            _ => continue,
+        };
+        messages.push(ChatLine {
             frame: e.frame,
             time: e.time,
             player,
@@ -1723,20 +1736,8 @@ fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> Dem
             dest,
             text: text.clone(),
             system,
-        };
-    let messages = stream
-        .events
-        .iter()
-        .filter_map(|e| match &e.kind {
-            StreamEventKind::Chat { from, dest, text } => {
-                Some(line(e, *from, Some(*dest), text, false))
-            }
-            StreamEventKind::SystemMessage { player, text } => {
-                Some(line(e, *player, None, text, true))
-            }
-            _ => None,
-        })
-        .collect();
+        });
+    }
     DemoChat {
         messages,
         incomplete: stream.stopped.is_some(),
@@ -2996,7 +2997,7 @@ mod tests {
     // ---- the demo stream, inside a whole file --------------------------------
 
     use super::stream::fixture::Packets;
-    use crate::model::{ChatDest, StreamEventKind, PREGAME_FRAME};
+    use crate::model::{ChatDest, StreamEventKind, TeamAction, PREGAME_FRAME};
 
     /// A finished 1v1 with a demo stream in it: a start position, two frames,
     /// and a line of chat.
@@ -3168,6 +3169,10 @@ mod tests {
                         StreamEventKind::Select { .. } => "select",
                         StreamEventKind::GameOver { .. } => "gameOver",
                         StreamEventKind::StartPos { .. } => "startPos",
+                        StreamEventKind::Pause { .. } => "pause",
+                        StreamEventKind::PlayerLeft { .. } => "playerLeft",
+                        StreamEventKind::Team { .. } => "team",
+                        StreamEventKind::NewPlayer { .. } => "newPlayer",
                     })
                     .or_default() += 1;
             }
@@ -3179,6 +3184,71 @@ mod tests {
                 s.undecoded,
                 s.stopped,
             );
+            // A few of the timeline events, by number only, leaving out the join
+            // messages every replay opens with. A late joiner's
+            // name is checked for presence and never printed.
+            for e in s
+                .events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.kind,
+                        StreamEventKind::Pause { .. }
+                            | StreamEventKind::PlayerLeft { .. }
+                            | StreamEventKind::Team { .. }
+                            | StreamEventKind::NewPlayer { .. }
+                    )
+                })
+                .filter(|e| {
+                    !matches!(
+                        e.kind,
+                        StreamEventKind::Team {
+                            action: TeamAction::JoinTeam { .. },
+                            ..
+                        }
+                    )
+                })
+                .take(20)
+            {
+                match &e.kind {
+                    StreamEventKind::NewPlayer {
+                        player,
+                        spectator,
+                        team,
+                        name,
+                    } => eprintln!(
+                        "  frame {} newPlayer player={player} spectator={spectator} team={team} nameLen={}",
+                        e.frame,
+                        name.len()
+                    ),
+                    kind => eprintln!("  frame {} {kind:?}", e.frame),
+                }
+            }
+            // Every chat line from a late joiner carries a name.
+            let joined: Vec<u8> = s
+                .events
+                .iter()
+                .filter_map(|e| match e.kind {
+                    StreamEventKind::NewPlayer { player, .. } => Some(player),
+                    _ => None,
+                })
+                .collect();
+            if !joined.is_empty() {
+                let chat = chat_from_stream(&s, HashMap::new());
+                let from_joiners: Vec<_> = chat
+                    .messages
+                    .iter()
+                    .filter(|m| joined.contains(&m.player))
+                    .collect();
+                eprintln!(
+                    "  late joiners {joined:?}: {} chat lines from them, {} without a name",
+                    from_joiners.len(),
+                    from_joiners
+                        .iter()
+                        .filter(|m| m.player_name.is_none())
+                        .count()
+                );
+            }
             // Every packet of a kind the walk reads fits the layout it reads
             // it with, and the framing holds to the last byte.
             assert_eq!(s.undecoded, 0, "{}", path.display());
@@ -4293,6 +4363,27 @@ mod tests {
         assert_eq!(c.messages[0].player_name.as_deref(), Some("Latecomer"));
         assert_eq!(c.messages[1].player_name, None);
         assert_eq!(c.messages[1].player, 9);
+    }
+
+    /// A number reused by a later joiner. The same seat holds one name before
+    /// the join and another after, so a map built up front would give every
+    /// line the last name.
+    #[test]
+    fn a_late_joiner_is_named_from_the_frame_they_joined() {
+        let s = Packets::default()
+            .keyframe(0)
+            .chat(9, 254, "before anyone joined")
+            .new_player(9, 1, 0, "First")
+            .chat(9, 254, "first speaks")
+            .new_player(9, 1, 0, "Second")
+            .chat(9, 254, "second speaks");
+        let c = chat_of("chat_reused.sdf", fixture_with_stream(s.bytes()));
+        let names: Vec<_> = c
+            .messages
+            .iter()
+            .map(|m| m.player_name.as_deref())
+            .collect();
+        assert_eq!(names, [None, Some("First"), Some("Second")]);
     }
 
     /// `demo_chat` takes a replay path and nothing else, so it cannot look for
