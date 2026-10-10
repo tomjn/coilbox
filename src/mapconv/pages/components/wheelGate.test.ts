@@ -1,8 +1,8 @@
 /**
- * The truth table `releaseWheel` is for (issue #2331): a wheel over sky
- * always scrolls the page, and a wheel over the map always zooms, with no
- * click needed first. `groundHit` is the approximate ray/plane test that
- * stands in for a raycast against the terrain (issue #2326).
+ * Tests for `groundHit`, the approximate ray/plane test that stands in for a
+ * raycast against the terrain (issue #2326). It feeds the wheel gate in
+ * `MapPreview3D` (issue #2331): a wheel over sky scrolls the page, and a wheel
+ * over the map zooms. `releaseWheel` is `!hit`, so it has no test of its own.
  */
 
 import { describe, expect, it } from "vitest";

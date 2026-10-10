@@ -182,6 +182,112 @@ describe("matchStatsCsv", () => {
   });
 });
 
+describe("matchStatsCsv column names", () => {
+  const csv = (series: ChartSeries[], allSeries?: ChartSeries[], i = info) =>
+    matchStatsCsv({
+      info: i,
+      metric,
+      mode: "cumulative",
+      view: "players",
+      series,
+      allSeries,
+      rows: [],
+    }).split("\r\n")[0];
+  const firstColumns = (header: string, n: number) =>
+    header.split(",").slice(1, 1 + n);
+
+  it("adds the team number to two players with one name", () => {
+    const head = csv([line("team0", "Bob"), line("team3", "Bob")]);
+    expect(firstColumns(head, 2)).toEqual(["Bob (team 0)", "Bob (team 3)"]);
+  });
+
+  it("adds the team number to all three players with one name", () => {
+    const head = csv([
+      line("team0", "Bob"),
+      line("team1", "Bob"),
+      line("team2", "Bob"),
+    ]);
+    expect(firstColumns(head, 3)).toEqual([
+      "Bob (team 0)",
+      "Bob (team 1)",
+      "Bob (team 2)",
+    ]);
+  });
+
+  it("leaves a name that does not collide as it was", () => {
+    const head = csv([
+      line("team0", "Bob"),
+      line("team1", "Bob"),
+      line("team2", "Alice"),
+    ]);
+    expect(firstColumns(head, 3)[2]).toBe("Alice");
+  });
+
+  it("renames a player named like a fixed column", () => {
+    const head = csv([
+      line("team0", "map"),
+      line("team1", "match_time_sec"),
+      line("team2", "game_id"),
+    ]);
+    expect(firstColumns(head, 3)).toEqual([
+      "map (team 0)",
+      "match_time_sec (team 1)",
+      "game_id (team 2)",
+    ]);
+    const names = head.split(",");
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("still quotes and guards the final header text", () => {
+    const head = csv([line("team0", "=x"), line("team1", "=x")]);
+    expect(firstColumns(head, 2)).toEqual(["'=x (team 0)", "'=x (team 1)"]);
+    const comma = csv([line("team0", "a,b"), line("team1", "a,b")]);
+    expect(
+      comma.startsWith('match_time_sec,"a,b (team 0)","a,b (team 1)"'),
+    ).toBe(true);
+  });
+
+  it("gives a player the same header whether or not a namesake is unchecked", () => {
+    const bob0 = line("team0", "Bob");
+    const bob1 = line("team1", "Bob");
+    const both = csv([bob0, bob1], [bob0, bob1]);
+    const onlyFirst = csv([bob0], [bob0, bob1]);
+    const onlySecond = csv([bob1], [bob0, bob1]);
+    expect(firstColumns(onlyFirst, 1)).toEqual(["Bob (team 0)"]);
+    expect(firstColumns(onlySecond, 1)).toEqual(["Bob (team 1)"]);
+    expect(firstColumns(both, 2)).toEqual(["Bob (team 0)", "Bob (team 1)"]);
+  });
+
+  it("lists the member teams of a side's line", () => {
+    const sides = {
+      ...info,
+      players: [
+        { name: "A", team: 1, allyTeam: 0 },
+        { name: "B", team: 4, allyTeam: 0 },
+        { name: "C", team: 2, allyTeam: 1 },
+      ],
+      ais: [],
+    } as unknown as DemoInfo;
+    const head = csv(
+      [line("ally0", "Red"), line("ally1", "Red")],
+      undefined,
+      sides,
+    );
+    // The comma in the first name makes it a quoted field.
+    expect(
+      head.startsWith('match_time_sec,"Red (teams 1, 4)",Red (team 2),'),
+    ).toBe(true);
+  });
+
+  it("writes a file with no collisions as it was before", () => {
+    expect(
+      csv([line("team0", "Alice"), line("team1", 'Bob, the "Builder"')]),
+    ).toBe(
+      'match_time_sec,Alice,"Bob, the ""Builder""",game_id,map,started_utc,metric,unit,view,values',
+    );
+  });
+});
+
 describe("matchStatsCsvFileName", () => {
   it("is built from the map, the date and the metric", () => {
     expect(matchStatsCsvFileName(info, metric)).toBe(
