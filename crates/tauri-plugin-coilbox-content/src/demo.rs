@@ -39,6 +39,7 @@ use crate::model::{
     PlayerStats, ReplayFile, StartBox, StreamEventKind, TeamStatSample, TeamStatSeries,
 };
 
+mod build_orders;
 pub(crate) mod stream;
 
 /// Folders under a write dir that hold client demos. The engine writes to
@@ -1921,6 +1922,23 @@ pub(crate) async fn content_demo_chat(replay_path: String) -> CliResult {
         Ok(Ok(chat)) => CliResult::ok(json!(chat)),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo chat task failed: {e}")),
+    }
+}
+
+/// `content_demo_build_orders`, every order to build something in a replay
+/// (#1145), with the unit definition ids as the engine recorded them. Turning an
+/// id into a unit is the caller's job, through unitsync and the game the replay
+/// names. `replayPath` is an absolute demo path. Read on demand (it walks the
+/// whole demo stream), not during listing.
+#[tauri::command]
+pub(crate) async fn content_demo_build_orders(replay_path: String) -> CliResult {
+    let demo_path = PathBuf::from(&replay_path);
+    match tauri::async_runtime::spawn_blocking(move || build_orders::demo_build_orders(&demo_path))
+        .await
+    {
+        Ok(Ok(orders)) => CliResult::ok(json!(orders)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(format!("demo build orders task failed: {e}")),
     }
 }
 

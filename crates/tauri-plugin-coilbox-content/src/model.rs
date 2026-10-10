@@ -663,6 +663,107 @@ pub struct Order {
     pub params: Vec<f32>,
 }
 
+/// Every order to build something in a replay, in the order the engine
+/// recorded them (#1145).
+///
+/// These are orders given, not buildings completed. The stream does not say
+/// whether an order was carried out, cancelled or refused by the engine.
+#[derive(Serialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DemoBuildOrders {
+    pub orders: Vec<BuildOrder>,
+    /// A name for each player number in `orders`, where the start script or the
+    /// stream gives one.
+    pub players: Vec<BuildOrderPlayer>,
+    /// Factory queue orders that took units off a queue. They are not orders to
+    /// build, so they are counted here and left out of `orders`.
+    pub removals: u32,
+    /// The last simulation frame the stream reached. 30 frames are one second.
+    pub last_frame: i32,
+    /// True when the stream walk stopped before the end, so orders after that
+    /// point are missing. The ones before it are good.
+    pub incomplete: bool,
+}
+
+/// The name behind a player number in [`DemoBuildOrders::orders`].
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildOrderPlayer {
+    pub player: u8,
+    pub name: String,
+}
+
+/// One order to build a unit, as a player gave it.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildOrder {
+    /// The simulation frame the order arrived in. 30 frames are one second.
+    pub frame: i32,
+    /// The player who sent the order, by `[playerN]` number.
+    pub player: u8,
+    /// The `[teamN]` index that player was on when the order arrived. For an
+    /// order from a skirmish AI it is the AI's team. Absent when neither the
+    /// start script nor the stream seats the player.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
+    pub origin: CommandOrigin,
+    /// The engine's unit definition id. It means something only inside the
+    /// build of the game the replay was played on.
+    pub unit_def_id: i32,
+    /// Where the building was placed, in world units (elmos). Absent for an
+    /// order with no position, which is one given to a factory's queue.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub position: Option<BuildPosition>,
+    /// Which way the building faces: 0 south, 1 east, 2 north, 3 west. Absent
+    /// when the order does not say, and the engine then builds it facing south.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub facing: Option<u8>,
+    /// How many units the order asks for. Always 1 for a placed building. A
+    /// factory queue order asks for 5 with shift, 20 with control and 100 with
+    /// both.
+    pub count: u32,
+    /// Where in the builder's queue the order went.
+    pub slot: BuildSlot,
+    /// How many units were given the order: the player's selection, or the
+    /// units a widget or an AI named. One order to several builders is one
+    /// order. Zero when the player had selected nothing the stream recorded.
+    pub builders: u32,
+    /// The build command's option bits as sent, see [`Order::options`].
+    pub options: u8,
+}
+
+/// A placed building's position, in world units (elmos): `x` and `z` across
+/// the map, `y` up.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildPosition {
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
+/// Where in a builder's queue a build order went.
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum BuildSlot {
+    /// A placed building given without shift. It replaces everything the
+    /// builder had queued.
+    Replace,
+    /// Added to the end of the queue: a placed building given with shift, or a
+    /// factory order.
+    Append,
+    /// A factory order given with alt, which goes to the front of the queue.
+    Front,
+    /// `CMD_INSERT` by queue position. 0 is the front, so "build this next",
+    /// and a negative position counts back from the end, so -1 is last.
+    #[serde(rename_all = "camelCase")]
+    InsertAt { position: i32 },
+    /// `CMD_INSERT` beside the queued command carrying `tag`: before it, or
+    /// after it when `after` is true.
+    #[serde(rename_all = "camelCase")]
+    InsertAtTag { tag: u32, after: bool },
+}
+
 pub const SCHEMA_VERSION: u32 = 1;
 
 /// Read the store from `path`, returning a default (empty) store if it's absent.

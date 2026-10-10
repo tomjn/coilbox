@@ -705,6 +705,12 @@ pub(crate) mod fixture {
             self.bytes.clone()
         }
 
+        /// The packets walked to the end, for a test of something that reads a
+        /// walked stream.
+        pub(crate) fn walked(&self) -> DemoStream {
+            walk(&self.bytes, Until::TheEnd)
+        }
+
         /// One chunk: `f32 modGameTime, u32 length`, then the payload as given.
         pub(crate) fn raw(mut self, payload: &[u8]) -> Self {
             let time = self.count as f32 * 0.5;
