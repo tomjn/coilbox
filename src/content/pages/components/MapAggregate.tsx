@@ -63,8 +63,8 @@ import {
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
 import { useStartNames } from "../../useStartNames";
 import { MapExportButtons } from "./MapExportButtons";
-import { MapRecords, PlaceNumber } from "./MapRecords";
-import { ReplaySourceNote } from "./ReplaySourceNote";
+import { MapRecords, MapRecordsHelp, PlaceNumber } from "./MapRecords";
+import { SectionHelp } from "./SectionHelp";
 import { VersionList, VersionSpan } from "./VersionList";
 
 const ANY = "any";
@@ -112,7 +112,7 @@ const LEGEND_LABEL: Record<HeatLayerId, string> = {
   deaths: "Where units died",
 };
 
-/** What a scaling does, in a sentence under the control. */
+/** What a scaling does, for the help. */
 const NORMALISE_NOTE: Record<Normalise, string> = {
   share:
     "Each match counts the same: its events are scaled to add up to one before the matches are averaged. A long busy match weighs no more than a short quiet one.",
@@ -407,9 +407,7 @@ export function MapAggregate({
       <section className="flex flex-col gap-2" data-testid="map-aggregate">
         <h2 className="text-sm font-medium">How this map is played</h2>
         <p className="text-sm text-muted-foreground">
-          No match on this map is in your library yet. A picture of where
-          players start, build and send their units is drawn here once there is
-          one.
+          No match on this map is in your library yet.
           {family.remixes > 0 &&
             ` ${plural(family.remixes, "remix is", "remixes are")} here, and a remix is a copy of another match and not a match of its own.`}
         </p>
@@ -433,7 +431,50 @@ export function MapAggregate({
   return (
     <section className="flex flex-col gap-3" data-testid="map-aggregate">
       <div className="flex flex-col gap-1">
-        <h2 className="text-sm font-medium">How this map is played</h2>
+        <div className="flex items-center gap-1">
+          <h2 className="text-sm font-medium">How this map is played</h2>
+          <SectionHelp
+            section="how this map is played"
+            source={
+              layer === "deaths" ? "log" : layer === "" ? undefined : "stream"
+            }
+            detail={
+              layer === "deaths" || layer === ""
+                ? undefined
+                : "These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
+            }
+          >
+            <AggregateHelp
+              layer={layer}
+              drawn={drawn}
+              normalise={normalise}
+              timeWindow={timeWindow}
+              picture={shown.length > 0}
+              versions={versions.length}
+              leftOut={leftOut.join(" and ")}
+              leftOutCount={mentioned}
+              short={!filters.includeShort ? choices.short : 0}
+              showStarts={showStarts}
+              hasDots={dots.length > 0}
+              analysedShown={withEvents}
+              unattacked={replays.reduce((n, r) => n + r.deathsUnattacked, 0)}
+              noPosition={replays.reduce((n, r) => n + r.deathsNoPosition, 0)}
+              windowCount={drawn !== null && drawn.contributing > 0}
+            />
+            {shown.length > 0 && (
+              <MapRecordsHelp
+                shown={shown}
+                elsewhere={elsewhere}
+                joined={joined}
+                records={startRecords}
+                rows={rows}
+                reading={read.reading}
+                versions={spanned}
+                mapName={mapName}
+              />
+            )}
+          </SectionHelp>
+        </div>
         <p
           className="text-sm text-muted-foreground"
           data-testid="aggregate-summary"
@@ -446,22 +487,6 @@ export function MapAggregate({
             : `${withOrders.toLocaleString()} ${withOrders === 1 ? "has" : "have"} orders recorded, and ${withEvents.toLocaleString()} ${withEvents === 1 ? "has" : "have"} been analysed and ${withEvents === 1 ? "has" : "have"} event data.`}
           {diverged > 0 &&
             ` ${plural(diverged, "was", "were")} analysed and the playback did not reproduce the match, so ${diverged === 1 ? "it has" : "they have"} no events.`}
-        </p>
-        <p
-          className="text-xs text-muted-foreground"
-          data-testid="grouping-note"
-        >
-          Matches are grouped by the map's name with a trailing version taken
-          off, and not by the map's archive. A replay records the map's name and
-          nothing that says which archive it was played on, so two archives with
-          one name cannot be told apart.
-          {versions.length > 1 &&
-            " A version can differ in layout. Its starts and counts are drawn on this page's map as the replay recorded them, so a version that moved things puts them in the wrong place."}
-          {leftOut.length > 0 &&
-            ` ${leftOut.join(" and ")} ${mentioned === 1 ? "is" : "are"} left out, so each match counts once.`}
-          {!filters.includeShort &&
-            choices.short > 0 &&
-            ` ${plural(choices.short, "match", "matches")} under a minute ${choices.short === 1 ? "is" : "are"} left out too.`}
         </p>
         {read.failed.length > 0 && (
           <p className="text-xs text-destructive">
@@ -493,12 +518,10 @@ export function MapAggregate({
           />
           <p
             className="text-xs text-muted-foreground"
-            data-testid="version-sizes-note"
+            data-testid="version-layout-warning"
           >
-            A version is left out only when it is installed and its size differs
-            from this page's map. A version that is not installed has no size to
-            compare, because a replay does not record the size of the map it was
-            played on.
+            A version can differ in layout, so its starts and counts may be in
+            the wrong place on this page's map.
           </p>
         </>
       )}
@@ -724,10 +747,6 @@ export function MapAggregate({
                   ))}
                 </ToggleGroup>
               </div>
-              <p className="text-xs text-muted-foreground">
-                The number beside a layer is how many matches it is drawn from.
-                One density layer shows at a time.
-              </p>
 
               <div className="flex flex-wrap items-end gap-2">
                 <OptionSelect
@@ -778,12 +797,6 @@ export function MapAggregate({
                   shown until it is.
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                {NORMALISE_NOTE[normalise]}
-                {timeWindow.kind !== "whole" &&
-                  ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
-              </p>
-
               {showStarts && (
                 <p
                   className="text-xs text-muted-foreground"
@@ -793,7 +806,7 @@ export function MapAggregate({
                     ? read.reading
                       ? "Reading start positions…"
                       : "None of these replays recorded a start position."
-                    : `A dot is where one team's start was set before one match: ${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}. The engine can move a start into its start box, so a commander may have appeared a short way off.`}
+                    : `${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}.`}
                 </p>
               )}
 
@@ -806,14 +819,6 @@ export function MapAggregate({
                   analysedShown={withEvents}
                   reading={read.reading}
                   categoriesLoading={categoriesLoading}
-                  unattacked={replays.reduce(
-                    (n, r) => n + r.deathsUnattacked,
-                    0,
-                  )}
-                  noPosition={replays.reduce(
-                    (n, r) => n + r.deathsNoPosition,
-                    0,
-                  )}
                   incomplete={replays.filter((r) => r.incomplete).length}
                 />
               )}
@@ -841,10 +846,8 @@ export function MapAggregate({
           </div>
           <MapRecords
             versions={spanned}
-            mapName={mapName}
             shown={shown}
             elsewhere={elsewhere}
-            joined={joined}
             records={startRecords}
             rows={rows}
             orphans={resolved.orphans}
@@ -858,7 +861,8 @@ export function MapAggregate({
   );
 }
 
-/** What is said under the controls about the layer being drawn. */
+/** What is said under the controls about the layer being drawn: its counts and
+ *  the warnings that the picture may be incomplete. The rest is in the help. */
 function LayerNotes({
   layer,
   drawn,
@@ -867,8 +871,6 @@ function LayerNotes({
   analysedShown,
   reading,
   categoriesLoading,
-  unattacked,
-  noPosition,
   incomplete,
 }: {
   layer: HeatLayerId;
@@ -879,8 +881,6 @@ function LayerNotes({
   analysedShown: number;
   reading: boolean;
   categoriesLoading: boolean;
-  unattacked: number;
-  noPosition: number;
   /** Replays whose stream could not be read to the end. */
   incomplete: number;
 }) {
@@ -888,43 +888,21 @@ function LayerNotes({
   const windowed = timeWindow.kind !== "whole";
   return (
     <div className="flex flex-col gap-2" data-testid="layer-notes">
-      {layer === "deaths" ? (
-        <ReplaySourceNote source="log" />
-      ) : (
-        <ReplaySourceNote
-          source="stream"
-          detail="These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
-        />
-      )}
-
       {layer === "deaths" && analysedShown === 0 && (
         <p className="text-xs text-muted-foreground" data-testid="no-analysis">
           No match on this map in the picture has been analysed, so there are no
-          deaths to draw. Deaths come from playing a match back, which is run
-          from a replay's own page.
-        </p>
-      )}
-      {layer === "deaths" && analysedShown > 0 && (
-        <p className="text-xs text-muted-foreground">
-          Every unit that was destroyed counts, whatever destroyed it.
-          {unattacked > 0 &&
-            ` ${plural(unattacked, "death names", "deaths name")} no attacker, which is how a cancelled build and a self destruct are recorded.`}
-          {noPosition > 0 &&
-            ` ${plural(noPosition, "death was", "deaths were")} recorded at exactly the map's corner, which is what the recorder writes when it has no position, and ${noPosition === 1 ? "is" : "are"} left out.`}
+          deaths to draw.
         </p>
       )}
 
-      {category && (
+      {category && (categoriesLoading || drawn.unclassified > 0) && (
         <p
           className="text-xs text-muted-foreground"
           data-testid="category-note"
         >
-          What a building is for is read from the installed game with exactly
-          the name and version the replay records, matched by name.
           {categoriesLoading
-            ? " Reading unit definitions…"
-            : drawn.unclassified > 0 &&
-              ` ${plural(drawn.unclassified, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified === 1 ? "it is" : "they are"} left out of this layer.`}
+            ? "Reading unit definitions…"
+            : `${plural(drawn.unclassified, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified === 1 ? "it is" : "they are"} left out of this layer.`}
         </p>
       )}
 
@@ -944,7 +922,7 @@ function LayerNotes({
         <p className="text-xs text-muted-foreground" data-testid="window-count">
           {drawn.contributing.toLocaleString()} of {matchCount(drawn.available)}{" "}
           {drawn.contributing === 1 ? "has" : "have"} anything on this layer in{" "}
-          {windowLabel(timeWindow)}. The others are not in the average.
+          {windowLabel(timeWindow)}.
         </p>
       )}
       {drawn.contributing > 0 && (
@@ -956,9 +934,8 @@ function LayerNotes({
       )}
       {incomplete > 0 && layer !== "deaths" && (
         <p className="text-xs text-muted-foreground">
-          {plural(incomplete, "replay", "replays")} could not be read to the
-          end, so {incomplete === 1 ? "its" : "their"} later orders may be
-          missing.
+          {plural(incomplete, "replay", "replays")} could not be read to the end
+          and may be missing later orders.
         </p>
       )}
 
@@ -969,5 +946,132 @@ function LayerNotes({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * What the picture is made of and what it leaves out, for the section's help
+ * popover (#3889). The records' own explanation follows it in the popover.
+ */
+function AggregateHelp({
+  layer,
+  drawn,
+  normalise,
+  timeWindow,
+  picture,
+  versions,
+  leftOut,
+  leftOutCount,
+  short,
+  showStarts,
+  hasDots,
+  analysedShown,
+  unattacked,
+  noPosition,
+  windowCount,
+}: {
+  layer: HeatLayerId | "";
+  drawn: LayerAggregate | null;
+  normalise: Normalise;
+  timeWindow: MatchWindow;
+  /** Whether any match is in the picture. */
+  picture: boolean;
+  versions: number;
+  /** The matches left out, as a sentence part such as "2 remixes". */
+  leftOut: string;
+  leftOutCount: number;
+  /** Matches under a minute that are left out, or 0. */
+  short: number;
+  showStarts: boolean;
+  hasDots: boolean;
+  analysedShown: number;
+  unattacked: number;
+  noPosition: number;
+  /** Whether the layer has anything in the picture. */
+  windowCount: boolean;
+}) {
+  const windowed = timeWindow.kind !== "whole";
+  const category = layer === "defence" || layer === "economy";
+  return (
+    <>
+      <p data-testid="grouping-note">
+        Matches are grouped by the map's name with a trailing version taken off,
+        and not by the map's archive. A replay records the map's name and
+        nothing that says which archive it was played on, so two archives with
+        one name cannot be told apart.
+      </p>
+      {(leftOut || short > 0) && (
+        <p data-testid="left-out-note">
+          {leftOut &&
+            `${leftOut} ${leftOutCount === 1 ? "is" : "are"} left out, so each match counts once.`}
+          {short > 0 &&
+            `${leftOut ? " " : ""}${plural(short, "match", "matches")} under a minute ${short === 1 ? "is" : "are"} left out${leftOut ? " too" : ""}.`}
+        </p>
+      )}
+      {versions > 1 && (
+        <>
+          <p>
+            A version can differ in layout. Its starts and counts are drawn on
+            this page's map as the replay recorded them, so a version that moved
+            things puts them in the wrong place.
+          </p>
+          <p data-testid="version-sizes-note">
+            A version is left out only when it is installed and its size differs
+            from this page's map. A version that is not installed has no size to
+            compare, because a replay does not record the size of the map it was
+            played on.
+          </p>
+        </>
+      )}
+      {picture && (
+        <p>
+          The number beside a layer is how many matches it is drawn from. One
+          density layer shows at a time.
+        </p>
+      )}
+      {picture && showStarts && hasDots && (
+        <p>
+          A dot is where one team's start was set before one match. The engine
+          can move a start into its start box, so a commander may have appeared
+          a short way off.
+        </p>
+      )}
+      {picture && layer && (
+        <p data-testid="scaling-note">
+          {NORMALISE_NOTE[normalise]}
+          {windowed &&
+            ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
+          {windowed &&
+            windowCount &&
+            " Matches with nothing on this layer in the window are not in the average."}
+        </p>
+      )}
+      {picture && layer === "deaths" && (
+        <p>
+          Deaths come from playing a match back, which is run from a replay's
+          own page.
+          {analysedShown > 0 &&
+            " Every unit that was destroyed counts, whatever destroyed it."}
+          {analysedShown > 0 &&
+            unattacked > 0 &&
+            ` ${plural(unattacked, "death names", "deaths name")} no attacker, which is how a cancelled build and a self destruct are recorded.`}
+          {analysedShown > 0 &&
+            noPosition > 0 &&
+            ` ${plural(noPosition, "death was", "deaths were")} recorded at exactly the map's corner, which is what the recorder writes when it has no position, and ${noPosition === 1 ? "is" : "are"} left out.`}
+        </p>
+      )}
+      {picture && category && (
+        <p>
+          What a building is for is read from the installed game with exactly
+          the name and version the replay records, matched by name.
+        </p>
+      )}
+      {picture && drawn?.field && drawn.field.peak > 0 && (
+        <p>
+          Colours compare places on this map with each other, not with another
+          picture.
+        </p>
+      )}
+    </>
   );
 }
