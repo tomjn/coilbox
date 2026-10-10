@@ -15,6 +15,7 @@ export const MAP_LAYERS = [
   "starts",
   "buildings",
   "density",
+  "bases",
 ] as const;
 
 export type MapLayer = (typeof MAP_LAYERS)[number];
@@ -32,6 +33,7 @@ export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   starts: true,
   buildings: false,
   density: false,
+  bases: false,
 };
 
 /** Parse a stored value. Anything missing or not a boolean takes its default. */

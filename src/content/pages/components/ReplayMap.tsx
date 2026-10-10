@@ -43,6 +43,7 @@ import { useReplayBuildOrders } from "../../useReplayBuildOrders";
 import { useReplayTimeWindow } from "../../useReplayTimeWindow";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
@@ -227,6 +228,7 @@ export function ReplayMap({
     starts: layersShown && stored.starts,
     buildings: layersShown && stored.buildings,
     density: layersShown && stored.density,
+    bases: layersShown && stored.bases,
   };
 
   // The engine's heightmap has one sample more than it has squares, and a
@@ -247,7 +249,7 @@ export function ReplayMap({
   // Build orders are read once for the page. A layer that draws them asks for
   // them when it is switched on, including one left on from the last visit.
   const orders = useReplayBuildOrders(replayPath ?? "");
-  const wantOrders = !!replayPath && (on.buildings || on.density);
+  const wantOrders = !!replayPath && (on.buildings || on.density || on.bases);
   const { status: ordersStatus, load: loadOrders } = orders;
   useEffect(() => {
     if (wantOrders && ordersStatus === "idle") loadOrders();
@@ -283,7 +285,7 @@ export function ReplayMap({
 
   // The time window (#1153). The layers that have a time to filter by are read
   // through it, and the ones that are set before the game are not.
-  const windowed = on.buildings || on.density;
+  const windowed = on.buildings || on.density || on.bases;
   const domainSec = Math.ceil(
     timelineDomain(
       [{ second: result ? result.lastFrame / FRAMES_PER_SECOND : null }],
@@ -459,6 +461,7 @@ export function ReplayMap({
               <ToggleGroupItem value="density">
                 Building density
               </ToggleGroupItem>
+              <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
             </ToggleGroup>
             <ReplaySourceNote
               source="stream"
@@ -565,6 +568,19 @@ export function ReplayMap({
                   </p>
                 )}
               </>
+            )}
+
+            {on.bases && (
+              <ReplayBaseCrops
+                info={info}
+                dots={dots}
+                orders={inWindow}
+                world={world}
+                units={units.units}
+                minimapUrl={minimapUrl}
+                timeWindow={timeWindow}
+                domainSec={domainSec}
+              />
             )}
 
             {field && field.peak > 0 && (
