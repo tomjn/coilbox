@@ -25,7 +25,7 @@ import {
  */
 
 /** Record separator RFC 4180 asks for. */
-const EOL = "\r\n";
+export const EOL = "\r\n";
 
 /**
  * A text cell opens with one of these and a spreadsheet reads it as a formula.

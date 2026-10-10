@@ -35,7 +35,13 @@ import {
   WHOLE,
   windowLabel,
 } from "../../mapAggregate";
-import { joinStarts, type Point, placeRecords } from "../../mapRecords";
+import { mapExportInfo } from "../../mapAggregateExport";
+import {
+  joinStarts,
+  type Point,
+  placeRecords,
+  sharedFormat,
+} from "../../mapRecords";
 import {
   countBy,
   includedVersions,
@@ -56,6 +62,7 @@ import {
 } from "../../startNames";
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
 import { useStartNames } from "../../useStartNames";
+import { MapExportButtons } from "./MapExportButtons";
 import { MapRecords, PlaceNumber } from "./MapRecords";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { VersionList, VersionSpan } from "./VersionList";
@@ -345,6 +352,20 @@ export function MapAggregate({
         }),
       ),
     [rows, world],
+  );
+
+  // What the exports say about where their numbers came from.
+  const exportBasis = useMemo(
+    () =>
+      mapExportInfo({
+        mapName,
+        shown,
+        filters,
+        replaySet: activeSet?.name ?? "",
+        worldWidth: world.worldWidth,
+        worldHeight: world.worldHeight,
+      }),
+    [mapName, shown, filters, activeSet, world],
   );
 
   const heatRef = useRef<HTMLCanvasElement | null>(null);
@@ -796,6 +817,26 @@ export function MapAggregate({
                   incomplete={replays.filter((r) => r.incomplete).length}
                 />
               )}
+
+              <MapExportButtons
+                info={exportBasis}
+                layer={layer}
+                layerSentence={layer ? LEGEND_LABEL[layer] : ""}
+                drawn={drawn}
+                normalise={normalise}
+                window={timeWindow}
+                records={startRecords}
+                rows={rows}
+                split={
+                  sharedFormat(shown) === "duel" ||
+                  sharedFormat(shown) === "teams"
+                }
+                minimapUrl={minimapUrl}
+                world={world}
+                dots={dots}
+                places={marks}
+                showStarts={showStarts}
+              />
             </div>
           </div>
           <MapRecords

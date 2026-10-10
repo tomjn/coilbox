@@ -302,6 +302,44 @@ What counts as one match and one map:
 
 Reading a replay costs a walk of its whole stream, the first time. The counts are then kept in the app's cache folder, one small file a replay, and the next visit reads those. On one Mac, in an unoptimised build, the largest replay in a library of 18 (3.1 MB on disk, 105,824 orders with a place) took 364 ms to walk and 7 ms to read back from its kept file, which was 177 KB. All 18 took 1.3 seconds to walk between them and their kept files came to 651 KB. The cost grows with the number of replays, and nothing here measures a large library. A kept file is thrown away when the replay file changes size or modified time, and the folder can be cleared from the storage settings at any time.
 
+### Exporting the picture's numbers
+
+The section has two CSV exports, for anyone who wants to do their own analysis. Neither computes anything the screen does not. Each is disabled, with the reason as its tooltip, when there is nothing to write. Both are plain RFC 4180 files with CRLF line ends, a dot decimal and every digit of each number. Text a spreadsheet would run as a formula (a leading `=`, `+`, `-`, `@`, tab or carriage return) gets a single quote in front. The provenance is repeated as columns on every row, so there is no header block to skip and two files can be joined.
+
+Coordinates in both files are in elmos from the map's north west corner. `x` grows east and `z` grows south, as a replay records them. Column 0 is the grid's west edge and row 0 its north edge. A cell's `x` and `z` are those of its middle.
+
+Export layer CSV writes the layer on screen, one row for each grid cell that has an event in it. A cell that is not in the file is zero. The grid is the one the replays are counted on, 256 cells along the map's longer side, and nothing in the file is smoothed.
+
+| Column | Holds |
+| --- | --- |
+| `cell_column`, `cell_row` | The cell, from 0 |
+| `x_elmos_from_west`, `z_elmos_from_north` | The middle of the cell |
+| `mean_scaled_per_match` | Each contributing match's events in the cell, scaled by the mode in `scaling`, then averaged over the contributing matches. This is the array the picture is smoothed from. Its unit is the mode's: a fraction of a match's events for share, a fraction of a match's busiest spot for peak, events a minute for rate |
+| `events_unscaled` | The plain number of events in the cell over the contributing matches, for anyone who wants another scaling |
+| `map`, `map_versions`, `game_versions` | The page's map, and the map names and game versions of the matches in the picture, joined with `; ` |
+| `matches_in_picture`, `matches_in_layer` | Matches after every filter, and those with something on this layer in the window |
+| `layer`, `scaling`, `window` | The layer, the scaling mode and the window of match time |
+| `filter_players`, `filter_sides`, `filter_analysed`, `filter_played_from`, `filter_played_until`, `filter_replay_set`, `includes_matches_under_a_minute` | The other filters in force. An empty date or set is no bound |
+| `map_width_elmos`, `map_height_elmos`, `grid_width_cells`, `grid_height_cells` | The map's size and the grid's |
+| `exported_utc` | When the file was made |
+
+Export start positions CSV writes the positions in the records under the picture, one row for each position. The table on screen joins positions the player gave one name into a row. This file lists the positions, so the counts of the rows that share a `row_number` add up to the table's row. `name` is the player's own text.
+
+| Column | Holds |
+| --- | --- |
+| `row_number`, `position_key`, `position_kind` | The number on the minimap, the key (`d3` for the map's third declared position, `c3:7` for a group of starts), and `declared` or `cluster` |
+| `name` | The name the player gave the position, or empty |
+| `x_elmos_from_west`, `z_elmos_from_north`, `radius_elmos` | The position's centre, and the distance from it to the farthest start in a group (0 for a declared position) |
+| `taken`, `taken_by_ai`, `with_result`, `won` | Starts at the position, those held by an AI, those in a match with a recorded result, and those among them whose side won |
+| `team_1_*`, `team_2_*` | Taken, with result and won for each team, only when the matches in the picture are all 1v1 or all two sides, as the table splits them |
+| the provenance columns above, `declared_tolerance_elmos`, `grouping_distance_elmos` | How a start was placed at a position. Empty when the map has no such figure |
+
+Export picture saves a PNG of what is on screen with its provenance written under the map. The map is at the top, with the layer over it and the start marks if they are on. A white panel under it, which does not change with the app's theme, holds the colour bar, the legend's sentence, and in words the map, the number of replays and how many have something on the layer, the time window, the scaling, the map and game versions, the filters, and "Made with coilbox" with the app's version and the day of the export. The day is there because the picture is made from a library that grows, so the same filters give another picture later. Text is wrapped to the panel and never drawn over the map. Only the start marks are, and a position's name sits on its own dark label.
+
+The map is as wide as the minimap along its longer side, up to 2048 pixels, and never enlarged, so a 1024 pixel minimap gives a map 1024 pixels across. The shorter side follows the map's shape. The image is at least 720 pixels wide, with a thin map centred on the panel.
+
+The minimap is read with `fetch` and drawn from a bitmap made from the bytes. An `<img>` of the page's `coilbox://` address draws fine, but a canvas it was drawn on refuses to be saved. The PNG is written with the unit builder's save command, which writes bytes to an absolute path and does not care what the file is.
+
 ### The records under a map's picture
 
 Under the picture the section counts what the library knows about the map, over the same matches and the same filters, so a filter changes both together. A refight is left out here as it is left out of the stats page.
