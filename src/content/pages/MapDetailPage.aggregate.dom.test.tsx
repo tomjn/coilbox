@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 let HIDE: string[] = [];
 let mounts = 0;
+let STARTS: { x: number; z: number }[] = [];
 const MAP = "Some Map 1.0";
 const archive = {
   name: MAP,
@@ -53,7 +54,7 @@ vi.mock("../config", () => ({
   useUnitsyncArchiveTree: () => ({ tree: null, loading: false }),
   useUnitsyncThumbnails: () => ({ thumbs: new Map() }),
   useUnitsyncMapMeta: () => ({ meta: new Map() }),
-  useUnitsyncMinimap: () => ({ startPositions: [] }),
+  useUnitsyncMinimap: () => ({ startPositions: STARTS }),
   useUnitsyncHeightmap: () => ({}),
   useUnitsyncMapInfo: () => ({}),
   useUnitsyncMapSkybox: () => ({}),
@@ -82,6 +83,7 @@ vi.mock("./components/MapAggregate", () => ({
   MapAggregate: (props: {
     mapName: string;
     world: { worldWidth: number; worldHeight: number };
+    declared?: { x: number; z: number }[];
   }) => {
     useEffect(() => {
       mounts++;
@@ -89,6 +91,7 @@ vi.mock("./components/MapAggregate", () => ({
     return (
       <div data-testid="map-aggregate">
         {props.mapName} {props.world.worldWidth}x{props.world.worldHeight}
+        <span data-testid="declared">{JSON.stringify(props.declared)}</span>
       </div>
     );
   },
@@ -99,6 +102,7 @@ const { default: MapDetailPage } = await import("./MapDetailPage");
 afterEach(() => {
   cleanup();
   HIDE = [];
+  STARTS = [];
   mounts = 0;
 });
 
@@ -117,9 +121,20 @@ describe("the picture of every match on a map's page", () => {
   it("is shown, for the map by its exact name and at the map's size", () => {
     renderPage();
     // No heightmap here, so the size is the map's own: 16 elmos a square.
-    expect(screen.getByTestId("map-aggregate").textContent).toBe(
-      "Some Map 1.0 128x64",
+    expect(screen.getByTestId("map-aggregate").textContent).toMatch(
+      /^Some Map 1.0 128x64/,
     );
+  });
+
+  it("hands the section the positions the map declares, which the records are numbered by", () => {
+    STARTS = [
+      { x: 10, z: 20 },
+      { x: 30, z: 40 },
+    ];
+    renderPage();
+    expect(
+      JSON.parse(screen.getByTestId("declared").textContent ?? ""),
+    ).toEqual(STARTS);
   });
 
   it("starts again for another map, so one map's filters are not the next one's", () => {

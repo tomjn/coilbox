@@ -27,6 +27,7 @@ import {
   type MatchWindow,
   mapMatches,
   matchCount,
+  matchesElsewhere,
   matchesWithStarts,
   NO_FILTERS,
   NORMALISE_LABEL,
@@ -34,13 +35,17 @@ import {
   WHOLE,
   windowLabel,
 } from "../../mapAggregate";
+import { joinStarts, type Point, placeRecords } from "../../mapRecords";
 import { useStoredAnalyses } from "../../replayAnalysis";
 import { type MapWorld, mapFraction } from "../../replayMapLayers";
 import { findSet, resolveSet, useReplaySets } from "../../replaySets";
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
+import { MapRecords, PlaceNumber } from "./MapRecords";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 
 const ANY = "any";
+const NO_POSITIONS: readonly Point[] = [];
+const NO_REFIGHTS: ReadonlySet<string> = new Set();
 
 /** The windows offered by name. Each is a stretch of every match's own clock. */
 const WINDOWS: { value: string; label: string; window: MatchWindow | null }[] =
@@ -111,6 +116,8 @@ export function MapAggregate({
   records,
   ingesting,
   scene,
+  declared = NO_POSITIONS,
+  refights = NO_REFIGHTS,
 }: {
   mapName: string;
   world: MapWorld;
@@ -120,12 +127,20 @@ export function MapAggregate({
   ingesting: boolean;
   /** The page's 3D preview, or null when it has none. */
   scene: MapScene3D | null;
+  /** The positions the map itself declares, in elmos. */
+  declared?: readonly Point[];
+  /** File names marked as refights, which the library does not count. */
+  refights?: ReadonlySet<string>;
 }) {
   const analyses = useStoredAnalyses();
   const { sets } = useReplaySets();
   const all = useMemo(
-    () => mapMatches(records, mapName, analyses),
-    [records, mapName, analyses],
+    () => mapMatches(records, mapName, analyses, refights),
+    [records, mapName, analyses, refights],
+  );
+  const rest = useMemo(
+    () => matchesElsewhere(records, mapName, analyses, refights),
+    [records, mapName, analyses, refights],
   );
   const choices = useMemo(() => filterChoices(all.matches), [all]);
 
@@ -151,6 +166,24 @@ export function MapAggregate({
     [all, filters, scope],
   );
   const filtered = shown.length !== all.matches.length;
+  // The rest of the library under the same filters, for the length to be set
+  // beside. A set's members are looked up among those matches too.
+  const elsewhere = useMemo(
+    () =>
+      filterMatches(
+        rest.matches,
+        filters,
+        activeSet
+          ? new Set(
+              resolveSet(
+                activeSet,
+                rest.matches.map((m) => m.record),
+              ).present.map((r) => r.filename),
+            )
+          : null,
+      ),
+    [rest, filters, activeSet],
+  );
 
   const asks = useMemo(
     () =>
@@ -220,6 +253,22 @@ export function MapAggregate({
     [starts, world],
   );
   const startMatches = matchesWithStarts(starts);
+  const joined = useMemo(
+    () => joinStarts(shown, read.counts),
+    [shown, read.counts],
+  );
+  const startRecords = useMemo(
+    () => placeRecords(joined.starts, declared, world),
+    [joined, declared, world],
+  );
+  const marks = useMemo(
+    () =>
+      startRecords.places.flatMap((p) => {
+        const at = mapFraction(p.place, world);
+        return at ? [{ ...at, n: p.place.number, key: p.place.key }] : [];
+      }),
+    [startRecords, world],
+  );
 
   const heatRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
@@ -261,6 +310,7 @@ export function MapAggregate({
 
   const leftOut = [
     all.remixes > 0 ? plural(all.remixes, "remix", "remixes") : null,
+    all.refights > 0 ? plural(all.refights, "refight", "refights") : null,
     all.duplicates > 0
       ? plural(
           all.duplicates,
@@ -269,7 +319,7 @@ export function MapAggregate({
         )
       : null,
   ].filter(Boolean);
-  const mentioned = all.remixes + all.duplicates;
+  const mentioned = all.remixes + all.duplicates + all.refights;
 
   return (
     <section className="flex flex-col gap-3" data-testid="map-aggregate">
@@ -430,165 +480,198 @@ export function MapAggregate({
           No match on this map passes these filters.
         </p>
       ) : (
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
-            <div
-              className="relative w-full"
-              style={{
-                aspectRatio: sized
-                  ? `${world.worldWidth} / ${world.worldHeight}`
-                  : "1 / 1",
-              }}
-            >
-              {minimapUrl && (
-                <img
-                  src={minimapUrl}
-                  alt={`Minimap of ${mapName}`}
-                  className="absolute inset-0 size-full object-fill brightness-[0.7]"
-                />
-              )}
-              {field && field.peak > 0 && (
-                <canvas
-                  ref={heatRef}
-                  data-layer={layer}
-                  className="pointer-events-none absolute inset-0 size-full"
-                />
-              )}
-              {showStarts &&
-                dots.map((dot) => (
-                  <span
-                    key={dot.key}
-                    data-layer="starts"
-                    aria-hidden
-                    className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/80 bg-white/80"
-                    style={{
-                      left: `${dot.left * 100}%`,
-                      top: `${dot.top * 100}%`,
-                    }}
+        <>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+            <div className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
+              <div
+                className="relative w-full"
+                style={{
+                  aspectRatio: sized
+                    ? `${world.worldWidth} / ${world.worldHeight}`
+                    : "1 / 1",
+                }}
+              >
+                {minimapUrl && (
+                  <img
+                    src={minimapUrl}
+                    alt={`Minimap of ${mapName}`}
+                    className="absolute inset-0 size-full object-fill brightness-[0.7]"
                   />
-                ))}
-            </div>
-          </div>
-
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="flex flex-wrap gap-1">
-              <Toggle
-                size="sm"
-                variant="outline"
-                pressed={showStarts}
-                onPressedChange={setShowStarts}
-                data-testid="layer-starts"
-              >
-                Start positions · {startMatches.toLocaleString()}
-              </Toggle>
-              <ToggleGroup
-                type="single"
-                variant="outline"
-                size="sm"
-                spacing={1}
-                aria-label="Density layer"
-                className="flex-wrap"
-                value={layer}
-                onValueChange={(v) => setLayer(v as HeatLayerId | "")}
-              >
-                {HEAT_LAYERS.map((id) => (
-                  <ToggleGroupItem
-                    key={id}
-                    value={id}
-                    data-testid={`layer-${id}`}
-                  >
-                    {LAYER_LABEL[id]} ·{" "}
-                    {perLayer[id].contributing.toLocaleString()}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              The number beside a layer is how many matches it is drawn from.
-              One density layer shows at a time.
-            </p>
-
-            <div className="flex flex-wrap items-end gap-2">
-              <OptionSelect
-                size="sm"
-                className="w-56"
-                ariaLabel="How each match is scaled"
-                value={normalise}
-                onValueChange={(v) => setNormalise(v as Normalise)}
-                options={(Object.keys(NORMALISE_LABEL) as Normalise[]).map(
-                  (mode) => ({ value: mode, label: NORMALISE_LABEL[mode] }),
                 )}
-              />
-              <OptionSelect
-                size="sm"
-                className="w-52"
-                ariaLabel="Window of match time"
-                value={windowChoice}
-                onValueChange={setWindowChoice}
-                options={WINDOWS.map(({ value, label }) => ({ value, label }))}
-              />
-              {windowChoice === "custom" && (
-                <>
-                  <Field label="From minute" className="w-24 text-xs">
-                    <Input
-                      type="number"
-                      min={0}
-                      value={customFrom}
-                      onChange={(e) => setCustomFrom(e.target.value)}
+                {field && field.peak > 0 && (
+                  <canvas
+                    ref={heatRef}
+                    data-layer={layer}
+                    className="pointer-events-none absolute inset-0 size-full"
+                  />
+                )}
+                {showStarts &&
+                  dots.map((dot) => (
+                    <span
+                      key={dot.key}
+                      data-layer="starts"
+                      aria-hidden
+                      className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/80 bg-white/80"
+                      style={{
+                        left: `${dot.left * 100}%`,
+                        top: `${dot.top * 100}%`,
+                      }}
                     />
-                  </Field>
-                  <Field label="To minute" className="w-24 text-xs">
-                    <Input
-                      type="number"
-                      min={1}
-                      value={customTo}
-                      onChange={(e) => setCustomTo(e.target.value)}
-                    />
-                  </Field>
-                </>
+                  ))}
+                {showStarts &&
+                  marks.map((m) => (
+                    <span
+                      key={m.key}
+                      data-layer="start-places"
+                      data-testid={`start-mark-${m.n}`}
+                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      style={{
+                        left: `${m.left * 100}%`,
+                        top: `${m.top * 100}%`,
+                      }}
+                    >
+                      <PlaceNumber n={m.n} />
+                    </span>
+                  ))}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-1 flex-col gap-2">
+              <div className="flex flex-wrap gap-1">
+                <Toggle
+                  size="sm"
+                  variant="outline"
+                  pressed={showStarts}
+                  onPressedChange={setShowStarts}
+                  data-testid="layer-starts"
+                >
+                  Start positions · {startMatches.toLocaleString()}
+                </Toggle>
+                <ToggleGroup
+                  type="single"
+                  variant="outline"
+                  size="sm"
+                  spacing={1}
+                  aria-label="Density layer"
+                  className="flex-wrap"
+                  value={layer}
+                  onValueChange={(v) => setLayer(v as HeatLayerId | "")}
+                >
+                  {HEAT_LAYERS.map((id) => (
+                    <ToggleGroupItem
+                      key={id}
+                      value={id}
+                      data-testid={`layer-${id}`}
+                    >
+                      {LAYER_LABEL[id]} ·{" "}
+                      {perLayer[id].contributing.toLocaleString()}
+                    </ToggleGroupItem>
+                  ))}
+                </ToggleGroup>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                The number beside a layer is how many matches it is drawn from.
+                One density layer shows at a time.
+              </p>
+
+              <div className="flex flex-wrap items-end gap-2">
+                <OptionSelect
+                  size="sm"
+                  className="w-56"
+                  ariaLabel="How each match is scaled"
+                  value={normalise}
+                  onValueChange={(v) => setNormalise(v as Normalise)}
+                  options={(Object.keys(NORMALISE_LABEL) as Normalise[]).map(
+                    (mode) => ({ value: mode, label: NORMALISE_LABEL[mode] }),
+                  )}
+                />
+                <OptionSelect
+                  size="sm"
+                  className="w-52"
+                  ariaLabel="Window of match time"
+                  value={windowChoice}
+                  onValueChange={setWindowChoice}
+                  options={WINDOWS.map(({ value, label }) => ({
+                    value,
+                    label,
+                  }))}
+                />
+                {windowChoice === "custom" && (
+                  <>
+                    <Field label="From minute" className="w-24 text-xs">
+                      <Input
+                        type="number"
+                        min={0}
+                        value={customFrom}
+                        onChange={(e) => setCustomFrom(e.target.value)}
+                      />
+                    </Field>
+                    <Field label="To minute" className="w-24 text-xs">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={customTo}
+                        onChange={(e) => setCustomTo(e.target.value)}
+                      />
+                    </Field>
+                  </>
+                )}
+              </div>
+              {customInvalid && (
+                <p className="text-xs text-destructive">
+                  The second minute must be after the first. The whole match is
+                  shown until it is.
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                {NORMALISE_NOTE[normalise]}
+                {timeWindow.kind !== "whole" &&
+                  ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
+              </p>
+
+              {showStarts && (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="starts-note"
+                >
+                  {dots.length === 0
+                    ? read.reading
+                      ? "Reading start positions…"
+                      : "None of these replays recorded a start position."
+                    : `A dot is where one team's start was set before one match: ${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}. The engine can move a start into its start box, so a commander may have appeared a short way off.`}
+                </p>
+              )}
+
+              {layer && drawn && (
+                <LayerNotes
+                  layer={layer}
+                  drawn={drawn}
+                  normalise={normalise}
+                  timeWindow={timeWindow}
+                  analysedShown={withEvents}
+                  reading={read.reading}
+                  categoriesLoading={categoriesLoading}
+                  unattacked={replays.reduce(
+                    (n, r) => n + r.deathsUnattacked,
+                    0,
+                  )}
+                  noPosition={replays.reduce(
+                    (n, r) => n + r.deathsNoPosition,
+                    0,
+                  )}
+                  incomplete={replays.filter((r) => r.incomplete).length}
+                />
               )}
             </div>
-            {customInvalid && (
-              <p className="text-xs text-destructive">
-                The second minute must be after the first. The whole match is
-                shown until it is.
-              </p>
-            )}
-            <p className="text-xs text-muted-foreground">
-              {NORMALISE_NOTE[normalise]}
-              {timeWindow.kind !== "whole" &&
-                ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
-            </p>
-
-            {showStarts && (
-              <p
-                className="text-xs text-muted-foreground"
-                data-testid="starts-note"
-              >
-                {dots.length === 0
-                  ? read.reading
-                    ? "Reading start positions…"
-                    : "None of these replays recorded a start position."
-                  : `A dot is where one team's start was set before one match: ${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}. The engine can move a start into its start box, so a commander may have appeared a short way off.`}
-              </p>
-            )}
-
-            {layer && drawn && (
-              <LayerNotes
-                layer={layer}
-                drawn={drawn}
-                normalise={normalise}
-                timeWindow={timeWindow}
-                analysedShown={withEvents}
-                reading={read.reading}
-                categoriesLoading={categoriesLoading}
-                unattacked={replays.reduce((n, r) => n + r.deathsUnattacked, 0)}
-                noPosition={replays.reduce((n, r) => n + r.deathsNoPosition, 0)}
-                incomplete={replays.filter((r) => r.incomplete).length}
-              />
-            )}
           </div>
-        </div>
+          <MapRecords
+            shown={shown}
+            elsewhere={elsewhere}
+            joined={joined}
+            records={startRecords}
+            reading={read.reading}
+          />
+        </>
       )}
     </section>
   );
