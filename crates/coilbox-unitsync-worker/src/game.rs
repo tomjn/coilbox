@@ -26,7 +26,7 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> GameIn
             }
         }
     };
-    us.init(false, 0);
+    us.init_game(game_archive);
     let mut errors = us.drain_errors();
 
     // Cheap file-identity cache: a hit returns before mounting the archive set.

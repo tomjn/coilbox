@@ -31,6 +31,11 @@ pub const SERVE_FLAG: &str = "--serve";
 /// The environment variable the plugin puts a new worker's token in.
 pub const TOKEN_ENV: &str = "COILBOX_UNITSYNC_SERVE_TOKEN";
 
+/// The only argument of a request that is not a read: nothing is waiting for
+/// this worker, so it lets go of the game it kept mounted for the next read
+/// (issue #3728). It gets no reply.
+pub const RELEASE_FLAG: &str = "--release";
+
 /// What every frame's header line starts with.
 pub const MARKER: &str = "@coilbox-unitsync";
 
@@ -65,6 +70,11 @@ pub struct ReplyHead {
     /// Set when answering this request ran `Init`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init: Option<InitTiming>,
+    /// How long each mount of an archive set took while answering this request,
+    /// in milliseconds. One entry per `AddAllArchives` call, for the plugin's
+    /// dev log (issue #3728).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mount_ms: Vec<u64>,
 }
 
 /// The header as it is written, with the length of the bytes that follow.
@@ -227,6 +237,7 @@ mod tests {
             id,
             code: 0,
             init: None,
+            mount_ms: Vec::new(),
         }
     }
 
@@ -269,6 +280,7 @@ mod tests {
                 lock_wait_ms: 3,
                 call_ms: 190,
             }),
+            mount_ms: vec![41, 3],
         };
         let payload = b"{\"errors\":[]}\n";
         let mut input = Cursor::new(frame(TOKEN, &sent, payload));

@@ -154,6 +154,35 @@ impl Worker {
         id
     }
 
+    /// Send one request and return its reply's header.
+    fn ask(&mut self, mode: &[&str]) -> ReplyHead {
+        let id = self.next_id;
+        self.next_id += 1;
+        let mut args = self.base.clone();
+        args.extend(mode.iter().map(|a| a.to_string()));
+        protocol::write_request(
+            self.stdin.as_mut().expect("open input"),
+            &Request { id, args },
+        )
+        .expect("send the request");
+        let (head, _) = protocol::read_reply(&mut self.stdout, TOKEN)
+            .expect("a readable reply")
+            .expect("a reply before the output closed");
+        assert_eq!(head.id, id);
+        head
+    }
+
+    /// Tell the worker nothing is waiting for it, as the plugin does. It gets
+    /// no reply.
+    fn release(&mut self) {
+        let request = Request {
+            id: 0,
+            args: vec![protocol::RELEASE_FLAG.to_string()],
+        };
+        protocol::write_request(self.stdin.as_mut().expect("open input"), &request)
+            .expect("send the release");
+    }
+
     /// Scan, and return the reply's header with the map names it lists.
     fn scan(&mut self) -> (ReplyHead, Vec<String>) {
         let id = self.send_scan();
@@ -303,5 +332,102 @@ fn closing_the_input_in_the_middle_of_init_lets_init_finish() {
     assert!(
         took >= Duration::from_millis(1000),
         "it waited for Init, and exited after {took:?}"
+    );
+}
+
+/// The one game the stand-in reports in these tests.
+const GAME: &str = "alpha-1.0.sdz";
+
+/// A read that mounts the game: its faction logos, with no cache to answer
+/// from. The stand-in has no archive to open, so the read finds no logo, which
+/// is beside the point. It says which game it reads and mounts it.
+const GAME_READ: [&str; 5] = ["--faction-logos", "--game", GAME, "--sides", "Arm"];
+
+/// A world with the game's archive on disk, and a worker told about it.
+fn serving_a_game(tag: &str) -> (World, Worker) {
+    let world = World::new(tag);
+    std::fs::create_dir_all(world.dir.join("games")).expect("games folder");
+    std::fs::write(world.dir.join("games").join(GAME), b"a game").expect("game");
+    // Past the second the archive was written in, as `World::new` does.
+    std::thread::sleep(Duration::from_millis(1100));
+    let worker = world.serve(&[("FAKE_UNITSYNC_GAME", GAME)]);
+    (world, worker)
+}
+
+#[test]
+fn reads_of_one_game_with_no_release_between_them_mount_it_once() {
+    let (world, mut worker) = serving_a_game("game-once");
+    let first = worker.ask(&GAME_READ);
+    assert_eq!(first.mount_ms.len(), 1, "the first read mounts");
+    for _ in 0..2 {
+        let next = worker.ask(&GAME_READ);
+        assert!(next.mount_ms.is_empty(), "the next uses that mount");
+    }
+    assert_eq!(world.calls("AddAllArchives"), 1, "{:?}", world.log());
+    assert_eq!(world.calls("Init end"), 1);
+}
+
+#[test]
+fn a_release_between_two_reads_of_a_game_is_a_second_mount() {
+    let (world, mut worker) = serving_a_game("game-release");
+    worker.ask(&GAME_READ);
+    let emptied = world.calls("RemoveAllArchives");
+    worker.release();
+    let again = worker.ask(&GAME_READ);
+    assert_eq!(again.mount_ms.len(), 1);
+    assert_eq!(world.calls("AddAllArchives"), 2);
+    // In the order the library saw them: the release emptied the file system
+    // before the second mount.
+    let log = world.log();
+    let second_mount = log
+        .iter()
+        .rposition(|line| line == "AddAllArchives")
+        .expect("a second mount");
+    let emptied_before = log[..second_mount]
+        .iter()
+        .filter(|line| *line == "RemoveAllArchives")
+        .count();
+    assert!(emptied_before > emptied, "{log:?}");
+}
+
+#[test]
+fn a_read_that_names_no_game_after_a_game_read_finds_the_file_system_emptied() {
+    let (world, mut worker) = serving_a_game("game-then-scan");
+    worker.ask(&GAME_READ);
+    let emptied = world.calls("RemoveAllArchives");
+    // A scan, with no release sent, so the mount is still there when it starts.
+    worker.ask(&[]);
+    let log = world.log();
+    let scan = log
+        .iter()
+        .position(|line| line == "GetMapCount")
+        .expect("the scan read the maps");
+    let emptied_before = log[..scan]
+        .iter()
+        .filter(|line| *line == "RemoveAllArchives")
+        .count();
+    assert!(emptied_before > emptied, "{log:?}");
+}
+
+#[test]
+fn input_closing_straight_after_a_release_still_reaches_uninit() {
+    let (world, mut worker) = serving_a_game("game-release-close");
+    worker.ask(&GAME_READ);
+    worker.release();
+    // No wait between the two: the worker may still be reading the release
+    // when its input closes.
+    worker.close_and_wait();
+    assert_eq!(world.calls("UnInit"), 1, "{:?}", world.log());
+    let log = world.log();
+    let uninit = log.iter().position(|line| line == "UnInit").unwrap();
+    let mount = log
+        .iter()
+        .position(|line| line == "AddAllArchives")
+        .unwrap();
+    assert!(
+        log[mount..uninit]
+            .iter()
+            .any(|line| line == "RemoveAllArchives"),
+        "the game was let go before UnInit: {log:?}"
     );
 }

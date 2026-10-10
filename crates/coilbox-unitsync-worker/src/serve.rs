@@ -63,13 +63,24 @@ pub fn run(raw: &[String]) -> i32 {
     let library = unsafe { Unitsync::load(Path::new(&base.lib)) }.ok();
 
     let mut stdout = std::io::stdout();
-    answer_all(&requests, &gate, &token, &mut stdout, |args| {
-        let code = answer(&base, args);
-        if let Some(us) = &library {
-            us.reset();
-        }
-        code
-    });
+    answer_all(
+        &requests,
+        &gate,
+        &token,
+        &mut stdout,
+        |args| {
+            let code = answer(&base, args);
+            if let Some(us) = &library {
+                us.reset();
+            }
+            code
+        },
+        || {
+            if let Some(us) = &library {
+                us.release();
+            }
+        },
+    );
 
     if let Some(us) = &library {
         us.shutdown();
@@ -110,14 +121,22 @@ fn read_requests(gate: Arc<Mutex<Gate>>) -> Receiver<Request> {
 /// Answer each request in turn until there are no more, writing one frame per
 /// request to `out`. `answer` prints the answer and returns the exit code a
 /// one-shot worker would have ended with.
+///
+/// A request that is `protocol::RELEASE_FLAG` alone runs `release` and gets no
+/// frame.
 fn answer_all(
     requests: &Receiver<Request>,
     gate: &Mutex<Gate>,
     token: &str,
     out: &mut impl Write,
     mut answer: impl FnMut(&[String]) -> i32,
+    mut release: impl FnMut(),
 ) {
     while let Ok(request) = requests.recv() {
+        if request.args == [protocol::RELEASE_FLAG] {
+            release();
+            continue;
+        }
         {
             let mut gate = gate.lock().unwrap_or_else(|e| e.into_inner());
             if gate.closed {
@@ -130,6 +149,7 @@ fn answer_all(
             id: request.id,
             code,
             init: session::take_init(),
+            mount_ms: session::take_mounts(),
         };
         // Not busy before the reply goes out. The reader has no way to tell the
         // answer is done, and a client that closes the input on seeing the
@@ -196,7 +216,14 @@ mod tests {
         }
         drop(tx);
         let mut wire = Vec::new();
-        answer_all(&rx, &Mutex::new(Gate::default()), TOKEN, &mut wire, answer);
+        answer_all(
+            &rx,
+            &Mutex::new(Gate::default()),
+            TOKEN,
+            &mut wire,
+            answer,
+            || {},
+        );
         let mut input = Cursor::new(wire);
         let mut replies = Vec::new();
         while let Some((head, payload)) = protocol::read_reply(&mut input, TOKEN).unwrap() {
@@ -257,12 +284,52 @@ mod tests {
         });
         let mut wire = Vec::new();
         let mut answered = 0;
-        answer_all(&rx, &gate, TOKEN, &mut wire, |_| {
-            answered += 1;
-            0
-        });
+        answer_all(
+            &rx,
+            &gate,
+            TOKEN,
+            &mut wire,
+            |_| {
+                answered += 1;
+                0
+            },
+            || {},
+        );
         assert_eq!(answered, 0);
         assert!(wire.is_empty());
+    }
+
+    #[test]
+    fn a_release_is_run_in_its_turn_and_gets_no_reply() {
+        let (tx, rx) = mpsc::channel();
+        for req in [
+            request(1, &["--map", "a"]),
+            request(0, &[protocol::RELEASE_FLAG]),
+            request(2, &["--map", "b"]),
+        ] {
+            tx.send(req).unwrap();
+        }
+        drop(tx);
+        let order = std::cell::RefCell::new(Vec::new());
+        let mut wire = Vec::new();
+        answer_all(
+            &rx,
+            &Mutex::new(Gate::default()),
+            TOKEN,
+            &mut wire,
+            |args| {
+                order.borrow_mut().push(args[1].clone());
+                0
+            },
+            || order.borrow_mut().push("release".into()),
+        );
+        assert_eq!(*order.borrow(), ["a", "release", "b"]);
+        let mut input = Cursor::new(wire);
+        let mut ids = Vec::new();
+        while let Some((head, _)) = protocol::read_reply(&mut input, TOKEN).unwrap() {
+            ids.push(head.id);
+        }
+        assert_eq!(ids, [1, 2]);
     }
 
     #[test]

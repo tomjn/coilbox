@@ -463,7 +463,7 @@ pub fn render(lib: &str, game_archive: &str, cache_dir: Option<&Path>) -> UnitDa
             }
         }
     };
-    us.init(false, 0);
+    us.init_game(game_archive);
     let out = resolve(&us, game_archive, cache_dir);
     us.uninit();
     out
