@@ -199,6 +199,17 @@ describe("ReplayBuildOrders", () => {
     expect(screen.getAllByRole("listitem")[0].textContent).toContain("Unit 2");
   });
 
+  it("says the total entries in the opening's show more button", async () => {
+    // Alternating units stop the opening collapsing repeats into one entry.
+    const many = Array.from({ length: 250 }, (_, i) =>
+      order({ frame: i * 30, unitDefId: 1 + (i % 2) }),
+    );
+    await open(orders(many));
+    expect(
+      screen.getByRole("button", { name: "Show 100 more of 250 entries" }),
+    ).toBeTruthy();
+  });
+
   it("draws a long list a page at a time", async () => {
     const many = Array.from({ length: 250 }, (_, i) =>
       order({ frame: i * 30 }),
@@ -206,10 +217,12 @@ describe("ReplayBuildOrders", () => {
     await open(orders(many));
     expect(screen.getAllByRole("listitem")).toHaveLength(100);
     fireEvent.click(
-      screen.getByRole("button", { name: "Show 100 more of 150" }),
+      screen.getByRole("button", { name: "Show 100 more of 250" }),
     );
     expect(screen.getAllByRole("listitem")).toHaveLength(200);
-    fireEvent.click(screen.getByRole("button", { name: "Show 50 more of 50" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Show 50 more of 250" }),
+    );
     expect(screen.getAllByRole("listitem")).toHaveLength(250);
     expect(screen.queryByRole("button", { name: /more of/ })).toBeNull();
   });

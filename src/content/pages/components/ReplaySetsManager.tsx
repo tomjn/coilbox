@@ -138,15 +138,18 @@ function SetRow({
       )}
       {missing > 0 && (
         <p className="text-xs text-muted-foreground">
-          {missing} not in your library. They stay in the set.
+          {missing} not in your library.{" "}
+          {missing === 1 ? "It stays" : "They stay"} in the set.
         </p>
       )}
       {mode === "delete" ? (
         <div className="flex flex-col gap-1.5">
           <p className="text-xs">
-            Delete the set “{set.name}”? Only the set goes. Its{" "}
-            {plural(set.members.length, "replay", "replays")} stay in your
-            library.
+            Delete the set “{set.name}”? Only the set goes.
+            {set.members.length > 0 &&
+              ` Its ${plural(set.members.length, "replay", "replays")} ${
+                set.members.length === 1 ? "stays" : "stay"
+              } in your library.`}
           </p>
           <div className="flex gap-1.5">
             <Button
