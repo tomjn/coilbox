@@ -162,6 +162,33 @@ describe("scaling each match before adding", () => {
     expect(at(got.field, QUIET)).toBeGreaterThan(0);
   });
 
+  it("keeps the cells before smoothing, mean and raw events, out of an enumeration", () => {
+    const got = aggregateLayer([quiet(), busy()], "orders", WORLD, {
+      normalise: "share",
+      window: WHOLE,
+    });
+    const grid = got.grid;
+    expect(grid).toBeDefined();
+    expect(Object.keys(got)).not.toContain("grid");
+    expect(grid?.width).toBe(256);
+    // Each match is one share, so the cell holds half of one after the mean.
+    expect(grid?.mean[QUIET]).toBeCloseTo(0.5, 6);
+    expect(grid?.mean[BUSY]).toBeCloseTo(0.5, 6);
+    expect(grid?.events[QUIET]).toBe(10);
+    expect(grid?.events[BUSY]).toBe(100);
+    const total = Array.from(grid?.events ?? []).reduce((a, b) => a + b, 0);
+    expect(total).toBe(got.events);
+  });
+
+  it("has no grid for a layer that was only counted", () => {
+    const got = aggregateLayer([quiet()], "orders", WORLD, {
+      normalise: "share",
+      window: WHOLE,
+      countsOnly: true,
+    });
+    expect(got.grid).toBeUndefined();
+  });
+
   it("rate: events a minute, so the busy match is five times brighter and not ten", () => {
     const got = aggregateLayer([quiet(), busy()], "orders", WORLD, {
       normalise: "rate",

@@ -476,6 +476,27 @@ export interface LayerAggregate {
    * for an empty layer.
    */
   atPeak: number | null;
+  /**
+   * The grid the field was smoothed from, for an export. Absent when `field`
+   * is. Not enumerable, so the aggregate can travel as a React prop without the
+   * development build walking every cell.
+   */
+  grid?: LayerGrid;
+}
+
+/**
+ * A layer's cells before any smoothing, row-major, `width * height` each, with
+ * row 0 the map's north edge and column 0 its west edge, as {@link HeatField}.
+ */
+export interface LayerGrid {
+  width: number;
+  height: number;
+  /** The mean over the contributing matches of each match's scaled amount in
+   *  the cell. This is the array the field is smoothed from. */
+  mean: Float32Array;
+  /** Events in the cell over the contributing matches, unscaled. Adds up to
+   *  `events`. */
+  events: Float32Array;
 }
 
 /** One match's counts for a layer, cut to the window: the cells and amounts,
@@ -487,6 +508,7 @@ function matchCells(
   keep: ((def: number) => boolean) | null,
   into: Float32Array,
   scale: number,
+  unscaled?: Float32Array,
 ): number {
   let total = 0;
   for (let i = 0; i < columns.entries; i++) {
@@ -495,6 +517,7 @@ function matchCells(
     if (keep && !(columns.def && keep(columns.def[i]))) continue;
     total += columns.count[i];
     if (scale !== 0) into[columns.cell[i]] += columns.count[i] * scale;
+    if (unscaled) unscaled[columns.cell[i]] += columns.count[i];
   }
   return total;
 }
@@ -530,6 +553,9 @@ export function aggregateLayer(
   );
   const sum = new Float32Array(width * height);
   const scratch = new Float32Array(width * height);
+  const unscaled = options.countsOnly
+    ? undefined
+    : new Float32Array(width * height);
   const category = LAYER_CATEGORY[layer];
   let available = 0;
   let contributing = 0;
@@ -593,7 +619,7 @@ export function aggregateLayer(
       if (!(peak > 0)) continue;
       scale = 1 / peak;
     }
-    matchCells(columns, range.lo, range.hi, keep, sum, scale);
+    matchCells(columns, range.lo, range.hi, keep, sum, scale, unscaled);
     contributing++;
     events += total;
   }
@@ -612,7 +638,7 @@ export function aggregateLayer(
     resolution: MAP_GRID_RESOLUTION,
     counted: events,
   });
-  return {
+  const out: LayerAggregate = {
     field,
     available,
     contributing,
@@ -621,6 +647,12 @@ export function aggregateLayer(
     atPeak:
       options.normalise === "peak" ? null : (field.peakWithinRadius ?? null),
   };
+  if (unscaled)
+    Object.defineProperty(out, "grid", {
+      value: { width, height, mean: sum, events: unscaled } satisfies LayerGrid,
+      enumerable: false,
+    });
+  return out;
 }
 
 const NOUN: Record<HeatLayerId, [one: string, many: string]> = {
