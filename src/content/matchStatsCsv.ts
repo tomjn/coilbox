@@ -57,7 +57,7 @@ export function csvNumber(value: number | null | undefined): string {
 }
 
 /** The battle's start as an ISO 8601 UTC timestamp, or "" when the file has none. */
-function startedAt(info: DemoInfo): string {
+export function startedAt(info: DemoInfo): string {
   const ms = info.startTimeMs;
   return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : "";
 }
@@ -150,7 +150,7 @@ export function matchStatsCsv(input: MatchStatsCsvInput): string {
 }
 
 /** Lower case letters and digits, and single hyphens between them. */
-function slug(text: string): string {
+export function slug(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
