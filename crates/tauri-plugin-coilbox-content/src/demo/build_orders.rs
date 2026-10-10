@@ -27,7 +27,7 @@ use crate::model::{
 };
 
 /// `CMD_INSERT` in `rts/Sim/Units/CommandAI/Command.h`.
-const CMD_INSERT: i32 = 1;
+pub(super) const CMD_INSERT: i32 = 1;
 
 // The option bits, from the same header.
 const RIGHT_MOUSE_KEY: u8 = 1 << 4;
@@ -53,7 +53,7 @@ pub fn demo_build_orders(demo: &Path) -> Result<DemoBuildOrders, String> {
 
 /// Map player number to team from the start script's `[playerN]` sections. A
 /// spectator has no team that can be ordered to build, and is left out.
-fn player_teams(game: &Section) -> HashMap<u32, i32> {
+pub(super) fn player_teams(game: &Section) -> HashMap<u32, i32> {
     let mut out = HashMap::new();
     for (name, sec) in &game.children {
         let Some(num) = name
@@ -72,30 +72,26 @@ fn player_teams(game: &Section) -> HashMap<u32, i32> {
     out
 }
 
-/// The build orders of a walked stream, with every other event dropped.
+/// Who is on which team at a point in the stream.
 ///
-/// `names` and `teams` are the start script's, by player number. The stream
-/// changes both as it goes: a late joiner brings a name and a seat, and a player
-/// can move to another team. An order takes the team its player was on when it
-/// arrived.
-pub(super) fn build_orders_from_stream(
-    stream: &DemoStream,
-    mut names: HashMap<u32, String>,
-    mut teams: HashMap<u32, i32>,
-) -> DemoBuildOrders {
-    let mut out = DemoBuildOrders {
-        last_frame: stream.last_frame,
-        incomplete: stream.stopped.is_some(),
-        ..Default::default()
-    };
-    // How many units each player has selected, which is who an order from the
-    // engine's own interface goes to.
-    let mut selected: HashMap<u8, u32> = HashMap::new();
+/// The start script gives both at the start. The stream changes them as it
+/// goes: a late joiner brings a name and a seat, and a player can move to
+/// another team. An order takes the team its player was on when it arrived.
+pub(super) struct Seats {
+    pub(super) names: HashMap<u32, String>,
+    teams: HashMap<u32, i32>,
+}
 
-    for e in &stream.events {
-        match &e.kind {
+impl Seats {
+    pub(super) fn new(names: HashMap<u32, String>, teams: HashMap<u32, i32>) -> Self {
+        Seats { names, teams }
+    }
+
+    /// Take in an event, if it changes who is where.
+    pub(super) fn observe(&mut self, kind: &StreamEventKind) {
+        match kind {
             StreamEventKind::PlayerName { player, name } => {
-                names
+                self.names
                     .entry(u32::from(*player))
                     .or_insert_with(|| name.clone());
             }
@@ -105,19 +101,85 @@ pub(super) fn build_orders_from_stream(
                 team,
                 name,
             } => {
-                names.insert(u32::from(*player), name.clone());
+                self.names.insert(u32::from(*player), name.clone());
                 if *spectator {
-                    teams.remove(&u32::from(*player));
+                    self.teams.remove(&u32::from(*player));
                 } else {
-                    teams.insert(u32::from(*player), i32::from(*team));
+                    self.teams.insert(u32::from(*player), i32::from(*team));
                 }
             }
             StreamEventKind::Team {
                 player,
                 action: TeamAction::JoinTeam { team },
             } => {
-                teams.insert(u32::from(*player), i32::from(*team));
+                self.teams.insert(u32::from(*player), i32::from(*team));
             }
+            _ => {}
+        }
+    }
+
+    /// The team an order belongs to. An AI's order is its AI's team's, not its
+    /// host's.
+    pub(super) fn team_of(&self, origin: &CommandOrigin, player: u8) -> Option<i32> {
+        match origin {
+            CommandOrigin::Ai { team, .. } => Some(i32::from(*team)),
+            _ => self.teams.get(&u32::from(player)).copied(),
+        }
+    }
+}
+
+/// A `CMD_INSERT` order taken apart (`CCommandAI::ExecuteInsert`).
+pub(super) struct Inserted<'a> {
+    /// A queue position when the insert carries the alt bit, a command tag when
+    /// it does not.
+    pub(super) place: f32,
+    pub(super) id: i32,
+    pub(super) options: u8,
+    pub(super) params: &'a [f32],
+}
+
+/// The command an insert wraps, or `None` when the order is not an insert or is
+/// too short to be one (fewer than three parameters is no insert at all). The
+/// engine reads all three with a plain cast, so the same here.
+pub(super) fn unwrap_insert(order: &Order) -> Option<Inserted<'_>> {
+    if order.id != CMD_INSERT {
+        return None;
+    }
+    let [place, id, options, params @ ..] = order.params.as_slice() else {
+        return None;
+    };
+    Some(Inserted {
+        place: *place,
+        id: *id as i32,
+        options: *options as u8,
+        params,
+    })
+}
+
+/// The build orders of a walked stream, with every other event dropped.
+///
+/// `names` and `teams` are the start script's, by player number. The stream
+/// changes both as it goes: a late joiner brings a name and a seat, and a player
+/// can move to another team. An order takes the team its player was on when it
+/// arrived.
+pub(super) fn build_orders_from_stream(
+    stream: &DemoStream,
+    names: HashMap<u32, String>,
+    teams: HashMap<u32, i32>,
+) -> DemoBuildOrders {
+    let mut out = DemoBuildOrders {
+        last_frame: stream.last_frame,
+        incomplete: stream.stopped.is_some(),
+        ..Default::default()
+    };
+    let mut seats = Seats::new(names, teams);
+    // How many units each player has selected, which is who an order from the
+    // engine's own interface goes to.
+    let mut selected: HashMap<u8, u32> = HashMap::new();
+
+    for e in &stream.events {
+        seats.observe(&e.kind);
+        match &e.kind {
             StreamEventKind::Select { player, units } => {
                 selected.insert(*player, units.len() as u32);
             }
@@ -134,10 +196,7 @@ pub(super) fn build_orders_from_stream(
                     _ if *pairwise => 1,
                     _ => units.len() as u32,
                 };
-                let team = match origin {
-                    CommandOrigin::Ai { team, .. } => Some(i32::from(*team)),
-                    _ => teams.get(&u32::from(*player)).copied(),
-                };
+                let team = seats.team_of(origin, *player);
                 for order in orders {
                     let b = match read_build(order) {
                         Some(Build::Order(b)) => b,
@@ -193,10 +252,13 @@ pub(super) fn build_orders_from_stream(
     out.players = players
         .into_iter()
         .filter_map(|player| {
-            names.get(&u32::from(player)).map(|name| BuildOrderPlayer {
-                player,
-                name: name.clone(),
-            })
+            seats
+                .names
+                .get(&u32::from(player))
+                .map(|name| BuildOrderPlayer {
+                    player,
+                    name: name.clone(),
+                })
         })
         .collect();
     out
@@ -235,26 +297,19 @@ fn read_build(order: &Order) -> Option<Build> {
         }
         return Some(Build::Order(facts));
     }
-    if order.id != CMD_INSERT {
+    let inserted = unwrap_insert(order)?;
+    if inserted.id >= 0 {
         return None;
     }
-    // `ExecuteInsert`: fewer than three parameters is no insert at all.
-    let [place, id, options, params @ ..] = order.params.as_slice() else {
-        return None;
-    };
-    // The engine reads all three with a plain cast, so the same here.
-    let id = *id as i32;
-    if id >= 0 {
-        return None;
-    }
-    let mut facts = build_facts(id, *options as u8, params);
+    let (place, id, params) = (inserted.place, inserted.id, inserted.params);
+    let mut facts = build_facts(id, inserted.options, params);
     facts.slot = if order.options & ALT_KEY != 0 {
         BuildSlot::InsertAt {
-            position: *place as i32,
+            position: place as i32,
         }
     } else {
         BuildSlot::InsertAtTag {
-            tag: *place as u32,
+            tag: place as u32,
             after: order.options & RIGHT_MOUSE_KEY != 0,
         }
     };
