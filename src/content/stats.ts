@@ -8,7 +8,8 @@ import type { StatRecord } from "./bindings";
  * A player is identified by their in-game name, so these aggregate over
  * `record.players` only. The match's bots are recorded separately in
  * `record.ais` (#1148) and deliberately stay out: a bot has no dossier, and its
- * name repeats across unrelated matches. Win/loss comes from the recorded
+ * name repeats across unrelated matches. The AIs a player beat are projected
+ * separately by `aiWinFacts` in `aiRecord.ts`. Win/loss comes from the recorded
  * winning ally-teams either way.
  */
 
