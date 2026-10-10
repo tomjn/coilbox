@@ -348,8 +348,10 @@ fn rejects_a_tree_that_is_not_a_tree() {
 /// were taken from the models in Balanced Annihilation 15.9.8, Metal Factions
 /// 2.58, Spring 1944 2.31, XTA 9.65 and Basically OTA 1.7.
 #[test]
+#[ignore = "needs COILBOX_3DO_CORPUS set to a folder of .3do models"]
 fn parses_the_installed_games() {
     let Some(root) = std::env::var_os("COILBOX_3DO_CORPUS").map(PathBuf::from) else {
+        eprintln!("COILBOX_3DO_CORPUS is not set, so there is nothing to sweep.");
         return;
     };
 

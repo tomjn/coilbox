@@ -94,6 +94,7 @@ fn pieces_of(lua: &str) -> Vec<String> {
 }
 
 #[test]
+#[ignore = "needs COILBOX_BOS_SWEEP set to a folder of BOS scripts and their compiled COBs"]
 fn converted_scripts_move_pieces_as_their_cobs_do() {
     let Ok(root) = std::env::var("COILBOX_BOS_SWEEP") else {
         eprintln!("COILBOX_BOS_SWEEP is not set, so there is nothing to compare.");

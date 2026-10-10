@@ -108,6 +108,7 @@ fn read(table: DefTable, key: &str, field: &str, expect: f64) -> ProbeRead {
 }
 
 #[test]
+#[ignore = "needs the game named by COILBOX_TWEAK_SLOT_GAME (default Beyond All Reason test-30922-8064a43) in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
 fn typed_values_load_as_typed_through_tweak_slots() {
     let (engine, data) = match setup() {
         Ok(v) => v,

@@ -160,6 +160,7 @@ fn worker(
 }
 
 #[test]
+#[ignore = "needs THIS.sdd in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
 fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
     let engine = match setup() {
         Ok(v) => v,
@@ -259,6 +260,7 @@ fn a_typed_maxdamage_written_in_place_loads_as_typed_in_the_engine() {
 /// game through a project field change, is settled the same way and loads as
 /// typed once its own file sits in the game (issue #3095).
 #[test]
+#[ignore = "needs THIS.sdd in ~/.spring/games, an installed engine with libunitsync, a built coilbox-unitsync-worker in target/debug"]
 fn a_copys_own_typed_maxdamage_loads_as_typed_in_the_engine() {
     let engine = match setup() {
         Ok(v) => v,
