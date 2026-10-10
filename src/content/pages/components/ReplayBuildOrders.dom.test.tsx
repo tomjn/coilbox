@@ -180,7 +180,7 @@ describe("ReplayBuildOrders", () => {
         /played on SplinterFaction 0\.1\.84, which is not installed\. Unit names come from SplinterFaction 0\.1\.88, a different build, and may be wrong/i,
       ),
     ).toBeTruthy();
-    expect(screen.getByText("Land Factory")).toBeTruthy();
+    expect(screen.getAllByText("Land Factory").length).toBeGreaterThan(0);
   });
 
   it("shows the ids when the installed game's units cannot be read", async () => {
@@ -230,6 +230,98 @@ describe("ReplayBuildOrders", () => {
       ),
     ).toBeTruthy();
     expect(screen.getByText(/later build orders may be missing/i)).toBeTruthy();
+  });
+
+  describe("opening", () => {
+    const PRICED: UnitDatasetEntry[] = [
+      { name: "condenser", fullName: "Geothermal Condenser" },
+      {
+        name: "f1landfac",
+        fullName: "Land Factory",
+        stats: { metalCost: 100, energyCost: 1000 },
+      },
+      { name: "fedengineer", stats: { metalCost: 10, energyCost: 50 } },
+    ];
+    const run = orders([
+      order({ frame: 30 * 10, unitDefId: 2 }),
+      order({ frame: 30 * 20, unitDefId: 2 }),
+      order({ frame: 30 * 30, unitDefId: 3, count: 5 }),
+      order({ frame: 30 * 40, unitDefId: 3, count: 20 }),
+      order({ frame: 30 * 150, unitDefId: 2 }),
+    ]);
+    const entries = () =>
+      screen
+        .getAllByText(/^(Land Factory|fedengineer)$/)
+        .map((e) => e.parentElement?.textContent);
+
+    it("folds repeats into one entry with a count and prices the orders", async () => {
+      GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+      DATASET = { units: PRICED };
+      await open({ ...run, removals: 7 });
+
+      // 2 + 1 land factories, 25 engineers. The raw list repeats the names
+      // but is not the first block, so read the opening's rows by their time.
+      const rows = entries();
+      expect(rows[0]).toContain("0:10");
+      expect(rows[0]).toContain("×2");
+      expect(rows[1]).toContain("0:30");
+      expect(rows[1]).toContain("×25");
+      expect(rows[2]).toContain("2:30");
+
+      // 3 factories at 100 metal, 1000 energy. 25 engineers at 10 and 50.
+      // Queue removals are not subtracted.
+      expect(
+        screen.getByText(
+          /not of what was built: 550 metal and 4,250 energy\./i,
+        ),
+      ).toBeTruthy();
+    });
+
+    it("cuts the opening at the minute the reader types", async () => {
+      GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+      DATASET = { units: PRICED };
+      await open(run);
+      fireEvent.change(screen.getByRole("textbox"), { target: { value: "1" } });
+      expect(screen.getByText(/first 1 min/i)).toBeTruthy();
+      expect(
+        screen.getByText(
+          /not of what was built: 450 metal and 3,250 energy\./i,
+        ),
+      ).toBeTruthy();
+      fireEvent.change(screen.getByRole("textbox"), {
+        target: { value: "0" },
+      });
+      expect(
+        screen.getByText(/no orders were given in this stretch/i),
+      ).toBeTruthy();
+    });
+
+    it("counts units with no cost as left out", async () => {
+      GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+      DATASET = { units: PRICED };
+      await open(orders([order({ unitDefId: 1, count: 2 })]));
+      expect(
+        screen.getByText(/2 units could not be priced and are left out/i),
+      ).toBeTruthy();
+    });
+
+    it("warns that costs may be wrong on a different build", async () => {
+      GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
+      DATASET = { units: PRICED };
+      await open(run, "SplinterFaction 0.1.84");
+      expect(
+        screen.getByText(/costs come from a different build and may be wrong/i),
+      ).toBeTruthy();
+    });
+
+    it("shows the collapsed ids and no totals when the game is not installed", async () => {
+      GAMES = [game("Metal Factions v2.58", "metal_factions-v2.58.sdz")];
+      DATASET = { units: PRICED };
+      await open(run, "Beyond All Reason test-30018-d71d659");
+      expect(screen.getAllByText("Unit 2").length).toBeGreaterThan(0);
+      expect(screen.getByText("×25")).toBeTruthy();
+      expect(screen.queryByText(/cost of what was ordered/i)).toBeNull();
+    });
   });
 
   it("says so when the replay holds no build orders", async () => {
