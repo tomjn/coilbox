@@ -63,7 +63,7 @@ function bytesOf(text: string): Uint8Array {
  * because a column that does not line up with the others would put an order
  * somewhere it was not.
  */
-function column<T extends ArrayLike<number>>(
+export function column<T extends ArrayLike<number>>(
   text: string,
   make: new (buffer: ArrayBuffer) => T,
   width: number,
