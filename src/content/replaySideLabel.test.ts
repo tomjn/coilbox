@@ -62,7 +62,10 @@ describe("teamResultLabel", () => {
  * guards against a deleted CSS tier coming back.
  */
 const HERE = fileURLToPath(new URL(".", import.meta.url));
-const ROSTER = readFileSync(`${HERE}pages/ReplayDetailPage.tsx`, "utf8");
+// The roster table moved out of the page into its own component (#1143).
+const ROSTER =
+  readFileSync(`${HERE}pages/ReplayDetailPage.tsx`, "utf8") +
+  readFileSync(`${HERE}pages/components/ReplayRoster.tsx`, "utf8");
 const STATS_SECTION = readFileSync(
   `${HERE}pages/components/MatchStatsSection.tsx`,
   "utf8",
