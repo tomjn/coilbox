@@ -2295,21 +2295,8 @@ pub(crate) async fn content_replay_map_grids<R: Runtime>(
         if let Some(cache) = &cache {
             sweep_map_grids_once(cache, &roots);
         }
-        let mut replays = Vec::new();
-        let mut failed = Vec::new();
-        for path in paths {
-            let demo = PathBuf::from(&path);
-            let read = if is_listed_replay(&demo, &roots) {
-                map_grids::replay_grids(&demo, &grid, cache.as_deref(), analyses.as_deref())
-            } else {
-                Err("not in a folder the Replays list reads".to_string())
-            };
-            match read {
-                Ok(grids) => replays.push(grids),
-                Err(error) => failed.push(json!({ "path": path, "error": error })),
-            }
-        }
-        (replays, failed)
+        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        map_grids::listed_replay_grids(&paths, &grid, cache.as_deref(), analyses.as_deref(), &roots)
     })
     .await
     {

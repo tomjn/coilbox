@@ -209,8 +209,11 @@ pub struct DeathLayer {
     /// cancelled build and a self destruct. They are counted in `layer` like
     /// any other, as the replay's own page counts them.
     pub unattacked: u32,
-    /// True when the events came from an earlier logger than this app ships.
-    pub outdated: bool,
+    /// Deaths left out because the log places them at exactly the map's north
+    /// west corner. The logger writes 0 for a position the engine did not give,
+    /// so such a death is far more likely to have no position than to have
+    /// happened there, and drawing it would light a corner nothing died in.
+    pub no_position: u32,
 }
 
 /// One replay, reduced.
@@ -314,31 +317,31 @@ pub fn reduce_replay(demo: &Path, grid: &Grid) -> Result<ReplayGrids, String> {
 
 /// What says whether a match's stored analysis is the one a kept file counted:
 /// when it was written. `None` when there is no analysis with events.
-fn analysis_signature(analyses: &Path, game_id: &str) -> Option<(u64, bool)> {
+fn analysis_signature(analyses: &Path, game_id: &str) -> Option<u64> {
     let stored = store::read(analyses, game_id).ok().flatten()?;
-    match stored.state {
-        AnalysisState::Diverged => None,
-        AnalysisState::Outdated => Some((stored.provenance.analysed_at_ms, true)),
-        AnalysisState::Current => Some((stored.provenance.analysed_at_ms, false)),
-    }
+    (stored.state != AnalysisState::Diverged).then_some(stored.provenance.analysed_at_ms)
 }
 
 /// Count where units died in a match's stored analysis.
-pub fn reduce_deaths(
-    analyses: &Path,
-    game_id: &str,
-    grid: &Grid,
-    outdated: bool,
-) -> Option<DeathLayer> {
+///
+/// The rule for what counts is the replay page's own (`placedEvents` in
+/// `src/content/replayEventLayers.ts`): every `unit_destroyed` line with a
+/// frame and a position, whether or not it names an attacker.
+pub fn reduce_deaths(analyses: &Path, game_id: &str, grid: &Grid) -> Option<DeathLayer> {
     let kinds = ["unit_destroyed".to_string()];
     let page = store::read_events(analyses, game_id, Some(&kinds), 0, None).ok()?;
     let mut counts = Counts::default();
     let mut unattacked = 0;
+    let mut no_position = 0;
     for event in &page.events {
         let number = |key: &str| event.get(key).and_then(|v| v.as_f64());
         let (Some(x), Some(z), Some(frame)) = (number("x"), number("z"), number("frame")) else {
             continue;
         };
+        if x == 0.0 && z == 0.0 {
+            no_position += 1;
+            continue;
+        }
         if number("attacker").is_none() && number("attackerTeam").is_none() {
             unattacked += 1;
         }
@@ -347,7 +350,7 @@ pub fn reduce_deaths(
     Some(DeathLayer {
         layer: counts.pack(false),
         unattacked,
-        outdated,
+        no_position,
     })
 }
 
@@ -438,10 +441,9 @@ pub fn replay_grids(
     let analysis = analyses
         .zip(game_id.as_deref())
         .and_then(|(dir, id)| analysis_signature(dir, id).map(|sig| (dir, id, sig)));
-    let deaths_from = analysis.map(|(_, _, (at, _))| at);
+    let deaths_from = analysis.map(|(_, _, at)| at);
     if walked || kept_deaths_from != deaths_from {
-        grids.deaths =
-            analysis.and_then(|(dir, id, (_, outdated))| reduce_deaths(dir, id, grid, outdated));
+        grids.deaths = analysis.and_then(|(dir, id, _)| reduce_deaths(dir, id, grid));
         if let Some(path) = &kept_path {
             let _ = save_kept(
                 path,
@@ -461,6 +463,47 @@ pub fn replay_grids(
     }
     grids.from_cache = !walked;
     Ok(grids)
+}
+
+/// A replay that was asked for and not reduced, and why.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GridFailure {
+    pub path: String,
+    pub error: String,
+}
+
+/// [`replay_grids`] for paths the frontend handed over, one replay at a time.
+///
+/// A path is input, so each must be a replay in a folder the Replays list
+/// reads under `roots`, by the same test the delete commands apply
+/// ([`super::is_listed_replay`]). One that is not is refused and nothing of it
+/// is opened. A replay that will not read is a failure of its own and does not
+/// stop the rest.
+pub fn listed_replay_grids(
+    paths: &[PathBuf],
+    grid: &Grid,
+    cache_dir: Option<&Path>,
+    analyses: Option<&Path>,
+    roots: &[PathBuf],
+) -> (Vec<ReplayGrids>, Vec<GridFailure>) {
+    let mut replays = Vec::new();
+    let mut failed = Vec::new();
+    for demo in paths {
+        let read = if super::is_listed_replay(demo, roots) {
+            replay_grids(demo, grid, cache_dir, analyses)
+        } else {
+            Err("not in a folder the Replays list reads".to_string())
+        };
+        match read {
+            Ok(grids) => replays.push(grids),
+            Err(error) => failed.push(GridFailure {
+                path: demo.to_string_lossy().into_owned(),
+                error,
+            }),
+        }
+    }
+    (replays, failed)
 }
 
 /// Delete every kept file that is not for one of `live`, and say how many
@@ -707,6 +750,8 @@ mod tests {
         let events = [
             death(10, 100.0, 1000.0, Some(3)),
             death(FRAMES_PER_SLICE * 2, 100.0, 1000.0, None),
+            // The logger's stand in for a position the engine did not give.
+            death(20, 0.0, 0.0, Some(3)),
             LogLine::UnitFinished(UnitEvent::default()),
         ];
         store::write(
@@ -724,7 +769,8 @@ mod tests {
             vec![(0, 31 * 256 + 3, 1), (2, 31 * 256 + 3, 1)]
         );
         assert_eq!(deaths.unattacked, 1);
-        assert!(!deaths.outdated);
+        assert_eq!(deaths.no_position, 1);
+        assert_eq!(deaths.layer.total, 2);
     }
 
     #[test]
@@ -874,6 +920,47 @@ mod tests {
 
         store::delete(&analyses, &id).unwrap();
         assert_eq!(read().deaths, None);
+    }
+
+    /// The check the delete commands make: only a replay in a folder the list
+    /// reads. A file elsewhere is refused before it is opened, and so is
+    /// anything that is not a replay.
+    #[test]
+    fn a_path_outside_the_replay_folders_is_refused() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("root");
+        let demos = root.join("demos");
+        std::fs::create_dir_all(&demos).unwrap();
+        let cache = tmp.path().join("cache");
+        let inside = replay(&demos, "in.sdfz", short_match(), 7);
+        let outside = replay(tmp.path(), "out.sdfz", short_match(), 8);
+        let sneaky = demos.join("..").join("..").join("out.sdfz");
+        let not_a_replay = demos.join("notes.txt");
+        std::fs::write(&not_a_replay, b"x").unwrap();
+
+        let (replays, failed) = listed_replay_grids(
+            &[
+                inside.clone(),
+                outside.clone(),
+                sneaky,
+                not_a_replay,
+                demos.join("gone.sdfz"),
+            ],
+            &GRID,
+            Some(&cache),
+            None,
+            std::slice::from_ref(&root),
+        );
+        assert_eq!(replays.len(), 1);
+        assert_eq!(replays[0].path, inside.to_string_lossy());
+        assert_eq!(failed.len(), 4);
+        for refused in &failed[..3] {
+            assert_eq!(refused.error, "not in a folder the Replays list reads");
+        }
+        // In the folder and missing: let through, and it fails to read.
+        assert!(failed[3].error.starts_with("read demo"), "{:?}", failed[3]);
+        // Nothing was kept for a refused path.
+        assert_eq!(std::fs::read_dir(&cache).unwrap().count(), 1);
     }
 
     #[test]
