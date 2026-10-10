@@ -157,6 +157,46 @@ describe("replay sets on the replays page", () => {
     expect(stored("content.replaySets")).toHaveLength(1);
   });
 
+  it.each([
+    [[], "Delete the set “Finals”? Only the set goes."],
+    [
+      [{ filename: "b.sdfz" }],
+      "Delete the set “Finals”? Only the set goes. Its 1 replay stays in your library.",
+    ],
+    [
+      [{ filename: "a.sdfz" }, { filename: "b.sdfz" }],
+      "Delete the set “Finals”? Only the set goes. Its 2 replays stay in your library.",
+    ],
+  ])("words the delete confirmation for members %j", async (members, text) => {
+    storage.set(
+      "content.replaySets",
+      JSON.stringify([{ id: "s1", name: "Finals", members }]),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /^Sets \(1\)$/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete set" }));
+    const confirm = await screen.findByText(/Only the set goes/);
+    expect(confirm.textContent).toBe(text);
+  });
+
+  it.each([
+    [1, "1 not in your library. It stays in the set."],
+    [2, "2 not in your library. They stay in the set."],
+  ])("words the missing note for %i missing", async (count, text) => {
+    const members = Array.from({ length: count }, (_, i) => ({
+      filename: `gone${i}.sdfz`,
+    }));
+    storage.set(
+      "content.replaySets",
+      JSON.stringify([{ id: "s1", name: "Finals", members }]),
+    );
+    renderPage();
+    fireEvent.click(screen.getByRole("button", { name: /^Sets \(1\)$/ }));
+    expect((await screen.findByText(/not in your library/)).textContent).toBe(
+      text,
+    );
+  });
+
   it("adds every shown replay to a set and deletes the set without touching replays", async () => {
     storage.set(
       "content.replaySets",
