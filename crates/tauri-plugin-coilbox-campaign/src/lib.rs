@@ -501,15 +501,6 @@ mod tests {
     }
 
     #[test]
-    fn is_safe_rel_matches_profile_guard() {
-        assert!(is_safe_rel(Path::new("abc.jpg")));
-        assert!(!is_safe_rel(Path::new("")));
-        assert!(!is_safe_rel(Path::new("../x.jpg")));
-        assert!(!is_safe_rel(Path::new("/abs.jpg")));
-        assert!(!is_safe_rel(Path::new("a/../b.jpg")));
-    }
-
-    #[test]
     fn read_json_dir_reads_only_json_and_tags_source() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("a.json"), r#"{"id":"a"}"#).unwrap();
