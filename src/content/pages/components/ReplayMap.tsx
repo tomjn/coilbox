@@ -10,6 +10,7 @@ import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
 import { isProfileHidden } from "../../../profile/hidden";
 import type { DemoInfo, StartBox } from "../../bindings";
 import { useStoredColorMode } from "../../chartColorMode";
+import { FRAMES_PER_SECOND } from "../../chatClock";
 import { playerTeam } from "../../matchStats";
 import {
   type BuildMark,
@@ -29,14 +30,22 @@ import {
 } from "../../replayMapLayers";
 import { layersOn, useStoredMapLayers } from "../../replayMapLayerToggles";
 import { teamLabel } from "../../replaySideLabel";
+import { timelineDomain } from "../../replayTimeline";
+import {
+  activitySeries,
+  filterByFrame,
+  windowRange,
+} from "../../replayTimeWindow";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import { useMatchStats } from "../../useMatchStats";
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
+import { useReplayTimeWindow } from "../../useReplayTimeWindow";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
+import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
 
 /** How many pixels wide the marks are drawn at, before the page scales the
  *  canvas to the map's box. Twice the box's widest, so marks stay sharp on a
@@ -272,17 +281,54 @@ export function ReplayMap({
     [sized, info, world, colours, meTeam, openings],
   );
 
-  const built = useMemo(
+  // The time window (#1153). The layers that have a time to filter by are read
+  // through it, and the ones that are set before the game are not.
+  const windowed = on.buildings || on.density;
+  const domainSec = Math.ceil(
+    timelineDomain(
+      [{ second: result ? result.lastFrame / FRAMES_PER_SECOND : null }],
+      info.durationSec,
+      result?.incomplete ?? false,
+    ),
+  );
+  const [timeWindow, setTimeWindow] = useReplayTimeWindow(
+    replayPath ?? "",
+    domainSec,
+  );
+  const inWindow = useMemo(
     () =>
-      result && sized ? buildMarks(result.orders, world, units.units) : null,
-    [result, sized, world, units.units],
+      result
+        ? filterByFrame(result.orders, windowRange(timeWindow, domainSec))
+        : null,
+    [result, timeWindow, domainSec],
+  );
+  const placedCount = useMemo(
+    () => ({
+      inside: inWindow?.filter((o) => o.position).length ?? 0,
+      total: result?.orders.filter((o) => o.position).length ?? 0,
+    }),
+    [inWindow, result],
+  );
+  const activity = useMemo(
+    () =>
+      activitySeries(
+        stats.data?.trailer ?? null,
+        info,
+        stats.data?.metrics ?? [],
+      ),
+    [stats.data, info],
+  );
+
+  const built = useMemo(
+    () => (inWindow && sized ? buildMarks(inWindow, world, units.units) : null),
+    [inWindow, sized, world, units.units],
   );
   const field = useMemo(
     () =>
-      result && sized && on.density
-        ? buildHeatField(buildingHeatPoints(result.orders), world)
+      inWindow && sized && on.density
+        ? buildHeatField(buildingHeatPoints(inWindow), world)
         : null,
-    [result, sized, world, on.density],
+    [inWindow, sized, world, on.density],
   );
 
   const emphasis = useSeriesEmphasis();
@@ -419,6 +465,16 @@ export function ReplayMap({
               detail="Start boxes come from the match setup."
             />
 
+            {windowed && (
+              <ReplayTimeWindowControl
+                domainSec={domainSec}
+                window={timeWindow}
+                onChange={setTimeWindow}
+                activity={activity}
+                count={result ? placedCount : null}
+              />
+            )}
+
             {on.startBoxes && !hasBoxes && (
               <p className="text-xs text-muted-foreground">
                 This match set no start boxes.
@@ -454,7 +510,7 @@ export function ReplayMap({
                 The build orders could not be read from this replay.
               </p>
             )}
-            {wantOrders && built && placed === 0 && (
+            {wantOrders && built && placedCount.total === 0 && (
               <p className="text-xs text-muted-foreground">
                 No buildings were ordered in this replay.
               </p>
@@ -514,7 +570,7 @@ export function ReplayMap({
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
-                peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot`}
+                peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
               />
             )}
           </>
