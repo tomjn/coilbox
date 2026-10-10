@@ -146,6 +146,7 @@ export function MatchStatsSection({
           info={info}
           trailer={data.trailer}
           metrics={data.metrics}
+          replayPath={replayPath}
         />
       </>
     );
