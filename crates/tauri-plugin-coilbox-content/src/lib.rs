@@ -1155,6 +1155,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             stats_watcher::content_stats_watch_start,
             stats_watcher::content_stats_watch_stop,
             demo::content_demo_chat,
+            demo::content_demo_build_orders,
             demo::content_rewrite_demo,
             demo::content_delete_replay,
             demo::content_delete_replays,

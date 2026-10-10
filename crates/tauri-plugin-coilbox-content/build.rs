@@ -23,6 +23,7 @@ const COMMANDS: &[&str] = &[
     "content_stats_watch_start",
     "content_stats_watch_stop",
     "content_demo_chat",
+    "content_demo_build_orders",
     "content_rewrite_demo",
     "content_delete_replay",
     "content_delete_replays",

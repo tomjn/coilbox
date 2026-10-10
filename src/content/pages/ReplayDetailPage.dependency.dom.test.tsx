@@ -110,6 +110,9 @@ vi.mock("./components/MatchStatsSection", () => ({
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
+vi.mock("./components/ReplayBuildOrders", () => ({
+  ReplayBuildOrders: () => null,
+}));
 vi.mock("../../play/LaunchContentProvider", () => ({
   useLaunchContent: () => ({ ensureContent: async () => ({ ready: true }) }),
 }));

@@ -23,6 +23,7 @@ permissions = [
   "allow-content-stats-watch-start",
   "allow-content-stats-watch-stop",
   "allow-content-demo-chat",
+  "allow-content-demo-build-orders",
   "allow-content-rewrite-demo",
   "allow-content-delete-replay",
   "allow-content-delete-replays",

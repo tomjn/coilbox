@@ -53,6 +53,7 @@ import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
+import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayRoster, swatch } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
@@ -819,6 +820,9 @@ export default function ReplayDetailPage() {
              * question the roster raises. */}
             {replay && !isProfileHidden("analytics.matchStats") && (
               <MatchStatsSection info={info} replayPath={replay.path} />
+            )}
+            {replay && !isProfileHidden("analytics.matchStats") && (
+              <ReplayBuildOrders info={info} replayPath={replay.path} />
             )}
           </SeriesEmphasisProvider>
 
