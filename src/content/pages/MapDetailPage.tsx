@@ -46,6 +46,7 @@ import { type MapSize, sameMapFamily } from "../mapVersions";
 import { refightFilenames, useReplayUserState } from "../replayUserState";
 import { allPlayers, guessPrimaryPlayer, mapRecordFor } from "../stats";
 import { usePlayMap } from "../usePlayMap";
+import { useStartNames } from "../useStartNames";
 import { ArchiveRow } from "./components/ArchiveRow";
 import { DeleteArchiveButton } from "./components/DeleteArchiveButton";
 import { MapAggregate } from "./components/MapAggregate";
@@ -140,6 +141,9 @@ export default function MapDetailPage() {
     statsRoots,
     selected?.enginePath,
   );
+  // The player's names for this map's start positions, which the markers on
+  // the preview use for the positions the map declares.
+  const { stored: startNames } = useStartNames(decoded);
   const { state: replayUserState } = useReplayUserState();
   const refights = useMemo(
     () => refightFilenames(replayUserState),
@@ -428,7 +432,10 @@ export default function MapDetailPage() {
                     key={m.key}
                     className="absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white bg-primary shadow"
                     style={{ left: `${m.left}%`, top: `${m.top}%` }}
-                    title={`Start position ${i + 1}`}
+                    title={
+                      startNames.find((e) => e.key === `d${i + 1}`)?.name ??
+                      `Start position ${i + 1}`
+                    }
                   />
                 ))}
               </div>

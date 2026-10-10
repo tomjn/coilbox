@@ -46,7 +46,16 @@ import {
 import { useStoredAnalyses } from "../../replayAnalysis";
 import { type MapWorld, mapFraction } from "../../replayMapLayers";
 import { findSet, resolveSet, useReplaySets } from "../../replaySets";
+import {
+  resolveNames,
+  type StartRow,
+  type StoredName,
+  startRows,
+  withNames,
+  withoutName,
+} from "../../startNames";
 import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
+import { useStartNames } from "../../useStartNames";
 import { MapRecords, PlaceNumber } from "./MapRecords";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { VersionList, VersionSpan } from "./VersionList";
@@ -302,13 +311,40 @@ export function MapAggregate({
     () => placeRecords(joined.starts, declared, world),
     [joined, declared, world],
   );
+  // The player's names for the positions above, and the rows they join.
+  const { stored, save } = useStartNames(mapName);
+  const resolved = useMemo(
+    () =>
+      resolveNames(
+        stored,
+        startRecords.places.map((p) => p.place),
+        startRecords.scale,
+      ),
+    [stored, startRecords],
+  );
+  const rows = useMemo(
+    () =>
+      startRows(
+        startRecords.places,
+        new Map([...resolved.byPlace].map(([key, e]) => [key, e.name])),
+      ),
+    [startRecords, resolved],
+  );
+  const rename = (row: StartRow, name: string) =>
+    save(withNames(stored, resolved, row.places, name));
+  const forget = (entry: StoredName) => save(withoutName(stored, entry));
+  // A mark takes the number and name of the row its position is in.
   const marks = useMemo(
     () =>
-      startRecords.places.flatMap((p) => {
-        const at = mapFraction(p.place, world);
-        return at ? [{ ...at, n: p.place.number, key: p.place.key }] : [];
-      }),
-    [startRecords, world],
+      rows.flatMap((row) =>
+        row.places.flatMap((place) => {
+          const at = mapFraction(place, world);
+          return at
+            ? [{ ...at, n: row.number, name: row.name, key: place.key }]
+            : [];
+        }),
+      ),
+    [rows, world],
   );
 
   const heatRef = useRef<HTMLCanvasElement | null>(null);
@@ -616,13 +652,19 @@ export function MapAggregate({
                       key={m.key}
                       data-layer="start-places"
                       data-testid={`start-mark-${m.n}`}
-                      className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                      title={m.name ?? undefined}
+                      className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center${m.name ? "" : " pointer-events-none"}`}
                       style={{
                         left: `${m.left * 100}%`,
                         top: `${m.top * 100}%`,
                       }}
                     >
                       <PlaceNumber n={m.n} />
+                      {m.name && (
+                        <span className="absolute left-full ml-1 max-w-24 overflow-hidden text-ellipsis whitespace-nowrap rounded bg-black/70 px-1 text-[10px] text-white">
+                          {m.name}
+                        </span>
+                      )}
                     </span>
                   ))}
               </div>
@@ -763,6 +805,10 @@ export function MapAggregate({
             elsewhere={elsewhere}
             joined={joined}
             records={startRecords}
+            rows={rows}
+            orphans={resolved.orphans}
+            onRename={rename}
+            onDeleteName={forget}
             reading={read.reading}
           />
         </>

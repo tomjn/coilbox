@@ -1,3 +1,4 @@
+import { Button } from "@picoframe/frame";
 import { useMemo } from "react";
 import {
   Table,
@@ -19,6 +20,8 @@ import {
   teamRecord,
   withResult,
 } from "../../mapRecords";
+import type { StartRow, StoredName } from "../../startNames";
+import { PlaceNameInput } from "./PlaceNameInput";
 import { VersionSpan } from "./VersionList";
 
 const plural = (n: number, one: string, many: string) =>
@@ -37,6 +40,16 @@ export function PlaceNumber({ n }: { n: number }) {
       {n}
     </span>
   );
+}
+
+/** Where a row's position or positions are. */
+function describeRow(row: StartRow): string {
+  if (row.places.length > 1)
+    return `${row.places.length.toLocaleString()} places with this name`;
+  const place = row.places[0];
+  return place.kind === "declared"
+    ? "Declared by the map"
+    : `Around ${Math.round(place.x).toLocaleString()}, ${Math.round(place.z).toLocaleString()}${place.radius > 0 ? `, within ${elmos(place.radius)}` : ""}`;
 }
 
 /** What a position's record means in the arrangement the matches share. */
@@ -65,6 +78,10 @@ export function MapRecords({
   elsewhere,
   joined,
   records,
+  rows,
+  orphans,
+  onRename,
+  onDeleteName,
   reading,
   versions,
   mapName,
@@ -78,6 +95,12 @@ export function MapRecords({
   elsewhere: AggregateMatch[];
   joined: JoinedStarts;
   records: StartRecords;
+  /** The start table's rows: a position, or positions that share a name. */
+  rows: StartRow[];
+  /** Names that found no position in the matches above. */
+  orphans: StoredName[];
+  onRename: (row: StartRow, name: string) => void;
+  onDeleteName: (entry: StoredName) => void;
   reading: boolean;
 }) {
   const teams = useMemo(() => teamRecord(shown), [shown]);
@@ -88,7 +111,7 @@ export function MapRecords({
   const split = format === "duel" || format === "teams";
 
   const decided = withResult(shown);
-  const byAi = records.places.reduce((n, p) => n + p.byAi, 0);
+  const byAi = rows.reduce((n, r) => n + r.byAi, 0);
 
   return (
     <div className="flex flex-col gap-4" data-testid="map-records">
@@ -203,6 +226,7 @@ export function MapRecords({
             <TableHeader>
               <TableRow>
                 <TableHead className="w-0">No.</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Place</TableHead>
                 <TableHead className="text-right">Taken</TableHead>
                 <TableHead className="text-right">Result</TableHead>
@@ -215,19 +239,19 @@ export function MapRecords({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {records.places.map((p) => (
-                <TableRow
-                  key={p.place.key}
-                  data-testid={`start-row-${p.place.number}`}
-                >
+              {rows.map((p) => (
+                <TableRow key={p.key} data-testid={`start-row-${p.number}`}>
                   <TableCell>
-                    <PlaceNumber n={p.place.number} />
+                    <PlaceNumber n={p.number} />
                   </TableCell>
                   <TableCell>
-                    {p.place.kind === "declared"
-                      ? "Declared by the map"
-                      : `Around ${Math.round(p.place.x).toLocaleString()}, ${Math.round(p.place.z).toLocaleString()}${p.place.radius > 0 ? `, within ${elmos(p.place.radius)}` : ""}`}
+                    <PlaceNameInput
+                      value={p.name}
+                      label={`Name for place ${p.number}`}
+                      onCommit={(name) => onRename(p, name)}
+                    />
                   </TableCell>
+                  <TableCell>{describeRow(p)}</TableCell>
                   <TableCell className="text-right">{p.taken}</TableCell>
                   <TableCell className="text-right">
                     {wonOf(p.won, p.known)}
@@ -250,9 +274,10 @@ export function MapRecords({
           </Table>
         )}
         <p className="text-xs text-muted-foreground" data-testid="starts-basis">
-          {arrangementNote(format)} Taken is the number of starts at the place,
-          and the result column counts only those in a match with a recorded
-          result.
+          {arrangementNote(format)} Names are yours, kept on this computer for{" "}
+          {mapName} by its exact name, and positions you give one name are one
+          row, counted together. Taken is the number of starts at the place, and
+          the result column counts only those in a match with a recorded result.
           {versions > 1 &&
             ` With more than one version in, every start is placed on ${mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance.`}
           {records.tolerance !== null &&
@@ -262,6 +287,37 @@ export function MapRecords({
           {byAi > 0 &&
             ` ${plural(byAi, "start was", "starts were")} taken by an AI and ${byAi === 1 ? "is" : "are"} counted.`}
         </p>
+        {!reading && orphans.length > 0 && (
+          <div className="flex flex-col gap-1" data-testid="orphan-names">
+            <p className="text-xs text-muted-foreground">
+              Saved names that match no place in the matches above. They are
+              kept until you delete them, and a name is used again if a place
+              turns up where it was.
+            </p>
+            <ul className="flex flex-col gap-1">
+              {orphans.map((o) => (
+                <li
+                  key={`${o.key}:${o.name}`}
+                  className="flex items-center gap-2 text-xs"
+                >
+                  <span>{o.name}</span>
+                  <span className="text-muted-foreground">
+                    was around {Math.round(o.x).toLocaleString()},{" "}
+                    {Math.round(o.z).toLocaleString()}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Delete the name ${o.name}`}
+                    onClick={() => onDeleteName(o)}
+                  >
+                    Delete
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {(joined.noTeamIds > 0 ||
           joined.noSeat > 0 ||
           joined.noStarts > 0 ||
