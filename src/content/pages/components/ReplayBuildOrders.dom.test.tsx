@@ -43,6 +43,7 @@ vi.mock("../../config", () => ({
 }));
 
 const { ReplayBuildOrders } = await import("./ReplayBuildOrders");
+const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
@@ -86,6 +87,8 @@ const info = (gameType: string) =>
 
 afterEach(() => {
   cleanup();
+  // The read is shared across the page, so it outlives a render.
+  resetReplayBuildOrders();
   GAMES = [];
   DATASET = null;
   ASKED = [];
