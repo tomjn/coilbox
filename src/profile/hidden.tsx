@@ -16,6 +16,34 @@ import { canonicalProfileId } from "./renamedIds";
  */
 
 /**
+ * Replay analytics keys (milestone 17, #1170). Unlike the nav ids below, these
+ * hide sections inside a page, so a distribution can switch each part off
+ * separately. `analytics.run` is its own key because it is the only part that
+ * costs anything: it runs the engine over a replay.
+ *
+ * A surface gates itself with one line, `!isProfileHidden("analytics.<name>")`,
+ * written as a string literal so the call site scan in `hidden.test.ts` sees it.
+ */
+export const ANALYTICS_HIDE_IDS: string[] = [
+  "analytics.matchStats",
+  "analytics.spatialLayers",
+  "analytics.mapInsight",
+  "analytics.run",
+];
+
+/**
+ * The analytics keys no surface gates on yet. A profile may list them, so they
+ * stay in `HIDEABLE_NAV_IDS`, but they do nothing until their issue lands.
+ * Remove a key from here in the same change that gates its surface: the test
+ * in `hidden.test.ts` fails if a key is listed here and also gated.
+ */
+export const UNWIRED_ANALYTICS_IDS: string[] = [
+  "analytics.spatialLayers",
+  "analytics.mapInsight",
+  "analytics.run",
+];
+
+/**
  * Nav ids that opt into profile hiding via `isProfileHidden(id)`. Hiding is opt-in
  * per nav item, with no central registry, so this is the authoritative set the
  * profile's `hide` list can actually affect — anything else is a silent no-op. The
@@ -44,6 +72,7 @@ export const HIDEABLE_NAV_IDS: string[] = [
   "runlite.list",
   "career.overview",
   "campaign.builder",
+  ...ANALYTICS_HIDE_IDS,
 ];
 
 /**

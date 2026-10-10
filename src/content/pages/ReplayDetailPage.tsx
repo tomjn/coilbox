@@ -26,6 +26,7 @@ import { QueueProgress } from "../../downloads/pages/components/ProgressBar";
 import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { MapPreview3D } from "../../mapconv/pages/components/MapPreview3D";
 import { useReplayTarget } from "../../play/config";
+import { isProfileHidden } from "../../profile/hidden";
 import type {
   AllyTeamInfo,
   DemoInfo,
@@ -1078,7 +1079,9 @@ export default function ReplayDetailPage() {
           {/* Directly under the roster (#1200). The roster is where a player is
            * already reading per-seat numbers, and the chart answers the question
            * the roster raises. */}
-          {replay && <MatchStatsSection info={info} replayPath={replay.path} />}
+          {replay && !isProfileHidden("analytics.matchStats") && (
+            <MatchStatsSection info={info} replayPath={replay.path} />
+          )}
 
           <ReplayNotes filename={filename} />
 

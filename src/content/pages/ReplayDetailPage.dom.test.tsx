@@ -12,11 +12,31 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 /** The one replay file the list holds. Set by each test before it renders. */
 let FILE = "";
+/** The profile's `hide` list. Set by each test before it renders. */
+let HIDE: string[] = [];
+/** The parsed replay header. `null` until a test needs the loaded page. */
+let INFO: object | null = null;
+const LOADED_INFO = {
+  engineVersion: "",
+  startTimeMs: 0,
+  durationSec: 0,
+  wallclockSec: 0,
+  mapName: "Some Map",
+  gameType: "Some Game",
+  winningAllyTeams: [],
+  winnersKnown: false,
+  numAllyTeams: 0,
+  allyTeams: [],
+  players: [],
+  ais: [],
+  modOptions: {},
+  mapOptions: {},
+};
 const NOT_FOUND = /isn't in the current scan/;
 
 vi.mock("../config", () => ({
   invalidateMapPreview: () => {},
-  useDemoInfo: () => ({ info: null, loading: false, error: null }),
+  useDemoInfo: () => ({ info: INFO, loading: false, error: null }),
   useReplays: () => ({
     replays: [
       {
@@ -47,7 +67,10 @@ vi.mock("../../play/config", () => ({
   useReplayTarget: () => ({ resolved: null }),
 }));
 vi.mock("../useReplayEngine", () => ({
-  useReplayEngine: () => ({ watch: { kind: "direct" } }),
+  useReplayEngine: () => ({
+    watch: { kind: "direct" },
+    notice: { kind: "none" },
+  }),
 }));
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({
@@ -67,8 +90,18 @@ vi.mock("../../downloads/pages/components/ProgressBar", () => ({
 vi.mock("../../mapconv/pages/components/MapPreview3D", () => ({
   MapPreview3D: () => null,
 }));
+vi.mock("../../profile/profile", async (orig) => ({
+  ...(await orig<typeof import("../../profile/profile")>()),
+  getProfile: () => ({ version: 1, hide: HIDE }),
+}));
 vi.mock("./components/MatchStatsSection", () => ({
-  MatchStatsSection: () => null,
+  MatchStatsSection: () => <p>match stats section</p>,
+}));
+vi.mock("../../play/LaunchContentProvider", () => ({
+  useLaunchContent: () => ({ ensureContent: async () => ({ ready: true }) }),
+}));
+vi.mock("../../play/PlayProvider", () => ({
+  usePlay: () => ({ running: false, launchReplay: async () => ({}) }),
 }));
 vi.mock("./components/RefightPanel", () => ({ RefightPanel: () => null }));
 vi.mock("./components/RemixPanel", () => ({ RemixPanel: () => null }));
@@ -77,6 +110,8 @@ vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
 
 afterEach(() => {
+  HIDE = [];
+  INFO = null;
   cleanup();
   window.location.hash = "";
 });
@@ -117,5 +152,20 @@ describe("ReplayDetailPage", () => {
     renderAt(name);
     expect(screen.queryByText(NOT_FOUND)).toBeNull();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(name);
+  });
+
+  it("shows the match statistics section by default", () => {
+    FILE = "a.sdfz";
+    INFO = LOADED_INFO;
+    renderAt("a.sdfz");
+    expect(screen.queryByText("match stats section")).not.toBeNull();
+  });
+
+  it("hides the match statistics section when the profile hides it", () => {
+    FILE = "a.sdfz";
+    HIDE = ["analytics.matchStats"];
+    INFO = LOADED_INFO;
+    renderAt("a.sdfz");
+    expect(screen.queryByText("match stats section")).toBeNull();
   });
 });
