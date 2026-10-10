@@ -1,14 +1,13 @@
-//! The transient rewrite: a scratch copy of a replay whose game is the analysis
-//! game (issues #1183 and #1155).
+//! Pointing a replay at a different game: the code the remix
+//! ([`super::rewrite_demo`]) and the replay analysis copy ([`write_retargeted`],
+//! issues #1183, #1155 and #3861) share.
 //!
-//! This is not the remix. [`super::super::rewrite_demo`] writes a sibling file
-//! into the replay library, stamps a `[coilbox]` marker so the library can show
-//! what it came from, and refuses a file that already carries one. A copy made
-//! here goes to a scratch path the caller names, carries no marker, is never
-//! listed, and is deleted after the run. It shares the low level code: the
-//! header offsets, the gzip sniffing and the `gametype` replacement.
+//! The remix writes a sibling file into the replay library, stamps a
+//! `[coilbox]` marker and refuses a file that already carries one. The analysis
+//! copy goes to a scratch path the caller names, carries no marker, is never
+//! listed, and is deleted after the run.
 //!
-//! It also rewrites one thing the remix does not. A replay names its game in
+//! A replay names its game in
 //! two places: the start script after the header, and the first packet of the
 //! demo stream, `NETMSG_GAMEDATA`, which carries the same script again,
 //! compressed. The engine has loaded the game from the packet, not the header,
@@ -26,9 +25,10 @@
 use std::io::{Read, Write};
 use std::path::Path;
 
-use super::super::{
-    atomic_write, i32_at, put_i32_at, read_all_maybe_gzip, replace_gametype, same_path, MAGIC,
-    MIN_HEADER, OFF_DEMO_STREAM_SIZE, OFF_HEADER_SIZE, OFF_SCRIPT_SIZE,
+use super::{
+    atomic_write, find_game, i32_at, open_maybe_gzip, parse_tdf, put_i32_at, read_all_maybe_gzip,
+    read_at_least, replace_gametype, same_path, MAGIC, MIN_HEADER, OFF_DEMO_STREAM_SIZE,
+    OFF_HEADER_SIZE, OFF_SCRIPT_SIZE,
 };
 
 /// `NETMSG_GAMEDATA` in `rts/Net/Protocol/NetMessageTypes.h`.
@@ -75,6 +75,17 @@ fn swap_gametype(script: &[u8], gametype: &str) -> Result<Vec<u8>, String> {
 /// Everything after the first stream packet is copied as it is, trailer
 /// included, so the result still decodes to the same winners and totals.
 pub(super) fn retarget(bytes: &[u8], gametype: &str) -> Result<Vec<u8>, String> {
+    retarget_with(bytes, gametype, Ok)
+}
+
+/// [`retarget`], with `stamp` applied to the header's start script after its
+/// `gametype` is replaced. The remix stamps its marker there. The packet's own
+/// script gets only the new `gametype`.
+pub(super) fn retarget_with(
+    bytes: &[u8],
+    gametype: &str,
+    stamp: impl FnOnce(String) -> Result<String, String>,
+) -> Result<Vec<u8>, String> {
     if bytes.len() < MIN_HEADER || &bytes[..MAGIC.len()] != MAGIC {
         return Err("not a Spring demo file (bad magic)".into());
     }
@@ -88,7 +99,11 @@ pub(super) fn retarget(bytes: &[u8], gametype: &str) -> Result<Vec<u8>, String> 
         .checked_add(script_size)
         .filter(|&end| end <= bytes.len())
         .ok_or("demo header reports an invalid script size")?;
-    let new_script = swap_gametype(&bytes[header_size..script_end], gametype)?;
+    let new_script = stamp(replace_gametype(
+        &String::from_utf8_lossy(&bytes[header_size..script_end]),
+        gametype,
+    )?)?
+    .into_bytes();
 
     // The first chunk of the stream, which has to be the game data packet.
     let length = bytes
@@ -147,6 +162,45 @@ pub(super) fn retarget(bytes: &[u8], gametype: &str) -> Result<Vec<u8>, String> 
     Ok(out)
 }
 
+/// The `gametype` in the replay's first packet, which is the game the engine
+/// plays it on. `None` when the file has no readable game data packet.
+///
+/// Reads only the file's prefix: the header, the script and the one packet.
+pub(super) fn packet_game_of(demo: &Path) -> Option<String> {
+    let mut rdr = open_maybe_gzip(demo).ok()?;
+    let mut buf = Vec::new();
+    read_at_least(&mut rdr, &mut buf, MIN_HEADER).ok()?;
+    let script_end = i32_at(&buf, OFF_HEADER_SIZE)
+        .ok()?
+        .max(0)
+        .checked_add(i32_at(&buf, OFF_SCRIPT_SIZE).ok()?.max(0))? as usize;
+    read_at_least(
+        &mut rdr,
+        &mut buf,
+        script_end + CHUNK_HEADER_SIZE + GAMEDATA_HEADER_SIZE,
+    )
+    .ok()?;
+    let length = u32::from_le_bytes(buf[script_end + 4..script_end + 8].try_into().ok()?) as usize;
+    let start = script_end + CHUNK_HEADER_SIZE;
+    read_at_least(&mut rdr, &mut buf, start + length).ok()?;
+    let script = packet_script(&buf[start..start + length])?;
+    find_game(&parse_tdf(&script))
+        .get("gametype")
+        .map(str::to_string)
+}
+
+/// The start script inside a `NETMSG_GAMEDATA` payload.
+fn packet_script(payload: &[u8]) -> Option<String> {
+    if payload.first() != Some(&NETMSG_GAMEDATA) {
+        return None;
+    }
+    let compressed =
+        payload.get(GAMEDATA_HEADER_SIZE..GAMEDATA_HEADER_SIZE + u16_at(payload, 3)?)?;
+    inflate(compressed)
+        .ok()
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+}
+
 /// Write a copy of the replay at `src` to `dst` that plays `gametype`.
 ///
 /// `dst` is a scratch path the caller owns and deletes. The source is read and
@@ -171,7 +225,7 @@ pub fn write_retargeted(src: &Path, dst: &Path, gametype: &str) -> Result<(), St
 
 #[cfg(test)]
 pub(super) mod tests {
-    use super::super::super::{decode_trailer, find_game, parse_tdf, read_trailer, tests::*};
+    use super::super::{decode_trailer, find_game, parse_tdf, read_trailer, tests::*};
     use super::*;
     use crate::model::TeamStatSample;
 

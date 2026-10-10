@@ -151,6 +151,10 @@ pub struct ReplayFile {
     /// True when this file carries coilbox's remix marker — a copy rewritten to run
     /// on a different local build, not an engine-recorded demo.
     pub remixed: bool,
+    /// True for a remix whose header names one game and whose first packet
+    /// names another, so the engine plays it on the game it was recorded with.
+    /// Only coilbox before the fix for issue #3861 made these.
+    pub stale_remix: bool,
     /// The match's game id, for a replay that has a usable one and is not a
     /// remix. A remix carries its original's id but has no analysis of its own,
     /// so it does not hold the original's analysis in place. Not sent to the
@@ -420,6 +424,8 @@ pub struct DemoInfo {
     /// True when this file carries coilbox's remix marker (a rewritten copy, not an
     /// engine-recorded demo).
     pub remixed: bool,
+    /// See [`ReplayFile::stale_remix`].
+    pub stale_remix: bool,
     /// For a remix, the `gametype` the replay was originally recorded on (before it
     /// was pointed at a local build).
     #[serde(skip_serializing_if = "Option::is_none")]
