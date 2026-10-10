@@ -226,6 +226,20 @@ function contrastRatio(a: string, b: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/**
+ * Whether a colour reaches `minContrast` against the brightest card any preset
+ * gives under this theme, the surface {@link readableTeamTextColor} corrects
+ * against with `"anyCard"`. Invalid input does not read.
+ */
+export function readsOnAnyCard(
+  rawHex: string,
+  theme: "dark" | "light",
+  minContrast: number = NON_TEXT_CONTRAST,
+): boolean {
+  const hex = normalizeHex(rawHex);
+  return !!hex && contrastRatio(hex, SURFACE_HEX.anyCard[theme]) >= minContrast;
+}
+
 /** Lightness step the search below nudges by, fine enough that the result
  * never lands short of {@link AA_CONTRAST} once rounded to the nearest hex
  * channel. */
