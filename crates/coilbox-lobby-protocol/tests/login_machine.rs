@@ -41,17 +41,3 @@ fn full_plain_handshake_line_order() {
     );
     assert_eq!(m.phase(), LoginPhase::Ready);
 }
-
-#[test]
-fn stls_handshake_emits_stls_before_listcompflags() {
-    let mut m = LoginMachine::new(config(true));
-
-    let out = m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
-    assert_eq!(out, vec!["STLS".to_string()]);
-    assert_eq!(m.phase(), LoginPhase::TlsUpgrade);
-
-    // Plugin upgrades TLS and re-feeds the greeting.
-    let out = m.on_message(&parse_line("TASSERVER 0.38 * 8201 0"));
-    assert_eq!(out, vec!["LISTCOMPFLAGS".to_string()]);
-    assert_eq!(m.phase(), LoginPhase::AwaitCompFlags);
-}

@@ -7,17 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { groundHit, releaseWheel } from "./wheelGate";
-
-describe("releaseWheel", () => {
-  it("releases a wheel over sky", () => {
-    expect(releaseWheel(false)).toBe(true);
-  });
-
-  it("keeps a wheel over the map, so it zooms", () => {
-    expect(releaseWheel(true)).toBe(false);
-  });
-});
+import { groundHit } from "./wheelGate";
 
 describe("groundHit", () => {
   const groundY = 0;

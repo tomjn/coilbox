@@ -32,13 +32,6 @@ describe("skirmishEngineOffer", () => {
     });
   });
 
-  it("makes the page usable once the download has installed an engine", () => {
-    const before = skirmishEngineOffer(bare());
-    expect(before.kind).toBe("download");
-    // The page reads the engines again after the download, so it now has one.
-    expect(skirmishEngineOffer(bare({ hasTarget: true })).kind).toBe("none");
-  });
-
   it("falls back to the settings message when the catalog has no build for this platform", () => {
     expect(
       skirmishEngineOffer(

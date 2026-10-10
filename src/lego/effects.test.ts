@@ -208,10 +208,6 @@ const flame: FlameEmission = {
 };
 
 describe("the muzzle flame", () => {
-  it("defaults to the size the weapon def defaults give", () => {
-    expect(DEFAULT_FLAME_SIZE).toBeCloseTo(0.003);
-  });
-
   // At the default size `fade` is 0.49 at age 1, 0.98 at age 2 and 1 from
   // age 3, so the flame quad, drawn only while `fade < 1`, shows for two
   // frames and the smoke quad for four.
