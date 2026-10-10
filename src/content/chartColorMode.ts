@@ -12,26 +12,27 @@ import type { ChartColorMode } from "./matchStats";
 
 const KEY = "coilbox.matchStats.colorMode";
 
-/** The mode when nothing valid is stored: coilbox's palette. */
-export const DEFAULT_COLOR_MODE: ChartColorMode = "palette";
-
-/** Parse a stored value, falling back to the default for anything else. */
-export function storedColorMode(raw: string | null): ChartColorMode {
-  return raw === "game" || raw === "palette" ? raw : DEFAULT_COLOR_MODE;
+/**
+ * Parse a stored value. `null` means nobody has chosen, so the chart picks a mode
+ * for each match (#3830). Anything but the two known modes counts as not chosen.
+ * Before #3830 nothing valid meant the palette, but the key is only written when
+ * the toggle is used, so every stored value keeps its meaning.
+ */
+export function storedColorMode(raw: string | null): ChartColorMode | null {
+  return raw === "game" || raw === "palette" ? raw : null;
 }
 
-/** The remembered mode, and a setter that remembers the answer. */
+/** The remembered mode (null until chosen), and a setter that remembers it. */
 export function useStoredColorMode(): [
-  ChartColorMode,
+  ChartColorMode | null,
   (mode: ChartColorMode) => void,
 ] {
-  const [mode, setMode] = useState<ChartColorMode>(() => {
+  const [mode, setMode] = useState<ChartColorMode | null>(() => {
     try {
       return storedColorMode(localStorage.getItem(KEY));
     } catch {
-      // Storage unavailable (private mode or quota). The choice still applies
-      // for the session.
-      return DEFAULT_COLOR_MODE;
+      // Storage unavailable (private mode or quota). The chart picks per match.
+      return null;
     }
   });
 

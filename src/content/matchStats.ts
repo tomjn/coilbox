@@ -1,9 +1,10 @@
-import { CHART_PALETTE } from "@/lib/chartPalette";
+import { CHART_PALETTE, pairsStayApart } from "@/lib/chartPalette";
 import { formatDuration } from "@/lib/format";
 import {
   isBlackHex,
   NON_TEXT_CONTRAST,
   readableTeamTextColor,
+  readsOnAnyCard,
 } from "@/lib/teamColor";
 import { PALETTE, rgbToHex } from "@/play/participants";
 import type {
@@ -443,6 +444,35 @@ function gameColoursPresent(info: DemoInfo): boolean {
       seen.add(seat.rgbColor ? rgbToHex(seat.rgbColor) : "");
     }
   return seats < 2 || seen.size > 1;
+}
+
+/**
+ * The mode a chart opens in when nobody has chosen one (#3830): the game's own
+ * colours when they already read well, the palette when they do not.
+ *
+ * "Read well" is the palette's own bar. Every colour reaches
+ * {@link NON_TEXT_CONTRAST} on the brightest card any preset gives under this
+ * theme, the surface the lightness correction uses, and every pair is far enough
+ * apart under normal, protan and deutan vision. The colours are tested as the
+ * game gave them, before any lightness correction, so the game's colours are only
+ * chosen when they need no help. Colours that are all one value count as absent,
+ * as in {@link colorSeries}.
+ *
+ * Both views are tested, each on its own lines, so the pick is one answer for the
+ * match and the colours do not change scheme when the view does. Pass the
+ * unpainted lines of {@link teamSeries} and {@link allySeries}.
+ */
+export function autoColorMode(
+  players: ChartSeries[],
+  sides: ChartSeries[],
+  info: DemoInfo,
+  theme: "dark" | "light",
+): ChartColorMode {
+  if (!gameColoursPresent(info)) return "palette";
+  const reads = (lines: ChartSeries[]) =>
+    lines.every((s) => readsOnAnyCard(s.color, theme)) &&
+    pairsStayApart(lines.map((s) => s.color));
+  return reads(players) && reads(sides) ? "game" : "palette";
 }
 
 /**

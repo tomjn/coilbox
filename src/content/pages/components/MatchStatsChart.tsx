@@ -31,6 +31,7 @@ import { useStoredColorMode } from "../../chartColorMode";
 import { useStoredHighlightMe } from "../../highlightMe";
 import {
   allySeries,
+  autoColorMode,
   type ChartDisplay,
   type ChartMode,
   type ChartRow,
@@ -365,13 +366,19 @@ export function MatchStatsChart({
   const [display, setDisplay] = useState<ChartDisplay>("chart");
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
-  const [colorMode, setColorMode] = useStoredColorMode();
+  const [storedMode, setColorMode] = useStoredColorMode();
   const [highlightMe, setHighlightMe] = useStoredHighlightMe();
   const { resolved: theme } = useTheme();
 
   const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
   const sides = useMemo(() => allySeries(trailer, info), [trailer, info]);
   const view = chosen ?? defaultChartView(players, sides);
+  // Until the toggle has been used the mode is the match's own pick, which also
+  // follows the theme because contrast depends on the card.
+  const colorMode = useMemo(
+    () => storedMode ?? autoColorMode(players, sides, info, theme),
+    [storedMode, players, sides, info, theme],
+  );
   // Painted last, from the view's lines, so the colour a team wears depends on
   // the match and the mode and never on which lines are showing.
   const series = useMemo(

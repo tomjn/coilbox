@@ -6,6 +6,7 @@ import type { DemoInfo, DemoTrailer, TeamStatSample } from "./bindings";
 import { storedColorMode } from "./chartColorMode";
 import {
   allySeries,
+  autoColorMode,
   type ChartColorMode,
   colorSeries,
   teamSeries,
@@ -226,10 +227,90 @@ describe("colorSeries in game mode", () => {
 });
 
 describe("storedColorMode", () => {
-  it("reads the two modes and falls back to the palette for anything else", () => {
+  it("reads the two modes and treats anything else as never chosen", () => {
     expect(storedColorMode("game")).toBe("game");
     expect(storedColorMode("palette")).toBe("palette");
-    expect(storedColorMode(null)).toBe("palette");
-    expect(storedColorMode("sepia")).toBe("palette");
+    expect(storedColorMode(null)).toBeNull();
+    expect(storedColorMode("sepia")).toBeNull();
+  });
+});
+
+describe("autoColorMode", () => {
+  const pick = (seats: Seat[], theme: "dark" | "light" = "dark") => {
+    const { trailer, info } = match(seats);
+    return autoColorMode(
+      teamSeries(trailer, info),
+      allySeries(trailer, info),
+      info,
+      theme,
+    );
+  };
+  const rgb = (hex: string): [number, number, number] => hexToRgb(hex);
+
+  it("keeps the game's colours when they read well and stay apart", () => {
+    const seats: Seat[] = ["#ff8000", "#2080ff", "#e0e000", "#ff40c0"].map(
+      (h, t) => ({ team: t, ally: t, rgb: rgb(h) }),
+    );
+    expect(pick(seats)).toBe("game");
+  });
+
+  it("falls back to the palette when a colour is near black on a dark card", () => {
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: [0.02, 0.02, 0.02] },
+      { team: 1, ally: 1, rgb: rgb("#ff8000") },
+    ];
+    expect(pick(seats, "dark")).toBe("palette");
+  });
+
+  it("falls back to the palette when a colour is white on a light card", () => {
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: [1, 1, 1] },
+      { team: 1, ally: 1, rgb: rgb("#ff8000") },
+    ];
+    expect(pick(seats, "light")).toBe("palette");
+  });
+
+  it("falls back to the palette when two colours are near identical", () => {
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: rgb("#20c020") },
+      { team: 1, ally: 1, rgb: rgb("#28c828") },
+    ];
+    expect(pick(seats)).toBe("palette");
+  });
+
+  it("falls back to the palette when every colour is the same", () => {
+    const seats: Seat[] = [0, 1, 2].map((t) => ({
+      team: t,
+      ally: t,
+      rgb: red,
+    }));
+    expect(pick(seats)).toBe("palette");
+  });
+
+  it("falls back to the palette when two colours differ only for normal vision", () => {
+    // Delta E 21 for normal vision, 4.7 under deutan simulation.
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: rgb("#ff3000") },
+      { team: 1, ally: 1, rgb: rgb("#a08000") },
+    ];
+    expect(pick(seats)).toBe("palette");
+  });
+
+  it("follows the theme", () => {
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: rgb("#ffe040") },
+      { team: 1, ally: 1, rgb: rgb("#2080ff") },
+    ];
+    expect(pick(seats, "dark")).toBe("game");
+    expect(pick(seats, "light")).toBe("palette");
+  });
+
+  it("picks game colours for a team game whose sides and players all read", () => {
+    const seats: Seat[] = [
+      { team: 0, ally: 0, rgb: rgb("#ff8000") },
+      { team: 1, ally: 0, rgb: rgb("#2080ff") },
+      { team: 2, ally: 1, rgb: rgb("#e0e000") },
+    ];
+    expect(pick(seats)).toBe("game");
   });
 });
