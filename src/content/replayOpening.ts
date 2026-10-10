@@ -9,6 +9,7 @@
 
 import type { BuildOrder, UnitDatasetEntry } from "./bindings";
 import { resolveBuildUnit } from "./replayBuildOrders";
+import { classifyUnit, type UnitCategory } from "./unitCategory";
 
 /** Simulation frames per second of match time. */
 const FRAMES_PER_SECOND = 30;
@@ -122,16 +123,96 @@ export function orderedCost(
 ): OrderedCost {
   const total: OrderedCost = { metal: 0, energy: 0, priced: 0, unpriced: 0 };
   for (const order of orders) {
-    const unit = resolveBuildUnit(order.unitDefId, units);
-    const metal = unit ? stat(unit, "metalCost") : null;
-    const energy = unit ? stat(unit, "energyCost") : null;
-    if (metal === null && energy === null) {
+    const price = priceOf(order, units);
+    if (!price) {
       total.unpriced += order.count;
       continue;
     }
-    total.metal += (metal ?? 0) * order.count;
-    total.energy += (energy ?? 0) * order.count;
+    total.metal += price.metal * order.count;
+    total.energy += price.energy * order.count;
     total.priced += order.count;
   }
   return total;
+}
+
+/** One unit's cost, or null when the dataset has no cost to add for it. */
+function priceOf(
+  order: BuildOrder,
+  units: UnitDatasetEntry[] | null | undefined,
+): { unit: UnitDatasetEntry; metal: number; energy: number } | null {
+  const unit = resolveBuildUnit(order.unitDefId, units);
+  if (!unit) return null;
+  const metal = stat(unit, "metalCost");
+  const energy = stat(unit, "energyCost");
+  if (metal === null && energy === null) return null;
+  return { unit, metal: metal ?? 0, energy: energy ?? 0 };
+}
+
+/**
+ * The kinds of unit the opening is split into. Economy, defence and offence are
+ * the three the match is argued over. Builders, factories, sensors and
+ * transports are known kinds that are none of those, so they share `other`
+ * rather than each getting a column. `unclassified` is a unit the game's
+ * definitions do not describe well enough to place.
+ */
+export const SPLIT_BUCKETS = [
+  "economy",
+  "defence",
+  "offence",
+  "other",
+  "unclassified",
+] as const;
+
+export type SplitBucket = (typeof SPLIT_BUCKETS)[number];
+
+/** The column a unit category is counted in. */
+export function splitBucket(category: UnitCategory): SplitBucket {
+  switch (category) {
+    case "economy":
+    case "defence":
+    case "offence":
+    case "unclassified":
+      return category;
+    default:
+      return "other";
+  }
+}
+
+/** Metal and energy, kept apart. */
+export interface CostShare {
+  metal: number;
+  energy: number;
+}
+
+/** What a set of orders asked for, by kind of unit. */
+export interface OrderedSplit {
+  buckets: Record<SplitBucket, CostShare>;
+  /** Units ordered that could not be priced, so are in no bucket. The same
+   *  number `orderedCost` reports, so the two lines agree. */
+  unpriced: number;
+}
+
+/**
+ * The cost of what `orders` asked for, split by what each unit is for. It prices
+ * orders exactly as `orderedCost` does, so the buckets add up to its totals.
+ */
+export function orderedSplit(
+  orders: BuildOrder[],
+  units: UnitDatasetEntry[] | null | undefined,
+): OrderedSplit {
+  const buckets = Object.fromEntries(
+    SPLIT_BUCKETS.map((b) => [b, { metal: 0, energy: 0 }]),
+  ) as Record<SplitBucket, CostShare>;
+  let unpriced = 0;
+  for (const order of orders) {
+    const price = priceOf(order, units);
+    if (!price) {
+      unpriced += order.count;
+      continue;
+    }
+    const share = buckets[splitBucket(classifyUnit(price.unit))];
+    share.metal += price.metal * order.count;
+    share.energy += price.energy * order.count;
+  }
+  return { buckets, unpriced };
 }
