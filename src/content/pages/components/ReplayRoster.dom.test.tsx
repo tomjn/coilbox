@@ -353,6 +353,29 @@ describe("the figures", () => {
       /rating the lobby recorded for its declared game mode/i,
     );
     expect(tip).toContain("[µ=25.0, σ=8.3]");
+    // A rating with no uncertainty in the file says nothing about one.
+    expect(tip).not.toMatch(/uncertainty/i);
+  });
+
+  it("adds the uncertainty the file recorded, as written, to the tooltip", async () => {
+    mount(
+      twoVTwo({
+        players: [
+          seat("Ann", 0, 0, {
+            skill: "[25.06]",
+            skillUncertainty: 2.65,
+          }),
+          seat("Ben", 1, 0),
+        ],
+      } as Partial<DemoInfo>),
+      false,
+    );
+    const badge = await screen.findByRole("img", { name: /rating 25/i });
+    const tip = badge.getAttribute("title") ?? "";
+    expect(tip).toContain("uncertainty of 2.65");
+    expect(tip).toMatch(
+      /rating the lobby recorded for its declared game mode/i,
+    );
   });
 });
 

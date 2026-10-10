@@ -441,6 +441,9 @@ export interface ReplayPlayer {
   /** Set only when the winner is known and the player isn't a spectator. */
   won?: boolean;
   skill?: string;
+  /** The `skilluncertainty` the lobby wrote beside `skill`, as the script
+   * holds it. Absent when the script has none or it is not a number. */
+  skillUncertainty?: number;
   countryCode?: string;
   /** This seat's counters, absent when the match has none to show. */
   stats?: PlayerStats;

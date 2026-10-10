@@ -69,9 +69,15 @@ export function swatch(rgb?: [number, number, number]): string | undefined {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-/** What the rating's tooltip says besides the number. */
-function ratingDetail(skill: string): string {
-  return `This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: ${skill}`;
+/**
+ * What the rating's tooltip says besides the number. The uncertainty is the
+ * figure the start script holds, shown as written and used for nothing else.
+ */
+export function ratingDetail(skill: string, uncertainty?: number): string {
+  const base = `This is the rating the lobby recorded for its declared game mode, which may not be the one this match was played in. The start script says: ${skill}`;
+  return uncertainty === undefined
+    ? base
+    : `${base}. The lobby recorded an uncertainty of ${uncertainty} with the rating.`;
 }
 
 /** How a seat's side finished, or undefined where the file doesn't say. */
@@ -356,7 +362,10 @@ export function ReplayRoster({
                   {s.kind === "player" && n !== undefined && s.player.skill && (
                     <RatingBadge
                       rating={{ casual: null, matchmaking: null, overall: n }}
-                      detail={ratingDetail(s.player.skill)}
+                      detail={ratingDetail(
+                        s.player.skill,
+                        s.player.skillUncertainty,
+                      )}
                     />
                   )}
                 </div>
