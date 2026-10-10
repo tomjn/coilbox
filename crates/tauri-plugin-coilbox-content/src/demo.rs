@@ -21,7 +21,7 @@
 //! The demo stream itself, which is what each player did, is walked by
 //! [`stream`].
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
@@ -514,8 +514,11 @@ fn demo_files_in(base: &Path) -> Vec<DemoFileEntry> {
 /// as a fallback for a trailer the decoder refuses. `engine_dir` is only where
 /// that fallback looks, so `None` (no engine installed) still answers with the
 /// header and script and leaves a winner the trailer cannot give unknown.
+///
+/// This is the detail path, so it also reads where each team started from the
+/// start of the demo stream. The list and the stats ingest do not.
 pub fn demo_info(engine_dir: Option<&Path>, demo: &Path) -> Result<DemoInfo, String> {
-    Ok(decode(engine_dir, demo)?.0)
+    Ok(decode(engine_dir, demo, true)?.0)
 }
 
 /// Decode one replay for the stats store: the same info as [`demo_info`], plus
@@ -530,12 +533,13 @@ pub fn demo_info_for_stats(
     engine_dir: &Path,
     demo: &Path,
 ) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
-    decode(Some(engine_dir), demo)
+    decode(Some(engine_dir), demo, false)
 }
 
 fn decode(
     engine_dir: Option<&Path>,
     demo: &Path,
+    with_start_positions: bool,
 ) -> Result<(DemoInfo, Option<Vec<TeamTotals>>), String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
@@ -563,7 +567,19 @@ fn decode(
         .filter(|t| t.players.is_some())
         .map(metrics::match_totals);
     let player_stats = trailer.and_then(|t| t.players);
-    Ok((build_demo_info(raw, &game, winners, player_stats), totals))
+    let mut info = build_demo_info(raw, &game, winners, player_stats);
+    if with_start_positions {
+        // A stream this decoder cannot read costs the positions and nothing
+        // else, the way a refused trailer costs the statistics.
+        let teams: HashSet<i32> = game
+            .children
+            .iter()
+            .filter_map(|(name, _)| index_suffix(name, "team"))
+            .collect();
+        info.start_positions =
+            stream::read_start_positions(demo, |t| teams.contains(&t)).unwrap_or_default();
+    }
+    Ok((info, totals))
 }
 
 /// Native-only decode (header + start-script, no demotool/winner) used for the
@@ -1607,6 +1623,7 @@ fn build_demo_info(
         origin_filename: marker.origin,
         mod_options,
         map_options,
+        start_positions: Vec::new(),
     }
 }
 
@@ -3137,6 +3154,89 @@ mod tests {
         assert!(err.contains("bad magic"), "got: {err}");
     }
 
+    /// Prints every team's sequence of start positions in each real replay next
+    /// to what `demo_info` reduces it to (#1146). Ignored by default.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_start_positions -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_start_positions() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            let info = demo_info(None, &path).unwrap();
+            let s = stream::read_stream(&path).unwrap();
+            eprintln!(
+                "{} startPosType={:?} ais={} reduced={}",
+                path.file_name().unwrap().to_string_lossy(),
+                info.start_pos_type,
+                info.ais.len(),
+                info.start_positions.len()
+            );
+            let mut seq: std::collections::BTreeMap<u8, Vec<String>> = Default::default();
+            for ev in &s.events {
+                if let StreamEventKind::StartPos {
+                    player,
+                    team,
+                    ready,
+                    x,
+                    y,
+                    z,
+                } = ev.kind
+                {
+                    seq.entry(team).or_default().push(format!(
+                        "f{} p{player} r{ready} ({x:.0},{y:.0},{z:.0})",
+                        ev.frame
+                    ));
+                }
+            }
+            for (team, msgs) in &seq {
+                let kept = info
+                    .start_positions
+                    .iter()
+                    .find(|p| p.team == i32::from(*team));
+                eprintln!("  team {team}: {} -> {kept:?}", msgs.join(" | "));
+            }
+        }
+    }
+
+    /// Times `demo_info` on the largest replay in a directory, for the cost of
+    /// the detail path (#1146). Ignored by default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test --release -p tauri-plugin-coilbox-content real_demo_info_timing -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_info_timing() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        let biggest = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .filter(|e| is_replay_path(&e.path()))
+            .max_by_key(|e| e.metadata().unwrap().len())
+            .expect("no replays");
+        let path = biggest.path();
+        let mut times = Vec::new();
+        for _ in 0..7 {
+            let t = std::time::Instant::now();
+            let info = demo_info(None, &path).unwrap();
+            times.push(t.elapsed());
+            std::hint::black_box(&info);
+        }
+        times.sort();
+        eprintln!(
+            "demo_info on {} bytes: min {:?} median {:?} max {:?}",
+            biggest.metadata().unwrap().len(),
+            times[0],
+            times[times.len() / 2],
+            times[times.len() - 1]
+        );
+    }
+
     /// End-to-end over real replays, for the check a synthetic stream cannot
     /// make: that the layouts agree with packets the engine wrote. Ignored by
     /// default, it needs replays on disk.
@@ -3906,6 +4006,78 @@ mod tests {
             vec![1],
             "the trailer needs no engine"
         );
+    }
+
+    /// The detail path carries where each team started (#1146). A team in the
+    /// stream that the script does not declare is dropped, and the stats
+    /// ingest's decode leaves the field empty because it never walks the stream.
+    #[test]
+    fn demo_info_carries_where_each_team_started() {
+        let stream = Packets::default()
+            .start_pos(0, 0, 0, [10.0, 0.0, 20.0])
+            .start_pos(0, 0, 1, [724.0, 3.0, 800.0])
+            .start_pos(255, 1, 1, [4000.0, 0.0, 5000.0])
+            .start_pos(255, 9, 1, [1.0, 1.0, 1.0])
+            .keyframe(0)
+            .start_pos(0, 0, 0, [7.0, 7.0, 7.0])
+            .bytes();
+        let demo = write_tmp(
+            "start-positions.sdfz",
+            &fixture_with_stream(stream).gzipped(),
+        );
+        let info = demo_info(None, &demo).unwrap();
+        let got: Vec<_> = info
+            .start_positions
+            .iter()
+            .map(|p| (p.team, p.x, p.y, p.z))
+            .collect();
+        assert_eq!(got, vec![(0, 724.0, 3.0, 800.0), (1, 4000.0, 0.0, 5000.0)]);
+
+        let json = serde_json::to_value(&info).unwrap();
+        assert_eq!(json["startPositions"][0]["team"], 0);
+        assert_eq!(json["startPositions"][1]["z"], 5000.0);
+
+        let (stats, _) = demo_info_for_stats(Path::new("/no/such/engine"), &demo).unwrap();
+        assert!(stats.start_positions.is_empty());
+        assert!(decode_native(&demo).unwrap().start_positions.is_empty());
+    }
+
+    /// The read stops early, so a pregame longer than the first read has to be
+    /// read on, in a plain file and a gzipped one.
+    #[test]
+    fn a_pregame_longer_than_the_first_read_is_read_to_its_end() {
+        let mut p = Packets::default();
+        for i in 0..30_000 {
+            p = p.start_pos(0, 0, 0, [i as f32, 0.0, 1.0]);
+        }
+        let stream = p.start_pos(0, 0, 1, [123.0, 4.0, 5.0]).keyframe(0).bytes();
+        assert!(stream.len() > 2 * 256 * 1024);
+        for (name, bytes) in [
+            (
+                "long-pregame.sdf",
+                fixture_with_stream(stream.clone()).bytes(),
+            ),
+            ("long-pregame.sdfz", fixture_with_stream(stream).gzipped()),
+        ] {
+            let demo = write_tmp(name, &bytes);
+            let info = demo_info(None, &demo).unwrap();
+            assert_eq!(info.start_positions.len(), 1, "{name}");
+            assert_eq!(info.start_positions[0].x, 123.0, "{name}");
+        }
+    }
+
+    /// A recording with no stream, and one in a layout the walk refuses, still
+    /// decode, with no positions and no key in the JSON.
+    #[test]
+    fn demo_info_without_a_readable_stream_has_no_start_positions() {
+        let demo = write_tmp("no-stream.sdfz", &fixture_with_stream(Vec::new()).gzipped());
+        let info = demo_info(None, &demo).unwrap();
+        assert!(info.start_positions.is_empty());
+        assert!(serde_json::to_value(&info)
+            .unwrap()
+            .get("startPositions")
+            .is_none());
+        assert_eq!(info.map_name, "Valles Marineris 2.6.1");
     }
 
     /// With no engine, a refused trailer has no `demotool` to fall back to, so

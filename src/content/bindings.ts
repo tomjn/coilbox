@@ -492,6 +492,16 @@ export interface AllyTeamInfo {
   color?: [number, number, number];
 }
 
+/** Where one team started, in world units (elmos): `x` and `z` across the map,
+ * `y` up. Not scaled to the map, which a replay does not state the size of. */
+export interface TeamStartPosition {
+  /** The `[teamN]` index, the same number `ReplayPlayer.team` and `ReplayAi.team` carry. */
+  team: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
 /** Decoded replay metadata (native header + start-script + trailer, with
  * demotool as a fallback for a trailer format the decoder refuses). */
 export interface DemoInfo {
@@ -532,6 +542,10 @@ export interface DemoInfo {
   /** The `[mapoptions]` section verbatim, as `modOptions` is. Empty when the
    * script carried none. */
   mapOptions: Record<string, string>;
+  /** Where each team started, by team id, from the replay's stream (#1146). A
+   * team with no recorded position is absent, since 0,0,0 is a real map corner.
+   * Absent altogether when the stream has none or cannot be read. */
+  startPositions?: TeamStartPosition[];
 }
 
 /**
