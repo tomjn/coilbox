@@ -91,10 +91,12 @@ function answerBatchReadsFrom(current: () => ScanResult) {
 /** A promise the test settles by hand. */
 function held<T>() {
   let resolve: (value: T) => void = () => {};
-  const promise = new Promise<T>((res) => {
+  let reject: (reason: Error) => void = () => {};
+  const promise = new Promise<T>((res, rej) => {
     resolve = res;
+    reject = rej;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 /** A Maps or Games page: the scan and the three batch reads. */
@@ -372,5 +374,158 @@ describe("the other caches a change clears", () => {
     expect(bindings.unitsyncLastScanWrite).toHaveBeenCalledTimes(2);
     expect(mapInScan(dir, ENGINE, "A")).toBe(true);
     expect(mapInScan(dir, ENGINE, "B")).toBe(false);
+  });
+});
+
+describe("a scan the library changed under", () => {
+  it("is followed by a fresh scan for a list that mounted while it ran", async () => {
+    // Nothing is mounted yet, as when the launch warm-up scans.
+    const running = held<ScanResult>();
+    bindings.unitsyncScan.mockImplementationOnce(() => running.promise);
+    bindings.unitsyncScan.mockImplementation(async () => scanOf("A", "B"));
+    const warmUp = primeScan(ENGINE, dir);
+    invalidateScans();
+
+    const { result } = renderHook(() => useUnitsyncScan(ENGINE, dir));
+    await act(async () => {
+      running.resolve(scanOf("A"));
+      await warmUp;
+    });
+
+    await waitFor(() => expect(result.current.data?.maps).toHaveLength(2));
+    expect(result.current.loading).toBe(false);
+    expect(bindings.unitsyncScan).toHaveBeenCalledTimes(2);
+    // The warm-up asked for the library, so it gets the fresh answer too.
+    expect((await warmUp).maps).toHaveLength(2);
+  });
+
+  it("never shows a deleted archive as checked when it lands after the delete", async () => {
+    const { page, seen, setDisk } = await mountedOn("A", "B");
+    const running = held<ScanResult>();
+    bindings.unitsyncScan.mockImplementationOnce(() => running.promise);
+    // A rescan is running, started before the delete.
+    act(() => invalidateScans());
+    expect(bindings.unitsyncScan).toHaveBeenCalledTimes(2);
+
+    setDisk("A");
+    act(() => invalidateScans(true));
+    const from = seen.length;
+    expect(page.result.current.scan.data).toBeNull();
+
+    // It lists the folders as they were, with B still there.
+    await act(async () => {
+      running.resolve(scanOf("A", "B"));
+      await running.promise;
+    });
+
+    await waitFor(() =>
+      expect(page.result.current.scan.data?.maps).toHaveLength(1),
+    );
+    for (const render of seen.slice(from)) expect(render.maps).toBeLessThan(2);
+    expect(bindings.unitsyncScan).toHaveBeenCalledTimes(3);
+  });
+
+  it("never shows an overtaken answer after a download either", async () => {
+    const { page, seen, setDisk } = await mountedOn("A");
+    const running = held<ScanResult>();
+    bindings.unitsyncScan.mockImplementationOnce(() => running.promise);
+    act(() => invalidateScans());
+
+    setDisk("A", "B", "C");
+    act(() => invalidateScans());
+    const from = seen.length;
+    await act(async () => {
+      running.resolve(scanOf("A", "B"));
+      await running.promise;
+    });
+
+    await waitFor(() =>
+      expect(page.result.current.scan.data?.maps).toHaveLength(3),
+    );
+    // One map before, three after, and never the two the overtaken scan saw.
+    for (const render of seen.slice(from)) expect(render.maps).not.toBe(2);
+  });
+
+  it("is run again when it fails, and the failure is not shown", async () => {
+    const { page, setDisk } = await mountedOn("A");
+    const errors: (string | null)[] = [];
+    const watcher = renderHook(() => {
+      const scan = useUnitsyncScan(ENGINE, dir);
+      errors.push(scan.error);
+      return scan;
+    });
+    const running = held<ScanResult>();
+    bindings.unitsyncScan.mockImplementationOnce(() => running.promise);
+    act(() => invalidateScans());
+
+    setDisk("A", "B");
+    act(() => invalidateScans());
+    await act(async () => {
+      running.reject(new Error("worker died"));
+      await running.promise.catch(() => {});
+    });
+
+    await waitFor(() =>
+      expect(page.result.current.scan.data?.maps).toHaveLength(2),
+    );
+    await waitFor(() =>
+      expect(watcher.result.current.data?.maps).toHaveLength(2),
+    );
+    expect(errors.every((e) => e === null)).toBe(true);
+    expect(bindings.unitsyncScan).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("a rescan cancelled after a delete", () => {
+  it("leaves every mounted hook cancelled, not waiting on nothing", async () => {
+    bindings.unitsyncScan.mockImplementation(async () => scanOf("A", "B"));
+    const first = renderHook(() => useUnitsyncScan(ENGINE, dir));
+    const second = renderHook(() => useUnitsyncScan(ENGINE, dir));
+    await waitFor(() => {
+      expect(first.result.current.data).not.toBeNull();
+      expect(second.result.current.data).not.toBeNull();
+    });
+
+    const running = held<ScanResult>();
+    bindings.unitsyncScan.mockImplementationOnce(() => running.promise);
+    act(() => invalidateScans(true));
+    expect(first.result.current.data).toBeNull();
+
+    // The page the user landed on cancels the rescan.
+    await act(async () => {
+      running.reject(new Error("Scan cancelled"));
+      await running.promise.catch(() => {});
+    });
+
+    for (const hook of [first, second]) {
+      await waitFor(() => expect(hook.result.current.cancelled).toBe(true));
+      expect(hook.result.current.data).toBeNull();
+      expect(hook.result.current.loading).toBe(false);
+      expect(hook.result.current.error).toBeNull();
+    }
+    // Nothing restarts a scan the user stopped.
+    expect(bindings.unitsyncScan).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("a batch read while the scan keeps failing", () => {
+  it("reads once more after the library changes", async () => {
+    bindings.unitsyncScan.mockRejectedValue(new Error("no engine"));
+    bindings.unitsyncThumbnails.mockResolvedValue({
+      thumbnails: [],
+      errors: [],
+    });
+    renderHook(() => useUnitsyncThumbnails(ENGINE, dir));
+    await waitFor(() =>
+      expect(bindings.unitsyncThumbnails).toHaveBeenCalledTimes(1),
+    );
+
+    act(() => invalidateScans());
+
+    await waitFor(() =>
+      expect(bindings.unitsyncThumbnails).toHaveBeenCalledTimes(2),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(bindings.unitsyncThumbnails).toHaveBeenCalledTimes(2);
   });
 });

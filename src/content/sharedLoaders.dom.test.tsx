@@ -125,6 +125,20 @@ describe("batch reads", () => {
       await prime("/engine", dir);
       expect(command).toHaveBeenCalledTimes(2);
     });
+
+    it(`does not hand a caller after a rescan the ${label} read open from before it`, async () => {
+      const open = held<typeof answer>();
+      command.mockReturnValue(open.promise);
+      const before = prime("/engine", dir);
+      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(1));
+
+      await primeScan("/engine", dir, true);
+      const after = prime("/engine", dir);
+      // Both are open at once, and each reached the worker.
+      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(2));
+      open.resolve(answer);
+      await Promise.all([before, after]);
+    });
   }
 });
 

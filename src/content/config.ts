@@ -280,11 +280,9 @@ const inFlightScans = new Map<
 /**
  * Scans that were running when the library changed on disk, keyed like the scan
  * cache. Such a scan may have listed the folders before the change, so its
- * answer goes to whoever asked and is not kept.
+ * answer is handed to nobody and the scan runs again.
  */
 const staleScans = new Set<string>();
-/** Stale scans that a mounted list wants run again once they finish. */
-const rescanQueued = new Set<string>();
 
 /**
  * The last scan kept for each target. Unlike `scanCache` it survives the
@@ -292,20 +290,45 @@ const rescanQueued = new Set<string>();
  * scan lands and read again only then.
  */
 const landedScans = new Map<string, ScanResult>();
+/** The targets whose last scan failed, until one lands. */
+const failedScans = new Set<string>();
 const landedListeners = new Set<() => void>();
 
-/** The last scan kept for a target, changing each time a newer one lands. */
-function useLandedScan(
-  enginePath?: string,
-  dataDir?: string,
-): ScanResult | undefined {
+/**
+ * What a batch read of a target was made against: the last scan kept for it,
+ * or, while its scans fail, the epoch they failed in. A failing target has no
+ * newer scan to wait for, so there the epoch is what says the library may have
+ * changed.
+ */
+type ScanToken = ScanResult | string | undefined;
+
+function scanToken(key: string): ScanToken {
+  return failedScans.has(key)
+    ? `failed:${scanEpochs.get(key) ?? 0}`
+    : landedScans.get(key);
+}
+
+/**
+ * The target's {@link scanToken}, changing each time a batch read should be
+ * made again. Holding it counts as a list on screen, so the target is rescanned
+ * when the library changes.
+ */
+function useScanToken(enginePath?: string, dataDir?: string): ScanToken {
   const key = enginePath && dataDir ? `${dataDir}::${enginePath}` : "";
+  useEffect(() => {
+    if (!enginePath || !dataDir) return;
+    return watchScans(enginePath, dataDir, () => {});
+  }, [enginePath, dataDir]);
   return useSyncExternalStore(
     (cb) => {
       landedListeners.add(cb);
-      return () => landedListeners.delete(cb);
+      epochListeners.add(cb);
+      return () => {
+        landedListeners.delete(cb);
+        epochListeners.delete(cb);
+      };
     },
-    () => landedScans.get(key),
+    () => scanToken(key),
   );
 }
 
@@ -375,37 +398,53 @@ export async function primeScan(
   const inFlight = inFlightScans.get(key);
   if (inFlight) return inFlight.promise;
 
-  const opId = crypto.randomUUID();
-  const promise = (async () => {
+  const running = { promise: undefined as never, opId: "" } as {
+    promise: Promise<ScanResult>;
+    opId: string;
+  };
+  running.promise = (async () => {
     let cancelled = false;
     try {
-      const res = await unitsyncScan({ enginePath, dataDir, opId });
-      // Cached nowhere, not even as a failure: an `Init` that fails does so
-      // fast, so the next open can afford to ask again, and by then the disk
-      // may have room.
-      if (res.initFailure) throw new ScanInitFailure(res);
-      // The one place every game modinfo this machine reads goes through, so it
-      // is where the shortnames are picked up. They outlive the build they came
-      // from, so an export pinned to a superseded build still knows its game's
-      // shortname (issue #1364).
-      rememberShortnames(res.games);
-      // The library changed while this ran, so the next read scans again.
-      if (staleScans.has(key)) return res;
-      scanCache.set(key, res);
-      landedScans.set(key, res);
-      for (const l of landedListeners) l();
-      writeLastScan(enginePath, dataDir, res);
-      // What a cached read of this library is looked up by (issue #3714).
-      rememberScanHints(dataDir, enginePath, res);
-      return res;
+      // One scan, and one more for as long as the library changed under the
+      // last. Whoever waits gets the answer of the scan nothing overtook.
+      for (;;) {
+        staleScans.delete(key);
+        running.opId = crypto.randomUUID();
+        let res: ScanResult;
+        try {
+          res = await unitsyncScan({ enginePath, dataDir, opId: running.opId });
+          // Cached nowhere, not even as a failure: an `Init` that fails does
+          // so fast, so the next open can afford to ask again, and by then the
+          // disk may have room.
+          if (res.initFailure) throw new ScanInitFailure(res);
+        } catch (e) {
+          cancelled = /cancelled/i.test(
+            e instanceof Error ? e.message : `${e}`,
+          );
+          // A cancel is the user stopping the scan, so nothing restarts it.
+          if (staleScans.has(key) && !cancelled) continue;
+          throw e;
+        }
+        if (staleScans.has(key)) continue;
+        scanCache.set(key, res);
+        landedScans.set(key, res);
+        failedScans.delete(key);
+        for (const l of landedListeners) l();
+        writeLastScan(enginePath, dataDir, res);
+        // What a cached read of this library is looked up by (issue #3714).
+        rememberScanHints(dataDir, enginePath, res);
+        // The one place every game modinfo this machine reads goes through, so
+        // it is where the shortnames are picked up. They outlive the build they
+        // came from, so an export pinned to a superseded build still knows its
+        // game's shortname (issue #1364).
+        rememberShortnames(res.games);
+        return res;
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      cancelled = /cancelled/i.test(msg);
-      // Nor is the failure of a scan the library changed under kept.
-      const keepFailure = !cancelled && !staleScans.has(key);
-      // A user cancellation isn't a target failure — don't poison the error
-      // cache, or the next open would resurface "cancelled" as a scan error.
-      if (!(e instanceof ScanInitFailure) && keepFailure)
+      // A cancel is not a failure of the target, so it is not kept as one, or
+      // the next open would show "cancelled" as a scan error.
+      if (!(e instanceof ScanInitFailure) && !cancelled)
         scanErrorCache.set(key, msg);
       // A rescan that failed leaves nothing to vouch for the answer before it,
       // so a page opened next must not be handed that answer. A cancel learned
@@ -413,19 +452,19 @@ export async function primeScan(
       if (!cancelled) {
         scanCache.delete(key);
         forgetScanHints(dataDir, enginePath);
+        failedScans.add(key);
+        for (const l of landedListeners) l();
       }
       throw e;
     } finally {
       inFlightScans.delete(key);
       staleScans.delete(key);
-      // A cancel is the user stopping the scan, so nothing restarts it.
-      if (rescanQueued.delete(key) && !cancelled) rescanMounted(key);
     }
   })();
-  inFlightScans.set(key, { promise, opId });
+  inFlightScans.set(key, running);
   const watched = scanWatchers.get(key);
-  if (watched) for (const w of [...watched.watchers]) w(promise);
-  return promise;
+  if (watched) for (const w of [...watched.watchers]) w(running.promise);
+  return running.promise;
 }
 
 /**
@@ -446,12 +485,16 @@ export function currentScan(
  * after a content download so a freshly-installed game/map shows up (e.g. in the
  * singleplayer picker) without a manual rescan. Also bumps each known target's
  * epoch for the readers that follow it. A scan running now may have missed the
- * change, so its answer is not kept. Nothing rescans here: the next read does,
- * or {@link rescanMounted}.
+ * change, so it runs again before it answers. Nothing else rescans here: the
+ * next read does, or {@link rescanMounted}.
  */
 export function forgetScans(): void {
   invalidateInstalledContent();
-  const keys = new Set([...scanCache.keys(), ...scanErrorCache.keys()]);
+  const keys = new Set([
+    ...scanCache.keys(),
+    ...scanErrorCache.keys(),
+    ...failedScans,
+  ]);
   scanCache.clear();
   scanErrorCache.clear();
   forgetScanHints();
@@ -461,19 +504,12 @@ export function forgetScans(): void {
 
 /**
  * Scan again for every target a mounted list is showing, one scan a target, so
- * the list updates where it is. A target with a fresh answer is left alone, as
- * is one whose scan started after the last change. A scan the change overtook
- * is followed by one more when it ends, however many changes arrive meanwhile.
- * Pass a key to rescan that target only.
+ * the list updates where it is. A target with a fresh answer is left alone, and
+ * so is one being scanned, since a scan the change overtook runs again itself.
  */
-export function rescanMounted(only?: string): void {
+export function rescanMounted(): void {
   for (const [key, { enginePath, dataDir }] of scanWatchers) {
-    if (only !== undefined && key !== only) continue;
-    if (scanCache.has(key)) continue;
-    if (inFlightScans.has(key)) {
-      if (staleScans.has(key)) rescanQueued.add(key);
-      continue;
-    }
+    if (scanCache.has(key) || inFlightScans.has(key)) continue;
     primeScan(enginePath, dataDir).catch(() => {});
   }
 }
@@ -600,7 +636,7 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
   useEffect(() => {
     if (!enginePath || !dataDir) return;
     let live = true;
-    const stop = watchScans(enginePath, dataDir, (scan) => {
+    const take: ScanWatcher = (scan) => {
       if (!scan) {
         setData(null);
         return;
@@ -616,14 +652,23 @@ export function useUnitsyncScan(enginePath?: string, dataDir?: string) {
         (e) => {
           if (!live) return;
           const msg = e instanceof Error ? e.message : String(e);
-          // As in `runWithReason`: a cancel keeps the answer before it.
-          if (/cancelled/i.test(msg)) return;
+          // As in `runWithReason`: a cancel keeps the answer before it, and
+          // every hook of the target says it was cancelled, not only the one
+          // whose page stopped it.
+          if (/cancelled/i.test(msg)) {
+            setCancelled(true);
+            return;
+          }
           if (e instanceof ScanInitFailure) setUnvouched(e.result);
           setData(null);
           setError(msg);
         },
       );
-    });
+    };
+    const stop = watchScans(enginePath, dataDir, take);
+    // A scan already running when this mounted is one it was not told about.
+    const running = inFlightScans.get(`${dataDir}::${enginePath}`);
+    if (running) take(running.promise);
     return () => {
       live = false;
       stop();
@@ -681,19 +726,23 @@ function renderedUrl(
  * cannot answer every archive named from disk (issue #3721).
  */
 async function batchForScan<T>(
-  cache: Map<string, { scan: ScanResult | null; value: T }>,
+  cache: Map<string, { token: ScanToken; value: T }>,
   pending: Map<string, Promise<T>>,
   enginePath: string,
   dataDir: string,
   read: () => Promise<T>,
 ): Promise<T> {
   const key = `${dataDir}::${enginePath}`;
-  const scan = await currentScan(enginePath, dataDir).catch(() => null);
+  const scan = await currentScan(enginePath, dataDir).catch(() => undefined);
+  const token = scan ?? scanToken(key);
   const held = cache.get(key);
-  if (held && held.scan === scan) return held.value;
-  return shareInFlight(pending, `${key}::${scanSerial(scan)}`, async () => {
+  if (held && held.token === token) return held.value;
+  // Keyed on the token too, so a caller after a rescan does not join a read
+  // that was opened before it.
+  const open = typeof token === "string" ? token : scanSerial(token);
+  return shareInFlight(pending, `${key}::${open}`, async () => {
     const value = await read();
-    cache.set(key, { scan, value });
+    cache.set(key, { token, value });
     return value;
   });
 }
@@ -701,7 +750,7 @@ async function batchForScan<T>(
 /** A number for each scan answer, so an open read can be keyed on its scan. */
 const scanSerials = new WeakMap<ScanResult, number>();
 let lastScanSerial = 0;
-function scanSerial(scan: ScanResult | null): number {
+function scanSerial(scan: ScanResult | undefined): number {
   if (!scan) return 0;
   let serial = scanSerials.get(scan);
   if (serial === undefined) {
@@ -721,7 +770,7 @@ export interface MapThumbData {
 /** Session cache of batch thumbnails, keyed by `dataDir::enginePath`. */
 const thumbnailsCache = new Map<
   string,
-  { scan: ScanResult | null; value: Map<string, MapThumbData> }
+  { token: ScanToken; value: Map<string, MapThumbData> }
 >();
 /** Open renders, keyed like the cache, so the warm-up and a page share one. */
 const thumbnailsPending = new Map<string, Promise<Map<string, MapThumbData>>>();
@@ -755,7 +804,7 @@ export async function primeThumbnails(
 
 /** Lazily render and cache thumbnails for every map (name -> thumbnail + dims). */
 export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
-  const scan = useLandedScan(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [thumbs, setThumbs] = useState<Map<string, MapThumbData>>(new Map());
   const [loading, setLoading] = useState(false);
 
@@ -788,7 +837,7 @@ export function useUnitsyncThumbnails(enginePath?: string, dataDir?: string) {
 /** Session cache of batch map metadata, keyed by `dataDir::enginePath`. */
 const mapMetaCache = new Map<
   string,
-  { scan: ScanResult | null; value: Map<string, Record<string, string>> }
+  { token: ScanToken; value: Map<string, Record<string, string>> }
 >();
 /** Open reads, keyed like the cache. */
 const mapMetaPending = new Map<
@@ -824,7 +873,7 @@ export async function primeMapMeta(
 
 /** Lazily read and cache mapinfo metadata for every map (name -> info). */
 export function useUnitsyncMapMeta(enginePath?: string, dataDir?: string) {
-  const scan = useLandedScan(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [meta, setMeta] = useState<Map<string, Record<string, string>>>(
     new Map(),
   );
@@ -1895,7 +1944,7 @@ export function useUnitsyncArchiveFile(
 /** Session cache of batch game-header art, keyed by `dataDir::enginePath`. */
 const gameHeadersCache = new Map<
   string,
-  { scan: ScanResult | null; value: Map<string, string> }
+  { token: ScanToken; value: Map<string, string> }
 >();
 /** Open renders, keyed like the cache. */
 const gameHeadersPending = new Map<string, Promise<Map<string, string>>>();
@@ -1929,7 +1978,7 @@ export async function primeGameHeaders(
 
 /** Lazily render and cache header art for every game (name -> URL). */
 export function useUnitsyncGameHeaders(enginePath?: string, dataDir?: string) {
-  const scan = useLandedScan(enginePath, dataDir);
+  const scan = useScanToken(enginePath, dataDir);
   const [headers, setHeaders] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(false);
 
