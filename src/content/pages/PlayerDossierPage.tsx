@@ -225,6 +225,15 @@ export default function PlayerDossierPage() {
                   />
                 </div>
               )}
+              {relation.gamesAgainst > 0 && (
+                <Link
+                  to={`/stats/${encodeURIComponent(playerName)}/matchup?me=${encodeURIComponent(me)}`}
+                  className="mt-3 inline-flex w-fit items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  <Swords className="size-3.5" /> See the matchup by map,
+                  faction and game length
+                </Link>
+              )}
               {relation.commonMaps.length > 0 && (
                 <div className="mt-3">
                   <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">

@@ -194,6 +194,11 @@ const multiplayerPlugin: FramePlugin = {
       crumb: (c) => c.params.name ?? "Player",
     },
     {
+      path: "stats/:name/matchup",
+      lazy: () => import("../content/pages/MatchupPage"),
+      crumb: "Matchup",
+    },
+    {
       path: "battle",
       lazy: () => import("./pages/BattleRoomPage"),
       crumb: "Battle Room",
