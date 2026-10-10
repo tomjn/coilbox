@@ -61,6 +61,9 @@ pub struct JobSpec {
     pub replay: PathBuf,
     pub engine_dir: PathBuf,
     pub data_dirs: Vec<PathBuf>,
+    /// Another installed version of the replay's game to depend on, when the
+    /// exact one is not installed.
+    pub game: Option<String>,
     /// The key the result is stored under. See [`store::replay_key`].
     pub game_id: String,
     /// The replay's file name, for a list to show.
@@ -105,6 +108,7 @@ impl Engine for HeadlessEngine {
                 replay: job.replay.clone(),
                 engine_dir: job.engine_dir.clone(),
                 data_dirs: job.data_dirs.clone(),
+                game: job.game.clone(),
                 scratch_root: self.scratch_root.clone(),
                 timeout: run_timeout(job.match_seconds),
             },
@@ -770,6 +774,7 @@ pub fn job_for(
     replay: &Path,
     engine_dir: &Path,
     data_dirs: Vec<PathBuf>,
+    game: Option<String>,
     force: bool,
 ) -> Result<JobSpec, String> {
     let (game_id, match_seconds) = check_replay(replay).map_err(|why| why.message().to_string())?;
@@ -780,6 +785,7 @@ pub fn job_for(
         replay: replay.to_path_buf(),
         engine_dir: engine_dir.to_path_buf(),
         data_dirs,
+        game: game.filter(|game| !game.trim().is_empty()),
         game_id,
         name: replay
             .file_name()
@@ -813,6 +819,7 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     replay_path: String,
     engine_path: String,
     data_dir: String,
+    game: Option<String>,
     force: Option<bool>,
 ) -> CliResult {
     let Some(queue) = app.try_state::<AnalysisQueue>().map(|q| q.inner().clone()) else {
@@ -830,6 +837,7 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
             Path::new(&replay_path),
             Path::new(&engine_path),
             data_dirs,
+            game,
             force.unwrap_or(false),
         )?;
         let outcome = queue.enqueue(spec)?;
@@ -843,21 +851,43 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     }
 }
 
+/// The engine folders among `paths` that hold a headless engine, which is what
+/// an analysis runs. Other folders hold an engine that can only open a window.
+pub fn headless_engines(paths: Vec<String>) -> Vec<String> {
+    paths
+        .into_iter()
+        .filter(|path| super::launch::headless_binary(Path::new(path)).is_file())
+        .collect()
+}
+
 /// `content_analysis_check`: whether a replay can be analysed at all, read
-/// from the replay and nothing else, so a page can say why not beside a
-/// disabled button. Answers `{ cannot, gameId, matchSeconds }`. `cannot` is
+/// from the replay, so a page can say why not beside a disabled button.
+/// `enginePaths` are the installed engine folders the page is considering, and
+/// `headless` answers which of them hold a headless engine. Answers `{ cannot,
+/// gameId, matchSeconds, headless }`. `cannot` is
 /// null for a replay that can be, and otherwise `remix`, `noGameId`,
 /// `noGameOver` or `unreadable`. Whether its engine, game and map are
 /// installed is a separate question, which the page already answers.
 #[tauri::command]
-pub(crate) async fn content_analysis_check(replay_path: String) -> CliResult {
-    let checked =
-        tauri::async_runtime::spawn_blocking(move || check_replay(Path::new(&replay_path))).await;
+pub(crate) async fn content_analysis_check(
+    replay_path: String,
+    engine_paths: Option<Vec<String>>,
+) -> CliResult {
+    let checked = tauri::async_runtime::spawn_blocking(move || {
+        let headless = headless_engines(engine_paths.unwrap_or_default());
+        (check_replay(Path::new(&replay_path)), headless)
+    })
+    .await;
     match checked {
-        Ok(Ok((game_id, match_seconds))) => CliResult::ok(
-            json!({ "cannot": null, "gameId": game_id, "matchSeconds": match_seconds }),
+        Ok((Ok((game_id, match_seconds)), headless)) => CliResult::ok(json!({
+            "cannot": null,
+            "gameId": game_id,
+            "matchSeconds": match_seconds,
+            "headless": headless,
+        })),
+        Ok((Err(why), headless)) => CliResult::ok(
+            json!({ "cannot": why, "gameId": null, "matchSeconds": 0, "headless": headless }),
         ),
-        Ok(Err(why)) => CliResult::ok(json!({ "cannot": why, "gameId": null, "matchSeconds": 0 })),
         Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
     }
 }
@@ -1135,6 +1165,7 @@ mod tests {
             replay: PathBuf::from(format!("/replays/{game_id}.sdfz")),
             engine_dir: PathBuf::from("/engines/1"),
             data_dirs: Vec::new(),
+            game: None,
             game_id: game_id.into(),
             name: format!("{game_id}.sdfz"),
             match_seconds: 50,
@@ -1775,8 +1806,14 @@ mod tests {
             analyses.clone(),
             move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
         );
-        let spec = job_for(&replay, Path::new(&engine_dir), data_dirs.clone(), false)
-            .expect("a replay that can be analysed");
+        let spec = job_for(
+            &replay,
+            Path::new(&engine_dir),
+            data_dirs.clone(),
+            None,
+            false,
+        )
+        .expect("a replay that can be analysed");
         let game_id = store::replay_key(&replay).unwrap();
         let limit = run_timeout(spec.match_seconds);
         let wait_idle = |what: &str| {
@@ -1945,7 +1982,14 @@ mod tests {
         fn a_finished_replay_becomes_a_job_keyed_by_its_game_id() {
             let (_dir, replay, engine) = world(finished().gzipped());
 
-            let spec = job_for(&replay, &engine, vec![PathBuf::from("/content")], false).unwrap();
+            let spec = job_for(
+                &replay,
+                &engine,
+                vec![PathBuf::from("/content")],
+                None,
+                false,
+            )
+            .unwrap();
 
             assert_eq!(spec.game_id, super::ID);
             assert_eq!(spec.name, "match.sdfz");
@@ -1960,7 +2004,7 @@ mod tests {
                 ..Default::default()
             };
             let (_dir, replay, engine) = world(unfinished.gzipped());
-            let err = job_for(&replay, &engine, Vec::new(), false).unwrap_err();
+            let err = job_for(&replay, &engine, Vec::new(), None, false).unwrap_err();
             assert!(err.contains("never recorded a game over"), "{err}");
 
             let no_id = DemoFixture {
@@ -1968,17 +2012,23 @@ mod tests {
                 ..finished()
             };
             let (_dir, replay, engine) = world(no_id.gzipped());
-            let err = job_for(&replay, &engine, Vec::new(), false).unwrap_err();
+            let err = job_for(&replay, &engine, Vec::new(), None, false).unwrap_err();
             assert!(err.contains("no game id"), "{err}");
 
             let (dir, replay, engine) = world(finished().gzipped());
             let remix =
                 super::super::super::super::rewrite_demo(&replay, "Other Game", None).unwrap();
-            let err = job_for(&remix, &engine, Vec::new(), false).unwrap_err();
+            let err = job_for(&remix, &engine, Vec::new(), None, false).unwrap_err();
             assert!(err.contains("remix"), "{err}");
 
-            let err =
-                job_for(&replay, &dir.path().join("no-engine"), Vec::new(), false).unwrap_err();
+            let err = job_for(
+                &replay,
+                &dir.path().join("no-engine"),
+                Vec::new(),
+                None,
+                false,
+            )
+            .unwrap_err();
             assert!(err.contains("no headless engine"), "{err}");
 
             let junk = dir.path().join("junk.sdfz");
@@ -1991,5 +2041,26 @@ mod tests {
                 "noGameOver"
             );
         }
+    }
+
+    #[test]
+    fn only_engine_folders_with_a_headless_binary_are_offered() {
+        let dir = tempfile::tempdir().unwrap();
+        let with = dir.path().join("with");
+        let without = dir.path().join("without");
+        std::fs::create_dir_all(&with).unwrap();
+        std::fs::create_dir_all(&without).unwrap();
+        std::fs::write(super::super::launch::headless_binary(&with), b"").unwrap();
+        let paths = |dirs: &[&Path]| -> Vec<String> {
+            dirs.iter()
+                .map(|d| d.to_string_lossy().into_owned())
+                .collect()
+        };
+
+        let missing = dir.path().join("missing");
+        let offered = headless_engines(paths(&[&without, &with, &missing]));
+
+        assert_eq!(offered, paths(&[&with]));
+        assert!(headless_engines(Vec::new()).is_empty());
     }
 }

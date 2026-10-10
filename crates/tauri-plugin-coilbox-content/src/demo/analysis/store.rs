@@ -149,6 +149,73 @@ pub struct Provenance {
     /// failed.
     #[serde(default)]
     pub disagreements: Vec<Disagreement>,
+    /// The engine version the replay's header names. Empty in a file written
+    /// before this was recorded, and for a replay that names none: both read as
+    /// unknown, never as the same engine.
+    #[serde(default)]
+    pub recorded_engine: String,
+    /// The game the replay's start script names. Empty as above.
+    #[serde(default)]
+    pub recorded_game: String,
+    /// Whether the run used an engine other than the recorded one. `None` when
+    /// either is not known.
+    #[serde(default)]
+    pub engine_differs: Option<bool>,
+    /// Whether the run depended on a game version other than the recorded one.
+    /// `None` when the recorded game is not known.
+    #[serde(default)]
+    pub game_differs: Option<bool>,
+    /// Every engine and game the match diverged on, oldest first, the latest
+    /// included. Only a diverged file has any. "It diverged" is true of an
+    /// engine and a game, not of the replay, so each attempt is kept apart.
+    #[serde(default)]
+    pub attempts: Vec<Attempt>,
+}
+
+/// One run that finished and did not reproduce the match.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Attempt {
+    pub engine: String,
+    pub game: String,
+    pub analysed_at_ms: u64,
+    #[serde(default)]
+    pub disagreements: Vec<Disagreement>,
+}
+
+/// Whether two engine version strings name the same build: the dotted release
+/// and the commit count after it, as the frontend's `compareEngineVersions`
+/// reads them, so a different branch label on one build still matches. A string
+/// with no leading number is compared as text.
+pub fn same_engine(a: &str, b: &str) -> bool {
+    fn parse(version: &str) -> Option<(Vec<u64>, u64)> {
+        let v = version.trim();
+        let end = v
+            .find(|c: char| !(c.is_ascii_digit() || c == '.'))
+            .unwrap_or(v.len());
+        let dotted = v[..end].trim_end_matches('.');
+        if dotted.is_empty() {
+            return None;
+        }
+        let mut parts: Vec<u64> = dotted.split('.').map(|n| n.parse().unwrap_or(0)).collect();
+        while parts.last() == Some(&0) {
+            parts.pop();
+        }
+        let commits = v[dotted.len()..]
+            .strip_prefix('-')
+            .map(|rest| {
+                rest.chars()
+                    .take_while(char::is_ascii_digit)
+                    .collect::<String>()
+            })
+            .and_then(|digits| digits.parse().ok())
+            .unwrap_or(0);
+        Some((parts, commits))
+    }
+    match (parse(a), parse(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => a.trim() == b.trim(),
+    }
 }
 
 impl Provenance {
@@ -160,6 +227,21 @@ impl Provenance {
             AnalysisStatus::Incomplete | AnalysisStatus::LoggerNotLoaded => return None,
         };
         let header = run.report.header.clone().unwrap_or_default();
+        let report = &run.report;
+        let engine_differs = (!report.recorded_engine.is_empty() && !header.engine.is_empty())
+            .then(|| !same_engine(&report.recorded_engine, &header.engine));
+        let game_differs =
+            (!report.recorded_game.is_empty()).then(|| report.base_game != report.recorded_game);
+        let attempts = if outcome == StoredOutcome::Diverged {
+            vec![Attempt {
+                engine: header.engine.clone(),
+                game: report.base_game.clone(),
+                analysed_at_ms,
+                disagreements: report.disagreements.clone(),
+            }]
+        } else {
+            Vec::new()
+        };
         Some(Provenance {
             kind: PROVENANCE_KIND.into(),
             store_format: STORE_FORMAT,
@@ -175,6 +257,11 @@ impl Provenance {
             wall_seconds: run.report.exit.wall_seconds,
             counts: run.report.counts,
             disagreements: run.report.disagreements.clone(),
+            recorded_engine: report.recorded_engine.clone(),
+            recorded_game: report.recorded_game.clone(),
+            engine_differs,
+            game_differs,
+            attempts,
         })
     }
 }
@@ -231,6 +318,7 @@ pub fn write(
     events: Option<&[LogLine]>,
 ) -> Result<u64, String> {
     let path = file_path(dir, &provenance.game_id)?;
+    let provenance = &with_earlier_attempts(dir, provenance);
     std::fs::create_dir_all(dir).map_err(|e| format!("could not create {}: {e}", dir.display()))?;
     // In the same folder, so the rename cannot cross a filesystem. The name
     // does not end the way a stored file does, so a temporary file a crash
@@ -254,6 +342,40 @@ pub fn write(
         let _ = std::fs::remove_file(&temp);
     }
     result.map_err(|e| format!("could not store the analysis: {e}"))
+}
+
+/// `provenance` with the attempts an earlier diverged file for the same match
+/// holds. A second attempt on the same engine and game replaces the first, and
+/// a run that reproduced the match carries none.
+fn with_earlier_attempts(dir: &Path, provenance: &Provenance) -> Provenance {
+    let mut merged = provenance.clone();
+    if provenance.outcome != StoredOutcome::Diverged {
+        merged.attempts.clear();
+        return merged;
+    }
+    let earlier = match read(dir, &provenance.game_id) {
+        Ok(Some(stored)) if stored.provenance.outcome == StoredOutcome::Diverged => {
+            stored.provenance
+        }
+        _ => return merged,
+    };
+    // A file from before attempts were kept holds one, in its own fields.
+    let mut attempts = if earlier.attempts.is_empty() {
+        vec![Attempt {
+            engine: earlier.engine,
+            game: earlier.game,
+            analysed_at_ms: earlier.analysed_at_ms,
+            disagreements: earlier.disagreements,
+        }]
+    } else {
+        earlier.attempts
+    };
+    for latest in &provenance.attempts {
+        attempts.retain(|a| !(same_engine(&a.engine, &latest.engine) && a.game == latest.game));
+        attempts.push(latest.clone());
+    }
+    merged.attempts = attempts;
+    merged
 }
 
 /// Open a stored file as lines.
@@ -475,6 +597,8 @@ pub(super) mod tests {
             report: AnalysisReport {
                 status,
                 base_game: "Some Game 1.0".into(),
+                recorded_game: "Some Game 1.0".into(),
+                recorded_engine: "2026.01.0 test".into(),
                 match_seconds: 50,
                 exit: EngineExit {
                     code: Some(0),
@@ -1032,5 +1156,202 @@ pub(super) mod tests {
         bare.report.header = None;
         let provenance = Provenance::of(ID, &bare, 0).unwrap();
         assert_eq!(provenance.engine, LogHeader::default().engine);
+    }
+
+    /// A run of the fixture match on `engine` and `game`, whose replay says it
+    /// was recorded on `recorded_engine` and `recorded_game`.
+    fn run_on(
+        status: AnalysisStatus,
+        engine: &str,
+        game: &str,
+        recorded_engine: &str,
+        recorded_game: &str,
+    ) -> AnalysisRun {
+        let mut run = run_with(status);
+        run.report.header.as_mut().unwrap().engine = engine.into();
+        run.report.base_game = game.into();
+        run.report.recorded_engine = recorded_engine.into();
+        run.report.recorded_game = recorded_game.into();
+        run
+    }
+
+    #[test]
+    fn a_run_on_the_recorded_engine_and_game_records_that_it_did_not_differ() {
+        let run = run_on(
+            AnalysisStatus::Reproduced,
+            "2026.07.01-102-g6e5c5a0 macos_renderer-diagnostics",
+            "Some Game 1.0",
+            "2026.07.01-102-g6e5c5a0",
+            "Some Game 1.0",
+        );
+        let p = Provenance::of(ID, &run, 0).unwrap();
+        assert_eq!(p.engine_differs, Some(false));
+        assert_eq!(p.game_differs, Some(false));
+        assert_eq!(p.recorded_engine, "2026.07.01-102-g6e5c5a0");
+    }
+
+    #[test]
+    fn a_run_on_another_engine_and_game_version_records_both_and_survives_storage() {
+        let dir = tempfile::tempdir().unwrap();
+        let run = run_on(
+            AnalysisStatus::Reproduced,
+            "2026.07.04-46-g04f42e2 macos_integration",
+            "Some Game 1.1",
+            "2025.06.21",
+            "Some Game 1.0",
+        );
+        let p = Provenance::of(ID, &run, 0).unwrap();
+        write(dir.path(), &p, run.events.as_deref()).unwrap();
+
+        let stored = read(dir.path(), ID).unwrap().unwrap().provenance;
+        assert_eq!(stored.engine_differs, Some(true));
+        assert_eq!(stored.game_differs, Some(true));
+        assert_eq!(stored.recorded_engine, "2025.06.21");
+        assert_eq!(stored.recorded_game, "Some Game 1.0");
+        assert_eq!(stored.game, "Some Game 1.1");
+        assert!(stored.attempts.is_empty());
+    }
+
+    #[test]
+    fn a_replay_that_names_no_engine_reads_as_unknown_and_not_as_the_same() {
+        let run = run_on(
+            AnalysisStatus::Reproduced,
+            "2026.07.04-46-g04f42e2",
+            "Some Game 1.0",
+            "",
+            "",
+        );
+        let p = Provenance::of(ID, &run, 0).unwrap();
+        assert_eq!(p.engine_differs, None);
+        assert_eq!(p.game_differs, None);
+    }
+
+    #[test]
+    fn a_file_written_before_the_recorded_engine_was_kept_reads_as_unknown() {
+        let dir = tempfile::tempdir().unwrap();
+        let run = run_with(AnalysisStatus::Reproduced);
+        let mut line = serde_json::to_value(Provenance::of(ID, &run, 0).unwrap()).unwrap();
+        for key in [
+            "recordedEngine",
+            "recordedGame",
+            "engineDiffers",
+            "gameDiffers",
+            "attempts",
+        ] {
+            line.as_object_mut().unwrap().remove(key);
+        }
+        let mut gz = GzEncoder::new(Vec::new(), Compression::default());
+        writeln!(gz, "{line}").unwrap();
+        std::fs::write(
+            dir.path().join(format!("{ID}.jsonl.gz")),
+            gz.finish().unwrap(),
+        )
+        .unwrap();
+
+        let stored = read(dir.path(), ID).unwrap().expect("old file reads");
+        assert_eq!(stored.provenance.recorded_engine, "");
+        assert_eq!(stored.provenance.engine_differs, None);
+        assert_eq!(stored.provenance.game_differs, None);
+        assert!(stored.provenance.attempts.is_empty());
+    }
+
+    #[test]
+    fn engine_versions_match_by_release_and_commit_count_and_not_by_label() {
+        assert!(same_engine(
+            "2026.07.01-102-g6e5c5a0",
+            "2026.07.01-102-g6e5c5a0 macos_renderer-diagnostics"
+        ));
+        assert!(same_engine("2025.06.19", "2025.06.19 macos_arm64"));
+        assert!(!same_engine("2025.06.21", "2026.07.01-102-g6e5c5a0"));
+        assert!(!same_engine(
+            "2026.07.01-71-gd0901ec",
+            "2026.07.01-102-g6e5c5a0"
+        ));
+        assert!(same_engine("local build", "local build "));
+        assert!(!same_engine("local build", "other build"));
+    }
+
+    #[test]
+    fn a_diverged_attempt_is_kept_for_each_engine_it_was_made_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let attempt = |engine: &str, at: u64| {
+            let run = run_on(
+                AnalysisStatus::Diverged,
+                engine,
+                "Some Game 1.0",
+                "2025.06.21",
+                "Some Game 1.0",
+            );
+            write(
+                dir.path(),
+                &Provenance::of(ID, &run, at).unwrap(),
+                run.events.as_deref(),
+            )
+            .unwrap();
+            read(dir.path(), ID).unwrap().unwrap().provenance
+        };
+
+        let first = attempt("2026.07.01-102-g6e5c5a0", 1);
+        assert_eq!(first.attempts.len(), 1);
+
+        let second = attempt("2026.07.04-46-g04f42e2", 2);
+        assert_eq!(second.engine, "2026.07.04-46-g04f42e2");
+        let engines: Vec<_> = second.attempts.iter().map(|a| a.engine.as_str()).collect();
+        assert_eq!(
+            engines,
+            ["2026.07.01-102-g6e5c5a0", "2026.07.04-46-g04f42e2"]
+        );
+
+        // The same engine again replaces its own attempt and keeps the other.
+        let third = attempt("2026.07.01-102-g6e5c5a0 macos_renderer-diagnostics", 3);
+        assert_eq!(third.attempts.len(), 2);
+        assert_eq!(third.attempts[1].analysed_at_ms, 3);
+        assert_eq!(third.attempts[0].engine, "2026.07.04-46-g04f42e2");
+    }
+
+    #[test]
+    fn a_run_that_reproduces_clears_the_diverged_attempts() {
+        let dir = tempfile::tempdir().unwrap();
+        let diverged = run_with(AnalysisStatus::Diverged);
+        write(dir.path(), &Provenance::of(ID, &diverged, 1).unwrap(), None).unwrap();
+        let ok = run_with(AnalysisStatus::Reproduced);
+        write(
+            dir.path(),
+            &Provenance::of(ID, &ok, 2).unwrap(),
+            ok.events.as_deref(),
+        )
+        .unwrap();
+
+        let stored = read(dir.path(), ID).unwrap().unwrap();
+        assert_eq!(stored.state, AnalysisState::Current);
+        assert!(stored.provenance.attempts.is_empty());
+    }
+
+    #[test]
+    fn a_diverged_file_without_attempts_counts_as_one_attempt_when_another_is_added() {
+        let dir = tempfile::tempdir().unwrap();
+        let old = run_on(
+            AnalysisStatus::Diverged,
+            "2026.07.01-102-g6e5c5a0",
+            "Some Game 1.0",
+            "",
+            "",
+        );
+        let mut provenance = Provenance::of(ID, &old, 1).unwrap();
+        provenance.attempts.clear();
+        write(dir.path(), &provenance, None).unwrap();
+
+        let next = run_on(
+            AnalysisStatus::Diverged,
+            "2026.07.04-46-g04f42e2",
+            "Some Game 1.0",
+            "",
+            "",
+        );
+        write(dir.path(), &Provenance::of(ID, &next, 2).unwrap(), None).unwrap();
+
+        let stored = read(dir.path(), ID).unwrap().unwrap().provenance;
+        assert_eq!(stored.attempts.len(), 2);
+        assert_eq!(stored.attempts[0].engine, "2026.07.01-102-g6e5c5a0");
     }
 }

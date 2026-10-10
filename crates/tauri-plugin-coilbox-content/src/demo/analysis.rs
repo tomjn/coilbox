@@ -69,8 +69,13 @@ pub enum AnalysisStatus {
 #[serde(rename_all = "camelCase")]
 pub struct AnalysisReport {
     pub status: AnalysisStatus,
-    /// The game the replay was recorded on, which the analysis game depended on.
+    /// The game the analysis game depended on. The one the replay was recorded
+    /// on, unless the request named another installed version of it.
     pub base_game: String,
+    /// The game the replay says it was recorded on.
+    pub recorded_game: String,
+    /// The engine version in the replay's header. Empty when it names none.
+    pub recorded_engine: String,
     /// The match's length as the replay's header has it, to set against
     /// `exit.wallSeconds`.
     pub match_seconds: u32,
@@ -107,6 +112,9 @@ pub struct AnalysisRequest {
     pub engine_dir: PathBuf,
     /// The content folders holding the replay's game and map.
     pub data_dirs: Vec<PathBuf>,
+    /// Another installed version of the replay's game to depend on, when the
+    /// exact one is not installed. `None` depends on the one the replay names.
+    pub game: Option<String>,
     /// Where to make this run's scratch folder. Under the app's cache directory
     /// in the app.
     pub scratch_root: PathBuf,
@@ -314,10 +322,16 @@ fn analyse_with(
         );
     }
     let raw = super::read_header_and_script(&request.replay)?;
-    let base_game = super::find_game(&super::parse_tdf(&raw.script))
+    let recorded_game = super::find_game(&super::parse_tdf(&raw.script))
         .get("gametype")
         .unwrap_or("")
         .to_string();
+    let base_game = request
+        .game
+        .as_deref()
+        .map(str::trim)
+        .filter(|game| !game.is_empty())
+        .map_or_else(|| recorded_game.clone(), str::to_string);
     let engine = launch::headless_binary(&request.engine_dir);
     if !engine.is_file() {
         return Err(format!(
@@ -393,6 +407,8 @@ fn analyse_with(
         report: AnalysisReport {
             status,
             base_game,
+            recorded_game,
+            recorded_engine: raw.engine_version.trim().to_string(),
             match_seconds: raw.game_time,
             exit,
             header: parsed.header().cloned(),
@@ -480,12 +496,22 @@ mod tests {
         }
 
         fn analyse(&self, engine_body: &str, timeout: Duration) -> Result<AnalysisRun, String> {
+            self.analyse_on(engine_body, timeout, None)
+        }
+
+        fn analyse_on(
+            &self,
+            engine_body: &str,
+            timeout: Duration,
+            game: Option<&str>,
+        ) -> Result<AnalysisRun, String> {
             fake_engine(self.dir.path(), engine_body);
             analyse_replay(
                 &AnalysisRequest {
                     replay: self.replay.clone(),
                     engine_dir: self.dir.path().join("engine"),
                     data_dirs: vec![self.dir.path().join("content")],
+                    game: game.map(str::to_string),
                     scratch_root: self.scratch_root(),
                     timeout,
                 },
@@ -590,6 +616,32 @@ mod tests {
         );
         // The counts are still reported, so the report says how far it got.
         assert_eq!(run.report.counts.unit_destroyed, 4);
+    }
+
+    /// Another installed version of the replay's game stands in for the one it
+    /// names, and the report keeps both so the record can say so.
+    #[test]
+    fn another_game_version_is_depended_on_and_both_are_reported() {
+        let world = World::new(replay_bytes());
+        let witness = world.witness();
+        let body = format!(
+            "{}mkdir -p '{w}'\n\
+             cp \"${{SPRING_DATADIR%%:*}}/games/{folder}/modinfo.lua\" '{w}/modinfo.lua'\n",
+            writes(FIXTURE),
+            w = witness.display(),
+            folder = game::FOLDER,
+        );
+
+        let run = world
+            .analyse_on(&body, LONG, Some("Some Game 1.1"))
+            .unwrap();
+
+        assert_eq!(run.report.base_game, "Some Game 1.1");
+        assert_eq!(run.report.recorded_game, "Some Game 1.0");
+        assert!(!run.report.recorded_engine.is_empty());
+        let modinfo = std::fs::read_to_string(witness.join("modinfo.lua")).unwrap();
+        assert!(modinfo.contains("    \"Some Game 1.1\","), "{modinfo}");
+        assert!(!modinfo.contains("Some Game 1.0"), "{modinfo}");
     }
 
     /// The failure that reads like success: an engine that never started the
@@ -764,6 +816,7 @@ mod tests {
                 replay: world.replay.clone(),
                 engine_dir: world.dir.path().join("no-engine-here"),
                 data_dirs: Vec::new(),
+                game: None,
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
             },
@@ -802,6 +855,7 @@ mod tests {
                 replay: world.replay.clone(),
                 engine_dir: world.dir.path().join("engine"),
                 data_dirs: Vec::new(),
+                game: None,
                 scratch_root: world.scratch_root(),
                 timeout: LONG,
             },
@@ -941,6 +995,7 @@ mod tests {
                     .split(coilbox_proc::DATADIR_SEP)
                     .map(PathBuf::from)
                     .collect(),
+                game: None,
                 scratch_root: scratch.path().to_path_buf(),
                 timeout: Duration::from_secs(timeout.parse().expect("seconds")),
             },
