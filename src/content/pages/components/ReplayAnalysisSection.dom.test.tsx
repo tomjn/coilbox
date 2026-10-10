@@ -228,7 +228,7 @@ describe("a replay that has not been analysed", () => {
     show();
     expect(
       screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).not.toMatch(/expect about/);
+    ).not.toMatch(/expect about|about \d+ (second|minute)/i);
   });
 
   it("estimates from this computer's own runs once there are some, and says how many", () => {
@@ -242,6 +242,10 @@ describe("a replay that has not been analysed", () => {
       ],
     });
     show();
+    expect(
+      screen.getByRole("region", { name: "Analysis" }).textContent,
+    ).toContain("About 25 seconds");
+    // The page carries the figure as a label and no sentence around it.
     expect(
       screen.getByRole("region", { name: "Analysis" }).textContent,
     ).not.toContain("Expect about");

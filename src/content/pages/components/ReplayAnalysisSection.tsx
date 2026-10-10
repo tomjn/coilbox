@@ -266,6 +266,8 @@ function AnalysisBody({
     </Button>
   );
 
+  const estimate = estimateAnalysisSeconds(analyses.values(), info.durationSec);
+
   const offer = (label: string, force: boolean) => (
     <>
       {substitution && (
@@ -278,12 +280,19 @@ function AnalysisBody({
           gameUsed={otherGame ? gameUsed : null}
         />
       )}
-      {button(
-        chosen
-          ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
-          : label,
-        force,
-      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {button(
+          chosen
+            ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
+            : label,
+          force,
+        )}
+        {estimate && (
+          <span className="text-xs text-muted-foreground">
+            About {roughly(estimate.seconds)}
+          </span>
+        )}
+      </div>
       {check !== undefined && blockers.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-amber-700 dark:text-amber-400">
           {blockers.map((b) => (
