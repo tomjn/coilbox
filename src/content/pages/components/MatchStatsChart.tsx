@@ -258,6 +258,15 @@ const DIM_OPACITY = 0.2;
 /** A wide invisible stroke over each line, so the pointer doesn't have to hit 2px. */
 const HIT_WIDTH = 12;
 
+/**
+ * recharts paints lines in the order they registered, not the order they are
+ * written, so raising one is done with z-index. The halo sits with the dimmed
+ * lines, the emphasised line above it, and the hit lines above everything.
+ */
+const Z_LINE = 400;
+const Z_LIT = 401;
+const Z_HIT = 402;
+
 /** Vertical room one end-point label needs, in pixels. */
 const END_LABEL_GAP = 14;
 
@@ -446,12 +455,6 @@ export function MatchStatsChart({
     color: s.color,
     teams: teamsOf.get(s.id) ?? [],
   }));
-  // SVG paints in document order, so the emphasised line is drawn last to sit
-  // above the rest.
-  const drawn = [
-    ...series.filter((s) => !litLine(s.id)),
-    ...series.filter((s) => litLine(s.id)),
-  ];
 
   // Four or fewer lines get their names at their end points, and the legend's
   // colour-matching job disappears with them.
@@ -563,11 +566,10 @@ export function MatchStatsChart({
                     content={<SeriesLegend entries={legendEntries} />}
                   />
                 )}
-                {/* Halos first so they sit under every line, then the lines
-                 * dimmed or not, with the emphasised one last. The invisible
-                 * hit lines come after so they are what the pointer lands on.
-                 * Only the real lines report to the tooltip. */}
-                {drawn
+                {/* The halo, the lines (dimmed or not) and the invisible hit
+                 * lines the pointer lands on, stacked by z-index. Only the
+                 * real lines report to the tooltip. */}
+                {series
                   .filter((s) => litLine(s.id))
                   .map((s) => (
                     <Line
@@ -577,6 +579,7 @@ export function MatchStatsChart({
                       stroke={s.color}
                       strokeWidth={HALO_WIDTH}
                       strokeOpacity={HALO_OPACITY}
+                      zIndex={Z_LINE}
                       strokeLinecap="round"
                       dot={false}
                       activeDot={false}
@@ -585,7 +588,7 @@ export function MatchStatsChart({
                       isAnimationActive={false}
                     />
                   ))}
-                {drawn.map((s) => {
+                {series.map((s) => {
                   const lit = litLine(s.id);
                   return (
                     <Line
@@ -596,6 +599,7 @@ export function MatchStatsChart({
                       stroke={s.color}
                       strokeWidth={lit ? LIT_LINE_WIDTH : LINE_WIDTH}
                       strokeOpacity={emphasis.dimming && !lit ? DIM_OPACITY : 1}
+                      zIndex={lit ? Z_LIT : Z_LINE}
                       dot={false}
                       activeDot={{ r: 3 }}
                       isAnimationActive={false}
@@ -611,6 +615,7 @@ export function MatchStatsChart({
                       dataKey={s.id}
                       stroke="transparent"
                       strokeWidth={HIT_WIDTH}
+                      zIndex={Z_HIT}
                       dot={false}
                       activeDot={false}
                       legendType="none"
