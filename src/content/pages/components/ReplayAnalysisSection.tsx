@@ -44,6 +44,7 @@ import {
 } from "../../replayAnalysisOffer";
 import { replayDependencyBlock } from "../../replayEngine";
 import { useMetricRegistry } from "../../useMetricRegistry";
+import { SectionHelp } from "./SectionHelp";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
 
@@ -268,7 +269,6 @@ function AnalysisBody({
   const offer = (label: string, force: boolean) => (
     <>
       <BeforeRunning
-        matchSeconds={info.durationSec}
         estimate={estimateAnalysisSeconds(analyses.values(), info.durationSec)}
       />
       {substitution && (
@@ -304,7 +304,23 @@ function AnalysisBody({
       className="flex flex-col gap-2"
       aria-label="Analysis"
     >
-      <h2 className="text-sm font-medium">Analysis</h2>
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">Analysis</h2>
+        <SectionHelp section="the analysis">
+          <AnalysisHelp
+            canRun={!hidden}
+            matchSeconds={info.durationSec}
+            estimate={estimateAnalysisSeconds(
+              analyses.values(),
+              info.durationSec,
+            )}
+            hasEngineOptions={options.length > 0}
+            gameUsed={otherGame ? gameUsed : null}
+            running={!!running}
+            diverged={stored?.state === "diverged"}
+          />
+        </SectionHelp>
+      </div>
       <div className="flex flex-col gap-3 rounded-lg border border-border/50 bg-card p-3 text-sm">
         {running ? (
           <Running
@@ -363,25 +379,104 @@ function AnalysisBody({
   );
 }
 
-/** What pressing the button will do, said before it is pressed. */
+/**
+ * What pressing the button will do, said before it is pressed. It is consent,
+ * not help: pressing it starts the game's engine on this computer. The rest is
+ * in {@link AnalysisHelp}.
+ */
 function BeforeRunning({
-  matchSeconds,
   estimate,
 }: {
-  matchSeconds: number;
   estimate: { seconds: number; runs: number } | null;
 }) {
   return (
     <p className="max-w-prose text-muted-foreground">
-      Analysing plays this match back in the game's engine on this computer, to
-      record where units were made and lost. The match is{" "}
-      {formatDuration(matchSeconds)} long, and playback runs faster than the
-      match did.{" "}
-      {estimate &&
-        `Going by the ${plural(estimate.runs, "analysis", "analyses")} this computer has finished, expect about ${roughly(estimate.seconds)}. `}
-      The engine and the game the replay used must be installed. The result is
-      kept, so this happens once.
+      Analysing plays this match back in the game's engine on this computer. The
+      result is kept only if the playback matches the recorded match.
+      {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
     </p>
+  );
+}
+
+/**
+ * Why the analysis behaves as it does, for the section's help entry: what it
+ * records, how long it takes, why a different engine often will not match, and
+ * what a run and a failed match leave behind.
+ */
+function AnalysisHelp({
+  canRun,
+  matchSeconds,
+  estimate,
+  hasEngineOptions,
+  gameUsed,
+  running,
+  diverged,
+}: {
+  canRun: boolean;
+  matchSeconds: number;
+  estimate: { seconds: number; runs: number } | null;
+  hasEngineOptions: boolean;
+  gameUsed: string | null;
+  running: boolean;
+  diverged: boolean;
+}) {
+  const different =
+    hasEngineOptions && gameUsed
+      ? "engine or game version"
+      : hasEngineOptions
+        ? "engine"
+        : "game version";
+  return (
+    <>
+      <p>
+        Analysing plays the match back in the game's engine on this computer, to
+        record where units were made and lost.
+      </p>
+      {canRun && (
+        <>
+          <p>
+            The match is {formatDuration(matchSeconds)} long, and playback runs
+            faster than the match did.
+            {estimate &&
+              ` The estimate goes by the ${plural(estimate.runs, "analysis", "analyses")} this computer has finished.`}{" "}
+            The engine and the game the replay used must be installed. The
+            result is kept, so this happens once.
+          </p>
+          <p>
+            A different {different} often computes a different match, because
+            the engine only keeps its playback in step within one version. The
+            result is kept only if the playback matches the recorded match
+            exactly: who won, how long it lasted and every team's final totals.
+            If it does not, no events are kept and the page says so.
+          </p>
+          {hasEngineOptions && (
+            <p>
+              Engines are listed newest first. Coilbox has no measure of which
+              version is nearest to the one the replay was recorded on, so it
+              has not picked one for that.
+            </p>
+          )}
+          {gameUsed && (
+            <p>
+              The game version used is the highest numbered one installed, and
+              coilbox cannot tell whether it is the nearest.
+            </p>
+          )}
+        </>
+      )}
+      {running && (
+        <p>
+          The frame shown is where the playback had got to when a unit was last
+          made or lost, so it can stand still for a while.
+        </p>
+      )}
+      {diverged && (
+        <p>
+          The usual reason a playback does not match is that the installed game
+          or engine is not exactly the one the match was played on.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -441,11 +536,6 @@ function Substitution({
                     : o.label,
                 }))}
               />
-              <span className="text-xs text-muted-foreground">
-                Newest first. Coilbox has no measure of which version is nearest
-                to the one the replay was recorded on, so it has not picked one
-                for that.
-              </span>
             </div>
           )}
           {tried.length > 0 && (
@@ -460,23 +550,8 @@ function Substitution({
         <p>
           The game this replay was recorded on, {recordedGame}, is not
           installed. The analysis will use {gameUsed}, another version of it.
-          That is the highest numbered version installed, and coilbox cannot
-          tell whether it is the nearest.
         </p>
       )}
-      <p className="text-muted-foreground">
-        A different{" "}
-        {options.length > 0 && gameUsed
-          ? "engine or game version"
-          : options.length > 0
-            ? "engine"
-            : "game version"}{" "}
-        often computes a different match, because the engine only keeps its
-        playback in step within one version. The result is kept only if the
-        playback matches the recorded match exactly: who won, how long it lasted
-        and every team's final totals. If it does not, no events are kept and
-        the page says so.
-      </p>
     </div>
   );
 }
@@ -515,10 +590,7 @@ function Running({
           aria-label="Playback progress"
         />
       )}
-      <p className="text-xs text-muted-foreground">
-        The frame is where the playback had got to when a unit was last made or
-        lost, so it can stand still for a while. You can leave this page.
-      </p>
+      <p className="text-xs text-muted-foreground">You can leave this page.</p>
     </div>
   );
 }
@@ -615,10 +687,7 @@ function Disagreements({ stored }: { stored: StoredReplayAnalysis }) {
   const rest = figures.slice(FIGURES_SHOWN);
   return (
     <div className="flex flex-col gap-1 text-xs">
-      <p className="text-muted-foreground">
-        The usual reason is that the installed game or engine is not exactly the
-        one the match was played on. What disagreed:
-      </p>
+      <p className="text-muted-foreground">What disagreed:</p>
       <ul className="flex list-disc flex-col gap-0.5 pl-4">
         {first.map((f) => (
           <li key={f}>{f}</li>

@@ -23,6 +23,7 @@ import {
   type MatchupGroup,
   matchupAgainst,
 } from "../stats";
+import { SectionHelp } from "./components/SectionHelp";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 function playedAt(ms: number): string {
@@ -180,13 +181,29 @@ export default function MatchupPage() {
         >
           <ArrowLeft className="size-3.5" /> {other || "Player"}
         </Link>
-        <h1 className="text-lg font-semibold">
-          {me && other ? `${me} vs ${other}` : "Matchup"}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Games where you were on opposing teams, from the replays in your
-          content folders.
-        </p>
+        <div className="flex items-center gap-1">
+          <h1 className="text-lg font-semibold">
+            {me && other ? `${me} vs ${other}` : "Matchup"}
+          </h1>
+          <SectionHelp section="the matchup">
+            <p>
+              A matchup is the games where you were on opposing teams, from the
+              replays in your content folders.
+            </p>
+            {matchup && left > 0 && (
+              <p>
+                {matchup.gamesTogether > 0 &&
+                  `${gamesLabel(matchup.gamesTogether)} on the same team not counted. `}
+                {matchup.gamesSideUnknown > 0 &&
+                  `${gamesLabel(matchup.gamesSideUnknown)} with an unknown team not counted.`}
+              </p>
+            )}
+            <p>
+              Each square is one game, oldest first. Filled is a win, red is a
+              loss, an outline is no recorded result.
+            </p>
+          </SectionHelp>
+        </div>
       </header>
 
       {error && <ErrorBanner message={error} />}
@@ -215,18 +232,6 @@ export default function MatchupPage() {
             <p className="text-sm">
               {gamesLabel(matchup.overall.games)} against {other}:{" "}
               {recordCounts(matchup.overall)}.
-            </p>
-            {left > 0 && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {matchup.gamesTogether > 0 &&
-                  `${gamesLabel(matchup.gamesTogether)} on the same team not counted. `}
-                {matchup.gamesSideUnknown > 0 &&
-                  `${gamesLabel(matchup.gamesSideUnknown)} with an unknown team not counted.`}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">
-              Each square is one game, oldest first. Filled is a win, red is a
-              loss, an outline is no recorded result.
             </p>
           </section>
 

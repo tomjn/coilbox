@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { contrast, type Rgb } from "@/lib/contrast.testhelper";
-import { HEAT_RAMP } from "@/lib/heatRamp";
+import { HEAT_RAMPS } from "@/lib/heatRamp";
 import { WHOLE } from "./mapAggregate";
 import type { MapExportInfo } from "./mapAggregateExport";
 import {
@@ -395,7 +395,13 @@ describe("drawMapImage", () => {
 
   it("draws the panel, the map, its dimming, then the field, in that order", () => {
     const { ctx, calls } = recorder();
-    drawMapImage(ctx, layout, { minimap, field, dots: [], places: [] });
+    drawMapImage(ctx, layout, {
+      minimap,
+      field,
+      kind: "buildings",
+      dots: [],
+      places: [],
+    });
     const named = calls.filter(
       (c) => c[0] === "fillRect" || c[0] === "drawImage",
     );
@@ -410,7 +416,13 @@ describe("drawMapImage", () => {
 
   it("draws a plain backdrop when the map has no minimap", () => {
     const { ctx, calls } = recorder();
-    drawMapImage(ctx, layout, { minimap: null, field, dots: [], places: [] });
+    drawMapImage(ctx, layout, {
+      minimap: null,
+      field,
+      kind: "buildings",
+      dots: [],
+      places: [],
+    });
     expect(calls.some((c) => c[0] === "drawImage" && c[1] === minimap)).toBe(
       false,
     );
@@ -424,6 +436,7 @@ describe("drawMapImage", () => {
     drawMapImage(ctx, layout, {
       minimap,
       field,
+      kind: "buildings",
       dots: [{ left: 0.25, top: 0.5 }],
       places: [{ left: 0.5, top: 0.75, n: 3, name: null }],
     });
@@ -439,6 +452,7 @@ describe("drawMapImage", () => {
     drawMapImage(ctx, layout, {
       minimap,
       field,
+      kind: "buildings",
       dots: [],
       places: [
         { left: 0.1, top: 0.2, n: 1, name: "Front" },
@@ -457,9 +471,15 @@ describe("drawMapImage", () => {
 
   it("draws the ramp's bar from the page's stops and then every line of text", () => {
     const { ctx, calls } = recorder();
-    drawMapImage(ctx, layout, { minimap, field, dots: [], places: [] });
+    drawMapImage(ctx, layout, {
+      minimap,
+      field,
+      kind: "buildings",
+      dots: [],
+      places: [],
+    });
     expect(calls.filter((c) => c[0] === "addColorStop")).toHaveLength(
-      HEAT_RAMP.length,
+      HEAT_RAMPS.buildings.length,
     );
     expect(calls.find((c) => c[0] === "addColorStop")?.[2]).toBe(
       "rgba(85, 30, 166, 0.30)",

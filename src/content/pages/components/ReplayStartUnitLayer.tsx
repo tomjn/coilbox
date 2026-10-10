@@ -243,36 +243,22 @@ export function StartUnitNotes({
   if (tracks.length === 0)
     return (
       <p className="text-xs text-muted-foreground" data-testid="start-units">
-        This analysis recorded no starting unit. A player's first unit has to be
-        made for them at the start, not given to them, to count as one.
+        This analysis recorded no starting unit.
       </p>
     );
 
-  const changed = tracks.filter((t) => t.changedTeam).length;
-  const still = startPaths.filter((p) => trackLength(p.points) === 0).length;
   const removed = startEnds.filter((e) => e.cause === "removed").length;
   const inWindow = ev.windowed ? " in this window" : "";
 
   return (
     <div className="flex flex-col gap-2" data-testid="start-units">
       <p className="text-xs text-muted-foreground">
-        {plural(tracks.length, "starting unit", "starting units")} recorded. A
-        starting unit is one a player had on the frame their first unit
-        appeared, made by no builder. In most games that is the commander, but
-        the engine does not say which unit is a commander, so none is called one
-        here.
-        {changed > 0 &&
-          ` ${plural(changed, "changed hands and keeps", "changed hands and keep")} the colour of the player who started with ${changed === 1 ? "it" : "them"}.`}
+        {plural(tracks.length, "starting unit", "starting units")} recorded.
       </p>
 
-      {ev.startPathsOn && (
+      {ev.startPathsOn && startPaths.length === 0 && (
         <p className="text-xs text-muted-foreground">
-          {startPaths.length === 0
-            ? `No starting unit was alive${inWindow}.`
-            : `A line is where one starting unit went${inWindow}, in its player's colour. The dot is where the line begins and the name is where it ends.`}
-          {still > 0 &&
-            startPaths.length > 0 &&
-            ` ${still.toLocaleString()} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
+          No starting unit was alive{inWindow}.
         </p>
       )}
 
@@ -281,14 +267,16 @@ export function StartUnitNotes({
           <p className="text-xs text-muted-foreground">
             {startEnds.length === 0
               ? `No starting unit was lost${inWindow}.`
-              : `${plural(startEnds.length, "starting unit was", "starting units were")} lost${inWindow}.`}{" "}
-            <EndIcon cause="destroyed" /> is one that was destroyed.
-            {removed > 0 && (
+              : `${plural(startEnds.length, "starting unit was", "starting units were")} lost${inWindow}.`}
+            {startEnds.length > 0 && (
               <>
                 {" "}
-                <EndIcon cause="removed" /> is one the game's own script took
-                away, which is how a game swaps a unit for its upgrade. The log
-                cannot follow it into the unit that replaced it.
+                <EndIcon cause="destroyed" /> destroyed
+                {removed > 0 && (
+                  <>
+                    , <EndIcon cause="removed" /> removed by the game
+                  </>
+                )}
               </>
             )}
           </p>
@@ -304,5 +292,64 @@ export function StartUnitNotes({
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * What the two starting unit layers mean, for the map's help entry: what a
+ * starting unit is, what a line and an end mark are, and what is not shown.
+ * It holds the same conditions as {@link StartUnitNotes}.
+ */
+export function StartUnitHelp({ ev }: { ev: EventLayers }) {
+  if (ev.state.kind !== "ready" || !(ev.startDeathsOn || ev.startPathsOn))
+    return null;
+  if (ev.startRead.status !== "done" || !ev.startUnitsRecorded) return null;
+
+  const { tracks, startEnds, startPaths } = ev;
+  if (tracks.length === 0)
+    return (
+      <p>
+        A player's first unit has to be made for them at the start, not given to
+        them, to count as a starting unit.
+      </p>
+    );
+
+  const changed = tracks.filter((t) => t.changedTeam).length;
+  const still = startPaths.filter((p) => trackLength(p.points) === 0).length;
+  const removed = startEnds.filter((e) => e.cause === "removed").length;
+  const inWindow = ev.windowed ? " in this window" : "";
+  return (
+    <>
+      <p>
+        A starting unit is one a player had on the frame their first unit
+        appeared, made by no builder. In most games that is the commander, but
+        the engine does not say which unit is a commander, so none is called one
+        here.
+        {changed > 0 &&
+          ` ${plural(changed, "changed hands and keeps", "changed hands and keep")} the colour of the player who started with ${changed === 1 ? "it" : "them"}.`}
+      </p>
+      {ev.startPathsOn && startPaths.length > 0 && (
+        <p>
+          A line is where one starting unit went{inWindow}, in its player's
+          colour. The dot is where the line begins and the name is where it
+          ends.
+          {still > 0 &&
+            ` ${still.toLocaleString()} did not move${inWindow} and ${still === 1 ? "shows" : "show"} as a dot alone.`}
+        </p>
+      )}
+      {ev.startDeathsOn && startEnds.length > 0 && (
+        <p>
+          <EndIcon cause="destroyed" /> is a starting unit that was destroyed.
+          {removed > 0 && (
+            <>
+              {" "}
+              <EndIcon cause="removed" /> is one the game's own script took
+              away, which is how a game swaps a unit for its upgrade. The log
+              cannot follow it into the unit that replaced it.
+            </>
+          )}
+        </p>
+      )}
+    </>
   );
 }

@@ -174,6 +174,11 @@ function show(
   );
 }
 
+/** The section's help entry, opened. Why and how long are said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the analysis" }));
+  return screen.getByRole("dialog").textContent ?? "";
+};
 const commands = () => called.map((c) => c.command);
 const analyseButton = () =>
   screen.getByRole("button", { name: "Analyse this replay" });
@@ -200,12 +205,20 @@ describe("a replay that has not been analysed", () => {
     expect(text).toContain(
       "plays this match back in the game's engine on this computer",
     );
-    expect(text).toContain("The match is 12:49 long");
-    expect(text).toContain("playback runs faster than the match did");
+    // The consent is short and says what is kept.
     expect(text).toContain(
+      "The result is kept only if the playback matches the recorded match",
+    );
+    // The rest is in the help and not in the section.
+    expect(text).not.toContain("The match is 12:49 long");
+    expect(text).not.toContain("playback runs faster than the match did");
+    const said = help();
+    expect(said).toContain("The match is 12:49 long");
+    expect(said).toContain("playback runs faster than the match did");
+    expect(said).toContain(
       "The engine and the game the replay used must be installed",
     );
-    expect(text).toContain("The result is kept, so this happens once");
+    expect(said).toContain("The result is kept, so this happens once");
     await waitFor(() =>
       expect(analyseButton()).toHaveProperty("disabled", false),
     );
@@ -231,8 +244,9 @@ describe("a replay that has not been analysed", () => {
     show();
     expect(
       screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).toContain(
-      "Going by the 1 analysis this computer has finished, expect about 25 seconds.",
+    ).toContain("Expect about 25 seconds.");
+    expect(help()).toContain(
+      "The estimate goes by the 1 analysis this computer has finished.",
     );
   });
 
@@ -386,7 +400,10 @@ describe("a replay with something stored", () => {
     await screen.findByText(/Units beamed in for team 0/);
     const text = screen.getByRole("region", { name: "Analysis" }).textContent;
     expect(text).toContain("did not reproduce the recorded match");
-    expect(text).toContain(
+    expect(text).not.toContain(
+      "is not exactly the one the match was played on",
+    );
+    expect(help()).toContain(
       "the installed game or engine is not exactly the one the match was played on",
     );
     expect(text).toContain(
@@ -579,9 +596,13 @@ describe("a replay whose engine is not installed (#3869)", () => {
       "The analysis will use engine 2026.07.04-46-g04f42e2 macos_integration instead.",
     );
     expect(region()).toContain(
-      "The result is kept only if the playback matches the recorded match exactly",
+      "The result is kept only if the playback matches the recorded match",
     );
-    expect(region()).toContain("often computes a different match");
+    expect(region()).not.toContain("often computes a different match");
+    expect(help()).toContain("often computes a different match");
+    expect(screen.getByRole("dialog").textContent).toContain(
+      "who won, how long it lasted and every team's final totals",
+    );
     // No odds are quoted.
     expect(region()).not.toMatch(/usually|likely to work|%/);
   });

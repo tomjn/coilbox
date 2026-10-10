@@ -1,9 +1,10 @@
 import { cn, useTheme } from "@picoframe/frame";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
 import { buildHeatField } from "@/lib/heatField";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
@@ -57,12 +58,23 @@ import { useReplayEventLayers } from "../../useReplayEventLayers";
 import { useReplayTimeWindow } from "../../useReplayTimeWindow";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplayBaseCrops } from "./ReplayBaseCrops";
-import { EventLayerCanvases, EventLayerNotes } from "./ReplayEventLayers";
+import { BaseCropsHelp, ReplayBaseCrops } from "./ReplayBaseCrops";
+import {
+  EventLayerCanvases,
+  EventLayerHelp,
+  EventLayerNotes,
+} from "./ReplayEventLayers";
 import { swatch } from "./ReplayRoster";
-import { ReplaySourceNote } from "./ReplaySourceNote";
-import { StartUnitCanvas, StartUnitNotes } from "./ReplayStartUnitLayer";
-import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
+import {
+  StartUnitCanvas,
+  StartUnitHelp,
+  StartUnitNotes,
+} from "./ReplayStartUnitLayer";
+import {
+  ReplayTimeWindowControl,
+  TimeWindowHelp,
+} from "./ReplayTimeWindowControl";
+import { SectionHelp } from "./SectionHelp";
 import { StoredListNote } from "./UnitListNotes";
 
 /** How many pixels wide the marks are drawn at, before the page scales the
@@ -177,6 +189,28 @@ function StartDotButton({ dot }: { dot: StartDot }) {
   );
 }
 
+/** A layer switch that needs an analysis. When it cannot be used, the reason
+ *  is its tooltip, on a wrapper because a disabled button takes no pointer. */
+function EventToggle({
+  value,
+  reason,
+  children,
+}: {
+  value: string;
+  reason: string | null;
+  children: ReactNode;
+}) {
+  if (!reason)
+    return <ToggleGroupItem value={value}>{children}</ToggleGroupItem>;
+  return (
+    <span title={reason}>
+      <ToggleGroupItem value={value} disabled>
+        {children}
+      </ToggleGroupItem>
+    </span>
+  );
+}
+
 /** The shapes the marks are drawn in, and what each stands for. */
 function ShapeKey({ shapes }: { shapes: [MarkShape, string][] }) {
   return (
@@ -215,6 +249,7 @@ export function ReplayMap({
   minimapUrl,
   heightmap,
   preview,
+  heading,
 }: {
   info: DemoInfo;
   replayPath: string | undefined;
@@ -227,6 +262,8 @@ export function ReplayMap({
     React.ComponentProps<typeof MapPreview3D>,
     "onScene" | "worldWidth" | "worldHeight" | "className"
   > | null;
+  /** The section's heading, which the help entry sits beside. */
+  heading?: ReactNode;
 }) {
   const layersShown = !isProfileHidden("analytics.spatialLayers");
   const [stored, setLayers] = useStoredMapLayers();
@@ -416,16 +453,21 @@ export function ReplayMap({
   }, [marks, colours, emphasis.state]);
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeatField(canvas, field);
+    if (canvas && field)
+      drawHeatField(canvas, field, HEAT_KIND_OF_LAYER.density);
   }, [field]);
   useEffect(() => {
     const canvas = orderHeatRef.current;
-    if (canvas && orderField) drawHeatField(canvas, orderField);
+    if (canvas && orderField)
+      drawHeatField(canvas, orderField, HEAT_KIND_OF_LAYER.orderDensity);
   }, [orderField]);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
-  useHeatmapLayer(handle, orderField ?? field);
-  useHeatmapLayer(handle, ev.field);
+  // One 3D layer for each density, so two on at once are both on the terrain,
+  // each in its own ramp.
+  useHeatmapLayer(handle, field, HEAT_KIND_OF_LAYER.density);
+  useHeatmapLayer(handle, orderField, HEAT_KIND_OF_LAYER.orderDensity);
+  useHeatmapLayer(handle, ev.field, HEAT_KIND_OF_LAYER.deaths);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
@@ -445,8 +487,95 @@ export function ReplayMap({
   // The minimap and the 3D preview sit side by side. Everything said about the
   // layers goes under both, across the section, so a wide page is used and the
   // base views have room to sit in a row.
+  const showColourNote =
+    (orderField?.peak ?? 0) > 0 ||
+    (field?.peak ?? 0) > 0 ||
+    (ev.field?.peak ?? 0) > 0;
+  const basesShown = on.bases && dots.length > 0 && !!inWindow;
+
   return (
     <div className="flex flex-col gap-3">
+      <div className="flex items-center gap-1">
+        {heading}
+        <SectionHelp
+          section="the map"
+          source="stream"
+          detail="Start boxes come from the match setup."
+        >
+          {layersShown && (windowed || ev.active) && (
+            <TimeWindowHelp
+              activity={activity}
+              subject={windowSubject(windowed, ev.active)}
+            />
+          )}
+          {on.startBoxes && hasBoxes && (
+            <p>A start box is where a team was allowed to start.</p>
+          )}
+          {on.starts && !noStarts && (
+            <p>
+              A dot is where a player's start was set before the game. The
+              engine can move a start into its start box, so the commander may
+              have appeared a short way off. Point at a dot to see whose it is.
+            </p>
+          )}
+          {wantOrders && built && placed > 0 && (
+            <p>
+              Buildings ordered shows the orders each player gave, not what was
+              built. An order that was cancelled or never carried out is drawn
+              like any other.
+              {built.unplaced > 0 &&
+                ` ${built.unplaced.toLocaleString()} factory queue ${built.unplaced === 1 ? "order has" : "orders have"} no position and ${built.unplaced === 1 ? "is" : "are"} not drawn.`}
+              {built.offMap > 0 &&
+                ` ${built.offMap.toLocaleString()} ${built.offMap === 1 ? "order was" : "orders were"} placed off the map and ${built.offMap === 1 ? "is" : "are"} not drawn.`}
+              {on.buildings && " A mark is one order, in its player's colour."}
+            </p>
+          )}
+          {wantPoints && allOrders && allOrders.count > 0 && bySender && (
+            <>
+              <p>
+                Order density shows where orders were aimed, which is roughly
+                where attention went.{" "}
+                {(orderField?.counted ?? 0).toLocaleString()} orders
+                {timeWindow ? " in this window" : ""} are on it, from the
+                player's own selection, widgets acting for them and AIs alike
+                {bySender.lua > 0 &&
+                  `, and ${bySender.lua.toLocaleString()} of them were sent by widgets`}
+                .
+              </p>
+              <p>
+                Orders aimed at a unit are not on it, as the replay holds the
+                unit and not its position.{" "}
+                {allOrders.unitAimed.toLocaleString()}{" "}
+                {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
+                at a unit
+                {timeWindow
+                  ? " in the whole match, which the window cannot narrow"
+                  : ""}
+                .
+                {allOrders.custom > 0 &&
+                  ` ${allOrders.custom.toLocaleString()} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
+                {(orderField?.dropped ?? 0) > 0 &&
+                  ` ${(orderField?.dropped ?? 0).toLocaleString()} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
+              </p>
+            </>
+          )}
+          {showColourNote && (
+            <p>
+              Colours compare places on this map with each other, not with
+              another picture.
+            </p>
+          )}
+          {layersShown && <EventLayerHelp ev={ev} />}
+          {layersShown && <StartUnitHelp ev={ev} />}
+          {basesShown && (
+            <BaseCropsHelp
+              world={world}
+              timeWindow={timeWindow}
+              domainSec={domainSec}
+            />
+          )}
+        </SectionHelp>
+      </div>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div
           data-map-column
@@ -572,23 +701,19 @@ export function ReplayMap({
               Order density
             </ToggleGroupItem>
             <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
-            <ToggleGroupItem value="deaths" disabled={!!ev.block}>
+            <EventToggle value="deaths" reason={ev.block}>
               Deaths
-            </ToggleGroupItem>
-            <ToggleGroupItem value="finished" disabled={!!ev.block}>
+            </EventToggle>
+            <EventToggle value="finished" reason={ev.block}>
               Buildings finished
-            </ToggleGroupItem>
-            <ToggleGroupItem value="startUnitDeaths" disabled={!!ev.block}>
+            </EventToggle>
+            <EventToggle value="startUnitDeaths" reason={ev.block}>
               Starting unit deaths
-            </ToggleGroupItem>
-            <ToggleGroupItem value="startUnitPaths" disabled={!!ev.block}>
+            </EventToggle>
+            <EventToggle value="startUnitPaths" reason={ev.block}>
               Starting unit paths
-            </ToggleGroupItem>
+            </EventToggle>
           </ToggleGroup>
-          <ReplaySourceNote
-            source="stream"
-            detail="Start boxes come from the match setup."
-          />
 
           {(windowed || ev.active) && (
             // Straight under the maps it filters, and wide enough to drag.
@@ -612,15 +737,15 @@ export function ReplayMap({
                 noun={
                   on.orderDensity
                     ? buildLayer
-                      ? "orders to place a building"
-                      : "orders with a place on the map"
+                      ? "building orders"
+                      : "orders on the map"
                     : undefined
                 }
                 also={
                   on.orderDensity && buildLayer
                     ? {
                         count: orderCount,
-                        noun: "orders with a place on the map",
+                        noun: "orders on the map",
                       }
                     : undefined
                 }
@@ -639,26 +764,12 @@ export function ReplayMap({
                 This match set no start boxes.
               </p>
             )}
-            {on.startBoxes && hasBoxes && (
-              <p className="text-xs text-muted-foreground">
-                A start box is where a team was allowed to start.
-              </p>
-            )}
 
             {noStarts && (
               <p className="text-xs text-muted-foreground">
                 This replay recorded no start positions.
               </p>
             )}
-            {on.starts && !noStarts && (
-              <p className="text-xs text-muted-foreground">
-                A dot is where a player's start was set before the game. The
-                engine can move a start into its start box, so the commander may
-                have appeared a short way off. Point at a dot to see whose it
-                is.
-              </p>
-            )}
-
             {wantOrders && orders.loading && (
               <p className="text-xs text-muted-foreground">
                 Reading build orders…
@@ -672,18 +783,6 @@ export function ReplayMap({
             {wantOrders && built && placedCount.total === 0 && (
               <p className="text-xs text-muted-foreground">
                 No buildings were ordered in this replay.
-              </p>
-            )}
-            {wantOrders && built && placed > 0 && (
-              <p className="text-xs text-muted-foreground">
-                {placed.toLocaleString()} {placed === 1 ? "order" : "orders"} to
-                place a building. These are the orders each player gave, not
-                what was built. An order that was cancelled or never carried out
-                is drawn like any other.
-                {built.unplaced > 0 &&
-                  ` ${built.unplaced.toLocaleString()} factory queue ${built.unplaced === 1 ? "order has" : "orders have"} no position and ${built.unplaced === 1 ? "is" : "are"} not drawn.`}
-                {built.offMap > 0 &&
-                  ` ${built.offMap.toLocaleString()} ${built.offMap === 1 ? "order was" : "orders were"} placed off the map and ${built.offMap === 1 ? "is" : "are"} not drawn.`}
               </p>
             )}
             {wantOrders && result?.incomplete && (
@@ -706,29 +805,6 @@ export function ReplayMap({
                 No orders with a place on the map were given in this replay.
               </p>
             )}
-            {wantPoints && allOrders && allOrders.count > 0 && bySender && (
-              <p className="text-xs text-muted-foreground">
-                Where orders were aimed, which is roughly where attention went.{" "}
-                {(orderField?.counted ?? 0).toLocaleString()} orders
-                {timeWindow ? " in this window" : ""} are on it, from the
-                player's own selection, widgets acting for them and AIs alike
-                {bySender.lua > 0 &&
-                  `, and ${bySender.lua.toLocaleString()} of them were sent by widgets`}
-                . Orders aimed at a unit are not on it, as the replay holds the
-                unit and not its position:{" "}
-                {allOrders.unitAimed.toLocaleString()}{" "}
-                {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
-                at a unit
-                {timeWindow
-                  ? " in the whole match, which the window cannot narrow"
-                  : ""}
-                .
-                {allOrders.custom > 0 &&
-                  ` ${allOrders.custom.toLocaleString()} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
-                {(orderField?.dropped ?? 0) > 0 &&
-                  ` ${(orderField?.dropped ?? 0).toLocaleString()} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
-              </p>
-            )}
             {wantPoints && allOrders?.incomplete && (
               <p className="text-xs text-muted-foreground">
                 This replay could not be read to the end, so later orders may be
@@ -738,9 +814,6 @@ export function ReplayMap({
 
             {on.buildings && placed > 0 && (
               <>
-                <p className="text-xs text-muted-foreground">
-                  A mark is one order, in its player's colour.
-                </p>
                 {categorised ? (
                   <ShapeKey
                     shapes={usedCategories.map((category) => [
@@ -776,12 +849,14 @@ export function ReplayMap({
               <HeatLegend
                 label="Where orders were aimed"
                 peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                kind={HEAT_KIND_OF_LAYER.orderDensity}
               />
             )}
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
                 peak={`${Math.round(field.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(field.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(field.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
+                kind={HEAT_KIND_OF_LAYER.density}
               />
             )}
           </div>
@@ -794,7 +869,6 @@ export function ReplayMap({
               units={units.units}
               minimapUrl={minimapUrl}
               timeWindow={timeWindow}
-              domainSec={domainSec}
             />
           )}
         </div>

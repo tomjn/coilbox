@@ -264,6 +264,11 @@ const labels = () =>
     el.textContent,
   ]);
 const notes = () => screen.getByTestId("start-units").textContent ?? "";
+/** The map's help entry, opened. What a starting unit is, is said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About the map" }));
+  return screen.getByRole("dialog").textContent ?? "";
+};
 
 afterEach(() => {
   cleanup();
@@ -294,7 +299,10 @@ describe("a replay with no analysis", () => {
       expect(toggle(name).dataset.state).toBe("off");
     }
     expect(screen.getByTestId("event-block").textContent).toMatch(
-      /Deaths, Buildings finished and the two starting unit layers draw events from an analysis, and this replay has not been analysed/,
+      /This replay has not been analysed/,
+    );
+    expect(help()).toMatch(
+      /Deaths, Buildings finished and the two starting unit layers draw events from an analysis/,
     );
     expect(eventsRead).not.toHaveBeenCalled();
     expect(layer()).toBeNull();
@@ -378,16 +386,17 @@ describe("starting unit paths", () => {
     fireEvent.click(toggle("Starting unit paths"));
     await screen.findByTestId("start-units");
     expect(notes()).toMatch(/2 starting units recorded/);
-    expect(notes()).toMatch(
+    expect(notes()).not.toMatch(/made by no builder/);
+    expect(notes()).not.toMatch(/where the line begins/);
+    const said = help();
+    expect(said).toMatch(
       /one a player had on the frame their first unit appeared, made by no builder/,
     );
-    expect(notes()).toMatch(
-      /the engine does not say which unit is a commander/,
-    );
-    expect(notes()).toMatch(
+    expect(said).toMatch(/the engine does not say which unit is a commander/);
+    expect(said).toMatch(
       /The dot is where the line begins and the name is where it ends/,
     );
-    expect(screen.getByText(/playing the match back/)).toBeTruthy();
+    expect(said).toMatch(/playing the match back/);
   });
 
   it("keeps a path to the time window, and drops a unit that had ended before it", async () => {
@@ -400,7 +409,7 @@ describe("starting unit paths", () => {
     // Alice's was replaced at 2:00, before the last five minutes of ten.
     fireEvent.click(screen.getByRole("button", { name: "Last 5 minutes" }));
     await waitFor(() => expect(labels().map((l) => l[1])).toEqual(["Bob"]));
-    expect(notes()).toMatch(/in this window/);
+    expect(help()).toMatch(/where one starting unit went in this window/);
   });
 
   it("says so when the analysis holds no starting unit", async () => {
@@ -441,8 +450,10 @@ describe("starting unit deaths", () => {
     show();
     fireEvent.click(toggle("Starting unit deaths"));
     await screen.findByTestId("start-units");
-    expect(notes()).toMatch(/is one that was destroyed/);
-    expect(notes()).toMatch(
+    expect(notes()).not.toMatch(/swaps a unit for its upgrade/);
+    const said = help();
+    expect(said).toMatch(/is a starting unit that was destroyed/);
+    expect(said).toMatch(
       /the game's own script took away, which is how a game swaps a unit for its upgrade\. The log cannot follow it into the unit that replaced it/,
     );
   });

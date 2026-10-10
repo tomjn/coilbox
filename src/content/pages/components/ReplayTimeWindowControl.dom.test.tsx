@@ -12,7 +12,10 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TimeWindow } from "../../replayTimeWindow";
-import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
+import {
+  ReplayTimeWindowControl,
+  TimeWindowHelp,
+} from "./ReplayTimeWindowControl";
 
 beforeAll(() => {
   // Radix sizes a thumb with a ResizeObserver, which happy-dom lacks.
@@ -94,12 +97,16 @@ describe("the whole match", () => {
     show({ activity: null });
     expect(screen.queryByTestId("time-window-activity")).toBeNull();
     expect(screen.getAllByRole("slider")).toHaveLength(2);
-    expect(screen.getByText(/no match statistics are drawn/i)).toBeTruthy();
+    expect(screen.queryByText(/no match statistics are drawn/i)).toBeNull();
   });
 
-  it("says the window is when an order was given", () => {
+  it("keeps what the window means out of the control, and says it in the help", () => {
     show();
+    expect(screen.queryByText(/not when anything was built/i)).toBeNull();
+    cleanup();
+    render(<TimeWindowHelp activity={null} subject="orders" />);
     expect(screen.getByText(/not when anything was built/i)).toBeTruthy();
+    expect(screen.getByText(/no match statistics are drawn/i)).toBeTruthy();
   });
 
   it("draws nothing for a match with no length", () => {
@@ -225,7 +232,7 @@ describe("what the window says", () => {
     });
     expect(
       screen.getByText(
-        /Orders given from 10:00 to 15:00\. 12 of 3,605 orders are in this window/,
+        /Orders given from 10:00 to 15:00\. 12 of 3,605 orders\./,
       ),
     ).toBeTruthy();
   });
@@ -235,13 +242,11 @@ describe("what the window says", () => {
       window: { startSec: 600, endSec: 900 },
       count: { inside: 0, total: 3605 },
     });
-    expect(
-      screen.getByText(/None of the 3,605 orders were given in this window/),
-    ).toBeTruthy();
+    expect(screen.getByText(/0 of 3,605 orders\./)).toBeTruthy();
   });
 
   it("says nothing of a count before the orders are read", () => {
     show({ count: null });
-    expect(screen.queryByText(/orders are in this window/)).toBeNull();
+    expect(screen.queryByText(/of 3,605 orders/)).toBeNull();
   });
 });

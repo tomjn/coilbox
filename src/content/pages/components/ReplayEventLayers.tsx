@@ -2,8 +2,13 @@ import { useEffect, useRef } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { drawHeatField } from "@/lib/heatCanvas";
+import { HEAT_KIND_OF_LAYER } from "@/lib/heatRamp";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
-import { deathLegend, OUTDATED_NOTE } from "../../replayEventLayers";
+import {
+  deathLegend,
+  EVENT_LAYER_NAMES,
+  OUTDATED_NOTE,
+} from "../../replayEventLayers";
 import {
   CATEGORY_LABEL,
   CATEGORY_SHAPE,
@@ -11,10 +16,10 @@ import {
   NEUTRAL_SHAPE,
   NEUTRAL_TEAM_COLOUR,
 } from "../../replayMapLayers";
+import { REPLAY_SOURCE_NOTES } from "../../replaySources";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import type { EventLayers } from "../../useReplayEventLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplaySourceNote } from "./ReplaySourceNote";
 import { StoredListNote } from "./UnitListNotes";
 
 /** How much of a mark shows when another player is the emphasised one. The
@@ -57,7 +62,8 @@ export function EventLayerCanvases({
 
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeatField(canvas, field);
+    if (canvas && field)
+      drawHeatField(canvas, field, HEAT_KIND_OF_LAYER.deaths);
   }, [field]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the emphasis state stands for isLit and dimming
@@ -166,8 +172,8 @@ function OutlineKey({ ev }: { ev: EventLayers }) {
 
 /**
  * What the event layers say under the map: why they cannot be switched on,
- * what each one is counting, and the legend. Mount it where the other layers'
- * notes are.
+ * how many there are, the warnings, and the legend. What each one means is in
+ * {@link EventLayerHelp}. Mount it where the other layers' notes are.
  */
 export function EventLayerNotes({ ev }: { ev: EventLayers }) {
   const { state, units } = ev;
@@ -220,7 +226,6 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
       </p>
     );
 
-  const noAttacker = ev.deaths.filter((d) => !d.attacked).length;
   const finished = ev.finishedAll;
   const deathLegendText = ev.field
     ? deathLegend(ev.field, ev.weighted, ev.windowed)
@@ -228,7 +233,6 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
 
   return (
     <>
-      <ReplaySourceNote source="log" />
       {state.outdated && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
           {OUTDATED_NOTE}
@@ -252,12 +256,6 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
           ) : (
             <p className="text-xs text-muted-foreground">
               {plural(ev.deaths.length, "unit died", "units died")}.
-              {noAttacker > 0 &&
-                ` ${plural(noAttacker, "had", "had")} no attacker recorded, such as a cancelled build, and ${noAttacker === 1 ? "is" : "are"} counted like the rest.`}{" "}
-              Every player's deaths are counted, whoever is highlighted.
-              {ev.field &&
-                ev.field.dropped > 0 &&
-                ` ${plural(ev.field.dropped, "death was", "deaths were")} off the map and ${ev.field.dropped === 1 ? "is" : "are"} not drawn.`}
             </p>
           )}
           {ev.canWeigh && (
@@ -275,15 +273,6 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
                 <ToggleGroupItem value="count">Units lost</ToggleGroupItem>
                 <ToggleGroupItem value="cost">Metal cost lost</ToggleGroupItem>
               </ToggleGroup>
-              {ev.weighted && (
-                <p className="text-xs text-muted-foreground">
-                  Each death counts its unit's metal cost from the installed
-                  game, so this is where value was lost and not where units
-                  died.
-                  {ev.costed < ev.deaths.length &&
-                    ` ${(ev.deaths.length - ev.costed).toLocaleString()} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
-                </p>
-              )}
               {ev.weighted && (
                 <StoredListNote source={units.source} subject="Costs" />
               )}
@@ -310,17 +299,6 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
         <>
           <p className="text-xs text-muted-foreground">
             {plural(finished.marks.length, "building", "buildings")} finished.
-            An outline is one finished building, in its player's colour. Beside
-            Buildings ordered, a fill with an outline round it is an order that
-            was carried out, a fill alone is an order with no building finished
-            there, and an outline alone is a building no order in the window
-            placed.
-            {finished.mobile > 0 &&
-              ` ${plural(finished.mobile, "finished unit that moves is", "finished units that move are")} not drawn, because only a building can be compared with an order.`}
-            {finished.unknown > 0 &&
-              ` ${plural(finished.unknown, "finished unit has", "finished units have")} no definition in the installed game and ${finished.unknown === 1 ? "is" : "are"} not drawn.`}
-            {finished.offMap > 0 &&
-              ` ${plural(finished.offMap, "building stands", "buildings stand")} off the map and ${finished.offMap === 1 ? "is" : "are"} not drawn.`}
           </p>
           {finished.marks.length > 0 && <OutlineKey ev={ev} />}
           <StoredListNote
@@ -338,7 +316,61 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
       )}
 
       {deathLegendText && ev.field && ev.field.peak > 0 && (
-        <HeatLegend {...deathLegendText} />
+        <HeatLegend {...deathLegendText} kind={HEAT_KIND_OF_LAYER.deaths} />
+      )}
+    </>
+  );
+}
+
+/**
+ * What the event layers mean, for the map's help entry: where the events come
+ * from, what each count and mark stands for, and what was left out and how
+ * many. The counts are the same ones the notes used to carry in place.
+ */
+export function EventLayerHelp({ ev }: { ev: EventLayers }) {
+  const { state } = ev;
+  const intro = <p>{EVENT_LAYER_NAMES} draw events from an analysis.</p>;
+  if (ev.block || state.kind !== "ready" || !ev.active) return intro;
+
+  const noAttacker = ev.deaths.filter((d) => !d.attacked).length;
+  const finished = ev.finishedAll;
+  const showDeaths = ev.deathsOn && ev.deathRead.status === "done";
+  return (
+    <>
+      {intro}
+      <p className="text-muted-foreground">{REPLAY_SOURCE_NOTES.log}</p>
+      {showDeaths && ev.deaths.length > 0 && (
+        <p>
+          Every player's deaths are counted, whoever is highlighted.
+          {noAttacker > 0 &&
+            ` ${plural(noAttacker, "death has", "deaths have")} no attacker recorded, such as a cancelled build, and ${noAttacker === 1 ? "is" : "are"} counted like the rest.`}
+          {ev.field &&
+            ev.field.dropped > 0 &&
+            ` ${plural(ev.field.dropped, "death was", "deaths were")} off the map and ${ev.field.dropped === 1 ? "is" : "are"} not drawn.`}
+        </p>
+      )}
+      {showDeaths && ev.canWeigh && ev.weighted && (
+        <p>
+          Each death counts its unit's metal cost from the installed game, so
+          this is where value was lost and not where units died.
+          {ev.costed < ev.deaths.length &&
+            ` ${(ev.deaths.length - ev.costed).toLocaleString()} ${ev.deaths.length - ev.costed === 1 ? "death is" : "deaths are"} of a unit with no stated cost and count nothing.`}
+        </p>
+      )}
+      {finished && (
+        <p>
+          An outline is one finished building, in its player's colour. Beside
+          Buildings ordered, a fill with an outline round it is an order that
+          was carried out, a fill alone is an order with no building finished
+          there, and an outline alone is a building no order in the window
+          placed.
+          {finished.mobile > 0 &&
+            ` ${plural(finished.mobile, "finished unit that moves is", "finished units that move are")} not drawn, because only a building can be compared with an order.`}
+          {finished.unknown > 0 &&
+            ` ${plural(finished.unknown, "finished unit has", "finished units have")} no definition in the installed game and ${finished.unknown === 1 ? "is" : "are"} not drawn.`}
+          {finished.offMap > 0 &&
+            ` ${plural(finished.offMap, "building stands", "buildings stand")} off the map and ${finished.offMap === 1 ? "is" : "are"} not drawn.`}
+        </p>
       )}
     </>
   );

@@ -56,7 +56,7 @@ function describeRow(row: StartRow): string {
 function arrangementNote(format: ReturnType<typeof sharedFormat>): string {
   switch (format) {
     case "duel":
-      return "In a 1v1 each start is a team of one, so a position's record is the record of whoever held it against one opponent. Team 1 is the team with the lower number in the match.";
+      return "In a 1v1 each start is a team of one, so a position's record is the record of whoever held it against one opponent.";
     case "teams":
       return "In a team game a position's record depends on the team it was on and on who else was on it. It is split by team here, and it is not controlled for anything else.";
     case "ffa":
@@ -76,7 +76,6 @@ function arrangementNote(format: ReturnType<typeof sharedFormat>): string {
 export function MapRecords({
   shown,
   elsewhere,
-  joined,
   records,
   rows,
   orphans,
@@ -84,16 +83,12 @@ export function MapRecords({
   onDeleteName,
   reading,
   versions,
-  mapName,
 }: {
   /** How many versions of the map the matches were recorded under. */
   versions: number;
-  /** The page's map, whose declared positions starts are placed on. */
-  mapName: string;
   shown: AggregateMatch[];
   /** Matches on every other map, under the same filters. */
   elsewhere: AggregateMatch[];
-  joined: JoinedStarts;
   records: StartRecords;
   /** The start table's rows: a position, or positions that share a name. */
   rows: StartRow[];
@@ -111,7 +106,6 @@ export function MapRecords({
   const split = format === "duel" || format === "teams";
 
   const decided = withResult(shown);
-  const byAi = rows.reduce((n, r) => n + r.byAi, 0);
 
   return (
     <div className="flex flex-col gap-4" data-testid="map-records">
@@ -125,9 +119,7 @@ export function MapRecords({
           data-testid="records-played"
         >
           {matchCount(shown.length)} played, {decided.toLocaleString()} with a
-          recorded result. A match with no result is in no win or loss below.
-          Every figure is a count of those matches, with the number it is out of
-          beside it.
+          recorded result.
         </p>
       </div>
 
@@ -151,12 +143,6 @@ export function MapRecords({
             {wonOf(teams.team2Won, teams.decided)}, in{" "}
             {plural(teams.decided, "match", "matches")} of two teams with a
             result.
-            {teams.twoSides > teams.decided &&
-              ` ${plural(teams.twoSides - teams.decided, "more has", "more have")} no result.`}
-            {teams.other > 0 &&
-              ` ${plural(teams.other, "match", "matches")} of another arrangement ${teams.other === 1 ? "is" : "are"} not in it.`}{" "}
-            Team 1 is the team with the lower number in the match, so this does
-            not say which slot or which side of the map is stronger.
           </p>
         )}
       </div>
@@ -201,13 +187,6 @@ export function MapRecords({
             ))}
           </TableBody>
         </Table>
-        <p className="text-xs text-muted-foreground">
-          The other maps are counted under the same filters. Nothing here tests
-          whether a difference is more than chance, and with few matches on
-          either row it may be.
-          {here.noLength + rest.noLength > 0 &&
-            ` ${plural(here.noLength + rest.noLength, "match has", "matches have")} no length in the replay's header and ${here.noLength + rest.noLength === 1 ? "is" : "are"} left out of it.`}
-        </p>
       </div>
 
       <div className="flex flex-col gap-1" data-testid="start-records">
@@ -273,26 +252,10 @@ export function MapRecords({
             </TableBody>
           </Table>
         )}
-        <p className="text-xs text-muted-foreground" data-testid="starts-basis">
-          {arrangementNote(format)} Names are yours, kept on this computer for{" "}
-          {mapName} by its exact name, and positions you give one name are one
-          row, counted together. Taken is the number of starts at the place, and
-          the result column counts only those in a match with a recorded result.
-          {versions > 1 &&
-            ` With more than one version in, every start is placed on ${mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance.`}
-          {records.tolerance !== null &&
-            ` A start within ${elmos(records.tolerance)} of a position the map declares is counted at it. That is half the distance between the two closest declared positions, so a start is never near two.`}
-          {records.scale !== null &&
-            ` Other starts are grouped when they are within ${elmos(records.scale)} of one another, directly or through others, which is 1/32 of the map's shorter side and the grain of the density layers. Nothing measured says that suits every map, and a group with a wide radius may be more than one position.`}
-          {byAi > 0 &&
-            ` ${plural(byAi, "start was", "starts were")} taken by an AI and ${byAi === 1 ? "is" : "are"} counted.`}
-        </p>
         {!reading && orphans.length > 0 && (
           <div className="flex flex-col gap-1" data-testid="orphan-names">
             <p className="text-xs text-muted-foreground">
-              Saved names that match no place in the matches above. They are
-              kept until you delete them, and a name is used again if a place
-              turns up where it was.
+              Saved names that match no place in the matches above.
             </p>
             <ul className="flex flex-col gap-1">
               {orphans.map((o) => (
@@ -317,30 +280,6 @@ export function MapRecords({
               ))}
             </ul>
           </div>
-        )}
-        {(joined.noTeamIds > 0 ||
-          joined.noSeat > 0 ||
-          joined.noStarts > 0 ||
-          joined.unread > 0 ||
-          records.ungrouped > 0) && (
-          <p
-            className="text-xs text-muted-foreground"
-            data-testid="starts-left-out"
-          >
-            Left out:
-            {joined.noTeamIds > 0 &&
-              ` ${plural(joined.noTeamIds, "match", "matches")} saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again.`}
-            {joined.noSeat > 0 &&
-              ` ${plural(joined.noSeat, "start", "starts")} for a team that no player or AI held.`}
-            {joined.noStarts > 0 &&
-              ` ${plural(joined.noStarts, "match", "matches")} with no start recorded.`}
-            {joined.unread > 0 &&
-              (reading
-                ? ` ${plural(joined.unread, "match", "matches")} not read yet.`
-                : ` ${plural(joined.unread, "match", "matches")} whose replay could not be read.`)}
-            {records.ungrouped > 0 &&
-              ` ${plural(records.ungrouped, "start", "starts")} that could not be grouped because the map has no size.`}
-          </p>
         )}
       </div>
 
@@ -372,13 +311,110 @@ export function MapRecords({
             </TableBody>
           </Table>
         )}
-        <p className="text-xs text-muted-foreground">
-          Every player counts, so two players of one faction on one team count
-          twice. In a team game a faction's record is not separated from the
-          team it was on or the factions beside it. Skirmish AIs are not
-          counted.
-        </p>
       </div>
     </div>
+  );
+}
+
+/**
+ * What the figures in `MapRecords` mean and what they leave out, for the
+ * section's help popover (#3889). It sits in the popover of "How this map is
+ * played" and not under the tables.
+ */
+export function MapRecordsHelp({
+  shown,
+  elsewhere,
+  joined,
+  records,
+  rows,
+  reading,
+  versions,
+  mapName,
+}: {
+  shown: AggregateMatch[];
+  elsewhere: AggregateMatch[];
+  joined: JoinedStarts;
+  records: StartRecords;
+  rows: StartRow[];
+  reading: boolean;
+  versions: number;
+  /** The page's map, whose declared positions starts are placed on. */
+  mapName: string;
+}) {
+  const teams = teamRecord(shown);
+  const noLength =
+    lengthSummary(shown).noLength + lengthSummary(elsewhere).noLength;
+  const format = sharedFormat(shown);
+  const byAi = rows.reduce((n, r) => n + r.byAi, 0);
+  return (
+    <>
+      <p>
+        A match with no recorded result is in no win or loss. Every figure about
+        wins is a count of the matches that have one, with the number it is out
+        of beside it.
+      </p>
+      {teams.twoSides > 0 && (
+        <p data-testid="team-note">
+          Team 1 is the team with the lower number in the match, so the team
+          record does not say which slot or which side of the map is stronger.
+          {teams.twoSides > teams.decided &&
+            ` ${plural(teams.twoSides - teams.decided, "more match of two teams has", "more matches of two teams have")} no result.`}
+          {teams.other > 0 &&
+            ` ${plural(teams.other, "match", "matches")} of another arrangement ${teams.other === 1 ? "is" : "are"} not in it.`}
+        </p>
+      )}
+      <p data-testid="length-note">
+        The other maps are counted under the same filters. Nothing here tests
+        whether a difference in length is more than chance, and with few matches
+        on either row it may be.
+        {noLength > 0 &&
+          ` ${plural(noLength, "match has", "matches have")} no length in the replay's header and ${noLength === 1 ? "is" : "are"} left out of it.`}
+      </p>
+      <p data-testid="starts-basis">
+        {arrangementNote(format)} Taken is the number of starts at the place.
+        The result column counts only those in a match with a recorded result.
+        Positions you give one name are one row, counted together.
+        {versions > 1 &&
+          ` With more than one version in, every start is placed on ${mapName}, this page's map. Another version may declare other positions, and a start of its that is near none of this map's is grouped with the others by distance.`}
+        {records.tolerance !== null &&
+          ` A start within ${elmos(records.tolerance)} of a position the map declares is counted at it. That is half the distance between the two closest declared positions, so a start is never near two.`}
+        {records.scale !== null &&
+          ` Other starts are grouped when they are within ${elmos(records.scale)} of one another, directly or through others, which is 1/32 of the map's shorter side and the grain of the density layers. Nothing measured says that suits every map, and a group with a wide radius may be more than one position.`}
+        {byAi > 0 &&
+          ` ${plural(byAi, "start was", "starts were")} taken by an AI and ${byAi === 1 ? "is" : "are"} counted.`}
+      </p>
+      <p>
+        Names are yours, kept on this computer for {mapName} by its exact name.
+        A saved name that matches no place is kept until you delete it, and it
+        is used again if a place turns up where it was.
+      </p>
+      {(joined.noTeamIds > 0 ||
+        joined.noSeat > 0 ||
+        joined.noStarts > 0 ||
+        joined.unread > 0 ||
+        records.ungrouped > 0) && (
+        <p data-testid="starts-left-out">
+          Left out of the start positions:
+          {joined.noTeamIds > 0 &&
+            ` ${plural(joined.noTeamIds, "match", "matches")} saved before team numbers were kept, which a start cannot be matched to a result through until the library is read again.`}
+          {joined.noSeat > 0 &&
+            ` ${plural(joined.noSeat, "start", "starts")} for a team that no player or AI held.`}
+          {joined.noStarts > 0 &&
+            ` ${plural(joined.noStarts, "match", "matches")} with no start recorded.`}
+          {joined.unread > 0 &&
+            (reading
+              ? ` ${plural(joined.unread, "match", "matches")} not read yet.`
+              : ` ${plural(joined.unread, "match", "matches")} whose replay could not be read.`)}
+          {records.ungrouped > 0 &&
+            ` ${plural(records.ungrouped, "start", "starts")} that could not be grouped because the map has no size.`}
+        </p>
+      )}
+      <p data-testid="faction-note">
+        Every player counts in the faction record, so two players of one faction
+        on one team count twice. In a team game a faction's record is not
+        separated from the team it was on or the factions beside it. Skirmish
+        AIs are not counted.
+      </p>
+    </>
   );
 }

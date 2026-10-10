@@ -108,10 +108,6 @@ export function ClearUnfinishedButton({
                 {preview.deleted === 1 ? "recording" : "recordings"}?
               </h3>
               <p className="text-xs text-muted-foreground">
-                These files are empty. The game that was recording each one did
-                not finish.
-              </p>
-              <p className="text-xs text-muted-foreground">
                 {UNFINISHED_WARNING}
               </p>
             </div>

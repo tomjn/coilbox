@@ -43,7 +43,7 @@ import { teamLabel } from "../../replaySideLabel";
 import { isEmphasised } from "../../seriesEmphasis";
 import { useMatchStats } from "../../useMatchStats";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
-import { ReplaySourceNote } from "./ReplaySourceNote";
+import { SectionHelp } from "./SectionHelp";
 
 /**
  * The roster on replay detail: one row per team, grouped by ally side, with the
@@ -425,8 +425,13 @@ export function ReplayRoster({
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium">Players</h2>
-      <ReplaySourceNote source={statsOn ? "players" : "setup"} />
+      <div className="flex items-center gap-1">
+        <h2 className="text-sm font-medium">Players</h2>
+        <SectionHelp
+          section="the players"
+          source={statsOn ? "players" : "setup"}
+        />
+      </div>
       {sorted && hasChecks && checkableSides.length > 0 && (
         // Sorting drops the side header rows, which is where side boxes live.
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">

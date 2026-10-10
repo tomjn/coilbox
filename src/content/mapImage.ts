@@ -1,4 +1,9 @@
-import { HEAT_ALPHA_MAX, HEAT_ALPHA_MIN, HEAT_RAMP } from "@/lib/heatRamp";
+import {
+  HEAT_ALPHA_MAX,
+  HEAT_ALPHA_MIN,
+  HEAT_RAMPS,
+  type HeatKind,
+} from "@/lib/heatRamp";
 import {
   type HeatLayerId,
   LAYER_LABEL,
@@ -406,6 +411,8 @@ export interface ImageParts {
   minimap: CanvasImageSource | null;
   /** The heat field, painted one pixel a cell. */
   field: CanvasImageSource;
+  /** The layer's ramp, which the colour bar is drawn in. */
+  kind: HeatKind;
   dots: readonly MarkPlace[];
   places: readonly MarkPlace[];
 }
@@ -437,10 +444,11 @@ export type Draw2D = Pick<
 
 /** The ramp as a gradient on `ctx`, least at the bar's left, with the page's
  *  opacity rising along it. */
-function rampGradient(ctx: Draw2D, bar: Rect): CanvasGradient {
+function rampGradient(ctx: Draw2D, bar: Rect, kind: HeatKind): CanvasGradient {
   const gradient = ctx.createLinearGradient(bar.x, 0, bar.x + bar.w, 0);
-  const stops = HEAT_RAMP.length - 1;
-  HEAT_RAMP.forEach((hex, i) => {
+  const ramp = HEAT_RAMPS[kind];
+  const stops = ramp.length - 1;
+  ramp.forEach((hex, i) => {
     const t = i / stops;
     const alpha = HEAT_ALPHA_MIN + (HEAT_ALPHA_MAX - HEAT_ALPHA_MIN) * t;
     const n = Number.parseInt(hex.slice(1), 16);
@@ -498,7 +506,7 @@ export function drawMapImage(
 
   ctx.fillStyle = IMAGE_COLOURS.rampBackdrop;
   ctx.fillRect(layout.bar.x, layout.bar.y, layout.bar.w, layout.bar.h);
-  ctx.fillStyle = rampGradient(ctx, layout.bar);
+  ctx.fillStyle = rampGradient(ctx, layout.bar, parts.kind);
   ctx.fillRect(layout.bar.x, layout.bar.y, layout.bar.w, layout.bar.h);
 
   ctx.textAlign = "left";

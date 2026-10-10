@@ -136,6 +136,15 @@ function show(info: DemoInfo = INFO) {
 }
 
 const text = () => screen.getByTestId("living-value").textContent ?? "";
+/** The chart's help entry, opened. The method is said there. */
+const help = () => {
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "About the value of living units by kind",
+    }),
+  );
+  return screen.getByRole("dialog").textContent ?? "";
+};
 const open = () =>
   fireEvent.click(
     screen.getByRole("button", { name: "Show value of living units by kind" }),
@@ -165,9 +174,15 @@ describe("a replay the charts cannot be drawn for", () => {
     show();
     expect(text()).toMatch(/Value of living units by kind/);
     expect(text()).toMatch(
-      /This needs an analysis, and this replay has not been analysed\. The replay itself records what was produced and lost, not what a player owned at any moment/,
+      /This needs an analysis, and this replay has not been analysed\./,
     );
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(text()).not.toMatch(/The replay itself records/);
+    expect(help()).toMatch(
+      /The replay itself records what was produced and lost, not what a player owned at any moment/,
+    );
+    expect(
+      screen.queryByRole("button", { name: /show value of living units/i }),
+    ).toBeNull();
     expect(eventsRead).not.toHaveBeenCalled();
   });
 
@@ -236,14 +251,18 @@ describe("an analysed replay", () => {
     show();
     open();
     await screen.findByRole("radio", { name: "Metal cost" });
-    expect(text()).toMatch(
+    expect(text()).not.toMatch(/never added together/);
+    const said = help();
+    expect(said).toMatch(
       /The metal cost of each line's finished, living units every 15 seconds/,
     );
+    expect(said).toMatch(/Metal and energy are never added together/);
     fireEvent.click(screen.getByRole("radio", { name: "Energy cost" }));
     await waitFor(() =>
-      expect(text()).toMatch(/The energy cost of each line's/),
+      expect(screen.getByRole("dialog").textContent).toMatch(
+        /The energy cost of each line's/,
+      ),
     );
-    expect(text()).toMatch(/Metal and energy are never added together/);
   });
 
   it("says how many finished units have no cost", async () => {
@@ -253,10 +272,10 @@ describe("an analysed replay", () => {
     DATASET = { units: UNITS };
     show();
     open();
-    await waitFor(() =>
-      expect(text()).toMatch(
-        /1 of 2 finished units have no cost in the installed game and count nothing/,
-      ),
+    await screen.findByRole("radio", { name: "Metal cost" });
+    expect(text()).not.toMatch(/have no cost in the installed game/);
+    expect(help()).toMatch(
+      /1 of 2 finished units have no cost in the installed game and count nothing/,
     );
   });
 

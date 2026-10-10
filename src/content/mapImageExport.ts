@@ -1,5 +1,6 @@
 import { drawHeatField } from "@/lib/heatCanvas";
 import type { HeatField } from "@/lib/heatField";
+import type { HeatKind } from "@/lib/heatRamp";
 import { legoSaveGlb } from "../lego/bindings";
 import {
   canvasPng,
@@ -23,6 +24,8 @@ export interface MapImageInput {
   minimapUrl: string | undefined;
   world: { worldWidth: number; worldHeight: number };
   field: HeatField;
+  /** The layer's ramp, for the field and the colour bar. */
+  kind: HeatKind;
   words: ImageWords;
   /** One white dot a start, and one numbered circle a start position. */
   dots: readonly MarkPlace[];
@@ -57,10 +60,11 @@ export async function renderMapImage(
     if (!ctx) throw new Error("A 2D canvas is not available.");
 
     const fieldCanvas = document.createElement("canvas");
-    drawHeatField(fieldCanvas, input.field);
+    drawHeatField(fieldCanvas, input.field, input.kind);
     drawMapImage(ctx, layout, {
       minimap,
       field: fieldCanvas,
+      kind: input.kind,
       dots: input.dots,
       places: input.places,
     });

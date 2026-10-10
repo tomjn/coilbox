@@ -94,6 +94,12 @@ afterEach(() => {
   ASKED = [];
 });
 
+/** The section's help entry, opened. What the orders are is said there. */
+const help = () => {
+  fireEvent.click(screen.getByRole("button", { name: "About build orders" }));
+  return within(screen.getByRole("dialog"));
+};
+
 async function open(
   result: typeof RESULT,
   gameType = "SplinterFaction 0.1.88",
@@ -106,7 +112,7 @@ async function open(
   );
   fireEvent.click(screen.getByRole("button", { name: /show build orders/i }));
   await screen.findAllByText(
-    /orders each player gave|no build orders|could not be read/i,
+    /Opening length in minutes|no build orders|could not be read/i,
   );
 }
 
@@ -139,7 +145,8 @@ describe("ReplayBuildOrders", () => {
         <ReplayBuildOrders replayPath="/replays/a.sdfz" info={info("X 1")} />
       </SeriesEmphasisProvider>,
     );
-    expect(screen.getByText(REPLAY_SOURCE_NOTES.stream)).toBeTruthy();
+    expect(screen.queryByText(REPLAY_SOURCE_NOTES.stream)).toBeNull();
+    expect(help().getByText(REPLAY_SOURCE_NOTES.stream)).toBeTruthy();
   });
 
   it("names units from the installed game the replay records", async () => {
@@ -147,8 +154,9 @@ describe("ReplayBuildOrders", () => {
     DATASET = { units: UNITS };
     await open(opening);
 
-    // Says these are orders and not buildings.
-    expect(screen.getByText(/not what was built/i)).toBeTruthy();
+    // Says these are orders and not buildings, in the help and not the page.
+    expect(screen.queryByText(/not what was built/i)).toBeNull();
+    expect(help().getByText(/not what was built/i)).toBeTruthy();
     expect(
       screen.getByText(
         /unit names come from SplinterFaction 0\.1\.88, matched by name/i,
@@ -257,8 +265,9 @@ describe("ReplayBuildOrders", () => {
 
   it("says how many queue removals were left out, and when the read stopped early", async () => {
     await open(orders([order({})], { removals: 3, incomplete: true }));
+    expect(screen.queryByText(/off a factory queue/i)).toBeNull();
     expect(
-      screen.getByText(
+      help().getByText(
         /3 orders that took units off a factory queue are not listed/i,
       ),
     ).toBeTruthy();
@@ -304,9 +313,7 @@ describe("ReplayBuildOrders", () => {
       // 3 factories at 100 metal, 1000 energy. 25 engineers at 10 and 50.
       // Queue removals are not subtracted.
       expect(
-        screen.getByText(
-          /not of what was built: 550 metal and 4,250 energy\./i,
-        ),
+        screen.getByText(/Ordered cost: 550 metal and 4,250 energy\./i),
       ).toBeTruthy();
     });
 
@@ -317,9 +324,7 @@ describe("ReplayBuildOrders", () => {
       fireEvent.change(screen.getByRole("textbox"), { target: { value: "1" } });
       expect(screen.getByText(/first 1 min/i)).toBeTruthy();
       expect(
-        screen.getByText(
-          /not of what was built: 450 metal and 3,250 energy\./i,
-        ),
+        screen.getByText(/Ordered cost: 450 metal and 3,250 energy\./i),
       ).toBeTruthy();
       fireEvent.change(screen.getByRole("textbox"), {
         target: { value: "0" },
@@ -406,9 +411,12 @@ describe("ReplayBuildOrders", () => {
         "4 units",
       ]);
       expect(within(table).getByText("Unclassified")).toBeTruthy();
+      expect(screen.queryByText(/not of what was built/i)).toBeNull();
       expect(
-        screen.getAllByText(/not of what was built/i).length,
-      ).toBeGreaterThan(0);
+        help().getByText(
+          /cost of what was ordered, not of what was built\. Other is builders/i,
+        ),
+      ).toBeTruthy();
     });
 
     it("shows the collapsed ids and no totals when the game is not installed", async () => {
@@ -417,7 +425,7 @@ describe("ReplayBuildOrders", () => {
       await open(run, "Beyond All Reason test-30018-d71d659");
       expect(screen.getAllByText("Unit 2").length).toBeGreaterThan(0);
       expect(screen.getByText("×25")).toBeTruthy();
-      expect(screen.queryByText(/cost of what was ordered/i)).toBeNull();
+      expect(screen.queryByText(/ordered cost/i)).toBeNull();
     });
   });
 

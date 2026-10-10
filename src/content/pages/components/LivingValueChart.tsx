@@ -33,6 +33,7 @@ import {
 import { SPLIT_BUCKETS, type SplitBucket } from "../../replayOpening";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { SectionHelp } from "./SectionHelp";
 import { StoredListNote } from "./UnitListNotes";
 
 /**
@@ -103,12 +104,19 @@ interface ChartProps {
   periodSec: number;
 }
 
-const frame = (children: React.ReactNode) => (
+const frame = (children: React.ReactNode, help?: React.ReactNode) => (
   <div
     className="flex flex-col gap-2 border-t border-border/50 pt-3"
     data-testid="living-value"
   >
-    <h3 className="text-sm font-medium">{HEADING}</h3>
+    <div className="flex items-center gap-1">
+      <h3 className="text-sm font-medium">{HEADING}</h3>
+      {help && (
+        <SectionHelp section="the value of living units by kind" source="log">
+          {help}
+        </SectionHelp>
+      )}
+    </div>
     {children}
   </div>
 );
@@ -140,9 +148,15 @@ export function LivingValueChart(props: ChartProps) {
     return frame(
       note(
         state.canAnalyse
-          ? "This needs an analysis, and this replay has not been analysed. The replay itself records what was produced and lost, not what a player owned at any moment."
+          ? "This needs an analysis, and this replay has not been analysed."
           : "This needs an analysis, and this replay has not been analysed. This copy of coilbox cannot analyse replays.",
       ),
+      state.canAnalyse ? (
+        <p>
+          The replay itself records what was produced and lost, not what a
+          player owned at any moment.
+        </p>
+      ) : undefined,
     );
 
   if (!open)
@@ -383,20 +397,30 @@ function OpenValueChart({
             })}
           </div>
         )}
-        <p className="text-xs text-muted-foreground">
-          The {resource} cost of each line's finished, living units every{" "}
-          {periodSec} seconds, stacked by what each unit is for. A unit counts
-          from the moment it is finished until it is destroyed, and moves with
-          it when it is given away or captured. A unit still being built counts
-          nothing. Costs and kinds come from the installed game's unit
-          definitions, and every panel has the same scale. Metal and energy are
-          never added together.
-          {value.unpriced > 0 &&
-            ` ${value.unpriced.toLocaleString()} of ${value.finished.toLocaleString()} finished units have no cost in the installed game and count nothing.`}
-        </p>
       </>
     );
   };
 
-  return frame(body());
+  const explained =
+    read.status === "done" &&
+    !!units.source &&
+    units.source.kind !== "notInstalled" &&
+    !!value &&
+    value.seconds.length >= 2;
+  return frame(
+    body(),
+    explained && value ? (
+      <p>
+        The {resource} cost of each line's finished, living units every{" "}
+        {periodSec} seconds, stacked by what each unit is for. A unit counts
+        from the moment it is finished until it is destroyed, and moves with it
+        when it is given away or captured. A unit still being built counts
+        nothing. Costs and kinds come from the installed game's unit
+        definitions, and every panel has the same scale. Metal and energy are
+        never added together.
+        {value.unpriced > 0 &&
+          ` ${value.unpriced.toLocaleString()} of ${value.finished.toLocaleString()} finished units have no cost in the installed game and count nothing.`}
+      </p>
+    ) : undefined,
+  );
 }
