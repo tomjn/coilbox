@@ -252,6 +252,7 @@ This table lists each part of the interface, the source it shows, and what makes
 | Matchup view | The store, using start script teams and sides, trailer winners and header length | A game where you were not on opposing teams is not counted |
 | Stats page and achievements | The store, using start script players, sides and AIs, and trailer winners | A remix or refight rerun is left out. A game with no result is not a win |
 | A map's page, how this map is played | Every match on the map by its exact name, counted once however many files hold it. Each replay's stream is walked once and kept as counts on the map's grid by minute. Start positions are a dot a team a match. Building density, order density and the two kinds of building are stream orders. Deaths are from the event log. Each match is scaled before the matches are averaged, and the legend says what the brightest spot holds under that scaling | Orders are not buildings. A layer is drawn from the matches that have it, and the number beside the layer says how many: every match with a stream for orders, only an analysed match for deaths. Defences and economy leave out a match whose exact game build is not installed. Another version of the map is another map and is not added in. A remix is left out, and so is a match under a minute unless asked for |
+| A map's page, records for the map | The same matches as the picture, under the same filters. Start positions come from the stream and results from the trailer, joined by engine team id and then side, so a position is counted as won when the side that held it won. Length is the header's length. Factions are the start script's sides for every player | A record saved before team ids were kept has none and is left out of the position counts, and the page says how many. A match with no result is a start taken and in no win or loss. A position's record in a team game is confounded by the team it was on and who was beside it, and so is a faction's. The other maps' lengths are counted under the same filters |
 
 The store is one JSON file written whole, and it never holds a series.
 
@@ -282,6 +283,27 @@ What counts as one match and one map:
 - Defences and economy need to know what each building is for. A unit definition id means a unit in one build of one game, so a match is only classified against an installed game with exactly the name and version the replay records. A match on any other build is left out of those two layers and counted in the note under them.
 
 Reading a replay costs a walk of its whole stream, the first time. The counts are then kept in the app's cache folder, one small file a replay, and the next visit reads those. On one Mac, in an unoptimised build, the largest replay in a library of 18 (3.1 MB on disk, 105,824 orders with a place) took 364 ms to walk and 7 ms to read back from its kept file, which was 177 KB. All 18 took 1.3 seconds to walk between them and their kept files came to 651 KB. The cost grows with the number of replays, and nothing here measures a large library. A kept file is thrown away when the replay file changes size or modified time, and the folder can be cleared from the storage settings at any time.
+
+### The records under a map's picture
+
+Under the picture the section counts what the library knows about the map, over the same matches and the same filters, so a filter changes both together. A refight is left out here as it is left out of the stats page.
+
+Every figure is a count with the number it is out of, such as "won 3 of 5". The page shows no percentage and hides no figure for a small sample, because the codebase has no rule for when a sample is big enough.
+
+- Results: how many matches have a recorded result, and which team won among the matches of two teams. Team 1 is the team with the lower number in the match.
+- Length: the median and the range of match lengths on this map, beside the same for every other map in the library under the same filters, each with its count. Nothing tests whether the difference is more than chance.
+- Factions: the games and wins of each faction for every player on the map. Skirmish AIs are not counted. In a team game a faction's record is not separated from its team or the factions beside it.
+- Start positions: how often each position was taken, how many of those have a result, and how many were won.
+
+A start position is joined to a result through the engine team id. The start belongs to a team, the team belongs to a side, and the side won or lost. A record saved before team ids were kept cannot be joined, and an absent id is never read as team 0. Those matches are counted on the page as left out.
+
+Which starts are the same position depends on the map.
+
+- On a map that declares start positions, a start within half the smallest distance between two declared positions of one is at it. That is the largest radius at which a start cannot be near two, so a start exactly between two is at neither. The tolerance comes from the map and not from a number of elmos.
+- Every other start is grouped by distance. Two starts within 1/32 of the map's shorter side of each other, directly or through others, are one position. That is the grain of the density layers. It is a display choice and nothing measured says it suits every map. On a map where players spread their starts evenly through a box it can chain them into one wide group, and the table gives each group's radius so that shows.
+- A group's key is the cell its centre falls in, on a grid of squares one grain across, such as `c3:7`. A declared position's key is `d` and its number in the map's own list. The same starts in any order give the same groups. Adding a start never splits a group, and a key changes only when a group's centre moves into another cell.
+
+A position in a free for all or a duel has no pair of sides to split by, and the table says so. In a team game the table splits each position by team, and says that nothing else is controlled for. When the matches in view are a mix of arrangements the table is not split by team.
 
 ## Why two numbers may not match
 
