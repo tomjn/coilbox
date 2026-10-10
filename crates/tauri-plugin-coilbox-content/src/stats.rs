@@ -441,6 +441,7 @@ mod tests {
             origin_filename: None,
             mod_options: std::collections::HashMap::new(),
             map_options: std::collections::HashMap::new(),
+            start_positions: Vec::new(),
         }
     }
 

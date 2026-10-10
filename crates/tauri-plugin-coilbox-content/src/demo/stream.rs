@@ -23,12 +23,17 @@
 //! [`super::decode_trailer`] finds it from the header's sizes and never from
 //! where a walk got to.
 
+use std::collections::BTreeMap;
+use std::io::Read;
 use std::path::Path;
 
-use super::{read_all_maybe_gzip, DemoHeader, DEMO_VERSION, HEADER_V5_SIZE, MAGIC, MIN_HEADER};
+use super::{
+    open_maybe_gzip, read_all_maybe_gzip, DemoHeader, DEMO_VERSION, HEADER_V5_SIZE, MAGIC,
+    MIN_HEADER,
+};
 use crate::model::{
     ChatDest, CommandOrigin, DemoStream, LeaveReason, Order, StreamEvent, StreamEventKind,
-    StreamStop, TeamAction, PREGAME_FRAME,
+    StreamStop, TeamAction, TeamStartPosition, PREGAME_FRAME,
 };
 
 /// `DemoStreamChunkHeader`: `f32 modGameTime`, `u32 length`.
@@ -51,6 +56,9 @@ const NETMSG_PLAYERLEFT: u8 = 39;
 const NETMSG_TEAM: u8 = 51;
 const NETMSG_CREATE_NEWPLAYER: u8 = 75;
 const NETMSG_AICOMMAND_TRACKED: u8 = 76;
+
+/// `PLAYER_RDYSTATE_FAILED` in `rts/Game/Players/Player.h`.
+const RDYSTATE_FAILED: u8 = 3;
 
 // The `TEAMMSG_*` sub actions of `NETMSG_TEAM`.
 const TEAMMSG_GIVEAWAY: u8 = 1;
@@ -78,8 +86,95 @@ pub fn read_stream(demo: &Path) -> Result<DemoStream, String> {
     decode_stream(&bytes)
 }
 
+/// Where each team started, by `[teamN]` index, for the teams `is_team` accepts.
+///
+/// The walk stops at the first frame, because the engine sends every start
+/// position before the game starts. A position sent after that arrives when
+/// units have already spawned, so it is not where the team started.
+///
+/// The last pregame message per team counts. `CGame` applies each one in order
+/// with `CTeam::SetStartPos`, and `CGameServer::StartGame` ends the pregame by
+/// broadcasting one per team from the server's own record of it. That final
+/// message is the position the game started with, for a team a player placed,
+/// for an AI team and for a map with fixed positions alike.
+///
+/// A team the stream never mentions is absent. So is a team whose last message
+/// says its player never readied and carries no position at all, which is the
+/// server's zero vector for a position nobody sent.
+pub fn read_start_positions(
+    demo: &Path,
+    is_team: impl Fn(i32) -> bool,
+) -> Result<Vec<TeamStartPosition>, String> {
+    let mut rdr = open_maybe_gzip(demo)?;
+    let mut bytes = Vec::new();
+    let mut want = FIRST_READ;
+    loop {
+        // Only as much of the file as the pregame takes, because a gzipped
+        // replay is decompressed as it is read and the rest is most of it.
+        let wanted = (want - bytes.len()) as u64;
+        (&mut rdr)
+            .take(wanted)
+            .read_to_end(&mut bytes)
+            .map_err(|e| format!("read demo: {e}"))?;
+        let all_read = bytes.len() < want;
+        match decode_stream_until(&bytes, Until::GameStarts) {
+            Ok(stream) if all_read || stream.last_frame != PREGAME_FRAME => {
+                return Ok(start_positions(&stream, is_team));
+            }
+            Err(e) if all_read => return Err(e),
+            // The prefix ends before the pregame does, or before the stream
+            // starts. Read twice as much and walk again.
+            _ => want = want.saturating_mul(2),
+        }
+    }
+}
+
+/// How much of a replay the first read takes, in bytes. A read size and not a
+/// limit: a pregame longer than this is read in further doubling steps.
+const FIRST_READ: usize = 256 * 1024;
+
+/// The reduction behind [`read_start_positions`], over a walked stream.
+fn start_positions(stream: &DemoStream, is_team: impl Fn(i32) -> bool) -> Vec<TeamStartPosition> {
+    let mut by_team: BTreeMap<i32, TeamStartPosition> = BTreeMap::new();
+    for e in &stream.events {
+        let StreamEventKind::StartPos {
+            team,
+            ready,
+            x,
+            y,
+            z,
+            ..
+        } = e.kind
+        else {
+            continue;
+        };
+        let team = i32::from(team);
+        if e.frame != PREGAME_FRAME || !is_team(team) {
+            continue;
+        }
+        if ready == RDYSTATE_FAILED && x == 0.0 && y == 0.0 && z == 0.0 {
+            continue;
+        }
+        by_team.insert(team, TeamStartPosition { team, x, y, z });
+    }
+    by_team.into_values().collect()
+}
+
+/// How far a walk goes.
+#[derive(Clone, Copy, PartialEq)]
+enum Until {
+    /// To the end of the stream.
+    TheEnd,
+    /// To the first frame, so the pregame events only.
+    GameStarts,
+}
+
 /// Find the stream in a whole replay's bytes and walk it.
 pub(super) fn decode_stream(bytes: &[u8]) -> Result<DemoStream, String> {
+    decode_stream_until(bytes, Until::TheEnd)
+}
+
+fn decode_stream_until(bytes: &[u8], until: Until) -> Result<DemoStream, String> {
     if bytes.len() < MIN_HEADER || &bytes[..MAGIC.len()] != MAGIC {
         return Err("not a Spring demo file (bad magic)".into());
     }
@@ -102,7 +197,7 @@ pub(super) fn decode_stream(bytes: &[u8]) -> Result<DemoStream, String> {
         )
     })?;
 
-    let mut stream = walk(have);
+    let mut stream = walk(have, until);
     if stream.stopped.is_none() && end > bytes.len() {
         stream.stopped = Some(StreamStop {
             offset: have.len(),
@@ -130,7 +225,10 @@ fn unknown_format(
 /// The frame clock is the engine's. `NETMSG_KEYFRAME` states a frame number and
 /// `NETMSG_NEWFRAME` advances it by one, and on every real replay measured each
 /// keyframe was exactly one past the frame before it.
-fn walk(stream: &[u8]) -> DemoStream {
+///
+/// With [`Until::GameStarts`] the walk ends at the first packet after the frame
+/// clock leaves [`PREGAME_FRAME`], and says nothing about why in `stopped`.
+fn walk(stream: &[u8], until: Until) -> DemoStream {
     let mut out = DemoStream {
         events: Vec::new(),
         last_frame: PREGAME_FRAME,
@@ -140,6 +238,9 @@ fn walk(stream: &[u8]) -> DemoStream {
     };
     let mut at = 0;
     while at < stream.len() {
+        if until == Until::GameStarts && out.last_frame != PREGAME_FRAME {
+            break;
+        }
         let Some(head) = stream.get(at..at + CHUNK_HEADER_SIZE) else {
             out.stopped = Some(StreamStop {
                 offset: at,
@@ -820,7 +921,7 @@ mod tests {
     }
 
     fn walked(p: Packets) -> DemoStream {
-        let s = walk(&p.bytes());
+        let s = walk(&p.bytes(), Until::TheEnd);
         assert_eq!(s.stopped, None);
         assert_eq!(s.undecoded, 0);
         s
@@ -828,7 +929,7 @@ mod tests {
 
     #[test]
     fn an_empty_stream_is_a_match_that_never_started() {
-        let s = walk(&[]);
+        let s = walk(&[], Until::TheEnd);
         assert_eq!(s.events, vec![]);
         assert_eq!(s.last_frame, PREGAME_FRAME);
         assert_eq!(s.packets, 0);
@@ -1101,6 +1202,110 @@ mod tests {
         );
     }
 
+    fn every_team(_: i32) -> bool {
+        true
+    }
+
+    fn at(team: i32, x: f32, y: f32, z: f32) -> TeamStartPosition {
+        TeamStartPosition { team, x, y, z }
+    }
+
+    fn positions_of(p: Packets, is_team: impl Fn(i32) -> bool) -> Vec<TeamStartPosition> {
+        let s = walk(&p.bytes(), Until::GameStarts);
+        start_positions(&s, is_team)
+    }
+
+    #[test]
+    fn the_last_pregame_message_for_a_team_is_where_it_started() {
+        let got = positions_of(
+            Packets::default()
+                .start_pos(0, 0, 0, [100.0, 0.0, 200.0])
+                .start_pos(1, 1, 1, [900.0, 5.0, 800.0])
+                .start_pos(0, 0, 1, [300.0, 0.0, 400.0])
+                // The server's closing broadcast, which carries the final one.
+                .start_pos(0, 0, 1, [300.0, 0.0, 400.0])
+                .start_pos(255, 2, 1, [50.0, 1.0, 60.0]),
+            every_team,
+        );
+        assert_eq!(
+            got,
+            vec![
+                at(0, 300.0, 0.0, 400.0),
+                at(1, 900.0, 5.0, 800.0),
+                at(2, 50.0, 1.0, 60.0)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_team_with_no_message_is_absent_and_a_corner_is_a_position() {
+        let got = positions_of(
+            Packets::default().start_pos(255, 3, 1, [0.0, 0.0, 0.0]),
+            every_team,
+        );
+        assert_eq!(got, vec![at(3, 0.0, 0.0, 0.0)]);
+        assert_eq!(positions_of(Packets::default(), every_team), vec![]);
+    }
+
+    #[test]
+    fn a_player_who_never_readied_and_sent_nothing_has_no_position() {
+        let got = positions_of(
+            Packets::default()
+                .start_pos(4, 0, 3, [0.0, 0.0, 0.0])
+                .start_pos(5, 1, 3, [10.0, 0.0, 20.0]),
+            every_team,
+        );
+        assert_eq!(got, vec![at(1, 10.0, 0.0, 20.0)]);
+    }
+
+    #[test]
+    fn a_position_sent_after_the_game_started_does_not_move_a_team() {
+        let got = positions_of(
+            Packets::default()
+                .start_pos(255, 0, 1, [1.0, 0.0, 2.0])
+                .keyframe(0)
+                .start_pos(0, 0, 0, [9.0, 9.0, 9.0]),
+            every_team,
+        );
+        assert_eq!(got, vec![at(0, 1.0, 0.0, 2.0)]);
+    }
+
+    #[test]
+    fn a_team_the_script_does_not_have_is_dropped() {
+        let got = positions_of(
+            Packets::default()
+                .start_pos(0, 0, 1, [1.0, 0.0, 2.0])
+                .start_pos(0, 7, 1, [3.0, 0.0, 4.0])
+                .start_pos(0, 255, 1, [5.0, 0.0, 6.0]),
+            |t| t < 2,
+        );
+        assert_eq!(got, vec![at(0, 1.0, 0.0, 2.0)]);
+    }
+
+    #[test]
+    fn a_bounded_walk_stops_at_the_first_frame_and_a_full_one_does_not() {
+        let p = Packets::default()
+            .start_pos(255, 0, 1, [1.0, 0.0, 2.0])
+            .newframes(3)
+            .chat(0, 254, "gg");
+        let bounded = walk(&p.bytes(), Until::GameStarts);
+        assert_eq!(bounded.events.len(), 1);
+        assert_eq!(bounded.stopped, None);
+        assert_eq!(walk(&p.bytes(), Until::TheEnd).events.len(), 2);
+    }
+
+    #[test]
+    fn a_stream_that_stopped_early_still_gives_the_positions_it_read() {
+        let mut bytes = Packets::default()
+            .start_pos(255, 0, 1, [1.0, 0.0, 2.0])
+            .bytes();
+        bytes.extend_from_slice(&0.0f32.to_le_bytes());
+        bytes.extend_from_slice(&0x7FFF_FFFFu32.to_le_bytes());
+        let s = walk(&bytes, Until::GameStarts);
+        assert!(s.stopped.is_some());
+        assert_eq!(start_positions(&s, every_team), vec![at(0, 1.0, 0.0, 2.0)]);
+    }
+
     /// The reason the framing makes this safe: a message nobody here knows is
     /// stepped over by its length, and the one behind it reads correctly.
     #[test]
@@ -1303,6 +1508,7 @@ mod tests {
                 .raw(&[])
                 .chat(1, 254, "still here")
                 .bytes(),
+            Until::TheEnd,
         );
         assert_eq!(s.undecoded, 12);
         assert_eq!(s.packets, 13);
@@ -1322,7 +1528,7 @@ mod tests {
         bytes.extend_from_slice(&1_000_000u32.to_le_bytes());
         bytes.extend_from_slice(&[NETMSG_CHAT, 0, 0, 0]);
 
-        let s = walk(&bytes);
+        let s = walk(&bytes, Until::TheEnd);
         assert_eq!(s.events.len(), 1);
         assert_eq!(s.packets, 2);
         let stop = s.stopped.expect("the walk should have stopped");
@@ -1337,7 +1543,7 @@ mod tests {
         let break_at = bytes.len();
         bytes.extend_from_slice(&[1, 2, 3]);
 
-        let s = walk(&bytes);
+        let s = walk(&bytes, Until::TheEnd);
         assert_eq!(s.last_frame, 7);
         let stop = s.stopped.expect("the walk should have stopped");
         assert_eq!(stop.offset, break_at);

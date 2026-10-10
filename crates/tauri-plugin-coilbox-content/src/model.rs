@@ -291,6 +291,19 @@ pub struct AllyTeamInfo {
     pub color: Option<[f32; 3]>,
 }
 
+/// Where one team started, in world units (elmos): `x` and `z` across the map,
+/// `y` up. Not scaled to the map, which a replay does not state the size of.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TeamStartPosition {
+    /// The `[teamN]` index, the same number `PlayerInfo::team` and
+    /// `AiInfo::team` carry.
+    pub team: i32,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+}
+
 /// Decoded replay metadata: native header + start-script + trailer, with
 /// demotool as a fallback for the winner when the trailer's format is one the
 /// decoder refuses.
@@ -332,6 +345,13 @@ pub struct DemoInfo {
     /// leaves these out runs on the map's current defaults, not the values the
     /// match was played with (#1886).
     pub map_options: std::collections::HashMap<String, String>,
+    /// Where each team started, by team id, from the replay's stream (#1146).
+    /// A team with no recorded position is absent, since 0,0,0 is a real map
+    /// corner. Empty, and left out of the JSON, when the stream has none, is
+    /// missing or is in a format this decoder refuses, and always empty from
+    /// the cheap decodes the replay list and the stats ingest use.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub start_positions: Vec<TeamStartPosition>,
     /// True when this file carries coilbox's remix marker (a rewritten copy, not an
     /// engine-recorded demo).
     pub remixed: bool,
@@ -541,7 +561,9 @@ pub enum StreamEventKind {
     StartPos {
         player: u8,
         team: u8,
-        /// 0 not ready, 1 ready, 2 leave readiness as it was.
+        /// `CPlayer::PLAYER_RDYSTATE_*` in `rts/Game/Players/Player.h`: 0 the
+        /// player moved their marker without readying, 1 readied, 2 the server
+        /// forced the start, 3 the player never readied.
         ready: u8,
         x: f32,
         y: f32,
