@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/table";
 import { notify } from "@/notify/notify";
 import {
-  contentReplayAnalysisEvents,
   contentWriteFile,
   type DemoInfo,
   type StoredReplayAnalysis,
@@ -54,6 +53,7 @@ import {
   resolveBuildUnit,
   type UnitSource,
 } from "../../replayBuildOrders";
+import { readReplayEvents } from "../../replayEventRead";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
 
@@ -366,7 +366,8 @@ export function ReplayAnalysisEvents({
 
   const [open, setOpen] = useState(false);
   // What a read belongs to, so another replay or a newer run shows nothing of it.
-  const key = readable ? `${replayPath}\n${readable.analysedAtMs}` : null;
+  const atMs = readable?.analysedAtMs ?? 0;
+  const key = readable ? `${replayPath}\n${atMs}` : null;
   const [read, setRead] = useState<{
     key: string;
     status: "failed" | "done";
@@ -376,11 +377,10 @@ export function ReplayAnalysisEvents({
   useEffect(() => {
     if (!open || key === null || !gameId) return;
     let stale = false;
-    contentReplayAnalysisEvents({ gameId }).then(
-      (res) => {
-        if (!stale) {
-          setRead({ key, status: "done", events: res.events as LogEvent[] });
-        }
+    // Shared with the map's event layers, so each kind is read once.
+    readReplayEvents(gameId, atMs, null).then(
+      (events) => {
+        if (!stale) setRead({ key, status: "done", events });
       },
       () => {
         if (!stale) setRead({ key, status: "failed", events: [] });
@@ -389,7 +389,7 @@ export function ReplayAnalysisEvents({
     return () => {
       stale = true;
     };
-  }, [open, key, gameId]);
+  }, [open, key, gameId, atMs]);
 
   if (!readable) return null;
   const current = read?.key === key ? read : null;
