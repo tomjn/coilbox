@@ -2417,6 +2417,22 @@ export const unitsyncScan = defineCommand<
   ScanResult
 >("coilbox-unitsync", "unitsync_scan");
 
+/**
+ * The scan last saved for a target, or null when there is none, it is unreadable
+ * or it is from another format version. A first paint only: it can name an
+ * archive deleted since.
+ */
+export const unitsyncLastScanRead = defineCommand<
+  { enginePath: string; dataDir: string },
+  ScanResult | null
+>("coilbox-unitsync", "unitsync_last_scan_read");
+
+/** Save a scan that succeeded as the target's first paint at the next launch. */
+export const unitsyncLastScanWrite = defineCommand<
+  { enginePath: string; dataDir: string; scan: ScanResult },
+  null
+>("coilbox-unitsync", "unitsync_last_scan_write");
+
 /** Signal the matching in-flight `unitsync_scan`/`unitsync_thumbnails` worker to stop. */
 export const unitsyncCancel = defineCommand<{ opId: string }, unknown>(
   "coilbox-unitsync",

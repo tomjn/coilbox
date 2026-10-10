@@ -68,6 +68,7 @@ import { useContentState } from "./contentState";
 import { engineLabel, newestEngineId } from "./engineVersion";
 import { settleWithin, shareInFlight } from "./inFlight";
 import { invalidateInstalledContent } from "./installedContent";
+import { writeLastScan } from "./lastScan";
 import { useRecordMapAppearance } from "./mapAppearanceCache";
 import { readCachedModel } from "./modelFile";
 import { forgetScanHints, rememberScanHints } from "./scanHints";
@@ -320,6 +321,7 @@ export async function primeScan(
       // may have room.
       if (res.initFailure) throw new ScanInitFailure(res);
       scanCache.set(key, res);
+      writeLastScan(enginePath, dataDir, res);
       // What a cached read of this library is looked up by (issue #3714).
       rememberScanHints(dataDir, enginePath, res);
       // The one place every game modinfo this machine reads goes through, so it
