@@ -80,7 +80,6 @@ vi.mock("./bindings", () => ({
 
 vi.mock("./ringEffect", () => ({ triggerAttention: () => {} }));
 vi.mock("../notify/notify", () => ({ notify: async () => {} }));
-vi.mock("./notify/notify", () => ({ notify: async () => {} }));
 
 const KEY_A = "AF@tachyon-a.example:443";
 const KEY_B = "Zeta@tachyon-b.example:443";

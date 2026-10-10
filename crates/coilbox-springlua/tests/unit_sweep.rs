@@ -26,6 +26,7 @@ fn event(frame: u32, callin: &str, args: &[f64]) -> ScriptEvent {
 }
 
 #[test]
+#[ignore = "needs COILBOX_UNIT_SWEEP set to a folder of unit scripts"]
 fn every_unit_script_in_the_folder_runs() {
     let Ok(root) = std::env::var("COILBOX_UNIT_SWEEP") else {
         eprintln!("COILBOX_UNIT_SWEEP is not set, so there is nothing to sweep.");

@@ -943,7 +943,12 @@ pub(crate) mod tests {
                 .expect("a free port");
             socket.local_addr().expect("a bound address")
         };
-        minted_at(&w.state, &format!("turn:{silent}"), 86_400, NOW);
+        minted_at(
+            &w.state,
+            &format!("turn:{silent}"),
+            86_400,
+            crate::conn::now_ms(),
+        );
 
         let got = relay_ping(&w.registry, KEY).await;
         assert_eq!(

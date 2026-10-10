@@ -471,6 +471,7 @@ fn weapon_files_change_nothing_in_a_game_that_adds_unit_weapons_itself() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn weapon_files_change_nothing_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
@@ -525,6 +526,7 @@ fn a_typed_value_loads_changed_and_by_how_much_depends_on_the_route() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn a_typed_value_loads_changed_and_by_how_much_depends_on_the_route_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
@@ -656,6 +658,7 @@ fn a_typed_value_loads_as_typed_on_the_mutator_route() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn a_typed_value_loads_as_typed_on_the_mutator_route_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
@@ -685,6 +688,7 @@ fn the_model_game_scales_a_carried_weapon_twice() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn a_copied_unit_loads_like_its_source_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
@@ -694,6 +698,7 @@ fn a_copied_unit_loads_like_its_source_in_balanced_annihilation() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn library_weapons_load_like_their_sources_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");
@@ -708,6 +713,7 @@ fn a_death_explosion_loads_like_its_source_in_a_game_that_scales_on_load() {
 }
 
 #[test]
+#[ignore = "needs Balanced Annihilation V15.9.8 in ~/.spring/games"]
 fn a_death_explosion_loads_like_its_source_in_balanced_annihilation() {
     let Some(game) = balanced_annihilation() else {
         eprintln!("Balanced Annihilation V15.9.8 is not installed, so this checks nothing");

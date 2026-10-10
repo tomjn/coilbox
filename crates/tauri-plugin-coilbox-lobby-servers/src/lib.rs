@@ -733,7 +733,7 @@ mod tests {
     /// cargo test -p tauri-plugin-coilbox-lobby-servers security_tool -- --ignored --nocapture
     #[cfg(all(target_os = "macos", debug_assertions))]
     #[test]
-    #[ignore]
+    #[ignore = "writes to the login keychain of whoever runs it"]
     fn the_security_tool_replaces_and_removes() {
         use super::{read_via_security_tool, run_security_tool, SERVICE};
 
