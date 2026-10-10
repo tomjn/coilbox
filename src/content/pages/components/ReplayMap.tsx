@@ -28,6 +28,11 @@ import {
   teamColours,
 } from "../../replayMapLayers";
 import { layersOn, useStoredMapLayers } from "../../replayMapLayerToggles";
+import {
+  orderHeatPoints,
+  sourceCounts,
+  useReplayOrderPoints,
+} from "../../replayOrderPoints";
 import { teamLabel } from "../../replaySideLabel";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import { useMatchStats } from "../../useMatchStats";
@@ -218,6 +223,7 @@ export function ReplayMap({
     starts: layersShown && stored.starts,
     buildings: layersShown && stored.buildings,
     density: layersShown && stored.density,
+    orderDensity: layersShown && stored.orderDensity,
   };
 
   // The engine's heightmap has one sample more than it has squares, and a
@@ -244,6 +250,16 @@ export function ReplayMap({
     if (wantOrders && ordersStatus === "idle") loadOrders();
   }, [wantOrders, ordersStatus, loadOrders]);
   const result = orders.result;
+
+  // Every positioned order is a second read of the stream, asked for the same
+  // way: when the layer that draws it is on, including one left on last visit.
+  const orderPoints = useReplayOrderPoints(replayPath ?? "");
+  const wantPoints = !!replayPath && on.orderDensity;
+  const { status: pointsStatus, load: loadPoints } = orderPoints;
+  useEffect(() => {
+    if (wantPoints && pointsStatus === "idle") loadPoints();
+  }, [wantPoints, pointsStatus, loadPoints]);
+  const allOrders = orderPoints.result;
 
   const units = useReplayUnits(
     info,
@@ -285,9 +301,22 @@ export function ReplayMap({
     [result, sized, world, on.density],
   );
 
+  const orderField = useMemo(
+    () =>
+      allOrders && sized && on.orderDensity
+        ? buildHeatField(orderHeatPoints(allOrders), world)
+        : null,
+    [allOrders, sized, world, on.orderDensity],
+  );
+  const bySender = useMemo(
+    () => (allOrders ? sourceCounts(allOrders) : null),
+    [allOrders],
+  );
+
   const emphasis = useSeriesEmphasis();
   const marksRef = useRef<HTMLCanvasElement | null>(null);
   const heatRef = useRef<HTMLCanvasElement | null>(null);
+  const orderHeatRef = useRef<HTMLCanvasElement | null>(null);
   const marks = on.buildings ? (built?.marks ?? null) : null;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the emphasis state stands for isLit and dimming
   useEffect(() => {
@@ -305,9 +334,13 @@ export function ReplayMap({
     const canvas = heatRef.current;
     if (canvas && field) drawHeat(canvas, field);
   }, [field]);
+  useEffect(() => {
+    const canvas = orderHeatRef.current;
+    if (canvas && orderField) drawHeat(canvas, orderField);
+  }, [orderField]);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
-  useHeatmapLayer(handle, field);
+  useHeatmapLayer(handle, orderField ?? field);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
@@ -339,6 +372,13 @@ export function ReplayMap({
               <canvas
                 ref={heatRef}
                 data-layer="density"
+                className="pointer-events-none absolute inset-0 size-full"
+              />
+            )}
+            {orderField && orderField.peak > 0 && (
+              <canvas
+                ref={orderHeatRef}
+                data-layer="orderDensity"
                 className="pointer-events-none absolute inset-0 size-full"
               />
             )}
@@ -413,6 +453,9 @@ export function ReplayMap({
               <ToggleGroupItem value="density">
                 Building density
               </ToggleGroupItem>
+              <ToggleGroupItem value="orderDensity">
+                Order density
+              </ToggleGroupItem>
             </ToggleGroup>
             <ReplaySourceNote
               source="stream"
@@ -478,6 +521,47 @@ export function ReplayMap({
               </p>
             )}
 
+            {wantPoints && orderPoints.loading && (
+              <p className="text-xs text-muted-foreground">Reading orders…</p>
+            )}
+            {wantPoints && orderPoints.failed && (
+              <p className="text-xs text-destructive">
+                The orders could not be read from this replay.
+              </p>
+            )}
+            {wantPoints && allOrders && allOrders.count === 0 && (
+              <p className="text-xs text-muted-foreground">
+                No orders with a place on the map were given in this replay.
+              </p>
+            )}
+            {wantPoints && allOrders && allOrders.count > 0 && bySender && (
+              <p className="text-xs text-muted-foreground">
+                Where orders were aimed, which is roughly where attention went.{" "}
+                {(
+                  allOrders.count - (orderField?.dropped ?? 0)
+                ).toLocaleString()}{" "}
+                orders are on it, from the player's own selection, widgets
+                acting for them and AIs alike
+                {bySender.lua > 0 &&
+                  `, and ${bySender.lua.toLocaleString()} of them were sent by widgets`}
+                . Orders aimed at a unit are not on it, as the replay holds the
+                unit and not its position:{" "}
+                {allOrders.unitAimed.toLocaleString()}{" "}
+                {allOrders.unitAimed === 1 ? "order was" : "orders were"} aimed
+                at a unit.
+                {allOrders.custom > 0 &&
+                  ` ${allOrders.custom.toLocaleString()} ${allOrders.custom === 1 ? "order was" : "orders were"} a command the engine does not define, which a game or a widget made up and which says nothing about where it points, and ${allOrders.custom === 1 ? "is" : "are"} left out.`}
+                {(orderField?.dropped ?? 0) > 0 &&
+                  ` ${(orderField?.dropped ?? 0).toLocaleString()} ${orderField?.dropped === 1 ? "order was" : "orders were"} aimed off the map and ${orderField?.dropped === 1 ? "is" : "are"} not drawn.`}
+              </p>
+            )}
+            {wantPoints && allOrders?.incomplete && (
+              <p className="text-xs text-muted-foreground">
+                This replay could not be read to the end, so later orders may be
+                missing.
+              </p>
+            )}
+
             {on.buildings && placed > 0 && (
               <>
                 <p className="text-xs text-muted-foreground">
@@ -511,6 +595,12 @@ export function ReplayMap({
               </>
             )}
 
+            {orderField && orderField.peak > 0 && (
+              <HeatLegend
+                label="Where orders were aimed"
+                peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot`}
+              />
+            )}
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"

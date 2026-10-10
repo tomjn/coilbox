@@ -21,6 +21,7 @@ import type {
   BuildOrder,
   DemoBuildOrders,
   DemoInfo,
+  DemoOrderPoints,
   GameItem,
   UnitDatasetEntry,
 } from "../../bindings";
@@ -30,7 +31,9 @@ let ORDERS: DemoBuildOrders | Error;
 let GAMES: GameItem[] = [];
 let DATASET: { units: UnitDatasetEntry[] } | null = null;
 let PRIMARY = "";
+let POINTS: DemoOrderPoints | Error;
 const ordersRead = vi.fn();
+const pointsRead = vi.fn();
 
 vi.mock("../../../profile/profile", async (orig) => ({
   ...(await orig<typeof import("../../../profile/profile")>()),
@@ -42,6 +45,11 @@ vi.mock("../../bindings", async (original) => ({
     ordersRead(args);
     if (ORDERS instanceof Error) throw ORDERS;
     return ORDERS;
+  },
+  contentDemoOrderPoints: async (args: unknown) => {
+    pointsRead(args);
+    if (POINTS instanceof Error) throw POINTS;
+    return POINTS;
   },
 }));
 vi.mock("../../config", () => ({
@@ -73,6 +81,8 @@ vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
 const { ReplayMap } = await import("./ReplayMap");
 const { ReplayBuildOrders } = await import("./ReplayBuildOrders");
 const { resetReplayBuildOrders } = await import("../../useReplayBuildOrders");
+const { resetReplayOrderPoints } = await import("../../replayOrderPoints");
+const { packOrders } = await import("../../orderPointsFixture");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 
 const order = (over: Partial<BuildOrder>): BuildOrder => ({
@@ -186,8 +196,10 @@ const boxes = () => document.querySelectorAll('[data-layer="startBox"]');
 afterEach(() => {
   cleanup();
   resetReplayBuildOrders();
+  resetReplayOrderPoints();
   localStorage.clear();
   ordersRead.mockClear();
+  pointsRead.mockClear();
   HIDE = [];
   GAMES = [];
   DATASET = null;
@@ -212,6 +224,8 @@ describe("what is on when the page opens", () => {
     expect(toggle("Buildings ordered").dataset.state).toBe("off");
     expect(toggle("Building density").dataset.state).toBe("off");
     expect(ordersRead).not.toHaveBeenCalled();
+    expect(toggle("Order density").dataset.state).toBe("off");
+    expect(pointsRead).not.toHaveBeenCalled();
   });
 
   it("puts each start dot inside its own side's start box", () => {
@@ -371,6 +385,71 @@ describe("building density", () => {
     await screen.findByText(/no buildings were ordered/i);
     expect(screen.queryByText("Least")).toBeNull();
     expect(document.querySelector('[data-layer="density"]')).toBeNull();
+  });
+});
+
+describe("order density", () => {
+  const ORDER_POINTS = packOrders(
+    [
+      { x: 1024, z: 2048, source: 0 },
+      { x: 1040, z: 2060, source: 1 },
+      { x: 1050, z: 2070, source: 1 },
+      { x: 9999, z: 9999, source: 0 },
+    ],
+    { unitAimed: 5, custom: 2 },
+  );
+
+  it("reads the orders once, and only when switched on", async () => {
+    POINTS = ORDER_POINTS;
+    show();
+    expect(pointsRead).not.toHaveBeenCalled();
+    fireEvent.click(toggle("Order density"));
+    await screen.findByText("Where orders were aimed");
+    expect(pointsRead).toHaveBeenCalledTimes(1);
+    expect(pointsRead).toHaveBeenCalledWith({ replayPath: "/replays/a.sdfz" });
+    fireEvent.click(toggle("Order density"));
+    fireEvent.click(toggle("Order density"));
+    expect(pointsRead).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-layer="orderDensity"]')).toBeTruthy();
+  });
+
+  it("says what it is and what is not on it, with the counts", async () => {
+    POINTS = ORDER_POINTS;
+    show();
+    fireEvent.click(toggle("Order density"));
+    const note = await screen.findByText(/roughly where attention went/i);
+    const text = note.textContent ?? "";
+    // One of four is off the map, so three are on it.
+    expect(text).toMatch(/3 orders are on it/);
+    expect(text).toMatch(/2 of them were sent by widgets/);
+    expect(text).toMatch(/5 orders were aimed at a unit/);
+    expect(text).toMatch(/2 orders were a command the engine does not define/);
+    expect(text).toMatch(/1 order was aimed off the map/);
+  });
+
+  it("is a layer of its own and does not read the build orders", async () => {
+    POINTS = ORDER_POINTS;
+    show();
+    fireEvent.click(toggle("Order density"));
+    await screen.findByText("Where orders were aimed");
+    expect(ordersRead).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-layer="density"]')).toBeNull();
+  });
+
+  it("says so when the orders cannot be read", async () => {
+    POINTS = new Error("no stream");
+    show();
+    fireEvent.click(toggle("Order density"));
+    await screen.findByText(/orders could not be read from this replay/i);
+    expect(document.querySelector('[data-layer="orderDensity"]')).toBeNull();
+  });
+
+  it("says so when no order had a place", async () => {
+    POINTS = packOrders([]);
+    show();
+    fireEvent.click(toggle("Order density"));
+    await screen.findByText(/no orders with a place on the map/i);
+    expect(screen.queryByText("Least")).toBeNull();
   });
 });
 

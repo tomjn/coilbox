@@ -17,8 +17,13 @@ describe("the map's remembered layers", () => {
       starts: true,
       buildings: true,
       density: false,
+      orderDensity: true,
     });
-    expect(layersOn(storedMapLayers(raw))).toEqual(["starts", "buildings"]);
+    expect(layersOn(storedMapLayers(raw))).toEqual([
+      "starts",
+      "buildings",
+      "orderDensity",
+    ]);
   });
 
   it("takes the default for anything missing, unknown or unreadable", () => {
