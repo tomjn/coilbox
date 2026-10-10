@@ -196,7 +196,7 @@ export function PlayerMatchFigures({
               ? `In ${games(data.sharedTeamGames)} the team had other players.`
               : ""}
           </p>
-          <div className="overflow-x-auto">
+          <div>
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-xs text-muted-foreground">
