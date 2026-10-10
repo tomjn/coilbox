@@ -178,6 +178,64 @@ function kernelFor(sigmaCells: number, reachCells: number): Float32Array {
 }
 
 /**
+ * Spread each cell of a binned grid into the soft round blob, and find the
+ * brightest cell. `binned` and `into` may be the same array.
+ */
+function smooth(
+  binned: Float32Array,
+  into: Float32Array,
+  shape: {
+    width: number;
+    height: number;
+    worldWidth: number;
+    worldHeight: number;
+    radius: number;
+  },
+): { peak: number; peakAt: { x: number; z: number } | null } {
+  const { width, height, radius } = shape;
+  const cellW = shape.worldWidth / width;
+  const cellH = shape.worldHeight / height;
+  const sigma = radius * SIGMA_PER_RADIUS;
+  const across = new Float32Array(width * height);
+  blurLines(
+    binned,
+    across,
+    height,
+    width,
+    width,
+    1,
+    kernelFor(sigma / cellW, radius / cellW),
+  );
+  blurLines(
+    across,
+    into,
+    width,
+    height,
+    1,
+    width,
+    kernelFor(sigma / cellH, radius / cellH),
+  );
+  let peak = 0;
+  let peakIndex = -1;
+  for (let i = 0; i < into.length; i++) {
+    if (into[i] > peak) {
+      peak = into[i];
+      peakIndex = i;
+    }
+  }
+  return {
+    peak,
+    peakAt:
+      peakIndex < 0
+        ? null
+        : {
+            x: ((peakIndex % width) + 0.5) * cellW,
+            z: (Math.floor(peakIndex / width) + 0.5) * cellH,
+          },
+  };
+}
+
+/**
  * Add points up into a field.
  *
  * A point off the map, or one that is not a number, is left out and counted in
@@ -253,43 +311,9 @@ export function buildHeatField(
   }
   if (counted === 0) return makeField(shape, binned);
 
-  const sigma = radius * SIGMA_PER_RADIUS;
-  const across = new Float32Array(width * height);
-  blurLines(
-    binned,
-    across,
-    height,
-    width,
-    width,
-    1,
-    kernelFor(sigma / cellW, radius / cellW),
-  );
+  // The blur writes back into the binned grid, which nothing reads after it.
+  const { peak, peakAt } = smooth(binned, binned, shape);
   const values = binned;
-  blurLines(
-    across,
-    values,
-    width,
-    height,
-    1,
-    width,
-    kernelFor(sigma / cellH, radius / cellH),
-  );
-
-  let peak = 0;
-  let peakIndex = -1;
-  for (let i = 0; i < values.length; i++) {
-    if (values[i] > peak) {
-      peak = values[i];
-      peakIndex = i;
-    }
-  }
-  const peakAt =
-    peakIndex < 0
-      ? null
-      : {
-          x: ((peakIndex % width) + 0.5) * cellW,
-          z: (Math.floor(peakIndex / width) + 0.5) * cellH,
-        };
   let peakWithinRadius = 0;
   if (peakAt) {
     for (let i = 0; i < total; i++) {
@@ -313,6 +337,74 @@ export function buildHeatField(
     },
     values,
   );
+}
+
+/**
+ * A field from counts that are already on the map's grid: `binned[row * width
+ * + column]` is how much fell in that cell. Each cell's amount is taken to sit
+ * at the cell's middle.
+ *
+ * For counts made somewhere other than here. A replay's events are counted in
+ * Rust on this same grid (`map_grids.rs`), and many replays' counts are added
+ * before this smooths the sum once. The blob is linear, so smoothing a sum is
+ * the same as adding smoothed fields, and costs one pass and not one a replay.
+ *
+ * It differs from {@link buildHeatField} over the same events by where in a
+ * cell an event is put: there at its own place, shared between the four
+ * nearest cell middles, and here at the middle of its cell. That moves an
+ * event by half a cell at most.
+ *
+ * `binned` is left as it was. `counted` is what the field reports as how many
+ * events went in, and left out it is the sum of the grid.
+ */
+export function buildHeatFieldFromCounts(
+  binned: Float32Array,
+  map: { worldWidth: number; worldHeight: number },
+  options: HeatFieldOptions & { counted?: number } = {},
+): HeatField {
+  const { worldWidth, worldHeight } = map;
+  const { width, height } = heatGridSize(
+    worldWidth,
+    worldHeight,
+    options.resolution,
+  );
+  if (binned.length !== width * height)
+    throw new Error("counts are not on this map's grid");
+  const radius =
+    options.radius ??
+    Math.min(worldWidth, worldHeight) * DEFAULT_RADIUS_FRACTION;
+  let sum = 0;
+  for (let i = 0; i < binned.length; i++) sum += binned[i];
+  const shape = {
+    width,
+    height,
+    worldWidth,
+    worldHeight,
+    radius,
+    peak: 0,
+    peakAt: null,
+    counted: options.counted ?? sum,
+    dropped: 0,
+  };
+  const values = new Float32Array(width * height);
+  if (!(sum > 0) || !(worldWidth > 0) || !(worldHeight > 0))
+    return makeField(shape, values);
+  const { peak, peakAt } = smooth(binned, values, shape);
+  const cellW = worldWidth / width;
+  const cellH = worldHeight / height;
+  let peakWithinRadius = 0;
+  if (peakAt) {
+    for (let row = 0; row < height; row++) {
+      const dz = (row + 0.5) * cellH - peakAt.z;
+      for (let col = 0; col < width; col++) {
+        const amount = binned[row * width + col];
+        if (amount === 0) continue;
+        if (Math.hypot((col + 0.5) * cellW - peakAt.x, dz) <= radius)
+          peakWithinRadius += amount;
+      }
+    }
+  }
+  return makeField({ ...shape, peak, peakAt, peakWithinRadius }, values);
 }
 
 /**
