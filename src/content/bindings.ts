@@ -430,6 +430,10 @@ export interface Metric {
 
 /** One player/spectator from a demo, with side + ally-team resolved from their team. */
 export interface ReplayPlayer {
+  /** The `[playerN]` number, which a chat line's or a timeline event's
+   * `player` holds. The decoder always sends it. It is optional here only so
+   * that the many hand built players in tests need not carry one. */
+  player?: number;
   name: string;
   team?: number;
   allyTeam?: number;
@@ -761,15 +765,55 @@ export interface ChatLine {
   system: boolean;
 }
 
+/** Why a player left, from the engine's `bIntended` byte. `other` is a value
+ * the engine does not define, carried as sent. */
+export type LeaveReason =
+  | { kind: "lostConnection" }
+  | { kind: "left" }
+  | { kind: "kicked" }
+  | { kind: "other"; code: number };
+
+/** What a {@link TimelineEvent} is. The engine's `JoinTeam` message is left
+ * out, since every match opens with them. */
+export type TimelineEventKind =
+  /** The player stopped playing. */
+  | { type: "resigned" }
+  /** A team died. `players` are the names of whoever controlled it, empty when
+   * no named player did (a bot's team). The event's own `player` is only the
+   * one who reported it, so do not name them. */
+  | { type: "teamDied"; team: number; players: string[] }
+  | { type: "playerLeft"; reason: LeaveReason }
+  | { type: "paused"; paused: boolean }
+  /** A player who was not in the start script joined mid game. */
+  | { type: "joined"; spectator: boolean; team: number }
+  /** Everything `fromTeam` owned went to `toTeam`. */
+  | { type: "giveAway"; toTeam: number; fromTeam: number }
+  /** A team action the engine does not define, carried as sent. */
+  | { type: "other"; action: number; param1: number; param2: number };
+
+/** Something that happened to the match or its players, from the typed
+ * messages in the replay's stream. */
+export type TimelineEvent = {
+  /** Simulation frame, `-1` before the match started. 30 frames are one second. */
+  frame: number;
+  /** The packet's `modGameTime` in seconds. Orders events that share a frame. */
+  time: number;
+  /** The player it concerns. */
+  player: number;
+  /** That player's name as it stood when the event arrived, when known. */
+  playerName?: string;
+} & TimelineEventKind;
+
 /**
- * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) from the
- * native stream walk. Needs no engine folder. Read on demand, it walks the
- * whole demo stream. `incomplete` is set when the walk stopped early, so lines
- * after that point are missing.
+ * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) and its
+ * timeline events (resignations, departures, pauses, late joiners, team
+ * deaths) from one native stream walk. Needs no engine folder. Read on demand,
+ * it walks the whole demo stream. `incomplete` is set when the walk stopped
+ * early, so lines and events after that point are missing.
  */
 export const contentDemoChat = defineCommand<
   { replayPath: string },
-  { messages: ChatLine[]; incomplete: boolean }
+  { messages: ChatLine[]; incomplete: boolean; events: TimelineEvent[] }
 >("coilbox-content", "content_demo_chat");
 
 /** What issued an order. `lua` is a widget on the player's own machine acting

@@ -462,6 +462,7 @@ mod tests {
 
     fn player(name: &str, ally: i32, won: Option<bool>) -> PlayerInfo {
         PlayerInfo {
+            player: 0,
             name: name.into(),
             team: Some(ally),
             ally_team: Some(ally),

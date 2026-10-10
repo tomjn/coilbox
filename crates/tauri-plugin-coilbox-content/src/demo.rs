@@ -36,7 +36,8 @@ use tauri::{AppHandle, Runtime};
 use crate::metrics::{self, TeamTotals};
 use crate::model::{
     AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer, PlayerInfo,
-    PlayerStats, ReplayFile, StartBox, StreamEventKind, TeamStatSample, TeamStatSeries,
+    PlayerStats, ReplayFile, StartBox, StreamEvent, StreamEventKind, TeamAction, TeamStatSample,
+    TeamStatSeries, TimelineEvent, TimelineEventKind,
 };
 
 pub(crate) mod analysis;
@@ -1539,6 +1540,7 @@ fn build_demo_info(
             .ok()
             .and_then(|n| player_stats.as_ref()?.get(n).copied());
         players.push(PlayerInfo {
+            player: id,
             name: p.get("name").unwrap_or("").to_string(),
             team,
             ally_team,
@@ -1723,16 +1725,26 @@ pub fn demo_chat(demo: &Path) -> Result<DemoChat, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
     let stream = stream::read_stream(demo)?;
-    Ok(chat_from_stream(&stream, player_names(&game)))
+    Ok(chat_from_stream(
+        &stream,
+        player_names(&game),
+        player_seats(&game),
+    ))
 }
 
-/// The chat and system lines of a walked stream, with every other event dropped.
-/// A match is tens of thousands of events and only these are wanted.
+/// The chat and system lines of a walked stream, and the typed events that
+/// belong on a timeline, with every other event dropped. A match is tens of
+/// thousands of events and only these are wanted.
 ///
 /// A late joiner's name applies from the frame they joined. A player number can
-/// be reused, so the map is changed as the walk goes and a line takes the name
-/// its sender held when it was said.
-fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> DemoChat {
+/// be reused, so the map is changed as the walk goes and a line or an event
+/// takes the name its player held when it happened. `seats` is the engine team
+/// each playing player controls, which names who lost an army when a team died.
+fn chat_from_stream(
+    stream: &DemoStream,
+    mut names: HashMap<u32, String>,
+    mut seats: HashMap<u32, u8>,
+) -> DemoChat {
     for e in &stream.events {
         if let StreamEventKind::PlayerName { player, name } = &e.kind {
             names
@@ -1741,10 +1753,90 @@ fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> Dem
         }
     }
     let mut messages = Vec::new();
+    let mut events = Vec::new();
+    let mut dead_teams = Vec::new();
     for e in &stream.events {
         let (player, dest, text, system) = match &e.kind {
-            StreamEventKind::NewPlayer { player, name, .. } => {
+            StreamEventKind::NewPlayer {
+                player,
+                spectator,
+                team,
+                name,
+            } => {
                 names.insert(u32::from(*player), name.clone());
+                if *spectator {
+                    seats.remove(&u32::from(*player));
+                } else {
+                    seats.insert(u32::from(*player), *team);
+                }
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::Joined {
+                        spectator: *spectator,
+                        team: *team,
+                    },
+                ));
+                continue;
+            }
+            StreamEventKind::Pause { player, paused } => {
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::Paused { paused: *paused },
+                ));
+                continue;
+            }
+            StreamEventKind::PlayerLeft { player, reason } => {
+                events.push(timeline_event(
+                    e,
+                    *player,
+                    &names,
+                    TimelineEventKind::PlayerLeft { reason: *reason },
+                ));
+                continue;
+            }
+            StreamEventKind::Team { player, action } => {
+                let kind = match *action {
+                    TeamAction::Resign => TimelineEventKind::Resigned,
+                    // Every player reports a death, so one report per team.
+                    TeamAction::TeamDied { team } => {
+                        if dead_teams.contains(&team) {
+                            continue;
+                        }
+                        dead_teams.push(team);
+                        let mut owners: Vec<u32> = seats
+                            .iter()
+                            .filter(|(_, t)| **t == team)
+                            .map(|(p, _)| *p)
+                            .collect();
+                        owners.sort_unstable();
+                        TimelineEventKind::TeamDied {
+                            team,
+                            players: owners
+                                .iter()
+                                .filter_map(|p| names.get(p).cloned())
+                                .collect(),
+                        }
+                    }
+                    TeamAction::GiveAway { to_team, from_team } => {
+                        TimelineEventKind::GiveAway { to_team, from_team }
+                    }
+                    TeamAction::Other {
+                        action,
+                        param1,
+                        param2,
+                    } => TimelineEventKind::Other {
+                        action,
+                        param1,
+                        param2,
+                    },
+                    // How a match starts, not something that happened in it.
+                    TeamAction::JoinTeam { .. } => continue,
+                };
+                events.push(timeline_event(e, *player, &names, kind));
                 continue;
             }
             StreamEventKind::Chat { from, dest, text } => (*from, Some(*dest), text, false),
@@ -1764,6 +1856,23 @@ fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> Dem
     DemoChat {
         messages,
         incomplete: stream.stopped.is_some(),
+        events,
+    }
+}
+
+/// One timeline event, named from the map as it stands at this point of the walk.
+fn timeline_event(
+    e: &StreamEvent,
+    player: u8,
+    names: &HashMap<u32, String>,
+    kind: TimelineEventKind,
+) -> TimelineEvent {
+    TimelineEvent {
+        frame: e.frame,
+        time: e.time,
+        player,
+        player_name: names.get(&u32::from(player)).cloned(),
+        kind,
     }
 }
 
@@ -1778,6 +1887,27 @@ fn player_names(game: &Section) -> HashMap<u32, String> {
             if let Some(pname) = sec.get("name") {
                 out.insert(num, pname.to_string());
             }
+        }
+    }
+    out
+}
+
+/// Map player number -> the engine team they control, from the start-script's
+/// `[playerN]` sections. Spectators control none.
+fn player_seats(game: &Section) -> HashMap<u32, u8> {
+    let mut out = HashMap::new();
+    for (name, sec) in &game.children {
+        let Some(num) = name
+            .strip_prefix("player")
+            .and_then(|n| n.parse::<u32>().ok())
+        else {
+            continue;
+        };
+        if sec.get("spectator") == Some("1") {
+            continue;
+        }
+        if let Some(team) = sec.get("team").and_then(|t| t.parse::<u8>().ok()) {
+            out.insert(num, team);
         }
     }
     out
@@ -3074,7 +3204,7 @@ mod tests {
     // ---- the demo stream, inside a whole file --------------------------------
 
     use super::stream::fixture::Packets;
-    use crate::model::{ChatDest, StreamEventKind, TeamAction, PREGAME_FRAME};
+    use crate::model::{ChatDest, LeaveReason, StreamEventKind, TeamAction, PREGAME_FRAME};
 
     /// A finished 1v1 with a demo stream in it: a start position, two frames,
     /// and a line of chat.
@@ -3394,7 +3524,7 @@ mod tests {
                 })
                 .collect();
             if !joined.is_empty() {
-                let chat = chat_from_stream(&s, HashMap::new());
+                let chat = chat_from_stream(&s, HashMap::new(), HashMap::new());
                 let from_joiners: Vec<_> = chat
                     .messages
                     .iter()
@@ -3428,6 +3558,70 @@ mod tests {
             );
         }
         assert!(seen > 0, "no replays in {dir}");
+    }
+
+    /// What `demo_chat` hands the timeline for each real replay, by player
+    /// number and never by name. Ignored by default, it needs replays on disk.
+    ///
+    ///   COILBOX_REAL_DEMO_DIR=~/.spring/demos \
+    ///   cargo test -p tauri-plugin-coilbox-content real_demo_timeline_events -- --ignored --nocapture
+    #[test]
+    #[ignore]
+    fn real_demo_timeline_events() {
+        let dir = std::env::var("COILBOX_REAL_DEMO_DIR").expect("set COILBOX_REAL_DEMO_DIR");
+        for e in std::fs::read_dir(&dir).unwrap().flatten() {
+            let path = e.path();
+            if !is_replay_path(&path) || e.metadata().unwrap().len() == 0 {
+                continue;
+            }
+            let chat = demo_chat(&path).unwrap();
+            if chat.events.is_empty() {
+                continue;
+            }
+            eprintln!(
+                "{}: {} chat lines, {} events, incomplete={}",
+                path.file_name().unwrap().to_string_lossy(),
+                chat.messages.len(),
+                chat.events.len(),
+                chat.incomplete
+            );
+            // The join messages left out, and when they arrive.
+            let joins: Vec<i32> = stream::read_stream(&path)
+                .unwrap()
+                .events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.kind,
+                        StreamEventKind::Team {
+                            action: TeamAction::JoinTeam { .. },
+                            ..
+                        }
+                    )
+                })
+                .map(|e| e.frame)
+                .collect();
+            eprintln!(
+                "  {} JoinTeam left out, frames {:?} to {:?}",
+                joins.len(),
+                joins.iter().min(),
+                joins.iter().max()
+            );
+            for ev in &chat.events {
+                // A team's controllers are names, so they print as a count.
+                let mut kind = serde_json::to_value(&ev.kind).unwrap();
+                if let Some(p) = kind.get_mut("players") {
+                    *p = serde_json::json!(p.as_array().map_or(0, Vec::len));
+                }
+                eprintln!(
+                    "  frame {} ({}s) player={} named={} {kind}",
+                    ev.frame,
+                    ev.frame / 30,
+                    ev.player,
+                    ev.player_name.is_some(),
+                );
+            }
+        }
     }
 
     /// End-to-end over the real replays in `~/.spring/demos`, which is the check a
@@ -4616,6 +4810,159 @@ mod tests {
             .map(|m| m.player_name.as_deref())
             .collect();
         assert_eq!(names, [None, Some("First"), Some("Second")]);
+    }
+
+    // ---- timeline events, from the same walk -----------------------------------
+
+    #[test]
+    fn a_resignation_a_departure_and_a_pause_become_named_events() {
+        let s = Packets::default()
+            .player_name(3, "Carol")
+            .keyframe(0)
+            .newframes(2)
+            .team(3, 2, 0, 0)
+            .pause(3, 1)
+            .pause(3, 0)
+            .player_left(3, 0);
+        let c = chat_of("tl_basic.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .map(|e| (e.frame, e.player, e.player_name.as_deref(), e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (2, 3, Some("Carol"), TimelineEventKind::Resigned),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::Paused { paused: true }
+                ),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::Paused { paused: false }
+                ),
+                (
+                    2,
+                    3,
+                    Some("Carol"),
+                    TimelineEventKind::PlayerLeft {
+                        reason: LeaveReason::LostConnection
+                    }
+                ),
+            ]
+        );
+        assert!(c.messages.is_empty(), "events are not chat lines");
+    }
+
+    #[test]
+    fn join_team_is_left_out_and_an_unknown_action_is_kept_as_other() {
+        let s = Packets::default()
+            .keyframe(0)
+            .team(1, 3, 2, 0)
+            .team(1, 9, 5, 6)
+            .player_left(1, 7);
+        let c = chat_of("tl_other.sdf", fixture_with_stream(s.bytes()));
+        let kinds: Vec<_> = c.events.iter().map(|e| e.kind.clone()).collect();
+        assert_eq!(
+            kinds,
+            [
+                TimelineEventKind::Other {
+                    action: 9,
+                    param1: 5,
+                    param2: 6
+                },
+                TimelineEventKind::PlayerLeft {
+                    reason: LeaveReason::Other { code: 7 }
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn a_team_death_reported_by_every_player_is_one_event_naming_who_lost_it() {
+        let s = Packets::default()
+            .new_player(8, 0, 2, "Dee")
+            .new_player(9, 0, 2, "Eve")
+            .new_player(10, 1, 2, "Watcher")
+            .keyframe(0)
+            .team(0, 4, 2, 0)
+            .team(1, 4, 2, 0)
+            .team(1, 4, 3, 0);
+        let c = chat_of("tl_died.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .filter(|e| !matches!(e.kind, TimelineEventKind::Joined { .. }))
+            .map(|e| (e.player, e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (
+                    0,
+                    TimelineEventKind::TeamDied {
+                        team: 2,
+                        players: vec!["Dee".into(), "Eve".into()]
+                    }
+                ),
+                (
+                    1,
+                    TimelineEventKind::TeamDied {
+                        team: 3,
+                        players: vec![]
+                    }
+                ),
+            ]
+        );
+    }
+
+    /// The name on an event is the one its player held when it happened.
+    #[test]
+    fn a_late_joiner_is_an_event_and_names_what_follows() {
+        let s = Packets::default()
+            .keyframe(0)
+            .team(9, 2, 0, 0)
+            .new_player(9, 0, 1, "First")
+            .team(9, 2, 0, 0);
+        let c = chat_of("tl_joined.sdf", fixture_with_stream(s.bytes()));
+        let got: Vec<_> = c
+            .events
+            .iter()
+            .map(|e| (e.player_name.as_deref(), e.kind.clone()))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (None, TimelineEventKind::Resigned),
+                (
+                    Some("First"),
+                    TimelineEventKind::Joined {
+                        spectator: false,
+                        team: 1
+                    }
+                ),
+                (Some("First"), TimelineEventKind::Resigned),
+            ]
+        );
+    }
+
+    #[test]
+    fn events_serialise_with_a_type_and_the_reason_as_a_kind() {
+        let s = Packets::default()
+            .keyframe(0)
+            .player_left(1, 2)
+            .team(1, 2, 0, 0);
+        let c = chat_of("tl_json.sdf", fixture_with_stream(s.bytes()));
+        let js = serde_json::to_value(&c).unwrap();
+        assert_eq!(js["events"][0]["type"], "playerLeft");
+        assert_eq!(js["events"][0]["reason"]["kind"], "kicked");
+        assert_eq!(js["events"][1]["type"], "resigned");
+        assert_eq!(js["messages"], serde_json::json!([]));
     }
 
     /// `demo_chat` takes a replay path and nothing else, so it cannot look for
