@@ -23,6 +23,7 @@ import { type ReactNode, useSyncExternalStore } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DownloadQueueProvider } from "@/downloads/DownloadQueueProvider";
+import { invalidateEngineLists } from "@/downloads/engineLists";
 import type { PlayTarget } from "./config";
 import {
   LaunchContentProvider,
@@ -219,6 +220,7 @@ beforeEach(() => {
     scanError: null,
   });
   downloads.recoilCatalog = [];
+  invalidateEngineLists();
   render(<Caller />, { wrapper });
 });
 

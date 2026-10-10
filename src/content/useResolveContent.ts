@@ -1,10 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  dlRecoilEngines,
-  dlSpringfilesEngines,
-  type EngineRelease,
-  type SpringfilesEngine,
-} from "../downloads/bindings";
+import type { EngineRelease, SpringfilesEngine } from "../downloads/bindings";
 import { useWriteRoot } from "../downloads/config";
 import {
   identityOf,
@@ -13,6 +8,12 @@ import {
   useDownloadComplete,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
+import {
+  heldRecoilEngines,
+  heldSpringfilesEngines,
+  loadRecoilEngines,
+  loadSpringfilesEngines,
+} from "../downloads/engineLists";
 import { useContentTargets, useUnitsyncScan } from "./config";
 import {
   type ContentRequirement,
@@ -99,15 +100,21 @@ export function useResolveContent(
   const [engineCatalog, setEngineCatalog] = useState<{
     recoil: EngineRelease[];
     springfiles: SpringfilesEngine[];
-  } | null>(null);
+  } | null>(() => {
+    const recoil = heldRecoilEngines();
+    const springfiles = heldSpringfilesEngines();
+    return recoil && springfiles
+      ? { recoil: recoil.releases, springfiles: springfiles.engines }
+      : null;
+  });
   useEffect(() => {
     if (!hasEngineReq || engineCatalog) return;
     let cancelled = false;
     Promise.all([
-      dlRecoilEngines(undefined).catch(() => ({
+      loadRecoilEngines().catch(() => ({
         releases: [] as EngineRelease[],
       })),
-      dlSpringfilesEngines(undefined).catch(() => ({
+      loadSpringfilesEngines().catch(() => ({
         engines: [] as SpringfilesEngine[],
       })),
     ]).then(([r, s]) => {

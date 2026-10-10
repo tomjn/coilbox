@@ -1,7 +1,9 @@
 import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
+import { useTrustedHubUrl } from "../hub/config";
 import { BundledEngineSetup } from "./BundledEngineSetup";
+import { fetchListsInBackground } from "./backgroundFetch";
 import { contentRescan } from "./bindings";
 import {
   primeMapMeta,
@@ -35,7 +37,20 @@ export default function ContentStartupProvider({
   const [prefs] = useContentPrefs();
   const [selectedKey] = useSetting<string>("content.scanTarget", "");
   const [dlConfig, setDlConfig] = useDownloadsConfig();
+  const hubUrl = useTrustedHubUrl();
   const ran = useRef(false);
+  // The job starts after the first render, so it reads the settings as they are
+  // then and not as they were when the effect was set up.
+  const latest = useRef({ prefs, hubUrl });
+  latest.current = { prefs, hubUrl };
+
+  const fetchLists = useCallback(() => {
+    const { prefs: now, hubUrl: hub } = latest.current;
+    void fetchListsInBackground({
+      enabled: now.fetchListsInBackground !== false,
+      hubUrl: hub,
+    });
+  }, []);
 
   const warmUp = useCallback(async () => {
     try {
@@ -73,9 +88,19 @@ export default function ContentStartupProvider({
   useEffect(() => {
     if (ran.current) return;
     ran.current = true;
-    if (!prefs.autoScanOnStartup) return;
-    warmUp();
-  }, [prefs.autoScanOnStartup, warmUp]);
+    if (prefs.autoScanOnStartup) {
+      // The scan is what makes the first screen usable, so the lists wait for it.
+      warmUp().then(fetchLists);
+      return;
+    }
+    // With the scan off there is nothing to wait for, so wait for an idle moment.
+    // WebKit has no requestIdleCallback, so a macrotask stands in there.
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(fetchLists);
+    } else {
+      setTimeout(fetchLists, 0);
+    }
+  }, [prefs.autoScanOnStartup, warmUp, fetchLists]);
 
   // Back-fill the downloads write root on first run so the download
   // destination works without a trip to Downloads settings. Never overrides
