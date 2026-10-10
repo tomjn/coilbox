@@ -2,8 +2,8 @@ import { useSetting } from "@picoframe/frame";
 import { type ReactNode, useCallback, useEffect, useRef } from "react";
 import { useDownloadsConfig } from "../downloads/config";
 import { useTrustedHubUrl } from "../hub/config";
-import { fetchListsInBackground } from "./backgroundFetch";
 import { BundledEngineSetup } from "./BundledEngineSetup";
+import { fetchListsInBackground } from "./backgroundFetch";
 import { contentRescan } from "./bindings";
 import {
   primeMapMeta,
