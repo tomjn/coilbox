@@ -60,9 +60,11 @@ import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
 import { useReplaysRoot } from "../useReplaysRoot";
+import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
+import { SeatItem } from "./components/SeatEmphasis";
 import {
   DependencyBlocked,
   DetailLoading,
@@ -144,7 +146,7 @@ function SeatResult({ result }: { result: SeatOutcome }) {
 
 function PlayerRow({ p, result }: { p: ReplayPlayer; result: SeatOutcome }) {
   return (
-    <li className="flex items-center gap-2 py-1">
+    <SeatItem team={p.team} name={p.name}>
       <span
         className="inline-block size-3 shrink-0 rounded-sm border border-border/60"
         style={{ backgroundColor: swatch(p.rgbColor) ?? "transparent" }}
@@ -175,7 +177,7 @@ function PlayerRow({ p, result }: { p: ReplayPlayer; result: SeatOutcome }) {
       )}
       <Apm p={p} />
       <SeatResult result={result} />
-    </li>
+    </SeatItem>
   );
 }
 
@@ -189,7 +191,7 @@ function AiRow({ a, result }: { a: ReplayAi; result: SeatOutcome }) {
   const label = a.shortName || a.name || "AI";
   const full = [a.name, a.shortName, a.version].filter(Boolean).join(" · ");
   return (
-    <li className="flex items-center gap-2 py-1">
+    <SeatItem team={a.team} name={label}>
       <span
         className="inline-block size-3 shrink-0 rounded-sm border border-border/60"
         style={{ backgroundColor: swatch(a.rgbColor) ?? "transparent" }}
@@ -208,7 +210,7 @@ function AiRow({ a, result }: { a: ReplayAi; result: SeatOutcome }) {
         <span className="shrink-0 text-xs text-muted-foreground">{a.side}</span>
       )}
       <SeatResult result={result} />
-    </li>
+    </SeatItem>
   );
 }
 
@@ -1089,14 +1091,18 @@ export default function ReplayDetailPage() {
             </dl>
           </section>
 
-          <Players info={info} />
+          {/* One emphasised series for the roster and the chart (#1139). Keyed
+           * by replay so a selection can't follow you to the next one. */}
+          <SeriesEmphasisProvider key={filename}>
+            <Players info={info} />
 
-          {/* Directly under the roster (#1200). The roster is where a player is
-           * already reading per-seat numbers, and the chart answers the question
-           * the roster raises. */}
-          {replay && !isProfileHidden("analytics.matchStats") && (
-            <MatchStatsSection info={info} replayPath={replay.path} />
-          )}
+            {/* Directly under the roster (#1200). The roster is where a player
+             * is already reading per-seat numbers, and the chart answers the
+             * question the roster raises. */}
+            {replay && !isProfileHidden("analytics.matchStats") && (
+              <MatchStatsSection info={info} replayPath={replay.path} />
+            )}
+          </SeriesEmphasisProvider>
 
           <ReplayNotes filename={filename} />
 
