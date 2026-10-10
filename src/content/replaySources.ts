@@ -22,6 +22,8 @@ export const REPLAY_SOURCE_NOTES = {
   trailer: `From ${TRAILER}.`,
   /** The packets recorded during the match: what players asked for. */
   stream: "From the orders and messages recorded during the match.",
+  /** What the simulation did when coilbox played the match back (#1160). */
+  log: "From playing the match back with coilbox's own recorder, which is kept only when the playback reproduced the recorded match exactly. These are events, not orders.",
 } as const;
 
 export type ReplaySource = keyof typeof REPLAY_SOURCE_NOTES;

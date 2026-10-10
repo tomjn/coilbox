@@ -16,9 +16,27 @@ export const MAP_LAYERS = [
   "buildings",
   "density",
   "bases",
+  "deaths",
+  "finished",
 ] as const;
 
 export type MapLayer = (typeof MAP_LAYERS)[number];
+
+/** The layers drawn from an analysis's event log (#1160), which a replay with
+ *  no analysis cannot switch on. */
+export const EVENT_MAP_LAYERS: readonly MapLayer[] = ["deaths", "finished"];
+
+/**
+ * The toggle group's list with the event layers the reader chose on another
+ * replay put back in. A replay that cannot draw them shows them off and
+ * disabled, so a press on another toggle must not forget them.
+ */
+export function holdEventLayers(
+  next: readonly string[],
+  stored: MapLayerToggles,
+): string[] {
+  return [...next, ...EVENT_MAP_LAYERS.filter((layer) => stored[layer])];
+}
 
 export type MapLayerToggles = Record<MapLayer, boolean>;
 
@@ -34,6 +52,8 @@ export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   buildings: false,
   density: false,
   bases: false,
+  deaths: false,
+  finished: false,
 };
 
 /** Parse a stored value. Anything missing or not a boolean takes its default. */
