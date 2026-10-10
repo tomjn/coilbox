@@ -395,6 +395,35 @@ pub(super) mod tests {
         assert!(lines.next().unwrap().ends_with("spring-headless"));
     }
 
+    /// The coilbox that gets killed in
+    /// `a_coilbox_killed_outright_leaves_its_engine_for_the_next_sweep`. It is
+    /// a test only so that it can be started as a process of its own, and does
+    /// nothing otherwise.
+    #[test]
+    #[ignore = "started as a child process by the queue's killed coilbox test"]
+    fn the_coilbox_that_gets_killed() {
+        let Some(root) = std::env::var_os("COILBOX_KILLED_RUN_ROOT") else {
+            return;
+        };
+        let scratch = PathBuf::from(root).join(format!("run-{}-0", std::process::id()));
+        std::fs::create_dir_all(&scratch).unwrap();
+        let engine = fake_engine(&scratch, "while :; do sleep 1; done");
+        let _ = run_headless(
+            &Launch {
+                engine: &engine,
+                demo: &scratch.join("replay.sdfz"),
+                write_dir: &scratch.join("write"),
+                config: &scratch.join("engine.cfg"),
+                pid_file: &scratch.join(PID_FILE),
+                data_dirs: &[],
+                log: &scratch.join("engine.log"),
+                timeout: LONG,
+                on_poll: &|| {},
+            },
+            &RunControl::default(),
+        );
+    }
+
     #[test]
     fn the_engine_is_given_the_scratch_folder_then_the_content_folders() {
         let run = run("echo \"$SPRING_DATADIR\"", LONG, false);

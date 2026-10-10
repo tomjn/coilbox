@@ -1599,6 +1599,68 @@ mod tests {
         engine.wait().unwrap();
     }
 
+    /// The case #3863 is about, with the real run code: a process runs an
+    /// engine and is killed with SIGKILL, so nothing of its own runs. Where the
+    /// kernel can kill the engine with it (Linux) the engine goes. Elsewhere
+    /// it carries on, and the next sweep kills it.
+    #[cfg(unix)]
+    #[test]
+    fn a_coilbox_killed_outright_leaves_its_engine_for_the_next_sweep() {
+        let root = tempfile::tempdir().unwrap();
+        let mut coilbox = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "demo::analysis::launch::tests::the_coilbox_that_gets_killed",
+                "--ignored",
+            ])
+            .env("COILBOX_KILLED_RUN_ROOT", root.path())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let scratch = root.path().join(format!("run-{}-0", coilbox.id()));
+        let pid_file = scratch.join(super::super::launch::PID_FILE);
+        let until = |what: &str, done: &dyn Fn() -> bool| {
+            let began = Instant::now();
+            while !done() {
+                assert!(began.elapsed() < PATIENCE, "{what}");
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        };
+        until("the run never recorded its engine", &|| {
+            std::fs::read_to_string(&pid_file).is_ok_and(|r| r.ends_with('\n'))
+        });
+        let engine: u32 = std::fs::read_to_string(&pid_file)
+            .unwrap()
+            .lines()
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(coilbox_proc::is_running(engine));
+
+        coilbox.kill().unwrap();
+        coilbox.wait().unwrap();
+
+        if cfg!(target_os = "linux") {
+            until("the kernel did not kill the engine", &|| {
+                !coilbox_proc::is_running(engine)
+            });
+        } else {
+            // Give a signal that is not coming time to arrive.
+            std::thread::sleep(Duration::from_millis(500));
+            assert!(
+                coilbox_proc::is_running(engine),
+                "the engine should outlive its killed coilbox here"
+            );
+            assert_eq!(sweep_scratch(root.path()), 1);
+            until("the sweep did not end the engine", &|| {
+                !coilbox_proc::is_running(engine)
+            });
+            assert!(!scratch.exists());
+        }
+    }
+
     /// Changes are announced from the worker and from whoever asked, at once.
     /// The last snapshot a listener holds has to be the newest, or a page is
     /// left showing a job that has finished.
