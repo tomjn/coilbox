@@ -1121,6 +1121,15 @@ async fn content_import_container(src: String) -> CliResult {
 /// `contentbranding` root and calls this from outside the crate.
 pub use branding::branding_image_dir;
 
+/// The walk over a replay's demo stream and the events it returns (issue
+/// #1144). Exported because nothing inside the crate calls it yet: the build
+/// order, start position, chat and APM issues are its first callers.
+pub use demo::stream::read_stream;
+pub use model::{
+    ChatDest, CommandOrigin, DemoStream, Order, StreamEvent, StreamEventKind, StreamStop,
+    PREGAME_FRAME,
+};
+
 /// Build the plugin. Registered as `"coilbox-content"`; the frontend invokes
 /// `plugin:coilbox-content|<cmd>`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
