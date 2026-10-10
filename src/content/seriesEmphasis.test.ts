@@ -4,8 +4,10 @@ import { storedHighlightMe } from "./highlightMe";
 import { playerTeam, seriesTeams } from "./matchStats";
 import {
   activeTeams,
+  checkState,
   createEmphasisStore,
   isEmphasised,
+  isShown,
   sameTeams,
 } from "./seriesEmphasis";
 
@@ -65,6 +67,76 @@ describe("emphasis store", () => {
     expect(sameTeams([1, 2], [1])).toBe(false);
     expect(sameTeams(null, null)).toBe(true);
     expect(sameTeams(null, [])).toBe(false);
+  });
+});
+
+describe("the checked set", () => {
+  const plotted = () => {
+    const s = createEmphasisStore();
+    s.setPlot({ charted: [0, 1, 2, 3], resting: null });
+    return s;
+  };
+
+  it("starts with every charted team checked", () => {
+    const s = plotted();
+    expect(s.getState().hidden).toEqual([]);
+    expect(isShown(s.getState(), 2)).toBe(true);
+    expect(checkState(s.getState(), [0, 1])).toBe(true);
+  });
+
+  it("unchecks one team and leaves the others", () => {
+    const s = plotted();
+    s.setShown([1], false);
+    expect(isShown(s.getState(), 1)).toBe(false);
+    expect(isShown(s.getState(), 0)).toBe(true);
+    s.setShown([1], true);
+    expect(s.getState().hidden).toEqual([]);
+  });
+
+  it("reads a side as checked, unchecked or indeterminate", () => {
+    const s = plotted();
+    const side = [0, 1];
+    expect(checkState(s.getState(), side)).toBe(true);
+    s.setShown([0], false);
+    expect(checkState(s.getState(), side)).toBe("indeterminate");
+    s.setShown([1], false);
+    expect(checkState(s.getState(), side)).toBe(false);
+    s.setShown(side, true);
+    expect(checkState(s.getState(), side)).toBe(true);
+  });
+
+  it("does not count a team the chart does not draw", () => {
+    const s = plotted();
+    // Team 9 has no line, so a side of [3, 9] is checked or not by team 3 alone.
+    expect(checkState(s.getState(), [3, 9])).toBe(true);
+    s.setShown([3], false);
+    expect(checkState(s.getState(), [3, 9])).toBe(false);
+  });
+
+  it("keeps the hidden set sorted and free of repeats, and is quiet when nothing changes", () => {
+    const s = plotted();
+    const listener = vi.fn();
+    s.subscribe(listener);
+    s.setShown([2, 0], false);
+    s.setShown([0], false);
+    expect(s.getState().hidden).toEqual([0, 2]);
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores emphasis on a team with no line, so nothing fades for no reason", () => {
+    const s = plotted();
+    s.toggleSelected([1]);
+    s.setShown([1], false);
+    expect(activeTeams(s.getState())).toBeNull();
+    s.setShown([1], true);
+    expect(activeTeams(s.getState())).toEqual([1]);
+  });
+
+  it("drops a hover on the team just unchecked, which would never see its leave", () => {
+    const s = plotted();
+    s.hover([1]);
+    s.setShown([1], false);
+    expect(s.getState().hovered).toBeNull();
   });
 });
 

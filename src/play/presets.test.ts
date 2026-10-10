@@ -371,6 +371,10 @@ describe("draftKey", () => {
     modOptionValues: { maxunits: "500" },
   });
 
+  it("is never empty, because battle records are filed under it", () => {
+    expect(draftKey(setup)).not.toBe("");
+  });
+
   it("changes when an option is edited", () => {
     const edited = { ...setup, modOptionValues: { maxunits: "1000" } };
     expect(draftKey(edited)).not.toBe(draftKey(setup));

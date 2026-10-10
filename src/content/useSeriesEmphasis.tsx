@@ -9,9 +9,11 @@ import {
 } from "react";
 import {
   activeTeams,
+  checkState,
   createEmphasisStore,
   type EmphasisStore,
   isEmphasised,
+  isShown,
   type TeamSet,
 } from "./seriesEmphasis";
 
@@ -54,6 +56,12 @@ export function useSeriesEmphasis() {
     /** Whether this team has a line on the chart, so can be pointed at. */
     isCharted: (team: number | undefined) =>
       team !== undefined && state.charted.includes(team),
+    /** Whether this team's line is drawn: charted, and not unchecked in the roster. */
+    isShown: (team: number | undefined) =>
+      team !== undefined && isShown(state, team),
+    /** How a checkbox for these teams reads, including a side's indeterminate state. */
+    checkState: (teams: TeamSet) => checkState(state, teams),
+    setShown: store.setShown,
     hover: store.hover,
     toggleSelected: store.toggleSelected,
     /**
