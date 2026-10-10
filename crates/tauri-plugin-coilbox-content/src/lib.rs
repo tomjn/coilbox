@@ -1158,6 +1158,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::content_demo_build_orders,
             demo::content_demo_order_points,
             demo::content_replay_map_grids,
+            demo::unit_orders::content_replay_unit_orders,
             demo::content_demo_command_rates,
             demo::content_rewrite_demo,
             demo::analysis::queue::content_analysis_check,
