@@ -151,7 +151,7 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
   }, [versions, versionFilter]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="@container flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-border px-6 py-4">
         {cfg.rapidRepos.length === 0 ? (
           <p className="text-sm text-muted-foreground">
@@ -192,9 +192,9 @@ export function RapidBrowser({ writePath }: { writePath?: string }) {
 
       <SidecarWarning />
 
-      <div className="grid min-h-0 flex-1 grid-cols-[18rem_1fr]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-2 @[38rem]:grid-cols-[18rem_1fr] @[38rem]:grid-rows-1">
         {/* Left: repositories */}
-        <aside className="flex min-h-0 flex-col border-r border-border bg-card/30">
+        <aside className="flex min-h-0 flex-col border-b border-border bg-card/30 @[38rem]:border-r @[38rem]:border-b-0">
           <div className="flex items-center justify-between px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             <span>Repositories</span>
             {repos && (
