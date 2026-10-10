@@ -426,6 +426,7 @@ mod tests {
             source_gametype: None,
             origin_filename: None,
             mod_options: std::collections::HashMap::new(),
+            map_options: std::collections::HashMap::new(),
         }
     }
 

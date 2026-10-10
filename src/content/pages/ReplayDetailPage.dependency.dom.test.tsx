@@ -31,6 +31,7 @@ vi.mock("../config", () => ({
       players: [],
       ais: [],
       modOptions: {},
+      mapOptions: {},
     },
     loading: false,
     error: null,

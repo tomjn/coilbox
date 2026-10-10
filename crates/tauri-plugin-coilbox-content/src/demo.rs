@@ -1577,6 +1577,10 @@ fn build_demo_info(
         .child("modoptions")
         .map(|s| s.keys.clone())
         .unwrap_or_default();
+    let map_options = game
+        .child("mapoptions")
+        .map(|s| s.keys.clone())
+        .unwrap_or_default();
 
     DemoInfo {
         engine_version: raw.engine_version,
@@ -1597,6 +1601,7 @@ fn build_demo_info(
         source_gametype: marker.source,
         origin_filename: marker.origin,
         mod_options,
+        map_options,
     }
 }
 
@@ -3817,6 +3822,36 @@ mod tests {
             Some("")
         );
         assert_eq!(info.mod_options.len(), 2);
+        assert!(info.map_options.is_empty());
+    }
+
+    #[test]
+    fn build_demo_info_reads_mapoptions() {
+        let script = "[game]\n{\nmapname=BlockFort v1;\n\
+            [modoptions]\n{\nzombies=disabled;\n}\n\
+            [mapoptions]\n{\nfog=1;\nextractorradius=150;\n}\n}\n";
+        let game = find_game(&parse_tdf(script));
+        let info = build_demo_info(
+            RawDemo {
+                engine_version: String::new(),
+                game_id: String::new(),
+                unix_time: 0,
+                game_time: 0,
+                wallclock: 0,
+                game_over: true,
+                script: script.to_string(),
+            },
+            &game,
+            None,
+            None,
+        );
+        assert_eq!(
+            info.map_options.get("extractorradius").map(String::as_str),
+            Some("150")
+        );
+        assert_eq!(info.map_options.get("fog").map(String::as_str), Some("1"));
+        assert_eq!(info.map_options.len(), 2);
+        assert_eq!(info.mod_options.len(), 1);
     }
 
     #[test]

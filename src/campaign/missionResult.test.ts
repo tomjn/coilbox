@@ -58,6 +58,7 @@ function missionDemo(opts: {
     ],
     ais: [],
     modOptions: { coilbox_mission: "siege" },
+    mapOptions: {},
   };
 }
 

@@ -316,6 +316,10 @@ pub struct DemoInfo {
     /// to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
     /// when the script carried no `[modoptions]` section.
     pub mod_options: std::collections::HashMap<String, String>,
+    /// The `[mapoptions]` section verbatim, as `mod_options` is. A refight that
+    /// leaves these out runs on the map's current defaults, not the values the
+    /// match was played with (#1886).
+    pub map_options: std::collections::HashMap<String, String>,
     /// True when this file carries coilbox's remix marker (a rewritten copy, not an
     /// engine-recorded demo).
     pub remixed: bool,

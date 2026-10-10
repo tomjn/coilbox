@@ -529,6 +529,9 @@ export interface DemoInfo {
    * to reproduce the battle's options (e.g. refight-as-skirmish, #368). Empty
    * when the script carried no `[modoptions]` section. */
   modOptions: Record<string, string>;
+  /** The `[mapoptions]` section verbatim, as `modOptions` is. Empty when the
+   * script carried none. */
+  mapOptions: Record<string, string>;
 }
 
 /**
