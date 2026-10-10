@@ -29,6 +29,8 @@ const counts = (over: Partial<ReplayEventCounts> = {}): ReplayEventCounts => ({
   unitCreated: 3,
   unitFinished: 0,
   unitDestroyed: 2,
+  unitGiven: 0,
+  startUnitPosition: 0,
   gameOver: 1,
   unknown: 0,
   ...over,

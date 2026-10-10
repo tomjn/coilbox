@@ -84,6 +84,8 @@ function stored(over: Partial<StoredReplayAnalysis>): StoredReplayAnalysis {
       unitCreated: 57,
       unitFinished: 54,
       unitDestroyed: 22,
+      unitGiven: 0,
+      startUnitPosition: 0,
       gameOver: 1,
       unknown: 0,
     },

@@ -1102,11 +1102,17 @@ export interface ReplayLogHeader {
   mapSizeX: number;
   mapSizeZ: number;
   gaiaTeam: number;
+  /**
+   * How many frames lie between two `start_unit_position` lines for one unit.
+   * 0 from a logger that wrote none.
+   */
+  positionFrames: number;
 }
 
 /**
- * A unit being created, finished or destroyed. `def` is a unit definition id as
- * that run's engine numbered them. `x`, `y` and `z` are world coordinates.
+ * A unit being created, finished, destroyed or handed to another team. `def` is
+ * a unit definition id as that run's engine numbered them. `x`, `y` and `z` are
+ * world coordinates.
  */
 export interface ReplayUnitEvent {
   frame: number;
@@ -1116,6 +1122,17 @@ export interface ReplayUnitEvent {
   x: number;
   y: number;
   z: number;
+  /**
+   * Present and true on a unit its team started with: one created for a team
+   * other than Gaia, by no builder, on the frame that team's first unit was
+   * created. The engine has no idea of a commander, so this is not one, and the
+   * interface says "starting unit". Absent on every other unit.
+   */
+  startUnit?: boolean;
+  /** On `unit_given`, the team the unit left. `team` is the one it went to. */
+  from?: number;
+  /** On `unit_given`, present and true for a capture and absent for a gift. */
+  captured?: boolean;
   /** On `unit_created`, the unit that built it. Absent when nothing did. */
   builder?: number;
   /**
@@ -1126,6 +1143,21 @@ export interface ReplayUnitEvent {
   attackerDef?: number;
   attackerTeam?: number;
   weapon?: number;
+}
+
+/**
+ * Where a living starting unit was. Written every
+ * `ReplayLogHeader.positionFrames` frames and left out when the unit has not
+ * moved since the last one, so a gap means it stood still. Its `unit_created`
+ * line is its first position and its `unit_destroyed` line its last.
+ */
+export interface ReplayStartUnitPosition {
+  frame: number;
+  unit: number;
+  /** The team the unit belonged to on that frame. */
+  team: number;
+  x: number;
+  z: number;
 }
 
 /**
@@ -1148,6 +1180,8 @@ export type ReplayLogLine =
   | ({ kind: "unit_created" } & ReplayUnitEvent)
   | ({ kind: "unit_finished" } & ReplayUnitEvent)
   | ({ kind: "unit_destroyed" } & ReplayUnitEvent)
+  | ({ kind: "unit_given" } & ReplayUnitEvent)
+  | ({ kind: "start_unit_position" } & ReplayStartUnitPosition)
   | {
       kind: "game_over";
       frame: number;
@@ -1163,6 +1197,8 @@ export interface ReplayEventCounts {
   unitCreated: number;
   unitFinished: number;
   unitDestroyed: number;
+  unitGiven: number;
+  startUnitPosition: number;
   gameOver: number;
   /** Lines of a kind this build does not know. */
   unknown: number;
@@ -1172,8 +1208,9 @@ export interface ReplayEventCounts {
 export interface ReplayDisagreement {
   /**
    * `winners`, `gameSeconds`, `teams`, `samples`, `desyncWarnings`,
-   * `unitCreatedLines`, `unitDestroyedLines`, or a `TeamStatSample` key such as
-   * `metalProduced`.
+   * `unitCreatedLines`, `unitDestroyedLines`, `unitsReceivedLines`,
+   * `unitsSentLines`, `unitsCapturedLines`, `unitsOutCapturedLines`, or a
+   * `TeamStatSample` key such as `metalProduced`.
    */
   figure: string;
   /** The team the figure belongs to, when it is a team's. */

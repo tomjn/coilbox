@@ -713,22 +713,33 @@ pub(super) mod tests {
                 p.counts.unit_finished,
                 p.counts.unit_destroyed
             ),
-            (6, 5, 4)
+            (7, 6, 4)
         );
+        assert_eq!((p.counts.unit_given, p.counts.start_unit_position), (2, 2));
         assert!(p.disagreements.is_empty());
 
         let page = read_events(dir.path(), ID, None, 0, None).unwrap();
-        assert_eq!(page.total, 18);
-        assert_eq!(page.events.len(), 18);
+        assert_eq!(page.total, 24);
+        assert_eq!(page.events.len(), 24);
         assert_eq!(page.events[0]["kind"], "header");
-        assert_eq!(page.events[17]["kind"], "game_over");
-        // What comes back is what the logger wrote.
+        assert_eq!(page.events[23]["kind"], "game_over");
+        // What comes back is what the logger wrote, the kinds and fields a
+        // later logger added included.
         let original: Vec<serde_json::Value> = FIXTURE
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
         assert_eq!(page.events[3]["x"], original[3]["x"]);
         assert_eq!(page.events[3]["def"], original[3]["def"]);
+        for (stored, written) in page.events.iter().zip(&original) {
+            if matches!(
+                written["kind"].as_str(),
+                Some("unit_given" | "start_unit_position")
+            ) || written.get("startUnit").is_some()
+            {
+                assert_eq!(stored, written);
+            }
+        }
     }
 
     #[test]
@@ -765,7 +776,7 @@ pub(super) mod tests {
         assert!(all.events.iter().all(|e| e["kind"] == "unit_destroyed"));
 
         let both = read_events(dir.path(), ID, Some(&units), 0, None).unwrap();
-        assert_eq!(both.total, 10);
+        assert_eq!(both.total, 11);
 
         let window = read_events(dir.path(), ID, Some(&destroyed), 1, Some(2)).unwrap();
         assert_eq!((window.total, window.events.len()), (4, 2));
@@ -773,7 +784,7 @@ pub(super) mod tests {
         assert_eq!(window.events[1], all.events[2]);
 
         let past = read_events(dir.path(), ID, None, 100, Some(5)).unwrap();
-        assert_eq!((past.total, past.events.len()), (18, 0));
+        assert_eq!((past.total, past.events.len()), (24, 0));
     }
 
     /// What tells a reader to offer a new run: a file from a logger older than
@@ -796,7 +807,7 @@ pub(super) mod tests {
         assert!(!is_current(dir.path(), ID));
         assert_eq!(
             read_events(dir.path(), ID, None, 0, None).unwrap().total,
-            18
+            24
         );
 
         let other_format = Provenance {
@@ -834,7 +845,7 @@ pub(super) mod tests {
         assert_eq!(listed[0].provenance.game_id, ID);
         assert_eq!(
             read_events(dir.path(), ID, None, 0, None).unwrap().total,
-            18
+            24
         );
     }
 
