@@ -54,6 +54,7 @@ import { SeriesEmphasisProvider } from "../useSeriesEmphasis";
 import { MatchStatsSection } from "./components/MatchStatsSection";
 import { RefightPanel } from "./components/RefightPanel";
 import { RemixPanel } from "./components/RemixPanel";
+import { ReplayAnalysisEvents } from "./components/ReplayAnalysisEvents";
 import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
@@ -843,6 +844,11 @@ export default function ReplayDetailPage() {
               missingMap={missingMap}
               dependencyBlock={dependencyBlock}
             />
+          )}
+
+          {/* Match statistics in spirit, so it takes the build orders' gate (#1179). */}
+          {replay && !isProfileHidden("analytics.matchStats") && (
+            <ReplayAnalysisEvents info={info} replayPath={replay.path} />
           )}
 
           {/* Read from the replay file, so it needs no engine. */}

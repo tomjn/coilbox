@@ -18,17 +18,27 @@ import {
   waitFor,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChatLine, DemoInfo } from "../bindings";
+import type { ChatLine, DemoInfo, StoredReplayAnalysis } from "../bindings";
 
 const bindings = vi.hoisted(() => ({
   contentDemoInfo: vi.fn(),
   contentDemoChat: vi.fn(),
   contentReplayTrailer: vi.fn(),
+  contentReplayAnalysisEvents: vi.fn(),
 }));
 
 vi.mock("../bindings", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../bindings")>()),
   ...bindings,
+}));
+
+// The viewer names units through unitsync, which this file has no bridge for.
+vi.mock("../config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../config")>()),
+  useScanTargetSelection: () => ({ selected: null }),
+  useUnitsyncScan: () => ({ data: null, loading: false }),
+  useUnitsyncUnitDataset: () => ({ dataset: null, status: "idle" }),
+  useUnitsyncUnitBuildpics: () => null,
 }));
 
 vi.mock("../useMetricRegistry", () => ({
@@ -49,6 +59,11 @@ vi.mock("./components/MatchStatsChart", () => ({
 const { useDemoInfo } = await import("../config");
 const { ReplayChat } = await import("./components/ReplayChat");
 const { MatchStatsSection } = await import("./components/MatchStatsSection");
+const { ReplayAnalysisEvents } = await import(
+  "./components/ReplayAnalysisEvents"
+);
+const { resetReplayAnalysisForTests, seedReplayAnalysisForTests } =
+  await import("../replayAnalysis");
 
 /** A promise the test settles by hand. */
 function deferred<T>() {
@@ -228,5 +243,59 @@ describe("MatchStatsSection", () => {
     await act(async () => first.resolve(trailer("A")));
     expect(screen.getByText("chart B")).toBeTruthy();
     expect(screen.queryByText("chart A")).toBeNull();
+  });
+});
+
+describe("ReplayAnalysisEvents", () => {
+  const stored = (gameId: string) =>
+    ({
+      state: "current",
+      kind: "analysis",
+      gameId,
+      analysedAtMs: 1,
+      counts: { gameStart: 1 },
+    }) as unknown as StoredReplayAnalysis;
+  const eventsOf = (frame: number) => ({
+    events: [{ kind: "game_start", frame }],
+    total: 1,
+  });
+  const infoFor = (gameId: string) =>
+    ({ gameId, players: [], ais: [] }) as unknown as DemoInfo;
+
+  beforeEach(() => {
+    seedReplayAnalysisForTests({ analyses: [stored("one"), stored("two")] });
+  });
+  afterEach(resetReplayAnalysisForTests);
+
+  it("drops the first replay's events when the path changes", async () => {
+    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(eventsOf(3000));
+    const { rerender } = render(
+      <ReplayAnalysisEvents replayPath={a} info={infoFor("one")} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recorded events/i }));
+    expect(await screen.findByText("1:40")).toBeTruthy();
+
+    bindings.contentReplayAnalysisEvents.mockReturnValueOnce(
+      deferred().promise,
+    );
+    rerender(<ReplayAnalysisEvents replayPath={b} info={infoFor("two")} />);
+    expect(screen.queryByText("1:40")).toBeNull();
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("does not let a slow answer for the first replay land on the second", async () => {
+    const first = deferred<ReturnType<typeof eventsOf>>();
+    bindings.contentReplayAnalysisEvents.mockReturnValueOnce(first.promise);
+    bindings.contentReplayAnalysisEvents.mockResolvedValueOnce(eventsOf(900));
+    const { rerender } = render(
+      <ReplayAnalysisEvents replayPath={a} info={infoFor("one")} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /recorded events/i }));
+    rerender(<ReplayAnalysisEvents replayPath={b} info={infoFor("two")} />);
+    expect(await screen.findByText("0:30")).toBeTruthy();
+
+    await act(async () => first.resolve(eventsOf(3000)));
+    expect(screen.queryByText("1:40")).toBeNull();
+    expect(screen.getByText("0:30")).toBeTruthy();
   });
 });
