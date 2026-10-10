@@ -448,6 +448,9 @@ export default function MapDetailPage() {
 
       {insightShown && (
         <MapAggregate
+          // Keyed, so the filters and the layer of one map do not carry to
+          // the next when the route changes under the same page.
+          key={map.name}
           mapName={map.name}
           world={world}
           minimapUrl={minimap.url ?? undefined}

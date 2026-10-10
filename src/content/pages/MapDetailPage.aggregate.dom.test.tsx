@@ -4,11 +4,13 @@
  * distribution profile hides the map insight or the stats it is built from.
  * What the picture holds is `MapAggregate.dom.test.tsx`. This file is the gate.
  */
-import { cleanup, render, screen } from "@testing-library/react";
-import { HashRouter, Route, Routes } from "react-router";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { useEffect } from "react";
+import { Link, MemoryRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let HIDE: string[] = [];
+let mounts = 0;
 const MAP = "Some Map 1.0";
 const archive = {
   name: MAP,
@@ -35,7 +37,13 @@ vi.mock("../config", () => ({
   useUnitsyncScan: () => ({
     data: {
       games: [],
-      maps: [{ name: MAP, archives: [archive], info: {}, width: 8, height: 4 }],
+      maps: [MAP, "Other Map"].map((name) => ({
+        name,
+        archives: [archive],
+        info: {},
+        width: 8,
+        height: 4,
+      })),
       errors: [],
     },
     loading: false,
@@ -74,11 +82,16 @@ vi.mock("./components/MapAggregate", () => ({
   MapAggregate: (props: {
     mapName: string;
     world: { worldWidth: number; worldHeight: number };
-  }) => (
-    <div data-testid="map-aggregate">
-      {props.mapName} {props.world.worldWidth}x{props.world.worldHeight}
-    </div>
-  ),
+  }) => {
+    useEffect(() => {
+      mounts++;
+    }, []);
+    return (
+      <div data-testid="map-aggregate">
+        {props.mapName} {props.world.worldWidth}x{props.world.worldHeight}
+      </div>
+    );
+  },
 }));
 
 const { default: MapDetailPage } = await import("./MapDetailPage");
@@ -86,17 +99,17 @@ const { default: MapDetailPage } = await import("./MapDetailPage");
 afterEach(() => {
   cleanup();
   HIDE = [];
-  window.location.hash = "";
+  mounts = 0;
 });
 
 function renderPage() {
-  window.location.hash = `#/library/maps/${encodeURIComponent(MAP)}`;
   return render(
-    <HashRouter>
+    <MemoryRouter initialEntries={[`/library/maps/${encodeURIComponent(MAP)}`]}>
+      <Link to="/library/maps/Other%20Map">Another map</Link>
       <Routes>
         <Route path="/library/maps/:name" element={<MapDetailPage />} />
       </Routes>
-    </HashRouter>,
+    </MemoryRouter>,
   );
 }
 
@@ -107,6 +120,16 @@ describe("the picture of every match on a map's page", () => {
     expect(screen.getByTestId("map-aggregate").textContent).toBe(
       "Some Map 1.0 128x64",
     );
+  });
+
+  it("starts again for another map, so one map's filters are not the next one's", () => {
+    renderPage();
+    expect(mounts).toBe(1);
+    fireEvent.click(screen.getByText("Another map"));
+    expect(screen.getByTestId("map-aggregate").textContent).toMatch(
+      /^Other Map/,
+    );
+    expect(mounts).toBe(2);
   });
 
   it("is hidden by the map insight key", () => {
