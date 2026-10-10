@@ -349,8 +349,12 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
 
   // The lanes with a finished download no list on screen has rescanned for.
   const rescanOwed = useRef(new Set<QueueLane>());
-  // A download added to the library. The scans are forgotten now, so anything
-  // that reads one next scans again. The lists on screen rescan once the lane
+  // A download changed what a scan would say. Every kind does: a game, a map
+  // and a file add an archive, a rapid tag adds a game, and an engine install
+  // replaces the unitsync and base content its target is scanned with, so a
+  // scan of it that failed may now succeed. For an engine this runs before the
+  // install warms the new target, so the warm-up is not a scan to run twice.
+  // The scans are forgotten now, so anything that reads one next scans again. The lists on screen rescan once the lane
   // has nothing left to add (see `run`), so a run of maps costs one scan and
   // not one each.
   const libraryChanged = useCallback((item: QueueItem) => {
@@ -361,9 +365,15 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
   // is queued or running. `leaving` is the item on its way out of the lane.
   const rescanIfLaneDone = useCallback((leaving: QueueItem) => {
     const lane = laneOf(leaving);
-    const more = itemsRef.current.some(
-      (i) => i.id !== leaving.id && isPending(i) && laneOf(i) === lane,
-    );
+    // The lane's own record of what is running, since an item that has just
+    // finished still reads as active until the next render.
+    const running = busyLanesRef.current.get(lane);
+    const more =
+      (running !== undefined && running !== leaving.id) ||
+      itemsRef.current.some(
+        (i) =>
+          i.id !== leaving.id && i.status === "queued" && laneOf(i) === lane,
+      );
     if (!more && rescanOwed.current.delete(lane)) rescanMounted();
   }, []);
 
@@ -379,8 +389,10 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
             opId: item.id,
             onProgress: progressChannel(onProgress),
           });
-          // The freshly-written `.sdp` is now on disk; warm it into the page
-          // cache so the first launch/join after this download is quicker.
+          // A rapid tag installs a game, so a scan now lists it.
+          libraryChanged(item);
+          // The new `.sdp` is on disk now. Warm it into the page cache so the
+          // first launch or join after this download is quicker.
           warmAllRoots().catch(() => {});
           return;
         case "game":
@@ -421,31 +433,34 @@ export function DownloadQueueProvider({ children }: { children: ReactNode }) {
           libraryChanged(item);
           return;
         case "engineRecoil":
-          await installEngine(() =>
-            dlDownloadEngineRecoil({
+          await installEngine(async () => {
+            await dlDownloadEngineRecoil({
               ...item.args,
               opId: item.id,
               onProgress: progressChannel(onProgress),
-            }),
-          );
+            });
+            libraryChanged(item);
+          });
           return;
         case "engineSpring":
-          await installEngine(() =>
-            dlDownloadEngineSpring({
+          await installEngine(async () => {
+            await dlDownloadEngineSpring({
               ...item.args,
               opId: item.id,
               onProgress: progressChannel(onProgress),
-            }),
-          );
+            });
+            libraryChanged(item);
+          });
           return;
         case "engineBundled":
-          await installEngine(() =>
-            contentBundleInstallEngine({
+          await installEngine(async () => {
+            await contentBundleInstallEngine({
               ...item.args,
               opId: item.id,
               onProgress: progressChannel(onProgress),
-            }),
-          );
+            });
+            libraryChanged(item);
+          });
           return;
       }
     },
