@@ -1,5 +1,11 @@
 import { Button } from "@picoframe/frame";
-import { AlertCircle, CheckCircle2, Download, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  Loader2,
+  RefreshCw,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { OptionSelect } from "@/components/OptionSelect";
@@ -58,11 +64,21 @@ export function EngineInstaller() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (src: Source) => {
+  const load = useCallback(async (src: Source, refresh = false) => {
     setLoading(true);
     setError(null);
-    setItems(null);
+    // A refresh keeps the list on screen, so one that fails leaves it there.
+    if (!refresh) setItems(null);
     try {
+      let failure: unknown;
+      if (refresh) {
+        // Both lists, so the other source is current when it is picked next.
+        const results = await Promise.allSettled([
+          loadRecoilEngines(true),
+          loadSpringfilesEngines(true),
+        ]);
+        failure = results.find((r) => r.status === "rejected")?.reason;
+      }
       if (src === "recoil") {
         const res = await loadRecoilEngines();
         setPlatform(res.platform);
@@ -88,6 +104,7 @@ export function EngineInstaller() {
           })),
         );
       }
+      if (failure !== undefined) setError(errMessage(failure));
     } catch (e) {
       setError(errMessage(e));
     } finally {
@@ -136,15 +153,30 @@ export function EngineInstaller() {
         </Link>
         ).
       </p>
-      <OptionSelect
-        value={source}
-        onValueChange={(v) => setSource(v as Source)}
-        className="w-56"
-        options={[
-          { value: "recoil", label: "Recoil (GitHub releases)" },
-          { value: "springfiles", label: "springfiles" },
-        ]}
-      />
+      <div className="flex items-center gap-2">
+        <OptionSelect
+          value={source}
+          onValueChange={(v) => setSource(v as Source)}
+          className="w-56"
+          options={[
+            { value: "recoil", label: "Recoil (GitHub releases)" },
+            { value: "springfiles", label: "springfiles" },
+          ]}
+        />
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => load(source, true)}
+          disabled={loading}
+        >
+          {loading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RefreshCw className="size-4" />
+          )}
+          Refresh
+        </Button>
+      </div>
       {noWriteRoot && (
         <p className="text-xs text-muted-foreground">
           No download destination set — choose a content folder in{" "}

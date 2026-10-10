@@ -14,11 +14,20 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dlRecoilEngines } from "../downloads/bindings";
 import {
   DownloadQueueProvider,
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
-import { exactGameRequirement } from "./resolveContent";
+import {
+  invalidateEngineLists,
+  loadRecoilEngines,
+  loadSpringfilesEngines,
+} from "../downloads/engineLists";
+import {
+  engineVersionRequirement,
+  exactGameRequirement,
+} from "./resolveContent";
 import { useResolveContent } from "./useResolveContent";
 
 const downloadGameAnySource = vi.hoisted(() => vi.fn());
@@ -132,5 +141,32 @@ describe("useResolveContent's errorFor", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useResolveContent's engine lookup", () => {
+  const engine = engineVersionRequirement("2026.1");
+
+  it("refetches once for a missing version and not on re-render", async () => {
+    invalidateEngineLists();
+    vi.mocked(dlRecoilEngines).mockResolvedValue({
+      releases: [],
+      platform: "linux",
+    } as never);
+    // Held before the hook asks, as when the app has been open a while.
+    await loadRecoilEngines();
+    await loadSpringfilesEngines();
+    vi.mocked(dlRecoilEngines).mockClear();
+    const { result, rerender } = renderHook(
+      () => useResolveContent([engine], undefined, false),
+      { wrapper },
+    );
+    // One refetch for the miss.
+    await waitFor(() => expect(dlRecoilEngines).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(result.current.canDownload(engine)).toBe(false));
+    rerender();
+    rerender();
+    await act(async () => {});
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(1);
   });
 });

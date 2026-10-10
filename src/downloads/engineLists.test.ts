@@ -9,7 +9,9 @@ vi.mock("./bindings", () => ({ dlRecoilEngines, dlSpringfilesEngines }));
 const {
   heldRecoilEngines,
   heldSpringfilesEngines,
+  engineTick,
   invalidateEngineLists,
+  loadEngineCatalog,
   loadRecoilEngines,
   loadSpringfilesEngines,
 } = await import("./engineLists");
@@ -81,5 +83,47 @@ describe("the engine list cache", () => {
     finish(recoil);
     await read;
     expect(heldRecoilEngines()).toBeUndefined();
+  });
+});
+
+describe("loadEngineCatalog", () => {
+  const rel = (version: string) => ({ version }) as never;
+  const oldList = { releases: [rel("1")], platform: "linux" };
+  const newList = { releases: [rel("2"), rel("1")], platform: "linux" };
+
+  it("refetches once on a miss and finds the version in the fresh list", async () => {
+    dlRecoilEngines.mockResolvedValueOnce(oldList).mockResolvedValue(newList);
+    await loadRecoilEngines();
+    const askedAt = engineTick();
+    const catalog = await loadEngineCatalog(["2"], askedAt);
+    expect(catalog.recoil.map((r) => r.version)).toEqual(["2", "1"]);
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(2);
+    expect(dlSpringfilesEngines).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refetch again for a version the fresh list lacks", async () => {
+    const askedAt = engineTick();
+    await loadEngineCatalog(["9"], askedAt);
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(1);
+    await loadEngineCatalog(["9"], askedAt);
+    await loadEngineCatalog(["9"], askedAt);
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(1);
+    expect(dlSpringfilesEngines).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fetch when the held list has the version", async () => {
+    dlRecoilEngines.mockResolvedValue(oldList);
+    await loadRecoilEngines();
+    await loadEngineCatalog(["1"], engineTick());
+    expect(dlRecoilEngines).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the held list when the refetch fails", async () => {
+    dlRecoilEngines.mockResolvedValueOnce(oldList);
+    await loadRecoilEngines();
+    dlRecoilEngines.mockRejectedValueOnce(new Error("offline"));
+    const catalog = await loadEngineCatalog(["2"], engineTick());
+    expect(catalog.recoil.map((r) => r.version)).toEqual(["1"]);
+    expect(heldRecoilEngines()).toBe(oldList);
   });
 });

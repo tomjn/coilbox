@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EngineRelease, SpringfilesEngine } from "../downloads/bindings";
 import { useWriteRoot } from "../downloads/config";
 import {
@@ -9,10 +9,10 @@ import {
   useDownloadQueue,
 } from "../downloads/DownloadQueueProvider";
 import {
+  engineTick,
   heldRecoilEngines,
   heldSpringfilesEngines,
-  loadRecoilEngines,
-  loadSpringfilesEngines,
+  loadEngineCatalog,
 } from "../downloads/engineLists";
 import { useContentTargets, useUnitsyncScan } from "./config";
 import {
@@ -107,24 +107,34 @@ export function useResolveContent(
       ? { recoil: recoil.releases, springfiles: springfiles.engines }
       : null;
   });
+  // Taken once, when this hook first renders. A list that loaded after it is
+  // trusted, so re-rendering with a version no list has does not fetch again.
+  const askedAt = useRef<number | null>(null);
+  askedAt.current ??= engineTick();
+  const engineKeys = requirements
+    .filter((r) => r.kind === "engine")
+    .map((r) => r.downloadKey ?? r.label)
+    .join("\n");
   useEffect(() => {
-    if (!hasEngineReq || engineCatalog) return;
+    if (!hasEngineReq) return;
     let cancelled = false;
-    Promise.all([
-      loadRecoilEngines().catch(() => ({
-        releases: [] as EngineRelease[],
-      })),
-      loadSpringfilesEngines().catch(() => ({
-        engines: [] as SpringfilesEngine[],
-      })),
-    ]).then(([r, s]) => {
-      if (!cancelled)
-        setEngineCatalog({ recoil: r.releases, springfiles: s.engines });
-    });
+    loadEngineCatalog(engineKeys.split("\n"), askedAt.current ?? 0).then(
+      (next) => {
+        if (cancelled) return;
+        // Keep the same object when nothing changed, so no render is wasted.
+        setEngineCatalog((prev) =>
+          prev &&
+          prev.recoil === next.recoil &&
+          prev.springfiles === next.springfiles
+            ? prev
+            : next,
+        );
+      },
+    );
     return () => {
       cancelled = true;
     };
-  }, [hasEngineReq, engineCatalog]);
+  }, [hasEngineReq, engineKeys]);
 
   useDownloadComplete(() => {
     scan.run(true);
