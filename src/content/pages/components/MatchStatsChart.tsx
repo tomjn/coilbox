@@ -1,5 +1,5 @@
 import { useTheme } from "@picoframe/frame";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -28,6 +28,7 @@ import { formatDuration } from "@/lib/format";
 import { readableTeamTextColor } from "@/lib/teamColor";
 import type { DemoInfo, DemoTrailer, Metric } from "../../bindings";
 import { useStoredColorMode } from "../../chartColorMode";
+import { useStoredHighlightMe } from "../../highlightMe";
 import {
   allySeries,
   type ChartDisplay,
@@ -47,14 +48,19 @@ import {
   formatRate,
   metricGroups,
   modeRows,
+  playerTeam,
   secondsPerFrame,
+  seriesTeams,
   spreadLabels,
   teamSeries,
   tooltipRows,
   valueTable,
 } from "../../matchStats";
+import { usePrimaryPlayer } from "../../usePrimaryPlayer";
+import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
+import { type LegendEntry, SeriesLegend } from "./SeriesLegend";
 
 /**
  * The match's chart: a line per seat or a line per side over match time, a
@@ -242,6 +248,16 @@ function SeriesTooltip({
   );
 }
 
+/** Line widths, in pixels. Emphasis widens a line and adds a halo, never a new colour. */
+const LINE_WIDTH = 2;
+const LIT_LINE_WIDTH = 3.5;
+const HALO_WIDTH = 9;
+const HALO_OPACITY = 0.25;
+/** Opacity of every line that is not the emphasised one, while one is. */
+const DIM_OPACITY = 0.2;
+/** A wide invisible stroke over each line, so the pointer doesn't have to hit 2px. */
+const HIT_WIDTH = 12;
+
 /** Vertical room one end-point label needs, in pixels. */
 const END_LABEL_GAP = 14;
 
@@ -254,7 +270,15 @@ const LEADER_THRESHOLD = 2;
  * recharts' own `LabelList` places each series on its own, which is exactly the
  * case a duel produces, so this reads the axis scales instead.
  */
-function EndLabels({ points }: { points: EndPoint[] }) {
+function EndLabels({
+  points,
+  isLit,
+  dimming,
+}: {
+  points: EndPoint[];
+  isLit: (id: string) => boolean;
+  dimming: boolean;
+}) {
   const xScale = useXAxisScale();
   const yScale = useYAxisScale();
   const plot = usePlotArea();
@@ -284,7 +308,10 @@ function EndLabels({ points }: { points: EndPoint[] }) {
       {spread.map((p) => {
         const from = lineY.get(p.id) ?? p.y;
         return (
-          <g key={p.id}>
+          <g
+            key={p.id}
+            opacity={dimming && !isLit(p.id) ? DIM_OPACITY + 0.15 : 1}
+          >
             {Math.abs(from - p.y) > LEADER_THRESHOLD && (
               <polyline
                 points={`${p.x},${from} ${p.x + 4},${p.y}`}
@@ -300,6 +327,7 @@ function EndLabels({ points }: { points: EndPoint[] }) {
               dy={4}
               fill={readableTeamTextColor(p.color, theme, "card")}
               fontSize={11}
+              fontWeight={isLit(p.id) ? 700 : 400}
             >
               {clip(p.label)}
             </text>
@@ -329,6 +357,7 @@ export function MatchStatsChart({
   const metric = metrics.find((m) => m.key === key) ?? opening;
 
   const [colorMode, setColorMode] = useStoredColorMode();
+  const [highlightMe, setHighlightMe] = useStoredHighlightMe();
   const { resolved: theme } = useTheme();
 
   const players = useMemo(() => teamSeries(trailer, info), [trailer, info]);
@@ -378,8 +407,51 @@ export function MatchStatsChart({
     [series, rows, metric, mode, view],
   );
 
+  // Which engine teams each line stands for, so a line, a roster seat and a
+  // legend entry can all be compared by the same numbers.
+  const teamsOf = useMemo(
+    () => new Map(series.map((s) => [s.id, seriesTeams(s, info)])),
+    [series, info],
+  );
+  // "Me" is the library's player when they sat in this match and have a line.
+  // Only the Players view can show one person's line, so the control and the
+  // resting emphasis both go away on Teams.
+  const primary = usePrimaryPlayer();
+  const meTeam = primary ? playerTeam(info, primary) : undefined;
+  const chartedTeams = useMemo(
+    () => players.flatMap((s) => seriesTeams(s, info)).sort((a, b) => a - b),
+    [players, info],
+  );
+  const canHighlightMe =
+    view === "players" && meTeam !== undefined && chartedTeams.includes(meTeam);
+  const resting = canHighlightMe && highlightMe ? [meTeam] : null;
+  const restingKey = resting?.join(",") ?? "";
+  const emphasis = useSeriesEmphasis();
+  const { setPlot } = emphasis.store;
+  // Hands the roster, and later the map, what this chart draws and who is the
+  // resting emphasis. Cleared on the way out so a gone chart leaves no toggles.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restingKey stands for resting
+  useEffect(() => {
+    setPlot({ charted: chartedTeams, resting });
+    return () => setPlot({ charted: [], resting: null });
+  }, [setPlot, chartedTeams, restingKey]);
+
   if (!metric || !table || series.length === 0 || rows.length === 0)
     return null;
+
+  const litLine = (id: string) => emphasis.isLit(teamsOf.get(id));
+  const legendEntries: LegendEntry[] = series.map((s) => ({
+    id: s.id,
+    label: s.label,
+    color: s.color,
+    teams: teamsOf.get(s.id) ?? [],
+  }));
+  // SVG paints in document order, so the emphasised line is drawn last to sit
+  // above the rest.
+  const drawn = [
+    ...series.filter((s) => !litLine(s.id)),
+    ...series.filter((s) => litLine(s.id)),
+  ];
 
   // Four or fewer lines get their names at their end points, and the legend's
   // colour-matching job disappears with them.
@@ -415,6 +487,13 @@ export function MatchStatsChart({
           checked={colorMode === "game"}
           onChange={(on) => setColorMode(on ? "game" : "palette")}
         />
+        {canHighlightMe && (
+          <CheckField
+            label="Highlight me"
+            checked={highlightMe}
+            onChange={setHighlightMe}
+          />
+        )}
       </div>
 
       {/* The picker and what it enlarges. Beside each other where there is room
@@ -478,21 +557,79 @@ export function MatchStatsChart({
                   cursor={{ stroke: "currentColor", strokeOpacity: 0.35 }}
                   isAnimationActive={false}
                 />
-                {!labelled && <Legend wrapperStyle={{ fontSize: 12 }} />}
-                {series.map((s) => (
-                  <Line
-                    key={s.id}
-                    type="monotone"
-                    dataKey={s.id}
-                    name={s.label}
-                    stroke={s.color}
-                    strokeWidth={2}
-                    dot={false}
-                    activeDot={{ r: 3 }}
-                    isAnimationActive={false}
+                {!labelled && (
+                  <Legend
+                    wrapperStyle={{ fontSize: 12 }}
+                    content={<SeriesLegend entries={legendEntries} />}
                   />
-                ))}
-                {labelled && <EndLabels points={endPoints(series, rows)} />}
+                )}
+                {/* Halos first so they sit under every line, then the lines
+                 * dimmed or not, with the emphasised one last. The invisible
+                 * hit lines come after so they are what the pointer lands on.
+                 * Only the real lines report to the tooltip. */}
+                {drawn
+                  .filter((s) => litLine(s.id))
+                  .map((s) => (
+                    <Line
+                      key={`halo-${s.id}`}
+                      type="monotone"
+                      dataKey={s.id}
+                      stroke={s.color}
+                      strokeWidth={HALO_WIDTH}
+                      strokeOpacity={HALO_OPACITY}
+                      strokeLinecap="round"
+                      dot={false}
+                      activeDot={false}
+                      legendType="none"
+                      tooltipType="none"
+                      isAnimationActive={false}
+                    />
+                  ))}
+                {drawn.map((s) => {
+                  const lit = litLine(s.id);
+                  return (
+                    <Line
+                      key={s.id}
+                      type="monotone"
+                      dataKey={s.id}
+                      name={s.label}
+                      stroke={s.color}
+                      strokeWidth={lit ? LIT_LINE_WIDTH : LINE_WIDTH}
+                      strokeOpacity={emphasis.dimming && !lit ? DIM_OPACITY : 1}
+                      dot={false}
+                      activeDot={{ r: 3 }}
+                      isAnimationActive={false}
+                    />
+                  );
+                })}
+                {series.map((s) => {
+                  const teams = teamsOf.get(s.id) ?? [];
+                  return (
+                    <Line
+                      key={`hit-${s.id}`}
+                      type="monotone"
+                      dataKey={s.id}
+                      stroke="transparent"
+                      strokeWidth={HIT_WIDTH}
+                      dot={false}
+                      activeDot={false}
+                      legendType="none"
+                      tooltipType="none"
+                      isAnimationActive={false}
+                      style={{ cursor: "pointer" }}
+                      onMouseEnter={() => emphasis.hover(teams)}
+                      onMouseLeave={() => emphasis.hover(null)}
+                      onClick={() => emphasis.toggleSelected(teams)}
+                    />
+                  );
+                })}
+                {labelled && (
+                  <EndLabels
+                    points={endPoints(series, rows)}
+                    isLit={litLine}
+                    dimming={emphasis.dimming}
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
