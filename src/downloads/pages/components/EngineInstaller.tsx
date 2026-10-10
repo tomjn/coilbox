@@ -11,11 +11,11 @@ import {
   identityOf,
   useDownloadQueue,
 } from "../../DownloadQueueProvider";
-import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
 import {
   type EngineSource,
   emptyEngineListMessage,
 } from "../../emptyEngineList";
+import { loadRecoilEngines, loadSpringfilesEngines } from "../../engineLists";
 import { QueueProgress } from "./ProgressBar";
 import { errMessage } from "./states";
 
