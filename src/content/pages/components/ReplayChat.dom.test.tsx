@@ -1,5 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatLine } from "../../bindings";
 
@@ -24,10 +30,18 @@ const line = (over: Partial<ChatLine>): ChatLine => ({
 
 afterEach(cleanup);
 
-async function open(result: typeof RESULT) {
+function open(result: typeof RESULT) {
   RESULT = result;
-  render(<ReplayChat replayPath="/replays/a.sdfz" />);
-  fireEvent.click(screen.getByRole("button", { name: /show chat log/i }));
+  render(<ReplayChat replayPath="/replays/a.sdfz" durationSec={600} />);
+}
+
+/** Opens the log once the chat has been read. */
+async function showLog() {
+  const button = await screen.findByRole("button", { name: /show chat log/i });
+  await waitFor(() =>
+    expect((button as HTMLButtonElement).disabled).toBe(false),
+  );
+  fireEvent.click(button);
 }
 
 describe("chatTime", () => {
@@ -44,7 +58,7 @@ describe("chatTime", () => {
 
 describe("ReplayChat", () => {
   it("shows time, sender and destination on each line", async () => {
-    await open({
+    open({
       incomplete: false,
       messages: [
         line({
@@ -72,6 +86,7 @@ describe("ReplayChat", () => {
         line({ frame: 30, player: 255, system: true, text: "Bob paused" }),
       ],
     });
+    await showLog();
     expect(await screen.findByText("gg")).toBeTruthy();
     expect(screen.getByText("1:05")).toBeTruthy();
     expect(screen.getByText("to allies")).toBeTruthy();
@@ -83,15 +98,17 @@ describe("ReplayChat", () => {
   });
 
   it("notes an incomplete log", async () => {
-    await open({
+    open({
       incomplete: true,
       messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
     });
-    expect(await screen.findByText(/may be incomplete/)).toBeTruthy();
+    await showLog();
+    expect(await screen.findByText(/chat log may be incomplete/)).toBeTruthy();
+    expect(screen.getByText(/timeline stops at the last line/)).toBeTruthy();
   });
 
   it("says plainly when the chat could not be read, without naming a tool", async () => {
-    await open(new Error("boom"));
+    open(new Error("boom"));
     const msg = await screen.findByText(
       "The chat could not be read from this replay.",
     );
@@ -99,7 +116,8 @@ describe("ReplayChat", () => {
   });
 
   it("says when there was no chat", async () => {
-    await open({ incomplete: false, messages: [] });
+    open({ incomplete: false, messages: [] });
     expect(await screen.findByText(/No chat was recorded/)).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });

@@ -219,7 +219,7 @@ export default function ReplaysPage() {
     "content.replayFilters.set",
     "",
   );
-  // Whether the figures and metric sorts are for the primary player's own team
+  // Whether the figures and metric sorts are for the primary player's own army
   // rather than the whole match.
   const [mineOnly, setMineOnly] = useSetting(
     "content.replayFilters.mine",
@@ -495,9 +495,9 @@ export default function ReplaysPage() {
                     onClick={() => setMineOnly(!mineOnly)}
                     aria-pressed={mineOnly}
                     className="gap-1.5"
-                    title={`Show and sort the figures for ${primary}'s team instead of the whole match`}
+                    title={`Show and sort the figures for ${primary} alone instead of the whole match`}
                   >
-                    <User className="size-4" /> My team
+                    <User className="size-4" /> My figures
                   </Button>
                 )}
                 {filterVisibility.watched && (

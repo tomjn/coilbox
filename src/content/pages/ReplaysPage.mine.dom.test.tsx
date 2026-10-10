@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * Issue #3829: the replay list can show and sort its figures for the primary
- * player's own team instead of the whole match. The metric key is made up,
+ * player's own figures instead of the whole match. The metric key is made up,
  * because `metricRegistry.test.ts` forbids a real one outside the bindings.
  */
 import {
@@ -120,7 +120,7 @@ const order = () =>
     .map((a) => a.textContent ?? "")
     .filter((t) => t.includes("Map of"))
     .map((t) => t.match(/Map of (\w)/)?.[1]);
-const mineButton = () => screen.queryByRole("button", { name: "My team" });
+const mineButton = () => screen.queryByRole("button", { name: "My figures" });
 const sortBy = (dir: "asc" | "desc") =>
   storage.set(
     "content.replayFilters.sort",
@@ -133,7 +133,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("the replay list's My team switch", () => {
+describe("the replay list's My figures switch", () => {
   it("is absent when nobody is known to be the primary player", () => {
     STORED = [];
     renderPage();
@@ -147,7 +147,7 @@ describe("the replay list's My team switch", () => {
     expect(mineButton()?.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("sorts on the primary player's own team once pressed", async () => {
+  it("sorts on the primary player's own figures once pressed", async () => {
     sortBy("desc");
     renderPage();
     fireEvent.click(mineButton() as HTMLElement);
@@ -165,6 +165,25 @@ describe("the replay list's My team switch", () => {
     await waitFor(() => expect(order()[0]).toBe("a"));
     expect(order().slice(0, 2)).toEqual(["a", "b"]);
     expect(order().slice(2).sort()).toEqual(["c", "d"]);
+  });
+
+  it("does not call a player's own figures a team when allies differ", async () => {
+    // Ann and Ben are allies on one side (ally team 0) with separate engine
+    // teams, so their figures differ. The replay page calls that side "Team 1".
+    STORED = [
+      {
+        ...record("a", [seat("Ann", 0), seat("Ben", 1)], [10, 500]),
+        players: [
+          { name: "Ann", team: 0, allyTeam: 0, spectator: false },
+          { name: "Ben", team: 1, allyTeam: 0, spectator: false },
+        ],
+      } as unknown as StatRecord,
+    ];
+    renderPage();
+    const button = mineButton() as HTMLElement;
+    expect(button.textContent).not.toMatch(/team/i);
+    expect(button.getAttribute("title")).not.toMatch(/team/i);
+    expect(button.getAttribute("title")).toContain("Ann");
   });
 
   it("remembers the choice", () => {

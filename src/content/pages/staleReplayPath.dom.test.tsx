@@ -158,12 +158,14 @@ describe("ReplayChat", () => {
   it("drops the first replay's chat when the path changes", async () => {
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from a"));
     const { rerender } = render(<ReplayChat replayPath={a} />);
-    fireEvent.click(screen.getByRole("button", { name: /show chat log/i }));
-    expect(await screen.findByText("gg from a")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
+    expect(await screen.findByText("gg from a", { exact: false })).toBeTruthy();
 
+    bindings.contentDemoChat.mockReturnValueOnce(deferred().promise);
     rerender(<ReplayChat replayPath={b} />);
-    expect(screen.queryByText("gg from a")).toBeNull();
-    expect(screen.getByRole("button", { name: /show chat log/i })).toBeTruthy();
+    expect(screen.queryByText("gg from a", { exact: false })).toBeNull();
+    expect(screen.queryByRole("button", { name: /everyone/i })).toBeNull();
+    expect(screen.getByText("Reading chat…", { selector: "p" })).toBeTruthy();
   });
 
   it("does not let a slow chat for the first replay land on the second", async () => {
@@ -171,15 +173,21 @@ describe("ReplayChat", () => {
     bindings.contentDemoChat.mockReturnValueOnce(first.promise);
     bindings.contentDemoChat.mockResolvedValueOnce(chat("gg from b"));
     const { rerender } = render(<ReplayChat replayPath={a} />);
-    fireEvent.click(screen.getByRole("button", { name: /show chat log/i }));
 
     rerender(<ReplayChat replayPath={b} />);
-    fireEvent.click(screen.getByRole("button", { name: /show chat log/i }));
-    expect(await screen.findByText("gg from b")).toBeTruthy();
+    fireEvent.click(await screen.findByRole("button", { name: /everyone/i }));
+    expect(await screen.findByText("gg from b", { exact: false })).toBeTruthy();
 
     await act(async () => first.resolve(chat("gg from a")));
-    expect(screen.queryByText("gg from a")).toBeNull();
-    expect(screen.getByText("gg from b")).toBeTruthy();
+    expect(screen.queryByText("gg from a", { exact: false })).toBeNull();
+    expect(screen.getByText("gg from b", { exact: false })).toBeTruthy();
+  });
+
+  it("reads the chat once for the page, not once per surface", async () => {
+    bindings.contentDemoChat.mockResolvedValue(chat("gg"));
+    render(<ReplayChat replayPath={a} />);
+    await screen.findByRole("button", { name: /everyone/i });
+    expect(bindings.contentDemoChat).toHaveBeenCalledTimes(1);
   });
 });
 

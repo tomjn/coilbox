@@ -7,21 +7,22 @@ import { gamesFor, isGenuineMatch } from "./stats";
  * A player's match figures as rates, for the dossier (#1166).
  *
  * The store keeps one end-of-match total per team and metric. A game's figure
- * for a player is their own team's total (`matchFigure`), divided by the
+ * for a player is the totals of the army they control (`matchFigure`), divided by the
  * match's minutes so that a player who plays long games does not look better at
  * economy. Nothing here names a metric: the metrics are whatever the caller
  * passes, which is the registry's roster set.
  *
  * Two rules the page depends on:
  *
- * - A game counts only when the store has its team's totals and a usable
+ * - A game counts only when the store has that army's totals and a usable
  *   length. The rest are counted as left out, never silently dropped.
  * - The average is the mean of each game's own rate, with the median beside it.
  *   Total over total minutes would let one long game outweigh several short
  *   ones, which is the complaint the rates exist to answer.
  *
- * A team is not a player. Where players share a team, each of them has the
- * team's whole total, and the total is not divided between them.
+ * An army is not a side. Allies on one side each control their own army, so
+ * their figures differ. Where players share control of one army, each of them
+ * has its whole total, and the total is not divided between them.
  */
 
 /** One counted game: the rate for each metric the store has a figure for. */
@@ -38,19 +39,19 @@ export interface RateGame {
 export interface PlayerRateGames {
   /** Genuine games the player played. */
   games: number;
-  /** Games in `list`: the team's totals are known and the length is usable. */
+  /** Games in `list`: the army's totals are known and the length is usable. */
   counted: number;
   /** Games with no team id, no totals, or none of the asked-for metrics. */
   leftOutNoTotals: number;
   /** Games with totals but a zero, negative or missing length. */
   leftOutNoLength: number;
-  /** Counted games where another player shared the team, so its total is theirs too. */
+  /** Counted games where another player shared control of the army (the same engine team, not just the same side), so its total is theirs too. */
   sharedTeamGames: number;
   /** Counted games, oldest first. */
   list: RateGame[];
 }
 
-/** Whether another seat, not a watcher, played for the same team as `name`. */
+/** Whether another seat, not a watcher, controls the same engine team as `name`. Allies on separate engine teams do not count. */
 function teamIsShared(record: StatRecord, name: string): boolean {
   const mine = record.players.find((p) => !p.spectator && p.name === name);
   if (mine?.team === undefined) return false;
@@ -186,7 +187,7 @@ export function leftOutNote(r: PlayerRateGames): string | null {
   const parts: string[] = [];
   if (r.leftOutNoTotals > 0)
     parts.push(
-      `${r.leftOutNoTotals} with no team totals recorded (older or unmeasured replays)`,
+      `${r.leftOutNoTotals} with no figures recorded (older or unmeasured replays)`,
     );
   if (r.leftOutNoLength > 0)
     parts.push(`${r.leftOutNoLength} with no usable length`);

@@ -178,7 +178,7 @@ function SeatOpening({
             size="sm"
             onClick={() => setShown((n) => n + PAGE)}
           >
-            Show {Math.min(PAGE, left)} more of {left} entries
+            Show {Math.min(PAGE, left)} more of {entries.length} entries
           </Button>
         </div>
       )}
@@ -299,7 +299,7 @@ function SeatOrders({
               size="sm"
               onClick={() => setShown((n) => n + PAGE)}
             >
-              Show {Math.min(PAGE, left)} more of {left}
+              Show {Math.min(PAGE, left)} more of {seat.orders.length}
             </Button>
           </div>
         )}

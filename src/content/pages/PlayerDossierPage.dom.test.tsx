@@ -5,7 +5,7 @@
  * page must show the parameter as it comes. A second decode threw on a bare
  * `%` and showed the wrong name for `%25` (#3422).
  */
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { HashRouter, Route, Routes } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Metric, StatRecord } from "../bindings";
@@ -123,21 +123,64 @@ describe("PlayerDossierPage match figures", () => {
     renderAnn();
     expect(screen.getByText("Match figures per minute")).not.toBeNull();
     expect(screen.getByText(/Drawn from 2 of 3 games/)).not.toBeNull();
-    expect(screen.getByText(/1 with no team totals/)).not.toBeNull();
+    expect(screen.getByText(/1 with no figures recorded/)).not.toBeNull();
     // 6000 over 10 minutes.
     expect(screen.getAllByText("600").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/1 game$/).length).toBeGreaterThan(0);
-    expect(screen.getByText("Ann's team, per minute")).not.toBeNull();
+    expect(screen.getByText("Ann's own figures, per minute")).not.toBeNull();
   });
 
   it("says so, and shows no numbers, when no game has totals", () => {
     RECORDS = [played("a", 1, true, false), played("b", 2, false, false)];
     renderAnn();
     expect(
-      screen.getByText(/None of Ann's 2 games has team totals recorded/),
+      screen.getByText(/None of Ann's 2 games has figures recorded/),
     ).not.toBeNull();
     expect(screen.queryByText(/Drawn from/)).toBeNull();
     expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("does not call a player's own figures a team when allies differ", () => {
+    // Ann and Ben are allies on one side with separate engine teams, and their
+    // totals differ. The replay page calls that side "Team 1".
+    RECORDS = [
+      {
+        ...played("a", 1, true, true),
+        players: [
+          { name: "Ann", team: 0, allyTeam: 0, spectator: false, won: true },
+          { name: "Ben", team: 1, allyTeam: 0, spectator: false, won: true },
+        ],
+        teamTotals: [
+          { team: 0, totals: { alpha: 6000 } },
+          { team: 1, totals: { alpha: 600 } },
+        ],
+      } as unknown as StatRecord,
+    ];
+    renderAnn();
+    const section = screen
+      .getByText("Match figures per minute")
+      .closest("section") as HTMLElement;
+    expect(within(section).getAllByText("600").length).toBeGreaterThan(0);
+    expect(within(section).queryByText("60")).toBeNull();
+    expect(section.textContent).not.toMatch(/team/i);
+    expect(section.textContent).toContain("Ann's own figures");
+    expect(section.textContent).not.toContain("another player shared control");
+  });
+
+  it("says when players shared control of one army", () => {
+    RECORDS = [
+      {
+        ...played("a", 1, true, true),
+        players: [
+          { name: "Ann", team: 0, allyTeam: 0, spectator: false, won: true },
+          { name: "Ben", team: 0, allyTeam: 0, spectator: false, won: true },
+        ],
+      } as unknown as StatRecord,
+    ];
+    renderAnn();
+    expect(
+      screen.getByText(/In 1 game another player shared control of Ann's army/),
+    ).not.toBeNull();
   });
 
   it("is hidden when the profile hides match statistics", () => {
