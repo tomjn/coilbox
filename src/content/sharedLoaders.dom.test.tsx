@@ -36,6 +36,7 @@ const {
   primeGameHeaders,
   primeMapInfo,
   primeMapMeta,
+  primeScan,
   primeThumbnails,
   useDemoInfo,
   useUnitsyncArchiveFile,
@@ -49,7 +50,12 @@ let dir = "";
 
 beforeEach(() => {
   for (const fn of Object.values(bindings)) fn.mockReset();
-  bindings.unitsyncScan.mockResolvedValue({ maps: [], games: [], errors: [] });
+  // A new answer each time, as a real scan gives.
+  bindings.unitsyncScan.mockImplementation(async () => ({
+    maps: [],
+    games: [],
+    errors: [],
+  }));
   n += 1;
   dir = `/data-${n}`;
 });
@@ -109,14 +115,15 @@ describe("batch reads", () => {
       expect(command).toHaveBeenCalledTimes(2);
     });
 
-    it(`keeps ${label} for a different scan epoch apart`, async () => {
-      const open = held<typeof answer>();
-      command.mockReturnValue(open.promise);
-      const before = prime("/engine", dir, 0);
-      const after = prime("/engine", dir, 1);
-      await vi.waitFor(() => expect(command).toHaveBeenCalledTimes(2));
-      open.resolve(answer);
-      await Promise.all([before, after]);
+    it(`keeps ${label} for one scan and reads again for a newer one`, async () => {
+      command.mockResolvedValue(answer);
+      await prime("/engine", dir);
+      await prime("/engine", dir);
+      expect(command).toHaveBeenCalledTimes(1);
+
+      await primeScan("/engine", dir, true);
+      await prime("/engine", dir);
+      expect(command).toHaveBeenCalledTimes(2);
     });
   }
 });
