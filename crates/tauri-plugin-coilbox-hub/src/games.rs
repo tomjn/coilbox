@@ -806,9 +806,6 @@ mod tests {
             api_url("https://hub.example/", SUBMIT_PATH, "Sending").unwrap(),
             "https://hub.example/api/v1/games/facts"
         );
-        assert!(api_url("http://hub.example", SUBMIT_PATH, "Sending")
-            .unwrap_err()
-            .contains("https"));
     }
 
     // --------------------------------------------------------- what is refused

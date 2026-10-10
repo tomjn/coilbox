@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { contrast, hsl, type Rgb } from "../../../lib/contrast.testhelper";
 import runlitePlugin from "../../../runlite";
 import conquestPlugin from "../../index";
 import {
@@ -50,45 +51,9 @@ import {
  * the reason `src/theme/mutedForeground.test.ts` gives.
  */
 
-type Rgb = [number, number, number];
-
-/** CSS `hsl()` to sRGB channels, all 0 to 1 except the hue. */
-function hsl(h: number, s: number, l: number): Rgb {
-  const c = (1 - Math.abs(2 * l - 1)) * Math.min(Math.max(s, 0), 1);
-  const sector = ((((h % 360) + 360) % 360) / 60) % 6;
-  const x = c * (1 - Math.abs((sector % 2) - 1));
-  const rgb: Rgb =
-    sector < 1
-      ? [c, x, 0]
-      : sector < 2
-        ? [x, c, 0]
-        : sector < 3
-          ? [0, c, x]
-          : sector < 4
-            ? [0, x, c]
-            : sector < 5
-              ? [x, 0, c]
-              : [c, 0, x];
-  const m = l - c / 2;
-  return rgb.map((v) => v + m) as Rgb;
-}
-
 /** Straight-alpha composite of `layer` over `base`. */
 function over(base: Rgb, layer: Rgb, alpha: number): Rgb {
   return base.map((c, i) => c * (1 - alpha) + layer[i] * alpha) as Rgb;
-}
-
-/** WCAG 2.2 relative luminance. */
-function luminance([r, g, b]: Rgb): number {
-  const lin = (v: number) =>
-    v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
-
-/** WCAG 2.2 contrast ratio between two colours. */
-function contrast(a: Rgb, b: Rgb): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
-  return (hi + 0.05) / (lo + 0.05);
 }
 
 /** The alpha in a `hsl(var(--token)/N)` arbitrary value, or 1 if it has none. */

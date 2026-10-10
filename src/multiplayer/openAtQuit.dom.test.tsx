@@ -17,11 +17,7 @@
 
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
+import type { LobbyEvent } from "./bindings";
 
 type StoredAccount = {
   id: string;
@@ -50,11 +46,9 @@ function accounts(): StoredAccount[] {
   ).accounts;
 }
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
@@ -94,61 +88,31 @@ vi.mock("./VerificationCodeDialog", () => ({
   VerificationCodeDialog: () => null,
 }));
 
-const emptyState = (): LobbyState =>
-  ({
-    myUsername: "AF",
-    compflags: [],
-    users: {},
-    channels: {},
-    dms: {},
-    battles: {},
-    currentBattle: null,
-    lastBattle: null,
-    hostPort: null,
-    channelDirectory: [],
-    currentVote: null,
-    serverIgnores: [],
-    friends: [],
-    friendRequests: [],
-    party: null,
-  }) as unknown as LobbyState;
-
 const wire = vi.hoisted(() => ({
   channels: new Map<string, FakeChannel>(),
 }));
 
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { serverKey: string; onEvent: FakeChannel }) => {
     wire.channels.set(args.serverKey, args.onEvent);
     return { connected: true };
   },
-  mpConnectTachyon: async () => ({ connected: true }),
-  mpConnectZerok: async () => ({ connected: true }),
-  mpSnapshot: async () => ({ state: emptyState() }),
+  mpSnapshot: async () => ({ state: emptyLobbyState() }),
   mpDisconnect: async () => ({ disconnected: true }),
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: [] }),
   mpReattach: async () => ({ reattached: true }),
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpRegister: async () => ({}),
-  mpRegisterZerok: async () => ({}),
-  mpSetStatus: async () => ({}),
-  mpTachyonSignedIn: async () => ({ signedIn: true }),
-  mpTachyonSignIn: async () => ({}),
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
 import { BUILTIN_SERVERS } from "../lobby-servers/config";
+import {
+  emptyLobbyState,
+  type FakeChannel,
+} from "./lobbyStoreMocks.testhelper";
 import { MultiplayerProvider, useMultiplayer } from "./store";
 
 const BAR = BUILTIN_SERVERS.find((s) => s.id === "bar-ssl");

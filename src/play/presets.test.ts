@@ -25,6 +25,7 @@ import {
 } from "../lib/storedSetting";
 import { type SkirmishDraft, useSkirmishDraft } from "./drafts";
 import {
+  draftKey,
   PRESET_KIND_VERSION,
   PRESETS_KEY,
   parsePresetJson,
@@ -362,6 +363,40 @@ describe("presetMatchesDraft", () => {
       modOptionValues: { b: "2", a: "1" },
     });
     expect(presetMatchesDraft([saved], reordered)).toBe(true);
+  });
+});
+
+describe("draftKey", () => {
+  const setup = draftWith(["p0", "p1"], {
+    modOptionValues: { maxunits: "500" },
+  });
+
+  it("changes when an option is edited", () => {
+    const edited = { ...setup, modOptionValues: { maxunits: "1000" } };
+    expect(draftKey(edited)).not.toBe(draftKey(setup));
+  });
+
+  it("changes when the map, game or an opponent is edited", () => {
+    const key = draftKey(setup);
+    const [you, bot] = setup.participants;
+    expect(draftKey({ ...setup, mapName: "Other" })).not.toBe(key);
+    expect(draftKey({ ...setup, gameName: "Other 2.0" })).not.toBe(key);
+    expect(
+      draftKey({
+        ...setup,
+        participants: [you, { ...bot, handicap: 10 }],
+      }),
+    ).not.toBe(key);
+  });
+
+  it("changes when a map option is edited", () => {
+    expect(draftKey({ ...setup, mapOptionValues: { wind: "high" } })).not.toBe(
+      draftKey(setup),
+    );
+  });
+
+  it("treats no start boxes and an empty set of them as the same", () => {
+    expect(draftKey({ ...setup, startRects: {} })).toBe(draftKey(setup));
   });
 });
 

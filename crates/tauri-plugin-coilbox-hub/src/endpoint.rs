@@ -199,3 +199,17 @@ pub fn unreachable_message(url: &str, timed_out: bool) -> String {
         format!("Could not reach the hub at {host}. Check your connection, and give it a moment if it is waking up after a quiet spell.")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The rule every hub route shares. Each module tests its own route constant
+    /// and relies on this for the refusal.
+    #[test]
+    fn plain_http_will_not_carry_a_token() {
+        let refused = api_url("http://hub.example", "/api/v1/anything", "Sending").unwrap_err();
+        assert!(refused.contains("https"), "{refused}");
+        assert!(refused.starts_with("Sending"), "{refused}");
+    }
+}

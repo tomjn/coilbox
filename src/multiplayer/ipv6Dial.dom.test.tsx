@@ -9,7 +9,7 @@
  * gets the bare address. A Tachyon server is the exception, because the Rust
  * side builds a URL from the host and a URL writes an IPv6 host in brackets.
  *
- * The mock setup is copied from `connectionState.dom.test.tsx`.
+ * The shared mock pieces are in `lobbyStoreMocks.testhelper.ts`.
  */
 
 import { act, cleanup, render } from "@testing-library/react";
@@ -19,22 +19,15 @@ import {
   memorySettingsStorage,
 } from "../lib/storedSetting";
 import type { LobbyServer } from "../lobby-servers/config";
-import type { LobbyEvent, LobbyState } from "./bindings";
-
-interface FakeChannel {
-  onmessage?: (ev: LobbyEvent) => void;
-}
 
 const wire = vi.hoisted(() => ({
   /** The `host` each dialling command was handed, in order, by command. */
   hosts: [] as { command: string; host: string }[],
 }));
 
-vi.mock("@tauri-apps/api/core", () => ({
-  Channel: class {
-    onmessage?: (ev: LobbyEvent) => void;
-  },
-}));
+vi.mock("@tauri-apps/api/core", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).tauriCoreStub(),
+);
 
 vi.mock("@picoframe/frame", async () => {
   const react = await import("react");
@@ -56,31 +49,13 @@ vi.mock("./VerificationCodeDialog", () => ({
   VerificationCodeDialog: () => null,
 }));
 
-const emptyState = (): LobbyState =>
-  ({
-    myUsername: "AF",
-    compflags: [],
-    users: {},
-    channels: {},
-    dms: {},
-    battles: {},
-    currentBattle: null,
-    lastBattle: null,
-    hostPort: null,
-    channelDirectory: [],
-    currentVote: null,
-    serverIgnores: [],
-    friends: [],
-    friendRequests: [],
-    party: null,
-  }) as unknown as LobbyState;
-
 const dials = (command: string) => async (args: { host: string }) => {
   wire.hosts.push({ command, host: args.host });
   return { connected: true };
 };
 
-vi.mock("./bindings", () => ({
+vi.mock("./bindings", async () => ({
+  ...(await import("./lobbyStoreMocks.testhelper")).inertBindings(),
   mpConnect: async (args: { host: string }) => dials("mpConnect")(args),
   mpConnectTachyon: async (args: { host: string }) =>
     dials("mpConnectTachyon")(args),
@@ -104,28 +79,20 @@ vi.mock("./bindings", () => ({
     } as never);
     return { connected: true };
   },
-  mpSnapshot: async () => ({ state: emptyState() }),
+  mpSnapshot: async () => ({ state: emptyLobbyState() }),
   mpDisconnect: async () => ({ disconnected: true }),
-  mpWaitUntilReady: async () => ({ ready: true }),
   mpActiveKeys: async () => ({ keys: [] as string[] }),
   mpReattach: async () => ({ reattached: true }),
-  mpCancelConnect: async () => ({ cancelled: true }),
-  mpConfirmAgreement: async () => ({}),
-  mpFriendList: async () => ({}),
-  mpFriendRequestList: async () => ({}),
-  mpIgnore: async () => ({}),
-  mpIgnoreList: async () => ({}),
-  mpJoinBattle: async () => ({}),
-  mpJoinChannel: async () => ({}),
-  mpSetStatus: async () => ({}),
-  mpTachyonSignedIn: async () => ({ signedIn: true }),
-  mpTachyonSignIn: async () => ({}),
 }));
 
-vi.mock("../lobby-servers/bindings", () => ({
-  lsGetCredential: async () => ({ secret: "hunter2" }),
-}));
+vi.mock("../lobby-servers/bindings", async () =>
+  (await import("./lobbyStoreMocks.testhelper")).lobbyServerBindings(),
+);
 
+import {
+  emptyLobbyState,
+  type FakeChannel,
+} from "./lobbyStoreMocks.testhelper";
 import { MultiplayerProvider, useMultiplayer } from "./store";
 
 let store: ReturnType<typeof useMultiplayer>;

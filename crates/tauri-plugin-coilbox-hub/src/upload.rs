@@ -1324,12 +1324,6 @@ mod tests {
     }
 
     #[test]
-    fn plain_http_will_not_carry_a_token() {
-        let refused = api_url("http://hub.example", UPLOAD_PATH, "Sending").unwrap_err();
-        assert!(refused.contains("https"), "{refused}");
-    }
-
-    #[test]
     fn the_route_is_built_off_the_configured_base() {
         assert_eq!(
             api_url("https://hub.example/", UPLOAD_PATH, "Sending").unwrap(),
