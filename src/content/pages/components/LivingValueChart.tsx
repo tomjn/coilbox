@@ -34,6 +34,7 @@ import { SPLIT_BUCKETS, type SplitBucket } from "../../replayOpening";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { SectionHelp } from "./SectionHelp";
+import { StoredListNote } from "./UnitListNotes";
 
 /**
  * What each player's living units were worth, by kind of unit, as its own
@@ -186,7 +187,7 @@ function OpenValueChart({
 }: ChartProps & { state: Extract<EventState, { kind: "ready" }> }) {
   const [resource, setResource] = useState<ValueResource>("metal");
   const [read, setRead] = useState<Read>({ status: "loading" });
-  const units = useReplayUnits(info, true);
+  const units = useReplayUnits(info, true, "events");
   const emphasis = useSeriesEmphasis();
   const { resolved: theme } = useTheme();
   const colours = COLOURS[theme === "light" ? "light" : "dark"];
@@ -266,6 +267,7 @@ function OpenValueChart({
       );
     return (
       <>
+        <StoredListNote source={units.source} subject="Costs and kinds" />
         {units.source.kind === "differentBuild" && (
           <p className="text-xs text-amber-600 dark:text-amber-400">
             This replay was played on {units.recorded}, which is not installed.

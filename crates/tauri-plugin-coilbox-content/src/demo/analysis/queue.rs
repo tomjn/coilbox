@@ -34,6 +34,7 @@ use serde::Serialize;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
+use super::super::def_sets;
 use super::launch::RunControl;
 use super::{
     analyse_replay, divergence, now_ms, run_timeout, store, AnalysisRequest, AnalysisRun,
@@ -485,6 +486,42 @@ fn failure(
     })
 }
 
+/// Make the unit definition store agree with the analysis just stored.
+///
+/// A run that reproduced the match wrote the engine's own list of unit
+/// definitions, which is the numbering every `def` in its events uses. That
+/// list is kept and linked to the replay. A run that left no whole list, which
+/// includes every run that diverged, leaves the replay with no engine list,
+/// because the one from an earlier run no longer describes the stored file.
+///
+/// Failing here loses names and not the analysis, so it is logged and the run
+/// still counts as stored.
+fn keep_engine_unit_defs(
+    analyses: &Path,
+    provenance: &store::Provenance,
+    events: Option<&[super::log::LogLine]>,
+) {
+    let dir = def_sets::dir_beside(analyses);
+    let result = match events.and_then(super::log::unit_defs_of) {
+        Some(units) => def_sets::record(
+            &dir,
+            &provenance.game_id,
+            &units,
+            &def_sets::Source {
+                origin: def_sets::Origin::Engine,
+                game: &provenance.game,
+                game_differs: provenance.game_differs,
+                taken_at_ms: provenance.analysed_at_ms,
+            },
+        )
+        .map(|_| ()),
+        None => def_sets::unlink_engine(&dir, &provenance.game_id).map(|_| ()),
+    };
+    if let Err(e) = result {
+        eprintln!("replay analysis: the engine's unit definitions were not kept: {e}");
+    }
+}
+
 /// Work out what a run came to, storing it when it is one of the two outcomes
 /// that are stored.
 fn settle(
@@ -499,7 +536,10 @@ fn settle(
     };
     if let Some(provenance) = store::Provenance::of(&job.game_id, &run, now_ms()) {
         return match store::write(analyses, &provenance, run.events.as_deref()) {
-            Ok(_) => Outcome::Stored,
+            Ok(_) => {
+                keep_engine_unit_defs(analyses, &provenance, run.events.as_deref());
+                Outcome::Stored
+            }
             Err(e) => failure(job, FailureReason::CouldNotRun, e, None),
         };
     }
@@ -1194,6 +1234,101 @@ mod tests {
         );
     }
 
+    /// A run by a logger that lists the engine's unit definitions: the four of
+    /// the logger's own fixture, then the fixture match.
+    fn run_with_unit_defs(status: AnalysisStatus) -> AnalysisRun {
+        use super::super::log::tests::{FIXTURE, UNIT_DEFS_FIXTURE};
+        let match_lines = FIXTURE.split_once('\n').expect("a header line").1;
+        let log = super::super::log::parse_log(&format!("{UNIT_DEFS_FIXTURE}{match_lines}"));
+        let mut run = run_with(status);
+        run.report.header = log.header().cloned();
+        run.report.counts = log.counts();
+        if run.events.is_some() {
+            run.events = Some(log.lines);
+        }
+        run
+    }
+
+    /// The engine's own list is the numbering the stored events use, so it is
+    /// kept when they are, once for every replay that shares it, and it goes
+    /// when the stored file stops being that run's.
+    #[test]
+    fn a_reproduced_run_keeps_the_engines_unit_definitions_beside_its_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = store::store_dir(dir.path());
+        let sets = def_sets::dir_beside(&analyses);
+        let stored = |game_id: &str, status| {
+            matches!(
+                settle(
+                    &analyses,
+                    &job(game_id, false),
+                    Ok(run_with_unit_defs(status)),
+                    false
+                ),
+                Outcome::Stored
+            )
+        };
+
+        assert!(stored(ID, AnalysisStatus::Reproduced));
+
+        let found = def_sets::for_replay(&sets, ID).unwrap();
+        assert_eq!(found.links.len(), 1);
+        let link = found.events.clone().expect("a list for the events");
+        assert_eq!(link.origin, def_sets::Origin::Engine);
+        assert_eq!(link.game, "Some Game 1.0");
+        assert_eq!(link.game_differs, Some(false));
+        assert_eq!(link.taken_at_ms, {
+            let p = store::read(&analyses, ID).unwrap().unwrap().provenance;
+            p.analysed_at_ms
+        });
+        // The run used the recorded game, so the list names the orders too.
+        assert_eq!(found.stream, Some(link.clone()));
+        let names: Vec<&str> = found.sets[&link.digest]
+            .iter()
+            .map(|unit| unit.name.as_str())
+            .collect();
+        assert_eq!(names, vec!["tgcom", "tgmex", "tgwind", "tg\"odd"]);
+
+        // The stored file says how many there were and holds none of them.
+        let provenance = store::read(&analyses, ID).unwrap().unwrap().provenance;
+        assert_eq!(provenance.counts.unit_def, 4);
+        let events = store::read_events(&analyses, ID, None, 0, None).unwrap();
+        assert_eq!(events.total, 24);
+        assert!(events.events.iter().all(|e| e["kind"] != "unit_def"));
+
+        // A second match on the same build shares the one list.
+        assert!(stored(OTHER, AnalysisStatus::Reproduced));
+        let usage = def_sets::usage(&sets);
+        assert_eq!((usage.sets, usage.replays), (1, 2));
+
+        // A later run that did not reproduce the match leaves no events, so
+        // the first replay has no engine list any more. The other keeps its.
+        assert!(stored(ID, AnalysisStatus::Diverged));
+        assert_eq!(def_sets::for_replay(&sets, ID).unwrap().links, Vec::new());
+        let usage = def_sets::usage(&sets);
+        assert_eq!((usage.sets, usage.replays), (1, 1));
+    }
+
+    /// A stored analysis from a logger that listed no unit definitions has
+    /// nothing to keep, and that is not a failure.
+    #[test]
+    fn a_run_with_no_unit_definitions_keeps_none() {
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = store::store_dir(dir.path());
+
+        let outcome = settle(
+            &analyses,
+            &job(ID, false),
+            Ok(run_with(AnalysisStatus::Reproduced)),
+            false,
+        );
+
+        assert!(matches!(outcome, Outcome::Stored));
+        let sets = def_sets::dir_beside(&analyses);
+        assert_eq!(def_sets::for_replay(&sets, ID).unwrap().links, Vec::new());
+        assert_eq!(def_sets::usage(&sets).sets, 0);
+    }
+
     #[test]
     fn a_diverged_run_is_remembered_and_is_not_a_failure() {
         let world = World::new(Script::Finish(AnalysisStatus::Diverged));
@@ -1869,13 +2004,32 @@ mod tests {
         assert!(p.wall_seconds > 0.0);
         assert_eq!((p.counts.header, p.counts.game_over), (1, 1));
         assert!(p.counts.unit_created > 0 && p.counts.unit_destroyed > 0);
+        // Every line the run wrote but the unit definitions, which are kept
+        // in their own store.
         let lines = p.counts.header
             + p.counts.game_start
             + p.counts.unit_created
             + p.counts.unit_finished
             + p.counts.unit_destroyed
+            + p.counts.unit_given
+            + p.counts.start_unit_position
             + p.counts.game_over
             + p.counts.unknown;
+        let sets = def_sets::dir_beside(&analyses);
+        let kept = def_sets::for_replay(&sets, &game_id).unwrap();
+        let engine_list = kept.events.as_ref().expect("the engine's own unit list");
+        assert_eq!(engine_list.origin, def_sets::Origin::Engine);
+        assert_eq!(kept.sets[&engine_list.digest].len(), p.counts.unit_def);
+        assert!(
+            p.counts.unit_def > 0,
+            "the logger listed no unit definitions"
+        );
+        eprintln!(
+            "the engine listed {} unit definitions, kept as {} in {} bytes",
+            p.counts.unit_def,
+            engine_list.digest,
+            def_sets::usage(&sets).bytes
+        );
         let all = store::read_events(&analyses, &game_id, None, 0, None).unwrap();
         assert_eq!((all.total, all.events.len()), (lines, lines));
         let destroyed = store::read_events(

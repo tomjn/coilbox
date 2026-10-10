@@ -126,7 +126,7 @@ export function useReplayEventLayers({
   const deathRead = useEventRead(state, DEATH_KINDS, deathsOn);
   const finishedRead = useEventRead(state, FINISHED_KINDS, finishedOn);
   const startRead = useEventRead(state, START_UNIT_KINDS, startOn);
-  const units = useReplayUnits(info, deathsOn || finishedOn);
+  const units = useReplayUnits(info, deathsOn || finishedOn, "events");
 
   const [costMode, setCostMode] = useState(false);
   const deaths = useMemo(

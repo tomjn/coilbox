@@ -1,4 +1,4 @@
-{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":2,"positionFrames":60}
+{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":2,"positionFrames":60,"unitDefs":0}
 {"kind":"game_start","frame":0}
 {"kind":"unit_created","frame":0,"unit":1,"def":12,"team":0,"x":100.0,"y":5.3,"z":200.0,"startUnit":true}
 {"kind":"unit_finished","frame":0,"unit":1,"def":12,"team":0,"x":100.0,"y":5.3,"z":200.0,"startUnit":true}

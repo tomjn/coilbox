@@ -20,6 +20,7 @@ import { REPLAY_SOURCE_NOTES } from "../../replaySources";
 import { UNIT_CATEGORIES } from "../../unitCategory";
 import type { EventLayers } from "../../useReplayEventLayers";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { StoredListNote } from "./UnitListNotes";
 
 /** How much of a mark shows when another player is the emphasised one. The
  *  order marks use the same. */
@@ -272,6 +273,9 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
                 <ToggleGroupItem value="count">Units lost</ToggleGroupItem>
                 <ToggleGroupItem value="cost">Metal cost lost</ToggleGroupItem>
               </ToggleGroup>
+              {ev.weighted && (
+                <StoredListNote source={units.source} subject="Costs" />
+              )}
               {ev.weighted &&
                 differentBuild &&
                 units.source?.kind === "differentBuild" && (
@@ -297,6 +301,10 @@ export function EventLayerNotes({ ev }: { ev: EventLayers }) {
             {plural(finished.marks.length, "building", "buildings")} finished.
           </p>
           {finished.marks.length > 0 && <OutlineKey ev={ev} />}
+          <StoredListNote
+            source={units.source}
+            subject="Shapes and the choice of buildings"
+          />
           {differentBuild && units.source?.kind === "differentBuild" && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               This replay was played on {units.recorded}, which is not

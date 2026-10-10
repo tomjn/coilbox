@@ -1,6 +1,6 @@
 import { Button, Input } from "@picoframe/frame";
 import { ChevronRight, Hammer, Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Field } from "@/components/Field";
 import {
   Collapsible,
@@ -28,13 +28,15 @@ import {
   ordersUpTo,
   parseCutMinutes,
 } from "../../replayOpening";
+import { orderFit } from "../../replayUnitDefs";
 import { useReplayBuildOrders } from "../../useReplayBuildOrders";
-import { useReplayUnits } from "../../useReplayUnits";
+import { useKeepUnitList, useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { OpeningSplitHelp, ReplayOpeningSplit } from "./ReplayOpeningSplit";
 import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
+import { OrderFitNote, StoredListNote, UnitListHelp } from "./UnitListNotes";
 
 /** How many of a seat's orders are drawn at first, and added per press. A long
  *  match has hundreds per player, and all of them at once is thousands of rows. */
@@ -59,6 +61,7 @@ function SourceNote({
       </p>
     );
   }
+  if (source.kind === "stored") return <StoredListNote source={source} />;
   if (unitsFailed) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -99,12 +102,15 @@ function SeatOpening({
   seat,
   units,
   pics,
+  noPictures,
   cutMinutes,
   differentBuild,
 }: {
   seat: BuildOrderSeat;
   units: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
+  /** No installed game can be asked for a picture, so none is on its way. */
+  noPictures: boolean;
   cutMinutes: number | null;
   differentBuild: boolean;
 }) {
@@ -138,7 +144,7 @@ function SeatOpening({
                 {unit && (
                   <UnitIcon
                     display={pics?.units[unit.name]}
-                    pending={pics === null}
+                    pending={pics === null && !noPictures}
                     size="sm"
                   />
                 )}
@@ -198,6 +204,7 @@ function SeatOrders({
   seat,
   units,
   pics,
+  noPictures,
   defaultOpen,
   cutMinutes,
   differentBuild,
@@ -205,6 +212,7 @@ function SeatOrders({
   seat: BuildOrderSeat;
   units: UnitDatasetEntry[] | null;
   pics: UnitBuildpicsResult | null;
+  noPictures: boolean;
   defaultOpen: boolean;
   cutMinutes: number | null;
   differentBuild: boolean;
@@ -236,6 +244,7 @@ function SeatOrders({
           seat={seat}
           units={units}
           pics={pics}
+          noPictures={noPictures}
           cutMinutes={cutMinutes}
           differentBuild={differentBuild}
         />
@@ -256,7 +265,7 @@ function SeatOrders({
                 {unit && (
                   <UnitIcon
                     display={pics?.units[unit.name]}
-                    pending={pics === null}
+                    pending={pics === null && !noPictures}
                     size="sm"
                   />
                 )}
@@ -320,9 +329,22 @@ export function ReplayBuildOrders({
   // Which installed game can name the ids, from the live scan the page's
   // missing-game notice reads. Nothing is asked of unitsync until there are
   // orders to name.
-  const { selected, recorded, source, archive, status, units } = useReplayUnits(
-    info,
-    result !== null && result.orders.length > 0,
+  const {
+    selected,
+    recorded,
+    source,
+    archive,
+    picturesArchive,
+    status,
+    units,
+    links,
+  } = useReplayUnits(info, result !== null && result.orders.length > 0);
+  // The list just read is kept for this replay, so it can still be named when
+  // the game has moved on. Only a list the replay's own orders agree with.
+  useKeepUnitList(info, source, units, result?.orders ?? null, links);
+  const fit = useMemo(
+    () => (result && units ? orderFit(result.orders, units) : null),
+    [result, units],
   );
   const named = result
     ? [
@@ -336,7 +358,7 @@ export function ReplayBuildOrders({
   const pics = useUnitsyncUnitBuildpics(
     selected?.enginePath,
     selected?.rootPath,
-    archive,
+    picturesArchive,
     named,
   );
 
@@ -359,6 +381,7 @@ export function ReplayBuildOrders({
                 with repeats shown as a count.
               </p>
               {units && <OpeningSplitHelp />}
+              <UnitListHelp fit={fit} />
               {result && result.removals > 0 && (
                 <p>
                   {result.removals}{" "}
@@ -408,6 +431,7 @@ export function ReplayBuildOrders({
               unitsFailed={archive !== undefined && units === null}
             />
           )}
+          {fit && <OrderFitNote fit={fit} />}
           <Field
             label="Opening length in minutes"
             hint="Leave this empty to fold the whole match."
@@ -441,6 +465,7 @@ export function ReplayBuildOrders({
               seat={seat}
               units={units}
               pics={pics}
+              noPictures={picturesArchive === undefined}
               defaultOpen={seats.length === 1}
               cutMinutes={parseCutMinutes(cut)}
               differentBuild={source?.kind === "differentBuild"}

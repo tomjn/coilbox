@@ -24,12 +24,7 @@ import {
   type UnitBuildpicsResult,
   type UnitDatasetEntry,
 } from "../../bindings";
-import {
-  useScanTargetSelection,
-  useUnitsyncScan,
-  useUnitsyncUnitBuildpics,
-  useUnitsyncUnitDataset,
-} from "../../config";
+import { useUnitsyncUnitBuildpics } from "../../config";
 import { useStoredAnalyses } from "../../replayAnalysis";
 import {
   ALL_KINDS,
@@ -48,15 +43,15 @@ import {
 } from "../../replayAnalysisEvents";
 import {
   buildOrderTime,
-  pickUnitSource,
-  recordedGame,
   resolveBuildUnit,
   type UnitSource,
 } from "../../replayBuildOrders";
 import { readReplayEvents } from "../../replayEventRead";
+import { useReplayUnits } from "../../useReplayUnits";
 import { SectionHelp } from "./SectionHelp";
 import { ErrorBanner } from "./states";
 import { UnitIcon } from "./UnitIcon";
+import { StoredListNote } from "./UnitListNotes";
 
 /** How many rows are drawn at first, and added per press. A match can hold tens
  *  of thousands of events, and the build orders page theirs the same way. */
@@ -81,6 +76,7 @@ function UnitNote({
       </p>
     );
   }
+  if (source.kind === "stored") return <StoredListNote source={source} />;
   if (unitsFailed) {
     return (
       <p className="text-xs text-muted-foreground">
@@ -193,24 +189,18 @@ function EventsTable({
   const { rows, left } = pageOf(matching, shown);
 
   // Nothing is asked of unitsync until there are events to name.
-  const { selected } = useScanTargetSelection();
-  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
-  const recorded = recordedGame(info);
+  // An event's ids are those of the game the analysis ran on, which the
+  // engine's own list answers for when the run recorded one.
   const hasUnits = events.some((e) => typeof e.def === "number");
-  const source =
-    hasUnits && scan.data && !scan.loading
-      ? pickUnitSource(recorded, scan.data.games)
-      : null;
-  const archive =
-    source && source.kind !== "notInstalled"
-      ? source.game.primaryArchive.name
-      : undefined;
-  const { dataset, status } = useUnitsyncUnitDataset(
-    selected?.enginePath,
-    selected?.rootPath,
+  const {
+    selected,
+    recorded,
+    source,
     archive,
-  );
-  const units = archive && dataset ? dataset.units : null;
+    picturesArchive,
+    status,
+    units,
+  } = useReplayUnits(info, hasUnits, "events");
   const named = [
     ...new Set(
       rows.flatMap((e) =>
@@ -223,7 +213,7 @@ function EventsTable({
   const pics: UnitBuildpicsResult | null = useUnitsyncUnitBuildpics(
     selected?.enginePath,
     selected?.rootPath,
-    archive,
+    picturesArchive,
     named,
   );
 
@@ -308,7 +298,9 @@ function EventsTable({
                         {unit && (
                           <UnitIcon
                             display={pics?.units[unit.name]}
-                            pending={pics === null}
+                            pending={
+                              pics === null && picturesArchive !== undefined
+                            }
                             size="sm"
                           />
                         )}

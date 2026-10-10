@@ -171,6 +171,7 @@ do
 	check("the header names the engine", header.engine == "2026.01.0 test")
 	check("the header names the Gaia team", header.gaiaTeam == 2)
 	check("the header says how many frames lie between two positions", header.positionFrames == 60)
+	check("the header says the engine had no unit definitions to list", header.unitDefs == 0)
 end
 
 do
@@ -513,6 +514,89 @@ do
 
 	check("a write directory that refuses the file removes the gadget and says why",
 		engine.removed and #engine.lines == 0 and engine.logs[1]:find("could not open", 1, true) ~= nil)
+end
+
+--------------------------------------------------------------------------------
+-- The engine's unit definitions.
+--------------------------------------------------------------------------------
+
+-- Four definitions as the engine's UnitDefs table hands them over: every field
+-- present, zero where the definition said nothing.
+local UNIT_DEFS = {
+	{
+		name = "tgcom", humanName = "Commander", metalCost = 2500, energyCost = 25000.5, speed = 37.5,
+		isBuilder = true, buildOptions = { 2, 3 }, weapons = { {} },
+		transportCapacity = 0, metalMake = 1.5, energyMake = 25, metalStorage = 500, energyStorage = 0,
+		radarDistance = 700,
+	},
+	{
+		name = "tgmex", humanName = "Metal Extractor", metalCost = 50, energyCost = 500, speed = 0,
+		isBuilder = false, buildOptions = {}, weapons = {},
+		extractsMetal = 0.0010000000474974513, energyUpkeep = 3,
+	},
+	{
+		name = "tgwind", humanName = "", metalCost = 35, energyCost = 0, speed = 0,
+		isBuilder = false, buildOptions = {}, weapons = {},
+		windGenerator = 25, energyUpkeep = -0.00001,
+	},
+	{
+		name = 'tg"odd', humanName = 'tg"odd', metalCost = 0, energyCost = 0, speed = 90,
+		isBuilder = false, buildOptions = {}, weapons = { {}, {} }, transportCapacity = 8,
+	},
+}
+
+do
+	local engine = newEngine({ unitDefs = UNIT_DEFS })
+	local lines = decoded(engine)
+	local defs = ofKind(engine, "unit_def")
+
+	check("every unit definition is one unit_def line", #defs == 4, tostring(#defs))
+	check("the header says how many definitions follow", lines[1].unitDefs == 4)
+	check("the definitions follow the header and nothing comes between",
+		lines[1].kind == "header" and lines[2].kind == "unit_def" and lines[5].kind == "unit_def" and #lines == 5)
+	check("the ids count up from 1 in the engine's order",
+		defs[1].id == 1 and defs[2].id == 2 and defs[3].id == 3 and defs[4].id == 4)
+	check("a definition carries its key, its name and both costs",
+		defs[1].name == "tgcom" and defs[1].humanName == "Commander" and defs[1].metalCost == 2500
+			and defs[1].energyCost == 25000.5)
+	check("a unit that moves, builds, has a build menu and a weapon says so",
+		defs[1].mobile == true and defs[1].builder == true and defs[1].builds == true and defs[1].armed == true)
+	check("a building says none of them, and the flags are left out, not written as false",
+		defs[2].mobile == nil and defs[2].builder == nil and defs[2].builds == nil and defs[2].armed == nil
+			and not engine.raw:find(":false", 1, true))
+	check("what a unit makes, stores and senses comes through under the engine's names",
+		defs[1].metalMake == 1.5 and defs[1].energyMake == 25 and defs[1].metalStorage == 500
+			and defs[1].radarDistance == 700 and defs[2].energyUpkeep == 3 and defs[3].windGenerator == 25
+			and defs[4].transportCapacity == 8)
+	check("a number that is zero is left out", defs[1].energyStorage == nil and defs[1].transportCapacity == nil)
+	check("a cost of nothing is still written, because free is a price",
+		defs[4].metalCost == 0 and defs[4].energyCost == 0)
+	check("a 32 bit float is written to four places, without the noise",
+		engine.lines[3]:find('"extractsMetal":0.001,', 1, true) ~= nil, engine.lines[3])
+	check("a number too small to write is left out, never written as minus zero", defs[3].energyUpkeep == nil)
+	check("an empty name, and one that repeats the key, are left out",
+		defs[3].humanName == nil and defs[4].humanName == nil)
+	check("a key with a quote in it survives", defs[4].name == 'tg"odd')
+	check("every definition line is flushed like any other", engine.flushes == #engine.lines)
+
+	local path = support.root() .. "/tests/fixtures/unit_defs.jsonl"
+	if os.getenv("COILBOX_WRITE_FIXTURE") then
+		local out = assert(io.open(path, "w"))
+		out:write(engine.raw)
+		out:close()
+		print("wrote " .. path)
+	end
+	local fixture = io.open(path)
+	local recorded = fixture and fixture:read("*a")
+	if fixture then
+		fixture:close()
+	end
+	check("the unit definition fixture is what these definitions write, byte for byte", recorded == engine.raw)
+end
+
+do
+	local engine = newEngine()
+	check("an engine with no unit definitions writes none", #ofKind(engine, "unit_def") == 0 and #engine.lines == 1)
 end
 
 --------------------------------------------------------------------------------

@@ -13,6 +13,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::super::def_sets::UnitDef;
+
 /// The format this reader was written against. The logger raises its own
 /// number when a line loses or changes a field, never for an addition.
 pub const FORMAT_VERSION: u32 = 1;
@@ -23,7 +25,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 2;
+pub const LOGGER_VERSION: u32 = 3;
 
 /// The first line: what the gadget saw the run as.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -45,6 +47,8 @@ pub struct LogHeader {
     /// How many frames lie between two `start_unit_position` lines for one
     /// unit. 0 from a logger that wrote none.
     pub position_frames: i32,
+    /// How many `unit_def` lines follow. 0 from a logger that wrote none.
+    pub unit_defs: u32,
 }
 
 /// A unit being created, finished, destroyed or handed to another team.
@@ -106,6 +110,17 @@ pub struct StartUnitPosition {
     pub z: f32,
 }
 
+/// One of the engine's unit definitions, as the run's own `UnitDefs` table had
+/// it. The logger writes one for each, in id order, straight after the header.
+/// Every `def` on a later line is an `id` here.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct UnitDefLine {
+    pub id: u32,
+    #[serde(flatten)]
+    pub def: UnitDef,
+}
+
 /// One team's last statistics sample as Lua read it when the game ended, with
 /// the number of samples the team had. The fields are the engine's own
 /// `TeamStatistics`, the same ones the replay's trailer holds.
@@ -152,6 +167,8 @@ pub struct LoggedGameOver {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum LogLine {
     Header(LogHeader),
+    /// Boxed because a definition is several times the size of any other line.
+    UnitDef(Box<UnitDefLine>),
     GameStart {
         frame: i32,
     },
@@ -173,6 +190,9 @@ pub enum LogLine {
 #[serde(rename_all = "camelCase", default)]
 pub struct EventCounts {
     pub header: usize,
+    /// The engine's unit definitions. A stored file keeps this count and not
+    /// the lines, which go to the unit definition store.
+    pub unit_def: usize,
     pub game_start: usize,
     pub unit_created: usize,
     pub unit_finished: usize,
@@ -217,6 +237,7 @@ impl EventLog {
         for line in &self.lines {
             match line {
                 LogLine::Header(_) => counts.header += 1,
+                LogLine::UnitDef(_) => counts.unit_def += 1,
                 LogLine::GameStart { .. } => counts.game_start += 1,
                 LogLine::UnitCreated(_) => counts.unit_created += 1,
                 LogLine::UnitFinished(_) => counts.unit_finished += 1,
@@ -229,6 +250,31 @@ impl EventLog {
         }
         counts
     }
+}
+
+/// The engine's unit definitions in id order, when `lines` hold the whole
+/// list: as many as the header says, with ids that count up from 1. Anything
+/// else is no list, because a definition is found by its place in it and a
+/// list with a hole would name the wrong unit for every id after the hole.
+pub fn unit_defs_of(lines: &[LogLine]) -> Option<Vec<UnitDef>> {
+    let expected = lines.iter().find_map(|line| match line {
+        LogLine::Header(header) => Some(header.unit_defs as usize),
+        _ => None,
+    })?;
+    let defs: Vec<&UnitDefLine> = lines
+        .iter()
+        .filter_map(|line| match line {
+            LogLine::UnitDef(def) => Some(def.as_ref()),
+            _ => None,
+        })
+        .collect();
+    let whole = expected > 0
+        && defs.len() == expected
+        && defs
+            .iter()
+            .enumerate()
+            .all(|(index, line)| line.id as usize == index + 1);
+    whole.then(|| defs.into_iter().map(|line| line.def.clone()).collect())
 }
 
 /// Parse the logger's file.
@@ -273,6 +319,7 @@ pub(super) mod tests {
             log.counts(),
             EventCounts {
                 header: 1,
+                unit_def: 0,
                 game_start: 1,
                 unit_created: 7,
                 unit_finished: 6,
@@ -309,13 +356,14 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                2,
+                3,
                 vec![
                     "game_over",
                     "game_start",
                     "header",
                     "start_unit_position",
                     "unit_created",
+                    "unit_def",
                     "unit_destroyed",
                     "unit_finished",
                     "unit_given"
@@ -339,6 +387,7 @@ pub(super) mod tests {
         assert_eq!((header.map_size_x, header.map_size_z), (4096.0, 2048.0));
         assert_eq!(header.gaia_team, 2);
         assert_eq!(header.position_frames, 60);
+        assert_eq!(header.unit_defs, 0);
     }
 
     #[test]
@@ -517,6 +566,76 @@ pub(super) mod tests {
                 serde_json::from_str(&serde_json::to_string(&parsed).unwrap()).unwrap();
             assert_eq!(written, original, "{line}");
         }
+    }
+
+    /// What the logger writes for the unit definitions in its own test, which
+    /// fails if the logger stops producing exactly this.
+    pub(in super::super::super) const UNIT_DEFS_FIXTURE: &str =
+        include_str!("../../../../../lua/replay-logger/tests/fixtures/unit_defs.jsonl");
+
+    #[test]
+    fn the_engines_unit_definitions_read_in_id_order() {
+        let log = parse_log(UNIT_DEFS_FIXTURE);
+
+        assert_eq!(log.malformed, 0);
+        assert_eq!((log.counts().header, log.counts().unit_def), (1, 4));
+        let defs = unit_defs_of(&log.lines).expect("a whole list");
+        assert_eq!(defs.len(), 4);
+        assert_eq!(
+            defs[0],
+            UnitDef {
+                name: "tgcom".into(),
+                human_name: Some("Commander".into()),
+                metal_cost: Some(2500.0),
+                energy_cost: Some(25000.5),
+                mobile: true,
+                builder: true,
+                builds: true,
+                armed: true,
+                metal_make: Some(1.5),
+                energy_make: Some(25.0),
+                metal_storage: Some(500.0),
+                radar_distance: Some(700.0),
+                ..Default::default()
+            }
+        );
+        assert_eq!(defs[1].extracts_metal, Some(0.001));
+        assert_eq!((defs[1].mobile, defs[1].builder), (false, false));
+        assert_eq!(defs[2].human_name, None);
+        assert_eq!(defs[3].name, "tg\"odd");
+        assert_eq!(
+            (defs[3].metal_cost, defs[3].transport_capacity),
+            (Some(0.0), Some(8.0))
+        );
+    }
+
+    /// A definition is found by its place in the list.
+    #[test]
+    fn a_list_that_is_cut_short_or_out_of_order_is_no_list() {
+        let lines: Vec<&str> = UNIT_DEFS_FIXTURE.lines().collect();
+        let without = |skip: usize| -> String {
+            lines
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != skip)
+                .map(|(_, line)| format!("{line}\n"))
+                .collect()
+        };
+        let defs = |text: &str| unit_defs_of(&parse_log(text).lines);
+
+        // No header, so nothing says how many there should be.
+        assert!(defs(&without(0)).is_none());
+        assert!(defs(&without(1)).is_none());
+        assert!(defs(&without(3)).is_none());
+        // A run stopped part way through the list.
+        assert!(defs(&without(4)).is_none());
+        let swapped = format!(
+            "{}\n{}\n{}\n{}\n{}\n",
+            lines[0], lines[2], lines[1], lines[3], lines[4]
+        );
+        assert!(defs(&swapped).is_none());
+        // A logger from before the list was written.
+        assert!(defs(FIXTURE).is_none());
     }
 
     #[test]

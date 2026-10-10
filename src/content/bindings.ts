@@ -1193,6 +1193,10 @@ export type ReplayLogLine =
 /** How many lines of each kind a run's log held. */
 export interface ReplayEventCounts {
   header: number;
+  /** The engine's unit definitions the run listed. They are kept in the unit
+   *  definition store and not among the events. Absent from a file written
+   *  before the logger listed them. */
+  unitDef?: number;
   gameStart: number;
   unitCreated: number;
   unitFinished: number;
@@ -1475,6 +1479,102 @@ export const contentReplayAnalysisDelete = defineCommand<
   { gameId: string },
   { deleted: boolean }
 >("coilbox-content", "content_replay_analysis_delete");
+
+/**
+ * One unit definition as the unit definition store keeps it (#1176): what the
+ * replay page reads of a unit and no more. A number that is absent is one the
+ * source did not give, which is not the same as zero.
+ */
+export interface StoredUnitDef {
+  /** The definition's key. */
+  name: string;
+  /** What a player calls it. Absent when the source gave none. */
+  humanName?: string;
+  metalCost?: number;
+  energyCost?: number;
+  /** Whether it moves. Left out when false, like the three below. */
+  mobile?: boolean;
+  /** Whether the definition says it builds. */
+  builder?: boolean;
+  /** Whether it has a build menu. */
+  builds?: boolean;
+  /** Whether it has a weapon. */
+  armed?: boolean;
+  transportCapacity?: number;
+  metalMake?: number;
+  energyMake?: number;
+  makesMetal?: number;
+  extractsMetal?: number;
+  windGenerator?: number;
+  tidalGenerator?: number;
+  metalUpkeep?: number;
+  energyUpkeep?: number;
+  metalStorage?: number;
+  energyStorage?: number;
+  radarDistance?: number;
+  sonarDistance?: number;
+  radarDistanceJam?: number;
+  sonarDistanceJam?: number;
+  seismicDistance?: number;
+}
+
+/**
+ * Where a stored unit list came from, least trusted first. `folder` and
+ * `archive` were read through unitsync from an installed game matched by name:
+ * a loose folder can change under its name and a packaged archive cannot.
+ * `engine` is the engine's own list, written during an analysis run.
+ */
+export type UnitDefOrigin = "folder" | "archive" | "engine";
+
+/** One unit list recorded for a replay. */
+export interface UnitDefLink {
+  /** `sha256:` and 64 hex digits, the list's name. */
+  digest: string;
+  origin: UnitDefOrigin;
+  /** The game the list was read from, name and version. */
+  game: string;
+  takenAtMs: number;
+  /** For an engine's list: whether the run used a game other than the one the
+   *  replay names. Absent when that is not known. */
+  gameDiffers?: boolean;
+}
+
+/** What is recorded for one replay. */
+export interface ReplayUnitDefSets {
+  links: UnitDefLink[];
+  /** The link that names the ids in the replay's own stream, if any. */
+  stream: UnitDefLink | null;
+  /** The link that names the ids in the replay's analysis events, if any. */
+  events: UnitDefLink | null;
+  /** The lists `stream` and `events` name, by digest, each in id order. */
+  sets: Record<string, StoredUnitDef[]>;
+}
+
+/**
+ * The unit lists recorded for one replay. `gameId` is the replay's own, which
+ * for a remix is its original's, so a remix reads its original's lists.
+ */
+export const contentUnitDefSet = defineCommand<
+  { gameId: string },
+  ReplayUnitDefSets
+>("coilbox-content", "content_unit_def_set");
+
+/**
+ * Keep the unit list a replay was just read against. Only for a game installed
+ * under the exact name the replay records. `archive` is the installed game's
+ * archive name, which says whether it is a loose folder. A replay that already
+ * has a list from that kind of read keeps it, and `digest` is the one it kept.
+ */
+export const contentUnitDefSetStore = defineCommand<
+  { gameId: string; game: string; archive: string; units: StoredUnitDef[] },
+  { digest: string | null; origin: UnitDefOrigin; links: UnitDefLink[] }
+>("coilbox-content", "content_unit_def_set_store");
+
+/** How many unit lists are kept, for how many replays, and their size on disk. */
+export const contentUnitDefSetsUsage = defineCommand<
+  undefined,
+  { sets: number; replays: number; bytes: number }
+>("coilbox-content", "content_unit_def_sets_usage");
 
 /**
  * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
