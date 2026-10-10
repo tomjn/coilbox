@@ -70,8 +70,8 @@ import {
 import { StartBoxEditor } from "@/startbox/StartBoxEditor";
 import { StartBoxOverlay } from "@/startbox/StartBoxOverlay";
 import { StartPosCard } from "@/startbox/StartPosCard";
-import { contentListReplays } from "../../content/bindings";
 import { useBrandingEntry } from "../../content/branding";
+import { loadReplays } from "../../content/replayList";
 import { useReplayUserState } from "../../content/replayUserState";
 import { buildImportCodeLink } from "../../deeplink/build";
 import { copyDeepLink } from "../../deeplink/copyLink";
@@ -666,7 +666,7 @@ export default function SkirmishPage() {
     // failure here just disables tagging/detection, never the launch itself.
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;

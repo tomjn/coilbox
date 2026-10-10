@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { contentListReplays } from "@/content/bindings";
+import { loadReplays } from "@/content/replayList";
 import { useReplayUserState } from "@/content/replayUserState";
 import { notify } from "@/notify/notify";
 import type { BattleConfig } from "@/play/bindings";
@@ -133,7 +133,7 @@ export function useBattleLaunch(
     // tagging for this launch, never the launch itself.
     let beforePaths: Set<string> | null = null;
     try {
-      const { replays } = await contentListReplays({ root: target.dataDir });
+      const replays = await loadReplays(target.dataDir, true);
       beforePaths = new Set(replays.map((r) => r.path));
     } catch {
       beforePaths = null;

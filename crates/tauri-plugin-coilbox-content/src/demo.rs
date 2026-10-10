@@ -26,7 +26,9 @@ use std::time::{Duration, Instant, UNIX_EPOCH};
 
 use flate2::read::GzDecoder;
 use picoframe_core::CliResult;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
+use tauri::{AppHandle, Runtime};
 
 use crate::metrics::{self, TeamTotals};
 use crate::model::{
@@ -81,46 +83,156 @@ const PLAYER_STAT_ELEM_SIZE: usize = 20;
 
 // ---- listing ---------------------------------------------------------------
 
-/// List a root's replays (cheap fs metadata only, demotool is never run here so
-/// the list stays fast), newest first.
-pub fn list_replays(root: &Path) -> Vec<ReplayFile> {
-    let mut out: Vec<ReplayFile> = demo_file_entries(root)
-        .into_iter()
-        .map(|e| {
-            // Cheap native decode (header + start-script only, no demotool) so the
-            // list can show map/players/duration. Best-effort, ignored on failure.
-            let summary = decode_native(&e.path).ok();
-            let (skill_min, skill_avg, skill_max) = summary
-                .as_ref()
-                .map(|i| skill_stats(&i.players))
-                .unwrap_or((None, None, None));
-            ReplayFile {
-                filename: e.filename,
-                path: e.path.to_string_lossy().into_owned(),
-                size_bytes: e.size_bytes,
-                modified_ms: e.modified_ms,
-                map_name: summary
-                    .as_ref()
-                    .map(|i| i.map_name.clone())
-                    .filter(|s| !s.is_empty()),
-                game_type: summary
-                    .as_ref()
-                    .map(|i| i.game_type.clone())
-                    .filter(|s| !s.is_empty()),
-                duration_sec: summary.as_ref().map(|i| i.duration_sec),
-                player_count: summary.as_ref().map(|i| {
-                    (i.players.iter().filter(|p| !p.spectator).count() + i.ais.len()) as u32
-                }),
-                start_time_ms: summary.as_ref().map(|i| i.start_time_ms),
-                skill_min,
-                skill_avg,
-                skill_max,
-                remixed: summary.as_ref().map(|i| i.remixed).unwrap_or(false),
+/// List a root's replays with nothing kept between calls, newest first. Every
+/// file is decoded. The command uses [`list_replays_stored`] instead.
+#[cfg(test)]
+fn list_replays(root: &Path) -> Vec<ReplayFile> {
+    list_replays_stored(root, None).0
+}
+
+/// Bumped when [`ReplaySummary`] changes shape. A store written under another
+/// version is read as empty and rebuilt.
+const SUMMARY_STORE_VERSION: u32 = 1;
+
+/// What the list shows for one replay, from the cheap native decode (header and
+/// start-script, no demotool, no winner).
+#[derive(Serialize, Deserialize, Clone)]
+struct ReplaySummary {
+    map_name: Option<String>,
+    game_type: Option<String>,
+    duration_sec: Option<u32>,
+    player_count: Option<u32>,
+    start_time_ms: Option<u64>,
+    skill_min: Option<f32>,
+    skill_avg: Option<f32>,
+    skill_max: Option<f32>,
+    remixed: bool,
+}
+
+/// One replay file's stored summary and the signature it was decoded under. A
+/// file that would not decode keeps `summary: None`, so it is not opened again
+/// until it changes.
+#[derive(Serialize, Deserialize)]
+struct StoredSummary {
+    size_bytes: u64,
+    modified_ms: u64,
+    summary: Option<ReplaySummary>,
+}
+
+/// The stored summaries for one replay root, keyed by the file's full path so
+/// two folders holding the same file name do not collide.
+#[derive(Serialize, Deserialize)]
+struct SummaryStore {
+    version: u32,
+    entries: HashMap<String, StoredSummary>,
+}
+
+impl Default for SummaryStore {
+    fn default() -> Self {
+        Self {
+            version: SUMMARY_STORE_VERSION,
+            entries: HashMap::new(),
+        }
+    }
+}
+
+/// Read a store. A missing, unreadable, corrupt or other-version file is an
+/// empty store, which the next listing rebuilds.
+fn load_summaries(path: &Path) -> SummaryStore {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<SummaryStore>(&s).ok())
+        .filter(|s| s.version == SUMMARY_STORE_VERSION)
+        .unwrap_or_default()
+}
+
+fn summarise(info: &DemoInfo) -> ReplaySummary {
+    let (skill_min, skill_avg, skill_max) = skill_stats(&info.players);
+    ReplaySummary {
+        map_name: Some(info.map_name.clone()).filter(|s| !s.is_empty()),
+        game_type: Some(info.game_type.clone()).filter(|s| !s.is_empty()),
+        duration_sec: Some(info.duration_sec),
+        player_count: Some(
+            (info.players.iter().filter(|p| !p.spectator).count() + info.ais.len()) as u32,
+        ),
+        start_time_ms: Some(info.start_time_ms),
+        skill_min,
+        skill_avg,
+        skill_max,
+        remixed: info.remixed,
+    }
+}
+
+/// List a root's replays (cheap fs metadata plus the cheap native decode, demotool
+/// is never run here), newest first, and how many files were decoded.
+///
+/// With a `store_path` the decoded summaries are kept there. A file whose size and
+/// modified time match its stored entry reuses it, so only new or changed files
+/// are decoded. Entries for files that are gone are dropped. The store is written
+/// only when it changed, and failing to write it is not an error.
+pub fn list_replays_stored(root: &Path, store_path: Option<&Path>) -> (Vec<ReplayFile>, usize) {
+    let mut store = store_path.map(load_summaries).unwrap_or_default();
+    let mut decoded = 0;
+    let mut changed = false;
+    let mut live: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut out: Vec<ReplayFile> = Vec::new();
+    for e in demo_file_entries(root) {
+        let key = e.path.to_string_lossy().into_owned();
+        let fresh = store
+            .entries
+            .get(&key)
+            .is_some_and(|s| s.size_bytes == e.size_bytes && s.modified_ms == e.modified_ms);
+        if !fresh {
+            let summary = decode_native(&e.path).ok().map(|i| summarise(&i));
+            decoded += 1;
+            changed = true;
+            store.entries.insert(
+                key.clone(),
+                StoredSummary {
+                    size_bytes: e.size_bytes,
+                    modified_ms: e.modified_ms,
+                    summary,
+                },
+            );
+        }
+        let summary = store.entries[&key].summary.clone();
+        live.insert(key.clone());
+        out.push(replay_file(e, summary));
+    }
+    let held = store.entries.len();
+    store.entries.retain(|k, _| live.contains(k));
+    changed |= store.entries.len() != held;
+    if changed {
+        if let Some(path) = store_path {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
             }
-        })
-        .collect();
+            if let Ok(json) = serde_json::to_string(&store) {
+                let _ = coilbox_gamebackup::write_atomic(path, json.as_bytes());
+            }
+        }
+    }
     out.sort_by_key(|r| std::cmp::Reverse(r.modified_ms));
-    out
+    (out, decoded)
+}
+
+fn replay_file(e: DemoFileEntry, summary: Option<ReplaySummary>) -> ReplayFile {
+    let s = summary.as_ref();
+    ReplayFile {
+        filename: e.filename,
+        path: e.path.to_string_lossy().into_owned(),
+        size_bytes: e.size_bytes,
+        modified_ms: e.modified_ms,
+        map_name: s.and_then(|s| s.map_name.clone()),
+        game_type: s.and_then(|s| s.game_type.clone()),
+        duration_sec: s.and_then(|s| s.duration_sec),
+        player_count: s.and_then(|s| s.player_count),
+        start_time_ms: s.and_then(|s| s.start_time_ms),
+        skill_min: s.and_then(|s| s.skill_min),
+        skill_avg: s.and_then(|s| s.skill_avg),
+        skill_max: s.and_then(|s| s.skill_max),
+        remixed: s.is_some_and(|s| s.remixed),
+    }
 }
 
 /// A demo file's identity from cheap fs metadata only (no header/script decode) —
@@ -1703,12 +1815,24 @@ fn parse_winners(out: &str) -> Option<Vec<u32>> {
 /// `<root>/replays`, and in the same folders of every engine installed under the
 /// root (fast fs metadata, no decoding). `root` is a `ContentRoot.path`.
 #[tauri::command]
-pub(crate) async fn content_list_replays(root: String) -> CliResult {
+pub(crate) async fn content_list_replays<R: Runtime>(app: AppHandle<R>, root: String) -> CliResult {
     let p = PathBuf::from(&root);
-    match tauri::async_runtime::spawn_blocking(move || list_replays(&p)).await {
+    let store = summary_store_path(&app, &p);
+    match tauri::async_runtime::spawn_blocking(move || list_replays_stored(&p, store.as_deref()).0)
+        .await
+    {
         Ok(replays) => CliResult::ok(json!({ "replays": replays })),
         Err(e) => CliResult::err(format!("list replays task failed: {e}")),
     }
+}
+
+/// Where a root's replay summaries are kept: one file per root under the app
+/// cache dir. `None` when the cache dir cannot be resolved, and every listing
+/// then decodes every file.
+fn summary_store_path<R: Runtime>(app: &AppHandle<R>, root: &Path) -> Option<PathBuf> {
+    let dir = coilbox_portable::cache_dir(app).ok()?;
+    let id = crate::hash_id(&[&root.to_string_lossy()]);
+    Some(dir.join("replay-summaries").join(format!("{id}.json")))
 }
 
 /// `content_demo_info`, decode one replay: native header + start-script (map,
@@ -2967,6 +3091,107 @@ mod tests {
         assert_eq!(list.len(), 2);
         assert!(list.iter().any(|r| r.filename == "a.sdfz"));
         assert!(list.iter().any(|r| r.filename == "b.sdf"));
+    }
+
+    /// A root with two real replays and a store path beside it.
+    fn stored_fixture(name: &str) -> (PathBuf, PathBuf) {
+        let root = std::env::temp_dir().join(name);
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        let demo = build_demo(SCRIPT, true);
+        std::fs::write(root.join("demos").join("a.sdfz"), &demo).unwrap();
+        std::fs::write(root.join("demos").join("b.sdfz"), &demo).unwrap();
+        let store = root.join("cache").join("summaries.json");
+        (root, store)
+    }
+
+    #[test]
+    fn a_second_listing_of_an_unchanged_folder_decodes_nothing() {
+        let (root, store) = stored_fixture("coilbox_summary_second_test");
+        let (first, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 2);
+        let (second, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 0);
+        assert_eq!(second.len(), 2);
+        assert_eq!(second[0].map_name, first[0].map_name);
+        assert_eq!(
+            second[0].map_name.as_deref(),
+            Some("Valles Marineris 2.6.1")
+        );
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_new_file_is_the_only_one_decoded() {
+        let (root, store) = stored_fixture("coilbox_summary_new_test");
+        list_replays_stored(&root, Some(&store));
+        std::fs::write(root.join("demos").join("c.sdfz"), build_demo(SCRIPT, true)).unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!(decoded, 1);
+        assert_eq!(list.len(), 3);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_changed_size_or_modified_time_decodes_that_file_again() {
+        let (root, store) = stored_fixture("coilbox_summary_changed_test");
+        list_replays_stored(&root, Some(&store));
+        let a = root.join("demos").join("a.sdfz");
+        let mut bytes = build_demo(SCRIPT, true);
+        bytes.push(0);
+        std::fs::write(&a, bytes).unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 1);
+
+        let b = std::fs::File::options()
+            .write(true)
+            .open(root.join("demos").join("b.sdfz"))
+            .unwrap();
+        b.set_modified(std::time::SystemTime::now() + Duration::from_secs(60))
+            .unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 1);
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_removed_file_is_dropped_from_the_store() {
+        let (root, store) = stored_fixture("coilbox_summary_removed_test");
+        list_replays_stored(&root, Some(&store));
+        std::fs::remove_file(root.join("demos").join("a.sdfz")).unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!((list.len(), decoded), (1, 0));
+        let kept = load_summaries(&store);
+        assert_eq!(kept.entries.len(), 1);
+        assert!(kept.entries.keys().all(|k| k.ends_with("b.sdfz")));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn a_corrupt_or_old_store_is_rebuilt() {
+        let (root, store) = stored_fixture("coilbox_summary_corrupt_test");
+        std::fs::create_dir_all(store.parent().unwrap()).unwrap();
+        std::fs::write(&store, b"not json").unwrap();
+        let (list, decoded) = list_replays_stored(&root, Some(&store));
+        assert_eq!((list.len(), decoded), (2, 2));
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+
+        std::fs::write(&store, br#"{"version":0,"entries":{}}"#).unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn the_same_file_name_in_two_folders_is_stored_twice() {
+        let (root, store) = stored_fixture("coilbox_summary_collide_test");
+        std::fs::create_dir_all(root.join("replays")).unwrap();
+        std::fs::write(
+            root.join("replays").join("a.sdfz"),
+            build_demo(SCRIPT, true),
+        )
+        .unwrap();
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 3);
+        assert_eq!(list_replays_stored(&root, Some(&store)).1, 0);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     /// The engine writes `demos/` relative to its write dir, and a Recoil release

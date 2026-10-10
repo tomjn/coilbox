@@ -52,6 +52,7 @@ import {
   type ReplayEngineNotice,
   replayDependencyBlock,
 } from "../replayEngine";
+import { forgetReplay } from "../replayList";
 import { provenanceLink } from "../replayProvenanceLink";
 import { teamLabel, teamResultLabel } from "../replaySideLabel";
 import { useReplayUserState } from "../replayUserState";
@@ -794,6 +795,7 @@ function DeleteReplayButton({
     setError(null);
     try {
       await contentDeleteReplay({ path: replayPath });
+      forgetReplay(replayPath);
       setOpen(false);
       onDeleted();
     } catch (e) {

@@ -19,7 +19,6 @@ import {
   contentDemoInfo,
   contentKeybindsRead,
   contentKeybindsWrite,
-  contentListReplays,
   contentListSaves,
   contentStatsIngest,
   contentStatsQuery,
@@ -35,7 +34,6 @@ import {
   type MapSkyboxResult,
   type MetalmapResult,
   type MinimapResult,
-  type ReplayFile,
   type SaveFile,
   type ScanResult,
   STATS_UPDATED_EVENT,
@@ -2058,42 +2056,7 @@ export function useUnitsyncMapSkybox(
  * Replays — list a root's demo files, and lazily decode one for its detail view.
  * -------------------------------------------------------------------------- */
 
-/** List the replays in a content root (re-runs on `rootPath` change / refresh). */
-export function useReplays(rootPath?: string) {
-  const [replays, setReplays] = useState<ReplayFile[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  // The rootPath whose listing `replays`/`error` currently reflect. Until it
-  // matches the requested rootPath the list hasn't loaded yet — which the UI
-  // must distinguish from "loaded and empty" (a root with no replays), or it
-  // would show a skeleton forever instead of an empty state.
-  const [loadedFor, setLoadedFor] = useState<string | undefined>(undefined);
-
-  const refresh = useCallback(async () => {
-    if (!rootPath) {
-      setReplays([]);
-      setLoadedFor(undefined);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await contentListReplays({ root: rootPath });
-      setReplays(res.replays);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoadedFor(rootPath);
-      setLoading(false);
-    }
-  }, [rootPath]);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { replays, loading, error, refresh, ready: loadedFor === rootPath };
-}
+export { useReplays } from "./replayList";
 
 /** List the savegames in a content root (re-runs on `rootPath` change / refresh). */
 export function useSaves(rootPath?: string) {
