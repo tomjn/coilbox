@@ -172,6 +172,9 @@ do
 	check("the header names the Gaia team", header.gaiaTeam == 2)
 	check("the header says how many frames lie between two positions", header.positionFrames == 60)
 	check("the header says the engine had no unit definitions to list", header.unitDefs == 0)
+	check("the header says how many frames one damage line adds up", header.damageFrames == 450)
+	check("the header gives the grid damage is added up on, 256 cells on the longer side",
+		header.gridWidth == 256 and header.gridHeight == 128)
 end
 
 do
@@ -476,6 +479,7 @@ do
 	local allowed = {
 		GetGameFrame = true,
 		GetUnitPosition = true,
+		GetUnitHealth = true,
 		GetTeamStatsHistory = true,
 		GetGaiaTeamID = true,
 		GetTeamList = true,
@@ -600,8 +604,353 @@ do
 end
 
 --------------------------------------------------------------------------------
--- The fixture file the Rust parser reads.
+-- A start unit a game swaps for another.
 --------------------------------------------------------------------------------
+
+local KILLED_BY_SCRIPT = -21
+
+-- Two teams, each with one start unit, 400 frames in.
+local function twoStartUnits()
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	local mine = engine.create(12, 0, 100, 5, 200)
+	local theirs = engine.create(31, 1, 3900, 10, 1800)
+	engine.runTo(400)
+	return engine, mine, theirs
+end
+
+do
+	-- The new unit first and the old one destroyed in the same call, which is
+	-- what Metal Factions does.
+	local engine, mine = twoStartUnits()
+	engine.move(mine, 150.5, 5, 260.3)
+	local upgraded = engine.create(13, 0, 150.5, 5, 260.3)
+	engine.finish(upgraded)
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+
+	check("a start unit a script swaps for a unit made in its place is one replaced line", #replaced == 1,
+		tostring(#replaced))
+	check("the line names the old unit, the new one, the team, the frame and the place",
+		replaced[1].unit == mine and replaced[1].by == upgraded and replaced[1].team == 0
+			and replaced[1].frame == 400 and replaced[1].x == 150.5 and replaced[1].z == 260.3)
+	local lines = decoded(engine)
+	check("the replaced line comes before the old unit's destroyed line",
+		lines[#lines - 1].kind == "start_unit_replaced" and lines[#lines].kind == "unit_destroyed"
+			and lines[#lines].unit == mine and lines[#lines].startUnit == true)
+
+	engine.move(upgraded, 400, 5, 400)
+	engine.runTo(420)
+	local positions = ofKind(engine, "start_unit_position")
+	check("the new unit's positions are written from then on",
+		positions[#positions].unit == upgraded and positions[#positions].frame == 420
+			and positions[#positions].team == 0)
+	engine.destroy(upgraded, mine, 7)
+	local destroyed = ofKind(engine, "unit_destroyed")
+	check("and its later lines say it is a start unit", destroyed[#destroyed].startUnit == true)
+end
+
+do
+	-- The old unit destroyed a frame after the new one is made, which is what
+	-- Splinter Faction does. Both may have moved by then.
+	local engine, mine = twoStartUnits()
+	local upgraded = engine.create(13, 0, 100, 5, 200)
+	engine.runTo(401)
+	engine.move(mine, 101, 5, 200)
+	engine.move(upgraded, 99, 5, 200)
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+
+	check("an old unit destroyed on the next frame is still replaced",
+		#replaced == 1 and replaced[1].unit == mine and replaced[1].by == upgraded and replaced[1].frame == 401)
+end
+
+do
+	-- A game that destroys the old unit before it makes the new one.
+	local engine, mine = twoStartUnits()
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	local upgraded = engine.create(13, 0, 100, 5, 200)
+	local replaced = ofKind(engine, "start_unit_replaced")
+	local created = ofKind(engine, "unit_created")
+
+	check("an old unit destroyed first is replaced by a unit made in its place on that frame",
+		#replaced == 1 and replaced[1].unit == mine and replaced[1].by == upgraded)
+	check("and the new unit's created line already says it is a start unit",
+		created[#created].unit == upgraded and created[#created].startUnit == true)
+
+	local second = engine.create(14, 0, 100, 5, 200)
+	check("a second unit made in the same place replaces nothing",
+		#ofKind(engine, "start_unit_replaced") == 1 and second ~= nil)
+end
+
+do
+	local engine, mine = twoStartUnits()
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	engine.runTo(401)
+	engine.create(13, 0, 100, 5, 200)
+	check("a unit made in a destroyed start unit's place a frame later replaces nothing",
+		#ofKind(engine, "start_unit_replaced") == 0)
+end
+
+do
+	-- Everything that looks like an upgrade and is not one.
+	local function links(scene)
+		local engine, mine, theirs = twoStartUnits()
+		scene(engine, mine, theirs)
+		return #ofKind(engine, "start_unit_replaced")
+	end
+
+	check("a start unit an attacker killed is not replaced, whatever was made in its place", links(function(e, mine, theirs)
+		e.create(13, 0, 100, 5, 200)
+		e.destroy(mine, theirs, 7)
+	end) == 0)
+	check("a start unit that died of something other than a script is not replaced", links(function(e, mine)
+		e.create(13, 0, 100, 5, 200)
+		e.destroy(mine)
+	end) == 0)
+	check("a script that names an attacker did not swap the unit", links(function(e, mine, theirs)
+		e.create(13, 0, 100, 5, 200)
+		e.destroy(mine, theirs, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a unit made a tenth of an elmo away is not in its place", links(function(e, mine)
+		e.create(13, 0, 100.1, 5, 200)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a unit made in its place for another team is not its successor", links(function(e, mine)
+		e.create(13, 1, 100, 5, 200)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a unit something built in its place is not its successor", links(function(e, mine)
+		e.create(13, 0, 100, 5, 200, mine)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a unit made in its place two frames before it was destroyed is not its successor", links(function(e, mine)
+		e.create(13, 0, 100, 5, 200)
+		e.runTo(402)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("with two units that could each be the successor, neither is", links(function(e, mine)
+		e.create(13, 0, 100, 5, 200)
+		e.create(14, 0, 100, 5, 200)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a successor that died before the old unit is not one", links(function(e, mine, theirs)
+		local upgraded = e.create(13, 0, 100, 5, 200)
+		e.destroy(upgraded, theirs, 7)
+		e.destroy(mine, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+	check("a unit that is not a start unit is never replaced", links(function(e, mine)
+		local tank = e.create(40, 0, 500, 5, 500, mine)
+		e.create(41, 0, 500, 5, 500)
+		e.destroy(tank, nil, KILLED_BY_SCRIPT)
+	end) == 0)
+end
+
+do
+	-- An upgrade of an upgrade.
+	local engine, mine = twoStartUnits()
+	local second = engine.create(13, 0, 100, 5, 200)
+	engine.destroy(mine, nil, KILLED_BY_SCRIPT)
+	engine.runTo(900)
+	local third = engine.create(14, 0, 100, 5, 200)
+	engine.destroy(second, nil, KILLED_BY_SCRIPT)
+	local replaced = ofKind(engine, "start_unit_replaced")
+
+	check("a successor is replaced in its turn",
+		#replaced == 2 and replaced[2].unit == second and replaced[2].by == third and replaced[2].frame == 900)
+end
+
+--------------------------------------------------------------------------------
+-- Damage.
+--------------------------------------------------------------------------------
+
+-- The stub's map is 4096 by 2048, so the grid is 256 by 128 and a cell is 16
+-- elmos a side.
+local function cellAt(x, z)
+	return math.floor(z / 16) * 256 + math.floor(x / 16)
+end
+
+local function damageMatch()
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2 })
+	local a = engine.create(12, 0, 100, 5, 200)
+	local b = engine.create(31, 1, 3900, 10, 1800)
+	return engine, a, b
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.runTo(10)
+	engine.damage(b, 10, a)
+	engine.damage(b, 2.5, a)
+	engine.runTo(20)
+	engine.damage(a, 7, b)
+	check("nothing is written while a stretch is still being added up", #ofKind(engine, "damage") == 0)
+
+	engine.runTo(449)
+	engine.damage(b, 1, a)
+	engine.runTo(450)
+	check("nor on the first frame of the next, until something is hit", #ofKind(engine, "damage") == 0)
+	engine.damage(b, 4, a)
+	local damage = ofKind(engine, "damage")
+
+	check("a stretch is written once a hit lands in the next: one line for each pair of teams", #damage == 2,
+		tostring(#damage))
+	check("a line names the stretch's first frame, the attacker's team and the target's",
+		damage[1].frame == 0 and damage[1].team == 0 and damage[1].target == 1
+			and damage[2].team == 1 and damage[2].target == 0)
+	check("hits on one cell are added up, where the unit hit stood",
+		#damage[1].at == 2 and damage[1].at[1] == cellAt(3900, 1800) and damage[1].at[2] == 13.5,
+		table.concat(damage[1].at, ","))
+	check("and again where the attacker stood",
+		#damage[1].origin == 2 and damage[1].origin[1] == cellAt(100, 200) and damage[1].origin[2] == 13.5)
+	check("a whole number of damage is written whole", engine.lines[#engine.lines]:find('"at":[3078,7]', 1, true) ~= nil,
+		engine.lines[#engine.lines])
+
+	engine.frame = 451
+	engine.synced:GameOver({ 0 })
+	damage = ofKind(engine, "damage")
+	local lines = decoded(engine)
+	check("the stretch the game ended in is written before the game over line",
+		#damage == 3 and damage[3].frame == 450 and damage[3].at[2] == 4
+			and lines[#lines].kind == "game_over" and lines[#lines - 1].kind == "damage")
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.damage(b, 10, a)
+	engine.move(b, 2000, 10, 1000)
+	engine.move(a, 500, 5, 600)
+	engine.damage(b, 20, a)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+	local line = ofKind(engine, "damage")[1]
+
+	check("a unit hit in two places is in two cells, in the order it was hit",
+		#line.at == 4 and line.at[1] == cellAt(3900, 1800) and line.at[2] == 10
+			and line.at[3] == cellAt(2000, 1000) and line.at[4] == 20)
+	check("and so is an attacker that moved",
+		line.origin[1] == cellAt(100, 200) and line.origin[3] == cellAt(500, 600) and line.origin[4] == 20)
+end
+
+do
+	local engine, a, b = damageMatch()
+	-- Every unit in the stub has 100 health.
+	engine.damage(b, 60, a)
+	engine.damage(b, 5000, a)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+	local line = ofKind(engine, "damage")[1]
+
+	check("a hit far larger than its target counts for what the target had left", line.at[2] == 100,
+		tostring(line.at[2]))
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.damage(b, 30, a, true)
+	engine.damage(b, -10, a)
+	engine.damage(b, 0, a)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+
+	check("paralysis, healing and a hit that did nothing are not damage", #ofKind(engine, "damage") == 0)
+end
+
+do
+	local engine, a, b = damageMatch()
+	engine.damage(b, 12)
+	engine.damage(a, 3, a)
+	engine.move(b, -50, 10, 1800)
+	engine.damage(b, 6, a)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+	local damage = ofKind(engine, "damage")
+
+	check("damage with no attacker has no team and no origin",
+		damage[1].team == nil and damage[1].origin == nil and damage[1].target == 1 and damage[1].at[2] == 12)
+	check("a unit that hit itself is a line with its team on both sides",
+		damage[2].team == 0 and damage[2].target == 0 and damage[2].at[2] == 3 and damage[2].origin[2] == 3)
+	check("damage to a unit off the map is counted apart, and its attacker's place is still kept",
+		damage[3].off == 6 and #damage[3].at == 0 and damage[3].origin[2] == 6)
+	check("an empty list is still a list", engine.raw:find('"at":[],', 1, true) ~= nil)
+	check("off is left out when nothing was off the map", damage[1].off == nil)
+end
+
+do
+	local engine = newEngine({ teams = { 0, 1 }, gaiaTeam = 2, game = { mapSizeX = 2048, mapSizeZ = 6144 } })
+	local header = ofKind(engine, "header")[1]
+	local a = engine.create(12, 0, 2048, 5, 6144)
+	engine.damage(a, 5)
+	engine.runTo(450)
+	engine.synced:GameOver({})
+	local line = ofKind(engine, "damage")[1]
+
+	check("a tall map has its 256 cells north to south", header.gridWidth == 85 and header.gridHeight == 256)
+	check("a unit on the map's far edge is in the last cell", line.at[1] == 255 * 85 + 84, tostring(line.at[1]))
+end
+
+--------------------------------------------------------------------------------
+-- The fixture files the Rust parser reads.
+--------------------------------------------------------------------------------
+
+-- A short match with an upgrade by replacement and some fighting in it, for
+-- the readers of the two kinds that fixtureMatch has none of.
+local function upgradeMatch()
+	local engine = newEngine({ teams = { 0, 1, 2 }, gaiaTeam = 2, stats = STATS })
+	engine.synced:GameStart()
+	local commander0 = engine.create(12, 0, 100, 5, 200)
+	engine.finish(commander0)
+	local commander1 = engine.create(31, 1, 3900, 10, 1800)
+	engine.finish(commander1)
+	engine.move(commander0, 400, 5, 300)
+	engine.runTo(120)
+
+	-- Team 0 upgrades at frame 300, the new unit first.
+	engine.runTo(300)
+	local upgraded = engine.create(13, 0, 400, 5, 300)
+	engine.finish(upgraded)
+	engine.destroy(commander0, nil, KILLED_BY_SCRIPT)
+	engine.move(upgraded, 900, 5, 700)
+	engine.runTo(360)
+
+	-- A fight across two stretches.
+	engine.runTo(400)
+	engine.damage(commander1, 20, upgraded)
+	engine.damage(upgraded, 5.5, commander1)
+	engine.runTo(500)
+	engine.damage(commander1, 30, upgraded)
+	engine.damage(commander1, 4)
+
+	-- Team 1's start unit dies to an attacker with a unit made in its place,
+	-- which is a death and no upgrade.
+	engine.runTo(600)
+	engine.create(50, 1, 3900, 10, 1800)
+	engine.damage(commander1, 500, upgraded)
+	engine.destroy(commander1, upgraded, 7)
+	engine.runTo(601)
+	engine.synced:GameOver({ 0 })
+	return engine
+end
+
+do
+	local engine = upgradeMatch()
+	check("the upgrade match holds one replacement and four damage lines",
+		#ofKind(engine, "start_unit_replaced") == 1 and #ofKind(engine, "damage") == 4,
+		#ofKind(engine, "start_unit_replaced") .. " and " .. #ofKind(engine, "damage"))
+
+	local path = support.root() .. "/tests/fixtures/upgrade.jsonl"
+	if os.getenv("COILBOX_WRITE_FIXTURE") then
+		local out = assert(io.open(path, "w"))
+		out:write(engine.raw)
+		out:close()
+		print("wrote " .. path)
+	end
+	local fixture = io.open(path)
+	local recorded = fixture and fixture:read("*a")
+	if fixture then
+		fixture:close()
+	end
+	check("the upgrade fixture is what the upgrade match writes, byte for byte", recorded == engine.raw)
+end
 
 do
 	local engine = fixtureMatch()

@@ -34,6 +34,7 @@ import {
   EVENT_MAP_LAYERS,
   holdEventLayers,
   layersOn,
+  oneOfDeathsAndDamage,
   useStoredMapLayers,
 } from "../../replayMapLayerToggles";
 import {
@@ -464,10 +465,12 @@ export function ReplayMap({
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);
   // One 3D layer for each density, so two on at once are both on the terrain,
-  // each in its own ramp.
-  useHeatmapLayer(handle, field, HEAT_KIND_OF_LAYER.density);
+  // each in its own ramp. Layers at one depth are drawn in the order they were
+  // made, so orders go first and the sparser buildings sit on top of them.
   useHeatmapLayer(handle, orderField, HEAT_KIND_OF_LAYER.orderDensity);
+  useHeatmapLayer(handle, field, HEAT_KIND_OF_LAYER.density);
   useHeatmapLayer(handle, ev.field, HEAT_KIND_OF_LAYER.deaths);
+  useHeatmapLayer(handle, ev.damageField, HEAT_KIND_OF_LAYER.damage);
 
   const boxes = on.startBoxes ? info.allyTeams.filter((a) => a.startBox) : [];
   const hasBoxes = info.allyTeams.some((a) => a.startBox);
@@ -490,7 +493,8 @@ export function ReplayMap({
   const showColourNote =
     (orderField?.peak ?? 0) > 0 ||
     (field?.peak ?? 0) > 0 ||
-    (ev.field?.peak ?? 0) > 0;
+    (ev.field?.peak ?? 0) > 0 ||
+    (ev.damageField?.peak ?? 0) > 0;
   const basesShown = on.bases && dots.length > 0 && !!inWindow;
 
   return (
@@ -588,17 +592,19 @@ export function ReplayMap({
               style={{ aspectRatio: aspect }}
               className="block max-h-full max-w-full object-fill"
             />
-            {field && field.peak > 0 && (
-              <canvas
-                ref={heatRef}
-                data-layer="density"
-                className="pointer-events-none absolute inset-0 size-full"
-              />
-            )}
+            {/* Orders cover most of a map and buildings a few patches of it,
+                so the sparser layer goes on top where it can still be seen. */}
             {orderField && orderField.peak > 0 && (
               <canvas
                 ref={orderHeatRef}
                 data-layer="orderDensity"
+                className="pointer-events-none absolute inset-0 size-full"
+              />
+            )}
+            {field && field.peak > 0 && (
+              <canvas
+                ref={heatRef}
+                data-layer="density"
                 className="pointer-events-none absolute inset-0 size-full"
               />
             )}
@@ -687,9 +693,10 @@ export function ReplayMap({
             value={layersOn(stored).filter(
               (l) => !ev.block || !EVENT_MAP_LAYERS.includes(l),
             )}
-            onValueChange={(next) =>
-              setLayers(ev.block ? holdEventLayers(next, stored) : next)
-            }
+            onValueChange={(picked) => {
+              const next = oneOfDeathsAndDamage(picked, stored);
+              setLayers(ev.block ? holdEventLayers(next, stored) : next);
+            }}
           >
             <ToggleGroupItem value="startBoxes">Start boxes</ToggleGroupItem>
             <ToggleGroupItem value="starts">Start positions</ToggleGroupItem>
@@ -703,6 +710,9 @@ export function ReplayMap({
             <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
             <EventToggle value="deaths" reason={ev.block}>
               Deaths
+            </EventToggle>
+            <EventToggle value="damage" reason={ev.block}>
+              Damage dealt
             </EventToggle>
             <EventToggle value="finished" reason={ev.block}>
               Buildings finished

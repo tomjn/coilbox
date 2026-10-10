@@ -701,6 +701,14 @@ mod tests {
         .unwrap()
     }
 
+    /// Lines as the logger writes them, which is what the store is handed.
+    fn text(lines: &[LogLine]) -> Vec<String> {
+        lines
+            .iter()
+            .map(|line| serde_json::to_string(line).unwrap())
+            .collect()
+    }
+
     fn event(unit: i32, def: i32, team: i32) -> UnitEvent {
         UnitEvent {
             unit,
@@ -732,7 +740,7 @@ mod tests {
         store::write(
             &analyses,
             &provenance(&id, "reproduced", 5),
-            Some(&events[..]),
+            Some(&text(&events)),
         )
         .unwrap();
 
@@ -874,7 +882,12 @@ mod tests {
         assert_eq!(read().events, None);
 
         let one = [LogLine::UnitFinished(event(1, 42, 0))];
-        store::write(&analyses, &provenance(&id, "reproduced", 5), Some(&one[..])).unwrap();
+        store::write(
+            &analyses,
+            &provenance(&id, "reproduced", 5),
+            Some(&text(&one)),
+        )
+        .unwrap();
         let got = read();
         assert!(got.from_cache, "the stream was not walked again");
         assert_eq!(finished(&got), Some(1));
@@ -883,7 +896,12 @@ mod tests {
             LogLine::UnitFinished(event(1, 42, 0)),
             LogLine::UnitFinished(event(2, 42, 0)),
         ];
-        store::write(&analyses, &provenance(&id, "reproduced", 6), Some(&two[..])).unwrap();
+        store::write(
+            &analyses,
+            &provenance(&id, "reproduced", 6),
+            Some(&text(&two)),
+        )
+        .unwrap();
         assert_eq!(finished(&read()), Some(2));
         // Unchanged since, so the kept events answer.
         assert_eq!(finished(&read()), Some(2));
@@ -1005,7 +1023,12 @@ mod tests {
         let engines = list(&["alpha", "beta", "gamma"]);
         def_sets::record(&lists, &id, &engines, &source(Origin::Engine, Some(true))).unwrap();
         let one = [LogLine::UnitFinished(event(1, 2, 0))];
-        store::write(&analyses, &provenance(&id, "reproduced", 5), Some(&one[..])).unwrap();
+        store::write(
+            &analyses,
+            &provenance(&id, "reproduced", 5),
+            Some(&text(&one)),
+        )
+        .unwrap();
         let demo = replay(tmp.path(), "a.sdfz", short_match(), 7);
         let orders = replay_unit_orders(&demo, None, Some(&analyses)).unwrap();
 

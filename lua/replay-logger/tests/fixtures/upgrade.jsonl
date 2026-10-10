@@ -1,0 +1,19 @@
+{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":2,"positionFrames":60,"unitDefs":0,"damageFrames":450,"gridWidth":256,"gridHeight":128}
+{"kind":"game_start","frame":0}
+{"kind":"unit_created","frame":0,"unit":1,"def":12,"team":0,"x":100.0,"y":5.0,"z":200.0,"startUnit":true}
+{"kind":"unit_finished","frame":0,"unit":1,"def":12,"team":0,"x":100.0,"y":5.0,"z":200.0,"startUnit":true}
+{"kind":"unit_created","frame":0,"unit":2,"def":31,"team":1,"x":3900.0,"y":10.0,"z":1800.0,"startUnit":true}
+{"kind":"unit_finished","frame":0,"unit":2,"def":31,"team":1,"x":3900.0,"y":10.0,"z":1800.0,"startUnit":true}
+{"kind":"start_unit_position","frame":60,"unit":1,"team":0,"x":400.0,"z":300.0}
+{"kind":"unit_created","frame":300,"unit":3,"def":13,"team":0,"x":400.0,"y":5.0,"z":300.0}
+{"kind":"unit_finished","frame":300,"unit":3,"def":13,"team":0,"x":400.0,"y":5.0,"z":300.0}
+{"kind":"start_unit_replaced","frame":300,"unit":1,"by":3,"team":0,"x":400.0,"z":300.0}
+{"kind":"unit_destroyed","frame":300,"unit":1,"def":12,"team":0,"x":400.0,"y":5.0,"z":300.0,"startUnit":true,"weapon":-21}
+{"kind":"start_unit_position","frame":360,"unit":3,"team":0,"x":900.0,"z":700.0}
+{"kind":"damage","frame":0,"team":0,"target":1,"at":[28915,20],"origin":[11064,20]}
+{"kind":"damage","frame":0,"team":1,"target":0,"at":[11064,5.5],"origin":[28915,5.5]}
+{"kind":"unit_created","frame":600,"unit":4,"def":50,"team":1,"x":3900.0,"y":10.0,"z":1800.0}
+{"kind":"unit_destroyed","frame":600,"unit":2,"def":31,"team":1,"x":3900.0,"y":10.0,"z":1800.0,"startUnit":true,"attacker":3,"attackerDef":13,"attackerTeam":0,"weapon":7}
+{"kind":"damage","frame":450,"team":0,"target":1,"at":[28915,76],"origin":[11064,76]}
+{"kind":"damage","frame":450,"target":1,"at":[28915,4]}
+{"kind":"game_over","frame":601,"winners":[0],"teams":[{"team":0,"samples":3,"frame":601,"metalUsed":1234.567749023437500,"energyUsed":5000,"metalProduced":1500,"energyProduced":9000.500000000000000,"metalExcess":0.300000011920929,"energyExcess":0,"metalReceived":0,"energyReceived":0,"metalSent":0,"energySent":0,"damageDealt":4100,"damageReceived":0,"unitsProduced":4,"unitsDied":1,"unitsReceived":0,"unitsSent":1,"unitsCaptured":1,"unitsOutCaptured":0,"unitsKilled":2},{"team":1,"samples":2,"frame":601,"metalUsed":300,"energyUsed":2000,"metalProduced":900,"energyProduced":4000,"metalExcess":0,"energyExcess":0,"metalReceived":0,"energyReceived":0,"metalSent":0,"energySent":0,"damageDealt":0,"damageReceived":4100,"unitsProduced":2,"unitsDied":2,"unitsReceived":1,"unitsSent":0,"unitsCaptured":0,"unitsOutCaptured":1,"unitsKilled":0}]}

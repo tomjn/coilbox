@@ -27,21 +27,34 @@ export type HeatKind = "buildings" | "orders" | "deaths";
  *
  * - buildings: violet through magenta to pink, chosen in #1151 when it was the
  *   only layer. Magenta is the colour a map is least likely to be.
- * - orders: dark teal to pale aqua. Teal and magenta are far apart on the
- *   red-green axis a deutan reader loses, which blue and magenta are not.
+ * - orders: deep cyan to pale aqua. Seen on a tan map and a green one, the
+ *   green leaning teal this replaced was a grey green wash at low density,
+ *   because that is the colour of terrain. Cyan is not. It stops short of
+ *   blue, because blue and magenta are close on the axis a deutan reader
+ *   keeps: buildings against orders measures 10.7 for deutan vision at the
+ *   closest stop, where the teal measured 9.0 and a blue ramp 2.1.
  * - deaths: brown through orange to pale amber. It differs from both by hue and
  *   it is the one colour of the three that carries a warning.
  *
  * None is a red to green ramp, and no two are red against green. Where a map
- * is itself teal, as water can be, the legend bar beside the layer's name says
+ * is itself cyan, as water can be, the legend bar beside the layer's name says
  * which layer is which.
+ *
+ * There is no fourth ramp, and damage is drawn in the deaths ramp with only
+ * one of the two shown at a time. Red and green colour blindness leaves one
+ * axis of hue, from blue to yellow, and the three ramps sit at its blue end,
+ * its middle and its yellow end. Of 9,000 single hue ramps tried against these
+ * three (every 5 degrees of hue, five saturations, 25 ranges of lightness),
+ * the 310 that kept `CVD_TARGET` and `NORMAL_FLOOR` at every stop all began at
+ * 8% lightness: they passed by being darker than the others at the same stop,
+ * which on a map reads as the same colour at a lower density.
  *
  * The same ramps serve both themes. They are drawn over the map's own texture
  * and never over the card, so the theme does not change what is behind them.
  */
 export const HEAT_RAMPS: Readonly<Record<HeatKind, readonly string[]>> = {
   buildings: ["#551ea6", "#8628b8", "#b436b6", "#e25aae", "#ffa0cc"],
-  orders: ["#0a5a50", "#10847a", "#1fae98", "#4fd8c4", "#9af5ea"],
+  orders: ["#00788f", "#00a0b8", "#0ac8dc", "#54e4f2", "#aaf6fc"],
   deaths: ["#7a3b00", "#b05a00", "#e07a00", "#ff9f40", "#ffd070"],
 };
 
@@ -49,7 +62,8 @@ export const HEAT_RAMPS: Readonly<Record<HeatKind, readonly string[]>> = {
  * Which ramp each density layer is drawn in. The one place that decides, so a
  * layer keeps its colour on the replay's map, in the 3D terrain, in its legend,
  * on a map's own page and in the exported picture. The replay's toggles are
- * `density` (buildings ordered) and `orderDensity`. A map's page names its
+ * `density` (buildings ordered), `orderDensity`, `deaths` and `damage`, and the
+ * last two share a ramp and are never drawn together. A map's page names its
  * layers `buildings`, `defence`, `economy`, `orders` and `deaths`, and the
  * three building layers are all buildings.
  */
@@ -61,6 +75,7 @@ export const HEAT_KIND_OF_LAYER = {
   economy: "buildings",
   orders: "orders",
   deaths: "deaths",
+  damage: "deaths",
 } as const satisfies Record<string, HeatKind>;
 
 /**

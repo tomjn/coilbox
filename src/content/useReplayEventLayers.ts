@@ -1,8 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildHeatField, type HeatField } from "@/lib/heatField";
+import {
+  buildHeatField,
+  buildHeatFieldFromCounts,
+  type HeatField,
+} from "@/lib/heatField";
 import type { DemoInfo } from "./bindings";
 import { analysisRunHidden, useStoredAnalyses } from "./replayAnalysis";
 import type { LogEvent } from "./replayAnalysisEvents";
+import {
+  DAMAGE_KINDS,
+  DAMAGE_LOGGER_VERSION,
+  type DamageMode,
+  damageGrid,
+  damageInRange,
+  damageLog,
+  damageTotals,
+  gridFits,
+} from "./replayDamage";
 import {
   costedDeaths,
   DEATH_KINDS,
@@ -19,10 +33,12 @@ import {
 import { readReplayEvents } from "./replayEventRead";
 import type { MapWorld } from "./replayMapLayers";
 import {
+  REPLACED_LOGGER_VERSION,
   START_UNIT_KINDS,
   START_UNIT_LOGGER_VERSION,
   startUnitEnds,
   startUnitTracks,
+  startUnitUpgrades,
   trackInRange,
 } from "./replayStartUnits";
 import {
@@ -102,6 +118,7 @@ export function useReplayEventLayers({
   layersShown: boolean;
   toggles: {
     deaths: boolean;
+    damage: boolean;
     finished: boolean;
     startUnitDeaths: boolean;
     startUnitPaths: boolean;
@@ -118,6 +135,8 @@ export function useReplayEventLayers({
   const block = layersShown ? eventBlock(state) : null;
   const ready = layersShown && state.kind === "ready";
   const deathsOn = ready && toggles.deaths;
+  // Damage shares the deaths ramp, so it is drawn only when deaths are not.
+  const damageOn = ready && toggles.damage && !toggles.deaths;
   const finishedOn = ready && toggles.finished;
   const startDeathsOn = ready && toggles.startUnitDeaths;
   const startPathsOn = ready && toggles.startUnitPaths;
@@ -126,6 +145,7 @@ export function useReplayEventLayers({
   const deathRead = useEventRead(state, DEATH_KINDS, deathsOn);
   const finishedRead = useEventRead(state, FINISHED_KINDS, finishedOn);
   const startRead = useEventRead(state, START_UNIT_KINDS, startOn);
+  const damageRead = useEventRead(state, DAMAGE_KINDS, damageOn);
   const units = useReplayUnits(info, deathsOn || finishedOn, "events");
 
   const [costMode, setCostMode] = useState(false);
@@ -163,6 +183,27 @@ export function useReplayEventLayers({
     [deathsOn, sized, deathsInWindow, points, range, world],
   );
 
+  // An analysis from before the logger recorded damage holds none, which is a
+  // different answer from a match with no fighting.
+  const damageRecorded =
+    state.kind === "ready" && state.loggerVersion >= DAMAGE_LOGGER_VERSION;
+  const [damageMode, setDamageMode] = useState<DamageMode>("at");
+  const damage = useMemo(
+    () => damageLog(damageRead.events),
+    [damageRead.events],
+  );
+  const damageFits = sized && gridFits(damage, world);
+  const damageLines = useMemo(
+    () => damageInRange(damage.lines, range),
+    [damage, range],
+  );
+  const damageSums = useMemo(() => damageTotals(damageLines), [damageLines]);
+  const damageField: HeatField | null = useMemo(() => {
+    if (!damageOn || !damageFits || !damage.grid) return null;
+    const grid = damageGrid(damageLines, damage.grid, damageMode);
+    return grid.total > 0 ? buildHeatFieldFromCounts(grid.binned, world) : null;
+  }, [damageOn, damageFits, damage.grid, damageLines, damageMode, world]);
+
   const finishedAll: FinishedBuildings | null = useMemo(
     () =>
       finishedOn && sized && units.units
@@ -188,6 +229,16 @@ export function useReplayEventLayers({
     [startRead.events],
   );
   const startEndsAll = useMemo(() => startUnitEnds(tracks), [tracks]);
+  const startUpgradesAll = useMemo(() => startUnitUpgrades(tracks), [tracks]);
+  // An upgrade is a mark on a path, so it is drawn with the paths.
+  const startUpgrades = useMemo(
+    () => (startPathsOn ? filterByFrame(startUpgradesAll, range) : []),
+    [startPathsOn, startUpgradesAll, range],
+  );
+  // An analysis from before the logger joined a starting unit to the unit that
+  // replaced it ends every path at its first upgrade.
+  const replacementsRecorded =
+    state.kind === "ready" && state.loggerVersion >= REPLACED_LOGGER_VERSION;
   const startEnds = useMemo(
     () => (startDeathsOn ? filterByFrame(startEndsAll, range) : []),
     [startDeathsOn, startEndsAll, range],
@@ -230,9 +281,26 @@ export function useReplayEventLayers({
     block,
     deathsOn,
     finishedOn,
+    damageOn,
+    damageRead,
+    /** Whether the analysis is from a logger that records damage. */
+    damageRecorded,
+    /** Whether the logger's grid is this map's, so a cell is a place. */
+    damageFits,
+    damageMode,
+    setDamageMode,
+    /** What the damage in the window adds up to. */
+    damageSums,
+    /** How many frames one stretch of damage covers. */
+    damageFrames: damage.frames,
+    damageField,
     startDeathsOn,
     startPathsOn,
     startRead,
+    /** Whether the analysis is from a logger that follows a replacement. */
+    replacementsRecorded,
+    /** The upgrades on the paths inside the window. */
+    startUpgrades,
     /** Whether the analysis is from a logger that flags starting units. */
     startUnitsRecorded,
     /** Every starting unit in the log, whatever the window. */
@@ -242,7 +310,7 @@ export function useReplayEventLayers({
     /** Each starting unit's path inside the window. */
     startPaths,
     /** Whether any layer is drawing, which is when the window applies. */
-    active: deathsOn || finishedOn || startOn,
+    active: deathsOn || damageOn || finishedOn || startOn,
     deathRead,
     finishedRead,
     units,

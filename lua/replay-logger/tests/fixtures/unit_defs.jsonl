@@ -1,4 +1,4 @@
-{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":-1,"positionFrames":60,"unitDefs":4}
+{"kind":"header","format":1,"game":"Test Game","gameVersion":"1.0","gameShortName":"TG","map":"Test Map","engine":"2026.01.0 test","mapSizeX":4096,"mapSizeZ":2048,"gaiaTeam":-1,"positionFrames":60,"unitDefs":4,"damageFrames":450,"gridWidth":256,"gridHeight":128}
 {"kind":"unit_def","id":1,"name":"tgcom","humanName":"Commander","metalCost":2500,"energyCost":25000.5,"mobile":true,"builder":true,"builds":true,"armed":true,"metalMake":1.5,"energyMake":25,"metalStorage":500,"radarDistance":700}
 {"kind":"unit_def","id":2,"name":"tgmex","humanName":"Metal Extractor","metalCost":50,"energyCost":500,"extractsMetal":0.001,"energyUpkeep":3}
 {"kind":"unit_def","id":3,"name":"tgwind","metalCost":35,"energyCost":0,"windGenerator":25}

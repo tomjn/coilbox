@@ -15,6 +15,7 @@ import {
   START_UNIT_KINDS,
   startUnitEnds,
   startUnitTracks,
+  startUnitUpgrades,
   trackInRange,
   trackLength,
 } from "./replayStartUnits";
@@ -168,6 +169,7 @@ describe("which units have a track", () => {
       "unit_destroyed",
       "unit_given",
       "start_unit_position",
+      "start_unit_replaced",
     ]);
   });
 
@@ -272,6 +274,143 @@ describe("how a track ends", () => {
       [13532, 0, 2559],
       [2693, 1, 3000],
     ]);
+  });
+});
+
+describe("a starting unit the game swapped for another", () => {
+  const replaced: LogEvent = {
+    kind: "start_unit_replaced",
+    frame: 2559,
+    unit: 13532,
+    by: 4001,
+    team: 0,
+    x: 760,
+    z: 7200,
+  };
+  const successor: LogEvent = {
+    kind: "unit_created",
+    frame: 2559,
+    unit: 4001,
+    def: 31,
+    team: 0,
+    x: 760,
+    y: 239,
+    z: 7200,
+  };
+  const walked: LogEvent = {
+    kind: "start_unit_position",
+    frame: 2640,
+    unit: 4001,
+    team: 0,
+    x: 900,
+    z: 7000,
+  };
+  const killed: LogEvent = {
+    kind: "unit_destroyed",
+    frame: 5000,
+    unit: 4001,
+    def: 31,
+    team: 0,
+    x: 950,
+    y: 239,
+    z: 6900,
+    startUnit: true,
+    attacker: 9,
+    attackerTeam: 1,
+    weapon: 3,
+  };
+  const removal = LOG.findIndex(
+    (e) => e.kind === "unit_destroyed" && e.unit === 13532,
+  );
+  // The new unit and the replaced line first, as a game that creates before it
+  // destroys writes them.
+  const createFirst = [
+    ...LOG.slice(0, removal),
+    successor,
+    replaced,
+    ...LOG.slice(removal),
+    walked,
+    killed,
+  ];
+  // The old unit destroyed first, then the replaced line, then the new unit's
+  // created line, which already carries the flag.
+  const destroyFirst = [
+    ...LOG.slice(0, removal + 1),
+    replaced,
+    { ...successor, startUnit: true },
+    ...LOG.slice(removal + 1),
+    walked,
+    killed,
+  ];
+
+  it.each([
+    ["created first", createFirst],
+    ["destroyed first", destroyFirst],
+  ])("is one track through both units, %s", (_name, log) => {
+    const tracks = startUnitTracks(log);
+    expect(tracks.map((t) => [t.unit, t.team])).toEqual([
+      [13532, 0],
+      [2693, 1],
+    ]);
+    const track = tracks[0];
+    expect(track.upgrades).toEqual([{ frame: 2559, x: 760, z: 7200 }]);
+    // The path does not stop at the swap: it runs on to the new unit's death.
+    const frames = track.points.map((p) => p.frame);
+    expect(frames).toEqual([...frames].sort((a, b) => a - b));
+    expect(frames[frames.length - 1]).toBe(5000);
+    expect(track.points.some((p) => p.frame === 2640 && p.x === 900)).toBe(
+      true,
+    );
+    expect(track.end).toEqual({
+      frame: 5000,
+      x: 950,
+      z: 6900,
+      cause: "destroyed",
+      attackerTeam: 1,
+    });
+  });
+
+  it("is no loss: only the real death is an end", () => {
+    const ends = startUnitEnds(startUnitTracks(createFirst));
+    expect(ends.map((e) => [e.unit, e.frame, e.cause])).toEqual([
+      [2693, 3000, "destroyed"],
+      [13532, 5000, "destroyed"],
+    ]);
+  });
+
+  it("lists the swap as an upgrade, with whose unit it was", () => {
+    expect(startUnitUpgrades(startUnitTracks(createFirst))).toEqual([
+      { frame: 2559, x: 760, z: 7200, unit: 13532, team: 0 },
+    ]);
+    expect(startUnitUpgrades(startUnitTracks(LOG))).toEqual([]);
+  });
+
+  it("is still alive in a window after the swap", () => {
+    const [track] = startUnitTracks(createFirst);
+    const points = trackInRange(track, { from: 3000, to: 4000 });
+    expect(points).toEqual([{ frame: 2640, x: 900, z: 7000 }]);
+  });
+
+  it("does not join a unit to one the log does not say replaced it", () => {
+    // The same lines with no replaced line: a removal, and no second track.
+    const tracks = startUnitTracks([
+      ...LOG.slice(0, removal),
+      successor,
+      ...LOG.slice(removal),
+      walked,
+    ]);
+    expect(tracks[0].end?.cause).toBe("removed");
+    expect(tracks[0].upgrades).toEqual([]);
+    expect(tracks).toHaveLength(2);
+  });
+
+  it("ignores a replaced line for a unit that is not a starting unit, or one already dead", () => {
+    const stray = { ...replaced, unit: 29579, by: 4002 };
+    expect(startUnitTracks([...LOG, stray])[0].upgrades).toEqual([]);
+    const late = { ...replaced, frame: 3100, unit: 2693, by: 4003 };
+    const tracks = startUnitTracks([...LOG, late]);
+    expect(tracks[1].end?.cause).toBe("destroyed");
+    expect(tracks[1].upgrades).toEqual([]);
   });
 });
 

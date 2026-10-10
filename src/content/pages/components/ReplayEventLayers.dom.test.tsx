@@ -686,3 +686,156 @@ describe("the time window with events", () => {
     await waitFor(() => expect(eventsRead).not.toHaveBeenCalled());
   });
 });
+
+describe("damage dealt", () => {
+  // The map is 4096 elmos square, so the grid is 256 cells a side.
+  const HEADER = {
+    kind: "header",
+    gridWidth: 256,
+    gridHeight: 256,
+    damageFrames: 450,
+  };
+  const cell = (col: number, row: number) => row * 256 + col;
+  const DAMAGE = [
+    HEADER,
+    {
+      kind: "damage",
+      frame: 0,
+      team: 0,
+      target: 1,
+      at: [cell(200, 40), 300, cell(201, 40), 100],
+      origin: [cell(20, 220), 400],
+    },
+    {
+      kind: "damage",
+      frame: 20 * MIN,
+      team: 1,
+      target: 0,
+      at: [cell(20, 220), 50],
+      origin: [cell(200, 40), 50],
+      off: 7,
+    },
+    { kind: "damage", frame: 20 * MIN, target: 0, at: [cell(30, 30), 25] },
+    {
+      kind: "damage",
+      frame: 20 * MIN,
+      team: 0,
+      target: 0,
+      at: [5, 10],
+      origin: [5, 10],
+    },
+  ];
+
+  it("reads the header and the damage, and only once the layer is on", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = [...DEATHS, ...DAMAGE];
+    show();
+    expect(eventsRead).not.toHaveBeenCalled();
+    fireEvent.click(toggle("Damage dealt"));
+    await screen.findByText("Where damage landed");
+    expect(eventsRead).toHaveBeenCalledTimes(1);
+    expect(eventsRead).toHaveBeenCalledWith({
+      gameId: "game-a",
+      kinds: ["header", "damage"],
+    });
+  });
+
+  it("draws where damage landed, with a legend that reads in damage", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = DAMAGE;
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    expect(
+      await screen.findByText(
+        /Most is 400 damage landed within 128 elmos of one spot/,
+      ),
+    ).toBeTruthy();
+    expect(layer("damage")).toBeTruthy();
+    const said = help();
+    expect(said.getByText(/492 damage landed\./)).toBeTruthy();
+    expect(said.getByText(/25 of it had no attacker/)).toBeTruthy();
+    expect(
+      said.getByText(/10 of it a player did to their own units/),
+    ).toBeTruthy();
+    expect(said.getByText(/7 of it landed on a unit off the map/)).toBeTruthy();
+    expect(said.getByText(/totals for\s+each 15 seconds/)).toBeTruthy();
+  });
+
+  it("draws where it came from when asked", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = DAMAGE;
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    await screen.findByText("Where damage landed");
+    fireEvent.click(screen.getByRole("radio", { name: "Where it came from" }));
+    expect(
+      await screen.findByText(
+        /Most is 400 damage was dealt from within 128 elmos of one spot/,
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText("Where damage came from")).toBeTruthy();
+  });
+
+  it("is never drawn with deaths, whose colours it shares", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = [...DEATHS, ...DAMAGE];
+    show();
+    fireEvent.click(toggle("Deaths"));
+    await screen.findByText("Where units died");
+    fireEvent.click(toggle("Damage dealt"));
+    await screen.findByText("Where damage landed");
+    expect(toggle("Deaths").dataset.state).toBe("off");
+    expect(layer("deaths")).toBeNull();
+    fireEvent.click(toggle("Deaths"));
+    await screen.findByText("Where units died");
+    expect(toggle("Damage dealt").dataset.state).toBe("off");
+    expect(layer("damage")).toBeNull();
+  });
+
+  it("narrows to the stretches that begin inside the time window", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = DAMAGE;
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    await screen.findByText("Where damage landed");
+    fireEvent.click(screen.getByRole("button", { name: "First 5 minutes" }));
+    expect(
+      await screen.findByText(
+        /Most is 400 damage landed within 128 elmos of one spot in this window/,
+      ),
+    ).toBeTruthy();
+    expect(
+      help().getByText(/400 damage landed\s+in this window\./),
+    ).toBeTruthy();
+  });
+
+  it("says an older analysis recorded none, and points at the analysis", async () => {
+    analysed({ loggerVersion: 3 });
+    EVENTS = DEATHS;
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    expect(
+      await screen.findByText(/recorded before coilbox logged damage/),
+    ).toBeTruthy();
+    expect(layer("damage")).toBeNull();
+  });
+
+  it("says so when a match had no damage", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = [HEADER];
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    expect(await screen.findByText(/No damage was recorded\./)).toBeTruthy();
+  });
+
+  it("will not place damage recorded on a grid that is not this map's", async () => {
+    analysed({ loggerVersion: 4 });
+    EVENTS = [{ ...HEADER, gridWidth: 128 }, ...DAMAGE.slice(1)];
+    show();
+    fireEvent.click(toggle("Damage dealt"));
+    expect(
+      await screen.findByText(/recorded on a map of another size/),
+    ).toBeTruthy();
+    expect(layer("damage")).toBeNull();
+  });
+});

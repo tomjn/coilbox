@@ -732,14 +732,19 @@ mod tests {
         .unwrap()
     }
 
-    fn death(frame: i32, x: f32, z: f32, attacker: Option<i32>) -> LogLine {
-        LogLine::UnitDestroyed(UnitEvent {
+    /// A line as the logger writes it, which is what the store is handed.
+    fn text(line: &LogLine) -> String {
+        serde_json::to_string(line).unwrap()
+    }
+
+    fn death(frame: i32, x: f32, z: f32, attacker: Option<i32>) -> String {
+        text(&LogLine::UnitDestroyed(UnitEvent {
             frame,
             x,
             z,
             attacker,
             ..Default::default()
-        })
+        }))
     }
 
     #[test]
@@ -752,7 +757,7 @@ mod tests {
             death(FRAMES_PER_SLICE * 2, 100.0, 1000.0, None),
             // The logger's stand in for a position the engine did not give.
             death(20, 0.0, 0.0, Some(3)),
-            LogLine::UnitFinished(UnitEvent::default()),
+            text(&LogLine::UnitFinished(UnitEvent::default())),
         ];
         store::write(
             &analyses,

@@ -1203,6 +1203,11 @@ export interface ReplayEventCounts {
   unitDestroyed: number;
   unitGiven: number;
   startUnitPosition: number;
+  /** Absent from a file written before the logger followed a starting unit
+   *  through a replacement. */
+  startUnitReplaced?: number;
+  /** Absent from a file written before the logger recorded damage. */
+  damage?: number;
   gameOver: number;
   /** Lines of a kind this build does not know. */
   unknown: number;

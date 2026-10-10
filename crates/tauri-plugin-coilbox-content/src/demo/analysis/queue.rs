@@ -499,10 +499,10 @@ fn failure(
 fn keep_engine_unit_defs(
     analyses: &Path,
     provenance: &store::Provenance,
-    events: Option<&[super::log::LogLine]>,
+    events: Option<&[String]>,
 ) {
     let dir = def_sets::dir_beside(analyses);
-    let result = match events.and_then(super::log::unit_defs_of) {
+    let result = match events.and_then(super::log::unit_defs_of_raw) {
         Some(units) => def_sets::record(
             &dir,
             &provenance.game_id,
@@ -1244,7 +1244,7 @@ mod tests {
         run.report.header = log.header().cloned();
         run.report.counts = log.counts();
         if run.events.is_some() {
-            run.events = Some(log.lines);
+            run.events = Some(log.raw);
         }
         run
     }

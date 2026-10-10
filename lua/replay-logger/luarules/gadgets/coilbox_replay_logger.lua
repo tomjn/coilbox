@@ -20,7 +20,7 @@
 --
 --   header               format, game, gameVersion, gameShortName, map,
 --                        engine, mapSizeX, mapSizeZ, gaiaTeam, positionFrames,
---                        unitDefs
+--                        unitDefs, damageFrames, gridWidth, gridHeight
 --   unit_def             id, name, humanName, metalCost, energyCost, mobile,
 --                        builder, builds, armed, and the numbers under
 --                        DEF_NUMBERS
@@ -32,6 +32,8 @@
 --   unit_given           frame, unit, def, team, x, y, z, startUnit, from,
 --                        captured
 --   start_unit_position  frame, unit, team, x, z
+--   start_unit_replaced  frame, unit, by, team, x, z
+--   damage               frame, team, target, at, origin, off
 --   game_over            frame, winners, teams
 --
 -- The game over line is the last one. The engine is told to quit as soon as it
@@ -48,9 +50,19 @@
 -- declares is a name the game is free to ignore. So this is the one thing the
 -- engine can say whatever the game: a unit created for a team other than Gaia,
 -- by no builder, on the frame that team's first unit was created. A team whose
--- first unit was given to it has none. A game that swaps a unit for another
--- when it upgrades ends the start unit there, because the engine reports that
--- as one unit destroyed and another created.
+-- first unit was given to it has none.
+--
+-- "start_unit_replaced" says a start unit was swapped for another unit, which
+-- is how some games upgrade one: their Lua creates the new unit and destroys
+-- the old. The engine reports that as one unit created and another destroyed
+-- and ties the two together nowhere, so this is the rule, and it names no game
+-- and no unit. "unit" was a start unit that a Lua script destroyed, with no
+-- attacker (the engine gives weapon id -21 for Spring.DestroyUnit). "by" is a
+-- unit created for the same team, by no builder, at exactly the x and z the
+-- old one stood at as it was created, on the same frame or the one before.
+-- From then on "by" is a start unit: its later lines carry "startUnit" and its
+-- positions are written. "x" and "z" are where "by" was when the line was
+-- written. Nothing is written when two units could each be the successor.
 --
 -- "unit_given" is written once a unit has changed team, for a gift and a
 -- capture alike. "team" is the team it now belongs to and "from" the one it
@@ -73,6 +85,20 @@
 -- "positionFrames" frames, left out when it has not moved since the last
 -- position written for it. Its created line is the first position and its
 -- destroyed line the last.
+--
+-- "damage" is the damage one team's units did to another's in one stretch of
+-- "damageFrames" frames, added up on a grid of "gridWidth" by "gridHeight"
+-- cells over the map. "frame" is the stretch's first frame. "team" is the
+-- attacker's team, left out for damage with no attacker, and "target" the team
+-- of the units hit. A team that hit its own units has a line with both the
+-- same. "at" is where the units hit stood and "origin" where the attackers
+-- stood, each a flat list of a cell and then the damage in it, the cell being
+-- its row times "gridWidth" plus its column, from the north west corner.
+-- "origin" is left out when there was no attacker. "off" is damage to a unit
+-- that stood off the map, left out when there was none.
+-- Damage is what the engine hands UnitDamaged, less whatever went past the
+-- unit's last health, so a hit far larger than its target counts for what the
+-- target had left. Paralysis and healing are not counted.
 
 -- Raised when a line gains or loses a field a reader depends on. Adding a kind
 -- or an optional field does not raise it.
@@ -97,6 +123,36 @@ local LOG_SECTION = "coilbox-replay-logger"
 -- step measured over sixty frames was 94.2 elmos, a Metal Factions commander
 -- at its full 1.57.
 local POSITION_FRAMES = 60
+
+-- How many frames after its successor was created a start unit may still be
+-- destroyed and count as replaced by it. Metal Factions creates the new unit
+-- and destroys the old one in the same call, so none. Splinter Faction
+-- destroys the old one from GameFrame on the next frame, "to prevent upgraded
+-- last-commanders inadvertently finishing the game", so one.
+local SUCCESSOR_FRAMES = 1
+
+-- The weapon id the engine reports for a unit Spring.DestroyUnit removed:
+-- minus CSolidObject::DAMAGE_KILLED_LUA in rts/Sim/Objects/SolidObject.h.
+local KILLED_BY_SCRIPT = -21
+
+-- How many frames of damage one "damage" line adds up. The engine takes a
+-- statistics sample every 15 seconds (TeamStatistics::statsPeriod), which is
+-- what a replay's own totals are spaced at, and four of them are the minute
+-- coilbox bins a map's picture by.
+local DAMAGE_FRAMES = 450
+
+-- Cells along the map's longer side. The grid is the one buildHeatField in
+-- src/lib/heatField.ts makes for the same map, so a cell here is a cell there.
+local GRID_RESOLUTION = 256
+
+local function gridSide(world, longest)
+	return math.max(1, math.floor(GRID_RESOLUTION * world / longest + 0.5))
+end
+
+local MAP_X = Game.mapSizeX or 0
+local MAP_Z = Game.mapSizeZ or 0
+local GRID_WIDTH = MAP_X > 0 and MAP_Z > 0 and gridSide(MAP_X, math.max(MAP_X, MAP_Z)) or 0
+local GRID_HEIGHT = MAP_X > 0 and MAP_Z > 0 and gridSide(MAP_Z, math.max(MAP_X, MAP_Z)) or 0
 
 function gadget:GetInfo()
 	return {
@@ -159,7 +215,9 @@ if gadgetHandler:IsSyncedCode() then
 
 	local GetGameFrame = Spring.GetGameFrame
 	local GetUnitPosition = Spring.GetUnitPosition
+	local GetUnitHealth = Spring.GetUnitHealth
 	local GetTeamUnitStats = Spring.GetTeamUnitStats
+	local floor = math.floor
 
 	local GAIA = Spring.GetGaiaTeamID()
 
@@ -178,6 +236,16 @@ if gadgetHandler:IsSyncedCode() then
 	local lastPlace = {}
 	-- team -> how many captures the engine had counted for it when last asked.
 	local captures = {}
+	-- A living start unit -> the one unit that could be its successor, as
+	-- { unit, frame }. "unit" is false once a second unit could be.
+	local successor = {}
+	-- The other way round: a unit that could be a successor -> the start unit.
+	local successorOf = {}
+	-- Start units a script destroyed on "vacatedFrame" with no successor yet,
+	-- for a game that destroys the old unit before it creates the new one. Each
+	-- is { unit, team, x, z }, or false once it has been replaced.
+	local vacated = {}
+	local vacatedFrame = -1
 
 	local function send(line)
 		SendToUnsynced(MESSAGE, line)
@@ -210,15 +278,89 @@ if gadgetHandler:IsSyncedCode() then
 		send('{"kind":"game_start","frame":' .. number(GetGameFrame()) .. "}")
 	end
 
+	local function track(unitID, unitTeam)
+		startTeam[unitID] = unitTeam
+		startUnits[#startUnits + 1] = unitID
+		lastPlace[unitID] = place(unitID)
+	end
+
+	-- "by" takes over from the start unit "unitID".
+	local function replace(unitID, by, unitTeam, frame)
+		track(by, unitTeam)
+		local line = '{"kind":"start_unit_replaced","frame":' .. number(frame)
+			.. ',"unit":' .. number(unitID)
+			.. ',"by":' .. number(by)
+			.. ',"team":' .. number(unitTeam)
+		if lastPlace[by] then
+			line = line .. "," .. lastPlace[by]
+		end
+		send(line .. "}")
+	end
+
+	-- A unit made by no builder may be standing in for a start unit of its
+	-- team. Either the start unit is still there, at the same place, and this
+	-- is remembered until a script destroys it. Or a script destroyed it
+	-- earlier on this frame at this place, and this takes over now.
+	local function claim(unitID, unitTeam, frame)
+		local x, _, z = GetUnitPosition(unitID)
+		if not x then
+			return
+		end
+
+		local old, matches = nil, 0
+		for index = 1, #startUnits do
+			local startUnit = startUnits[index]
+			if startTeam[startUnit] == unitTeam then
+				local sx, _, sz = GetUnitPosition(startUnit)
+				if sx == x and sz == z then
+					old, matches = startUnit, matches + 1
+				end
+			end
+		end
+		if matches == 1 then
+			local held = successor[old]
+			if held and held.unit then
+				successorOf[held.unit] = nil
+			end
+			if held and frame - held.frame <= SUCCESSOR_FRAMES then
+				-- Two units could each be the successor, so neither is.
+				successor[old] = { unit = false, frame = frame }
+			else
+				successor[old] = { unit = unitID, frame = frame }
+				successorOf[unitID] = old
+			end
+			return
+		end
+		if matches > 1 or vacatedFrame ~= frame then
+			return
+		end
+
+		local slot
+		matches = 0
+		for index = 1, #vacated do
+			local gone = vacated[index]
+			if gone and gone.team == unitTeam and gone.x == x and gone.z == z then
+				slot, matches = index, matches + 1
+			end
+		end
+		if matches == 1 then
+			local gone = vacated[slot]
+			vacated[slot] = false
+			replace(gone.unit, unitID, unitTeam, frame)
+		end
+	end
+
 	function gadget:UnitCreated(unitID, unitDefID, unitTeam, builderID)
 		local frame = GetGameFrame()
 		if firstFrame[unitTeam] == nil then
 			firstFrame[unitTeam] = frame
 		end
-		if firstFrame[unitTeam] == frame and not builderID and unitTeam ~= GAIA then
-			startTeam[unitID] = unitTeam
-			startUnits[#startUnits + 1] = unitID
-			lastPlace[unitID] = place(unitID)
+		if not builderID and unitTeam ~= GAIA then
+			if firstFrame[unitTeam] == frame then
+				track(unitID, unitTeam)
+			else
+				claim(unitID, unitTeam, frame)
+			end
 		end
 
 		local line = unitLine("unit_created", unitID, unitDefID, unitTeam)
@@ -275,6 +417,7 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		startTeam[unitID] = nil
 		lastPlace[unitID] = nil
+		successor[unitID] = nil
 		for index = 1, #startUnits do
 			if startUnits[index] == unitID then
 				table.remove(startUnits, index)
@@ -283,7 +426,45 @@ if gadgetHandler:IsSyncedCode() then
 		end
 	end
 
+	-- A start unit a script destroyed with no attacker is replaced by its one
+	-- successor when it has one that is recent enough. Otherwise its place is
+	-- kept for the rest of the frame, for a unit created there after it.
+	local function vacate(unitID, frame)
+		local held = successor[unitID]
+		if held and held.unit then
+			successorOf[held.unit] = nil
+		end
+		if held and frame - held.frame <= SUCCESSOR_FRAMES then
+			-- With two that could have been, nothing is written.
+			if held.unit then
+				replace(unitID, held.unit, startTeam[unitID], frame)
+			end
+			return
+		end
+		local x, _, z = GetUnitPosition(unitID)
+		if not x then
+			return
+		end
+		if vacatedFrame ~= frame then
+			vacated = {}
+			vacatedFrame = frame
+		end
+		vacated[#vacated + 1] = { unit = unitID, team = startTeam[unitID], x = x, z = z }
+	end
+
 	function gadget:UnitDestroyed(unitID, unitDefID, unitTeam, attackerID, attackerDefID, attackerTeam, weaponDefID)
+		-- A unit that could have been a successor and died first is not one.
+		local old = successorOf[unitID]
+		if old then
+			successorOf[unitID] = nil
+			if successor[old] and successor[old].unit == unitID then
+				successor[old] = nil
+			end
+		end
+		if startTeam[unitID] and not attackerID and weaponDefID == KILLED_BY_SCRIPT then
+			vacate(unitID, GetGameFrame())
+		end
+
 		local line = unitLine("unit_destroyed", unitID, unitDefID, unitTeam)
 		forget(unitID)
 		if attackerID then
@@ -299,6 +480,133 @@ if gadgetHandler:IsSyncedCode() then
 			line = line .. ',"weapon":' .. number(weaponDefID)
 		end
 		send(line .. "}")
+	end
+
+	----------------------------------------------------------------------------
+	-- Damage, added up and never written a hit at a time: one unit under fire
+	-- is hit many times a second.
+	----------------------------------------------------------------------------
+
+	-- The stretch being added up, as its number counted from frame 0.
+	local stretch = 0
+	-- attacker team (or -1 for none) -> target team -> what is being added up.
+	local sums = {}
+	-- The same records in the order each was first needed, so they are written
+	-- in an order that does not depend on how a table happens to be laid out.
+	local written = {}
+
+	local function cellOf(x, z)
+		if GRID_WIDTH == 0 or not (x >= 0 and z >= 0 and x <= MAP_X and z <= MAP_Z) then
+			return nil
+		end
+		local col = floor(x / MAP_X * GRID_WIDTH)
+		local row = floor(z / MAP_Z * GRID_HEIGHT)
+		if col > GRID_WIDTH - 1 then
+			col = GRID_WIDTH - 1
+		end
+		if row > GRID_HEIGHT - 1 then
+			row = GRID_HEIGHT - 1
+		end
+		return row * GRID_WIDTH + col
+	end
+
+	-- A cell's damage to a tenth, as a whole number when it is one.
+	local function amount(value)
+		local text = string.format("%.1f", value)
+		if text:sub(-2) == ".0" then
+			return text:sub(1, -3)
+		end
+		return text
+	end
+
+	local function cellList(order, byCell)
+		local parts = {}
+		for index = 1, #order do
+			local cell = order[index]
+			parts[index] = number(cell) .. "," .. amount(byCell[cell])
+		end
+		return "[" .. table.concat(parts, ",") .. "]"
+	end
+
+	local function flushDamage()
+		for index = 1, #written do
+			local sum = written[index]
+			local line = '{"kind":"damage","frame":' .. number(stretch * DAMAGE_FRAMES)
+			if sum.team >= 0 then
+				line = line .. ',"team":' .. number(sum.team)
+			end
+			line = line .. ',"target":' .. number(sum.target)
+				.. ',"at":' .. cellList(sum.atOrder, sum.at)
+			if sum.team >= 0 then
+				line = line .. ',"origin":' .. cellList(sum.originOrder, sum.origin)
+			end
+			if sum.off > 0 then
+				line = line .. ',"off":' .. amount(sum.off)
+			end
+			send(line .. "}")
+		end
+		sums = {}
+		written = {}
+	end
+
+	local function add(order, byCell, cell, damage)
+		local held = byCell[cell]
+		if held then
+			byCell[cell] = held + damage
+		else
+			byCell[cell] = damage
+			order[#order + 1] = cell
+		end
+	end
+
+	function gadget:UnitDamaged(unitID, unitDefID, unitTeam, damage, paralyzer, weaponDefID, projectileID,
+		attackerID, attackerDefID, attackerTeam)
+		if paralyzer or not (damage > 0) then
+			return
+		end
+		-- The engine has already taken the damage off, so health below nothing
+		-- is how far the hit went past what the unit had left.
+		local health = GetUnitHealth(unitID)
+		if health and health < 0 then
+			damage = damage + health
+			if not (damage > 0) then
+				return
+			end
+		end
+
+		local now = floor(GetGameFrame() / DAMAGE_FRAMES)
+		if now ~= stretch then
+			flushDamage()
+			stretch = now
+		end
+
+		local team = attackerTeam or -1
+		local byTarget = sums[team]
+		if not byTarget then
+			byTarget = {}
+			sums[team] = byTarget
+		end
+		local sum = byTarget[unitTeam]
+		if not sum then
+			sum = { team = team, target = unitTeam, at = {}, atOrder = {}, origin = {}, originOrder = {}, off = 0 }
+			byTarget[unitTeam] = sum
+			written[#written + 1] = sum
+		end
+
+		local x, _, z = GetUnitPosition(unitID)
+		local cell = x and cellOf(x, z)
+		if cell then
+			add(sum.atOrder, sum.at, cell, damage)
+		else
+			sum.off = sum.off + damage
+		end
+		if attackerID then
+			local ax, _, az = GetUnitPosition(attackerID)
+			local from = ax and cellOf(ax, az)
+			if from then
+				add(sum.originOrder, sum.origin, from, damage)
+			end
+		end
 	end
 
 	-- The engine's own field names, in the order its TeamStatistics declares
@@ -334,6 +642,8 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:GameOver(winningAllyTeams)
+		flushDamage()
+
 		local winners = {}
 		for index, allyTeam in ipairs(winningAllyTeams or {}) do
 			winners[index] = number(allyTeam)
@@ -457,6 +767,9 @@ else
 			.. ',"gaiaTeam":' .. number(Spring.GetGaiaTeamID() or -1)
 			.. ',"positionFrames":' .. number(POSITION_FRAMES)
 			.. ',"unitDefs":' .. number(countUnitDefs())
+			.. ',"damageFrames":' .. number(DAMAGE_FRAMES)
+			.. ',"gridWidth":' .. number(GRID_WIDTH)
+			.. ',"gridHeight":' .. number(GRID_HEIGHT)
 			.. "}"
 	end
 
