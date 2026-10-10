@@ -470,6 +470,7 @@ mod tests {
         let sample = |i: usize, last: bool| TeamStatSample {
             frame: (i as i32 + 1) * 450,
             damage_dealt: if last { 90_000.0 } else { 100.0 * i as f32 },
+            skill_uncertainty: None,
             units_produced: if last { 700 } else { i as i32 },
             ..Default::default()
         };

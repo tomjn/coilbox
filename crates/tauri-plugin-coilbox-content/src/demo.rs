@@ -1546,6 +1546,10 @@ fn build_demo_info(
             spectator,
             won,
             skill: p.get("skill").map(str::to_string),
+            skill_uncertainty: p
+                .get("skilluncertainty")
+                .and_then(|v| v.trim().parse::<f32>().ok())
+                .filter(|v| v.is_finite()),
             country_code: p.get("countrycode").map(str::to_string),
             stats,
             apm: stats.and_then(|s| apm(s.num_commands, raw.game_time)),
@@ -2384,6 +2388,43 @@ mod tests {
         assert_eq!(second.version, None);
         assert_eq!(second.advantage, None);
         assert_eq!(second.income_multiplier, Some(1.5));
+    }
+
+    /// The shape a SPADS-hosted recording uses: `skill` in brackets and
+    /// `skilluncertainty` as a bare number, one key each per seat.
+    const SKILL_SCRIPT: &str = "[game]\n{\n\
+        mapname=Comet Catcher;\n\
+        gametype=BAR;\n\
+        [team0]\n{\nallyteam=0;\n}\n\
+        [team1]\n{\nallyteam=1;\n}\n\
+        [team2]\n{\nallyteam=1;\n}\n\
+        [player0]\n{\nteam=0;\nname=Rated;\nskill=[25.06];\nskilluncertainty=2.65;\n}\n\
+        [player1]\n{\nteam=1;\nname=Unrated;\n}\n\
+        [player2]\n{\nteam=2;\nname=Garbled;\nskill=[20];\nskilluncertainty=lots;\n}\n\
+        [player3]\n{\nteam=2;\nname=Empty;\nskill=[20];\nskilluncertainty=;\n}\n\
+        [allyteam0]\n{\nnumallies=0;\n}\n\
+        [allyteam1]\n{\nnumallies=0;\n}\n}\n";
+
+    #[test]
+    fn skill_uncertainty_is_read_when_present_and_absent_when_not() {
+        let info = ai_info("skill-unc.sdfz", SKILL_SCRIPT, None);
+        let by = |n: &str| info.players.iter().find(|p| p.name == n).unwrap();
+        assert_eq!(by("Rated").skill.as_deref(), Some("[25.06]"));
+        assert_eq!(by("Rated").skill_uncertainty, Some(2.65));
+        assert_eq!(by("Unrated").skill_uncertainty, None);
+    }
+
+    /// A value that is not a number is no uncertainty, and does not take the
+    /// rating or the roster down with it.
+    #[test]
+    fn a_malformed_skill_uncertainty_is_absent() {
+        let info = ai_info("skill-unc-bad.sdfz", SKILL_SCRIPT, None);
+        for name in ["Garbled", "Empty"] {
+            let p = info.players.iter().find(|p| p.name == name).unwrap();
+            assert_eq!(p.skill_uncertainty, None, "{name}");
+            assert_eq!(p.skill.as_deref(), Some("[20]"), "{name}");
+        }
+        assert_eq!(info.players.len(), 4);
     }
 
     /// A bot's win is its ally team's win, exactly as a player's is.
