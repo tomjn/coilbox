@@ -119,4 +119,5 @@ Download and run the installer / AppImage from the [latest release](https://gith
 - [Teaching your game](/teaching-your-game): how a distribution offers a new player a first lesson.
 - [Hand-made maps](/hand-made-maps): how to make a Conquest map of land from images and a text file.
 - [Server admin](/server-admin): the moderation and admin tools for an uberserver lobby.
+- [Where a replay's numbers come from](/replay-data-sources): which source each figure on a replay page shows, and why two numbers may differ.
 - [Routes](/routes) — the app's screen map.

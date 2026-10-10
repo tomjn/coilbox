@@ -64,6 +64,10 @@ export default defineConfig({
           { text: "Routes", link: "/routes" },
           { text: "The s3o model format", link: "/s3o-format" },
           { text: "The 3do model format", link: "/3do-format" },
+          {
+            text: "Where a replay's numbers come from",
+            link: "/replay-data-sources",
+          },
           { text: "The unit builder", link: "/lego-builder" },
           { text: "Lego parts pack", link: "/lego-parts-pack" },
           { text: "The mission runtime", link: "/mission-runtime" },
