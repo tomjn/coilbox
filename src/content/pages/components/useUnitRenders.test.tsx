@@ -29,6 +29,8 @@ const remembered: { game: string; unit: string; variant: string }[] = [];
 const drawnAngles: string[] = [];
 const encodedAngles: string[] = [];
 let encodeSkips = false;
+const keyAsks: { units: { unit: string }[] }[] = [];
+const encodeSources: { modelDigest?: string; sourceArchive?: string }[] = [];
 
 vi.mock("@/hub/assets/localRenders", () => ({
   localRenders: async (
@@ -65,8 +67,35 @@ vi.mock("@/hub/assets/renderTop", () => ({
 }));
 
 vi.mock("@/content/bindings", () => ({
-  unitsyncUnitRender: async (input: { angle: string }) => {
+  unitsyncUnitRenderKeys: async (input: {
+    units: { unit: string }[];
+    angles?: string[];
+  }) => {
+    keyAsks.push(input);
+    return {
+      keys: Object.fromEntries(
+        input.units.map((u) => [
+          u.unit,
+          Object.fromEntries(
+            ["top", "front", "side", "angled"].map((angle) => [
+              `render:${angle}`,
+              { modelDigest: "digest", sourceMember: "objects3d/thing.s3o" },
+            ]),
+          ),
+        ]),
+      ),
+      sourceArchive: "Test Game test-1",
+      skipped: {},
+      errors: [],
+    };
+  },
+  unitsyncUnitRender: async (input: {
+    angle: string;
+    modelDigest?: string;
+    sourceArchive?: string;
+  }) => {
     encodedAngles.push(input.angle);
+    encodeSources.push(input);
     if (encodeSkips) {
       return { assetSkipped: "no-model", errors: [] };
     }
@@ -126,6 +155,8 @@ beforeEach(() => {
   drawnAngles.length = 0;
   encodedAngles.length = 0;
   encodeSkips = false;
+  keyAsks.length = 0;
+  encodeSources.length = 0;
 });
 
 afterEach(() => {
@@ -265,6 +296,75 @@ describe("useUnitRenders", () => {
     expect(remembered.map((r) => r.variant).sort()).toEqual(
       RENDER_ANGLES.map((a) => `render:${a}`).sort(),
     );
+  });
+
+  it("asks for the names of the renders once, and hands them to every encode", async () => {
+    renderHook(() =>
+      useUnitRenders(
+        "/engine",
+        "/data",
+        "test.sdz",
+        "TG",
+        "armsolar",
+        "objects3d/thing.s3o",
+        1,
+        1,
+        FIXTURE_MODEL,
+      ),
+    );
+
+    await waitFor(() =>
+      expect(encodedAngles).toHaveLength(RENDER_ANGLES.length),
+    );
+    expect(keyAsks).toHaveLength(1);
+    expect(keyAsks[0].units.map((u) => u.unit)).toEqual(["armsolar"]);
+    expect(encodeSources.map((e) => e.modelDigest)).toEqual(
+      RENDER_ANGLES.map(() => "digest"),
+    );
+    expect(encodeSources.map((e) => e.sourceArchive)).toEqual(
+      RENDER_ANGLES.map(() => "Test Game test-1"),
+    );
+  });
+
+  it("asks for the names before the model has arrived, so the read queues behind the model's", async () => {
+    renderHook(() =>
+      useUnitRenders(
+        "/engine",
+        "/data",
+        "test.sdz",
+        "TG",
+        "armsolar",
+        "objects3d/thing.s3o",
+        1,
+        1,
+        null,
+      ),
+    );
+
+    await waitFor(() => expect(keyAsks).toHaveLength(1));
+    expect(drawnAngles).toHaveLength(0);
+  });
+
+  it("asks for no names when the cache holds every angle", async () => {
+    held = [...RENDER_ANGLES];
+
+    const { result } = renderHook(() =>
+      useUnitRenders(
+        "/engine",
+        "/data",
+        "test.sdz",
+        "TG",
+        "armsolar",
+        "objects3d/thing.s3o",
+        1,
+        1,
+        FIXTURE_MODEL,
+      ),
+    );
+
+    await waitFor(() => expect(result.current.top.status).toBe("ready"));
+    expect(keyAsks).toHaveLength(0);
+    expect(drawnAngles).toHaveLength(0);
   });
 
   it("says why an angle the engine refused to draw is unavailable, rather than showing nothing", async () => {
