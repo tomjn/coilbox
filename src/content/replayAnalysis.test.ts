@@ -175,11 +175,54 @@ describe("why a replay cannot be analysed", () => {
       dependencyBlock: "Archive not installed: Base. Some Game depends on it.",
     });
     expect(blockers).toEqual([
-      "Engine 2026.07.01 is not installed. An analysis only runs on the engine the match was recorded on.",
+      "Engine 2026.07.01 is not installed, and no other engine is installed.",
       "The game is not installed.",
       "The map is not installed.",
       "Archive not installed: Base. Some Game depends on it.",
     ]);
+  });
+
+  it("does not block on the engine when another installed engine can run it", () => {
+    expect(
+      analysisBlockers({
+        ...installed,
+        engineInstalled: false,
+        otherEngines: 2,
+        installedEngines: 2,
+      }),
+    ).toEqual([]);
+  });
+
+  it("says when engines are installed and none can run headless", () => {
+    expect(
+      analysisBlockers({
+        ...installed,
+        engineInstalled: false,
+        otherEngines: 0,
+        installedEngines: 3,
+      }),
+    ).toEqual([
+      "Engine 2026.07.01 is not installed, and none of the engines that are installed can run an analysis, which needs one with a headless build.",
+    ]);
+  });
+
+  it("does not block on a missing game when another version of it stands in", () => {
+    expect(
+      analysisBlockers({ ...installed, missingGame: true, otherGame: true }),
+    ).toEqual([]);
+  });
+
+  it("still blocks on a missing map whatever else stands in", () => {
+    expect(
+      analysisBlockers({
+        ...installed,
+        engineInstalled: false,
+        otherEngines: 1,
+        missingGame: true,
+        otherGame: true,
+        missingMap: true,
+      }),
+    ).toEqual(["The map is not installed."]);
   });
 
   it("lets what the replay is outrank what is installed", () => {

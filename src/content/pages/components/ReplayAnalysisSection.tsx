@@ -1,7 +1,8 @@
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Loader2, ScanSearch, Trash2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { ConfirmPopover } from "@/components/ConfirmPopover";
+import { OptionSelect } from "@/components/OptionSelect";
 import {
   Collapsible,
   CollapsibleContent,
@@ -12,6 +13,7 @@ import { formatBytes, formatDuration } from "@/lib/format";
 import {
   contentAnalysisCheck,
   type DemoInfo,
+  type GameItem,
   type ReplayAnalysisFailure,
   type ReplayAnalysisRunningJob,
   type StoredReplayAnalysis,
@@ -23,6 +25,7 @@ import {
   analysisRunHidden,
   cancelAnalysis,
   deleteStoredAnalysis,
+  differenceNote,
   disagreementInWords,
   dismissAnalysisFailure,
   estimateAnalysisSeconds,
@@ -30,6 +33,15 @@ import {
   useAnalysisQueue,
   useStoredAnalyses,
 } from "../../replayAnalysis";
+import {
+  divergedAttempts,
+  type EngineOption,
+  type InstalledEngine,
+  otherEngineOptions,
+  otherGameVersion,
+  useInstalledEngines,
+} from "../../replayAnalysisOffer";
+import { replayDependencyBlock } from "../../replayEngine";
 import { useMetricRegistry } from "../../useMetricRegistry";
 
 type Check = Awaited<ReturnType<typeof contentAnalysisCheck>>;
@@ -74,14 +86,20 @@ function roughly(seconds: number): string {
  * The page works out what is installed and hands it in, so this asks nothing
  * of the content scan itself.
  */
-export function ReplayAnalysisSection({
-  replayPath,
-  info,
-  target,
-  missingGame,
-  missingMap,
-  dependencyBlock,
-}: {
+export function ReplayAnalysisSection(props: SectionProps) {
+  // With the run hidden nothing is run, so the engines are not asked for.
+  return analysisRunHidden() ? (
+    <AnalysisBody {...props} engines={[]} />
+  ) : (
+    <WithEngines {...props} />
+  );
+}
+
+function WithEngines(props: SectionProps) {
+  return <AnalysisBody {...props} engines={useInstalledEngines()} />;
+}
+
+interface SectionProps {
   replayPath: string;
   info: DemoInfo;
   /**
@@ -93,19 +111,45 @@ export function ReplayAnalysisSection({
   missingGame: boolean;
   missingMap: boolean;
   dependencyBlock: string | null;
-}) {
+  /** The installed games, to find another version of a missing one. */
+  installedGames?: GameItem[];
+  /**
+   * The page's offer to download whatever the replay is missing, shown beside
+   * the reasons an analysis cannot run. It renders nothing when nothing is
+   * missing, and it is the page's own, so a download here is the same download.
+   */
+  downloads?: ReactNode;
+}
+
+function AnalysisBody({
+  replayPath,
+  info,
+  target,
+  missingGame,
+  missingMap,
+  dependencyBlock,
+  installedGames = [],
+  downloads = null,
+  engines,
+}: SectionProps & { engines: InstalledEngine[] }) {
   const hidden = analysisRunHidden();
   const queue = useAnalysisQueue();
   const analyses = useStoredAnalyses();
   const [check, setCheck] = useState<Check | undefined>(undefined);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The engine the person picked, by path. Unset until they pick one. */
+  const [picked, setPicked] = useState<string | null>(null);
+  const enginePaths = engines.map((e) => e.path).join("\n");
 
   useEffect(() => {
     if (hidden) return;
     let stale = false;
     setCheck(undefined);
-    contentAnalysisCheck({ replayPath }).then(
+    contentAnalysisCheck({
+      replayPath,
+      enginePaths: enginePaths ? enginePaths.split("\n") : [],
+    }).then(
       (r) => {
         if (!stale) setCheck(r);
       },
@@ -114,7 +158,7 @@ export function ReplayAnalysisSection({
     return () => {
       stale = true;
     };
-  }, [replayPath, hidden]);
+  }, [replayPath, hidden, enginePaths]);
 
   // A remix carries its original's game id and has no analysis of its own.
   const gameId = info.remixed ? undefined : info.gameId;
@@ -133,25 +177,58 @@ export function ReplayAnalysisSection({
     ? queue.failures.find((f) => f.gameId === jobId)
     : undefined;
 
+  // The recorded game, or another installed version of it (#3869).
+  const otherGame = missingGame
+    ? otherGameVersion(info.gameType, installedGames)
+    : null;
+  const gameUsed = otherGame?.name ?? info.gameType;
+  // What earlier runs on other engines found. Only a diverged file has any.
+  const attempts = divergedAttempts(stored);
+  const options: EngineOption[] =
+    target === null
+      ? otherEngineOptions({
+          recorded: info.engineVersion,
+          engines,
+          headless: check?.headless ?? [],
+          attempts,
+          game: gameUsed,
+        })
+      : [];
+  // The newest engine not yet tried. When every one has been tried there is
+  // no default, and a person has to ask for one to run it again.
+  const chosen =
+    options.find((o) => o.path === picked) ??
+    options.find((o) => !o.tried) ??
+    null;
+  const run =
+    target ?? (chosen && { enginePath: chosen.path, dataDir: chosen.dataDir });
+
   const blockers = analysisBlockers({
     cannot: check?.cannot,
     engineVersion: info.engineVersion,
     engineInstalled: target !== null,
+    otherEngines: options.length,
+    installedEngines: engines.length,
     missingGame,
+    otherGame: otherGame !== null,
     missingMap,
-    dependencyBlock,
+    dependencyBlock: otherGame
+      ? replayDependencyBlock(otherGame.name, installedGames)
+      : dependencyBlock,
   });
-  const ready = check !== undefined && blockers.length === 0 && target !== null;
+  const ready = check !== undefined && blockers.length === 0 && run !== null;
+  const substitution = check !== undefined && (options.length > 0 || otherGame);
 
   async function analyse(force: boolean) {
-    if (!target) return;
+    if (!run) return;
     setPending(true);
     setError(null);
     try {
       await requestAnalysis({
         replayPath,
-        enginePath: target.enginePath,
-        dataDir: target.dataDir,
+        enginePath: run.enginePath,
+        dataDir: run.dataDir,
+        game: otherGame?.name,
         force,
       });
     } catch (e) {
@@ -193,7 +270,22 @@ export function ReplayAnalysisSection({
         matchSeconds={info.durationSec}
         estimate={estimateAnalysisSeconds(analyses.values(), info.durationSec)}
       />
-      {button(label, force)}
+      {substitution && (
+        <Substitution
+          recordedEngine={info.engineVersion}
+          options={options}
+          chosen={chosen}
+          onPick={setPicked}
+          recordedGame={otherGame ? info.gameType : null}
+          gameUsed={otherGame ? gameUsed : null}
+        />
+      )}
+      {button(
+        chosen
+          ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
+          : label,
+        force,
+      )}
       {check !== undefined && blockers.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-amber-700 dark:text-amber-400">
           {blockers.map((b) => (
@@ -201,6 +293,7 @@ export function ReplayAnalysisSection({
           ))}
         </ul>
       )}
+      {check !== undefined && blockers.length > 0 && downloads}
     </>
   );
 
@@ -287,6 +380,102 @@ function BeforeRunning({
   );
 }
 
+/**
+ * What will be used in place of what the replay was recorded with, said before
+ * the button is pressed (#3869).
+ *
+ * The app has an order for engine versions and no measure of how near one is
+ * to another, so the engines are listed newest first and the newest not yet
+ * tried is the one picked. The odds are not guessed at: all this says is what
+ * the engine's design supports, that its simulation is only kept in step
+ * within one version, and that the result is kept only when the playback
+ * matches the recorded match exactly.
+ */
+function Substitution({
+  recordedEngine,
+  options,
+  chosen,
+  onPick,
+  recordedGame,
+  gameUsed,
+}: {
+  recordedEngine: string;
+  options: EngineOption[];
+  chosen: EngineOption | null;
+  onPick: (path: string) => void;
+  recordedGame: string | null;
+  gameUsed: string | null;
+}) {
+  const tried = options.filter((o) => o.tried);
+  return (
+    <div className="flex max-w-prose flex-col gap-2">
+      {options.length > 0 && (
+        <>
+          <p>
+            {recordedEngine
+              ? `This replay was recorded on engine ${recordedEngine}, which is not installed.`
+              : "This replay does not say which engine recorded it."}{" "}
+            {chosen
+              ? `The analysis will use engine ${chosen.label} instead.`
+              : "Every installed engine has been tried and did not reproduce the match. Pick one to try it again."}
+          </p>
+          {options.length > 1 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium">Engine to use</span>
+              <OptionSelect
+                value={chosen?.path ?? ""}
+                onValueChange={onPick}
+                placeholder="Pick an engine"
+                size="sm"
+                className="max-w-sm"
+                ariaLabel="Engine to use"
+                options={options.map((o) => ({
+                  value: o.path,
+                  label: o.tried
+                    ? `${o.label} (did not reproduce this match)`
+                    : o.label,
+                }))}
+              />
+              <span className="text-xs text-muted-foreground">
+                Newest first. Coilbox has no measure of which version is nearest
+                to the one the replay was recorded on, so it has not picked one
+                for that.
+              </span>
+            </div>
+          )}
+          {tried.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              Already tried, and did not reproduce the match:{" "}
+              {tried.map((o) => o.label).join(", ")}.
+            </p>
+          )}
+        </>
+      )}
+      {recordedGame && gameUsed && (
+        <p>
+          The game this replay was recorded on, {recordedGame}, is not
+          installed. The analysis will use {gameUsed}, another version of it.
+          That is the highest numbered version installed, and coilbox cannot
+          tell whether it is the nearest.
+        </p>
+      )}
+      <p className="text-muted-foreground">
+        A different{" "}
+        {options.length > 0 && gameUsed
+          ? "engine or game version"
+          : options.length > 0
+            ? "engine"
+            : "game version"}{" "}
+        often computes a different match, because the engine only keeps its
+        playback in step within one version. The result is kept only if the
+        playback matches the recorded match exactly: who won, how long it lasted
+        and every team's final totals. If it does not, no events are kept and
+        the page says so.
+      </p>
+    </div>
+  );
+}
+
 function Running({
   job,
   onCancel,
@@ -338,6 +527,8 @@ function Stored({
 }) {
   const diverged = stored.state === "diverged";
   const { counts } = stored;
+  const difference = differenceNote(stored);
+  const attempts = divergedAttempts(stored);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -361,6 +552,11 @@ function Stored({
             {!diverged &&
               ` Takes ${formatBytes(stored.sizeBytes) ?? "0 B"} on disk.`}
           </p>
+          {difference && (
+            <p className="max-w-prose text-xs text-amber-700 dark:text-amber-400">
+              {difference}
+            </p>
+          )}
         </div>
         <ConfirmPopover
           triggerProps={{
@@ -383,6 +579,15 @@ function Stored({
         </ConfirmPopover>
       </div>
       {diverged && <Disagreements stored={stored} />}
+      {diverged && attempts.length > 1 && (
+        <p className="text-xs text-muted-foreground">
+          Tried so far, and none reproduced the match:{" "}
+          {attempts
+            .map((a) => `engine ${a.engine || "unknown"} with ${a.game}`)
+            .join(", ")}
+          .
+        </p>
+      )}
       {stored.state === "outdated" && (
         <p className="text-xs text-amber-700 dark:text-amber-400">
           This analysis was made by an earlier version of coilbox, which

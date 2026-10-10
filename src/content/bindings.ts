@@ -1104,7 +1104,10 @@ export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
  * replay.
  *
  * `replayPath` is a `ReplayFile.path`. `enginePath` and `dataDir` are the
- * `PlayTarget.enginePath` and `PlayTarget.dataDir` a replay launch would use.
+ * `PlayTarget.enginePath` and `PlayTarget.dataDir` a replay launch would use,
+ * or those of another installed engine when the replay's own is not installed
+ * (#3869). `game` names another installed version of the replay's game to
+ * depend on instead of the one it names, and is left out for the recorded one.
  * `force` asks for a run of a match that already has a current analysis.
  *
  * It rejects, with the reason, for a replay that cannot be analysed: a remix,
@@ -1113,7 +1116,13 @@ export const ANALYSIS_QUEUE_EVENT = "coilbox-content://analysis-queue";
  * time for the engine to start.
  */
 export const contentAnalysisEnqueue = defineCommand<
-  { replayPath: string; enginePath: string; dataDir: string; force?: boolean },
+  {
+    replayPath: string;
+    enginePath: string;
+    dataDir: string;
+    game?: string;
+    force?: boolean;
+  },
   {
     outcome: "queued" | "alreadyQueued" | "alreadyAnalysed";
     queue: ReplayAnalysisQueue;
@@ -1130,13 +1139,18 @@ export const contentAnalysisEnqueue = defineCommand<
  * - `noGameOver`: the match was quit before a game over was recorded.
  * - `noGameId`: the header holds no id to file a result under.
  * - `unreadable`: the file does not read as a replay.
+ *
+ * `enginePaths` are installed engine folders (`Engine.path`), and `headless`
+ * answers which of them hold a headless engine, the only kind an analysis can
+ * run.
  */
 export const contentAnalysisCheck = defineCommand<
-  { replayPath: string },
+  { replayPath: string; enginePaths?: string[] },
   {
     cannot: "remix" | "noGameId" | "noGameOver" | "unreadable" | null;
     gameId: string | null;
     matchSeconds: number;
+    headless: string[];
   }
 >("coilbox-content", "content_analysis_check");
 
@@ -1171,6 +1185,14 @@ export const contentAnalysisDismiss = defineCommand<
  */
 export type ReplayAnalysisState = "current" | "outdated" | "diverged";
 
+/** One run that finished and did not reproduce the match. */
+export interface ReplayAnalysisAttempt {
+  engine: string;
+  game: string;
+  analysedAtMs: number;
+  disagreements: ReplayDisagreement[];
+}
+
 /**
  * What is stored for one analysed match: what produced it, when, and how many
  * events of each kind it holds. Never the events themselves.
@@ -1189,8 +1211,19 @@ export interface StoredReplayAnalysis {
   loggerVersion: number;
   /** The engine the run used, as it named itself. */
   engine: string;
-  /** The game the replay was recorded on, name and version. */
+  /** The game the run depended on, name and version. */
   game: string;
+  /**
+   * What the replay says it was recorded with. Empty in a file written before
+   * these were kept, which reads as unknown and never as the same.
+   */
+  recordedEngine?: string;
+  recordedGame?: string;
+  /** Whether the run used another engine or game version. Null when unknown. */
+  engineDiffers?: boolean | null;
+  gameDiffers?: boolean | null;
+  /** Every engine and game the match diverged on, oldest first. */
+  attempts?: ReplayAnalysisAttempt[];
   map: string;
   analysedAtMs: number;
   /** The match's length, and how long the engine took to play it back. */
