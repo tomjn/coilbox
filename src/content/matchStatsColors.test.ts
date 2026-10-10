@@ -9,6 +9,8 @@ import {
   autoColorMode,
   type ChartColorMode,
   colorSeries,
+  partlyHidden,
+  shownSeries,
   teamSeries,
 } from "./matchStats";
 
@@ -312,5 +314,73 @@ describe("autoColorMode", () => {
       { team: 2, ally: 1, rgb: rgb("#e0e000") },
     ];
     expect(pick(seats)).toBe("game");
+  });
+});
+
+describe("unchecking a team in the roster", () => {
+  const seats: Seat[] = [
+    { team: 0, ally: 0, rgb: [1, 0, 0] },
+    { team: 1, ally: 0, rgb: [0, 1, 0] },
+    { team: 2, ally: 1, rgb: [0, 0, 1] },
+    { team: 3, ally: 1, rgb: [1, 1, 0] },
+  ];
+  const charted = [0, 1, 2, 3];
+
+  /** Painted from the whole match, then narrowed, as the chart does it. */
+  function narrowed(
+    hidden: number[],
+    mode: ChartColorMode,
+    view: "players" | "teams",
+  ) {
+    const { trailer, info } = match(seats);
+    const lines =
+      view === "teams" ? allySeries(trailer, info) : teamSeries(trailer, info);
+    const painted = colorSeries(lines, trailer, info, mode, "dark");
+    return {
+      painted,
+      shown: shownSeries(painted, info, charted, hidden),
+      partial: partlyHidden(
+        shownSeries(painted, info, charted, hidden),
+        info,
+        charted,
+        hidden,
+      ),
+    };
+  }
+
+  for (const mode of ["palette", "game"] as const) {
+    for (const view of ["players", "teams"] as const) {
+      it(`removes the line and repaints nobody (${mode}, ${view})`, () => {
+        const hidden = view === "teams" ? [0, 1] : [1];
+        const { painted, shown } = narrowed(hidden, mode, view);
+        expect(shown.length).toBeLessThan(painted.length);
+        for (const s of shown)
+          expect(s.color).toBe(painted.find((p) => p.id === s.id)?.color);
+      });
+    }
+  }
+
+  it("removes a player's line when that team is unchecked", () => {
+    const { shown } = narrowed([1], "palette", "players");
+    expect(shown.map((s) => s.id)).toEqual(["team0", "team2", "team3"]);
+  });
+
+  it("keeps a side's line while any member is checked, at the full side total", () => {
+    const { painted, shown, partial } = narrowed([0], "palette", "teams");
+    expect(shown.map((s) => s.id)).toEqual(["ally0", "ally1"]);
+    // The very same line, so its samples still add up every member.
+    expect(shown[0]).toBe(painted[0]);
+    expect(partial.map((s) => s.id)).toEqual(["ally0"]);
+  });
+
+  it("removes a side's line once every member is unchecked", () => {
+    const { shown, partial } = narrowed([0, 1], "palette", "teams");
+    expect(shown.map((s) => s.id)).toEqual(["ally1"]);
+    expect(partial).toEqual([]);
+  });
+
+  it("hands back the same lines when nothing is unchecked", () => {
+    const { painted, shown } = narrowed([], "palette", "players");
+    expect(shown).toBe(painted);
   });
 });

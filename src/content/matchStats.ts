@@ -495,6 +495,56 @@ export function seriesTeams(
     .sort((a, b) => a - b);
 }
 
+/** The teams of a line that the chart measured, split by whether they are hidden. */
+function lineTeams(
+  series: Pick<ChartSeries, "id">,
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+) {
+  const teams = seriesTeams(series, info).filter((t) => charted.includes(t));
+  return {
+    shown: teams.filter((t) => !hidden.includes(t)).length,
+    hidden: teams.filter((t) => hidden.includes(t)).length,
+  };
+}
+
+/**
+ * The lines left once the roster's unchecked teams are removed. Call it on lines
+ * that are already painted, so a colour never depends on what is showing.
+ *
+ * A player's line has one team and goes when that team is unchecked. A side's
+ * line stays while any measured member is checked, and it is still the sum of
+ * every member, checked or not: a side total that left some players out would
+ * read as the side's score, so the Teams view narrows by whole sides only
+ * ({@link partlyHidden} names the ones a note is owed for).
+ */
+export function shownSeries(
+  series: ChartSeries[],
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+): ChartSeries[] {
+  if (hidden.length === 0) return series;
+  return series.filter((s) => {
+    const t = lineTeams(s, info, charted, hidden);
+    return t.shown > 0 || t.hidden === 0;
+  });
+}
+
+/** Lines still drawn that have a member unchecked, so their total counts someone not shown. */
+export function partlyHidden(
+  series: ChartSeries[],
+  info: DemoInfo,
+  charted: readonly number[],
+  hidden: readonly number[],
+): ChartSeries[] {
+  return series.filter((s) => {
+    const t = lineTeams(s, info, charted, hidden);
+    return t.shown > 0 && t.hidden > 0;
+  });
+}
+
 /**
  * The team a named player held, for finding "me" in a replay. Matches the way
  * the dossier does (`gamesFor` in `stats.ts`): a seated player with that name,
