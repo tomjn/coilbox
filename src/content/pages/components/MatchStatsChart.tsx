@@ -62,6 +62,7 @@ import {
 import { usePrimaryPlayer } from "../../usePrimaryPlayer";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
 import { CommandRateChart } from "./CommandRateChart";
+import { LivingValueChart } from "./LivingValueChart";
 import { MatchStatsExportButton } from "./MatchStatsExportButton";
 import { MatchStatsPicker } from "./MatchStatsPicker";
 import { MatchStatsTable } from "./MatchStatsTable";
@@ -719,6 +720,14 @@ export function MatchStatsChart({
           replayPath={replayPath}
           series={drawn}
           endSec={rows[rows.length - 1]?.timeSec ?? 0}
+        />
+      )}
+      {!noneDrawn && (
+        <LivingValueChart
+          info={info}
+          series={drawn}
+          endSec={rows[rows.length - 1]?.timeSec ?? 0}
+          periodSec={trailer.teamStatPeriodSec}
         />
       )}
     </div>
