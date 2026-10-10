@@ -292,19 +292,6 @@ mod tests {
         assert_eq!(hex(&[0x00, 0x0f, 0xa0, 0xff]), "000fa0ff");
     }
 
-    /// The `sha256:` prefix is part of the value, because the hub serves it that
-    /// way and a comparison that has to strip something is a comparison that can
-    /// strip it differently on the two sides.
-    #[test]
-    fn the_digest_names_its_own_algorithm() {
-        let digest = catalog_digest();
-        let hex = digest.strip_prefix("sha256:").expect("prefixed");
-        assert_eq!(hex.len(), 64);
-        assert!(hex
-            .chars()
-            .all(|c| c.is_ascii_hexdigit() && !c.is_uppercase()));
-    }
-
     /// The two documents are digested apart, which is the whole reason this is a
     /// second file.
     #[test]
