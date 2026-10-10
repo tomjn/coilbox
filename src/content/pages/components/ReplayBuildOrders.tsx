@@ -432,15 +432,12 @@ export function ReplayBuildOrders({
             />
           )}
           {fit && <OrderFitNote fit={fit} />}
-          <Field
-            label="Opening length in minutes"
-            hint="Leave this empty to fold the whole match."
-            className="max-w-sm"
-          >
+          <Field label="Opening length in minutes" className="max-w-sm">
             <Input
               inputMode="decimal"
               value={cut}
               onChange={(e) => setCut(e.target.value)}
+              placeholder="Whole match"
               className="h-8 w-24"
               autoComplete="off"
             />

@@ -123,6 +123,19 @@ describe("ReplayChat", () => {
     expect(screen.queryByRole("button", { name: /show chat log/i })).toBeNull();
   });
 
+  it("keeps how to read the timeline in its help and not under it", async () => {
+    open({
+      incomplete: false,
+      messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
+    });
+    await screen.findByRole("button", { name: /show chat log/i });
+    expect(screen.queryByText(/Point at or focus a mark/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "About the timeline" }));
+    const said = within(screen.getByRole("dialog"));
+    expect(said.getByText(/Point at or focus a mark to read it/)).toBeTruthy();
+    expect(said.getByText(/open the chat log at that line/)).toBeTruthy();
+  });
+
   it("says the timeline and the log come from the recorded orders and messages", async () => {
     open({
       incomplete: false,

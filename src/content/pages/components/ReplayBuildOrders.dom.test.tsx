@@ -149,6 +149,16 @@ describe("ReplayBuildOrders", () => {
     expect(help().getByText(REPLAY_SOURCE_NOTES.stream)).toBeTruthy();
   });
 
+  it("says an empty opening length folds the whole match in the box's placeholder", async () => {
+    await open(opening);
+    expect(screen.queryByText(/fold the whole match/i)).toBeNull();
+    expect(
+      screen
+        .getByRole("textbox", { name: /Opening length in minutes/i })
+        .getAttribute("placeholder"),
+    ).toBe("Whole match");
+  });
+
   it("names units from the installed game the replay records", async () => {
     GAMES = [game("SplinterFaction 0.1.88", "SplinterFaction_0.1.88.sdz")];
     DATASET = { units: UNITS };
