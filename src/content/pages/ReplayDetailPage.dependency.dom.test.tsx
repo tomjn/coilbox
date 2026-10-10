@@ -83,6 +83,9 @@ vi.mock("../useReplayEngine", () => ({
     notice: { kind: "none" },
   }),
 }));
+vi.mock("../replaySets", () => ({
+  useReplaySets: () => ({ sets: [] }),
+}));
 vi.mock("../replayUserState", () => ({
   useReplayUserState: () => ({
     get: () => ({ provenance: null, tags: [], watched: false }),
