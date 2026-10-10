@@ -599,6 +599,13 @@ export const contentMetricRegistry = defineCommand<
 /** One player as recorded in a stats-database game (flattened from the demo). */
 export interface StatPlayer {
   name: string;
+  /**
+   * The `[teamN]` index this seat plays for: the key of its team's entry in
+   * `StatRecord.teamTotals`. Absent for a spectator, and for a record ingested
+   * before schema 5 until the next pass re-decodes it. Team 0 is a real team,
+   * so test for `undefined` and never for falsy.
+   */
+  team?: number;
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;
@@ -627,6 +634,9 @@ export interface StatAi {
   /** The AI's identity (`name` is usually just a slot label like `AI 1`). */
   shortName: string;
   version?: string;
+  /** The `[teamN]` index the bot plays for. Absent on a record from before
+   * schema 5. See `StatPlayer.team`. */
+  team?: number;
   allyTeam?: number;
   /** Faction (the team's `side`). */
   side?: string;

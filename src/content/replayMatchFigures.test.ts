@@ -80,6 +80,103 @@ describe("matchFigure", () => {
   });
 });
 
+describe("matchFigure for a named player", () => {
+  const fight = metric({ key: "alpha", unit: "damage" });
+  const economy = metric({ key: "alpha", unit: "metal" });
+  const seat = (name: string, team?: number, spectator = false) => ({
+    name,
+    team,
+    spectator,
+  });
+  const played = (...players: ReturnType<typeof seat>[]) =>
+    record({
+      teamTotals: teams(100, 250),
+      players: players as unknown as StatRecord["players"],
+    });
+
+  it("is the player's own team, whatever the metric counts", () => {
+    const r = played(seat("Ann", 0), seat("Ben", 1));
+    expect(matchFigure(r, fight, "Ann")).toBe(100);
+    expect(matchFigure(r, economy, "Ann")).toBe(100);
+    expect(matchFigure(r, fight, "Ben")).toBe(250);
+    expect(figureBasis(fight, "Ann")).toBe("Ann's team");
+  });
+
+  it("treats team 0 as a team", () => {
+    const r = played(seat("Ann", 0));
+    expect(matchFigure(r, fight, "Ann")).toBe(100);
+  });
+
+  it("is unknown when the player was not in the match", () => {
+    const r = played(seat("Ben", 1));
+    expect(matchFigure(r, fight, "Ann")).toBeUndefined();
+  });
+
+  it("is unknown for a player who only watched", () => {
+    const r = played(seat("Ann", 0, true));
+    expect(matchFigure(r, fight, "Ann")).toBeUndefined();
+  });
+
+  it("is unknown, never team 0, when an old record has no team id", () => {
+    const r = played(seat("Ann"), seat("Ben", 1));
+    expect(matchFigure(r, fight, "Ann")).toBeUndefined();
+  });
+
+  it("is unknown when the team has no figure for the metric", () => {
+    const r = record({
+      teamTotals: [{ team: 1, totals: { alpha: 5 } }],
+      players: [seat("Ann", 0)] as unknown as StatRecord["players"],
+    });
+    expect(matchFigure(r, fight, "Ann")).toBeUndefined();
+  });
+
+  it("is unknown for a replay that measured nothing, and for no record", () => {
+    const r = record({
+      statsKnown: false,
+      teamTotals: [],
+      players: [seat("Ann", 0)] as unknown as StatRecord["players"],
+    });
+    expect(matchFigure(r, fight, "Ann")).toBeUndefined();
+    expect(matchFigure(undefined, fight, "Ann")).toBeUndefined();
+  });
+
+  it("is a real zero when the player's team measured zero", () => {
+    const r = record({
+      teamTotals: teams(0, 9),
+      players: [seat("Ann", 0)] as unknown as StatRecord["players"],
+    });
+    expect(matchFigure(r, fight, "Ann")).toBe(0);
+  });
+
+  it("sorts rows with no figure for the player last, in both directions", () => {
+    const rows = {
+      mid: played(seat("Ann", 0)),
+      high: record({
+        teamTotals: teams(500),
+        players: [seat("Ann", 0)] as unknown as StatRecord["players"],
+      }),
+      away: played(seat("Ben", 1)),
+      old: played(seat("Ann")),
+      none: record({ statsKnown: false, players: [seat("Ann", 0)] as never }),
+    };
+    const order = (dir: "asc" | "desc") =>
+      Object.entries(rows)
+        .sort(([, a], [, b]) =>
+          compareFigures(
+            matchFigure(a, fight, "Ann"),
+            matchFigure(b, fight, "Ann"),
+            dir,
+          ),
+        )
+        .map(([name]) => name);
+    expect(order("desc").slice(0, 2)).toEqual(["high", "mid"]);
+    expect(order("asc").slice(0, 2)).toEqual(["mid", "high"]);
+    for (const dir of ["asc", "desc"] as const) {
+      expect(order(dir).slice(2).sort()).toEqual(["away", "none", "old"]);
+    }
+  });
+});
+
 describe("formatFigure", () => {
   it("leaves an unknown figure as a dash and formats a known one", () => {
     expect(formatFigure(undefined)).toBe("—");
