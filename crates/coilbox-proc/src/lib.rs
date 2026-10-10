@@ -320,6 +320,11 @@ pub fn set_content_roots(roots: Vec<String>) {
     *CONTENT_ROOTS.write().unwrap() = roots;
 }
 
+/// The content folders last published with [`set_content_roots`].
+pub fn content_roots() -> Vec<String> {
+    CONTENT_ROOTS.read().unwrap().clone()
+}
+
 /// The published content folders other than `primary`, as a `SPRING_DATADIR`
 /// style list. Empty when there are none.
 pub fn extra_datadirs(primary: &str) -> String {
