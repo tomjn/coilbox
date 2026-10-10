@@ -2478,35 +2478,43 @@ const demoInfoPending = new Map<string, Promise<{ info: DemoInfo }>>();
  * only a winner the trailer cannot give is left unknown.
  */
 export function useDemoInfo(enginePath?: string, replayPath?: string) {
-  const [info, setInfo] = useState<DemoInfo | null>(null);
+  // The replay `settled` belongs to, so another replay shows nothing of it.
+  const [settled, setSettled] = useState<{
+    path: string;
+    info: DemoInfo | null;
+    error: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!replayPath) {
-      setInfo(null);
+      setSettled(null);
       return;
     }
     const key = `${enginePath ?? ""}::${replayPath}`;
     const cached = demoInfoCache.get(key);
     if (cached) {
-      setInfo(cached);
-      setError(null);
+      setSettled({ path: replayPath, info: cached, error: null });
+      setLoading(false);
       return;
     }
     let cancelled = false;
     setLoading(true);
-    setError(null);
     shareInFlight(demoInfoPending, key, () =>
       contentDemoInfo({ enginePath, replayPath }),
     )
       .then((res) => {
         if (cancelled) return;
         demoInfoCache.set(key, res.info);
-        setInfo(res.info);
+        setSettled({ path: replayPath, info: res.info, error: null });
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled)
+          setSettled({
+            path: replayPath,
+            info: null,
+            error: e instanceof Error ? e.message : String(e),
+          });
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -2516,7 +2524,12 @@ export function useDemoInfo(enginePath?: string, replayPath?: string) {
     };
   }, [enginePath, replayPath]);
 
-  return { info, loading, error };
+  const current = !!replayPath && settled?.path === replayPath;
+  return {
+    info: current ? settled.info : null,
+    loading: replayPath ? (current ? loading : true) : false,
+    error: current ? settled.error : null,
+  };
 }
 
 /* -------------------------------------------------------------------------- *

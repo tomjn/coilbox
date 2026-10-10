@@ -40,17 +40,15 @@ const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const trailerCache = new Map<string, DemoTrailer>();
 
 function useMatchStats(replayPath: string) {
-  const [data, setData] = useState<{
-    trailer: DemoTrailer;
-    metrics: Metric[];
+  // The replay `settled` belongs to, so another replay shows nothing of it.
+  const [settled, setSettled] = useState<{
+    path: string;
+    data: { trailer: DemoTrailer; metrics: Metric[] } | null;
+    error: string | null;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
-    setLoading(true);
     const cached = trailerCache.get(replayPath);
     const trailer = cached
       ? Promise.resolve(cached)
@@ -59,20 +57,27 @@ function useMatchStats(replayPath: string) {
       .then(([t, metrics]) => {
         if (cancelled) return;
         trailerCache.set(replayPath, t);
-        setData({ trailer: t, metrics });
+        setSettled({
+          path: replayPath,
+          data: { trailer: t, metrics },
+          error: null,
+        });
       })
       .catch((e) => {
-        if (!cancelled) setError(errMessage(e));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled)
+          setSettled({ path: replayPath, data: null, error: errMessage(e) });
       });
     return () => {
       cancelled = true;
     };
   }, [replayPath]);
 
-  return { data, loading, error };
+  const current = settled?.path === replayPath;
+  return {
+    data: current ? settled.data : null,
+    loading: !current,
+    error: current ? settled.error : null,
+  };
 }
 
 /** A metric's icon comes from its group, so the next metric arrives with one. */
