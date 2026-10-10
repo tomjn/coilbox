@@ -16,6 +16,7 @@ export const MAP_LAYERS = [
   "buildings",
   "density",
   "orderDensity",
+  "bases",
 ] as const;
 
 export type MapLayer = (typeof MAP_LAYERS)[number];
@@ -34,6 +35,7 @@ export const DEFAULT_MAP_LAYERS: MapLayerToggles = {
   buildings: false,
   density: false,
   orderDensity: false,
+  bases: false,
 };
 
 /** Parse a stored value. Anything missing or not a boolean takes its default. */

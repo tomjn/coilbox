@@ -696,6 +696,20 @@ describe("order density in the time window", () => {
     ).toBeTruthy();
   });
 
+  it("counts the bases layer's build orders and this layer's points under their own names", async () => {
+    POINTS = POINTS_OVER_TIME;
+    ORDERS = {
+      ...PLACED,
+      lastFrame: 30 * MIN,
+      orders: PLACED.orders.map((o) => ({ ...o, frame: 100 })),
+    };
+    show(LONG);
+    fireEvent.click(toggle("Bases"));
+    fireEvent.click(toggle("Order density"));
+    await screen.findByText(/4 of 4 orders with a place on the map/);
+    expect(screen.getByText(/3 of 3 orders to place a building/)).toBeTruthy();
+  });
+
   it("counts each layer's points under its own name when both are on", async () => {
     POINTS = POINTS_OVER_TIME;
     ORDERS = {

@@ -50,6 +50,7 @@ import { useReplayBuildOrders } from "../../useReplayBuildOrders";
 import { useReplayTimeWindow } from "../../useReplayTimeWindow";
 import { useReplayUnits } from "../../useReplayUnits";
 import { useSeriesEmphasis } from "../../useSeriesEmphasis";
+import { ReplayBaseCrops } from "./ReplayBaseCrops";
 import { swatch } from "./ReplayRoster";
 import { ReplaySourceNote } from "./ReplaySourceNote";
 import { ReplayTimeWindowControl } from "./ReplayTimeWindowControl";
@@ -235,6 +236,7 @@ export function ReplayMap({
     buildings: layersShown && stored.buildings,
     density: layersShown && stored.density,
     orderDensity: layersShown && stored.orderDensity,
+    bases: layersShown && stored.bases,
   };
 
   // The engine's heightmap has one sample more than it has squares, and a
@@ -255,7 +257,7 @@ export function ReplayMap({
   // Build orders are read once for the page. A layer that draws them asks for
   // them when it is switched on, including one left on from the last visit.
   const orders = useReplayBuildOrders(replayPath ?? "");
-  const wantOrders = !!replayPath && (on.buildings || on.density);
+  const wantOrders = !!replayPath && (on.buildings || on.density || on.bases);
   const { status: ordersStatus, load: loadOrders } = orders;
   useEffect(() => {
     if (wantOrders && ordersStatus === "idle") loadOrders();
@@ -301,7 +303,8 @@ export function ReplayMap({
 
   // The time window (#1153). The layers that have a time to filter by are read
   // through it, and the ones that are set before the game are not.
-  const windowed = on.buildings || on.density || on.orderDensity;
+  const buildLayer = on.buildings || on.density || on.bases;
+  const windowed = buildLayer || on.orderDensity;
   const domainSec = Math.ceil(
     timelineDomain(
       [
@@ -526,6 +529,7 @@ export function ReplayMap({
               <ToggleGroupItem value="orderDensity">
                 Order density
               </ToggleGroupItem>
+              <ToggleGroupItem value="bases">Bases</ToggleGroupItem>
             </ToggleGroup>
             <ReplaySourceNote
               source="stream"
@@ -541,7 +545,7 @@ export function ReplayMap({
                 // With the order layer on as well there are two kinds of point
                 // to count, and each is counted under its own name.
                 count={
-                  on.orderDensity && !(on.buildings || on.density)
+                  on.orderDensity && !buildLayer
                     ? orderCount
                     : result
                       ? placedCount
@@ -549,13 +553,13 @@ export function ReplayMap({
                 }
                 noun={
                   on.orderDensity
-                    ? on.buildings || on.density
+                    ? buildLayer
                       ? "orders to place a building"
                       : "orders with a place on the map"
                     : undefined
                 }
                 also={
-                  on.orderDensity && (on.buildings || on.density)
+                  on.orderDensity && buildLayer
                     ? {
                         count: orderCount,
                         noun: "orders with a place on the map",
@@ -706,6 +710,19 @@ export function ReplayMap({
                 peak={`${Math.round(orderField.peakWithinRadius ?? 0).toLocaleString()} ${Math.round(orderField.peakWithinRadius ?? 0) === 1 ? "order" : "orders"} within ${Math.round(orderField.radius).toLocaleString()} elmos of one spot${timeWindow ? " in this window" : ""}`}
               />
             )}
+            {on.bases && (
+              <ReplayBaseCrops
+                info={info}
+                dots={dots}
+                orders={inWindow}
+                world={world}
+                units={units.units}
+                minimapUrl={minimapUrl}
+                timeWindow={timeWindow}
+                domainSec={domainSec}
+              />
+            )}
+
             {field && field.peak > 0 && (
               <HeatLegend
                 label="Where buildings were ordered"
