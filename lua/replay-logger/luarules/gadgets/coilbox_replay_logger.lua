@@ -19,7 +19,11 @@
 -- field it does not know, which is what lets a later version add both.
 --
 --   header               format, game, gameVersion, gameShortName, map,
---                        engine, mapSizeX, mapSizeZ, gaiaTeam, positionFrames
+--                        engine, mapSizeX, mapSizeZ, gaiaTeam, positionFrames,
+--                        unitDefs
+--   unit_def             id, name, humanName, metalCost, energyCost, mobile,
+--                        builder, builds, armed, and the numbers under
+--                        DEF_NUMBERS
 --   game_start           frame
 --   unit_created         frame, unit, def, team, x, y, z, startUnit, builder
 --   unit_finished        frame, unit, def, team, x, y, z, startUnit
@@ -52,6 +56,18 @@
 -- capture alike. "team" is the team it now belongs to and "from" the one it
 -- left. "captured" is true when the engine counted it as a capture, and left
 -- out for a gift.
+--
+-- "unit_def" is one of the engine's unit definitions, one line for each, in id
+-- order, straight after the header. Every "def" on a later line is an "id"
+-- here, so the log names its own units and needs no installed game to be read.
+-- The header's "unitDefs" is how many there are, so a reader can tell a whole
+-- list from one a stopped run cut short.
+-- It is the engine's own list for this match, with the match's mod options and
+-- map applied. The unsynced half writes it, from a table that only reads.
+-- "name" is the definition's key. "humanName" is left out when the definition
+-- gives none. "mobile", "builder", "builds" (it has a build menu) and "armed"
+-- (it has a weapon) are left out when false, and a number other than a cost is
+-- left out when zero.
 --
 -- "start_unit_position" is where a living start unit was, every
 -- "positionFrames" frames, left out when it has not moved since the last
@@ -353,6 +369,81 @@ else
 		file:flush()
 	end
 
+	-- What a unit definition makes, stores, senses and carries, under the
+	-- engine's own names. They are what coilbox sorts a unit into a kind by.
+	local DEF_NUMBERS = {
+		"transportCapacity",
+		"metalMake", "energyMake", "makesMetal", "extractsMetal",
+		"windGenerator", "tidalGenerator",
+		"metalUpkeep", "energyUpkeep",
+		"metalStorage", "energyStorage",
+		"radarDistance", "sonarDistance",
+		"radarDistanceJam", "sonarDistanceJam", "seismicDistance",
+	}
+
+	-- A definition's number to four decimal places with the trailing zeros
+	-- gone, which is all a unit definition's numbers carry.
+	local function stat(value)
+		if type(value) ~= "number" or value ~= value or value == math.huge or value == -math.huge then
+			return "0"
+		end
+		if value == math.floor(value) and value > -1e15 and value < 1e15 then
+			return string.format("%.0f", value)
+		end
+		local text = string.format("%.4f", value):gsub("0+$", ""):gsub("%.$", "")
+		if text == "-0" then
+			return "0"
+		end
+		return text
+	end
+
+	local function defLine(id, def)
+		local parts = {
+			'{"kind":"unit_def","id":' .. number(id),
+			'"name":' .. quote(def.name or ""),
+		}
+		local human = def.humanName
+		if type(human) == "string" and human ~= "" and human ~= def.name then
+			parts[#parts + 1] = '"humanName":' .. quote(human)
+		end
+		parts[#parts + 1] = '"metalCost":' .. stat(def.metalCost)
+		parts[#parts + 1] = '"energyCost":' .. stat(def.energyCost)
+		if type(def.speed) == "number" and def.speed > 0 then
+			parts[#parts + 1] = '"mobile":true'
+		end
+		if def.isBuilder then
+			parts[#parts + 1] = '"builder":true'
+		end
+		if type(def.buildOptions) == "table" and #def.buildOptions > 0 then
+			parts[#parts + 1] = '"builds":true'
+		end
+		if type(def.weapons) == "table" and #def.weapons > 0 then
+			parts[#parts + 1] = '"armed":true'
+		end
+		for _, key in ipairs(DEF_NUMBERS) do
+			local text = stat(def[key])
+			if text ~= "0" then
+				parts[#parts + 1] = '"' .. key .. '":' .. text
+			end
+		end
+		return table.concat(parts, ",") .. "}"
+	end
+
+	-- The engine numbers its definitions from 1 with no gaps.
+	local function countUnitDefs()
+		local count = 0
+		while UnitDefs and UnitDefs[count + 1] do
+			count = count + 1
+		end
+		return count
+	end
+
+	local function writeUnitDefs()
+		for id = 1, countUnitDefs() do
+			write(defLine(id, UnitDefs[id]))
+		end
+	end
+
 	local function header()
 		local engine = (Engine and Engine.versionFull) or (Engine and Engine.version) or Game.version
 		return '{"kind":"header","format":' .. number(FORMAT_VERSION)
@@ -365,6 +456,7 @@ else
 			.. ',"mapSizeZ":' .. number(Game.mapSizeZ or 0)
 			.. ',"gaiaTeam":' .. number(Spring.GetGaiaTeamID() or -1)
 			.. ',"positionFrames":' .. number(POSITION_FRAMES)
+			.. ',"unitDefs":' .. number(countUnitDefs())
 			.. "}"
 	end
 
@@ -392,6 +484,7 @@ else
 		end
 		file = opened
 		write(header())
+		writeUnitDefs()
 		playFast()
 	end
 

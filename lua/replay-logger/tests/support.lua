@@ -79,7 +79,8 @@ end
 -- `options.game` overrides fields of the Game table, `options.teams` is the team
 -- list, `options.gaiaTeam` the Gaia team, and `options.stats` is keyed by team
 -- and holds that team's statistics samples, oldest first. `options.noFile` makes
--- the write directory refuse the file.
+-- the write directory refuse the file. `options.unitDefs` is the engine's list
+-- of unit definitions, in id order, and is empty unless a test gives one.
 function M.newEngine(options)
 	options = options or {}
 
@@ -209,6 +210,7 @@ function M.newEngine(options)
 	setmetatable(syncedEnv, { __index = _G })
 
 	local unsyncedEnv = common({
+		UnitDefs = options.unitDefs or {},
 		Spring = {
 			GetGaiaTeamID = function()
 				return options.gaiaTeam

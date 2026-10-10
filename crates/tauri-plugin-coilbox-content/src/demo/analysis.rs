@@ -1045,6 +1045,7 @@ mod tests {
             assert_eq!(
                 run.events.as_ref().expect("events").len(),
                 counts.header
+                    + counts.unit_def
                     + counts.game_start
                     + counts.unit_created
                     + counts.unit_finished

@@ -328,7 +328,13 @@ pub fn write(
         let mut gz = GzEncoder::new(std::fs::File::create(&temp)?, Compression::default());
         serde_json::to_writer(&mut gz, provenance)?;
         gz.write_all(b"\n")?;
-        for line in events.unwrap_or_default() {
+        // The engine's unit definitions are kept once for every replay that
+        // shares them, in `def_sets`, and not again in each replay's file.
+        for line in events
+            .unwrap_or_default()
+            .iter()
+            .filter(|line| !matches!(line, LogLine::UnitDef(_)))
+        {
             serde_json::to_writer(&mut gz, line)?;
             gz.write_all(b"\n")?;
         }
@@ -571,7 +577,13 @@ pub(crate) async fn content_replay_analysis_delete<R: Runtime>(
     app: AppHandle<R>,
     game_id: String,
 ) -> CliResult {
-    match app_store_dir(&app).and_then(|dir| delete(&dir, &game_id)) {
+    let deleted = app_store_dir(&app).and_then(|dir| {
+        let deleted = delete(&dir, &game_id)?;
+        // The engine's list of unit definitions numbered that file's events.
+        super::super::def_sets::unlink_engine(&super::super::def_sets::dir_beside(&dir), &game_id)?;
+        Ok(deleted)
+    });
+    match deleted {
         Ok(deleted) => CliResult::ok(json!({ "deleted": deleted })),
         Err(e) => CliResult::err(e),
     }
@@ -1122,6 +1134,71 @@ pub(super) mod tests {
 
         assert_eq!((summary.deleted, summary.analyses), (1, 1));
         assert_eq!(names(&analyses), Vec::<String>::new());
+    }
+
+    /// The unit definitions recorded for a match go by the rule its analysis
+    /// goes by, whether or not it was ever analysed: with the last replay of
+    /// the match. A list another match still links to stays.
+    #[test]
+    fn deleting_the_last_copy_of_a_match_forgets_its_unit_definitions() {
+        use super::super::super::def_sets::{self, Origin, Source};
+        let dir = tempfile::tempdir().unwrap();
+        let analyses = dir.path().join("analyses");
+        let sets = def_sets::dir_beside(&analyses);
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(root.join("demos")).unwrap();
+        let first = root.join("demos").join("a.sdfz");
+        let second = root.join("demos").join("b.sdfz");
+        let other = root.join("demos").join("other.sdfz");
+        std::fs::write(&first, replay(fixture_id())).unwrap();
+        std::fs::write(&second, replay(fixture_id())).unwrap();
+        std::fs::write(&other, replay([7; 16])).unwrap();
+        let other_id = "07".repeat(16);
+        let shared = def_sets::tests::known();
+        let own = vec![shared[0].clone()];
+        let source = |origin| Source {
+            origin,
+            game: "Some Game 1.0",
+            game_differs: None,
+            taken_at_ms: 1,
+        };
+        def_sets::record(&sets, ID, &shared, &source(Origin::Archive)).unwrap();
+        def_sets::record(&sets, ID, &own, &source(Origin::Folder)).unwrap();
+        def_sets::record(&sets, &other_id, &shared, &source(Origin::Archive)).unwrap();
+        let counts = || {
+            let usage = def_sets::usage(&sets);
+            (usage.sets, usage.replays)
+        };
+        assert_eq!(counts(), (2, 2));
+        let delete = super::super::super::delete_replays;
+
+        // A preview forgets nothing.
+        let both = [first.clone(), second.clone()];
+        delete(&both, false, Some(&analyses), &library_of(&root));
+        assert_eq!(counts(), (2, 2));
+
+        // One of two copies: the other still reads the list.
+        let one = std::slice::from_ref(&first);
+        delete(one, true, Some(&analyses), &library_of(&root));
+        assert_eq!(def_sets::links_for(&sets, ID).unwrap().len(), 2);
+
+        // A remix carries the original's id and has no key, so deleting one
+        // forgets nothing.
+        let remix = super::super::super::rewrite_demo(&second, "Other Game 2.0", None).unwrap();
+        delete(&[remix], true, Some(&analyses), &library_of(&root));
+        assert_eq!(counts(), (2, 2));
+
+        // The last copy: its links go, its own list goes, and the list the
+        // other match shares stays.
+        let last = std::slice::from_ref(&second);
+        let applied = delete(last, true, Some(&analyses), &library_of(&root));
+        assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
+        assert_eq!(def_sets::links_for(&sets, ID).unwrap(), Vec::new());
+        assert_eq!(counts(), (1, 1));
+        assert_eq!(
+            def_sets::for_replay(&sets, &other_id).unwrap().sets.len(),
+            1
+        );
     }
 
     /// Gathering moves a replay out of an engine's folder. The key is in the
