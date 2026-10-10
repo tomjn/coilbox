@@ -18,6 +18,9 @@ const bindings = vi.hoisted(() => ({
   unitsyncMapInfo: vi.fn(),
   unitsyncUnitBuildpics: vi.fn(),
   unitsyncUnitModels: vi.fn(),
+  unitsyncArchiveTree: vi.fn(),
+  unitsyncArchiveFile: vi.fn(),
+  unitsyncMinimap: vi.fn(),
 }));
 
 vi.mock("./bindings", async (importOriginal) => ({
@@ -25,13 +28,24 @@ vi.mock("./bindings", async (importOriginal) => ({
   ...bindings,
 }));
 
+vi.mock("./mapAppearanceCache", async (importOriginal) => {
+  const record = () => {};
+  return {
+    ...(await importOriginal<typeof import("./mapAppearanceCache")>()),
+    useRecordMapAppearance: () => record,
+  };
+});
+
 vi.mock("./modelFile", () => ({
   readCachedModel: vi.fn(async (file: string) => ({ path: file })),
 }));
 
 const {
+  useUnitsyncArchiveFile,
+  useUnitsyncArchiveTree,
   useUnitsyncGameInfo,
   useUnitsyncMapInfo,
+  useUnitsyncMinimap,
   useUnitsyncUnitBuildpics,
   useUnitsyncUnitDataset,
   useUnitsyncUnitModel,
@@ -189,6 +203,64 @@ describe("useUnitsyncUnitModel", () => {
     expect(renders[before].model).toBeNull();
     expect(renders[before].loading).toBe(true);
     expect(renders[before].failed).toBe(false);
+  });
+});
+
+describe("useUnitsyncArchiveTree", () => {
+  it("returns no tree and loading on the first render for a new archive", async () => {
+    const treeA = { entries: [], errors: [] };
+    bindings.unitsyncArchiveTree.mockResolvedValueOnce(treeA);
+    bindings.unitsyncArchiveTree.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ archive }: { archive: string }) =>
+        useUnitsyncArchiveTree("/engine", dir, archive),
+      { archive: "A.sdz" },
+    );
+    await waitFor(() => expect(result.current.tree).toBe(treeA));
+    const before = renders.length;
+    rerender({ archive: "B.sdz" });
+    expect(renders[before].tree).toBeNull();
+    expect(renders[before].loading).toBe(true);
+  });
+});
+
+describe("useUnitsyncArchiveFile", () => {
+  it("returns no file and loading on the first render for a new file", async () => {
+    const fileA = { kind: "text", text: "a" };
+    bindings.unitsyncArchiveFile.mockResolvedValueOnce(fileA);
+    bindings.unitsyncArchiveFile.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ file }: { file: string }) =>
+        useUnitsyncArchiveFile("/engine", dir, "A.sdz", file),
+      { file: "a.txt" },
+    );
+    await waitFor(() => expect(result.current.data).toBe(fileA));
+    const before = renders.length;
+    rerender({ file: "b.txt" });
+    expect(renders[before].data).toBeNull();
+    expect(renders[before].loading).toBe(true);
+  });
+});
+
+describe("useUnitsyncMinimap", () => {
+  it("returns no image and loading on the first render for a new map", async () => {
+    bindings.unitsyncMinimap.mockResolvedValueOnce({
+      dataUrl: "data:image/png;base64,AAAA",
+      startPositions: [{ x: 1, z: 2 }],
+    });
+    bindings.unitsyncMinimap.mockReturnValueOnce(never());
+    const { result, rerender, renders } = recorded(
+      ({ map }: { map: string }) => useUnitsyncMinimap("/engine", dir, map),
+      { map: "A" },
+    );
+    await waitFor(() => expect(result.current.url).not.toBeNull());
+    expect(result.current.startPositions).toHaveLength(1);
+    const before = renders.length;
+    rerender({ map: "B" });
+    expect(renders[before].url).toBeNull();
+    expect(renders[before].startPositions).toEqual([]);
+    expect(renders[before].appearance).toBeNull();
+    expect(renders[before].loading).toBe(true);
   });
 });
 
