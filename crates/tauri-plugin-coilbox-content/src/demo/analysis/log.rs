@@ -26,7 +26,7 @@ pub const FORMAT_VERSION: u32 = 1;
 /// stored analysis, so a file from before the change can be told from one made
 /// after it. `the_logger_writes_the_kinds_this_version_stands_for` fails when
 /// the gadget gains a kind and this was not raised with it.
-pub const LOGGER_VERSION: u32 = 3;
+pub const LOGGER_VERSION: u32 = 4;
 
 /// The first line: what the gadget saw the run as.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
@@ -50,6 +50,14 @@ pub struct LogHeader {
     pub position_frames: i32,
     /// How many `unit_def` lines follow. 0 from a logger that wrote none.
     pub unit_defs: u32,
+    /// How many frames one `damage` line adds up. 0 from a logger that wrote
+    /// none.
+    pub damage_frames: i32,
+    /// The grid `damage` lines number their cells on: columns west to east and
+    /// rows north to south. It is the grid `map_grids::Grid::for_world` gives
+    /// the map. 0 from a logger that wrote no damage.
+    pub grid_width: u32,
+    pub grid_height: u32,
 }
 
 /// A unit being created, finished, destroyed or handed to another team.
@@ -109,6 +117,55 @@ pub struct StartUnitPosition {
     pub team: i32,
     pub x: f32,
     pub z: f32,
+}
+
+/// A start unit swapped for another unit by the game's own script, which is how
+/// some games upgrade one. `unit` was destroyed by a script with no attacker,
+/// and `by` was created for the same team, by no builder, at exactly the place
+/// `unit` stood at, on the same frame or the one before. From this line on `by`
+/// is a start unit, and the old unit's `unit_destroyed` line is no death.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StartUnitReplaced {
+    pub frame: i32,
+    pub unit: i32,
+    pub by: i32,
+    pub team: i32,
+    /// Where `by` was when the line was written.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub x: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub z: Option<f32>,
+}
+
+/// The damage one team's units did to another's over
+/// [`LogHeader::damage_frames`] frames, added up on the header's grid. `frame`
+/// is the first frame of the stretch.
+///
+/// `at` and `origin` are flat lists of a cell and then the damage in it. A
+/// cell is its row times [`LogHeader::grid_width`] plus its column, from the
+/// north west corner. Damage is what the engine handed `UnitDamaged`, less
+/// whatever went past the unit's last health. Paralysis and healing are not in
+/// it.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DamageLine {
+    pub frame: i32,
+    /// The attacker's team. Absent for damage nothing dealt, such as water.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub team: Option<i32>,
+    /// The team of the units hit, which is `team` again for a team that hit
+    /// its own.
+    pub target: i32,
+    /// Where the units hit stood.
+    #[serde(default)]
+    pub at: Vec<f64>,
+    /// Where the attackers stood. Absent with no attacker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<Vec<f64>>,
+    /// Damage to a unit that stood off the map, which is in no cell.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub off: Option<f64>,
 }
 
 /// One of the engine's unit definitions, as the run's own `UnitDefs` table had
@@ -178,6 +235,8 @@ pub enum LogLine {
     UnitDestroyed(UnitEvent),
     UnitGiven(UnitEvent),
     StartUnitPosition(StartUnitPosition),
+    StartUnitReplaced(StartUnitReplaced),
+    Damage(DamageLine),
     GameOver(LoggedGameOver),
     /// A kind a later logger writes and this reader does not know.
     #[serde(other)]
@@ -200,6 +259,8 @@ pub struct EventCounts {
     pub unit_destroyed: usize,
     pub unit_given: usize,
     pub start_unit_position: usize,
+    pub start_unit_replaced: usize,
+    pub damage: usize,
     pub game_over: usize,
     /// Lines of a kind this reader does not know.
     pub unknown: usize,
@@ -249,6 +310,8 @@ impl EventLog {
                 LogLine::UnitDestroyed(_) => counts.unit_destroyed += 1,
                 LogLine::UnitGiven(_) => counts.unit_given += 1,
                 LogLine::StartUnitPosition(_) => counts.start_unit_position += 1,
+                LogLine::StartUnitReplaced(_) => counts.start_unit_replaced += 1,
+                LogLine::Damage(_) => counts.damage += 1,
                 LogLine::GameOver(_) => counts.game_over += 1,
                 LogLine::Unknown => counts.unknown += 1,
             }
@@ -354,12 +417,92 @@ pub(super) mod tests {
                 unit_destroyed: 4,
                 unit_given: 2,
                 start_unit_position: 2,
+                start_unit_replaced: 0,
+                damage: 0,
                 game_over: 1,
                 unknown: 0,
             }
         );
         assert_eq!(log.malformed, 0);
         assert!(!log.truncated);
+    }
+
+    /// What the logger's own upgrade match writes: a start unit swapped for
+    /// another, and some fighting. `logger_test.lua` fails if the logger stops
+    /// producing exactly this.
+    pub(in super::super) const UPGRADE_FIXTURE: &str =
+        include_str!("../../../../../lua/replay-logger/tests/fixtures/upgrade.jsonl");
+
+    #[test]
+    fn a_replaced_start_unit_names_the_old_unit_the_new_one_and_the_place() {
+        let log = parse_log(UPGRADE_FIXTURE);
+        let replaced: Vec<&StartUnitReplaced> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::StartUnitReplaced(replaced) => Some(replaced),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(log.malformed, 0);
+        assert_eq!(
+            replaced,
+            vec![&StartUnitReplaced {
+                frame: 300,
+                unit: 1,
+                by: 3,
+                team: 0,
+                x: Some(400.0),
+                z: Some(300.0),
+            }]
+        );
+        assert_eq!(log.counts().start_unit_replaced, 1);
+    }
+
+    #[test]
+    fn damage_is_read_by_stretch_and_pair_of_teams_on_the_headers_grid() {
+        let log = parse_log(UPGRADE_FIXTURE);
+        let header = log.header().expect("header");
+        assert_eq!(
+            (header.damage_frames, header.grid_width, header.grid_height),
+            (450, 256, 128)
+        );
+        let damage: Vec<&DamageLine> = log
+            .lines
+            .iter()
+            .filter_map(|line| match line {
+                LogLine::Damage(damage) => Some(damage),
+                _ => None,
+            })
+            .collect();
+
+        assert_eq!(log.counts().damage, 4);
+        assert_eq!(
+            damage[1],
+            &DamageLine {
+                frame: 0,
+                team: Some(1),
+                target: 0,
+                at: vec![11064.0, 5.5],
+                origin: Some(vec![28915.0, 5.5]),
+                off: None,
+            }
+        );
+        // Damage nothing dealt has no team and no origin.
+        assert_eq!((damage[3].team, &damage[3].origin), (None, &None));
+        let total = |line: &DamageLine| -> f64 {
+            line.at.iter().skip(1).step_by(2).sum::<f64>() + line.off.unwrap_or(0.0)
+        };
+        assert_eq!(total(damage[3]), 4.0);
+        // 20 in the first stretch, then 30 and the 46 a 500 damage hit found
+        // left of 100 health.
+        let dealt: f64 = damage
+            .iter()
+            .filter(|d| d.team == Some(0))
+            .map(|d| total(d))
+            .sum();
+        assert_eq!(dealt, 96.0);
     }
 
     /// Ties [`LOGGER_VERSION`] to the gadget. A stored analysis is called
@@ -384,12 +527,14 @@ pub(super) mod tests {
         assert_eq!(
             (LOGGER_VERSION, kinds),
             (
-                3,
+                4,
                 vec![
+                    "damage",
                     "game_over",
                     "game_start",
                     "header",
                     "start_unit_position",
+                    "start_unit_replaced",
                     "unit_created",
                     "unit_def",
                     "unit_destroyed",
@@ -416,6 +561,8 @@ pub(super) mod tests {
         assert_eq!(header.gaia_team, 2);
         assert_eq!(header.position_frames, 60);
         assert_eq!(header.unit_defs, 0);
+        assert_eq!(header.damage_frames, 450);
+        assert_eq!((header.grid_width, header.grid_height), (256, 128));
     }
 
     #[test]

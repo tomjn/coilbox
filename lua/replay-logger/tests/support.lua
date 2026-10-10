@@ -86,7 +86,7 @@ function M.newEngine(options)
 
 	local engine = {
 		frame = 0,
-		-- unitID -> { defID, team, x, y, z }
+		-- unitID -> { defID, team, x, y, z, health }
 		units = {},
 		-- team -> how many units the engine has counted it capturing.
 		captured = {},
@@ -148,6 +148,15 @@ function M.newEngine(options)
 				return nil
 			end
 			return unit.x, unit.y, unit.z
+		end,
+		-- health and maxHealth, in the engine's order. A unit no test has hit
+		-- has all of its health.
+		GetUnitHealth = function(unitID)
+			local unit = engine.units[unitID]
+			if not unit then
+				return nil
+			end
+			return unit.health or 100, 100
 		end,
 		GetGaiaTeamID = function()
 			return options.gaiaTeam
@@ -290,6 +299,20 @@ function M.newEngine(options)
 			engine.captured[newTeam] = (engine.captured[newTeam] or 0) + 1
 		end
 		engine.synced:UnitGiven(unitID, unit.defID, newTeam, oldTeam)
+	end
+
+	--- Hit a unit, the way the engine does: the damage comes off its health
+	-- first, and UnitDamaged is called after. `attackerID` is nothing for
+	-- damage nothing dealt, such as water. `paralyzer` is paralysis and takes
+	-- no health.
+	function engine.damage(unitID, damage, attackerID, paralyzer)
+		local unit = engine.units[unitID]
+		local attacker = attackerID and engine.units[attackerID]
+		if not paralyzer then
+			unit.health = (unit.health or 100) - damage
+		end
+		engine.synced:UnitDamaged(unitID, unit.defID, unit.team, damage, paralyzer or false, 7, -1,
+			attackerID, attacker and attacker.defID, attacker and attacker.team)
 	end
 
 	--- Simulate every frame up to and including `frame`.

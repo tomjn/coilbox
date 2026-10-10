@@ -1052,6 +1052,8 @@ mod tests {
                     + counts.unit_destroyed
                     + counts.unit_given
                     + counts.start_unit_position
+                    + counts.start_unit_replaced
+                    + counts.damage
                     + counts.game_over
                     + counts.unknown
             );
