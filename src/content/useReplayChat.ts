@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { type ChatLine, contentDemoChat } from "./bindings";
+import { type ChatLine, contentDemoChat, type TimelineEvent } from "./bindings";
 
 interface ChatRead {
   messages: ChatLine[];
   incomplete: boolean;
+  events: TimelineEvent[];
 }
 
 /**
@@ -12,6 +13,8 @@ interface ChatRead {
  * entry goes once it settles, so a later visit reads again.
  */
 const inFlight = new Map<string, Promise<ChatRead>>();
+
+const NO_EVENTS: TimelineEvent[] = [];
 
 function readChat(replayPath: string): Promise<ChatRead> {
   let held = inFlight.get(replayPath);
@@ -25,7 +28,9 @@ function readChat(replayPath: string): Promise<ChatRead> {
 }
 
 /**
- * A replay's chat and system lines, read once when the replay is shown. The
+ * A replay's chat and system lines and its timeline events, read once when the
+ * replay is shown. Both come from the one command, so one walk of the stream
+ * serves both. The
  * result is keyed on the path it was read for, so another replay shows nothing
  * of it, and an answer that arrives after the path moved on is dropped.
  */
@@ -57,5 +62,6 @@ export function useReplayChat(replayPath: string) {
     failed: current?.failed ?? false,
     messages: current?.data?.messages ?? null,
     incomplete: current?.data?.incomplete ?? false,
+    events: current?.data?.events ?? NO_EVENTS,
   };
 }

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ChatLine } from "../../bindings";
-import { timelineDomain, toMarks } from "../../replayTimeline";
+import type { ChatLine, TimelineEvent } from "../../bindings";
+import { timelineDomain, toEventMarks, toMarks } from "../../replayTimeline";
 import { ReplayTimeline } from "./ReplayTimeline";
 
 afterEach(cleanup);
@@ -16,12 +16,18 @@ const line = (over: Partial<ChatLine>): ChatLine => ({
   ...over,
 });
 
-function strip(lines: ChatLine[], onOpenLine = vi.fn()) {
+function strip(
+  lines: ChatLine[],
+  onOpenLine = vi.fn(),
+  events: TimelineEvent[] = [],
+) {
   const marks = toMarks(lines);
+  const eventMarks = toEventMarks(events);
   render(
     <ReplayTimeline
       marks={marks}
-      totalSec={timelineDomain(marks, 600, false)}
+      events={eventMarks}
+      totalSec={timelineDomain([...marks, ...eventMarks], 600, false)}
       describe={(l) => l.text}
       onOpenLine={onOpenLine}
     />,
@@ -77,5 +83,58 @@ describe("ReplayTimeline", () => {
     ]);
     fireEvent.click(screen.getAllByRole("button")[1]);
     expect(onOpen).toHaveBeenCalledWith(1);
+  });
+
+  it("draws events in their own labelled rows and reads them out in words", () => {
+    strip([line({ frame: 30 * 60, text: "hi" })], vi.fn(), [
+      {
+        frame: 30 * 120,
+        time: 0,
+        player: 2,
+        playerName: "Ann",
+        type: "resigned",
+      },
+      {
+        frame: 30 * 300,
+        time: 0,
+        player: 3,
+        playerName: "Ben",
+        type: "playerLeft",
+        reason: { kind: "lostConnection" },
+      },
+    ]);
+    expect(screen.getByText("Resigned")).toBeTruthy();
+    expect(screen.getByText("Left")).toBeTruthy();
+    const mark = screen.getByRole("button", {
+      name: /Event, Resigned, .*1 event/,
+    });
+    fireEvent.focus(mark);
+    expect(screen.getByText(/Ann resigned/)).toBeTruthy();
+    fireEvent.focus(
+      screen.getByRole("button", { name: /Event, Left, .*1 event/ }),
+    );
+    expect(screen.getByText(/Ben lost connection/)).toBeTruthy();
+  });
+
+  it("only reads an event out when selected, since the chat log has nothing to open", () => {
+    const onOpen = strip([], vi.fn(), [
+      {
+        frame: 30 * 120,
+        time: 0,
+        player: 2,
+        playerName: "Ann",
+        type: "paused",
+        paused: true,
+      },
+    ]);
+    fireEvent.click(screen.getByRole("button", { name: /Event, Pauses/ }));
+    expect(screen.getByText(/Ann paused the game/)).toBeTruthy();
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("shows no event rows for a replay with none", () => {
+    strip([line({ frame: 30 * 60, text: "hi" })]);
+    expect(screen.queryByText("Resigned")).toBeNull();
+    expect(screen.queryByText("Pauses")).toBeNull();
   });
 });

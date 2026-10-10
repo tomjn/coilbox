@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDuration } from "@/lib/format";
 import type { ChatDest, ChatLine } from "../../bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "../../chatClock";
-import { timelineDomain, toMarks } from "../../replayTimeline";
+import { timelineDomain, toEventMarks, toMarks } from "../../replayTimeline";
 import { useReplayChat } from "../../useReplayChat";
 import { ReplayTimeline } from "./ReplayTimeline";
 import { ErrorBanner } from "./states";
@@ -116,7 +116,8 @@ export function ReplayChat({
   replayPath: string;
   durationSec?: number;
 }) {
-  const { loading, failed, messages, incomplete } = useReplayChat(replayPath);
+  const { loading, failed, messages, incomplete, events } =
+    useReplayChat(replayPath);
   // The replay the log was opened for, so another replay starts closed.
   const [opened, setOpened] = useState<{
     path: string;
@@ -132,12 +133,17 @@ export function ReplayChat({
     }
     return out;
   }, [messages]);
-  const totalSec = timelineDomain(marks, durationSec, incomplete);
+  const eventMarks = useMemo(() => toEventMarks(events), [events]);
+  const totalSec = timelineDomain(
+    [...marks, ...eventMarks],
+    durationSec,
+    incomplete,
+  );
 
   return (
     <>
       <section className="flex flex-col gap-2">
-        <h2 className="text-sm font-medium">Chat timeline</h2>
+        <h2 className="text-sm font-medium">Timeline</h2>
         {loading && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
@@ -148,13 +154,14 @@ export function ReplayChat({
           <ErrorBanner message="The chat could not be read from this replay." />
         )}
         {messages !== null &&
-          (messages.length === 0 ? (
+          (messages.length === 0 && eventMarks.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No chat was recorded in this replay.
             </p>
           ) : (
             <ReplayTimeline
               marks={marks}
+              events={eventMarks}
               totalSec={totalSec}
               describe={(line) => describeLine(line, names)}
               onOpenLine={(line) => setOpened({ path: replayPath, line })}
