@@ -4,8 +4,9 @@
 //! writes one JSON object per line and flushes each one. Every line has a
 //! `kind`. The format is meant to grow: a later logger adds kinds for damage,
 //! army value and projectiles, and fields to the kinds here. So this reader
-//! keeps a kind it does not know as [`LogLine::Unknown`] rather than failing,
-//! and ignores a field it does not know.
+//! counts a kind it does not know as [`LogLine::Unknown`] rather than failing,
+//! and ignores a field it does not know. Neither is lost: [`EventLog::raw`]
+//! holds every line as the logger wrote it, and that text is what is stored.
 //!
 //! A file that stops part way through is expected, because an engine that is
 //! killed or crashes leaves one. Every line up to the last whole one reads, and
@@ -209,6 +210,10 @@ pub struct EventCounts {
 pub struct EventLog {
     /// Every line that read, in file order, the header and game over included.
     pub lines: Vec<LogLine>,
+    /// The same lines as the logger wrote them, one for each entry of `lines`.
+    /// This is what the store keeps, so a kind or a field this reader has no
+    /// name for is still there for a reader that does.
+    pub raw: Vec<String>,
     /// Whole lines that are not a JSON object with a `kind`. A healthy log has
     /// none.
     pub malformed: usize,
@@ -277,6 +282,26 @@ pub fn unit_defs_of(lines: &[LogLine]) -> Option<Vec<UnitDef>> {
     whole.then(|| defs.into_iter().map(|line| line.def.clone()).collect())
 }
 
+/// The `kind` of one of the logger's lines as it was written, or `None` for
+/// text that is not a JSON object with one.
+pub fn kind_of(line: &str) -> Option<String> {
+    #[derive(Deserialize)]
+    struct Kind {
+        kind: String,
+    }
+    serde_json::from_str::<Kind>(line).ok().map(|k| k.kind)
+}
+
+/// The engine's unit definitions from the logger's own text. See
+/// [`unit_defs_of`].
+pub fn unit_defs_of_raw(raw: &[String]) -> Option<Vec<UnitDef>> {
+    let lines: Vec<LogLine> = raw
+        .iter()
+        .filter_map(|line| serde_json::from_str(line).ok())
+        .collect();
+    unit_defs_of(&lines)
+}
+
 /// Parse the logger's file.
 ///
 /// The logger ends every line with a newline, so text after the last newline is
@@ -294,7 +319,10 @@ pub fn parse_log(text: &str) -> EventLog {
             continue;
         }
         match serde_json::from_str::<LogLine>(line) {
-            Ok(parsed) => log.lines.push(parsed),
+            Ok(parsed) => {
+                log.lines.push(parsed);
+                log.raw.push(line.to_string());
+            }
             Err(_) => log.malformed += 1,
         }
     }
@@ -549,23 +577,18 @@ pub(super) mod tests {
         );
     }
 
-    /// The store writes each line back out, so a new kind or field has to
-    /// survive that or a stored file would lose it.
+    /// The store keeps the logger's own text, so the text has to come through
+    /// the parse untouched, one entry for each line that read.
     #[test]
-    fn the_new_lines_serialise_back_as_the_logger_wrote_them() {
-        for line in FIXTURE.lines().filter(|line| {
-            line.contains("unit_given")
-                || line.contains("start_unit_position")
-                || line.contains("startUnit")
-        }) {
-            let parsed: LogLine = serde_json::from_str(line).unwrap();
-            let original: serde_json::Value = serde_json::from_str(line).unwrap();
-            // Through text, as the store does. A value built directly would
-            // widen each 32 bit coordinate into digits the logger never wrote.
-            let written: serde_json::Value =
-                serde_json::from_str(&serde_json::to_string(&parsed).unwrap()).unwrap();
-            assert_eq!(written, original, "{line}");
-        }
+    fn every_line_that_reads_is_kept_as_the_logger_wrote_it() {
+        let log = parse_log(FIXTURE);
+        let written: Vec<&str> = FIXTURE.lines().collect();
+
+        assert_eq!(log.raw, written);
+        assert_eq!(log.raw.len(), log.lines.len());
+        assert_eq!(kind_of(&log.raw[0]).as_deref(), Some("header"));
+        assert_eq!(kind_of("not json"), None);
+        assert_eq!(kind_of("{\"no\":\"kind\"}"), None);
     }
 
     /// What the logger writes for the unit definitions in its own test, which
@@ -639,25 +662,30 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn a_kind_a_later_logger_adds_is_kept_as_unknown_and_stops_nothing() {
-        let text = "{\"kind\":\"header\",\"format\":1}\n\
-            {\"kind\":\"unit_damaged\",\"frame\":10,\"unit\":1,\"damage\":50}\n\
-            {\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\"x\":1.0,\"y\":2.0,\"z\":3.0}\n";
-        let log = parse_log(text);
+    fn a_kind_a_later_logger_adds_is_counted_as_unknown_and_kept_whole() {
+        let invented = "{\"kind\":\"unit_teleported\",\"frame\":10,\"unit\":1,\"to\":[5,6]}";
+        let text = format!(
+            "{{\"kind\":\"header\",\"format\":1}}\n{invented}\n\
+            {{\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\"x\":1.0,\"y\":2.0,\"z\":3.0}}\n"
+        );
+        let log = parse_log(&text);
 
         assert_eq!(log.counts().unknown, 1);
         assert_eq!(log.counts().unit_created, 1);
         assert_eq!(log.malformed, 0);
+        assert_eq!(log.lines[1], LogLine::Unknown);
+        assert_eq!(log.raw[1], invented);
     }
 
     #[test]
-    fn a_field_a_later_logger_adds_is_ignored() {
+    fn a_field_a_later_logger_adds_is_ignored_by_the_reader_and_kept_in_the_text() {
         let text = "{\"kind\":\"unit_created\",\"frame\":10,\"unit\":2,\"def\":3,\"team\":0,\
             \"x\":1.0,\"y\":2.0,\"z\":3.0,\"cost\":120,\"veteran\":true}\n";
         let log = parse_log(text);
 
         assert_eq!(log.counts().unit_created, 1);
         assert_eq!(log.malformed, 0);
+        assert_eq!(format!("{}\n", log.raw[0]), text);
     }
 
     /// The reason for one object per line: a run that is killed leaves a file

@@ -9,7 +9,10 @@
 //! produced the file, when, and how many lines of each kind follow. So "is this
 //! replay analysed, by what, and when" is answered by decoding one line, and a
 //! reader that wants the events streams the rest. The lines after it are the
-//! logger's own, in the order it wrote them.
+//! logger's own, in the order it wrote them and byte for byte as it wrote
+//! them. Nothing between the logger and this file reads a line into a type and
+//! writes the type back, so a kind or a field this coilbox has no name for is
+//! kept whole (issue #3887). A reader gives each line a meaning when it reads.
 //!
 //! Only two outcomes of a run are a property of the replay and are stored:
 //!
@@ -37,7 +40,7 @@ use serde_json::json;
 use tauri::{AppHandle, Runtime};
 
 use super::divergence::Disagreement;
-use super::log::{EventCounts, LogLine, FORMAT_VERSION, LOGGER_VERSION};
+use super::log::{kind_of, EventCounts, FORMAT_VERSION, LOGGER_VERSION};
 use super::{AnalysisRun, AnalysisStatus};
 
 /// The folder under `<data dir>/content/` that holds the files.
@@ -310,12 +313,13 @@ fn file_path(dir: &Path, game_id: &str) -> Result<PathBuf, String> {
 
 /// Store a run's outcome, replacing whatever was stored for that match.
 ///
-/// `events` is every line of a run that reproduced the match, and `None` for
-/// one that diverged. Returns the size of the file written.
+/// `events` is every line of a run that reproduced the match, as the logger
+/// wrote it, and `None` for one that diverged. Returns the size of the file
+/// written.
 pub fn write(
     dir: &Path,
     provenance: &Provenance,
-    events: Option<&[LogLine]>,
+    events: Option<&[String]>,
 ) -> Result<u64, String> {
     let path = file_path(dir, &provenance.game_id)?;
     let provenance = &with_earlier_attempts(dir, provenance);
@@ -333,9 +337,9 @@ pub fn write(
         for line in events
             .unwrap_or_default()
             .iter()
-            .filter(|line| !matches!(line, LogLine::UnitDef(_)))
+            .filter(|line| kind_of(line).as_deref() != Some("unit_def"))
         {
-            serde_json::to_writer(&mut gz, line)?;
+            gz.write_all(line.as_bytes())?;
             gz.write_all(b"\n")?;
         }
         let file = gz.finish()?;
@@ -636,7 +640,7 @@ pub(super) mod tests {
                 },
                 log_excerpt: Vec::new(),
             },
-            events: reproduced.then_some(log.lines),
+            events: reproduced.then_some(log.raw),
         }
     }
 
@@ -735,23 +739,66 @@ pub(super) mod tests {
         assert_eq!(page.events.len(), 24);
         assert_eq!(page.events[0]["kind"], "header");
         assert_eq!(page.events[23]["kind"], "game_over");
-        // What comes back is what the logger wrote, the kinds and fields a
-        // later logger added included.
+        // What comes back is what the logger wrote, every line of it.
         let original: Vec<serde_json::Value> = FIXTURE
             .lines()
             .map(|line| serde_json::from_str(line).unwrap())
             .collect();
-        assert_eq!(page.events[3]["x"], original[3]["x"]);
-        assert_eq!(page.events[3]["def"], original[3]["def"]);
-        for (stored, written) in page.events.iter().zip(&original) {
-            if matches!(
-                written["kind"].as_str(),
-                Some("unit_given" | "start_unit_position")
-            ) || written.get("startUnit").is_some()
-            {
-                assert_eq!(stored, written);
-            }
-        }
+        assert_eq!(page.events, original);
+    }
+
+    /// Issue #3887. A logger newer than this reader writes a kind it has no
+    /// variant for and a field it has no name for. Both come back whole.
+    #[test]
+    fn a_kind_and_a_field_the_reader_does_not_know_survive_the_store() {
+        let dir = tempfile::tempdir().unwrap();
+        let invented_kind = r#"{"kind":"unit_teleported","frame":77,"unit":9,"to":{"x":1.5,"z":-2},"why":"a \"gate\"","path":[1,2,3]}"#;
+        let invented_field = r#"{"kind":"unit_created","frame":78,"unit":10,"def":3,"team":0,"x":1.0,"y":2.0,"z":3.0,"veteran":true,"cargo":{"metal":12.25}}"#;
+        let mut lines: Vec<&str> = FIXTURE.lines().collect();
+        lines.insert(2, invented_kind);
+        lines.insert(3, invented_field);
+        let text: String = lines.iter().map(|line| format!("{line}\n")).collect();
+        let log = parse_log(&text);
+        assert_eq!((log.counts().unknown, log.malformed), (1, 0));
+        let mut run = run_with(AnalysisStatus::Reproduced);
+        run.report.counts = log.counts();
+        run.events = Some(log.raw);
+        let provenance = Provenance::of(ID, &run, 0).unwrap();
+
+        write(dir.path(), &provenance, run.events.as_deref()).unwrap();
+
+        // Byte for byte: the stored file's lines after the provenance are the
+        // logger's text.
+        let stored: Vec<String> = lines_of(&dir.path().join(format!("{ID}.jsonl.gz")))
+            .unwrap()
+            .skip(1)
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(stored, lines);
+        // And read back through the reader the page uses, as JSON values.
+        let page = read_events(dir.path(), ID, None, 0, None).unwrap();
+        let value = |line: &str| serde_json::from_str::<serde_json::Value>(line).unwrap();
+        assert_eq!(page.events[2], value(invented_kind));
+        assert_eq!(page.events[2]["to"]["z"], -2);
+        assert_eq!(page.events[2]["why"], "a \"gate\"");
+        assert_eq!(page.events[3], value(invented_field));
+        assert_eq!(page.events[3]["cargo"]["metal"], 12.25);
+        let only = vec!["unit_teleported".to_string()];
+        assert_eq!(
+            read_events(dir.path(), ID, Some(&only), 0, None)
+                .unwrap()
+                .total,
+            1
+        );
+        assert_eq!(
+            read(dir.path(), ID)
+                .unwrap()
+                .unwrap()
+                .provenance
+                .counts
+                .unknown,
+            1
+        );
     }
 
     #[test]

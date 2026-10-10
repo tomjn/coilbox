@@ -35,7 +35,7 @@ pub mod store;
 
 use divergence::Disagreement;
 use launch::{EngineExit, RunControl};
-use log::{EventCounts, LogHeader, LogLine};
+use log::{EventCounts, LogHeader};
 
 /// The folder under the app's cache directory that runs make their scratch
 /// folders in.
@@ -98,9 +98,9 @@ pub struct AnalysisReport {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AnalysisRun {
     pub report: AnalysisReport,
-    /// Every line the logger wrote, in order. Only for a run that reproduced
-    /// the match.
-    pub events: Option<Vec<LogLine>>,
+    /// Every line the logger wrote, in order and as it wrote them. Only for a
+    /// run that reproduced the match.
+    pub events: Option<Vec<String>>,
 }
 
 /// What a run needs.
@@ -421,7 +421,7 @@ fn analyse_with(
                 excerpt(&output)
             },
         },
-        events: reproduced.then_some(parsed.lines),
+        events: reproduced.then_some(parsed.raw),
     })
 }
 
@@ -1058,10 +1058,7 @@ mod tests {
             if let Some(keep) = var("COILBOX_ANALYSIS_KEEP").map(PathBuf::from) {
                 let events = run.events.as_deref().expect("events");
                 std::fs::create_dir_all(&keep).unwrap();
-                let lines: String = events
-                    .iter()
-                    .map(|line| serde_json::to_string(line).unwrap() + "\n")
-                    .collect();
+                let lines: String = events.iter().map(|line| format!("{line}\n")).collect();
                 std::fs::write(keep.join("events.jsonl"), &lines).unwrap();
                 let provenance = store::Provenance::of("0123456789abcdef0123456789abcdef", &run, 0)
                     .expect("a run that reproduced is stored");
