@@ -20,6 +20,8 @@
 //!   counts or waits on.
 //! - `FAKE_UNITSYNC_INIT_MS`: how long `Init` takes.
 //! - `FAKE_UNITSYNC_READ_MS`: how long `GetMapCount` takes, which is a read.
+//! - `FAKE_UNITSYNC_GAME`: the file name of the one game it reports, which
+//!   lives in `<data dir>/games`. Without it there are no games.
 
 // The exports carry unitsync's own names, which are not snake case.
 #![allow(non_snake_case)]
@@ -124,24 +126,54 @@ pub extern "C" fn GetMapArchiveName(_index: c_int) -> *const c_char {
     std::ptr::null()
 }
 
+/// A string the caller copies after the call returns. Leaked, since a test
+/// asks for a handful.
+fn leaked(text: &str) -> *const c_char {
+    CString::new(text).map_or(std::ptr::null(), |c| c.into_raw().cast_const())
+}
+
+fn game() -> Option<String> {
+    std::env::var("FAKE_UNITSYNC_GAME").ok()
+}
+
 #[no_mangle]
 pub extern "C" fn GetPrimaryModCount() -> c_int {
-    0
+    c_int::from(game().is_some())
 }
 
 #[no_mangle]
 pub extern "C" fn GetPrimaryModArchive(_index: c_int) -> *const c_char {
-    std::ptr::null()
+    game().map_or(std::ptr::null(), |file| leaked(&file))
 }
 
 #[no_mangle]
 pub extern "C" fn GetPrimaryModArchiveCount(_index: c_int) -> c_int {
-    0
+    c_int::from(game().is_some())
+}
+
+/// The game's archive set as the engine gives it, by versioned name.
+#[no_mangle]
+pub extern "C" fn GetPrimaryModArchiveList(_index: c_int) -> *const c_char {
+    game().map_or(std::ptr::null(), |_| leaked("Fake Game 1.0"))
+}
+
+/// The folder an archive is in, for the game and nothing else.
+///
+/// # Safety
+///
+/// `name` is a C string, as unitsync's callers pass.
+#[no_mangle]
+pub unsafe extern "C" fn GetArchivePath(name: *const c_char) -> *const c_char {
+    let name = std::ffi::CStr::from_ptr(name).to_string_lossy();
+    match (game(), datadir()) {
+        (Some(file), Some(dir)) if file == name => leaked(&dir.join("games").to_string_lossy()),
+        _ => std::ptr::null(),
+    }
 }
 
 #[no_mangle]
-pub extern "C" fn GetPrimaryModArchiveList(_index: c_int) -> *const c_char {
-    std::ptr::null()
+pub extern "C" fn AddAllArchives(_root: *const c_char) {
+    log("AddAllArchives");
 }
 
 #[no_mangle]
