@@ -708,24 +708,41 @@ export const contentStatsWatchStop = defineCommand<
   { watching: boolean }
 >("coilbox-content", "content_stats_watch_stop");
 
+/** Who a chat line was addressed to. */
+export type ChatDest =
+  | { kind: "player"; player: number }
+  | { kind: "allies" }
+  | { kind: "spectators" }
+  | { kind: "everyone" };
+
 /** One chat/system line from a replay's network stream. */
 export interface ChatLine {
-  /** The speaking player's number, when the line names one. */
-  player?: number;
-  /** Player name resolved from the start-script, when known. */
+  /** Simulation frame the line arrived in, `-1` before the match started.
+   * 30 frames are one second of match time. */
+  frame: number;
+  /** The packet's `modGameTime` in seconds. Orders pregame lines. Not match
+   * time. */
+  time: number;
+  /** The speaking player's number. 255 is the server. */
+  player: number;
+  /** Player name from the start script or the stream, when either names them. */
   playerName?: string;
+  /** Who a player's line was for. Absent on system lines. */
+  dest?: ChatDest;
   text: string;
   /** True for engine system messages (vs a player chat line). */
   system: boolean;
 }
 
 /**
- * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) via
- * `demotool --dump`. Read on demand — it walks the whole demo stream.
+ * Extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG` lines) from the
+ * native stream walk. Needs no engine folder. Read on demand, it walks the
+ * whole demo stream. `incomplete` is set when the walk stopped early, so lines
+ * after that point are missing.
  */
 export const contentDemoChat = defineCommand<
-  { enginePath: string; replayPath: string },
-  { messages: ChatLine[] }
+  { replayPath: string },
+  { messages: ChatLine[]; incomplete: boolean }
 >("coilbox-content", "content_demo_chat");
 
 /**

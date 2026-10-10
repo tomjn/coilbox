@@ -35,8 +35,9 @@ use tauri::{AppHandle, Runtime};
 
 use crate::metrics::{self, TeamTotals};
 use crate::model::{
-    AiInfo, AllyTeamInfo, ChatLine, DemoChat, DemoInfo, DemoTrailer, PlayerInfo, PlayerStats,
-    ReplayFile, StartBox, TeamStatSample, TeamStatSeries,
+    AiInfo, AllyTeamInfo, ChatDest, ChatLine, DemoChat, DemoInfo, DemoStream, DemoTrailer,
+    PlayerInfo, PlayerStats, ReplayFile, StartBox, StreamEvent, StreamEventKind, TeamStatSample,
+    TeamStatSeries,
 };
 
 pub(crate) mod stream;
@@ -1693,17 +1694,53 @@ fn skill_stats(players: &[PlayerInfo]) -> (Option<f32>, Option<f32>, Option<f32>
     (Some(min), Some(avg), Some(max))
 }
 
-/// Extract a demo's chat log: run `demotool --dump` and parse its `CHAT`/`SYSTEMMSG`
-/// lines, resolving player numbers to names via the start-script.
-pub fn demo_chat(engine_dir: &Path, demo: &Path) -> Result<DemoChat, String> {
+/// Extract a demo's chat log from the native stream walk. It needs no engine
+/// folder. Player numbers resolve to names through the start script first, then
+/// through the name packets in the stream.
+pub fn demo_chat(demo: &Path) -> Result<DemoChat, String> {
     let raw = read_header_and_script(demo)?;
     let game = find_game(&parse_tdf(&raw.script));
-    let names = player_names(&game);
-    let bin = resolve_demotool(engine_dir).ok_or("demotool not found in engine folder")?;
-    let out = run_demotool(&bin, demo, "--dump", DEMOTOOL_TIMEOUT)?;
-    Ok(DemoChat {
-        messages: parse_chat(&out, &names),
-    })
+    let stream = stream::read_stream(demo)?;
+    Ok(chat_from_stream(&stream, player_names(&game)))
+}
+
+/// The chat and system lines of a walked stream, with every other event dropped.
+/// A match is tens of thousands of events and only these are wanted.
+fn chat_from_stream(stream: &DemoStream, mut names: HashMap<u32, String>) -> DemoChat {
+    for e in &stream.events {
+        if let StreamEventKind::PlayerName { player, name } = &e.kind {
+            names
+                .entry(u32::from(*player))
+                .or_insert_with(|| name.clone());
+        }
+    }
+    let line =
+        |e: &StreamEvent, player: u8, dest: Option<ChatDest>, text: &String, system| ChatLine {
+            frame: e.frame,
+            time: e.time,
+            player,
+            player_name: names.get(&u32::from(player)).cloned(),
+            dest,
+            text: text.clone(),
+            system,
+        };
+    let messages = stream
+        .events
+        .iter()
+        .filter_map(|e| match &e.kind {
+            StreamEventKind::Chat { from, dest, text } => {
+                Some(line(e, *from, Some(*dest), text, false))
+            }
+            StreamEventKind::SystemMessage { player, text } => {
+                Some(line(e, *player, None, text, true))
+            }
+            _ => None,
+        })
+        .collect();
+    DemoChat {
+        messages,
+        incomplete: stream.stopped.is_some(),
+    }
 }
 
 /// Map player number -> name from the start-script's `[playerN]` sections.
@@ -1720,33 +1757,6 @@ fn player_names(game: &Section) -> HashMap<u32, String> {
         }
     }
     out
-}
-
-/// Parse demotool `--dump` output for chat + system lines. Each is one line:
-/// `CHAT: Player: N Msg: <text>` / `SYSTEMMSG: Player: N Msg: <text>`.
-fn parse_chat(out: &str, names: &HashMap<u32, String>) -> Vec<ChatLine> {
-    let mut msgs = Vec::new();
-    for line in out.lines() {
-        let (system, rest) = if let Some(r) = line.strip_prefix("CHAT: Player: ") {
-            (false, r)
-        } else if let Some(r) = line.strip_prefix("SYSTEMMSG: Player: ") {
-            (true, r)
-        } else {
-            continue;
-        };
-        let Some((num_str, text)) = rest.split_once(" Msg: ") else {
-            continue;
-        };
-        let player = num_str.trim().parse::<u32>().ok();
-        let player_name = player.and_then(|n| names.get(&n).cloned());
-        msgs.push(ChatLine {
-            player,
-            player_name,
-            text: text.to_string(),
-            system,
-        });
-    }
-    msgs
 }
 
 /// Run `demotool --teamstats <demo>` and parse its trailing `Winning Allyteams:`
@@ -1881,15 +1891,15 @@ pub(crate) async fn content_replay_trailer(replay_path: String) -> CliResult {
     }
 }
 
-/// `content_demo_chat`, extract a replay's chat log (its `NETMSG_CHAT`/`SYSTEMMSG`
-/// lines) by running `demotool --dump`. `enginePath` holds `demotool`, `replayPath`
-/// is an absolute demo path. Read on demand (it walks the whole demo stream), not
-/// during listing.
+/// `content_demo_chat`, extract a replay's chat log (its `NETMSG_CHAT` and
+/// `NETMSG_SYSTEMMSG` lines) from the native stream walk. No engine folder is
+/// needed. Each line carries its frame, so the page can show match time.
+/// `replayPath` is an absolute demo path. Read on demand (it walks the whole
+/// demo stream), not during listing.
 #[tauri::command]
-pub(crate) async fn content_demo_chat(engine_path: String, replay_path: String) -> CliResult {
-    let engine = PathBuf::from(&engine_path);
+pub(crate) async fn content_demo_chat(replay_path: String) -> CliResult {
     let demo_path = PathBuf::from(&replay_path);
-    match tauri::async_runtime::spawn_blocking(move || demo_chat(&engine, &demo_path)).await {
+    match tauri::async_runtime::spawn_blocking(move || demo_chat(&demo_path)).await {
         Ok(Ok(chat)) => CliResult::ok(json!(chat)),
         Ok(Err(e)) => CliResult::err(e),
         Err(e) => CliResult::err(format!("demo chat task failed: {e}")),
@@ -4178,22 +4188,123 @@ mod tests {
         let _ = std::fs::remove_file(&dst);
     }
 
+    // ---- the chat log, from the stream walk ------------------------------------
+
+    fn chat_of(name: &str, f: DemoFixture) -> DemoChat {
+        demo_chat(&write_tmp(name, &f.bytes())).unwrap()
+    }
+
     #[test]
-    fn parse_chat_reads_chat_and_system_lines() {
-        let mut names = HashMap::new();
-        names.insert(0u32, "Alice".to_string());
-        let out = "HEADER\n\
-            CHAT: Player: 0 Msg: gg wp\n\
-            SYSTEMMSG: Player: 1 Msg: Bob paused\n\
-            KEYFRAME: 1\n\
-            CHAT: Player: 9 Msg: unknown speaker\n";
-        let msgs = parse_chat(out, &names);
-        assert_eq!(msgs.len(), 3);
-        assert_eq!(msgs[0].player, Some(0));
-        assert_eq!(msgs[0].player_name.as_deref(), Some("Alice"));
-        assert_eq!(msgs[0].text, "gg wp");
-        assert!(!msgs[0].system);
-        assert!(msgs[1].system);
-        assert_eq!(msgs[2].player_name, None);
+    fn chat_has_a_frame_a_name_and_a_destination() {
+        let c = chat_of(
+            "chat_normal.sdf",
+            fixture_with_stream(short_match().bytes()),
+        );
+        assert!(!c.incomplete);
+        assert_eq!(c.messages.len(), 1);
+        let m = &c.messages[0];
+        assert_eq!(m.frame, 1);
+        assert_eq!(m.player, 1);
+        assert_eq!(m.player_name.as_deref(), Some("Bob"));
+        assert_eq!(m.dest, Some(ChatDest::Everyone));
+        assert_eq!(m.text, "gg");
+        assert!(!m.system);
+    }
+
+    #[test]
+    fn a_whisper_keeps_its_recipient() {
+        let s = Packets::default()
+            .keyframe(0)
+            .chat(0, 1, "psst")
+            .chat(0, 252, "allies")
+            .chat(2, 253, "specs");
+        let c = chat_of("chat_whisper.sdf", fixture_with_stream(s.bytes()));
+        let dests: Vec<_> = c.messages.iter().map(|m| m.dest).collect();
+        assert_eq!(
+            dests,
+            [
+                Some(ChatDest::Player { player: 1 }),
+                Some(ChatDest::Allies),
+                Some(ChatDest::Spectators)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_system_message_has_no_destination() {
+        let s = Packets::default()
+            .keyframe(0)
+            .newframes(2)
+            .system_message(255, "Bob paused");
+        let c = chat_of("chat_system.sdf", fixture_with_stream(s.bytes()));
+        assert_eq!(c.messages.len(), 1);
+        let m = &c.messages[0];
+        assert!(m.system);
+        assert_eq!(m.dest, None);
+        assert_eq!(m.player, 255);
+        assert_eq!(m.player_name, None);
+        assert_eq!(m.frame, 2);
+    }
+
+    #[test]
+    fn pregame_lines_keep_the_pregame_frame_and_their_order() {
+        let s = Packets::default()
+            .chat(0, 254, "first")
+            .chat(1, 254, "second")
+            .keyframe(0)
+            .chat(0, 254, "in game");
+        let c = chat_of("chat_pregame.sdf", fixture_with_stream(s.bytes()));
+        let frames: Vec<_> = c.messages.iter().map(|m| m.frame).collect();
+        assert_eq!(frames, [PREGAME_FRAME, PREGAME_FRAME, 0]);
+        assert!(c.messages[0].time < c.messages[1].time);
+        assert_eq!(c.messages[0].text, "first");
+    }
+
+    #[test]
+    fn a_stream_that_stopped_early_keeps_its_chat_and_says_so() {
+        let mut bytes = Packets::default()
+            .keyframe(0)
+            .chat(0, 254, "before the break")
+            .bytes();
+        // Three bytes where a packet header should be.
+        bytes.extend_from_slice(&[1, 2, 3]);
+        let c = chat_of("chat_stopped.sdf", fixture_with_stream(bytes));
+        assert!(c.incomplete);
+        assert_eq!(c.messages.len(), 1);
+        assert_eq!(c.messages[0].text, "before the break");
+    }
+
+    #[test]
+    fn a_replay_with_no_chat_gives_an_empty_complete_log() {
+        let s = Packets::default().keyframe(0).newframes(3);
+        let c = chat_of("chat_none.sdf", fixture_with_stream(s.bytes()));
+        assert!(c.messages.is_empty());
+        assert!(!c.incomplete);
+    }
+
+    #[test]
+    fn a_sender_the_script_lacks_is_named_by_the_stream_or_left_unnamed() {
+        let s = Packets::default()
+            .player_name(7, "Latecomer")
+            .keyframe(0)
+            .chat(7, 254, "hi")
+            .chat(9, 254, "who am I");
+        let c = chat_of("chat_names.sdf", fixture_with_stream(s.bytes()));
+        assert_eq!(c.messages[0].player_name.as_deref(), Some("Latecomer"));
+        assert_eq!(c.messages[1].player_name, None);
+        assert_eq!(c.messages[1].player, 9);
+    }
+
+    /// `demo_chat` takes a replay path and nothing else, so it cannot look for
+    /// `demotool`. The only inputs are the file's own bytes.
+    #[test]
+    fn chat_reads_with_no_engine_folder() {
+        let p = write_tmp(
+            "chat_no_engine.sdfz",
+            &fixture_with_stream(short_match().bytes()).gzipped(),
+        );
+        let c = demo_chat(&p).unwrap();
+        assert_eq!(c.messages.len(), 1);
+        assert_eq!(c.messages[0].text, "gg");
     }
 }
