@@ -88,6 +88,35 @@ describe("MatchStatsExportButton", () => {
     );
   });
 
+  it("says nothing is hidden when every line is checked", () => {
+    render(<MatchStatsExportButton input={input} />);
+    expect(
+      screen.getByRole("button", { name: /export csv/i }).getAttribute("title"),
+    ).toBe("Writes every line on the chart. Nothing is hidden.");
+  });
+
+  it("says how many unchecked lines the file leaves out", () => {
+    render(<MatchStatsExportButton input={input} hiddenCount={3} />);
+    expect(
+      screen.getByRole("button", { name: /export csv/i }).getAttribute("title"),
+    ).toBe(
+      "Writes the lines on the chart. 3 unchecked in the roster are left out.",
+    );
+  });
+
+  it("has nothing to write when every line is unchecked", () => {
+    render(
+      <MatchStatsExportButton
+        input={{ ...input, series: [], rows: [] }}
+        hiddenCount={1}
+      />,
+    );
+    expect(
+      (screen.getByRole("button", { name: /export csv/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
   it("reports a failed write", async () => {
     save.mockResolvedValue("/tmp/out.csv");
     write.mockRejectedValue(new Error("disk full"));

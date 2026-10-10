@@ -13,12 +13,17 @@ import {
 /**
  * "Export CSV" for the match statistics controls (#1172). It writes the lines the
  * chart is drawing, in the value mode on screen, to a path the reader picks.
- * Closing the save dialog is a decision, not a failure, so it says nothing.
+ * Lines unchecked in the roster are not drawn, so they are not in the file
+ * either, and the tooltip says how many were left out. Closing the save dialog
+ * is a decision, not a failure, so it says nothing.
  */
 export function MatchStatsExportButton({
   input,
+  hiddenCount = 0,
 }: {
   input: MatchStatsCsvInput;
+  /** Lines the roster has unchecked, which the file leaves out. */
+  hiddenCount?: number;
 }) {
   const [busy, setBusy] = useState(false);
 
@@ -49,7 +54,12 @@ export function MatchStatsExportButton({
       variant="outline"
       size="sm"
       className="gap-1.5"
-      disabled={busy}
+      disabled={busy || input.series.length === 0}
+      title={
+        hiddenCount > 0
+          ? `Writes the lines on the chart. ${hiddenCount} unchecked in the roster ${hiddenCount === 1 ? "is" : "are"} left out.`
+          : "Writes every line on the chart. Nothing is hidden."
+      }
       onClick={exportCsv}
     >
       {busy ? (
