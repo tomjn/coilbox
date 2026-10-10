@@ -200,3 +200,19 @@ describe("the replay list's My figures switch", () => {
     expect(mineButton()).toBeNull();
   });
 });
+
+describe("what the replay list says in the page", () => {
+  it("keeps a figure's basis out of the page and on its tooltip", () => {
+    sortBy("desc");
+    renderPage();
+    expect(screen.queryByText(/match total|best single army/)).toBeNull();
+    expect(screen.queryByText(/own figures/i)).toBeNull();
+    expect(screen.getAllByText("Alpha").length).toBeGreaterThan(0);
+  });
+
+  it("keeps the short heading line and the reason on the switch", () => {
+    renderPage();
+    expect(screen.getByText("Demo files in your content folder.")).toBeTruthy();
+    expect(mineButton()?.getAttribute("title")).toMatch(/alone instead of/);
+  });
+});
