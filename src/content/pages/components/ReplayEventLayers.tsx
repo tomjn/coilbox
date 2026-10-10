@@ -1,8 +1,7 @@
 import { useEffect, useRef } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { HeatField } from "@/lib/heatField";
-import { paintHeatField } from "@/lib/heatRamp";
+import { drawHeatField } from "@/lib/heatCanvas";
 import { ANALYSIS_SECTION_ID } from "../../replayAnalysis";
 import { deathLegend, OUTDATED_NOTE } from "../../replayEventLayers";
 import {
@@ -31,16 +30,6 @@ const OUTLINE_SCALE = 1.45;
 /** A finished mark's half width as a fraction of the map's width. */
 const MARK_SIZE = 0.0075;
 
-function paintHeat(canvas: HTMLCanvasElement, field: HeatField) {
-  canvas.width = field.width;
-  canvas.height = field.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const image = ctx.createImageData(field.width, field.height);
-  image.data.set(paintHeatField(field));
-  ctx.putImageData(image, 0, 0);
-}
-
 /**
  * The event layers on the minimap: the deaths density, and an outline for each
  * finished building. Put it inside the box that holds the minimap image.
@@ -67,7 +56,7 @@ export function EventLayerCanvases({
 
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) paintHeat(canvas, field);
+    if (canvas && field) drawHeatField(canvas, field);
   }, [field]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the emphasis state stands for isLit and dimming

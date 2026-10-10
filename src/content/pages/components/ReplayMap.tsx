@@ -2,8 +2,8 @@ import { cn, useTheme } from "@picoframe/frame";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { HeatLegend } from "@/components/HeatLegend";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { buildHeatField, type HeatField } from "@/lib/heatField";
-import { paintHeatField } from "@/lib/heatRamp";
+import { drawHeatField } from "@/lib/heatCanvas";
+import { buildHeatField } from "@/lib/heatField";
 import type { MapScene3D } from "@/lib/mapScene";
 import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
 import { MapPreview3D } from "../../../mapconv/pages/components/MapPreview3D";
@@ -116,16 +116,6 @@ function drawMarks(
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
-}
-
-function drawHeat(canvas: HTMLCanvasElement, field: HeatField) {
-  canvas.width = field.width;
-  canvas.height = field.height;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const image = ctx.createImageData(field.width, field.height);
-  image.data.set(paintHeatField(field));
-  ctx.putImageData(image, 0, 0);
 }
 
 /** One real start position. A button, so it can be pointed at, tabbed to and
@@ -424,11 +414,11 @@ export function ReplayMap({
   }, [marks, colours, emphasis.state]);
   useEffect(() => {
     const canvas = heatRef.current;
-    if (canvas && field) drawHeat(canvas, field);
+    if (canvas && field) drawHeatField(canvas, field);
   }, [field]);
   useEffect(() => {
     const canvas = orderHeatRef.current;
-    if (canvas && orderField) drawHeat(canvas, orderField);
+    if (canvas && orderField) drawHeatField(canvas, orderField);
   }, [orderField]);
 
   const [handle, setHandle] = useState<MapScene3D | null>(null);

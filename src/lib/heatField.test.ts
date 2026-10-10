@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   addHeatFields,
   buildHeatField,
+  buildHeatFieldFromCounts,
   DEFAULT_RADIUS_FRACTION,
   heatAt,
   heatGridSize,
@@ -188,5 +189,93 @@ describe("adding fields together", () => {
     });
     expect(() => addHeatFields([a, b])).toThrow();
     expect(addHeatFields([])).toBeNull();
+  });
+});
+
+describe("a field from counts already on the grid", () => {
+  const WIDE = { worldWidth: 8192, worldHeight: 4096 };
+  // A cell of either map is 32 elmos each way.
+  const CELL = 32;
+
+  /** Count points into the cell each falls in, the way `map_grids.rs` does. */
+  function counted(
+    positions: number[],
+    map: { worldWidth: number; worldHeight: number },
+  ): Float32Array {
+    const { width, height } = heatGridSize(map.worldWidth, map.worldHeight);
+    const binned = new Float32Array(width * height);
+    for (let i = 0; i < positions.length; i += 2) {
+      const col = Math.min(
+        width - 1,
+        Math.floor((positions[i] / map.worldWidth) * width),
+      );
+      const row = Math.min(
+        height - 1,
+        Math.floor((positions[i + 1] / map.worldHeight) * height),
+      );
+      binned[row * width + col] += 1;
+    }
+    return binned;
+  }
+
+  it("equals the field of the same points when they sit on cell middles", () => {
+    // Middles of cells: 3.5, 31.5 and 200.5 cells in.
+    const positions = [112, 1008, 112, 1008, 6416, 3024];
+    const fromPoints = buildHeatField({ positions }, WIDE);
+    const fromCounts = buildHeatFieldFromCounts(counted(positions, WIDE), WIDE);
+    expect(fromCounts.width).toBe(fromPoints.width);
+    expect(fromCounts.height).toBe(fromPoints.height);
+    expect(fromCounts.peak).toBeCloseTo(fromPoints.peak, 5);
+    expect(fromCounts.peakAt).toEqual(fromPoints.peakAt);
+    expect(fromCounts.peakWithinRadius).toBe(2);
+    expect(fromCounts.counted).toBe(3);
+    for (let i = 0; i < fromPoints.values.length; i++)
+      expect(fromCounts.values[i]).toBeCloseTo(fromPoints.values[i], 5);
+  });
+
+  it("is within half a cell of the field of points that sit anywhere", () => {
+    // Off the middles on purpose, and thick enough in one place to peak there.
+    const positions = [
+      1000, 1000, 1010, 1020, 990, 985, 1030, 1001, 6000, 3000, 6007, 3011,
+    ];
+    const fromPoints = buildHeatField({ positions }, WIDE);
+    const fromCounts = buildHeatFieldFromCounts(counted(positions, WIDE), WIDE);
+    const a = fromPoints.peakAt as { x: number; z: number };
+    const b = fromCounts.peakAt as { x: number; z: number };
+    expect(Math.abs(a.x - b.x)).toBeLessThanOrEqual(CELL);
+    expect(Math.abs(a.z - b.z)).toBeLessThanOrEqual(CELL);
+    expect(fromCounts.peakWithinRadius).toBe(fromPoints.peakWithinRadius);
+    // The radius is 4 cells on this map and the blob's standard deviation 1.6,
+    // so moving a point half a cell changes the peak by a few percent.
+    expect(Math.abs(fromCounts.peak - fromPoints.peak)).toBeLessThan(
+      fromPoints.peak * 0.05,
+    );
+  });
+
+  it("reads row then column, so a transposed grid lands somewhere else", () => {
+    const { width, height } = heatGridSize(WIDE.worldWidth, WIDE.worldHeight);
+    const binned = new Float32Array(width * height);
+    // Row 10, column 200: far east, near the north edge.
+    binned[10 * width + 200] = 5;
+    const field = buildHeatFieldFromCounts(binned, WIDE);
+    expect(field.peakAt).toEqual({ x: 200.5 * CELL, z: 10.5 * CELL });
+    expect(heatAt(field, 10.5 * CELL, 200.5 * CELL)).toBe(0);
+  });
+
+  it("leaves the counts as they were, and takes a count of events from the caller", () => {
+    const binned = counted([1000, 1000], SQUARE);
+    const before = Array.from(binned);
+    const field = buildHeatFieldFromCounts(binned, SQUARE, { counted: 7 });
+    expect(Array.from(binned)).toEqual(before);
+    expect(field.counted).toBe(7);
+  });
+
+  it("gives an empty field for an empty grid and refuses another grid's counts", () => {
+    const empty = buildHeatFieldFromCounts(new Float32Array(256 * 256), SQUARE);
+    expect(empty.peak).toBe(0);
+    expect(empty.peakAt).toBeNull();
+    expect(() =>
+      buildHeatFieldFromCounts(new Float32Array(256 * 128), SQUARE),
+    ).toThrow();
   });
 });

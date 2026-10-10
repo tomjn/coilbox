@@ -1,0 +1,709 @@
+import { Button, Input, useSetting } from "@picoframe/frame";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Field } from "@/components/Field";
+import { HeatLegend } from "@/components/HeatLegend";
+import { OptionSelect } from "@/components/OptionSelect";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Toggle } from "@/components/ui/toggle";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { drawHeatField } from "@/lib/heatCanvas";
+import type { MapScene3D } from "@/lib/mapScene";
+import { useHeatmapLayer } from "@/lib/useHeatmapLayer";
+import type { StatRecord } from "../../bindings";
+import {
+  type AggregateFilters,
+  aggregateLayer,
+  aggregateStarts,
+  FORMAT_LABEL,
+  filterChoices,
+  filterMatches,
+  HEAT_LAYERS,
+  type HeatLayerId,
+  LAYER_LABEL,
+  type LayerAggregate,
+  layerEvents,
+  layerLegend,
+  type MatchFormat,
+  type MatchWindow,
+  mapMatches,
+  matchCount,
+  matchesWithStarts,
+  NO_FILTERS,
+  NORMALISE_LABEL,
+  type Normalise,
+  WHOLE,
+  windowLabel,
+} from "../../mapAggregate";
+import { useStoredAnalyses } from "../../replayAnalysis";
+import { type MapWorld, mapFraction } from "../../replayMapLayers";
+import { findSet, resolveSet, useReplaySets } from "../../replaySets";
+import { useGameCategories, useMapReplayCounts } from "../../useMapAggregate";
+import { ReplaySourceNote } from "./ReplaySourceNote";
+
+const ANY = "any";
+
+/** The windows offered by name. Each is a stretch of every match's own clock. */
+const WINDOWS: { value: string; label: string; window: MatchWindow | null }[] =
+  [
+    { value: "whole", label: "Whole match", window: WHOLE },
+    {
+      value: "first5",
+      label: "First 5 minutes",
+      window: { kind: "first", minutes: 5 },
+    },
+    {
+      value: "first10",
+      label: "First 10 minutes",
+      window: { kind: "first", minutes: 10 },
+    },
+    {
+      value: "5to10",
+      label: "Minutes 5 to 10",
+      window: { kind: "range", from: 5, to: 10 },
+    },
+    {
+      value: "10to20",
+      label: "Minutes 10 to 20",
+      window: { kind: "range", from: 10, to: 20 },
+    },
+    {
+      value: "last5",
+      label: "Last 5 minutes",
+      window: { kind: "last", minutes: 5 },
+    },
+    { value: "custom", label: "Between two minutes", window: null },
+  ];
+
+const LEGEND_LABEL: Record<HeatLayerId, string> = {
+  buildings: "Where buildings were ordered",
+  defence: "Where defences were ordered",
+  economy: "Where economy buildings were ordered",
+  orders: "Where orders were aimed",
+  deaths: "Where units died",
+};
+
+/** What a scaling does, in a sentence under the control. */
+const NORMALISE_NOTE: Record<Normalise, string> = {
+  share:
+    "Each match counts the same: its events are scaled to add up to one before the matches are averaged. A long busy match weighs no more than a short quiet one.",
+  peak: "Each match is scaled so its own busiest spot is one, then the matches are averaged. A spot is bright when it was the busiest place in many matches.",
+  rate: "Each match is divided by its length in the window, then the matches are averaged. A busy match weighs more than a quiet one, and a long one no more than a short one.",
+};
+
+const plural = (n: number, one: string, many: string) =>
+  `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
+/**
+ * Every match of one map in the library, drawn as one picture (#1161).
+ *
+ * The section a map's page shows under its preview. The picture is drawn on
+ * its own copy of the minimap, and draped over the page's 3D preview through
+ * `scene`. Each layer says how many matches are behind it, because they
+ * differ: every match with a stream has orders, and only an analysed one has
+ * deaths.
+ *
+ * `records` is the library's stat records, which the page already holds.
+ */
+export function MapAggregate({
+  mapName,
+  world,
+  minimapUrl,
+  records,
+  ingesting,
+  scene,
+}: {
+  mapName: string;
+  world: MapWorld;
+  minimapUrl: string | undefined;
+  records: StatRecord[];
+  /** True while the library's records are still being read for the first time. */
+  ingesting: boolean;
+  /** The page's 3D preview, or null when it has none. */
+  scene: MapScene3D | null;
+}) {
+  const analyses = useStoredAnalyses();
+  const { sets } = useReplaySets();
+  const all = useMemo(
+    () => mapMatches(records, mapName, analyses),
+    [records, mapName, analyses],
+  );
+  const choices = useMemo(() => filterChoices(all.matches), [all]);
+
+  const [filters, setFilters] = useState<AggregateFilters>(NO_FILTERS);
+  // The set the picture is scoped to, kept as the stats page keeps its own.
+  // A saved pick whose set was deleted means every replay again.
+  const [setId, setSetId] = useSetting("content.mapInsightSet", "");
+  const activeSet = findSet(sets, setId);
+  const scope = useMemo(
+    () =>
+      activeSet
+        ? new Set(
+            resolveSet(
+              activeSet,
+              all.matches.map((m) => m.record),
+            ).present.map((r) => r.filename),
+          )
+        : null,
+    [activeSet, all],
+  );
+  const shown = useMemo(
+    () => filterMatches(all.matches, filters, scope),
+    [all, filters, scope],
+  );
+  const filtered = shown.length !== all.matches.length;
+
+  const asks = useMemo(
+    () =>
+      shown.map((m) => ({
+        path: m.record.path,
+        analysedAtMs:
+          (m.analysis === "events" && m.record.gameId
+            ? analyses.get(m.record.gameId)?.analysedAtMs
+            : 0) ?? 0,
+      })),
+    [shown, analyses],
+  );
+  const read = useMapReplayCounts(asks, world);
+  const replays = useMemo(
+    () => shown.flatMap((m) => read.counts.get(m.record.path) ?? []),
+    [shown, read.counts],
+  );
+
+  const [layer, setLayer] = useState<HeatLayerId | "">("buildings");
+  const [showStarts, setShowStarts] = useState(true);
+  const [normalise, setNormalise] = useState<Normalise>("share");
+  const [windowChoice, setWindowChoice] = useState("whole");
+  const [customFrom, setCustomFrom] = useState("0");
+  const [customTo, setCustomTo] = useState("5");
+  const timeWindow = useMemo<MatchWindow>(() => {
+    const preset = WINDOWS.find((w) => w.value === windowChoice)?.window;
+    if (preset) return preset;
+    const from = Math.floor(Number(customFrom));
+    const to = Math.floor(Number(customTo));
+    return from >= 0 && to > from ? { kind: "range", from, to } : WHOLE;
+  }, [windowChoice, customFrom, customTo]);
+  const customInvalid =
+    windowChoice === "custom" && timeWindow.kind !== "range";
+
+  const gameTypes = useMemo(() => replays.map((r) => r.gameType), [replays]);
+  const { categories, loading: categoriesLoading } = useGameCategories(
+    gameTypes,
+    replays.length > 0,
+  );
+
+  // Every layer is counted, so each toggle can say how many matches are behind
+  // it. Only the one being drawn is smoothed into a field.
+  const perLayer = useMemo(() => {
+    const out = {} as Record<HeatLayerId, LayerAggregate>;
+    for (const id of HEAT_LAYERS)
+      out[id] = aggregateLayer(replays, id, world, {
+        normalise,
+        window: timeWindow,
+        categories,
+        countsOnly: id !== layer,
+      });
+    return out;
+  }, [replays, world, normalise, timeWindow, categories, layer]);
+  const drawn = layer ? perLayer[layer] : null;
+  const field = drawn?.field ?? null;
+
+  const starts = useMemo(
+    () => aggregateStarts(shown, read.counts),
+    [shown, read.counts],
+  );
+  const dots = useMemo(
+    () =>
+      starts.flatMap((s) => {
+        const at = mapFraction(s, world);
+        return at ? [{ ...at, key: `${s.filename}:${s.team}` }] : [];
+      }),
+    [starts, world],
+  );
+  const startMatches = matchesWithStarts(starts);
+
+  const heatRef = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const canvas = heatRef.current;
+    if (canvas && field) drawHeatField(canvas, field);
+  }, [field]);
+  useHeatmapLayer(scene, field);
+
+  const sized = world.worldWidth > 0 && world.worldHeight > 0;
+  const withOrders = replays.filter((r) => r.orders.total > 0).length;
+  const withEvents = shown.filter((m) => m.analysis === "events").length;
+  const diverged = shown.filter((m) => m.analysis === "diverged").length;
+  const set = (patch: Partial<AggregateFilters>) =>
+    setFilters((f) => ({ ...f, ...patch }));
+  const anyFilter =
+    JSON.stringify(filters) !== JSON.stringify(NO_FILTERS) || !!activeSet;
+
+  if (ingesting && records.length === 0)
+    return (
+      <section className="flex flex-col gap-2">
+        <h2 className="text-sm font-medium">How this map is played</h2>
+        <Skeleton className="h-24 rounded bg-muted" />
+      </section>
+    );
+
+  if (all.matches.length === 0)
+    return (
+      <section className="flex flex-col gap-2" data-testid="map-aggregate">
+        <h2 className="text-sm font-medium">How this map is played</h2>
+        <p className="text-sm text-muted-foreground">
+          No match on this map is in your library yet. A picture of where
+          players start, build and send their units is drawn here once there is
+          one.
+          {all.remixes > 0 &&
+            ` ${plural(all.remixes, "remix is", "remixes are")} here, and a remix is a copy of another match and not a match of its own.`}
+        </p>
+      </section>
+    );
+
+  const leftOut = [
+    all.remixes > 0 ? plural(all.remixes, "remix", "remixes") : null,
+    all.duplicates > 0
+      ? plural(
+          all.duplicates,
+          "second file of a match already counted",
+          "second files of matches already counted",
+        )
+      : null,
+  ].filter(Boolean);
+  const mentioned = all.remixes + all.duplicates;
+
+  return (
+    <section className="flex flex-col gap-3" data-testid="map-aggregate">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-sm font-medium">How this map is played</h2>
+        <p
+          className="text-sm text-muted-foreground"
+          data-testid="aggregate-summary"
+        >
+          {filtered
+            ? `${matchCount(shown.length)} of the ${all.matches.length.toLocaleString()} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`
+            : `${shown.length === 1 ? "The 1 match" : `All ${shown.length.toLocaleString()} matches`} on this map in your library ${shown.length === 1 ? "is" : "are"} in this picture.`}{" "}
+          {read.reading
+            ? `Reading replays: ${read.done.toLocaleString()} of ${read.total.toLocaleString()}.`
+            : `${withOrders.toLocaleString()} ${withOrders === 1 ? "has" : "have"} orders recorded, and ${withEvents.toLocaleString()} ${withEvents === 1 ? "has" : "have"} been analysed and ${withEvents === 1 ? "has" : "have"} event data.`}
+          {diverged > 0 &&
+            ` ${plural(diverged, "was", "were")} analysed and the playback did not reproduce the match, so ${diverged === 1 ? "it has" : "they have"} no events.`}
+        </p>
+        <p className="text-xs text-muted-foreground">
+          This is the map by its exact name, so another version of it is another
+          map and is not added in.
+          {leftOut.length > 0 &&
+            ` ${leftOut.join(" and ")} ${mentioned === 1 ? "is" : "are"} left out, so each match counts once.`}
+          {!filters.includeShort &&
+            choices.short > 0 &&
+            ` ${plural(choices.short, "match", "matches")} under a minute ${choices.short === 1 ? "is" : "are"} left out too.`}
+        </p>
+        {read.failed.length > 0 && (
+          <p className="text-xs text-destructive">
+            {plural(read.failed.length, "replay", "replays")} could not be read
+            and {read.failed.length === 1 ? "is" : "are"} not in the picture.
+          </p>
+        )}
+      </div>
+
+      <div
+        className="flex flex-wrap items-end gap-2"
+        data-testid="aggregate-filters"
+      >
+        {choices.playerCounts.length > 1 && (
+          <OptionSelect
+            size="sm"
+            className="w-44"
+            ariaLabel="Players in the match"
+            value={
+              filters.playerCount === null ? ANY : String(filters.playerCount)
+            }
+            onValueChange={(v) =>
+              set({ playerCount: v === ANY ? null : Number(v) })
+            }
+            options={[
+              { value: ANY, label: "Any number of players" },
+              ...choices.playerCounts.map((n) => ({
+                value: String(n),
+                label: `${n} players`,
+              })),
+            ]}
+          />
+        )}
+        {choices.games.length > 1 && (
+          <OptionSelect
+            size="sm"
+            className="w-56"
+            ariaLabel="Game and version"
+            value={filters.game ?? ANY}
+            onValueChange={(v) => set({ game: v === ANY ? null : v })}
+            options={[
+              { value: ANY, label: "Any game or version" },
+              ...choices.games.map((g) => ({ value: g, label: g })),
+            ]}
+          />
+        )}
+        {choices.formats.length > 1 && (
+          <OptionSelect
+            size="sm"
+            className="w-40"
+            ariaLabel="How the sides were arranged"
+            value={filters.format ?? ANY}
+            onValueChange={(v) =>
+              set({ format: v === ANY ? null : (v as MatchFormat) })
+            }
+            options={[
+              { value: ANY, label: "Any sides" },
+              ...choices.formats.map((f) => ({
+                value: f,
+                label: FORMAT_LABEL[f],
+              })),
+            ]}
+          />
+        )}
+        <OptionSelect
+          size="sm"
+          className="w-44"
+          ariaLabel="Analysed or not"
+          value={filters.analysed}
+          onValueChange={(v) =>
+            set({ analysed: v as AggregateFilters["analysed"] })
+          }
+          options={[
+            { value: "any", label: "Analysed or not" },
+            { value: "yes", label: "Analysed" },
+            { value: "no", label: "Not analysed" },
+          ]}
+        />
+        {sets.length > 0 && (
+          <OptionSelect
+            size="sm"
+            className="w-48"
+            ariaLabel="Scope to a set"
+            value={activeSet?.id ?? "all"}
+            onValueChange={(v) => setSetId(v === "all" ? "" : v)}
+            options={[
+              { value: "all", label: "All replays" },
+              ...sets.map((s) => ({ value: s.id, label: `Set: ${s.name}` })),
+            ]}
+          />
+        )}
+        <Field label="Played from" className="w-40 text-xs">
+          <Input
+            type="date"
+            value={filters.from}
+            onChange={(e) => set({ from: e.target.value })}
+          />
+        </Field>
+        <Field label="Played until" className="w-40 text-xs">
+          <Input
+            type="date"
+            value={filters.to}
+            onChange={(e) => set({ to: e.target.value })}
+          />
+        </Field>
+        {choices.short > 0 && (
+          <Toggle
+            size="sm"
+            variant="outline"
+            pressed={filters.includeShort}
+            onPressedChange={(on) => set({ includeShort: on })}
+          >
+            Matches under a minute
+          </Toggle>
+        )}
+        {anyFilter && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setFilters(NO_FILTERS);
+              setSetId("");
+            }}
+          >
+            Clear filters
+          </Button>
+        )}
+      </div>
+
+      {shown.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No match on this map passes these filters.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="relative flex w-full max-w-sm shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border/50 bg-card">
+            <div
+              className="relative w-full"
+              style={{
+                aspectRatio: sized
+                  ? `${world.worldWidth} / ${world.worldHeight}`
+                  : "1 / 1",
+              }}
+            >
+              {minimapUrl && (
+                <img
+                  src={minimapUrl}
+                  alt={`Minimap of ${mapName}`}
+                  className="absolute inset-0 size-full object-fill brightness-[0.7]"
+                />
+              )}
+              {field && field.peak > 0 && (
+                <canvas
+                  ref={heatRef}
+                  data-layer={layer}
+                  className="pointer-events-none absolute inset-0 size-full"
+                />
+              )}
+              {showStarts &&
+                dots.map((dot) => (
+                  <span
+                    key={dot.key}
+                    data-layer="starts"
+                    aria-hidden
+                    className="pointer-events-none absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/80 bg-white/80"
+                    style={{
+                      left: `${dot.left * 100}%`,
+                      top: `${dot.top * 100}%`,
+                    }}
+                  />
+                ))}
+            </div>
+          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex flex-wrap gap-1">
+              <Toggle
+                size="sm"
+                variant="outline"
+                pressed={showStarts}
+                onPressedChange={setShowStarts}
+                data-testid="layer-starts"
+              >
+                Start positions · {startMatches.toLocaleString()}
+              </Toggle>
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                size="sm"
+                spacing={1}
+                aria-label="Density layer"
+                className="flex-wrap"
+                value={layer}
+                onValueChange={(v) => setLayer(v as HeatLayerId | "")}
+              >
+                {HEAT_LAYERS.map((id) => (
+                  <ToggleGroupItem
+                    key={id}
+                    value={id}
+                    data-testid={`layer-${id}`}
+                  >
+                    {LAYER_LABEL[id]} ·{" "}
+                    {perLayer[id].contributing.toLocaleString()}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              The number beside a layer is how many matches it is drawn from.
+              One density layer shows at a time.
+            </p>
+
+            <div className="flex flex-wrap items-end gap-2">
+              <OptionSelect
+                size="sm"
+                className="w-56"
+                ariaLabel="How each match is scaled"
+                value={normalise}
+                onValueChange={(v) => setNormalise(v as Normalise)}
+                options={(Object.keys(NORMALISE_LABEL) as Normalise[]).map(
+                  (mode) => ({ value: mode, label: NORMALISE_LABEL[mode] }),
+                )}
+              />
+              <OptionSelect
+                size="sm"
+                className="w-52"
+                ariaLabel="Window of match time"
+                value={windowChoice}
+                onValueChange={setWindowChoice}
+                options={WINDOWS.map(({ value, label }) => ({ value, label }))}
+              />
+              {windowChoice === "custom" && (
+                <>
+                  <Field label="From minute" className="w-24 text-xs">
+                    <Input
+                      type="number"
+                      min={0}
+                      value={customFrom}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="To minute" className="w-24 text-xs">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={customTo}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                    />
+                  </Field>
+                </>
+              )}
+            </div>
+            {customInvalid && (
+              <p className="text-xs text-destructive">
+                The second minute must be after the first. The whole match is
+                shown until it is.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {NORMALISE_NOTE[normalise]}
+              {timeWindow.kind !== "whole" &&
+                ` The window is ${windowLabel(timeWindow)} of each match by its own clock, in whole minutes.`}
+            </p>
+
+            {showStarts && (
+              <p
+                className="text-xs text-muted-foreground"
+                data-testid="starts-note"
+              >
+                {dots.length === 0
+                  ? read.reading
+                    ? "Reading start positions…"
+                    : "None of these replays recorded a start position."
+                  : `A dot is where one team's start was set before one match: ${plural(dots.length, "start", "starts")} from ${matchCount(startMatches)}. The engine can move a start into its start box, so a commander may have appeared a short way off.`}
+              </p>
+            )}
+
+            {layer && drawn && (
+              <LayerNotes
+                layer={layer}
+                drawn={drawn}
+                normalise={normalise}
+                timeWindow={timeWindow}
+                analysedShown={withEvents}
+                reading={read.reading}
+                categoriesLoading={categoriesLoading}
+                unattacked={replays.reduce((n, r) => n + r.deathsUnattacked, 0)}
+                noPosition={replays.reduce((n, r) => n + r.deathsNoPosition, 0)}
+                incomplete={replays.filter((r) => r.incomplete).length}
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** What is said under the controls about the layer being drawn. */
+function LayerNotes({
+  layer,
+  drawn,
+  normalise,
+  timeWindow,
+  analysedShown,
+  reading,
+  categoriesLoading,
+  unattacked,
+  noPosition,
+  incomplete,
+}: {
+  layer: HeatLayerId;
+  drawn: LayerAggregate;
+  normalise: Normalise;
+  timeWindow: MatchWindow;
+  /** Matches in the picture that have event data. */
+  analysedShown: number;
+  reading: boolean;
+  categoriesLoading: boolean;
+  unattacked: number;
+  noPosition: number;
+  /** Replays whose stream could not be read to the end. */
+  incomplete: number;
+}) {
+  const category = layer === "defence" || layer === "economy";
+  const windowed = timeWindow.kind !== "whole";
+  return (
+    <div className="flex flex-col gap-2" data-testid="layer-notes">
+      {layer === "deaths" ? (
+        <ReplaySourceNote source="log" />
+      ) : (
+        <ReplaySourceNote
+          source="stream"
+          detail="These are orders given, which is what players meant to do and not what happened. An order that was cancelled or never carried out counts like any other."
+        />
+      )}
+
+      {layer === "deaths" && analysedShown === 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="no-analysis">
+          No match on this map in the picture has been analysed, so there are no
+          deaths to draw. Deaths come from playing a match back, which is run
+          from a replay's own page.
+        </p>
+      )}
+      {layer === "deaths" && analysedShown > 0 && (
+        <p className="text-xs text-muted-foreground">
+          Every unit that was destroyed counts, whatever destroyed it.
+          {unattacked > 0 &&
+            ` ${plural(unattacked, "death names", "deaths name")} no attacker, which is how a cancelled build and a self destruct are recorded.`}
+          {noPosition > 0 &&
+            ` ${plural(noPosition, "death was", "deaths were")} recorded at exactly the map's corner, which is what the recorder writes when it has no position, and ${noPosition === 1 ? "is" : "are"} left out.`}
+        </p>
+      )}
+
+      {category && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="category-note"
+        >
+          What a building is for is read from the installed game with exactly
+          the name and version the replay records, matched by name.
+          {categoriesLoading
+            ? " Reading unit definitions…"
+            : drawn.unclassified > 0 &&
+              ` ${plural(drawn.unclassified, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified === 1 ? "it is" : "they are"} left out of this layer.`}
+        </p>
+      )}
+
+      {!reading &&
+        drawn.contributing === 0 &&
+        !(layer === "deaths" && analysedShown === 0) && (
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="layer-empty"
+          >
+            {windowed
+              ? `None of these matches has anything on this layer in ${windowLabel(timeWindow)}.`
+              : "None of these matches has anything on this layer."}
+          </p>
+        )}
+      {drawn.contributing > 0 && windowed && (
+        <p className="text-xs text-muted-foreground" data-testid="window-count">
+          {drawn.contributing.toLocaleString()} of {matchCount(drawn.available)}{" "}
+          {drawn.contributing === 1 ? "has" : "have"} anything on this layer in{" "}
+          {windowLabel(timeWindow)}. The others are not in the average.
+        </p>
+      )}
+      {drawn.contributing > 0 && (
+        <p className="text-xs text-muted-foreground" data-testid="layer-events">
+          {layerEvents(layer, drawn.events)}
+          {windowed ? ` in ${windowLabel(timeWindow)}` : ""}, from{" "}
+          {matchCount(drawn.contributing)}.
+        </p>
+      )}
+      {incomplete > 0 && layer !== "deaths" && (
+        <p className="text-xs text-muted-foreground">
+          {plural(incomplete, "replay", "replays")} could not be read to the
+          end, so {incomplete === 1 ? "its" : "their"} later orders may be
+          missing.
+        </p>
+      )}
+
+      {drawn.field && drawn.field.peak > 0 && (
+        <HeatLegend
+          label={LEGEND_LABEL[layer]}
+          peak={layerLegend(layer, drawn, normalise, timeWindow)}
+        />
+      )}
+    </div>
+  );
+}

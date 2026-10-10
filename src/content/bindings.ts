@@ -961,6 +961,78 @@ export const contentDemoOrderPoints = defineCommand<
   DemoOrderPoints
 >("coilbox-content", "content_demo_order_points");
 
+/**
+ * How many events fell in each cell of a map's grid in each minute of a match,
+ * packed (#1161). The columns are parallel, little endian in standard base64,
+ * and `entries` is how many each holds. See `mapAggregate.ts` for the decode.
+ */
+export interface MapCountLayer {
+  entries: number;
+  /** `u32`: the row times the grid's width plus the column. */
+  cell: string;
+  /** `u16`: the minute of the match, 0 for the first. */
+  slice: string;
+  /** `u16`: how many events. */
+  count: string;
+  /** `u32`: the unit definition id. On the buildings layer only. */
+  def?: string;
+  /** How many events are in the entries. */
+  total: number;
+  /** How many had a place off the map and were left out. */
+  offMap: number;
+}
+
+/** One replay reduced to counts on its map's grid (#1161). */
+export interface ReplayMapGrids {
+  path: string;
+  /** Absent for a remix, which carries its original's id. */
+  gameId?: string;
+  remixed: boolean;
+  mapName: string;
+  gameType: string;
+  lastFrame: number;
+  /** True when the walk stopped early, so later events are missing. */
+  incomplete: boolean;
+  /** Where each team started, by engine team, in elmos. */
+  starts: { team: number; x: number; z: number }[];
+  /** Orders to place a building, with each one's unit definition id. */
+  buildings: MapCountLayer;
+  /** Every order aimed at a place on the map. */
+  orders: MapCountLayer;
+  unitAimed: number;
+  custom: number;
+  /** Where units died. Absent when the match has no analysis with events. */
+  deaths?: {
+    layer: MapCountLayer;
+    /** Deaths the log names no attacker for. Counted in `layer` all the same. */
+    unattacked: number;
+    /** Deaths the log puts at exactly 0,0, which are left out. */
+    noPosition: number;
+  };
+  /** Whether the counts came from a kept file and not from walking the replay. */
+  fromCache: boolean;
+}
+
+/**
+ * Reduce replays to counts on their map's grid. `worldWidth` and `worldHeight`
+ * are the map's size in elmos. A path must be a replay in a folder the Replays
+ * list reads. One that is not, or will not read, comes back in `failed`.
+ * Replays are walked one at a time, so ask for one path a call to show progress.
+ */
+export const contentReplayMapGrids = defineCommand<
+  { paths: string[]; worldWidth: number; worldHeight: number },
+  {
+    grid: {
+      width: number;
+      height: number;
+      worldWidth: number;
+      worldHeight: number;
+    };
+    replays: ReplayMapGrids[];
+    failed: { path: string; error: string }[];
+  }
+>("coilbox-content", "content_replay_map_grids");
+
 /** Who sent a run of orders. A widget is the player's Lua acting for them. */
 export type OrderSource = "selection" | "lua" | "ai";
 
