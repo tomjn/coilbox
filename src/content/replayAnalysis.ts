@@ -126,6 +126,8 @@ export async function requestAnalysis(args: {
   replayPath: string;
   enginePath: string;
   dataDir: string;
+  /** Another installed version of the replay's game, in place of its own. */
+  game?: string;
   force?: boolean;
 }): Promise<"queued" | "alreadyQueued" | "alreadyAnalysed"> {
   if (analysisRunHidden()) {
@@ -183,7 +185,16 @@ export function analysisBlockers(facts: {
   engineVersion: string;
   /** The exact engine the replay was recorded on is installed. */
   engineInstalled: boolean;
+  /**
+   * How many other installed engines the analysis could use instead, and how
+   * many engines are installed at all, for saying which is the problem. Left
+   * out, they read as none.
+   */
+  otherEngines?: number;
+  installedEngines?: number;
   missingGame: boolean;
+  /** Another installed version of the game stands in for the missing one. */
+  otherGame?: boolean;
   missingMap: boolean;
   /** `replayDependencyBlock`: why the replay's game cannot run, or null. */
   dependencyBlock: string | null;
@@ -206,17 +217,57 @@ export function analysisBlockers(facts: {
       return ["This file does not read as a replay."];
   }
   const blockers: string[] = [];
-  if (!facts.engineInstalled) {
+  if (!facts.engineInstalled && !facts.otherEngines) {
+    const which = facts.engineVersion
+      ? `Engine ${facts.engineVersion} is not installed`
+      : "This replay does not say which engine recorded it";
     blockers.push(
-      facts.engineVersion
-        ? `Engine ${facts.engineVersion} is not installed. An analysis only runs on the engine the match was recorded on.`
-        : "This replay does not say which engine recorded it.",
+      facts.installedEngines
+        ? `${which}, and none of the engines that are installed can run an analysis, which needs one with a headless build.`
+        : `${which}, and no other engine is installed.`,
     );
   }
-  if (facts.missingGame) blockers.push("The game is not installed.");
+  if (facts.missingGame && !facts.otherGame) {
+    blockers.push("The game is not installed.");
+  }
   if (facts.missingMap) blockers.push("The map is not installed.");
   if (facts.dependencyBlock) blockers.push(facts.dependencyBlock);
   return blockers;
+}
+
+/**
+ * What a stored analysis says about being made with another engine or another
+ * version of the game than the replay was recorded with (#3869), or null when
+ * it was not. A file from before this was kept, or a replay that named no
+ * engine, leaves it unknown, which says nothing: it is never read as the same.
+ */
+export function differenceNote(a: StoredReplayAnalysis): string | null {
+  const engine = a.engineDiffers === true;
+  const game = a.gameDiffers === true;
+  if (!engine && !game) return null;
+  const said: string[] = [];
+  if (engine) {
+    said.push(
+      `It used engine ${a.engine || "unknown"}, and the replay was recorded on engine ${a.recordedEngine || "unknown"}.`,
+    );
+  }
+  if (game) {
+    said.push(
+      `It used ${a.game || "an unnamed game"}, and the replay was recorded on ${a.recordedGame || "an unnamed game"}.`,
+    );
+  }
+  const what =
+    engine && game
+      ? "engine or game version"
+      : engine
+        ? "engine"
+        : "game version";
+  said.push(
+    a.outcome === "diverged"
+      ? `A different ${what} is the likely reason.`
+      : "The playback still matched the recorded match exactly, so the events are kept.",
+  );
+  return said.join(" ");
 }
 
 /**

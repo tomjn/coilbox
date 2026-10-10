@@ -32,7 +32,10 @@ let CHECK: {
   cannot: string | null;
   gameId: string | null;
   matchSeconds: number;
+  headless: string[];
 };
+/** The engines in the one content folder `content_state_load` answers with. */
+let ENGINES: { path: string; version: string; syncVersion?: string }[] = [];
 
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
@@ -41,6 +44,8 @@ vi.mock("@picoframe/plugin-sdk", () => ({
       switch (command) {
         case "content_analysis_check":
           return CHECK;
+        case "content_state_load":
+          return { state: { roots: [{ path: "/data", engines: ENGINES }] } };
         case "content_analysis_enqueue":
           return { outcome: "queued", queue: EMPTY_QUEUE };
         case "content_replay_analyses":
@@ -68,9 +73,11 @@ vi.mock("../../../profile/profile", async (orig) => ({
 
 import type {
   DemoInfo,
+  GameItem,
   ReplayAnalysisRunningJob,
   StoredReplayAnalysis,
 } from "../../bindings";
+import { resetContentState } from "../../contentState";
 import {
   resetReplayAnalysisForTests,
   seedReplayAnalysisForTests,
@@ -172,7 +179,9 @@ const analyseButton = () =>
 beforeEach(() => {
   called.length = 0;
   HIDE = [];
-  CHECK = { cannot: null, gameId: ID, matchSeconds: 769 };
+  CHECK = { cannot: null, gameId: ID, matchSeconds: 769, headless: [] };
+  ENGINES = [];
+  resetContentState();
   resetReplayAnalysisForTests();
   seedReplayAnalysisForTests({});
 });
@@ -257,7 +266,12 @@ describe("a replay that has not been analysed", () => {
 
 describe("a replay that cannot be analysed", () => {
   it("says a match that was quit cannot be, beside a disabled button", async () => {
-    CHECK = { cannot: "noGameOver", gameId: null, matchSeconds: 0 };
+    CHECK = {
+      cannot: "noGameOver",
+      gameId: null,
+      matchSeconds: 0,
+      headless: [],
+    };
     show();
 
     await screen.findByText(/never recorded a game over/);
@@ -276,7 +290,12 @@ describe("a replay that cannot be analysed", () => {
   });
 
   it("gives a remix no analysis, even its original's", async () => {
-    CHECK = { cannot: "remix", gameId: null, matchSeconds: 0 };
+    CHECK = {
+      cannot: "remix",
+      gameId: null,
+      matchSeconds: 0,
+      headless: [],
+    };
     seedReplayAnalysisForTests({ analyses: [stored()] });
     show({ info: { ...INFO, remixed: true } as DemoInfo });
 
@@ -523,5 +542,297 @@ describe("a distribution that hides analytics.run", () => {
     show();
     expect(screen.queryByRole("button", { name: "Cancel" })).toBeNull();
     expect(screen.getByText(/^Analysed\./)).toBeTruthy();
+  });
+});
+
+describe("a replay whose engine is not installed (#3869)", () => {
+  const OLD = { path: "/engines/2025.06.19", version: "2025.06.19" };
+  const NEW = {
+    path: "/engines/2026.07.04-46-g04f42e2 macos_integration",
+    version: "2026.07.04-46-g04f42e2 macos_integration",
+  };
+  const NO_HEADLESS = { path: "/engines/2027.01.01", version: "2027.01.01" };
+
+  function withEngines(headless: { path: string }[] = [OLD, NEW]) {
+    ENGINES = [OLD, NEW, NO_HEADLESS];
+    CHECK = { ...CHECK, headless: headless.map((e) => e.path) };
+  }
+
+  const region = () =>
+    screen.getByRole("region", { name: "Analysis" }).textContent ?? "";
+  const enqueued = () =>
+    called.find((c) => c.command === "content_analysis_enqueue")?.args;
+
+  it("says which engine recorded it, which will be used, and when the result is kept", async () => {
+    withEngines();
+    show({ target: null });
+
+    await screen.findByRole("button", {
+      name: "Analyse with 2026.07.04-46-g04f42e2 macos_integration",
+    });
+    expect(region()).toContain(
+      "This replay was recorded on engine 2026.07.01, which is not installed.",
+    );
+    expect(region()).toContain(
+      "The analysis will use engine 2026.07.04-46-g04f42e2 macos_integration instead.",
+    );
+    expect(region()).toContain(
+      "The result is kept only if the playback matches the recorded match exactly",
+    );
+    expect(region()).toContain("often computes a different match");
+    // No odds are quoted.
+    expect(region()).not.toMatch(/usually|likely to work|%/);
+  });
+
+  it("offers only engines that can run headless, newest first", async () => {
+    withEngines();
+    show({ target: null });
+    await screen.findByRole("button", { name: /^Analyse with/ });
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Engine to use" }));
+    const options = (await screen.findAllByRole("option")).map(
+      (o) => o.textContent,
+    );
+    expect(options).toEqual([NEW.version, OLD.version]);
+  });
+
+  it("runs nothing until the button is pressed, then asks for the chosen engine and its folder", async () => {
+    withEngines();
+    show({ target: null });
+    const button = await screen.findByRole("button", { name: /^Analyse with/ });
+    await waitFor(() => expect(button).toHaveProperty("disabled", false));
+    expect(enqueued()).toBeUndefined();
+
+    fireEvent.click(button);
+
+    await waitFor(() => expect(enqueued()).toBeDefined());
+    expect(enqueued()).toEqual({
+      replayPath: PATH,
+      enginePath: NEW.path,
+      dataDir: "/data",
+      game: undefined,
+      force: false,
+    });
+  });
+
+  it("says so when engines are installed and none can run headless", async () => {
+    withEngines([]);
+    show({ target: null });
+
+    await screen.findByText(/none of the engines that are installed can run/);
+    expect(analyseButton()).toHaveProperty("disabled", true);
+  });
+
+  it("offers the download for a missing map in its own place, and no run", async () => {
+    withEngines();
+    show({
+      missingMap: true,
+      downloads: <button type="button">Download map</button>,
+    });
+
+    await screen.findByText("The map is not installed.");
+    expect(screen.getByRole("button", { name: "Download map" })).toBeTruthy();
+    expect(analyseButton()).toHaveProperty("disabled", true);
+    expect(commands()).not.toContain("content_analysis_enqueue");
+  });
+
+  it("shows no download offer when nothing is in the way", async () => {
+    show({ downloads: <button type="button">Download map</button> });
+    await waitFor(() =>
+      expect(analyseButton()).toHaveProperty("disabled", false),
+    );
+    expect(screen.queryByRole("button", { name: "Download map" })).toBeNull();
+  });
+
+  it("depends on another installed version of the game, and says so", async () => {
+    withEngines();
+    const games = [
+      { name: "Some Game 0.9" },
+      { name: "Some Game 1.2" },
+    ] as unknown as GameItem[];
+    show({
+      info: { ...INFO, gameType: "Some Game 1.0" } as DemoInfo,
+      target: null,
+      missingGame: true,
+      installedGames: games,
+    });
+
+    const button = await screen.findByRole("button", { name: /^Analyse with/ });
+    expect(region()).toContain(
+      "The game this replay was recorded on, Some Game 1.0, is not installed. The analysis will use Some Game 1.2, another version of it.",
+    );
+    await waitFor(() => expect(button).toHaveProperty("disabled", false));
+    fireEvent.click(button);
+    await waitFor(() => expect(enqueued()).toBeDefined());
+    expect(enqueued()).toMatchObject({ game: "Some Game 1.2" });
+  });
+
+  it("does not offer an engine again that did not reproduce the match, until it is asked for", async () => {
+    withEngines();
+    const attempt = (engine: string) => ({
+      engine,
+      game: "Some Game 1.0",
+      analysedAtMs: 1,
+      disagreements: [],
+    });
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored({
+          state: "diverged",
+          outcome: "diverged",
+          engine: NEW.version,
+          attempts: [attempt(NEW.version)],
+        }),
+      ],
+    });
+    show({ target: null });
+
+    // The untried engine is the one picked.
+    await screen.findByRole("button", {
+      name: "Try with 2025.06.19",
+    });
+    expect(region()).toContain(
+      `Already tried, and did not reproduce the match: ${NEW.version}.`,
+    );
+  });
+
+  it("leaves the choice to the person when every engine has been tried", async () => {
+    withEngines();
+    const attempt = (engine: string) => ({
+      engine,
+      game: "Some Game 1.0",
+      analysedAtMs: 1,
+      disagreements: [],
+    });
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored({
+          state: "diverged",
+          outcome: "diverged",
+          attempts: [attempt(NEW.version), attempt(OLD.version)],
+        }),
+      ],
+    });
+    show({ target: null });
+
+    await screen.findByText(/Every installed engine has been tried/);
+    expect(screen.getByRole("button", { name: "Try again" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+  });
+
+  it("offers nothing new when the recorded engine is installed", async () => {
+    withEngines();
+    show();
+    await waitFor(() =>
+      expect(analyseButton()).toHaveProperty("disabled", false),
+    );
+    expect(region()).not.toContain("which is not installed");
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+});
+
+describe("a stored analysis made with another engine (#3869)", () => {
+  const region = () =>
+    screen.getByRole("region", { name: "Analysis" }).textContent ?? "";
+
+  it("says a different engine was used, and that the events are kept because the match matched", () => {
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored({
+          engine: "2026.07.04-46-g04f42e2",
+          recordedEngine: "2025.06.21",
+          engineDiffers: true,
+          gameDiffers: false,
+        }),
+      ],
+    });
+    show();
+
+    expect(region()).toContain(
+      "It used engine 2026.07.04-46-g04f42e2, and the replay was recorded on engine 2025.06.21.",
+    );
+    expect(region()).toContain(
+      "The playback still matched the recorded match exactly, so the events are kept.",
+    );
+  });
+
+  it("names a different engine as the likely reason a run did not reproduce", () => {
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored({
+          state: "diverged",
+          outcome: "diverged",
+          engine: "2026.07.04-46-g04f42e2",
+          recordedEngine: "2025.06.21",
+          engineDiffers: true,
+          disagreements: [
+            {
+              figure: "winners",
+              recorded: "0",
+              observed: "1",
+            },
+          ],
+        }),
+      ],
+    });
+    show({ target: null });
+
+    expect(region()).toContain("A different engine is the likely reason.");
+    expect(region()).toContain("the replay recorded 0, the playback gave 1.");
+  });
+
+  it("says nothing about a different engine for a file written before it was recorded", () => {
+    seedReplayAnalysisForTests({
+      analyses: [stored({ engineDiffers: null, gameDiffers: null })],
+    });
+    show();
+
+    expect(region()).not.toMatch(/It used engine|different engine|same engine/);
+  });
+
+  it("lists every engine a match has been tried on", () => {
+    seedReplayAnalysisForTests({
+      analyses: [
+        stored({
+          state: "diverged",
+          outcome: "diverged",
+          attempts: [
+            {
+              engine: "2026.07.01",
+              game: "G 1",
+              analysedAtMs: 1,
+              disagreements: [],
+            },
+            {
+              engine: "2026.07.04",
+              game: "G 1",
+              analysedAtMs: 2,
+              disagreements: [],
+            },
+          ],
+        }),
+      ],
+    });
+    show({ target: null });
+
+    expect(region()).toContain(
+      "Tried so far, and none reproduced the match: engine 2026.07.01 with G 1, engine 2026.07.04 with G 1.",
+    );
+  });
+});
+
+describe("a distribution that hides analytics.run (#3869)", () => {
+  it("offers no other engine and does not ask which engines there are", () => {
+    HIDE = ["analytics.run"];
+    ENGINES = [{ path: "/engines/2025.06.19", version: "2025.06.19" }];
+    seedReplayAnalysisForTests({ analyses: [stored()] });
+    show({ target: null });
+
+    expect(commands()).not.toContain("content_state_load");
+    expect(commands()).not.toContain("content_analysis_check");
+    expect(screen.queryByRole("button", { name: /Analyse/ })).toBeNull();
+    expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

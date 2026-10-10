@@ -843,6 +843,17 @@ export default function ReplayDetailPage() {
               missingGame={missingGame}
               missingMap={missingMap}
               dependencyBlock={dependencyBlock}
+              installedGames={answered?.games ?? []}
+              downloads={
+                <MissingContentNotice
+                  gameType={info.gameType}
+                  mapName={info.mapName}
+                  missingGame={missingGame}
+                  missingMap={missingMap}
+                  engine={engine}
+                  onMapDownloaded={onMapDownloaded}
+                />
+              }
             />
           )}
 
