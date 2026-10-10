@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
-# Run the same checks CI runs (.github/workflows/lint.yml), sequentially, and
-# write each command's full output to check-output/ (gitignored) instead of a
-# path invented at the filesystem root.
+# Run the same checks CI runs (.github/workflows/lint.yml) and write each
+# command's full output to check-output/ (gitignored) instead of a path
+# invented at the filesystem root.
 #
 # Every check runs even if an earlier one fails, so one invocation surfaces
 # every failure CI would catch, not just the first. The script exits non-zero
 # if any check failed.
 #
-# Sequential on purpose: two cargo invocations at once fight over the same
-# target lock, and `bun tauri dev` may already be holding it.
+# Two lanes run side by side (#3745). The cargo commands stay in order in one
+# lane, because two cargo invocations at once fight over the same target lock,
+# and `bun tauri dev` may already be holding it. Nothing in the other lane
+# touches the target folder. Two lanes and not one per check: nine at once has
+# pushed this machine's load past 300 and timed tests out.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -21,38 +24,49 @@ mkdir -p "$OUT_DIR"
 # real `bun tauri dev` has populated them.
 mkdir -p src-tauri/mapconv src-tauri/prdownloader
 
-FAILED=0
-
+# A check reports as it finishes, so lines from the two lanes interleave. A
+# failure is printed in one write so its log tail stays in one piece. The
+# lanes are subshells, so a failure is recorded as a file, not a variable.
 run_check() {
   local name="$1"
   shift
   local log="$OUT_DIR/$name.log"
-  echo "==> $name: $*"
   if "$@" >"$log" 2>&1; then
-    echo "    pass"
+    echo "pass  $name"
   else
-    FAILED=1
-    echo "    FAIL - full output in $log"
-    echo "    --- last 20 lines ---"
-    tail -n 20 "$log" | sed 's/^/    /'
+    touch "$OUT_DIR/$name.failed"
+    printf 'FAIL  %s: %s\n      full output in %s\n      --- last 20 lines ---\n%s\n' \
+      "$name" "$*" "$log" "$(tail -n 20 "$log" | sed 's/^/      /')"
   fi
 }
 
-run_check cargo-fmt cargo fmt --all --check
-run_check cargo-clippy cargo clippy --all-targets -- -D warnings
-# Clippy compiles the #[cfg(test)] modules but never runs them, so without this
-# a Rust test can be wrong for as long as it still compiles.
-run_check cargo-test cargo test --workspace
-run_check biome bunx biome ci .
-run_check typecheck bun run typecheck
-run_check test bun run test
+cargo_lane() {
+  run_check cargo-fmt cargo fmt --all --check
+  run_check cargo-clippy cargo clippy --all-targets -- -D warnings
+  # Clippy compiles the #[cfg(test)] modules but never runs them, so without
+  # this a Rust test can be wrong for as long as it still compiles. nextest is
+  # what CI runs. It skips doctests, so those get a run of their own.
+  run_check cargo-nextest cargo nextest run --workspace
+  run_check cargo-doctest cargo test --workspace --doc
+}
+
+js_lane() {
+  run_check biome bunx biome ci .
+  run_check typecheck bun run typecheck
+  run_check test bun run test
+  # The mission runtime and the blueprint widget are Lua the engine runs, so
+  # nothing above compiles them.
+  run_check mission-tests scripts/mission-tests.sh
+}
+
+cargo_lane &
+js_lane &
+wait
 
 echo
 echo "Full logs: $OUT_DIR/"
-if [ "$FAILED" -eq 0 ]; then
-  echo "All checks passed."
-else
+if compgen -G "$OUT_DIR/*.failed" >/dev/null; then
   echo "Some checks failed."
+  exit 1
 fi
-
-exit "$FAILED"
+echo "All checks passed."
