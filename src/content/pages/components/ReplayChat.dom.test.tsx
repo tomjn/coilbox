@@ -18,6 +18,7 @@ vi.mock("../../bindings", () => ({
 }));
 
 const { ReplayChat, chatTime } = await import("./ReplayChat");
+const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
 const line = (over: Partial<ChatLine>): ChatLine => ({
   frame: 0,
@@ -118,6 +119,15 @@ describe("ReplayChat", () => {
   it("says when there was no chat", async () => {
     open({ incomplete: false, messages: [] });
     expect(await screen.findByText(/No chat was recorded/)).toBeTruthy();
-    expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /show chat log/i })).toBeNull();
+  });
+
+  it("says the timeline and the log come from the recorded orders and messages", async () => {
+    open({
+      incomplete: false,
+      messages: [line({ player: 0, playerName: "Alice", text: "gg" })],
+    });
+    await screen.findByRole("button", { name: /show chat log/i });
+    expect(screen.getAllByText(REPLAY_SOURCE_NOTES.stream)).toHaveLength(2);
   });
 });

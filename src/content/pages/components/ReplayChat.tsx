@@ -6,6 +6,7 @@ import type { ChatDest, ChatLine } from "../../bindings";
 import { FRAMES_PER_SECOND, PREGAME_FRAME } from "../../chatClock";
 import { timelineDomain, toEventMarks, toMarks } from "../../replayTimeline";
 import { useReplayChat } from "../../useReplayChat";
+import { ReplaySourceNote } from "./ReplaySourceNote";
 import { ReplayTimeline } from "./ReplayTimeline";
 import { ErrorBanner } from "./states";
 
@@ -144,6 +145,7 @@ export function ReplayChat({
     <>
       <section className="flex flex-col gap-2">
         <h2 className="text-sm font-medium">Timeline</h2>
+        <ReplaySourceNote source="stream" />
         {loading && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin" />
@@ -178,6 +180,7 @@ export function ReplayChat({
       {(messages === null || messages.length > 0) && (
         <section className="flex flex-col gap-2">
           <h2 className="text-sm font-medium">Chat log</h2>
+          <ReplaySourceNote source="stream" />
           {messages === null || !open ? (
             <div>
               <Button

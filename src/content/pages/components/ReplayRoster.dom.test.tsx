@@ -79,6 +79,7 @@ const { ReplayRoster } = await import("./ReplayRoster");
 const { MatchStatsSection } = await import("./MatchStatsSection");
 const { SeriesEmphasisProvider } = await import("../../useSeriesEmphasis");
 const { isProfileHidden } = await import("../../../profile/hidden");
+const { REPLAY_SOURCE_NOTES } = await import("../../replaySources");
 
 /** No metric is named here: `metricRegistry.test.ts` forbids it. */
 function sample(frame: number): TeamStatSample {
@@ -487,5 +488,18 @@ describe("with nothing to show", () => {
     expect(screen.getByRole("img", { name: /rating 25/i })).toBeTruthy();
     // Nothing was asked of the replay file either.
     expect(trailerRead).not.toHaveBeenCalled();
+    // So the roster claims the setup as its only source.
+    expect(screen.getByText(REPLAY_SOURCE_NOTES.setup)).toBeTruthy();
+    expect(screen.queryByText(REPLAY_SOURCE_NOTES.players)).toBeNull();
+  });
+
+  it("says where the roster and the statistics section get their figures", async () => {
+    mount(twoVTwo());
+    await screen.findByText(REPLAY_SOURCE_NOTES.players);
+    expect(
+      await screen.findByText(
+        `${REPLAY_SOURCE_NOTES.trailer} Figures are sampled every 15 seconds.`,
+      ),
+    ).toBeTruthy();
   });
 });
