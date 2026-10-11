@@ -1,4 +1,4 @@
-# Teaching your game with a campaign
+# Make a tutorial campaign
 
 A distribution can teach its game. You write missions in the scenario editor, put them in a campaign, bundle the campaign with your distribution profile, and name it in the profile's `start` field. A new player then sees a "Start here" card on the home page that opens the first lesson.
 
@@ -36,7 +36,7 @@ A scenario restriction is enforced by the mission runtime, can be lifted mid-mis
 
 - **It cannot pause a multiplayer game.** `pause_game` works in single player only, because a pause stops the game for everyone in it. A held dialogue line works in both.
 - **A paused lesson only moves when the player acts.** A paused game runs no clock, so a trigger that waits on time does nothing until the game is running again. Unpause from a trigger that waits on `dialogue_dismissed`. See [Stop and wait for the player](scenarios.md#stop-and-wait-for-the-player).
-- **A bundled campaign plays its radio messages silent.** The portraits and voice clips do not travel with a bundled campaign. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) and [issue #877](https://github.com/tomjn/coilbox/issues/877).
+- **A bundled campaign plays its radio messages silent.** The portraits and voice clips do not travel with a bundled campaign. See [Bundling a campaign in a distribution](campaigns.md#bundle-a-campaign-in-a-distribution) and [issue #877](https://github.com/tomjn/coilbox/issues/877).
 - **Nobody has watched the objectives and dialogue panels drawn in a real engine.** See [What a scenario cannot do yet](scenarios.md#what-a-scenario-cannot-do-yet).
 
 ## Step 1: write the missions
@@ -129,7 +129,7 @@ Use **Test in game** in the editor to play each scenario before you go on. See [
 
 ## Step 2: put the missions in a campaign
 
-Create a campaign in the Campaign Builder, add a mission for each lesson, and attach each scenario to its mission. Missions play in the order you list them. See [Authoring a campaign](campaigns.md#authoring-a-campaign) and [Missions that play a scenario](campaigns.md#missions-that-play-a-scenario).
+Create a campaign in the Campaign Builder, add a mission for each lesson, and attach each scenario to its mission. Missions play in the order you list them. See [Authoring a campaign](campaigns.md#author-a-campaign) and [Missions that play a scenario](campaigns.md#missions-that-play-a-scenario).
 
 Attaching copies the scenario into the mission. If you edit the scenario later, use **Update to latest** on the mission.
 
@@ -173,7 +173,7 @@ Export the campaign when it is ready. The exported file has this shape, shown wi
 }
 ```
 
-Coilbox writes `snapshot`, `scenario`, the ids and the dates for you. Do not write them by hand. Export from the Campaign Builder, and the file arrives complete. See [Export / import](campaigns.md#export--import).
+Coilbox writes `snapshot`, `scenario`, the ids and the dates for you. Do not write them by hand. Export from the Campaign Builder, and the file arrives complete. See [Export / import](campaigns.md#export-and-import).
 
 ## Step 3: bundle the campaign with the profile
 
@@ -187,7 +187,7 @@ Save the exported file as `.coilbox/campaigns/<any-name>.json` beside your profi
       learn-the-basics.json
 ```
 
-Bundled campaigns are read-only and play like any other. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution).
+Bundled campaigns are read-only and play like any other. See [Bundling a campaign in a distribution](campaigns.md#bundle-a-campaign-in-a-distribution).
 
 ## Step 4: name it as the starting point
 

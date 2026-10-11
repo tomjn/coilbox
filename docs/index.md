@@ -14,8 +14,11 @@ hero:
       text: Download
       link: https://github.com/tomjn/coilbox/releases/latest
     - theme: alt
-      text: Guides
-      link: /portable-mode
+      text: Player guides
+      link: /players/
+    - theme: alt
+      text: Game developer guides
+      link: /developers/
     - theme: alt
       text: Community hub
       link: https://coilbox-hub.vercel.app
@@ -110,14 +113,11 @@ xattr -dr com.apple.quarantine /Applications/Coilbox.app
 
 Download and run the installer / AppImage from the [latest release](https://github.com/tomjn/coilbox/releases/latest).
 
-## Learn more
+## Documentation
 
-- [Portable mode](/portable-mode) — run Coilbox from a self-contained folder.
-- [Distribution profile](/distribution-profile) — reskin and narrow Coilbox for a specific game.
-- [Campaigns](/campaigns), [Galactic conquest](/conquest) and [Roguelite run](/roguelite-run) — the singleplayer game modes.
-- [Scenarios](/scenarios) and [the mission runtime](/mission-runtime): authoring in-engine missions, and what a game does to play them.
-- [Teaching your game](/teaching-your-game): how a distribution offers a new player a first lesson.
-- [Hand-made maps](/hand-made-maps): how to make a Conquest map of land from images and a text file.
-- [Server admin](/server-admin): the moderation and admin tools for an uberserver lobby.
-- [Where a replay's numbers come from](/replay-data-sources): which source each figure on a replay page shows, and why two numbers may differ.
-- [Routes](/routes) — the app's screen map.
+The documentation is split by who is reading.
+
+- [Player guides](players/index.md). Battle presets, Galactic conquest, Warpath and portable mode.
+- [Game developer guides](developers/index.md). Package coilbox with your game, brand it, and make campaigns, scenarios, maps and units for it.
+- [Server staff](staff/server-admin.md). The moderation and admin tools for an uberserver lobby.
+- [Reference](reference/index.md). The app's routes, replay data sources, model file formats and protocol notes.

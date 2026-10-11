@@ -8,7 +8,7 @@ A mission can also carry a [scenario](scenarios.md), which is what puts spawns, 
 
 Everything below is about authoring and shipping those missions — the mission is the unit of work in a campaign, so most of the detail (setup snapshot, briefing media, unit restrictions, win/loss) is per-mission.
 
-## Authoring a campaign
+## Author a campaign
 
 The **Campaign Builder** is an advanced-mode tool: turn on Advanced mode (Settings > General) to see **Campaign Builder** in the sidebar. From there you can create a campaign, add missions, and edit each mission's briefing, objectives, panorama and skirmish setup.
 
@@ -28,7 +28,7 @@ A mission's skirmish setup is a **snapshot**: when you attach a preset to a miss
 
 Missions carry more than a still panorama:
 
-- **Briefing** — authored as **Markdown**. Embed media inline by relative path with the image syntax: `![](images/intro.jpg)` shows an image, and a source ending in an audio or video extension renders an `<audio>` / `<video>` player instead (`![](briefings/vo.mp3)`, `![](briefings/intro.mp4)`). A link to `https:`, `mailto:` or `tel:` opens in the reader's browser, mail client or dialler. Any other link is refused, because Coilbox has no back button to return from a page drawn over it, so link a bundled file with the image syntax above rather than as a link.
+- **Briefing** — authored as **Markdown**. Embed media inline by relative path with the image syntax: `![](../images/intro.jpg)` shows an image, and a source ending in an audio or video extension renders an `<audio>` / `<video>` player instead (`![](../briefings/vo.mp3)`, `![](../briefings/intro.mp4)`). A link to `https:`, `mailto:` or `tel:` opens in the reader's browser, mail client or dialler. Any other link is refused, because Coilbox has no back button to return from a page drawn over it, so link a bundled file with the image syntax above rather than as a link.
 - **Panorama** and **side graphic**: each can be a still image, a looping muted video, the mission's map as a live 3D preview, or one of the mission's game's units as a spinning 3D model. Pick the source in the mission editor. If the player's install can't draw the chosen unit, the briefing shows that slot's image instead.
 - **Voiceover** (audio) and **cutscene** (video) — optional players shown on the briefing screen.
 
@@ -61,13 +61,13 @@ Attaching **copies the whole scenario document into the mission** and sets the m
 
 A scenario's dialogue clips stay in coilbox's own store rather than inside the mission, so deleting a scenario a campaign mission uses keeps its clips behind for that mission. The builder says which of the two it is doing when you press delete.
 
-An export carries every attached scenario and its dialogue clips, and import writes the clips back. See [Export / import](#export--import). **Bundling is the gap**: a bundled campaign carries its scenarios but not their portraits and voice clips, so its radio messages play silent ([issue #877](https://github.com/tomjn/coilbox/issues/877)).
+An export carries every attached scenario and its dialogue clips, and import writes the clips back. See [Export / import](#export-and-import). **Bundling is the gap**: a bundled campaign carries its scenarios but not their portraits and voice clips, so its radio messages play silent ([issue #877](https://github.com/tomjn/coilbox/issues/877)).
 
 A scenario can vary by difficulty, and then the player picks a level on the mission's briefing. The choice is the campaign run's, not the mission's: it holds for every mission after it until the player changes it, and it is saved with their progress, so a bundled campaign nobody can edit is still playable at every level. See [Difficulty](scenarios.md#difficulty).
 
 Which game can play a scenario mission, and what a game has to do to play one itself, is [the mission runtime's](mission-runtime.md) business rather than the campaign's.
 
-## Export / import
+## Export and import
 
 A campaign can be exported to a single `.json` file (Campaign Builder > a campaign > Export) for sharing. The export format:
 
@@ -87,9 +87,9 @@ Any campaign **images** are inlined as base64 `data:` URIs, so the file is self-
 
 The version is bumped only for a campaign that has a scenario. That is exactly the file an older coilbox would misread: it would parse the document, drop the scenario field it has never heard of, and offer a mission that plays as a bare skirmish with none of the triggers the author wrote. A campaign with no scenarios has no such problem, so it stays at the version older builds can open. The pre-container wrapper shown above is still read on import, and is no longer what export writes.
 
-## Bundling a campaign in a distribution
+## Bundle a campaign in a distribution
 
-A [distribution profile](distribution-profile.md) can ship one or more campaigns as **read-only** content, so players get them out of the box without importing anything. Bundled campaigns live under the profile's [`.coilbox`](portable-mode.md) folder:
+A [distribution profile](distribution-profile.md) can ship one or more campaigns as **read-only** content, so players get them out of the box without importing anything. Bundled campaigns live under the profile's [`.coilbox`](../players/portable-mode.md) folder:
 
 ```
 <YourGameFolder>/
@@ -103,7 +103,7 @@ A [distribution profile](distribution-profile.md) can ship one or more campaigns
 
 Each file in `campaigns/` is an exported campaign, dropped in as-is: export from Campaign Builder and save the resulting `.json` as `.coilbox/campaigns/<any-name>.json`. (A bare campaign document — the inner `campaign` object without the export wrapper — is also accepted.) Images are embedded in the export, so a still-image campaign is a single self-contained file.
 
-To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
+To ship **audio or video** (which can't be embedded), reference the files by relative path from `.coilbox/` — a `"local"` media reference such as `{ "kind": "local", "path": "briefings/intro.mp4" }` for a panorama, voiceover or cutscene, or `![](../images/art.jpg)` inline in a Markdown briefing — and place the files under `.coilbox/` alongside the campaign. These paths resolve the same way as [distribution-profile](distribution-profile.md) welcome-screen media.
 
 Bundled campaigns show up in the Campaigns list marked read-only (no edit/delete in the builder) but otherwise play exactly like local ones, and their progress is tracked the same way.
 
@@ -111,7 +111,7 @@ A profile can name a bundled campaign as where a new player starts, which puts a
 
 One exception: a bundled campaign whose missions carry a [scenario](scenarios.md) brings the scenario but not its dialogue portraits and voice clips, so those lines play silent. Import the campaign rather than bundling it until [issue #877](https://github.com/tomjn/coilbox/issues/877) is done.
 
-## Win/loss detection
+## How coilbox detects a win or a loss
 
 After a mission's game exits (and wasn't cancelled), Coilbox tries to work out the result automatically instead of asking:
 

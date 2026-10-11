@@ -1,6 +1,6 @@
 # Hand-made maps
 
-A hand-made map is a folder that holds a text file and two or three images. You paint the provinces in an image editor and describe them in `map.json`. Coilbox reads the folder into a map of land for [Conquest](conquest.md) and [Warpath](roguelite-run.md), with provinces, cities, borders and roads. There is no map editor.
+A hand-made map is a folder that holds a text file and two or three images. You paint the provinces in an image editor and describe them in `map.json`. Coilbox reads the folder into a map of land for [Conquest](../players/conquest.md) and [Warpath](../players/warpath.md), with provinces, cities, borders and roads. There is no map editor.
 
 This guide takes you from an empty folder to a map a player can play. It follows the sample map, so open the sample beside it.
 

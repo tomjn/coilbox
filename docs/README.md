@@ -1,35 +1,32 @@
 # Coilbox documentation
 
-Guides for running Coilbox in **portable mode** and shipping it alongside a game. If you're setting Coilbox up for your game (or just trying it next to another lobby), start here.
+These pages are published at [tomjn.github.io/coilbox](https://tomjn.github.io/coilbox/). They are grouped by who reads them, one folder each.
 
-## Start here
+| Folder | Reader | Start at |
+| --- | --- | --- |
+| [`players/`](players/index.md) | People who play games through coilbox | [Player guides](players/index.md) |
+| [`developers/`](developers/index.md) | People who make a game, a campaign, a map or a unit | [Game developer guides](developers/index.md) |
+| [`staff/`](staff/server-admin.md) | Moderators and admins of a lobby server | [Server admin](staff/server-admin.md) |
+| [`reference/`](reference/index.md) | Anyone looking something up | [Reference](reference/index.md) |
 
-- **[Portable mode](portable-mode.md)** — the foundation. How to run Coilbox self-contained in a `.coilbox` folder, where files live, how to run it alongside skylobby, and how to bundle the game and package everything up for players. **Read this first.**
-- **[Distributing to players](distributing.md)** — the short, practical follow-up: the per-OS package layout (one zip each for Windows, Linux, macOS), why to ship a folder rather than loose files, and the macOS `.zip`-not-`.dmg` gotcha.
+## Adding a page
 
-## Branding and shipping
+1. Put the page in the folder for its reader. A page that serves two readers is two pages.
+2. Add it to that folder's sidebar in `.vitepress/config.mts`.
+3. Add a line for it to that folder's `index.md`.
 
-- **[Distribution profiles](distribution-profile.md)** — the `profile.json` file that rebrands and narrows Coilbox for your game without rebuilding it: title, theme, hidden features, a welcome screen, sidebar links, a splash, and a game-update source. Full field reference with examples.
-- **[Routes and nav ids](routes.md)** — every in-app link (`#/…`) and every id you can hide, so the profile's `hide` / `hideSettings` / `welcome` / `links` examples point at real things.
+A guide tells one reader how to do one thing. Lists of fields, ids, bytes and messages go in `reference/`, and the guide links to them.
 
-## Content
+## What is not published
 
-- **[Campaigns](campaigns.md)** — authoring a linear sequence of skirmish missions in the Campaign Builder, mission media and unit restrictions, export/import, and bundling campaigns into a distribution.
-- **[Galactic Conquest](conquest.md)** — the single-player conquest map: generating a map (style, size, layout, starting territory, fog of war), how a run plays, supplying your game's system/faction names via the profile or branding catalog, and bundling a galaxy.
-- **[Hand-made maps](hand-made-maps.md)**: a guide for map authors, from an empty folder to a Conquest map of land that the reader accepts. Covers the province image, `map.json` field by field, every error message, and shipping a map.
-- **[Scenarios](scenarios.md)**: authoring in-engine missions in the Scenario Builder, what triggers can do, testing one, and how a scenario relates to a mission and a campaign.
-- **[The mission runtime](mission-runtime.md)**: the adoption contract a game follows to play scenarios itself, what coilbox installs, how versions are negotiated, and how the runtime is tested.
-- **[Teaching your game](teaching-your-game.md)**: a guide for distribution authors, from writing missions to a new player being offered the first lesson.
-- **[Roguelite Run](roguelite-run.md)** — the single-player roguelite mode built on the conquest engine: crossing a forward-only node map once, unit-unlocks as a shared tech ceiling, per-team perks, hull/salvage, and between-run meta-progression.
+`superpowers/`, `mockups/`, `examples/`, `reports/` and any `ideas-*.md` file are left out of the site. `examples/` holds the sample files the guides link to on GitHub.
 
----
-
-A quick mental model of how the pieces fit:
+## How the pieces of a distribution fit
 
 ```
-portable mode  ─ the .coilbox folder that makes everything below possible
-   ├── profile.json   ─ branding/narrowing         (distribution-profile.md)
-   ├── campaigns/      ─ bundled missions, scenarios and all (campaigns.md)
-   ├── galaxies/       ─ bundled conquest maps        (conquest.md)
-   └── game content    ─ engine + .sdz as a Portable root (portable-mode.md)
+portable mode  - the .coilbox folder that makes everything below possible
+   |-- profile.json   - branding and narrowing      (developers/distribution-profile.md)
+   |-- campaigns/     - bundled missions            (developers/campaigns.md)
+   |-- galaxies/      - bundled conquest maps       (developers/conquest-for-your-game.md)
+   `-- game content   - the engine, game and maps   (developers/distributing.md)
 ```

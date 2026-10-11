@@ -1,4 +1,4 @@
-# The lego parts pack
+# Parts pack format
 
 A parts pack is a library of pre-textured geometry the unit builder assembles units from. It is a documented format, not a coilbox internal, so anyone can build and ship one.
 
@@ -159,7 +159,7 @@ There is no directory in the blob. `pack.json` holds it.
 
 ## Things a pack has to get right
 
-**Triangles wind counter-clockwise** seen from outside, matching s3o. See [the s3o format](/s3o-format).
+**Triangles wind counter-clockwise** seen from outside, matching s3o. See [the s3o format](s3o-format.md).
 
 **UVs are not clamped to 0 to 1.** Some parts in the bundled pack sample a neighbouring atlas column through negative `u`, so the texture must repeat rather than clamp.
 

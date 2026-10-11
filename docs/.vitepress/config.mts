@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { defineConfig } from "vitepress";
 
 // The public gallery, where people share what they make in Coilbox. Kept as one
@@ -5,6 +7,34 @@ import { defineConfig } from "vitepress";
 // homepage. Matches DEFAULT_HUB_URL in src/hub/config.ts, which is where the app
 // itself points.
 const HUB_URL = "https://coilbox-hub.vercel.app";
+
+// Every page sat at the site root until the pages were grouped by reader.
+// Released builds of the app link to some of the old addresses, so each old
+// address still answers, with a page that forwards to the new one.
+const MOVED: Record<string, string> = {
+  presets: "players/presets",
+  "portable-mode": "players/portable-mode",
+  conquest: "players/conquest",
+  "roguelite-run": "players/warpath",
+  distributing: "developers/distributing",
+  "distribution-profile": "developers/distribution-profile",
+  "branding-catalog": "developers/branding-catalog",
+  "map-packs": "developers/map-packs",
+  "teaching-your-game": "developers/teaching-your-game",
+  campaigns: "developers/campaigns",
+  scenarios: "developers/scenarios",
+  "mission-runtime": "developers/mission-runtime",
+  "hand-made-maps": "developers/hand-made-maps",
+  "lego-builder": "developers/lego-builder",
+  "lobby-moderation": "staff/lobby-moderation",
+  "server-admin": "staff/server-admin",
+  routes: "reference/routes",
+  "replay-data-sources": "reference/replay-data-sources",
+  "s3o-format": "reference/s3o-format",
+  "3do-format": "reference/3do-format",
+  "lego-parts-pack": "reference/lego-parts-pack",
+  "tachyon-protocol": "reference/tachyon-protocol",
+};
 
 // The public documentation site (issue #168), published to GitHub Pages at
 // tomjn.github.io/coilbox/. It renders the user guides in `docs/`; internal design
@@ -37,56 +67,143 @@ export default defineConfig({
     // right rail that includes both h2 and h3 headings (default is h2 only).
     outline: { level: [2, 3], label: "On this page" },
     nav: [
-      { text: "Guides", link: "/portable-mode" },
+      { text: "Players", link: "/players/", activeMatch: "^/players/" },
+      {
+        text: "Game developers",
+        link: "/developers/",
+        activeMatch: "^/developers/",
+      },
+      {
+        text: "Server staff",
+        link: "/staff/server-admin",
+        activeMatch: "^/staff/",
+      },
+      { text: "Reference", link: "/reference/", activeMatch: "^/reference/" },
       { text: "Hub", link: HUB_URL },
       {
         text: "Download",
         link: "https://github.com/tomjn/coilbox/releases/latest",
       },
     ],
-    sidebar: [
-      {
-        text: "Getting started",
-        items: [
-          { text: "Overview", link: "/" },
-          { text: "Community hub", link: HUB_URL },
-        ],
-      },
-      {
-        text: "Guides",
-        items: [
-          { text: "Battle presets", link: "/presets" },
-          { text: "Portable mode", link: "/portable-mode" },
-          { text: "Distribution profile", link: "/distribution-profile" },
-          { text: "Branding catalog", link: "/branding-catalog" },
-          { text: "Map packs", link: "/map-packs" },
-          { text: "Hand-made maps", link: "/hand-made-maps" },
-          { text: "Routes", link: "/routes" },
-          { text: "The s3o model format", link: "/s3o-format" },
-          { text: "The 3do model format", link: "/3do-format" },
-          {
-            text: "Where a replay's numbers come from",
-            link: "/replay-data-sources",
-          },
-          { text: "The unit builder", link: "/lego-builder" },
-          { text: "Lego parts pack", link: "/lego-parts-pack" },
-          { text: "The mission runtime", link: "/mission-runtime" },
-          { text: "Teaching your game", link: "/teaching-your-game" },
-          { text: "Lobby moderation", link: "/lobby-moderation" },
-          { text: "Server admin", link: "/server-admin" },
-          { text: "Tachyon protocol", link: "/tachyon-protocol" },
-        ],
-      },
-      {
-        text: "Game modes",
-        items: [
-          { text: "Campaigns", link: "/campaigns" },
-          { text: "Scenarios", link: "/scenarios" },
-          { text: "Galactic conquest", link: "/conquest" },
-          { text: "Roguelite run", link: "/roguelite-run" },
-        ],
-      },
-    ],
+    // One sidebar per kind of reader, chosen by the folder a page is in, so a
+    // player never has to scan past file formats and a game developer never
+    // has to scan past moderation tools.
+    sidebar: {
+      "/players/": [
+        {
+          text: "Player guides",
+          items: [{ text: "Overview", link: "/players/" }],
+        },
+        {
+          text: "Play",
+          items: [
+            { text: "Battle presets", link: "/players/presets" },
+            { text: "Galactic conquest", link: "/players/conquest" },
+            { text: "Warpath", link: "/players/warpath" },
+          ],
+        },
+        {
+          text: "Set up",
+          items: [{ text: "Portable mode", link: "/players/portable-mode" }],
+        },
+        {
+          text: "Share",
+          items: [{ text: "Community hub", link: HUB_URL }],
+        },
+      ],
+      "/developers/": [
+        {
+          text: "Game developer guides",
+          items: [{ text: "Overview", link: "/developers/" }],
+        },
+        {
+          text: "Ship coilbox with your game",
+          items: [
+            {
+              text: "Package coilbox with your game",
+              link: "/developers/distributing",
+            },
+            {
+              text: "Distribution profiles",
+              link: "/developers/distribution-profile",
+            },
+            { text: "Branding catalog", link: "/developers/branding-catalog" },
+            { text: "Map packs", link: "/developers/map-packs" },
+          ],
+        },
+        {
+          text: "Campaigns and missions",
+          items: [
+            { text: "Campaigns", link: "/developers/campaigns" },
+            { text: "Scenarios", link: "/developers/scenarios" },
+            { text: "Mission runtime", link: "/developers/mission-runtime" },
+            {
+              text: "Make a tutorial campaign",
+              link: "/developers/teaching-your-game",
+            },
+          ],
+        },
+        {
+          text: "Conquest and Warpath",
+          items: [
+            {
+              text: "Set up conquest for your game",
+              link: "/developers/conquest-for-your-game",
+            },
+            { text: "Hand-made maps", link: "/developers/hand-made-maps" },
+          ],
+        },
+        {
+          text: "Units",
+          items: [{ text: "Unit builder", link: "/developers/lego-builder" }],
+        },
+      ],
+      "/staff/": [
+        {
+          text: "Server staff",
+          items: [
+            { text: "Server admin", link: "/staff/server-admin" },
+            { text: "Lobby moderation", link: "/staff/lobby-moderation" },
+          ],
+        },
+      ],
+      "/reference/": [
+        {
+          text: "Reference",
+          items: [{ text: "Overview", link: "/reference/" }],
+        },
+        {
+          text: "The app",
+          items: [
+            {
+              text: "Routes and navigation ids",
+              link: "/reference/routes",
+            },
+            {
+              text: "Replay data sources",
+              link: "/reference/replay-data-sources",
+            },
+          ],
+        },
+        {
+          text: "File formats",
+          items: [
+            { text: "s3o model format", link: "/reference/s3o-format" },
+            { text: "3do model format", link: "/reference/3do-format" },
+            { text: "Parts pack format", link: "/reference/lego-parts-pack" },
+          ],
+        },
+        {
+          text: "Protocols",
+          items: [
+            {
+              text: "Tachyon protocol support",
+              link: "/reference/tachyon-protocol",
+            },
+          ],
+        },
+      ],
+    },
     socialLinks: [{ icon: "github", link: "https://github.com/tomjn/coilbox" }],
     footer: {
       message:
@@ -94,5 +211,14 @@ export default defineConfig({
       copyright: "Coilbox",
     },
     search: { provider: "local" },
+  },
+  buildEnd({ outDir, site }) {
+    for (const [from, to] of Object.entries(MOVED)) {
+      const url = `${site.base}${to}`;
+      writeFileSync(
+        join(outDir, `${from}.html`),
+        `<!doctype html><meta charset="utf-8"><title>Moved</title><link rel="canonical" href="${url}"><meta http-equiv="refresh" content="0; url=${url}"><script>location.replace(${JSON.stringify(url)} + location.hash)</script><p>This page moved to <a href="${url}">${url}</a>.</p>\n`,
+      );
+    }
   },
 });
