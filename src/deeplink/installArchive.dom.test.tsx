@@ -182,6 +182,31 @@ describe("a file opened with coilbox", () => {
     );
   });
 
+  it("says what it is copying, and takes no other file, until the copy ends", async () => {
+    let finish: () => void = () => {};
+    install.mockImplementationOnce(
+      () => new Promise((resolve) => (finish = () => resolve({}))),
+    );
+    await draw();
+    act(() => dispatchDeepLink(GAME_URL));
+    await screen.findByText("Install the game SplinterFaction_0.1.89.sdz?");
+    press("Install");
+    await screen.findByText("Copying SplinterFaction_0.1.89.sdz.");
+
+    act(() => dispatchDeepLink("file:///Users/me/comet.sd7"));
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Ignored a file" }),
+    );
+    expect(inspect).toHaveBeenCalledTimes(1);
+
+    await act(async () => finish());
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Copying SplinterFaction_0.1.89.sdz."),
+      ).toBeNull(),
+    );
+  });
+
   it("copies nothing when the prompt is cancelled", async () => {
     await draw();
     act(() => dispatchDeepLink(GAME_URL));

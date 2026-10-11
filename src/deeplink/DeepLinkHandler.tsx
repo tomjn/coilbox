@@ -137,6 +137,9 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // Files handed over and not yet read. They wait here until the content
   // folders are known, which on a cold start is after the file arrives.
   const [queued, setQueued] = useState<string[] | null>(null);
+  // What is being copied right now, for the notice that covers a copy. A game
+  // can be most of a gigabyte, and the dialog has closed by the time it starts.
+  const [installing, setInstalling] = useState<string | null>(null);
   // True while an archive is being dragged over the window.
   const [dragging, setDragging] = useState(false);
 
@@ -159,11 +162,19 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
   const runInstall = useCallback(
     async (offers: ArchiveOffer[], roots: ArchiveRoots) => {
+      // A copy holds the one prompt, like a fetch does, so nothing else is
+      // asked over the top of it.
+      open.current.archives = true;
+      setInstalling(
+        offers.length === 1 ? offers[0].fileName : `${offers.length} archives`,
+      );
       const { installed, failed } = await installArchives(
         offers,
         roots,
         dlInstallArchive,
       );
+      open.current.archives = false;
+      setInstalling(null);
       if (installed.length > 0) {
         // The game and map lists read the disk again, so the new one shows
         // without a restart.
@@ -537,6 +548,17 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
             <DialogDescription>
               Contacting {fetching} and checking what it sends back.
             </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={installing !== null}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Loader2 className="size-4 animate-spin text-muted-foreground" />
+              Installing
+            </DialogTitle>
+            <DialogDescription>Copying {installing}.</DialogDescription>
           </DialogHeader>
         </DialogContent>
       </Dialog>
