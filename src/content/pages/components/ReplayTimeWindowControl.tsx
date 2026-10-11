@@ -56,7 +56,9 @@ export function TimeWindowHelp({
   return (
     <p>
       {SUBJECT_NOTE[subject]}
-      {!activity && " No match statistics are drawn behind the range."}
+      {activity
+        ? ` Behind the range, ${activity.label.toLowerCase()} across all teams.`
+        : " No match statistics are drawn behind the range."}
     </p>
   );
 }
@@ -144,7 +146,14 @@ export function ReplayTimeWindowControl({
 
   return (
     <div className="flex flex-col gap-1.5" data-testid="time-window">
-      <span className="text-xs font-medium">Time window</span>
+      <div className="flex flex-wrap items-baseline gap-x-2">
+        <span className="text-xs font-medium">Time window</span>
+        {activity && (
+          <span className="text-xs text-muted-foreground">
+            {`Shaded: ${activity.label.toLowerCase()}`}
+          </span>
+        )}
+      </div>
       <div className="flex flex-wrap gap-1">
         <Button
           variant="outline"
@@ -228,11 +237,6 @@ export function ReplayTimeWindowControl({
         {also?.count && ` ${countText(also.count, also.noun)}`}
         {events.map((e) => ` ${countText(e, e.noun)}`)}
       </p>
-      {activity && (
-        <p className="text-xs text-muted-foreground">
-          {`Behind the range, ${activity.label.toLowerCase()} across all teams.`}
-        </p>
-      )}
     </div>
   );
 }

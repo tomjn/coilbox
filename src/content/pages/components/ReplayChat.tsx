@@ -146,7 +146,12 @@ export function ReplayChat({
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-1">
           <h2 className="text-sm font-medium">Timeline</h2>
-          <SectionHelp section="the timeline" source="stream" />
+          <SectionHelp section="the timeline" source="stream">
+            <p>
+              Point at or focus a mark to read it. Select a chat mark to open
+              the chat log at that line.
+            </p>
+          </SectionHelp>
         </div>
         {loading && (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">

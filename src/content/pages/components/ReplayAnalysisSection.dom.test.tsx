@@ -198,21 +198,21 @@ afterEach(() => {
 });
 
 describe("a replay that has not been analysed", () => {
-  it("says what pressing the button will do before it is pressed", async () => {
+  it("says what pressing the button will do in the help and not in the section", async () => {
     show();
 
     const text = screen.getByRole("region", { name: "Analysis" }).textContent;
-    expect(text).toContain(
-      "plays this match back in the game's engine on this computer",
-    );
-    // The consent is short and says what is kept.
-    expect(text).toContain(
-      "The result is kept only if the playback matches the recorded match",
-    );
-    // The rest is in the help and not in the section.
+    expect(text).not.toContain("plays this match back");
+    expect(text).not.toContain("The result is kept only if");
     expect(text).not.toContain("The match is 12:49 long");
     expect(text).not.toContain("playback runs faster than the match did");
     const said = help();
+    expect(said).toContain(
+      "Analysing plays the match back in the game's engine on this computer",
+    );
+    expect(said).toContain(
+      "The result is kept only if the playback matches the recorded match",
+    );
     expect(said).toContain("The match is 12:49 long");
     expect(said).toContain("playback runs faster than the match did");
     expect(said).toContain(
@@ -228,7 +228,7 @@ describe("a replay that has not been analysed", () => {
     show();
     expect(
       screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).not.toMatch(/expect about/);
+    ).not.toMatch(/expect about|about \d+ (second|minute)/i);
   });
 
   it("estimates from this computer's own runs once there are some, and says how many", () => {
@@ -244,8 +244,14 @@ describe("a replay that has not been analysed", () => {
     show();
     expect(
       screen.getByRole("region", { name: "Analysis" }).textContent,
-    ).toContain("Expect about 25 seconds.");
-    expect(help()).toContain(
+    ).toContain("About 25 seconds");
+    // The page carries the figure as a label and no sentence around it.
+    expect(
+      screen.getByRole("region", { name: "Analysis" }).textContent,
+    ).not.toContain("Expect about");
+    const said = help();
+    expect(said).toContain("Expect about 25 seconds.");
+    expect(said).toContain(
       "The estimate goes by the 1 analysis this computer has finished.",
     );
   });
@@ -595,12 +601,14 @@ describe("a replay whose engine is not installed (#3869)", () => {
     expect(region()).toContain(
       "The analysis will use engine 2026.07.04-46-g04f42e2 macos_integration instead.",
     );
-    expect(region()).toContain(
+    expect(region()).not.toContain("The result is kept only if");
+    expect(region()).not.toContain("often computes a different match");
+    const said = help();
+    expect(said).toContain(
       "The result is kept only if the playback matches the recorded match",
     );
-    expect(region()).not.toContain("often computes a different match");
-    expect(help()).toContain("often computes a different match");
-    expect(screen.getByRole("dialog").textContent).toContain(
+    expect(said).toContain("often computes a different match");
+    expect(said).toContain(
       "who won, how long it lasted and every team's final totals",
     );
     // No odds are quoted.

@@ -269,12 +269,7 @@ export function ReplayTimeline({
               )}
             </ul>
           </>
-        ) : (
-          <p className="text-muted-foreground">
-            Point at or focus a mark to read it. Select a chat mark to open the
-            chat log at that line.
-          </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

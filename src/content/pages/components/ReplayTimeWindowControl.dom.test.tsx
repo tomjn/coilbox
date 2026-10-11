@@ -88,8 +88,20 @@ describe("the whole match", () => {
     show();
     expect(screen.getByTestId("time-window-activity")).toBeTruthy();
     expect(screen.getByText("10:00")).toBeTruthy();
+    // A short legend label, with the rest in the help.
+    expect(screen.getByText("Shaded: some metric per minute")).toBeTruthy();
+    expect(screen.queryByText(/across all teams/i)).toBeNull();
+    cleanup();
+    render(
+      <TimeWindowHelp
+        activity={{ label: "Some metric per minute", points: [] }}
+        subject="orders"
+      />,
+    );
     expect(
-      screen.getByText(/some metric per minute across all teams/i),
+      screen.getByText(
+        /Behind the range, some metric per minute across all teams/,
+      ),
     ).toBeTruthy();
   });
 

@@ -266,11 +266,10 @@ function AnalysisBody({
     </Button>
   );
 
+  const estimate = estimateAnalysisSeconds(analyses.values(), info.durationSec);
+
   const offer = (label: string, force: boolean) => (
     <>
-      <BeforeRunning
-        estimate={estimateAnalysisSeconds(analyses.values(), info.durationSec)}
-      />
       {substitution && (
         <Substitution
           recordedEngine={info.engineVersion}
@@ -281,12 +280,19 @@ function AnalysisBody({
           gameUsed={otherGame ? gameUsed : null}
         />
       )}
-      {button(
-        chosen
-          ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
-          : label,
-        force,
-      )}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {button(
+          chosen
+            ? `${label.startsWith("Try") ? "Try" : "Analyse"} with ${chosen.label}`
+            : label,
+          force,
+        )}
+        {estimate && (
+          <span className="text-xs text-muted-foreground">
+            About {roughly(estimate.seconds)}
+          </span>
+        )}
+      </div>
       {check !== undefined && blockers.length > 0 && (
         <ul className="flex flex-col gap-1 text-xs text-amber-700 dark:text-amber-400">
           {blockers.map((b) => (
@@ -380,25 +386,6 @@ function AnalysisBody({
 }
 
 /**
- * What pressing the button will do, said before it is pressed. It is consent,
- * not help: pressing it starts the game's engine on this computer. The rest is
- * in {@link AnalysisHelp}.
- */
-function BeforeRunning({
-  estimate,
-}: {
-  estimate: { seconds: number; runs: number } | null;
-}) {
-  return (
-    <p className="max-w-prose text-muted-foreground">
-      Analysing plays this match back in the game's engine on this computer. The
-      result is kept only if the playback matches the recorded match.
-      {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
-    </p>
-  );
-}
-
-/**
  * Why the analysis behaves as it does, for the section's help entry: what it
  * records, how long it takes, why a different engine often will not match, and
  * what a run and a failed match leave behind.
@@ -437,6 +424,7 @@ function AnalysisHelp({
           <p>
             The match is {formatDuration(matchSeconds)} long, and playback runs
             faster than the match did.
+            {estimate && ` Expect about ${roughly(estimate.seconds)}.`}
             {estimate &&
               ` The estimate goes by the ${plural(estimate.runs, "analysis", "analyses")} this computer has finished.`}{" "}
             The engine and the game the replay used must be installed. The
