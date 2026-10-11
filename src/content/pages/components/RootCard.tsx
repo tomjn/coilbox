@@ -22,12 +22,16 @@ function Stat({ label, value }: { label: string; value: number }) {
 /** One tracked content folder: path, status badges, counts, and per-root actions. */
 export function RootCard({
   root,
+  receives = [],
   busy,
   onRescan,
   onRemove,
   onOpen,
 }: {
   root: ContentRoot;
+  /** What new content is downloaded into this folder, as badge text. Empty for
+   *  a folder nothing is downloaded into. */
+  receives?: string[];
   busy: boolean;
   onRescan: (path: string) => void;
   onRemove: (path: string) => void;
@@ -45,6 +49,11 @@ export function RootCard({
             {root.path}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
+            {receives.map((what) => (
+              <StatusBadge key={what} tone="good">
+                {what}
+              </StatusBadge>
+            ))}
             <StatusBadge tone={isManual ? "info" : "neutral"}>
               {isManual ? "manual" : "auto"}
             </StatusBadge>

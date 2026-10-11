@@ -125,12 +125,12 @@ How the update check decides whether to prompt:
 - It considers you up to date if **any** of those asset filenames matches a game archive already installed in your content roots (matched by **filename**, case-insensitive).
 - So a bundled archive whose filename equals the latest release's asset name reads as "installed" → no update prompt. When you publish a **new** release with a **new** archive filename, the installed one no longer matches → a **Game update** badge and settings section offer a one-click download.
 
-An update downloads the new archive into the Downloads write root's `games/` folder, rescans content so it appears without a restart, and — if the release also ships an asset named exactly `profile.json` — drops that into `.coilbox/` and offers a restart to apply the refreshed profile.
+An update downloads the new archive into the `games/` folder of the content folder chosen for games, rescans content so it appears without a restart, and — if the release also ships an asset named exactly `profile.json` — drops that into `.coilbox/` and offers a restart to apply the refreshed profile.
 
 Two things to get right for this to behave:
 
 - **Version your archive filenames.** `splinterfaction_1.3.sdz` → `splinterfaction_1.4.sdz` gives you "same version = matched, new version = update" for free. A filename that never changes (`splinterfaction.sdz`) would always look installed, so no update ever prompts.
-- **Point the Downloads write root at a portable location** (Settings > Downloads) if you want updates to land inside the package rather than in a per-user folder. Otherwise the bundled archive and any downloaded update end up in different places.
+- **Point the download folder at a portable location** (Settings > Content folders, under "New content goes to") if you want updates to land inside the package rather than in a per-user folder. Otherwise the bundled archive and any downloaded update end up in different places.
 
 If instead you'd rather ship a thin package and have players fetch the game on first run, skip bundling and rely on `release` alone, or leave the Downloads pages visible so they can grab it themselves.
 

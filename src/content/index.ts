@@ -367,7 +367,8 @@ const contentPlugin: FramePlugin = {
     {
       id: "content-folders",
       title: "Content folders",
-      description: "The folders coilbox reads games and maps from.",
+      description:
+        "The folders coilbox reads games and maps from, and which one new content goes to.",
       parent: "library",
       order: 10,
       icon: FolderTree,
