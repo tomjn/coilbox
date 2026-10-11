@@ -45,7 +45,9 @@ function NeedRow({
   need: MissionNeed;
   onInstalled: (need: MissionNeed) => Promise<void>;
 }) {
-  const writeRoot = useWriteRoot();
+  const writeRoot = useWriteRoot(
+    need.kind === "map" ? "maps" : need.kind === "game" ? "games" : undefined,
+  );
   const writePath = writeRoot.path;
   const newest = useNewestEngine(need.kind === "engine");
   const input =

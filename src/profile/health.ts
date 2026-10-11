@@ -89,7 +89,14 @@ export interface HealthInputs {
   campaignFailures: CampaignFailure[];
   /** Bundled and local scenarios the reader skipped, and why. */
   scenarioFailures: ScenarioFailure[];
-  writable: { writeRoot?: WritableResult; dataDir?: WritableResult };
+  /** `gamesRoot` and `mapsRoot` are set only when that kind has a download
+   *  folder of its own, so the default is not probed three times. */
+  writable: {
+    writeRoot?: WritableResult;
+    gamesRoot?: WritableResult;
+    mapsRoot?: WritableResult;
+    dataDir?: WritableResult;
+  };
   /** The profile's `hide` list (nav ids the bundler wants hidden). */
   hide: string[];
   /** Nav ids that actually opt into hiding — the set `hide` can affect. */
@@ -707,9 +714,12 @@ export function deriveHealthChecks(i: HealthInputs): HealthCheck[] {
 
   // 8. Folders writable
   {
-    const probes = [i.writable.writeRoot, i.writable.dataDir].filter(
-      (p): p is WritableResult => p !== undefined,
-    );
+    const probes = [
+      i.writable.writeRoot,
+      i.writable.gamesRoot,
+      i.writable.mapsRoot,
+      i.writable.dataDir,
+    ].filter((p): p is WritableResult => p !== undefined);
     if (probes.length === 0) {
       checks.push({
         id: "writable",

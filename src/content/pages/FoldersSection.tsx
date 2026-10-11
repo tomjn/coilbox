@@ -6,7 +6,7 @@ import { CheckField } from "@/components/Field";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDefaultWriteRoot } from "../../downloads/config";
+import { useDefaultWriteRoot, useWriteRootPath } from "../../downloads/config";
 import {
   type ContentState,
   contentAddRoot,
@@ -17,6 +17,7 @@ import {
   contentScanRoot,
 } from "../bindings";
 import { useContentPrefs, useContentState, useSetupStatus } from "../config";
+import { DownloadFolders } from "./components/DownloadFolders";
 import { RootCard } from "./components/RootCard";
 
 const msg = (e: unknown): string =>
@@ -150,9 +151,23 @@ export default function FoldersSection() {
   };
 
   const roots = state?.roots ?? [];
+  // Where downloads go right now, after any fallback, so each folder's badges
+  // say what a download would do and not only what was picked.
+  const defaultPath = useWriteRootPath();
+  const gamesPath = useWriteRootPath("games");
+  const mapsPath = useWriteRootPath("maps");
+  const receives = (path: string): string[] => [
+    ...(path === defaultPath ? ["new content goes here"] : []),
+    ...(path === gamesPath && path !== defaultPath
+      ? ["new games go here"]
+      : []),
+    ...(path === mapsPath && path !== defaultPath ? ["new maps go here"] : []),
+  ];
 
   return (
     <div className="space-y-8">
+      <DownloadFolders roots={roots} />
+
       <section className="space-y-4">
         {/* No intro line. The section's description says what these folders
             are, and it sits directly above. */}
@@ -265,6 +280,7 @@ export default function FoldersSection() {
               <RootCard
                 key={root.id}
                 root={root}
+                receives={receives(root.path)}
                 busy={busyRoot === root.path}
                 onRescan={rescanRoot}
                 onRemove={removeRoot}

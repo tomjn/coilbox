@@ -68,7 +68,7 @@ function SubstitutedMap({
   const { target } = usePreferredTarget();
   const scan = useUnitsyncScan(target?.enginePath, target?.dataDir);
   const { isExcluded } = useMapEligibility();
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("maps");
   const mapDl = useQueuedDownload({
     // The challenge carries a map name and nothing else, so there is no picked
     // source to pin: resolve it across every source in policy order.

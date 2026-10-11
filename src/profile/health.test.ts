@@ -166,6 +166,23 @@ describe("deriveHealthChecks", () => {
     expect(c.hint).toContain("read-only");
   });
 
+  it("errors when the folder games or maps go to is read-only", () => {
+    for (const own of ["gamesRoot", "mapsRoot"] as const) {
+      const c = byId(
+        {
+          ...base(),
+          writable: {
+            writeRoot: { writable: true },
+            [own]: { writable: false, error: "denied" },
+            dataDir: { writable: true },
+          },
+        },
+        "writable",
+      );
+      expect(c.status).toBe("error");
+    }
+  });
+
   it("warns when a campaign failed to load, naming it and the error", () => {
     const c = byId(
       {

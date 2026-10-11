@@ -333,7 +333,9 @@ describe("ensureContent", () => {
       requirements: launchRequirements({ map: "Tabula" }),
     });
 
-    await screen.findByText(/Set a download folder in Downloads settings/);
+    await screen.findByText(
+      /Set a download folder in Content folders settings/,
+    );
     expect(
       (screen.getByRole("button", { name: "Download" }) as HTMLButtonElement)
         .disabled,

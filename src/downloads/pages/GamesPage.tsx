@@ -116,7 +116,7 @@ interface GameItem {
  * there's no default destination.
  */
 export default function GamesPage() {
-  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot("games");
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
@@ -456,9 +456,9 @@ export default function GamesPage() {
             Set a download folder in{" "}
             <Link
               className="underline underline-offset-4"
-              to="/settings/downloads"
+              to="/settings/content-folders"
             >
-              Downloads settings
+              Content folders settings
             </Link>{" "}
             to enable game downloads.
           </p>

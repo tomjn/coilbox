@@ -125,7 +125,7 @@ function springSubtitle(f: SpringFile): string {
 }
 
 export default function MapsPage() {
-  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot("maps");
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
@@ -460,9 +460,9 @@ export default function MapsPage() {
             No download folder set — pick one in{" "}
             <Link
               className="underline underline-offset-4"
-              to="/settings/downloads"
+              to="/settings/content-folders"
             >
-              Downloads settings
+              Content folders settings
             </Link>{" "}
             so maps land where the engine can find them.
           </p>

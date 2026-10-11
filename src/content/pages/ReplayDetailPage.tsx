@@ -166,7 +166,7 @@ function ReplayMapPreview({
 /** Best-effort game download (rapid). The demo's `gameType` is a display string,
  * not a rapid tag, so an exact-version match isn't guaranteed — surfaced honestly. */
 function GameDownload({ gameType }: { gameType: string }) {
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("games");
   const gameDl = useQueuedDownload({
     kind: "rapid",
     label: `Game: ${gameType}`,
@@ -215,7 +215,7 @@ function MapDownload({
   mapName: string;
   onDownloaded: () => void;
 }) {
-  const { path: writePath, loading: writeRootLoading } = useWriteRoot();
+  const { path: writePath, loading: writeRootLoading } = useWriteRoot("maps");
   // Only once the read has landed and said there is none. Before that `writePath`
   // is undefined whatever the user has configured (issue #1104).
   const noWriteRoot = !writeRootLoading && !writePath;
@@ -257,9 +257,9 @@ function MapDownload({
           Set a download folder in{" "}
           <Link
             className="underline underline-offset-4"
-            to="/settings/downloads"
+            to="/settings/content-folders"
           >
-            Downloads settings
+            Content folders settings
           </Link>{" "}
           first.
         </p>
@@ -295,9 +295,9 @@ function EngineDownload({
             Engine {notice.version} is not installed. Set a download folder in{" "}
             <Link
               className="underline underline-offset-4"
-              to="/settings/downloads"
+              to="/settings/content-folders"
             >
-              Downloads settings
+              Content folders settings
             </Link>{" "}
             to download it.
           </>

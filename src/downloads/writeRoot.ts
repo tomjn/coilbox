@@ -67,3 +67,44 @@ export function healWriteRoot(
     configured
   );
 }
+
+/** The kinds of content that can have a download folder of their own. */
+export type WriteRootKind = "games" | "maps";
+
+/** The folder ids the user has chosen, as the downloads config stores them. */
+export interface WriteRootIds {
+  /** The default, which everything without a folder of its own goes to. */
+  writeRootId?: string;
+  gamesRootId?: string;
+  mapsRootId?: string;
+}
+
+/**
+ * The folder a download of `kind` goes to. With no kind this is the default
+ * from {@link healWriteRoot}, which engines and everything else use.
+ *
+ * A kind's own folder wins when it is set and still usable. It is not usable
+ * when it has been removed, when it is the bundled content folder, or when a
+ * portable install would be writing outside its package. Each of those falls
+ * back to the default, so a stale choice never leaves a download with nowhere
+ * to go.
+ */
+export function pickWriteRoot(
+  allRoots: WriteRootCandidate[],
+  ids: WriteRootIds,
+  kind: WriteRootKind | undefined,
+  packageDir: string | null,
+): WriteRootCandidate | undefined {
+  const fallback = healWriteRoot(allRoots, ids.writeRootId, packageDir);
+  const ownId =
+    kind === "games"
+      ? ids.gamesRootId
+      : kind === "maps"
+        ? ids.mapsRootId
+        : undefined;
+  if (!ownId) return fallback;
+  const own = allRoots.find((r) => r.id === ownId && !r.bundled);
+  if (!own) return fallback;
+  if (packageDir && !isInsidePackage(own.path, packageDir)) return fallback;
+  return own;
+}

@@ -7,7 +7,7 @@ import { RapidBrowser } from "./components/RapidBrowser";
  * content root. The browsing UI is shared with the Games page via `RapidBrowser`.
  */
 export default function ExplorerPage() {
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("games");
 
   return (
     <div className="flex h-full flex-col">

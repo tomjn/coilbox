@@ -27,10 +27,12 @@ import {
 import {
   engineVersionRequirement,
   exactGameRequirement,
+  exactMapRequirement,
 } from "./resolveContent";
 import { useResolveContent } from "./useResolveContent";
 
 const downloadGameAnySource = vi.hoisted(() => vi.fn());
+const downloadMapAnySource = vi.hoisted(() => vi.fn());
 const scanRun = vi.hoisted(() => vi.fn());
 const { installEngine } = vi.hoisted(() => ({
   installEngine: vi.fn(async (download: () => Promise<unknown>) => {
@@ -49,10 +51,15 @@ vi.mock("../downloads/bindings", () => ({
   dlSpringfilesEngines: vi.fn(async () => ({ engines: [] })),
 }));
 vi.mock("../downloads/downloadGame", () => ({ downloadGameAnySource }));
-vi.mock("../downloads/downloadMap", () => ({ downloadMapAnySource: vi.fn() }));
+vi.mock("../downloads/downloadMap", () => ({ downloadMapAnySource }));
 vi.mock("../downloads/warmEngineCache", () => ({ installEngine }));
 vi.mock("../downloads/config", () => ({
-  useWriteRoot: () => ({ path: "/content", loading: false }),
+  // Games and maps each have a folder of their own here, so a download sent to
+  // the wrong one shows up as the wrong path.
+  useWriteRoot: (kind?: "games" | "maps") => ({
+    path: kind ? `/content-${kind}` : "/content",
+    loading: false,
+  }),
 }));
 
 vi.mock("./config", () => ({
@@ -144,6 +151,30 @@ describe("useResolveContent's errorFor", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("useResolveContent's download folder", () => {
+  it("sends a game and a map each to the folder chosen for its kind", async () => {
+    const game = exactGameRequirement("Beyond All Reason");
+    const map = exactMapRequirement("Red Comet");
+    const { result } = renderHook(
+      () => useResolveContent([game, map], undefined, false),
+      { wrapper },
+    );
+
+    act(() => {
+      result.current.download(game);
+      result.current.download(map);
+    });
+
+    await waitFor(() => expect(downloadMapAnySource).toHaveBeenCalled());
+    expect(downloadGameAnySource).toHaveBeenCalledWith(
+      expect.objectContaining({ writePath: "/content-games" }),
+    );
+    expect(downloadMapAnySource).toHaveBeenCalledWith(
+      expect.objectContaining({ writePath: "/content-maps" }),
+    );
   });
 });
 

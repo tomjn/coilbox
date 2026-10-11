@@ -46,7 +46,7 @@ function BuildTreeWidget({
  */
 function MapPackWidget() {
   const rootPaths = useContentRootPaths();
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("maps");
   const [maps, setMaps] = useState<Set<string>>(new Set());
   useEffect(() => {
     if (rootPaths.length === 0) {

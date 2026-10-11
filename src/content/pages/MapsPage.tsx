@@ -85,7 +85,7 @@ export default function MapsPage() {
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no maps.
-  const writeRoot = useWriteRoot();
+  const writeRoot = useWriteRoot("maps");
   const suggested = useSuggestedMaps();
   const rootPaths = useContentRootPaths();
   const [installed, setInstalled] = useState<Set<string>>(new Set());

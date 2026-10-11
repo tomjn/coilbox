@@ -89,6 +89,8 @@ export function useResolveContent(
   const contentTargets = useContentTargets();
   const writeRoot = useWriteRoot();
   const writePath = writeRoot.path;
+  const gamesPath = useWriteRoot("games").path;
+  const mapsPath = useWriteRoot("maps").path;
   const {
     enqueue,
     statusFor: queueStatusFor,
@@ -174,28 +176,29 @@ export function useResolveContent(
 
   const enqueueInputFor = useCallback(
     (req: ContentRequirement) => {
-      if (!writePath) return null;
       const key = req.downloadKey ?? req.label;
       if (req.kind === "game") {
+        if (!gamesPath) return null;
         // Resolve across every source in policy order (GitHub and mirrors first,
         // pr-downloader last, per issue 500) so a GitHub-only game such as
         // SplinterFaction installs instead of failing on rapid.
         return {
           kind: "game" as const,
           label: `Game: ${req.label}`,
-          args: { gameName: key, writePath },
+          args: { gameName: key, writePath: gamesPath },
         };
       }
       if (req.kind === "map") {
+        if (!mapsPath) return null;
         // Resolve across every source in policy order (known mirrors first,
         // pr-downloader last, per issue 511), matching the game requirement above.
         return {
           kind: "mapAnySource" as const,
           label: `Map: ${req.label}`,
-          args: { mapName: key, writePath },
+          args: { mapName: key, writePath: mapsPath },
         };
       }
-      if (!engineCatalog) return null;
+      if (!writePath || !engineCatalog) return null;
       const recoil = engineCatalog.recoil.find((r) => r.version === key);
       if (recoil) {
         return {
@@ -218,7 +221,7 @@ export function useResolveContent(
       }
       return null;
     },
-    [writePath, engineCatalog],
+    [writePath, gamesPath, mapsPath, engineCatalog],
   );
 
   const download = useCallback(

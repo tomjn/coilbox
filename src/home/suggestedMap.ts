@@ -819,7 +819,7 @@ export function useSuggestedMapInstall(
   noWriteRoot: boolean;
   download: () => void;
 } {
-  const writeRoot = useWriteRoot();
+  const writeRoot = useWriteRoot("maps");
   const writePath = writeRoot.path;
   const { enqueue, statusFor, items } = useDownloadQueue();
 
