@@ -68,7 +68,7 @@ export default function GamesPage() {
   const busy = loading || (!!selected && !data && !error && !cancelled);
 
   // Curated download suggestions shown when this engine sees no games.
-  const writeRoot = useWriteRoot();
+  const writeRoot = useWriteRoot("games");
   const suggested = useSuggestedGames();
   const entries = useBrandingCatalog();
   const rootPaths = useContentRootPaths();

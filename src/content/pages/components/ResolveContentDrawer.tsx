@@ -102,7 +102,7 @@ function RequirementRow({
           <p className="text-xs text-muted-foreground">
             {req.kind === "engine" && !resolve.noWriteRoot
               ? "No matching engine build found automatically — install one from Settings → Engines."
-              : "Set a download folder in Downloads settings to enable this."}
+              : "Set a download folder in Content folders settings to enable this."}
           </p>
         )}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -303,9 +303,9 @@ export function ResolveContentGate({
                     See{" "}
                     <Link
                       className="underline underline-offset-4"
-                      to="/settings/downloads"
+                      to="/settings/content-folders"
                     >
-                      Downloads settings
+                      Content folders settings
                     </Link>{" "}
                     for the destination folder.
                   </p>

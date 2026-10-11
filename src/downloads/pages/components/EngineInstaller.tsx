@@ -148,8 +148,11 @@ export function EngineInstaller() {
       <p className="text-xs text-muted-foreground">
         Installs an engine matching this platform into the configured content
         folder's <code>engine/</code> directory (set the destination in{" "}
-        <Link className="underline underline-offset-4" to="/settings/downloads">
-          Downloads settings
+        <Link
+          className="underline underline-offset-4"
+          to="/settings/content-folders"
+        >
+          Content folders settings
         </Link>
         ).
       </p>
@@ -182,9 +185,9 @@ export function EngineInstaller() {
           No download destination set — choose a content folder in{" "}
           <Link
             className="underline underline-offset-4"
-            to="/settings/downloads"
+            to="/settings/content-folders"
           >
-            Downloads settings
+            Content folders settings
           </Link>{" "}
           to enable engine downloads.
         </p>

@@ -42,7 +42,7 @@ export function MissingMapBox({
 }) {
   const { picture: rung, onError } = useMapPictureRung(picture);
   const previewUrl = rung.from === "placeholder" ? undefined : rung.url;
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("maps");
   const { active, queued } = useDownloadQueue();
   const [autoEnabled] = useSetting<boolean>(AUTO_DOWNLOAD_ON_JOIN_KEY, true);
   const mapDl = useQueuedDownload({

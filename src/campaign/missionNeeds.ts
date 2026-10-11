@@ -72,7 +72,8 @@ export function needNotice(input: {
   if (noWriteRoot) {
     return {
       canDownload: false,
-      message: "Set a download folder in Downloads settings to enable this.",
+      message:
+        "Set a download folder in Content folders settings to enable this.",
     };
   }
   if (need.kind === "engine") {

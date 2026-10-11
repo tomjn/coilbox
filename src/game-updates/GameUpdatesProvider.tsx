@@ -61,7 +61,7 @@ export function useGameUpdates(): GameUpdatesContextValue {
 
 export function GameUpdatesProvider({ children }: { children: ReactNode }) {
   const repo = getProfile().release?.repo ?? null;
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("games");
   const rootPaths = useContentRootPaths();
   const { selected } = useScanTargetSelection();
 

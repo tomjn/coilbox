@@ -124,7 +124,7 @@ export default function ContentStartupProvider({
   }, [prefs.autoScanOnStartup, warmUp, fetchLists]);
 
   // Back-fill the downloads write root on first run so the download
-  // destination works without a trip to Downloads settings. Never overrides
+  // destination works without a trip to Content folders settings. Never overrides
   // a value the user (or a prior run of this effect) already set.
   useEffect(() => {
     if (dlConfig.writeRootId) return;

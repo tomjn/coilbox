@@ -975,7 +975,7 @@ describe("the suggested map card", () => {
     const html = render({
       install: { canDownload: false, noWriteRoot: true },
     });
-    expect(html).toContain("Downloads settings");
+    expect(html).toContain("Content folders settings");
     expect(html).toContain("disabled");
   });
 
@@ -988,7 +988,7 @@ describe("the suggested map card", () => {
     const html = render({
       install: { canDownload: false, noWriteRoot: false },
     });
-    expect(html).not.toContain("Downloads settings");
+    expect(html).not.toContain("Content folders settings");
     expect(html).toContain("disabled");
   });
 
@@ -1017,7 +1017,7 @@ describe("the suggested map card", () => {
     const html = render({
       install: { state: "installed", canDownload: false, noWriteRoot: true },
     });
-    expect(html).not.toContain("Downloads settings");
+    expect(html).not.toContain("Content folders settings");
   });
 });
 
@@ -1091,7 +1091,7 @@ describe("the card in the Downloads group", () => {
     // In the group the card is a flex item, so a sibling paragraph would be a
     // fifth item in the row.
     const html = card({ install: { canDownload: false, noWriteRoot: true } });
-    expect(html).toContain("Downloads settings");
+    expect(html).toContain("Content folders settings");
     expect(html).toContain("flex w-full flex-col gap-2 sm:w-64");
   });
 });

@@ -7,6 +7,11 @@ import { useUnitsyncScan } from "../content/config";
 import { loadContentState } from "../content/contentState";
 import { dlPathWritable } from "../downloads/bindings";
 import { useDownloadsConfig } from "../downloads/config";
+import {
+  packageDirOf,
+  pickWriteRoot,
+  type WriteRootKind,
+} from "../downloads/writeRoot";
 import { resolveHomeBackground } from "../home/background";
 import { describeHome, resolveHome } from "../home/config";
 import { homeMarkupIssues } from "../home/markup";
@@ -122,6 +127,8 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
   // Hook read at top level; feeds the effect (and re-runs it if the write root changes).
   const [cfg] = useDownloadsConfig();
   const writeRootId = cfg.writeRootId;
+  const gamesRootId = cfg.gamesRootId;
+  const mapsRootId = cfg.mapsRootId;
   // Which games are installed is a unitsync question, not a file-listing one, so
   // the panel asks the same scan every picker asks (issue #959). The result is
   // cached for the session, so this is usually free by the time Settings opens.
@@ -150,6 +157,17 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
       const writeRootPath = writeRootId
         ? state?.roots.find((r) => r.id === writeRootId)?.path
         : undefined;
+      // A kind's own download folder, when it has one that is in use. One that
+      // falls back to the default is already covered by the default's probe.
+      const ownPath = (kind: WriteRootKind) => {
+        const path = pickWriteRoot(
+          state?.roots ?? [],
+          { writeRootId, gamesRootId, mapsRootId },
+          kind,
+          packageDirOf(portableRoot),
+        )?.path;
+        return path === writeRootPath ? undefined : path;
+      };
 
       // Every campaign that did load, which is what `start` may name.
       const campaigns: StartCampaign[] = [];
@@ -210,10 +228,13 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         : null;
 
       const dataDirPath = portableRoot ? `${portableRoot}/data` : undefined;
-      const [writeRootProbe, dataDirProbe] = await Promise.all([
-        probe(writeRootPath),
-        probe(dataDirPath),
-      ]);
+      const [writeRootProbe, gamesRootProbe, mapsRootProbe, dataDirProbe] =
+        await Promise.all([
+          probe(writeRootPath),
+          probe(ownPath("games")),
+          probe(ownPath("maps")),
+          probe(dataDirPath),
+        ]);
 
       if (cancelled) return;
 
@@ -241,7 +262,12 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
         writeRootPath,
         campaignFailures,
         scenarioFailures,
-        writable: { writeRoot: writeRootProbe, dataDir: dataDirProbe },
+        writable: {
+          writeRoot: writeRootProbe,
+          gamesRoot: gamesRootProbe,
+          mapsRoot: mapsRootProbe,
+          dataDir: dataDirProbe,
+        },
         hide: profile.hide ?? [],
         hideableNavIds: HIDEABLE_NAV_IDS,
         hideSettings: profile.hideSettings ?? [],
@@ -265,7 +291,15 @@ export function useHealthChecks(): { checks: HealthCheck[]; loading: boolean } {
     return () => {
       cancelled = true;
     };
-  }, [writeRootId, installedGames, scannedGames, scannedMaps, scanError]);
+  }, [
+    writeRootId,
+    gamesRootId,
+    mapsRootId,
+    installedGames,
+    scannedGames,
+    scannedMaps,
+    scanError,
+  ]);
 
   return { checks, loading };
 }

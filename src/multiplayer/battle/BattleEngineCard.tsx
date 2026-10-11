@@ -81,7 +81,7 @@ function MissingEngine({
         </Button>
       ) : resolve.noWriteRoot ? (
         <p className="text-xs text-muted-foreground">
-          Set a download folder in Downloads settings to download it.
+          Set a download folder in Content folders settings to download it.
         </p>
       ) : (
         !resolve.loading && (

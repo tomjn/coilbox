@@ -35,7 +35,7 @@ export function BattleRowMapThumb({
   enginePath?: string;
   dataDir?: string;
 }) {
-  const writePath = useWriteRootPath();
+  const writePath = useWriteRootPath("maps");
   // Bumped after a download lands, to remount `Minimap` with a fresh
   // `useUnitsyncMinimap` call: that hook's effect only reruns on
   // enginePath/dataDir/mapName/mip, none of which change when a map appears on
