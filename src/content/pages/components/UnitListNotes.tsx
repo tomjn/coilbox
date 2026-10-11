@@ -81,9 +81,11 @@ export function UnitListHelp({ fit }: { fit?: OrderFit | null }) {
         most reliable of the three.
       </p>
       <p>
-        With the right list, a placed order names a building and a factory order
-        names a unit that moves. A game's unit list can change with the match's
-        mod options and AIs, and then some orders do not fit.
+        The installed game is read with the match's own mod options, teams and
+        AIs, because a game's unit list can change with them. With the right
+        list, a placed order names a building and a factory order names a unit
+        that moves. A list can still be the wrong one, for a build that is not
+        the match's or a unit that a map adds, and then some orders do not fit.
         {reasons.length > 0 && ` Here ${reasons.join(", ")}.`}
       </p>
     </>

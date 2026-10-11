@@ -8,13 +8,14 @@
  * dataset. That holds for the build of the game the replay was played on and
  * for no other: a build with one unit more or fewer moves every id after it.
  *
- * It does not always hold even for that build (#3847). Unitsync runs a game's
- * definitions with no mod options and no match, and the engine ran them with
- * the match's. Beyond All Reason adds units for several mod options and for a
- * Scavengers or Raptors AI. The engine also gives no id to a definition it
- * refuses, and unitsync still lists it. The engine's own list, which an
- * analysis run records, has none of these problems. `orderFit` in
- * `replayUnitDefs.ts` is the check for the rest.
+ * It does not hold for the game's own list even for that build (#3847). The
+ * engine ran the game's definitions with the match's mod options, teams and
+ * AIs, and gave no id to a definition it refused. Beyond All Reason adds units
+ * for several mod options and for a Scavengers or Raptors AI. So the build a
+ * replay was played on is read with the replay's own setup, which gives the
+ * list the engine built for that match as far as a start script can say. The
+ * engine's own list, which an analysis run records, needs none of that.
+ * `orderFit` in `replayUnitDefs.ts` is the check for what is left.
  */
 
 import { formatDuration } from "@/lib/format";

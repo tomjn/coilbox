@@ -108,7 +108,7 @@ One pass over the decompressed stream. These timings were measured on one Mac, m
 
 Start positions only need the pregame, so that read stops at the first frame and decompresses only as much of the file as it needs.
 
-The replay page reads chat and events once, when the page opens. It reads build orders only when you press "Show build orders". Naming units needs the installed game's unit list from unitsync. That cost was not measured for this page.
+The replay page reads chat and events once, when the page opens. It reads build orders only when you press "Show build orders". Naming units needs the installed game's unit list from unitsync, read with the match's setup. A setup that changes the list costs one more run of the game's definitions, once. On the development machine four such reads of Beyond All Reason test-30922 took between 0.83 and 1.25 seconds each once unitsync's archive cache was warm, in an unoptimised build.
 
 ### When it is missing or partial
 
@@ -136,7 +136,7 @@ Unit numbers in the stream are definition ids. The engine numbers a game's defin
 A unit list comes from one of four places. Coilbox takes the first that applies.
 
 1. The engine's own list, when the replay has been analysed. The replay logger writes the engine's unit definitions at the start of an analysis run, so this is the numbering the match really used, with its mod options, its AIs and its map applied. It always names an analysis's events. It names the replay's build orders when the run used the game the replay records, and not when it had to use another version.
-2. A packaged archive (`.sdz`, `.sd7`, or a rapid package) installed under the exact name and version the replay records, read through unitsync. The section says the names were matched by name and version.
+2. A packaged archive (`.sdz`, `.sd7`, or a rapid package) installed under the exact name and version the replay records, read through unitsync with the match's own setup. The section says the names were matched by name and version.
 3. A list coilbox kept for this replay. The section says when it was recorded and from which game. A kept list also stands in for an exact match that is a loose folder (`.sdd`), and then the section says so, because a folder can change under the same name and the list is what it held the day the replay was read.
 4. Another installed version of the same game, with a warning that names come from a different build and may be wrong. One unit added or removed moves every id after it.
 
@@ -153,22 +153,57 @@ Coilbox keeps the unit list a replay was read against, so the replay still names
 - A remix carries its original's game id and its original's unit ids, so it reads its original's list.
 - When one goes. With the last replay of its match, by the rule an analysis goes by. Deleting an analysis removes the engine's list for that replay. The Storage screen says how many lists are kept and what they cost.
 
-### When unitsync's list is not the engine's
+### Reading the list the engine built for the match
 
-Unitsync runs a game's definition scripts with no mod options and no match. The engine ran them with the match's. For most games that makes no difference. For some it does, and then unitsync's list numbers the units differently from the match, for the right build of the right game. This was measured on 10 October 2026.
+A unit id is a place in the list the engine built when the match loaded. The engine built it by running the game's definition scripts with the match's mod options, teams and AIs to hand, and then refused some definitions. Unitsync on its own runs the same scripts with no match and refuses nothing. For most games that makes no difference. For some it does, and then the game's own list numbers the units differently from the match, for the right build of the right game.
 
-- Mod options. In Beyond All Reason test-30922, 9 of the 145 on, off and list settings tried change the unit list. With no options there are 564 definitions. `experimentalextraunits` or `scavunitsforplayers` makes 918, `experimentallegionfaction` 809, `ruins` enabled or any `zombies` setting 1,828, and `forceallunits` 1,955. Zero-K v1.14.8.0 gains one definition with `campaign_chassis`. No setting changed the list in the other 29 installed games, the three Splinter Faction builds and Metal Factions v2.58 among them. Number options were not tried.
-- The AIs in the match. Beyond All Reason's definition scripts read the team list and add units when a Scavengers or Raptors AI is playing. Read in its source and not measured.
-- Definitions the engine refuses. The engine gives no id to a definition with no health, a negative cost, no build time, a negative speed, or a movement class the game does not define, and the next definition takes its id. Unitsync still lists it. XTA 9.65 has 15 such definitions, which the engine's own log names. Total Annihilation Prime 1.05 has 10 candidates and Jauria RTS 0.6.7 has 1, found by reading their definitions and not confirmed on an engine.
-- Key case is not a cause. The engine lowercases every definition key before it sorts them, and so does the unit list. None of the 31 installed games has a key that is not already lowercase.
+So a replay's list is read with the replay's own setup, taken from its start script:
 
-On the two matches checked directly, the engine's own list equalled unitsync's entry for entry: 154 of 154 for Splinter Faction and 716 of 716 for Metal Factions, in name, order, cost and whether each unit moves.
+- The mod options and map options, as the strings the start script holds.
+- The players, teams and ally teams, renumbered from zero the way the engine renumbers them, with the Gaia team added last.
+- The AIs. An AI counts as a Lua AI when the game's own `LuaAI.lua` lists its short name, which is the engine's rule.
+
+Coilbox answers 15 of the 16 functions the engine gives its definitions parser from these: `GetModOptions`, `GetModOption`, `GetMapOptions`, `GetMapOption`, `GetTeamList`, `GetAllyTeamList`, `GetGaiaTeamID`, `GetPlayerList`, `GetTeamInfo`, `GetAllyTeamInfo`, `GetTeamAllyTeamID`, `GetTeamLuaAI`, `GetAIInfo`, `AreTeamsAllied` and `ArePlayersAllied`. Each is a copy of the engine's own, in `lua/match-unit-list/match_unit_list.lua`. `GetSideData` is not answered from a match, because it reads the game's sides and not the start script, and it gives no value as before.
+
+Then the definitions the engine refuses are left out before the rest are numbered. The engine gives no id to a definition with health at or below zero, a negative metal or energy cost, a build time at or below zero, a negative speed, reverse speed, acceleration or brake rate, or a movement class the game does not define when the unit moves over ground or water. The next definition takes the id.
+
+What it costs:
+
+- A match played with every mod option at the default the game declares, and with none of the game's Lua AIs, is read as a match with no setup. Every such replay of a game shares one read, and when the engine refuses none of the game's definitions that read is the game's own unit list, kept once. An option the game does not declare counts as changed.
+- Any other setup runs the game's definitions once more and is kept on disk under the game's archive and the setup together. Two replays with the same setup share it.
+- The game's own unit list keeps its place on disk, so the unit pages read nothing again.
+
+What it was checked against, on 11 October 2026, with engine 2026.07.01-102-g6e5c5a0. Each row is a match started headless from a start script in scratch folders and ended after a second. The engine's list is the replay logger's `unit_def` lines from that run, and the setup is read back out of the replay the run recorded.
+
+| Game | Setup | Engine's list | Read with the setup, equal by id and name | The game's own list, equal by id and name |
+| --- | --- | --- | --- | --- |
+| Splinter Faction 0.1.89 | Two options at their defaults | 155 | 155 of 155 | 155 of 155 |
+| Splinter Faction 0.1.89 | `startmetal` changed, one of the game's Lua AIs | 155 | 155 of 155 | 155 of 155 |
+| Metal Factions v2.58 | One option at its default | 716 | 716 of 716 | 716 of 716 |
+| Metal Factions v2.58 | `maxunits` changed, one of the game's Lua AIs | 716 | 716 of 716 | 716 of 716 |
+| Zero-K v1.14.8.0 | No options | 614 | 614 of 614 | 614 of 614 |
+| Zero-K v1.14.8.0 | `campaign_chassis` on | 615 | 615 of 615 | 394 of 615 |
+
+XTA 9.65 does not load far enough on that engine to run the logger: it stops on a model it cannot read. Its log still names the definitions it refused, all 15 for the movement class `smallboat`. The read leaves out 15 of the game's 439, the same 15, with no options, with `newunits` on and with `xtaidunits` on.
+
+Two copies of the Lua with one rule broken were run through the same comparison, and both failed it. With `GetModOptions` answering an empty table, the Zero-K match with `campaign_chassis` read 614 definitions against the engine's 615, with 221 ids naming another unit. With the movement class rule taken out, the XTA read left out none of the 15.
+
+Beyond All Reason is not checked against an engine. No engine on the development machine runs the installed build. Read through unitsync with a setup, test-30922 gives 564 definitions with no setup, 809 with `experimentallegionfaction`, 691 with a Raptors AI on a team and 1,828 with a Scavengers AI, and 564 with a native AI or with one of its other Lua AIs. The first two match what was measured before by handing the scripts a table of options, which was also a read through unitsync. None of the six is checked against an engine.
+
+What it does not cover:
+
+- A unit a map ships. The engine loads the map before the definitions, and this read mounts the game alone.
+- A definition script that draws a random number. The engine seeds it from the match, and under unitsync it returns nothing.
+- A definition script that reads a map field off `Game`, such as `Game.mapSizeX`.
+- A replay whose exact build of the game is not installed. Another version is read as it always was, with the warning.
+- A player being active. The definitions load before the engine marks any player active, so asking for active players gives none. That is from reading the engine's source and is not measured.
+- Whether anything the engine calls while it builds a definition refuses it, beyond the nine checks in the definition's own constructor.
 
 What protects a replay from a wrong list:
 
-- An analysed replay uses the engine's list, which has none of these problems.
+- An analysed replay uses the engine's own list, which needs none of this.
 - For any other replay the page checks the list against the replay's own build orders. A placed order should name a unit that does not move, a factory order one that does, and no id should be past the end of the list. When some orders do not fit, the build order section says how many and that names and costs may be wrong, and no list is kept from that read. On a 10 player Beyond All Reason replay read against a later build, 1,413 of 3,605 orders did not fit.
-- The check can pass on a wrong list, when the ids that moved are not ones the players ordered. A replay with no build orders cannot be checked at all. Reading unitsync's list with the match's own mod options and AIs is not built.
+- The check can pass on a wrong list, when the ids that moved are not ones the players ordered. A replay with no build orders cannot be checked at all.
 
 ## The event log
 
@@ -445,7 +480,7 @@ A position in a free for all or a duel has no pair of sides to split by, and the
 These are the reasons the code and the pull requests established.
 
 - Orders are not buildings. A cost of what was ordered is not what was spent, because cancelled orders count and queue removals are not subtracted. The trailer's "metal used" is the engine's own count.
-- A unit's name and cost come from a unit list: the engine's own for an analysed replay, and otherwise the installed build of the game matched by name, or a list kept from when it was. A different installed build can name the wrong unit, and so can the right build when the match's mod options changed its unit list. 518 million metal once appeared under Defence on a Splinter Faction 0.1.77 replay, because that game's definitions give its lootboxes, drop pods and scanner probe a cost of 518,181,504 and the replay's ids landed on them in the installed build. The page showed its "different build" warning.
+- A unit's name and cost come from a unit list: the engine's own for an analysed replay, and otherwise the installed build of the game matched by name, or a list kept from when it was. A different installed build can name the wrong unit. The right build is read with the match's own mod options, teams and AIs, and can still differ from the match where a map ships a unit or a definition script draws a random number. 518 million metal once appeared under Defence on a Splinter Faction 0.1.77 replay, because that game's definitions give its lootboxes, drop pods and scanner probe a cost of 518,181,504 and the replay's ids landed on them in the installed build. The page showed its "different build" warning.
 - A figure for a player in the library is their own army's. The store keys totals by engine team, which is the army one player controls. The replay page uses "Team 1" and "Team 2" for a side. Allies on one side each have their own army and their own figure.
 - A library row for a whole match uses the best single army for metal and energy, and the sum of all armies for damage and unit counts. The "My figures" switch uses the player's own army for every metric.
 - The trailer is sampled every 15 seconds on the replays checked, and the header holds the match length in whole seconds. The last point on the chart is the last sample, not the last frame.
