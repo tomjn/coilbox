@@ -112,7 +112,7 @@ if [ "$APPLY_GUARDS" = 1 ]; then
     echo "patching $SF_GAME with $GUARDS_PATCH, which adds:"
     printf '  %s\n' "${missing[@]}"
     "${GUARDS_APPLY[@]}" || {
-      echo "the patch did not apply. Add the guards by hand, see docs/mission-runtime.md" >&2
+      echo "the patch did not apply. Add the guards by hand, see docs/developers/mission-runtime.md" >&2
       exit 2
     }
     echo "  undo it with: ${GUARDS_APPLY[*]} -R"
@@ -121,7 +121,7 @@ if [ "$APPLY_GUARDS" = 1 ]; then
   else
     echo "$SF_GAME has some of the guards already, so the patch cannot be applied whole:" >&2
     printf '  missing %s\n' "${missing[@]}" >&2
-    echo "Add the rest by hand, or revert the game's gadgets first. See docs/mission-runtime.md" >&2
+    echo "Add the rest by hand, or revert the game's gadgets first. See docs/developers/mission-runtime.md" >&2
     exit 2
   fi
 fi
@@ -133,7 +133,7 @@ if [ "${#missing[@]}" -ne 0 ]; then
   echo "They are the game's change to make, not coilbox's, so this proof will not" >&2
   echo "write them into your game unasked. Apply them with:" >&2
   echo "  ${GUARDS_APPLY[*]}" >&2
-  echo "or re-run this script with --apply-guards. See docs/mission-runtime.md" >&2
+  echo "or re-run this script with --apply-guards. See docs/developers/mission-runtime.md" >&2
   exit 2
 fi
 

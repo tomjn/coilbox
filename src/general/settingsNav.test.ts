@@ -57,7 +57,7 @@ describe("the Settings nav group", () => {
     expect(onSidebar, "would duplicate the footer gear").toEqual([]);
   });
 
-  it("adds no routes, so the group cannot drift from docs/routes.md", () => {
+  it("adds no routes, so the group cannot drift from docs/reference/routes.md", () => {
     // `routesDoc.test.ts` checks `path`, not `to`. If this group ever grows a
     // route it has to be documented, and this is the reminder.
     const general = all.find((p) => p.id === "general");

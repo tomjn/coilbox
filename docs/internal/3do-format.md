@@ -1,6 +1,6 @@
 # The 3do model format
 
-Reference for `.3do`, the Total Annihilation model format Spring and Recoil still load. Written because most units in most installed games are `.3do` rather than [`.s3o`](/s3o-format), so anything that shows a real game's models has to read it.
+Reference for `.3do`, the Total Annihilation model format Spring and Recoil still load. Written because most units in most installed games are `.3do` rather than [`.s3o`](s3o-format.md), so anything that shows a real game's models has to read it.
 
 Everything here is verified two ways: against `rts/Rendering/Models/3DOParser.h` and `3DOParser.cpp` in [RecoilEngine](https://github.com/beyond-all-reason/RecoilEngine), and by parsing the 3633 `.3do` files shipped by five installed games. The `coilbox-3do` crate implements it.
 

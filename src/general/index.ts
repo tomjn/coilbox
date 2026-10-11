@@ -41,7 +41,7 @@ const generalPlugin: FramePlugin = {
   // (General, Advanced) that belong to nobody else.
   //
   // Each item links to a settings section rather than a route of its own, so
-  // there are no new routes and nothing to add to `docs/routes.md`.
+  // there are no new routes and nothing to add to `docs/reference/routes.md`.
   //
   // Welcome page only, via `sidebar: false` on every item. The sidebar already
   // had a way in and still does: the frame's footer gear, which carries the

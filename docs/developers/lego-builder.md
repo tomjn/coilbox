@@ -1,4 +1,4 @@
-# The unit builder
+# Unit builder
 
 Assemble a Recoil or Spring unit out of pre-textured parts, animate it from a preset, and write it into a game. No modelling, no UV work: every part in a pack shares one texture, so anything you build from them is already mapped.
 
@@ -154,7 +154,7 @@ It always writes:
 
 - `objects3d/<unit>.s3o`, the model.
 - `units/<unit>.lua`, a unit definition. Without one the engine has nothing to spawn.
-- `language/en/coilbox.json`, but only for a game that names its units in a localisation file rather than in their definitions. See [Where the unit's name goes](#where-the-units-name-goes).
+- `language/en/coilbox.json`, but only for a game that names its units in a localisation file rather than in their definitions. See [Where the unit's name goes](#where-the-unit-s-name-goes).
 
 It writes, if you leave the boxes ticked:
 
@@ -316,6 +316,6 @@ Record any further outcome here, and on [issue #565](https://github.com/tomjn/co
 
 ## Parts packs
 
-The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears in the parts filters once there is more than one. The format, where extension packs go and how to build one are in [the parts pack guide](/lego-parts-pack).
+The bundled pack is derived from KaiserJ's original v2 lego parts, released on the [Spring forums](https://springrts.com/phpbb/viewtopic.php?t=22283) with "do whatever the heck you'd like with these". Several packs can be installed at once and they share one atlas, so parts from all of them can sit in the same unit. A pack picker appears in the parts filters once there is more than one. The format, where extension packs go and how to build one are in [the parts pack guide](../reference/lego-parts-pack.md).
 
 A unit records the pack it was built against. Opening one whose pack is not installed still works: the pieces keep their names, hierarchy and transforms, and any piece whose part is missing draws nothing and is counted in the warnings above the viewport.

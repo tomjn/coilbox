@@ -113,7 +113,7 @@ function ChatPage() {
 
   // Named channels, and with them every ChanServ and moderator command below, exist
   // only on TASServer. On Tachyon the chat surface is direct messages plus battle
-  // chat, and the sidebar says so. See `docs/tachyon-protocol.md`. Read off the open
+  // chat, and the sidebar says so. See `docs/internal/tachyon-protocol.md`. Read off the open
   // conversation's own connection, not the app's globally focused one, so a channel
   // on one server never picks up another connection's protocol.
   const activeProtocol = protocolForKey(activeServerKey, servers);

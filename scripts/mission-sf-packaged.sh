@@ -145,14 +145,14 @@ if [ "${#missing[@]}" -eq 0 ]; then
 elif [ "${#missing[@]}" -eq 3 ]; then
   git -C "$COPY" apply -p1 --ignore-whitespace "$GUARDS_PATCH" || {
     echo "the guards patch did not apply to the copy of $SF_GAME" >&2
-    echo "See docs/mission-runtime.md for what it adds." >&2
+    echo "See docs/developers/mission-runtime.md for what it adds." >&2
     exit 2
   }
   GUARDS="all three, patched into the copy"
 else
   echo "$SF_GAME has some of the guards already, so the patch cannot be applied whole:" >&2
   printf '  missing %s\n' "${missing[@]}" >&2
-  echo "Revert the game's gadgets, or add the rest by hand. See docs/mission-runtime.md" >&2
+  echo "Revert the game's gadgets, or add the rest by hand. See docs/developers/mission-runtime.md" >&2
   exit 2
 fi
 

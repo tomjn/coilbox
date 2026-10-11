@@ -1,4 +1,4 @@
-# Lobby moderation controls
+# Lobby moderation
 
 Coilbox exposes ChanServ channel-operator actions and server-moderator actions directly from the chat UI, gated so the controls only appear to users who actually hold the privilege. This is the coilbox side of issue #203; the wire commands target an uberserver/TASServer-style lobby (the reference is `~/dev/uberserver`).
 
@@ -25,7 +25,7 @@ If you are neither, no menu or topic control renders for that channel.
 > the `access=` line the answer carries, keeping it as `ConnectionState.adminLevel`
 > per connection. This chat member menu still does not read that level, so a
 > strictly admin-only verb (e.g. `BROADCAST`, `SETACCESS`) still is not
-> surfaced here. It's offered instead on the [Server admin](/server-admin) page,
+> surfaced here. It's offered instead on the [Server admin](server-admin.md) page,
 > under its Announcements and Staff tools.
 
 ## Actions and the commands they send

@@ -1,12 +1,12 @@
-# Distributing Coilbox with your game
+# Package coilbox with your game
 
-This is the short, practical guide for **game authors** shipping Coilbox to players: how to lay out and zip a self-contained package for each operating system. It assumes you've already branded and configured the app — for the *why* and the full detail, read [portable-mode.md](portable-mode.md), which this guide condenses.
+This guide is for game authors shipping coilbox to players. It covers how to lay out and zip a self-contained package for each operating system, how to bundle the engine, the game and maps, and how to keep a bundled game up to date. A package is built on [portable mode](../players/portable-mode.md), which explains the `.coilbox` folder from a player's side.
 
 The goal is one download per OS that a player unzips and runs, with no installer and nothing scattered across their system.
 
-## The idea in one line
+## How a package works
 
-On every OS, Coilbox looks for a `.coilbox` folder **next to the binary**. If that folder contains a `profile.json`, Coilbox runs [portable](portable-mode.md): all its settings, caches and downloads stay inside `.coilbox`, and the whole folder is self-contained and movable. The `.exe`, the `.AppImage` and the `.app` are all treated the same way in this respect.
+On every OS, Coilbox looks for a `.coilbox` folder **next to the binary**. If that folder contains a `profile.json`, Coilbox runs [portable](../players/portable-mode.md): all its settings, caches and downloads stay inside `.coilbox`, and the whole folder is self-contained and movable. The `.exe`, the `.AppImage` and the `.app` are all treated the same way in this respect.
 
 > **Two things people get wrong.** (1) The folder alone does nothing — it must contain a `profile.json` (an empty `{}` works, but you'll want real branding; see [distribution-profile.md](distribution-profile.md)). (2) `.coilbox` is **hidden** on Linux and macOS (the leading dot), so a player who moves the binary out of the folder will silently leave `.coilbox` behind. Ship a **folder**, not loose files — see below.
 
@@ -46,7 +46,7 @@ The player unzips one of these and runs the binary directly.
 
 > **Why a `.zip` for macOS, not a `.dmg`.** A `.dmg` nudges the player to drag only `Coilbox.app` into their Applications folder — which orphans the `.coilbox` folder and the game inside it, so portable mode never turns on. A `.zip` that expands to a single `SplinterFaction/` folder keeps the three pieces together. The same "ship a folder" logic is why all three targets are zips: if the player relocates a loose binary, the hidden `.coilbox` folder won't come with it.
 
-## The `.coilbox` folder, minimally
+## What goes in the `.coilbox` folder
 
 Inside each package's `.coilbox/`:
 
@@ -59,7 +59,7 @@ Inside each package's `.coilbox/`:
   images/ ...     # optional media referenced by the profile/campaigns
 ```
 
-Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run — you don't ship those. See [portable-mode.md](portable-mode.md#what-lives-where) for the full breakdown. The engine, the game and maps go in `content/`, described in [Bundle the engine, the game and maps](#bundle-the-engine-the-game-and-maps).
+Coilbox creates `data/` and `cache/` inside `.coilbox/` on first run — you don't ship those. See [portable-mode.md](../players/portable-mode.md#what-is-in-the-coilbox-folder) for the full breakdown. The engine, the game and maps go in `content/`, described in [Bundle the engine, the game and maps](#bundle-the-engine-the-game-and-maps).
 
 > **A bundled scenario needs a game that can play it.** A file in `.coilbox/scenarios/` is the authored document and nothing else. It is played by [the mission runtime](mission-runtime.md), which lives in the game, so the game you ship with it, in a `games/` folder next to the binary, has to carry the runtime and the two guards from [the adoption contract](mission-runtime.md#the-adoption-contract). It also has to be a loose `.sdd`, because coilbox writes each compiled mission into the game's own `missions/` folder as it launches and cannot write into a packaged archive. For the same reason that `.sdd` cannot go in `.coilbox/content/`, which coilbox never writes into. Ship the game as a `.sd7` or `.sdz` and every scenario in the package falls back to a generated test game. They play, but your end conditions and opening phases run over the top of the mission. See [what a player needs to play your scenario](scenarios.md#what-a-player-needs-to-play-your-scenario).
 
@@ -154,10 +154,79 @@ Settings > Content folders lists the bundle with a "bundled, read only" badge.
 
 To test the package as a player gets it, unzip it on a machine with no Spring install and no connection, and launch it.
 
-## Getting the binaries
+## Bundle the game in the app folder
 
-Each release build produces the per-OS binaries you drop into these packages: Windows `.exe`, Linux `.AppImage`, macOS `.app`. See [portable-mode.md](portable-mode.md#packaging-checklist) for the end-to-end packaging checklist, and [distribution-profile.md](distribution-profile.md) for everything `profile.json` can do (title, theme, hidden nav, welcome screen, links, and self-updating from GitHub releases).
+If you're **packaging Coilbox to hand to players**, you probably want the game itself inside the package too, so a player unzips one folder and everything is there — no separate Spring install, no downloads on first run.
 
-## Verify before you ship
+There are two places for it. `.coilbox/content/` is a read-only bundle coilbox never writes into, searched after the app folder, with the engine copied out on first run. [Bundle the engine, the game and maps](#bundle-the-engine-the-game-and-maps) covers it. This section covers the other, the app folder itself, which is also where downloads go.
+
+Content (engine + game archive + maps) is tracked as **content roots** — folders Coilbox scans for game data. A content root can be stored two ways:
+
+- **Absolute** — a fixed path like `/home/you/.spring`. Fine for your own use; useless in a package you ship, because the player's paths differ.
+- **Portable (relative)** — stored relative to the app folder, so it keeps working no matter where the player unzips the package or what they rename the parent folder to.
+
+To bundle content portably:
+
+1. Lay the game content out **directly in the app folder** (the folder that contains the binary and `.coilbox/`), using the ordinary **Spring/Recoil data-root layout**: the `.sdz`/`.sd7` game archive under a **`games/`** subfolder, maps under **`maps/`**, and the engine under **`engine/`**. Coilbox (like every Spring/Recoil tool) only scans a game archive if it sits in `games/` — a `.sdz` dropped loose in the app folder is invisible. **Do not put any of this inside `.coilbox/`** (see [What is in the `.coilbox` folder](../players/portable-mode.md#what-is-in-the-coilbox-folder)).
+2. In **Settings > Content Folders**, add the **app folder itself** as a root and tick **Portable** (the checkbox is only meaningful in portable mode). Coilbox stores it as a relative path (`.` for the app folder) and shows a **Portable** badge. In portable mode the app folder is usually seeded as a root automatically, so it may already be listed.
+
+```
+SplinterFaction/                 <- the folder you zip and distribute; THIS is the content root
+  coilbox.exe
+  .coilbox/                      <- Coilbox's private data (NOT your game)
+    profile.json
+    data/  cache/                (created on first run)
+  games/                         <- bundled content, at the app-folder top level
+    splinterfaction.sdz
+  maps/
+  engine/
+```
+
+The app folder plays the role of a `~/.spring`-style data directory: `games/`, `maps/` and `engine/` sit at its top level, right beside `coilbox.exe` and `.coilbox/`. Coilbox ignores `.coilbox/` when scanning content. A layout that buries the game anywhere else inside `.coilbox/` (e.g. `.coilbox/games/…`) is wrong — that content won't be scanned and could be lost when Coilbox's data is reset.
+
+Rules to know:
+
+- A **Portable root must live inside the app folder.** Coilbox refuses to store a portable root for a folder outside the package — there'd be nothing stable to make it relative to.
+- In portable mode, roots you add that happen to sit inside the app folder are relativised automatically, so they travel with the package even if you forget to tick the box.
+- Everything downstream (scanning, launching, pr-downloader) receives the resolved absolute path, so bundled content behaves exactly like a normal install once found.
+
+## Update a bundled game from GitHub releases
+
+Bundling and GitHub-release updates are **complementary, not an either/or** — the intended setup for a self-updating package is to do both. You ship the current game archive inside the package (so first run works offline), and you also set the profile's [`release`](distribution-profile.md#release-object) field so Coilbox pulls newer versions from your repo's GitHub releases.
+
+How the update check decides whether to prompt:
+
+- On launch, Coilbox fetches your repo's **latest** release and looks at its `.sdz`/`.sd7` assets.
+- It considers you up to date if **any** of those asset filenames matches a game archive already installed in your content roots (matched by **filename**, case-insensitive).
+- So a bundled archive whose filename equals the latest release's asset name reads as "installed" → no update prompt. When you publish a **new** release with a **new** archive filename, the installed one no longer matches → a **Game update** badge and settings section offer a one-click download.
+
+An update downloads the new archive into the `games/` folder of the content folder chosen for games, rescans content so it appears without a restart, and — if the release also ships an asset named exactly `profile.json` — drops that into `.coilbox/` and offers a restart to apply the refreshed profile.
+
+Two things to get right for this to behave:
+
+- **Version your archive filenames.** `splinterfaction_1.3.sdz` → `splinterfaction_1.4.sdz` gives you "same version = matched, new version = update" for free. A filename that never changes (`splinterfaction.sdz`) would always look installed, so no update ever prompts.
+- **Point the download folder at a portable location** (Settings > Content folders, under "New content goes to") if you want updates to land inside the package rather than in a per-user folder. Otherwise the bundled archive and any downloaded update end up in different places.
+
+If instead you'd rather ship a thin package and have players fetch the game on first run, skip bundling and rely on `release` alone, or leave the Downloads pages visible so they can grab it themselves.
+
+## Get the binaries
+
+Each release build produces the per-OS binaries you drop into these packages: Windows `.exe`, Linux `.AppImage`, macOS `.app`. See the [packaging checklist](#packaging-checklist) for every step in order, and [Distribution profiles](distribution-profile.md) for everything `profile.json` can do (title, theme, hidden nav, welcome screen, links, and self-updating from GitHub releases).
+
+## Packaging checklist
+
+To ship a branded, self-contained Coilbox for your game:
+
+1. **Get a Coilbox build** for each OS you're targeting (Windows `.exe`, Linux binary/AppImage, macOS `.app`). Put each in its own distribution folder.
+2. **Add `.coilbox/`** next to the binary.
+3. **Add `profile.json`** in `.coilbox/` to brand and narrow the app — title, theme, hidden nav, a welcome screen, links. See [distribution-profile.md](distribution-profile.md), and [routes.md](../reference/routes.md) for the exact route/nav ids those fields use.
+4. **Bundle the game content**, in [`.coilbox/content/`](#bundle-the-engine-the-game-and-maps) or as a [Portable root in the app folder](#bundle-the-game-in-the-app-folder), *or* configure `release` to download it, *or* leave downloads on for the player to fetch. Bundling plus `release` together gives an offline-ready package that still self-updates.
+5. **Bundle any campaigns** by dropping their exported `.json` into `.coilbox/campaigns/` and their media alongside — see [campaigns.md](campaigns.md). Standalone missions go in `.coilbox/scenarios/` the same way — see [scenarios.md](scenarios.md#ship-a-scenario-in-a-distribution).
+6. **Test the package** by moving/renaming the whole folder and launching — a correctly-portable package keeps working after it's moved. Confirm **Settings > Distribution profile** shows your profile loaded, and that bundled content and campaigns appear.
+7. **Zip the folder** and distribute. Players unzip and run the binary directly.
+
+> Coilbox has no installer requirement in this mode — the folder *is* the install. That's the whole point: a player can keep it on a USB stick, delete it cleanly, or run it next to whatever else they already have.
+
+## Test the package
 
 For each package, the one test that matters: **move or rename the whole folder, then launch.** If your settings, profile and bundled content are all still there, the package is genuinely portable. Coilbox's **Settings > Distribution profile** confirms the profile loaded, and **Settings > Content Folders** shows a **Portable** badge on bundled content.

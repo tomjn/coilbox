@@ -1,4 +1,4 @@
-# The mission runtime
+# Mission runtime
 
 The runtime is the Lua that plays a coilbox [scenario](scenarios.md) inside the engine. It is coilbox-authored and game-agnostic, and the game archive **bundles a copy of it**. Coilbox writes the files into a loose `.sdd` game folder and updates them from there.
 
@@ -6,14 +6,14 @@ This page is for two readers. The first half is the adoption contract, for anyon
 
 For authoring, see [Scenarios](scenarios.md).
 
-## What adopting costs
+## What adopting the runtime costs
 
 - **Three folders of Lua**, all of it named `coilbox_*` so you can see at a glance what came from here.
 - **One guard** in whatever your game calls `Spring.GameOver()` from.
 - **One guard** in whatever your game starts a team with. Two, if starting a team is a sequence of pre-game phases rather than a call.
 - **Nothing in a normal game.** Without the `coilbox_mission` modoption the gadget's chunk returns `false` before it defines a callin or reads a file, so the gadget handler drops it. The cost of the runtime in an ordinary match is reading one file at load.
 - **One unit per human-played team in a mission.** The runtime places an invisible anchor so the engine cannot end the mission early. It shows in that team's unit count and nowhere else ([issue #820](https://github.com/tomjn/coilbox/issues/820)).
-- **Nothing for your own systems, unless you want them.** [Declaring condition and action types of your own](#4-optional-declare-your-own-condition-and-action-types) is two files and no coilbox release, and a game that declares none loses nothing.
+- **Nothing for your own systems, unless you want them.** [Declaring condition and action types of your own](#_4-optional-declare-your-own-condition-and-action-types) is two files and no coilbox release, and a game that declares none loses nothing.
 
 A game that has not adopted the runtime is not shut out of scenarios. It just cannot play them itself, and everything goes through coilbox's test mutator instead, which is a development route and never a distribution one.
 
@@ -309,7 +309,7 @@ Enough to be worth knowing before you adopt it:
 - **The start.** Every actor, base building, per-team start unit and non-dormant group is created at game start. A building is put through `Spring.Pos2BuildPos` on the way, so it sits on the build grid and can be rebuilt where it stood.
 - **Starting resources, for every mission team.** At game frame 1 each team the scenario declares has its bank set to the scenario's number, defaulting to nothing. That is how the game's usual opening bank is suppressed. Free income, if the scenario asks for it, is paid every frame, and a mission may move a bank, change what a team is paid or change how much it can hold at any point with `give_resources`, `set_income` and `give_storage`.
 - **Anything a mission asks your own Lua for.** `call_lua` names a function by dotted path, walked from the gadget's environment, so `GG.YourGame.DoThing` reaches the function your gadget put there. It is called with the trigger's parameters and the runtime's shared context, and a name your game has no function for is reported rather than fatal.
-- **Commanders, only where asked.** A team whose scenario entry sets `noCommander` is a team the runtime starts and your game does not, which is [contract item 3](#3-do-not-start-a-team-the-mission-has-already-started). Teams without the flag keep the commander your game gave them.
+- **Commanders, only where asked.** A team whose scenario entry sets `noCommander` is a team the runtime starts and your game does not, which is [contract item 3](#_3-do-not-start-a-team-the-mission-has-already-started). Teams without the flag keep the commander your game gave them.
 
   Add the guard and nothing else happens. Skip it and the runtime falls back to removing what your game spawned, from load until the end of game frame 1, touching only creations with no builder. That window is no use to a game that spawns later than frame 1: Splinter Faction spawns on frame 1800, and its commanders arrived despite `noCommander` until it took the guard ([issue #884](https://github.com/tomjn/coilbox/issues/884)).
 - **Game over**, through your guard and the anchor unit.

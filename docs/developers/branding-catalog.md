@@ -6,7 +6,7 @@ The **branding catalog** is how a game supplies its own art, links and metadata 
 
 It exists because games increasingly render their loading screen in Lua, or ship a `modinfo` whose links have gone dead — so there's no reliable art or link to pull out of the published archive. The catalog lets you supply current art and links **without re-publishing the game** and **without a Coilbox release**.
 
-## Catalog vs. distribution profile
+## Catalog or distribution profile
 
 These are two different customisation channels; pick by audience:
 
@@ -17,7 +17,7 @@ These are two different customisation channels; pick by audience:
 
 If you just want your game to look right for anyone who downloads it in vanilla Coilbox, you want the **catalog**. Reach for a distribution profile when you're shipping a branded, narrowed Coilbox as part of your game's own download.
 
-## How it reaches users without a release
+## How a catalog change reaches players
 
 **The catalog is a single file:** `catalog.json` at the root of the [coilbox repo](https://github.com/tomjn/coilbox). That one file is both the source the app fetches at runtime (from the `main`-branch raw URL, `https://raw.githubusercontent.com/tomjn/coilbox/main/catalog.json`) and the copy bundled into the app as an offline / first-run seed.
 
@@ -54,7 +54,7 @@ Edit `catalog.json` and open a pull request against `main`. Validate the JSON be
 - **The catalog hosts no binaries** — only URLs. They can point anywhere (project sites, itch.io, imgur, GitHub); the app proxies images, so there's no CSP host allow-listing to worry about.
 - `videos` are either `{ "kind": "youtube", "id", "title"? }` or `{ "kind": "link", "url", "title"? }`.
 
-## Matching (keep it narrow, per-project)
+## How a game is matched to its entry
 
 `match` is tested against the installed game's identity — `game.name`, with `game.info.shortname` as a secondary target for `names`:
 
@@ -65,12 +65,12 @@ Edit `catalog.json` and open a pull request against `main`. Validate the JSON be
 
 Keep matchers **tight and per-project.** Games that share ancestry — Balanced Annihilation, Beyond All Reason, Splinter Faction — are **distinct** projects, and a broad ancestral pattern would misbrand siblings. A `game.name` usually embeds a version; verify your pattern against the real installed name before landing it.
 
-## Suggested content and galactic-conquest names
+## Suggested content and conquest names
 
 Two more things ride in the same catalog file:
 
 - **Suggested content and map packs.** Besides `entries[]`, the catalog carries a `suggested` block of curated games, maps and **map packs** offered to users who have none yet (and on the Maps download page). See the dedicated **[Map packs](map-packs.md)** guide for the shape and behaviour.
-- **Galactic-conquest naming.** A branding entry can carry a `conquest` field that supplies per-game star/faction name pools and lore factions, so a generated galaxy reads as *your* game rather than generic space. See **[Galactic conquest → Names and factions](conquest.md#names-and-factions)**.
+- **Galactic-conquest naming.** A branding entry can carry a `conquest` field that supplies per-game star/faction name pools and lore factions, so a generated galaxy reads as *your* game rather than generic space. See **[Galactic conquest → Names and factions](conquest-for-your-game.md#names-and-factions)**.
 
 ## Excluding maps from warpath and conquest
 
