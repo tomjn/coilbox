@@ -277,11 +277,13 @@ export function MapAggregate({
   const customInvalid =
     windowChoice === "custom" && timeWindow.kind !== "range";
 
-  const gameTypes = useMemo(() => replays.map((r) => r.gameType), [replays]);
-  const { categories, loading: categoriesLoading } = useGameCategories(
-    gameTypes,
-    replays.length > 0,
-  );
+  // Asked once every replay's counts are in, so the unit orders are read in
+  // one call.
+  const {
+    categories,
+    misfit,
+    loading: categoriesLoading,
+  } = useGameCategories(replays, replays.length > 0 && !read.reading);
 
   // Every layer is counted, so each toggle can say how many matches are behind
   // it. Only the one being drawn is smoothed into a field.
@@ -818,6 +820,7 @@ export function MapAggregate({
                   analysedShown={withEvents}
                   reading={read.reading}
                   categoriesLoading={categoriesLoading}
+                  misfit={misfit}
                   incomplete={replays.filter((r) => r.incomplete).length}
                 />
               )}
@@ -870,6 +873,7 @@ function LayerNotes({
   analysedShown,
   reading,
   categoriesLoading,
+  misfit,
   incomplete,
 }: {
   layer: HeatLayerId;
@@ -880,6 +884,9 @@ function LayerNotes({
   analysedShown: number;
   reading: boolean;
   categoriesLoading: boolean;
+  /** Matches whose orders do not fit their unit list, so no category layer
+   *  has them. */
+  misfit: number;
   /** Replays whose stream could not be read to the end. */
   incomplete: number;
 }) {
@@ -894,14 +901,23 @@ function LayerNotes({
         </p>
       )}
 
-      {category && (categoriesLoading || drawn.unclassified > 0) && (
+      {category && (categoriesLoading || drawn.unclassified > misfit) && (
         <p
           className="text-xs text-muted-foreground"
           data-testid="category-note"
         >
           {categoriesLoading
             ? "Reading unit definitions…"
-            : `${plural(drawn.unclassified, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified === 1 ? "it is" : "they are"} left out of this layer.`}
+            : `${plural(drawn.unclassified - misfit, "match was", "matches were")} played on a game or version that is not installed, so nothing says what ${drawn.unclassified - misfit === 1 ? "its" : "their"} buildings are for and ${drawn.unclassified - misfit === 1 ? "it is" : "they are"} left out of this layer.`}
+        </p>
+      )}
+      {category && !categoriesLoading && misfit > 0 && (
+        <p
+          className="text-xs text-muted-foreground"
+          data-testid="category-misfit"
+        >
+          {plural(misfit, "match", "matches")} left out: orders do not fit the
+          unit list.
         </p>
       )}
 
@@ -1062,8 +1078,12 @@ function AggregateHelp({
       )}
       {picture && category && (
         <p>
-          What a building is for is read from the installed game with exactly
-          the name and version the replay records, matched by name.
+          What a building is for is read from the unit list that replay's own
+          page names its orders from: the engine's own list when the match was
+          analysed, then the installed game with exactly the name and version
+          the replay records, read with the match's own mod options and AIs. A
+          match whose build orders do not fit that list, or whose orders could
+          not be checked against it, is left out of Defences and Economy.
         </p>
       )}
       {picture && drawn?.field && drawn.field.peak > 0 && (
