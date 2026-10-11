@@ -13,7 +13,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use coilbox_lobby_protocol::{
     command, parse_line, record_outgoing_private, redact_line, reduce_at, ChatKind, Delta,
-    LobbyState, LoginConfig, LoginMachine, LoginPhase, ServerMessage,
+    LobbyState, LoginConfig, LoginMachine, LoginPhase, RingHost, ServerMessage,
 };
 use futures_util::{SinkExt, StreamExt};
 use serde::Serialize;
@@ -480,6 +480,7 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
     // kind of line, so a stale announcement from earlier in the session is
     // never mistaken for why a later, unrelated drop happened.
     let mut last_server_msg: Option<String> = None;
+    let mut ring_host = RingHost::default();
 
     // Moderator and admin commands, one on the wire at a time.
     let mut admin = AdminQueue::default();
@@ -594,6 +595,28 @@ async fn run_loop(stream: Box<dyn AsyncReadWrite>, login_cfg: LoginConfig, ctx: 
                                 );
                             },
                         );
+                    }
+
+                    // A battle this client founded has no autohost in it, so
+                    // `!ring` typed there is ours to answer. Read off the line
+                    // rather than in the frontend, so it is answered whichever
+                    // page the host has open.
+                    if let ServerMessage::SaidBattle { username, message } = &msg {
+                        let answer = ring_host.hear(
+                            &lock_or_recover(&state),
+                            username,
+                            message,
+                            now_ms(),
+                        );
+                        outbound.extend(answer.send);
+                        if let Some(from) = answer.ring_me {
+                            emit(
+                                &sink,
+                                LobbyEvent::Delta {
+                                    delta: Delta::Ring { from },
+                                },
+                            );
+                        }
                     }
 
                     // We just joined a channel and it starts empty: ask for its stored

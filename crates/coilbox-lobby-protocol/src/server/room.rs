@@ -531,6 +531,7 @@ impl RoomState {
                 team_color,
             } => self.force(peer, &username, |m| m.team_color = team_color as u32),
             ClientCommand::KickFromBattle { username } => self.kick(peer, &username),
+            ClientCommand::Ring { username } => self.ring(peer, &username),
             // Everything else is a command a room has no answer for: the friend
             // and ignore lists our own client fires on login, the channel
             // directory, a registration attempt. Silence is the right answer.
@@ -1258,6 +1259,30 @@ impl RoomState {
         });
         out.push(Outbound::Close { peer: target });
         out
+    }
+
+    /// Ring somebody in the battle. The host may ring any member and a member
+    /// may ring the host, which is the rule uberserver holds a `RING` to.
+    fn ring(&mut self, peer: PeerId, username: &str) -> Vec<Outbound> {
+        let Some(name) = self.name_of(peer) else {
+            return vec![];
+        };
+        if self.peers[&peer].member.is_none() {
+            return vec![];
+        }
+        if !self.is_host(peer) && username != self.config.host {
+            return vec![];
+        }
+        let Some(target) = self.peer_named(username) else {
+            return vec![];
+        };
+        if self.peers[&target].member.is_none() {
+            return vec![];
+        }
+        vec![Outbound::To {
+            peer: target,
+            line: line::ring(&name),
+        }]
     }
 
     /// Run a change only the host may make.
@@ -2155,6 +2180,27 @@ mod tests {
 
         let out = log_in(&mut room, 3, "bob");
         assert_eq!(due(&out, 3), ["DENIED alice removed you from this room"]);
+    }
+
+    /// The host rings a member and a member rings the host. A member ringing
+    /// another member, or somebody outside the battle ringing in, reaches nobody.
+    #[test]
+    fn a_ring_passes_between_the_host_and_a_member_only() {
+        let mut room = started(false);
+        send(&mut room, BOB, "JOINBATTLE 1 * s3cret");
+        log_in(&mut room, 3, "carol");
+
+        let out = send(&mut room, ALICE, "RING bob");
+        assert_eq!(due(&out, BOB), ["RING alice"]);
+        assert!(due(&out, ALICE).is_empty());
+
+        let out = send(&mut room, BOB, "RING alice");
+        assert_eq!(due(&out, ALICE), ["RING bob"]);
+
+        assert!(send(&mut room, 3, "RING alice").is_empty());
+        assert!(send(&mut room, ALICE, "RING carol").is_empty());
+        send(&mut room, 3, "JOINBATTLE 1 * s3cret");
+        assert!(send(&mut room, BOB, "RING carol").is_empty());
     }
 
     /// The host is the battle. When they go, it goes, and the joiners' clients

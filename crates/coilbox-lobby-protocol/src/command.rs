@@ -437,6 +437,12 @@ pub fn kick_from_battle(user: &str) -> String {
     format!("KICKFROMBATTLE {user}")
 }
 
+/// `RING <user>`. A battle's host may ring anybody in it, and anybody in it may
+/// ring the host.
+pub fn ring(user: &str) -> String {
+    format!("RING {user}")
+}
+
 /// `ADDSTARTRECT <ally> <left> <top> <right> <bottom>`.
 pub fn add_start_rect(ally: u8, left: i32, top: i32, right: i32, bottom: i32) -> String {
     format!("ADDSTARTRECT {ally} {left} {top} {right} {bottom}")
