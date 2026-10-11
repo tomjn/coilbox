@@ -37,6 +37,7 @@ describe("AutohostControls in an ordinary lobby battle", () => {
         directRoom={false}
         selfHost={false}
         onCommand={vi.fn()}
+        onRing={vi.fn()}
       />,
     );
     expect(screen.getByText("Host commands")).toBeTruthy();
@@ -54,6 +55,7 @@ describe("AutohostControls in an ordinary lobby battle", () => {
         directRoom={false}
         selfHost={false}
         onCommand={onCommand}
+        onRing={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText("Balance"));
@@ -69,6 +71,7 @@ describe("AutohostControls in a direct room", () => {
         directRoom={true}
         selfHost={false}
         onCommand={vi.fn()}
+        onRing={vi.fn()}
       />,
     );
     expect(screen.getByText("Ask the host")).toBeTruthy();
@@ -86,6 +89,7 @@ describe("AutohostControls in a direct room", () => {
         directRoom={true}
         selfHost={false}
         onCommand={onCommand}
+        onRing={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText("Ring unready"));
@@ -100,6 +104,7 @@ describe("AutohostControls in a direct room", () => {
         directRoom={true}
         selfHost={false}
         onCommand={onCommand}
+        onRing={vi.fn()}
       />,
     );
     fireEvent.click(screen.getByText("Suggest balance"));
@@ -115,6 +120,7 @@ describe("AutohostControls in a direct room", () => {
         directRoom={true}
         selfHost={false}
         onCommand={vi.fn()}
+        onRing={vi.fn()}
       />,
     );
     expect(screen.getByText("Suggest unlock")).toBeTruthy();
@@ -125,19 +131,22 @@ describe("AutohostControls for a founder hosting the battle themselves", () => {
   it.each([
     false,
     true,
-  ])("offers Ring unready and nothing else (direct room: %s)", (directRoom) => {
+  ])("offers Ring unready alone, and rings without a chat command (direct room: %s)", (directRoom) => {
     const onCommand = vi.fn();
+    const onRing = vi.fn();
     render(
       <AutohostControls
         locked={false}
         directRoom={directRoom}
         selfHost={true}
         onCommand={onCommand}
+        onRing={onRing}
       />,
     );
     expect(screen.getByText("Host commands")).toBeTruthy();
     expect(screen.getAllByRole("button")).toHaveLength(1);
     fireEvent.click(screen.getByText("Ring unready"));
-    expect(onCommand).toHaveBeenCalledWith("!ring");
+    expect(onRing).toHaveBeenCalledTimes(1);
+    expect(onCommand).not.toHaveBeenCalled();
   });
 });

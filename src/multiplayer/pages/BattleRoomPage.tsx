@@ -791,6 +791,7 @@ function BattleRoomPage() {
             directRoom={room.directRoom}
             selfHost={room.selfHost}
             onCommand={room.autohostSend}
+            onRing={() => room.hostControls.ring()}
           />
           <BattleGameCard
             enginePath={room.enginePath}

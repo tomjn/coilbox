@@ -108,6 +108,7 @@ export function BattleMembersTable({
     forceColor: (user: string, hex: string) => void;
     forceSpectator: (user: string) => void;
     kick: (user: string) => void;
+    ring: (user?: string) => void;
     appointBoss: (user: string) => void;
     unboss: (user: string) => void;
     removeBot: (name: string) => void;
@@ -197,6 +198,7 @@ export function BattleMembersTable({
         onForceSpectator: selfHost
           ? () => hostControls.forceSpectator(row.name)
           : undefined,
+        onRing: selfHost ? () => hostControls.ring(row.name) : undefined,
         onKick: () => hostControls.kick(row.name),
         onAppointBoss:
           canBoss && !row.boss

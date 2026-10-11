@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BellRing,
   Bot as BotIcon,
   CheckCircle2,
   Crown,
@@ -43,6 +44,8 @@ export interface MemberControls {
   onForceAlly?: (ally: number) => void;
   onForceColor?: (hex: string) => void;
   onForceSpectator?: () => void;
+  /** Host only: ring this member's client to get their attention. */
+  onRing?: () => void;
   onKick: () => void;
   /** Bots we own/host only: change the bot's AI in place (issue #532). */
   onChangeAi?: (aiShortName: string) => void;
@@ -491,6 +494,19 @@ export function MemberActionsMenu({
           >
             <Eye className="size-4" />
             Force spectate
+          </button>
+        )}
+        {control.onRing && (
+          <button
+            type="button"
+            onClick={() => {
+              setMenuOpen(false);
+              control.onRing?.();
+            }}
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-accent"
+          >
+            <BellRing className="size-4" />
+            Ring
           </button>
         )}
         {control.onAppointBoss && (
