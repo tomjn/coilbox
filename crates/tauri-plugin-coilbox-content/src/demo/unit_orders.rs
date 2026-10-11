@@ -35,6 +35,7 @@ use tauri::{AppHandle, Runtime};
 use super::analysis::store::{self, AnalysisState};
 use super::build_orders::{build_orders_from_stream, player_teams};
 use super::def_sets::{self, Ids, Link, UnitDef};
+use super::match_setup::MatchSetup;
 use super::{build_demo_info, find_game, parse_tdf, player_names, read_header_and_script, stream};
 use crate::model::CommandOrigin;
 
@@ -42,7 +43,10 @@ use crate::model::CommandOrigin;
 /// shape of [`ReplayUnitOrders`], which orders are counted, how a seat is told
 /// from another, or which events count as finished and died. A file kept under
 /// another version is not read, and the replay is walked again.
-pub const UNIT_ORDERS_VERSION: u32 = 1;
+///
+/// 2: a replay carries its match's setup, which the unit list it is read
+/// against is now read with (#3847).
+pub const UNIT_ORDERS_VERSION: u32 = 2;
 
 /// The folder under the app's cache directory that holds the kept files. It is
 /// in `caches::CACHE_SUBDIRS`, so the storage screen sizes it and clears it.
@@ -119,6 +123,11 @@ pub struct ReplayUnitOrders {
     /// The game and version whose build numbered the ids in `seats`. For a
     /// remix that is the game it was recorded on, not the one it points at.
     pub game_type: String,
+    /// The match's setup as the engine held it, which the game's unit list is
+    /// read with (#3847). Absent for a start script the engine would have
+    /// refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_setup: Option<MatchSetup>,
     /// The last frame the stream reached. 30 frames are one second.
     pub last_frame: i32,
     /// True when the walk stopped early, so later orders are missing.
@@ -194,6 +203,7 @@ pub fn reduce_replay(demo: &Path) -> Result<ReplayUnitOrders, String> {
             .source_gametype
             .filter(|_| info.remixed)
             .unwrap_or(info.game_type),
+        match_setup: info.match_setup,
         last_frame: read.last_frame,
         incomplete: read.incomplete,
         removals: read.removals,

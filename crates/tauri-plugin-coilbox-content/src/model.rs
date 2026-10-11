@@ -419,6 +419,11 @@ pub struct DemoInfo {
     /// leaves these out runs on the map's current defaults, not the values the
     /// match was played with (#1886).
     pub map_options: std::collections::HashMap<String, String>,
+    /// The match's setup as the engine held it, for reading the unit list the
+    /// engine built for this match (#3847). Absent for a start script the
+    /// engine would have refused.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub match_setup: Option<crate::demo::match_setup::MatchSetup>,
     /// Where each team started, by team id, from the replay's stream (#1146).
     /// A team with no recorded position is absent, since 0,0,0 is a real map
     /// corner. Empty, and left out of the JSON, when the stream has none, is
