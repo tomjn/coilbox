@@ -1,5 +1,8 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrent, onOpenUrl } from "@tauri-apps/plugin-deep-link";
-import { Loader2 } from "lucide-react";
+import { Loader2, PackagePlus } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
@@ -9,6 +12,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { fileDropClaimed } from "@/lib/fileDropClaim";
+import { invalidateScans } from "../content/config";
+import { dlInspectArchive, dlInstallArchive } from "../downloads/bindings";
+import { useWriteRoot } from "../downloads/config";
+import {
+  type ArchiveOffer,
+  type ArchiveRoots,
+  describeOffers,
+  installArchives,
+  isArchivePath,
+  pathFromFileUrl,
+  planArchives,
+} from "../downloads/installArchive";
 import {
   hubItemIdFromUrl,
   hubItemRoute,
@@ -69,12 +85,24 @@ import { openScreenRoute, parseDeepLink } from "./parse";
  * no confirmation before it: the page is the confirmation. `hubItemIdFromUrl`
  * only reads an id out of that one path shape, so every other hub address, its
  * gallery, its API, its home page, still takes the fetch flow above.
+ *
+ * A game or map archive the player has as a file comes through here too. It
+ * arrives three ways: dropped on the window, opened with coilbox on macOS, which
+ * the OS delivers as a `file://` URL on the event links use, and opened with
+ * coilbox on Windows or Linux, which is a launch argument (`open_file.rs`). All
+ * three end at `offerArchives`, which reads the file, asks with the same dialog
+ * and under the same one prompt at a time rule, and only then copies it into the
+ * content folder chosen for its kind.
  */
 
 /** What a link that arrives while another is open is told. Written the way the
  * invite store's refusal of a second join link is. */
 const BUSY =
   "Another link is still open. Answer or close it, then open this link again.";
+
+/** The same refusal for a file. */
+const BUSY_FILE =
+  "Another prompt is still open. Answer or close it, then open this file again.";
 
 export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -86,9 +114,14 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // What is open right now, kept where a link that arrives in the same moment
   // can read it. State is only current after the next render, and a second link
   // must not slip in before it.
-  const open = useRef<{ pending: boolean; fetching: boolean }>({
+  const open = useRef<{
+    pending: boolean;
+    fetching: boolean;
+    archives: boolean;
+  }>({
     pending: false,
     fetching: false,
+    archives: false,
   });
   const setPending = useCallback((next: Pending | null) => {
     open.current.pending = next !== null;
@@ -98,6 +131,93 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
     open.current.fetching = host !== null;
     setFetchingState(host);
   }, []);
+
+  const gamesRoot = useWriteRoot("games");
+  const mapsRoot = useWriteRoot("maps");
+  // Files handed over and not yet read. They wait here until the content
+  // folders are known, which on a cold start is after the file arrives.
+  const [queued, setQueued] = useState<string[] | null>(null);
+  // True while an archive is being dragged over the window.
+  const [dragging, setDragging] = useState(false);
+
+  // Take a set of files to install. Nothing is read or copied here: the effect
+  // below reads them, and the dialog it opens does the copying.
+  const offerArchives = useCallback((paths: string[]) => {
+    if (paths.length === 0) return;
+    if (
+      open.current.pending ||
+      open.current.fetching ||
+      open.current.archives ||
+      invitePromptOpen()
+    ) {
+      notify({ title: "Ignored a file", body: BUSY_FILE, level: "error" });
+      return;
+    }
+    open.current.archives = true;
+    setQueued(paths);
+  }, []);
+
+  const runInstall = useCallback(
+    async (offers: ArchiveOffer[], roots: ArchiveRoots) => {
+      const { installed, failed } = await installArchives(
+        offers,
+        roots,
+        dlInstallArchive,
+      );
+      if (installed.length > 0) {
+        // The game and map lists read the disk again, so the new one shows
+        // without a restart.
+        invalidateScans();
+        notify(
+          installed.length === 1
+            ? {
+                title: `Installed ${installed[0].fileName}`,
+                body: `Copied to ${installed[0].destDir}.`,
+                level: "success",
+              }
+            : {
+                title: `Installed ${installed.length} archives`,
+                body: installed.map((o) => o.fileName).join(", "),
+                level: "success",
+              },
+        );
+      }
+      if (failed.length > 0) {
+        notify({
+          title: "Could not install an archive",
+          body: failed.join(" "),
+          level: "error",
+        });
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (!queued || gamesRoot.loading || mapsRoot.loading) return;
+    const roots = { gamesRoot: gamesRoot.path, mapsRoot: mapsRoot.path };
+    setQueued(null);
+    void planArchives(queued, roots, dlInspectArchive).then(
+      ({ offers, refused }) => {
+        open.current.archives = false;
+        if (offers.length === 0) {
+          notify({
+            title: "Nothing was installed",
+            body: refused.join(" "),
+            level: "error",
+          });
+          return;
+        }
+        setPending({
+          ...describeOffers(offers),
+          warnings: refused,
+          confirmLabel: "Install",
+          icon: PackagePlus,
+          run: () => void runInstall(offers, roots),
+        });
+      },
+    );
+  }, [queued, gamesRoot, mapsRoot, runInstall, setPending]);
 
   // Build the second (apply) confirmation for a resolved import plan. `host` is
   // set for a fetch-URL import so the dialog says where the content came from.
@@ -151,6 +271,13 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
   // toast. Never acts directly: the dialog's Confirm button does.
   const handleUrl = useCallback(
     (raw: string) => {
+      // A file opened with coilbox, which macOS delivers as a URL.
+      const file = pathFromFileUrl(raw);
+      if (file !== null) {
+        offerArchives([file]);
+        return;
+      }
+
       const result = parseDeepLink(raw);
       if (result.kind === "invalid") {
         notify({
@@ -165,7 +292,12 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       // player has read keeps doing what the words above it said, so a link that
       // arrives while another is being asked about, or while an import is being
       // fetched for the player to answer next, is refused rather than swapped in.
-      if (open.current.pending || open.current.fetching || invitePromptOpen()) {
+      if (
+        open.current.pending ||
+        open.current.fetching ||
+        open.current.archives ||
+        invitePromptOpen()
+      ) {
         notify({
           title: "Ignored a coilbox link",
           body: BUSY,
@@ -283,8 +415,76 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
 
       setPending(buildImportPending(plan.plan));
     },
-    [navigate, runFetch, buildImportPending, setPending, trustedHubUrl],
+    [
+      navigate,
+      runFetch,
+      buildImportPending,
+      setPending,
+      trustedHubUrl,
+      offerArchives,
+    ],
   );
+
+  // What the OS hands over at once. Several files opened together arrive as
+  // one list and are asked about together. A link is still taken one at a time.
+  const receive = useCallback(
+    (urls: string[]) => {
+      const files = urls
+        .map(pathFromFileUrl)
+        .filter((path): path is string => path !== null);
+      if (files.length > 0) offerArchives(files);
+      else if (urls.length > 0) handleUrl(urls[0]);
+    },
+    [handleUrl, offerArchives],
+  );
+
+  // Files that do not come as a URL: one dropped on the window, and one opened
+  // with coilbox on Windows or Linux.
+  useEffect(() => {
+    let cancelled = false;
+    const unlisten: (() => void)[] = [];
+    const keep = (subscription: Promise<() => void>) =>
+      subscription
+        .then((fn) => {
+          if (cancelled) fn();
+          else unlisten.push(fn);
+        })
+        .catch(() => {});
+
+    // Cold start. The command answers once, so the files it names are taken
+    // even if this effect has been torn down and run again by then.
+    invoke<string[]>("launch_archives")
+      .then(offerArchives)
+      .catch(() => {});
+
+    keep(listen<string[]>("open-archive", (e) => offerArchives(e.payload)));
+
+    try {
+      keep(
+        getCurrentWebview().onDragDropEvent((event) => {
+          const p = event.payload;
+          // A page that takes dropped files for itself is on screen.
+          if (fileDropClaimed()) {
+            setDragging(false);
+            return;
+          }
+          if (p.type === "enter") setDragging(p.paths.some(isArchivePath));
+          else if (p.type === "leave") setDragging(false);
+          else if (p.type === "drop") {
+            setDragging(false);
+            offerArchives(p.paths);
+          }
+        }),
+      );
+    } catch {
+      // No webview to listen on, which is a test or a plain browser.
+    }
+
+    return () => {
+      cancelled = true;
+      for (const fn of unlisten) fn();
+    };
+  }, [offerArchives]);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -293,14 +493,12 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
     // Cold start: the link the app was launched with, if any.
     getCurrent()
       .then((urls) => {
-        if (!cancelled && urls && urls.length > 0) handleUrl(urls[0]);
+        if (!cancelled && urls) receive(urls);
       })
       .catch(() => {});
 
     // While running: links delivered by the OS (macOS) or forwarded here.
-    onOpenUrl((urls) => {
-      if (urls.length > 0) handleUrl(urls[0]);
-    })
+    onOpenUrl(receive)
       .then((fn) => {
         if (cancelled) fn();
         else unlisten = fn;
@@ -324,7 +522,7 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
       unlisten?.();
       setDeepLinkHandler(null);
     };
-  }, [handleUrl]);
+  }, [handleUrl, receive]);
 
   return (
     <>
@@ -343,6 +541,14 @@ export function DeepLinkHandler({ children }: { children: React.ReactNode }) {
         </DialogContent>
       </Dialog>
       <ConfirmDialog pending={pending} setPending={setPending} />
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-background/80">
+          <p className="flex items-center gap-2 rounded-md border bg-card px-4 py-3 text-sm font-medium">
+            <PackagePlus className="size-4 text-muted-foreground" />
+            Drop to install
+          </p>
+        </div>
+      )}
     </>
   );
 }
