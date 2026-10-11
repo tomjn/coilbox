@@ -1,6 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Loader2, ScanSearch, Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -21,6 +27,7 @@ import {
 import {
   ANALYSIS_SECTION_ID,
   analysisBlockers,
+  analysisEngineOutput,
   analysisPercent,
   analysisProgressLabel,
   analysisRunHidden,
@@ -552,6 +559,42 @@ function Running({
   onCancel: () => void;
 }) {
   const label = analysisProgressLabel(job);
+  const [now, setNow] = useState(() => Date.now());
+  const [outputOpen, setOutputOpen] = useState(false);
+  const [output, setOutput] = useState<string[]>([]);
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  // Read only while it is open, and again each second: the engine goes on
+  // writing for as long as it runs.
+  useEffect(() => {
+    if (!outputOpen) return;
+    let stale = false;
+    const read = () =>
+      analysisEngineOutput(job.id).then(
+        (lines) => {
+          if (!stale) setOutput(lines);
+        },
+        () => {},
+      );
+    void read();
+    const timer = setInterval(read, 1000);
+    return () => {
+      stale = true;
+      clearInterval(timer);
+    };
+  }, [outputOpen, job.id]);
+  // The newest line is the one worth reading, so the box stays at its end
+  // until it is scrolled away from there.
+  const outputBox = useRef<HTMLPreElement>(null);
+  const atEnd = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the lines change, which is when the box grows.
+  useLayoutEffect(() => {
+    const box = outputBox.current;
+    if (box && atEnd.current) box.scrollTop = box.scrollHeight;
+  }, [output]);
+  const elapsed = Math.max(0, (now - job.startedAtMs) / 1000);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -578,7 +621,33 @@ function Running({
           aria-label="Playback progress"
         />
       )}
-      <p className="text-xs text-muted-foreground">You can leave this page.</p>
+      <p className="text-xs text-muted-foreground">
+        Running for {formatDuration(elapsed)}. You can leave this page.
+      </p>
+      <Collapsible open={outputOpen} onOpenChange={setOutputOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="group w-fit gap-1.5">
+            <ChevronRight className="size-4 transition-transform group-data-[state=open]:rotate-90 motion-reduce:transition-none" />
+            What the engine is saying
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <pre
+            ref={outputBox}
+            onScroll={(e) => {
+              const box = e.currentTarget;
+              // Within a pixel, because scroll positions are fractional.
+              atEnd.current =
+                box.scrollHeight - box.scrollTop - box.clientHeight <= 1;
+            }}
+            className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-xs"
+          >
+            {output.length > 0
+              ? output.join("\n")
+              : "The engine has written nothing yet."}
+          </pre>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 }

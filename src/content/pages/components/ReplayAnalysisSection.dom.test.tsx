@@ -36,6 +36,8 @@ let CHECK: {
 };
 /** The engines in the one content folder `content_state_load` answers with. */
 let ENGINES: { path: string; version: string; syncVersion?: string }[] = [];
+/** What `content_analysis_engine_output` answers. Null is a job not running. */
+let ENGINE_OUTPUT: string[] | null = null;
 
 vi.mock("@picoframe/plugin-sdk", () => ({
   defineCommand:
@@ -50,6 +52,8 @@ vi.mock("@picoframe/plugin-sdk", () => ({
           return { outcome: "queued", queue: EMPTY_QUEUE };
         case "content_replay_analyses":
           return { analyses: [] };
+        case "content_analysis_engine_output":
+          return { lines: ENGINE_OUTPUT };
         case "content_metric_registry":
           return {
             metrics: [{ key: "unitsTeleported", label: "Units beamed in" }],
@@ -188,6 +192,7 @@ beforeEach(() => {
   HIDE = [];
   CHECK = { cannot: null, gameId: ID, matchSeconds: 769, headless: [] };
   ENGINES = [];
+  ENGINE_OUTPUT = null;
   resetContentState();
   resetReplayAnalysisForTests();
   seedReplayAnalysisForTests({});
@@ -437,6 +442,45 @@ describe("a replay in the queue", () => {
     expect(
       called.find((c) => c.command === "content_analysis_cancel")?.args,
     ).toEqual({ id: 7 });
+  });
+
+  it("says how long it has been running", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: job({ startedAtMs: Date.now() - 192_000 }) },
+    });
+    show();
+
+    expect(screen.getByText(/Running for 3:1\d\./)).toBeTruthy();
+  });
+
+  it("reads the engine's output only once it is asked for, by job id", async () => {
+    ENGINE_OUTPUT = ["[t=00:00:09.1][f=0000000] paused the demo"];
+    seedReplayAnalysisForTests({ queue: { running: job() } });
+    show();
+
+    expect(commands()).not.toContain("content_analysis_engine_output");
+    fireEvent.click(
+      screen.getByRole("button", { name: "What the engine is saying" }),
+    );
+
+    expect(await screen.findByText(/paused the demo/)).toBeTruthy();
+    expect(
+      called.find((c) => c.command === "content_analysis_engine_output")?.args,
+    ).toEqual({ id: 7 });
+  });
+
+  it("says so when the engine has written nothing", async () => {
+    ENGINE_OUTPUT = [];
+    seedReplayAnalysisForTests({ queue: { running: job() } });
+    show();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "What the engine is saying" }),
+    );
+
+    expect(
+      await screen.findByText("The engine has written nothing yet."),
+    ).toBeTruthy();
   });
 
   it("draws no bar while the engine is still starting", () => {

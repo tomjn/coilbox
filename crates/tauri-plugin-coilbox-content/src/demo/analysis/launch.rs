@@ -110,9 +110,53 @@ struct ControlState {
     cancelled: bool,
     /// A cancel found the engine running and killed it.
     killed: bool,
+    /// Where the engine's output is going, once it has been started.
+    log: Option<PathBuf>,
+}
+
+/// How much of the end of the engine's output is read to show while it runs.
+/// Room for [`super::LOG_EXCERPT_LINES`] lines as long as the longest in one
+/// infolog measured, 229 bytes, which comes to 9,160 bytes, rounded up. Longer
+/// lines only mean fewer are shown.
+const OUTPUT_TAIL_BYTES: u64 = 16 * 1024;
+
+/// The last whole lines of the engine's output file, oldest first.
+fn output_tail(log: &Path) -> Vec<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let Ok(mut file) = std::fs::File::open(log) else {
+        return Vec::new();
+    };
+    let len = file.metadata().map(|m| m.len()).unwrap_or(0);
+    let from = len.saturating_sub(OUTPUT_TAIL_BYTES);
+    let mut tail = Vec::new();
+    if file.seek(SeekFrom::Start(from)).is_err() || file.read_to_end(&mut tail).is_err() {
+        return Vec::new();
+    }
+    let tail = String::from_utf8_lossy(&tail);
+    let mut lines: Vec<&str> = tail.lines().collect();
+    // A read that began part way into the file began part way into a line.
+    if from > 0 && !lines.is_empty() {
+        lines.remove(0);
+    }
+    lines[lines.len().saturating_sub(super::LOG_EXCERPT_LINES)..]
+        .iter()
+        .map(|line| line.to_string())
+        .collect()
 }
 
 impl RunControl {
+    /// What the engine has said most recently, for showing while it runs.
+    /// Empty before the engine has been started.
+    pub fn output_tail(&self) -> Vec<String> {
+        let log = self
+            .state
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .log
+            .clone();
+        log.as_deref().map(output_tail).unwrap_or_default()
+    }
+
     /// Stop the run: kill its engine if it has one and wait for it to be gone,
     /// and refuse it one if it has not started it yet.
     pub fn cancel(&self) {
@@ -287,6 +331,7 @@ pub fn run_headless(launch: &Launch, control: &RunControl) -> Result<EngineExit,
             format!("{}\n{}\n", child.id(), launch.engine.display()),
         );
         state.child = Some(child);
+        state.log = Some(launch.log.to_path_buf());
     }
 
     loop {
@@ -532,6 +577,63 @@ pub(super) mod tests {
         assert_eq!(exit.signal, Some(libc_sigkill()));
         // Killed, not left to finish its ten minutes.
         assert!(started.elapsed() < Duration::from_secs(30));
+    }
+
+    /// What a person watching a run that has stopped moving has to go on: the
+    /// engine's own lines, while it is still running.
+    #[test]
+    fn what_the_engine_has_said_can_be_read_while_it_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = fake_engine(dir.path(), "echo one; echo two; exec sleep 600");
+        let control = RunControl::default();
+        let started = Instant::now();
+        assert!(control.output_tail().is_empty());
+
+        std::thread::scope(|scope| {
+            let run = scope.spawn(|| {
+                run_headless(
+                    &Launch {
+                        engine: &engine,
+                        demo: &dir.path().join("replay.sdfz"),
+                        write_dir: &dir.path().join("write"),
+                        config: &dir.path().join("engine.cfg"),
+                        pid_file: &dir.path().join(PID_FILE),
+                        data_dirs: &[],
+                        log: &dir.path().join("engine.log"),
+                        timeout: LONG,
+                        on_poll: &|| {},
+                    },
+                    &control,
+                )
+            });
+            while control.output_tail() != ["one", "two"] {
+                assert!(started.elapsed() < LONG, "the engine's lines never came");
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            control.cancel();
+            run.join().unwrap().unwrap();
+        });
+    }
+
+    /// The engine's log grows for the whole run, and on Windows its lines end
+    /// in a carriage return as well.
+    #[test]
+    fn only_the_last_whole_lines_of_a_long_output_are_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("engine.log");
+        let lines = 2000;
+        let output: String = (0..lines)
+            .map(|n| format!("[f={n:07}] a line of the engine's output\r\n"))
+            .collect();
+        assert!(output.len() as u64 > OUTPUT_TAIL_BYTES);
+        std::fs::write(&log, output).unwrap();
+
+        let tail = output_tail(&log);
+
+        let expected: Vec<String> = (lines - super::super::LOG_EXCERPT_LINES..lines)
+            .map(|n| format!("[f={n:07}] a line of the engine's output"))
+            .collect();
+        assert_eq!(tail, expected);
     }
 
     /// The one thing between an analysis and a player's settings. Without

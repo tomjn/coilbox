@@ -33,6 +33,7 @@ const COMMANDS: &[&str] = &[
     "content_analysis_enqueue",
     "content_analysis_queue",
     "content_analysis_cancel",
+    "content_analysis_engine_output",
     "content_analysis_dismiss",
     "content_replay_analyses",
     "content_replay_analysis",

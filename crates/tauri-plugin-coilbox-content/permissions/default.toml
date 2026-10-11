@@ -33,6 +33,7 @@ permissions = [
   "allow-content-analysis-enqueue",
   "allow-content-analysis-queue",
   "allow-content-analysis-cancel",
+  "allow-content-analysis-engine-output",
   "allow-content-analysis-dismiss",
   "allow-content-replay-analyses",
   "allow-content-replay-analysis",

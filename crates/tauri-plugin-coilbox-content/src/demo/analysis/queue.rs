@@ -420,6 +420,19 @@ impl AnalysisQueue {
         self.0.announce();
     }
 
+    /// What the engine of a running job has said most recently, or `None` when
+    /// that job is not the one running.
+    pub fn engine_output(&self, id: u64) -> Option<Vec<String>> {
+        let control = self
+            .0
+            .lock()
+            .running
+            .as_ref()
+            .filter(|running| running.job.id == id)
+            .map(|running| running.control.clone())?;
+        Some(control.output_tail())
+    }
+
     /// Forget a match's last failure, once a person has read it.
     pub fn dismiss_failure(&self, game_id: &str) {
         self.0.lock().failures.retain(|f| f.game_id != game_id);
@@ -966,6 +979,23 @@ pub(crate) async fn content_analysis_cancel(
     })
 }
 
+/// `content_analysis_engine_output`: the last lines the engine of a running
+/// job has written, oldest first, for a page to show while the run goes on.
+/// `lines` is null when that job is not the one running.
+#[tauri::command]
+pub(crate) async fn content_analysis_engine_output(
+    queue: State<'_, AnalysisQueue>,
+    id: u64,
+) -> Result<CliResult, ()> {
+    let queue = queue.inner().clone();
+    // Off the async runtime: it reads a file.
+    let lines = tauri::async_runtime::spawn_blocking(move || queue.engine_output(id)).await;
+    Ok(match lines {
+        Ok(lines) => CliResult::ok(json!({ "lines": lines })),
+        Err(e) => CliResult::err(format!("replay analysis task failed: {e}")),
+    })
+}
+
 /// `content_analysis_dismiss`: forget a match's last failed run, once it has
 /// been read.
 #[tauri::command]
@@ -1456,6 +1486,24 @@ mod tests {
             !world.queue.cancel(id),
             "a finished job is not there to cancel"
         );
+    }
+
+    #[test]
+    fn the_engines_output_is_only_given_for_the_job_that_is_running() {
+        let world = World::new(Script::UntilCancelled);
+        world.ask(ID);
+        world.ask(OTHER);
+        let playing = world.until_playing(1);
+        let running = playing.running.unwrap().id;
+        let queued = playing.queued[0].id;
+
+        // The stand in engine writes no output, so there are no lines yet.
+        assert_eq!(world.queue.engine_output(running), Some(Vec::new()));
+        assert_eq!(world.queue.engine_output(queued), None);
+
+        world.queue.cancel_all();
+        world.until_idle();
+        assert_eq!(world.queue.engine_output(running), None);
     }
 
     #[test]
