@@ -464,7 +464,7 @@ export interface LayerAggregate {
   available: number;
   /** Matches with at least one event in the window. The mean is over these. */
   contributing: number;
-  /** Matches left out because their game build is not installed, so nothing
+  /** Matches left out because no unit list that fits them is known, so nothing
    *  says what their buildings are for. Category layers only. */
   unclassified: number;
   /** Events in the window, over the contributing matches, unscaled. */
@@ -529,9 +529,9 @@ const ownPeaks = new WeakMap<CountColumns, Map<string, number>>();
 /**
  * Add the matches up for one layer.
  *
- * `categories` gives the category table for a game build by the name the
- * replay records, or undefined when that build is not installed. It is only
- * asked for a category layer.
+ * `categories` gives the category table for one replay, made from the unit
+ * list that replay's orders are named from, or undefined when it has none or its
+ * orders do not fit it. It is only asked for a category layer.
  */
 export function aggregateLayer(
   replays: readonly ReplayCounts[],
@@ -540,7 +540,7 @@ export function aggregateLayer(
   options: {
     normalise: Normalise;
     window: MatchWindow;
-    categories?: (gameType: string) => DefCategories | undefined;
+    categories?: (replay: ReplayCounts) => DefCategories | undefined;
     /** Count the matches and events and build no field, for a layer that is
      *  not being drawn and still has a count beside its toggle. */
     countsOnly?: boolean;
@@ -572,7 +572,7 @@ export function aggregateLayer(
     if (!columns) continue;
     let keep: ((def: number) => boolean) | null = null;
     if (category) {
-      const table = options.categories?.(replay.gameType);
+      const table = options.categories?.(replay);
       if (!table) {
         unclassified++;
         continue;

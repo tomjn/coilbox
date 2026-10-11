@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { heatGridSize } from "@/lib/heatField";
-import { contentReplayMapGrids } from "./bindings";
 import {
-  loadUnitsyncUnitDataset,
-  useScanTargetSelection,
-  useUnitsyncScan,
-} from "./config";
+  contentReplayMapGrids,
+  contentReplayUnitOrders,
+  type ReplayUnitOrders,
+  type StoredUnitDef,
+  type UnitDatasetEntry,
+} from "./bindings";
 import {
   type DefCategories,
   decodeReplayGrids,
@@ -13,8 +14,9 @@ import {
   MAP_GRID_RESOLUTION,
   type ReplayCounts,
 } from "./mapAggregate";
-import { pickUnitSource } from "./replayBuildOrders";
 import type { MapWorld } from "./replayMapLayers";
+import { listMisfits, replayLists, storedLists } from "./unitUsage";
+import { useInstalledGames, useUnitListReads } from "./useUnitListReads";
 
 /** One replay to read, and what would make an earlier read of it stale. */
 export interface ReplayAsk {
@@ -127,77 +129,147 @@ export function useMapReplayCounts(
   }, [tick, asksKey, sized, world.worldWidth, world.worldHeight]);
 }
 
+/** The orders read so far, by replay. Grows as the page's replays do. */
+interface OrdersHeld {
+  replays: Map<string, ReplayUnitOrders>;
+  lists: Map<string, UnitDatasetEntry[]>;
+  /** Replays Rust could not read, or whose call failed. */
+  failed: Set<string>;
+}
+
+const NO_ORDERS: OrdersHeld = {
+  replays: new Map(),
+  lists: new Map(),
+  failed: new Set(),
+};
+
 /**
- * What each building is for, by the game and version a replay names.
+ * What each replay's buildings are for, from the unit list that replay's own
+ * page would name its orders from (#3904).
  *
- * A unit definition id means a unit in one build of one game and nothing in
- * any other, so a table is only made from the build installed under exactly
- * the name the replay records. A replay of a build that is not installed gets
- * no table, and the category layers leave it out and say so. The replay page
- * falls back to another version of the same game with a warning. A picture of
- * many matches has nowhere to put that warning per match, so it does not.
+ * A unit definition id means a unit in the list the engine built for one match,
+ * and the list depends on the match's setup. So each replay is named from the
+ * engine's own list when it was analysed, then from the game installed under
+ * exactly the name it records, read with the replay's setup
+ * (`streamNaming`). Replays of one game with one setup share a read
+ * (`useUnitListReads`). A replay with no such list, or whose own orders do not
+ * fit its list, gets no table and the category layers leave it out. The replay
+ * page falls back to another version of the same game with a warning. A
+ * picture of many matches has nowhere to put that warning per match, so it
+ * does not.
  *
- * Nothing is asked of unitsync until `wanted`.
+ * Nothing is asked of Rust or unitsync until `wanted`.
  */
 export function useGameCategories(
-  gameTypes: readonly string[],
+  replays: readonly { path: string }[],
   wanted: boolean,
 ) {
-  const { selected } = useScanTargetSelection();
-  const scan = useUnitsyncScan(selected?.enginePath, selected?.rootPath);
-  // A game type maps to its table, or to null once its read has failed or
-  // come back empty, so a read is tried once and "still reading" has an end.
-  const [tables, setTables] = useState<
-    ReadonlyMap<string, DefCategories | null>
-  >(() => new Map());
-  const games = scan.data?.games;
-  const enginePath = selected?.enginePath;
-  const rootPath = selected?.rootPath;
+  const { installed, enginePath, rootPath } = useInstalledGames();
+  const [held, setHeld] = useState<OrdersHeld>(NO_ORDERS);
+  const heldRef = useRef(held);
+  heldRef.current = held;
+  const pathsKey = replays.map((r) => r.path).join("\n");
 
-  // The archive to read for each game type that is installed under its exact
-  // name. A string, so the effect depends on what it says and not on the
-  // identity of the scan's list.
-  const wantedKey = useMemo(() => {
-    if (!wanted || !games) return "";
-    return [...new Set(gameTypes)]
-      .sort()
-      .flatMap((gameType) => {
-        const source = pickUnitSource(gameType, games);
-        return source.kind === "installed"
-          ? [`${gameType}\t${source.game.primaryArchive.name}`]
-          : [];
-      })
-      .join("\n");
-  }, [wanted, games, gameTypes]);
-
+  // Only the replays not read yet are asked for, so narrowing a filter asks
+  // for nothing and a replay arriving does not read the others again.
   useEffect(() => {
-    if (!wantedKey || !enginePath || !rootPath) return;
+    if (!wanted || !pathsKey) return;
+    const have = heldRef.current;
+    const missing = pathsKey
+      .split("\n")
+      .filter((p) => !have.replays.has(p) && !have.failed.has(p));
+    if (missing.length === 0) return;
     let live = true;
-    for (const line of wantedKey.split("\n")) {
-      const [gameType, archive] = line.split("\t");
-      const settle = (table: DefCategories | null) => {
-        if (live) setTables((before) => new Map(before).set(gameType, table));
-      };
-      loadUnitsyncUnitDataset(enginePath, rootPath, archive).then(
-        (dataset) =>
-          settle(
-            dataset.units.length > 0 ? defCategories(dataset.units) : null,
-          ),
-        () => settle(null),
-      );
-    }
+    const merge = (
+      got: {
+        replays: ReplayUnitOrders[];
+        sets: Record<string, StoredUnitDef[]>;
+      },
+      failed: string[],
+    ) =>
+      setHeld((before) => ({
+        replays: new Map([
+          ...before.replays,
+          ...got.replays.map((r) => [r.path, r] as const),
+        ]),
+        lists: new Map([...before.lists, ...storedLists(got.sets)]),
+        failed: new Set([...before.failed, ...failed]),
+      }));
+    contentReplayUnitOrders({ paths: missing }).then(
+      (got) => {
+        if (!live) return;
+        const read = new Set(got.replays.map((r) => r.path));
+        merge(
+          got,
+          missing.filter((p) => !read.has(p)),
+        );
+      },
+      () => {
+        if (live) merge({ replays: [], sets: {} }, missing);
+      },
+    );
     return () => {
       live = false;
     };
-  }, [wantedKey, enginePath, rootPath]);
+  }, [wanted, pathsKey]);
+
+  const datasets = useUnitListReads(
+    held.replays,
+    held.lists,
+    installed,
+    enginePath,
+    rootPath,
+  );
+
+  // Each replay's table, or why it has none.
+  const verdicts = useMemo(() => {
+    const tables = new Map<readonly UnitDatasetEntry[], DefCategories>();
+    const out = new Map<
+      string,
+      DefCategories | "waiting" | "misfit" | "none"
+    >();
+    for (const path of pathsKey ? pathsKey.split("\n") : []) {
+      const orders = held.replays.get(path);
+      if (!orders) {
+        // Not answered yet, or answered with a failure that cannot be checked.
+        out.set(path, held.failed.has(path) ? "misfit" : "waiting");
+        continue;
+      }
+      const { stream } = replayLists(orders, held.lists, installed, datasets);
+      if (stream.kind !== "named") {
+        out.set(path, stream.kind);
+        continue;
+      }
+      if (listMisfits(orders, stream)) {
+        out.set(path, "misfit");
+        continue;
+      }
+      let table = tables.get(stream.units);
+      if (!table) {
+        table = defCategories(stream.units);
+        tables.set(stream.units, table);
+      }
+      out.set(path, table);
+    }
+    return out;
+  }, [pathsKey, held, installed, datasets]);
 
   return useMemo(() => {
-    const asked = wantedKey
-      ? wantedKey.split("\n").map((l) => l.split("\t")[0])
-      : [];
+    let misfit = 0;
+    let waiting = false;
+    for (const verdict of verdicts.values()) {
+      if (verdict === "misfit") misfit++;
+      else if (verdict === "waiting") waiting = true;
+    }
     return {
-      categories: (gameType: string) => tables.get(gameType) ?? undefined,
-      loading: (wanted && scan.loading) || asked.some((g) => !tables.has(g)),
+      categories: (replay: { path: string }) => {
+        const verdict = verdicts.get(replay.path);
+        return typeof verdict === "object" ? verdict : undefined;
+      },
+      /** Replays whose orders do not fit their list, or could not be checked
+       *  against it. They are in no category layer. */
+      misfit,
+      loading: wanted && (installed === null || waiting),
     };
-  }, [tables, wantedKey, wanted, scan.loading]);
+  }, [verdicts, wanted, installed]);
 }

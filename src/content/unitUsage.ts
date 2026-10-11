@@ -112,6 +112,17 @@ export function totalsMisfits(
   return misfits;
 }
 
+/**
+ * Whether a replay's own orders contradict the list it is named from. The
+ * engine's own list is the numbering the match used, so it is not checked.
+ */
+export function listMisfits(
+  replay: Pick<ReplayUnitOrders, "seats">,
+  stream: { units: readonly UnitDatasetEntry[]; engine: boolean },
+): boolean {
+  return !stream.engine && totalsMisfits(replay, stream.units) > 0;
+}
+
 /** What one counted replay is read against. */
 export interface ReplayLists {
   /** The list that names the replay's build orders, or why there is none.
@@ -325,8 +336,8 @@ export function foldUnitUsage(
       out.noList.orders += myOrders;
       continue;
     }
-    const { units, engine } = lists.stream;
-    if (!engine && totalsMisfits(replay, units) > 0) {
+    const { units } = lists.stream;
+    if (listMisfits(replay, lists.stream)) {
       out.misfit.games++;
       out.misfit.orders += myOrders;
       continue;

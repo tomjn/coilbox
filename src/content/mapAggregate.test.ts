@@ -325,8 +325,8 @@ describe("how many matches are behind each layer", () => {
   });
   const nothing = replay({ path: "/demos/c.sdfz" });
   const all = [withBuildings, otherBuild, nothing];
-  const categories = (game: string) =>
-    game === "Some Game 1.0"
+  const categories = (r: { gameType: string }) =>
+    r.gameType === "Some Game 1.0"
       ? ([undefined, "defence", "economy"] as const)
       : undefined;
   const options = { normalise: "share", window: WHOLE, categories } as const;
@@ -374,6 +374,43 @@ describe("how many matches are behind each layer", () => {
     const economy = aggregateLayer(all, "economy", WORLD, options);
     expect(economy.events).toBe(6);
     expect(at(economy.field, QUIET)).toBe(0);
+  });
+
+  it("reads each match against its own table, even for one game", () => {
+    // The same game and build, numbered differently by two matches' setups.
+    const plain = replay({
+      path: "/demos/plain.sdfz",
+      gameType: "Some Game 1.0",
+      buildings: layer([[QUIET, 0, 4, 1]]),
+    });
+    const optioned = replay({
+      path: "/demos/optioned.sdfz",
+      gameType: "Some Game 1.0",
+      buildings: layer([[BUSY, 0, 6, 1]]),
+    });
+    const tables = new Map([
+      ["/demos/plain.sdfz", [undefined, "defence"] as const],
+      ["/demos/optioned.sdfz", [undefined, "economy"] as const],
+    ]);
+    const options = {
+      normalise: "share",
+      window: WHOLE,
+      categories: (r: { path: string }) => tables.get(r.path),
+    } as const;
+    const defence = aggregateLayer(
+      [plain, optioned],
+      "defence",
+      WORLD,
+      options,
+    );
+    expect([defence.events, defence.contributing]).toEqual([4, 1]);
+    const economy = aggregateLayer(
+      [plain, optioned],
+      "economy",
+      WORLD,
+      options,
+    );
+    expect([economy.events, economy.contributing]).toEqual([6, 1]);
   });
 
   it("leaves every match out of a category layer when no build is installed", () => {

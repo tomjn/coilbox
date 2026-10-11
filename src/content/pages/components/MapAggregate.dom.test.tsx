@@ -18,7 +18,9 @@ import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   MapCountLayer,
+  MatchSetup,
   ReplayMapGrids,
+  ReplayUnitOrders,
   StatRecord,
   StoredReplayAnalysis,
 } from "../../bindings";
@@ -27,11 +29,31 @@ import type { ReplaySet } from "../../replaySets";
 let GRIDS: Record<string, Partial<ReplayMapGrids> | Error> = {};
 let SETS: ReplaySet[] = [];
 let UNITS: Record<string, unknown[]> = {};
+/** What unit orders Rust answers for a replay, over a plain default. */
+let ORDERS: Record<string, Partial<ReplayUnitOrders>> = {};
+/** Units read for an archive with a match setup, by archive and setup. */
+let SETUP_UNITS: { setup: MatchSetup; units: unknown[] }[] = [];
+const loaded = vi.fn();
 let SETTINGS: Record<string, unknown> = {};
 const asked = vi.fn();
 
 vi.mock("../../bindings", async (original) => ({
   ...(await original<typeof import("../../bindings")>()),
+  contentReplayUnitOrders: async (args: { paths: string[] }) => ({
+    replays: args.paths.map((path) => ({
+      path,
+      remixed: false,
+      gameType: GRIDS_GAME(path),
+      lastFrame: 0,
+      incomplete: false,
+      removals: 0,
+      seats: [],
+      fromCache: false,
+      ...ORDERS[path],
+    })),
+    sets: {},
+    failed: [],
+  }),
   contentReplayMapGrids: async (args: {
     paths: string[];
     worldWidth: number;
@@ -68,10 +90,21 @@ vi.mock("../../config", () => ({
     },
     loading: false,
   }),
-  loadUnitsyncUnitDataset: async (_e: string, _d: string, archive: string) => ({
-    units: UNITS[archive.replace(/\.sdz$/, "")] ?? [],
-    errors: [],
-  }),
+  loadUnitsyncUnitDataset: async (
+    _e: string,
+    _d: string,
+    archive: string,
+    setup?: MatchSetup,
+  ) => {
+    loaded(archive, setup);
+    const read = SETUP_UNITS.find(
+      (s) => JSON.stringify(s.setup) === JSON.stringify(setup),
+    );
+    return {
+      units: read?.units ?? UNITS[archive.replace(/\.sdz$/, "")] ?? [],
+      errors: [],
+    };
+  },
 }));
 vi.mock("../../replaySets", async (original) => ({
   ...(await original<typeof import("../../replaySets")>()),
@@ -88,6 +121,13 @@ vi.mock("@picoframe/frame", async () => ({
 }));
 vi.mock("@/lib/useHeatmapLayer", () => ({ useHeatmapLayer: () => {} }));
 vi.mock("@tauri-apps/plugin-opener", () => ({ openUrl: async () => {} }));
+
+const GRIDS_GAME = (path: string) => {
+  const found = GRIDS[path];
+  return (
+    (found instanceof Error ? undefined : found?.gameType) ?? "Some Game 1.0"
+  );
+};
 
 const { MapAggregate } = await import("./MapAggregate");
 const { resetMapReplayCounts } = await import("../../useMapAggregate");
@@ -231,8 +271,11 @@ beforeEach(() => {
   GRIDS = {};
   SETS = [];
   UNITS = {};
+  ORDERS = {};
+  SETUP_UNITS = [];
   SETTINGS = {};
   asked.mockClear();
+  loaded.mockClear();
   resetMapReplayCounts();
   resetReplayAnalysisForTests();
   seedReplayAnalysisForTests({});
@@ -326,6 +369,94 @@ describe("the picture of every match on a map", () => {
     expect(text("category-note")).toMatch(
       /1 match was played on a game or version that is not installed.*it is left out of this layer/,
     );
+  });
+
+  describe("naming buildings from each match's own unit list (#3904)", () => {
+    const setup = {
+      modOptions: { campaign_chassis: "1" },
+      mapOptions: {},
+      teams: [],
+      allyTeams: [],
+      players: [],
+      ais: [],
+    } satisfies MatchSetup;
+    const defence = {
+      mobile: false,
+      buildOptions: [],
+      stats: { weapons: [{}] },
+    };
+    const mine = {
+      mobile: false,
+      buildOptions: [],
+      stats: { extractsMetal: 1 },
+    };
+    const tank = { mobile: true, buildOptions: [], stats: { weapons: [{}] } };
+
+    /** Three matches of one game. `plain` and `wrong` have no setup, so they
+     *  share a read of the game's own list. `optioned` was played with a mod
+     *  option that puts an economy building at id 1. `wrong` places a tank,
+     *  which the list it is read against cannot be right about. */
+    function threeMatches(): StatRecord[] {
+      const one = (gameId: string, count: number) => ({
+        gameId,
+        buildings: layer([[50 * 256 + 50, 0, count, 1]]),
+      });
+      GRIDS = {
+        "/demos/plain.sdfz": one("pp", 4),
+        "/demos/optioned.sdfz": one("oo", 6),
+        "/demos/wrong.sdfz": one("ww", 8),
+      };
+      UNITS = { "Some Game 1.0": [defence, tank] };
+      SETUP_UNITS = [{ setup, units: [mine, tank] }];
+      ORDERS = {
+        "/demos/optioned.sdfz": { matchSetup: setup },
+        "/demos/wrong.sdfz": {
+          seats: [
+            { player: 0, defs: [{ def: 2, placed: 3, queued: 0, units: 3 }] },
+          ],
+        },
+      };
+      return ["plain", "optioned", "wrong"].map((name) =>
+        record({
+          filename: `${name}.sdfz`,
+          gameId: name.slice(0, 1).repeat(2),
+        }),
+      );
+    }
+
+    it("reads a match with a setup from the list read with it, and shares reads", async () => {
+      show(threeMatches());
+      await settled();
+      await waitFor(() => expect(text("layer-defence")).toBe("Defences · 1"));
+      expect(text("layer-economy")).toBe("Economy · 1");
+      fireEvent.click(screen.getByTestId("layer-defence"));
+      expect(text("layer-events")).toBe(
+        "4 orders to place a defence, from 1 match.",
+      );
+      fireEvent.click(screen.getByTestId("layer-economy"));
+      expect(text("layer-events")).toBe(
+        "6 orders to place an economy building, from 1 match.",
+      );
+      // One read of the game with no setup, for two matches, and one with it.
+      expect(loaded.mock.calls).toEqual([
+        ["Some Game 1.0.sdz", undefined],
+        ["Some Game 1.0.sdz", setup],
+      ]);
+    });
+
+    it("leaves out a match whose orders do not fit its list, and counts it", async () => {
+      show(threeMatches());
+      await settled();
+      await waitFor(() => expect(text("layer-defence")).toBe("Defences · 1"));
+      fireEvent.click(screen.getByTestId("layer-defence"));
+      expect(text("category-misfit")).toBe(
+        "1 match left out: orders do not fit the unit list.",
+      );
+      // It is a match with a game installed, so it is not also "not installed".
+      expect(screen.queryByTestId("category-note")).toBeNull();
+      const popover = help();
+      expect(popover.getByText(/do not fit that list/)).toBeTruthy();
+    });
   });
 
   it("says no match has been analysed when the deaths layer has none", async () => {
