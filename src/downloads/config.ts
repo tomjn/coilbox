@@ -5,7 +5,12 @@ import { loadContentState, useContentState } from "../content/contentState";
 import { getProfileRoot } from "../profile/profile";
 import { dlSetEngineDirs } from "./bindings";
 import { DEFAULT_RAPID_MASTERS } from "./rapidMasters";
-import { healWriteRoot, packageDirOf } from "./writeRoot";
+import {
+  healWriteRoot,
+  packageDirOf,
+  pickWriteRoot,
+  type WriteRootKind,
+} from "./writeRoot";
 
 /** A user-configured rapid master. `url` is the base; `dl_repos` appends `/repos.gz`. */
 export interface RapidRepo {
@@ -23,6 +28,10 @@ export interface DownloadsConfig {
   rapidRepos: RapidRepo[];
   /** Id of the content-plugin root downloads write into (`--filesystem-writepath`). */
   writeRootId?: string;
+  /** Id of the root games go to instead. Unset means they follow `writeRootId`. */
+  gamesRootId?: string;
+  /** Id of the root maps go to instead. Unset means they follow `writeRootId`. */
+  mapsRootId?: string;
 }
 
 /** The Spring rapid master ships pre-configured, and the user can add more. */
@@ -119,10 +128,14 @@ export interface WriteRoot {
 }
 
 /**
- * Resolve the configured write-root id (Downloads settings) to its on-disk path,
- * via the content plugin's detected roots. Shared by every download screen so
- * they all write into the same chosen folder. `undefined` when none is set or
- * the root no longer exists.
+ * Resolve the configured write-root id (Content folders settings) to its
+ * on-disk path, via the content plugin's detected roots. Shared by every
+ * download screen so they all write into the same chosen folder. `undefined`
+ * when none is set or the root no longer exists.
+ *
+ * Pass `kind` for a game or a map, which can each have a folder of their own
+ * and otherwise follow the default. Everything else, engines included, asks
+ * with no kind and gets the default. See {@link pickWriteRoot}.
  *
  * A read that fails is `loading: false` with no path: the content plugin could
  * not name a single root, so there is nowhere to download to, which is the same
@@ -133,14 +146,14 @@ export interface WriteRoot {
  * to an in-package root and persists that correction, so downloads can't silently
  * land next to the wrong folder. See {@link healWriteRoot}.
  */
-export function useWriteRoot(): WriteRoot {
+export function useWriteRoot(kind?: WriteRootKind): WriteRoot {
   const [cfg, setCfg] = useDownloadsConfig();
   // Latest config for the heal-persist below, without re-running the load every
   // render (the effect keys on the writeRootId primitive, not the cfg object).
   const cfgRef = useRef(cfg);
   cfgRef.current = cfg;
   const { state, error } = useContentState();
-  const chosen = useMemo(
+  const healed = useMemo(
     () =>
       state
         ? healWriteRoot(
@@ -155,10 +168,26 @@ export function useWriteRoot(): WriteRoot {
   // stale id doesn't linger. One-shot: once the id matches, this stops firing.
   // Spread the latest config (via ref) so a concurrent rapid-repo edit isn't lost.
   useEffect(() => {
-    if (chosen && chosen.id !== cfg.writeRootId) {
-      setCfg({ ...cfgRef.current, writeRootId: chosen.id });
+    if (healed && healed.id !== cfg.writeRootId) {
+      setCfg({ ...cfgRef.current, writeRootId: healed.id });
     }
-  }, [chosen, cfg.writeRootId, setCfg]);
+  }, [healed, cfg.writeRootId, setCfg]);
+  const chosen = useMemo(
+    () =>
+      state
+        ? pickWriteRoot(
+            state.roots,
+            {
+              writeRootId: cfg.writeRootId,
+              gamesRootId: cfg.gamesRootId,
+              mapsRootId: cfg.mapsRootId,
+            },
+            kind,
+            packageDirOf(getProfileRoot()),
+          )
+        : undefined,
+    [state, cfg.writeRootId, cfg.gamesRootId, cfg.mapsRootId, kind],
+  );
   // A later re-read (the heal above, or a settings change) does not go back to
   // loading. The previous answer stands until the new one lands, which is what
   // every caller already saw and is a definite answer either way.
@@ -176,8 +205,8 @@ export function useWriteRoot(): WriteRoot {
  * put under it. They read `undefined` before the load lands exactly as they did
  * before {@link useWriteRoot} existed.
  */
-export function useWriteRootPath(): string | undefined {
-  return useWriteRoot().path;
+export function useWriteRootPath(kind?: WriteRootKind): string | undefined {
+  return useWriteRoot(kind).path;
 }
 
 // `useBarMap` lived here: BAR's maps-metadata list keyed by springName, read for
