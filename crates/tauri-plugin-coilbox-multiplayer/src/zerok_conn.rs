@@ -229,6 +229,12 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
 
     let mut framed = Framed::new(stream, LinesCodec::new());
 
+    // Channel joins asked for before the server has made its own. It joins an
+    // account to its default channels while logging it in and refuses a second
+    // join for any of them, so these wait for the friend list, which it sends
+    // straight after. `None` once that has arrived.
+    let mut held_joins: Option<Vec<ZerokAction>> = Some(Vec::new());
+
     let reason: Option<String> = 'conn: loop {
         let mut outbound: Vec<String> = Vec::new();
         let mut shutdown = false;
@@ -389,6 +395,12 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
                         emit(&sink, LobbyEvent::Delta { delta });
                     }
                     outbound.extend(replies);
+                    if matches!(message, ZerokMessage::FriendList(_)) {
+                        let held = lock_or_recover(&state);
+                        for action in held_joins.take().into_iter().flatten() {
+                            push_built(&held, &action, &mut outbound, &sink);
+                        }
+                    }
                 }
                 Some(Err(e)) => break 'conn Some(e.to_string()),
                 None => break 'conn None,
@@ -396,19 +408,17 @@ async fn run_loop(stream: TcpStream, login: ZerokLogin, ctx: ZerokConnContext) {
             Some(out) = rx.recv() => match out {
                 Outbound::Line(line) => outbound.push(line),
                 Outbound::Shutdown => shutdown = true,
-                Outbound::Zerok(action) => {
-                    let built = build(&lock_or_recover(&state), &action);
-                    match built {
-                        Ok(lines) => outbound.extend(lines),
-                        // Nothing generated can fail to serialise, so this says
-                        // the types have moved rather than that the action was
-                        // wrong.
-                        Err(e) => emit(&sink, LobbyEvent::Console {
-                            direction: "out".into(),
-                            line: format!("could not build the command: {e}"),
-                        }),
+                Outbound::Zerok(action) => match &mut held_joins {
+                    Some(held)
+                        if matches!(
+                            action,
+                            ZerokAction::Chat(zerok_chat::ChatAction::JoinChannel { .. })
+                        ) =>
+                    {
+                        held.push(action)
                     }
-                }
+                    _ => push_built(&lock_or_recover(&state), &action, &mut outbound, &sink),
+                },
                 // Zero-K has no `EXIT` to write and no agreement to confirm, and
                 // a Tachyon action never reaches a connection without a Tachyon
                 // client. A private message is queued by a command that refuses
@@ -480,6 +490,27 @@ fn build(state: &LobbyState, action: &ZerokAction) -> Result<Vec<String>, serde_
         }
         ZerokAction::Room(action) => zerok_room::build(state, action),
         ZerokAction::Chat(action) => zerok_chat::build(state, action),
+    }
+}
+
+/// Queue the wire lines for an action, or say in the console why there are none.
+fn push_built(
+    state: &LobbyState,
+    action: &ZerokAction,
+    outbound: &mut Vec<String>,
+    sink: &EventSink,
+) {
+    match build(state, action) {
+        Ok(lines) => outbound.extend(lines),
+        // Nothing generated can fail to serialise, so this says the types have
+        // moved rather than that the action was wrong.
+        Err(e) => emit(
+            sink,
+            LobbyEvent::Console {
+                direction: "out".into(),
+                line: format!("could not build the command: {e}"),
+            },
+        ),
     }
 }
 

@@ -464,6 +464,24 @@ fn a_battle_line_outside_a_room_is_not_sent() {
     .is_empty());
 }
 
+/// The server refuses a join for a channel we are in, so one is not sent.
+#[test]
+fn a_channel_we_are_in_is_not_joined_again() {
+    let mut state = ready();
+    feed(
+        &mut state,
+        r#"JoinChannelResponse {"Success":true,"ChannelName":"zk","Channel":{"ChannelName":"zk","Users":["someone"]}}"#,
+    );
+    assert!(replies(
+        &state,
+        &[ChatAction::JoinChannel {
+            channel: "zk".into(),
+            password: None,
+        }]
+    )
+    .is_empty());
+}
+
 #[test]
 fn joining_and_leaving_a_channel_name_it() {
     let state = ready();
