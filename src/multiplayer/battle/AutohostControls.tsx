@@ -22,18 +22,22 @@ import { Lock, Unlock } from "lucide-react";
  * answers `!ring` wherever coilbox hosts the battle (`RingHost` in the lobby
  * protocol crate), so it keeps its plain label in a direct room and is the one
  * button a `selfHost` founder gets: the rest are inert for them, with lock in
- * the header and balance beside the presets.
+ * the header and balance beside the presets. The founder's button rings
+ * through `onRing` rather than `onCommand`: a host has no need to type a
+ * command into its own battle to use a power it holds.
  */
 export function AutohostControls({
   locked,
   directRoom,
   selfHost,
   onCommand,
+  onRing,
 }: {
   locked: boolean;
   directRoom: boolean;
   selfHost: boolean;
   onCommand: (command: string) => void;
+  onRing: () => void;
 }) {
   const ring = { label: "Ring unready", cmd: "!ring" };
   const quick: { label: string; cmd: string }[] = selfHost
@@ -57,7 +61,7 @@ export function AutohostControls({
             key={q.cmd}
             variant="outline"
             size="sm"
-            onClick={() => onCommand(q.cmd)}
+            onClick={() => (selfHost ? onRing() : onCommand(q.cmd))}
           >
             {q.label}
           </Button>

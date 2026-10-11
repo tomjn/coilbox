@@ -8,7 +8,13 @@
  * spectators pulled out of the table into a compact list (#3194).
  */
 
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BattleMembersTable } from "./BattleMembersTable";
@@ -55,6 +61,7 @@ const noopHostControls = {
   forceColor: vi.fn(),
   forceSpectator: vi.fn(),
   kick: vi.fn(),
+  ring: vi.fn(),
   appointBoss: vi.fn(),
   unboss: vi.fn(),
   removeBot: vi.fn(),
@@ -214,5 +221,18 @@ describe("spectators in a compact list (#3194)", () => {
     expect(
       screen.getByRole("button", { name: "Add note for Carol" }),
     ).toBeTruthy();
+  });
+});
+
+describe("ringing a member from their row", () => {
+  it("rings that member by name, and offers no ring on our own row", () => {
+    renderTable([
+      row({ name: "alice", self: true, host: true }),
+      row({ name: "bob", ready: false }),
+    ]);
+    const rings = screen.getAllByText("Ring");
+    expect(rings).toHaveLength(1);
+    fireEvent.click(rings[0]);
+    expect(noopHostControls.ring).toHaveBeenCalledWith("bob");
   });
 });
