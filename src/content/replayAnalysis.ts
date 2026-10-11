@@ -5,6 +5,7 @@ import {
   ANALYSIS_QUEUE_EVENT,
   contentAnalysisCancel,
   contentAnalysisDismiss,
+  contentAnalysisEngineOutput,
   contentAnalysisEnqueue,
   contentAnalysisQueue,
   contentReplayAnalyses,
@@ -146,6 +147,16 @@ export async function requestAnalysis(args: {
 export async function cancelAnalysis(id?: number): Promise<void> {
   if (analysisRunHidden()) return;
   await contentAnalysisCancel({ id });
+}
+
+/**
+ * What a running analysis's engine has said most recently, oldest line first.
+ * Empty when that job is no longer the one running.
+ */
+export async function analysisEngineOutput(id: number): Promise<string[]> {
+  if (analysisRunHidden()) return [];
+  const { lines } = await contentAnalysisEngineOutput({ id });
+  return lines ?? [];
 }
 
 /** Forget a match's last failed run. */

@@ -253,6 +253,8 @@ The replay's map draws five layers from these lines: deaths, damage dealt, build
 
 A run starts only when you press the button on the replay page, and a distribution can hide the button with `analytics.run`. Runs go through a queue the app owns, so leaving the page changes nothing. A game you start always wins. A running analysis is stopped and put back at the front of the queue.
 
+While a run goes on, the section says how long it has been running. "What the engine is saying" shows the last 40 lines of the engine's output, read again each second while it is open. Every line the engine logs carries its own frame number, so this is where to look when the frame on the page has stopped moving.
+
 ### What it costs
 
 An engine run. These were measured on one Mac with engine 2026.07.01.
@@ -296,6 +298,8 @@ Two matches from two games reproduced exactly. The check was tried by changing t
 So the check answers for what coilbox records. It does not answer for every value the simulation holds.
 
 What was not verified when the run was built: unit definition ids were not asserted against the base game directly, positions were checked against a stub and not known positions in a real engine, and nothing ran on Linux, Windows or Beyond All Reason.
+
+On Windows 11 one run has been reported stuck at frame 0 with the engine still running (#3937). The cause was not found from a Mac.
 
 ## A game's own service
 

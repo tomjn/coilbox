@@ -1386,6 +1386,15 @@ export const contentAnalysisCancel = defineCommand<
   { cancelled: boolean }
 >("coilbox-content", "content_analysis_cancel");
 
+/**
+ * The last lines a running analysis's engine has written, oldest first. Null
+ * when that job is not the one running.
+ */
+export const contentAnalysisEngineOutput = defineCommand<
+  { id: number },
+  { lines: string[] | null }
+>("coilbox-content", "content_analysis_engine_output");
+
 /** Forget a match's last failed run, once it has been read. */
 export const contentAnalysisDismiss = defineCommand<
   { gameId: string },
