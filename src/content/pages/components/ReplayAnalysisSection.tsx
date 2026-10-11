@@ -1,6 +1,12 @@
 import { Button } from "@picoframe/frame";
 import { ChevronRight, Loader2, ScanSearch, Trash2, X } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { ConfirmPopover } from "@/components/ConfirmPopover";
 import { OptionSelect } from "@/components/OptionSelect";
 import {
@@ -579,6 +585,15 @@ function Running({
       clearInterval(timer);
     };
   }, [outputOpen, job.id]);
+  // The newest line is the one worth reading, so the box stays at its end
+  // until it is scrolled away from there.
+  const outputBox = useRef<HTMLPreElement>(null);
+  const atEnd = useRef(true);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs when the lines change, which is when the box grows.
+  useLayoutEffect(() => {
+    const box = outputBox.current;
+    if (box && atEnd.current) box.scrollTop = box.scrollHeight;
+  }, [output]);
   const elapsed = Math.max(0, (now - job.startedAtMs) / 1000);
   return (
     <div className="flex flex-col gap-2">
@@ -617,7 +632,16 @@ function Running({
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-xs">
+          <pre
+            ref={outputBox}
+            onScroll={(e) => {
+              const box = e.currentTarget;
+              // Within a pixel, because scroll positions are fractional.
+              atEnd.current =
+                box.scrollHeight - box.scrollTop - box.clientHeight <= 1;
+            }}
+            className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded bg-muted p-2 font-mono text-xs"
+          >
             {output.length > 0
               ? output.join("\n")
               : "The engine has written nothing yet."}
