@@ -17,7 +17,7 @@ import { homeMarkup, loadHomeMarkup } from "./markup";
 import { resolveCardArtOverrides } from "./profileArt";
 
 /**
- * What `docs/distribution-profile.md` tells a distribution author about the
+ * What `docs/developers/distribution-profile.md` tells a distribution author about the
  * `home` key has to stay true.
  *
  * Two things are checked, and both are documentation rather than code:
@@ -117,7 +117,10 @@ describe("the worked example distribution", () => {
   });
 
   it("names only tool ids the routes reference documents", () => {
-    const routes = readFileSync(join(REPO, "docs", "routes.md"), "utf8");
+    const routes = readFileSync(
+      join(REPO, "docs", "reference", "routes.md"),
+      "utf8",
+    );
     const { entries } = resolveHome(exampleProfile().home);
     const ids = [...resolveCardArtOverrides(entries).keys()];
     expect(ids.length).toBeGreaterThan(0);
@@ -135,7 +138,7 @@ describe("the worked example distribution", () => {
 
   it("is the example the documentation prints", () => {
     const doc = readFileSync(
-      join(REPO, "docs", "distribution-profile.md"),
+      join(REPO, "docs", "developers", "distribution-profile.md"),
       "utf8",
     );
     const shipped = readFileSync(join(EXAMPLE, "profile.json"), "utf8").trim();
@@ -171,7 +174,7 @@ describe("the worked example distribution", () => {
  */
 function docSamples(): { block: string; home: unknown }[] {
   const doc = readFileSync(
-    join(REPO, "docs", "distribution-profile.md"),
+    join(REPO, "docs", "developers", "distribution-profile.md"),
     "utf8",
   );
   const start = doc.indexOf("### `home` (object)");

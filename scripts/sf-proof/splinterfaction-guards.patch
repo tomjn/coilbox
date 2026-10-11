@@ -1,7 +1,7 @@
 The mission runtime guards for Splinter Faction.
 
 These are the game side of the coilbox mission runtime's adoption contract, items
-2 and 3 in docs/mission-runtime.md. They are Splinter Faction's changes to make,
+2 and 3 in docs/developers/mission-runtime.md. They are Splinter Faction's changes to make,
 not coilbox's, so they live here as a patch rather than in the game.
 
 Three guards, in two of the game's own gadgets:

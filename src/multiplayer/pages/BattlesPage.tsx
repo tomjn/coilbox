@@ -315,7 +315,7 @@ function ServerBattles({
   // than one of them being hidden. On TASServer this machine becomes the host.
   // Under Tachyon the server allocates a dedicated autohost and a client cannot
   // host at all, so what it offers instead is a lobby (see
-  // `docs/tachyon-protocol.md`). Zero-K sits between the two: the server runs
+  // `docs/internal/tachyon-protocol.md`). Zero-K sits between the two: the server runs
   // the game, but the room is opened in a player's name and founding it carries
   // the room's commands with it.
   const openControl =

@@ -18,7 +18,7 @@
  * exactly as the file states them, in elmos, since the whole point of the
  * object is that it is the real unit's size.
  *
- * Read with a parser written from docs/s3o-format.md, sharing no code with
+ * Read with a parser written from docs/internal/s3o-format.md, sharing no code with
  * `crates/coilbox-s3o`, on the same reasoning as `scripts/reads3o.mjs`.
  */
 

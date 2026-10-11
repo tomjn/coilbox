@@ -73,7 +73,7 @@ The runtime takes over the start rather than sharing it, so a mission plays the 
 - Game frame 1: every mission team's bank is set to its `resources`, defaulting to nothing. This is how the normal starting resources are suppressed. `income` is then paid in every frame, spread over the second it is quoted per.
 - A team whose scenario entry sets `noCommander` gets no start from the game. The game is asked not to spawn one, and a game that has not been asked has anything it spawns removed instead, from load until the end of game frame 1. Only creations with no builder are touched, so nothing anyone has begun building is affected.
 
-Asking is the third item in the [adoption contract](../../docs/mission-runtime.md). A game calls `GG.CoilboxMission.suppressesStart(teamID)` where its own start gadget would spawn, and spawns nothing when the answer is true. The answer is the scenario's, so it holds for the whole mission rather than for a window.
+Asking is the third item in the [adoption contract](../../docs/developers/mission-runtime.md). A game calls `GG.CoilboxMission.suppressesStart(teamID)` where its own start gadget would spawn, and spawns nothing when the answer is true. The answer is the scenario's, so it holds for the whole mission rather than for a window.
 
 A game whose start is a sequence of pre-game phases rather than a call asks `GG.CoilboxMission.suppressesEveryStart()` at the top of the sequence and skips it. That is the same question asked about the game rather than about one team, true when the mission owns the start of every non-Gaia team in the engine's team list. A phase is global, so the whole game decides whether one is worth running, and a team the mission says nothing about still has a start to pick a faction and a position for.
 
@@ -129,7 +129,7 @@ A trigger fires when its condition group holds. The group is flat, one `op` over
 
 ## Game extensions
 
-`coilbox_extensions.lua` is the same registration seam, offered to the game. A game that ships `missions/extensions.lua` declaring condition and action types of its own, and a handler implementing them, gets a trigger naming one dispatched to its code. The format is in [docs/mission-runtime.md](../../docs/mission-runtime.md#4-optional-declare-your-own-condition-and-action-types), which is the page a game maintainer reads. What matters here is how the module holds the line.
+`coilbox_extensions.lua` is the same registration seam, offered to the game. A game that ships `missions/extensions.lua` declaring condition and action types of its own, and a handler implementing them, gets a trigger naming one dispatched to its code. The format is in [docs/developers/mission-runtime.md](../../docs/developers/mission-runtime.md#4-optional-declare-your-own-condition-and-action-types), which is the page a game maintainer reads. What matters here is how the module holds the line.
 
 - **Registration is the loader's, not the game's.** The handler returns a table of implementations rather than being handed the engine, so the two rules below are structural rather than something a game is asked to respect.
 - **A type the version marker declares is refused**, whichever of its two lists it is in, with an error naming it. `missions/runtime.lua` is the boundary: what it declares is the runtime's, and everything else is the game's to add.

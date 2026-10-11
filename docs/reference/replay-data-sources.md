@@ -1,12 +1,12 @@
-# Where a replay's numbers come from
+# Replay data sources
 
 Coilbox shows numbers about a match from up to four places, and they do not all mean the same kind of thing. Some are the engine's own record, some are what players asked for, and some come from playing the match again. This page says which is which, what each costs to read, and why two numbers on screen can disagree.
 
 Three of the four sources exist today. The fourth, a game's own service, is planned and not built.
 
-The first half is for players who want to know which number to trust. The second half, from [For people extending this](#for-people-extending-this), is for developers.
+The first half is for players who want to know which number to trust. The second half, from [For people extending this](#extending-the-replay-readers), is for developers.
 
-## The sources at a glance
+## The four sources
 
 | Source | What it is | What it can tell you | Present when |
 | --- | --- | --- | --- |
@@ -526,7 +526,7 @@ What it cannot see lands in unclassified. That includes Beyond All Reason's ener
 
 Two calls are known to be wrong. A static unit with a weapon is defence, so nuke silos and static artillery read as defence. Splinter Faction's lootboxes read as economy. A player does not order either in an opening.
 
-## For people extending this
+## Extending the replay readers
 
 ### Where each decoder lives
 
@@ -586,7 +586,7 @@ The design notes and tickets assumed these points wrongly, and the code follows 
 
 ### Profile keys
 
-`analytics.matchStats` hides the statistics sections and `analytics.run` hides the button and everything that steers a run. See [Distribution profile](distribution-profile.md) and [Routes](routes.md) for all of them.
+`analytics.matchStats` hides the statistics sections and `analytics.run` hides the button and everything that steers a run. See [Distribution profile](../developers/distribution-profile.md) and [Routes](routes.md) for all of them.
 
 ## Reading list
 

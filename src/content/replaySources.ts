@@ -8,7 +8,7 @@
 
 /** The docs page that says what each source is, what it costs and how far to trust it. */
 export const REPLAY_SOURCES_DOC_URL =
-  "https://tomjn.github.io/coilbox/replay-data-sources";
+  "https://tomjn.github.io/coilbox/reference/replay-data-sources";
 
 const SETUP = "Names, sides and ratings come from the match setup.";
 const TRAILER = "the engine's own record at the end of the match";

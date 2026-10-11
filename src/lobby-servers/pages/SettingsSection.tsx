@@ -1149,7 +1149,7 @@ function AccountForm({
           disabled={saved === false && !a.connectOnStartup}
         />
         {/* A Tachyon server has no named channels, so there is nothing to auto-join
-            (see `docs/tachyon-protocol.md`). */}
+            (see `docs/internal/tachyon-protocol.md`). */}
         {server &&
           serverProtocol(server) !== "tachyon" &&
           a.username.trim() !== "" && (
@@ -1180,7 +1180,7 @@ function AccountForm({
  * because it is half the key the token is stored under.
  *
  * Signing out forgets the stored token. That is all a client can do, because the
- * server offers no revocation endpoint (see `docs/tachyon-protocol.md`).
+ * server offers no revocation endpoint (see `docs/internal/tachyon-protocol.md`).
  */
 function TachyonSignIn({
   account: a,

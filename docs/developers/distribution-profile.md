@@ -4,14 +4,14 @@ A **distribution profile** lets you ship Coilbox alongside a game (or otherwise 
 
 If no profile is present, Coilbox behaves exactly as normal.
 
-> New here? Read **[portable-mode.md](portable-mode.md)** first — it explains the
+> New here? Read **[portable-mode.md](../players/portable-mode.md)** first — it explains the
 > `.coilbox` folder this file lives in and how to package everything up. For the
 > exact route/nav ids the `hide`, `hideSettings`, `welcome` and `links` fields
-> below refer to, see **[routes.md](routes.md)**.
+> below refer to, see **[routes.md](../reference/routes.md)**.
 
 ## Where the file goes
 
-Profiles ride on **[portable mode](portable-mode.md)**. Put a `.coilbox` folder next to the Coilbox executable and place `profile.json` inside it. The presence of that `profile.json` is exactly what turns portable mode on (a bare `.coilbox` folder is no longer enough, since the Windows installer keeps sidecars there too):
+Profiles ride on **[portable mode](../players/portable-mode.md)**. Put a `.coilbox` folder next to the Coilbox executable and place `profile.json` inside it. The presence of that `profile.json` is exactly what turns portable mode on (a bare `.coilbox` folder is no longer enough, since the Windows installer keeps sidecars there too):
 
 ```
 <YourGameFolder>/
@@ -109,8 +109,8 @@ See the [about page](#/pages/about) for more.
 
 Notes:
 
-- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A Markdown image `![](pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a file under `.coilbox/`. Audio/video files referenced as images render inline players.
-- **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain `[label](other.md)` link — handy with `nav: false` for pages reached only from elsewhere. See [File references](#file-references) for the full link/route scheme.
+- **Assets are `.coilbox`-relative**, the same convention as the splash/logo images. A Markdown image `![](../pages/diagram.png)` or a `background: pages/bg.jpg` resolves to a file under `.coilbox/`. Audio/video files referenced as images render inline players.
+- **Link between pages** (or from a welcome screen) with `#/pages/<path>`, or a plain `[label](../other.md)` link — handy with `nav: false` for pages reached only from elsewhere. See [File references](#file-references) for the full link/route scheme.
 - **Compose** pages with [`@` references](#file-references): include shared fragments (`@.coilbox/pages/_foo.md`), link to routes (`@route/singleplayer`), and embed live GUI (`@widget/onboarding`, `@widget/build-tree/<game>`).
 - Content is trusted bundler-authored Markdown (safe by default: no raw HTML/JS). Malformed or duplicate `path`s are skipped rather than breaking the app.
 
@@ -154,10 +154,10 @@ Includes are cycle-guarded and depth-capped; a missing file or an include loop s
 
 Markdown links resolve intelligently:
 
-- `[Rules](rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
-- `[Play](@route/singleplayer)` → navigates in-app.
+- `[Rules](../rules.md)` → the page `#/pages/rules` (a `.md` link maps to its page by filename; a nested page can be linked with `@route/pages/...`).
+- `[Play](../@route/singleplayer)` → navigates in-app.
 - `[Discord](https://discord.gg/…)` → opens in the system browser (never navigates the app's own window away).
-- `[Our guide](@.coilbox/docs/guide.pdf)` → opens the bundled file in whatever program the OS opens that file type with. Pictures, PDFs, plain text, HTML, audio and video open. Any other type, and anything the OS turns down, is shown in the system file manager instead, with its folder open and the file selected. Coilbox will not open a file the OS would run rather than show, such as a `.exe` or a `.sh`, so a link cannot be used to start a program. A link to a bundled file is never followed in the app's own window, because that would draw the file over Coilbox with no way back.
+- `[Our guide](../@.coilbox/docs/guide.pdf)` → opens the bundled file in whatever program the OS opens that file type with. Pictures, PDFs, plain text, HTML, audio and video open. Any other type, and anything the OS turns down, is shown in the system file manager instead, with its folder open and the file selected. Coilbox will not open a file the OS would run rather than show, such as a `.exe` or a `.sh`, so a link cannot be used to start a program. A link to a bundled file is never followed in the app's own window, because that would draw the file over Coilbox with no way back.
 
 ### Widget catalogue
 
@@ -293,11 +293,11 @@ Hides top-level navigation items (sidebar + welcome launcher) by id, and makes t
 { "version": 1, "hide": ["downloads.games", "library.games"] }
 ```
 
-> The four `analytics.*` ids hide parts of a page, not nav items, so a distribution can switch the replay analytics off piece by piece. `analytics.run` is separate from the rest because it is the only part that costs anything: it spends CPU time running the engine over a replay. All four work today. [Where a replay's numbers come from](replay-data-sources.md) says what each part of the replay analytics shows.
+> The four `analytics.*` ids hide parts of a page, not nav items, so a distribution can switch the replay analytics off piece by piece. `analytics.run` is separate from the rest because it is the only part that costs anything: it spends CPU time running the engine over a replay. All four work today. [Where a replay's numbers come from](../reference/replay-data-sources.md) says what each part of the replay analytics shows.
 
 > Adding a new hideable nav item is a one-line change in that plugin's `index.ts`
 > (`useVisible: () => !isProfileHidden("<id>")`), so this list can grow on request.
-> See **[routes.md](routes.md)** for the full list of pages and nav ids.
+> See **[routes.md](../reference/routes.md)** for the full list of pages and nav ids.
 
 > **Renamed ids still work.** Content became Library, so `content.maps`, `content.games`, `content.blueprints`, `content.archives` and the `content` settings section are now `library.*` and `library`. A profile written against the old names keeps working, in `hide`, `hideSettings` and `art` alike, and the profile health check names the replacement rather than reporting the id as matching nothing. `content.setupPacks` did not change, because it never named a nav item.
 >
@@ -387,11 +387,11 @@ Instead of inlining the markup, point `html`/`css` at a **file** in your `.coilb
 - `css` — injected alongside the HTML. Inline, or a `@.coilbox/<path>.css` reference.
 - **Local media**: reference files bundled in your `.coilbox/` folder by relative path, and Coilbox resolves them at load time — in both the HTML and the CSS. So `<img src="images/logo.webp">`, `background: url(images/hero.gif)`, and even `@font-face { src: url(fonts/brand.woff2) }` all pull from `.coilbox/images/…`, `.coilbox/fonts/…`, etc. Images, animated GIFs, audio (`<audio src="…">`), video (`<video>`) and web fonts are supported. A `@.coilbox/<path>` [file reference](#file-references) works in the same places and means the same file. Absolute URLs (`https:`, `data:`), app-absolute paths (`/…`) and `@route/`, `@widget/` references are left untouched, so remote `https` images still work directly with no embedding, and a `navigate` marker's `href` still reads as a route.
 - **Stylesheets**: a `<style>` block and a `<link rel="stylesheet" href="theme.css">` both work, and both work wherever you put them, before your markup or after it. A relative `href` resolves against your `.coilbox/` folder like any other asset, so the stylesheet's own relative `url()`s resolve beside it. They are the only two. A `<base>`, a `<meta>` or a `<script>` is removed wherever you write it, because a `<base href>` re-points every relative URL in Coilbox and a `<meta http-equiv="refresh">` navigates the app away from itself, neither of which is a thing your markup should be able to do to the page around it. Your markup never runs JavaScript, so a `<script>` would do nothing anyway.
-- **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">` navigates inside the app without a reload. Useful routes include `#/play/skirmish`, `#/library/maps`, `#/play/replays`, `#/battles`, `#/settings` — the full list is in **[routes.md](routes.md)**.
+- **In-app links**: because Coilbox uses hash routing, an `<a href="#/play/skirmish">` navigates inside the app without a reload. Useful routes include `#/play/skirmish`, `#/library/maps`, `#/play/replays`, `#/battles`, `#/settings` — the full list is in **[routes.md](../reference/routes.md)**.
 - **Links that go nowhere**: an `<a>` Coilbox cannot follow is ignored, and says why in the developer console. An `https:` or `http:` link opens in the system browser, a `mailto:` link in the mail client and a `tel:` link in the dialler, so Coilbox stays on screen behind whatever opens. A `#/…` hash link moves around inside the app. Everything else is a mistake it will not act on, because following it would replace Coilbox with whatever is at the other end and only a restart would bring it back. A relative `href="images/logo.webp"` is the picture rather than a page, an `href="@route/play/replays"` needs the `navigate` marker below to mean anything, and an app-absolute `href="/play/replays"` is a full page load, so write that one as `#/play/replays`.
 - **Actions**: the welcome HTML can't run JavaScript, but any element carrying a `data-coilbox-action` attribute is wired to a built-in action when clicked — the interactive hook available without scripting.
   - `data-coilbox-action="quit"` closes Coilbox. Use it to add your own exit control to a branded landing page (handy for fullscreen builds). This works regardless of the [`quit`](#quit-boolean) flag.
-  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#pages-array) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`. A `#/…` hash link is not one of those spellings and does not need to be: it navigates on its own, with or without the marker.
+  - `data-coilbox-action="navigate"` goes to an in-app route named in a `data-coilbox-route` attribute (or the element's `href`), using the same `@route/<path>` / `.md` / `/path` scheme as [custom pages](#custom-pages) — so `@route/singleplayer` and `/downloads/games` both resolve to the same route a page link would. A route that doesn't resolve is ignored (no crash). This makes a "Play now" button possible on the welcome screen from any element, not just an `<a href="#/…">`. A `#/…` hash link is not one of those spellings and does not need to be: it navigates on its own, with or without the marker.
 
   The same markers work in the [`home`](#home-object) key's markup, and mean the same thing there.
 
@@ -435,7 +435,7 @@ Names a campaign or a scenario you bundle as where a new player starts. The home
 | `mission`  | The `id` of one mission in that campaign. Leave it out to start on the campaign's first mission.     |
 | `scenario` | The `id` of a scenario in `.coilbox/scenarios/`. Use it in place of `campaign`, never beside it.     |
 
-Give `campaign` or `scenario`, not both. `campaign` and `mission` are the `id` values inside the campaign's exported `.json`, not its title or file name. See [Bundling a campaign in a distribution](campaigns.md#bundling-a-campaign-in-a-distribution) for how the campaign gets into the package.
+Give `campaign` or `scenario`, not both. `campaign` and `mission` are the `id` values inside the campaign's exported `.json`, not its title or file name. See [Bundling a campaign in a distribution](campaigns.md#bundle-a-campaign-in-a-distribution) for how the campaign gets into the package.
 
 What the card does:
 
@@ -638,7 +638,7 @@ The `cards` entry takes an `art` map from tool id to a picture:
 - `false` gives the icon-only card, an icon beside a label with no picture.
 - A tool you do not list is untouched and walks the rest of the resolution chain: art from the player's own install (a last-played minimap, a campaign panorama, a game's loading art), then a bundled illustration, then a pattern generated from the tool id and your accent colour. The last of those always succeeds, so no card is ever blank and you never have to fill the map in.
 
-Tool ids are the nav ids in [routes.md](routes.md), the same ids [`hide`](#hide-string) uses. Warpath is `runlite.list` and Singleplayer is `play.skirmish`, so check the table rather than guessing from the label.
+Tool ids are the nav ids in [routes.md](../reference/routes.md), the same ids [`hide`](#hide-string) uses. Warpath is `runlite.list` and Singleplayer is `play.skirmish`, so check the table rather than guessing from the label.
 
 Any image is safe to put under a card: the label sits in a band measured to stay legible over a pure black picture and a pure white one, in both colour schemes.
 
@@ -1006,7 +1006,7 @@ Curated **map packs** offered for bulk download on the Maps download page — a 
 }
 ```
 
-Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }` (a direct mirror file); `filename` enables "already downloaded" detection. This is the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see [Branding catalog](../README.md#branding-catalog); catalog packs are listed first, then a profile's, deduped by `id`.
+Each map's `download` is `{ "kind": "map", "springName", "searchUrl"? }` (fetched by springname via pr-downloader) or `{ "kind": "url", "url", "filename", "subdir"? }` (a direct mirror file); `filename` enables "already downloaded" detection. This is the same shape and mechanism the branding catalog's `suggested.mapLists` uses — see [Branding catalog](https://github.com/tomjn/coilbox#branding-catalog); catalog packs are listed first, then a profile's, deduped by `id`.
 
 A map may also carry `blurb`, a line of description, and `thumb`, an array of image URLs of which the first that loads wins. Neither is needed for the pack itself, which shows no pictures. Both are what the home page's suggested map card shows on the day it picks that map. A map with no `blurb` gets a stock line. A map with no `thumb` is never suggested at all: the card is a picture of one named map, and there is no honest substitute to draw, so the day's pick moves on to the next map that has one.
 
@@ -1070,7 +1070,7 @@ Controls the app-frame chrome — the sidebar mode, the breadcrumb, the top-bar 
 | `sidebarCollapsed` | boolean | **Seed** the sidebar to start collapsed. The user can still expand it, and their choice persists. Only meaningful when `popover` is off. |
 | `hideBreadcrumb`   | boolean | Hide the breadcrumb region in the top bar entirely.                     |
 | `historyButtons`   | boolean | Force the top-bar back/forward buttons on (`true`) or off (`false`).    |
-| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert (does **not** force fullscreen — that's [`fullscreenLocked`](#fullscreenlocked-boolean)). Default `true`. |
+| `fullscreenButton` | boolean | `false` hides the top-bar fullscreen button and makes F11 inert (does **not** force fullscreen — that's `fullscreenLocked`). Default `true`. |
 | `menu`             | object  | Branding for the popover menu button (see below).                       |
 | `left` / `center` / `right` | object | A logo/text in the corresponding top-bar slot (see below).     |
 
@@ -1112,7 +1112,7 @@ Use this when you package a build and want your own difficulty curve, for exampl
 
 ### `conquest` (object)
 
-Supplies system/faction names — and whole lore factions — for **[Galactic Conquest](conquest.md)** galaxies generated in this distribution, so they read as your game rather than generic space. Every field is optional and overrides the branding catalog's per-game defaults.
+Supplies system/faction names — and whole lore factions — for **[Galactic Conquest](../players/conquest.md)** galaxies generated in this distribution, so they read as your game rather than generic space. Every field is optional and overrides the branding catalog's per-game defaults.
 
 ```json
 {
@@ -1131,7 +1131,7 @@ Supplies system/faction names — and whole lore factions — for **[Galactic Co
 - `factionNames` — full faction names, used when no `factions` presets are given.
 - `factions` — lore factions assigned in order (the player first); each is `{ name, color?, side?, aggression? }`.
 
-See the [Names and factions](conquest.md#names-and-factions) section for how the pools are drawn and the full merge order (profile over catalog over built-ins).
+See the [Names and factions](conquest-for-your-game.md#names-and-factions) section for how the pools are drawn and the full merge order (profile over catalog over built-ins).
 
 ### `onlyOwnMaps` (boolean)
 
@@ -1153,7 +1153,7 @@ Leave `onlyOwnMaps` out and nothing changes.
 
 ### Bundling a hand-made map
 
-A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map folder inside `.coilbox/galaxies/`, the same folder that holds [bundled galaxy files](conquest.md#bundling-a-galaxy). No `profile.json` entry is needed.
+A distribution can bundle a [hand-made map](hand-made-maps.md). Put the map folder inside `.coilbox/galaxies/`, the same folder that holds [bundled galaxy files](conquest-for-your-game.md#bundle-a-galaxy). No `profile.json` entry is needed.
 
 ```
 <YourGameFolder>/

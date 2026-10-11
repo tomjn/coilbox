@@ -249,7 +249,7 @@ The lists are not only coilbox's. A game can declare condition and action types 
 
 They are never greyed out on a runtime version, because the game implements them rather than the runtime, so they work on either route.
 
-The game writes them in `missions/extensions.lua`, and [declare your own condition and action types](mission-runtime.md#4-optional-declare-your-own-condition-and-action-types) is the format. An extension can only add the game's own concepts: anything engine-level, spawning, orders, zones, sight, restrictions, the ending, the camera, is the runtime's and a game naming one of those is refused.
+The game writes them in `missions/extensions.lua`, and [declare your own condition and action types](mission-runtime.md#_4-optional-declare-your-own-condition-and-action-types) is the format. An extension can only add the game's own concepts: anything engine-level, spawning, orders, zones, sight, restrictions, the ending, the camera, is the runtime's and a game naming one of those is refused.
 
 ## Objectives
 

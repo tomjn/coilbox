@@ -1,14 +1,14 @@
-# Routes and nav ids
+# Routes and navigation ids
 
-A reference for the internal locations you can link to and the ids you can hide, so the [distribution profile](distribution-profile.md) `hide`, `hideSettings`, `welcome`, `links` and `home` fields have something concrete to point at.
+A reference for the internal locations you can link to and the ids you can hide, so the [distribution profile](../developers/distribution-profile.md) `hide`, `hideSettings`, `welcome`, `links` and `home` fields have something concrete to point at.
 
-The **nav id** column is also the key a profile's [`home.zones` art map](distribution-profile.md#home-object) uses to give one tool its own card picture.
+The **nav id** column is also the key a profile's [`home.zones` art map](../developers/distribution-profile.md#home-object) uses to give one tool its own card picture.
 
 Coilbox uses **hash routing**: every screen is a URL fragment beginning with `#/`. That's what makes in-app links work from a profile's welcome HTML. `<a href="#/play/skirmish">` navigates without a page reload.
 
 ## Top-level pages
 
-These appear in the sidebar for every user (unless hidden). The **nav id** column is what you pass to the profile [`hide`](distribution-profile.md#hide-string) list (only the ids marked hideable can currently be hidden).
+These appear in the sidebar for every user (unless hidden). The **nav id** column is what you pass to the profile [`hide`](../developers/distribution-profile.md#hide-string) list (only the ids marked hideable can currently be hidden).
 
 | Sidebar group | Item          | Link (`href`)        | Nav id             | Hideable |
 | ------------- | ------------- | --------------------- | ------------------ | -------- |
@@ -119,7 +119,7 @@ Reachable by clicking through the lists above. Not sidebar items, but you can de
 
 ## Settings sections
 
-Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hidden from the Settings nav via the profile [`hideSettings`](distribution-profile.md#hidesettings-string) list. Sections with no page of their own are group headers. Visiting one shows an index of the sections nested under it (the indented rows below it).
+Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hidden from the Settings nav via the profile [`hideSettings`](../developers/distribution-profile.md#hidesettings-string) list. Sections with no page of their own are group headers. Visiting one shows an index of the sections nested under it (the indented rows below it).
 
 | Settings section        | Id                 | Link                           |
 | ------------------------ | ------------------ | ------------------------------- |
@@ -157,7 +157,7 @@ Each settings section lives at `#/settings/<id>`. **Any** of these ids can be hi
 
 ## Useful links for a welcome screen
 
-A profile's [`welcome`](distribution-profile.md#welcome-object) HTML commonly points at:
+A profile's [`welcome`](../developers/distribution-profile.md#welcome-object) HTML commonly points at:
 
 ```html
 <a href="#/play/skirmish">Play Skirmish</a>

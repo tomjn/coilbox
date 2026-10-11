@@ -2,7 +2,7 @@
 
 A **map pack** is a curated, named list of maps offered for **one-click bulk download** on the Maps download page — a tournament pool, a galactic-conquest galaxy's maps, a "space maps" set, a starter bundle, and so on. Each pack has a title, an optional blurb, and a list of maps; **Download all** queues every map in the pack that isn't already present through the normal download queue.
 
-## Two sources
+## Where map packs come from
 
 Map packs come from either (or both) of two places — the same shape and mechanism, different reach:
 
@@ -13,7 +13,7 @@ Map packs come from either (or both) of two places — the same shape and mechan
 
 When both are present, **catalog packs are listed first, then the profile's**, deduped by `id`. So a distribution can ship a tournament pack of its own alongside the shared catalog packs without either clobbering the other.
 
-## Shape
+## Format
 
 A pack is `{ id, title, blurb?, maps[] }`. Each map is the same object used everywhere else in Coilbox's curated content:
 
@@ -45,13 +45,13 @@ Each map's `download` is one of:
 - `{ "kind": "map", "springName", "searchUrl"? }` — fetched by springname via the bundled pr-downloader (the usual case for maps in the Spring/Recoil ecosystem).
 - `{ "kind": "url", "url", "filename", "subdir"? }` — a direct mirror file streamed to disk (`subdir` is `"maps"` for a map).
 
-## Behaviour
+## What downloading a pack does
 
 - **Download all** queues every not-yet-present map in the pack through the normal download queue — the same queue, progress and error handling as any other download. Maps already installed (matched by `filename`) are skipped.
 - Individual maps can still be downloaded one at a time from the pack card.
 - Because packs reuse the standard queue, there's nothing special to clean up or configure; they're just a curated front-end over downloads Coilbox already does.
 
-## Where to define one
+## Where to define a map pack
 
-- **For all users:** add a `suggested.mapLists[]` entry to the branding catalog and open a PR — see [Branding catalog → Suggested content](branding-catalog.md#suggested-content-and-galactic-conquest-names). This reaches everyone at runtime, no app release.
+- **For all users:** add a `suggested.mapLists[]` entry to the branding catalog and open a PR — see [Branding catalog → Suggested content](branding-catalog.md#suggested-content-and-conquest-names). This reaches everyone at runtime, no app release.
 - **For a packaged distribution:** add a `mapLists[]` entry to your `.coilbox/profile.json` — see [Distribution profile → `mapLists`](distribution-profile.md#maplists-object). This ships with your bundle only.

@@ -255,7 +255,7 @@ export default function SkirmishPage() {
   // that can host counts (issue #514, #2847): `hostableKeys` is every live lobby
   // login that is not Tachyon, focused first. Under Tachyon the server allocates a
   // dedicated autohost from its own pool and a client cannot host at all (see
-  // `docs/tachyon-protocol.md`). A room is a connection too once it is up, but
+  // `docs/internal/tachyon-protocol.md`). A room is a connection too once it is up, but
   // hosting on one that is already open opens nothing, so it is left out.
   const { connections, activeKey } = useMultiplayer();
   const hostServers = useProtocolServers();

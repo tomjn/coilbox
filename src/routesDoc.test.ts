@@ -14,7 +14,7 @@ Object.assign(globalThis, {
 const { plugins } = await import("./app.plugins");
 
 /**
- * docs/routes.md is a hand-written mirror of every plugin's `routes` array.
+ * docs/reference/routes.md is a hand-written mirror of every plugin's `routes` array.
  * Issue #2430 found it 13 routes behind the code, drift nobody noticed because
  * nothing checked it. This reads the same `plugins` array app.plugins.ts feeds
  * picoframe, so a route that ships with no line in the doc fails here instead
@@ -28,7 +28,10 @@ const { plugins } = await import("./app.plugins");
  */
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..");
-const routesDoc = readFileSync(join(REPO, "docs", "routes.md"), "utf8");
+const routesDoc = readFileSync(
+  join(REPO, "docs", "reference", "routes.md"),
+  "utf8",
+);
 
 function escapeRegExp(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -55,7 +58,7 @@ const paths = plugins
   .flatMap((p) => p.routes?.map((r) => r.path) ?? [])
   .filter((path): path is string => Boolean(path));
 
-describe("docs/routes.md", () => {
+describe("docs/reference/routes.md", () => {
   it("found routes to check against", () => {
     // A guard on the extraction itself: a plugin list that stopped yielding
     // routes would otherwise pass this suite by finding nothing to check.
