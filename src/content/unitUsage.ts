@@ -16,6 +16,7 @@
 
 import type {
   GameItem,
+  MatchSetup,
   ReplayUnitOrders,
   StoredUnitDef,
   UnitDatasetEntry,
@@ -45,8 +46,9 @@ export type StreamNaming =
    *  list, which is the numbering the match used and needs no check. */
   | { kind: "named"; units: UnitDatasetEntry[]; engine: boolean }
   /** An installed game under the replay's exact name, to be read through
-   *  unitsync. */
-  | { kind: "installed"; archive: string }
+   *  unitsync with the match's own setup (#3847). `read` names the read: two
+   *  replays of one game with one setup share it. */
+  | { kind: "installed"; archive: string; setup?: MatchSetup; read: string }
   /** No list was kept and that build is not installed. Another version's list
    *  could name the wrong unit, so the replay is not named at all. */
   | { kind: "none" };
@@ -58,7 +60,7 @@ export type StreamNaming =
  * that warning, so it does not.
  */
 export function streamNaming(
-  replay: Pick<ReplayUnitOrders, "gameType" | "streamList">,
+  replay: Pick<ReplayUnitOrders, "gameType" | "streamList" | "matchSetup">,
   lists: ReadonlyMap<string, UnitDatasetEntry[]>,
   games: GameItem[],
 ): StreamNaming {
@@ -77,7 +79,14 @@ export function streamNaming(
     };
   }
   if (source.kind === "installed") {
-    return { kind: "installed", archive: source.game.primaryArchive.name };
+    const archive = source.game.primaryArchive.name;
+    const setup = replay.matchSetup;
+    return {
+      kind: "installed",
+      archive,
+      ...(setup ? { setup } : {}),
+      read: setup ? `${archive}\n${JSON.stringify(setup)}` : archive,
+    };
   }
   return { kind: "none" };
 }
@@ -118,14 +127,17 @@ export interface ReplayLists {
 /**
  * What one replay is read against, given what has been read so far.
  *
- * `datasets` holds each installed game's units by archive name once its read
- * has ended: the units, or null for a read that failed or came back empty. An
- * archive not in it yet is still being read. `games` is null until the scan of
+ * `datasets` holds each read of an installed game's units, by the read's name
+ * (`StreamNaming.read`), once it has ended: the units, or null for a read that
+ * failed or came back empty. A read not in it yet is still going. `games` is null until the scan of
  * installed games has answered, and until then only a kept engine list can
  * name a replay, because every other choice depends on what is installed.
  */
 export function replayLists(
-  replay: Pick<ReplayUnitOrders, "gameType" | "streamList" | "eventsList">,
+  replay: Pick<
+    ReplayUnitOrders,
+    "gameType" | "streamList" | "eventsList" | "matchSetup"
+  >,
   lists: ReadonlyMap<string, UnitDatasetEntry[]>,
   games: GameItem[] | null,
   datasets: ReadonlyMap<string, UnitDatasetEntry[] | null>,
@@ -141,10 +153,10 @@ export function replayLists(
   }
   if (!games) return { stream: { kind: "waiting" }, events };
   if (naming.kind === "none") return { stream: naming, events };
-  if (!datasets.has(naming.archive)) {
+  if (!datasets.has(naming.read)) {
     return { stream: { kind: "waiting" }, events };
   }
-  const units = datasets.get(naming.archive);
+  const units = datasets.get(naming.read);
   return {
     stream: units ? { kind: "named", units, engine: false } : { kind: "none" },
     events,

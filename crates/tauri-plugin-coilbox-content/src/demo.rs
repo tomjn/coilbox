@@ -44,6 +44,7 @@ pub(crate) mod analysis;
 mod build_orders;
 pub(crate) mod def_sets;
 pub mod map_grids;
+pub(crate) mod match_setup;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
@@ -1828,6 +1829,7 @@ fn build_demo_info(
         origin_filename: marker.origin,
         mod_options,
         map_options,
+        match_setup: match_setup::match_setup(game),
         start_positions: Vec::new(),
     }
 }

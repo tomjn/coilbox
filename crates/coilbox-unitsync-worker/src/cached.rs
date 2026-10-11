@@ -16,6 +16,7 @@
 //! different key, so no entry: it cannot be answered from the old one.
 
 use crate::cachekey::{self, ArchiveStamp};
+use crate::matchsetup::{MatchFacts, MatchListEntry, MatchSetup};
 use crate::model::{
     ArchiveFileEntry, ArchiveTreeOutput, FactionLogoEntry, FactionLogosOutput, GameHeaderItem,
     GameHeadersOutput, HeightWindow, HeightmapOutput, MapAppearance, MapMeta, MapMetaOutput,
@@ -50,6 +51,44 @@ pub fn game_info(dir: &Path, archive: &Path) -> Option<Value> {
 pub fn unit_dataset(dir: &Path, archive: &Path) -> Option<Value> {
     let stamp = ArchiveStamp::of(archive)?;
     info_blob(dir, &cachekey::dataset_key(&stamp))
+}
+
+/// The unit list a game gives for one match's setup (issue #3847), when the
+/// cache can say without running the game's definitions.
+///
+/// A setup read before is found under its own key. One not read before can
+/// still be answered when the game's facts are kept and say the setup changes
+/// nothing: it is then the empty setup's list, which every such replay of the
+/// game shares, and which is the game's own unit dataset unless the engine
+/// refuses one of its definitions.
+pub fn match_unit_list(dir: &Path, archive: &Path, setup: &MatchSetup) -> Option<Value> {
+    match_unit_list_at(dir, &ArchiveStamp::of(archive)?, setup)
+}
+
+/// [`match_unit_list`] for a stamp already in hand, which is how the worker
+/// asks: it has the archive's stamp from unitsync.
+pub fn match_unit_list_at(dir: &Path, stamp: &ArchiveStamp, setup: &MatchSetup) -> Option<Value> {
+    if let Some(list) = match_list_entry(dir, stamp, setup) {
+        return Some(list);
+    }
+    let facts: MatchFacts = info_blob(dir, &cachekey::match_facts_key(stamp))
+        .and_then(|value| serde_json::from_value(value).ok())?;
+    let reduced = setup.reduced(&facts);
+    if reduced == *setup {
+        return None;
+    }
+    match_list_entry(dir, stamp, &reduced)
+}
+
+/// What is kept under exactly this setup's key, with a pointer to the game's
+/// unit dataset followed.
+fn match_list_entry(dir: &Path, stamp: &ArchiveStamp, setup: &MatchSetup) -> Option<Value> {
+    let key = cachekey::match_list_key(stamp, &setup.canonical());
+    let entry: MatchListEntry<Value> = serde_json::from_value(info_blob(dir, &key)?).ok()?;
+    match entry {
+        MatchListEntry::SameAsDefault => info_blob(dir, &cachekey::dataset_key(stamp)),
+        MatchListEntry::List { dataset } => dataset.is_object().then_some(dataset),
+    }
 }
 
 /// A map's options and checksum.

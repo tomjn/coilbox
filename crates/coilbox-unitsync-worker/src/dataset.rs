@@ -17,6 +17,8 @@
 use crate::ffi::Unitsync;
 use crate::infocache;
 use crate::model::{LanguageUnitText, UnitDatasetEntry, UnitDatasetOutput};
+use coilbox_unitsync_worker::matchsetup::{MatchFacts, MatchListEntry, MatchSetup, OptionDefault};
+use coilbox_unitsync_worker::{cached, cachekey};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -26,8 +28,15 @@ use std::path::Path;
 /// game's own files and the base `springcontent` def scripts.
 const VFS_ALL_MODES: &str = "rmMbe";
 
+/// What a read for one match puts between the two halves of the script: the
+/// definitions the engine gives an id to, in id order, in place of every key of
+/// the table. `__cb_engine_keeps` is a local the match's prelude defines
+/// (`lua/match-unit-list/match_unit_list.lua`).
+const ENGINE_KEEPS: &str = "\nud, names = __cb_engine_keeps(defs, ud)\n";
+
 /// The Lua that [`units_via_shim`] runs, with [`crate::lua::CHUNKED_RESULT`] and
-/// [`crate::lua::DEFS_ENV_SHIM`] prepended. It mirrors `game.rs`'s unit-list shim
+/// [`crate::lua::DEFS_ENV_SHIM`] prepended, in two halves. This one loads the
+/// definitions and sorts their keys. It mirrors `game.rs`'s unit-list shim
 /// but also collects each unit's `buildoptions`. Keys and buildoptions are
 /// lowercased so the graph's edges match its node names.
 ///
@@ -36,7 +45,7 @@ const VFS_ALL_MODES: &str = "rmMbe";
 /// weapons are a list of objects, and a tab-separated line can only carry one by
 /// inventing a third delimiter that some game's weapon name will eventually
 /// contain. `shared/unitdef-stats.json` writes down what goes in it.
-const UNIT_DATASET_SHIM_SCRIPT: &str = r#"
+const UNIT_DATASET_SHIM_HEAD: &str = r#"
 local ok, defs = pcall(VFS.Include, 'gamedata/defs.lua')
 if not ok then return { __error = tostring(defs) } end
 local ud = (type(defs) == 'table') and defs.unitdefs or nil
@@ -45,7 +54,11 @@ if type(ud) ~= 'table' then return { __error = 'defs.lua produced no unitdefs ta
 local names = {}
 for k in pairs(ud) do names[#names + 1] = k end
 table.sort(names)
+"#;
 
+/// The rest of the script. A read for one match puts [`ENGINE_KEEPS`] between
+/// the two halves.
+const UNIT_DATASET_SHIM_TAIL: &str = r#"
 -- A unit is mobile if its unitdef declares a non-zero speed. Games spell this
 -- field differently (modern `speed`, legacy `maxvelocity`/`maxVelocity`), so try
 -- each; a building leaves them all nil/0.
@@ -541,11 +554,31 @@ pub(crate) fn resolve(
     }
     errors.extend(us.drain_errors());
 
+    let out = read_mounted(us, game_archive, None, errors);
+    us.remove_all_archives();
+
+    if let Some((dir, key)) = cache {
+        if worth_caching(&out) {
+            infocache::write(dir, key, &out);
+        }
+    }
+    out
+}
+
+/// Read the unit graph of a game whose archive set the caller has mounted, and
+/// leave it mounted. `prelude` is as [`units_via_shim`] takes it, and `errors`
+/// is what the caller has collected so far.
+fn read_mounted(
+    us: &Unitsync,
+    game_archive: &str,
+    prelude: Option<&str>,
+    mut errors: Vec<String>,
+) -> UnitDatasetOutput {
     // Read the whole unitdef table (with buildoptions) through the Lua parser.
     // A game that ships no gamedata/defs.lua (legacy TDF `.fbi` games) has no
     // units to give, and says which of the two it is rather than reading as a
     // game with nothing in it.
-    let mut units = match units_via_shim(us) {
+    let mut units = match units_via_shim(us, prelude) {
         Ok(units) => units,
         Err(e) => {
             errors.push(format!("could not read this game's units: {}", e.trim()));
@@ -573,19 +606,159 @@ pub(crate) fn resolve(
     let checksum = primary_mod_checksum(us, game_archive);
 
     errors.extend(us.drain_errors());
-    us.remove_all_archives();
 
-    let out = UnitDatasetOutput {
+    UnitDatasetOutput {
         units,
         checksum,
         errors,
+    }
+}
+
+/// Load `game_archive` and read the unit list the engine built for one match
+/// (issue #3847): the game's definitions run with that match's `setup`, less
+/// the definitions the engine refuses. Entry `n - 1` is the unit a replay of
+/// the match calls id `n`.
+pub fn render_for_match(
+    lib: &str,
+    game_archive: &str,
+    setup: &MatchSetup,
+    cache_dir: Option<&Path>,
+) -> UnitDatasetOutput {
+    let us = match unsafe { Unitsync::load(Path::new(lib)) } {
+        Ok(u) => u,
+        Err(e) => {
+            return UnitDatasetOutput {
+                errors: vec![e],
+                ..Default::default()
+            }
+        }
     };
-    if let Some((dir, key)) = cache {
-        if worth_caching(&out) {
-            infocache::write(dir, key, &out);
+    us.init_game(game_archive);
+    let out = resolve_for_match(&us, game_archive, setup, cache_dir);
+    us.uninit();
+    out
+}
+
+/// [`render_for_match`] in a session the caller has initialised.
+///
+/// The cache answers first, without mounting anything. Past that the game is
+/// mounted once, and what happens next depends on what the game says about the
+/// setup ([`MatchSetup::reduced`]):
+///
+/// - A setup that changes nothing is read as the empty setup, which every such
+///   replay of the game shares. The first one runs the definitions once to
+///   learn whether the engine refuses any of them.
+/// - Any other setup runs the definitions with it, once.
+///
+/// A list equal to the game's unit dataset is kept as a pointer to that blob
+/// and not as a second copy. The dataset's own key and blob are never changed
+/// from here: a missing one is read and written exactly as [`resolve`] would.
+pub(crate) fn resolve_for_match(
+    us: &Unitsync,
+    game_archive: &str,
+    setup: &MatchSetup,
+    cache_dir: Option<&Path>,
+) -> UnitDatasetOutput {
+    let mut errors = us.drain_errors();
+    let stamp = infocache::archive_stamp(us, game_archive);
+    let cache = cache_dir.zip(stamp.as_ref());
+
+    let kept = |setup: &MatchSetup| {
+        cache
+            .and_then(|(dir, stamp)| cached::match_unit_list_at(dir, stamp, setup))
+            .and_then(|value| serde_json::from_value::<UnitDatasetOutput>(value).ok())
+    };
+    if let Some(hit) = kept(setup) {
+        return hit;
+    }
+
+    if !us.add_all_archives(game_archive) {
+        errors.push("this engine's libunitsync can't load game archives".into());
+        return UnitDatasetOutput {
+            errors,
+            ..Default::default()
+        };
+    }
+    errors.extend(us.drain_errors());
+
+    let facts = match_facts(us);
+    let _ = us.drain_errors();
+    if let Some((dir, stamp)) = cache {
+        infocache::write(dir, &cachekey::match_facts_key(stamp), &facts);
+    }
+    let reduced = setup.reduced(&facts);
+    if reduced != *setup {
+        if let Some(hit) = kept(&reduced) {
+            us.remove_all_archives();
+            return hit;
+        }
+    }
+
+    // The game's own unit dataset, to tell a list that is the same from one
+    // that is not. Read from its blob, or read and kept the way `resolve`
+    // keeps it.
+    let dataset_key = stamp.as_ref().map(cachekey::dataset_key);
+    let default = cache_dir
+        .zip(dataset_key.as_deref())
+        .and_then(|(dir, key)| infocache::read::<UnitDatasetOutput>(dir, key))
+        .unwrap_or_else(|| {
+            let out = read_mounted(us, game_archive, None, Vec::new());
+            if let Some((dir, key)) = cache_dir.zip(dataset_key.as_deref()) {
+                if worth_caching(&out) {
+                    infocache::write(dir, key, &out);
+                }
+            }
+            out
+        });
+
+    let prelude = reduced.prelude(&facts.lua_ais);
+    let out = read_mounted(us, game_archive, Some(&prelude), errors);
+    us.remove_all_archives();
+
+    if let Some((dir, stamp)) = cache {
+        if worth_caching(&out) && worth_caching(&default) {
+            let key = cachekey::match_list_key(stamp, &reduced.canonical());
+            if same_units(&out, &default) {
+                infocache::write(
+                    dir,
+                    &key,
+                    &MatchListEntry::<UnitDatasetOutput>::SameAsDefault,
+                );
+            } else {
+                infocache::write(dir, &key, &MatchListEntry::List { dataset: &out });
+            }
         }
     }
     out
+}
+
+/// Whether two reads hold the same units, field for field, in the same order.
+fn same_units(a: &UnitDatasetOutput, b: &UnitDatasetOutput) -> bool {
+    serde_json::to_value(&a.units).ok() == serde_json::to_value(&b.units).ok()
+}
+
+/// What the mounted game says that decides whether a setup changes its unit
+/// list: each mod option's default, by the key a start script writes it under,
+/// and the short names in its `LuaAI.lua`.
+fn match_facts(us: &Unitsync) -> MatchFacts {
+    let count = us.mod_option_count();
+    let options = crate::read_options(us, count)
+        .into_iter()
+        .filter_map(|option| {
+            let kind = option.kind.filter(|kind| kind != "section")?;
+            Some((
+                option.key.to_lowercase(),
+                OptionDefault {
+                    kind,
+                    default: option.default.unwrap_or_default(),
+                },
+            ))
+        })
+        .collect();
+    MatchFacts {
+        options,
+        lua_ais: us.lua_ais().into_iter().map(|(name, _)| name).collect(),
+    }
 }
 
 /// A game's sync checksum as a hex string, or `None` when this engine build
@@ -645,11 +818,17 @@ pub fn emit_error(msg: String) {
 /// per-unit lines. The failure is returned rather than swallowed, because a game
 /// whose units cannot be read has to say so: an empty list is indistinguishable
 /// from a game that ships none.
-fn units_via_shim(us: &Unitsync) -> Result<Vec<UnitDatasetEntry>, String> {
+///
+/// `prelude` is the Lua a read for one match puts ahead of everything
+/// ([`MatchSetup::prelude`]), or `None` for the game's own unit dataset, whose
+/// script is then exactly what it was before a match could be read.
+fn units_via_shim(us: &Unitsync, prelude: Option<&str>) -> Result<Vec<UnitDatasetEntry>, String> {
     let script = format!(
-        "{}{}{UNIT_DATASET_SHIM_SCRIPT}",
+        "{}{}{}{UNIT_DATASET_SHIM_HEAD}{}{UNIT_DATASET_SHIM_TAIL}",
         crate::lua::CHUNKED_RESULT,
-        crate::lua::DEFS_ENV_SHIM
+        prelude.unwrap_or(""),
+        crate::lua::DEFS_ENV_SHIM,
+        if prelude.is_some() { ENGINE_KEEPS } else { "" },
     );
     us.run_lua_source(&script, VFS_ALL_MODES)
         .map(|raw| parse_dataset_units(&raw))
@@ -746,7 +925,7 @@ fn parse_morph_targets(field: Option<&str>) -> Vec<Map<String, Value>> {
         .collect()
 }
 
-/// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_SCRIPT`]
+/// Parse the `name\tfullname\topt1,opt2,...` lines [`UNIT_DATASET_SHIM_TAIL`]
 /// returns into `UnitDatasetEntry`s. A full name equal to the internal name (the
 /// script's fallback) or missing collapses to `None`; an empty options field
 /// yields no edges.
@@ -1390,8 +1569,16 @@ mod tests {
         assert_eq!(units[0].waterline, None);
     }
 
+    /// The game's own unit dataset script, whole: the two halves with nothing
+    /// between them.
+    fn whole_script() -> String {
+        format!("{UNIT_DATASET_SHIM_HEAD}{UNIT_DATASET_SHIM_TAIL}")
+    }
+
     #[test]
     fn shim_script_reads_buildoptions_and_returns_result() {
+        #[allow(non_snake_case)]
+        let UNIT_DATASET_SHIM_SCRIPT = whole_script();
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("VFS.Include"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("buildoptions"));
         assert!(UNIT_DATASET_SHIM_SCRIPT.contains("speed_of"));
@@ -1473,7 +1660,7 @@ mod tests {
 
     // ------------------------------------------------- extraction, in real Lua
 
-    /// Run [`UNIT_DATASET_SHIM_SCRIPT`] over a fixture `defs` table, and
+    /// Run the unit dataset script over a fixture `defs` table, and
     /// optionally one morph config mounted at `path`, in stock Lua 5.1.
     ///
     /// `VFS.Include` answers by path and raises on anything else, the way the
@@ -1489,13 +1676,312 @@ mod tests {
                error(\"Include() file missing '\" .. name .. \"'\")\n\
              end }}\n\
              __cb_chunk = function(s) return s end\n\
-             return (function()\n{UNIT_DATASET_SHIM_SCRIPT}\nend)()"
+             return (function()\n{}\nend)()",
+            whole_script()
         );
         let raw: String = lua
             .load(script)
             .eval()
             .expect("the shim script did not run");
         parse_dataset_units(&raw)
+    }
+
+    /// Run the read for one match over a `gamedata/defs.lua` body, in stock
+    /// Lua 5.1: the match's prelude, the worker's own stand-in, and the two
+    /// halves of the script with the engine's refusals between them. `Spring`
+    /// starts empty, as it is for everything a match asks about under
+    /// unitsync.
+    fn extract_for_match(
+        defs_body: &str,
+        setup: &MatchSetup,
+        lua_ais: &[String],
+    ) -> Vec<UnitDatasetEntry> {
+        let lua = mlua::Lua::new();
+        let script = format!(
+            "Spring = {{}}\n\
+             VFS = {{ Include = function(name)\n\
+               if name == 'gamedata/defs.lua' then return (function()\n{defs_body}\nend)() end\n\
+               error(\"Include() file missing '\" .. name .. \"'\")\n\
+             end }}\n\
+             __cb_chunk = function(s) return s end\n\
+             return (function()\n{}{}{UNIT_DATASET_SHIM_HEAD}{ENGINE_KEEPS}{UNIT_DATASET_SHIM_TAIL}\nend)()",
+            setup.prelude(lua_ais),
+            crate::lua::DEFS_ENV_SHIM,
+        );
+        let raw: String = lua
+            .load(script)
+            .eval()
+            .expect("the match script did not run");
+        parse_dataset_units(&raw)
+    }
+
+    /// A game that adds a unit for a mod option and another for a kind of AI
+    /// team, and ships one definition the engine refuses.
+    const A_GAME_THAT_READS_ITS_MATCH: &str = r#"
+      local units = {
+        armcom = { name = 'Commander', canmove = true, speed = 30, movementclass = 'kbot' },
+        armboat = { name = 'Boat', canmove = true, speed = 30, movementclass = 'smallboat' },
+        armsolar = { name = 'Solar' },
+      }
+      if Spring.GetModOptions().unit_pack == '1' then
+        units.armextra = { name = 'Extra' }
+      end
+      for _, team in ipairs(Spring.GetTeamList()) do
+        local ai = Spring.GetTeamLuaAI(team)
+        if ai and ai:find('Raptors') then units.raptor = { name = 'Raptor' } end
+      end
+      return { unitdefs = units, movedefs = { { name = 'KBOT' } } }
+    "#;
+
+    fn names(units: &[UnitDatasetEntry]) -> Vec<&str> {
+        units.iter().map(|u| u.name.as_str()).collect()
+    }
+
+    /// The empty setup changes what the game sees in nothing, and still
+    /// leaves out the definition the engine would refuse.
+    #[test]
+    fn the_empty_setup_drops_only_what_the_engine_refuses() {
+        let units = extract_for_match(A_GAME_THAT_READS_ITS_MATCH, &MatchSetup::default(), &[]);
+        assert_eq!(names(&units), ["armcom", "armsolar"]);
+    }
+
+    #[test]
+    fn a_matchs_mod_option_reaches_the_games_definitions() {
+        let setup = MatchSetup {
+            mod_options: [("unit_pack".to_string(), "1".to_string())].into(),
+            ..Default::default()
+        };
+        let units = extract_for_match(A_GAME_THAT_READS_ITS_MATCH, &setup, &[]);
+        assert_eq!(names(&units), ["armcom", "armextra", "armsolar"]);
+    }
+
+    /// An AI is a Lua AI only when the game's own list names it, which is the
+    /// engine's rule, so the same script seat adds the unit in one game and
+    /// not in another.
+    #[test]
+    fn a_lua_ai_team_reaches_the_games_definitions() {
+        let setup: MatchSetup =
+            serde_json::from_str(include_str!("../tests/fixtures/match_setup.json")).unwrap();
+        let listed = extract_for_match(
+            A_GAME_THAT_READS_ITS_MATCH,
+            &setup,
+            &["RaptorsAI".to_string()],
+        );
+        assert_eq!(names(&listed), ["armcom", "armsolar", "raptor"]);
+        let unlisted = extract_for_match(A_GAME_THAT_READS_ITS_MATCH, &setup, &[]);
+        assert_eq!(names(&unlisted), ["armcom", "armsolar"]);
+    }
+
+    /// The unit list read for one match's setup against the list the engine
+    /// built for that match, id by id and name by name.
+    ///
+    /// The engine's list is the replay logger's `unit_def` lines, which the
+    /// content plugin's `a_scratch_match_records_its_setup_and_the_engines_unit_list`
+    /// writes beside the setup it read back out of the recorded replay. Reads
+    /// what to compare from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_UNITLIST_LIB`: `libunitsync` in a copy of the engine the
+    ///   match ran on. Unitsync is told to read no folder but that copy and
+    ///   the one below.
+    /// - `COILBOX_UNITLIST_DATA_DIR`: a scratch content folder holding the
+    ///   game. Unitsync may write its archive cache there.
+    /// - `COILBOX_UNITLIST_ARCHIVE`: the game's archive, as unitsync names it.
+    /// - `COILBOX_UNITLIST_SETUP`: the match's setup, as JSON.
+    /// - `COILBOX_UNITLIST_ENGINE_LIST`: the logger's lines.
+    /// - `COILBOX_UNITLIST_REFUSED`: for a game the engine cannot load far
+    ///   enough to run the logger, in place of the logger's lines: the engine's
+    ///   own log of the run. Every definition it names in a line
+    ///   `Couldn't find a MoveClass named ... (used in UnitDef: ...)` must be
+    ///   left out of the list, and nothing else may be.
+    /// - `COILBOX_UNITLIST_LUA`: a copy of `match_unit_list.lua` to run in
+    ///   place of the one compiled in, for proving the comparison notices a
+    ///   rule that is wrong. The test is then expected to fail.
+    /// - `COILBOX_UNITLIST_EXPECT`: `shared` when the match's list must be
+    ///   kept as a pointer to the game's own dataset, `own` when it must not.
+    #[test]
+    #[ignore = "needs an engine copy, a game, and the engine's own unit list for one match"]
+    fn the_list_read_for_a_match_is_the_engines() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let truth = var("COILBOX_UNITLIST_ENGINE_LIST").or(var("COILBOX_UNITLIST_REFUSED"));
+        let (Some(lib), Some(data_dir), Some(archive), Some(setup), Some(_)) = (
+            var("COILBOX_UNITLIST_LIB"),
+            var("COILBOX_UNITLIST_DATA_DIR"),
+            var("COILBOX_UNITLIST_ARCHIVE"),
+            var("COILBOX_UNITLIST_SETUP"),
+            truth,
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_UNITLIST_LIB, COILBOX_UNITLIST_DATA_DIR, \
+                 COILBOX_UNITLIST_ARCHIVE, COILBOX_UNITLIST_SETUP and one of \
+                 COILBOX_UNITLIST_ENGINE_LIST and COILBOX_UNITLIST_REFUSED to run it"
+            );
+            return;
+        };
+        let setup: MatchSetup =
+            serde_json::from_str(&std::fs::read_to_string(&setup).expect("the setup"))
+                .expect("the setup as JSON");
+        // The engine's list: each line's id and name, in id order.
+        let mut engine: Vec<(u64, String)> = var("COILBOX_UNITLIST_ENGINE_LIST")
+            .map(|file| std::fs::read_to_string(file).expect("the engine's list"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|line| line["kind"] == "unit_def")
+            .map(|line| {
+                (
+                    line["id"].as_u64().expect("an id"),
+                    line["name"].as_str().expect("a name").to_string(),
+                )
+            })
+            .collect();
+        engine.sort();
+        for (index, (id, _)) in engine.iter().enumerate() {
+            assert_eq!(*id, index as u64 + 1, "the engine's ids have a gap");
+        }
+        // The definitions the engine's log says it refused.
+        let refused: Option<std::collections::BTreeSet<String>> = var("COILBOX_UNITLIST_REFUSED")
+            .map(|file| {
+                std::fs::read_to_string(file)
+                    .expect("the engine's log")
+                    .lines()
+                    .filter(|line| line.contains("Couldn't find a MoveClass named"))
+                    .filter_map(|line| {
+                        let name = line.split("(used in UnitDef: ").nth(1)?;
+                        Some(name.trim_end().trim_end_matches(')').to_string())
+                    })
+                    .collect()
+            });
+        assert!(
+            !engine.is_empty() || refused.is_some(),
+            "the engine's list holds no unit_def line"
+        );
+
+        // Unitsync reads the engine copy and the scratch content folder and
+        // nothing else.
+        let engine_dir = Path::new(&lib).parent().expect("the engine's folder");
+        std::env::set_var("SPRING_ISOLATED", engine_dir);
+        std::env::remove_var("COILBOX_EXTRA_DATADIRS");
+        crate::enter_engine(&lib, &data_dir);
+
+        let us = unsafe { Unitsync::load(Path::new(&lib)) }.expect("unitsync");
+        us.init_game(&archive);
+        assert!(us.add_all_archives(&archive), "the game did not mount");
+        let _ = us.drain_errors();
+        let facts = match_facts(&us);
+        let reduced = setup.reduced(&facts);
+        let prelude = match var("COILBOX_UNITLIST_LUA") {
+            Some(file) => reduced.prelude_with(
+                &facts.lua_ais,
+                &std::fs::read_to_string(file).expect("the Lua to run"),
+            ),
+            None => reduced.prelude(&facts.lua_ais),
+        };
+        let own = read_mounted(&us, &archive, None, Vec::new());
+        let read = read_mounted(&us, &archive, Some(&prelude), Vec::new());
+        us.remove_all_archives();
+
+        if let Some(refused) = refused {
+            let kept: std::collections::BTreeSet<&str> =
+                read.units.iter().map(|u| u.name.as_str()).collect();
+            let left_out: std::collections::BTreeSet<String> = own
+                .units
+                .iter()
+                .filter(|u| !kept.contains(u.name.as_str()))
+                .map(|u| u.name.clone())
+                .collect();
+            eprintln!(
+                "the engine's log refuses {} definitions, the read leaves out {} of the \
+                 game's {}, and {} are in both",
+                refused.len(),
+                left_out.len(),
+                own.units.len(),
+                refused.intersection(&left_out).count(),
+            );
+            assert!(!refused.is_empty(), "the engine's log refuses nothing");
+            assert_eq!(left_out, refused);
+            assert_eq!(read.units.len() + refused.len(), own.units.len());
+            us.uninit();
+            std::mem::forget(us);
+            return;
+        }
+
+        let matches = engine
+            .iter()
+            .zip(&read.units)
+            .filter(|((_, name), unit)| *name == unit.name)
+            .count();
+        let own_matches = engine
+            .iter()
+            .zip(&own.units)
+            .filter(|((_, name), unit)| *name == unit.name)
+            .count();
+        eprintln!(
+            "engine {} definitions, read for the match {} ({} equal by id and name, {} not), \
+             the game's own dataset {} ({} equal), setup {}, errors {:?}",
+            engine.len(),
+            read.units.len(),
+            matches,
+            engine.len().max(read.units.len()) - matches,
+            own.units.len(),
+            own_matches,
+            if reduced == MatchSetup::default() {
+                "read as the empty one"
+            } else {
+                "read whole"
+            },
+            read.errors,
+        );
+        if let Some(((id, name), unit)) = engine
+            .iter()
+            .zip(&read.units)
+            .find(|((_, name), unit)| *name != unit.name)
+        {
+            eprintln!(
+                "first difference: id {id} is {name} in the engine and {} here",
+                unit.name
+            );
+        }
+        assert_eq!(read.units.len(), engine.len(), "the lists differ in length");
+        assert_eq!(matches, engine.len(), "the lists differ");
+
+        // The same answer through the cache, twice, and what was kept for it.
+        if var("COILBOX_UNITLIST_LUA").is_none() {
+            let cache =
+                std::env::temp_dir().join(format!("coilbox-unitlist-test-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&cache);
+            let first = resolve_for_match(&us, &archive, &setup, Some(&cache));
+            let files = std::fs::read_dir(&cache).unwrap().count();
+            let second = resolve_for_match(&us, &archive, &setup, Some(&cache));
+            assert!(same_units(&first, &read) && same_units(&second, &read));
+            assert_eq!(
+                std::fs::read_dir(&cache).unwrap().count(),
+                files,
+                "the second read wrote to the cache, so it was not answered from it"
+            );
+            let stamp = infocache::archive_stamp(&us, &archive).expect("the archive's stamp");
+            let key = cachekey::match_list_key(&stamp, &reduced.canonical());
+            let entry: MatchListEntry<Value> =
+                infocache::read(&cache, &key).expect("an entry for the setup");
+            let _ = std::fs::remove_dir_all(&cache);
+            let shared = entry == MatchListEntry::SameAsDefault;
+            eprintln!(
+                "kept as {}",
+                if shared {
+                    "a pointer to the game's own dataset"
+                } else {
+                    "a list of its own"
+                }
+            );
+            match var("COILBOX_UNITLIST_EXPECT").as_deref() {
+                Some("shared") => assert!(shared, "the match's list was kept apart"),
+                Some("own") => assert!(!shared, "the match's list was kept as the game's own"),
+                _ => {}
+            }
+        }
+        us.uninit();
+        // Dropping the library here ended the test's process with a SIGSEGV
+        // on macOS, after everything above had passed, so it is left loaded.
+        std::mem::forget(us);
     }
 
     /// This is the extraction end to end rather than the parser on its own: the

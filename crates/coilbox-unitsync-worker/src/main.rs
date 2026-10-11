@@ -476,6 +476,28 @@ fn dispatch(args: &Args) -> i32 {
     // game-detail mode because it also keys off --game.
     if let Some(Mode::UnitDataset(mode)) = &args.unit_dataset {
         let cache_dir = mode.cache_dir.as_deref().map(Path::new);
+        // With a match's setup this is the unit list the engine built for that
+        // match (issue #3847), and the game's own dataset is left as it is.
+        if let Some(file) = &mode.match_setup_file {
+            let setup = std::fs::read_to_string(file)
+                .map_err(|e| format!("could not read the match setup: {e}"))
+                .and_then(|text| {
+                    serde_json::from_str::<coilbox_unitsync_worker::matchsetup::MatchSetup>(&text)
+                        .map_err(|e| format!("could not read the match setup: {e}"))
+                });
+            let setup = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    dataset::emit_error(e);
+                    return 1;
+                }
+            };
+            return run_mode(
+                || dataset::render_for_match(&args.lib, &mode.game, &setup, cache_dir),
+                print_ok,
+                || dataset::emit_error("worker panicked while reading a match's units".into()),
+            );
+        }
         return run_mode(
             || dataset::render(&args.lib, &mode.game, cache_dir),
             print_ok,
@@ -1166,6 +1188,10 @@ fn parse_args(raw: &[String]) -> Result<Args, String> {
             "--lua" => lua_flag = true,
             // Consumed by `Mode::Lua`'s `from_args` below, not stored here.
             "--source-file" | "--chunks-file" => {
+                it.next();
+            }
+            // Consumed by `Mode::UnitDataset`'s `from_args` below.
+            "--match-setup-file" => {
                 it.next();
             }
             // Consumed by `Mode::Minimap`'s and `Mode::Thumbnails`'s

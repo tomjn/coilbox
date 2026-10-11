@@ -35,6 +35,7 @@ use tauri::{AppHandle, Runtime};
 use super::analysis::store::{self, AnalysisState};
 use super::build_orders::{build_orders_from_stream, player_teams};
 use super::def_sets::{self, Ids, Link, UnitDef};
+use super::match_setup::MatchSetup;
 use super::{build_demo_info, find_game, parse_tdf, player_names, read_header_and_script, stream};
 use crate::model::CommandOrigin;
 
@@ -42,7 +43,10 @@ use crate::model::CommandOrigin;
 /// shape of [`ReplayUnitOrders`], which orders are counted, how a seat is told
 /// from another, or which events count as finished and died. A file kept under
 /// another version is not read, and the replay is walked again.
-pub const UNIT_ORDERS_VERSION: u32 = 1;
+///
+/// 2: a replay carries its match's setup, which the unit list it is read
+/// against is now read with (#3847).
+pub const UNIT_ORDERS_VERSION: u32 = 2;
 
 /// The folder under the app's cache directory that holds the kept files. It is
 /// in `caches::CACHE_SUBDIRS`, so the storage screen sizes it and clears it.
@@ -119,6 +123,11 @@ pub struct ReplayUnitOrders {
     /// The game and version whose build numbered the ids in `seats`. For a
     /// remix that is the game it was recorded on, not the one it points at.
     pub game_type: String,
+    /// The match's setup as the engine held it, which the game's unit list is
+    /// read with (#3847). Absent for a start script the engine would have
+    /// refused.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub match_setup: Option<MatchSetup>,
     /// The last frame the stream reached. 30 frames are one second.
     pub last_frame: i32,
     /// True when the walk stopped early, so later orders are missing.
@@ -194,6 +203,7 @@ pub fn reduce_replay(demo: &Path) -> Result<ReplayUnitOrders, String> {
             .source_gametype
             .filter(|_| info.remixed)
             .unwrap_or(info.game_type),
+        match_setup: info.match_setup,
         last_frame: read.last_frame,
         incomplete: read.incomplete,
         removals: read.removals,
@@ -580,6 +590,193 @@ mod tests {
 
     const SHIFT_KEY: u8 = 1 << 5;
     const NO_AI: u8 = 255;
+
+    /// How many of a replay's build orders do not fit a unit list, the way the
+    /// dossier counts it (`totalsMisfits` in `src/content/unitUsage.ts`): a
+    /// placed order should name a unit that does not move, a factory order one
+    /// that does, and no id should be past the end.
+    fn misfits(replay: &ReplayUnitOrders, mobile: &[bool]) -> u32 {
+        let mut count = 0;
+        for def in replay.seats.iter().flat_map(|seat| &seat.defs) {
+            match def.def.checked_sub(1).and_then(|i| mobile.get(i as usize)) {
+                None => count += def.placed + def.queued,
+                Some(true) => count += def.placed,
+                Some(false) => count += def.queued,
+            }
+        }
+        count
+    }
+
+    /// A game's name as the app compares two (`normalizeGameIdentity` in
+    /// `src/content/resolveContent.ts`): lower case, no `v` ahead of a version
+    /// number, and nothing but letters and digits.
+    fn identity(name: &str) -> String {
+        let lower: Vec<char> = name.to_lowercase().chars().collect();
+        let mut out = String::new();
+        for (i, c) in lower.iter().enumerate() {
+            let starts_word = i == 0 || !lower[i - 1].is_ascii_alphanumeric();
+            let before_digit = lower.get(i + 1).is_some_and(char::is_ascii_digit);
+            if *c == 'v' && starts_word && before_digit {
+                continue;
+            }
+            if c.is_ascii_alphanumeric() {
+                out.push(*c);
+            }
+        }
+        out
+    }
+
+    /// Over a library of real replays: how many have build orders that fit the
+    /// unit list of the game installed under their exact name, read the old
+    /// way and read with the match's own setup (#3847).
+    ///
+    /// Reads only. Nothing is asked of the unit definition store, so this is
+    /// the unitsync read alone, not what a replay with a kept list shows.
+    /// Reads what to run from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_LIBRARY_DEMOS`: folders of replays, separated the way
+    ///   `SPRING_DATADIR` is.
+    /// - `COILBOX_LIBRARY_WORKER`: the unitsync worker binary.
+    /// - `COILBOX_LIBRARY_UNITSYNC`: an engine's `libunitsync`.
+    /// - `COILBOX_LIBRARY_DATADIR`: the content folder the games are in. The
+    ///   worker reads it the way the app does.
+    /// - `COILBOX_LIBRARY_CACHE`: an empty folder for the worker's cache.
+    #[test]
+    #[ignore = "needs a folder of replays, their games, an engine and the unitsync worker"]
+    fn a_librarys_build_orders_fit_before_and_after_reading_with_the_setup() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(demos), Some(worker), Some(lib), Some(datadir), Some(cache)) = (
+            var("COILBOX_LIBRARY_DEMOS"),
+            var("COILBOX_LIBRARY_WORKER"),
+            var("COILBOX_LIBRARY_UNITSYNC"),
+            var("COILBOX_LIBRARY_DATADIR"),
+            var("COILBOX_LIBRARY_CACHE"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_LIBRARY_DEMOS, COILBOX_LIBRARY_WORKER, \
+                 COILBOX_LIBRARY_UNITSYNC, COILBOX_LIBRARY_DATADIR and COILBOX_LIBRARY_CACHE \
+                 to run it"
+            );
+            return;
+        };
+        let run = |args: &[&str]| -> serde_json::Value {
+            let out = std::process::Command::new(&worker)
+                .args(["--lib", &lib, "--datadir", &datadir])
+                .args(args)
+                .output()
+                .expect("the worker ran");
+            serde_json::from_slice(&out.stdout).expect("the worker printed one JSON document")
+        };
+        // Whether each unit of a read moves, in id order, or None for a read
+        // that gave no units.
+        let mobile = |read: &serde_json::Value| -> Option<Vec<bool>> {
+            let units = read["units"].as_array().filter(|u| !u.is_empty())?;
+            Some(
+                units
+                    .iter()
+                    .map(|u| u["mobile"].as_bool().unwrap_or(false))
+                    .collect(),
+            )
+        };
+
+        let scan = run(&[]);
+        let games: Vec<(String, String)> = scan["games"]
+            .as_array()
+            .expect("the scan's games")
+            .iter()
+            .filter_map(|game| {
+                Some((
+                    identity(game["name"].as_str()?),
+                    game["primaryArchive"]["name"].as_str()?.to_string(),
+                ))
+            })
+            .collect();
+
+        let mut paths: Vec<PathBuf> = Vec::new();
+        for dir in demos.split(coilbox_proc::DATADIR_SEP) {
+            let Ok(entries) = std::fs::read_dir(dir) else {
+                continue;
+            };
+            paths.extend(
+                entries
+                    .filter_map(|entry| Some(entry.ok()?.path()))
+                    .filter(|path| super::super::is_replay_path(path)),
+            );
+        }
+        paths.sort();
+
+        let setup_file = Path::new(&cache).join("setup.json");
+        std::fs::create_dir_all(&cache).unwrap();
+        let (mut unread, mut not_installed, mut no_orders, mut no_units) = (0, 0, 0, 0);
+        let (mut checked, mut fit_before, mut fit_after) = (0, 0, 0);
+        let (mut better, mut worse, mut same_list) = (0, 0, 0);
+        let (mut orders_all, mut misfits_before, mut misfits_after) = (0u32, 0u32, 0u32);
+        for path in &paths {
+            let Ok(replay) = reduce_replay(path) else {
+                unread += 1;
+                continue;
+            };
+            let wanted = identity(&replay.game_type);
+            let Some((_, archive)) = games.iter().find(|(name, _)| *name == wanted) else {
+                not_installed += 1;
+                continue;
+            };
+            let orders: u32 = replay
+                .seats
+                .iter()
+                .flat_map(|seat| &seat.defs)
+                .map(|def| def.placed + def.queued)
+                .sum();
+            if orders == 0 {
+                no_orders += 1;
+                continue;
+            }
+            let before = run(&["--unit-dataset", "--game", archive, "--cache-dir", &cache]);
+            let after = match &replay.match_setup {
+                Some(setup) => {
+                    std::fs::write(&setup_file, serde_json::to_string(setup).unwrap()).unwrap();
+                    run(&[
+                        "--unit-dataset",
+                        "--game",
+                        archive,
+                        "--cache-dir",
+                        &cache,
+                        "--match-setup-file",
+                        &setup_file.to_string_lossy(),
+                    ])
+                }
+                None => before.clone(),
+            };
+            let (Some(before), Some(after)) = (mobile(&before), mobile(&after)) else {
+                no_units += 1;
+                continue;
+            };
+            let (was, is) = (misfits(&replay, &before), misfits(&replay, &after));
+            checked += 1;
+            orders_all += orders;
+            misfits_before += was;
+            misfits_after += is;
+            fit_before += u32::from(was == 0);
+            fit_after += u32::from(is == 0);
+            better += u32::from(is < was);
+            worse += u32::from(is > was);
+            same_list += u32::from(before == after);
+        }
+        let _ = std::fs::remove_file(&setup_file);
+        eprintln!(
+            "{} replays: {unread} would not read, {not_installed} name a game that is not \
+             installed, {no_orders} hold no build orders, {no_units} name a game whose units \
+             would not read, {checked} checked",
+            paths.len()
+        );
+        eprintln!(
+            "of {checked} checked, with {orders_all} build orders: {fit_before} fit before and \
+             {fit_after} after, {misfits_before} orders did not fit before and {misfits_after} \
+             after, {better} replays fit better, {worse} worse, and {same_list} are read \
+             against a list that moves the same units"
+        );
+        assert_eq!(worse, 0, "a replay fits its list worse than it did");
+    }
 
     fn order(id: i32, options: u8, params: &[f32]) -> Order {
         Order {

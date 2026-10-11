@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   contentReplayUnitOrders,
   type GameItem,
+  type MatchSetup,
   type ReplayUnitOrders,
   type UnitDatasetEntry,
 } from "./bindings";
@@ -17,6 +18,14 @@ import {
   storedLists,
   streamNaming,
 } from "./unitUsage";
+
+/** The archive and the setup a read's name holds (`StreamNaming.read`). */
+function splitRead(read: string): [string, MatchSetup | undefined] {
+  const at = read.indexOf("\n");
+  return at < 0
+    ? [read, undefined]
+    : [read.slice(0, at), JSON.parse(read.slice(at + 1)) as MatchSetup];
+}
 
 /** One list, so a render with nothing installed does not look like a change. */
 const NOTHING_INSTALLED: GameItem[] = [];
@@ -36,8 +45,9 @@ interface Answer {
  * One command call for the whole set: Rust walks each replay once and keeps
  * its totals on disk, so only the first visit after a new replay reads a demo.
  * A replay with no kept unit list is read against the game installed under its
- * exact name, which is one unitsync read for each such game and none for a
- * replay that has a list.
+ * exact name, with the match's own setup (#3847). A setup that changes nothing
+ * about the game's unit list shares the game's one read, and any other costs a
+ * read of its own, once. A replay that has a list costs none.
  *
  * Nothing is asked for until `wanted`.
  */
@@ -90,40 +100,51 @@ export function useUnitUsage(
 
   const current = answer && answer.key === pathsKey ? answer : null;
 
-  // The archives to read: each installed game a replay with no kept list is
-  // named from. A string, so the effect depends on what it says.
-  const archivesKey = useMemo(() => {
+  // The reads to make: one for each installed game and match setup a replay
+  // with no kept list is named from. As text, so the effect depends on what it
+  // says. A read's name holds its archive and its setup, so it is all the
+  // effect needs.
+  const readsKey = useMemo(() => {
     if (!current || !installed) return "";
-    const archives = new Set<string>();
+    const reads = new Set<string>();
     for (const replay of current.replays.values()) {
       const naming = streamNaming(replay, current.lists, installed);
-      if (naming.kind === "installed") archives.add(naming.archive);
+      if (naming.kind === "installed") reads.add(naming.read);
     }
-    return [...archives].sort().join("\n");
+    return JSON.stringify([...reads].sort());
   }, [current, installed]);
 
-  // An archive maps to its units, or to null once its read has failed or come
-  // back empty, so a read is tried once and "still reading" has an end.
+  // A read maps to its units, or to null once it has failed or come back
+  // empty, so a read is tried once and "still reading" has an end.
   const [datasets, setDatasets] = useState<
     ReadonlyMap<string, UnitDatasetEntry[] | null>
   >(() => new Map());
 
   useEffect(() => {
-    if (!archivesKey || !enginePath || !rootPath) return;
+    if (!readsKey || !enginePath || !rootPath) return;
     let live = true;
-    for (const archive of archivesKey.split("\n")) {
-      const settle = (units: UnitDatasetEntry[] | null) => {
-        if (live) setDatasets((before) => new Map(before).set(archive, units));
-      };
-      loadUnitsyncUnitDataset(enginePath, rootPath, archive).then(
-        (dataset) => settle(dataset.units.length > 0 ? dataset.units : null),
-        () => settle(null),
-      );
-    }
+    // One after another. A setup that changes a game's unit list runs the
+    // game's definitions again, and a player's games can hold many setups.
+    void (async () => {
+      for (const read of JSON.parse(readsKey) as string[]) {
+        if (!live) return;
+        const [archive, setup] = splitRead(read);
+        const units = await loadUnitsyncUnitDataset(
+          enginePath,
+          rootPath,
+          archive,
+          setup,
+        ).then(
+          (dataset) => (dataset.units.length > 0 ? dataset.units : null),
+          () => null,
+        );
+        if (live) setDatasets((before) => new Map(before).set(read, units));
+      }
+    })();
     return () => {
       live = false;
     };
-  }, [archivesKey, enginePath, rootPath]);
+  }, [readsKey, enginePath, rootPath]);
 
   const usage = useMemo(
     () =>

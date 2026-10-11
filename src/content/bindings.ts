@@ -576,6 +576,9 @@ export interface DemoInfo {
   /** The `[mapoptions]` section verbatim, as `modOptions` is. Empty when the
    * script carried none. */
   mapOptions: Record<string, string>;
+  /** The match's setup as the engine held it, which the game's unit list is
+   * read with (#3847). Absent for a start script the engine would refuse. */
+  matchSetup?: MatchSetup;
   /** Where each team started, by team id, from the replay's stream (#1146). A
    * team with no recorded position is absent, since 0,0,0 is a real map corner.
    * Absent altogether when the stream has none or cannot be read. */
@@ -1614,6 +1617,29 @@ export interface UnitDefEvents {
   died: number;
 }
 
+/**
+ * One match's setup as the engine held it once it had read the start script:
+ * players, teams and ally teams numbered from zero with no gaps (#3847).
+ *
+ * The engine builds a match's unit list with these to hand, so a replay's unit
+ * ids only count into a list read with them. Nothing here reads the fields. It
+ * is taken from a replay and handed to {@link unitsyncUnitDataset} whole.
+ */
+export interface MatchSetup {
+  modOptions: Record<string, string>;
+  mapOptions: Record<string, string>;
+  teams: {
+    leader: number;
+    allyTeam: number;
+    side: string;
+    incomeMultiplier: number;
+    custom: Record<string, string>;
+  }[];
+  allyTeams: { allies: number[]; custom: Record<string, string> }[];
+  players: { team: number; spectator: boolean }[];
+  ais: { team: number; shortName: string; name: string; host: number }[];
+}
+
 /** One replay's build orders reduced to totals (#1167). */
 export interface ReplayUnitOrders {
   path: string;
@@ -1622,6 +1648,8 @@ export interface ReplayUnitOrders {
   remixed: boolean;
   /** The game and version whose build numbered the ids in `seats`. */
   gameType: string;
+  /** The match's setup, which the game's unit list is read with (#3847). */
+  matchSetup?: MatchSetup;
   lastFrame: number;
   /** True when the walk stopped early, so later orders are missing. */
   incomplete: boolean;
@@ -2447,14 +2475,22 @@ export interface UnitDatasetResult {
   errors: string[];
 }
 
+/** A unit dataset read, which may be for one match. */
+type UnitDatasetArgs = GameReadArgs & {
+  /** Read the unit list the engine built for this match, and not the game's
+   *  own (#3847). Entry `n - 1` is then the unit a replay of the match calls
+   *  id `n`. */
+  matchSetup?: MatchSetup;
+};
+
 /**
  * Load a game's reusable unit graph (units + their `buildoptions` edges) — lazy,
  * since it mounts the game's archive set. Powers the per-faction build-tree viewer
  * and unit include/exclude filters. `gameArchive` is the primary archive name.
  */
-export const unitsyncUnitDataset = (args: GameReadArgs) =>
+export const unitsyncUnitDataset = (args: UnitDatasetArgs) =>
   unitDatasetCommand(withGameArchivePath(args));
-const unitDatasetCommand = defineCommand<GameReadArgs, UnitDatasetResult>(
+const unitDatasetCommand = defineCommand<UnitDatasetArgs, UnitDatasetResult>(
   "coilbox-unitsync",
   "unitsync_unit_dataset",
 );

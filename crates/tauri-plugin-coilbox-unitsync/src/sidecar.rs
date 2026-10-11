@@ -181,17 +181,22 @@ pub fn build_faction_logos_args(
 /// The mode's fields live once in `coilbox_unitsync_worker::UnitDatasetArgs`,
 /// so this function only has to add `--lib`/`--datadir`, which every mode
 /// takes and `Mode::to_args` does not include (issue #2448).
+///
+/// `match_setup_file` names a file holding one match's setup, which makes the
+/// read that match's unit list and not the game's own (issue #3847).
 pub fn build_unit_dataset_args(
     lib: &str,
     datadir: &str,
     game: &str,
     cache_dir: Option<&str>,
+    match_setup_file: Option<&str>,
 ) -> Vec<String> {
     let mut args = build_args(lib, datadir);
     args.extend(
         coilbox_unitsync_worker::Mode::UnitDataset(coilbox_unitsync_worker::UnitDatasetArgs {
             game: game.into(),
             cache_dir: cache_dir.map(String::from),
+            match_setup_file: match_setup_file.map(String::from),
         })
         .to_args(),
     );
@@ -1611,6 +1616,7 @@ mod tests {
             "/data",
             "BAR.sdd",
             Some("/cache/info"),
+            Some("/tmp/setup.json"),
         );
         assert!(a.contains(&"--unit-dataset".to_string()));
         let recovered = UnitDatasetArgs::from_args(&a).expect("valid argv");
@@ -1619,14 +1625,18 @@ mod tests {
             UnitDatasetArgs {
                 game: "BAR.sdd".into(),
                 cache_dir: Some("/cache/info".into()),
+                match_setup_file: Some("/tmp/setup.json".into()),
             }
         );
 
-        let without = build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None);
+        let without =
+            build_unit_dataset_args("/eng/libunitsync.so", "/data", "BAR.sdd", None, None);
         assert!(without.contains(&"--unit-dataset".to_string()));
         assert!(!without.iter().any(|x| x == "--cache-dir"));
+        assert!(!without.iter().any(|x| x == "--match-setup-file"));
         let recovered = UnitDatasetArgs::from_args(&without).expect("valid argv");
         assert_eq!(recovered.cache_dir, None);
+        assert_eq!(recovered.match_setup_file, None);
     }
 
     /// What `build_unit_defs_args` writes, the worker's own `from_args` reads
