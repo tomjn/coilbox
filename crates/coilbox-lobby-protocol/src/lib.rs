@@ -25,6 +25,7 @@ mod login;
 mod message;
 mod redact;
 mod reduce;
+mod ring;
 pub mod server;
 mod state;
 mod status;
@@ -41,6 +42,7 @@ pub use redact::redact_line;
 pub use reduce::{
     begin_channel_list, push_chat, push_dm, record_outgoing_private, reduce, reduce_at, Delta,
 };
+pub use ring::{RingAnswer, RingHost};
 pub use state::{
     Battle, Bot, ChannelState, ChatKind, ChatMsg, Debriefing, DebriefingAward, DebriefingPlayer,
     DirChannel, LobbyState, MatchFound, MatchQueue, Matchmaking, MemberStatus, Party, Rating,

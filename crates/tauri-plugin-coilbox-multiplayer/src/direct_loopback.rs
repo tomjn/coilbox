@@ -827,6 +827,54 @@ async fn battle_chat_reaches_both_ends() {
     room.stop("done").await;
 }
 
+/// `!ring` typed in the battle is answered by the host's own client, because a
+/// battle coilbox hosts has no autohost in it to answer.
+///
+/// Both directions, since they take different routes: a joiner is rung with a
+/// `RING` the room passes on, and the host is rung by its own client, which
+/// never sends itself one.
+#[tokio::test]
+async fn the_host_answers_ring_typed_in_the_battle() {
+    let registry = Registry::default();
+    let (room, host, joiner) = hosted_battle_with_a_joiner(&registry).await;
+
+    host.send(command::say_battle("!ring bob"));
+    wait_until(
+        || joiner.received().contains(&"RING alice".to_string()),
+        "the joiner to be rung",
+    )
+    .await;
+    wait_until(
+        || {
+            battle_chat(&joiner.state()).contains(&(
+                "alice".to_string(),
+                "Ringing bob (by alice)".to_string(),
+                ChatKind::SaidEx,
+            ))
+        },
+        "the joiner to read who rang them",
+    )
+    .await;
+
+    joiner.send(command::say_battle("!ring alice"));
+    wait_until(
+        || {
+            host.events.lock().unwrap().iter().any(|e| {
+                let event: serde_json::Value = serde_json::from_str(e).unwrap_or_default();
+                event["delta"]["kind"] == "ring" && event["delta"]["from"] == "bob"
+            })
+        },
+        "the host to be rung by the joiner",
+    )
+    .await;
+    assert!(
+        !host.received().iter().any(|line| line.starts_with("RING ")),
+        "the host is rung by its own client, not over the wire"
+    );
+
+    room.stop("done").await;
+}
+
 /// Everything said in the battle channel, as sender, text and kind.
 fn battle_chat(state: &LobbyState) -> Vec<(String, String, ChatKind)> {
     state
