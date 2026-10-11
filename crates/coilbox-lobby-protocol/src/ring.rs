@@ -1,4 +1,5 @@
-//! The host's answer to `!ring` typed in battle chat.
+//! Ringing players from a battle this client founded, either on the founder's
+//! say-so or as the answer to `!ring` typed in battle chat.
 //!
 //! A SPADS autohost answers `!ring` by sending the lobby's `RING` to the
 //! players holding the battle up (`hRing` in SPADS `src/spads.pl`). A battle
@@ -8,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use crate::{command, LobbyState};
+use crate::{command, Battle, LobbyState};
 
 /// How long a player is left alone after being rung. SPADS's default
 /// `minRingDelay` (`etc/spads.conf`).
@@ -46,13 +47,9 @@ impl RingHost {
         {
             return RingAnswer::default();
         }
-        let battle = state.current_battle.and_then(|id| state.battles.get(&id));
-        let (Some(me), Some(battle)) = (state.my_username.as_deref(), battle) else {
+        let Some((me, battle)) = founded(state) else {
             return RingAnswer::default();
         };
-        if battle.host != me {
-            return RingAnswer::default();
-        }
         let named = words.next();
         if words.next().is_some() {
             return say("Invalid syntax, use !ring or !ring <player>".into());
@@ -86,14 +83,7 @@ impl RingHost {
         }
 
         // The caller is left out: they are at the keyboard, they just typed.
-        let (resting, ringing): (Vec<&str>, Vec<&str>) = names
-            .into_iter()
-            .filter(|name| *name != from)
-            .filter(|name| {
-                let status = battle.members[*name].battle_status;
-                status.mode && (!status.ready || status.sync != 1)
-            })
-            .partition(|name| self.last_rung.contains_key(*name));
+        let (resting, ringing) = self.holding_up(battle, from);
         if ringing.is_empty() {
             return say(if resting.is_empty() {
                 "There is no one to ring".into()
@@ -111,6 +101,78 @@ impl RingHost {
             format!("Ringing unready/unsynced player(s): {list}")
         };
         self.ring(&ringing, me, from, now_ms, format!("{words} (by {from})"))
+    }
+
+    /// The founder ringing from their own battle room, with nothing typed.
+    ///
+    /// `named` rings that one member whatever their status, and without it
+    /// everybody unready or unsynced is rung. The lines to send come back, or
+    /// the reason nobody was rung, which is the founder's alone to read: a
+    /// host that talks to its own battle about a button it pressed is noise.
+    pub fn host_rings(
+        &mut self,
+        state: &LobbyState,
+        named: Option<&str>,
+        now_ms: u64,
+    ) -> Result<Vec<String>, String> {
+        let Some((me, battle)) = founded(state) else {
+            return Err("You are not hosting this battle.".into());
+        };
+        self.last_rung
+            .retain(|_, at| now_ms.saturating_sub(*at) < MIN_RING_DELAY_MS);
+        let ringing = match named {
+            Some(name) => {
+                if name == me || !battle.members.contains_key(name) {
+                    return Err(format!("{name} is not in this battle."));
+                }
+                if let Some(at) = self.last_rung.get(name) {
+                    let wait_ms = MIN_RING_DELAY_MS - now_ms.saturating_sub(*at);
+                    return Err(format!(
+                        "{name} was rung a moment ago. Try again in {}s.",
+                        wait_ms.div_ceil(1000)
+                    ));
+                }
+                vec![name]
+            }
+            None => {
+                let (resting, ringing) = self.holding_up(battle, me);
+                if ringing.is_empty() {
+                    return Err(if resting.is_empty() {
+                        "Everyone is ready.".into()
+                    } else {
+                        "Everyone who is not ready was rung a moment ago.".into()
+                    });
+                }
+                ringing
+            }
+        };
+        // Said as an action, so it reads "alice rings bob" in the battle.
+        let list = ringing.join(", ");
+        let words = if list.len() > NAMED_LIST_LIMIT {
+            format!("rings {} players", ringing.len())
+        } else {
+            format!("rings {list}")
+        };
+        Ok(self.ring(&ringing, me, me, now_ms, words).send)
+    }
+
+    /// The players who are unready or unsynced, apart from `except`, split into
+    /// those rung too recently to ring again and those who can be rung now.
+    /// Both in name order.
+    fn holding_up<'a>(&self, battle: &'a Battle, except: &str) -> (Vec<&'a str>, Vec<&'a str>) {
+        let mut names: Vec<&str> = battle
+            .members
+            .iter()
+            .filter(|(name, member)| {
+                let status = member.battle_status;
+                name.as_str() != except && status.mode && (!status.ready || status.sync != 1)
+            })
+            .map(|(name, _)| name.as_str())
+            .collect();
+        names.sort_unstable();
+        names
+            .into_iter()
+            .partition(|name| self.last_rung.contains_key(*name))
     }
 
     fn ring(
@@ -133,6 +195,13 @@ impl RingHost {
         answer.send.push(command::say_battle_ex(&words));
         answer
     }
+}
+
+/// This client's name and the battle it is in, when it founded that battle.
+fn founded(state: &LobbyState) -> Option<(&str, &Battle)> {
+    let me = state.my_username.as_deref()?;
+    let battle = state.battles.get(&state.current_battle?)?;
+    (battle.host == me).then_some((me, battle))
 }
 
 fn say(words: String) -> RingAnswer {
@@ -168,7 +237,7 @@ fn clever_search<'a>(wanted: &str, names: &[&'a str]) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{default_battle_status, Battle, MemberStatus};
+    use crate::{default_battle_status, MemberStatus};
 
     const UNREADY: (bool, u8) = (false, 1);
     const READY: (bool, u8) = (true, 1);
@@ -352,6 +421,77 @@ mod tests {
         assert_eq!(
             answer.send[6],
             "SAYBATTLEEX Ringing 6 unready/unsynced players (by alice)"
+        );
+    }
+
+    #[test]
+    fn the_founder_rings_the_unready_without_typing_anything() {
+        let state = battle(
+            "alice",
+            "alice",
+            &[
+                ("alice", player(READY)),
+                ("bob", player(UNREADY)),
+                ("carol", player(UNSYNCED)),
+                ("dave", player(READY)),
+            ],
+        );
+        let mut host = RingHost::default();
+        assert_eq!(
+            host.host_rings(&state, None, 0).unwrap(),
+            ["RING bob", "RING carol", "SAYBATTLEEX rings bob, carol"]
+        );
+        // The same delay holds whichever way a player was rung.
+        assert_eq!(
+            host.host_rings(&state, None, 1).unwrap_err(),
+            "Everyone who is not ready was rung a moment ago."
+        );
+        assert_eq!(
+            host.hear(&state, "dave", "!ring", 1).send,
+            ["SAYBATTLEEX There is no one to ring (ring spam protection for bob,carol)"]
+        );
+    }
+
+    #[test]
+    fn the_founder_rings_one_member_whatever_their_status() {
+        let state = battle(
+            "alice",
+            "alice",
+            &[("alice", player(READY)), ("dave", player(READY))],
+        );
+        let mut host = RingHost::default();
+        assert_eq!(
+            host.host_rings(&state, Some("dave"), 0).unwrap(),
+            ["RING dave", "SAYBATTLEEX rings dave"]
+        );
+        assert_eq!(
+            host.host_rings(&state, Some("dave"), 4_500).unwrap_err(),
+            "dave was rung a moment ago. Try again in 16s."
+        );
+    }
+
+    #[test]
+    fn a_ring_that_reaches_nobody_is_refused_and_says_nothing_in_the_battle() {
+        let ready = battle(
+            "alice",
+            "alice",
+            &[("alice", player(UNREADY)), ("bob", player(READY))],
+        );
+        let mut host = RingHost::default();
+        assert_eq!(
+            host.host_rings(&ready, None, 0).unwrap_err(),
+            "Everyone is ready."
+        );
+        for name in ["alice", "zed"] {
+            assert_eq!(
+                host.host_rings(&ready, Some(name), 0).unwrap_err(),
+                format!("{name} is not in this battle.")
+            );
+        }
+        let joined = battle("bob", "alice", &[("carol", player(UNREADY))]);
+        assert_eq!(
+            host.host_rings(&joined, None, 0).unwrap_err(),
+            "You are not hosting this battle."
         );
     }
 }
