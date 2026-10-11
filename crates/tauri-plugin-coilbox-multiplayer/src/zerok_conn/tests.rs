@@ -808,6 +808,96 @@ async fn a_join_is_answered_with_a_status_once_the_server_confirms_it() {
     );
 }
 
+/// The server joins an account to its default channels while it logs in, and
+/// refuses a second join for one of them. The friend list follows those joins,
+/// so a join asked for before it waits, and by then the state says which of
+/// them the server has already made.
+#[tokio::test]
+async fn a_channel_join_waits_for_the_server_s_own_joins() {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .expect("bind a loopback port");
+    let port = listener.local_addr().expect("it has an address").port();
+    let heard: Arc<Mutex<Vec<String>>> = Arc::default();
+    let keep = Arc::clone(&heard);
+
+    tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.expect("a client connects");
+        let (read, mut write) = socket.into_split();
+        if write
+            .write_all(b"Welcome {\"UserCount\":3}\n")
+            .await
+            .is_err()
+        {
+            return;
+        }
+        let mut reader = BufReader::new(read).lines();
+        while let Ok(Some(raw)) = reader.next_line().await {
+            let name = line::split_line(&raw)
+                .map(|(name, _)| name.to_string())
+                .unwrap_or_default();
+            keep.lock().unwrap_or_else(|e| e.into_inner()).push(raw);
+            let answer: &[&str] = match name.as_str() {
+                "Login" => &[r#"LoginResponse {"ResultCode":0,"Name":"someone"}"#],
+                // The status is queued behind the two joins, so hearing it
+                // first is the joins having waited.
+                "ChangeUserStatus" => &[
+                    r#"JoinChannelResponse {"Success":true,"ChannelName":"zk","Channel":{"ChannelName":"zk","Users":["someone"]}}"#,
+                    r#"FriendList {"Friends":[]}"#,
+                ],
+                _ => continue,
+            };
+            for line in answer {
+                if write
+                    .write_all(format!("{line}\n").as_bytes())
+                    .await
+                    .is_err()
+                {
+                    return;
+                }
+            }
+        }
+    });
+
+    let client = Client::connect(port, "someone").await;
+    client.wait_for("loggedIn").await;
+    {
+        let registry = client.registry.lock().unwrap_or_else(|e| e.into_inner());
+        let tx = &registry[&client.key].tx;
+        for channel in ["zk", "elsewhere"] {
+            tx.send(Outbound::Zerok(ZerokAction::Chat(
+                zerok_chat::ChatAction::JoinChannel {
+                    channel: channel.into(),
+                    password: None,
+                },
+            )))
+            .expect("the connection takes it");
+        }
+        tx.send(Outbound::Zerok(ZerokAction::Status {
+            ingame: false,
+            away: true,
+        }))
+        .expect("the connection takes it");
+    }
+
+    let deadline = std::time::Instant::now() + PATIENCE;
+    while std::time::Instant::now() < deadline {
+        let sent = heard.lock().unwrap_or_else(|e| e.into_inner()).clone();
+        if sent.len() >= 3 {
+            assert!(sent[1].starts_with("ChangeUserStatus "), "{sent:?}");
+            // The joins go out in the order they were asked for, so `zk`
+            // would have been ahead of this one had it been sent.
+            assert_eq!(sent[2], r#"JoinChannel {"ChannelName":"elsewhere"}"#);
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(2)).await;
+    }
+    panic!(
+        "the held join never went out: {:?}",
+        heard.lock().unwrap_or_else(|e| e.into_inner())
+    );
+}
+
 /// Chat through the whole task, and the one place Zero-K parts company with the
 /// TASServer path: it relays our own private message back to us, so nothing is
 /// recorded when it goes out and the thread is built from the echo.
