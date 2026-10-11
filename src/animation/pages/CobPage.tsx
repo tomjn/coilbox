@@ -19,6 +19,7 @@ import { SEVERITY_COLOR, worstSeverity } from "@/components/CheckItem";
 import { PageHeader } from "@/components/PageHeader";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useClaimFileDrop } from "@/lib/fileDropClaim";
 import { errorText } from "@/lib/helpers";
 import {
   animBos2cob,
@@ -261,6 +262,8 @@ export default function CobPage() {
     });
     if (typeof picked === "string") await compile(picked);
   }
+
+  useClaimFileDrop();
 
   // Native file drop (Tauri exposes real paths). Mounted once; handlers stable.
   // biome-ignore lint/correctness/useExhaustiveDependencies: subscribe once on mount, not per render

@@ -30,6 +30,7 @@ import { CheckField } from "@/components/Field";
 import { PageHeader } from "@/components/PageHeader";
 import { SourceEditor } from "@/components/SourceEditor";
 import { Label } from "@/components/ui/label";
+import { useClaimFileDrop } from "@/lib/fileDropClaim";
 import { errorText } from "@/lib/helpers";
 import { MissionLuaCode } from "@/scenario/pages/components/MissionLuaCode";
 import {
@@ -230,6 +231,8 @@ export default function Bos2LuaPage() {
     });
     if (typeof picked === "string") await loadPath(picked);
   }
+
+  useClaimFileDrop();
 
   // A file dropped on the window. Tauri hands over real paths, which a
   // browser drop does not, and the includes are found from the path.

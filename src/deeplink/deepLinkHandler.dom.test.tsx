@@ -44,6 +44,12 @@ vi.mock("../hub/config", async () => ({
   useTrustedHubUrl: () => "https://hub.example",
 }));
 
+// The handler reads the content folders for a file it is handed, which is not
+// what these tests are about. The folders come from the frame's settings store.
+vi.mock("../downloads/config", () => ({
+  useWriteRoot: () => ({ path: undefined, loading: false }),
+}));
+
 const notify = vi.fn();
 vi.mock("../notify/notify", () => ({
   notify: (input: unknown) => notify(input),

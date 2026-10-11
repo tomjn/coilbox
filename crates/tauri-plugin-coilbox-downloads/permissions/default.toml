@@ -24,4 +24,6 @@ permissions = [
   "allow-dl-path-writable",
   "allow-dl-fetch-text",
   "allow-dl-rapid-release-archives",
+  "allow-dl-inspect-archive",
+  "allow-dl-install-archive",
 ]

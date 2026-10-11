@@ -41,6 +41,14 @@
       "../lua/blueprint-widget": "blueprint-widget"
     },
     "active": true,
+    "fileAssociations": [
+      {
+        "ext": ["sdz", "sd7"],
+        "name": "Spring archive",
+        "description": "Spring game or map archive",
+        "role": "Viewer"
+      }
+    ],
     "createUpdaterArtifacts": true,
     "targets": ["appimage", "app", "dmg", "nsis"],
     "icon": [

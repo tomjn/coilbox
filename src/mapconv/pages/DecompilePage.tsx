@@ -16,6 +16,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useClaimFileDrop } from "@/lib/fileDropClaim";
 import { basename, errorText } from "@/lib/helpers";
 import { versionLabel } from "@/lib/utils";
 import {
@@ -96,6 +97,8 @@ export default function DecompilePage() {
       .then(setProbe)
       .catch(() => {});
   }, []);
+
+  useClaimFileDrop();
 
   // Native file drop (Tauri exposes real paths; HTML5 drag-drop can't in a webview).
   useEffect(() => {
