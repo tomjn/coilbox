@@ -778,20 +778,20 @@ function BattleRoomPage() {
             onSetBattleStatusBatch={room.setBattleStatusBatch}
             onAutohostSend={room.autohostSend}
           />
-          {/* The `!`-command panel only makes sense for somebody who isn't
-              hosting the battle themselves: self-hosted, those commands are
-              inert (lock moves to the header, map changes go through the map
-              card). A direct room runs no SPADS, so here it reads as
+          {/* The `!`-command panel is mostly for somebody who isn't hosting
+              the battle themselves: self-hosted, those commands are inert
+              (lock moves to the header, map changes go through the map card)
+              and only Ring unready is left, which the founder's own client
+              answers. A direct room runs no SPADS, so here it reads as
               requests the founder answers in the battle chat rather than
               commands a bot answers (issue #2871, replacing #2738's outright
               hiding of this panel there). */}
-          {!room.selfHost && (
-            <AutohostControls
-              locked={battle.locked}
-              directRoom={room.directRoom}
-              onCommand={room.autohostSend}
-            />
-          )}
+          <AutohostControls
+            locked={battle.locked}
+            directRoom={room.directRoom}
+            selfHost={room.selfHost}
+            onCommand={room.autohostSend}
+          />
           <BattleGameCard
             enginePath={room.enginePath}
             dataDir={room.dataDir}
