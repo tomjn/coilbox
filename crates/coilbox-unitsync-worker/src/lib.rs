@@ -32,6 +32,7 @@
 pub mod beforepost;
 pub mod cached;
 pub mod cachekey;
+pub mod matchsetup;
 /// The shapes the worker prints and the cache files hold. Declared here and not in
 /// the binary so the plugin can read a cached answer without starting a worker
 /// (issue #3714).
@@ -1237,6 +1238,12 @@ impl FactionLogosArgs {
 pub struct UnitDatasetArgs {
     pub game: String,
     pub cache_dir: Option<String>,
+    /// A file holding one match's setup as JSON (`matchsetup::MatchSetup`).
+    /// With it the read is of the unit list the engine built for that match
+    /// (issue #3847), and without it of the game's own unit dataset. A file
+    /// and not an argument because a start script's mod options can run past
+    /// what a command line holds.
+    pub match_setup_file: Option<String>,
 }
 
 impl UnitDatasetArgs {
@@ -1252,6 +1259,10 @@ impl UnitDatasetArgs {
             args.push("--cache-dir".to_string());
             args.push(dir.clone());
         }
+        if let Some(file) = &self.match_setup_file {
+            args.push("--match-setup-file".to_string());
+            args.push(file.clone());
+        }
         args
     }
 
@@ -1262,17 +1273,20 @@ impl UnitDatasetArgs {
     pub fn from_args(args: &[String]) -> Result<Self, String> {
         let mut game = None;
         let mut cache_dir = None;
+        let mut match_setup_file = None;
         let mut it = args.iter();
         while let Some(a) = it.next() {
             match a.as_str() {
                 "--game" => game = it.next().cloned(),
                 "--cache-dir" => cache_dir = it.next().cloned(),
+                "--match-setup-file" => match_setup_file = it.next().cloned(),
                 _ => {}
             }
         }
         Ok(UnitDatasetArgs {
             game: game.unwrap_or_default(),
             cache_dir,
+            match_setup_file,
         })
     }
 }
@@ -2585,6 +2599,7 @@ mod tests {
         UnitDatasetArgs {
             game: "BAR.sdd".into(),
             cache_dir: Some("/cache/dataset".into()),
+            match_setup_file: Some("/tmp/setup.json".into()),
         }
     }
 

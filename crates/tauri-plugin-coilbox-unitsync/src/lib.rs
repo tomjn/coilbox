@@ -21,6 +21,7 @@ mod renderindex;
 mod sidecar;
 
 use base64::Engine;
+use coilbox_unitsync_worker::matchsetup::MatchSetup;
 use coilbox_unitsync_worker::{cached, RenderSource};
 use picoframe_core::CliResult;
 use sidecar::{
@@ -1107,6 +1108,11 @@ async fn unitsync_faction_logos<R: Runtime>(
 /// graph (every unit plus the internal names it can build, `buildoptions`). Feeds
 /// the per-faction build-tree viewer and unit include/exclude filters. Fetched on
 /// demand (mounts the game), disk-cached in the info-blob cache dir.
+///
+/// With `match_setup`, the read is of the unit list the engine built for one
+/// match, which is what a replay's unit ids count into (issue #3847). It is
+/// cached on the archive and the setup together, and the game's own dataset
+/// keeps its key and its blob.
 #[tauri::command]
 async fn unitsync_unit_dataset<R: Runtime>(
     app: AppHandle<R>,
@@ -1114,12 +1120,16 @@ async fn unitsync_unit_dataset<R: Runtime>(
     data_dir: String,
     game_archive: String,
     archive_path: Option<String>,
+    match_setup: Option<MatchSetup>,
 ) -> CliResult {
     if let Some(hit) = answered(
         "unit dataset",
-        info_cache_dir(&app)
-            .zip(archive_path.as_deref())
-            .and_then(|(dir, path)| cached::unit_dataset(&dir, Path::new(path))),
+        info_cache_dir(&app).zip(archive_path.as_deref()).and_then(
+            |(dir, path)| match &match_setup {
+                Some(setup) => cached::match_unit_list(&dir, Path::new(path), setup),
+                None => cached::unit_dataset(&dir, Path::new(path)),
+            },
+        ),
     ) {
         return hit;
     }
@@ -1127,15 +1137,29 @@ async fn unitsync_unit_dataset<R: Runtime>(
         Ok(v) => v,
         Err(e) => return CliResult::err(e),
     };
+    // The setup goes over in a file: a start script's mod options can run past
+    // what a command line holds.
+    let setup_file = match &match_setup {
+        Some(setup) => match write_temp_list("match-setup", &setup.canonical()) {
+            Ok(path) => Some(path),
+            Err(e) => return CliResult::err(e),
+        },
+        None => None,
+    };
     let cache_dir = info_cache_dir(&app).map(|p| p.to_string_lossy().into_owned());
     let args = build_unit_dataset_args(
         &libpath.to_string_lossy(),
         &data_dir,
         &game_archive,
         cache_dir.as_deref(),
+        setup_file.as_deref().and_then(Path::to_str),
     );
     let envs = loader_envs(&engine_dir, &data_dir);
-    run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await
+    let result = run_worker(bin, args, envs, SCAN_TIMEOUT, "unit dataset", None).await;
+    if let Some(path) = setup_file {
+        let _ = std::fs::remove_file(path);
+    }
+    result
 }
 
 /// `unitsync_unit_defs`: load one game's archives and read every key it

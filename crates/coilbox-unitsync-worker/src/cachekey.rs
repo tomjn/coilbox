@@ -108,6 +108,8 @@ pub const HEADER_CACHE_VERSION: u32 = 3;
 /// a name.
 pub const KIND_GAME: &str = "game";
 pub const KIND_DATASET: &str = "unitdataset";
+const KIND_MATCH_LIST: &str = "matchunitlist";
+const KIND_MATCH_FACTS: &str = "matchfacts";
 pub const KIND_MAP: &str = "map";
 pub const KIND_MAP_META: &str = "mapmeta";
 const KIND_ARCHIVE_HASH: &str = "maphash";
@@ -197,6 +199,33 @@ pub fn game_key(stamp: &ArchiveStamp) -> String {
 /// archive never collide.
 pub fn dataset_key(stamp: &ArchiveStamp) -> String {
     info_key(stamp, KIND_DATASET)
+}
+
+/// Salts the keys of a unit list read for one match's setup (issue #3847). Bump
+/// when the Lua that stands in for the engine's team and option functions
+/// changes, or the rules for refusing a definition do, so a list read under the
+/// old ones is read again. The unit dataset's own key does not carry it.
+pub const MATCH_LIST_VERSION: u32 = 1;
+
+/// The unit list a game gives for one match setup. `setup` is the setup's
+/// canonical text (`MatchSetup::canonical`). Apart from [`dataset_key`], which
+/// stays the key of the read with no setup, so reading a replay never moves or
+/// rebuilds the blob the unit pages use.
+pub fn match_list_key(stamp: &ArchiveStamp, setup: &str) -> String {
+    let mut h = DefaultHasher::new();
+    MATCH_LIST_VERSION.hash(&mut h);
+    info_key(stamp, KIND_MATCH_LIST).hash(&mut h);
+    setup.hash(&mut h);
+    format!("m{:016x}", h.finish())
+}
+
+/// What a game says that decides whether a setup changes its unit list: its
+/// mod options' defaults and its Lua AIs (`MatchFacts`).
+pub fn match_facts_key(stamp: &ArchiveStamp) -> String {
+    let mut h = DefaultHasher::new();
+    MATCH_LIST_VERSION.hash(&mut h);
+    info_key(stamp, KIND_MATCH_FACTS).hash(&mut h);
+    format!("f{:016x}", h.finish())
 }
 
 /// The sha256 of a map archive's own bytes, which is the catalog's `source_hash`
