@@ -140,10 +140,15 @@ export function useReplayUnits(
       : null;
   // A stored list needs no read of the game. A live one does.
   const archive = liveGame(source)?.primaryArchive.name;
+  // The build the replay was played on is read with the match's own setup,
+  // which gives the list the engine built for that match and not the game's
+  // list with no match at all (#3847). Another version's ids differ whatever
+  // it is read with, so that one is read as it always was.
   const { dataset, status } = useUnitsyncUnitDataset(
     selected?.enginePath,
     selected?.rootPath,
     archive,
+    source?.kind === "installed" ? info.matchSetup : undefined,
   );
   const units: UnitDatasetEntry[] | null =
     source?.kind === "stored"

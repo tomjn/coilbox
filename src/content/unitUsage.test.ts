@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type {
   GameItem,
+  MatchSetup,
   ReplayUnitOrders,
   StatRecord,
   UnitDatasetEntry,
@@ -431,7 +432,52 @@ describe("streamNaming and replayLists", () => {
       lists,
       [packaged],
     );
-    expect(got).toEqual({ kind: "installed", archive: "game-1.0.sdz" });
+    expect(got).toEqual({
+      kind: "installed",
+      archive: "game-1.0.sdz",
+      read: "game-1.0.sdz",
+    });
+  });
+
+  it("reads an installed game with the replay's own match setup", () => {
+    const setup = { modOptions: { unit_pack: "1" } } as unknown as MatchSetup;
+    const got = streamNaming(
+      { gameType: "Game 1.0", matchSetup: setup },
+      lists,
+      [packaged],
+    );
+    expect(got).toMatchObject({
+      kind: "installed",
+      archive: "game-1.0.sdz",
+      setup,
+    });
+    // Two replays with one setup share a read, and another setup has its own.
+    const read = (matchSetup: MatchSetup) => {
+      const naming = streamNaming({ gameType: "Game 1.0", matchSetup }, lists, [
+        packaged,
+      ]);
+      return naming.kind === "installed" ? naming.read : null;
+    };
+    expect(read({ ...setup })).toBe(read(setup));
+    expect(
+      read({ modOptions: { unit_pack: "0" } } as unknown as MatchSetup),
+    ).not.toBe(read(setup));
+    expect(read(setup)).not.toBe("game-1.0.sdz");
+  });
+
+  it("names a replay from the read made with its own setup and no other", () => {
+    const setup = { modOptions: { unit_pack: "1" } } as unknown as MatchSetup;
+    const replay = { gameType: "Game 1.0", matchSetup: setup };
+    const naming = streamNaming(replay, lists, [packaged]);
+    const read = naming.kind === "installed" ? naming.read : "";
+    // The game's own list is not this match's.
+    expect(
+      replayLists(replay, lists, [packaged], new Map([["game-1.0.sdz", V1]]))
+        .stream,
+    ).toEqual({ kind: "waiting" });
+    expect(
+      replayLists(replay, lists, [packaged], new Map([[read, V1]])).stream,
+    ).toEqual({ kind: "named", units: V1, engine: false });
   });
 
   it("uses the kept list when the build is gone or is a loose folder", () => {

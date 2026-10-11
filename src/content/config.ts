@@ -37,6 +37,7 @@ import {
   type SaveFile,
   type ScanResult,
   STATS_UPDATED_EVENT,
+  type MatchSetup,
   type StartPos,
   type StatRecord,
   type UnitBuildpicsResult,
@@ -1036,7 +1037,22 @@ export function invalidateGameInfo(
   gameInfoCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
 }
 
-/** Session cache of unit datasets, keyed by `dataDir::enginePath::gameArchive`. */
+/**
+ * The session cache key of one unit dataset read. A read for one match (#3847)
+ * is a different list from the game's own, so it is kept under the setup too,
+ * as the text Rust wrote it in. Two replays with the same setup share a key.
+ */
+export function unitDatasetKey(
+  enginePath: string,
+  dataDir: string,
+  gameArchive: string,
+  matchSetup?: string,
+): string {
+  const game = `${dataDir}::${enginePath}::${gameArchive}`;
+  return matchSetup ? `${game}::${matchSetup}` : game;
+}
+
+/** Session cache of unit datasets, keyed by {@link unitDatasetKey}. */
 const unitDatasetCache = new Map<string, UnitDatasetResult>();
 /** Open reads, so a page mounting the hook eight times spawns one worker. */
 const unitDatasetPending = new Map<string, Promise<UnitDatasetResult>>();
@@ -1045,19 +1061,26 @@ const unitDatasetPending = new Map<string, Promise<UnitDatasetResult>>();
  * Lazily load a game's reusable unit graph (units + `buildoptions` edges). Loads
  * the game's archive set, so it's fetched on demand — never during the scan.
  * Cached for the session only when syncable (mirrors the worker's disk cache).
+ *
+ * With `matchSetup` the read is of the unit list the engine built for that
+ * match, which is what a replay's unit ids count into (#3847).
  */
 export function useUnitsyncUnitDataset(
   enginePath?: string,
   dataDir?: string,
   gameArchive?: string,
+  matchSetup?: MatchSetup,
 ) {
   const [dataset, setDataset] = useState<UnitDatasetResult | null>(null);
   const [status, setStatus] = useState<UnitsyncInfoStatus>("idle");
   // The key `dataset` and `status` belong to, as in `useUnitsyncGameInfo`.
   const [loadedKey, setLoadedKey] = useState<string | undefined>(undefined);
+  // As text, so the effect depends on what the setup says and not on which
+  // object holds it.
+  const setup = matchSetup ? JSON.stringify(matchSetup) : undefined;
   const key =
     enginePath && dataDir && gameArchive
-      ? `${dataDir}::${enginePath}::${gameArchive}`
+      ? unitDatasetKey(enginePath, dataDir, gameArchive, setup)
       : undefined;
   const [nonce, setNonce] = useState(0);
   const reload = useCallback(() => setNonce((n) => n + 1), []);
@@ -1082,7 +1105,12 @@ export function useUnitsyncUnitDataset(
     setStatus("loading");
     setLoadedKey(key);
     shareInFlight(unitDatasetPending, key, () =>
-      unitsyncUnitDataset({ enginePath, dataDir, gameArchive }),
+      unitsyncUnitDataset({
+        enginePath,
+        dataDir,
+        gameArchive,
+        ...(setup ? { matchSetup: JSON.parse(setup) as MatchSetup } : {}),
+      }),
     )
       .then((res) => {
         if (cancelled) return;
@@ -1112,7 +1140,7 @@ export function useUnitsyncUnitDataset(
     return () => {
       cancelled = true;
     };
-  }, [enginePath, dataDir, gameArchive, key, nonce]);
+  }, [enginePath, dataDir, gameArchive, setup, key, nonce]);
 
   const current = loadedKey === key;
   const shownStatus: UnitsyncInfoStatus = current
@@ -1138,12 +1166,23 @@ export async function loadUnitsyncUnitDataset(
   enginePath: string,
   dataDir: string,
   gameArchive: string,
+  matchSetup?: MatchSetup,
 ): Promise<UnitDatasetResult> {
-  const key = `${dataDir}::${enginePath}::${gameArchive}`;
+  const key = unitDatasetKey(
+    enginePath,
+    dataDir,
+    gameArchive,
+    matchSetup ? JSON.stringify(matchSetup) : undefined,
+  );
   const cached = unitDatasetCache.get(key);
   if (cached) return cached;
   const res = await shareInFlight(unitDatasetPending, key, () =>
-    unitsyncUnitDataset({ enginePath, dataDir, gameArchive }),
+    unitsyncUnitDataset({
+      enginePath,
+      dataDir,
+      gameArchive,
+      ...(matchSetup ? { matchSetup } : {}),
+    }),
   );
   // Cached on the hook's terms: a read that loaded units and is syncable.
   if (res.checksum && !(res.units.length === 0 && res.errors.length > 0)) {
@@ -1166,7 +1205,13 @@ export function invalidateUnitDataset(
   gameArchive?: string,
 ) {
   if (!enginePath || !dataDir || !gameArchive) return;
-  unitDatasetCache.delete(`${dataDir}::${enginePath}::${gameArchive}`);
+  // The game's own dataset and every list read from it for a match.
+  const game = unitDatasetKey(enginePath, dataDir, gameArchive);
+  for (const key of [...unitDatasetCache.keys()]) {
+    if (key === game || key.startsWith(`${game}::`)) {
+      unitDatasetCache.delete(key);
+    }
+  }
 }
 
 /**

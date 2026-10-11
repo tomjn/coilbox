@@ -20,6 +20,8 @@ let GAMES: GameItem[] = [];
 let DATASET: { units: UnitDatasetEntry[] } | null = null;
 /** The archives the section asked unitsync to read units from. */
 let ASKED: (string | undefined)[] = [];
+/** The match setup each of those reads was asked with. */
+let ASKED_WITH: unknown[] = [];
 
 vi.mock("../../bindings", async (original) => ({
   ...(await original<typeof import("../../bindings")>()),
@@ -33,8 +35,14 @@ vi.mock("../../config", () => ({
     selected: { enginePath: "/engine", rootPath: "/data" },
   }),
   useUnitsyncScan: () => ({ data: { games: GAMES }, loading: false }),
-  useUnitsyncUnitDataset: (_e: string, _d: string, archive?: string) => {
+  useUnitsyncUnitDataset: (
+    _e: string,
+    _d: string,
+    archive?: string,
+    matchSetup?: unknown,
+  ) => {
     ASKED.push(archive);
+    ASKED_WITH.push(matchSetup);
     return archive && DATASET
       ? { dataset: DATASET, status: "ready" }
       : { dataset: null, status: archive ? "error" : "idle" };
@@ -82,8 +90,16 @@ const UNITS: UnitDatasetEntry[] = [
   { name: "fedengineer" },
 ];
 
+/** The match's setup, which the section never reads and only hands on. */
+const SETUP = { modOptions: { unit_pack: "1" } };
+
 const info = (gameType: string) =>
-  ({ gameType, remixed: false, ais: [] }) as unknown as DemoInfo;
+  ({
+    gameType,
+    remixed: false,
+    ais: [],
+    matchSetup: SETUP,
+  }) as unknown as DemoInfo;
 
 afterEach(() => {
   cleanup();
@@ -92,6 +108,7 @@ afterEach(() => {
   GAMES = [];
   DATASET = null;
   ASKED = [];
+  ASKED_WITH = [];
 });
 
 /** The section's help entry, opened. What the orders are is said there. */
@@ -163,6 +180,9 @@ describe("ReplayBuildOrders", () => {
       ),
     ).toBeTruthy();
     expect(ASKED).toContain("SplinterFaction_0.1.88.sdz");
+    // The build the replay was played on is read with the match's own setup,
+    // which is what gives the list the engine built for it (#3847).
+    expect(ASKED_WITH[ASKED.indexOf("SplinterFaction_0.1.88.sdz")]).toBe(SETUP);
 
     // One player, so the list is open.
     expect(screen.getAllByText("Alice").length).toBeGreaterThan(0);
@@ -209,6 +229,10 @@ describe("ReplayBuildOrders", () => {
       ),
     ).toBeTruthy();
     expect(screen.getAllByText("Land Factory").length).toBeGreaterThan(0);
+    // Another build's ids differ whatever it is read with, so it is read as
+    // the game's own list.
+    expect(ASKED).toContain("SplinterFaction_0.1.88.sdz");
+    expect(ASKED_WITH.every((setup) => setup === undefined)).toBe(true);
   });
 
   it("shows the ids when the installed game's units cannot be read", async () => {
