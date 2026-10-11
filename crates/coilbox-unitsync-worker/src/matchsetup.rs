@@ -186,13 +186,17 @@ impl MatchSetup {
     /// The empty setup writes `nil` for the table, which installs nothing and
     /// leaves only the engine's refusal rules.
     pub fn prelude(&self, lua_ais: &[String]) -> String {
+        self.prelude_with(lua_ais, MATCH_UNIT_LIST_LUA)
+    }
+
+    /// [`MatchSetup::prelude`] with `lua` in place of [`MATCH_UNIT_LIST_LUA`].
+    /// For the test that proves a comparison against the engine's own list
+    /// notices a rule that is wrong, by running a copy with one broken.
+    pub fn prelude_with(&self, lua_ais: &[String], lua: &str) -> String {
         if *self == MatchSetup::default() {
-            return format!("local __cb_match = nil\n{MATCH_UNIT_LIST_LUA}\n");
+            return format!("local __cb_match = nil\n{lua}\n");
         }
-        format!(
-            "local __cb_match = {}\n{MATCH_UNIT_LIST_LUA}\n",
-            self.lua_table(lua_ais)
-        )
+        format!("local __cb_match = {}\n{lua}\n", self.lua_table(lua_ais))
     }
 
     /// The setup as the Lua table the stand-in reads, with the Gaia team and

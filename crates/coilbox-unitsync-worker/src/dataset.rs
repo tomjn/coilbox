@@ -1772,6 +1772,218 @@ mod tests {
         assert_eq!(names(&unlisted), ["armcom", "armsolar"]);
     }
 
+    /// The unit list read for one match's setup against the list the engine
+    /// built for that match, id by id and name by name.
+    ///
+    /// The engine's list is the replay logger's `unit_def` lines, which the
+    /// content plugin's `a_scratch_match_records_its_setup_and_the_engines_unit_list`
+    /// writes beside the setup it read back out of the recorded replay. Reads
+    /// what to compare from the environment and does nothing without it:
+    ///
+    /// - `COILBOX_UNITLIST_LIB`: `libunitsync` in a copy of the engine the
+    ///   match ran on. Unitsync is told to read no folder but that copy and
+    ///   the one below.
+    /// - `COILBOX_UNITLIST_DATA_DIR`: a scratch content folder holding the
+    ///   game. Unitsync may write its archive cache there.
+    /// - `COILBOX_UNITLIST_ARCHIVE`: the game's archive, as unitsync names it.
+    /// - `COILBOX_UNITLIST_SETUP`: the match's setup, as JSON.
+    /// - `COILBOX_UNITLIST_ENGINE_LIST`: the logger's lines.
+    /// - `COILBOX_UNITLIST_REFUSED`: for a game the engine cannot load far
+    ///   enough to run the logger, in place of the logger's lines: the engine's
+    ///   own log of the run. Every definition it names in a line
+    ///   `Couldn't find a MoveClass named ... (used in UnitDef: ...)` must be
+    ///   left out of the list, and nothing else may be.
+    /// - `COILBOX_UNITLIST_LUA`: a copy of `match_unit_list.lua` to run in
+    ///   place of the one compiled in, for proving the comparison notices a
+    ///   rule that is wrong. The test is then expected to fail.
+    /// - `COILBOX_UNITLIST_EXPECT`: `shared` when the match's list must be
+    ///   kept as a pointer to the game's own dataset, `own` when it must not.
+    #[test]
+    #[ignore = "needs an engine copy, a game, and the engine's own unit list for one match"]
+    fn the_list_read_for_a_match_is_the_engines() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let truth = var("COILBOX_UNITLIST_ENGINE_LIST").or(var("COILBOX_UNITLIST_REFUSED"));
+        let (Some(lib), Some(data_dir), Some(archive), Some(setup), Some(_)) = (
+            var("COILBOX_UNITLIST_LIB"),
+            var("COILBOX_UNITLIST_DATA_DIR"),
+            var("COILBOX_UNITLIST_ARCHIVE"),
+            var("COILBOX_UNITLIST_SETUP"),
+            truth,
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_UNITLIST_LIB, COILBOX_UNITLIST_DATA_DIR, \
+                 COILBOX_UNITLIST_ARCHIVE, COILBOX_UNITLIST_SETUP and one of \
+                 COILBOX_UNITLIST_ENGINE_LIST and COILBOX_UNITLIST_REFUSED to run it"
+            );
+            return;
+        };
+        let setup: MatchSetup =
+            serde_json::from_str(&std::fs::read_to_string(&setup).expect("the setup"))
+                .expect("the setup as JSON");
+        // The engine's list: each line's id and name, in id order.
+        let mut engine: Vec<(u64, String)> = var("COILBOX_UNITLIST_ENGINE_LIST")
+            .map(|file| std::fs::read_to_string(file).expect("the engine's list"))
+            .unwrap_or_default()
+            .lines()
+            .filter_map(|line| serde_json::from_str::<Value>(line).ok())
+            .filter(|line| line["kind"] == "unit_def")
+            .map(|line| {
+                (
+                    line["id"].as_u64().expect("an id"),
+                    line["name"].as_str().expect("a name").to_string(),
+                )
+            })
+            .collect();
+        engine.sort();
+        for (index, (id, _)) in engine.iter().enumerate() {
+            assert_eq!(*id, index as u64 + 1, "the engine's ids have a gap");
+        }
+        // The definitions the engine's log says it refused.
+        let refused: Option<std::collections::BTreeSet<String>> = var("COILBOX_UNITLIST_REFUSED")
+            .map(|file| {
+                std::fs::read_to_string(file)
+                    .expect("the engine's log")
+                    .lines()
+                    .filter(|line| line.contains("Couldn't find a MoveClass named"))
+                    .filter_map(|line| {
+                        let name = line.split("(used in UnitDef: ").nth(1)?;
+                        Some(name.trim_end().trim_end_matches(')').to_string())
+                    })
+                    .collect()
+            });
+        assert!(
+            !engine.is_empty() || refused.is_some(),
+            "the engine's list holds no unit_def line"
+        );
+
+        // Unitsync reads the engine copy and the scratch content folder and
+        // nothing else.
+        let engine_dir = Path::new(&lib).parent().expect("the engine's folder");
+        std::env::set_var("SPRING_ISOLATED", engine_dir);
+        std::env::remove_var("COILBOX_EXTRA_DATADIRS");
+        crate::enter_engine(&lib, &data_dir);
+
+        let us = unsafe { Unitsync::load(Path::new(&lib)) }.expect("unitsync");
+        us.init_game(&archive);
+        assert!(us.add_all_archives(&archive), "the game did not mount");
+        let _ = us.drain_errors();
+        let facts = match_facts(&us);
+        let reduced = setup.reduced(&facts);
+        let prelude = match var("COILBOX_UNITLIST_LUA") {
+            Some(file) => reduced.prelude_with(
+                &facts.lua_ais,
+                &std::fs::read_to_string(file).expect("the Lua to run"),
+            ),
+            None => reduced.prelude(&facts.lua_ais),
+        };
+        let own = read_mounted(&us, &archive, None, Vec::new());
+        let read = read_mounted(&us, &archive, Some(&prelude), Vec::new());
+        us.remove_all_archives();
+
+        if let Some(refused) = refused {
+            let kept: std::collections::BTreeSet<&str> =
+                read.units.iter().map(|u| u.name.as_str()).collect();
+            let left_out: std::collections::BTreeSet<String> = own
+                .units
+                .iter()
+                .filter(|u| !kept.contains(u.name.as_str()))
+                .map(|u| u.name.clone())
+                .collect();
+            eprintln!(
+                "the engine's log refuses {} definitions, the read leaves out {} of the \
+                 game's {}, and {} are in both",
+                refused.len(),
+                left_out.len(),
+                own.units.len(),
+                refused.intersection(&left_out).count(),
+            );
+            assert!(!refused.is_empty(), "the engine's log refuses nothing");
+            assert_eq!(left_out, refused);
+            assert_eq!(read.units.len() + refused.len(), own.units.len());
+            us.uninit();
+            std::mem::forget(us);
+            return;
+        }
+
+        let matches = engine
+            .iter()
+            .zip(&read.units)
+            .filter(|((_, name), unit)| *name == unit.name)
+            .count();
+        let own_matches = engine
+            .iter()
+            .zip(&own.units)
+            .filter(|((_, name), unit)| *name == unit.name)
+            .count();
+        eprintln!(
+            "engine {} definitions, read for the match {} ({} equal by id and name, {} not), \
+             the game's own dataset {} ({} equal), setup {}, errors {:?}",
+            engine.len(),
+            read.units.len(),
+            matches,
+            engine.len().max(read.units.len()) - matches,
+            own.units.len(),
+            own_matches,
+            if reduced == MatchSetup::default() {
+                "read as the empty one"
+            } else {
+                "read whole"
+            },
+            read.errors,
+        );
+        if let Some(((id, name), unit)) = engine
+            .iter()
+            .zip(&read.units)
+            .find(|((_, name), unit)| *name != unit.name)
+        {
+            eprintln!(
+                "first difference: id {id} is {name} in the engine and {} here",
+                unit.name
+            );
+        }
+        assert_eq!(read.units.len(), engine.len(), "the lists differ in length");
+        assert_eq!(matches, engine.len(), "the lists differ");
+
+        // The same answer through the cache, twice, and what was kept for it.
+        if var("COILBOX_UNITLIST_LUA").is_none() {
+            let cache =
+                std::env::temp_dir().join(format!("coilbox-unitlist-test-{}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&cache);
+            let first = resolve_for_match(&us, &archive, &setup, Some(&cache));
+            let files = std::fs::read_dir(&cache).unwrap().count();
+            let second = resolve_for_match(&us, &archive, &setup, Some(&cache));
+            assert!(same_units(&first, &read) && same_units(&second, &read));
+            assert_eq!(
+                std::fs::read_dir(&cache).unwrap().count(),
+                files,
+                "the second read wrote to the cache, so it was not answered from it"
+            );
+            let stamp = infocache::archive_stamp(&us, &archive).expect("the archive's stamp");
+            let key = cachekey::match_list_key(&stamp, &reduced.canonical());
+            let entry: MatchListEntry<Value> =
+                infocache::read(&cache, &key).expect("an entry for the setup");
+            let _ = std::fs::remove_dir_all(&cache);
+            let shared = entry == MatchListEntry::SameAsDefault;
+            eprintln!(
+                "kept as {}",
+                if shared {
+                    "a pointer to the game's own dataset"
+                } else {
+                    "a list of its own"
+                }
+            );
+            match var("COILBOX_UNITLIST_EXPECT").as_deref() {
+                Some("shared") => assert!(shared, "the match's list was kept apart"),
+                Some("own") => assert!(!shared, "the match's list was kept as the game's own"),
+                _ => {}
+            }
+        }
+        us.uninit();
+        // Dropping the library here ended the test's process with a SIGSEGV
+        // on macOS, after everything above had passed, so it is left loaded.
+        std::mem::forget(us);
+    }
+
     /// This is the extraction end to end rather than the parser on its own: the
     /// shim is where a stat is turned into a number or dropped, and a Lua `or 0`
     /// slipped into it would quietly turn every absent field into a claim of

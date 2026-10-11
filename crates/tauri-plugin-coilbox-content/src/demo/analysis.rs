@@ -940,6 +940,161 @@ mod tests {
         assert!(!a.exists() && !b.exists());
     }
 
+    /// A gadget that ends a scratch match one second in, so the engine exits
+    /// cleanly and writes the replay it recorded. If the game never starts it
+    /// ends the run after twenty seconds of the engine's own clock instead.
+    const QUIT_GADGET: &str = r#"
+function gadget:GetInfo()
+	return { name = "Coilbox scratch match end", layer = 0, enabled = true }
+end
+
+if gadgetHandler:IsSyncedCode() then
+	return
+end
+
+local started = Spring.GetTimer()
+
+function gadget:Update()
+	if Spring.GetGameFrame() >= 30 or Spring.DiffTimers(Spring.GetTimer(), started) > 20 then
+		Spring.SendCommands("quitforce")
+	end
+end
+"#;
+
+    /// Play a start script headless for a second under the replay logger, and
+    /// keep the two things a unit list read for that match is checked against
+    /// (#3847): the engine's own unit list, as the logger's `unit_def` lines,
+    /// and the match's setup, read back out of the replay the engine recorded.
+    ///
+    /// The unitsync worker's `the_list_read_for_a_match_is_the_engines` does
+    /// the comparing. Reads what to run from the environment and does nothing
+    /// without it:
+    ///
+    /// - `COILBOX_SCRATCH_MATCH_SCRIPT`: the start script. Its `gametype` is
+    ///   the game to play, and the run plays the logger's game on top of it.
+    /// - `COILBOX_SCRATCH_MATCH_ENGINE_DIR`: a copy of an engine, in scratch.
+    /// - `COILBOX_SCRATCH_MATCH_DATA_DIRS`: scratch content folders holding
+    ///   the game and the map, separated the way `SPRING_DATADIR` is.
+    /// - `COILBOX_SCRATCH_MATCH_TIMEOUT_SECS`: how long the engine may run.
+    /// - `COILBOX_SCRATCH_MATCH_KEEP`: the folder to leave `unit_defs.jsonl`,
+    ///   `setup.json` and the engine's log in.
+    ///
+    /// The engine's write directory is a temporary directory.
+    #[test]
+    #[ignore = "needs an engine copy, a game, a map and a start script for them"]
+    fn a_scratch_match_records_its_setup_and_the_engines_unit_list() {
+        use super::super::match_setup::match_setup;
+        use super::super::{find_game, parse_tdf, read_header_and_script, replace_gametype};
+
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(script), Some(engine_dir), Some(data_dirs), Some(timeout), Some(keep)) = (
+            var("COILBOX_SCRATCH_MATCH_SCRIPT"),
+            var("COILBOX_SCRATCH_MATCH_ENGINE_DIR"),
+            var("COILBOX_SCRATCH_MATCH_DATA_DIRS"),
+            var("COILBOX_SCRATCH_MATCH_TIMEOUT_SECS"),
+            var("COILBOX_SCRATCH_MATCH_KEEP"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_SCRATCH_MATCH_SCRIPT, COILBOX_SCRATCH_MATCH_ENGINE_DIR, \
+                 COILBOX_SCRATCH_MATCH_DATA_DIRS, COILBOX_SCRATCH_MATCH_TIMEOUT_SECS and \
+                 COILBOX_SCRATCH_MATCH_KEEP to run it"
+            );
+            return;
+        };
+        let keep = PathBuf::from(keep);
+        let script = std::fs::read_to_string(script).expect("the start script");
+        let asked = find_game(&parse_tdf(&script));
+        let base_game = asked.get("gametype").expect("a gametype").to_string();
+        let wanted = match_setup(&asked).expect("a script the engine would start");
+
+        let scratch = tempfile::tempdir().unwrap();
+        let data = scratch.path().join("data");
+        let write_dir = scratch.path().join("write");
+        let game = game::write_game(&data, &base_game, game::LOGGER).unwrap();
+        std::fs::write(
+            game.join("luarules/gadgets/coilbox_scratch_match_end.lua"),
+            QUIT_GADGET,
+        )
+        .unwrap();
+        let played = scratch.path().join("script.txt");
+        std::fs::write(
+            &played,
+            replace_gametype(&script, &game::gametype()).expect("a gametype to replace"),
+        )
+        .unwrap();
+
+        let mut dirs = vec![data];
+        dirs.extend(
+            data_dirs
+                .split(coilbox_proc::DATADIR_SEP)
+                .map(PathBuf::from),
+        );
+        let engine_log = scratch.path().join("engine.log");
+        let exit = launch::run_headless(
+            &launch::Launch {
+                engine: &launch::headless_binary(Path::new(&engine_dir)),
+                demo: &played,
+                write_dir: &write_dir,
+                config: &scratch.path().join("engine.cfg"),
+                pid_file: &scratch.path().join(launch::PID_FILE),
+                data_dirs: &dirs,
+                log: &engine_log,
+                timeout: Duration::from_secs(timeout.parse().expect("seconds")),
+                on_poll: &|| {},
+            },
+            &RunControl::default(),
+        )
+        .expect("the run");
+        std::fs::create_dir_all(&keep).unwrap();
+        let _ = std::fs::copy(&engine_log, keep.join("engine.log"));
+        eprintln!("{exit:?}");
+        assert!(!exit.timed_out, "the engine was killed at its time limit");
+
+        // The engine's own list.
+        let events =
+            std::fs::read_to_string(write_dir.join(game::EVENTS_FILE)).expect("the logger's file");
+        let defs: Vec<&str> = events
+            .lines()
+            .filter(|line| line.starts_with("{\"kind\":\"unit_def\""))
+            .collect();
+        assert!(!defs.is_empty(), "the logger wrote no unit definitions");
+        std::fs::write(keep.join("unit_defs.jsonl"), defs.join("\n") + "\n").unwrap();
+
+        // The setup, from the replay the engine recorded of this match.
+        // A game may restart the engine once while it loads, which Splinter
+        // Faction does on a first run to rebuild its textures. Each start
+        // records a replay named by its time, so the match is the last.
+        let mut demos: Vec<PathBuf> = std::fs::read_dir(write_dir.join("demos"))
+            .expect("the engine recorded no replay")
+            .filter_map(|entry| Some(entry.ok()?.path()))
+            .filter(|path| super::super::is_replay_path(path))
+            .collect();
+        demos.sort();
+        let demo = demos.last().expect("the engine recorded no replay");
+        let raw = read_header_and_script(demo).expect("the replay");
+        let recorded = match_setup(&find_game(&parse_tdf(&raw.script)))
+            .expect("the replay's script is one the engine started");
+        assert_eq!(
+            recorded, wanted,
+            "the replay's setup is not the start script's"
+        );
+        std::fs::write(
+            keep.join("setup.json"),
+            serde_json::to_string(&recorded).unwrap(),
+        )
+        .unwrap();
+        eprintln!(
+            "{} unit definitions, {} replays recorded, the last of {} seconds, \
+             setup of {} mod options, {} teams, {} AIs",
+            defs.len(),
+            demos.len(),
+            raw.game_time,
+            recorded.mod_options.len(),
+            recorded.teams.len(),
+            recorded.ais.len()
+        );
+    }
+
     /// The whole route against a real engine, a real game and a real replay.
     ///
     /// Reads what to run from the environment and does nothing without it:
