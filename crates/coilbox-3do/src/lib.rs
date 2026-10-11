@@ -11,7 +11,7 @@
 //! load, each marked below with the engine's reason.
 //!
 //! Field layout is taken from `3DOParser.h` and checked against the 3633 `.3do`
-//! files in the games installed on the author's machine. `docs/3do-format.md`
+//! files in the games installed on the author's machine. `docs/reference/3do-format.md`
 //! records what the struct does not state.
 //!
 //! Everything is little endian, and every offset is absolute from the start of

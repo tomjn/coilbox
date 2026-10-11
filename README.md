@@ -203,7 +203,7 @@ offered to users who have none yet (or from the Maps download page):
   normal download queue (already-present maps are skipped).
 - A distribution profile can ship its own packs too, via `mapLists` in
   `.coilbox/profile.json` — see
-  [Distribution profile](docs/distribution-profile.md). Catalog packs are listed
+  [Distribution profile](docs/developers/distribution-profile.md). Catalog packs are listed
   first, then profile packs, deduped by `id`.
 
 ## Licensing

@@ -57,7 +57,7 @@ const campaignPlugin: FramePlugin = {
         {
           id: "campaign.guide",
           label: "Campaigns guide",
-          href: "https://tomjn.github.io/coilbox/campaigns",
+          href: "https://tomjn.github.io/coilbox/developers/campaigns",
           icon: CoilMark,
           sidebar: false,
           order: 3,

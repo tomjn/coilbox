@@ -56,7 +56,7 @@ use crate::{
 
 /// The path the WebSocket sits at. The specification carries an open question about
 /// advertising it in the OAuth metadata, and nothing advertises it today, so this
-/// convention is hardcoded (see `docs/tachyon-protocol.md`).
+/// convention is hardcoded (see `docs/reference/tachyon-protocol.md`).
 const TACHYON_PATH: &str = "/tachyon";
 
 /// How long a graceful disconnect waits for the close handshake before dropping the

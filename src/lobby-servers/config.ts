@@ -5,7 +5,7 @@ import { bracketedHost } from "./hostForms";
 import { hostIdentity } from "./sameServer";
 
 /**
- * The wire protocol a lobby server speaks. See `docs/tachyon-protocol.md`.
+ * The wire protocol a lobby server speaks. See `docs/reference/tachyon-protocol.md`.
  *
  * `zerok` is Zero-K's own line protocol, which is neither of the other two: a
  * command name and a JSON object over plain TCP, defined by C# classes rather
@@ -179,7 +179,7 @@ export const BUILTIN_SERVERS: LobbyServer[] = [
     // The endpoint is wss://server4.beyondallreason.info/tachyon, so this server's
     // real identity is a URL origin, not a host and port. Storing the HTTPS port is
     // deliberate: it keeps the derived serverKey `${username}@${host}:${port}` unique
-    // per entry, so no consumer of that key has to change. See docs/tachyon-protocol.md.
+    // per entry, so no consumer of that key has to change. See docs/reference/tachyon-protocol.md.
     port: 443,
     tls: true,
     allowSelfSigned: false,

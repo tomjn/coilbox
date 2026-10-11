@@ -192,7 +192,7 @@ function ConnectionGroup({
   const protocol = protocolForKey(serverKey, servers);
   // Tachyon can only address a player, a party or a lobby, so there are no named
   // channels to list or browse. Upstream means this, so the section is replaced by
-  // a standing note rather than left empty. See `docs/tachyon-protocol.md`.
+  // a standing note rather than left empty. See `docs/reference/tachyon-protocol.md`.
   const hasChannels = protocol !== "tachyon";
   // Parties are the other way round: Tachyon has them and TASServer has nothing
   // like them, so the section is only there on a Tachyon connection.

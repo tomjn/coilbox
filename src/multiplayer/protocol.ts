@@ -52,7 +52,7 @@ export function liveTachyonKeys(
  * it is among them. Pure.
  *
  * Under Tachyon the server allocates a dedicated autohost from its own pool
- * and a client cannot host at all (see `docs/tachyon-protocol.md`), so this
+ * and a client cannot host at all (see `docs/reference/tachyon-protocol.md`), so this
  * is every live connection whose protocol is not Tachyon. With more than one
  * such connection open, "Host as battle" has to ask which one rather than
  * always taking the focused connection (issue #2847).

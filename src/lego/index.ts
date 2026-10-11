@@ -46,7 +46,7 @@ const legoPlugin: FramePlugin = {
         {
           id: "lego.builder-guide",
           label: "Unit builder guide",
-          href: "https://tomjn.github.io/coilbox/lego-builder",
+          href: "https://tomjn.github.io/coilbox/developers/lego-builder",
           icon: CoilMark,
           sidebar: false,
           order: 2,
@@ -55,7 +55,7 @@ const legoPlugin: FramePlugin = {
         {
           id: "lego.parts-pack-guide",
           label: "Parts pack format",
-          href: "https://tomjn.github.io/coilbox/lego-parts-pack",
+          href: "https://tomjn.github.io/coilbox/reference/lego-parts-pack",
           icon: CoilMark,
           sidebar: false,
           order: 3,
@@ -64,7 +64,7 @@ const legoPlugin: FramePlugin = {
         {
           id: "lego.s3o-format",
           label: "s3o format",
-          href: "https://tomjn.github.io/coilbox/s3o-format",
+          href: "https://tomjn.github.io/coilbox/reference/s3o-format",
           icon: CoilMark,
           sidebar: false,
           order: 4,

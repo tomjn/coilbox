@@ -11,7 +11,7 @@ import {
  * at all, however much access you hold. Both lists are checked against
  * uberserver's source directly (`DataHandler.py`'s `scheduled_clean`,
  * `SQLUsers.py`'s `clean` and `audit_access`, and `SETACCESS` in
- * `protocol/Protocol.py`). See `docs/server-admin.md` for the full page.
+ * `protocol/Protocol.py`). See `docs/staff/server-admin.md` for the full page.
  *
  * Sits above the tool list and its content, rather than inside any one tool,
  * since both lists apply to the page as a whole. Collapsed by default, the

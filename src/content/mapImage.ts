@@ -23,7 +23,7 @@ import type { MapExportInfo } from "./mapAggregateExport";
  * numbers and text: the size, the layout, the words, the wrapping. The drawing
  * is a short list of calls over that layout, and it is tested against a
  * recording context. Nothing in this file has been looked at as pixels by a
- * person, and `docs/replay-data-sources.md` says so.
+ * person, and `docs/reference/replay-data-sources.md` says so.
  */
 
 /**
