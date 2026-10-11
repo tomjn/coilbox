@@ -5,6 +5,7 @@
 //! list downloadable content before downloading a tag.
 
 mod github_cache;
+mod install;
 mod progress;
 mod rapid;
 mod sidecar;
@@ -1490,6 +1491,68 @@ async fn dl_path_writable(path: String) -> CliResult {
     CliResult::ok(json!({ "writable": writable, "error": error }))
 }
 
+/// What `dl_inspect_archive` and `dl_install_archive` answer with.
+fn archive_plan_json(plan: &install::Plan) -> serde_json::Value {
+    json!({
+        "kind": plan.kind.as_str(),
+        "fileName": plan.file_name,
+        "destDir": plan.dest_dir.display().to_string(),
+    })
+}
+
+/// `dl_inspect_archive` — say whether the `.sdz` or `.sd7` at `path` is a game
+/// or a map and which folder it would be copied into, without copying it. The
+/// frontend asks this before it asks the player. Fails with the reason when the
+/// file is neither, has no folder chosen for its kind, or is already there.
+#[tauri::command]
+async fn dl_inspect_archive(
+    path: String,
+    games_root: Option<String>,
+    maps_root: Option<String>,
+) -> CliResult {
+    let planned = tauri::async_runtime::spawn_blocking(move || {
+        install::plan(
+            std::path::Path::new(&path),
+            games_root.as_deref(),
+            maps_root.as_deref(),
+        )
+    })
+    .await;
+    match planned {
+        Ok(Ok(plan)) => CliResult::ok(archive_plan_json(&plan)),
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
+/// `dl_install_archive` — copy the archive at `path` into `games/` or `maps/`
+/// under the root for its kind. The original is left where it is and a file
+/// already in the target folder is never replaced.
+#[tauri::command]
+async fn dl_install_archive(
+    path: String,
+    games_root: Option<String>,
+    maps_root: Option<String>,
+) -> CliResult {
+    let installed = tauri::async_runtime::spawn_blocking(move || {
+        install::install(
+            std::path::Path::new(&path),
+            games_root.as_deref(),
+            maps_root.as_deref(),
+        )
+    })
+    .await;
+    match installed {
+        Ok(Ok((plan, dest))) => {
+            let mut body = archive_plan_json(&plan);
+            body["path"] = json!(dest.display().to_string());
+            CliResult::ok(body)
+        }
+        Ok(Err(e)) => CliResult::err(e),
+        Err(e) => CliResult::err(e.to_string()),
+    }
+}
+
 /// Build the plugin. Registered as `"coilbox-downloads"` (crate name minus
 /// the `tauri-plugin-` prefix); the frontend invokes
 /// `plugin:coilbox-downloads|<cmd>`.
@@ -1524,7 +1587,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             dl_set_engine_dirs,
             dl_path_writable,
             dl_fetch_text,
-            dl_rapid_release_archives
+            dl_rapid_release_archives,
+            dl_inspect_archive,
+            dl_install_archive
         ])
         .build()
 }
