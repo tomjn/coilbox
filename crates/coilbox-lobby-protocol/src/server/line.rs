@@ -299,6 +299,11 @@ pub fn said_battle_ex(username: &str, message: &str) -> String {
     format!("SAIDBATTLEEX {username} {message}")
 }
 
+/// `RING <username>`, naming who rang.
+pub fn ring(username: &str) -> String {
+    format!("RING {username}")
+}
+
 /// `SERVERMSG <text>`, an announcement shown to the player verbatim.
 ///
 /// A room uses it for the one thing it has to say that no room message covers:
