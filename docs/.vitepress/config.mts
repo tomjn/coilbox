@@ -8,6 +8,11 @@ import { defineConfig } from "vitepress";
 // itself points.
 const HUB_URL = "https://coilbox-hub.vercel.app";
 
+// Notes on formats and protocols other projects own are kept in the repo for
+// people working on coilbox and are not published. Their old addresses forward
+// to the file on GitHub.
+const INTERNAL_URL = "https://github.com/tomjn/coilbox/blob/main/docs/internal";
+
 // Every page sat at the site root until the pages were grouped by reader.
 // Released builds of the app link to some of the old addresses, so each old
 // address still answers, with a page that forwards to the new one.
@@ -30,10 +35,10 @@ const MOVED: Record<string, string> = {
   "server-admin": "staff/server-admin",
   routes: "reference/routes",
   "replay-data-sources": "reference/replay-data-sources",
-  "s3o-format": "reference/s3o-format",
-  "3do-format": "reference/3do-format",
+  "s3o-format": `${INTERNAL_URL}/s3o-format.md`,
+  "3do-format": `${INTERNAL_URL}/3do-format.md`,
   "lego-parts-pack": "reference/lego-parts-pack",
-  "tachyon-protocol": "reference/tachyon-protocol",
+  "tachyon-protocol": `${INTERNAL_URL}/tachyon-protocol.md`,
 };
 
 // The public documentation site (issue #168), published to GitHub Pages at
@@ -58,6 +63,7 @@ export default defineConfig({
     "mockups/**",
     "examples/**",
     "reports/**",
+    "internal/**",
     "ideas-*.md",
     "README.md",
   ],
@@ -173,7 +179,7 @@ export default defineConfig({
           items: [{ text: "Overview", link: "/reference/" }],
         },
         {
-          text: "The app",
+          text: "Coilbox",
           items: [
             {
               text: "Routes and navigation ids",
@@ -183,23 +189,7 @@ export default defineConfig({
               text: "Replay data sources",
               link: "/reference/replay-data-sources",
             },
-          ],
-        },
-        {
-          text: "File formats",
-          items: [
-            { text: "s3o model format", link: "/reference/s3o-format" },
-            { text: "3do model format", link: "/reference/3do-format" },
             { text: "Parts pack format", link: "/reference/lego-parts-pack" },
-          ],
-        },
-        {
-          text: "Protocols",
-          items: [
-            {
-              text: "Tachyon protocol support",
-              link: "/reference/tachyon-protocol",
-            },
           ],
         },
       ],
@@ -214,7 +204,7 @@ export default defineConfig({
   },
   buildEnd({ outDir, site }) {
     for (const [from, to] of Object.entries(MOVED)) {
-      const url = `${site.base}${to}`;
+      const url = to.startsWith("https://") ? to : `${site.base}${to}`;
       writeFileSync(
         join(outDir, `${from}.html`),
         `<!doctype html><meta charset="utf-8"><title>Moved</title><link rel="canonical" href="${url}"><meta http-equiv="refresh" content="0; url=${url}"><script>location.replace(${JSON.stringify(url)} + location.hash)</script><p>This page moved to <a href="${url}">${url}</a>.</p>\n`,

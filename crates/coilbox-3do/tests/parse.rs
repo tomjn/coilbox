@@ -6,7 +6,7 @@
 //!
 //! The second parses the real thing, over a corpus of models extracted from the
 //! installed games. It is skipped unless `COILBOX_3DO_CORPUS` points at a
-//! directory of `.3do` files, so it never runs in CI. See `docs/reference/3do-format.md`
+//! directory of `.3do` files, so it never runs in CI. See `docs/internal/3do-format.md`
 //! for how to fill one.
 
 use std::path::{Path, PathBuf};

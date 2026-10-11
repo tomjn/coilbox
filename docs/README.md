@@ -15,11 +15,13 @@ These pages are published at [tomjn.github.io/coilbox](https://tomjn.github.io/c
 2. Add it to that folder's sidebar in `.vitepress/config.mts`.
 3. Add a line for it to that folder's `index.md`.
 
-A guide tells one reader how to do one thing. Lists of fields, ids, bytes and messages go in `reference/`, and the guide links to them.
+A guide tells one reader how to do one thing. Lists of fields and ids that are coilbox's own go in `reference/`, and the guide links to them.
 
 ## What is not published
 
-`superpowers/`, `mockups/`, `examples/`, `reports/` and any `ideas-*.md` file are left out of the site. `examples/` holds the sample files the guides link to on GitHub.
+`superpowers/`, `mockups/`, `examples/`, `reports/`, `internal/` and any `ideas-*.md` file are left out of the site. `examples/` holds the sample files the guides link to on GitHub.
+
+`internal/` holds notes for people working on coilbox about things another project owns: the s3o and 3do model formats and the Tachyon protocol. The site does not publish a reference for those, because the project that owns each one is the place for it.
 
 ## How the pieces of a distribution fit
 

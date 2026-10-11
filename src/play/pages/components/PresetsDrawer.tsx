@@ -106,7 +106,7 @@ export function PresetsDrawer({
   onBrowseHub: () => void;
   /** "Host as battle" (#373): take this preset online without loading it into
    * the page first. Absent where hosting is impossible, which is what hides the
-   * action on a Tachyon connection (see `docs/reference/tachyon-protocol.md`). */
+   * action on a Tachyon connection (see `docs/internal/tachyon-protocol.md`). */
   onHostAsBattle?: (preset: SkirmishPreset) => void;
   disabled?: boolean;
 }) {

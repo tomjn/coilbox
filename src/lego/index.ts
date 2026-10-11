@@ -62,15 +62,6 @@ const legoPlugin: FramePlugin = {
           useVisible: useAdvancedMode,
         },
         {
-          id: "lego.s3o-format",
-          label: "s3o format",
-          href: "https://tomjn.github.io/coilbox/reference/s3o-format",
-          icon: CoilMark,
-          sidebar: false,
-          order: 4,
-          useVisible: useAdvancedMode,
-        },
-        {
           id: "lego.s3o-blender-tools",
           label: "S3O Blender Tools",
           href: "https://github.com/ChrisFloofyKitsune/s3o-blender-tools/",

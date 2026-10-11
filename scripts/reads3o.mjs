@@ -3,7 +3,7 @@
  *
  * Usage: bun run lego:reads3o <file.s3o>
  *
- * Written from docs/reference/s3o-format.md alone, and deliberately sharing no code with
+ * Written from docs/internal/s3o-format.md alone, and deliberately sharing no code with
  * `crates/coilbox-s3o`. Our reader agreeing with our writer proves very little,
  * so this is a second opinion: if the two disagree, one of them is wrong and
  * the disagreement is the finding.

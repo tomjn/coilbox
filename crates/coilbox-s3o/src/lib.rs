@@ -1,7 +1,7 @@
 //! Reader and writer for the Spring/Recoil `.s3o` model format.
 //!
 //! Field layout is taken from `rts/Rendering/Models/s3o.h` in RecoilEngine and
-//! cross-checked against shipped models. `docs/reference/s3o-format.md` records the
+//! cross-checked against shipped models. `docs/internal/s3o-format.md` records the
 //! conventions the engine relies on but does not state in the struct: vertex
 //! positions are used verbatim with no axis negation, front faces wind
 //! counter-clockwise, and a `Triangles` piece has a flat index list with no
