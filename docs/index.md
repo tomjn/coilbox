@@ -120,4 +120,4 @@ The documentation is split by who is reading.
 - [Player guides](players/index.md). Battle presets, Galactic conquest, Warpath and portable mode.
 - [Game developer guides](developers/index.md). Package coilbox with your game, brand it, and make campaigns, scenarios, maps and units for it.
 - [Server staff](staff/server-admin.md). The moderation and admin tools for an uberserver lobby.
-- [Reference](reference/index.md). The app's routes, replay data sources and the parts pack format.
+- [Reference](reference/index.md). The app's routes, replay data sources, the parts pack format and the replay track format.
