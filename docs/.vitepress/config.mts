@@ -190,6 +190,10 @@ export default defineConfig({
               link: "/reference/replay-data-sources",
             },
             { text: "Parts pack format", link: "/reference/lego-parts-pack" },
+            {
+              text: "Replay track format",
+              link: "/reference/replay-track-format",
+            },
           ],
         },
       ],
