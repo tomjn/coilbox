@@ -115,7 +115,7 @@ M.SYNCED = {
 	},
 	{
 		id = "units",
-		feature = "units",
+		feature = "creating and placing units",
 		calls = {
 			"Spring.CreateUnit",
 			"Spring.DestroyUnit",
@@ -361,9 +361,9 @@ function M.check(roots, rows)
 				result.refused = true
 				result.lines[#result.lines + 1] = "cannot play: this engine has no "
 					.. missing
-					.. ", which "
+					.. ". It is needed for "
 					.. row.feature
-					.. " needs. Engine "
+					.. ". Engine "
 					.. row.since
 					.. " and later have it"
 				if not blocked then
@@ -374,9 +374,9 @@ function M.check(roots, rows)
 				off[#off + 1] = row
 				result.lines[#result.lines + 1] = "this engine has no "
 					.. missing
-					.. ", so "
+					.. ". Switched off: "
 					.. row.feature
-					.. " is switched off. "
+					.. ". "
 					.. row.without
 					.. ". Engine "
 					.. row.since

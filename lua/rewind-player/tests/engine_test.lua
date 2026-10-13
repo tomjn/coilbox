@@ -311,7 +311,7 @@ for _, row in ipairs(Table.SYNCED) do
 		else
 			local line = logged(w, "this engine has no " .. call)
 			t.check(label .. " the log line names the call", line ~= nil, table.concat(w.lines, " | "))
-			t.check(label .. " and says " .. row.feature .. " is switched off", line ~= nil and line:find(row.feature .. " is switched off", 1, true) ~= nil, line)
+			t.check(label .. " and says " .. row.feature .. " is switched off", line ~= nil and line:find("Switched off: " .. row.feature .. ".", 1, true) ~= nil, line)
 			t.check(label .. " and what happens", line ~= nil and line:find(row.without, 1, true) ~= nil, line)
 			t.check(label .. " and which engine has it", line ~= nil and line:find("Engine " .. row.since .. " and later have it", 1, true) ~= nil, line)
 			t.same(label .. " the note", w.params[NOTE], noteOf({ row }))

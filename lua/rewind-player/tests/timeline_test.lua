@@ -780,7 +780,7 @@ do
 				t.same(label .. " the pointer is not over it", widget:IsAbove(960, 40), false)
 				t.same(label .. " nothing is sent to the player", #e.sent, 0)
 			else
-				t.check(label .. " the line says " .. row.feature .. " is switched off", line ~= nil and line:find(row.feature .. " is switched off", 1, true) ~= nil, line)
+				t.check(label .. " the line says " .. row.feature .. " is switched off", line ~= nil and line:find("Switched off: " .. row.feature .. ".", 1, true) ~= nil, line)
 				t.check(label .. " the timeline still draws", e.shapes > 0)
 				if row.id == "marks" then
 					t.same(label .. " the mark key is left to the game", widget:KeyPress(CODES["]"], NONE, false), false)

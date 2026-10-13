@@ -124,18 +124,18 @@ function M.check(roots)
 				result.lines[#result.lines + 1] = M.PREFIX
 					.. "cannot start: this engine has no "
 					.. missing
-					.. ", which "
+					.. ". It is needed for "
 					.. row.feature
-					.. " needs. Engine "
+					.. ". Engine "
 					.. row.since
 					.. " and later have it"
 			else
 				result.lines[#result.lines + 1] = M.PREFIX
 					.. "this engine has no "
 					.. missing
-					.. ", so "
+					.. ". Switched off: "
 					.. row.feature
-					.. " is switched off. "
+					.. ". "
 					.. row.without
 					.. ". Engine "
 					.. row.since
