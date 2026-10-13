@@ -2076,6 +2076,49 @@ pub fn defs_probe_blocking(
     out
 }
 
+/// The modinfo `shortname` of the installed game named `game`, which is the
+/// name the engine builds for it: the game's `name`, a space and its `version`
+/// (issue #3943).
+///
+/// Blocking, and not a command of its own: the replay analysis calls it from a
+/// blocking task, to give the game it generates the short name of the game it
+/// depends on. It reads the scan the games list is built from, so the answer
+/// is the one every other screen shows.
+pub fn game_short_name_blocking(
+    engine_path: &str,
+    data_dir: &str,
+    game: &str,
+) -> Result<String, String> {
+    let (bin, libpath, engine_dir) = prepare(engine_path)?;
+    let args = build_args(&libpath.to_string_lossy(), data_dir);
+    let envs = loader_envs(&engine_dir, data_dir);
+    let out = run_worker_blocking(
+        bin,
+        args,
+        envs,
+        SCAN_TIMEOUT,
+        "game short name".into(),
+        None,
+    )?;
+    short_name_in_scan(&out, game)
+}
+
+/// The `shortname` in the scan's entry for the game named `game`.
+fn short_name_in_scan(scan: &str, game: &str) -> Result<String, String> {
+    let scan: serde_json::Value =
+        serde_json::from_str(scan).map_err(|e| format!("the scan did not read as JSON: {e}"))?;
+    let entry = scan["games"]
+        .as_array()
+        .and_then(|games| games.iter().find(|g| g["name"].as_str() == Some(game)))
+        .ok_or_else(|| format!("no installed game is named {game:?}"))?;
+    entry["info"]["shortname"]
+        .as_str()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .ok_or_else(|| format!("the game {game:?} declares no short name in its modinfo"))
+}
+
 /// `unitsync_lua_repl_exec` — REPL replay: run `chunks` (the session's
 /// previously-successful inputs plus the new one) sequentially in one fresh Lua
 /// state, with `archive` mounted. The chunks are handed to the worker as a JSON
@@ -2269,6 +2312,29 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const SCAN: &str = r#"{"maps":[],"games":[
+        {"name":"Other Game 1","info":{"shortname":"OG"}},
+        {"name":"Beyond All Reason test-1","info":{"shortname":" BYAR "}},
+        {"name":"No Short 1","info":{"name":"No Short 1"}}
+    ],"errors":[]}"#;
+
+    #[test]
+    fn a_game_s_short_name_is_read_from_the_scan_entry_with_its_name() {
+        assert_eq!(
+            short_name_in_scan(SCAN, "Beyond All Reason test-1").as_deref(),
+            Ok("BYAR")
+        );
+    }
+
+    #[test]
+    fn a_game_that_is_not_installed_or_declares_no_short_name_is_an_error() {
+        let missing = short_name_in_scan(SCAN, "Absent 1").unwrap_err();
+        assert!(missing.contains("no installed game"), "{missing}");
+        let none = short_name_in_scan(SCAN, "No Short 1").unwrap_err();
+        assert!(none.contains("no short name"), "{none}");
+        assert!(short_name_in_scan("not json", "x").is_err());
+    }
 
     #[test]
     fn timeout_message_names_op_and_seconds() {

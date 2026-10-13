@@ -26,6 +26,8 @@ coilbox-tdf = { path = "../coilbox-tdf" }
 # The writer the scenario test mutator uses for a generated game, which the
 # replay analysis game is written with too (issue #1183).
 tauri-plugin-coilbox-scenario = { path = "../tauri-plugin-coilbox-scenario" }
+# Reads the short name of the game an analysis depends on (issue #3943).
+tauri-plugin-coilbox-unitsync = { path = "../tauri-plugin-coilbox-unitsync" }
 flate2 = "1"
 # Names a stored unit definition list by its content (issue #1176), as the map
 # catalog and the asset vocabulary name theirs.

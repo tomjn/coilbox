@@ -280,6 +280,6 @@ On an Apple M1 Pro with a load average between 3.9 and 6.3, through the analysis
 | Of them for a weapon after the first | 0 | 1,613 |
 | Terrain rows | 4,939 | 272,135 |
 
-The BAR runs needed a change that is not in this repository. BAR does not reproduce under the generated game as it is, with or without the recorder, because the generated game has a short name of its own. With the short name set to BAR's the match reproduced. Issue #3943 has the detail.
+The BAR runs were made with the generated game's short name set to BAR's. The generated game now takes the short name of the game it depends on (issue #3943), so a BAR replay reproduces without that change.
 
 Inside the recorder, the BAR run spent 20.4 seconds sampling units, 9.5 on terrain, 6.0 packing and writing, 1.4 going through the unit list, 1.2 on features and 0.3 on projectiles, by `os.clock`. That is 38.7 of the 65.1 seconds the recorder added. Where the rest went was not measured.
