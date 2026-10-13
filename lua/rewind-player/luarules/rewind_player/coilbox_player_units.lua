@@ -35,8 +35,16 @@
 -- the window changes, and never in a frame of play. With no view the order is
 -- the window's list.
 --
+-- A unit that a slow seek makes gets a short effect where it appears (issue
+-- #4009). The stage only says which: a unit made in a later frame than the one
+-- that showed the seek, while the seek's units are still arriving, inside the
+-- view's corners, and not while the timeline's knob is being dragged. It asks
+-- with `context.arrive`, and the gadget's unsynced half draws. A seek that is
+-- shown in one frame, a removal and a unit that play brings in ask for none.
+--
 -- The game's adapter can hide a unit definition, which is then never created,
 -- and can ask to be told when a unit is created and put in place (issue #3799).
+-- Its hook can show the game's own effect, and says so by giving true.
 --
 -- The engine heals a unit by itself, and nothing in the engine switches that
 -- off for one unit (issue #3986). CUnit::SlowUpdate adds `autoHeal`, and
@@ -151,6 +159,9 @@ function M.new(context, rotation)
 		-- Whether a seek's units are still being made. It is what the view's
 		-- order is for, so that a frame of play never sorts.
 		arriving = false,
+		-- Whether the frame that showed the last seek is over. A unit made after
+		-- it, while the seek's units arrive, is one a viewer saw arrive late.
+		late = false,
 		-- Where the viewer looks: the camera's place on the ground, and the
 		-- corners of the view on the ground, which `cornered` says are there.
 		-- `viewed` is whether any of it is.
@@ -347,6 +358,7 @@ end
 function Units:resync()
 	self.seeking = true
 	self.arriving = true
+	self.late = false
 	self.orderStale = true
 	local Spring = self.Spring
 	local failed = self.failed
@@ -585,9 +597,14 @@ function Units:put(w, i, serial, unitID, t, clock)
 		end
 		self.MoveCtrl.SetPosition(unitID, transform[1], transform[2], transform[3])
 		self.MoveCtrl.SetRotation(unitID, self.euler(transform[4], transform[5], transform[6], transform[7]))
-		local placed = self.context.hooks.unitPlaced
-		if made and placed then
-			placed(unitID, self.defID[w.unitDef[i] + 1], t, clock)
+		if made then
+			local context = self.context
+			local placed, arrive = context.hooks.unitPlaced, context.arrive
+			local effect = self.late and self.arriving and not clock.dragging and arrive ~= nil and self:inView(transform[1], transform[3])
+			local handled = placed and placed(unitID, self.defID[w.unitDef[i] + 1], t, clock, effect)
+			if effect and not handled then
+				arrive(unitID, transform[1], transform[2], transform[3], context.teamOf(w.unitTeam[i]))
+			end
 		end
 	end
 end
@@ -689,6 +706,7 @@ function Units:place(t, clock)
 	if not self.unsettled then
 		self.arriving = false
 	end
+	self.late = true
 end
 
 return M

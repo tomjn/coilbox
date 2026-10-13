@@ -28,8 +28,11 @@ M.HOOKS = {
 	-- () once, when the player has opened the track, before the first frame and
 	-- so before anything of the track is in the world.
 	started = true,
-	-- (unitID, unitDefID, t, clock) after the player created a unit and put it
-	-- in place. Called again for a unit made again after a seek.
+	-- (unitID, unitDefID, t, clock, effect) after the player created a unit and
+	-- put it in place. Called again for a unit made again after a seek. `effect`
+	-- is whether the player is about to show its arrival effect for the unit
+	-- (issue #4009), and a hook that gives true has shown the game's own, so
+	-- the player shows none.
 	unitPlaced = true,
 	-- (t, clock) after every stage has put the world in place on a frame.
 	afterFrame = true,
@@ -138,25 +141,24 @@ end
 
 --- A hook of the adapter that cannot take the player down. A hook that raises is
 -- reported once and not called again. Gives nil when the adapter has no such
--- hook, so a caller can test for it once and not on every frame.
+-- hook, so a caller can test for it once and not on every frame. What the hook
+-- gives back is handed on, and a hook that raised gives nothing.
 function M.guarded(adapter, name, report)
 	local hook = adapter and adapter.hooks[name]
 	if not hook then
 		return nil
 	end
 	local broken = false
-	return function(a, b, c, d)
+	return function(a, b, c, d, e)
 		if broken then
 			return
 		end
-		local ok, err = pcall(hook, a, b, c, d)
-		if not ok then
-			broken = true
-			report(
-				"hook " .. name,
-				"the adapter's " .. name .. " hook raised and is switched off for the rest of the run: " .. tostring(err)
-			)
+		local ok, err = pcall(hook, a, b, c, d, e)
+		if ok then
+			return err
 		end
+		broken = true
+		report("hook " .. name, "the adapter's " .. name .. " hook raised and is switched off for the rest of the run: " .. tostring(err))
 	end
 end
 

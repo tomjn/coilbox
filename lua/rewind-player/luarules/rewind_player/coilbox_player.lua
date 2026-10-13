@@ -142,7 +142,9 @@ end
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
 -- when there is none because the game's could not be used. `options.engine` is
 -- what coilbox_player_engine.lua's `check` gave for the engine, which says what
--- is switched off. Without it every feature is on.
+-- is switched off. Without it every feature is on. `options.arrive` is a function
+-- the units stage calls with a unit's id, its x, y and z and its team when the
+-- unit wants an arrival effect (issue #4009), and without it none is asked for.
 function M.new(track, options)
 	local header = track.header
 	local info, why = track:info()
@@ -221,6 +223,7 @@ function M.new(track, options)
 		WeaponDefNames = WeaponDefNames,
 		teamOf = teamOf,
 		report = report,
+		arrive = options.arrive,
 	}
 	-- A stage whose calls the engine lacks is the one that does nothing.
 	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
