@@ -71,6 +71,18 @@ pub struct PieceTree {
     pub pieces: Vec<String>,
     /// Each piece's parent as a piece number, and 0 for the root.
     pub parents: Vec<u32>,
+    /// The extension of the model's file in lower case, and empty for a
+    /// definition that names none. A `3do` or `s3o` piece has no rest
+    /// rotation. For any other format the engine may give it one that the
+    /// dump does not have.
+    #[serde(rename = "modelType")]
+    pub model_type: Option<String>,
+    /// Each piece's rest offset from its parent, in elmos. A dump made before
+    /// issue #3783 has none.
+    pub offsets: Option<Vec<[f32; 3]>>,
+    /// The box round each piece's own geometry, in the piece's own space: the
+    /// least x, y and z, then the greatest. Empty for a piece with none.
+    pub bounds: Option<Vec<Vec<f32>>>,
 }
 
 /// The end block. A dump without one is a run that was stopped.

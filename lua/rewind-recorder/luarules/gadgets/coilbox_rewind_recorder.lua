@@ -129,6 +129,15 @@ local function wholes(list)
 	return "[" .. table.concat(parts, ",") .. "]"
 end
 
+-- Numbers that are not whole. Nine digits carry a 32 bit float exactly.
+local function floats(list)
+	local parts = {}
+	for index = 1, #list do
+		parts[index] = string.format("%.9g", tonumber(list[index]) or 0)
+	end
+	return "[" .. table.concat(parts, ",") .. "]"
+end
+
 --------------------------------------------------------------------------------
 -- The engine, as locals.
 --------------------------------------------------------------------------------
@@ -281,16 +290,30 @@ end
 
 -- The piece tree of a unit definition, read from one unit of it and written
 -- to the dump once.
-local function pieceTree(unitID, unitDefID)
+--
+-- A piece row is a matrix in the unit's model space. Issue #3783 turns it into
+-- the turn and move a unit script set on the piece, and for that it needs what
+-- the model says about the piece at rest: its offset from its parent, and the
+-- box round its geometry, which says how far a turn of the piece moves anything.
+-- The engine does not tell Lua the rest rotation that some model formats bake
+-- into a piece, so the model's format is written for a reader to judge by.
+local function pieceTree(unitID, unitDefID, modelType)
 	local names = Spring.GetUnitPieceList(unitID) or {}
 	local index = {}
 	for piece = 1, #names do
 		index[names[piece]] = piece
 	end
-	local parents = {}
+	local parents, offsets, bounds = {}, {}, {}
 	for piece = 1, #names do
-		local info = Spring.GetUnitPieceInfo(unitID, piece)
-		parents[piece] = info and index[info.parent] or 0
+		local info = Spring.GetUnitPieceInfo(unitID, piece) or {}
+		parents[piece] = index[info.parent] or 0
+		offsets[piece] = floats(info.offset or { 0, 0, 0 })
+		local min, max = info.min, info.max
+		if info.isEmpty or not (min and max) then
+			bounds[piece] = "[]"
+		else
+			bounds[piece] = floats({ min[1], min[2], min[3], max[1], max[2], max[3] })
+		end
 	end
 	local depths = {}
 	for piece = 1, #names do
@@ -304,7 +327,10 @@ local function pieceTree(unitID, unitDefID)
 	end
 	writeText(BLOCK_PIECES, '{"def":' .. whole(unitDefID)
 		.. ',"pieces":' .. quoted(names)
-		.. ',"parents":' .. wholes(parents) .. "}")
+		.. ',"parents":' .. wholes(parents)
+		.. ',"modelType":' .. quote(modelType or "")
+		.. ',"offsets":[' .. table.concat(offsets, ",")
+		.. '],"bounds":[' .. table.concat(bounds, ",") .. "]}")
 	return names, parents, depths
 end
 
@@ -314,7 +340,7 @@ local function defOf(unitID, unitDefID)
 		return known
 	end
 	local unitDef = UnitDefs[unitDefID] or {}
-	local names, parents, depths = pieceTree(unitID, unitDefID)
+	local names, parents, depths = pieceTree(unitID, unitDefID, unitDef.modeltype)
 	known = {
 		weapons = type(unitDef.weapons) == "table" and #unitDef.weapons or 0,
 		builder = unitDef.isBuilder and true or false,

@@ -18,6 +18,7 @@ use std::collections::HashMap;
 
 /// One piece's curve while its unit is alive.
 struct Posing {
+    curve: PoseCurve,
     stretch: Stretch<PoseCurve>,
     /// The piece as last recorded. The recorder writes a piece only when its
     /// matrix changes, so this is where it is until the next row.
@@ -29,7 +30,6 @@ struct Building {
     transform_curve: TransformCurve,
     transform: Stretch<TransformCurve>,
     status: Stretch<StatusCurve>,
-    pose_curve: PoseCurve,
     /// One for each of `unit.poses`, in the same order.
     posing: Vec<Posing>,
     /// The frame of the unit's last sample.
@@ -118,9 +118,6 @@ impl Sink for Thinner {
                 },
                 transform: Stretch::default(),
                 status: Stretch::default(),
-                pose_curve: PoseCurve {
-                    radius: start.radius,
-                },
                 posing: vec![],
                 last_point: None,
             },
@@ -221,6 +218,9 @@ impl Sink for Thinner {
                     keys: vec![],
                 });
                 b.posing.push(Posing {
+                    curve: PoseCurve {
+                        reach: sample.reach,
+                    },
                     stretch: Stretch::default(),
                     last: PoseSample {
                         frame,
@@ -242,7 +242,7 @@ impl Sink for Thinner {
                     frame: held_to,
                     ..posing.last
                 };
-                posing.stretch.push(&b.pose_curve, &rules, held, keys)?;
+                posing.stretch.push(&posing.curve, &rules, held, keys)?;
             }
         }
         let next = PoseSample {
@@ -251,7 +251,7 @@ impl Sink for Thinner {
             angles: pose::angles(&sample.rotation, Some(posing.last.angles)),
         };
         posing.last = next;
-        posing.stretch.push(&b.pose_curve, &rules, next, keys)
+        posing.stretch.push(&posing.curve, &rules, next, keys)
     }
 
     fn unit_end(&mut self, serial: u32, last_frame: u32) -> Result<()> {
@@ -266,7 +266,7 @@ impl Sink for Thinner {
         for (posing, track) in b.posing.iter_mut().zip(&mut b.unit.poses) {
             posing
                 .stretch
-                .finish(&b.pose_curve, &rules, &mut track.keys)?;
+                .finish(&posing.curve, &rules, &mut track.keys)?;
         }
         let mut unit = b.unit;
         unit.last_frame = last_frame;
@@ -277,6 +277,14 @@ impl Sink for Thinner {
         }
         unit.queue.retain(|k| k.frame <= last_frame);
         unit.targets.retain(|t| !t.keys.is_empty());
+        // A piece with no track is at rest, so a track that never leaves rest
+        // says nothing. Most watched pieces are like that: the pieces between
+        // a muzzle and the root that no script moves.
+        unit.poses.retain(|p| {
+            p.keys
+                .iter()
+                .any(|k| (k.angles, k.offsets) != ([0; 3], [0; 3]))
+        });
         unit.targets.sort_by_key(|t| t.weapon);
         unit.poses.sort_by_key(|p| p.piece);
         // The keys stay in memory until the track is written, and a list that

@@ -104,7 +104,8 @@ end
 -- none. `options.noFile` makes the write directory refuse the file.
 -- `options.unitDefs`, `featureDefs` and `weaponDefs` are the definition lists.
 -- `options.models` is keyed by unit definition and holds `{ pieces = { names },
--- parents = { parent name for each } }`. `options.handlerCallIn` puts a
+-- parents = { parent name for each }, offsets = { three numbers for each },
+-- bounds = { six numbers for each, or false } }`. `options.handlerCallIn` puts a
 -- function of the gadget handler's own at the heightmap call-in before the
 -- recorder loads. `options.frontOnly` makes the direction calls answer the
 -- front and nothing else, as an older engine does.
@@ -286,7 +287,17 @@ function M.newEngine(options)
 		end,
 		GetUnitPieceInfo = function(unitID, piece)
 			local model = options.models[unit(unitID).def]
-			return { name = model.pieces[piece], parent = model.parents[piece] or "[null]" }
+			local offset = model.offsets and model.offsets[piece] or { 0, 0, 0 }
+			local bounds = model.bounds and model.bounds[piece]
+			return {
+				name = model.pieces[piece],
+				parent = model.parents[piece] or "[null]",
+				offset = offset,
+				isEmpty = not bounds,
+				-- What the engine holds for a piece with no geometry.
+				min = bounds and { bounds[1], bounds[2], bounds[3] } or { 10000, 10000, 10000 },
+				max = bounds and { bounds[4], bounds[5], bounds[6] } or { -10000, -10000, -10000 },
+			}
 		end,
 		GetUnitPiecePosDir = function(unitID, piece)
 			local u = unit(unitID)

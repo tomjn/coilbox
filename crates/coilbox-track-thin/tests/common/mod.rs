@@ -171,7 +171,23 @@ pub struct Scene {
     pub radii: bool,
     /// Left out when false, as a run that was stopped.
     pub ended: bool,
+    /// Left out of the piece trees when false, as a dump from before issue
+    /// #3783.
+    pub rest: bool,
+    /// The format of every model.
+    pub model_type: String,
 }
+
+/// Every model: a base, a turret 5 elmos up from it, a barrel 2 up and 3
+/// forward of the turret, and a flare with no geometry 12 along the barrel.
+pub const PIECES: [&str; 4] = ["base", "turret", "barrel", "flare"];
+pub const REST: [[f32; 3]; 4] = [
+    [0.0, 0.0, 0.0],
+    [0.0, 5.0, 0.0],
+    [0.0, 2.0, 3.0],
+    [0.0, 0.0, 12.0],
+];
+const BOUNDS: &str = "[[-8,0,-12,8,5,12],[-5,0,-5,5,4,5],[-0.5,-0.5,0,0.5,0.5,12],[]]";
 
 impl Scene {
     pub fn new(last_frame: u32) -> Self {
@@ -181,6 +197,8 @@ impl Scene {
             frames: BTreeMap::new(),
             radii: true,
             ended: true,
+            rest: true,
+            model_type: "s3o".into(),
         }
     }
 
@@ -268,8 +286,16 @@ impl Scene {
         let mut dump = DumpBuilder::new();
         dump.header(&self.header_json());
         for def in 1..=self.unit_defs.len() {
+            let rest = if self.rest {
+                format!(
+                    ",\"modelType\":\"{}\",\"offsets\":{REST:?},\"bounds\":{BOUNDS}",
+                    self.model_type
+                )
+            } else {
+                String::new()
+            };
             dump.pieces(&format!(
-                "{{\"def\":{def},\"pieces\":[\"base\",\"turret\",\"barrel\"],\"parents\":[0,1,2]}}"
+                "{{\"def\":{def},\"pieces\":{PIECES:?},\"parents\":[0,1,2,3]{rest}}}"
             ));
         }
         let empty = FrameSpec::default();
@@ -294,26 +320,76 @@ impl Scene {
     }
 }
 
-/// A piece pose row: the unit, the piece number from 1, then a matrix that
-/// turns the piece by `angle` radians about y and puts it at `offset`.
-pub fn piece_row(unit: u32, piece: u32, angle: f32, offset: [f32; 3]) -> [f32; 14] {
-    let (s, c) = angle.sin_cos();
-    [
-        unit as f32,
-        piece as f32,
-        c,
-        0.0,
-        -s,
-        0.0,
-        1.0,
-        0.0,
-        s,
-        0.0,
-        c,
-        offset[0],
-        offset[1],
-        offset[2],
-    ]
+/// What a script has set on one piece: turns about x, y and z in radians,
+/// and a move from its rest position.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Set {
+    pub turn: [f32; 3],
+    pub moved: [f32; 3],
+}
+
+impl Set {
+    pub fn turn(x: f32, y: f32, z: f32) -> Self {
+        Self {
+            turn: [x, y, z],
+            moved: [0.0; 3],
+        }
+    }
+}
+
+type M3 = [[f64; 3]; 3];
+
+fn times(a: &M3, b: &M3) -> M3 {
+    let mut out = [[0.0; 3]; 3];
+    for r in 0..3 {
+        for c in 0..3 {
+            out[r][c] = (0..3).map(|k| a[r][k] * b[k][c]).sum();
+        }
+    }
+    out
+}
+
+/// The rotation the engine makes of a piece's three turns: about z, then
+/// about x, then about y (`CQuaternion::FromEulerYPR`).
+fn turned(turn: [f32; 3]) -> M3 {
+    let [(sx, cx), (sy, cy), (sz, cz)] = turn.map(|a| (a as f64).sin_cos());
+    let about_x = [[1.0, 0.0, 0.0], [0.0, cx, -sx], [0.0, sx, cx]];
+    let about_y = [[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]];
+    let about_z = [[cz, -sz, 0.0], [sz, cz, 0.0], [0.0, 0.0, 1.0]];
+    times(&times(&about_y, &about_x), &about_z)
+}
+
+/// The piece pose rows of one unit on one frame, as the engine would give
+/// them: `set` is what a script has set on each piece from the base down, and
+/// each row is the piece in the unit's model space. The rows come deepest
+/// piece first, which is the order the recorder writes them in.
+pub fn piece_rows(unit: u32, set: &[Set]) -> Vec<[f32; 14]> {
+    let mut rotation: M3 = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
+    let mut at = [0.0f64; 3];
+    let mut rows = Vec::new();
+    for (piece, set) in set.iter().enumerate() {
+        // A piece sits at its rest offset and its move, in its parent's space.
+        for r in 0..3 {
+            at[r] += (0..3)
+                .map(|c| rotation[r][c] * (REST[piece][c] + set.moved[c]) as f64)
+                .sum::<f64>();
+        }
+        rotation = times(&rotation, &turned(set.turn));
+        let mut row = [0.0f32; 14];
+        row[0] = unit as f32;
+        row[1] = (piece + 1) as f32;
+        for c in 0..3 {
+            for r in 0..3 {
+                row[2 + c * 3 + r] = rotation[r][c] as f32;
+            }
+        }
+        for r in 0..3 {
+            row[11 + r] = at[r] as f32;
+        }
+        rows.push(row);
+    }
+    rows.reverse();
+    rows
 }
 
 /// Everything in a written track.

@@ -3,10 +3,12 @@
 //!
 //! A distance is one number in elmos. Where a sample has a rotation as well
 //! as a position, the angle between the recorded rotation and the track's is
-//! multiplied by the unit's radius and added to the distance between the two
-//! positions. That bounds how far any point within the radius of the unit's
-//! centre is from where it was recorded, so one tolerance holds for a unit's
-//! centre and for the end of its barrel.
+//! multiplied by a length and added to the distance between the two
+//! positions. For a unit the length is its radius, which bounds how far any
+//! point within the radius of the unit's centre is from where it was
+//! recorded. For a piece, which is measured relative to its parent, it is how
+//! far the piece's geometry and that of the pieces below it reach from the
+//! piece's origin.
 
 use crate::error::Result;
 use crate::pose::{self, PieceSample};
@@ -150,8 +152,9 @@ pub(crate) struct PoseSample {
 }
 
 pub(crate) struct PoseCurve {
-    /// The unit's radius in elmos, which the piece's turn is multiplied by.
-    pub radius: f64,
+    /// The length in elmos the piece's turn is multiplied by: how far the
+    /// piece reaches from its own origin. See [`pose::reaches`].
+    pub reach: f64,
 }
 
 impl Curve for PoseCurve {
@@ -175,7 +178,7 @@ impl Curve for PoseCurve {
         match pose_at(keys, q, s.frame) {
             Some((angles, offsets)) => {
                 distance(offsets, s.piece.translation)
-                    + self.radius * pose::angle_between(&pose::rotation(angles), &s.piece.rotation)
+                    + self.reach * pose::angle_between(&pose::rotation(angles), &s.piece.rotation)
             }
             None => f64::INFINITY,
         }

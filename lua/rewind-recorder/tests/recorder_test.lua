@@ -84,7 +84,7 @@ end
 
 local DEFS = {
 	unitDefs = {
-		{ name = "tank", weapons = { {}, {} }, radius = 21.5 },
+		{ name = "tank", weapons = { {}, {} }, radius = 21.5, modeltype = "s3o" },
 		{ name = "builder", weapons = {}, isBuilder = true, isMobileBuilder = true, radius = 12 },
 		{ name = "factory", weapons = {}, isBuilder = true, radius = 48 },
 		{ name = "wall", weapons = {} },
@@ -95,6 +95,12 @@ local DEFS = {
 		[1] = {
 			pieces = { "base", "turret", "sleeve", "barrel", "flare", "leg" },
 			parents = { nil, "base", "turret", "sleeve", "barrel", "base" },
+			offsets = { { 0, 0, 0 }, { 0, 10, -2.5 }, { 0, 3, 4 }, { 0, 0, 6 }, { 0, 0, 12 }, { -7, -4, 0 } },
+			-- The flare has no geometry.
+			bounds = {
+				{ -8, 0, -12, 8, 10, 12 }, { -5, 0, -5, 5, 4, 5 }, { -1, -1, 0, 1, 1, 6 },
+				{ -0.5, -0.5, 0, 0.5, 0.5, 12 }, false, { -2, -4, -2, 2, 0, 2 },
+			},
 		},
 		[2] = { pieces = { "body" }, parents = {} },
 		[3] = { pieces = { "pad" }, parents = {} },
@@ -323,6 +329,19 @@ do
 		"base turret sleeve barrel flare leg")
 	same("a tree gives each piece's parent, 0 for the root", table.concat(trees[1].parents, " "), "0 1 2 3 4 1")
 	same("a model with no pieces has an empty tree", #trees[2].pieces, 0)
+	same("a tree gives the format of the model it was read from", trees[1].modelType, "s3o")
+	same("a definition that names no model format has an empty one", trees[2].modelType, "")
+	local offsets, bounds = {}, {}
+	for piece = 1, 6 do
+		offsets[piece] = table.concat(trees[1].offsets[piece], " ")
+		bounds[piece] = table.concat(trees[1].bounds[piece], " ")
+	end
+	same("a tree gives each piece's rest offset from its parent", table.concat(offsets, ", "),
+		"0 0 0, 0 10 -2.5, 0 3 4, 0 0 6, 0 0 12, -7 -4 0")
+	same("a tree gives the box round each piece's own geometry, and nothing for a piece with none",
+		table.concat(bounds, ", "),
+		"-8 0 -12 8 10 12, -5 0 -5 5 4 5, -1 -1 0 1 1 6, -0.5 -0.5 0 0.5 0.5 12, , -2 -4 -2 2 0 2")
+	same("a model with no pieces has no offsets", #trees[2].offsets, 0)
 	local read = engine.read()
 	check("a tree comes before the frame that first uses it",
 		read.blocks[2].kind == dump.BLOCK_PIECES and read.blocks[#read.blocks].kind == dump.BLOCK_FRAME)

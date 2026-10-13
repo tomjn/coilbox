@@ -8,7 +8,7 @@
 
 use crate::dump::{BuilderWork, DumpHeader, Frame, PieceTree, UnitPose, WeaponTarget};
 use crate::error::{Result, ThinError};
-use crate::pose::PieceSample;
+use crate::pose::{self, ModelSample, PieceSample};
 use coilbox_track::{
     quaternion_from_front_up, Feature, Info, PosedPieces, Quantiser, Team, TerrainRow,
 };
@@ -96,7 +96,8 @@ pub(crate) trait Sink {
     /// `weapon` is the weapon number from 1, or 0 for builder work.
     fn target(&mut self, serial: u32, frame: u32, weapon: u8, target: &TargetValue) -> Result<()>;
     fn queue(&mut self, serial: u32, frame: u32, items: &[QueueEntry]) -> Result<()>;
-    /// `piece` is an index in the posed pieces of the unit's definition.
+    /// `piece` is an index in the posed pieces of the unit's definition, and
+    /// the sample is the piece relative to its parent.
     fn piece(&mut self, serial: u32, frame: u32, piece: u16, sample: &PieceSample) -> Result<()>;
     fn unit_end(&mut self, serial: u32, last_frame: u32) -> Result<()>;
     fn projectile_start(&mut self, projectile: &ProjectileStart) -> Result<()>;
@@ -143,10 +144,30 @@ impl Names {
     }
 }
 
+/// What a unit definition's model says about its pieces before a script
+/// moves them. Entry `n`, counting from 0, is piece number `n + 1`.
+struct Rig {
+    names: Vec<String>,
+    /// Each piece's parent as a piece number, and 0 for the root.
+    parents: Vec<u32>,
+    /// Each piece's rest offset from its parent, in elmos.
+    offsets: Vec<[f64; 3]>,
+    /// See [`pose::reaches`].
+    reaches: Vec<Option<f64>>,
+    /// Whether the model's format can give a piece a rest rotation, which
+    /// the dump does not have.
+    bakes: bool,
+}
+
 struct LiveUnit {
     serial: u32,
     def_id: u32,
     first_frame: u32,
+    /// In elmos.
+    radius: f64,
+    /// Each posed piece in the unit's model space, as last written, by piece
+    /// number.
+    pieces: Vec<(u32, ModelSample)>,
     /// The last point passed on, to hold if the unit ends with no pose.
     last: UnitPoint,
     /// What each weapon aims at, and weapon 0 for builder work.
@@ -184,13 +205,17 @@ pub(crate) struct Rest {
     pub terrain: Vec<TerrainRow>,
     pub units: u32,
     pub projectiles: u32,
+    /// The unit definitions with posed pieces whose model format can give a
+    /// piece a rest rotation. Their angles hold that rotation as well as the
+    /// script's, because the dump cannot say what it is.
+    pub unread_rest_rotations: Vec<String>,
 }
 
 pub(crate) struct Interpreter {
     header: DumpHeader,
     radii: Vec<f32>,
     q: Quantiser,
-    trees: HashMap<u32, PieceTree>,
+    rigs: HashMap<u32, Rig>,
     unit_defs: Names,
     weapon_defs: Names,
     feature_defs: Names,
@@ -262,7 +287,7 @@ impl Interpreter {
             header,
             radii,
             q,
-            trees: HashMap::new(),
+            rigs: HashMap::new(),
             unit_defs: Names::default(),
             weapon_defs: Names::default(),
             feature_defs: Names::default(),
@@ -280,8 +305,35 @@ impl Interpreter {
         })
     }
 
-    pub fn pieces(&mut self, tree: PieceTree) {
-        self.trees.insert(tree.def, tree);
+    pub fn pieces(&mut self, tree: PieceTree) -> Result<()> {
+        let def = tree.def;
+        let (Some(offsets), Some(bounds)) = (&tree.offsets, &tree.bounds) else {
+            return Err(ThinError::Dump(format!(
+                "the dump's piece tree for unit definition {def} has no offsets or no bounds, so \
+                 it was recorded before the recorder wrote them (issue #3783). Record the replay \
+                 again"
+            )));
+        };
+        let count = tree.pieces.len();
+        if tree.parents.len() != count
+            || offsets.len() != count
+            || bounds.len() != count
+            || bounds.iter().any(|b| !b.is_empty() && b.len() != 6)
+        {
+            return Err(ThinError::Dump(format!(
+                "the dump's piece tree for unit definition {def} does not give a parent, an \
+                 offset and bounds for each of its {count} pieces"
+            )));
+        }
+        let rig = Rig {
+            reaches: pose::reaches(&tree, offsets, bounds),
+            offsets: offsets.iter().map(|o| f3(*o)).collect(),
+            bakes: !matches!(tree.model_type.as_deref(), Some("3do" | "s3o")),
+            parents: tree.parents,
+            names: tree.pieces,
+        };
+        self.rigs.insert(def, rig);
+        Ok(())
     }
 
     /// The radius of one of the dump's unit definitions, in elmos.
@@ -472,6 +524,7 @@ impl Interpreter {
             let engine_id = u16::try_from(row.unit).map_err(|_| {
                 ThinError::Dump(format!("unit id {} does not fit the track", row.unit))
             })?;
+            let radius = self.radii[row.def as usize - 1] as f64;
             sink.unit_start(&UnitStart {
                 serial,
                 engine_id,
@@ -479,7 +532,7 @@ impl Interpreter {
                 def_name: self.header.unit_defs[row.def as usize - 1].clone(),
                 team: team(row.team),
                 frame,
-                radius: self.radii[row.def as usize - 1] as f64,
+                radius,
             })?;
             let at = point(frame, &row.pose);
             // A unit that is also sampled in this block gets its point from
@@ -493,6 +546,8 @@ impl Interpreter {
                     serial,
                     def_id: row.def,
                     first_frame: frame,
+                    radius,
+                    pieces: Vec::new(),
                     last: at,
                     targets: Vec::new(),
                 },
@@ -656,27 +711,92 @@ impl Interpreter {
             sink.queue(serial, frame, &items)?;
         }
 
+        // Piece rows. A row is a piece in the unit's model space, written
+        // when that changes, and a key holds the piece relative to its parent.
+        // The recorder writes a piece before its parents, so every row of the
+        // block is taken in before any piece is worked out.
+        let mut moved: Vec<(u32, Vec<u32>)> = Vec::new();
+        let mut moved_at: HashMap<u32, usize> = HashMap::new();
         for row in &block.poses {
-            let Some(unit) = self.units.get(&row.unit) else {
+            let Some(unit) = self.units.get_mut(&row.unit) else {
                 continue;
             };
-            let posed = self.posed.entry(unit.def_id).or_default();
-            let index = match posed.iter().position(|p| *p == row.piece) {
-                Some(index) => index,
-                None => {
-                    posed.push(row.piece);
-                    posed.len() - 1
-                }
-            };
-            let index = u16::try_from(index).map_err(|_| {
-                ThinError::Dump("a unit definition has too many posed pieces".into())
+            let sample = ModelSample::from_row(&row.matrix);
+            match unit.pieces.iter_mut().find(|(p, _)| *p == row.piece) {
+                Some((_, held)) => *held = sample,
+                None => unit.pieces.push((row.piece, sample)),
+            }
+            let at = *moved_at.entry(row.unit).or_insert_with(|| {
+                moved.push((row.unit, Vec::new()));
+                moved.len() - 1
+            });
+            moved[at].1.push(row.piece);
+        }
+        for (id, written) in &moved {
+            let unit = &self.units[id];
+            let def = unit.def_id;
+            let rig = self.rigs.get(&def).ok_or_else(|| {
+                ThinError::Dump(format!(
+                    "the dump poses pieces of unit definition {def} and has no piece tree for it"
+                ))
             })?;
-            sink.piece(
-                unit.serial,
-                frame,
-                index,
-                &PieceSample::from_row(&row.matrix),
-            )?;
+            let posed = self.posed.entry(def).or_default();
+            for (piece, model) in &unit.pieces {
+                let at = (*piece as usize)
+                    .checked_sub(1)
+                    .filter(|at| *at < rig.names.len())
+                    .ok_or_else(|| {
+                        ThinError::Dump(format!(
+                            "the dump poses piece {piece} of unit definition {def}, which has {}",
+                            rig.names.len()
+                        ))
+                    })?;
+                // A piece whose parent moved is somewhere else relative to
+                // it, whether or not the piece has a row of its own.
+                let parent = rig.parents[at];
+                if !written.contains(piece) && !written.contains(&parent) {
+                    continue;
+                }
+                let above = match parent {
+                    0 => None,
+                    parent => Some(
+                        unit.pieces
+                            .iter()
+                            .find(|(p, _)| *p == parent)
+                            .map(|(_, held)| held)
+                            .ok_or_else(|| {
+                                ThinError::Dump(format!(
+                                    "frame {frame} poses piece {piece} of unit {id} and the dump \
+                                     has not posed piece {parent}, its parent"
+                                ))
+                            })?,
+                    ),
+                };
+                let (rotation, translation) = pose::relative(above, model, rig.offsets[at]);
+                let index = match posed.iter().position(|p| p == piece) {
+                    Some(index) => index,
+                    None => {
+                        posed.push(*piece);
+                        posed.len() - 1
+                    }
+                };
+                let index = u16::try_from(index).map_err(|_| {
+                    ThinError::Dump("a unit definition has too many posed pieces".into())
+                })?;
+                sink.piece(
+                    unit.serial,
+                    frame,
+                    index,
+                    &PieceSample {
+                        rotation,
+                        translation,
+                        // A piece with no geometry on it or below it has no
+                        // size of its own to go by, so its turn is weighted
+                        // as the unit's is.
+                        reach: rig.reaches[at].unwrap_or(unit.radius),
+                    },
+                )?;
+            }
         }
 
         for row in &block.samples {
@@ -759,36 +879,27 @@ impl Interpreter {
         }
 
         let mut posed_pieces = Vec::new();
+        let mut unread_rest_rotations = Vec::new();
         for (def_id, pieces) in &self.posed {
-            // Every definition in here had a unit, so it has an index.
-            let Some(unit_def) = self.unit_defs.index.get(def_id) else {
+            // Every definition in here had a unit and a piece tree, or its
+            // rows would not have been taken.
+            let (Some(unit_def), Some(rig)) =
+                (self.unit_defs.index.get(def_id), self.rigs.get(def_id))
+            else {
                 continue;
             };
-            let tree = self.trees.get(def_id).ok_or_else(|| {
-                ThinError::Dump(format!(
-                    "the dump poses pieces of unit definition {def_id} and has no piece tree for it"
-                ))
-            })?;
-            let mut names = Vec::with_capacity(pieces.len());
-            for piece in pieces {
-                names.push(
-                    (*piece as usize)
-                        .checked_sub(1)
-                        .and_then(|i| tree.pieces.get(i))
-                        .cloned()
-                        .ok_or_else(|| {
-                            ThinError::Dump(format!(
-                                "the dump poses piece {piece} of unit definition {def_id}, which has {}",
-                                tree.pieces.len()
-                            ))
-                        })?,
-                );
+            if rig.bakes {
+                unread_rest_rotations.push(self.header.unit_defs[*def_id as usize - 1].clone());
             }
             posed_pieces.push(PosedPieces {
                 unit_def: *unit_def,
-                pieces: names,
+                pieces: pieces
+                    .iter()
+                    .map(|piece| rig.names[*piece as usize - 1].clone())
+                    .collect(),
             });
         }
+        unread_rest_rotations.sort();
         posed_pieces.sort_by_key(|p| p.unit_def);
 
         let h = &self.header;
@@ -824,6 +935,7 @@ impl Interpreter {
             terrain: self.terrain,
             units: self.next_unit,
             projectiles: self.next_projectile,
+            unread_rest_rotations,
         })
     }
 }

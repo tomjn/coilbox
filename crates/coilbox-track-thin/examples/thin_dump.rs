@@ -94,5 +94,12 @@ fn main() -> ExitCode {
             None => println!("  {label:16} no samples"),
         }
     }
+    if !report.unread_rest_rotations.is_empty() {
+        println!(
+            "pose angles hold a rest rotation the dump does not have, for {} unit definitions: {}",
+            report.unread_rest_rotations.len(),
+            report.unread_rest_rotations.join(", ")
+        );
+    }
     ExitCode::SUCCESS
 }
