@@ -1,6 +1,6 @@
 # Rewind player
 
-The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features and terrain at any time. It does not yet place projectiles, pose aiming pieces or animate units (issues #3795 to #3797). The control on screen is a widget, the timeline (issue #3798). What a game switches off or hides during playback is its adapter (issue #3799).
+The rewind player plays a replay track back inside the engine, with time going in either direction. This folder holds the Lua that reads a track (issue #3792) and the gadget that makes the world match it (issue #3794): units, features, terrain and the shots in the air (issue #3795) at any time. It does not yet pose aiming pieces or animate units (issues #3796 and #3797). The control on screen is a widget, the timeline (issue #3798). What a game switches off or hides during playback is its adapter (issue #3799).
 
 A track is the file `crates/coilbox-track` writes, in the format `docs/reference/replay-track-format.md` describes. The format was designed so that the engine's Lua can read the file as it is, so there is no export step and no second copy on disk.
 
@@ -16,7 +16,7 @@ The player holds a time `t`, a frame of the track that can be a fraction. On eve
 | `luarules/gadgets/!coilbox_rewind_guard.lua` | stops the base game killing a team or ending the match |
 | `luarules/rewind_player/coilbox_player.lua` | the player: the clock, the list of stages, the published state |
 | `luarules/rewind_player/coilbox_player_clock.lua` | the time and the messages that change it. It touches nothing in the engine |
-| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua` | the three stages |
+| `luarules/rewind_player/coilbox_player_terrain.lua`, `coilbox_player_features.lua`, `coilbox_player_units.lua`, `coilbox_player_projectiles.lua` | the four stages |
 | `luarules/rewind_player/coilbox_player_rotation.lua` | a track's rotation as the pitch, yaw and roll the engine takes |
 | `luarules/rewind_player/coilbox_player_adapter.lua` | reads the game's adapter, and guards its hooks |
 | `luaui/widgets/coilbox_rewind_timeline.lua` | the timeline widget: the engine's call-ins for drawing, keys and the pointer |
@@ -80,7 +80,7 @@ Every row of the replay page's key table (`src/content/replayMapView/timelineKey
 
 A message that is refused changes nothing and logs one line, `COILBOX_REWIND_PLAYER the message "..." was refused:` and the reason. A speed off the list, a frame that is not a number and a command the player does not know are refused. Playing into either end pauses there.
 
-A unit that dies while playing forward at 0.5x, 1x or 2x dies with the game's own death effect. A unit that goes for any other reason, a seek, a step, playing backward or playing at 4x and over, is removed with nothing shown.
+A unit that dies while playing forward at 0.5x, 1x or 2x dies with the game's own death effect. A unit that goes for any other reason, a seek, a step, playing backward or playing at 4x and over, is removed with nothing shown. A shot is the same: it lands with the game's impact effect and makes its weapon's sound at those three speeds going forward, and otherwise comes and goes with nothing shown. [Projectiles](#projectiles) has the detail.
 
 ### Mod options
 
@@ -168,7 +168,7 @@ stage:remove(t, clock)  -- take away what is not in the track at t
 stage:place(t, clock)   -- create what is missing and put everything in place
 ```
 
-`clock.jumped` says the frame was reached by a seek or a step and not by play, and `clock.direction` and `clock.speed` say how it is playing. A stage is made with the context, a table that has the track, its `info` and `features`, the engine's `Spring`, `Game`, `CMD` and definition tables, `teamOf(team)` and `report(key, text)`. Take the engine from the context and not from a global, so that the tests can hand the stage a stand-in.
+`clock.jumped` says the frame was reached by a seek or a step and not by play, and `clock.direction` and `clock.speed` say how it is playing. `clock:watched()` is true for a frame of play forward at 0.5x, 1x or 2x, which is when a death, an impact and a sound are shown. A stage is made with the context, a table that has the track, its `info` and `features`, the engine's `Spring`, `Game`, `CMD` and definition tables, `teamOf(team)` and `report(key, text)`. Take the engine from the context and not from a global, so that the tests can hand the stage a stand-in.
 
 Three rules a stage has to keep:
 
@@ -176,9 +176,76 @@ Three rules a stage has to keep:
 - Look a definition up by name, once, when the stage is made. `report` a name the game does not have and skip what uses it. `report(key, text)` logs a line the first time it is given a key.
 - Let the engine choose ids, and map the track's serial numbers to them. A destroyed unit's id cannot be asked for again at once.
 
-The units stage has, by serial number, `unitOf[serial]` for the engine's unit id and `indexOf[serial]` for the unit's place in the current window's lists. `player.units` is the stage.
+The units stage has, by serial number, `unitOf[serial]` for the engine's unit id and `indexOf[serial]` for the unit's place in the current window's lists. `player.units` is the stage. The projectiles stage has `idOf[serial]` for the engine's projectile id of a shot it is holding, and is `player.projectiles`.
 
 Weapons never fire, because the units stage calls `Spring.SetUnitUseWeapons(unitID, false, false)` on every unit it creates. That also stops a weapon aiming. A stage that wants the engine to aim a unit has to give that back.
+
+### Projectiles
+
+No weapon fires in playback, so the projectiles stage creates each shot of the track with `Spring.SpawnProjectile` and decides where it is on every frame. A piece of debris, which the track stores with no weapon, is left to the engine, which makes its own when a unit dies with its death effect.
+
+What the stage does follows from how the engine treats a projectile, read in `rts/Sim/Projectiles` and `rts/Lua/LuaSyncedCtrl.cpp`:
+
+- `Spring.SetProjectileMoveControl` only stops the engine moving a projectile. On every frame `CProjectileHandler::CheckCollisions` still looks for a unit or a feature from where the projectile is to where its speed would take it, and takes a projectile under the ground to have hit it. The look comes before the move. So the last frame a track has a shot on is the frame the engine found its hit on, and the place and speed recorded there are all it takes to find the hit again.
+- Every kind of projectile counts its time to live down under move control. A shell bursts when it reaches nothing left, a bolt stops or fades, and a missile only bursts if its weapon has `selfExplode`.
+- A beam or a bolt of lightning (`BeamLaser`, `LightningCannon`) never moves and is never looked at for a hit. Its weapon does the damage when it fires, and the projectile is what is drawn. The track has where it starts and, as its velocity, the way to where it ends.
+
+#### Held
+
+A shot the track has in the air at `t` is a projectile under move control. On every frame it is put where the track has it and given a speed of one position step (an eighth of an elmo) along the recorded velocity. That keeps its direction, which is all the engine draws a held projectile from, and reaches nothing. It is created at the recorded speed, because a laser bolt keeps the speed it was created with as its length. Its time to live is 16,777,216 frames, the largest whole number the engine's Lua numbers count to, which is six days.
+
+Three places are not the track's, each because the engine would otherwise land the shot during a seek or a pause:
+
+- A shot under the ground is held one position step above it, or above the water for a weapon that is not a water weapon.
+- A shot on its last frame is held the track's tolerance (half an elmo) short of where the track has it, along its flight. The playback's units can be that far from the match's.
+- A laser bolt stops on the frame it hits and stays there while it fades, which the track has as a velocity of nothing. From the frame before it stops it is held one frame of its flight short of there. A bolt first created in the frames it fades in is pointed by the last frame the track has it moving on.
+
+A shot is held at any speed and in either direction, paused included, so it is the same projectile from its first frame to its last.
+
+#### Let go
+
+Played forward at 0.5x, 1x or 2x, a shot is let go on the frame its flight ends: its last frame, or for a bolt the last whole frame before it stops. It is put where the track has it on that frame, at the speed the track has. The engine's own look then finds what the match's did and makes the game's impact effect and its sound.
+
+No frames of free flight are needed, so none are given. Measured on the whole match below, with 195 rockets and 83 laser bolts: at 1x and at 0.5x all 278 landed, a mean of 0.09 elmo from the last frame of flight the track has for them. At 2x 277 landed. The one that did not was let go on the frame before its last, because play at 2x passed over the last, and the unit it hit was a frame short of where it was hit.
+
+What letting go means depends on the kind and on the engine:
+
+| Kind | Let go |
+| --- | --- |
+| `Cannon`, `AircraftBomb`, `LaserCannon`, `EmgCannon`, and a `MissileLauncher` with `selfExplode` | Move control off and one frame to live, with `Spring.SetProjectileTimeToLive`. The engine has it from there. A shell that hits nothing bursts one frame's flight on, and a bolt goes on to stop and fade as it did in the match |
+| `MissileLauncher`, `StarburstLauncher`, `TorpedoLauncher`, `Flame`, `DGun` | It stays under move control for the engine's one look, and is deleted on the next frame if it hit nothing |
+| Any kind on an engine before `2025.03.9`, which has no `Spring.SetProjectileTimeToLive` | As the row above. `Projectiles:release` is the one place the call is used |
+
+Only a rocket and a laser bolt have been let go in a real engine. The other kinds are read from the engine source and run on the stand-in.
+
+#### Fired once
+
+A beam cannot be steered, so it is fired once as play passes its first frame going forward, from where the track has it to where its velocity says it ends, for the frames the track has it divided by the speed of play. The engine fades it. At 4x and over only the beams born on the last frame of each step are fired, which is as many a frame as the match had. A seek and play backward fire none, so a beam is not among what is in the air when paused. The whole match below has no beam, so this has only run on the stand-in.
+
+A shot whose whole flight is inside one step of play at 2x is created and let go at once.
+
+#### No damage
+
+Every projectile is created and then given `Spring.SetProjectileDamages` with nothing for every armour type, `craterMult`, `craterBoost`, `impulseFactor` and `impulseBoost`. That changes the projectile's own copy of its damages and nothing of the weapon. So the engine works out no damage, no crater and no push for it, and nothing rests on the gadget's `UnitPreDamaged`, which another gadget after it could overrule.
+
+Two things follow from it:
+
+- An impact effect is given the damage as a number it can scale by (the `d` of an explosion generator), and that number is now nothing. Splinter Faction's two weapons below look as they do in a match.
+- The engine kills a unit that has no health left the next time anything hits it, for no damage too. So the units stage keeps a unit the track has alive one step of health, a 65,535th of its maximum, above none.
+
+A weapon's `fireStarter` is not on the projectile, so a shot that lands on a burnable feature can still set it on fire. The features stage makes a feature the fire destroys again.
+
+#### Sound
+
+A shot born while play is watched plays its weapon's fire sound where it was born, with `Spring.PlaySoundFile` on the battle channel at the weapon's volume. A unit's shots of one weapon on one frame make one sound. A weapon with `soundTrigger` makes one for a burst: no second sound within `(salvoSize - 1) * salvoDelay` frames of the first, or within `beamtime` for a beam. A weapon with several sounds plays them in turn. A shot carried into a window from the one before is not a birth there, so a shot born on the last frame or two before a window's end, 900 frames apart, makes no sound.
+
+Nobody has heard it. The headless engine has no sound and the runs with a window had it off.
+
+#### What is not there
+
+- A weapon the game does not have, or one of a kind that makes no projectile, is logged once by name and its shots are left out.
+- The engine can still end a held shot, when the playback's world is not the match's. The stage notices, because a projectile it holds has a time to live nothing else has, logs the first, and does not make the shot again until a seek, a turn or the next window. The engine tells Lua of a projectile's death only for weapons a gadget has asked to watch, a list the base game's gadgets change, so the stage asks and does not listen. In the whole match below the engine ended none.
+- A shot the engine has been handed, or has ended, is not in the air for the rest of its frames. Pause while a bolt fades and it finishes fading.
 
 ### The slow frame line
 
@@ -188,7 +255,11 @@ The unsynced half of the gadget times each frame's work and logs when it took lo
 COILBOX_REWIND_PLAYER slow frame: the work of frame 4521 took 41.0 ms, and a simulation frame lasts 33.3 ms. 3 slow since the last line, the slowest 52.0 ms
 ```
 
-After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and the unsynced half reads `Spring.GetTimer`, which gave whole milliseconds in these runs. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time. No larger track has been timed.
+After a line, slow frames are counted and not logged for 30 frames. Synced Lua has no clock, so the synced half calls `SendToUnsynced("coilbox_rewind_work", 0, frame)` before the work and with a 1 after it, and the unsynced half reads `Spring.GetTimer`, which gave whole milliseconds in these runs. Measured in four runs of the real engine run below, on a track of 5 units and 30 features, 460 frames each: a mean between 0.087 and 0.117 ms, and a slowest frame between 3 and 13 ms, which was the first frame every time.
+
+A whole match of 23,091 frames with up to 54 units, in the run [In a real engine](#in-a-real-engine) describes, over 2,236 frames of work: a mean of 0.305 ms and a slowest frame of 27 ms without the projectiles stage, and 0.321 ms and 26 ms with it. The slowest is a seek that creates the match's units. The shots plan, 13,929 frames of mostly play through the fight, had a mean of 0.220 ms and a slowest frame of 26 ms. None of those runs logged a slow frame. Two earlier runs of the shots plan logged one each, of 36 ms on a seek and of 59 ms in the middle of play, on a frame where the log shows nothing else happening. The timer reads the wall clock, so another process taking the processor shows up as a slow frame, and whether that is what those two were is not known.
+
+In an engine with a window the first seek from the start of that match to its last minutes took 39 and 41 ms in two runs, and logged the line. Timed stage by stage in the second: 33.3 ms for the units, 6.2 for the terrain, 1.5 for the projectiles and 0.1 for the features. The same seek later in the run took 20.3 ms for the units. Issue #3988 is about it.
 
 ### What the base game does
 
@@ -201,6 +272,8 @@ A game's adapter ([Game adapters](#game-adapters)) is where a game says what to 
 - The engine asks before it leaves a wreck, and is refused, because the track has every wreck of the match.
 - Nothing takes damage: `UnitPreDamaged` gives every hit no damage and no push. Health that changes anyway is set again on the next frame. That includes health that rises with no damage to hear of: the engine heals an idle unit, and a game can have a gadget that does, as Splinter Faction's `unit_auto_health_regeneration.lua` does for its commanders. The units stage asks the engine for each unit's health on every frame, so a wounded unit on a paused frame stays wounded.
 - A nanoframe nobody is building decays, and the engine kills it when its progress or health reaches zero. A unit under construction has both set on every frame, and held above one step of that decay.
+- A unit with no health left is killed by the next hit, and the track can have a living unit at none. A finished unit keeps one step of health.
+- A unit that dies with its death effect explodes, and that explosion damages features. `UnitPreDamaged` covers units only. A feature it destroys is made again on the next frame (issue #3987).
 
 A track's team is the same number in the game, because the start script carries the replay's teams. A team the game does not have as a team of its own is Gaia, read from `Spring.GetGaiaTeamID()`.
 
@@ -339,6 +412,7 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 | A menu that gives units and resources to another team | `gui_static_sharemenu.lua` | the widget is switched off, and the menu's Sharing button then does nothing |
 | A strip of buttons for the selection drew under the timeline | `gui_static_selected_units_buttons.lua`, which sits at the bottom centre of the view | the widget is switched off |
 | A wounded unit healed while the time stood still | the engine's idle healing and `unit_auto_health_regeneration.lua` | nothing. The player puts health back, for every game |
+| A feature of the track was destroyed a moment early | the death explosion of a unit that died while the match was watched | nothing yet. The player makes it again on the next frame (issue #3987) |
 
 With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter's `started` hook gives each team what that gadget gave it: the `startmetal` and `startenergy` of the team or of the mod options, and 1000 of each when neither says.
 
@@ -365,6 +439,19 @@ What the kept panels show is not all the recording's. A track holds no team reso
 | 12,000 | research points | 86 | 0 |
 
 Storage and income are right, because the same buildings make them. What is held, what is spent, the supply used and the research points are not. Issue #3982 is about recording them. Three more things on screen are the playback's and not the match's: a commander's name tag reads `CoilboxPlayback`, the one spectator who leads every team, where the match had the player's name. The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback.
+
+The game's gadgets hear of the player's shots as they would of a match's. In the whole match, whose two weapons are a rocket (`fedstorm_rocket`, a `MissileLauncher`) and a laser bolt (`fedcommander_up2_particlebeamcannon_up2`, a `LaserCannon`), none raised and none changed what the track has:
+
+- `gfx_explosion_lights.lua` lights an explosion and, for a cannon or a laser, the place a projectile is created. Both stay, being the game's own look. A bolt that the player creates after a seek is created where the track has it, in the air, so the light for a barrel flashes there. A held bolt carries the game's light for as long as it is held, which paused is a red glow that stays.
+- `lups_projectiles.lua` draws on projectiles of the weapons it lists. It ran with no error.
+
+Splinter Faction has more gadgets that act on a shot: `weapon_cluster_missiles.lua` and `game_airburst_weapons.lua` create projectiles of their own, `unit_turretLauncher.lua` creates a unit where a shot lands, `game_heat_weapons.lua` can destroy a unit, and `unit_area_timed_damage.lua` leaves an area that damages. The match fires none of their weapons, so what they do to a playback has been read and not seen, and the adapter switches none of them off (issue #3989).
+
+![The fight of the whole match, paused](screenshots/shots-paused.jpg)
+
+Paused, four rockets hang where the track has them, each with the game's own flame. Below, the same fight playing forward at 0.5x: the rockets have their trails, and one has just landed on the commander with the game's impact effect.
+
+![The same fight playing forward at 0.5x](screenshots/shots-watched.jpg)
 
 A commander shows the right stage after a seek with nothing done for it. Each stage is a unit definition of its own, `fedcommander_up1` and `fedcommander_up2` in the match that was played, with a script of its own that hides the pieces the stage does not have when the unit is created. A morph destroys one unit and creates another, so the track has two units with two definitions, and the player creates each by its definition.
 
@@ -472,7 +559,11 @@ Sampling writes into a table the caller owns and allocates nothing. The table ne
 | `window:sampleTarget(track, frame, out)` | 1: kind. 2: reference. 3: build power. 4 to 6: place in elmos, for kinds 128 and 129 |
 | `window:samplePose(track, frame, out)` | 1 to 3: turn about x, y, z in 65,536ths of a turn. 4 to 6: offset in elmos |
 | `window:sampleProjectile(p, frame, out)` | 1 to 3: place in elmos. 4 to 6: velocity in elmos a frame |
+| `window:projectileRange(frame)` | gives the positions `from, to` between which every projectile that exists at `frame` lies. Ask `projectileExistsAt` for each |
+| `window:projectilesBorn(after, frame)` | gives the positions `from, to` of the projectiles whose first frame is after `after` and no later than `frame` |
 | `window:sampleQueue(i, frame)` | gives the position of the first item and the number of items. The items are `queueItemDef`, `queueItemX`, `queueItemZ` (elmos) and `queueItemFacing` |
+
+The two range calls search the first frames and walk nothing, so a frame of play looks at the shots in the air and not at the window's whole list. That needs the entries in the order they were born in. Coilbox's writer keeps that order and the format does not promise it, so a window says whether it holds in `projectileOrdered`, and when it does not both calls give the whole list. `projectileLongest` is the longest any projectile lasts in the window, which is how far back a projectile alive now can have been born. A projectile with bit 0 of its flags set was born in an earlier window, whatever its first frame here.
 
 The sample calls give false when a curve has no key, which a good track never has. Call them for a unit only at a frame it exists.
 
@@ -508,6 +599,7 @@ luajit lua/rewind-player/tests/fetch_test.lua
 luajit lua/rewind-player/tests/clock_test.lua
 luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
+luajit lua/rewind-player/tests/projectiles_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/timeline_test.lua
@@ -521,13 +613,14 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `clock_test.lua` checks the clock and every message.
 - `rotation_test.lua` checks the pitch, yaw and roll against the engine's own matrix arithmetic, in doubles and with every result rounded to a float.
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, and that a frame of play allocates nothing.
+- `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
 - `gadget_test.lua` loads the two gadgets the way the engine does.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `timeline_test.lua` checks the timeline on a stand-in for `Spring` and `gl`: the message for every key, that a key with Ctrl, Alt or Meta is left alone, the frame a drag seeks to at both ends and between, the time and speed shown, that everything drawn is inside views from 640 by 480 to 3840 by 2160, moving the panel, changing a key, marks, and that 300 draws allocate nothing. It also loads the widget file the way a handler does.
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 
-`tests/engine.lua` is the stand-in for the player: units, features, the heightmap, teams and game rules parameters, each call written from the engine source it names.
+`tests/engine.lua` is the stand-in for the player: units, features, projectiles, the heightmap, teams and game rules parameters, each call written from the engine source it names. `world.simulate()` is the engine's own frame for projectiles: it looks for a hit along a projectile's speed and under the ground, whether or not the projectile is under move control, and then counts its time to live down.
 
 The tests cannot show that the player works in the engine. They show the logic, the reading and the addressing.
 
@@ -565,9 +658,20 @@ It was run on a match of 23,091 frames on All That Glitters v2.2.3, with up to 5
 - No Lua raised once the match was running, apart from `cus_gl4.lua`, the game's unit shader gadget. It calls `gl.SetUnitBufferUniforms` for every unit created, which a headless engine does not have, so it raised 664 times in a run. In an engine with a window it did not raise once.
 - With the player as it was before this test, the wounded unit, at 8.5% of its health, was 4.3% of its maximum higher after the 450 frames.
 
+A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same replay and runs the driver's shots plan on it with the shipped adapter (issue #3795). On the match above, whose shots are 195 rockets and 83 laser bolts fired between frames 20,256 and 23,048:
+
+- Paused on frame 22,819, the frame with the most in the air, the engine has the track's 7 shots, and still has them after 150 frames. At 20 seeks to frames with shots in the air it has as many as the track each time. Every shot is where the track has it, to four decimal places of an elmo, or held short as [Held](#held) says, and points the way the track has it going.
+- Nothing lands while paused or during the seeks.
+- Played backward from the frame it landed on, a rocket is nearer where it was fired on each of 58 frames in a row.
+- Played forward through the fight, all 278 shots land at 1x and at 0.5x, a mean of 0.09 elmo from the last frame of flight the track has for them, and 277 at 2x. At 4x and played backward none lands.
+- No shot did damage to a unit or a feature, by the engine's own sum before any gadget was asked, and none left a crater. After each pass every unit has the track's health.
+- The engine ended no shot the player was holding, no slow frame was logged, no team died and no Lua raised.
+
+The first runs of the plan did not show that, and what they showed is why a shot is held short of where it ends, why a unit keeps a step of health and why a bolt lands on a whole frame.
+
 What it cannot show: anything on screen. A headless engine draws nothing, so how a unit, a death or the changed ground looks cannot be seen in any of the above.
 
-The playback has been looked at in an engine with a window, on 13 October 2026, with a scratch widget seeking, moving the camera and taking the engine's own screenshots: the whole match above on Splinter Faction 0.1.89 with and without the adapter, the real replay of it at the same frames and from the same places, and the script's fixture match. Units draw as their models with their textures, team colours and shadows, and as the game's icons from far away. [Splinter Faction](#splinter-faction) has what the panels show and a picture of the commander.
+The playback has been looked at in an engine with a window, on 13 October 2026, with a scratch widget seeking, moving the camera and taking the engine's own screenshots: the whole match above on Splinter Faction 0.1.89 with and without the adapter, the real replay of it at the same frames and from the same places, and the script's fixture match. The fight was looked at the same way for the projectiles stage, on the game the replay was played on: paused, at 0.5x forward and at 1x backward. [Splinter Faction](#splinter-faction) has two of those pictures. Units draw as their models with their textures, team colours and shadows, and as the game's icons from far away. [Splinter Faction](#splinter-faction) has what the panels show and a picture of the commander.
 
 ![The fixture match from far away, with the engine's default icon atlas and with Splinter Faction's](screenshots/adapter-icons.jpg)
 

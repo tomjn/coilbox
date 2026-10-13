@@ -31,6 +31,56 @@ function Window:sampleStatus(i, frame, out)
 	return true
 end
 
+function Window:projectileExistsAt(p, frame)
+	self.track.projectileLooks = self.track.projectileLooks + 1
+	return frame >= self.projectileFirstFrame[p] and frame <= self.projectileLastFrame[p]
+end
+
+--- A projectile's `at(frame)` gives its place and its velocity.
+function Window:sampleProjectile(p, frame, out)
+	self.track.projectileLooks = self.track.projectileLooks + 1
+	out[1], out[2], out[3], out[4], out[5], out[6] = self.projectileSource[p].at(frame)
+	return true
+end
+
+--- As the reader's: the positions between which every projectile alive at
+-- `frame` lies, from the first frames alone.
+function Window:projectileRange(frame)
+	local n = self.projectileCount
+	if not self.projectileOrdered then
+		return 1, n
+	end
+	local firsts = self.projectileFirstFrame
+	local from, to = n + 1, 0
+	for p = 1, n do
+		if firsts[p] >= frame - self.projectileLongest and from > n then
+			from = p
+		end
+		if firsts[p] <= frame then
+			to = p
+		end
+	end
+	return from, to
+end
+
+function Window:projectilesBorn(after, frame)
+	local n = self.projectileCount
+	if not self.projectileOrdered then
+		return 1, n
+	end
+	local firsts = self.projectileFirstFrame
+	local from, to = n + 1, 0
+	for p = 1, n do
+		if firsts[p] > after and from > n then
+			from = p
+		end
+		if firsts[p] <= frame then
+			to = p
+		end
+	end
+	return from, to
+end
+
 local Track = {}
 Track.__index = Track
 
@@ -74,6 +124,34 @@ function Track:loadWindow(k)
 		end
 	end
 	w.unitCount = n
+	-- Projectiles, in the order the track was given them, which a test that
+	-- wants a window out of order of birth uses.
+	w.track = self
+	w.projectileSource, w.projectileSerial, w.projectileWeapon, w.projectileTeam = {}, {}, {}, {}
+	w.projectileFlags, w.projectileShooter, w.projectileFirstFrame, w.projectileLastFrame = {}, {}, {}, {}
+	w.projectileOrdered, w.projectileLongest = true, 0
+	local m = 0
+	for _, shot in ipairs(self.projectiles) do
+		if shot.first <= finish and shot.last >= start then
+			m = m + 1
+			local first, last = math.max(shot.first, start), math.min(shot.last, finish)
+			w.projectileSource[m] = shot
+			w.projectileSerial[m], w.projectileWeapon[m], w.projectileTeam[m] = shot.serial, shot.weapon, shot.team
+			w.projectileFlags[m] = (shot.first < start and 1 or 0) + (shot.last > finish and 2 or 0)
+			w.projectileFirstFrame[m], w.projectileLastFrame[m] = first, last
+			w.projectileShooter[m] = 0
+			for i = 1, n do
+				if shot.shooter and w.source[i] == self.units[shot.shooter] then
+					w.projectileShooter[m] = i
+				end
+			end
+			if m > 1 and first < w.projectileFirstFrame[m - 1] then
+				w.projectileOrdered = false
+			end
+			w.projectileLongest = math.max(w.projectileLongest, last - first)
+		end
+	end
+	w.projectileCount = m
 	self.window = w
 	self.loads = self.loads + 1
 	return w
@@ -128,9 +206,29 @@ local function unit(spec, serial)
 	}
 end
 
---- `spec` has `first`, `last` and `windowLength`, the names `unitDefs` and
--- `featureDefs`, `teams` as a list of team ids, and `units`, `features` and
--- `terrain` rows of `{ frame, x, z, before, after }`.
+--- A projectile of weapon definition 0 and team 0 that hangs at `0, 100, 0`
+-- going nowhere. `weapon = false` is one with no weapon definition, a piece of
+-- debris. `shooter` is the position of the unit that fired it in `spec.units`.
+local function projectile(spec, serial)
+	local place = spec.at or { 0, 100, 0, 0, 0, 0 }
+	return {
+		serial = spec.serial or serial,
+		weapon = spec.weapon == false and 65535 or spec.weapon or 0,
+		team = spec.team or 0,
+		shooter = spec.shooter,
+		first = spec.first,
+		last = spec.last,
+		at = type(place) == "function" and place or function()
+			return place[1], place[2], place[3], place[4], place[5], place[6]
+		end,
+	}
+end
+
+--- `spec` has `first`, `last` and `windowLength`, the names `unitDefs`,
+-- `weaponDefs` and `featureDefs`, `teams` as a list of team ids, and `units`,
+-- `projectiles`, `features` and `terrain` rows of
+-- `{ frame, x, z, before, after }`. `tolerance` and `positionStep` are the
+-- header's, 0.5 and 0.125 without them.
 function M.new(spec)
 	local first, last, length = spec.first or 0, spec.last, spec.windowLength or 900
 	local teams = {}
@@ -140,6 +238,10 @@ function M.new(spec)
 	local units = {}
 	for i, one in ipairs(spec.units or {}) do
 		units[i] = unit(one, i - 1)
+	end
+	local projectiles = {}
+	for i, one in ipairs(spec.projectiles or {}) do
+		projectiles[i] = projectile(one, i - 1)
 	end
 	local features = {}
 	for i, one in ipairs(spec.features or {}) do
@@ -161,6 +263,8 @@ function M.new(spec)
 			windowLength = length,
 			windowCount = math.max(1, math.ceil((last - first) / length)),
 			framesPerSecond = 30,
+			tolerance = spec.tolerance or 0.5,
+			positionStep = spec.positionStep or 0.125,
 		},
 		infoTable = {
 			engineVersion = "fake",
@@ -173,6 +277,9 @@ function M.new(spec)
 			teams = teams,
 		},
 		units = units,
+		projectiles = projectiles,
+		-- How often a window was asked whether a projectile exists or where it is.
+		projectileLooks = 0,
 		featureList = features,
 		terrainRows = spec.terrain or {},
 		broken = spec.broken or {},

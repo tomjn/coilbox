@@ -34,11 +34,6 @@ local M = {}
 local Units = {}
 Units.__index = Units
 
---- The fastest play at which a unit that dies is destroyed with the game's
--- death effect. "Near normal speed" is taken as 0.5, 1 and 2, the three speeds
--- the timeline has around the match's own.
-local LOUD_SPEED = 2
-
 --- The steps health and build progress are stored in (the format page's status
 -- keys). One more than the decay is the least the stage can add to it.
 local STEPS = 65535
@@ -226,7 +221,8 @@ function Units:remove(t, clock)
 		index(self, w)
 	end
 
-	local loud = not clock.jumped and clock.direction == 1 and clock.speed <= LOUD_SPEED
+	-- A unit that dies while somebody watches dies with the game's death effect.
+	local loud = clock:watched()
 	local indexOf = self.indexOf
 	for serial, unitID in next, self.unitOf do
 		local i = indexOf[serial]
@@ -319,6 +315,13 @@ function Units:applyStatus(w, i, serial, unitID, t)
 			self.nanoframe[serial] = true
 		end
 		return unitID
+	end
+
+	-- The engine kills a unit with no health left the next time anything hits
+	-- it, for no damage too (CUnit::DoDamage), and a shot of the track that
+	-- lands hits it. A unit the track has alive keeps one step of health.
+	if health < 1 / STEPS then
+		health = 1 / STEPS
 	end
 
 	if self.nanoframe[serial] then

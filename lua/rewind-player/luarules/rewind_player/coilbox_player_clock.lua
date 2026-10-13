@@ -22,6 +22,12 @@ M.PREFIX = "coilbox_rewind:"
 --- The speeds the timeline offers, as multiples of the match's own.
 M.SPEEDS = { 0.5, 1, 2, 4, 8, 16, 32 }
 
+--- The fastest play that counts as watching the match at near its own speed:
+-- 0.5, 1 and 2, the three speeds the timeline has around it. What is only
+-- worth showing to somebody watching is kept to those: a unit dying with the
+-- game's death effect, a shot landing with its impact effect and its sound.
+M.NEAR_SPEED = 2
+
 local SPEED_LIST = table.concat(M.SPEEDS, ", ")
 
 local Clock = {}
@@ -66,6 +72,12 @@ function Clock:advance()
 		self.playing = false
 	end
 	self.frame = frame
+end
+
+--- Whether the frame the last `advance` left is one of play forward at near
+-- the match's own speed, and not one a jump reached.
+function Clock:watched()
+	return not self.jumped and self.direction == 1 and self.speed <= M.NEAR_SPEED
 end
 
 --- Jumps to `frame`, held inside the track.

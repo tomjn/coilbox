@@ -2326,6 +2326,12 @@ end
     /// Launches the prepared playback with the driver in it, asked for its
     /// whole match plan, and gives the engine's log.
     fn whole_match(prepared: &Prepared) -> String {
+        driven(prepared, "driver_whole_match.lua")
+    }
+
+    /// Launches the prepared playback with the driver in it and the file that
+    /// asks it for one of its plans, and gives the engine's log.
+    fn driven(prepared: &Prepared, plan: &str) -> String {
         std::fs::write(
             prepared
                 .game_dir
@@ -2334,9 +2340,7 @@ end
         )
         .unwrap();
         std::fs::write(
-            prepared
-                .game_dir
-                .join("coilbox_rewind/driver_whole_match.lua"),
+            prepared.game_dir.join("coilbox_rewind").join(plan),
             "return true\n",
         )
         .unwrap();
@@ -2528,6 +2532,136 @@ end
         assert_eq!(field(teams, "game_over"), "0", "{teams}");
 
         let errors = lua_errors(&adapted);
+        assert!(errors.is_empty(), "{errors:#?}");
+    }
+
+    /// The projectiles stage against a real engine and a whole recorded match
+    /// (issue #3795). The driver's shots plan pauses on the frame of the match
+    /// with the most shots in the air and holds it for five seconds, seeks to
+    /// twenty frames that have shots, follows one shot backward frame by
+    /// frame, plays the whole fight forward at 1x, 0.5x, 2x and 4x and
+    /// backward at 1x, and seeks across the whole match and back.
+    ///
+    /// - Paused, held and at every seek the engine has as many of the track's
+    ///   shots in the air as the track, each where the track has it and
+    ///   pointing the way the track has it going.
+    /// - Nothing lands while paused, during a seek, at 4x or backward.
+    /// - Backward, the shot is nearer where it was fired on every frame.
+    /// - Forward at 1x and 0.5x every shot that ends lands once. At 2x a shot
+    ///   let go a frame before its last is a frame ahead of a unit it hit, so
+    ///   some miss, and the line says how many.
+    /// - No shot does damage, to a unit or a feature, by the engine's own sum
+    ///   before any gadget is asked. None leaves a crater. After each pass
+    ///   every unit has the track's health.
+    /// - The engine ended no shot the player was holding, no frame's work took
+    ///   longer than a simulation frame, and no Lua raised.
+    ///
+    /// Give it a replay of a whole match with a fight in it in
+    /// `COILBOX_ANALYSIS_REPLAY`, with the variables the tests above read.
+    #[test]
+    #[ignore = "needs an engine, Splinter Faction, a map and a replay of a whole match on them"]
+    fn the_shots_of_a_whole_match_follow_the_track() {
+        let Some(prepared) = prepared(false) else {
+            return;
+        };
+        prepared.rewrite(REWIND_PLAYER_ADAPTERS);
+        let output = driven(&prepared, "driver_shots.lua");
+        for l in lines_with(&output, &["REWIND_DRIVER ", "COILBOX_REWIND_PLAYER"]) {
+            eprintln!("{l}");
+        }
+        let driver = driver_lines(&output);
+        let line = |start: &str| {
+            *driver
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no driver line starting {start}"))
+        };
+        let start = line("start ");
+        let (tolerance, step) = (number(start, "tolerance"), number(start, "step"));
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+        assert!(
+            number(line("shots "), "held_kinds") > 0.0,
+            "the match has no shot of a weapon the game has"
+        );
+        assert!(
+            number(line("fight "), "most") > 1.0,
+            "the match has no fight"
+        );
+
+        // In the air: as many as the track has, where it has them.
+        let in_the_air = |l: &str| {
+            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            assert_eq!(field(l, "engine_shots"), field(l, "track_shots"), "{l}");
+            assert!(number(l, "place") <= tolerance, "{l}");
+            // A float's rounding of a place some thousands of elmos out.
+            assert!(number(l, "over") <= 0.01, "{l}");
+            assert!(number(l, "turn") <= 1e-4, "{l}");
+            assert!(number(l, "speed") <= step + 1e-4, "{l}");
+        };
+        let paused = line("paused ");
+        in_the_air(paused);
+        assert_eq!(field(paused, "track_shots"), field(line("fight "), "most"));
+        in_the_air(line("held "));
+        let seeks: Vec<&str> = driver
+            .iter()
+            .copied()
+            .filter(|l| l.starts_with("shots_seek "))
+            .collect();
+        assert_eq!(seeks.len(), 20, "{driver:?}");
+        seeks.iter().for_each(|l| in_the_air(l));
+        in_the_air(line("shots_after_seeks "));
+        assert_eq!(field(line("impacts paused"), "paused"), "0");
+        assert_eq!(field(line("impacts seeks"), "seeks"), "0");
+
+        // Backward, a shot goes from where it landed to where it was fired.
+        let backward = line("backward ");
+        assert!(number(backward, "frames") > 5.0, "{backward}");
+        assert_eq!(field(backward, "seen"), field(backward, "frames"));
+        assert_eq!(field(backward, "rises"), "0", "{backward}");
+        assert_eq!(
+            number(backward, "falls"),
+            number(backward, "frames") - 1.0,
+            "{backward}"
+        );
+        assert!(number(backward, "place") <= tolerance, "{backward}");
+        assert_eq!(field(backward, "impacts"), "0", "{backward}");
+
+        // Watched, shots land, and nothing they hit is hurt.
+        let fraction = 1.0 / 65535.0;
+        let harmless = |label: &str| {
+            let l = line(&format!("watched {label} "));
+            for key in ["craters", "raw_damage", "done_damage", "feature_damage"] {
+                assert_eq!(field(l, key), "0", "{l}");
+            }
+            assert_eq!(field(l, "in_air_after"), "0", "{l}");
+            let after = line(&format!("after_{label} "));
+            assert_eq!(field(after, "engine_units"), field(after, "track_units"));
+            assert!(number(after, "health_over") <= fraction, "{after}");
+            l
+        };
+        for label in ["forward", "half"] {
+            let l = harmless(label);
+            assert!(number(l, "shots_ended") > 0.0, "{l}");
+            assert_eq!(field(l, "impacts"), field(l, "shots_ended"), "{l}");
+            assert_eq!(field(l, "unmatched"), "0", "{l}");
+            assert!(number(l, "off_mean") <= tolerance, "{l}");
+        }
+        let double = harmless("double");
+        assert!(number(double, "impacts") > 0.0, "{double}");
+        assert!(
+            number(double, "impacts") <= number(double, "shots_ended"),
+            "{double}"
+        );
+        for label in ["fast", "backward"] {
+            assert_eq!(field(harmless(label), "impacts"), "0");
+        }
+
+        assert_eq!(count(&output, "the engine ended a shot"), 0);
+        let slow = lines_with(&output, &["slow frame:"]);
+        assert!(slow.is_empty(), "{slow:#?}");
+        let teams = line("teams ");
+        assert_eq!(field(teams, "dead"), "0", "{teams}");
+        let errors = lua_errors(&output);
         assert!(errors.is_empty(), "{errors:#?}");
     }
 

@@ -16,6 +16,7 @@ local function world()
 	return Engine.new({
 		unitDefs = { { name = "armcom" }, { name = "armpw" }, { name = "armsolar" } },
 		featureDefs = { { name = "rock" } },
+		weaponDefs = { { name = "laser", type = "LaserCannon" }, { name = "missile", type = "MissileLauncher" } },
 	})
 end
 

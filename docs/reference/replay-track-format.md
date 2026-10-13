@@ -380,6 +380,8 @@ One entry for each projectile that exists at any frame of the window.
 | 95, 96, 97 | `s16` | velocity x, y, z, difference with an escape |
 | 98, 99, 100 | `s32` | the wide columns for velocity |
 
+Coilbox's writer puts the entries in order of serial number, which is the order they were born in, so their first offsets never fall. That is not a rule of the format. A reader that searches the entries by first offset has to check the order first, as the Lua reader does.
+
 The engine's projectile id is not stored. The engine's `MAX_PROJECTILES` is 128,000, which does not fit 16 bits, and playback makes its own projectiles. The serial number is what identifies one across windows.
 
 A projectile with no weapon definition is a piece of debris. They are 1,895 of the 20,609 projectiles in the larger benchmark and 349 of 627 in the smaller.
