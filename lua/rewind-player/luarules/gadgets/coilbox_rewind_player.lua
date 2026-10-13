@@ -26,6 +26,14 @@
 -- and not a message, so it costs no frame), and the unsynced half logs a line
 -- when it took longer than one simulation frame lasts.
 --
+-- The same timing sets how much a seek may do in one frame (issue #3988). A
+-- seek can need hundreds of units made or removed, at a cost for each that only
+-- the engine knows. The synced half says how many it made and how many it
+-- removed in the frame, the unsynced half works out how many of each fit in half
+-- a simulation frame and sends that back as a Lua message, and the player does
+-- no more than that in a frame until it hears another. The player starts at one
+-- of each. The message reaches the synced half about two frames later.
+--
 -- The base game's own gadgets still run, except those the game's adapter
 -- switches off (issue #3799). !coilbox_rewind_guard.lua stops the rest killing a
 -- team or ending the match.
@@ -48,6 +56,14 @@ local PREFIX = "COILBOX_REWIND_PLAYER "
 
 --- What the synced half sends the unsynced one around a frame's work.
 local WORK = "coilbox_rewind_work"
+
+--- What the player does in a frame until the unsynced half has timed some work:
+-- the least that makes progress.
+local FIRST_BUDGET = 1
+
+--- The Lua message that sets the player's budget, which is
+-- `Player.BUDGET` in coilbox_player.lua.
+local BUDGET = "coilbox_rewind_budget:"
 
 if gadgetHandler:IsSyncedCode() then
 	local player
@@ -99,6 +115,9 @@ if gadgetHandler:IsSyncedCode() then
 		local made, madeWhy = Player.new(track, {
 			engine = engine,
 			modOptions = Spring.GetModOptions(),
+			-- Without SendToUnsynced nothing times the work, so nothing sets a budget
+			-- and a seek is shown in one frame, as before issue #3988.
+			budget = engine.on.workTiming and FIRST_BUDGET or nil,
 			log = log,
 			adapter = adapter,
 			adapterWhy = adapterWhy,
@@ -135,7 +154,7 @@ if gadgetHandler:IsSyncedCode() then
 		end
 		player:frame()
 		if engine.on.workTiming then
-			SendToUnsynced(WORK, 1, frame)
+			SendToUnsynced(WORK, 1, frame, player:worked())
 		end
 	end
 
@@ -219,26 +238,92 @@ else
 	-- frames, so a run of them does not make itself slower.
 	local QUIET_FRAMES = Game.gameSpeed
 
+	-- Half a frame is what a seek's work aims at. The rest of the frame is the
+	-- engine's own simulation and drawing, and the slow frame line is what says
+	-- whether that left enough.
+	local TARGET = LIMIT and LIMIT / 2
+
+	-- Microseconds where the engine has them, which it does from 2025.01.6. The
+	-- other timer gives whole milliseconds.
+	local micros = engine.on.microTimer
+	local clock = micros and Spring.GetTimerMicros or Spring.GetTimer
+	-- Whether the player has been told there is no budget to wait for.
+	local toldNone = false
+
 	local started
 	local lastLine
 	local slow, worst = 0, 0
+	-- How many units a frame may make and remove, as last sent.
+	local makeBudget, removeBudget = FIRST_BUDGET, FIRST_BUDGET
 
-	function gadget:RecvFromSynced(name, phase, frame)
+	--- The budget after a frame in which `count` units took `took` milliseconds,
+	-- for a budget that was `budget`. Each took that long with the rest of the
+	-- frame's work counted in, which only makes it more, so what fits in `TARGET`
+	-- errs low. A frame that used the whole budget sets it to what fits, at least
+	-- one and at most twice what the frame did. The cost of a few units says
+	-- little about the next many. A frame that used less of the budget leaves it
+	-- alone unless it took longer than `TARGET`, and then cuts it. The last frame
+	-- of a seek has few units and a rest of the frame that is dear beside them,
+	-- and says little.
+	local function fit(took, count, budget)
+		local wanted = math.floor(TARGET / math.max(took / count, 0.001))
+		if count >= budget then
+			return math.max(1, math.min(wanted, 2 * count))
+		elseif took > TARGET then
+			return math.max(1, math.min(wanted, budget))
+		end
+		return budget
+	end
+
+	--- A frame made `made` units and removed `removed` in `took` milliseconds.
+	-- Making costs the engine something other than removing, so only a frame that
+	-- did one of them says what that one costs. A frame that did neither ends a
+	-- seek, and the budgets go back to one. What a unit costs moves with how many
+	-- there are, from 0.28 to 0.5 ms to make and from 0.13 to 0.37 ms to remove
+	-- in a headless run of issue #3988 as the count went from none to 400 and
+	-- from 400 to none, so what one seek ended on is not safe for the start of
+	-- the next. Each starts from one and doubles each frame while the cost
+	-- allows.
+	local function retune(took, made, removed)
+		local make, remove = makeBudget, removeBudget
+		if made + removed == 0 then
+			make, remove = FIRST_BUDGET, FIRST_BUDGET
+		elseif made > 0 and removed == 0 then
+			make = fit(took, made, makeBudget)
+		elseif removed > 0 and made == 0 then
+			remove = fit(took, removed, removeBudget)
+		end
+		if make ~= makeBudget or remove ~= removeBudget then
+			makeBudget, removeBudget = make, remove
+			Spring.SendLuaRulesMsg(BUDGET .. make .. " " .. remove)
+		end
+	end
+
+	function gadget:RecvFromSynced(name, phase, frame, made, removed)
 		if name ~= WORK then
 			return false
 		end
 		if not engine.on.workTimingLine then
+			-- Nothing here can time a frame, so no budget will come. The player is
+			-- told once to stop waiting for one.
+			if not toldNone and engine.on.budgetMessage then
+				toldNone = true
+				Spring.SendLuaRulesMsg(BUDGET .. "none")
+			end
 			return true
 		end
 		if phase == 0 then
-			started = Spring.GetTimer()
+			started = clock()
 			return true
 		end
 		if not started then
 			return true
 		end
-		local took = Spring.DiffTimers(Spring.GetTimer(), started, true)
+		local took = Spring.DiffTimers(clock(), started, true, micros)
 		started = nil
+		if made and removed and engine.on.budgetMessage then
+			retune(took, made, removed)
+		end
 		if took <= LIMIT then
 			return true
 		end
