@@ -73,6 +73,7 @@ import {
 } from "./components/states";
 import { UncheckedEngineNotice } from "./components/UncheckedEngineNotice";
 import { WatchButton } from "./components/WatchButton";
+import { WatchWithRewindButton } from "./components/WatchWithRewindButton";
 import { OriginBadge } from "./ReplaysPage";
 
 const errMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -783,6 +784,18 @@ export default function ReplayDetailPage() {
               />
             )}
             {info && <RefightPanel info={info} filename={filename} />}
+            {info && (
+              <WatchWithRewindButton
+                replayPath={replay.path}
+                info={info}
+                watch={engine.watch}
+                dependencyBlock={dependencyBlock}
+                playbackBlock={playbackBlock}
+                missingGame={missingGame}
+                missingMap={missingMap}
+                game={playbackGame?.name}
+              />
+            )}
             {info && (
               <WatchButton
                 replayPath={replay.path}

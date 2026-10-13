@@ -115,6 +115,9 @@ vi.mock("./components/ReplayAnalysisEvents", () => ({
   ReplayAnalysisEvents: () => <p>analysis events section</p>,
 }));
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
+vi.mock("./components/WatchWithRewindButton", () => ({
+  WatchWithRewindButton: () => null,
+}));
 
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
 const { resetReplayTracksForTests, seedReplayTracksForTests } = await import(

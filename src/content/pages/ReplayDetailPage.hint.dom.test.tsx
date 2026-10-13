@@ -101,6 +101,9 @@ vi.mock("./components/ReplayBuildOrders", () => ({
   ReplayBuildOrders: () => null,
 }));
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
+vi.mock("./components/WatchWithRewindButton", () => ({
+  WatchWithRewindButton: () => null,
+}));
 
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
 
