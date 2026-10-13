@@ -1054,12 +1054,13 @@ pub(super) mod tests {
         let size = store(&analyses, ID, AnalysisStatus::Reproduced);
         let paths = [analysed.clone(), plain.clone()];
 
-        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses), &[]);
+        let preview =
+            super::super::super::delete_replays(&paths, false, Some(&analyses), None, &[]);
         assert_eq!((preview.deleted, preview.analyses), (2, 1));
         assert_eq!(preview.analysis_bytes, size);
         assert!(analysed.is_file() && is_current(&analyses, ID));
 
-        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), &[]);
+        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), None, &[]);
         assert_eq!((applied.deleted, applied.analyses), (2, 1));
         assert_eq!(applied.analysis_bytes, size);
         assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
@@ -1082,6 +1083,7 @@ pub(super) mod tests {
             std::slice::from_ref(&remix),
             true,
             Some(&analyses),
+            None,
             &[],
         );
 
@@ -1101,9 +1103,10 @@ pub(super) mod tests {
         }
         store(&analyses, ID, AnalysisStatus::Reproduced);
 
-        let preview = super::super::super::delete_replays(&paths, false, Some(&analyses), &[]);
+        let preview =
+            super::super::super::delete_replays(&paths, false, Some(&analyses), None, &[]);
         assert_eq!((preview.deleted, preview.analyses), (2, 1));
-        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), &[]);
+        let applied = super::super::super::delete_replays(&paths, true, Some(&analyses), None, &[]);
         assert_eq!((applied.deleted, applied.analyses), (2, 1));
         assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
     }
@@ -1138,19 +1141,19 @@ pub(super) mod tests {
         let delete = super::super::super::delete_replays;
 
         let one = [first.clone()];
-        let preview = delete(&one, false, Some(&analyses), &library_of(&root));
+        let preview = delete(&one, false, Some(&analyses), None, &library_of(&root));
         assert_eq!((preview.deleted, preview.analyses), (1, 0));
-        let applied = delete(&one, true, Some(&analyses), &library_of(&root));
+        let applied = delete(&one, true, Some(&analyses), None, &library_of(&root));
         assert_eq!((applied.deleted, applied.analyses), (1, 0));
         assert!(!first.exists() && second.is_file());
         assert!(is_current(&analyses, ID), "the other copy still uses it");
 
         let two = [second.clone()];
-        let preview = delete(&two, false, Some(&analyses), &library_of(&root));
+        let preview = delete(&two, false, Some(&analyses), None, &library_of(&root));
         assert_eq!((preview.deleted, preview.analyses), (1, 1));
         assert_eq!(preview.analysis_bytes, size);
         assert!(is_current(&analyses, ID));
-        let applied = delete(&two, true, Some(&analyses), &library_of(&root));
+        let applied = delete(&two, true, Some(&analyses), None, &library_of(&root));
         assert_eq!((applied.deleted, applied.analyses), (1, 1));
         assert_eq!(applied.analysis_bytes, size);
         assert_eq!(names(&analyses), Vec::<String>::new());
@@ -1177,6 +1180,7 @@ pub(super) mod tests {
             std::slice::from_ref(&original),
             true,
             Some(&analyses),
+            None,
             &library,
         );
 
@@ -1222,24 +1226,24 @@ pub(super) mod tests {
 
         // A preview forgets nothing.
         let both = [first.clone(), second.clone()];
-        delete(&both, false, Some(&analyses), &library_of(&root));
+        delete(&both, false, Some(&analyses), None, &library_of(&root));
         assert_eq!(counts(), (2, 2));
 
         // One of two copies: the other still reads the list.
         let one = std::slice::from_ref(&first);
-        delete(one, true, Some(&analyses), &library_of(&root));
+        delete(one, true, Some(&analyses), None, &library_of(&root));
         assert_eq!(def_sets::links_for(&sets, ID).unwrap().len(), 2);
 
         // A remix carries the original's id and has no key, so deleting one
         // forgets nothing.
         let remix = super::super::super::rewrite_demo(&second, "Other Game 2.0", None).unwrap();
-        delete(&[remix], true, Some(&analyses), &library_of(&root));
+        delete(&[remix], true, Some(&analyses), None, &library_of(&root));
         assert_eq!(counts(), (2, 2));
 
         // The last copy: its links go, its own list goes, and the list the
         // other match shares stays.
         let last = std::slice::from_ref(&second);
-        let applied = delete(last, true, Some(&analyses), &library_of(&root));
+        let applied = delete(last, true, Some(&analyses), None, &library_of(&root));
         assert!(applied.skipped.is_empty(), "{:?}", applied.skipped);
         assert_eq!(def_sets::links_for(&sets, ID).unwrap(), Vec::new());
         assert_eq!(counts(), (1, 1));

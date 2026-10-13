@@ -25,7 +25,7 @@ import { useQueuedDownload } from "../../downloads/useQueuedDownload";
 import { useReplayTarget } from "../../play/config";
 import { isProfileHidden } from "../../profile/hidden";
 import type { DemoInfo } from "../bindings";
-import { contentDeleteReplay } from "../bindings";
+import { contentDeleteReplay, contentDeleteReplays } from "../bindings";
 import {
   invalidateMapPreview,
   useDemoInfo,
@@ -45,6 +45,7 @@ import { forgetReplay } from "../replayList";
 import { provenanceLink } from "../replayProvenanceLink";
 import { useReplaySets } from "../replaySets";
 import { teamResultLabel } from "../replaySideLabel";
+import { refreshStoredTracks } from "../replayTracks";
 import { useReplayUserState } from "../replayUserState";
 import { gameNamesMatch } from "../resolveContent";
 import { type ReplayEngine, useReplayEngine } from "../useReplayEngine";
@@ -61,6 +62,7 @@ import { ReplayChat } from "./components/ReplayChat";
 import { ReplayMap } from "./components/ReplayMap";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
+import { ReplayTrackBadge } from "./components/ReplayTrackBadge";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
@@ -479,7 +481,7 @@ function ReplayNotes({
 }
 
 /** Delete a replay after a confirm (irreversible), then hand back to `onDeleted`. */
-function DeleteReplayButton({
+export function DeleteReplayButton({
   replayPath,
   onDeleted,
   unfinished = false,
@@ -493,16 +495,31 @@ function DeleteReplayButton({
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // What the delete would take with the replay besides the file, read off disk
+  // when the confirm opens (#3786). Null until it answers.
+  const [track, setTrack] = useState<{ bytes: number } | null>(null);
+
+  function onOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next) return;
+    setTrack(null);
+    contentDeleteReplays({ paths: [replayPath], apply: false }).then(
+      ({ summary }) =>
+        setTrack(summary.tracks > 0 ? { bytes: summary.trackBytes } : null),
+      () => {},
+    );
+  }
 
   async function del() {
     setPending(true);
     setError(null);
     try {
-      const { analysisDeleted } = await contentDeleteReplay({
+      const { analysisDeleted, trackDeleted } = await contentDeleteReplay({
         path: replayPath,
         ...(unfinished ? { onlyUnfinished: true } : {}),
       });
       if (analysisDeleted) void refreshStoredAnalyses();
+      if (trackDeleted) void refreshStoredTracks();
       forgetReplay(replayPath);
       setOpen(false);
       onDeleted();
@@ -514,7 +531,7 @@ function DeleteReplayButton({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="gap-1.5">
           <Trash2 className="size-4" /> Delete
@@ -528,6 +545,12 @@ function DeleteReplayButton({
             be undone. If this replay has been analysed, its stored analysis is
             deleted with it.
           </p>
+          {track && (
+            <p className="text-xs text-muted-foreground">
+              Its recorded track is deleted too, freeing{" "}
+              {formatBytes(track.bytes) ?? "0 B"}.
+            </p>
+          )}
           {unfinished && (
             <p className="text-xs text-muted-foreground">
               {UNFINISHED_WARNING}
@@ -693,6 +716,7 @@ export default function ReplayDetailPage() {
               </Badge>
             )}
             <OriginBadge origin={origin} />
+            <ReplayTrackBadge gameId={info?.gameId} remixed={info?.remixed} />
           </div>
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}

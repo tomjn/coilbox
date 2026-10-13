@@ -40,6 +40,14 @@ use std::fs::File;
 use std::io::{BufReader, Cursor, Read, Seek};
 use std::path::Path;
 
+/// The recorder version a track made today carries in its header. Raise it
+/// when the recorder would produce different keys from the same replay: a
+/// track with a lower number is stale and is recorded again. 2 is the first
+/// with pose keys relative to the parent piece (issue #3783).
+///
+/// The writer's default and the app's stale check both read this constant.
+pub const RECORDER_VERSION: u16 = 2;
+
 /// What a caller chooses about the track.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ThinOptions {
@@ -47,9 +55,8 @@ pub struct ThinOptions {
     pub tolerance: f32,
     /// Frames in a window of the track.
     pub window_length: u32,
-    /// Goes in the track's header. It changes when the recorder would produce
-    /// different keys from the same replay. 2 is the first with pose keys
-    /// relative to the parent piece (issue #3783).
+    /// Goes in the track's header. [`RECORDER_VERSION`] unless a caller is
+    /// measuring an older recorder.
     pub recorder_version: u16,
     /// The replay's game id, for the track's header. The dump does not have
     /// it.
@@ -67,7 +74,7 @@ impl Default for ThinOptions {
         Self {
             tolerance: 0.5,
             window_length: 900,
-            recorder_version: 2,
+            recorder_version: RECORDER_VERSION,
             game_id: [0; 16],
             rotation_bits: None,
         }

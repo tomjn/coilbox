@@ -162,9 +162,9 @@ pub struct ReplayFile {
     pub stale_remix: bool,
     /// The match's game id, for a replay that has a usable one and is not a
     /// remix. A remix carries its original's id but has no analysis of its own,
-    /// so it does not hold the original's analysis in place. Not sent to the
-    /// frontend.
-    #[serde(skip)]
+    /// so it does not hold the original's analysis in place. The list joins
+    /// stored tracks to replays by it (issue #3786).
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub game_id: Option<String>,
 }
 

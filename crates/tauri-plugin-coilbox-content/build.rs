@@ -39,6 +39,7 @@ const COMMANDS: &[&str] = &[
     "content_replay_analysis",
     "content_replay_analysis_events",
     "content_replay_analysis_delete",
+    "content_replay_tracks",
     "content_unit_def_set",
     "content_unit_def_set_store",
     "content_unit_def_sets_usage",

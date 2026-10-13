@@ -117,8 +117,12 @@ vi.mock("./components/ReplayAnalysisEvents", () => ({
 vi.mock("./components/WatchButton", () => ({ WatchButton: () => null }));
 
 const { default: ReplayDetailPage } = await import("./ReplayDetailPage");
+const { resetReplayTracksForTests, seedReplayTracksForTests } = await import(
+  "../replayTracks"
+);
 
 afterEach(() => {
+  resetReplayTracksForTests();
   HIDE = [];
   INFO = null;
   cleanup();
@@ -180,5 +184,22 @@ describe("ReplayDetailPage", () => {
     expect(screen.queryByText("match stats section")).toBeNull();
     expect(screen.queryByText("build orders section")).toBeNull();
     expect(screen.queryByText("analysis events section")).toBeNull();
+  });
+
+  it("says whether the replay's track is current or out of date (#3786)", () => {
+    const gameId = "00112233445566778899aabbccddeeff";
+    FILE = "a.sdfz";
+    INFO = { ...LOADED_INFO, gameId };
+    const track = { gameId, sizeBytes: 1, lastWatchedMs: 1 };
+
+    seedReplayTracksForTests([{ ...track, state: "current" }]);
+    const first = renderAt("a.sdfz");
+    expect(screen.queryByText("Track recorded")).not.toBeNull();
+    first.unmount();
+
+    seedReplayTracksForTests([{ ...track, state: "stale" }]);
+    renderAt("a.sdfz");
+    expect(screen.queryByText("Track out of date")).not.toBeNull();
+    expect(screen.queryByText("Track recorded")).toBeNull();
   });
 });

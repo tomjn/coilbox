@@ -6378,6 +6378,8 @@ dependencies = [
  "coilbox-portable",
  "coilbox-proc",
  "coilbox-tdf",
+ "coilbox-track",
+ "coilbox-track-thin",
  "filetime",
  "flate2",
  "image 0.25.10",
