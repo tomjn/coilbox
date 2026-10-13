@@ -523,6 +523,7 @@ function M.new(options)
 		local found = projectile(id)
 		if found then
 			found.ttl = math.floor(ttl)
+			world.ttlSets = (world.ttlSets or 0) + 1
 		end
 	end
 

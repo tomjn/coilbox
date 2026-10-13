@@ -81,7 +81,7 @@ end
 --- `context` is the player's (see coilbox_player.lua), `units` its units stage
 -- and `clock` coilbox_player_clock.lua.
 function M.new(context, units, clock)
-	local Spring, Game = context.Spring, context.Game
+	local Spring, Game, on = context.Spring, context.Game, context.on
 	local header = context.track.header
 	local names = context.info.weaponDefs
 	local defID, beam, ends, stops, wet = {}, {}, {}, {}, {}
@@ -108,7 +108,7 @@ function M.new(context, units, clock)
 			-- burst can be born. A weapon that sounds once for a burst fires its
 			-- shots `salvoDelay` apart, and a beam fires one on every frame of its
 			-- `beamtime` (CWeapon::Fire, CBeamLaser's constructor).
-			local set = def.fireSound
+			local set = on.sound and def.fireSound
 			if set and #set > 0 then
 				sounds[i], volumes[i] = {}, {}
 				for n = 1, #set do
@@ -143,8 +143,9 @@ function M.new(context, units, clock)
 		Spring = Spring,
 		units = units,
 		near = clock.NEAR_SPEED,
-		-- Missing before engine 2025.03.9. `release` is the one place it is used.
-		setTimeToLive = Spring.SetProjectileTimeToLive,
+		-- Missing before engine 2025.03.9, which coilbox_player_engine.lua checks.
+		-- `release` is the one place it is used.
+		setTimeToLive = on.shotHandover and Spring.SetProjectileTimeToLive or nil,
 		names = names,
 		defCount = #names,
 		defID = defID,
