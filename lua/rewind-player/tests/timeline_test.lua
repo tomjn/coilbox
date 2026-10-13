@@ -103,8 +103,14 @@ local function engine(values, files)
 		GetTextWidth = function(text)
 			return #text * 0.5
 		end,
+		-- The height of the text and how far it hangs below the baseline, in
+		-- multiples of the font size. A capital of the stand-in font is 0.7.
+		GetTextHeight = function()
+			return 0.7, 0, 1
+		end,
 		Text = function(text, x, y, size, options)
-			e.texts[text] = true
+			-- Where the text's baseline was put, which `x` says `y` is.
+			e.texts[text] = options:find("x", 1, true) and y or true
 			local width = #text * 0.5 * size
 			local left = x
 			if options:find("c", 1, true) then
@@ -112,8 +118,8 @@ local function engine(values, files)
 			elseif options:find("r", 1, true) then
 				left = x - width
 			end
-			cover(left, y - size / 2)
-			cover(left + width, y + size / 2)
+			cover(left, y - 0.2 * size)
+			cover(left + width, y + 0.8 * size)
 		end,
 	}
 	e.GL = { TRIANGLE_FAN = 6, LINE_LOOP = 2, TRIANGLES = 4 }
@@ -446,6 +452,23 @@ do
 	t.check("and the key", e.texts["Space"])
 	t.check("with both keys of an action that has two", e.texts["= or +"])
 	t.check("and Shift where it is needed", e.texts["Shift+Left"])
+	t.check("a key whose character is a speck is spelled out", e.texts["Comma"] and e.texts["Full stop"] and e.texts["Minus"])
+
+	-- Every label of a row is on one baseline, half a capital below the row's
+	-- middle, whatever letters it has. Centring each on its own letters put a
+	-- comma where an apostrophe goes.
+	local row = tl.rects["row:back"]
+	local baseline = (row.y1 + row.y2) / 2 - 0.35 * tl.smallSize
+	t.same("what a key does is on the row's baseline", e.texts["Back 1 second"], baseline)
+	t.same("and so is the key", e.texts["Left"], baseline)
+
+	-- Two rows share an edge, and a point on it is in one of them.
+	local upper, lower = tl.rects["row:toggle"], tl.rects["row:reverse"]
+	t.same("the rows of the list touch", upper.y1, lower.y2)
+	tl:mousePress((upper.x1 + upper.x2) / 2, upper.y1, 1)
+	t.same("a press on the edge two rows share is the lower row's", tl.listening, "reverse")
+	tl:mousePress((upper.x1 + upper.x2) / 2, upper.y1, 1)
+	t.same("and a second press there stops the wait", tl.listening, nil)
 
 	click(tl, tl.rects["row:toggle"])
 	t.same("a click on a row waits for a key", tl.listening, "toggle")

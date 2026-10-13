@@ -10,11 +10,14 @@
 -- so that the two behave the same way. A key held with Ctrl, Alt or Meta is
 -- never taken.
 --
--- It draws with gl.Color, gl.Rect, gl.BeginEnd, gl.Vertex, gl.Text and
--- gl.GetTextWidth and nothing else, in the engine's own font. Those are in the
--- engine at 105.0 and at 2026.07.04, and need no shader, texture or font from
--- the game. A draw allocates nothing: the shapes go through functions made
--- once, and a text is made when what it says changes.
+-- It draws with gl.Color, gl.Rect, gl.BeginEnd, gl.Vertex and gl.Text, and
+-- measures with gl.GetTextWidth and gl.GetTextHeight, in the engine's own
+-- font. Its one other call is gl.Texture(false), to drop a texture an earlier
+-- widget left bound. All of those are in the engine at 105.0 and at
+-- 2026.07.04, and need no shader, texture or font from the game.
+--
+-- A draw allocates nothing. The shapes go through functions made once, and a
+-- text is made when what it says changes.
 --
 -- The look follows Slate, the interface in luaui/slate of
 -- Recoil-Game-Archive/xta-springrts: a dark translucent panel with a thin
@@ -167,6 +170,12 @@ local function inside(rect, x, y)
 	return x >= rect.x1 and x <= rect.x2 and y >= rect.y1 and y <= rect.y2
 end
 
+--- The same for a row of the key list. The rows touch, and a point on the edge
+-- two of them share is in the lower one only.
+local function insideRow(rect, x, y)
+	return x >= rect.x1 and x <= rect.x2 and y > rect.y1 and y <= rect.y2
+end
+
 local function set(rect, x1, y1, x2, y2)
 	rect.x1, rect.y1, rect.x2, rect.y2 = x1, y1, x2, y2
 end
@@ -181,9 +190,12 @@ local function clock(seconds)
 	return string.format("%d:%02d", minutes, seconds % 60)
 end
 
+-- Keys whose own character is too small a mark to read in a list.
+local SPELLED = { [","] = "Comma", ["."] = "Full stop", ["-"] = "Minus" }
+
 --- A key's name as the list shows it: "space" as "Space" and "r" as "R".
 local function shown(key)
-	return key:sub(1, 1):upper() .. key:sub(2)
+	return SPELLED[key] or (key:sub(1, 1):upper() .. key:sub(2))
 end
 
 --- The frames of the marks the game holds, in order. A game with no marks
@@ -392,6 +404,8 @@ function Timeline:layout()
 	self.trackHalf, self.knobHalf = px(TRACK_H) / 2, px(KNOB) / 2
 	self.column = max(1, px(COLUMN))
 	self.unit = s
+	-- Half the height of a capital, in multiples of the font size.
+	self.capHalf = self.gl.GetTextHeight("X") / 2
 
 	local margin, pad, gap = px(MARGIN), px(PAD), px(GAP)
 	local w = min(px(PANEL_W), vsx - 2 * margin)
@@ -502,83 +516,43 @@ local function markFrom(self, direction)
 	end
 end
 
-local function step(self, seconds)
-	self:send(string.format("step %d", seconds * self.fps))
-end
-
--- What each action does. A held key repeats a move and not a switch. Each
--- gives whether the key was the timeline's to take.
-local PERFORM = {
-	toggle = function(self, isRepeat)
-		if not isRepeat then
-			self:send("toggle")
-		end
-		return true
-	end,
-	reverse = function(self, isRepeat)
-		if not isRepeat then
-			self:send("reverse")
-		end
-		return true
-	end,
-	back = function(self)
-		step(self, -M.STEP_SECONDS)
-		return true
-	end,
-	forward = function(self)
-		step(self, M.STEP_SECONDS)
-		return true
-	end,
-	backLarge = function(self)
-		step(self, -M.LARGE_STEP_SECONDS)
-		return true
-	end,
-	forwardLarge = function(self)
-		step(self, M.LARGE_STEP_SECONDS)
-		return true
-	end,
-	frameBack = function(self)
-		self:send("step -1")
-		return true
-	end,
-	frameForward = function(self)
-		self:send("step 1")
-		return true
-	end,
-	start = function(self)
-		self:send(string.format("seek %d", self.first))
-		return true
-	end,
-	finish = function(self)
-		self:send(string.format("seek %d", self.last))
-		return true
-	end,
-	slower = function(self)
-		self:send("slower")
-		return true
-	end,
-	faster = function(self)
-		self:send("faster")
-		return true
-	end,
+-- What each action sends. A held key repeats a move and not a switch.
+local SWITCH = { toggle = "toggle", reverse = "reverse" }
+local MOVE = { frameBack = "step -1", frameForward = "step 1", slower = "slower", faster = "faster" }
+local SECONDS = {
+	back = -M.STEP_SECONDS,
+	forward = M.STEP_SECONDS,
+	backLarge = -M.LARGE_STEP_SECONDS,
+	forwardLarge = M.LARGE_STEP_SECONDS,
 }
 
--- A game with no marks has nothing for the mark keys to do, so they stay the
--- game's.
-local function toMark(direction)
-	return function(self)
+--- Does an action. Gives whether the key was the timeline's to take, which it
+-- is not for a mark key in a game with no marks: there is nothing for it to
+-- do, so it stays the game's.
+local function perform(self, id, isRepeat)
+	if SWITCH[id] then
+		if not isRepeat then
+			self:send(SWITCH[id])
+		end
+	elseif MOVE[id] then
+		self:send(MOVE[id])
+	elseif SECONDS[id] then
+		self:send(string.format("step %d", SECONDS[id] * self.fps))
+	elseif id == "start" then
+		self:send(string.format("seek %d", self.first))
+	elseif id == "finish" then
+		self:send(string.format("seek %d", self.last))
+	else
 		if self.groupCount == 0 then
 			return false
 		end
-		local frame = markFrom(self, direction)
+		local frame = markFrom(self, id == "markForward" and 1 or -1)
 		if frame then
 			self:send(string.format("seek %d", frame))
 		end
-		return true
 	end
+	return true
 end
-PERFORM.markBack = toMark(-1)
-PERFORM.markForward = toMark(1)
 
 --- Gives `action` the key just pressed, and takes it from any action that had
 -- it.
@@ -635,7 +609,7 @@ function Timeline:keyPress(key, mods, isRepeat)
 	local shift = mods.shift and true or false
 	for i = 1, #list do
 		if list[i].shift == nil or list[i].shift == shift then
-			return PERFORM[list[i].action](self, isRepeat)
+			return perform(self, list[i].action, isRepeat)
 		end
 	end
 	return false
@@ -690,7 +664,7 @@ function Timeline:mousePress(x, y, button)
 		end
 		for i = 1, #M.ACTIONS do
 			local id = M.ACTIONS[i].id
-			if inside(rects["row:" .. id], x, y) and waiting ~= id then
+			if insideRow(rects["row:" .. id], x, y) and waiting ~= id then
 				self.listening = id
 			end
 		end
@@ -846,9 +820,12 @@ local function button(self, rect, mx, my, active)
 	outline(self, rect.x1, rect.y1, rect.x2, rect.y2, self.buttonRadius, LOOK.buttonBorder)
 end
 
+--- A line of text with its middle at `y`. It is put on the baseline that
+-- centres a capital there, and not centred on its own letters, so that a comma
+-- sits low and a row of labels sits level whatever letters each has.
 local function text(self, value, x, y, size, c, options)
 	colour(self.gl, c)
-	self.gl.Text(value, x, y, size, options)
+	self.gl.Text(value, x, y - self.capHalf * size, size, options)
 end
 
 local function drawBar(self)
@@ -914,14 +891,14 @@ local function drawButtons(self, mx, my)
 		self.speedTexts[self.speed] = speed
 	end
 	r = rects.speed
-	text(self, speed, (r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, self.textSize, LOOK.text, "cv")
+	text(self, speed, (r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, self.textSize, LOOK.text, "cx")
 
 	r = rects.time
-	text(self, self.timeText, r.x1, (r.y1 + r.y2) / 2, self.textSize, LOOK.textDim, "v")
+	text(self, self.timeText, r.x1, (r.y1 + r.y2) / 2, self.textSize, LOOK.textDim, "x")
 
 	r = rects.help
 	button(self, r, mx, my, self.helpOpen)
-	text(self, "?", (r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, self.textSize, LOOK.text, "cv")
+	text(self, "?", (r.x1 + r.x2) / 2, (r.y1 + r.y2) / 2, self.textSize, LOOK.text, "cx")
 end
 
 local function drawHelp(self, mx, my)
@@ -929,27 +906,27 @@ local function drawHelp(self, mx, my)
 	local help = rects.helpPanel
 	panel(self, help)
 	local first = rects["row:" .. M.ACTIONS[1].id]
-	text(self, "Keys", first.x1, self.helpTitleY, self.textSize, LOOK.accent, "v")
-	text(self, "Click a key to change it", first.x2, self.helpTitleY, self.smallSize, LOOK.textDim, "rv")
+	local inset = self.buttonRadius + 1
+	text(self, "Keys", first.x1 + inset, self.helpTitleY, self.textSize, LOOK.accent, "x")
+	text(self, "Click a key to change it", first.x2 - inset, self.helpTitleY, self.smallSize, LOOK.textDim, "rx")
 	for i = 1, #M.ACTIONS do
 		local action = M.ACTIONS[i]
 		local row = rects["row:" .. action.id]
 		local y = (row.y1 + row.y2) / 2
 		local waiting = self.listening == action.id
-		if waiting or inside(row, mx, my) then
+		if waiting or insideRow(row, mx, my) then
 			fill(self, row.x1, row.y1, row.x2, row.y2, self.buttonRadius, waiting and LOOK.buttonActive or LOOK.buttonHover)
 		end
-		local inset = self.buttonRadius + 1
-		text(self, action.does, row.x1 + inset, y, self.smallSize, LOOK.text, "v")
+		text(self, action.does, row.x1 + inset, y, self.smallSize, LOOK.text, "x")
 		if waiting then
-			text(self, "Press a key", row.x2 - inset, y, self.smallSize, LOOK.warn, "rv")
+			text(self, "Press a key", row.x2 - inset, y, self.smallSize, LOOK.warn, "rx")
 		else
-			text(self, self.labels[action.id], row.x2 - inset, y, self.smallSize, LOOK.accent, "rv")
+			text(self, self.labels[action.id], row.x2 - inset, y, self.smallSize, LOOK.accent, "rx")
 		end
 	end
 	local reset = rects.reset
 	button(self, reset, mx, my, false)
-	text(self, "Reset keys", (reset.x1 + reset.x2) / 2, (reset.y1 + reset.y2) / 2, self.smallSize, LOOK.text, "cv")
+	text(self, "Reset keys", (reset.x1 + reset.x2) / 2, (reset.y1 + reset.y2) / 2, self.smallSize, LOOK.text, "cx")
 end
 
 --- Draws the timeline, from `widget:DrawScreen`. Nothing is drawn in a game
@@ -966,7 +943,7 @@ function Timeline:draw()
 	if self.note then
 		local note = rects.note
 		panel(self, note)
-		text(self, self.note, (note.x1 + note.x2) / 2, (note.y1 + note.y2) / 2, self.smallSize, LOOK.warn, "cv")
+		text(self, self.note, (note.x1 + note.x2) / 2, (note.y1 + note.y2) / 2, self.smallSize, LOOK.warn, "cx")
 	end
 	panel(self, rects.panel)
 	drawBar(self)
