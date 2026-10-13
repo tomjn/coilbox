@@ -124,6 +124,7 @@ M.SYNCED = {
 			"Spring.GetAllUnits",
 			"Spring.GetUnitHealth",
 			"Spring.SetUnitHealth",
+			"Spring.SetUnitMaxHealth",
 			"Spring.MoveCtrl.Enable",
 			"Spring.MoveCtrl.SetPosition",
 			"Spring.MoveCtrl.SetRotation",
