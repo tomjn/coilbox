@@ -84,9 +84,9 @@ end
 
 local DEFS = {
 	unitDefs = {
-		{ name = "tank", weapons = { {}, {} } },
-		{ name = "builder", weapons = {}, isBuilder = true, isMobileBuilder = true },
-		{ name = "factory", weapons = {}, isBuilder = true },
+		{ name = "tank", weapons = { {}, {} }, radius = 21.5 },
+		{ name = "builder", weapons = {}, isBuilder = true, isMobileBuilder = true, radius = 12 },
+		{ name = "factory", weapons = {}, isBuilder = true, radius = 48 },
 		{ name = "wall", weapons = {} },
 	},
 	featureDefs = { { name = "tree" }, { name = "wreck" } },
@@ -129,6 +129,8 @@ do
 	same("the header gives the unit id limit features are offset by", header.maxUnits, 32000)
 	same("the header says terrain is recorded", header.terrain, true)
 	same("unit definitions are listed from id 1", table.concat(header.unitDefs, " "), "tank builder factory wall")
+	same("each unit definition's radius is listed beside its name, and 0 for one that has none",
+		table.concat(header.unitRadii, " "), "21.5 12 48 0")
 	same("feature definitions are listed from id 1", table.concat(header.featureDefs, " "), "tree wreck")
 	same("weapon definitions are listed from id 0", table.concat(header.weaponDefs, " "), "nothing cannon laser")
 	same("every team is listed", #header.teams, 3)

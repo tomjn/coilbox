@@ -992,6 +992,19 @@ local function names(list, first)
 	return quoted(found)
 end
 
+-- Each unit definition's radius in elmos, in the order of the names. The
+-- thinning of issue #3782 multiplies a unit's turn by it, so that a tolerance
+-- in elmos holds at the unit's edge. Nine digits carry a 32 bit float exactly.
+local function radii(list)
+	local found = {}
+	local id = 1
+	while list and list[id] do
+		found[#found + 1] = string.format("%.9g", tonumber(list[id].radius) or 0)
+		id = id + 1
+	end
+	return "[" .. table.concat(found, ",") .. "]"
+end
+
 local function teamLine(teamID, gaia)
 	local _, leader, _, hasAI, side, allyTeam = Spring.GetTeamInfo(teamID, false)
 	local red, green, blue = Spring.GetTeamColor(teamID)
@@ -1038,6 +1051,7 @@ local function header()
 		.. ',"terrain":' .. (canHearTerrain and "true" or "false")
 		.. ',"teams":[' .. table.concat(teams, ",") .. "]"
 		.. ',"unitDefs":' .. names(UnitDefs, 1)
+		.. ',"unitRadii":' .. radii(UnitDefs)
 		.. ',"featureDefs":' .. names(FeatureDefs, 1)
 		.. ',"weaponDefs":' .. names(WeaponDefs, 0)
 		.. "}"

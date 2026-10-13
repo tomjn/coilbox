@@ -91,6 +91,7 @@ One JSON object.
 | `terrain` | `false` when the recorder could not listen for heightmap changes, so the dump holds none. `true` otherwise |
 | `teams` | one object for each team, Gaia included |
 | `unitDefs` | unit definition names. Entry `n`, counting from 1, is definition id `n` |
+| `unitRadii` | each unit definition's radius in elmos, in the order of `unitDefs`. A dump made before issue #3782 has none, and the thinning refuses it |
 | `featureDefs` | feature definition names. Entry `n`, counting from 1, is definition id `n` |
 | `weaponDefs` | weapon definition names. Entry `n`, counting from 0, is definition id `n` |
 
