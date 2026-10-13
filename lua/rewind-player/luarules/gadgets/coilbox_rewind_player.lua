@@ -11,9 +11,11 @@
 -- lists. This file is the engine's side of it: the call-ins, and the two
 -- things only a gadget can do.
 --
--- Nothing takes damage. `UnitPreDamaged` gives every hit no damage and no
--- push, and the track owns health. The shots the player creates do not rest
--- on that: each is created with no damage to do.
+-- Nothing takes damage. `UnitPreDamaged` and `FeaturePreDamaged` give every hit
+-- no damage and no push, and the track owns health and what stands. A unit that
+-- dies while the match is watched explodes with the game's own effect, and that
+-- explosion reaches features (issue #3987). The shots the player creates do not
+-- rest on that: each is created with no damage to do.
 --
 -- Nothing heals either (issue #3986). The engine heals in the middle of a
 -- simulation frame, so `GameFramePost` gives the player the end of it, where it
@@ -116,6 +118,12 @@ if gadgetHandler:IsSyncedCode() then
 	end
 
 	function gadget:UnitPreDamaged()
+		if player then
+			return 0, 0
+		end
+	end
+
+	function gadget:FeaturePreDamaged()
 		if player then
 			return 0, 0
 		end

@@ -104,6 +104,9 @@ do
 	local damage, impulse = gadget:UnitPreDamaged(100, 1, 0, 500)
 	t.same("a hit does no damage", damage, 0)
 	t.same("and gives no push", impulse, 0)
+	local featureDamage, featureImpulse = gadget:FeaturePreDamaged(1, 0, -1, 80)
+	t.same("a death's explosion does no damage to a feature", featureDamage, 0)
+	t.same("and gives it no push", featureImpulse, 0)
 	t.same("the gadget takes the end of a simulation frame", pcall(gadget.GameFramePost, gadget, 1), true)
 	t.same("the engine is refused a wreck", gadget:AllowFeatureCreation(1, 0, 0, 0, 0), false)
 
@@ -166,6 +169,7 @@ do
 	gadget:GameFrame(1)
 	t.same("and the gadget then does nothing on a frame", w.sent, 0)
 	t.same("leaves damage alone", gadget:UnitPreDamaged(100, 1, 0, 500), nil)
+	t.same("and a feature's too", gadget:FeaturePreDamaged(1, 0, -1, 80), nil)
 	t.same("and does nothing at the end of a frame", pcall(gadget.GameFramePost, gadget, 1), true)
 	t.same("lets the engine leave wrecks", gadget:AllowFeatureCreation(1, 0, 0, 0, 0), true)
 	t.same("and takes no message", gadget:RecvLuaMsg("coilbox_rewind:play", 0), false)
