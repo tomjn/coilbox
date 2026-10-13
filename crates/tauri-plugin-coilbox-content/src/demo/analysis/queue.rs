@@ -112,6 +112,7 @@ impl Engine for HeadlessEngine {
                 game: job.game.clone(),
                 scratch_root: self.scratch_root.clone(),
                 timeout: run_timeout(job.match_seconds),
+                record: None,
             },
             control,
             on_poll,

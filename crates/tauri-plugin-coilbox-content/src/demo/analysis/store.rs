@@ -641,6 +641,7 @@ pub(super) mod tests {
                 log_excerpt: Vec::new(),
             },
             events: reproduced.then_some(log.raw),
+            recording: None,
         }
     }
 
