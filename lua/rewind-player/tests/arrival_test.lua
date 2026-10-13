@@ -377,7 +377,7 @@ do
 	arrival:draw()
 	t.check("half way through its life it is drawn", e.vertices > 0, e.vertices)
 	local box = e.box
-	local reach = 20 * Arrival.REACH
+	local reach = 20 * Arrival.REACH + Arrival.LINE
 	t.check(
 		"round the unit, no farther out than the module says an effect reaches",
 		box.x1 >= 1000 - reach and box.x2 <= 1000 + reach and box.z1 >= 2000 - reach and box.z2 <= 2000 + reach and box.y1 >= 50 - reach and box.y2 <= 50 + reach,
@@ -400,7 +400,7 @@ do
 	arrival2:add(7, 1000, 50, 2000, 1)
 	at2(Arrival.LIFE / 2)
 	arrival2:draw()
-	t.near("a unit twice the size has an effect twice as wide", e2.box.x2 - e2.box.x1, wide * 2, 1e-6)
+	t.near("a unit twice the size has an effect twice as wide, but for the ring's own line", e2.box.x2 - e2.box.x1 - 2 * Arrival.LINE, (wide - 2 * Arrival.LINE) * 2, 1e-6)
 
 	e.clear()
 	at(Arrival.LIFE + 0.01)

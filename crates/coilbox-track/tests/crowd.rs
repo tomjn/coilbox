@@ -12,6 +12,11 @@
 //! start to the end creates all of them, the first time of each definition
 //! included, and a seek back removes all of them.
 //!
+//! `COILBOX_CROWD_DEFS` is a list of unit definition names, with commas between
+//! them, to give the definitions the crowd uses instead of the match's own, in
+//! turn. That makes a crowd for another game than the one the match was played
+//! on, whose units the match's names do not exist in (issue #4009).
+//!
 //! ```sh
 //! COILBOX_CROWD_SOURCE=whole-match.cbtrack COILBOX_CROWD_OUT=crowd.cbtrack \
 //!   COILBOX_CROWD_UNITS=400 \
@@ -84,6 +89,13 @@ fn a_crowd_of_real_definitions_is_written() {
     });
     track.info = info;
     track.info.writer = "coilbox-track tests crowd".into();
+    if let Ok(names) = std::env::var("COILBOX_CROWD_DEFS") {
+        let names: Vec<&str> = names.split(',').filter(|n| !n.is_empty()).collect();
+        assert!(!names.is_empty(), "COILBOX_CROWD_DEFS names no definition");
+        for (n, def) in defs.iter().enumerate() {
+            track.info.unit_defs[*def as usize] = names[n % names.len()].to_string();
+        }
+    }
     track.features = features;
     for k in 0..h.window_count as usize {
         track.terrain.extend(reader.terrain(k).unwrap());

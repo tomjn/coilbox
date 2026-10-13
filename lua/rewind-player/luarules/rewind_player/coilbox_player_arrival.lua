@@ -23,28 +23,36 @@ local M = {}
 
 --- How long an effect lasts, in seconds. A choice, not a measurement: long
 -- enough to be seen and short next to the seconds a large seek takes.
-M.LIFE = 0.8
+M.LIFE = 0.9
 
---- The most effects alive at once. Each costs a draw time that was measured in
--- an engine with a window, and lua/rewind-player/README.md has the figures.
-M.MOST = 64
+--- The most effects alive at once. A draw of 256 took 3.6 ms in an engine with
+-- a window, which is what this allows a drawn frame at the worst.
+-- lua/rewind-player/README.md has the figures.
+M.MOST = 256
 
 --- How far from the unit an effect reaches, in the unit's radius.
-M.REACH = 4
+M.REACH = 2.5
+
+--- The widest the ring's line is, in elmos, which is its width round a unit
+-- of no size at all. A test adds it to the reach.
+M.LINE = 2
 
 -- The shape, in the unit's radius. All of these are choices of how it looks.
-local BEAM_HEIGHT = 3.6
-local BEAM_WIDTH = 0.55
-local RING_FROM, RING_TO = 2.4, 1.0
-local RING_BAND = 0.3
+local BEAM_HEIGHT = 2.4
+local BEAM_WIDTH = 0.3
+local RING_FROM, RING_TO = 1.3, 0.85
+-- The ring's line and half the side of a dot, in elmos: a part that every unit
+-- has and a part that grows with the unit, so that a small unit's can still be
+-- seen and a large one's are not slabs.
+local RING_BAND = 0.06
 local RING_LIFT = 0.1
-local DOT_FROM = 1.9
-local DOT_HEIGHT = 1.6
-local DOT_SIZE = 0.1
+local DOT_FROM = 1.25
+local DOT_HEIGHT = 1.4
+local DOT_SIZE, DOT_GROWS = 1.5, 0.02
 
 -- The ring is SEGMENTS quads, and DOTS dots fall in.
-local SEGMENTS = 16
-local DOTS = 12
+local SEGMENTS = 24
+local DOTS = 16
 
 local cos, sin, sqrt, pi = math.cos, math.sin, math.sqrt, math.pi
 
@@ -61,7 +69,7 @@ for k = 1, DOTS do
 	local angle = k * 2.399963
 	DOT_COS[k], DOT_SIN[k] = cos(angle), sin(angle)
 	DOT_HIGH[k] = (k * 0.618034) % 1
-	DOT_OUT[k] = 0.7 + 0.3 * ((k * 0.381966) % 1)
+	DOT_OUT[k] = 0.35 + 0.65 * ((k * 0.381966) % 1)
 	DOT_SHADE[k] = 0.8 + 0.35 * ((k * 0.754877) % 1)
 end
 
@@ -81,30 +89,32 @@ local function glow(self, now, rx, rz)
 		-- Lightened, so that a dark team colour still shows.
 		local r, g, b = 0.5 + 0.5 * reds[i], 0.5 + 0.5 * greens[i], 0.5 + 0.5 * blues[i]
 
-		-- The column: widest and brightest as the unit appears, clear at its top.
+		-- The column: widest and brightest as the unit appears, clear at its top
+		-- and at both sides, so that it has no edge.
 		local fade = (1 - p) * (1 - p)
-		local half = radius * BEAM_WIDTH * (0.25 + 0.75 * (1 - p))
+		local half = radius * BEAM_WIDTH * (0.3 + 0.7 * (1 - p))
 		local top = y + radius * BEAM_HEIGHT
-		Color(r, g, b, 0.55 * fade)
-		Vertex(x - rx * half, y, z - rz * half)
-		Vertex(x + rx * half, y, z + rz * half)
+		local core = 0.9 * fade
 		Color(r, g, b, 0)
-		Vertex(x + rx * half, top, z + rz * half)
-		Vertex(x - rx * half, top, z - rz * half)
-		half = half * 0.35
-		Color(1, 1, 1, 0.7 * fade)
 		Vertex(x - rx * half, y, z - rz * half)
-		Vertex(x + rx * half, y, z + rz * half)
-		Color(1, 1, 1, 0)
-		Vertex(x + rx * half, top, z + rz * half)
+		Color(1, 1, 1, core)
+		Vertex(x, y, z)
+		Color(r, g, b, 0)
+		Vertex(x, top, z)
 		Vertex(x - rx * half, top, z - rz * half)
+		Color(1, 1, 1, core)
+		Vertex(x, y, z)
+		Color(r, g, b, 0)
+		Vertex(x + rx * half, y, z + rz * half)
+		Vertex(x + rx * half, top, z + rz * half)
+		Vertex(x, top, z)
 
 		-- The ring: it closes on the unit, quickly at first, and is clear at
 		-- its outer edge.
 		local closed = 1 - (1 - p) * (1 - p)
 		local inner = radius * (RING_FROM + (RING_TO - RING_FROM) * closed)
-		local outer = inner + radius * RING_BAND
-		local alpha = 0.6 * (1 - p) * (p < 0.15 and p / 0.15 or 1)
+		local outer = inner + M.LINE + radius * RING_BAND
+		local alpha = 0.9 * (1 - p) * (p < 0.15 and p / 0.15 or 1)
 		local ground = y + radius * RING_LIFT
 		for k = 0, SEGMENTS - 1 do
 			local c1, s1, c2, s2 = RING_COS[k], RING_SIN[k], RING_COS[k + 1], RING_SIN[k + 1]
@@ -133,7 +143,7 @@ local function dots(self, now, rx, rz, ux, uy, uz)
 		local tc, ts = turnCos[i], turnSin[i]
 		local left = 1 - p
 		local out = radius * DOT_FROM * left * sqrt(left)
-		local size = radius * DOT_SIZE * (0.4 + 0.6 * left)
+		local size = (DOT_SIZE + radius * DOT_GROWS) * (0.5 + 0.5 * left)
 		local alpha = p < 0.7 and 1 or (1 - p) / 0.3
 		local sx, sz, tx, ty, tz = rx * size, rz * size, ux * size, uy * size, uz * size
 		for k = 1, DOTS do
