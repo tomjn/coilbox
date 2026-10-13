@@ -48,6 +48,7 @@ pub(crate) mod match_setup;
 mod orders;
 pub(crate) mod retarget;
 pub(crate) mod stream;
+pub mod track_budget;
 pub mod track_store;
 pub mod unit_orders;
 
