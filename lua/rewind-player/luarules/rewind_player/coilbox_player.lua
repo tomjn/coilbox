@@ -137,6 +137,7 @@ function M.new(track, options)
 	-- reported and switched off and does not take the player down. A table with
 	-- no hooks in it when the adapter has none.
 	local hooks = {
+		started = Adapter.guarded(options.adapter, "started", report),
 		unitPlaced = Adapter.guarded(options.adapter, "unitPlaced", report),
 		afterFrame = Adapter.guarded(options.adapter, "afterFrame", report),
 	}
@@ -194,6 +195,9 @@ function M.new(track, options)
 	publish(self, P.lastFrame, header.lastFrame)
 	publish(self, P.framesPerSecond, header.framesPerSecond)
 	publishClock(self)
+	if hooks.started then
+		hooks.started()
+	end
 	return self
 end
 

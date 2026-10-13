@@ -41,4 +41,31 @@ return {
 		-- Gives units and resources to another team.
 		"gui_static_sharemenu.lua",
 	},
+
+	hooks = {
+		-- game_spawn.lua also gave each team its storage at the start of a match,
+		-- the `startmetal` and `startenergy` of the team or of the mod options,
+		-- and 1000 of each when neither says. Without it a team keeps the
+		-- engine's own 1,000,000 and the resource bars read 0/1000000. The
+		-- storage a team's buildings add comes from the units the player places,
+		-- so this has to be in before any of them is.
+		started = function()
+			local options = Spring.GetModOptions()
+			local gaia = Spring.GetGaiaTeamID()
+			for _, team in ipairs(Spring.GetTeamList()) do
+				if team ~= gaia then
+					local keys = select(8, Spring.GetTeamInfo(team)) or {}
+					local metal = tonumber(keys.startmetal or options.startmetal) or 1000
+					local energy = tonumber(keys.startenergy or options.startenergy) or 1000
+					-- As the game does, a 0 leaves the engine's own.
+					if metal ~= 0 then
+						Spring.SetTeamResource(team, "ms", metal)
+					end
+					if energy ~= 0 then
+						Spring.SetTeamResource(team, "es", energy)
+					end
+				end
+			end
+		end,
+	},
 }

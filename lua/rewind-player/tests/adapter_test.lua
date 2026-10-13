@@ -127,7 +127,7 @@ do
 	t.same(
 		"and logs what it has",
 		Adapter.describe(adapter),
-		"adapter loaded: Splinter Faction. 4 gadgets and 3 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: none"
+		"adapter loaded: Splinter Faction. 4 gadgets and 3 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: started"
 	)
 	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
 end
@@ -251,9 +251,13 @@ end
 
 do
 	local placed, after = {}, {}
+	local started = 0
 	local world, player = setup({
 		name = "Hooked",
 		hooks = {
+			started = function()
+				started = started + 1
+			end,
 			unitPlaced = function(unitID, defID, frame, clock)
 				placed[#placed + 1] = { unitID = unitID, defID = defID, frame = frame, jumped = clock.jumped }
 			end,
@@ -262,9 +266,12 @@ do
 			end,
 		},
 	})
-	t.check("the line names the hooks", world.lines[1]:find("hooks: afterFrame, unitPlaced", 1, true) ~= nil, world.lines[1])
+	t.check("the line names the hooks", world.lines[1]:find("hooks: afterFrame, started, unitPlaced", 1, true) ~= nil, world.lines[1])
+	t.same("started is called when the player is made, before any frame", started, 1)
+	t.same("when nothing of the track is in the world yet", world.unitCount(), 0)
 	player:message("coilbox_rewind:pause")
 	player:frame()
+	t.same("a frame does not call it again", started, 1)
 	t.same("a unit made on the first frame is announced, one for each", #placed, 2)
 	t.same("with its engine id", placed[1].unitID, world.unitNamed("tank").id)
 	t.same("and its definition's engine id", placed[1].defID, world.units[placed[1].unitID].def.id)

@@ -25,6 +25,9 @@ M.PATH = "coilbox_rewind/adapter.lua"
 --- The hooks the player calls, and nothing else. The log names a hook the file
 -- has that is not here, since it is most likely a misspelling.
 M.HOOKS = {
+	-- () once, when the player has opened the track, before the first frame and
+	-- so before anything of the track is in the world.
+	started = true,
 	-- (unitID, unitDefID, t, clock) after the player created a unit and put it
 	-- in place. Called again for a unit made again after a seek.
 	unitPlaced = true,
