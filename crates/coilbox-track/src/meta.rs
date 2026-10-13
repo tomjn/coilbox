@@ -99,6 +99,8 @@ pub(crate) fn encode_info(info: &Info) -> Result<Chunk> {
     c.set_u32(180, info.map_size.to_vec());
     c.set_u16(181, info.unit_footprints.iter().map(|f| f[0]).collect());
     c.set_u16(182, info.unit_footprints.iter().map(|f| f[1]).collect());
+    put_strings(&mut c, 183, 184, &info.team_params)?;
+    put_strings(&mut c, 185, 186, &info.game_params)?;
     Ok(c)
 }
 
@@ -182,6 +184,9 @@ pub(crate) fn decode_info(c: &Chunk) -> Result<Info> {
             [x, z] => [*x, *z],
             _ => return Err(bad("column 180 does not have two values".into())),
         },
+        // A track from before recorder version 4 has none of the four columns.
+        team_params: get_strings(c, 183, 184)?,
+        game_params: get_strings(c, 185, 186)?,
     })
 }
 

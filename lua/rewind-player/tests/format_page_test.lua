@@ -118,4 +118,10 @@ t.same("it is at full health", out[1], 1)
 t.same("it is complete", out[2], 1)
 t.same("it is switched on", out[3], 1)
 
+-- The worked example is a track from before recorder version 4: its chunk has
+-- no columns for the numbers of a team and its header's bytes from 80 are zero.
+t.same("a track with no team resources has no tracks for them", w.valueCount, 0)
+t.same("asking for one gives nothing", w:valueOf(0, 0), nil)
+t.same("and its resource tolerance is 0", track.header.resourceTolerance, 0)
+
 t.report()

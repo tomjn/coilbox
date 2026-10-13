@@ -367,5 +367,90 @@ pub fn random_track(seed: u64, windows: u32, window_length: u32, units: usize) -
             after: 800 + rng.range(-600, 600) as i32,
         });
     }
+
+    // Team resources and rules parameters. They come last, so that everything
+    // above is what the same seed made before a track had them.
+    // A track with them is from recorder version 4 or later, which is how a
+    // reader knows a resource with no track is 0 and not unrecorded.
+    track.settings.recorder_version = 4;
+    track.settings.value_tolerance = 0.5;
+    track.settings.value_fraction = 1.0 / 1024.0;
+    track.info.team_params = vec!["supplyUsed".into(), "researchPoints".into()];
+    track.info.game_params = vec!["wave".into()];
+    let energy = value_code::ENERGY;
+    let parameter = value_code::PARAMETER;
+    let walked = |rng: &mut Rng, from: u32, to: u32, start: f32, spread: i64| {
+        let mut value = start;
+        frames(rng, from, to, 40)
+            .into_iter()
+            .map(|f| {
+                // Sixteenths, so a float holds every value exactly.
+                value = (value + rng.range(-spread, spread) as f32 / 16.0).max(0.0);
+                ValueKey::new(f, value)
+            })
+            .collect::<Vec<_>>()
+    };
+    let second_window = first + window_length;
+    let third_window = (first + 2 * window_length).min(last);
+    let values = [
+        // What team 0 holds, over the whole match.
+        (0, value_code::HELD, first, last, 1000.0, 400),
+        (0, energy + value_code::HELD, first, last, 5000.0, 4000),
+        (0, value_code::INCOME, first, last, 9.0, 8),
+        (0, energy + value_code::EXPENSE, first, last, 23.0, 30),
+        // Nothing until part way through the second window, so the first
+        // window has no track for it.
+        (
+            0,
+            value_code::EXCESS,
+            second_window + window_length / 2,
+            last,
+            3.0,
+            40,
+        ),
+        // A rules parameter from the first frame, one that is first set part
+        // way through the second window, and one of the game's that is first
+        // set on the edge between two windows.
+        (0, parameter, first, last, 3.0, 16),
+        (
+            0,
+            parameter + 1,
+            second_window + window_length / 3,
+            last,
+            216.0,
+            64,
+        ),
+        (NO_TEAM, parameter, third_window, last, 1.0, 16),
+    ];
+    for (team, code, from, to, start, spread) in values {
+        // A match of one window ends before some of these would start.
+        let from = from.min(last);
+        let mut keys = walked(&mut rng, from, to, start, spread);
+        if code == value_code::EXCESS && from > first + 1 {
+            // A resource is 0 from the first frame until it is something.
+            keys.insert(0, ValueKey::new(first, 0.0));
+            keys.insert(1, ValueKey::new(from - 1, 0.0));
+        }
+        track.values.push(ValueTrack { team, code, keys });
+    }
+    // Storage and the share level stand still and then change once.
+    for (code, before, after) in [
+        (value_code::STORAGE, 1000.0, 1100.0),
+        (energy + value_code::SHARE, 0.99, 0.5),
+    ] {
+        track.values.push(ValueTrack {
+            team: 0,
+            code,
+            keys: [
+                (first, before),
+                (second_window + 99, before),
+                (second_window + 100, after),
+            ]
+            .into_iter()
+            .filter(|(frame, _)| *frame <= last)
+            .map(|(frame, value)| ValueKey::new(frame, value))
+            .collect(),
+        });
+    }
     track
 }

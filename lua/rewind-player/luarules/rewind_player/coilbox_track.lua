@@ -35,6 +35,24 @@ local concat = table.concat
 
 local M = {}
 
+--- The codes of the numbers of a team, as `Window:valueOf` takes them. Add
+-- `ENERGY` to one of the first nine for energy. A rules parameter is
+-- `PARAMETER` plus its place in the info chunk's list, counted from 0.
+M.VALUE = {
+	HELD = 0,
+	STORAGE = 1,
+	PULL = 2,
+	INCOME = 3,
+	EXPENSE = 4,
+	SHARE = 5,
+	SENT = 6,
+	RECEIVED = 7,
+	EXCESS = 8,
+	ENERGY = 16,
+	PARAMETER = 256,
+	NO_TEAM = 255,
+}
+
 local FORMAT_VERSION = 1
 local HEADER_SIZE = 96
 local INDEX_ENTRY_SIZE = 16
@@ -103,8 +121,13 @@ local UNPACK = {
 	[3] = VFS.UnpackS16,
 	[4] = VFS.UnpackU32,
 	[5] = VFS.UnpackS32,
+	[6] = VFS.UnpackF32,
 }
-local TYPE_NAME = { [1] = "u8", [2] = "u16", [3] = "s16", [4] = "u32", [5] = "s32" }
+local TYPE_NAME = { [1] = "u8", [2] = "u16", [3] = "s16", [4] = "u32", [5] = "s32", [6] = "f32" }
+
+--- The first code of a rules parameter among the numbers of a team. A code
+-- below it is a resource.
+local PARAMETER = M.VALUE.PARAMETER
 
 --- A decompressed chunk's list of columns. A column of a type this reader does
 -- not know is left out, as the format says to.
@@ -501,6 +524,29 @@ local function decodeWindow(chunk, index, header)
 	w.projectileX, w.projectileY, w.projectileZ = p[1], p[2], p[3]
 	w.projectileVX, w.projectileVY, w.projectileVZ = v[1], v[2], v[3]
 
+	-- The numbers of the teams and of the game: what a team holds, the rest of
+	-- its economy and rules parameters. A track is one number of one team. A
+	-- track from before recorder version 4 has none.
+	local valueTeam = column(chunk, 104, 1)
+	local values = #valueTeam
+	w.valueCount = values
+	w.valueTeam = valueTeam
+	w.valueCode = exactly(column(chunk, 105, 2), values, 105)
+	local valueKeyCount = exactly(column(chunk, 106, 2), values, 106)
+	local valueKeyFirst
+	valueKeyFirst, total = layout(valueKeyCount, values)
+	times = exactly(column(chunk, 107, 2), total, 107)
+	toFrames(times, valueKeyFirst, valueKeyCount, values, start, "a number of a team")
+	w.valueKeyFirst, w.valueKeyCount, w.valueTime = valueKeyFirst, valueKeyCount, times
+	w.valueValue = exactly(column(chunk, 108, 6), total, 108)
+	-- By team and code, as one number: a team is under 256 and a code under
+	-- 65,536, so the two together are under 16,777,216.
+	w.valueIndex, w.valueCursor = {}, {}
+	for v = 1, values do
+		w.valueIndex[valueTeam[v] * 65536 + w.valueCode[v]] = v
+		w.valueCursor[v] = valueKeyFirst[v]
+	end
+
 	-- A cursor for each curve, at its first key.
 	w.transformCursor, w.statusCursor, w.queueCursor = {}, {}, {}
 	for i = 1, w.unitCount do
@@ -699,6 +745,41 @@ function Window:sampleQueue(i, frame)
 	return self.queueItemFirst[a], self.queueItemCount[a]
 end
 
+--- The track of one number of a team in this window, or nil when the window
+-- has none. `team` is the team's id, or 255 for a number that is the game's.
+-- `code` is the file's: 0 to 8 for the metal a team holds, its storage, pull,
+-- income, expense, share level, sent, received and excess, 16 to 24 for the
+-- same of energy, and 256 and up for a rules parameter, counted from the info
+-- chunk's first name. A resource with no track is 0 for the whole window. A
+-- rules parameter with none had not been set by the window's end.
+function Window:valueOf(team, code)
+	return self.valueIndex[team * 65536 + code]
+end
+
+--- Track `v` of the team numbers at `frame`, in a straight line between keys.
+-- Nothing for a rules parameter before the frame it was first set on, and for a
+-- track with no key, which a good track never has.
+function Window:sampleValue(v, frame)
+	local n = self.valueKeyCount[v]
+	if n == 0 then
+		return nil
+	end
+	local first = self.valueKeyFirst[v]
+	local times = self.valueTime
+	if frame < times[first] and self.valueCode[v] >= PARAMETER then
+		return nil
+	end
+	local a = locate(self, times, first, first + n - 1, self.valueCursor[v], frame)
+	self.valueCursor[v] = a
+	local values = self.valueValue
+	local ta = times[a]
+	if ta >= frame or a == first + n - 1 then
+		return values[a]
+	end
+	local b = a + 1
+	return values[a] + (values[b] - values[a]) * ((frame - ta) / (times[b] - ta))
+end
+
 --- The first position in the projectiles whose first frame is `frame` or
 -- later, or one past the end. Only for a window whose entries are in order.
 local function bornFrom(self, frame)
@@ -833,6 +914,10 @@ local function readHeader(fetch)
 		unitCount = VFS.UnpackU32(head, 53),
 		projectileCount = VFS.UnpackU32(head, 57),
 		featureCount = VFS.UnpackU32(head, 61),
+		-- Both 0 in a track from before recorder version 4, which holds no team
+		-- resources and has zero bytes here.
+		resourceTolerance = VFS.UnpackF32(head, 81),
+		resourceFraction = VFS.UnpackF32(head, 85),
 	}
 	local id = {}
 	for i = 65, 80 do
@@ -991,6 +1076,9 @@ function Track:info()
 		for i = 1, #across do
 			piece.unitFootprints[i] = { across[i], along[i] }
 		end
+		-- A track from before recorder version 4 names no rules parameters.
+		piece.teamParams = strings(chunk, 183, 184)
+		piece.gameParams = strings(chunk, 185, 186)
 		return piece
 	end)
 	if not info then

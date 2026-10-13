@@ -121,13 +121,81 @@ pub struct ProjectileKey {
     pub velocity: [i32; 3],
 }
 
+/// One number of a team's, or of the game's, at one frame: what a team holds,
+/// its storage, a rules parameter. The number is a 32 bit float, which is what
+/// the engine holds, kept as its bits so that two keys compare exactly.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ValueKey {
+    pub frame: u32,
+    /// The bits of the float. [`ValueKey::value`] gives the number.
+    pub bits: u32,
+}
+
+impl ValueKey {
+    pub fn new(frame: u32, value: f32) -> Self {
+        // Nothing and minus nothing are one value, and have to compare as one.
+        let value = if value == 0.0 { 0.0 } else { value };
+        Self {
+            frame,
+            bits: value.to_bits(),
+        }
+    }
+
+    pub fn value(&self) -> f32 {
+        f32::from_bits(self.bits)
+    }
+}
+
+/// What a [`ValueTrack`] holds, as the file's code for it.
+pub mod value_code {
+    /// What the team holds of a resource. The eight that follow are in the
+    /// order `Spring.GetTeamResources` answers in.
+    pub const HELD: u16 = 0;
+    pub const STORAGE: u16 = 1;
+    pub const PULL: u16 = 2;
+    pub const INCOME: u16 = 3;
+    pub const EXPENSE: u16 = 4;
+    /// The share level, a fraction from 0 to 1.
+    pub const SHARE: u16 = 5;
+    pub const SENT: u16 = 6;
+    pub const RECEIVED: u16 = 7;
+    pub const EXCESS: u16 = 8;
+    /// Added to one of the nine above for energy. Metal adds nothing.
+    pub const ENERGY: u16 = 16;
+    /// A rules parameter: this plus its index in the info chunk's team
+    /// parameter names, or in its game parameter names for [`super::NO_TEAM`].
+    pub const PARAMETER: u16 = 256;
+}
+
+/// The team of a [`ValueTrack`] that belongs to the game and to no team.
+pub const NO_TEAM: u8 = 255;
+
+/// One number of one team over time, or of the game when `team` is
+/// [`NO_TEAM`]. It runs in a straight line between keys.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValueTrack {
+    pub team: u8,
+    /// See [`value_code`].
+    pub code: u16,
+    pub keys: Vec<ValueKey>,
+}
+
+impl ValueTrack {
+    /// Whether the track is a rules parameter and not a resource. A resource
+    /// with no track is 0, and a parameter with none was never set.
+    pub fn is_parameter(&self) -> bool {
+        self.code >= value_code::PARAMETER
+    }
+}
+
 keyed!(
     TransformKey,
     StatusKey,
     TargetKey,
     PoseKey,
     QueueKey,
-    ProjectileKey
+    ProjectileKey,
+    ValueKey
 );
 
 /// One unit, over the whole match when written and over one window when read.
@@ -243,4 +311,10 @@ pub struct Info {
     pub teams: Vec<Team>,
     /// The map's size along x and z in elmos.
     pub map_size: [u32; 2],
+    /// The names of the team rules parameters the track holds. A
+    /// [`ValueTrack`] names one by its index here. Empty in a track written
+    /// before recorder version 4, and for a game whose adapter names none.
+    pub team_params: Vec<String>,
+    /// The names of the game rules parameters the track holds.
+    pub game_params: Vec<String>,
 }

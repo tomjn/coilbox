@@ -36,11 +36,11 @@ mod track;
 mod window;
 
 pub use chunk::{compress, decompress, Chunk, Column};
-pub use curve::{held, pose_at, projectile_at, status_at, transform_at};
+pub use curve::{held, pose_at, projectile_at, status_at, transform_at, value_at};
 pub use error::{Result, TrackError};
 pub use header::{
-    Extent, Header, Settings, WindowEntry, BLOCK_SIZE, FORMAT_VERSION, HEADER_SIZE,
-    INDEX_ENTRY_SIZE, MAGIC,
+    value_allowance, Extent, Header, Settings, WindowEntry, BLOCK_SIZE, FORMAT_VERSION,
+    HEADER_SIZE, INDEX_ENTRY_SIZE, MAGIC,
 };
 pub use keys::*;
 pub use quant::{
@@ -50,6 +50,6 @@ pub use reader::TrackReader;
 pub use terrain::apply_terrain;
 pub use track::Track;
 pub use window::{
-    FrameState, PoseState, ProjectileState, TargetState, UnitState, Window, WindowProjectile,
-    WindowUnit,
+    FrameState, PoseState, ProjectileState, TargetState, UnitState, ValueState, Window,
+    WindowProjectile, WindowUnit,
 };

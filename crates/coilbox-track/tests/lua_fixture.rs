@@ -116,7 +116,7 @@ fn expected_lua(bytes: &[u8]) -> String {
     let id: String = h.game_id.iter().map(|b| format!("{b:02x}")).collect();
     writeln!(
         o,
-        "\theader = {{ recorderVersion = {}, framesPerSecond = {}, firstFrame = {}, lastFrame = {}, windowLength = {}, windowCount = {}, tolerance = {}, positionShift = {}, velocityShift = {}, rotationBits = {}, sampleInterval = {}, unitCount = {}, projectileCount = {}, featureCount = {}, gameId = \"{id}\" }},",
+        "\theader = {{ recorderVersion = {}, framesPerSecond = {}, firstFrame = {}, lastFrame = {}, windowLength = {}, windowCount = {}, tolerance = {}, resourceTolerance = {}, resourceFraction = {}, positionShift = {}, velocityShift = {}, rotationBits = {}, sampleInterval = {}, unitCount = {}, projectileCount = {}, featureCount = {}, gameId = \"{id}\" }},",
         h.recorder_version,
         h.frames_per_second,
         h.first_frame,
@@ -124,6 +124,8 @@ fn expected_lua(bytes: &[u8]) -> String {
         h.window_length,
         h.window_count,
         num(h.tolerance as f64),
+        num(h.value_tolerance as f64),
+        num(h.value_fraction as f64),
         h.position_shift,
         h.velocity_shift,
         h.rotation_bits,
@@ -177,6 +179,8 @@ fn expected_lua(bytes: &[u8]) -> String {
         info.map_size[0], info.map_size[1]
     )
     .unwrap();
+    writeln!(o, "\t\tteamParams = {},", strings(&info.team_params)).unwrap();
+    writeln!(o, "\t\tgameParams = {},", strings(&info.game_params)).unwrap();
     writeln!(o, "\t}},").unwrap();
 
     writeln!(o, "\tfeatures = {{").unwrap();
@@ -301,7 +305,16 @@ fn expected_lua(bytes: &[u8]) -> String {
             )
             .unwrap();
         }
-        writeln!(o, "\t\t\t}} }},").unwrap();
+        writeln!(o, "\t\t\t}},").unwrap();
+        // Each number of a team's or the game's that has a value at the frame,
+        // as its team, its code and the value. A resource the window has no
+        // track for is 0 and is not listed.
+        let values: Vec<String> = s
+            .values
+            .iter()
+            .map(|v| format!("{{ {}, {}, {} }}", v.team, v.code, num(v.value)))
+            .collect();
+        writeln!(o, "\t\t\tvalues = {{ {} }} }},", values.join(", ")).unwrap();
     }
     writeln!(o, "\t}},").unwrap();
     writeln!(o, "}}").unwrap();
