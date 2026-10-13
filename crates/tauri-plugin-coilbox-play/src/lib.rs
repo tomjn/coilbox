@@ -99,7 +99,7 @@ impl ExitOutcome {
 /// "running" state before then.
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
-enum LaunchEvent {
+pub enum LaunchEvent {
     Started,
     Exited {
         code: Option<i32>,
@@ -363,6 +363,61 @@ async fn play_launch_save<R: Runtime>(
     Ok(launch_result(result))
 }
 
+/// Launch the engine on a start script that `prepare` writes, through the same
+/// registry as every other launch, for a command in another plugin that makes a
+/// game of its own first (issue #3793).
+///
+/// The registry is checked before `prepare` runs, because `prepare` may rewrite
+/// a game folder that the running game has open. Resolves when the engine
+/// exits, as [`play_launch_replay`] does. `prepare` runs on a blocking thread
+/// and answers the script's path.
+pub async fn launch_prepared<R: Runtime>(
+    app: &AppHandle<R>,
+    executable: String,
+    data_dir: String,
+    run_id: String,
+    on_event: Channel<LaunchEvent>,
+    prepare: impl FnOnce() -> Result<PathBuf, String> + Send + 'static,
+) -> CliResult {
+    let Some(reg) = app.try_state::<RunRegistry>() else {
+        return CliResult::err("the game launcher is not available");
+    };
+    launch_prepared_on(
+        reg.inner().clone(),
+        executable,
+        data_dir,
+        run_id,
+        on_event,
+        prepare,
+    )
+    .await
+}
+
+async fn launch_prepared_on(
+    reg: RunRegistry,
+    executable: String,
+    data_dir: String,
+    run_id: String,
+    on_event: Channel<LaunchEvent>,
+    prepare: impl FnOnce() -> Result<PathBuf, String> + Send + 'static,
+) -> CliResult {
+    let bin = PathBuf::from(&executable);
+    if !bin.is_file() {
+        return CliResult::err(format!("engine executable not found: {executable}"));
+    }
+    // Single game at a time.
+    if !reg.lock().unwrap().is_empty() {
+        return CliResult::err("a game is already running");
+    }
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let script = prepare()?;
+        let args = build_engine_args(&script.to_string_lossy(), None);
+        launch_blocking(bin, args, data_dir, run_id, reg, on_event)
+    })
+    .await;
+    launch_result(result)
+}
+
 /// `play_cancel` — kill an in-flight game by run id (its launch resolves shortly
 /// after, unfreezing the UI).
 #[tauri::command]
@@ -588,5 +643,91 @@ mod tests {
             "a run taken out of the registry reports no exit status, which is how a cancel \
              is told from a crash"
         );
+    }
+    /// A real file to stand in for an engine that is never started, because
+    /// the tests below are refused before the spawn.
+    fn any_file() -> String {
+        std::env::current_exe()
+            .expect("the test binary")
+            .to_string_lossy()
+            .into_owned()
+    }
+
+    /// The guard that keeps a second game from starting over a running one has
+    /// to come before `prepare`, which rewrites a game folder the running game
+    /// has open (issue #3793).
+    #[test]
+    fn a_prepared_launch_is_refused_before_it_prepares_anything_while_a_game_runs() {
+        let reg = RunRegistry::default();
+        let (bin, args) = a_process_that_lasts();
+        let running = {
+            let reg = reg.clone();
+            std::thread::spawn(move || {
+                launch_blocking(bin, args, a_data_dir(), "first".to_string(), reg, nowhere())
+            })
+        };
+        eventually_running(&reg, "first");
+
+        let prepared = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let flag = prepared.clone();
+        let answer = tauri::async_runtime::block_on(launch_prepared_on(
+            reg.clone(),
+            any_file(),
+            a_data_dir(),
+            "second".to_string(),
+            nowhere(),
+            move || {
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(PathBuf::from("script.txt"))
+            },
+        ));
+
+        assert!(!answer.success);
+        assert_eq!(answer.error.as_deref(), Some("a game is already running"));
+        assert!(
+            !prepared.load(std::sync::atomic::Ordering::SeqCst),
+            "the game folder must not be rewritten under a running game"
+        );
+        assert_eq!(pid_of(&reg, "second"), None);
+        running
+            .join()
+            .expect("the launch thread")
+            .expect("a process that starts and ends");
+    }
+
+    /// A prepare that fails ends the launch with its reason and starts nothing.
+    #[test]
+    fn a_prepare_that_fails_starts_no_engine() {
+        let reg = RunRegistry::default();
+        let answer = tauri::async_runtime::block_on(launch_prepared_on(
+            reg.clone(),
+            any_file(),
+            a_data_dir(),
+            "only".to_string(),
+            nowhere(),
+            || Err("no track".to_string()),
+        ));
+
+        assert!(!answer.success);
+        assert_eq!(answer.error.as_deref(), Some("no track"));
+        assert!(reg.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_prepared_launch_needs_an_engine_that_is_there() {
+        let answer = tauri::async_runtime::block_on(launch_prepared_on(
+            RunRegistry::default(),
+            "/no/such/engine".to_string(),
+            a_data_dir(),
+            "only".to_string(),
+            nowhere(),
+            || Ok(PathBuf::from("script.txt")),
+        ));
+
+        assert!(!answer.success);
+        assert!(answer
+            .error
+            .unwrap()
+            .contains("engine executable not found"));
     }
 }
