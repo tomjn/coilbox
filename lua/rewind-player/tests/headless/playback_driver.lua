@@ -66,6 +66,8 @@ local SETTLE = 3
 local PATIENCE = 300
 -- A file in the playback game that asks for the whole match plan.
 local WHOLE_MATCH = "coilbox_rewind/driver_whole_match.lua"
+-- And one that asks for the plan that looks at a match's shots.
+local SHOTS = "coilbox_rewind/driver_shots.lua"
 
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
@@ -78,14 +80,54 @@ local transform, status = { 0, 0, 0, 0, 0, 0, 0 }, { 0, 0, 0 }
 -- effect explodes, and one removed quietly does not.
 local explosions = 0
 
+-- The same for the weapons the track's shots are of, by the engine's weapon
+-- definition id, with where each was and what the ground was there.
+local shotWeapons = {}
+local impacts, impactCount = {}, 0
+-- Hits the engine worked out some damage for, before any gadget changed it,
+-- and hits that did some. The player's shots are created with none to do.
+local rawDamage, doneDamage = 0, 0
+
 function gadget:Initialize()
 	for weaponDefID in pairs(WeaponDefs) do
 		Script.SetWatchExplosion(weaponDefID, true)
 	end
 end
 
-function gadget:Explosion()
+function gadget:Explosion(weaponDefID, x, y, z)
 	explosions = explosions + 1
+	if shotWeapons[weaponDefID] then
+		impactCount = impactCount + 1
+		impacts[impactCount] = { def = weaponDefID, x = x, y = y, z = z, ground = Spring.GetGroundHeight(x, z), frame = Spring.GetGameRulesParam("coilbox_rewind_frame") }
+	end
+end
+
+-- This gadget is the first the game's handler asks, so the damage is the
+-- engine's own.
+function gadget:UnitPreDamaged(_, _, _, damage, _, weaponDefID)
+	if weaponDefID and shotWeapons[weaponDefID] and damage ~= 0 then
+		rawDamage = rawDamage + 1
+	end
+end
+
+function gadget:UnitDamaged(_, _, _, damage, _, weaponDefID)
+	if weaponDefID and shotWeapons[weaponDefID] and damage ~= 0 then
+		doneDamage = doneDamage + 1
+	end
+end
+
+-- The same for features: hits by the track's weapons that the engine worked
+-- out some damage for, and hits by anything else, which is a unit's death.
+local featureShotDamage, featureOtherDamage = 0, 0
+
+function gadget:FeaturePreDamaged(_, _, _, damage, weaponDefID)
+	if damage ~= 0 then
+		if weaponDefID and shotWeapons[weaponDefID] then
+			featureShotDamage = featureShotDamage + 1
+		else
+			featureOtherDamage = featureOtherDamage + 1
+		end
+	end
 end
 
 local function say(text)
@@ -356,6 +398,377 @@ local function ending()
 	say("teams dead=" .. dead .. " of=" .. #Spring.GetTeamList() .. " game_over=" .. (Spring.IsGameOver() and 1 or 0))
 end
 
+-- Projectiles (issue #3795).
+
+local shot = { 0, 0, 0, 0, 0, 0 }
+
+--- The weapon definitions of the track that the game has, and whether each is
+-- of a kind that is held in the air and not fired once.
+local function weapons()
+	local held = {}
+	for i, name in ipairs(info.weaponDefs) do
+		local def = WeaponDefNames[name]
+		if def then
+			shotWeapons[def.id] = i
+			held[i] = def.type ~= "BeamLaser" and def.type ~= "LightningCannon"
+			say(string.format("weapon name=%s type=%s held=%d", name, def.type, held[i] and 1 or 0))
+		else
+			say("weapon name=" .. name .. " type=missing held=0")
+		end
+	end
+	return held
+end
+
+--- Every shot of the track once: its weapon, its first and last frame, where
+-- it starts, and where and how fast the track last has it moving.
+local function allShots(held)
+	local h = track.header
+	local list, bySerial = {}, {}
+	for k = 0, h.windowCount - 1 do
+		local w = assert(track:loadWindow(k))
+		for p = 1, w.projectileCount do
+			local weapon = w.projectileWeapon[p] + 1
+			if w.projectileWeapon[p] ~= 65535 and held[weapon] then
+				local serial = w.projectileSerial[p]
+				local one = bySerial[serial]
+				if not one then
+					w:sampleProjectile(p, w.projectileFirstFrame[p], shot)
+					one = { serial = serial, weapon = weapon, first = w.projectileFirstFrame[p], x = shot[1], y = shot[2], z = shot[3] }
+					bySerial[serial] = one
+					list[#list + 1] = one
+				end
+				one.last = w.projectileLastFrame[p]
+				for frame = w.projectileFirstFrame[p], w.projectileLastFrame[p] do
+					w:sampleProjectile(p, frame, shot)
+					if shot[4] ^ 2 + shot[5] ^ 2 + shot[6] ^ 2 >= h.tolerance ^ 2 then
+						one.endFrame = frame
+						one.ex, one.ey, one.ez, one.evx, one.evy, one.evz = shot[1], shot[2], shot[3], shot[4], shot[5], shot[6]
+					end
+				end
+			end
+		end
+	end
+	return list
+end
+
+--- The engine's weapon projectiles of the track's weapons.
+local function airborne()
+	local list = {}
+	local big = 1e9
+	for _, id in ipairs(Spring.GetProjectilesInRectangle(-big, -big, big, big, false, true)) do
+		local def = Spring.GetProjectileDefID(id)
+		if def and shotWeapons[def] then
+			list[#list + 1] = id
+		end
+	end
+	return list
+end
+
+--- The track's shots at `frame` against the engine's projectiles. A shot the
+-- track has under the ground is expected a position step above it, which is
+-- where the player holds one.
+local function measureShots(label, frame, held, shots)
+	local h = track.header
+	local w = assert(track:seek(frame))
+	local engine = airborne()
+	local taken = {}
+	local wanted, raised, worstPlace, worstTurn, worstSpeed = 0, 0, 0, 0, 0
+	-- A shot at the end of its flight is held short of where the track has it:
+	-- by the tolerance on its last frame, and a bolt by a frame of its flight
+	-- from the frame before it stops. `short` is how many were, `place` the
+	-- furthest any other shot is from the track, and `over` the furthest any
+	-- shot is past what it may be.
+	local short, over = 0, 0
+	local bySerial = {}
+	for _, one in ipairs(shots) do
+		bySerial[one.serial] = one
+	end
+	for p = 1, w.projectileCount do
+		local weapon = w.projectileWeapon[p] + 1
+		if w.projectileWeapon[p] ~= 65535 and held[weapon] and w:projectileExistsAt(p, frame) then
+			wanted = wanted + 1
+			w:sampleProjectile(p, frame, shot)
+			local x, y, z = shot[1], shot[2], shot[3]
+			local floor = math.max(Spring.GetGroundHeight(x, z), 0)
+			if y <= floor then
+				y = floor + h.positionStep
+				raised = raised + 1
+			end
+			local def = WeaponDefNames[info.weaponDefs[weapon]].id
+			local best, bestDistance
+			for _, id in ipairs(engine) do
+				if not taken[id] and Spring.GetProjectileDefID(id) == def then
+					local px, py, pz = Spring.GetProjectilePosition(id)
+					local d = math.sqrt((px - x) ^ 2 + (py - y) ^ 2 + (pz - z) ^ 2)
+					if not bestDistance or d < bestDistance then
+						best, bestDistance = id, d
+					end
+				end
+			end
+			if best then
+				taken[best] = true
+				local one = bySerial[w.projectileSerial[p]]
+				local slack = 0
+				if one.endFrame and one.endFrame < one.last then
+					if frame > one.endFrame - 1 then
+						slack = math.sqrt(one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2)
+					end
+				elseif frame > one.last - 1 then
+					slack = h.tolerance
+				end
+				if slack > 0 then
+					short = short + 1
+				else
+					worstPlace = math.max(worstPlace, bestDistance)
+				end
+				over = math.max(over, bestDistance - slack)
+				local vx, vy, vz = Spring.GetProjectileVelocity(best)
+				local speed = math.sqrt(vx ^ 2 + vy ^ 2 + vz ^ 2)
+				local recorded = math.sqrt(shot[4] ^ 2 + shot[5] ^ 2 + shot[6] ^ 2)
+				worstSpeed = math.max(worstSpeed, speed)
+				if speed > 0 and recorded >= h.tolerance then
+					worstTurn = math.max(worstTurn, 1 - (vx * shot[4] + vy * shot[5] + vz * shot[6]) / (speed * recorded))
+				end
+			else
+				worstPlace = math.huge
+			end
+		end
+	end
+	say(string.format("%s frame=%s shown=%s track_shots=%d engine_shots=%d raised=%d short=%d place=%.4f over=%.4f turn=%.6f speed=%.4f", label, tostring(frame), tostring(param("frame")), wanted, #engine, raised, short, worstPlace, over, worstTurn, worstSpeed))
+end
+
+--- The plan for the shots of a whole recorded match: what is in the air paused
+-- during a fight and at seeks, a shot followed backward frame by frame, the
+-- fight watched forward at the match's own speed, then at 4x and backward, and
+-- a seek across the whole match and back.
+local function shotPlan()
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
+	local held = weapons()
+	local shots = allShots(held)
+	say("shots held_kinds=" .. #shots)
+	if #shots == 0 then
+		SendToUnsynced(REPORT)
+		return
+	end
+
+	-- The frame with the most in the air, and the frames the fight spans.
+	local perFrame, busiest, most = {}, nil, 0
+	local fightStart, fightEnd = shots[1].first, shots[1].last
+	local longest = shots[1]
+	for _, one in ipairs(shots) do
+		for frame = one.first, one.last do
+			perFrame[frame] = (perFrame[frame] or 0) + 1
+			if perFrame[frame] > most then
+				busiest, most = frame, perFrame[frame]
+			end
+		end
+		fightStart, fightEnd = math.min(fightStart, one.first), math.max(fightEnd, one.last)
+		if one.endFrame and longest.endFrame and one.endFrame - one.first > longest.endFrame - longest.first then
+			longest = one
+		end
+	end
+	say(string.format("fight first=%d last=%d busiest=%d most=%d", fightStart, fightEnd, busiest, most))
+
+	-- 1. Paused during the fight, and held there for five seconds.
+	send("pause")
+	seekTo(busiest)
+	push("run", function()
+		measureShots("paused", busiest, held, shots)
+	end)
+	push("wait", 150)
+	push("run", function()
+		measureShots("held", busiest, held, shots)
+		say("impacts paused=" .. impactCount)
+	end)
+
+	-- 2. Twenty seeks to frames with shots in the air, in an order that goes
+	-- both ways.
+	local frames = {}
+	for frame = fightStart, fightEnd do
+		if perFrame[frame] then
+			frames[#frames + 1] = frame
+		end
+	end
+	for n = 1, 20 do
+		local frame = frames[1 + (n * 7919) % #frames]
+		seekTo(frame)
+		push("run", function()
+			measureShots("shots_seek n=" .. n, frame, held, shots)
+		end)
+	end
+	push("run", function()
+		say("impacts seeks=" .. impactCount)
+	end)
+
+	-- 3. Backward, one shot frame by frame: how far it is from where the track
+	-- has it and from where it was fired.
+	local flight = longest.endFrame - longest.first - 2
+	seekTo(longest.endFrame)
+	send("speed 1")
+	send("play -1")
+	-- Looked at from the frame play has started on.
+	push("await", longest.endFrame - 1)
+	local def = WeaponDefNames[info.weaponDefs[longest.weapon]].id
+	local previous, falls, rises, seen, worst = nil, 0, 0, 0, 0
+	push("each", flight, function()
+		local frame = param("frame")
+		local w = assert(track:seek(frame))
+		for p = 1, w.projectileCount do
+			if w.projectileSerial[p] == longest.serial and w:projectileExistsAt(p, frame) then
+				w:sampleProjectile(p, frame, shot)
+				-- Under the ground the player holds it a position step above.
+				local floor = math.max(Spring.GetGroundHeight(shot[1], shot[3]), 0)
+				if shot[2] <= floor then
+					shot[2] = floor + h.positionStep
+				end
+				local best
+				for _, id in ipairs(airborne()) do
+					if Spring.GetProjectileDefID(id) == def then
+						local px, py, pz = Spring.GetProjectilePosition(id)
+						local d = math.sqrt((px - shot[1]) ^ 2 + (py - shot[2]) ^ 2 + (pz - shot[3]) ^ 2)
+						if not best or d < best.d then
+							best = { d = d, gun = math.sqrt((px - longest.x) ^ 2 + (py - longest.y) ^ 2 + (pz - longest.z) ^ 2) }
+						end
+					end
+				end
+				if best then
+					seen, worst = seen + 1, math.max(worst, best.d)
+					if previous then
+						if best.gun < previous then
+							falls = falls + 1
+						else
+							rises = rises + 1
+						end
+					end
+					previous = best.gun
+				end
+			end
+		end
+	end)
+	send("pause")
+	push("run", function()
+		say(string.format("backward serial=%d weapon=%s frames=%d seen=%d falls=%d rises=%d place=%.4f shown=%s first=%d impacts=%d", longest.serial, info.weaponDefs[longest.weapon], flight, seen, falls, rises, worst, tostring(param("frame")), longest.first, impactCount))
+	end)
+
+	-- 4. The fight watched forward at the match's own speed, then at 4x, then
+	-- backward. Only the first lands anything.
+	-- A whole number of steps at every speed, so that play lands on the end.
+	local from = math.max(first, fightStart - 5)
+	local to = math.min(last, from + math.ceil((fightEnd + 30 - from) / 4) * 4)
+	local function watch(label, speed, direction)
+		local before
+		seekTo(direction == 1 and from or to)
+		push("run", function()
+			before = impactCount
+			rawDamage, doneDamage = 0, 0
+			featureShotDamage, featureOtherDamage = 0, 0
+		end)
+		send("speed " .. speed)
+		send("play " .. direction)
+		push("await", direction == 1 and to or from, math.ceil((to - from) / speed) + PATIENCE)
+		send("pause")
+		push("wait", 30)
+		push("run", function()
+			-- How far each impact is from the nearest place a shot of that weapon
+			-- stopped moving, along its last frame of flight, and how many left a
+			-- mark on the ground.
+			local worstOff, total, craters, late = 0, 0, 0, 0
+			for n = before + 1, impactCount do
+				local hit = impacts[n]
+				local best = math.huge
+				for _, one in ipairs(shots) do
+					if one.endFrame and shotWeapons[hit.def] == one.weapon and math.abs(hit.frame - one.endFrame) <= 3 then
+						-- The nearest point of the last frame's flight.
+						local length = one.evx ^ 2 + one.evy ^ 2 + one.evz ^ 2
+						local along = math.max(0, math.min(1, ((hit.x - one.ex) * one.evx + (hit.y - one.ey) * one.evy + (hit.z - one.ez) * one.evz) / length))
+						local d = math.sqrt((hit.x - one.ex - one.evx * along) ^ 2 + (hit.y - one.ey - one.evy * along) ^ 2 + (hit.z - one.ez - one.evz * along) ^ 2)
+						best = math.min(best, d)
+					end
+				end
+				if best == math.huge then
+					late = late + 1
+				else
+					worstOff, total = math.max(worstOff, best), total + best
+				end
+				if math.abs(Spring.GetGroundHeight(hit.x, hit.z) - hit.ground) > 0.01 then
+					craters = craters + 1
+				end
+			end
+			local ended = 0
+			for _, one in ipairs(shots) do
+				if one.endFrame and one.endFrame > from and one.endFrame <= to then
+					ended = ended + 1
+				end
+			end
+			local landed = impactCount - before
+			if speed <= 2 and direction == 1 then
+				-- The shots that ended and have no impact of their weapon near their
+				-- end, by weapon, and the first few.
+				local missed, listed = {}, 0
+				for _, one in ipairs(shots) do
+					if one.endFrame and one.endFrame > from and one.endFrame <= to then
+						local found = false
+						for n = before + 1, impactCount do
+							local hit = impacts[n]
+							if shotWeapons[hit.def] == one.weapon and math.abs(hit.frame - one.endFrame) <= 3 then
+								found = true
+								break
+							end
+						end
+						if not found then
+							missed[one.weapon] = (missed[one.weapon] or 0) + 1
+							if listed < 6 then
+								listed = listed + 1
+								say(string.format("missed %s serial=%d weapon=%s first=%d end=%d last=%d", label, one.serial, info.weaponDefs[one.weapon], one.first, one.endFrame, one.last))
+							end
+						end
+					end
+				end
+				for weapon, n in pairs(missed) do
+					say(string.format("missed %s weapon=%s shots=%d", label, info.weaponDefs[weapon], n))
+				end
+			end
+			if speed > 2 or direction == -1 then
+				-- Nothing should land here, so say what did and what was near.
+				for n = before + 1, math.min(impactCount, before + 12) do
+					local hit = impacts[n]
+					local near = "nothing"
+					local unitID = Spring.GetUnitsInSphere(hit.x, hit.y, hit.z, 60)[1]
+					local featureID = Spring.GetFeaturesInSphere(hit.x, hit.y, hit.z, 60)[1]
+					if unitID then
+						near = "unit " .. UnitDefs[Spring.GetUnitDefID(unitID)].name
+					elseif featureID then
+						near = "feature " .. FeatureDefs[Spring.GetFeatureDefID(featureID)].name
+					end
+					say(string.format("stray %s weapon=%s frame=%s at=%.1f,%.1f,%.1f ground=%.1f near=%s", label, info.weaponDefs[shotWeapons[hit.def]], tostring(hit.frame), hit.x, hit.y, hit.z, hit.ground, near))
+				end
+			end
+			say(string.format("watched %s speed=%s direction=%d from=%d to=%d shots_ended=%d impacts=%d unmatched=%d off_mean=%.3f off_worst=%.3f craters=%d raw_damage=%d done_damage=%d feature_damage=%d feature_damage_by_deaths=%d in_air_after=%d", label, tostring(speed), direction, from, to, ended, landed, late, total / math.max(landed - late, 1), worstOff, craters, rawDamage, doneDamage, featureShotDamage, featureOtherDamage, #airborne()))
+			measure("after_" .. label, param("frame"))
+		end)
+	end
+	watch("forward", 1, 1)
+	watch("half", 0.5, 1)
+	watch("double", 2, 1)
+	watch("fast", 4, 1)
+	watch("backward", 1, -1)
+
+	-- 5. Across the whole match and back, and to the fight.
+	seekTo(first)
+	seekTo(last)
+	seekTo(first)
+	seekTo(busiest)
+	seekTo(last)
+	push("run", function()
+		measure("after_seeks", last)
+		measureShots("shots_after_seeks", last, held, shots)
+		ending()
+		SendToUnsynced(REPORT)
+	end)
+end
+
 --- The plan for a whole recorded match (issue #3800): all of it forward, all of
 -- it backward, ten seeks, and a death at the match's own speed, which is where
 -- the base game's own gadgets hear of a unit dying the way they would in a
@@ -552,7 +965,9 @@ function gadget:GameFrame()
 		info, features = assert(track:info()), assert(track:features())
 		-- The test that wants a whole match played writes this file beside the
 		-- track. Without it the plan is the fixture match's.
-		if VFS.FileExists(WHOLE_MATCH) then
+		if VFS.FileExists(SHOTS) then
+			shotPlan()
+		elseif VFS.FileExists(WHOLE_MATCH) then
 			matchPlan()
 		else
 			plan()
@@ -572,6 +987,13 @@ function gadget:GameFrame()
 					return
 				end
 				say("lost frame=" .. tostring(item.a) .. " shown=" .. tostring(param("frame")))
+			end
+		elseif item.kind == "each" then
+			-- A function run on each of a number of frames.
+			item.waited = item.waited + 1
+			if item.waited <= item.a then
+				item.b()
+				return
 			end
 		elseif item.kind == "wait" then
 			item.waited = item.waited + 1
