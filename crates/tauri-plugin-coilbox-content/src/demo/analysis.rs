@@ -211,6 +211,10 @@ pub enum RunPhase {
     Loading,
     /// The match is being played back.
     Playing,
+    /// The engine has exited and the recorder's dump is being thinned into a
+    /// track. Only a job that records gets here, and it has no progress to
+    /// report: `frame` stands where the playback ended.
+    Thinning,
 }
 
 /// Where a run is, read from the logger's file as it grows.

@@ -20,6 +20,15 @@
 //!   about the replay, so it is kept only here, as the last failure for that
 //!   match this session, for the page to show.
 //! - A match with a current analysis is not run again unless the job says to.
+//! - A job can also ask for the match to be recorded as a track (issue #3785).
+//!   Every run carries the logger, because its figures are what decides whether
+//!   the run played the match that was recorded, so recording adds the rewind
+//!   recorder to a run that happens anyway. A replay asked for as an analysis
+//!   and as a recording while it waits is one job, and one that is already
+//!   running cannot be given the recorder, so the recording follows it. After
+//!   the engine exits a run that reproduced the match has its dump thinned into
+//!   a track, as a stage of its own that can be cancelled. The dump is deleted
+//!   however the run ended.
 //!
 //! This is separate from the play launch's `RunRegistry` on purpose. That one
 //! refuses a second game. This one queues.
@@ -34,8 +43,13 @@ use serde::Serialize;
 use serde_json::json;
 use tauri::{AppHandle, Emitter, Manager, Runtime, State};
 
+use coilbox_track_thin::{thin_dump_cancellable, ThinError, ThinOptions, ThinReport};
+
 use super::super::def_sets;
+use super::super::track_store;
+use super::divergence::Disagreement;
 use super::launch::RunControl;
+use super::RecordingOutcome;
 use super::{
     analyse_replay, divergence, now_ms, run_timeout, store, AnalysisRequest, AnalysisRun,
     AnalysisStatus, RunPhase, RunProgress, SCRATCH_DIR,
@@ -54,6 +68,10 @@ const GAME_POLL: Duration = Duration::from_millis(500);
 /// tidying. A folder it does not wait long enough for is removed by
 /// [`sweep_scratch`] at the next start, so neither a short nor a long wait
 /// leaves anything behind for good.
+/// The folder under the app's cache directory that a recorder's dump waits in
+/// until it has been thinned.
+const RECORDINGS_DIR: &str = "replay-recording";
+
 const EXIT_TIDY_WAIT: Duration = Duration::from_secs(2);
 
 /// One replay to analyse.
@@ -70,20 +88,37 @@ pub struct JobSpec {
     /// The replay's file name, for a list to show.
     pub name: String,
     pub match_seconds: u32,
-    /// Run even though a current analysis is stored. Only a person asking for
-    /// a new analysis sets it.
+    /// Run even though a current analysis or track is stored. Only a person
+    /// asking for a new one sets it.
     pub force: bool,
+    /// Also record the match as a track. See [`track_store`].
+    pub record: bool,
 }
 
 /// What runs the engine, and what knows whether a game is being played. A seam
 /// so the queue's rules can be tested with neither.
 pub trait Engine: Send + Sync + 'static {
+    /// `record_to` is where the recorder's dump is to be left, for a job that
+    /// records, and the queue deletes it afterwards.
     fn run(
         &self,
         job: &JobSpec,
+        record_to: Option<&Path>,
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String>;
+
+    /// Thin a dump into a track. Blocks for as long as that takes, and gives up
+    /// with [`ThinError::Cancelled`] soon after `cancelled` answers true.
+    fn thin(
+        &self,
+        dump: &Path,
+        track: &Path,
+        options: &ThinOptions,
+        cancelled: &dyn Fn() -> bool,
+    ) -> Result<ThinReport, ThinError> {
+        thin_dump_cancellable(dump, track, options, cancelled)
+    }
 
     fn game_running(&self) -> bool;
 }
@@ -98,6 +133,7 @@ impl Engine for HeadlessEngine {
     fn run(
         &self,
         job: &JobSpec,
+        record_to: Option<&Path>,
         control: &RunControl,
         on_poll: &dyn Fn(RunProgress),
     ) -> Result<AnalysisRun, String> {
@@ -113,7 +149,7 @@ impl Engine for HeadlessEngine {
                 game_short_name: None,
                 scratch_root: self.scratch_root.clone(),
                 timeout: run_timeout(job.match_seconds),
-                record: None,
+                record: record_to.map(Path::to_path_buf),
             },
             control,
             on_poll,
@@ -136,6 +172,11 @@ pub enum FailureReason {
     EngineFailed,
     /// The run could not be started, or its result could not be stored.
     CouldNotRun,
+    /// The playback finished and did not reproduce the match, so a recording
+    /// of it would be of a game nobody played.
+    Diverged,
+    /// The playback was good and its recording could not be made into a track.
+    ThinFailed,
 }
 
 /// The last run of a match that failed this session.
@@ -152,6 +193,11 @@ pub struct Failure {
     pub limit_seconds: Option<u64>,
     /// What the engine said: its fatal lines, or its last lines.
     pub log_excerpt: Vec<String>,
+    /// The job was a recording, so the page words it as one.
+    pub record: bool,
+    /// Every figure the playback and the replay disagree on, for a run that
+    /// diverged. Empty for every other reason.
+    pub disagreements: Vec<Disagreement>,
 }
 
 /// The job that is running.
@@ -169,6 +215,8 @@ pub struct RunningJob {
     pub last_frame: i32,
     /// A cancel has been asked for and the run is on its way out.
     pub cancelling: bool,
+    /// The job records the match as a track.
+    pub record: bool,
 }
 
 /// A job that is waiting its turn.
@@ -179,6 +227,7 @@ pub struct QueuedJob {
     pub game_id: String,
     pub name: String,
     pub replay_path: String,
+    pub record: bool,
 }
 
 /// The whole queue, as a page shows it.
@@ -195,9 +244,11 @@ pub struct QueueSnapshot {
     /// Counts up each time the store changes because of a run, so a listener
     /// knows to ask the store again.
     pub stored: u64,
+    /// The same for the tracks, so a listener knows to ask for them again.
+    pub tracks: u64,
 }
 
-/// What asking for an analysis came to.
+/// What asking for an analysis or a recording came to.
 #[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum Enqueued {
@@ -207,6 +258,12 @@ pub enum Enqueued {
     /// That match has a current analysis and the job did not ask for a new
     /// one. Nothing was queued.
     AlreadyAnalysed,
+    /// That match has a current track and the job did not ask for a new one.
+    /// Nothing was queued.
+    AlreadyRecorded,
+    /// The match was waiting as an analysis and is now a recording too. It is
+    /// still one job, so the engine runs once.
+    Joined,
 }
 
 struct Job {
@@ -232,6 +289,7 @@ struct QueueState {
     failures: Vec<Failure>,
     waiting_for_game: bool,
     stored: u64,
+    tracks: u64,
     /// A worker thread exists.
     working: bool,
     /// The app is on its way out. Nothing is queued or started again.
@@ -252,6 +310,7 @@ impl QueueState {
                 frame: running.progress.frame,
                 last_frame: running.progress.last_frame,
                 cancelling: running.cancelling,
+                record: running.job.spec.record,
             }),
             queued: self
                 .queued
@@ -261,20 +320,26 @@ impl QueueState {
                     game_id: job.spec.game_id.clone(),
                     name: job.spec.name.clone(),
                     replay_path: job.spec.replay.to_string_lossy().into_owned(),
+                    record: job.spec.record,
                 })
                 .collect(),
             waiting_for_game: self.waiting_for_game,
             failures: self.failures.clone(),
             stored: self.stored,
+            tracks: self.tracks,
         }
     }
 
-    fn holds(&self, game_id: &str) -> bool {
-        self.queued.iter().any(|job| job.spec.game_id == game_id)
+    /// Whether a job for this match, waiting or running, already does what
+    /// `spec` asks. A recording also makes the analysis, so it covers a
+    /// request for one. An analysis does not cover a request to record.
+    fn covers(&self, spec: &JobSpec) -> bool {
+        let does = |held: &JobSpec| held.game_id == spec.game_id && (held.record || !spec.record);
+        self.queued.iter().any(|job| does(&job.spec))
             || self
                 .running
                 .as_ref()
-                .is_some_and(|running| running.job.spec.game_id == game_id)
+                .is_some_and(|running| does(&running.job.spec))
     }
 }
 
@@ -284,6 +349,11 @@ struct Shared {
     engine: Box<dyn Engine>,
     /// Where analyses are stored.
     analyses: PathBuf,
+    /// Where tracks are stored. See [`track_store`].
+    tracks: PathBuf,
+    /// Where a recorder's dump is left until it has been thinned. Outside a
+    /// run's scratch folder, which is deleted before the dump is read.
+    recordings: PathBuf,
     /// Told about every change, outside the state's lock.
     listener: Listener,
     /// Held from taking a snapshot to the listener having it, so two changes
@@ -297,6 +367,17 @@ struct Shared {
 }
 
 impl Shared {
+    /// Whether there is nothing for this job to do: the track it records is
+    /// current, or for a job that does not record, the analysis is.
+    fn is_current(&self, spec: &JobSpec) -> bool {
+        if spec.record {
+            track_store::state(&self.tracks, &spec.game_id)
+                .is_ok_and(|state| state == Some(track_store::TrackState::Current))
+        } else {
+            store::is_current(&self.analyses, &spec.game_id)
+        }
+    }
+
     fn lock(&self) -> MutexGuard<'_, QueueState> {
         // A panic while the lock was held leaves the state as it was at some
         // instant, which is still a queue.
@@ -327,11 +408,15 @@ impl AnalysisQueue {
     pub fn new(
         engine: impl Engine,
         analyses: PathBuf,
+        tracks: PathBuf,
+        recordings: PathBuf,
         listener: impl Fn(&QueueSnapshot) + Send + Sync + 'static,
     ) -> Self {
         AnalysisQueue(Arc::new(Shared {
             engine: Box::new(engine),
             analyses,
+            tracks,
+            recordings,
             listener: Box::new(listener),
             announcing: Mutex::new(()),
             state: Mutex::new(QueueState::default()),
@@ -343,35 +428,59 @@ impl AnalysisQueue {
         self.0.lock().snapshot()
     }
 
-    /// Ask for a replay to be analysed.
+    /// Ask for a replay to be analysed, or recorded as well when the spec says
+    /// so.
     pub fn enqueue(&self, spec: JobSpec) -> Result<Enqueued, String> {
         // Looked up before the lock is taken: it reads a file.
-        let current = !spec.force && store::is_current(&self.0.analyses, &spec.game_id);
+        let current = !spec.force && self.0.is_current(&spec);
+        let mut joined = false;
         {
             let mut state = self.0.lock();
             if state.closed {
                 return Err("coilbox is closing".into());
             }
-            if state.holds(&spec.game_id) {
+            if state.covers(&spec) {
                 return Ok(Enqueued::AlreadyQueued);
             }
             if current {
-                return Ok(Enqueued::AlreadyAnalysed);
+                return Ok(if spec.record {
+                    Enqueued::AlreadyRecorded
+                } else {
+                    Enqueued::AlreadyAnalysed
+                });
             }
             // Asking again is the answer to the last failure.
             state.failures.retain(|f| f.game_id != spec.game_id);
-            state.next_id += 1;
-            let id = state.next_id;
-            state.queued.push_back(Job { id, spec });
-            if !state.working {
-                state.working = true;
-                let shared = self.0.clone();
-                std::thread::spawn(move || work(&shared));
+            // A recording asked for while the analysis of that replay waits
+            // gives the waiting job the recorder, so the engine runs once.
+            // (One that is already running cannot be changed, so a job of its
+            // own is queued behind it.)
+            if let Some(waiting) = state
+                .queued
+                .iter_mut()
+                .find(|job| job.spec.game_id == spec.game_id)
+            {
+                waiting.spec.record |= spec.record;
+                waiting.spec.force |= spec.force;
+                joined = true;
+            } else {
+                state.next_id += 1;
+                let id = state.next_id;
+                state.queued.push_back(Job { id, spec });
+                if !state.working {
+                    state.working = true;
+                    let shared = self.0.clone();
+                    std::thread::spawn(move || work(&shared));
+                }
             }
         }
         self.0.changed.notify_all();
         self.0.announce();
-        Ok(Enqueued::Queued)
+        Ok(if joined {
+            Enqueued::Joined
+        } else {
+            Enqueued::Queued
+        })
     }
 
     /// Cancel one job. A queued one is dropped. A running one has its engine
@@ -488,7 +597,16 @@ fn failure(
     message: String,
     run: Option<&AnalysisRun>,
 ) -> Outcome {
-    Outcome::Failed(Failure {
+    Outcome::Failed(make_failure(job, reason, message, run))
+}
+
+fn make_failure(
+    job: &JobSpec,
+    reason: FailureReason,
+    message: String,
+    run: Option<&AnalysisRun>,
+) -> Failure {
+    Failure {
         game_id: job.game_id.clone(),
         name: job.name.clone(),
         reason,
@@ -498,7 +616,9 @@ fn failure(
         log_excerpt: run
             .map(|run| run.report.log_excerpt.clone())
             .unwrap_or_default(),
-    })
+        record: job.record,
+        disagreements: Vec::new(),
+    }
 }
 
 /// Make the unit definition store agree with the analysis just stored.
@@ -542,14 +662,14 @@ fn keep_engine_unit_defs(
 fn settle(
     analyses: &Path,
     job: &JobSpec,
-    result: Result<AnalysisRun, String>,
+    result: &Result<AnalysisRun, String>,
     preempted: bool,
 ) -> Outcome {
     let run = match result {
         Ok(run) => run,
-        Err(e) => return failure(job, FailureReason::CouldNotRun, e, None),
+        Err(e) => return failure(job, FailureReason::CouldNotRun, e.clone(), None),
     };
-    if let Some(provenance) = store::Provenance::of(&job.game_id, &run, now_ms()) {
+    if let Some(provenance) = store::Provenance::of(&job.game_id, run, now_ms()) {
         return match store::write(analyses, &provenance, run.events.as_deref()) {
             Ok(_) => {
                 keep_engine_unit_defs(analyses, &provenance, run.events.as_deref());
@@ -571,7 +691,7 @@ fn settle(
             job,
             FailureReason::TookTooLong,
             "the playback did not finish in the time allowed".into(),
-            Some(&run),
+            Some(run),
         );
     }
     let how = match (exit.code, exit.signal) {
@@ -588,8 +708,120 @@ fn settle(
         job,
         FailureReason::EngineFailed,
         format!("{how} {stage}"),
-        Some(&run),
+        Some(run),
     )
+}
+
+/// What became of the track a recording job was to make.
+enum Recorded {
+    Stored,
+    /// Nothing to keep and nothing to say: it was cancelled, or the engine run
+    /// failed and [`settle`] has said so.
+    Nothing,
+    Failed(Failure),
+}
+
+/// Turn the recorder's dump from a finished run into a stored track.
+///
+/// The run is the one [`settle`] has already judged. Only a run that reproduced
+/// the match is recorded, because the dump of any other is of a game nobody
+/// played. The thinning is a stage of its own, announced as one, and it stops
+/// when the job is cancelled.
+fn record_track(
+    shared: &Shared,
+    job_id: u64,
+    spec: &JobSpec,
+    control: &RunControl,
+    run: &AnalysisRun,
+    dump: &Path,
+) -> Recorded {
+    let report = &run.report;
+    if report.exit.cancelled {
+        return Recorded::Nothing;
+    }
+    let could_not = |message: String| {
+        Recorded::Failed(make_failure(
+            spec,
+            FailureReason::CouldNotRun,
+            message,
+            Some(run),
+        ))
+    };
+    match report.status {
+        AnalysisStatus::Reproduced => {}
+        AnalysisStatus::Diverged => {
+            let mut failure = make_failure(
+                spec,
+                FailureReason::Diverged,
+                "the playback did not reproduce the recorded match, so no track was made from it"
+                    .into(),
+                Some(run),
+            );
+            failure.disagreements = report.disagreements.clone();
+            return Recorded::Failed(failure);
+        }
+        // The engine failed or ran out of time, which [`settle`] reports.
+        AnalysisStatus::Incomplete | AnalysisStatus::LoggerNotLoaded => return Recorded::Nothing,
+    }
+    match &run.recording {
+        Some(RecordingOutcome::Kept { .. }) => {}
+        Some(RecordingOutcome::NotWritten) => {
+            return could_not(
+                "the recorder wrote no file, so it did not load or could not open one".into(),
+            )
+        }
+        Some(RecordingOutcome::NotKept(why)) => return could_not(why.clone()),
+        None => return could_not("the run was not asked to record".into()),
+    }
+    let Some(game_id) = track_store::id_bytes(&spec.game_id) else {
+        return could_not(format!("{:?} is not a game id", spec.game_id));
+    };
+    set_phase(shared, job_id, RunPhase::Thinning);
+    let options = ThinOptions {
+        game_id,
+        // The dump names the generated game it was recorded in.
+        game: Some(report.recorded_game.clone()).filter(|game| !game.trim().is_empty()),
+        ..ThinOptions::default()
+    };
+    let stored = track_store::store(&shared.tracks, &spec.game_id, |track| {
+        shared
+            .engine
+            .thin(dump, track, &options, &|| control.was_cancelled())
+            .map(|_| ())
+    });
+    match stored {
+        Ok(_) => Recorded::Stored,
+        // The store removed the half-written track.
+        Err(_) if control.was_cancelled() => Recorded::Nothing,
+        Err(message) => Recorded::Failed(make_failure(
+            spec,
+            FailureReason::ThinFailed,
+            message,
+            Some(run),
+        )),
+    }
+}
+
+/// Move the running job to a new stage and tell the windows.
+fn set_phase(shared: &Shared, job_id: u64, phase: RunPhase) {
+    {
+        let mut state = shared.lock();
+        let Some(running) = state.running.as_mut().filter(|r| r.job.id == job_id) else {
+            return;
+        };
+        running.progress.phase = phase;
+    }
+    shared.announce();
+}
+
+/// A recorder's dump, deleted when this is dropped: on every way out of a job,
+/// including a panic. A dump of a long match is hundreds of megabytes.
+struct DumpFile(PathBuf);
+
+impl Drop for DumpFile {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 /// The worker: take jobs in order until there are none.
@@ -645,13 +877,22 @@ fn work(shared: &Arc<Shared>) {
         };
         shared.announce();
 
-        // Never twice: it may have been analysed since it was queued.
-        let result = if !spec.force && store::is_current(&shared.analyses, &spec.game_id) {
+        // Never twice: it may have been analysed or recorded since it was
+        // queued.
+        let dump = DumpFile(
+            shared
+                .recordings
+                .join(format!("dump-{}-{job_id}", std::process::id())),
+        );
+        let result = if !spec.force && shared.is_current(&spec) {
             None
         } else {
-            Some(shared.engine.run(&spec, &control, &|progress| {
-                on_poll(shared, job_id, &control, progress)
-            }))
+            Some(shared.engine.run(
+                &spec,
+                spec.record.then_some(&*dump.0),
+                &control,
+                &|progress| on_poll(shared, job_id, &control, progress),
+            ))
         };
 
         let preempted = shared
@@ -659,10 +900,18 @@ fn work(shared: &Arc<Shared>) {
             .running
             .as_ref()
             .is_some_and(|running| running.preempted);
-        let outcome = match result {
+        let outcome = match &result {
             None => Outcome::Nothing,
             Some(result) => settle(&shared.analyses, &spec, result, preempted),
         };
+        let recorded = match &result {
+            Some(Ok(run)) if spec.record => {
+                record_track(shared, job_id, &spec, &control, run, &dump.0)
+            }
+            _ => Recorded::Nothing,
+        };
+        // Whatever happened, the dump goes before the job is over.
+        drop(dump);
         {
             let mut state = shared.lock();
             let running = state.running.take().expect("this worker's job");
@@ -675,6 +924,14 @@ fn work(shared: &Arc<Shared>) {
                     }
                 }
                 Outcome::Failed(failure) => {
+                    state.failures.retain(|f| f.game_id != failure.game_id);
+                    state.failures.push(failure);
+                }
+            }
+            match recorded {
+                Recorded::Stored => state.tracks += 1,
+                Recorded::Nothing => {}
+                Recorded::Failed(failure) => {
                     state.failures.retain(|f| f.game_id != failure.game_id);
                     state.failures.push(failure);
                 }
@@ -744,20 +1001,54 @@ pub fn sweep_scratch(scratch_root: &Path) -> usize {
     killed
 }
 
+/// Remove the dumps a coilbox that died mid run left behind. A dump is named
+/// after the process that made it, and one whose process is gone has nothing
+/// using it. Returns how many it removed.
+pub fn sweep_recordings(recordings: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(recordings) else {
+        return 0;
+    };
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let pid = name
+            .strip_prefix("dump-")
+            .and_then(|rest| rest.split('-').next())
+            .and_then(|pid| pid.parse::<u32>().ok());
+        if let Some(pid) = pid {
+            if pid != std::process::id()
+                && !coilbox_proc::is_running(pid)
+                && std::fs::remove_file(entry.path()).is_ok()
+            {
+                removed += 1;
+            }
+        }
+    }
+    removed
+}
+
 /// Make the app's queue and hand it to Tauri. Called once, at plugin setup.
 pub(crate) fn manage<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let scratch_root = coilbox_portable::cache_dir(app)?.join(SCRATCH_DIR);
     let analyses = store::app_store_dir(app)?;
+    let tracks = track_store::app_store_dir(app)?;
+    let recordings = coilbox_portable::cache_dir(app)?.join(RECORDINGS_DIR);
     {
         let scratch_root = scratch_root.clone();
+        let recordings = recordings.clone();
+        let tracks = tracks.clone();
         std::thread::spawn(move || {
             sweep_scratch(&scratch_root);
+            sweep_recordings(&recordings);
+            track_store::sweep_temporaries(&tracks);
         });
     }
     let handle = app.clone();
     app.manage(AnalysisQueue::new(
         HeadlessEngine { scratch_root },
         analyses,
+        tracks,
+        recordings,
         move |snapshot| {
             let _ = handle.emit(QUEUE_EVENT, snapshot);
         },
@@ -848,6 +1139,7 @@ pub fn job_for(
             .unwrap_or_default(),
         match_seconds,
         force,
+        record: false,
     })
 }
 
@@ -877,6 +1169,58 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
     game: Option<String>,
     force: Option<bool>,
 ) -> CliResult {
+    enqueue_command(
+        app,
+        replay_path,
+        engine_path,
+        data_dir,
+        game,
+        force.unwrap_or(false),
+        false,
+    )
+    .await
+}
+
+/// `content_recording_enqueue`: ask for a replay to be recorded as a track
+/// that can be played back and rewound (issue #3785). The arguments are those
+/// of `content_analysis_enqueue`, and so is the answer, with two more
+/// outcomes: `alreadyRecorded` for a match whose track is current and `joined`
+/// for a replay waiting as an analysis that is now a recording as well.
+///
+/// The job joins the analysis queue. It is cancelled with
+/// `content_analysis_cancel`, its state is in the queue's snapshot, and a run
+/// that ends without a track says why in the snapshot's `failures`. Nothing
+/// starts it but a person asking for that replay by name.
+#[tauri::command]
+pub(crate) async fn content_recording_enqueue<R: Runtime>(
+    app: AppHandle<R>,
+    replay_path: String,
+    engine_path: String,
+    data_dir: String,
+    game: Option<String>,
+    force: Option<bool>,
+) -> CliResult {
+    enqueue_command(
+        app,
+        replay_path,
+        engine_path,
+        data_dir,
+        game,
+        force.unwrap_or(false),
+        true,
+    )
+    .await
+}
+
+async fn enqueue_command<R: Runtime>(
+    app: AppHandle<R>,
+    replay_path: String,
+    engine_path: String,
+    data_dir: String,
+    game: Option<String>,
+    force: bool,
+    record: bool,
+) -> CliResult {
     let Some(queue) = app.try_state::<AnalysisQueue>().map(|q| q.inner().clone()) else {
         return CliResult::err(NO_QUEUE);
     };
@@ -893,9 +1237,9 @@ pub(crate) async fn content_analysis_enqueue<R: Runtime>(
             Path::new(&engine_path),
             data_dirs,
             game,
-            force.unwrap_or(false),
+            force,
         )?;
-        let outcome = queue.enqueue(spec)?;
+        let outcome = queue.enqueue(JobSpec { record, ..spec })?;
         Ok::<_, String>((outcome, queue.snapshot()))
     })
     .await;
@@ -1014,6 +1358,8 @@ mod tests {
     use super::super::launch::EngineExit;
     use super::super::store::tests::{run_with, ID};
     use super::*;
+    use coilbox_track::{Settings, Track, TrackReader};
+    use coilbox_track_thin::{thin_dump_cancellable, ThinError, ThinOptions, ThinReport};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::time::Instant;
 
@@ -1046,6 +1392,24 @@ mod tests {
         most_at_once: AtomicUsize,
         game: AtomicBool,
         release: AtomicBool,
+        /// What the thinning does.
+        thin_script: Mutex<ThinScript>,
+        thinned: AtomicUsize,
+        /// Whether the recorder leaves a file. Off is a recorder that did not
+        /// load.
+        recorder_writes: AtomicBool,
+    }
+
+    /// What a fake thinning does with a dump.
+    #[derive(Clone, Copy, PartialEq)]
+    enum ThinScript {
+        /// Thin it for real. Every dump the fake engine leaves is a small whole
+        /// one.
+        Real,
+        /// Write half a track and fail.
+        Fail,
+        /// Write half a track and go on until cancelled.
+        UntilCancelled,
     }
 
     impl FakeEngine {
@@ -1057,12 +1421,86 @@ mod tests {
                 most_at_once: AtomicUsize::new(0),
                 game: AtomicBool::new(false),
                 release: AtomicBool::new(false),
+                thin_script: Mutex::new(ThinScript::Real),
+                thinned: AtomicUsize::new(0),
+                recorder_writes: AtomicBool::new(true),
             })
         }
 
         fn set(&self, script: Script) {
             *self.script.lock().unwrap() = script;
         }
+
+        fn set_thin(&self, script: ThinScript) {
+            *self.thin_script.lock().unwrap() = script;
+        }
+
+        /// What the recorder leaves when the run ends: nothing, half a file
+        /// from a run that was stopped, or a whole dump.
+        fn leave_dump(&self, to: Option<&Path>, whole: bool) -> Option<RecordingOutcome> {
+            let to = to?;
+            if !self.recorder_writes.load(Ordering::SeqCst) {
+                return Some(RecordingOutcome::NotWritten);
+            }
+            let bytes = if whole {
+                fixture_dump()
+            } else {
+                b"CBRD half a dump".to_vec()
+            };
+            std::fs::create_dir_all(to.parent().unwrap()).unwrap();
+            std::fs::write(to, &bytes).unwrap();
+            Some(RecordingOutcome::Kept {
+                path: to.to_path_buf(),
+                bytes: bytes.len() as u64,
+            })
+        }
+    }
+
+    fn block(out: &mut Vec<u8>, kind: u32, payload: &[u8]) {
+        out.extend(kind.to_le_bytes());
+        out.extend((payload.len() as u32).to_le_bytes());
+        out.extend(payload);
+    }
+
+    /// A whole dump of a match with nothing in it, written from the byte layout
+    /// in `lua/rewind-recorder/README.md`: a header, a piece tree, a block for
+    /// each of 301 frames and the end.
+    fn fixture_dump() -> Vec<u8> {
+        let mut out = b"CBRD".to_vec();
+        out.extend(1u32.to_le_bytes());
+        block(
+            &mut out,
+            1,
+            br#"{"format":1,"engine":"2026.01.0 test","game":"Coilbox replay analysis","gameVersion":"1","map":"Some Map","mapSizeX":4096,"mapSizeZ":4096,"squareSize":8,"gameSpeed":30,"maxUnits":32000,"unitFrames":3,"lastFrame":300,"terrain":true,"teams":[{"team":0,"allyTeam":0,"side":"arm","leader":"Ada","color":[10,20,30]}],"unitDefs":["tank"],"unitRadii":[10],"featureDefs":["tree"],"weaponDefs":["nothing"]}"#,
+        );
+        block(
+            &mut out,
+            2,
+            br#"{"def":1,"pieces":["base"],"parents":[0],"modelType":"s3o","offsets":[[0,0,0]],"bounds":[[-8,0,-12,8,5,12]]}"#,
+        );
+        for frame in 0..=300u32 {
+            block(&mut out, 3, &(frame as f32).to_le_bytes());
+        }
+        block(
+            &mut out,
+            4,
+            br#"{"reason":"game_over","frame":300,"frames":301,"winners":[0]}"#,
+        );
+        out
+    }
+
+    /// The names of the files in a folder, sorted. None when it is not there.
+    fn files_in(dir: &Path) -> Vec<String> {
+        let mut names: Vec<String> = std::fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .map(|e| e.file_name().to_string_lossy().into_owned())
+                    .collect()
+            })
+            .unwrap_or_default();
+        names.sort();
+        names
     }
 
     fn with_exit(
@@ -1085,6 +1523,7 @@ mod tests {
         fn run(
             &self,
             job: &JobSpec,
+            record_to: Option<&Path>,
             control: &RunControl,
             on_poll: &dyn Fn(RunProgress),
         ) -> Result<AnalysisRun, String> {
@@ -1102,24 +1541,28 @@ mod tests {
             let result = match script {
                 Script::Finish(status) => {
                     on_poll(progress(60));
-                    Ok(run_with(status))
+                    let mut run = run_with(status);
+                    run.recording = self.leave_dump(record_to, true);
+                    Ok(run)
                 }
                 Script::UntilCancelled | Script::UntilReleased => {
+                    // The recorder has its file open from the first frame.
+                    let partial = self.leave_dump(record_to, false);
                     // The real launch finds out it was cancelled from the
                     // control. This asks it the way a test can.
                     let began = Instant::now();
                     loop {
                         on_poll(progress(90));
                         if control.was_cancelled() {
-                            break Ok(with_exit(
-                                run_with(AnalysisStatus::Incomplete),
-                                false,
-                                true,
-                                None,
-                            ));
+                            let mut run =
+                                with_exit(run_with(AnalysisStatus::Incomplete), false, true, None);
+                            run.recording = partial;
+                            break Ok(run);
                         }
                         if script == Script::UntilReleased && self.release.load(Ordering::SeqCst) {
-                            break Ok(run_with(AnalysisStatus::Reproduced));
+                            let mut run = run_with(AnalysisStatus::Reproduced);
+                            run.recording = self.leave_dump(record_to, true);
+                            break Ok(run);
                         }
                         assert!(
                             began.elapsed() < PATIENCE,
@@ -1150,6 +1593,33 @@ mod tests {
             result
         }
 
+        fn thin(
+            &self,
+            dump: &Path,
+            track: &Path,
+            options: &ThinOptions,
+            cancelled: &dyn Fn() -> bool,
+        ) -> Result<ThinReport, ThinError> {
+            self.thinned.fetch_add(1, Ordering::SeqCst);
+            let script = *self.thin_script.lock().unwrap();
+            match script {
+                ThinScript::Real => thin_dump_cancellable(dump, track, options, cancelled),
+                ThinScript::Fail => {
+                    std::fs::write(track, b"half a track").unwrap();
+                    Err(ThinError::Dump("the recording is damaged".into()))
+                }
+                ThinScript::UntilCancelled => {
+                    std::fs::write(track, b"half a track").unwrap();
+                    let began = Instant::now();
+                    while !cancelled() {
+                        assert!(began.elapsed() < PATIENCE, "the thinning was never stopped");
+                        std::thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(ThinError::Cancelled)
+                }
+            }
+        }
+
         fn game_running(&self) -> bool {
             self.game.load(Ordering::SeqCst)
         }
@@ -1171,6 +1641,8 @@ mod tests {
             let queue = AnalysisQueue::new(
                 engine.clone(),
                 dir.path().join("analyses"),
+                dir.path().join("tracks"),
+                dir.path().join("recordings"),
                 move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
             );
             World {
@@ -1183,6 +1655,18 @@ mod tests {
 
         fn analyses(&self) -> PathBuf {
             self.dir.path().join("analyses")
+        }
+
+        fn tracks(&self) -> PathBuf {
+            self.dir.path().join("tracks")
+        }
+
+        fn recordings(&self) -> PathBuf {
+            self.dir.path().join("recordings")
+        }
+
+        fn record(&self, game_id: &str) -> Enqueued {
+            self.queue.enqueue(record_job(game_id, false)).unwrap()
         }
 
         fn ask(&self, game_id: &str) -> Enqueued {
@@ -1242,6 +1726,14 @@ mod tests {
             name: format!("{game_id}.sdfz"),
             match_seconds: 50,
             force,
+            record: false,
+        }
+    }
+
+    fn record_job(game_id: &str, force: bool) -> JobSpec {
+        JobSpec {
+            record: true,
+            ..job(game_id, force)
         }
     }
 
@@ -1294,7 +1786,7 @@ mod tests {
                 settle(
                     &analyses,
                     &job(game_id, false),
-                    Ok(run_with_unit_defs(status)),
+                    &Ok(run_with_unit_defs(status)),
                     false
                 ),
                 Outcome::Stored
@@ -1351,7 +1843,7 @@ mod tests {
         let outcome = settle(
             &analyses,
             &job(ID, false),
-            Ok(run_with(AnalysisStatus::Reproduced)),
+            &Ok(run_with(AnalysisStatus::Reproduced)),
             false,
         );
 
@@ -1919,6 +2411,405 @@ mod tests {
         );
     }
 
+    // ---- recording a replay (issue #3785) ----
+
+    /// A whole track for a match, as the writer makes it, to stand in for one
+    /// made earlier.
+    fn earlier_track(game_id: &str) -> Vec<u8> {
+        let mut id = [0u8; 16];
+        for (i, byte) in id.iter_mut().enumerate() {
+            *byte = u8::from_str_radix(&game_id[i * 2..i * 2 + 2], 16).unwrap();
+        }
+        let mut track = Track::new(Settings {
+            game_id: id,
+            recorder_version: coilbox_track_thin::RECORDER_VERSION,
+            last_frame: 90,
+            ..Settings::default()
+        });
+        track.info.game = "An earlier game 1".into();
+        track.to_bytes().expect("a small track writes")
+    }
+
+    fn store_earlier_track(world: &World, game_id: &str) -> Vec<u8> {
+        let bytes = earlier_track(game_id);
+        track_store::store(&world.tracks(), game_id, |path| {
+            std::fs::write(path, &bytes)
+        })
+        .expect("an earlier track stores");
+        bytes
+    }
+
+    fn track_info(path: &Path) -> coilbox_track::Info {
+        TrackReader::open(std::io::BufReader::new(std::fs::File::open(path).unwrap()))
+            .unwrap()
+            .info()
+            .unwrap()
+    }
+
+    /// Acceptance: recording a replay from the queue ends with one track file
+    /// and no dump left behind.
+    #[test]
+    fn recording_a_replay_ends_with_one_track_and_no_dump_left_behind() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+
+        assert_eq!(world.record(ID), Enqueued::Queued);
+        let idle = world.until_idle();
+
+        assert_eq!(world.started(), 1);
+        assert!(idle.failures.is_empty(), "{:?}", idle.failures);
+        assert_eq!(idle.tracks, 1);
+        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+        assert_eq!(
+            track_store::state(&world.tracks(), ID).unwrap(),
+            Some(track_store::TrackState::Current)
+        );
+        // The track says which game it is of: the one the replay was recorded
+        // on, and not the generated game the dump names.
+        let info = track_info(&track_store::track_path(&world.tracks(), ID).unwrap());
+        assert_eq!(info.game, "Some Game 1.0");
+        // The same run kept the analysis, because its logger had played the
+        // same match.
+        assert!(store::is_current(&world.analyses(), ID));
+    }
+
+    /// Acceptance: cancelling part way leaves no files.
+    #[test]
+    fn cancelling_a_recording_part_way_leaves_no_files() {
+        let world = World::new(Script::UntilCancelled);
+        world.record(ID);
+        let busy = world.until_playing(1);
+        assert!(busy.running.as_ref().unwrap().record);
+        assert_eq!(
+            files_in(&world.recordings()).len(),
+            1,
+            "the recorder had a file open"
+        );
+
+        assert!(world.queue.cancel(busy.running.unwrap().id));
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+        assert_eq!(files_in(&world.tracks()), Vec::<String>::new());
+        assert_eq!(store::read(&world.analyses(), ID).unwrap(), None);
+        assert!(idle.failures.is_empty());
+        assert_eq!((idle.stored, idle.tracks), (0, 0));
+        assert_eq!(world.engine.thinned.load(Ordering::SeqCst), 0);
+    }
+
+    /// Acceptance: two requests run one after the other, never together.
+    #[test]
+    fn two_recordings_run_one_after_the_other_and_never_together() {
+        let world = World::new(Script::UntilReleased);
+
+        world.record(ID);
+        world.record(OTHER);
+        let busy = world.until("the first job running", |s| s.running.is_some());
+        assert_eq!(busy.running.as_ref().unwrap().game_id, ID);
+        assert_eq!(busy.queued.len(), 1);
+
+        world.engine.release.store(true, Ordering::SeqCst);
+        let idle = world.until_idle();
+
+        assert_eq!(world.started(), 2);
+        assert_eq!(world.engine.most_at_once.load(Ordering::SeqCst), 1);
+        assert_eq!(idle.tracks, 2);
+        assert_eq!(
+            files_in(&world.tracks()),
+            vec![format!("{OTHER}.cbtrack"), format!("{ID}.cbtrack")]
+        );
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+    }
+
+    /// A playback that did not reproduce the match is a recording of a match
+    /// nobody played. Nothing is stored for it but the mark on the replay.
+    #[test]
+    fn a_diverged_recording_stores_no_track_and_marks_the_replay_diverged() {
+        let world = World::new(Script::Finish(AnalysisStatus::Diverged));
+
+        world.record(ID);
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), Vec::<String>::new());
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+        assert_eq!(world.engine.thinned.load(Ordering::SeqCst), 0);
+        assert_eq!(idle.tracks, 0);
+        // The mark: a stored analysis in the diverged state, which is what the
+        // replay's page already shows.
+        let stored = store::read(&world.analyses(), ID).unwrap().expect("marked");
+        assert_eq!(stored.state, store::AnalysisState::Diverged);
+        // And what the person who asked is told.
+        assert_eq!(idle.failures.len(), 1);
+        let failure = &idle.failures[0];
+        assert_eq!(failure.reason, FailureReason::Diverged);
+        assert!(failure.record);
+        assert_eq!(failure.disagreements.len(), 1);
+        assert_eq!(failure.disagreements[0].figure, "metalProduced");
+    }
+
+    /// An earlier track is the only copy until the new one is whole.
+    #[test]
+    fn a_thinning_that_fails_deletes_the_dump_and_keeps_the_earlier_track() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        let earlier = store_earlier_track(&world, ID);
+        world.engine.set_thin(ThinScript::Fail);
+
+        assert_eq!(
+            world.queue.enqueue(record_job(ID, true)).unwrap(),
+            Enqueued::Queued
+        );
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
+        assert_eq!(
+            std::fs::read(track_store::track_path(&world.tracks(), ID).unwrap()).unwrap(),
+            earlier
+        );
+        assert_eq!(idle.tracks, 0);
+        assert_eq!(idle.failures.len(), 1);
+        assert_eq!(idle.failures[0].reason, FailureReason::ThinFailed);
+        assert!(
+            idle.failures[0]
+                .message
+                .contains("the recording is damaged"),
+            "{}",
+            idle.failures[0].message
+        );
+    }
+
+    /// The recorder is a second gadget in the same game, so a replay that
+    /// needs both an analysis and a track is simulated once.
+    #[test]
+    fn an_analysis_and_a_recording_of_one_replay_that_has_not_started_run_the_engine_once() {
+        let world = World::new(Script::UntilReleased);
+        world.ask(OTHER);
+        world.until("the first job running", |s| s.running.is_some());
+        assert_eq!(world.ask(ID), Enqueued::Queued);
+
+        assert_eq!(world.record(ID), Enqueued::Joined);
+
+        let waiting = world.queue.snapshot();
+        assert_eq!(waiting.queued.len(), 1, "one job for the replay");
+        assert!(waiting.queued[0].record);
+        // Asking again for either is asking for what is already there.
+        assert_eq!(world.record(ID), Enqueued::AlreadyQueued);
+        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
+
+        world.engine.release.store(true, Ordering::SeqCst);
+        let idle = world.until_idle();
+
+        assert_eq!(world.started(), 2, "OTHER once and ID once");
+        assert!(store::is_current(&world.analyses(), ID));
+        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
+        assert_eq!(idle.tracks, 1);
+    }
+
+    /// A run that is already going cannot be given the recorder. The recording
+    /// follows it, as a job of its own, and a recording that is going covers a
+    /// request for the analysis it makes anyway.
+    #[test]
+    fn a_recording_asked_for_while_an_analysis_runs_follows_it() {
+        let world = World::new(Script::UntilReleased);
+        world.ask(ID);
+        world.until("the analysis running", |s| s.running.is_some());
+
+        assert_eq!(world.record(ID), Enqueued::Queued);
+        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
+        let busy = world.queue.snapshot();
+        assert!(!busy.running.as_ref().unwrap().record);
+        assert_eq!(busy.queued.len(), 1);
+        assert!(busy.queued[0].record);
+
+        world.engine.release.store(true, Ordering::SeqCst);
+        let idle = world.until_idle();
+
+        assert_eq!(world.started(), 2);
+        assert_eq!(world.engine.most_at_once.load(Ordering::SeqCst), 1);
+        assert_eq!(idle.tracks, 1);
+    }
+
+    #[test]
+    fn an_analysis_asked_for_while_a_recording_runs_is_already_covered() {
+        let world = World::new(Script::UntilReleased);
+        world.record(ID);
+        let busy = world.until("the recording running", |s| s.running.is_some());
+        assert!(busy.running.unwrap().record);
+
+        assert_eq!(world.ask(ID), Enqueued::AlreadyQueued);
+
+        world.engine.release.store(true, Ordering::SeqCst);
+        world.until_idle();
+        assert_eq!(world.started(), 1);
+        assert!(store::is_current(&world.analyses(), ID));
+    }
+
+    /// Cancelling the thinning removes the temporary track, the dump and the
+    /// run, and the track from before stays.
+    #[test]
+    fn cancelling_during_the_thinning_leaves_no_files() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        let earlier = store_earlier_track(&world, ID);
+        world.engine.set_thin(ThinScript::UntilCancelled);
+
+        world
+            .queue
+            .enqueue(record_job(ID, true))
+            .expect("asking again");
+        let thinning = world.until("the thinning", |s| {
+            s.running
+                .as_ref()
+                .is_some_and(|r| r.phase == RunPhase::Thinning)
+        });
+        // The temporary track exists while it runs, so this is a test of
+        // something.
+        assert_eq!(files_in(&world.tracks()).len(), 2);
+        assert_eq!(files_in(&world.recordings()).len(), 1);
+
+        assert!(world.queue.cancel(thinning.running.unwrap().id));
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.recordings()), Vec::<String>::new());
+        assert_eq!(files_in(&world.tracks()), vec![format!("{ID}.cbtrack")]);
+        assert_eq!(
+            std::fs::read(track_store::track_path(&world.tracks(), ID).unwrap()).unwrap(),
+            earlier
+        );
+        assert!(idle.failures.is_empty(), "{:?}", idle.failures);
+        assert_eq!(idle.tracks, 0);
+        assert_eq!(world.started(), 1);
+    }
+
+    /// Progress is the frame the playback has reached, and the thinning after
+    /// it is a stage of its own and not a bar stuck at the end.
+    #[test]
+    fn a_recording_shows_the_playback_and_then_the_thinning_as_a_stage_of_its_own() {
+        let world = World::new(Script::UntilReleased);
+        world.record(ID);
+        world.until_playing(1);
+
+        world.engine.release.store(true, Ordering::SeqCst);
+        world.until_idle();
+
+        let phases: Vec<(RunPhase, i32)> = world
+            .heard
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s.running.as_ref())
+            .map(|r| (r.phase, r.frame))
+            .collect();
+        assert!(phases.contains(&(RunPhase::Playing, 90)), "{phases:?}");
+        let thinning = phases
+            .iter()
+            .position(|(phase, _)| *phase == RunPhase::Thinning)
+            .expect("the thinning was announced");
+        let playing = phases
+            .iter()
+            .rposition(|(phase, _)| *phase == RunPhase::Playing)
+            .unwrap();
+        assert!(playing < thinning, "{phases:?}");
+        // The playback ended where it ended. The stage does not claim frames.
+        assert_eq!(phases[thinning].1, phases[playing].1);
+    }
+
+    #[test]
+    fn a_track_that_is_current_is_not_recorded_again_unless_asked() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.record(ID);
+        world.until_idle();
+        assert_eq!(world.started(), 1);
+
+        assert_eq!(world.record(ID), Enqueued::AlreadyRecorded);
+        world.until_idle();
+        assert_eq!(world.started(), 1, "the engine ran a second time");
+
+        assert_eq!(
+            world.queue.enqueue(record_job(ID, true)).unwrap(),
+            Enqueued::Queued
+        );
+        world.until("a second track", |s| s.tracks == 2);
+        assert_eq!(world.started(), 2);
+    }
+
+    /// A recorder that wrote nothing leaves nothing to thin. Saying so beats
+    /// a job that ends with no track and no word.
+    #[test]
+    fn a_run_whose_recorder_wrote_no_file_fails_and_says_so() {
+        let world = World::new(Script::Finish(AnalysisStatus::Reproduced));
+        world.engine.recorder_writes.store(false, Ordering::SeqCst);
+
+        world.record(ID);
+        let idle = world.until_idle();
+
+        assert_eq!(files_in(&world.tracks()), Vec::<String>::new());
+        assert_eq!(idle.failures.len(), 1);
+        assert_eq!(idle.failures[0].reason, FailureReason::CouldNotRun);
+        assert!(
+            idle.failures[0].message.contains("recorder"),
+            "{}",
+            idle.failures[0].message
+        );
+        assert_eq!(world.engine.thinned.load(Ordering::SeqCst), 0);
+    }
+
+    /// A crash mid run leaves its dump, and it can be 661 MB.
+    #[test]
+    fn a_dump_left_by_a_dead_process_is_swept_and_a_live_ones_is_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut gone = coilbox_proc::command(std::env::current_exe().unwrap())
+            .arg("--list")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let dead = gone.id();
+        gone.wait().unwrap();
+        let ours = std::process::id();
+        for name in [
+            format!("dump-{dead}-1"),
+            format!("dump-{ours}-1"),
+            "something-else".to_string(),
+        ] {
+            std::fs::write(dir.path().join(name), b"CBRD").unwrap();
+        }
+
+        assert_eq!(sweep_recordings(dir.path()), 1);
+
+        assert_eq!(
+            files_in(dir.path()),
+            vec![format!("dump-{ours}-1"), "something-else".to_string()]
+        );
+    }
+
+    #[test]
+    fn a_recording_job_says_what_it_is_in_the_snapshot_json() {
+        let world = World::new(Script::UntilReleased);
+        world.record(ID);
+        world.ask(OTHER);
+        let busy = world.until("the recording running", |s| s.running.is_some());
+        let json = serde_json::to_value(&busy).unwrap();
+
+        assert_eq!(json["running"]["record"], true);
+        assert_eq!(json["queued"][0]["record"], false);
+        assert_eq!(json["tracks"], 0);
+        for (value, word) in [
+            (serde_json::to_value(RunPhase::Thinning), "thinning"),
+            (serde_json::to_value(FailureReason::Diverged), "diverged"),
+            (
+                serde_json::to_value(FailureReason::ThinFailed),
+                "thinFailed",
+            ),
+            (serde_json::to_value(Enqueued::Joined), "joined"),
+            (
+                serde_json::to_value(Enqueued::AlreadyRecorded),
+                "alreadyRecorded",
+            ),
+        ] {
+            assert_eq!(value.unwrap(), word);
+        }
+        world.queue.cancel_all();
+    }
+
     /// Counts the runs the real engine is asked for.
     struct Counted {
         engine: HeadlessEngine,
@@ -1929,11 +2820,12 @@ mod tests {
         fn run(
             &self,
             job: &JobSpec,
+            record_to: Option<&Path>,
             control: &RunControl,
             on_poll: &dyn Fn(RunProgress),
         ) -> Result<AnalysisRun, String> {
             self.runs.fetch_add(1, Ordering::SeqCst);
-            self.engine.run(job, control, on_poll)
+            self.engine.run(job, record_to, control, on_poll)
         }
 
         fn game_running(&self) -> bool {
@@ -1989,6 +2881,8 @@ mod tests {
                 runs: runs.clone(),
             },
             analyses.clone(),
+            dir.path().join("tracks"),
+            dir.path().join("recordings"),
             move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
         );
         let spec = job_for(
@@ -2148,6 +3042,133 @@ mod tests {
         assert_eq!(store::delete(&analyses, &game_id), Ok(true));
         assert_eq!(store::read(&analyses, &game_id).unwrap(), None);
         assert_eq!(std::fs::read_dir(&analyses).unwrap().count(), 0);
+    }
+
+    /// The whole route for a recording against a real engine, a real game and
+    /// a real replay: queue, run with the recorder, thin, store as a track.
+    /// The end is one track, no dump, nothing in scratch, and a track that
+    /// names the game the replay was recorded on.
+    ///
+    /// Reads what to run from the same variables as
+    /// `a_real_replay_goes_through_the_queue_into_the_store_and_out_again`, and
+    /// does nothing without them. `scripts/rewind-headless.sh` runs it on a
+    /// scripted Splinter Faction match.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn a_real_replay_is_recorded_through_the_queue_into_a_track() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(engine_dir), Some(data_dirs)) = (
+            var("COILBOX_ANALYSIS_REPLAY"),
+            var("COILBOX_ANALYSIS_ENGINE_DIR"),
+            var("COILBOX_ANALYSIS_DATA_DIRS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_ANALYSIS_REPLAY, COILBOX_ANALYSIS_ENGINE_DIR and \
+                 COILBOX_ANALYSIS_DATA_DIRS to run it"
+            );
+            return;
+        };
+        let replay = PathBuf::from(replay);
+        let data_dirs: Vec<PathBuf> = data_dirs
+            .split(coilbox_proc::DATADIR_SEP)
+            .map(PathBuf::from)
+            .collect();
+        let dir = tempfile::tempdir().unwrap();
+        let (analyses, tracks) = (dir.path().join("analyses"), dir.path().join("tracks"));
+        let (scratch_root, recordings) = (dir.path().join("scratch"), dir.path().join("dumps"));
+        let heard = Arc::new(Mutex::new(Vec::<QueueSnapshot>::new()));
+        let listener = heard.clone();
+        let queue = AnalysisQueue::new(
+            HeadlessEngine {
+                scratch_root: scratch_root.clone(),
+            },
+            analyses.clone(),
+            tracks.clone(),
+            recordings.clone(),
+            move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
+        );
+        let spec = JobSpec {
+            record: true,
+            ..job_for(&replay, Path::new(&engine_dir), data_dirs, None, false)
+                .expect("a replay that can be analysed")
+        };
+        let game_id = store::replay_key(&replay).unwrap();
+        let limit = run_timeout(spec.match_seconds);
+
+        let began = Instant::now();
+        assert_eq!(queue.enqueue(spec.clone()).unwrap(), Enqueued::Queued);
+        let idle = loop {
+            let snapshot = queue.snapshot();
+            if snapshot.running.is_none() && snapshot.queued.is_empty() {
+                break snapshot;
+            }
+            assert!(
+                began.elapsed() < limit + PATIENCE,
+                "the recording never finished"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let wall = began.elapsed();
+
+        assert_eq!(idle.failures, Vec::new(), "the recording failed");
+        assert_eq!((idle.stored, idle.tracks), (1, 1));
+        // One track and no dump. Nothing in scratch.
+        assert_eq!(files_in(&tracks), vec![format!("{game_id}.cbtrack")]);
+        assert_eq!(files_in(&recordings), Vec::<String>::new());
+        assert_eq!(files_in(&scratch_root), Vec::<String>::new());
+        // A record only run shows the playback moving and then the thinning.
+        let phases: Vec<(RunPhase, i32)> = heard
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s.running.as_ref())
+            .map(|r| (r.phase, r.frame))
+            .collect();
+        let mut frames: Vec<i32> = phases
+            .iter()
+            .filter(|(phase, _)| *phase == RunPhase::Playing)
+            .map(|(_, frame)| *frame)
+            .collect();
+        frames.dedup();
+        assert!(frames.len() > 1, "progress never moved: {frames:?}");
+        assert!(
+            phases.iter().any(|(phase, _)| *phase == RunPhase::Thinning),
+            "the thinning was never announced"
+        );
+        // The track is the replay's and names its game.
+        let path = track_store::track_path(&tracks, &game_id).unwrap();
+        assert_eq!(
+            track_store::state(&tracks, &game_id).unwrap(),
+            Some(track_store::TrackState::Current)
+        );
+        let raw = super::super::super::read_header_and_script(&replay).unwrap();
+        let recorded_game =
+            super::super::super::find_game(&super::super::super::parse_tdf(&raw.script))
+                .get("gametype")
+                .unwrap_or("")
+                .to_string();
+        let mut reader =
+            TrackReader::open(std::io::BufReader::new(std::fs::File::open(&path).unwrap()))
+                .unwrap();
+        let (last_frame, bytes) = (
+            reader.header().last_frame,
+            std::fs::metadata(&path).unwrap().len(),
+        );
+        let info = reader.info().unwrap();
+        assert_eq!(info.game, recorded_game);
+        assert!(last_frame > 0);
+        eprintln!(
+            "recorded in {:.1}s (limit {}s): {} frames, track {} bytes\n\
+             game: {}\nmap: {}\nengine: {}\nphases seen: {} playing steps, thinning announced",
+            wall.as_secs_f64(),
+            limit.as_secs(),
+            last_frame,
+            bytes,
+            info.game,
+            info.map,
+            info.engine_version,
+            frames.len(),
+        );
     }
 
     #[cfg(unix)]

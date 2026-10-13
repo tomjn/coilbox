@@ -1167,6 +1167,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demo::analysis::queue::content_analysis_cancel,
             demo::analysis::queue::content_analysis_engine_output,
             demo::analysis::queue::content_analysis_dismiss,
+            demo::analysis::queue::content_recording_enqueue,
             demo::analysis::store::content_replay_analyses,
             demo::analysis::store::content_replay_analysis,
             demo::analysis::store::content_replay_analysis_events,

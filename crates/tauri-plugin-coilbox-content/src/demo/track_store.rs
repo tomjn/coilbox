@@ -83,8 +83,9 @@ pub fn track_path(dir: &Path, game_id: &str) -> Result<PathBuf, String> {
     Ok(dir.join(format!("{}{EXTENSION}", valid_game_id(game_id)?)))
 }
 
-/// A game id as the 16 bytes a track's header holds. The id is already valid.
-fn id_bytes(game_id: &str) -> Option<[u8; 16]> {
+/// A game id as the 16 bytes a track's header holds. None for anything that is
+/// not 32 hex digits.
+pub(crate) fn id_bytes(game_id: &str) -> Option<[u8; 16]> {
     let mut out = [0u8; 16];
     for (i, byte) in out.iter_mut().enumerate() {
         *byte = u8::from_str_radix(game_id.get(i * 2..i * 2 + 2)?, 16).ok()?;
@@ -118,7 +119,6 @@ fn inspect(path: &Path, game_id: &str) -> Option<TrackState> {
 }
 
 /// The state of a match's track, or None when there is none.
-#[allow(dead_code)] // Called by #3785 and #3788, which is not built yet.
 pub fn state(dir: &Path, game_id: &str) -> Result<Option<TrackState>, String> {
     let path = track_path(dir, game_id)?;
     match std::fs::metadata(&path) {
@@ -135,7 +135,6 @@ pub fn state(dir: &Path, game_id: &str) -> Result<Option<TrackState>, String> {
 /// current track for `game_id`, or nothing is stored and the earlier track,
 /// if any, stays. Returns the size of the file stored. The temporary file is
 /// removed whatever happens.
-#[allow(dead_code)] // Called by #3785, which is not built yet.
 pub fn store<E: std::fmt::Display>(
     dir: &Path,
     game_id: &str,
@@ -172,6 +171,35 @@ pub fn store<E: std::fmt::Display>(
         let _ = std::fs::remove_file(&temp);
     }
     result
+}
+
+/// Remove the temporary files that a process which died while storing a track
+/// left behind, and return how many. They are named `<id>.cbtrack.tmp-<pid>`
+/// and are never read as a track. A file named for this process, or for one
+/// that is still running, is left: it may be a store in progress.
+pub fn sweep_temporaries(dir: &Path) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    let marker = format!("{EXTENSION}.tmp-");
+    let mut removed = 0;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some((id, pid)) = name.split_once(&marker) else {
+            continue;
+        };
+        let Ok(pid) = pid.parse::<u32>() else {
+            continue;
+        };
+        if valid_game_id(id).is_ok()
+            && pid != std::process::id()
+            && !coilbox_proc::is_running(pid)
+            && std::fs::remove_file(entry.path()).is_ok()
+        {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// Remove a match's track. Answers whether there was one.
@@ -731,5 +759,45 @@ mod tests {
         std::fs::remove_file(track_path(dir.path(), ID).unwrap()).unwrap();
         assert!(list(dir.path()).is_empty());
         assert_eq!(state(dir.path(), ID).unwrap(), None);
+    }
+
+    /// A crash while storing leaves `<id>.cbtrack.tmp-<pid>`, and nothing else
+    /// reads or removes it.
+    #[test]
+    fn a_temporary_file_left_by_a_dead_process_is_swept_and_nothing_else_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut gone = coilbox_proc::command(std::env::current_exe().unwrap())
+            .arg("--list")
+            .stdout(std::process::Stdio::null())
+            .spawn()
+            .unwrap();
+        let dead = gone.id();
+        gone.wait().unwrap();
+        let ours = std::process::id();
+        store_current(dir.path(), ID);
+        let temporary = |id: &str, pid: u32| format!("{id}{EXTENSION}.tmp-{pid}");
+        let kept = [
+            format!("{ID}{EXTENSION}"),
+            temporary(ID, ours),
+            temporary("not-an-id", dead),
+            format!("{ID}{EXTENSION}.tmp-soon"),
+        ];
+        for name in kept.iter().skip(1) {
+            std::fs::write(dir.path().join(name), b"half a track").unwrap();
+        }
+        std::fs::write(dir.path().join(temporary(OTHER, dead)), b"half a track").unwrap();
+
+        assert_eq!(sweep_temporaries(dir.path()), 1);
+
+        let mut left: Vec<String> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        left.sort();
+        let mut expected = kept.to_vec();
+        expected.sort();
+        assert_eq!(left, expected);
+        assert_eq!(sweep_temporaries(&dir.path().join("missing")), 0);
     }
 }

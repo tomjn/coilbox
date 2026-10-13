@@ -600,7 +600,11 @@ function Running({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="flex items-center gap-1.5">
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" />
-          Playing the match back. {label}.
+          {job.phase === "thinning"
+            ? "Making the track from the recording."
+            : job.record
+              ? `Recording the match. ${label}.`
+              : `Playing the match back. ${label}.`}
         </p>
         <Button
           type="button"
@@ -775,6 +779,8 @@ const FAILURE_WORDS: Record<ReplayAnalysisFailure["reason"], string> = {
   tookTooLong: "The playback took too long and was stopped.",
   engineFailed: "The engine stopped before the match ended.",
   couldNotRun: "The analysis could not be run.",
+  diverged: "The recording did not reproduce the match.",
+  thinFailed: "The recording could not be made into a track.",
 };
 
 function Failed({
@@ -792,7 +798,7 @@ function Failed({
           <p className="text-xs text-muted-foreground">
             {failure.reason === "tookTooLong" && failure.limitSeconds
               ? `It was allowed ${roughly(failure.limitSeconds)}, which is the length of the match plus time for the engine to start. Nothing was stored.`
-              : `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}. Nothing was stored.`}
+              : `${failure.message.charAt(0).toUpperCase()}${failure.message.slice(1)}. ${failure.record ? "No track was made." : "Nothing was stored."}`}
           </p>
         </div>
         <Button type="button" variant="ghost" size="sm" onClick={onDismiss}>

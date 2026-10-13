@@ -50,10 +50,23 @@ const RUNNING = {
   frame: 1500,
   lastFrame: 3000,
   cancelling: false,
+  record: false,
 };
 const QUEUED = [
-  { id: 2, gameId: "b".repeat(32), name: "second.sdfz", replayPath: "/b" },
-  { id: 3, gameId: "c".repeat(32), name: "third.sdfz", replayPath: "/c" },
+  {
+    id: 2,
+    gameId: "b".repeat(32),
+    name: "second.sdfz",
+    replayPath: "/b",
+    record: false,
+  },
+  {
+    id: 3,
+    gameId: "c".repeat(32),
+    name: "third.sdfz",
+    replayPath: "/c",
+    record: false,
+  },
 ];
 
 beforeEach(() => {
@@ -141,6 +154,8 @@ describe("the topbar while analyses are queued", () => {
             reason: "engineFailed",
             message: "the engine stopped",
             logExcerpt: [],
+            record: false,
+            disagreements: [],
           },
         ],
       },
@@ -167,5 +182,104 @@ describe("the topbar while analyses are queued", () => {
     seedReplayAnalysisForTests({ queue: { running: RUNNING, queued: QUEUED } });
     const { container } = render(<AnalysisQueueBadge />);
     expect(container.textContent).toBe("");
+  });
+});
+
+describe("the topbar while a replay is being recorded", () => {
+  const RECORDING = { ...RUNNING, record: true };
+  const RECORD_QUEUED = { ...QUEUED[0], record: true };
+
+  it("calls the work recording when every job records", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: RECORDING, queued: [RECORD_QUEUED] },
+    });
+    render(<AnalysisQueueBadge />);
+    expect(screen.getByRole("button").textContent).toBe("Recording 2 replays");
+  });
+
+  it("names both when the queue holds an analysis and a recording", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: RECORDING, queued: [QUEUED[1]] },
+    });
+    render(<AnalysisQueueBadge />);
+    expect(screen.getByRole("button").textContent).toBe(
+      "Analysing and recording 2 replays",
+    );
+  });
+
+  it("words the cancel for a recording as a recording", async () => {
+    seedReplayAnalysisForTests({
+      queue: { running: RECORDING, queued: [RECORD_QUEUED] },
+    });
+    render(<AnalysisQueueBadge />);
+    open();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Cancel the recording of first.sdfz",
+      }),
+    );
+
+    await waitFor(() => expect(cancels()).toHaveLength(1));
+    expect(cancels()[0].args).toEqual({ id: 1 });
+    expect(
+      screen.getByRole("button", {
+        name: "Cancel the recording of second.sdfz",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("shows the playback with a bar, as the frame the run has reached", () => {
+    seedReplayAnalysisForTests({ queue: { running: RECORDING } });
+    render(<AnalysisQueueBadge />);
+    open();
+
+    expect(screen.getByText("Frame 1,500 of 3,000")).toBeTruthy();
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe(
+      "50",
+    );
+  });
+
+  it("shows the thinning as a stage of its own, with no bar", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: { ...RECORDING, phase: "thinning", frame: 3000 } },
+    });
+    render(<AnalysisQueueBadge />);
+    open();
+
+    expect(screen.getByText("Making the track")).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(
+      screen.getByRole("button", {
+        name: "Cancel the recording of first.sdfz",
+      }),
+    ).toBeTruthy();
+  });
+
+  it("keeps a failed recording until it is dismissed, worded as a recording", () => {
+    seedReplayAnalysisForTests({
+      queue: {
+        failures: [
+          {
+            gameId: "d".repeat(32),
+            name: "broken.sdfz",
+            reason: "diverged",
+            message: "the playback did not reproduce the recorded match",
+            logExcerpt: [],
+            record: true,
+            disagreements: [],
+          },
+        ],
+      },
+    });
+    render(<AnalysisQueueBadge />);
+
+    expect(screen.getByRole("button").textContent).toBe("1 recording failed");
+    open();
+    expect(
+      screen.getByRole("button", {
+        name: "Dismiss the failed recording of broken.sdfz",
+      }),
+    ).toBeTruthy();
   });
 });

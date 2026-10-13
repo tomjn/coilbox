@@ -38,6 +38,8 @@ pub enum ThinError {
     /// The track could not be written or read back.
     Track(TrackError),
     Io(std::io::Error),
+    /// The caller asked for the thinning to stop. No file was written.
+    Cancelled,
 }
 
 impl fmt::Display for ThinError {
@@ -53,6 +55,7 @@ impl fmt::Display for ThinError {
             }
             Self::Track(e) => e.fmt(f),
             Self::Io(e) => write!(f, "reading the dump or writing the track failed: {e}"),
+            Self::Cancelled => f.write_str("the thinning was cancelled"),
         }
     }
 }

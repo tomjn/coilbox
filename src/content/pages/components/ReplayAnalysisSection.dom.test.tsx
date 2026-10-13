@@ -158,6 +158,7 @@ function job(
     frame: 11535,
     lastFrame: 23070,
     cancelling: false,
+    record: false,
     ...over,
   };
 }
@@ -493,14 +494,75 @@ describe("a replay in the queue", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
+  it("says a recording is a recording, with the same bar and cancel", () => {
+    seedReplayAnalysisForTests({ queue: { running: job({ record: true }) } });
+    show();
+
+    expect(screen.getByText(/Recording the match\. Frame/)).toBeTruthy();
+    expect(screen.queryByText(/Playing the match back/)).toBeNull();
+    expect(screen.getByRole("progressbar")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Cancel/ })).toBeTruthy();
+  });
+
+  it("shows the thinning of a recording as a stage, and draws no bar for it", () => {
+    seedReplayAnalysisForTests({
+      queue: { running: job({ record: true, phase: "thinning" }) },
+    });
+    show();
+
+    expect(
+      screen.getByText(/Making the track from the recording/),
+    ).toBeTruthy();
+    expect(screen.queryByRole("progressbar")).toBeNull();
+    expect(screen.getByRole("button", { name: /Cancel/ })).toBeTruthy();
+  });
+
+  it("says no track was made when a recording diverged, and what disagreed is the stored analysis's to show", () => {
+    seedReplayAnalysisForTests({
+      queue: {
+        failures: [
+          {
+            gameId: ID,
+            name: "match.sdfz",
+            reason: "diverged",
+            message:
+              "the playback did not reproduce the recorded match, so no track was made from it",
+            logExcerpt: [],
+            record: true,
+            disagreements: [
+              {
+                figure: "gameSeconds",
+                recorded: "1500",
+                observed: "1750",
+              },
+            ],
+          },
+        ],
+      },
+    });
+    show();
+
+    const text = screen.getByRole("alert").textContent;
+    expect(text).toContain("The recording did not reproduce the match.");
+    expect(text).toContain("No track was made.");
+    expect(text).not.toContain("Nothing was stored.");
+  });
+
   it("says how many are ahead of a queued one", () => {
     const other = {
       id: 3,
       gameId: "b".repeat(32),
       name: "b.sdfz",
       replayPath: "/b",
+      record: false,
     };
-    const mine = { id: 4, gameId: ID, name: "match.sdfz", replayPath: PATH };
+    const mine = {
+      id: 4,
+      gameId: ID,
+      name: "match.sdfz",
+      replayPath: PATH,
+      record: false,
+    };
     seedReplayAnalysisForTests({
       queue: {
         running: job({ gameId: "c".repeat(32) }),
@@ -515,7 +577,13 @@ describe("a replay in the queue", () => {
   });
 
   it("says it is waiting for the game when one is running", () => {
-    const mine = { id: 4, gameId: ID, name: "match.sdfz", replayPath: PATH };
+    const mine = {
+      id: 4,
+      gameId: ID,
+      name: "match.sdfz",
+      replayPath: PATH,
+      record: false,
+    };
     seedReplayAnalysisForTests({
       queue: { queued: [mine], waitingForGame: true },
     });
@@ -539,6 +607,8 @@ describe("a run that failed", () => {
             message: "the playback did not finish in the time allowed",
             limitSeconds: 1069,
             logExcerpt: [],
+            record: false,
+            disagreements: [],
           },
         ],
       },
@@ -564,6 +634,8 @@ describe("a run that failed", () => {
             message:
               "the engine exited with status 3 before the replay logger loaded",
             logExcerpt: ["GAME-section missing"],
+            record: false,
+            disagreements: [],
           },
         ],
       },

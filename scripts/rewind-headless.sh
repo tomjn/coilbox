@@ -12,6 +12,9 @@
 #    back (crates/coilbox-track-thin/examples/rewind_fixture.rs).
 # 4. Compares the counts to the values below, which are known for one version
 #    of Splinter Faction on one map.
+# 5. Puts the same replay through the analysis queue as a recording, which is
+#    the route the app takes (issue #3785), and checks it ends with one track
+#    and no dump.
 #
 # The match is generated every run, not committed as a replay, because a replay
 # only plays back against the exact game version it was recorded on. The known
@@ -289,6 +292,24 @@ for frame in "${POSITION_FRAMES[@]}"; do
     failures=$((failures + 1))
   fi
 done
+
+echo "== recording it through the analysis queue"
+QUEUE_LOG="$WORK/queue.log"
+if (
+  cd "$ROOT"
+  UNITSYNC_WORKER="$WORKER" \
+    COILBOX_ANALYSIS_REPLAY="$REPLAY" \
+    COILBOX_ANALYSIS_ENGINE_DIR="$(dirname "$ENGINE")" \
+    COILBOX_ANALYSIS_DATA_DIRS="$WORK/data" \
+    cargo nextest run -p tauri-plugin-coilbox-content --run-ignored only --no-capture \
+    -E 'test(a_real_replay_is_recorded_through_the_queue_into_a_track)'
+) >"$QUEUE_LOG" 2>&1; then
+  echo "  ok the queue stored one track and left no dump"
+else
+  echo "  fail the queue did not record the replay. The end of $QUEUE_LOG:"
+  tail -n 25 "$QUEUE_LOG" | sed 's/^/    /'
+  failures=$((failures + 1))
+fi
 
 echo
 if [ "$failures" -eq 0 ]; then

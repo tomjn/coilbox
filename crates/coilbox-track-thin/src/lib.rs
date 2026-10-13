@@ -65,6 +65,11 @@ pub struct ThinOptions {
     /// which takes it from the tolerance and the largest unit. A caller sets
     /// it to measure what rotation rounding costs.
     pub rotation_bits: Option<u8>,
+    /// The game's name and version for the track's info chunk, such as
+    /// `Splinter Faction 0.1.86`. `None` takes the dump's, which is the game the
+    /// recorder ran in. In an analysis run that is a generated game, so the
+    /// caller names the game the replay was recorded on.
+    pub game: Option<String>,
 }
 
 impl Default for ThinOptions {
@@ -77,6 +82,7 @@ impl Default for ThinOptions {
             recorder_version: RECORDER_VERSION,
             game_id: [0; 16],
             rotation_bits: None,
+            game: None,
         }
     }
 }
@@ -208,13 +214,16 @@ struct Scan {
     largest_radius: f32,
 }
 
-fn scan(path: &Path) -> Result<Scan> {
+fn scan(path: &Path, cancelled: &dyn Fn() -> bool) -> Result<Scan> {
     let mut reader = open(path)?;
     let mut header = None;
     let mut frames: Option<(u32, u32)> = None;
     let mut largest_radius = 0f32;
     let mut ended = false;
     while let Some(block) = reader.next_block()? {
+        if cancelled() {
+            return Err(ThinError::Cancelled);
+        }
         match block {
             Block::Header(h) => header = Some(*h),
             Block::Frame(f) => {
@@ -247,10 +256,19 @@ fn scan(path: &Path) -> Result<Scan> {
 }
 
 /// Reads a dump from the start and passes what it says to `sink`.
-fn replay(path: &Path, q: Quantiser, sink: &mut dyn Sink) -> Result<Rest> {
+fn replay(
+    path: &Path,
+    q: Quantiser,
+    sink: &mut dyn Sink,
+    game: Option<&str>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Rest> {
     let mut reader = open(path)?;
     let mut interpreter = None;
     while let Some(block) = reader.next_block()? {
+        if cancelled() {
+            return Err(ThinError::Cancelled);
+        }
         match (block, &mut interpreter) {
             (Block::Header(h), _) => interpreter = Some(Interpreter::new(*h, q)?),
             (Block::Pieces(tree), Some(i)) => i.pieces(tree)?,
@@ -263,19 +281,29 @@ fn replay(path: &Path, q: Quantiser, sink: &mut dyn Sink) -> Result<Rest> {
             (Block::End(_) | Block::Unknown(_), _) => {}
         }
     }
-    interpreter
+    let mut rest = interpreter
         .ok_or_else(|| ThinError::Dump("the dump has no header block".into()))?
-        .finish(sink)
+        .finish(sink)?;
+    if let Some(game) = game {
+        rest.info.game = game.to_string();
+    }
+    Ok(rest)
 }
 
 /// Measures every sample of a dump against a track, and fails if the track is
 /// further from one than `tolerance`.
-fn check<R: Read + Seek>(dump: &Path, track: R, weighting_length: f32) -> Result<CheckReport> {
+fn check<R: Read + Seek>(
+    dump: &Path,
+    track: R,
+    weighting_length: f32,
+    game: Option<&str>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<CheckReport> {
     let reader = TrackReader::open(track)?;
     let header = reader.header().clone();
     let q = reader.quantiser()?;
     let mut verifier = verify::Verifier::new(reader)?;
-    let rest = replay(dump, q, &mut verifier)?;
+    let rest = replay(dump, q, &mut verifier, game, cancelled)?;
     let (worst, samples, written) = verifier.finish(&rest)?;
 
     let tolerance = header.tolerance as f64;
@@ -309,11 +337,18 @@ fn check<R: Read + Seek>(dump: &Path, track: R, weighting_length: f32) -> Result
 /// every recorded sample against what a reader gets from the file, to the
 /// tolerance in the track's own header.
 pub fn check_track(dump: &Path, track: &Path) -> Result<CheckReport> {
-    let scan = scan(dump)?;
+    let scan = scan(dump, &|| false)?;
+    // The game's name is the caller's to give and the dump cannot confirm it,
+    // so the track's own is what the dump's is held against.
+    let game = TrackReader::open(BufReader::new(File::open(track)?))?
+        .info()?
+        .game;
     check(
         dump,
         BufReader::new(File::open(track)?),
         scan.largest_radius,
+        Some(&game),
+        &|| false,
     )
 }
 
@@ -323,13 +358,25 @@ pub fn check_track(dump: &Path, track: &Path) -> Result<CheckReport> {
 /// the track. Fails, and writes no file, when the dump is not a whole
 /// recording or when the track it made does not keep its own tolerance.
 pub fn thin_dump(dump: &Path, track: &Path, options: &ThinOptions) -> Result<ThinReport> {
+    thin_dump_cancellable(dump, track, options, &|| false)
+}
+
+/// [`thin_dump`], asking `cancelled` as each block of the dump is read, in each
+/// of its passes over the dump. Once it answers true the thinning stops with
+/// [`ThinError::Cancelled`] and writes no file.
+pub fn thin_dump_cancellable(
+    dump: &Path,
+    track: &Path,
+    options: &ThinOptions,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<ThinReport> {
     let tolerance = options.tolerance as f64;
     if !(tolerance > 0.0 && tolerance.is_finite()) {
         return Err(ThinError::Dump(format!(
             "the tolerance must be more than 0 elmos, not {tolerance}"
         )));
     }
-    let scan = scan(dump)?;
+    let scan = scan(dump, cancelled)?;
     let settings = Settings {
         recorder_version: options.recorder_version,
         frames_per_second: scan.header.game_speed as u16,
@@ -353,7 +400,7 @@ pub fn thin_dump(dump: &Path, track: &Path, options: &ThinOptions) -> Result<Thi
         first_frame: scan.first_frame,
         window_length: options.window_length,
     });
-    let rest = replay(dump, q, &mut thinner)?;
+    let rest = replay(dump, q, &mut thinner, options.game.as_deref(), cancelled)?;
     let (units, projectiles, _) = thinner.finish();
 
     let mut kept = KeyCounts {
@@ -375,7 +422,13 @@ pub fn thin_dump(dump: &Path, track: &Path, options: &ThinOptions) -> Result<Thi
     .to_bytes()?;
 
     // Checked before it is written, so a track that fails leaves no file.
-    let checked = check(dump, Cursor::new(&bytes), scan.largest_radius)?;
+    let checked = check(
+        dump,
+        Cursor::new(&bytes),
+        scan.largest_radius,
+        options.game.as_deref(),
+        cancelled,
+    )?;
     std::fs::write(track, &bytes)?;
     Ok(ThinReport {
         header: checked.header,

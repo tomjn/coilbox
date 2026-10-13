@@ -173,9 +173,8 @@ impl RunControl {
         }
     }
 
-    /// Whether the run has been cancelled, for a test's stand-in engine to
-    /// stop on.
-    #[cfg(test)]
+    /// Whether the run has been cancelled. The thinning that follows the
+    /// engine asks it, and so does a test's stand-in engine.
     pub(super) fn was_cancelled(&self) -> bool {
         self.state
             .lock()
