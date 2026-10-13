@@ -3,15 +3,17 @@
 -- Coilbox generates a game that depends on the game a replay was recorded on
 -- and puts the replay's track in it at coilbox_rewind/track.cbtrack. This
 -- gadget opens the track and, on every simulation frame, makes the world the
--- track at the time the player holds: units, features and terrain. Nothing is
--- simulated, so the time can jump and run backwards.
+-- track at the time the player holds: units, features, terrain and the shots
+-- in the air (issue #3795). Nothing is simulated, so the time can jump and run
+-- backwards.
 --
 -- The work is in luarules/rewind_player/coilbox_player.lua and the stages it
 -- lists. This file is the engine's side of it: the call-ins, and the two
 -- things only a gadget can do.
 --
 -- Nothing takes damage. `UnitPreDamaged` gives every hit no damage and no
--- push, and the track owns health.
+-- push, and the track owns health. The shots the player creates do not rest
+-- on that: each is created with no damage to do.
 --
 -- A frame's work is timed. Synced Lua has no clock, so the synced half tells
 -- the unsynced half when the work starts and ends (`SendToUnsynced` is a call
@@ -27,7 +29,7 @@
 function gadget:GetInfo()
 	return {
 		name = "Coilbox rewind player",
-		desc = "Plays a replay track back: units, features and terrain at any time, in either direction.",
+		desc = "Plays a replay track back: units, features, terrain and shots at any time, in either direction.",
 		author = "coilbox",
 		date = "2026",
 		license = "MIT",
