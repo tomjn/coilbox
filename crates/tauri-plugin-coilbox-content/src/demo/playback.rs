@@ -1461,6 +1461,26 @@ end
         })
     }
 
+    /// The engine's log as text. A game can log bytes that are not UTF-8, as
+    /// Balanced Annihilation 15.9.8 does, and a log read as a string would
+    /// then come back empty.
+    fn read_log(log: &Path) -> String {
+        String::from_utf8_lossy(&std::fs::read(log).unwrap_or_default()).into_owned()
+    }
+
+    /// A copy of a folder and everything in it.
+    fn copy_folder(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for entry in std::fs::read_dir(from).unwrap().flatten() {
+            let target = to.join(entry.file_name());
+            if entry.path().is_dir() {
+                copy_folder(&entry.path(), &target);
+            } else {
+                std::fs::copy(entry.path(), target).unwrap();
+            }
+        }
+    }
+
     /// Launches the headless engine on a prepared playback and reads its log
     /// until `done` says the lines are in. Gives whether it timed out, the log
     /// and how many replays the engine wrote.
@@ -1484,7 +1504,7 @@ end
                 log: &log,
                 timeout: prepared.wait,
                 on_poll: &|| {
-                    if done(&std::fs::read_to_string(&log).unwrap_or_default()) {
+                    if done(&read_log(&log)) {
                         control.cancel();
                     }
                 },
@@ -1492,10 +1512,17 @@ end
             &control,
         )
         .expect("the engine launches");
-        let output = std::fs::read_to_string(&log).unwrap_or_default();
+        let output = read_log(&log);
         // For a person to read afterwards, since the folder is removed.
         if let Some(keep) = var("COILBOX_PLAYBACK_LOG") {
             let _ = std::fs::copy(&log, keep);
+        }
+        // The game and its script, for a person to open in an engine with a
+        // window, which is the only way to see anything the playback draws.
+        if let Some(keep) = var("COILBOX_PLAYBACK_KEEP_GAME") {
+            let keep = PathBuf::from(keep);
+            copy_folder(&prepared.game_dir, &keep.join(FOLDER));
+            std::fs::copy(&prepared.script, keep.join("script.txt")).unwrap();
         }
         let written = std::fs::read_dir(write_dir.join("demos"))
             .map(|d| d.flatten().count())
@@ -1516,7 +1543,8 @@ end
     /// playback to depend on, for a replay recorded on a scratch game whose own
     /// gadgets would play over the track. `COILBOX_PLAYBACK_SECONDS` is how long to wait
     /// for the log lines (default 120). `COILBOX_PLAYBACK_LOG` is a path to copy
-    /// the engine's output to. The engine is the headless one in
+    /// the engine's output to. `COILBOX_PLAYBACK_KEEP_GAME` is a folder to copy
+    /// the playback game and its script to. The engine is the headless one in
     /// `COILBOX_ANALYSIS_ENGINE_DIR`, since a window cannot be checked here.
     #[test]
     #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
@@ -1799,5 +1827,112 @@ end
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
         assert_eq!(written, 0, "the playback wrote a replay");
+    }
+
+    /// The widget that presses the timeline's keys in the engine. It is
+    /// written into the game folder for the test below and is not part of the
+    /// game.
+    const TIMELINE_PROBE: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/timeline_probe.lua"
+    ));
+
+    /// The timeline widget against a real engine and a real game's widget
+    /// handler (issue #3798). The game's handler has to load the widget out of
+    /// the playback game and turn it on with nothing asked of the game, and
+    /// every key and a press on the bar have to change what the player
+    /// publishes, which is the message going the whole way round.
+    ///
+    /// `scripts/rewind-playback-headless.sh` runs this, and it reads the
+    /// variables the tests above do.
+    ///
+    /// The engine is headless, so the widget draws nothing. A draw that does
+    /// not raise is all this shows about how it looks.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn the_timeline_drives_the_player_in_the_engine() {
+        let Some(prepared) = prepared(true) else {
+            return;
+        };
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luaui/widgets/coilbox_rewind_timeline_probe.lua"),
+            TIMELINE_PROBE,
+        )
+        .unwrap();
+
+        let (timed_out, output, _) =
+            launch(&prepared, &|text| text.contains("TIMELINE_PROBE done"));
+        let probe: Vec<&str> = output
+            .lines()
+            .filter_map(|l| l.split_once("TIMELINE_PROBE ").map(|(_, rest)| rest))
+            .collect();
+        for l in &probe {
+            eprintln!("timeline {l}");
+        }
+        assert!(!timed_out, "the probe never finished. Log:\n{output}");
+        let line = |start: &str| {
+            *probe
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no probe line starting {start}"))
+        };
+
+        // The game's own handler loaded the widget and it reads the player.
+        let loaded = line("loaded=");
+        assert_eq!(field(loaded, "loaded"), "1", "{loaded}");
+        let (first, last) = (number(loaded, "first"), number(loaded, "last"));
+        assert!(last > first, "{loaded}");
+
+        // Every key was taken, and its message arrived.
+        let after = |step: &str| {
+            let l = line(&format!("{step} "));
+            assert_eq!(field(l, "taken"), "1", "{l}");
+            assert_eq!(field(l, "arrived"), "1", "{l}");
+            l
+        };
+        assert_eq!(field(after("toggle"), "playing"), "1");
+        assert_eq!(field(after("pause"), "playing"), "0");
+        assert_eq!(number(after("end"), "frame"), last);
+        assert_eq!(number(after("home"), "frame"), first);
+        assert_eq!(number(after("right"), "frame"), first + 30.0);
+        assert_eq!(number(after("shift_right"), "frame"), first + 330.0);
+        assert_eq!(number(after("shift_left"), "frame"), first + 30.0);
+        assert_eq!(number(after("left"), "frame"), first);
+        assert_eq!(number(after("full_stop"), "frame"), first + 1.0);
+        assert_eq!(number(after("comma"), "frame"), first);
+        assert_eq!(number(after("minus"), "speed"), 0.5);
+        assert_eq!(number(after("equals"), "speed"), 1.0);
+        assert_eq!(number(after("plus"), "speed"), 2.0);
+
+        // A key held with Ctrl is left alone and changes nothing.
+        let held = line("ctrl_space ");
+        assert_eq!(field(held, "taken"), "0", "{held}");
+        assert_eq!(field(held, "playing"), "0", "{held}");
+
+        // A press on the middle of the bar seeks to the middle of the track.
+        let drag = after("drag");
+        assert_eq!(
+            number(drag, "frame"),
+            (first + (last - first) / 2.0 + 0.5).floor(),
+            "{drag}"
+        );
+        let reverse = after("reverse");
+        assert_eq!(field(reverse, "direction"), "-1", "{reverse}");
+        assert_eq!(field(reverse, "playing"), "1", "{reverse}");
+
+        // The handler still has the widget, which it drops when one raises,
+        // and it was asked to draw in between.
+        let still = line("still_loaded=");
+        assert_eq!(field(still, "still_loaded"), "1", "{still}");
+        assert_eq!(field(still, "config"), "table", "{still}");
+        assert!(number(still, "draws") >= 1.0, "{still}");
+        let errors: Vec<&str> = output
+            .lines()
+            .filter(|l| l.to_lowercase().contains("error"))
+            .filter(|l| l.contains("coilbox_") || l.contains("Coilbox rewind"))
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 }
