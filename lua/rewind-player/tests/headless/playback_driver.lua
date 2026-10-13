@@ -155,6 +155,18 @@ local function say(text)
 	Spring.Echo(TAG .. text)
 end
 
+local function push(kind, a, b)
+	queue[#queue + 1] = { kind = kind, a = a, b = b, waited = 0 }
+end
+
+local function send(message)
+	push("send", "coilbox_rewind:" .. message)
+end
+
+local function param(name)
+	return Spring.GetGameRulesParam(PARAM .. name)
+end
+
 --- The height the track has a corner of the ground at `frame`: the last row
 -- that touches it, or the map's own.
 local function trackGround(corner, frame, x, z)
@@ -201,18 +213,6 @@ local function lookAtDeathGround()
 		deathExplosions[n] = nil
 	end
 	deathCount = 0
-end
-
-local function push(kind, a, b)
-	queue[#queue + 1] = { kind = kind, a = a, b = b, waited = 0 }
-end
-
-local function send(message)
-	push("send", "coilbox_rewind:" .. message)
-end
-
-local function param(name)
-	return Spring.GetGameRulesParam(PARAM .. name)
 end
 
 --- Seeks, waits for the player to show the frame, and lets the engine settle.

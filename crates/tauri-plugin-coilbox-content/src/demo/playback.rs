@@ -2788,8 +2788,9 @@ end
             let l = line(&format!("watched {label} "));
             assert_eq!(field(l, "feature_damage_by_deaths"), "0", "{l}");
         }
+        // Each pass counts from nothing, so this is the first pass's.
         assert!(
-            number(line("deaths "), "feature_hits_by_deaths") > 0.0,
+            number(line("watched forward "), "feature_hits_by_deaths") > 0.0,
             "no death in the fight reached a feature, so it shows nothing of the rule"
         );
         assert_eq!(
