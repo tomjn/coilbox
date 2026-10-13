@@ -1491,6 +1491,32 @@ export const contentReplayAnalysisEvents = defineCommand<
   { events: ReplayLogLine[]; total: number }
 >("coilbox-content", "content_replay_analysis_events");
 
+/**
+ * One recorded track on disk (issue #3786). `current` can be played. `stale`
+ * was made by an older or newer recorder, or does not read as a track, and is
+ * offered for recording again.
+ */
+export interface StoredReplayTrack {
+  gameId: string;
+  state: "current" | "stale";
+  sizeBytes: number;
+  /** When it was stored or last watched, in epoch milliseconds. */
+  lastWatchedMs: number;
+}
+
+/**
+ * Every track on disk, to join to replay records by `gameId`. This is how the
+ * library knows which replays have a track: the answer changes when a track is
+ * stored or removed, so it is asked for and never stored in a `StatRecord`.
+ *
+ * A remix carries its original's game id and has no track of its own, so leave
+ * replays with `remixed` set out of the join.
+ */
+export const contentReplayTracks = defineCommand<
+  undefined,
+  { tracks: StoredReplayTrack[] }
+>("coilbox-content", "content_replay_tracks");
+
 /** Delete what is stored for one match, leaving the replay alone. */
 export const contentReplayAnalysisDelete = defineCommand<
   { gameId: string },
@@ -1693,13 +1719,13 @@ export const contentReplayUnitOrders = defineCommand<
 
 /**
  * Delete a replay file. `path` must be a `.sdfz`/`.sdf` from
- * `content_list_replays`. Its stored analysis goes with it. With
+ * `content_list_replays`. Its stored analysis and track go with it. With
  * `onlyUnfinished` a file that is no longer empty is left alone. The backend
  * refuses an empty file while a game coilbox launched is running.
  */
 export const contentDeleteReplay = defineCommand<
   { path: string; onlyUnfinished?: boolean },
-  { ok: boolean; analysisDeleted: boolean }
+  { ok: boolean; analysisDeleted: boolean; trackDeleted: boolean }
 >("coilbox-content", "content_delete_replay");
 
 /** What a bulk replay delete removed, or would remove. */
@@ -1713,6 +1739,9 @@ export interface ReplayDeleteSummary {
   /** How many of the replays had a stored analysis, which goes with them. */
   analyses: number;
   analysisBytes: number;
+  /** How many had a recorded track, which goes with them, and what it frees. */
+  tracks: number;
+  trackBytes: number;
 }
 
 /**

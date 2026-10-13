@@ -101,6 +101,8 @@ describe("ClearUnfinishedButton", () => {
         skipped: [],
         analyses: 0,
         analysisBytes: 0,
+        tracks: 0,
+        trackBytes: 0,
       },
     });
     const onCleared = vi.fn();
@@ -153,6 +155,8 @@ describe("ClearUnfinishedButton", () => {
         ],
         analyses: 0,
         analysisBytes: 0,
+        tracks: 0,
+        trackBytes: 0,
       },
     });
     render(

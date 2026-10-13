@@ -65,6 +65,7 @@ import { GatherReplaysButton } from "./components/GatherReplaysButton";
 import { MapThumb } from "./components/MapThumb";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
 import { ReplaySetsManager } from "./components/ReplaySetsManager";
+import { ReplayTrackBadge } from "./components/ReplayTrackBadge";
 import { EmptyState, ErrorBanner, SkeletonList } from "./components/states";
 
 /** A fixed sort from the list below, or a `metric:<key>:<direction>` value. */
@@ -669,6 +670,10 @@ export default function ReplaysPage() {
                           </Badge>
                         )}
                         <OriginBadge origin={replayOrigin(us)} />
+                        <ReplayTrackBadge
+                          gameId={r.gameId}
+                          remixed={r.remixed}
+                        />
                         {r.filename === resumeFilename && (
                           <ContinueBadge label="Unwatched" />
                         )}
