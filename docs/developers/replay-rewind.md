@@ -156,7 +156,7 @@ A hook is an optional function in `hooks`. The player calls these three and no o
 | Hook | Called | Arguments |
 | --- | --- | --- |
 | `started` | Once, when the player has opened the track, before the first frame and so before anything of the track is in the world. | None. |
-| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. | The engine's unit id, the unit definition's engine id, the track frame and the clock. |
+| `unitPlaced` | After the player created a unit and put it in place, and again for a unit made again after a seek. A seek that needs many units made spreads them over several frames, so this can come some frames after the seek. | The engine's unit id, the unit definition's engine id, the track frame and the clock. |
 | `afterFrame` | At the end of every simulation frame, after every stage. | The track frame and the clock. |
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step. `clock.direction` is 1 or -1. `clock.speed` is how many frames of the track one simulation frame covers.

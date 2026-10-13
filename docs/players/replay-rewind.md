@@ -131,6 +131,7 @@ True to the recording:
 - Where units, wrecks and features are, which way they face and when they appear or go.
 - Health, health bars, build progress and its time left.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
+- A big jump. When a jump has hundreds of units to remove and make, the world takes a few frames to catch up, about a second for several hundred, so the units appear over that time and not all at once. The playback does this so that the game does not stutter.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
 - The resource bars. Each team's metal and energy, and how much it can store, are what they were in the match at the moment showing. They stay put while you pause and go back when you seek back. A figure is within half a unit of the match's, or within a thousandth of it for a team that holds thousands.
 - Supply used, supply available and research points.

@@ -60,7 +60,17 @@ M.PARAMS = {
 	firstFrame = "coilbox_rewind_first_frame",
 	lastFrame = "coilbox_rewind_last_frame",
 	framesPerSecond = "coilbox_rewind_frames_per_second",
+	-- 1 when the world is the track at the time shown, 0 from a seek until it is.
+	-- A seek can take several frames (issue #3988).
+	settled = "coilbox_rewind_settled",
 }
+
+--- The Lua message that sets the most units made in a frame and the most
+-- removed, as two whole numbers after the text. The gadget's unsynced half sends
+-- it, for example `coilbox_rewind_budget:40 30`. `coilbox_rewind_budget:none`
+-- says that no budget will come, because the unsynced half cannot time a frame,
+-- and takes the limit off.
+M.BUDGET = "coilbox_rewind_budget:"
 
 --- The mod options the player reads.
 M.OPTIONS = {
@@ -72,6 +82,14 @@ M.OPTIONS = {
 
 local Player = {}
 Player.__index = Player
+
+--- The whole number of 1 or more that `text` holds, or nil.
+local function whole(text)
+	local n = tonumber(text)
+	if n and n >= 1 and n < math.huge and n == math.floor(n) then
+		return n
+	end
+end
 
 --- A stage that does nothing, for one whose engine calls are missing. It takes
 -- the engine's call-ins too, since the player hands them to every stage.
@@ -90,13 +108,16 @@ end
 
 local function publishClock(self)
 	local clock, P = self.clock, M.PARAMS
+	publish(self, P.settled, self:settled() and 1 or 0)
 	publish(self, P.frame, clock.frame)
 	publish(self, P.playing, clock.playing and 1 or 0)
 	publish(self, P.direction, clock.direction)
 	publish(self, P.speed, clock.speed)
 end
 
---- A player of `track`, or nil and the reason. `options.modOptions` is what
+--- A player of `track`, or nil and the reason. `options.budget` is the most
+-- units a frame makes and the most it removes, and without it there is no
+-- limit. `options.modOptions` is what
 -- `Spring.GetModOptions` gave and `options.log` takes a line for the engine's
 -- log. `options.adapter` is the game's adapter as coilbox_player_adapter.lua
 -- reads it, or nil for a game with none, and `options.adapterWhy` is the reason
@@ -186,6 +207,9 @@ function M.new(track, options)
 	local terrain = on.terrain and Terrain.new(context, Reader) or OFF
 	local featureStage = on.features and Features.new(context, Rotation) or OFF
 	local units = Units.new(context, Rotation)
+	if options.budget then
+		units:setBudget(options.budget)
+	end
 	local projectiles = on.shots and Projectiles.new(context, units, Clock) or OFF
 	-- A track from before recorder version 4 has no team's resources in it.
 	local resources = OFF
@@ -268,9 +292,34 @@ function Player:framePost()
 	self.resources:afterSim()
 end
 
+--- Whether the world is the track at the time shown: no seek is waiting to be
+-- shown and no stage left work for a later frame.
+function Player:settled()
+	return not self.clock.pending and not self.units.unsettled and not self.projectiles.unsettled
+end
+
+--- How many units the last frame made, and how many it removed.
+function Player:worked()
+	return self.units.made, self.units.removed
+end
+
 --- A Lua message. True when it was the player's, done or refused, and false
 -- when it was somebody else's.
 function Player:message(text)
+	if text:sub(1, #M.BUDGET) == M.BUDGET then
+		if text == M.BUDGET .. "none" then
+			self.units:setBudget(math.huge)
+			return true
+		end
+		local make, remove = text:match("^(%S+) (%S+)$", #M.BUDGET + 1)
+		make, remove = whole(make), whole(remove)
+		if make and remove then
+			self.units:setBudget(make, remove)
+		else
+			self.log("the message \"" .. text .. "\" was refused: the budget is two whole numbers of 1 or more, the most units made and the most removed in a frame")
+		end
+		return true
+	end
 	local done, why = self.clock:message(text)
 	if done == nil then
 		return false

@@ -71,6 +71,8 @@ local SHOTS = "coilbox_rewind/driver_shots.lua"
 -- And one that asks for the plan that looks at the teams' resources. It
 -- returns a list of frames to look at, or anything else for none.
 local RESOURCES = "coilbox_rewind/driver_resources.lua"
+-- And one that asks for the plan of seeks across the whole match (issue #3988).
+local SEEKS = "coilbox_rewind/driver_seeks.lua"
 
 local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
 local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
@@ -218,10 +220,13 @@ local function lookAtDeathGround()
 	deathCount = 0
 end
 
---- Seeks, waits for the player to show the frame, and lets the engine settle.
+--- Seeks, waits for the player to show the frame and say that the world has
+-- caught up (a seek can take several frames, issue #3988), and lets the engine
+-- settle.
 local function seekTo(frame)
 	send("seek " .. frame)
 	push("await", frame)
+	push("settled")
 	push("wait", SETTLE)
 end
 
@@ -859,6 +864,7 @@ local function matchPlan()
 	send("speed 32")
 	send("play 1")
 	push("await", last, whole)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_forward", last)
@@ -866,6 +872,7 @@ local function matchPlan()
 	end)
 	send("reverse")
 	push("await", first, whole)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_backward", first)
@@ -1121,6 +1128,40 @@ local function resourcePlan(asked)
 	end)
 end
 
+--- The plan for seeks across a whole match (issue #3988): from the first frame
+-- to its last minutes, back, to the end, back, and again, each waited for until
+-- the player says the world has caught up. Each says how many simulation
+-- frames the world took to settle and what the engine has against the track.
+-- The player's own slow frame lines in the log say whether a frame took too
+-- long, and the work line at the end has the slowest.
+local function seeksPlan()
+	local h = track.header
+	local first, last = h.firstFrame, h.lastFrame
+	local late = math.max(first, last - 10 * h.framesPerSecond)
+	say(string.format("start first=%d last=%d tolerance=%s step=%s rotation_bits=%d", first, last, tostring(h.tolerance), tostring(h.positionStep), h.rotationBits))
+	send("pause")
+	seekTo(first)
+	for n, frame in ipairs({ late, first, last, first, late, last, first, late }) do
+		local sent
+		push("run", function()
+			sent = Spring.GetGameFrame()
+		end)
+		send("seek " .. frame)
+		push("await", frame)
+		push("settled")
+		push("run", function()
+			say(string.format("seek_settle n=%d to=%d frames=%d settled=%s", n, frame, Spring.GetGameFrame() - sent, tostring((param("settled")))))
+		end)
+		push("wait", SETTLE)
+		push("run", function()
+			measure("seeks n=" .. n, frame)
+		end)
+	end
+	push("run", function()
+		SendToUnsynced(REPORT)
+	end)
+end
+
 local function plan()
 	local h = track.header
 	local first, last = h.firstFrame, h.lastFrame
@@ -1206,6 +1247,7 @@ local function plan()
 	send("play 1")
 	send("speed 32")
 	push("await", last)
+	push("settled")
 	push("wait", SETTLE)
 	push("run", function()
 		measure("played_to_end", last)
@@ -1239,6 +1281,8 @@ function gadget:GameFrame()
 		-- track. Without it the plan is the fixture match's.
 		if VFS.FileExists(RESOURCES) then
 			resourcePlan(VFS.Include(RESOURCES))
+		elseif VFS.FileExists(SEEKS) then
+			seeksPlan()
 		elseif VFS.FileExists(SHOTS) then
 			shotPlan()
 		elseif VFS.FileExists(WHOLE_MATCH) then
@@ -1261,6 +1305,15 @@ function gadget:GameFrame()
 					return
 				end
 				say("lost frame=" .. tostring(item.a) .. " shown=" .. tostring(param("frame")))
+			end
+		elseif item.kind == "settled" then
+			-- A player that publishes no such parameter has nothing to wait for.
+			if param("settled") == 0 then
+				item.waited = item.waited + 1
+				if item.waited < PATIENCE then
+					return
+				end
+				say("lost settle")
 			end
 		elseif item.kind == "each" then
 			-- A function run on each of a number of frames.

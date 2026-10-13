@@ -427,10 +427,20 @@ local function unsyncedScene(removed)
 		GetTimer = function()
 			return clock.now
 		end,
-		DiffTimers = function(a, b)
+		GetTimerMicros = function()
+			return clock.now * 1000
+		end,
+		DiffTimers = function(a, b, _, fromMicroseconds)
+			if fromMicroseconds then
+				return (a - b) / 1000
+			end
 			return a - b
 		end,
+		SendLuaRulesMsg = function(text)
+			clock.messages[#clock.messages + 1] = text
+		end,
 	}
+	clock.messages = {}
 	env.VFS.Include = function(path)
 		local file = assert(path:match("^luarules/rewind_player/(.+)$"), path)
 		return t.load(file, env)
@@ -469,7 +479,14 @@ for _, row in ipairs(Table.UNSYNCED) do
 				gadget:RecvFromSynced("coilbox_rewind_work", 1, 1)
 			end)
 			t.check(label .. " a frame's work is taken and raises nothing", fine)
-			t.same(label .. " and nothing more is logged", #lines, 1)
+			-- A row that leaves the slow frame line on still logs a slow frame.
+			local more = 0
+			for _, l in ipairs(lines) do
+				if not l:find(PREFIX .. "slow frame:", 1, true) then
+					more = more + 1
+				end
+			end
+			t.same(label .. " and nothing more is logged", more, 1)
 		end
 	end
 end
