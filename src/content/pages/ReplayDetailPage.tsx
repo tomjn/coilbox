@@ -60,9 +60,9 @@ import { ReplayAnalysisSection } from "./components/ReplayAnalysisSection";
 import { ReplayBuildOrders } from "./components/ReplayBuildOrders";
 import { ReplayChat } from "./components/ReplayChat";
 import { ReplayMap } from "./components/ReplayMap";
+import { ReplayRecordingSection } from "./components/ReplayRecordingSection";
 import { ReplayRoster } from "./components/ReplayRoster";
 import { ReplaySetPicker } from "./components/ReplaySetPicker";
-import { ReplayTrackBadge } from "./components/ReplayTrackBadge";
 import { StaleRemixNotice } from "./components/StaleRemixNotice";
 import {
   DependencyBlocked,
@@ -716,7 +716,6 @@ export default function ReplayDetailPage() {
               </Badge>
             )}
             <OriginBadge origin={origin} />
-            <ReplayTrackBadge gameId={info?.gameId} remixed={info?.remixed} />
           </div>
           <p className="break-all font-mono text-xs text-muted-foreground">
             {filename}
@@ -876,6 +875,19 @@ export default function ReplayDetailPage() {
                     onMapDownloaded={onMapDownloaded}
                   />
                 }
+              />
+            )}
+
+            {/* The same queue as the analysis, so it sits with it (#3788). The
+             * section gates itself on `analytics.run`. */}
+            {replay && (
+              <ReplayRecordingSection
+                replayPath={replay.path}
+                info={info}
+                target={resolved?.matched ? resolved.target : null}
+                missingGame={missingGame}
+                missingMap={missingMap}
+                dependencyBlock={dependencyBlock}
               />
             )}
 

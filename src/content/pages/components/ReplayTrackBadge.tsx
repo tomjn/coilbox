@@ -3,7 +3,8 @@ import { useStoredTracks } from "../../replayTracks";
 
 /**
  * Whether a replay has a recorded track (#3786): nothing when it has none, and
- * a quiet badge when it has. A stale track is amber and says it is not played. The recording button and the full state are #3788.
+ * a quiet badge when it has. A stale track is amber and says it is not played. The replay's page shows the full state in
+ * its recording section (#3788), so this is for the list.
  *
  * A remix shares its original's game id and has no track of its own.
  */
