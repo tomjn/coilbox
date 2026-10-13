@@ -117,6 +117,27 @@ do
 	t.same("a track with no terrain rows never touches the heightmap", world.heightMapCalls, nil)
 end
 
+-- A unit the track has alive with no health left.
+
+do
+	local world, player = setup({
+		last = 300,
+		unitDefs = NAMES,
+		units = { {
+			first = 0,
+			last = 300,
+			status = function(frame)
+				return frame >= 100 and 0 or 0.5, 1, 0
+			end,
+		} },
+	})
+	player:message("coilbox_rewind:pause")
+	seek(player, 50)
+	t.same("a unit has the track's health", world.unitNamed("tank").health, 500)
+	seek(player, 150)
+	t.near("a unit the track has alive at no health keeps one step of it, since the engine kills a unit with none on its next hit", world.unitNamed("tank").health, 1000 / 65535, 1e-9)
+end
+
 -- Removals come before creations.
 
 do

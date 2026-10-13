@@ -317,6 +317,13 @@ function Units:applyStatus(w, i, serial, unitID, t)
 		return unitID
 	end
 
+	-- The engine kills a unit with no health left the next time anything hits
+	-- it, for no damage too (CUnit::DoDamage), and a shot of the track that
+	-- lands hits it. A unit the track has alive keeps one step of health.
+	if health < 1 / STEPS then
+		health = 1 / STEPS
+	end
+
 	if self.nanoframe[serial] then
 		local arg = self.buildArg
 		arg.health, arg.build = health * maxHealth, 1
