@@ -3044,6 +3044,133 @@ mod tests {
         assert_eq!(std::fs::read_dir(&analyses).unwrap().count(), 0);
     }
 
+    /// The whole route for a recording against a real engine, a real game and
+    /// a real replay: queue, run with the recorder, thin, store as a track.
+    /// The end is one track, no dump, nothing in scratch, and a track that
+    /// names the game the replay was recorded on.
+    ///
+    /// Reads what to run from the same variables as
+    /// `a_real_replay_goes_through_the_queue_into_the_store_and_out_again`, and
+    /// does nothing without them. `scripts/rewind-headless.sh` runs it on a
+    /// scripted Splinter Faction match.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn a_real_replay_is_recorded_through_the_queue_into_a_track() {
+        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
+        let (Some(replay), Some(engine_dir), Some(data_dirs)) = (
+            var("COILBOX_ANALYSIS_REPLAY"),
+            var("COILBOX_ANALYSIS_ENGINE_DIR"),
+            var("COILBOX_ANALYSIS_DATA_DIRS"),
+        ) else {
+            eprintln!(
+                "did nothing: set COILBOX_ANALYSIS_REPLAY, COILBOX_ANALYSIS_ENGINE_DIR and \
+                 COILBOX_ANALYSIS_DATA_DIRS to run it"
+            );
+            return;
+        };
+        let replay = PathBuf::from(replay);
+        let data_dirs: Vec<PathBuf> = data_dirs
+            .split(coilbox_proc::DATADIR_SEP)
+            .map(PathBuf::from)
+            .collect();
+        let dir = tempfile::tempdir().unwrap();
+        let (analyses, tracks) = (dir.path().join("analyses"), dir.path().join("tracks"));
+        let (scratch_root, recordings) = (dir.path().join("scratch"), dir.path().join("dumps"));
+        let heard = Arc::new(Mutex::new(Vec::<QueueSnapshot>::new()));
+        let listener = heard.clone();
+        let queue = AnalysisQueue::new(
+            HeadlessEngine {
+                scratch_root: scratch_root.clone(),
+            },
+            analyses.clone(),
+            tracks.clone(),
+            recordings.clone(),
+            move |snapshot: &QueueSnapshot| listener.lock().unwrap().push(snapshot.clone()),
+        );
+        let spec = JobSpec {
+            record: true,
+            ..job_for(&replay, Path::new(&engine_dir), data_dirs, None, false)
+                .expect("a replay that can be analysed")
+        };
+        let game_id = store::replay_key(&replay).unwrap();
+        let limit = run_timeout(spec.match_seconds);
+
+        let began = Instant::now();
+        assert_eq!(queue.enqueue(spec.clone()).unwrap(), Enqueued::Queued);
+        let idle = loop {
+            let snapshot = queue.snapshot();
+            if snapshot.running.is_none() && snapshot.queued.is_empty() {
+                break snapshot;
+            }
+            assert!(
+                began.elapsed() < limit + PATIENCE,
+                "the recording never finished"
+            );
+            std::thread::sleep(Duration::from_millis(50));
+        };
+        let wall = began.elapsed();
+
+        assert_eq!(idle.failures, Vec::new(), "the recording failed");
+        assert_eq!((idle.stored, idle.tracks), (1, 1));
+        // One track and no dump. Nothing in scratch.
+        assert_eq!(files_in(&tracks), vec![format!("{game_id}.cbtrack")]);
+        assert_eq!(files_in(&recordings), Vec::<String>::new());
+        assert_eq!(files_in(&scratch_root), Vec::<String>::new());
+        // A record only run shows the playback moving and then the thinning.
+        let phases: Vec<(RunPhase, i32)> = heard
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s.running.as_ref())
+            .map(|r| (r.phase, r.frame))
+            .collect();
+        let mut frames: Vec<i32> = phases
+            .iter()
+            .filter(|(phase, _)| *phase == RunPhase::Playing)
+            .map(|(_, frame)| *frame)
+            .collect();
+        frames.dedup();
+        assert!(frames.len() > 1, "progress never moved: {frames:?}");
+        assert!(
+            phases.iter().any(|(phase, _)| *phase == RunPhase::Thinning),
+            "the thinning was never announced"
+        );
+        // The track is the replay's and names its game.
+        let path = track_store::track_path(&tracks, &game_id).unwrap();
+        assert_eq!(
+            track_store::state(&tracks, &game_id).unwrap(),
+            Some(track_store::TrackState::Current)
+        );
+        let raw = super::super::super::read_header_and_script(&replay).unwrap();
+        let recorded_game =
+            super::super::super::find_game(&super::super::super::parse_tdf(&raw.script))
+                .get("gametype")
+                .unwrap_or("")
+                .to_string();
+        let mut reader =
+            TrackReader::open(std::io::BufReader::new(std::fs::File::open(&path).unwrap()))
+                .unwrap();
+        let (last_frame, bytes) = (
+            reader.header().last_frame,
+            std::fs::metadata(&path).unwrap().len(),
+        );
+        let info = reader.info().unwrap();
+        assert_eq!(info.game, recorded_game);
+        assert!(last_frame > 0);
+        eprintln!(
+            "recorded in {:.1}s (limit {}s): {} frames, track {} bytes\n\
+             game: {}\nmap: {}\nengine: {}\nphases seen: {} playing steps, thinning announced",
+            wall.as_secs_f64(),
+            limit.as_secs(),
+            last_frame,
+            bytes,
+            info.game,
+            info.map,
+            info.engine_version,
+            frames.len(),
+        );
+    }
+
     #[cfg(unix)]
     mod job_for {
         use super::super::super::super::tests::DemoFixture;
