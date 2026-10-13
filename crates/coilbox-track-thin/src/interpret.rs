@@ -214,6 +214,8 @@ pub(crate) struct Rest {
 pub(crate) struct Interpreter {
     header: DumpHeader,
     radii: Vec<f32>,
+    /// Each of the dump's unit definitions' footprint in elmos.
+    footprints: Vec<[u16; 2]>,
     q: Quantiser,
     rigs: HashMap<u32, Rig>,
     unit_defs: Names,
@@ -283,9 +285,41 @@ impl Interpreter {
                 radii.len()
             )));
         }
+        let squares = header.unit_footprints.clone().ok_or_else(|| {
+            ThinError::Dump(
+                "the dump's header has no unitFootprints, so it was recorded before the recorder \
+                 wrote them (issue #3807). Record the replay again"
+                    .into(),
+            )
+        })?;
+        if squares.len() != header.unit_defs.len() {
+            return Err(ThinError::Dump(format!(
+                "the dump's header names {} unit definitions and gives {} footprints",
+                header.unit_defs.len(),
+                squares.len()
+            )));
+        }
+        let elmos = |squares: u32| {
+            squares
+                .checked_mul(header.square_size)
+                .and_then(|e| u16::try_from(e).ok())
+                .ok_or_else(|| {
+                    ThinError::Dump(format!(
+                        "the dump gives a footprint of {squares} squares of {} elmos, which is \
+                         more than the {} elmos a track holds",
+                        header.square_size,
+                        u16::MAX
+                    ))
+                })
+        };
+        let footprints = squares
+            .iter()
+            .map(|f| Ok([elmos(f[0])?, elmos(f[1])?]))
+            .collect::<Result<Vec<_>>>()?;
         Ok(Self {
             header,
             radii,
+            footprints,
             q,
             rigs: HashMap::new(),
             unit_defs: Names::default(),
@@ -902,6 +936,14 @@ impl Interpreter {
         unread_rest_rotations.sort();
         posed_pieces.sort_by_key(|p| p.unit_def);
 
+        // In the order of the track's names, which is the order the dump
+        // first used each definition in.
+        let mut unit_footprints = vec![[0u16; 2]; self.unit_defs.names.len()];
+        for (def_id, index) in &self.unit_defs.index {
+            // `Names::get` took the name at this place, so the place exists.
+            unit_footprints[*index as usize] = self.footprints[*def_id as usize - 1];
+        }
+
         let h = &self.header;
         let info = Info {
             engine_version: h.engine.clone(),
@@ -909,6 +951,7 @@ impl Interpreter {
             map: h.map.clone(),
             writer: format!("coilbox-track-thin {}", env!("CARGO_PKG_VERSION")),
             unit_defs: self.unit_defs.names,
+            unit_footprints,
             weapon_defs: self.weapon_defs.names,
             feature_defs: self.feature_defs.names,
             posed_pieces,

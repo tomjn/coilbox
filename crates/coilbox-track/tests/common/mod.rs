@@ -146,6 +146,7 @@ pub fn random_track(seed: u64, windows: u32, window_length: u32, units: usize) -
     track.info.map = "test map".into();
     track.info.writer = "coilbox-track tests".into();
     track.info.unit_defs = vec!["armcom".into(), "armpw".into(), "armsolar".into()];
+    track.info.unit_footprints = vec![[32, 32], [32, 48], [80, 64]];
     track.info.weapon_defs = vec!["laser".into(), "missile".into()];
     track.info.feature_defs = vec!["rock".into()];
     track.info.posed_pieces = vec![PosedPieces {

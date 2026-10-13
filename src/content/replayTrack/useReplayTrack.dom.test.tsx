@@ -29,7 +29,7 @@ function bytes(base64: string): ArrayBuffer {
 const header: ReplayTrackHeader = {
   gameId: ID,
   formatVersion: 1,
-  recorderVersion: 2,
+  recorderVersion: 3,
   framesPerSecond: 30,
   firstFrame: fixture.geometry.firstFrame,
   lastFrame: 150,
@@ -49,6 +49,10 @@ const header: ReplayTrackHeader = {
   writer: "test",
   mapSize: [8192, 6144],
   unitDefs: ["armcom", "armpw"],
+  unitFootprints: [
+    [32, 48],
+    [16, 16],
+  ],
   weaponDefs: ["laser"],
   featureDefs: ["armmex_dead"],
   teams: [],

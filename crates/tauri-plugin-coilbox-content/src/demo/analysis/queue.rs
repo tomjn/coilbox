@@ -1525,7 +1525,7 @@ mod tests {
         block(
             &mut out,
             1,
-            br#"{"format":1,"engine":"2026.01.0 test","game":"Coilbox replay analysis","gameVersion":"1","map":"Some Map","mapSizeX":4096,"mapSizeZ":4096,"squareSize":8,"gameSpeed":30,"maxUnits":32000,"unitFrames":3,"lastFrame":300,"terrain":true,"teams":[{"team":0,"allyTeam":0,"side":"arm","leader":"Ada","color":[10,20,30]}],"unitDefs":["tank"],"unitRadii":[10],"featureDefs":["tree"],"weaponDefs":["nothing"]}"#,
+            br#"{"format":1,"engine":"2026.01.0 test","game":"Coilbox replay analysis","gameVersion":"1","map":"Some Map","mapSizeX":4096,"mapSizeZ":4096,"squareSize":8,"gameSpeed":30,"maxUnits":32000,"unitFrames":3,"lastFrame":300,"terrain":true,"teams":[{"team":0,"allyTeam":0,"side":"arm","leader":"Ada","color":[10,20,30]}],"unitDefs":["tank"],"unitRadii":[10],"unitFootprints":[[4,4]],"featureDefs":["tree"],"weaponDefs":["nothing"]}"#,
         );
         block(
             &mut out,

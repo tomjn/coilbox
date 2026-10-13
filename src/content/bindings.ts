@@ -1632,8 +1632,7 @@ export interface ReplayTrackTeam {
  * field, and a feature exists at frame `f` when `first[i] <= f <= last[i]`.
  * Its `team` is 255 for none and `x` and `z` are elmos.
  *
- * The track holds no footprint or radius for a unit definition, so the map view
- * cannot size a mark from this. See `src/content/replayTrack/`.
+ * See `src/content/replayTrack/`.
  */
 export interface ReplayTrackHeader {
   gameId: string;
@@ -1662,6 +1661,12 @@ export interface ReplayTrackHeader {
   mapSize: [number, number];
   /** A unit's `def` in a window indexes this. */
   unitDefs: string[];
+  /**
+   * Each unit definition's footprint in elmos, in the order of `unitDefs`:
+   * across the unit, then along the way it faces. The map view sizes a unit's
+   * mark from it (#3807).
+   */
+  unitFootprints: [number, number][];
   weaponDefs: string[];
   featureDefs: string[];
   teams: ReplayTrackTeam[];

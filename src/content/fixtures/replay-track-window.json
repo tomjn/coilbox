@@ -1,8 +1,198 @@
 {
+  "alive": [
+    {
+      "frame": 0,
+      "projectiles": 0,
+      "units": 1
+    },
+    {
+      "frame": 1,
+      "projectiles": 0,
+      "units": 1
+    },
+    {
+      "frame": 7,
+      "projectiles": 0,
+      "units": 1
+    },
+    {
+      "frame": 30,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 44,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 45,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 52,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 59,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 60,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 61,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 75,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 89,
+      "projectiles": 0,
+      "units": 2
+    },
+    {
+      "frame": 90,
+      "projectiles": 1,
+      "units": 1
+    },
+    {
+      "frame": 100,
+      "projectiles": 1,
+      "units": 2
+    },
+    {
+      "frame": 120,
+      "projectiles": 0,
+      "units": 2
+    },
+    {
+      "frame": 121,
+      "projectiles": 0,
+      "units": 2
+    },
+    {
+      "frame": 149,
+      "projectiles": 0,
+      "units": 2
+    },
+    {
+      "frame": 150,
+      "projectiles": 0,
+      "units": 1
+    }
+  ],
   "geometry": {
     "firstFrame": 0,
     "windowCount": 3,
     "windowLength": 60
+  },
+  "header": {
+    "engineVersion": "2025.04.8",
+    "featureCount": 2,
+    "featureDefs": [
+      "armmex_dead"
+    ],
+    "features": {
+      "def": [
+        0,
+        0
+      ],
+      "first": [
+        40,
+        0
+      ],
+      "last": [
+        150,
+        150
+      ],
+      "team": [
+        1,
+        255
+      ],
+      "x": [
+        1200.5,
+        0.0
+      ],
+      "z": [
+        300.25,
+        0.0
+      ]
+    },
+    "firstFrame": 0,
+    "formatVersion": 1,
+    "framesPerSecond": 30,
+    "game": "Test Game 1",
+    "gameId": "00112233445566778899aabbccddeeff",
+    "lastFrame": 150,
+    "lengthFrames": 150,
+    "map": "Test Map",
+    "mapSize": [
+      8192,
+      6144
+    ],
+    "positionShift": 3,
+    "projectileCount": 3,
+    "recorderVersion": 3,
+    "rotationBits": 12,
+    "teams": [
+      {
+        "allyTeam": 0,
+        "colour": [
+          255,
+          0,
+          10
+        ],
+        "id": 0,
+        "isAi": false,
+        "leader": "Ann",
+        "side": "arm"
+      },
+      {
+        "allyTeam": 1,
+        "colour": [
+          0,
+          128,
+          255
+        ],
+        "id": 1,
+        "isAi": true,
+        "leader": "Bot",
+        "side": "core"
+      }
+    ],
+    "tolerance": 0.5,
+    "unitCount": 3,
+    "unitDefs": [
+      "armcom",
+      "armpw"
+    ],
+    "unitFootprints": [
+      [
+        32,
+        48
+      ],
+      [
+        16,
+        16
+      ]
+    ],
+    "velocityShift": 11,
+    "weaponDefs": [
+      "laser"
+    ],
+    "windowCount": 3,
+    "windowLength": 60,
+    "writer": "track_view tests"
   },
   "layoutVersion": 1,
   "projectile": [

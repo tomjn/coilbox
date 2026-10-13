@@ -57,6 +57,13 @@ fn get_strings(c: &Chunk, lengths: u16, bytes: u16) -> Result<Vec<String>> {
 }
 
 pub(crate) fn encode_info(info: &Info) -> Result<Chunk> {
+    if !info.unit_footprints.is_empty() && info.unit_footprints.len() != info.unit_defs.len() {
+        return Err(TrackError::invalid(format!(
+            "the info has {} footprints for {} unit definitions",
+            info.unit_footprints.len(),
+            info.unit_defs.len()
+        )));
+    }
     let mut c = Chunk::new();
     put_strings(
         &mut c,
@@ -90,6 +97,8 @@ pub(crate) fn encode_info(info: &Info) -> Result<Chunk> {
     let leaders: Vec<&String> = info.teams.iter().map(|t| &t.leader).collect();
     put_strings(&mut c, 178, 179, &leaders)?;
     c.set_u32(180, info.map_size.to_vec());
+    c.set_u16(181, info.unit_footprints.iter().map(|f| f[0]).collect());
+    c.set_u16(182, info.unit_footprints.iter().map(|f| f[1]).collect());
     Ok(c)
 }
 
@@ -146,12 +155,24 @@ pub(crate) fn decode_info(c: &Chunk) -> Result<Info> {
         })
         .collect();
     let size = c.u32s(180)?;
+    let unit_defs = get_strings(c, 162, 163)?;
+    let (across, along) = (c.u16s(181)?, c.u16s(182)?);
+    // A track from before recorder version 3 has neither column.
+    if across.len() != along.len() || (!across.is_empty() && across.len() != unit_defs.len()) {
+        return Err(bad(format!(
+            "columns 181 and 182 have {} and {} footprints for {} unit definitions",
+            across.len(),
+            along.len(),
+            unit_defs.len()
+        )));
+    }
     Ok(Info {
         engine_version,
         game,
         map,
         writer,
-        unit_defs: get_strings(c, 162, 163)?,
+        unit_defs,
+        unit_footprints: across.iter().zip(along).map(|(x, z)| [*x, *z]).collect(),
         weapon_defs: get_strings(c, 164, 165)?,
         feature_defs: get_strings(c, 166, 167)?,
         posed_pieces,

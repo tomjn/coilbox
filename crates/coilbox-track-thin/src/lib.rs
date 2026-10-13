@@ -42,11 +42,14 @@ use std::path::Path;
 
 /// The recorder version a track made today carries in its header. Raise it
 /// when the recorder would produce different keys from the same replay: a
-/// track with a lower number is stale and is recorded again. 2 is the first
-/// with pose keys relative to the parent piece (issue #3783).
+/// track with a lower number is stale and is recorded again. Raise it too when
+/// a track gains something a reader depends on, since an older track lacks it.
+/// 2 is the first with pose keys relative to the parent piece (issue #3783).
+/// 3 is the first with a footprint for each unit definition, which the map
+/// view sizes its marks from (issue #3807).
 ///
 /// The writer's default and the app's stale check both read this constant.
-pub const RECORDER_VERSION: u16 = 2;
+pub const RECORDER_VERSION: u16 = 3;
 
 /// What a caller chooses about the track.
 #[derive(Debug, Clone, PartialEq)]

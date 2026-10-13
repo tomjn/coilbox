@@ -100,6 +100,7 @@ One JSON object.
 | `teams` | one object for each team, Gaia included |
 | `unitDefs` | unit definition names. Entry `n`, counting from 1, is definition id `n` |
 | `unitRadii` | each unit definition's radius in elmos, in the order of `unitDefs`. A dump made before issue #3782 has none, and the thinning refuses it |
+| `unitFootprints` | each unit definition's footprint, in the order of `unitDefs`, as a pair: the engine's `xsize` and `zsize`. Both count heightmap squares of `squareSize` elmos, and `xsize` is twice the definition's `footprintX`. A dump made before issue #3807 has none, and the thinning refuses it |
 | `featureDefs` | feature definition names. Entry `n`, counting from 1, is definition id `n` |
 | `weaponDefs` | weapon definition names. Entry `n`, counting from 0, is definition id `n` |
 

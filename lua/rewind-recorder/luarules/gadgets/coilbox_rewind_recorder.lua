@@ -1031,6 +1031,19 @@ local function radii(list)
 	return "[" .. table.concat(found, ",") .. "]"
 end
 
+-- Each unit definition's footprint, in the order of the names: the engine's
+-- xsize and zsize, which count heightmap squares. The map view of issue #3807
+-- sizes a unit's mark from it.
+local function footprints(list)
+	local found = {}
+	local id = 1
+	while list and list[id] do
+		found[#found + 1] = wholes({ tonumber(list[id].xsize) or 0, tonumber(list[id].zsize) or 0 })
+		id = id + 1
+	end
+	return "[" .. table.concat(found, ",") .. "]"
+end
+
 local function teamLine(teamID, gaia)
 	local _, leader, _, hasAI, side, allyTeam = Spring.GetTeamInfo(teamID, false)
 	local red, green, blue = Spring.GetTeamColor(teamID)
@@ -1078,6 +1091,7 @@ local function header()
 		.. ',"teams":[' .. table.concat(teams, ",") .. "]"
 		.. ',"unitDefs":' .. names(UnitDefs, 1)
 		.. ',"unitRadii":' .. radii(UnitDefs)
+		.. ',"unitFootprints":' .. footprints(UnitDefs)
 		.. ',"featureDefs":' .. names(FeatureDefs, 1)
 		.. ',"weaponDefs":' .. names(WeaponDefs, 0)
 		.. "}"
