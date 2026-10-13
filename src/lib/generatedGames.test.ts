@@ -3,9 +3,11 @@ import {
   generatedGameNote,
   isGeneratedGame,
   isMutatorArchive,
+  isPlaybackArchive,
   isScratchArchive,
   isWorkshopMutatorArchive,
   MUTATOR_FOLDER,
+  PLAYBACK_FOLDER,
   SCRATCH_FOLDER,
   WORKSHOP_MUTATOR_FOLDER,
   withoutGeneratedGames,
@@ -51,16 +53,39 @@ describe("isWorkshopMutatorArchive", () => {
   });
 });
 
+describe("isPlaybackArchive", () => {
+  it("recognises the replay playback game, whatever its casing", () => {
+    expect(PLAYBACK_FOLDER).toBe("coilbox-replay-playback.sdd");
+    expect(isPlaybackArchive(PLAYBACK_FOLDER)).toBe(true);
+    expect(isPlaybackArchive("Coilbox-Replay-Playback.sdd")).toBe(true);
+  });
+
+  it("never mistakes another archive for it", () => {
+    expect(isPlaybackArchive("ba1211.sdz")).toBe(false);
+    expect(isPlaybackArchive(SCRATCH_FOLDER)).toBe(false);
+    expect(isPlaybackArchive(MUTATOR_FOLDER)).toBe(false);
+    expect(isPlaybackArchive(WORKSHOP_MUTATOR_FOLDER)).toBe(false);
+  });
+
+  it("is not taken for the playback by any of the others", () => {
+    expect(isScratchArchive(PLAYBACK_FOLDER)).toBe(false);
+    expect(isMutatorArchive(PLAYBACK_FOLDER)).toBe(false);
+    expect(isWorkshopMutatorArchive(PLAYBACK_FOLDER)).toBe(false);
+  });
+});
+
 describe("generatedGameNote", () => {
   it("knows every one of coilbox's own games, and tells them apart", () => {
     const scratch = generatedGameNote(SCRATCH_FOLDER);
     const mutator = generatedGameNote(MUTATOR_FOLDER);
     const workshop = generatedGameNote(WORKSHOP_MUTATOR_FOLDER);
+    const playback = generatedGameNote(PLAYBACK_FOLDER);
 
     expect(scratch).toContain("unit");
     expect(mutator).toContain("scenario");
     expect(workshop).toContain("workshop");
-    expect(new Set([scratch, mutator, workshop]).size).toBe(3);
+    expect(playback).toContain("replay");
+    expect(new Set([scratch, mutator, workshop, playback]).size).toBe(4);
   });
 
   it("says how to be rid of any of them, since that is the whole undo", () => {
@@ -68,6 +93,7 @@ describe("generatedGameNote", () => {
       SCRATCH_FOLDER,
       MUTATOR_FOLDER,
       WORKSHOP_MUTATOR_FOLDER,
+      PLAYBACK_FOLDER,
     ]) {
       expect(generatedGameNote(name)).toContain("Deleting its folder undoes");
     }
@@ -86,6 +112,7 @@ describe("withoutGeneratedGames", () => {
       game(SCRATCH_FOLDER),
       game(MUTATOR_FOLDER),
       game(WORKSHOP_MUTATOR_FOLDER),
+      game(PLAYBACK_FOLDER),
       game("evolutionrts.sdz"),
     ];
 
