@@ -602,31 +602,39 @@ What a whole match did with no adapter, on engine `2026.07.01-102-g6e5c5a0`, and
 | A heal station healed the units round it and drew the heal effect on each | `unit_area_heal_radius.lua` | the gadget is switched off |
 | A feature of the track was destroyed a moment early | the death explosion of a unit that died while the match was watched | nothing needed. The player's `FeaturePreDamaged` gives it no damage ([Death explosions](#death-explosions)) |
 
-With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter's `started` hook gives each team what that gadget gave it: the `startmetal` and `startenergy` of the team or of the mod options, and 1000 of each when neither says.
+With `game_spawn.lua` off, a team would keep the engine's own storage of 1,000,000 and the resource bars would read 0/1000000. The adapter had a `started` hook that gave each team what that gadget gave it. The track now has each team's storage and the resources stage sets it on every frame, so the hook is gone and the adapter has no hooks.
+
+The adapter names three team rules parameters, `supplyUsed`, `supplyMax` and `researchPoints`. `gui_static_resourcebar.lua` reads all three for its supply and research panels. `unit_supply_requirement.lua` writes the first two on every unit event and `game_researchpoints_ledger.lua` the third in `GameFrame`. Both gadgets stay, because the game's build menu asks them what a team may build, and in a playback they count the units the player has placed. The recording has the last word: the stage sets the three after every unit is in place and again in `GameFramePost`.
 
 What stays, because it tells a viewer about the match: the resource bars, the tooltip with a unit's description, the minimap, the players list, health bars, build progress and its time left, the metal and geothermal spot markers, and the game's own effects, lights and weather. Two things stay for want of a way to take them out (issue #3983):
 
 - The menu at the top right is one widget, `gui_static_menu.lua`, with Settings, Keybinds, Economy, Graph, Log and Quit in it, so it stays whole. Its Resign button sends the engine's `spectator` command, which does nothing for somebody who already is one.
 - The build menu and order buttons of a selected unit, `gui_static_buildordermenu.lua`. A spectator's orders go nowhere. Switched off, the engine's own command menu takes its place and `game_buildHotkeys.lua` raises, both seen in a window.
 
-What the kept panels show is not all the recording's. A track holds no team resources, so everything on the resource bars is the playback game's own economy, run by the engine on the units the player has placed. Measured in the same match, in the real replay and in the playback, for team 0:
+What the kept panels show was not all the recording's until issue #3982. A track held no team resources, so everything on the resource bars was the playback game's own economy, run by the engine on the units the player had placed. The track now has them and the resources stage sets them ([Team resources](#team-resources)). Measured in the same match for team 0: in the real replay, in the playback before the stage, and in the playback now. The first two columns are from the look of issue #3800 and the third from the look of 14 October 2026, paused at the frame, on engine `2026.07.01-102-g6e5c5a0` and Splinter Faction 0.1.89.
 
-| At frame | Number | In the match | In the playback |
-| --- | --- | --- | --- |
-| 6,927 | metal storage | 1100 | 1100 |
-| 6,927 | metal income, expense | +9.1, -7.0 | +9.1, -0 |
-| 6,927 | metal held | 1028 | 171, and rising for as long as the playback runs |
-| 6,927 | energy income, expense | +100, -23.1 | +100, -12.6 |
-| 6,927 | supply used | 3 | 2 |
-| 6,927 | research points | 216 | 0 |
-| 12,000 | metal storage | 1700 | 1700 |
-| 12,000 | metal income, expense | +27.7, -24.6 | +27.7, -0 |
-| 12,000 | metal held | 87 | 640, and rising |
-| 12,000 | energy income, expense | +450, -161.9 | +450, -88.2 |
-| 12,000 | supply used | 30 | 29 |
-| 12,000 | research points | 86 | 0 |
+| At frame | Number | In the match | In the playback before | In the playback now |
+| --- | --- | --- | --- | --- |
+| 6,927 | metal storage | 1100 | 1100 | 1100 |
+| 6,927 | metal income, expense | +9.1, -7.0 | +9.1, -0 | +9.1, -6.9 |
+| 6,927 | metal held | 1028 | 171, and rising for as long as the playback runs | 1028, and it stays |
+| 6,927 | energy income, expense | +100, -23.1 | +100, -12.6 | +100, -23.0 |
+| 6,927 | supply used | 3 | 2 | 3 |
+| 6,927 | research points | 216 | 0 | 216 |
+| 12,000 | metal storage | 1700 | 1700 | 1700 |
+| 12,000 | metal income, expense | +27.7, -24.6 | +27.7, -0 | +27.7, -24.6 |
+| 12,000 | metal held | 87 | 640, and rising | 87, and it stays |
+| 12,000 | energy income, expense | +450, -161.9 | +450, -88.2 | +450, -161.9 |
+| 12,000 | supply used | 30 | 29 | 30 |
+| 12,000 | research points | 86 | 0 | 86 |
 
-Storage and income are right, because the same buildings make them. What is held, what is spent, the supply used and the research points are not. Issue #3982 is about recording them. Three more things on screen are the playback's and not the match's: a commander's name tag reads `CoilboxPlayback`, the one spectator who leads every team, where the match had the player's name. The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback.
+The real replay showed a metal expense of 7.0 at frame 6,927 and the track has 6.9114 there, which the playback now shows. Why the two differ by 0.1 was not looked into.
+
+![The resource bars before and after, at frames 6,927 and 12,000](screenshots/resources-before-after.jpg)
+
+The left column is the playback with the track marked as one that has no resources and the adapter as it was, which is the playback before the stage. The right is the same launch with the track as recorded. Both are the engine's own screenshots of a window, cut down to the bars, taken paused seven seconds after the seek.
+
+Three things on screen are still the playback's and not the match's. A commander's name tag reads `CoilboxPlayback`, the one spectator who leads every team, where the match had the player's name (issue #4012). The clock in the players list is the engine's, which starts at nothing whenever the playback is opened. And the game's day and night and its weather follow that clock, so a moment that was dark in the match can be light in the playback (issue #4013). None of the three can be set from the gadget: a player's name comes from the start script, and no Lua call sets the engine's frame number.
 
 The game's gadgets hear of the player's shots as they would of a match's. In the whole match, whose two weapons are a rocket (`fedstorm_rocket`, a `MissileLauncher`) and a laser bolt (`fedcommander_up2_particlebeamcannon_up2`, a `LaserCannon`), none raised and none changed what the track has:
 
@@ -872,6 +880,21 @@ A fifth test, `the_shots_of_a_whole_match_follow_the_track`, wants the same repl
 - The engine ended no shot the player was holding, no slow frame was logged, no team died and no Lua raised.
 
 The first runs of the plan did not show that, and what they showed is why a shot is held short of where it ends, why a unit keeps a step of health and why a bolt lands on a whole frame.
+
+A sixth test, `the_teams_resources_are_the_matchs_in_the_engine`, wants the same replay and runs the driver's resources plan (issue #3982). `COILBOX_PLAYBACK_RESOURCE_FRAMES` gives it frames to look at, as numbers with commas between them, and it adds eight more across the match. The driver's gadget runs before the player's on a frame, so what it reads is what the frame before left, which is what a widget draws. It launches the playback twice: with the track marked as recorder version 3, which the player takes as a track with no resources, and with the track as recorded. On the match above, at frames 6,927 and 12,000 and the eight others, for all three teams:
+
+| | Track marked as version 3 | Track as recorded |
+| --- | --- | --- |
+| What a team holds and can store, furthest from the track at the 10 frames | 999,000, the engine's own storage | 0 |
+| The same at 9 seeks backward | 999,000 | 0 |
+| The same over 600 frames held paused at frame 10,262 | 999,000 | 0 |
+| The same over 300 frames played forward and 300 backward at 1x | 999,000 | 0 |
+| Lines, of 60 for a resource of a team at a frame, with income, expense, pull or excess not the track's | not counted | 1 |
+| Supply used, supply available and research points, where the match had set them | supply 2 and research 0 at frame 6,927, where the track has 3 and 216 | the track's every time |
+
+0 means equal to the track's value as the 32 bit float the engine holds, with what is held cut to the storage. The one line is team 0's energy income at frame 5,131: 75 where the track has 62.5, and the playback's own is 75 with the stage off. After the 600 frames at frame 10,262 team 0's metal income was 28.1 where the track has 18.4, which [Team resources](#team-resources) explains. No team died and no Lua raised. The player's work took a mean of 0.224 ms a frame in that run.
+
+The first run of the plan waited two of the engine's sums after a seek and had 7 lines of 60 that were not the track's. One had an income of 112.5 at frame 6,927 where the track has 100, and was right a sum later, which is why the numbers are said to settle on the third sum. All 7 had more excess than the track, up to 396.7 where it has 174.7, which is why a team is given room for the playback's own income during a frame.
 
 What it cannot show: anything on screen. A headless engine draws nothing, so how a unit, a death or the changed ground looks cannot be seen in any of the above.
 
