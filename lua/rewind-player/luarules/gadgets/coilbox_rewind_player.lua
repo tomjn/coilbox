@@ -1,20 +1,32 @@
--- Coilbox rewind player: stand-in until the real player gadget replaces it
--- (issue #3794).
+-- Coilbox rewind player: plays a replay's track back (issue #3794).
 --
 -- Coilbox generates a game that depends on the game a replay was recorded on
 -- and puts the replay's track in it at coilbox_rewind/track.cbtrack. This
--- gadget only proves that the track reached the game. It loads the reader,
--- opens the track and logs one line with the track's frame range and counts,
--- or the reason it could not. It creates nothing and moves nothing.
+-- gadget opens the track and, on every simulation frame, makes the world the
+-- track at the time the player holds: units, features and terrain. Nothing is
+-- simulated, so the time can jump and run backwards.
 --
--- The real player takes this file's name and place, so the generated game does
--- not change when it arrives. Change it in the coilbox repository under
--- lua/rewind-player/.
+-- The work is in luarules/rewind_player/coilbox_player.lua and the stages it
+-- lists. This file is the engine's side of it: the call-ins, and the two
+-- things only a gadget can do.
+--
+-- Nothing takes damage. `UnitPreDamaged` gives every hit no damage and no
+-- push, and the track owns health.
+--
+-- A frame's work is timed. Synced Lua has no clock, so the synced half tells
+-- the unsynced half when the work starts and ends (`SendToUnsynced` is a call
+-- and not a message, so it costs no frame), and the unsynced half logs a line
+-- when it took longer than one simulation frame lasts.
+--
+-- The base game's own gadgets still run. !coilbox_rewind_guard.lua stops them
+-- killing a team or ending the match.
+--
+-- Change this in the coilbox repository under lua/rewind-player/.
 
 function gadget:GetInfo()
 	return {
 		name = "Coilbox rewind player",
-		desc = "Plays a replay track back. For now it logs the track's header.",
+		desc = "Plays a replay track back: units, features and terrain at any time, in either direction.",
 		author = "coilbox",
 		date = "2026",
 		license = "MIT",
@@ -23,50 +35,166 @@ function gadget:GetInfo()
 	}
 end
 
-if not gadgetHandler:IsSyncedCode() then
-	return false
-end
-
 local PREFIX = "COILBOX_REWIND_PLAYER "
 
-function gadget:Initialize()
-	local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
-	local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
+--- What the synced half sends the unsynced one around a frame's work.
+local WORK = "coilbox_rewind_work"
 
-	local fetch, why = Fetch.fromVFS()
-	if not fetch then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(why))
-		return
+if gadgetHandler:IsSyncedCode() then
+	local player
+
+	local function log(text)
+		Spring.Echo(PREFIX .. text)
 	end
-	local track, openWhy = Track.open(fetch)
-	if not track then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(openWhy))
-		return
-	end
-	local info, infoWhy = track:info()
-	if not info then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(infoWhy))
-		return
-	end
-	local features, featuresWhy = track:features()
-	if not features then
-		Spring.Echo(PREFIX .. "failed: " .. tostring(featuresWhy))
-		return
-	end
-	local h = track.header
-	Spring.Echo(
-		string.format(
-			"%strack frames %d to %d, windows %d, window length %d, unit defs %d, teams %d, features %d, game %s, map %s",
-			PREFIX,
-			h.firstFrame,
-			h.lastFrame,
-			h.windowCount,
-			h.windowLength,
-			#info.unitDefs,
-			#info.teams,
-			#features,
-			info.game,
-			info.map
+
+	function gadget:Initialize()
+		local Track = VFS.Include("luarules/rewind_player/coilbox_track.lua")
+		local Fetch = VFS.Include("luarules/rewind_player/coilbox_track_fetch.lua")
+		local Player = VFS.Include("luarules/rewind_player/coilbox_player.lua")
+
+		local fetch, why = Fetch.fromVFS()
+		if not fetch then
+			log("failed: " .. tostring(why))
+			return
+		end
+		local track, openWhy = Track.open(fetch)
+		if not track then
+			log("failed: " .. tostring(openWhy))
+			return
+		end
+		local made, madeWhy = Player.new(track, { modOptions = Spring.GetModOptions(), log = log })
+		if not made then
+			log("failed: " .. tostring(madeWhy))
+			return
+		end
+		player = made
+
+		local h, info = track.header, track:info()
+		log(
+			string.format(
+				"track frames %d to %d, windows %d, window length %d, unit defs %d, teams %d, features %d, game %s, map %s",
+				h.firstFrame,
+				h.lastFrame,
+				h.windowCount,
+				h.windowLength,
+				#info.unitDefs,
+				#info.teams,
+				#track:features(),
+				info.game,
+				info.map
+			)
 		)
-	)
+	end
+
+	function gadget:GameFrame(frame)
+		if not player then
+			return
+		end
+		SendToUnsynced(WORK, 0, frame)
+		player:frame()
+		SendToUnsynced(WORK, 1, frame)
+	end
+
+	function gadget:RecvLuaMsg(message)
+		return player ~= nil and player:message(message)
+	end
+
+	function gadget:UnitPreDamaged()
+		if player then
+			return 0, 0
+		end
+	end
+
+	function gadget:UnitDamaged(unitID)
+		if player then
+			player:unitDamaged(unitID)
+		end
+	end
+
+	function gadget:UnitCreated(unitID)
+		if player then
+			player:unitCreated(unitID)
+		end
+	end
+
+	function gadget:UnitDestroyed(unitID)
+		if player then
+			player:unitDestroyed(unitID)
+		end
+	end
+
+	function gadget:FeatureCreated(featureID)
+		if player then
+			player:featureCreated(featureID)
+		end
+	end
+
+	function gadget:FeatureDestroyed(featureID)
+		if player then
+			player:featureDestroyed(featureID)
+		end
+	end
+
+	function gadget:AllowFeatureCreation()
+		if player then
+			return player:allowFeatureCreation()
+		end
+		return true
+	end
+
+	function gadget:TeamDied(teamID)
+		if player then
+			player:teamDied(teamID)
+		end
+	end
+else
+	-- How long one simulation frame lasts, in milliseconds. Work that takes
+	-- longer than this cannot keep up with the match's own speed.
+	local LIMIT = 1000 / Game.gameSpeed
+
+	-- After a line, slow frames are counted and not logged for a second of
+	-- frames, so a run of them does not make itself slower.
+	local QUIET_FRAMES = Game.gameSpeed
+
+	local started
+	local lastLine
+	local slow, worst = 0, 0
+
+	function gadget:RecvFromSynced(name, phase, frame)
+		if name ~= WORK then
+			return false
+		end
+		if phase == 0 then
+			started = Spring.GetTimer()
+			return true
+		end
+		if not started then
+			return true
+		end
+		local took = Spring.DiffTimers(Spring.GetTimer(), started, true)
+		started = nil
+		if took <= LIMIT then
+			return true
+		end
+		slow = slow + 1
+		if took > worst then
+			worst = took
+		end
+		if not lastLine or frame - lastLine >= QUIET_FRAMES then
+			Spring.Echo(
+				string.format(
+					"%sslow frame: the work of frame %d took %.1f ms, and a simulation frame lasts %.1f ms. %d slow since the last line, the slowest %.1f ms",
+					PREFIX,
+					frame,
+					took,
+					LIMIT,
+					slow,
+					worst
+				)
+			)
+			lastLine = frame
+			slow, worst = 0, 0
+		end
+		return true
+	end
 end

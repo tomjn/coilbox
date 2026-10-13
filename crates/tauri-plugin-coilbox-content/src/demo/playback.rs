@@ -1145,30 +1145,32 @@ else
 end
 "#;
 
-    /// The whole route against a real engine, a real game and a real replay:
-    /// the replay is recorded into a track, the playback game and its script
-    /// are written for it, and the engine is launched on them. The engine's log
-    /// then has to show the replay's map, its teams with their colours, one
-    /// spectator, the stand-in gadget's line about the track, and no replay
-    /// written.
-    ///
-    /// Reads the same variables as the analysis tests, and does nothing without
-    /// them. `COILBOX_PLAYBACK_GAME` names another installed game for the
-    /// playback to depend on, for a replay recorded on a scratch game whose own
-    /// gadgets would play over the track. `COILBOX_PLAYBACK_SECONDS` is how long to wait
-    /// for the log lines (default 120). `COILBOX_PLAYBACK_LOG` is a path to copy
-    /// the engine's output to. The engine is the headless one in
-    /// `COILBOX_ANALYSIS_ENGINE_DIR`, since a window cannot be checked here.
-    #[test]
-    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
-    fn a_real_replay_is_played_back_in_the_engine() {
-        use super::super::analysis::launch::{headless_binary, run_headless, Launch, RunControl};
+    /// What the two tests below share: a replay recorded into a track, and the
+    /// playback game and start script written for it.
+    struct Prepared {
+        dir: tempfile::TempDir,
+        engine_dir: PathBuf,
+        data_dirs: Vec<PathBuf>,
+        content: PathBuf,
+        game_dir: PathBuf,
+        script: PathBuf,
+        wait: std::time::Duration,
+    }
+
+    fn var(name: &str) -> Option<String> {
+        std::env::var(name).ok().filter(|v| !v.is_empty())
+    }
+
+    /// Records the replay named by the environment into a track, the way the
+    /// queue does, and prepares its playback. `None` when the variables are not
+    /// set, which is every run but one made on purpose.
+    fn prepared() -> Option<Prepared> {
+        use super::super::analysis::launch::RunControl;
         use super::super::analysis::{
             analyse_replay, run_timeout, AnalysisRequest, AnalysisStatus,
         };
         use coilbox_track_thin::{thin_dump_cancellable, ThinOptions};
 
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
         let (Some(replay), Some(engine_dir), Some(data_dirs)) = (
             var("COILBOX_ANALYSIS_REPLAY"),
             var("COILBOX_ANALYSIS_ENGINE_DIR"),
@@ -1178,7 +1180,7 @@ end
                 "did nothing: set COILBOX_ANALYSIS_REPLAY, COILBOX_ANALYSIS_ENGINE_DIR and \
                  COILBOX_ANALYSIS_DATA_DIRS to run it"
             );
-            return;
+            return None;
         };
         let replay = PathBuf::from(replay);
         let engine_dir = PathBuf::from(engine_dir);
@@ -1255,27 +1257,41 @@ end
         )
         .expect("the playback is prepared");
         let game_dir = content.join("games").join(FOLDER);
-        std::fs::write(game_dir.join("luarules/gadgets/probe.lua"), PROBE).unwrap();
+        Some(Prepared {
+            dir,
+            engine_dir,
+            data_dirs,
+            content,
+            game_dir,
+            script,
+            wait,
+        })
+    }
 
-        // 3. Launch the engine on it and read its log until the lines are in.
-        let write_dir = dir.path().join("write");
-        let log = dir.path().join("engine.log");
+    /// Launches the headless engine on a prepared playback and reads its log
+    /// until `done` says the lines are in. Gives whether it timed out, the log
+    /// and how many replays the engine wrote.
+    fn launch(prepared: &Prepared, done: &dyn Fn(&str) -> bool) -> (bool, String, usize) {
+        use super::super::analysis::launch::{headless_binary, run_headless, Launch, RunControl};
+
+        let dir = prepared.dir.path();
+        let write_dir = dir.join("write");
+        let log = dir.join("engine.log");
         let control = RunControl::default();
-        let mut dirs = vec![content.clone()];
-        dirs.extend(data_dirs.iter().cloned());
+        let mut dirs = vec![prepared.content.clone()];
+        dirs.extend(prepared.data_dirs.iter().cloned());
         let exit = run_headless(
             &Launch {
-                engine: &headless_binary(&engine_dir),
-                demo: &script,
+                engine: &headless_binary(&prepared.engine_dir),
+                demo: &prepared.script,
                 write_dir: &write_dir,
-                config: &dir.path().join("engine.cfg"),
-                pid_file: &dir.path().join("engine.pid"),
+                config: &dir.join("engine.cfg"),
+                pid_file: &dir.join("engine.pid"),
                 data_dirs: &dirs,
                 log: &log,
-                timeout: wait,
+                timeout: prepared.wait,
                 on_poll: &|| {
-                    let text = std::fs::read_to_string(&log).unwrap_or_default();
-                    if text.contains("PROBE players") && text.contains("COILBOX_REWIND_PLAYER") {
+                    if done(&std::fs::read_to_string(&log).unwrap_or_default()) {
                         control.cancel();
                     }
                 },
@@ -1288,17 +1304,49 @@ end
         if let Some(keep) = var("COILBOX_PLAYBACK_LOG") {
             let _ = std::fs::copy(&log, keep);
         }
+        let written = std::fs::read_dir(write_dir.join("demos"))
+            .map(|d| d.flatten().count())
+            .unwrap_or(0);
+        eprintln!("exit: {exit:?}");
+        (exit.timed_out, output, written)
+    }
+
+    /// The whole route against a real engine, a real game and a real replay:
+    /// the replay is recorded into a track, the playback game and its script
+    /// are written for it, and the engine is launched on them. The engine's log
+    /// then has to show the replay's map, its teams with their colours, one
+    /// spectator, the player gadget's line about the track, and no replay
+    /// written.
+    ///
+    /// Reads the same variables as the analysis tests, and does nothing without
+    /// them. `COILBOX_PLAYBACK_GAME` names another installed game for the
+    /// playback to depend on, for a replay recorded on a scratch game whose own
+    /// gadgets would play over the track. `COILBOX_PLAYBACK_SECONDS` is how long to wait
+    /// for the log lines (default 120). `COILBOX_PLAYBACK_LOG` is a path to copy
+    /// the engine's output to. The engine is the headless one in
+    /// `COILBOX_ANALYSIS_ENGINE_DIR`, since a window cannot be checked here.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn a_real_replay_is_played_back_in_the_engine() {
+        let Some(prepared) = prepared() else {
+            return;
+        };
+        std::fs::write(prepared.game_dir.join("luarules/gadgets/probe.lua"), PROBE).unwrap();
+
+        let (timed_out, output, written) = launch(&prepared, &|text| {
+            text.contains("PROBE players") && text.contains("COILBOX_REWIND_PLAYER")
+        });
         let lines: Vec<&str> = output
             .lines()
             .filter(|l| l.contains("PROBE ") || l.contains("COILBOX_REWIND_PLAYER"))
             .collect();
-        eprintln!("exit: {exit:?}\n{}", lines.join("\n"));
-        eprintln!("script:\n{}", std::fs::read_to_string(&script).unwrap());
-
-        assert!(
-            !exit.timed_out,
-            "the log never showed the lines. Log:\n{output}"
+        eprintln!("{}", lines.join("\n"));
+        eprintln!(
+            "script:\n{}",
+            std::fs::read_to_string(&prepared.script).unwrap()
         );
+
+        assert!(!timed_out, "the log never showed the lines. Log:\n{output}");
         assert!(output.contains("PROBE players 1 spectators 1"), "{output}");
         // The track reached the game, through the reader.
         assert!(
@@ -1308,10 +1356,261 @@ end
             "{output}"
         );
         // No replay of the playback was written.
-        let demos = write_dir.join("demos");
-        let written = std::fs::read_dir(&demos)
-            .map(|d| d.flatten().count())
-            .unwrap_or(0);
+        assert_eq!(written, 0, "the playback wrote a replay");
+    }
+
+    /// The gadget that drives the player in the engine and reports what the
+    /// engine then has. It is written into the game folder for the test below
+    /// and is not part of the game.
+    const DRIVER: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../lua/rewind-player/tests/headless/playback_driver.lua"
+    ));
+
+    /// The value of `key=` in a line of the driver's.
+    fn field<'a>(line: &'a str, key: &str) -> &'a str {
+        line.split_whitespace()
+            .find_map(|word| word.strip_prefix(key)?.strip_prefix('='))
+            .unwrap_or_else(|| panic!("no {key}= in {line}"))
+    }
+
+    fn number(line: &str, key: &str) -> f64 {
+        field(line, key)
+            .parse()
+            .unwrap_or_else(|_| panic!("{key} is not a number in {line}"))
+    }
+
+    /// A track with `blocks` blocks of zero bytes after its header and index
+    /// and every block number moved along by as much. It is the same track by
+    /// the format page, with every chunk further into the file.
+    fn moved_along(track: &[u8], blocks: u32) -> Vec<u8> {
+        let word = |at: usize| u32::from_le_bytes(track[at..at + 4].try_into().unwrap());
+        let header = u16::from_le_bytes(track[6..8].try_into().unwrap()) as usize;
+        let windows = word(24) as usize;
+        let mut head = track[..header + 16 * windows].to_vec();
+        let mut first = word(36).min(word(44));
+        let mut shift = |at: usize| {
+            let moved = word(at) + blocks;
+            head[at..at + 4].copy_from_slice(&moved.to_le_bytes());
+        };
+        shift(36);
+        shift(44);
+        for k in 0..windows {
+            let at = header + 16 * k;
+            first = first.min(word(at));
+            shift(at);
+            if word(at + 12) > 0 {
+                shift(at + 8);
+            }
+        }
+        let start = first as usize * 64;
+        head.resize(start + blocks as usize * 64, 0);
+        head.extend_from_slice(&track[start..]);
+        head
+    }
+
+    /// The player gadget against a real engine (issue #3794). A replay is
+    /// recorded into a track and played back, and a driver gadget seeks the
+    /// player about and reports what the engine has each time, measured
+    /// against a reader of its own. The engine then has to have, at ten
+    /// times, the units and features the track has there, where and how the
+    /// track has them, and has to have a building gone before its construction,
+    /// the ground as the track has it, no dead team and no error from the
+    /// player's Lua.
+    ///
+    /// `scripts/rewind-playback-headless.sh` records a match that has all of
+    /// that in it and runs this on it. It reads the variables the test above
+    /// does. `COILBOX_PLAYBACK_PAD_BLOCKS` moves every chunk of the track that
+    /// many 64 byte blocks further into the file first, which is how a track
+    /// longer than 16,777,216 bytes is played (issue #3971).
+    ///
+    /// The engine is headless, so nothing here shows what a person would see.
+    #[test]
+    #[ignore = "needs an engine, a game, a map and a replay recorded with them"]
+    fn a_real_track_is_played_at_any_time() {
+        let Some(prepared) = prepared() else {
+            return;
+        };
+        std::fs::write(
+            prepared
+                .game_dir
+                .join("luarules/gadgets/playback_driver.lua"),
+            DRIVER,
+        )
+        .unwrap();
+
+        let inside = prepared.game_dir.join(TRACK_PATH);
+        let track = std::fs::read(&inside).unwrap();
+        if let Some(blocks) = var("COILBOX_PLAYBACK_PAD_BLOCKS") {
+            let moved = moved_along(&track, blocks.parse().expect("a number of blocks"));
+            // The file in the game is a link to the stored track, so it is
+            // replaced and not written through.
+            std::fs::remove_file(&inside).unwrap();
+            std::fs::write(&inside, &moved).unwrap();
+            eprintln!(
+                "the track is {} bytes, moved from {}",
+                moved.len(),
+                track.len()
+            );
+        }
+        let word = |at: usize| u32::from_le_bytes(track[at..at + 4].try_into().unwrap());
+        let (first, last) = (word(12), word(16));
+
+        // Open in the middle of the match, paused, the way #3809 will ask.
+        let middle = first + (last - first) / 2;
+        let script = std::fs::read_to_string(&prepared.script).unwrap();
+        let options = format!(
+            "\t\tcoilbox_rewind_start_frame={middle};\n\t\tcoilbox_rewind_start_paused=1;\n"
+        );
+        let opening = "\t[modoptions]\n\t{\n";
+        let script = match script.find(opening) {
+            Some(at) => {
+                let at = at + opening.len();
+                format!("{}{options}{}", &script[..at], &script[at..])
+            }
+            None => {
+                let end = script.rfind('}').unwrap();
+                format!("{}{opening}{options}\t}}\n}}\n", &script[..end])
+            }
+        };
+        std::fs::write(&prepared.script, script).unwrap();
+
+        let (timed_out, output, written) =
+            launch(&prepared, &|text| text.contains("REWIND_DRIVER done"));
+        let driver: Vec<&str> = output
+            .lines()
+            .filter_map(|l| l.split_once("REWIND_DRIVER ").map(|(_, rest)| rest))
+            .collect();
+        let player: Vec<&str> = output
+            .lines()
+            .filter(|l| l.contains("COILBOX_REWIND_PLAYER"))
+            .collect();
+        eprintln!("{}\n{}", player.join("\n"), driver.join("\n"));
+        assert!(!timed_out, "the driver never finished. Log:\n{output}");
+        let line = |start: &str| {
+            *driver
+                .iter()
+                .find(|l| l.starts_with(start))
+                .unwrap_or_else(|| panic!("no driver line starting {start}"))
+        };
+
+        // The mod options were read.
+        let options = line("options ");
+        assert_eq!(number(options, "frame"), f64::from(middle), "{options}");
+        assert_eq!(field(options, "playing"), "0", "{options}");
+
+        // A seek that the driver's own reader agrees with, at ten times.
+        let start = line("start ");
+        let tolerance = number(start, "tolerance");
+        let step = number(start, "step");
+        // The most a rotation is off by from being rounded, from the format page.
+        let rounding = 6f64.sqrt() / (2f64.powf(number(start, "rotation_bits") - 1.0) - 1.0);
+        // Health and build progress are stored in this many steps.
+        let fraction = 1.0 / 65535.0;
+        let agrees = |l: &str| {
+            assert_eq!(field(l, "shown"), field(l, "frame"), "{l}");
+            assert_eq!(field(l, "engine_units"), field(l, "track_units"), "{l}");
+            assert_eq!(
+                field(l, "engine_features"),
+                field(l, "track_features"),
+                "{l}"
+            );
+            assert!(number(l, "place") <= tolerance, "{l}");
+            assert!(number(l, "turn") <= rounding, "{l}");
+            assert!(number(l, "health") <= fraction, "{l}");
+            assert!(number(l, "build") <= fraction, "{l}");
+            assert_eq!(field(l, "wrong_build_state"), "0", "{l}");
+        };
+        let seeks: Vec<&str> = driver
+            .iter()
+            .copied()
+            .filter(|l| l.starts_with("seek "))
+            .collect();
+        assert_eq!(seeks.len(), 10, "{driver:?}");
+        seeks.iter().for_each(|l| agrees(l));
+        let mut counts: Vec<&str> = seeks.iter().map(|l| field(l, "track_units")).collect();
+        counts.sort_unstable();
+        counts.dedup();
+        assert!(
+            counts.len() >= 3,
+            "the seeks saw only {counts:?} units, so they show little"
+        );
+        assert!(!driver.iter().any(|l| l.starts_with("lost ")), "{driver:?}");
+
+        // Seeking backwards past a building's construction removes it.
+        let after = line("construction after ");
+        let during = line("construction during ");
+        let before = line("construction before ");
+        let again = line("construction again ");
+        assert!(number(after, "units") >= 1.0, "{after}");
+        assert_eq!(field(after, "building"), "0", "{after}");
+        assert_eq!(field(during, "units"), field(after, "units"), "{during}");
+        assert_eq!(field(during, "building"), "1", "{during}");
+        assert_eq!(
+            number(before, "units"),
+            number(after, "units") - 1.0,
+            "{before}"
+        );
+        assert_eq!(field(again, "units"), field(after, "units"), "{again}");
+        assert_eq!(field(again, "building"), "1", "{again}");
+
+        // A unit that dies while playing at the match's speed dies with its
+        // death effect, and what that leaves behind is removed, so the features
+        // are still the track's.
+        let past = line("played_past_death ");
+        assert!(
+            number(past, "frame") > number(line("death "), "last_frame"),
+            "{past}"
+        );
+        agrees(past);
+        // Every unit removed by a seek went quietly, and this one exploded.
+        let explosions = |start: &str, key: &str| number(line(start), key);
+        assert_eq!(explosions("explosions before_death", "before_death"), 0.0);
+        assert!(explosions("explosions after_death", "after_death") >= 1.0);
+
+        // The ground goes forward and comes back.
+        let ground: Vec<&str> = driver
+            .iter()
+            .copied()
+            .filter(|l| l.starts_with("terrain ") && !l.starts_with("terrain none"))
+            .collect();
+        assert_eq!(ground.len(), 3, "{driver:?}");
+        for l in ground {
+            let off = (number(l, "wanted") - number(l, "engine")).abs();
+            assert!(off <= step, "{l}");
+        }
+
+        // Play goes forward, backward and stops at the end.
+        let forward = number(line("play forward "), "shown");
+        assert!(
+            forward > f64::from(first) + 60.0 && forward <= f64::from(first) + 90.0,
+            "{forward}"
+        );
+        let backward = line("play backward ");
+        assert!(number(backward, "shown") < forward, "{backward}");
+        assert_eq!(field(backward, "direction"), "-1", "{backward}");
+        agrees(line("played_to_end "));
+        assert_eq!(field(line("play end "), "playing"), "0");
+
+        // The base game killed no team while the match was empty.
+        agrees(line("after_empty "));
+        assert_eq!(field(line("teams "), "dead"), "0");
+
+        // A string longer than a float can address was read right.
+        assert_eq!(field(line("long_string "), "wrong"), "0");
+
+        // No error from the player's Lua. The base game's own gadgets are not
+        // the player's to answer for.
+        let errors: Vec<&str> = output
+            .lines()
+            .filter(|l| l.to_lowercase().contains("error"))
+            .filter(|l| {
+                l.contains("coilbox_")
+                    || l.contains("rewind_player")
+                    || l.contains("playback_driver")
+            })
+            .collect();
+        assert!(errors.is_empty(), "{errors:#?}");
         assert_eq!(written, 0, "the playback wrote a replay");
     }
 }

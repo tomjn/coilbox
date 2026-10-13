@@ -443,7 +443,7 @@ To give every value at frame `f`:
 5. A feature exists when its first and last frame say so.
 6. For terrain, apply the rows between the frame last shown and `f`.
 
-A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it needs `io`, with `file:seek` to the block and `file:read` of the length. The Lua reader in `lua/rewind-player` takes the way bytes are fetched as a function, so a player can pick either.
+A reader that holds a whole track as one Lua string can only address the first 16,777,216 bytes of it exactly. Past that it either needs `io`, with `file:seek` to the block and `file:read` of the length, or has to cut the string into pieces short enough to address. The Lua reader in `lua/rewind-player` takes the way bytes are fetched as a function. Its string fetch cuts the string, since the player runs in synced Lua, which has no `io`.
 
 ## Rules for a writer
 
