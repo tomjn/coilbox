@@ -170,7 +170,10 @@ The look follows Slate, the interface in `luaui/slate` of [xta-springrts](https:
 stage:resync(t)         -- after a jump, before the two below
 stage:remove(t, clock)  -- take away what is not in the track at t
 stage:place(t, clock)   -- create what is missing and put everything in place
+stage:afterSim()        -- optional: the frame is over (GameFramePost)
 ```
+
+The engine does its own work on a frame between a gadget's `GameFrame` and its `GameFramePost`: units heal, and teams make and use resources. A stage that has to put something back after that has `afterSim`, as the units and resources stages do. `Player:framePost` calls it.
 
 `clock.jumped` says the frame was reached by a seek or a step and not by play, and `clock.direction` and `clock.speed` say how it is playing. `clock:watched()` is true for a frame of play forward at 0.5x, 1x or 2x, which is when a death, an impact and a sound are shown. A stage is made with the context, a table that has the track, its `info` and `features`, the engine's `Spring`, `Game`, `CMD` and definition tables, `teamOf(team)` and `report(key, text)`. Take the engine from the context and not from a global, so that the tests can hand the stage a stand-in.
 
@@ -210,10 +213,14 @@ A row names the calls (`calls`), the feature that hangs on them (`feature`), how
 | `shots` | `Spring.SpawnProjectile`, `SetProjectileMoveControl`, `SetProjectileDamages`, `SetProjectilePosition`, `SetProjectileVelocity`, `GetProjectileTimeToLive`, `GetProjectileDirection`, `DeleteProjectile`, `GetGroundHeight`, `Game.armorTypes` | no | the projectiles stage does nothing | shots |
 | `shotHandover` | `Spring.SetProjectileTimeToLive`, from `2025.03.9` | no | `Projectiles:release` keeps the shot under move control for the engine's one look | nothing |
 | `sound` | `Spring.PlaySoundFile`, `Game.gameSpeed` | no | weapons fire without a sound | nothing |
+| `resources` | `Spring.SetTeamResource`, `SetTeamShareLevel` | no | what each team holds, its storage and its share level are the playback's own | team resources |
+| `resourceRates` | `Spring.GetGameFrame`, `GetTeamResources`, `GetTeamInfo`, `AddTeamResource`, `UseTeamResource` | no | each team's income, expense and pull are the playback's own | team income and expense |
+| `resourceExcess` | `Spring.AddTeamResourceExcessStats`, from `2026.07.01` | no | what a team wasted reads as the playback's own | nothing |
+| `teamParams` | `Spring.SetTeamRulesParam` | no | the team rules parameters an adapter names are the playback's own | the game's own team numbers |
 | `workTiming` | `SendToUnsynced` | no | the slow frame line is not logged | nothing |
 | `adapter` | `VFS.FileExists` | no | no adapter is read | the game adapter |
 
-Every row has `since = "105.0"` except `shotHandover`. That is the oldest tag read, not a claim about an older engine. `105.0`, `105.1.1`, `2025.01.6` and `2026.07.04` were read for this table in `rts/Lua` of `~/dev/RecoilEngine`, and the spike on issue #3791 read ten tags and found `Spring.SetProjectileTimeToLive` registered from `2025.03.9` only. In `2025.01.6` the function's body is in `LuaSyncedCtrl.cpp` and nothing registers it.
+Every row has `since = "105.0"` except `shotHandover` and `resourceExcess`. The four rows of the resources stage were read at `105.0`, `105.1.1`, `2025.01.6`, `2025.03.9` and `2026.07.04`, and `Spring.AddTeamResourceExcessStats` at every tag of 2025 and 2026, of which `2026.07.01` is the first that registers it. That is the oldest tag read, not a claim about an older engine. `105.0`, `105.1.1`, `2025.01.6` and `2026.07.04` were read for this table in `rts/Lua` of `~/dev/RecoilEngine`, and the spike on issue #3791 read ten tags and found `Spring.SetProjectileTimeToLive` registered from `2025.03.9` only. In `2025.01.6` the function's body is in `LuaSyncedCtrl.cpp` and nothing registers it.
 
 #### What the note says
 
@@ -378,6 +385,54 @@ So the player takes away what the heal acts on. `SlowUpdate` heals only when `he
 
 What a viewer can notice: for the part of a frame between the player's `GameFrame` and `GameFramePost`, a wounded unit reports a maximum equal to its health. A gadget of a higher layer than the player's, which is 0, that reads a unit's health in its `GameFrame`, sees it as whole in that frame. Nothing is drawn in that time. A widget reads between frames, when the maximum is whole again.
 
+### Team resources
+
+A playback simulates nothing of the match, so left alone each team's economy is whatever the units the player placed happen to make. The resources stage, `coilbox_player_resources.lua`, makes the engine's own numbers the recorded match's (issue #3982). Nothing is hidden and no panel is changed: a resource bar, another widget and a gadget all ask the engine and all get the match.
+
+What can be set was read from the engine at commit `212c369b4c`, in `rts/Sim/Misc/Team.cpp`, `TeamHandler.cpp` and `rts/Lua/LuaSyncedCtrl.cpp`. `Spring.GetTeamResources` gives nine numbers for a resource.
+
+| Number | How the player makes it the match's | How true |
+| --- | --- | --- |
+| held | `Spring.SetTeamResource(team, "m", value)` on every frame and in `GameFramePost` | the track's value, as the 32 bit float the engine holds |
+| storage | `Spring.SetTeamResource(team, "ms", value)`, the same | exact when the frame is over. Set before what is held, since the engine cuts what is held to the storage |
+| share level | `Spring.SetTeamShareLevel`, the same | exact, except for part of one frame in 30 (below) |
+| income | `Spring.AddTeamResource` on the frames the engine sums up on | the match's, or the playback's own where that is more |
+| expense | `Spring.UseTeamResource` of an amount the team holds | the same |
+| pull | `Spring.UseTeamResource` of an amount the team does not hold | the same |
+| excess | `Spring.AddTeamResourceExcessStats`, on engines from `2026.07.01` | the match's. The playback's own on an older engine, and the larger of the two on an engine with no `GameFramePost` |
+| sent, received | not set | the playback's own, which is nothing |
+
+No call sets income, expense or pull. The engine keeps a running sum of each, and on every frame that divides by 30 (`TEAM_SLOWUPDATE_RATE`) `CTeam::ResetResourceState` makes the sums the numbers it reports and starts them again from nothing. `AddTeamResource` adds to the income sum as well as to what is held, and `UseTeamResource` always adds to the pull sum and adds to the expense sum when the team holds the amount. So on those frames the stage, for each resource of each team:
+
+1. Sets storage to twice what is about to go through it, so that nothing added runs over into excess.
+2. Sets what is held to 0 and adds the income that is missing. A team with an income multiplier in the start script has the amount divided by it first, since the engine multiplies what a gadget adds too.
+3. Sets what is held to the expense that is missing and uses exactly that, which goes through.
+4. Sets what is held to 0 and uses the pull that is missing, which does not go through and counts as a pull only.
+
+Then storage and what is held are set to the track's, as on every frame. All of it happens inside one call of the gadget, so nothing else sees the steps.
+
+"Missing" is the track's number less the playback's own. The playback's own sum for the 30 frames that are running cannot be read, since the engine only gives the sums of the 30 before. The stage reads those when the engine has summed up, takes off what it added itself, and uses the rest as its guess for the next 30. That guess is right while the same units stand in the world. After a seek it is wrong twice: the first sum still has what the units of the frame before the seek made, and the second is guessed from that one. So the numbers settle on the third of the engine's sums after a seek, which is up to three seconds, and can read too high or too low until then. They change once in 30 frames, as they did in the match, and a playback's 30 frames do not start where the match's did, so a number can be one sum behind.
+
+The sums only go up. Where the playback's own economy makes or uses more than the match did, the number reads as the playback's. That happens for a moment after the match's income went up. The engine reports the 30 frames before, so the track's income at frame 10,262 of the Splinter Faction match is 18.4 metal, from before a metal extractor was finished. The extractor stands finished in the playback at that frame, and held there the engine's own income is 28.1.
+
+The same goes for excess, and there the stage can do something. A team that is nearly full wastes what its units make, and the engine counts that as excess, which can be more than the match wasted: 396.7 energy against the track's 174.7 at frame 20,525. So at the start of a frame the stage gives a team room for all the playback makes in 30 frames, on top of the track's storage, and takes it away again in `GameFramePost`. The playback then wastes nothing itself and the excess is the track's. It does this only once the engine has made a `GameFramePost` call, since without one the storage would be drawn with the room in it.
+
+Production cannot be switched off at its source. `CUnit::SlowUpdate` adds a unit's `resourceMake`, takes its upkeep and adds what an extractor, a windmill or a tidal generator makes, all from the unit definition, which Lua reads and cannot change. `Spring.SetUnitResourcing` only reaches the amounts a gadget gave a unit itself. A team's income multiplier comes from the start script, and one of 0 would also stop the stage adding what is missing.
+
+What a team sent and received would take a transfer between two teams for each amount, through `Spring.ShareTeamResource`, which adds to one team's sent sum and the other's received sum. The stage would have to pair each team that sent with one that received. It does not do that yet, and both read as nothing. It is issue #4011. A team's running totals for the end of game statistics (`TeamStatistics`) have no call that sets them.
+
+#### When in a frame
+
+The engine's order in a frame is the gadgets' `GameFrame`, its own units, its teams and then the gadgets' `GameFramePost` (`CGame::SimFrame`). The units make and use resources, and the teams sum up and hand excess to allies, after the stage has set everything. So the stage sets storage, share level, what is held and the rules parameters again in `GameFramePost`, and that is what is drawn.
+
+It does not depend on that call-in, which an engine before `105.1.1-2590` does not make (issue #4002). Without it nothing is put back before the frame is drawn, so what a team holds reads one frame of the playback's own economy off, and never more, since the next frame sets it again. The sums are then read at the start of the next frame, which gives the same numbers.
+
+On a frame the engine sums up on, it also hands what a team holds above its share level to its allies (`CTeam::SlowUpdate`, with the game's `nativeExcessSharing`). The match did that once already. So on those frames the stage sets the share level to 1, where the engine has nothing to hand over, and `GameFramePost` sets it back. Without `GameFramePost` the share level reads 1 until the next frame.
+
+#### Old tracks
+
+A track from before recorder version 4 has no team's resources. The stage is not made for one, the player logs `the track is from recorder version 3, which did not record the teams' resources, so the resource bars show the playback's own economy`, and coilbox takes the track as stale: it refuses to play it and records the replay again.
+
 ### Death explosions
 
 What else a unit's death explosion does, read in `CGameHelper::Explosion`:
@@ -401,6 +456,9 @@ return {
 	units = { "armcom_start" },
 	features = { "grave_marker" },
 
+	teamParams = { "supplyUsed", "supplyMax" },
+	gameParams = { "wave" },
+
 	hooks = {
 		started = function() end,
 		unitPlaced = function(unitID, unitDefID, t, clock) end,
@@ -420,9 +478,11 @@ Every key is optional except `shortname` in an adapter that coilbox ships. A key
 | `widgets` | list of file names | widgets to switch off, as paths inside `luaui/widgets/` |
 | `units` | list of names | unit definitions the player never creates |
 | `features` | list of names | feature definitions the player never creates |
+| `teamParams` | list of names | team rules parameters that are the recording's to set, see [Rules parameters](#rules-parameters) |
+| `gameParams` | list of names | the same for game rules parameters |
 | `hooks` | table of functions | see [Hooks](#hooks) |
 
-The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features` and `hooks`.
+The file is run by `coilbox-springlua`, the sandboxed Spring Lua evaluator that reads a game's other config, so the lists can be worked out in Lua. It has no `io`, no `os` and no way to read another file. Coilbox reads everything but `hooks` from it before the engine starts, and the player reads the same file again in the engine, for `units`, `features`, `teamParams`, `gameParams` and `hooks`.
 
 ### Where an adapter lives
 
@@ -468,6 +528,26 @@ Coilbox does not write a shadow over one of its own files, and refuses an adapte
 
 The player never creates a unit of a definition in `units` or a feature of one in `features`. Names are compared without regard to case. The track still has them, so a seek has no effect on them, and the log has no line about a name the game lacks, since leaving them out is the point. A name that is in the list and not in the track is harmless. A unit the base game creates by itself, and a feature it creates, are still removed on the next frame as before.
 
+### Rules parameters
+
+A game keeps numbers of its own in rules parameters: supply, research points, a score. Neither the recorder nor the player can tell which of a game's parameters a viewer reads, so the adapter names them, as the game spells them. `teamParams` are the ones a gadget sets with `Spring.SetTeamRulesParam` and `gameParams` the ones it sets with `Spring.SetGameRulesParam`. Each list is names with no name twice.
+
+The lists are read in two places.
+
+- Before a recording run, `analysis.rs` in `tauri-plugin-coilbox-content` chooses the game's adapter the way a playback launch does and writes both lists into the recorder's request file, `luarules/configs/coilbox_rewind_request.lua`. The recorder writes each parameter when its value changes, and the track's info chunk has the names (`lua/rewind-recorder/README.md` and the format page).
+- In the engine, the resources stage sets each parameter that the track has and the adapter in use names. The track's names are what was recorded, and the adapter's are what the game says may be written over, so it takes both.
+
+The two can differ, since a track outlives the adapter it was recorded with. The player logs one line for each case and plays on:
+
+```
+COILBOX_REWIND_PLAYER the track has rules parameters the game's adapter does not name, so they are left to the game: supplyUsed
+COILBOX_REWIND_PLAYER the game's adapter names rules parameters the track was recorded without, so they are the playback's own. A new recording of the replay has them: supplyMax
+```
+
+Coilbox does not take a track as stale when an adapter gains a name. The track has to be cleared and the replay recorded again.
+
+A parameter is set on every frame and again in `GameFramePost`, so a gadget of the game that writes the same parameter during the frame is written over before anything is drawn. A parameter with no value at the time showing had not been set yet in the match, and the player leaves it as the game has it. `Spring.SetTeamRulesParam` is called with no access argument, which keeps whatever access the game gave the parameter, and gives a parameter the game never made the engine's default of private. A spectator with the full view reads those too.
+
 ### Hooks
 
 A hook is an optional function in `hooks`. The player calls these and no others, and logs a name in `hooks` that is not one of them or is not a function, since it is most likely a misspelling. A hook that raises is logged once and not called again, and the player carries on.
@@ -480,7 +560,7 @@ A hook is an optional function in `hooks`. The player calls these and no others,
 
 The clock is the player's, and a hook only reads it. `clock.jumped` says the frame was reached by a seek or a step, `clock.direction` is 1 or -1 and `clock.speed` is how many frames of the track a simulation frame covers.
 
-A hook runs in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which has to be set before any unit is placed), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
+A hook runs in synced Lua, in the gadget's environment, and a frame of play allocates nothing in the player, so a hook that is called every frame should not either. These are the only hook points. They are the smallest set that issues #3797 (a build spray effect that reads a builder's recorded work), #3800 (a team's storage, which had to be set before any unit was placed until the track held it, issue #3982), #3801 (a warp in effect for a unit that appears) and #3804 (replacing ghost drawing) are known to need, and a hook point is added by the issue that needs one.
 
 ### The log line
 
@@ -708,6 +788,7 @@ luajit lua/rewind-player/tests/clock_test.lua
 luajit lua/rewind-player/tests/rotation_test.lua
 luajit lua/rewind-player/tests/player_test.lua
 luajit lua/rewind-player/tests/projectiles_test.lua
+luajit lua/rewind-player/tests/resources_test.lua
 luajit lua/rewind-player/tests/gadget_test.lua
 luajit lua/rewind-player/tests/adapter_test.lua
 luajit lua/rewind-player/tests/engine_test.lua
@@ -723,6 +804,7 @@ luajit lua/rewind-player/tests/timeline_test.lua
 - `rotation_test.lua` checks the pitch, yaw and roll against the engine's own matrix arithmetic, in doubles and with every result rounded to a float.
 - `player_test.lua` checks the stages on tracks made from a table (`tests/fake_track.lua`): what is alive at a time, removal before creation, a seek back past a construction, play in both directions, a missing definition, a nil from `Spring.CreateUnit`, terrain forward and back, that the engine's own healing (`world.heal` in the stand-in, run between a frame and its post frame) leaves a wounded unit's health alone and its maximum is whole again afterwards, that health which moved anyway is put right and logged once, and that a frame of play allocates nothing.
 - `projectiles_test.lua` checks the projectiles stage: what is in the air at a time, stepping forward and backward, that a seek looks at the shots that can be alive and not the window's list, that a shot lands only while it is watched and with no damage, crater or push, a shell that ends in the air, a bolt that stops, a beam fired once, the fire sound and when it is not played, a weapon the game lacks, an engine with no `Spring.SetProjectileTimeToLive`, a shot the engine ended and an id handed out again, a shot alive across two windows, and that 300 frames of play with 40 shots in the air allocate nothing.
+- `resources_test.lua` checks the resources stage on a stand-in whose teams follow `rts/Sim/Misc/Team.cpp` and whose frame runs in the engine's order, with the playback's own economy between the gadget's two call-ins: what a team holds, its storage and its share level at a frame, after a seek forward and backward, held for 400 frames and while playing each way, on an engine with and without `GameFramePost`, income, expense and pull after three of the engine's sums, a team with an income multiplier, excess, allied teams and the engine's own sharing, rules parameters with and without an adapter that names them, a track from recorder version 3, the fixture through the real reader, and that 300 frames allocate nothing.
 - `gadget_test.lua` loads the two gadgets the way the engine does. That includes the gadget's answers of no damage for units and for features, and its post frame.
 - `adapter_test.lua` checks how the player reads an adapter, that it never creates a hidden unit or skipped feature and says nothing about either, that each hook is called with the right arguments and a hook that raises is switched off, the log line, and that 60 frames of play with hooks allocate nothing.
 - `engine_test.lua` is made from the engine table ([Engine calls](#engine-calls)). For every call of every row it takes the call out of the stand-in and plays the fixture track, and it checks the table against the source with `tests/scan.lua`. The widget's table is tested the same way in `timeline_test.lua`.
@@ -730,7 +812,7 @@ luajit lua/rewind-player/tests/timeline_test.lua
 
 `tests/support.lua` is the stand-in for the reader. Its `VFS.Unpack*` and `VFS.ZlibDecompress` follow the engine source, round what they return to a 32 bit float, and raise for a position or count a float could not hold. The zlib is the system's, through LuaJIT's FFI. Its synced environment has no `io`, so a reader that reached for it would fail the tests.
 
-`tests/engine.lua` is the stand-in for the player: units, features, projectiles, the heightmap, teams and game rules parameters, each call written from the engine source it names. `world.simulate()` is the engine's own frame for projectiles: it looks for a hit along a projectile's speed and under the ground, whether or not the projectile is under move control, and then counts its time to live down.
+`tests/engine.lua` is the stand-in for the player: units, features, projectiles, the heightmap, teams and their resources, and rules parameters, each call written from the engine source it names. `world.step(frame, post)` runs one frame in the engine's order: the gadget's `GameFrame`, the engine's own economy as the test gives it in `world.economy`, the teams' sums on a frame that divides by 30, and the gadget's `GameFramePost`. `world.simulate()` is the engine's own frame for projectiles: it looks for a hit along a projectile's speed and under the ground, whether or not the projectile is under move control, and then counts its time to live down.
 
 The tests cannot show that the player works in the engine. They show the logic, the reading and the addressing.
 

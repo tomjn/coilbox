@@ -314,6 +314,45 @@ do
 	near("a resource with no excess in the track has none", read(world, 0, "energy").excess, 0)
 end
 
+-- A team that is full. What the playback's own units make has nowhere to go,
+-- and the engine counts it as excess, which may be more than the match wasted.
+
+local function full()
+	return {
+		values = {
+			{ team = 0, code = HELD, at = 1000 },
+			{ team = 0, code = STORAGE, at = 1000 },
+			{ team = 0, code = SHARE, at = 0.99 },
+			{ team = 0, code = INCOME, at = 6 },
+			{ team = 0, code = EXCESS, at = 2 },
+		},
+	}
+end
+
+do
+	local world, player, run = setup(full())
+	world.economy = function()
+		world.produce(0, "metal", 0.2)
+	end
+	player:message("coilbox_rewind:pause")
+	run(90)
+	local metal = read(world, 0, "metal")
+	near("a full team wastes what the match wasted and not what the playback makes", metal.excess, 2)
+	near("its income is the track's", metal.income, 6)
+	t.same("it holds the track's metal", metal.held, 1000)
+	t.same("and its storage is the track's when the frame is over", metal.storage, 1000)
+
+	-- An engine with no post frame call cannot give the room and take it back.
+	local old, oldPlayer, _, runOld = setup(full())
+	old.economy = function()
+		old.produce(0, "metal", 0.2)
+	end
+	oldPlayer:message("coilbox_rewind:pause")
+	runOld(91)
+	near("without a post frame call the excess is the playback's own, which is more", read(old, 0, "metal").excess, 6)
+	t.same("and the storage is the track's on every frame", read(old, 0, "metal").storage, 1000)
+end
+
 -- Allied teams. The engine hands what a team holds above its share level to
 -- its allies on a slow update, which the match did once already.
 

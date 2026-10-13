@@ -11,7 +11,7 @@ Coilbox's replay analysis generates a game that depends on the game a replay was
 A run that records adds two files to the generated game:
 
 - `luarules/gadgets/coilbox_rewind_recorder.lua`, the gadget in this folder
-- `luarules/configs/coilbox_rewind_request.lua`, a Lua table holding `lastFrame`, the last frame in the replay's stream
+- `luarules/configs/coilbox_rewind_request.lua`, a Lua table holding `lastFrame`, the last frame in the replay's stream, and `teamParams` and `gameParams`, the names of the rules parameters to record (see [Team resources](#team-resources))
 
 The recorder writes `coilbox-rewind.dump` in the engine's write directory, which is the only place the engine lets Lua open a file. When the engine exits, coilbox moves the file to the path the request gave, whether or not the run reproduced the match. `AnalysisRun.recording` says what became of it.
 
@@ -103,6 +103,8 @@ One JSON object.
 | `unitFootprints` | each unit definition's footprint, in the order of `unitDefs`, as a pair: the engine's `xsize` and `zsize`. Both count heightmap squares of `squareSize` elmos, and `xsize` is twice the definition's `footprintX`. A dump made before issue #3807 has none, and the thinning refuses it |
 | `featureDefs` | feature definition names. Entry `n`, counting from 1, is definition id `n` |
 | `weaponDefs` | weapon definition names. Entry `n`, counting from 0, is definition id `n` |
+| `teamParams` | the names of the team rules parameters the request asked for, in the request's order. A parameter number in a frame block is a place in this list, counting from 1 |
+| `gameParams` | the same for game rules parameters |
 
 A team object has `team`, `allyTeam`, `side`, `leader` (the leading player's name) and `color` (red, green and blue from 0 to 255). An AI team also has `ai`, the AI's name. The Gaia team also has `gaia: true`.
 
@@ -167,6 +169,10 @@ A section is left out when it has nothing in it. A code appears at most once in 
 | 10 | features destroyed | 1 | feature id |
 | 11 | projectiles | 10 | projectile id, weapon definition id or -1, team or -1, the unit that fired it or -1, x, y, z, velocity x, y, z |
 | 12 | terrain | 4 | heightmap x, heightmap z, height before, height after |
+| 13 | team resources | 3 | team, metal held, energy held |
+| 14 | team economy | 17 | team, then for metal and then for energy: storage, pull, income, expense, share level, sent, received, excess |
+| 15 | team rules parameters | 3 | team, parameter number from 1, value |
+| 16 | game rules parameters | 2 | parameter number from 1, value |
 
 A pose is 13 numbers: position x, y, z, front direction x, y, z, up direction x, y, z, health, maximum health, build progress from 0 to 1, and flags. Bit 0 of the flags is set when the unit is switched on.
 
@@ -278,6 +284,18 @@ What follows from that:
 Corners on the far edges of the map, where x is the map's width in squares or z its depth, are not written. The engine clamps a position to one elmo inside the map before it reads a height, so Lua cannot read those corners exactly.
 
 A spectator who does not have the full view cannot make the engine copy heights. The recorder then only writes what the engine reports. The player of a replay has the full view unless something turns it off.
+
+### Team resources
+
+Every team on every frame, written when a number changes (issue #3982). A reader holds the last row of a team until the next one.
+
+The numbers are the nine `Spring.GetTeamResources` gives for metal and for energy. What a team holds changes on most frames, so it has a section of its own, 13. The other eight change when the engine sums a team's economy up, which is every 30 frames, so they share section 14: one row has all sixteen. Income, expense, pull, sent, received and excess are the sums of the 30 frames before, as the engine reports them, and not rates per second.
+
+A team starts as all zero, so a team that never has anything has no row. A number the engine gives that is not a number is written as 0.
+
+A game keeps numbers of its own as rules parameters, such as supply and research points. The recorder cannot know which of a game's parameters matter, so the request names them, and coilbox takes the names from the game's playback adapter (`teamParams` and `gameParams` in `lua/rewind-player/README.md`). A parameter is written when its value changes, in section 15 for a team's and 16 for the game's. Only a number is written. A parameter that holds text or a boolean, or that is not set, has no row, so a parameter with no row yet had not been set. A parameter that is taken away after it was set keeps its last row.
+
+A gadget reads every team's parameters whatever their access level, the unsynced half included, so a private one is recorded too.
 
 ## What was measured
 

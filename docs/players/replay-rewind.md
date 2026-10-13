@@ -110,11 +110,11 @@ If the engine is too old for part of the player, a small panel above the timelin
 
 ## Disk space
 
-A track takes disk space. The measured tracks are 4,713,582 bytes for the 45.83 minute Beyond All Reason match above and 289,328 bytes for the 12.83 minute Splinter Faction one. The Beyond All Reason match was between two AIs. A match with more units will be larger, and coilbox has not measured one between people.
+A track takes disk space. The measured tracks are 5,255,917 bytes for the 45.83 minute Beyond All Reason match above and 321,116 bytes for the 12.83 minute Splinter Faction one. About a tenth of each is the teams' resources. The Beyond All Reason match was between two AIs. A match with more units will be larger, and coilbox has not measured one between people.
 
 Tracks live in the `content/replay-tracks` folder of coilbox's data folder, one file for each match. In [portable mode](portable-mode.md) that folder is inside the `.coilbox` folder.
 
-The "Replay tracks" part of Library, then Storage, shows what tracks take, how many there are and the limit. The default limit is 450 MiB, which holds 100 tracks the size of the 4,713,582 byte one. Change it in "Disk space for tracks (MB)".
+The "Replay tracks" part of Library, then Storage, shows what tracks take, how many there are and the limit. The default limit is 450 MiB, which holds 89 tracks the size of the 5,255,917 byte one. Change it in "Disk space for tracks (MB)".
 
 When a new track is stored and the total goes over the limit, coilbox removes tracks until the total fits. Out of date tracks go first, then the track watched longest ago. It never removes the new track. A track larger than the whole limit is kept and every other track goes. Lowering the limit removes nothing by itself. It applies when the next track is stored, and until then the page says "Over the limit until the next recording".
 
@@ -132,14 +132,19 @@ True to the recording:
 - Health, health bars, build progress and its time left.
 - Terrain changes. One the engine did not report during the match can show up to 900 frames late.
 - Shots in the air. A unit that dies while you play forward at 0.5x, 1x or 2x dies with the game's own death effect, and a shot lands with the game's impact effect. At any other time (after a seek or a step, playing backward, or at 4x and faster) they come and go with nothing shown.
-- The resource bars' storage and income, because the same buildings make them.
+- The resource bars. Each team's metal and energy, and how much it can store, are what they were in the match at the moment showing. They stay put while you pause and go back when you seek back. A figure is within half a unit of the match's, or within a thousandth of it for a team that holds thousands.
+- Supply used, supply available and research points.
+- Income and spending, once the playback has caught up. They take up to three seconds to settle after a seek and can read high for a moment after a team's income rose in the match. The engine has no way to set them directly, so coilbox tops them up to the match's figures and cannot bring them down.
 - The minimap, the tooltip with a unit's description, the players list and the game's own effects and lights.
+
+A track recorded by an earlier version of coilbox has no resources in it. It shows as "Track out of date" and has to be recorded again.
 
 Not true to the recording:
 
-- Resources held and spent, supply used and research points. The recording holds no team resources, so the resource bars show the playback's own economy. At frame 6,927 of the Splinter Faction match, team 0 held 1028 metal in the real replay and 171 in the playback, and the playback's figure rises for as long as it runs. A fix is tracked in issue #3982.
-- A commander's name tag reads CoilboxPlayback, because one spectator leads every team. The match had the player's name.
-- The clock in the players list starts at nothing each time the playback is opened. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light.
+- Resources one team gave another. A playback shows none sent and none received. This is issue #4011.
+- The totals in the end of game statistics, such as all the metal a team ever made. The engine keeps those itself and nothing can set them.
+- A commander's name tag reads CoilboxPlayback, because one spectator leads every team. The match had the player's name. This is issue #4012.
+- The clock in the players list starts at nothing each time the playback is opened. The game's day and night and its weather follow that clock, so a moment that was dark in the match can be light. The engine's clock only counts up and cannot be set to the moment you seek to. This is issue #4013.
 - The menu at the top right stays whole. Its Resign button does nothing for a spectator and its Sharing button does nothing in a playback.
 - The build menu and order buttons show for a selected unit. Orders go nowhere.
 

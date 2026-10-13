@@ -20,15 +20,18 @@
 --   match's reads as the playback's.
 --
 --   Excess has a call on engines from 2026.07.01, which adds to the number the
---   engine reports.
+--   engine reports. So that the playback wastes nothing of its own, a team has
+--   room for the playback's own income for the length of a frame.
 --
 --   What a team sent and received is not set. It would take a transfer between
 --   two teams for each of them.
 --
 -- The playback's own share is not known for the 30 frames that are running,
 -- since only the sums of the 30 before can be read. The stage takes those, less
--- what it added itself. They are right once two of the engine's stretches of 30
--- frames have passed with the same units in the world.
+-- what it added itself. They are right once three of the engine's stretches of
+-- 30 frames have ended with the same units in the world: the first after a
+-- seek still has the units of the frame before it, and the second is guessed
+-- from that one.
 --
 -- The engine's own economy runs in the middle of a frame, after a gadget's
 -- GameFrame. With GameFramePost the numbers are put back before anything is
@@ -153,6 +156,8 @@ function M.new(context, reader)
 		-- True from a frame on which the engine sums up until its new numbers
 		-- have been read.
 		rolled = false,
+		-- True once the engine has called back at the end of a frame.
+		posted = false,
 		gameValue = {},
 		teamValue = {},
 	}, Resources)
@@ -281,15 +286,27 @@ end
 
 --- Sets what has a call: storage, share level and what a team holds, and the
 -- rules parameters. `summing` is true on a frame the engine sums up on.
-local function apply(self, w, t, summing)
+-- `during` is true for the start of a frame on an engine that is known to call
+-- back when the frame is over.
+local function apply(self, w, t, summing, during)
 	local Spring, teams = self.Spring, self.teams
 	if self.sets then
 		local setTeamResource, setTeamShareLevel = Spring.SetTeamResource, Spring.SetTeamShareLevel
+		local ownIncome = self.ownIncome
 		for i = 1, #teams do
 			local team = teams[i]
 			for r = 1, 2 do
 				local s = (i - 1) * 2 + r
-				setTeamResource(team, STORAGE_NAME[r], value(w, self.storage[s], t))
+				local storage = value(w, self.storage[s], t)
+				if during then
+					-- A team that is nearly full would waste what the playback's own
+					-- units make in the rest of the frame, and the engine would count
+					-- that as excess. So for the rest of the frame the team has room
+					-- for all the playback makes in 30 frames, which the engine last
+					-- measured. The storage is the track's again when the frame is over.
+					storage = storage + ownIncome[s]
+				end
+				setTeamResource(team, STORAGE_NAME[r], storage)
 				-- When the engine sums up it also hands what a team holds above its
 				-- share level to its allies, which the match did once already. At a
 				-- level of 1 it has nothing to hand over. The level is the track's
@@ -352,12 +369,14 @@ function Resources:place(t)
 		end
 		self.rolled = true
 	end
-	apply(self, w, t, summing)
+	apply(self, w, t, summing, self.posted)
 end
 
 --- The end of a simulation frame, after the engine's own economy and after it
 -- has summed up (GameFramePost).
 function Resources:afterSim()
+	-- The engine makes this call, which an old one does not (issue #4002).
+	self.posted = true
 	local w, t = self.window, self.t
 	if not w then
 		return
@@ -365,7 +384,7 @@ function Resources:afterSim()
 	if self.rolled then
 		settle(self, w, t)
 	end
-	apply(self, w, t, false)
+	apply(self, w, t, false, false)
 end
 
 return M
