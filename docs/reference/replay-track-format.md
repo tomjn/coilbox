@@ -2,7 +2,7 @@
 
 A track is a recording of where everything was during one replay: units, the pieces they aim with, projectiles, features, terrain and build queues. Coilbox records it in one headless run of the replay and plays it back with time going in either direction.
 
-This page is the design of format version 1. It is written so that a second person can write a reader from it. Nothing reads or writes the format yet. The Rust crate is issue #3781, and the engine side is the two milestones after "Replay rewind: record a match".
+This page is the design of format version 1. It is written so that a second person can write a reader from it. The Rust crate `crates/coilbox-track` (issue #3781) reads and writes it. The engine side is the two milestones after "Replay rewind: record a match".
 
 A track file has the extension `.cbtrack`. The same file is read by coilbox and by Lua inside the engine, so there is no export step and no second copy on disk.
 
@@ -70,7 +70,7 @@ Chunks start on 64 byte blocks so that Lua can address them. A block number belo
 
 A block number times 64 is the chunk's offset in the file. Every `u32` in the header and index is at most 16,777,215.
 
-The number of windows is the frame span divided by the window length, rounded up, and at least 1. Window `k` starts at `first frame + k * window length`. It ends one window length later, or at the last frame if that comes first. A frame on the boundary between two windows is in both, and both give the same values for it.
+The number of windows is the frame span divided by the window length, rounded up, and at least 1. The frame span is the last frame minus the first, so a span of exactly one window length is one window. Window `k` starts at `first frame + k * window length`. It ends one window length later, or at the last frame if that comes first. A frame on the boundary between two windows is in both, and both give the same values for it.
 
 The engine version, the game and the map are text and live in the info chunk.
 
@@ -115,7 +115,8 @@ u32     number of values
 - Columns are listed in rising order of id, and an id appears once.
 - Each column's data starts at a multiple of 4 bytes and is padded with zero bytes to the next one.
 - A column that is not listed has no values. For a column with one value per unit, that means 0 for every unit.
-- A reader ignores a column id it does not know.
+- A reader ignores a column id it does not know, and a column of a type it does not know.
+- A writer lists only columns that have values. It also leaves out a count column (ids 10, 11 and 12) whose value is 0 for every unit, as the worked example does.
 - A decompressed chunk is at most 16,777,215 bytes, so every offset in it is exact in Lua.
 - The 4 zero bytes at the end mean no column ends on the last byte of the chunk, which `VFS.Unpack*` cannot read from.
 - A zlib stream ends with a checksum of the data, and `uncompress` checks it. A chunk that fails to decompress is an error for that window only. The header, the index and every other window still read.
@@ -202,7 +203,7 @@ One chunk for the whole match, with one entry for each feature. Features appear 
 | 133 | `u32` | last frame it exists |
 | 134, 135, 136 | `s32` | position x, y, z, plain |
 | 137 | `u8` | rotation: which component is dropped |
-| 138, 139, 140 | `u16` | rotation: the three kept components, plain |
+| 138, 139, 140 | `u16` | rotation: the three kept components, plain. Each is the signed whole number `n` as a 16 bit two's complement value |
 
 A feature exists at frame `f` when `first <= f <= last`.
 
@@ -245,7 +246,7 @@ At least one for each unit.
 | 23 | `u8` | rotation: which component is dropped, 0 to 3 for x, y, z, w |
 | 24, 25, 26 | `u16` | rotation: the three kept components, wrapping difference, signed |
 
-Between two keys the position is a straight line. The rotation is the two quaternions blended in the same proportion and then scaled back to unit length, with the second one negated first when the dot product of the two is negative.
+Between two keys the position is a straight line. The rotation is the two quaternions blended in the same proportion and then scaled back to unit length, with the second one negated first when the dot product of the two is negative. A blend does not run at an even speed, so a window that starts part way along a blend, with a key added at its edge, matches the whole curve only to within rounding when the two keys are close in rotation. Keys kept by thinning are.
 
 ### Status keys
 
@@ -276,7 +277,7 @@ Column 10 says how many tracks each unit has. The tracks of the first unit come 
 | 43 | `u8` | kind |
 | 44 | `u32` | reference, 0 when the kind has none |
 | 45 | `u8` | for builder work, the build power in use, 255 for full. 0 for a weapon |
-| 46, 47, 48 | `s32` | position x, y, z, plain. One entry for each key whose kind is 128 or more |
+| 46, 47, 48 | `s32` | position x, y, z in position steps, plain. One entry for each key whose kind is 128 or more |
 
 | Kind | Meaning | Reference |
 | --- | --- | --- |
@@ -293,6 +294,8 @@ Column 10 says how many tracks each unit has. The tracks of the first unit come 
 | 129 | terraforming at a position | none. Takes the next entry of columns 46 to 48 |
 
 A target holds until the next key. A reader treats a kind it does not know as nothing, and still takes a position entry for it when the kind is 128 or more.
+
+A writer refuses a key whose reference is not in the window it is written into, since the file cannot say what it points at.
 
 The engine reports build power as a count out of 15 (`MASK_BITS` in `rts/Sim/Misc/NanoPieceCache.h`). A writer stores that count times 17.
 
@@ -314,7 +317,7 @@ Column 11 says how many tracks each unit has. A track that is missing means the 
 
 All six values run in a straight line between keys. An angle is not reduced to one turn when it is read. If two keys are a turn and a half apart, the piece turns a turn and a half between them.
 
-An angle cannot be stored without limit, because a piece that spins all match long passes 16,777,215 steps. The largest angle in the larger benchmark is 887.44 radians, which is 141 turns. So in each window a writer shifts every key of a track by the same whole number of turns, chosen so that the track's first key in that window is between -32,768 and 32,767. The shift does not change what is drawn. A reader never compares an angle in one window with an angle in another.
+An angle cannot be stored without limit, because a piece that spins all match long passes 16,777,215 steps. The largest angle in the larger benchmark is 887.44 radians, which is 141 turns. So in each window a writer shifts every key of a track by the same whole number of turns, chosen so that the track's first key in that window is between -32,768 and 32,767. The shift is chosen for each of the three angles on its own, so the three angles of one key may be shifted by different numbers of turns. The shift does not change what is drawn. A reader never compares an angle in one window with an angle in another.
 
 ### Build queue keys
 
@@ -340,7 +343,7 @@ One entry for each projectile that exists at any frame of the window.
 | 81 | `u16` | weapon definition, or 65,535 for a projectile that has none |
 | 82 | `u8` | team |
 | 83 | `u8` | flags. Bit 0: it existed before this window. Bit 1: it exists after this window |
-| 84 | `u16` | the unit that fired it, as an index in this window's units, or 65,535 |
+| 84 | `u16` | the unit that fired it, as an index in this window's units, or 65,535. A unit that is not in the window counts as none |
 | 85 | `u16` | offset of the first frame in this window at which it exists |
 | 86 | `u16` | offset of the last frame in this window at which it exists |
 | 87 | `u16` | number of keys |
@@ -371,10 +374,12 @@ One for each window in which the heightmap changed. It has one row for each heig
 | 112 | `u16` | frames since the previous row. For the first row, frames since the window's first frame |
 | 113 | `u16` | heightmap x, as a wrapping difference from the previous row |
 | 114 | `u16` | heightmap z, as a wrapping difference from the previous row |
-| 115 | `s32` | height before the change, as a difference from the previous row's height before. The first row's is a difference from 0 |
+| 115 | `s32` | height before the change in position steps, as a difference from the previous row's height before. The first row's is a difference from 0 |
 | 116 | `s32` | height after minus height before. Never 0 |
 
 Heightmap x and z count heightmap corners, which are 8 elmos apart (`SQUARE_SIZE`). All three running values start at 0 at the top of each chunk.
+
+A row belongs to one window only. Window 0 holds the rows at frames from the first frame to its last frame, and every later window the rows after its first frame up to its last frame. So a reader that has shown frame `a` and wants frame `b` reads the terrain chunks of the windows from the one holding `a` to the one holding `b`, and applies the rows between the two frames.
 
 A writer keeps three rules.
 
@@ -418,7 +423,7 @@ A reader that holds a whole track as one Lua string can only address the first 1
 - For each curve and each window the unit or projectile exists in, copy the keys that fall in the window. If no key sits on the first offset at which it exists in the window, work out the curve's value there and add it as a key, unless the first copied key rounds to the same value. Do the same at the last offset. A transform curve and a status curve always have at least one key. A projectile always has a key at both ends.
 - A reader must get the same value for any frame of a window from that window alone as it would from the whole curve. The added keys are what make that true.
 - The check in issue #3782, that no dropped sample is further from the track than the tolerance, runs against the rounded values a reader will see. It does not run against the values before rounding.
-- A value that does not fit is an error, not a silent wrap. A position past 16,777,215 steps is clamped to it.
+- A value that does not fit is an error, not a silent wrap. That covers a position, a velocity, an offset, a height and every value a column stores, including a difference from the key before. Nothing is clamped except health and build progress, which go to the range 0 to 65,535 as the status keys say.
 - Any zlib level reads the same. Level 9 was 1.6% smaller than level 6 on the larger benchmark.
 
 ## Choosing the steps and the window length
