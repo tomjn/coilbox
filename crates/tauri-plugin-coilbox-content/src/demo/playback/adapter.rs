@@ -867,6 +867,38 @@ mod tests {
         }
     }
 
+    /// Splinter Faction's adapter is chosen for every release of the game and
+    /// for a game folder under development, which declares no version, and for
+    /// no other game. What it switches off is spelled out here, so that a
+    /// change to the list is a change somebody meant (issue #3800).
+    #[test]
+    fn splinter_factions_adapter_is_for_every_version_of_it_and_no_other_game() {
+        let shipped = super::super::REWIND_PLAYER_ADAPTERS;
+
+        for version in [Some("0.1.88"), Some("0.1.89"), Some("$VERSION"), None] {
+            let chosen = choose(Ok(None), shipped, "SF", version);
+            assert_eq!(chosen.source, Source::App, "{version:?}");
+            let adapter = chosen.adapter.unwrap();
+            assert_eq!(adapter.name.as_deref(), Some("Splinter Faction"));
+            assert_eq!(
+                adapter.shadows(),
+                [
+                    "luarules/gadgets/game_end.lua",
+                    "luarules/gadgets/game_team_com_ends.lua",
+                    "luarules/gadgets/game_spawn.lua",
+                    "luarules/gadgets/unit_deathContainerSpawn.lua",
+                    "luaui/widgets/gui_static_factionchooser.lua",
+                    "luaui/widgets/gui_static_placement.lua",
+                    "luaui/widgets/gui_static_sharemenu.lua",
+                ]
+            );
+            assert!(adapter.units.is_empty() && adapter.features.is_empty());
+        }
+        for other in ["BYAR", "MF", "BA"] {
+            assert_eq!(choose(Ok(None), shipped, other, Some("1")), Chosen::none());
+        }
+    }
+
     /// The player reads the adapter from the path this side writes it to.
     #[test]
     fn the_adapter_sits_where_the_player_looks() {

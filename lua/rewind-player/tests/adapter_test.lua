@@ -119,6 +119,19 @@ t.same(
 	"adapter loaded: Test game. 1 gadgets and 0 widgets are switched off by the playback game, 2 unit definitions are hidden, 0 feature definitions are skipped, hooks: afterFrame"
 )
 
+-- The adapters coilbox ships, read the way the player reads one in the engine.
+
+do
+	local adapter, why = Adapter.normalize(dofile(t.root() .. "/adapters/splinter_faction.lua"))
+	t.check("the player reads Splinter Faction's adapter", adapter ~= nil, why)
+	t.same(
+		"and logs what it has",
+		Adapter.describe(adapter),
+		"adapter loaded: Splinter Faction. 4 gadgets and 3 widgets are switched off by the playback game, 0 unit definitions are hidden, 0 feature definitions are skipped, hooks: none"
+	)
+	t.same("it has no hook the player does not call", #adapter.unknownHooks, 0)
+end
+
 -- The player with an adapter.
 
 local UNIT_DEFS = {
