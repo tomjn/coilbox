@@ -53,6 +53,10 @@ pub struct WorstErrors {
     pub projectile: Option<Worst>,
     /// Health or build progress, as a fraction.
     pub status: Option<Worst>,
+    /// A projectile's velocity at a frame thinning dropped, in elmos per
+    /// frame. Reported, and not part of [`WorstErrors::elmos`], since the
+    /// track's tolerance covers position only.
+    pub projectile_velocity: Option<Worst>,
 }
 
 impl WorstErrors {
@@ -537,6 +541,22 @@ impl<R: Read + Seek> Sink for Verifier<R> {
             note(&mut self.worst.projectile, error, frame, || {
                 format!("projectile {serial}")
             });
+            // A key holds the velocity it was given, so only the samples
+            // thinning dropped say how well the curve's slope follows it.
+            if !p.keys.iter().any(|key| key.frame == frame) {
+                let error = ProjectileCurve::velocity_error(
+                    &self.q,
+                    &p.keys,
+                    &ProjectileSample {
+                        frame,
+                        position,
+                        velocity,
+                    },
+                );
+                note(&mut self.worst.projectile_velocity, error, frame, || {
+                    format!("projectile {serial}")
+                });
+            }
         }
         Ok(())
     }

@@ -235,6 +235,17 @@ impl Curve for ProjectileCurve {
     }
 }
 
+impl ProjectileCurve {
+    /// The distance between the recorded velocity and the slope of the
+    /// track's curve, in elmos per frame. Reported and not bounded.
+    pub fn velocity_error(q: &Quantiser, keys: &[ProjectileKey], s: &ProjectileSample) -> f64 {
+        match projectile_at(keys, q, s.frame) {
+            Some((_, v)) => distance(v, s.velocity),
+            None => f64::INFINITY,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

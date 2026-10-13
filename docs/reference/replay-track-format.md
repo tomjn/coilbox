@@ -453,7 +453,7 @@ The header's tolerance is one distance in elmos. How far a recorded sample is fr
 - A unit. The distance between the recorded position and the track's, plus the unit's radius times the angle in radians between the recorded rotation and the track's. No point within the radius of the unit's centre is further than that from where it was recorded, so one tolerance holds at a unit's centre and at the end of its barrel. The radius is the unit definition's, `UnitDefs[id].radius`, which the recorder writes in the dump's header.
 - A piece. The distance between the recorded offset and the track's, plus the piece's reach times the angle in radians between the recorded rotation and the track's. Both are relative to the piece's parent, as a pose key is. The reach is how far the model's geometry gets from the piece's origin, counting the piece's own geometry and that of every piece below it, with all of them at rest. So no point of that geometry is further than the tolerance from where a script's values for this piece put it. A piece with no geometry on it or below it, such as the point a barrel fires from, has no reach of its own and takes the unit's radius. The recorder writes each piece's rest offset and the box round its geometry in the dump's piece tree.
 - A piece is measured against its parent and not against the unit. A barrel on a sleeve on a turret is drawn with the error of all three, so in the unit's model space a point on it can be up to three tolerances from where it was recorded. How far the pieces of the benchmark tracks are in model space was not measured.
-- A projectile. The distance between the recorded position and the cubic's. Velocity is not measured.
+- A projectile. The distance between the recorded position and the cubic's. Velocity has no tolerance. Its worst error is reported, and [Projectile velocity](#projectile-velocity) has what it came to.
 - Health and build progress. These are fractions and not distances, so the header's tolerance does not apply. A sample is within one step of the 65,535 a fraction is stored in.
 - Flags, targets, build queues, teams, and the frames a unit or a projectile exists on have no tolerance. The track has what was recorded or it is wrong.
 
@@ -686,7 +686,7 @@ BAR-Rewind's README gives 108 MB for a 53 minute match. If the BAR multiple held
 - Projectiles as cubics, issue #3784. A throwaway thinner run on the raw projectile samples kept 54,426 keys with the cubic against 146,192 with straight lines for BAR, and 1,759 against 5,836 for Splinter Faction. With those keys the BAR track is 4,342,656 bytes, 8.56 times smaller than the benchmark file, and the Splinter Faction track is 261,824 bytes, 22.79 times smaller.
 - The thinning of issue #3782 is not the benchmark's, and keeps a different number of keys. The next section has what it kept.
 - The poses of issue #3783 are not the benchmark's. This projection uses the six values the benchmark stores for each pose key. [Measured with the poses of issue #3783](#measured-with-the-poses-of-issue-3783) has what they came to.
-- A target curve for each weapon, issue #3790. The benchmark records one weapon for each unit.
+- A target curve for each weapon, issue #3790. The benchmark records one weapon for each unit. [Measured with the projectiles of issue #3784 and the weapons of issue #3790](#measured-with-the-projectiles-of-issue-3784-and-the-weapons-of-issue-3790) has what it came to.
 
 ### Where Splinter Faction's pose keys went
 
@@ -811,6 +811,72 @@ The track cannot say which script turned a piece, so "a piece no weapon turns" i
 In Splinter Faction the four pieces `rthigh`, `rfoot`, `pelvis` and `rleg` of `fedstorm` hold 123,774 of the 125,204 keys, and its `turret` and `barrel1` hold 1,140. In BAR the pieces named `base`, `pelvis` and `torso` hold 276,748 of the 480,861, and the pieces named `turret` hold 21,173.
 
 Whether to record such pieces at all is issue #3941.
+
+## Measured with the projectiles of issue #3784 and the weapons of issue #3790
+
+Nothing in the thinning changed for these two issues. `coilbox-track-thin` made a track from `bar-4.dump` and `sf-4.dump` again on 13 October 2026, and each came out byte for byte the same as the track of the section above: 4,713,582 bytes for BAR and 289,328 for Splinter Faction. So the largest BAR window is still 454,968 bytes decompressed.
+
+The section sizes below are from the `section_bytes` example in `coilbox-track-thin`. It reads each window's main chunk, puts the columns of one section in a chunk of its own, compresses it at level 9 and adds up the windows. It also writes each window again from its keys, and gets the same bytes as the file has: 4,470,488 for BAR and 277,633 for Splinter Faction. The earlier tables on this page that say "compressed on their own" came from scripts that are not in the repository, and this method does not give the same figure for the projectile and target sections: 722,410 bytes for BAR projectiles here, where the section for #3782 has 693,276. Compare the figures in this section with each other and not with those.
+
+### Projectiles
+
+Keys at a tolerance of 0.5 elmo. "Straight lines" is the throwaway thinner in the first comment on #3784, run on the raw samples of the same two matches with keys rounded to the track's steps. The crate has no straight line thinning, so the straight line figure is a key count only and has no byte figure of its own.
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Projectile samples in the dump | 480,653 | 26,859 |
+| Keys with straight lines | 146,192 | 5,836 |
+| Keys with the cubic, kept | 54,654 | 1,769 |
+| Keys with the cubic, written to the file | 55,158 | 1,773 |
+| Projectile entries written | 21,113 | 631 |
+| Projectile columns before compression | 1,640,420 bytes | 51,808 bytes |
+| Projectile columns compressed on their own | 722,410 bytes | 24,024 bytes |
+| The track | 4,713,582 bytes | 289,328 bytes |
+| Furthest projectile sample from the track | 0.49983939 elmo | 0.49954246 elmo |
+
+The cubic keeps 37.4% of the keys straight lines needed for BAR and 30.3% for Splinter Faction. `54,654 / 146,192` and `1,769 / 5,836`.
+
+### Projectile velocity
+
+The tolerance covers position only. `coilbox-track-thin` now also measures, for every recorded projectile sample thinning dropped, the distance between the recorded velocity and the slope of the track's curve, in elmos per frame. A sample that is a key holds the velocity it was given, to within rounding, so it is not counted. The report prints the worst as "projectile velocity".
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Worst velocity error at a dropped sample | 929.996 elmos per frame, projectile 2658 on frame 31544 | 0.4927 elmo per frame, projectile 466 on frame 23036 |
+| Checks of a dropped sample, counted once for each window it is in | 425,999 | 25,090 |
+| Of them over 0.5 elmo per frame | 11,798 | 0 |
+| Of them over 100 elmos per frame | 10,253 | 0 |
+| Median error | 0.061 | 0.048 |
+| 99th percentile | 480.2 | 0.077 |
+
+The counts and percentiles are from a temporary line that printed each check, taken out again. The worst figures are the ones the report prints.
+
+Splinter Faction is well under half an elmo a frame. BAR is not, and the cause is not noise. The samples with a large error are projectiles whose position does not move while their recorded velocity is large. On frames 31543 to 31548 one place in the dump has several projectiles of weapon definition 217 with the same position and the same velocity of about 620 elmos per frame. The weapons with the most checks over 0.5 are named `corllt_cor_lightlaser`, `corhllt_hllt_top`, `armwar_armwar_laser`, `corhal_cor_canlaser`, `corexp_hllt_bottom`, `corhllt_hllt_bottom`, `corerad_cor_erad` and `armsh_armsh_weapon`. Several are lasers by name. What the engine puts in a beam's velocity was not looked up.
+
+Two keys with the same position and velocity are not flat between them. The curve swings away from the position and is back on it half way between the keys, whatever the gap. The slope there is -0.5 of the velocity at the keys, so a dropped frame in the middle is 1.5 times the velocity away. Position is right and velocity is not.
+
+No bound was added. A bound is only worth having if it comes from what playback does with the velocity, and playback does not exist yet. The nearest ground is that a velocity error that lasts one frame moves a projectile by that distance, which would make 0.5 elmo per frame the limit. BAR is over that limit at 11,798 checks, and the ones looked at were projectiles that a velocity does not move, so the limit would force keys for no reason that can be named yet. Velocity is stored and read back, and its worst error is reported.
+
+### Target tracks for every weapon
+
+Before issue #3790 a unit had target tracks for its first weapon and for builder work. Now it has one for each weapon that had a target in the window. The "before" figures are what the file would hold without the tracks for weapon 2 and above. They come from taking those tracks out of each window as read and writing the window again, so they are the file as it would have been if the recorder had stopped at the first weapon. Builder work is weapon 0 and stays. The target columns are 10, which counts each unit's tracks, and 40 to 48.
+
+| | BAR | Splinter Faction |
+| --- | --- | --- |
+| Target tracks and keys written, with every weapon | 3,769 and 26,984 | 83 and 1,663 |
+| Of them for a weapon after the first | 324 and 2,027 | 0 and 0 |
+| Target columns before compression, first weapon only | 243,780 bytes | 16,712 bytes |
+| Target columns before compression, every weapon | 261,000 bytes | 16,712 bytes |
+| Target columns compressed on their own, first weapon only | 66,240 bytes | 3,755 bytes |
+| Target columns compressed on their own, every weapon | 69,946 bytes | 3,755 bytes |
+| Main chunks compressed, first weapon only | 4,466,579 bytes | 277,633 bytes |
+| Main chunks compressed, every weapon | 4,470,488 bytes | 277,633 bytes |
+
+Weapons after the first cost the BAR track 3,909 bytes of main chunks, which is 0.08% of its 4,713,582. They cost the Splinter Faction track nothing, since none of its units had a target on a second weapon.
+
+The file stores each chunk in whole blocks of 64 bytes, so the difference in the size of the file can be up to 63 bytes a window different from the difference in main chunks. The track as it is, 4,713,582 and 289,328 bytes, is the "after".
+
+A unit with one weapon has one target track, and a second weapon that never had a target has none. The tests `a_unit_with_one_weapon_costs_one_target_track_and_a_weapon_without_a_target_none` and `two_weapons_aimed_at_different_targets_each_have_a_target_curve` in `coilbox-track-thin` check both. The second also covers a weapon aimed at a projectile and at a position, which neither benchmark recording has.
 
 ## Savings considered and rejected
 

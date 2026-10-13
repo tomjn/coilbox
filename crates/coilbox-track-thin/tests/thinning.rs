@@ -2,7 +2,7 @@
 
 mod common;
 
-use coilbox_track::{transform_at, Quantiser};
+use coilbox_track::{projectile_at, transform_at, Quantiser, TrackReader};
 use coilbox_track_thin::{check_track, thin_dump, ThinError, ThinOptions, ThinReport};
 use common::*;
 
@@ -102,6 +102,107 @@ fn a_weapon_target_is_kept_only_when_it_changes() {
     assert_eq!(second.keys[1].kind, 128);
     assert_eq!(second.keys[1].position, [2480, 44, 960]);
     assert_eq!(report.kept.target, 3);
+}
+
+#[test]
+fn two_weapons_aimed_at_different_targets_each_have_a_target_curve() {
+    let mut scene = Scene::new(300);
+    scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+    scene.unit(2, 1, 0, 300, |_| At::place(300.0, 0.0, 100.0));
+    scene.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+    scene.projectile(9, 1, 2, 40, 60, |f| {
+        ([300.0 + f as f32, 40.0, 100.0], [1.0, 0.0, 0.0])
+    });
+    // Weapon 1 takes unit 2 and lets go of it on frame 120.
+    scene.frame(30).targets.push([1.0, 1.0, 1.0, 2.0, 0.0, 0.0]);
+    scene
+        .frame(120)
+        .targets
+        .push([1.0, 1.0, 0.0, 0.0, 0.0, 0.0]);
+    // Weapon 2 takes unit 3, then the projectile, which is gone after frame
+    // 60, then a place.
+    scene.frame(35).targets.push([1.0, 2.0, 1.0, 3.0, 0.0, 0.0]);
+    scene.frame(45).targets.push([1.0, 2.0, 3.0, 9.0, 0.0, 0.0]);
+    scene
+        .frame(90)
+        .targets
+        .push([1.0, 2.0, 2.0, 700.0, 12.0, 160.0]);
+
+    let dir = tempfile::tempdir().unwrap();
+    let (dump, path) = scene.write(dir.path());
+    let report = thin_dump(&dump, &path, &ThinOptions::default()).unwrap();
+    let read = read_track(&path);
+    let unit = read.unit(0, 1);
+
+    assert_eq!(unit.targets.len(), 2);
+    assert_eq!(report.kept.target_tracks, 2);
+    let (first, second) = (&unit.targets[0], &unit.targets[1]);
+    assert_eq!((first.weapon, second.weapon), (1, 2));
+    // Each track starts with the key a window starts with, no target.
+    assert_eq!(frames(&first.keys), [0, 30, 120]);
+    assert_eq!(
+        first.keys.iter().map(|k| k.kind).collect::<Vec<_>>(),
+        [0, 1, 0]
+    );
+    assert_eq!(frames(&second.keys), [0, 35, 45, 61, 90]);
+    assert_eq!(
+        second.keys.iter().map(|k| k.kind).collect::<Vec<_>>(),
+        [0, 1, 4, 0, 128]
+    );
+    // Neither track's keys name what the other's do.
+    let engine_id = |key: &coilbox_track::TargetKey| {
+        read.windows[0].units[key.reference as usize].unit.engine_id
+    };
+    assert_eq!(engine_id(&first.keys[1]), 2);
+    assert_eq!(engine_id(&second.keys[1]), 3);
+    let projectile = &read.windows[0].projectiles[second.keys[2].reference as usize];
+    assert_eq!(projectile.projectile.first_frame, 40);
+    // A weapon aimed at a place keeps the place.
+    assert_eq!(second.keys[4].position, [5600, 96, 1280]);
+
+    // A reader that asks for frame 50 gets both weapons' targets, and for
+    // frame 100 the first weapon's unit and the second weapon's place.
+    let mut reader = TrackReader::open(std::fs::File::open(&path).unwrap()).unwrap();
+    let held_by = |frame: u32, reader: &mut TrackReader<std::fs::File>| {
+        let state = reader.sample(frame).unwrap();
+        let unit = state.units.iter().find(|u| u.engine_id == 1).unwrap();
+        unit.targets
+            .iter()
+            .map(|t| (t.weapon, t.kind))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(held_by(50, &mut reader), [(1, 1), (2, 4)]);
+    assert_eq!(held_by(100, &mut reader), [(1, 1), (2, 128)]);
+    assert_eq!(held_by(150, &mut reader), [(1, 0), (2, 128)]);
+}
+
+#[test]
+fn a_unit_with_one_weapon_costs_one_target_track_and_a_weapon_without_a_target_none() {
+    let aimed = |scene: &mut Scene| {
+        scene.unit(1, 1, 0, 300, |_| At::place(100.0, 0.0, 100.0));
+        scene.unit(2, 1, 0, 300, |_| At::place(300.0, 0.0, 100.0));
+        scene.frame(30).targets.push([1.0, 1.0, 1.0, 2.0, 0.0, 0.0]);
+    };
+    // Unit 1 has the one weapon. Unit 3 has a second weapon that the
+    // recorder has said has no target.
+    let mut with = Scene::new(300);
+    aimed(&mut with);
+    with.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+    with.frame(10).targets.push([3.0, 2.0, 0.0, 0.0, 0.0, 0.0]);
+    let mut without = Scene::new(300);
+    aimed(&mut without);
+    without.unit(3, 1, 0, 300, |_| At::place(500.0, 0.0, 100.0));
+
+    let (report, read) = thin(&with);
+    assert_eq!(read.unit(0, 1).targets.len(), 1);
+    assert_eq!(read.unit(0, 1).targets[0].weapon, 1);
+    assert!(read.unit(0, 3).targets.is_empty());
+    assert_eq!(report.kept.target_tracks, 1);
+    assert_eq!(report.written.target_tracks, 1);
+
+    // The second weapon adds nothing to the file.
+    let (bare, _) = thin(&without);
+    assert_eq!(report.bytes, bare.bytes);
 }
 
 #[test]
@@ -211,6 +312,119 @@ fn a_projectile_id_is_a_new_projectile_when_it_was_gone_or_is_not_the_same() {
     for p in &read.windows[0].projectiles {
         assert_eq!(p.projectile.keys.len(), 2);
     }
+}
+
+#[test]
+fn a_shell_under_constant_gravity_keeps_two_keys_and_is_within_tolerance_everywhere() {
+    let mut scene = Scene::new(200);
+    scene.unit(1, 1, 0, 200, |_| At::place(100.0, 0.0, 100.0));
+    // Fired forward at 8 elmos a frame along x and up at 6, with its upward
+    // speed falling by 0.2 elmos a frame every frame, for 90 frames.
+    let (from, to, gravity) = (10u32, 100u32, -0.2f32);
+    let flight = |f: u32| {
+        let t = (f - from) as f32;
+        (
+            [
+                100.0 + 8.0 * t,
+                5.0 + 6.0 * t + 0.5 * gravity * t * t,
+                100.0,
+            ],
+            [8.0, 6.0 + gravity * t, 0.0],
+        )
+    };
+    scene.projectile(9, 1, 1, from, to, flight);
+    let (report, read) = thin(&scene);
+
+    let projectiles = &read.windows[0].projectiles;
+    assert_eq!(projectiles.len(), 1);
+    let keys = &projectiles[0].projectile.keys;
+    assert_eq!(frames(keys), [from, to]);
+    assert_eq!(report.kept.projectile, 2);
+
+    // Every recorded frame, not only the ones thinning dropped.
+    let q = quantiser(&read);
+    let mut worst = 0.0f64;
+    for f in from..=to {
+        let (p, _) = projectile_at(keys, &q, f).unwrap();
+        let (recorded, _) = flight(f);
+        let off = (0..3)
+            .map(|i| (p[i] - recorded[i] as f64).powi(2))
+            .sum::<f64>()
+            .sqrt();
+        worst = worst.max(off);
+    }
+    assert!(
+        worst <= 0.5,
+        "furthest recorded frame is {worst} elmos away"
+    );
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_missile_that_changes_direction_keeps_a_key_at_the_turn() {
+    let mut scene = Scene::new(200);
+    scene.unit(1, 1, 0, 200, |_| At::place(100.0, 0.0, 100.0));
+    // Flies along x at 6 elmos a frame, and on frame 60 is flying along z at
+    // 6 elmos a frame, with nothing in between.
+    let turn = 60u32;
+    let flight = |f: u32| {
+        if f <= turn {
+            ([100.0 + 6.0 * f as f32, 50.0, 100.0], [6.0, 0.0, 0.0])
+        } else {
+            (
+                [
+                    100.0 + 6.0 * turn as f32,
+                    50.0,
+                    100.0 + 6.0 * (f - turn) as f32,
+                ],
+                [0.0, 0.0, 6.0],
+            )
+        }
+    };
+    scene.projectile(9, 1, 1, 20, 100, flight);
+    let (report, read) = thin(&scene);
+
+    let keys = &read.windows[0].projectiles[0].projectile.keys;
+    // Without a key at the turn, one cubic from the first frame to the last
+    // cuts the corner by tens of elmos. The velocity changes between frame 60
+    // and frame 61, so the curve needs a key on each side of the change.
+    let kept = frames(keys);
+    assert!(kept.contains(&turn), "{kept:?}");
+    assert!(kept.contains(&(turn + 1)), "{kept:?}");
+    let q = quantiser(&read);
+    let (at, _) = projectile_at(keys, &q, turn).unwrap();
+    assert_eq!(at, [460.0, 50.0, 100.0]);
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+}
+
+#[test]
+fn a_velocity_the_position_does_not_follow_is_reported_and_does_not_fail_the_track() {
+    let mut scene = Scene::new(100);
+    scene.unit(1, 1, 0, 100, |_| At::place(100.0, 0.0, 100.0));
+    // A beam, as the benchmark recordings have them: it stays where it was
+    // fired from, and the engine gives it a velocity along the beam.
+    scene.projectile(9, 1, 1, 10, 16, |_| {
+        ([100.0, 50.0, 100.0], [0.0, 0.0, 600.0])
+    });
+    // A shell that moves as fast as its velocity says.
+    scene.projectile(10, 1, 1, 10, 16, |f| {
+        (
+            [100.0, 50.0, 100.0 + 6.0 * (f - 10) as f32],
+            [0.0, 0.0, 6.0],
+        )
+    });
+    let (report, read) = thin(&scene);
+    assert!(report.worst_error() <= 0.5, "{}", report.worst_error());
+
+    let velocity = report.worst.projectile_velocity.as_ref().unwrap();
+    // Two keys with the same position and velocity, two frames apart, hold
+    // the position half way between them. The slope there is -0.5 of the
+    // velocity at the keys, so the recorded 600 is 900 away from it.
+    assert!((velocity.error - 900.0).abs() < 0.01, "{velocity}");
+    assert_eq!(velocity.what, "projectile 0");
+    // The shell's velocity is followed by its two keys and does not count.
+    let shell = &read.windows[0].projectiles[1].projectile;
+    assert_eq!(frames(&shell.keys), [10, 16]);
 }
 
 #[test]
